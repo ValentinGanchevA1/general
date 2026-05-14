@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem C:\\\\Users\\\\vganc\\\\g88\\\\packages\\\\shared -Recurse | Where-Object { -not $_.PSIsContainer } | Select-Object FullName)"
+    ]
+  }
+}

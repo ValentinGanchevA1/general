@@ -1,0 +1,17 @@
+{
+  "name": "g88",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter @g88/shared run build && pnpm -r --filter !@g88/shared run build",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
