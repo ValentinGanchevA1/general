@@ -1,7 +1,7 @@
 # STATUS — G88 Reconciliation & P1
 
-> **Last updated:** 2026-05-14
-> **Current phase:** R1 (Reconcile) — about to start
+> **Last updated:** 2026-05-20
+> **Current phase:** R3 complete — P0 mobile done
 > **Owner:** [your name]
 >
 > Update this file as work progresses. It's the single source of truth for "where are we?".
@@ -15,11 +15,11 @@ The only six things that must ship cleanly for "P1 done":
 | # | Pillar | State | Blocker | Owner | Notes |
 |---|---|---|---|---|---|
 | 1 | **Auth** (email/pw + OAuth) | ⚠️ Partial | OAuth endpoints missing; refresh-token rotation not DB-stored | — | Email/pw works end-to-end; see `apps/backend/src/modules/auth/` |
-| 2 | **Profile** | ❌ Not started in `apps/` | `users` module + S3 upload + mobile screens all need rebuild | — | Reference: `legacy/mobile/src/features/profile/` |
+| 2 | **Profile** | 🟦 Done | — | — | `PATCH /users/me/profile`, S3 presigned URL, ProfileCreation/Edit/Screen done |
 | 3 | **Map discovery** | ✅ Shipping | None | — | H3 + server-side clustering done. Viewport-diff (1.5) deferred. |
-| 4 | **Presence** | ⚠️ Partial | `presence:delta` not emitted; only ZSET writes work | — | See gap **Pr1** below |
-| 5 | **Wave** | ⚠️ Partial | Sender identity hardcoded empty in notification | — | See gap **W1** below |
-| 6 | **Chat** | ❌ Not shipping | Messages not persisted; no mobile UI | — | See gaps **C1–C6** below |
+| 4 | **Presence** | 🟦 Done | — | — | `presence:delta` emitted on cell boundary cross |
+| 5 | **Wave** | 🟦 Done | — | — | Sender fully hydrated; FCM fallback wired |
+| 6 | **Chat** | 🟦 Done | — | — | Persist + REST + mobile Inbox + ChatScreen |
 
 **Legend:** ✅ shipping · ⚠️ partial · ❌ blocked / not started · 🟦 done & verified
 
@@ -34,9 +34,9 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 | C1 | Chat | `apps/backend/src/realtime/realtime.gateway.ts:onChatSend` | `id: 'TODO_persisted_id'` — messages emit but never persist | M | ✅ R2 |
 | C2 | Chat | (missing) `apps/backend/src/modules/chat/chat.service.ts` | No service writes `messages` table | M | ✅ R2 |
 | C3 | Chat | (missing) `apps/backend/src/modules/chat/chat.controller.ts` | No `GET /conversations`, `GET /conversations/:id/messages` | S | ✅ R2 |
-| C4 | Chat | (missing) `apps/mobile/src/screens/{InboxScreen,ChatScreen}.tsx` | No mobile UI for chat | L | → R3 |
+| C4 | Chat | (missing) `apps/mobile/src/screens/{InboxScreen,ChatScreen}.tsx` | No mobile UI for chat | L | ✅ R3 |
 | P1 | Profile | (missing) `apps/backend/src/modules/users/` | No `PATCH /users/me/profile`, no profile completion endpoint | M | ✅ R2 |
-| P2 | Profile | (missing) `apps/mobile/src/screens/ProfileCreationScreen.tsx` | No mobile screen; auth gate in `AppNavigator` not implemented | L | → R3 |
+| P2 | Profile | (missing) `apps/mobile/src/screens/ProfileCreationScreen.tsx` | No mobile screen; auth gate in `AppNavigator` not implemented | L | ✅ R3 |
 | P3 | Profile | (missing) `apps/backend/src/common/s3.service.ts` (or similar) | No presigned URL endpoint for avatar upload | S | ✅ R2 |
 | W1 | Wave | `apps/backend/src/realtime/realtime.gateway.ts:emitWaveReceived` | Hardcodes `displayName: '', avatarUrl: null` — recipient sees empty notification | S | ✅ R2 |
 | Pr1 | Presence | `apps/backend/src/realtime/realtime.gateway.ts` | No emitter for `presence:delta`. ZSETs updated; rooms joined; nothing broadcasts the delta. | M | ✅ R2 |
@@ -57,7 +57,7 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 | C6 | Chat | Mobile outbox — retry queue for messages sent during socket disconnect | M |
 | M1 | Map | Viewport-diff protocol (`ARCHITECTURE.md §3.7`) — full responses on every pan are wasteful at city density | M |
 | A3 | Auth | Hardcoded dev-secret fallbacks in `auth.service.ts` source — remove, require env vars in non-dev | S |
-| A4 | Auth | `isAuthEndpoint` in `apps/mobile/src/api/client.ts` checks `/auth/signup`, backend uses `/auth/register`. Cosmetic. | XS |
+| A4 | Auth | `isAuthEndpoint` in `apps/mobile/src/api/client.ts` checks `/auth/signup`, backend uses `/auth/register`. Cosmetic. | XS | ✅ R3 |
 
 **Fix size legend:** XS <1h · S 1–4h · M 0.5–1d · L 1–3d
 
@@ -94,21 +94,21 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 | `auth/AuthScreen` | PORT | ❌ not started | UI is logic-free; quick port |
 | `map/*` | DROP | n/a | New `apps/mobile/src/screens/MapScreen.tsx` is better |
 | `discovery/*` (swipe) | DEFER | — | |
-| `profile/Profile{Creation,Edit}Screen` | PORT | ❌ not started | P0 |
-| `profile/types.ts` | REBUILD in `@g88/shared` | ❌ not started | Types belong in shared package |
-| `chat/ChatScreen` | PORT | ❌ not started | UI reusable; swap thunks for socket+axios |
-| `chat/chatSlice` | REBUILD | ❌ not started | Old REST routes don't exist in new layout |
+| `profile/Profile{Creation,Edit}Screen` | PORT | ✅ R3 done | profileSlice, ProfileCreationScreen, ProfileEditScreen, ProfileScreen |
+| `profile/types.ts` | REBUILD in `@g88/shared` | ✅ R2/R3 done | `UserProfile`, `UpdateProfileRequest` in `packages/shared/src/api.ts` |
+| `chat/ChatScreen` | PORT | ✅ R3 done | ChatScreen with optimistic send + cursor pagination |
+| `chat/chatSlice` | REBUILD | ✅ R3 done | Socket ack + REST fallback; `messageReceived / messageSentOptimistic / messageConfirmed` |
 | `interactions/interactionsSlice` | DROP | n/a | Wave logic now lives in `MapScreen` directly |
 | `verification/*` | DEFER | — | |
 | `trading/*`, `gifts/*`, `gamification/*`, `events/*`, `trending/*`, `payments/*`, `market/*` | DEFER | — | |
-| `notifications/NotificationsScreen` | PARTIAL PORT | ❌ not started | Strip geofence UI; keep waves + unread chat count |
-| `inbox/InboxScreen` | REBUILD | ❌ not started | Conversation list — P0 |
-| `settings/{Settings,Privacy}Screen` | PORT | ❌ not started | Logout + visibility toggle required for P1 |
-| `components/ErrorBoundary`, `ScreenErrorBoundary` | PORT | ❌ not started | Generic, high reuse |
+| `notifications/NotificationsScreen` | PARTIAL PORT | DEFER | Not P0 |
+| `inbox/InboxScreen` | REBUILD | ✅ R3 done | InboxScreen with enriched ConversationSummary + socket refresh |
+| `settings/{Settings,Privacy}Screen` | PORT | ✅ R3 done | SettingsScreen: visibility toggle + logout |
+| `components/ErrorBoundary`, `ScreenErrorBoundary` | PORT | ✅ R3 done | `apps/mobile/src/components/ErrorBoundary.tsx` |
 | `components/ActionHub` (center FAB) | DEFER | — | P1 tab bar = Map · Inbox · Profile, no FAB |
 | `components/VerificationBadge`, `SocialLinksDisplay` | DEFER | — | |
-| `utils/eventBus` | PARTIAL — reconcile with `authEvents` in new `client.ts` | ❌ not started | |
-| `utils/logger` | PORT | ❌ not started | If not yet in new layout |
+| `utils/eventBus` | reconciled | ✅ R3 done | `authEvents` in `client.ts` is the bus; no separate eventBus needed |
+| `utils/logger` | DEFER | — | `console.*` used for now; production silencing is C3 debt |
 
 ---
 

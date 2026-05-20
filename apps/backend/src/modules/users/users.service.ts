@@ -11,6 +11,7 @@ interface UserRow {
   avatar_url: string | null;
   bio: string | null;
   verification_level: string;
+  visibility: 'public' | 'private';
 }
 
 @Injectable()
@@ -19,7 +20,7 @@ export class UsersService {
 
   async findById(id: string): Promise<AuthenticatedUser | null> {
     const rows = await this.db.query<UserRow[]>(
-      `SELECT id, email, display_name, avatar_url, bio, verification_level
+      `SELECT id, email, display_name, avatar_url, bio, verification_level, visibility
          FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
       [id],
     );
@@ -29,7 +30,7 @@ export class UsersService {
 
   async getProfile(userId: string): Promise<UserProfile> {
     const rows = await this.db.query<UserRow[]>(
-      `SELECT id, email, display_name, avatar_url, bio, verification_level
+      `SELECT id, email, display_name, avatar_url, bio, verification_level, visibility
          FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
       [userId],
     );
@@ -53,6 +54,10 @@ export class UsersService {
       params.push(req.avatarUrl);
       setClauses.push(`avatar_url = $${params.length}`);
     }
+    if (req.visibility !== undefined) {
+      params.push(req.visibility);
+      setClauses.push(`visibility = $${params.length}`);
+    }
 
     if (setClauses.length === 0) return this.getProfile(userId);
 
@@ -60,7 +65,7 @@ export class UsersService {
     const rows = await this.db.query<UserRow[]>(
       `UPDATE users SET ${setClauses.join(', ')}
           WHERE id = $1 AND deleted_at IS NULL
-       RETURNING id, email, display_name, avatar_url, bio, verification_level`,
+       RETURNING id, email, display_name, avatar_url, bio, verification_level, visibility`,
       params,
     );
     if (!rows[0]) throw new NotFoundException({ code: 'users.not_found', message: 'User not found' });
@@ -81,7 +86,8 @@ export class UsersService {
     return {
       ...this.toPublic(r),
       bio: r.bio,
-      profileComplete: r.bio != null && r.avatar_url != null,
+      visibility: r.visibility,
+      profileComplete: r.bio != null,
     };
   }
 }

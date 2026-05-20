@@ -121,11 +121,13 @@ export interface UpdateProfileRequest {
   displayName?: string;
   bio?: string;
   avatarUrl?: string;
+  visibility?: 'public' | 'private';
 }
 
 export interface UserProfile extends AuthenticatedUser {
   bio: string | null;
-  /** true when bio IS NOT NULL AND avatarUrl IS NOT NULL */
+  visibility: 'public' | 'private';
+  /** true when bio IS NOT NULL */
   profileComplete: boolean;
 }
 
@@ -146,9 +148,16 @@ export interface ChatMessage {
   createdAt: string;  // ISO
 }
 
+export interface ConversationParticipant {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
 export interface ConversationSummary {
   id: string;
   participantIds: string[];
+  participants: ConversationParticipant[];
   lastMessageAt: string | null;
   lastMessage: { senderId: string; body: string } | null;
 }

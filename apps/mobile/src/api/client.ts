@@ -82,7 +82,7 @@ async function refreshOnce(): Promise<AuthTokens | null> {
 
 function isAuthEndpoint(url?: string): boolean {
   if (!url) return false;
-  return url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/signup');
+  return url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/register');
 }
 
 function normalizeError(err: unknown): ApiError {
@@ -102,11 +102,11 @@ function normalizeError(err: unknown): ApiError {
   };
 }
 
-// Tiny event bus so screens/navigation can react to forced logout.
+// Tiny event bus so the navigator can react to forced logout.
 type AuthEvent = 'logout';
 class AuthEvents {
   private listeners = new Map<AuthEvent, Set<(reason: string) => void>>();
-  emit(e: AuthEvent, reason: string) {
+  emit(e: AuthEvent, reason: string): void {
     this.listeners.get(e)?.forEach((fn) => fn(reason));
   }
   on(e: AuthEvent, fn: (reason: string) => void): () => void {
@@ -117,7 +117,12 @@ class AuthEvents {
 }
 export const authEvents = new AuthEvents();
 
-// Typed convenience wrappers for the discovery + interaction endpoints.
+// ─── Typed convenience wrappers ──────────────────────────────────────────────
+
+export async function getJson<TRes>(path: string, config?: AxiosRequestConfig): Promise<TRes> {
+  const res = await api.get<TRes>(path, config);
+  return res.data;
+}
 
 export async function postJson<TReq, TRes>(
   path: string,
@@ -128,10 +133,16 @@ export async function postJson<TReq, TRes>(
   return res.data;
 }
 
-export async function getJson<TRes>(
+export async function patchJson<TReq, TRes>(
   path: string,
+  body: TReq,
   config?: AxiosRequestConfig,
 ): Promise<TRes> {
-  const res = await api.get<TRes>(path, config);
+  const res = await api.patch<TRes>(path, body, config);
+  return res.data;
+}
+
+export async function deleteJson<TRes>(path: string, config?: AxiosRequestConfig): Promise<TRes> {
+  const res = await api.delete<TRes>(path, config);
   return res.data;
 }

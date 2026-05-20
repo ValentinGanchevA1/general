@@ -6,6 +6,7 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
   PresenceUpdatePayload,
+  ChatMessageEvent,
 } from '@g88/shared';
 
 import { tokenStore } from '@/api/tokenStore';
@@ -14,38 +15,30 @@ import { Config } from '@/config';
 type G88Socket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 interface UseSocketOptions {
-  /** Auto-connect on mount. Default true. */
   autoConnect?: boolean;
 }
 
 interface UseSocketResult {
   socket: G88Socket | null;
   connected: boolean;
-  /** Subscribe to a server event with type-checked callback. Returns unsubscribe. */
   on: <E extends keyof ServerToClientEvents>(
     event: E,
     handler: ServerToClientEvents[E],
   ) => () => void;
-  /** Push a presence heartbeat. Fire from useEffect on location/AppState changes. */
   sendPresence: (payload: PresenceUpdatePayload) => Promise<{ cellId: string } | null>;
+  joinConversation: (conversationId: string) => Promise<boolean>;
+  sendMessage: (conversationId: string, body: string) => Promise<ChatMessageEvent | null>;
 }
 
 let sharedSocket: G88Socket | null = null;
 
 /**
- * Module-level shared singleton so every screen sees the same socket and
- * avoids reconnect storms. The hook just exposes the lifecycle and helpers.
- *
- * Behavior:
- *  • Lazily creates the socket the first time the hook mounts.
- *  • Reconnects on AppState 'active' transitions (RN backgrounding kills sockets).
- *  • Re-auths on reconnect using the latest access token.
- *  • Cleans up subscribers but NOT the socket itself on unmount — other screens
- *    likely still need it. The singleton survives until the user logs out.
+ * Module-level singleton so every screen shares one socket connection.
+ * Survives screen navigation. Torn down only on logout.
  */
 export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
   const { autoConnect = true } = options;
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState(sharedSocket?.connected ?? false);
   const handlersRef = useRef<Set<() => void>>(new Set());
 
   useEffect(() => {
@@ -53,7 +46,7 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
 
     let cancelled = false;
 
-    const ensureSocket = async () => {
+    const ensureSocket = async (): Promise<void> => {
       if (sharedSocket?.connected) {
         if (!cancelled) setConnected(true);
         return;
@@ -63,7 +56,6 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
 
       sharedSocket ??= io(`${Config.API_BASE_URL}/realtime`, {
         transports: ['websocket'],
-        // Auth at handshake — re-auth happens automatically on reconnect via the function form.
         auth: async (cb) => {
           const fresh = await tokenStore.getAccessToken();
           cb({ token: fresh });
@@ -76,14 +68,12 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
       sharedSocket.on('connect', () => !cancelled && setConnected(true));
       sharedSocket.on('disconnect', () => !cancelled && setConnected(false));
       sharedSocket.on('error:event', (e) => {
-        // eslint-disable-next-line no-console
         console.warn(`[socket] server error: ${e.code} ${e.message}`);
       });
     };
 
     void ensureSocket();
 
-    // Wake-from-background: reconnect if needed.
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
       if (state === 'active' && sharedSocket && !sharedSocket.connected) {
         sharedSocket.connect();
@@ -93,7 +83,6 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
     return () => {
       cancelled = true;
       sub.remove();
-      // Clean up THIS hook's subscriptions; leave the socket alive.
       handlersRef.current.forEach((unsub) => unsub());
       handlersRef.current.clear();
     };
@@ -115,25 +104,54 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
   );
 
   const sendPresence = useCallback(
-    (payload: PresenceUpdatePayload): Promise<{ cellId: string } | null> => {
-      return new Promise((resolve) => {
+    (payload: PresenceUpdatePayload): Promise<{ cellId: string } | null> =>
+      new Promise((resolve) => {
         const s = sharedSocket;
         if (!s?.connected) return resolve(null);
-        // Ack-aware emit; falls back to null after 3s.
         const timer = setTimeout(() => resolve(null), 3_000);
         s.emit('presence:update', payload, (res) => {
           clearTimeout(timer);
           resolve(res.ok ? res.data : null);
         });
-      });
-    },
+      }),
     [],
   );
 
-  return { socket: sharedSocket, connected, on, sendPresence };
+  const joinConversation = useCallback(
+    (conversationId: string): Promise<boolean> =>
+      new Promise((resolve) => {
+        const s = sharedSocket;
+        if (!s?.connected) return resolve(false);
+        const timer = setTimeout(() => resolve(false), 3_000);
+        s.emit('conversation:join', { conversationId }, (res) => {
+          clearTimeout(timer);
+          resolve(res.ok);
+        });
+      }),
+    [],
+  );
+
+  const sendMessage = useCallback(
+    (conversationId: string, body: string): Promise<ChatMessageEvent | null> =>
+      new Promise((resolve) => {
+        const s = sharedSocket;
+        if (!s?.connected) return resolve(null);
+        const timer = setTimeout(() => resolve(null), 5_000);
+        s.emit(
+          'chat:send',
+          { conversationId, body, clientMessageId: `${Date.now()}` },
+          (res) => {
+            clearTimeout(timer);
+            resolve(res.ok ? res.data : null);
+          },
+        );
+      }),
+    [],
+  );
+
+  return { socket: sharedSocket, connected, on, sendPresence, joinConversation, sendMessage };
 }
 
-/** Tear down on logout — call from the auth slice's logout reducer/saga. */
 export function disconnectSocket(): void {
   if (sharedSocket) {
     sharedSocket.removeAllListeners();
