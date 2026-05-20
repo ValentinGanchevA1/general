@@ -1,4 +1,4 @@
-import { Logger, UseGuards } from '@nestjs/common';
+import { ForbiddenException, Logger, NotFoundException, UseGuards } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -17,13 +17,13 @@ import type {
   PresenceUpdatePayload,
   ChatSendPayload,
   AckResult,
-  WaveResponse,
   WaveReceivedEvent,
   ChatMessageEvent,
 } from '@g88/shared';
 
 import { WsJwtGuard } from './ws-jwt.guard';
 import { PresenceService } from '../modules/presence/presence.service';
+import { ChatService } from '../modules/chat/chat.service';
 
 type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 type G88Socket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
@@ -31,8 +31,6 @@ type G88Socket = Socket<ClientToServerEvents, ServerToClientEvents, Record<strin
 @WebSocketGateway({
   namespace: '/realtime',
   cors: { origin: true, credentials: true },
-  // Connection state recovery means a dropped socket can re-attach within 2min
-  // and replay missed events — huge UX win on mobile networks.
   connectionStateRecovery: {
     maxDisconnectionDuration: 2 * 60 * 1000,
     skipMiddlewares: true,
@@ -45,12 +43,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   @WebSocketServer()
   server!: G88Server;
 
-  constructor(private readonly presence: PresenceService) {}
+  constructor(
+    private readonly presence: PresenceService,
+    private readonly chat: ChatService,
+  ) {}
 
   // ─── Lifecycle ───────────────────────────────────────────────────────────
 
   async handleConnection(client: G88Socket): Promise<void> {
-    // WsJwtGuard populated client.data.userId at handshake.
     const userId = client.data.userId;
     if (!userId) {
       client.disconnect(true);
@@ -64,8 +64,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   async handleDisconnect(client: G88Socket): Promise<void> {
     const userId = client.data.userId;
     if (!userId) return;
-    // Only mark offline if this was the user's LAST socket — they may have
-    // another tab/device still connected.
     const remaining = await this.server.in(this.userRoom(userId)).fetchSockets();
     if (remaining.length === 0) {
       await this.presence.markOffline(userId);
@@ -82,9 +80,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   ): Promise<AckResult<{ cellId: string }>> {
     try {
       const result = await this.presence.heartbeat(client.data.userId, payload.location);
-
-      // Swap the user into the right cell room.
       const newRoom = this.cellRoom(result.cellId);
+
+      // Swap socket into the right cell room.
       for (const room of client.data.rooms) {
         if (room.startsWith('cell:')) {
           client.leave(room);
@@ -94,10 +92,44 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       client.join(newRoom);
       client.data.rooms.add(newRoom);
 
-      return { ok: true, data: result };
+      // Emit presence:delta when the user crosses a cell boundary (gap Pr1).
+      if (result.prevCellId) {
+        this.server.to(this.cellRoom(result.prevCellId)).emit('presence:delta', {
+          cellId: result.prevCellId,
+          added: [],
+          removed: [client.data.userId],
+        });
+        this.server.to(newRoom).emit('presence:delta', {
+          cellId: result.cellId,
+          added: [{ userId: client.data.userId, lat: result.lat, lng: result.lng }],
+          removed: [],
+        });
+      }
+
+      return { ok: true, data: { cellId: result.cellId } };
     } catch (err) {
       this.logger.error(`presence:update failed: ${err}`);
       return { ok: false, code: 'presence.failed', message: 'Could not update presence' };
+    }
+  }
+
+  @SubscribeMessage('conversation:join')
+  async onConversationJoin(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() payload: { conversationId: string },
+  ): Promise<AckResult<{ joined: true }>> {
+    try {
+      const ok = await this.chat.isParticipant(payload.conversationId, client.data.userId);
+      if (!ok) {
+        return { ok: false, code: 'chat.forbidden', message: 'Not a participant' };
+      }
+      const room = this.conversationRoom(payload.conversationId);
+      client.join(room);
+      client.data.rooms.add(room);
+      return { ok: true, data: { joined: true } };
+    } catch (err) {
+      this.logger.error(`conversation:join failed: ${err}`);
+      return { ok: false, code: 'chat.failed', message: 'Could not join conversation' };
     }
   }
 
@@ -106,38 +138,31 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: G88Socket,
     @MessageBody() payload: ChatSendPayload,
   ): Promise<AckResult<ChatMessageEvent>> {
-    // ChatService persistence omitted in this skeleton — wired in InteractionsModule.
-    // The shape below shows the contract: persist, fan out, ack with the canonical message.
-    const persisted: ChatMessageEvent = {
-      id: 'TODO_persisted_id',
-      conversationId: payload.conversationId,
-      senderId: client.data.userId,
-      body: payload.body,
-      createdAt: new Date().toISOString(),
-    };
-    this.server.to(this.conversationRoom(payload.conversationId)).emit('chat:message', persisted);
-    return { ok: true, data: persisted };
+    try {
+      const msg = await this.chat.persist(
+        payload.conversationId,
+        client.data.userId,
+        payload.body,
+      );
+
+      // Fan out to everyone in the conversation room (including sender's other devices).
+      this.server.to(this.conversationRoom(payload.conversationId)).emit('chat:message', msg);
+
+      return { ok: true, data: msg };
+    } catch (err) {
+      const res = (err as any)?.response;
+      const code = res?.code ?? 'chat.failed';
+      const message = res?.message ?? (err instanceof Error ? err.message : 'Unknown error');
+      if (!(err instanceof ForbiddenException) && !(err instanceof NotFoundException)) {
+        this.logger.error(`chat:send failed: ${err}`);
+      }
+      return { ok: false, code, message };
+    }
   }
 
   // ─── Outbound APIs (called by other services) ────────────────────────────
 
-  async emitWaveReceived(
-    toUserId: string,
-    wave: WaveResponse,
-    context: 'map' | 'profile' | 'event',
-  ): Promise<void> {
-    const evt: WaveReceivedEvent = {
-      waveId: wave.id,
-      fromUser: {
-        id: wave.fromUserId,
-        // Hydrated by the InteractionsService before calling — wire up in real impl.
-        displayName: '',
-        avatarUrl: null,
-        verification: 'none',
-      },
-      context,
-      createdAt: wave.createdAt,
-    };
+  async emitWaveReceived(toUserId: string, evt: WaveReceivedEvent): Promise<void> {
     this.server.to(this.userRoom(toUserId)).emit('wave:received', evt);
   }
 

@@ -9,7 +9,8 @@
 --     automatically populates all resolutions. No app code can forget.
 --   * Soft delete via `deleted_at`. Hard-delete pipelines run weekly.
 
-CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS postgis CASCADE;
+CREATE EXTENSION IF NOT EXISTS postgis_raster CASCADE;
 CREATE EXTENSION IF NOT EXISTS h3;          -- pg_h3 from Zachary Deziel et al.
 CREATE EXTENSION IF NOT EXISTS h3_postgis;  -- glue between PostGIS and h3
 CREATE EXTENSION IF NOT EXISTS pgcrypto;    -- for gen_random_uuid()

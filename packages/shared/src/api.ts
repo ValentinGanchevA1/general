@@ -115,6 +115,57 @@ export interface LoginResponse {
   tokens: AuthTokens;
 }
 
+// ─── Profile ───────────────────────────────────────────────────────────────
+
+export interface UpdateProfileRequest {
+  displayName?: string;
+  bio?: string;
+  avatarUrl?: string;
+}
+
+export interface UserProfile extends AuthenticatedUser {
+  bio: string | null;
+  /** true when bio IS NOT NULL AND avatarUrl IS NOT NULL */
+  profileComplete: boolean;
+}
+
+export interface PresignedUploadResponse {
+  /** Presigned S3 PUT URL — expires in 5 minutes. */
+  uploadUrl: string;
+  /** Final CDN URL to store as avatarUrl after the PUT succeeds. */
+  publicUrl: string;
+}
+
+// ─── Chat (REST) ───────────────────────────────────────────────────────────
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;  // ISO
+}
+
+export interface ConversationSummary {
+  id: string;
+  participantIds: string[];
+  lastMessageAt: string | null;
+  lastMessage: { senderId: string; body: string } | null;
+}
+
+export interface MessagePage {
+  messages: ChatMessage[];
+  /** Cursor for the next page (ISO timestamp of oldest message in this page). Null = no more pages. */
+  nextCursor: string | null;
+}
+
+// ─── Notifications ─────────────────────────────────────────────────────────
+
+export interface RegisterDeviceTokenRequest {
+  token: string;
+  platform: 'ios' | 'android';
+}
+
 // ─── Error envelope ────────────────────────────────────────────────────────
 
 export interface ApiError {

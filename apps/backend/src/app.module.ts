@@ -9,6 +9,8 @@ import { UsersModule } from './modules/users/users.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
 import { InteractionsModule } from './modules/interactions/interactions.module';
 import { PresenceModule } from './modules/presence/presence.module';
+import { ChatModule } from './modules/chat/chat.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
@@ -38,6 +40,8 @@ import { RealtimeModule } from './realtime/realtime.module';
     DiscoveryModule,
     InteractionsModule,
     PresenceModule,
+    ChatModule,
+    NotificationsModule,
     RealtimeModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

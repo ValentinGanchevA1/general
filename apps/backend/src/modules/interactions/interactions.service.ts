@@ -8,22 +8,20 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
-import type { WaveRequest, WaveResponse } from '@g88/shared';
+import type { WaveRequest, WaveResponse, WaveReceivedEvent } from '@g88/shared';
 
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class InteractionsService {
   private readonly logger = new Logger(InteractionsService.name);
-  /**
-   * Anti-spam window: a user can only wave at the same target once every N hours.
-   * Prevents the "wave every 5 minutes hoping for a reply" loop.
-   */
   private static readonly REWAVE_COOLDOWN_HOURS = 24;
 
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly realtime: RealtimeGateway,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -32,14 +30,22 @@ export class InteractionsService {
    *   2. Check cooldown window.
    *   3. If target has an OUTSTANDING wave to me → reciprocal. Open a conversation.
    *   4. Otherwise → insert wave row.
-   *   5. Emit socket event to recipient. Fire push if they're offline.
+   *   5. Emit socket event to recipient (push fallback if offline).
    *
-   * The whole thing runs in a single transaction so a partial state never escapes.
+   * Runs in a single transaction so partial state never escapes.
    */
   async wave(fromUserId: string, req: WaveRequest): Promise<WaveResponse> {
     if (fromUserId === req.toUserId) {
       throw new BadRequestException({ code: 'wave.self', message: 'Cannot wave to yourself' });
     }
+
+    // Fetch sender for hydrated notification — single lookup, outside the tx.
+    const senderRows = await this.db.query<Array<{ display_name: string; avatar_url: string | null; verification_level: string }>>(
+      `SELECT display_name, avatar_url, verification_level FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+      [fromUserId],
+    );
+    if (!senderRows[0]) throw new NotFoundException({ code: 'wave.sender_missing', message: 'Sender not found' });
+    const sender = senderRows[0];
 
     return this.db.transaction(async (tx) => {
       const target = await tx.query(
@@ -50,7 +56,6 @@ export class InteractionsService {
         throw new NotFoundException({ code: 'wave.target_missing', message: 'User not found' });
       }
 
-      // Cooldown check — prevent spam-waving.
       const recent = await tx.query(
         `SELECT 1 FROM waves
           WHERE from_user_id = $1 AND to_user_id = $2
@@ -65,7 +70,6 @@ export class InteractionsService {
         });
       }
 
-      // Reciprocal? Look for an outstanding (no conversation_id yet) wave the other way.
       const reciprocal = await tx.query(
         `SELECT id FROM waves
           WHERE from_user_id = $1 AND to_user_id = $2
@@ -99,10 +103,28 @@ export class InteractionsService {
         conversationId,
       };
 
-      // Fire-and-forget realtime delivery. The gateway falls back to push if offline.
+      // Build the fully-hydrated event — gateway no longer does the lookup.
+      const evt: WaveReceivedEvent = {
+        waveId: wave.id,
+        fromUser: {
+          id: fromUserId,
+          displayName: sender.display_name,
+          avatarUrl: sender.avatar_url,
+          verification: sender.verification_level as WaveReceivedEvent['fromUser']['verification'],
+        },
+        context: req.context ?? 'map',
+        createdAt: wave.createdAt,
+      };
+
       this.realtime
-        .emitWaveReceived(req.toUserId, wave, req.context ?? 'map')
+        .emitWaveReceived(req.toUserId, evt)
         .catch((err) => this.logger.error(`emitWaveReceived failed: ${err}`));
+
+      // Push fallback: always fire — FCM is a no-op if the user is online
+      // (socket delivery takes precedence on client; push arrives as silent update).
+      this.notifications
+        .notifyWave(req.toUserId, { id: fromUserId, displayName: sender.display_name }, req.context ?? 'map')
+        .catch((err) => this.logger.error(`notifyWave failed: ${err}`));
 
       if (conversationId) {
         this.realtime
@@ -119,7 +141,6 @@ export class InteractionsService {
     participantIds: string[],
   ): Promise<string> {
     const sorted = [...participantIds].sort();
-    // Idempotent insert: if a conversation between these two already exists, return it.
     const existing = await tx.query(
       `SELECT id FROM conversations WHERE participant_ids = $1::uuid[] LIMIT 1`,
       [sorted],

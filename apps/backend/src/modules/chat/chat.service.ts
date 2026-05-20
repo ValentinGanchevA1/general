@@ -1,0 +1,138 @@
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+
+import type {
+  ChatMessage,
+  ConversationSummary,
+  MessagePage,
+} from '@g88/shared';
+
+@Injectable()
+export class ChatService {
+  constructor(@InjectDataSource() private readonly db: DataSource) {}
+
+  /**
+   * Persist a message and bump last_message_at on the conversation.
+   * Verifies the sender is a participant before inserting.
+   */
+  async persist(
+    conversationId: string,
+    senderId: string,
+    body: string,
+  ): Promise<ChatMessage> {
+    const convo = await this.db.query<Array<{ participant_ids: string[] }>>(
+      `SELECT participant_ids FROM conversations WHERE id = $1 LIMIT 1`,
+      [conversationId],
+    );
+    if (!convo[0]) throw new NotFoundException({ code: 'chat.not_found', message: 'Conversation not found' });
+    if (!convo[0].participant_ids.includes(senderId)) {
+      throw new ForbiddenException({ code: 'chat.forbidden', message: 'Not a participant' });
+    }
+
+    const [msg] = await this.db.query<ChatMessage[]>(
+      `INSERT INTO messages (conversation_id, sender_id, body)
+            VALUES ($1, $2, $3)
+         RETURNING id, conversation_id AS "conversationId", sender_id AS "senderId", body, created_at AS "createdAt"`,
+      [conversationId, senderId, body],
+    );
+
+    await this.db.query(
+      `UPDATE conversations SET last_message_at = NOW() WHERE id = $1`,
+      [conversationId],
+    );
+
+    return { ...msg!, createdAt: (msg as any).createdAt?.toISOString?.() ?? msg!.createdAt };
+  }
+
+  /** Verify membership without persisting — used by conversation:join gateway handler. */
+  async isParticipant(conversationId: string, userId: string): Promise<boolean> {
+    const rows = await this.db.query<Array<{ ok: boolean }>>(
+      `SELECT 1 FROM conversations WHERE id = $1 AND $2 = ANY(participant_ids) LIMIT 1`,
+      [conversationId, userId],
+    );
+    return rows.length > 0;
+  }
+
+  /** List conversations the user participates in, newest activity first. */
+  async findConversations(userId: string): Promise<ConversationSummary[]> {
+    const rows = await this.db.query<
+      Array<{
+        id: string;
+        participant_ids: string[];
+        last_message_at: string | null;
+        last_body: string | null;
+        last_sender_id: string | null;
+      }>
+    >(
+      `SELECT
+         c.id,
+         c.participant_ids,
+         c.last_message_at,
+         m.body       AS last_body,
+         m.sender_id  AS last_sender_id
+       FROM conversations c
+       LEFT JOIN LATERAL (
+         SELECT body, sender_id
+           FROM messages
+          WHERE conversation_id = c.id
+          ORDER BY created_at DESC
+          LIMIT 1
+       ) m ON true
+       WHERE $1 = ANY(c.participant_ids)
+       ORDER BY c.last_message_at DESC NULLS LAST`,
+      [userId],
+    );
+
+    return rows.map((r) => ({
+      id: r.id,
+      participantIds: r.participant_ids,
+      lastMessageAt: r.last_message_at ?? null,
+      lastMessage: r.last_body != null && r.last_sender_id != null
+        ? { senderId: r.last_sender_id, body: r.last_body }
+        : null,
+    }));
+  }
+
+  /**
+   * Paginated message history, newest-first.
+   * Cursor = ISO timestamp of the oldest message on the previous page.
+   * Pass `cursor` to page back in time.
+   */
+  async findMessages(
+    conversationId: string,
+    userId: string,
+    cursor?: string,
+    limit = 50,
+  ): Promise<MessagePage> {
+    if (!(await this.isParticipant(conversationId, userId))) {
+      throw new ForbiddenException({ code: 'chat.forbidden', message: 'Not a participant' });
+    }
+
+    const cap = Math.min(limit, 100);
+    const rows = await this.db.query<ChatMessage[]>(
+      `SELECT id,
+              conversation_id AS "conversationId",
+              sender_id       AS "senderId",
+              body,
+              created_at      AS "createdAt"
+         FROM messages
+        WHERE conversation_id = $1
+          ${cursor ? `AND created_at < $3` : ''}
+        ORDER BY created_at DESC
+        LIMIT $2`,
+      cursor ? [conversationId, cap + 1, cursor] : [conversationId, cap + 1],
+    );
+
+    const hasMore = rows.length > cap;
+    const page = rows.slice(0, cap).map((r) => ({
+      ...r,
+      createdAt: (r as any).createdAt?.toISOString?.() ?? r.createdAt,
+    }));
+
+    return {
+      messages: page,
+      nextCursor: hasMore ? page[page.length - 1]!.createdAt : null,
+    };
+  }
+}

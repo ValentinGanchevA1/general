@@ -31,15 +31,15 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 
 | ID | Pillar | File | Gap | Fix size |
 |---|---|---|---|---|
-| C1 | Chat | `apps/backend/src/realtime/realtime.gateway.ts:onChatSend` | `id: 'TODO_persisted_id'` — messages emit but never persist | M |
-| C2 | Chat | (missing) `apps/backend/src/modules/chat/chat.service.ts` | No service writes `messages` table | M |
-| C3 | Chat | (missing) `apps/backend/src/modules/chat/chat.controller.ts` | No `GET /conversations`, `GET /conversations/:id/messages` | S |
-| C4 | Chat | (missing) `apps/mobile/src/screens/{InboxScreen,ChatScreen}.tsx` | No mobile UI for chat | L |
-| P1 | Profile | (missing) `apps/backend/src/modules/users/` | No `PATCH /users/me/profile`, no profile completion endpoint | M |
-| P2 | Profile | (missing) `apps/mobile/src/screens/ProfileCreationScreen.tsx` | No mobile screen; auth gate in `AppNavigator` not implemented | L |
-| P3 | Profile | (missing) `apps/backend/src/common/s3.service.ts` (or similar) | No presigned URL endpoint for avatar upload | S |
-| W1 | Wave | `apps/backend/src/realtime/realtime.gateway.ts:emitWaveReceived` | Hardcodes `displayName: '', avatarUrl: null` — recipient sees empty notification | S |
-| Pr1 | Presence | `apps/backend/src/realtime/realtime.gateway.ts` | No emitter for `presence:delta`. ZSETs updated; rooms joined; nothing broadcasts the delta. | M |
+| C1 | Chat | `apps/backend/src/realtime/realtime.gateway.ts:onChatSend` | `id: 'TODO_persisted_id'` — messages emit but never persist | M | ✅ R2 |
+| C2 | Chat | (missing) `apps/backend/src/modules/chat/chat.service.ts` | No service writes `messages` table | M | ✅ R2 |
+| C3 | Chat | (missing) `apps/backend/src/modules/chat/chat.controller.ts` | No `GET /conversations`, `GET /conversations/:id/messages` | S | ✅ R2 |
+| C4 | Chat | (missing) `apps/mobile/src/screens/{InboxScreen,ChatScreen}.tsx` | No mobile UI for chat | L | → R3 |
+| P1 | Profile | (missing) `apps/backend/src/modules/users/` | No `PATCH /users/me/profile`, no profile completion endpoint | M | ✅ R2 |
+| P2 | Profile | (missing) `apps/mobile/src/screens/ProfileCreationScreen.tsx` | No mobile screen; auth gate in `AppNavigator` not implemented | L | → R3 |
+| P3 | Profile | (missing) `apps/backend/src/common/s3.service.ts` (or similar) | No presigned URL endpoint for avatar upload | S | ✅ R2 |
+| W1 | Wave | `apps/backend/src/realtime/realtime.gateway.ts:emitWaveReceived` | Hardcodes `displayName: '', avatarUrl: null` — recipient sees empty notification | S | ✅ R2 |
+| Pr1 | Presence | `apps/backend/src/realtime/realtime.gateway.ts` | No emitter for `presence:delta`. ZSETs updated; rooms joined; nothing broadcasts the delta. | M | ✅ R2 |
 
 ## P1 Gap List (close before public TestFlight)
 
@@ -47,8 +47,8 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 |---|---|---|---|---|
 | A1 | Auth | `apps/backend/src/modules/auth/auth.service.ts` | Refresh tokens are stateless JWTs. Should be opaque, DB-stored, rotating, revocable per `ARCHITECTURE.md §5`. | L |
 | A2 | Auth | `apps/backend/src/modules/auth/auth.controller.ts` | No `POST /auth/oauth/google` or `POST /auth/oauth/apple` endpoints. Apple required for App Store if any social login ships. | M |
-| C5 | Chat | `apps/backend/src/realtime/realtime.gateway.ts` | `conversation:join` handler missing (`@SubscribeMessage('conversation:join')`) | S |
-| N1 | Notifications | (missing) `apps/backend/src/modules/notifications/` | FCM token registration + send-on-offline for waves and chat | M |
+| C5 | Chat | `apps/backend/src/realtime/realtime.gateway.ts` | `conversation:join` handler missing (`@SubscribeMessage('conversation:join')`) | S | ✅ R2 |
+| N1 | Notifications | (missing) `apps/backend/src/modules/notifications/` | FCM token registration + send-on-offline for waves and chat | M | ✅ R2 |
 
 ## P2 (post-P1 hardening)
 
@@ -125,14 +125,16 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 - [ ] Commit `STATUS.md` (this file)
 - [ ] Update `ARCHITECTURE.md` change log
 
-### Phase R2 — P0 backend (3–4 days)
+### Phase R2 — P0 backend (3–4 days) — ✅ COMPLETE 2026-05-20
 
-- [ ] **P1, P3** — `apps/backend/src/modules/users/` + S3 presigned URL endpoint
-- [ ] **C2** — `apps/backend/src/modules/chat/chat.service.ts` (persist + last_message_at update)
-- [ ] **C3** — Chat REST endpoints
-- [ ] **C1** — Wire `chat.service.persist()` into `onChatSend`; kill `TODO_persisted_id`
-- [ ] **W1** — Hydrate wave sender in `emitWaveReceived` (60s Redis cache for user lookup)
-- [ ] **N1** — Notifications module: FCM registration + send-on-offline-emit-failure
+- [x] **P1, P3** — `apps/backend/src/modules/users/` + S3 presigned URL endpoint
+- [x] **C2** — `apps/backend/src/modules/chat/chat.service.ts` (persist + last_message_at update)
+- [x] **C3** — Chat REST endpoints
+- [x] **C1** — Wire `chat.service.persist()` into `onChatSend`; kill `TODO_persisted_id`
+- [x] **W1** — Hydrate wave sender in `emitWaveReceived` (lookup in InteractionsService, fully hydrated event passed to gateway)
+- [x] **N1** — Notifications module: FCM registration + send-on-offline-emit-failure
+- [x] **Pr1** — `presence:delta` emitted on cell boundary crossing
+- [x] **C5** — `conversation:join` socket handler
 
 ### Phase R3 — P0 mobile (4–5 days)
 

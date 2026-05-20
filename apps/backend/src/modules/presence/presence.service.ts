@@ -37,16 +37,19 @@ export class PresenceService {
 
   /**
    * Record a heartbeat: mark user online and add to their current cell's set.
-   * Returns the cell id so the gateway can join the matching socket room.
+   * Returns the cell id, the previous cell id (null if first heartbeat or same
+   * cell), and the fuzzed lat/lng so the gateway can emit presence:delta.
    *
    * Location is fuzzed to r10 centroid before any storage or fan-out.
    */
-  async heartbeat(userId: string, location: LatLng): Promise<{ cellId: string }> {
+  async heartbeat(
+    userId: string,
+    location: LatLng,
+  ): Promise<{ cellId: string; prevCellId: string | null; lat: number; lng: number }> {
     const fuzzed = fuzzLocation(location, 10);
     const cellId = h3.latLngToCell(fuzzed.lat, fuzzed.lng, PresenceService.PRESENCE_RES);
     const now = Date.now();
 
-    // Read previous cell so we can move the user if they crossed a cell boundary.
     const prevCellKey = `presence:user_cell:${userId}`;
     const prevCellId = await this.redis.get(prevCellKey);
 
@@ -61,7 +64,13 @@ export class PresenceService {
     }
 
     await pipe.exec();
-    return { cellId };
+
+    return {
+      cellId,
+      prevCellId: prevCellId && prevCellId !== cellId ? prevCellId : null,
+      lat: fuzzed.lat,
+      lng: fuzzed.lng,
+    };
   }
 
   /** Mark a user offline immediately (called on socket disconnect). */

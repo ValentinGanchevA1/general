@@ -8,6 +8,7 @@ import {
   type DiscoveryResponse,
   type DiscoveryPoint,
   type EntityKind,
+  type VerificationLevel,
   type Viewport,
   h3ResolutionForZoom,
   isEntityZoom,
@@ -158,7 +159,8 @@ export class DiscoveryService {
           lat: r.lat,
           lng: r.lng,
           meta: {
-            ...(r.meta as Omit<UserMetaRow, 'online'>),
+            ...(r.meta as unknown as Omit<UserMetaRow, 'online' | 'verification'>),
+            verification: (r.meta as unknown as UserMetaRow).verification as VerificationLevel,
             online: onlineSet.has(r.id),
           },
         };
@@ -169,7 +171,7 @@ export class DiscoveryService {
         lat: r.lat,
         lng: r.lng,
         meta: r.meta,
-      } as DiscoveryPoint;
+      } as unknown as DiscoveryPoint;
     });
   }
 

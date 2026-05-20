@@ -1,4 +1,8 @@
 import 'reflect-metadata';
+import { config as loadEnv } from 'dotenv';
+import { join } from 'path';
+loadEnv({ path: join(process.cwd(), '../../.env') });
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
@@ -13,7 +17,6 @@ async function bootstrap(): Promise<void> {
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
-      enableImplicitConversion: true,
     }),
   );
 

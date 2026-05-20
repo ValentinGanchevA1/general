@@ -1,0 +1,152 @@
+# ─── Dependencies ────────────────────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+jspm_packages/
+
+# ─── Build outputs ───────────────────────────────────────────────────────────
+dist/
+build/
+out/
+*.tsbuildinfo
+.nest/
+
+# ─── Environment & secrets ───────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.development
+.env.staging
+.env.production
+# Keep the committed template
+!.env.example
+
+# Certs / signing / service-account keys
+*.pem
+*.key
+*.p12
+*.p8
+*.mobileprovision
+*.keystore
+*.jks
+!debug.keystore
+serviceAccountKey.json
+firebase-adminsdk-*.json
+google-services.json
+GoogleService-Info.plist
+.sentryclirc
+.sentry-native/
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ─── Testing & coverage ──────────────────────────────────────────────────────
+coverage/
+.nyc_output/
+*.lcov
+.jest-cache/
+
+# ─── React Native (shared) ───────────────────────────────────────────────────
+.metro-health-check*
+.metro-cache/
+.expo/
+.expo-shared/
+
+# ─── Mobile: Android ─────────────────────────────────────────────────────────
+apps/mobile/android/build/
+apps/mobile/android/.gradle/
+apps/mobile/android/app/build/
+apps/mobile/android/app/release/
+apps/mobile/android/captures/
+apps/mobile/android/local.properties
+apps/mobile/android/.idea/
+apps/mobile/android/.cxx/
+apps/mobile/android/.kotlin/
+*.apk
+*.aab
+*.ap_
+
+# ─── Mobile: iOS ─────────────────────────────────────────────────────────────
+apps/mobile/ios/Pods/
+apps/mobile/ios/build/
+apps/mobile/ios/DerivedData/
+apps/mobile/ios/.xcode.env.local
+apps/mobile/ios/**/xcuserdata/
+apps/mobile/ios/**/*.xcworkspace/xcuserdata/
+xcuserdata/
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.xcuserstate
+
+# ─── Backend (NestJS) ────────────────────────────────────────────────────────
+apps/backend/dist/
+apps/backend/uploads/
+apps/backend/.tsbuildinfo
+
+# ─── Docker / local data ─────────────────────────────────────────────────────
+# Volumes are named in docker-compose.yml (postgres_data, redis_data); these
+# patterns catch stray bind-mount data dirs and local dumps.
+postgres_data/
+redis_data/
+pgdata/
+*.sql.gz
+*.dump
+*.bak
+
+# ─── IDE / Editor (user-local only — committed shared config stays) ──────────
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/shelf/
+.idea/httpRequests/
+.idea/dataSources/
+.idea/dataSources.local.xml
+.idea/sonarlint/
+*.iml.local
+*.swp
+*.swo
+*.swn
+*~
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ─── Caches / misc ───────────────────────────────────────────────────────────
+.turbo/
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+.tmp/
+tmp/
+temp/
+*.tmp
+
+# ─── Project-specific scratch ────────────────────────────────────────────────
+# Mirrors the .idea/g88.iml exclude folders
+.tmp/
+/temp/
+/tmp/
