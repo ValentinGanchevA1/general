@@ -115,3 +115,4 @@ JWT access token (15min) + opaque refresh token (30d, rotating, stored hashed in
 ## Change log
 
 - 2026-05-13 — initial draft (H3, server-side clustering, location fuzzing, two-service split).
+- **2026-05-14** — Reconciliation Phase R1. Pre-monorepo `mobile/` and `backend/` moved under `legacy/` (frozen, read-only — see `legacy/README.md`). `pnpm-workspace.yaml` excludes `legacy/**`. ESLint and CI both block imports from `legacy/`. Tagged `legacy-freeze-2026-05-14`. P1 pillar progress tracked in `STATUS.md`. Old `CLAUDE.md` replaced — see updated version.
