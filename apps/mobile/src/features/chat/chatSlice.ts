@@ -114,7 +114,7 @@ const chatSlice = createSlice({
         state.messagesLoading[action.meta.arg.conversationId] = false;
       })
 
-      .addCase(logout, () => initialState);
+      .addCase(logout.fulfilled, () => initialState);
   },
 });
 

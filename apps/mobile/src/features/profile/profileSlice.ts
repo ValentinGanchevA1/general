@@ -72,7 +72,7 @@ const profileSlice = createSlice({
         state.error = action.payload as string;
       })
       // Reset when the user logs out.
-      .addCase(logout, () => initialState);
+      .addCase(logout.fulfilled, () => initialState);
   },
 });
 
