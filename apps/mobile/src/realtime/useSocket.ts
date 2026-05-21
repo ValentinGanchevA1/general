@@ -80,11 +80,12 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
       }
     });
 
+    const handlers = handlersRef.current;
     return () => {
       cancelled = true;
       sub.remove();
-      handlersRef.current.forEach((unsub) => unsub());
-      handlersRef.current.clear();
+      handlers.forEach((unsub) => unsub());
+      handlers.clear();
     };
   }, [autoConnect]);
 

@@ -24,22 +24,7 @@ export function useUserLocation(): UseUserLocationResult {
   const [coords, setCoords] = useState<LatLng | null>(null);
   const [watchId, setWatchId] = useState<ReturnType<typeof setInterval> | null>(null);
 
-  const requestPermission = useCallback(async () => {
-    if (Platform.OS === 'android') {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: 'Location Permission',
-          message: 'G88 needs your location to show nearby people and places.',
-          buttonPositive: 'Allow',
-        },
-      );
-      if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
-    }
-    startTracking();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function startTracking() {
+  const startTracking = useCallback(() => {
     const geo = typeof navigator !== 'undefined' ? navigator.geolocation : undefined;
     if (!geo) return;
     geo.getCurrentPosition(
@@ -56,7 +41,22 @@ export function useUserLocation(): UseUserLocationResult {
       );
     }, 30_000);
     setWatchId(id);
-  }
+  }, []); // setCoords and setWatchId are stable state setters
+
+  const requestPermission = useCallback(async () => {
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: 'Location Permission',
+          message: 'G88 needs your location to show nearby people and places.',
+          buttonPositive: 'Allow',
+        },
+      );
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
+    }
+    startTracking();
+  }, [startTracking]);
 
   useEffect(() => {
     return () => {

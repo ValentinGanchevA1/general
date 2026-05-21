@@ -5,10 +5,11 @@ module.exports = {
     project: './tsconfig.json',
     tsconfigRootDir: __dirname,
   },
-  plugins: ['@typescript-eslint', 'react', 'react-native'],
+  plugins: ['@typescript-eslint', 'react', 'react-hooks', 'react-native'],
   extends: [
     'plugin:@typescript-eslint/recommended',
     'plugin:react/recommended',
+    'plugin:react-hooks/recommended',
   ],
   env: {
     'react-native/react-native': true,
