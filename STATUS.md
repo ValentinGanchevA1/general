@@ -1,7 +1,7 @@
 # STATUS — G88 Reconciliation & P1
 
-> **Last updated:** 2026-05-20
-> **Current phase:** R3 complete — P0 mobile done
+> **Last updated:** 2026-05-21
+> **Current phase:** R4 complete — all P1 pillars done
 > **Owner:** [your name]
 >
 > Update this file as work progresses. It's the single source of truth for "where are we?".
@@ -14,7 +14,7 @@ The only six things that must ship cleanly for "P1 done":
 
 | # | Pillar | State | Blocker | Owner | Notes |
 |---|---|---|---|---|---|
-| 1 | **Auth** (email/pw + OAuth) | ⚠️ Partial | OAuth endpoints missing; refresh-token rotation not DB-stored | — | Email/pw works end-to-end; see `apps/backend/src/modules/auth/` |
+| 1 | **Auth** (email/pw + OAuth) | 🟦 Done | — | — | Email/pw + Google OAuth; opaque DB-stored rotating refresh tokens; Apple OAuth deferred (fast-follow before App Store) |
 | 2 | **Profile** | 🟦 Done | — | — | `PATCH /users/me/profile`, S3 presigned URL, ProfileCreation/Edit/Screen done |
 | 3 | **Map discovery** | ✅ Shipping | None | — | H3 + server-side clustering done. Viewport-diff (1.5) deferred. |
 | 4 | **Presence** | 🟦 Done | — | — | `presence:delta` emitted on cell boundary cross |
@@ -29,8 +29,8 @@ The only six things that must ship cleanly for "P1 done":
 
 Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 
-| ID | Pillar | File | Gap | Fix size |
-|---|---|---|---|---|
+| ID | Pillar | File | Gap | Fix size | |
+|---|---|---|---|---|---|
 | C1 | Chat | `apps/backend/src/realtime/realtime.gateway.ts:onChatSend` | `id: 'TODO_persisted_id'` — messages emit but never persist | M | ✅ R2 |
 | C2 | Chat | (missing) `apps/backend/src/modules/chat/chat.service.ts` | No service writes `messages` table | M | ✅ R2 |
 | C3 | Chat | (missing) `apps/backend/src/modules/chat/chat.controller.ts` | No `GET /conversations`, `GET /conversations/:id/messages` | S | ✅ R2 |
@@ -43,21 +43,22 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 
 ## P1 Gap List (close before public TestFlight)
 
-| ID | Pillar | File | Gap | Fix size |
-|---|---|---|---|---|
-| A1 | Auth | `apps/backend/src/modules/auth/auth.service.ts` | Refresh tokens are stateless JWTs. Should be opaque, DB-stored, rotating, revocable per `ARCHITECTURE.md §5`. | L |
-| A2 | Auth | `apps/backend/src/modules/auth/auth.controller.ts` | No `POST /auth/oauth/google` or `POST /auth/oauth/apple` endpoints. Apple required for App Store if any social login ships. | M |
+| ID | Pillar | File | Gap | Fix size | |
+|---|---|---|---|---|---|
+| A1 | Auth | `apps/backend/src/modules/auth/auth.service.ts` | Refresh tokens are stateless JWTs. Should be opaque, DB-stored, rotating, revocable per `ARCHITECTURE.md §5`. | L | ✅ R4 |
+| A2 | Auth | `apps/backend/src/modules/auth/auth.controller.ts` | No `POST /auth/oauth/google`. Apple deferred — required before App Store if social login ships. | M | ✅ R4 (Google); Apple = fast-follow |
 | C5 | Chat | `apps/backend/src/realtime/realtime.gateway.ts` | `conversation:join` handler missing (`@SubscribeMessage('conversation:join')`) | S | ✅ R2 |
 | N1 | Notifications | (missing) `apps/backend/src/modules/notifications/` | FCM token registration + send-on-offline for waves and chat | M | ✅ R2 |
 
 ## P2 (post-P1 hardening)
 
-| ID | Pillar | Gap | Fix size |
-|---|---|---|---|
-| C6 | Chat | Mobile outbox — retry queue for messages sent during socket disconnect | M |
-| M1 | Map | Viewport-diff protocol (`ARCHITECTURE.md §3.7`) — full responses on every pan are wasteful at city density | M |
-| A3 | Auth | Hardcoded dev-secret fallbacks in `auth.service.ts` source — remove, require env vars in non-dev | S |
-| A4 | Auth | `isAuthEndpoint` in `apps/mobile/src/api/client.ts` checks `/auth/signup`, backend uses `/auth/register`. Cosmetic. | XS | ✅ R3 |
+| ID | Pillar | Gap | Fix size | |
+|---|---|---|---|---|
+| A3 | Auth | Apple Sign-In (`POST /auth/oauth/apple`) — required by App Store before any social login ships | M | next up |
+| C6 | Chat | Mobile outbox — retry queue for messages sent during socket disconnect | M | |
+| M1 | Map | Viewport-diff protocol (`ARCHITECTURE.md §3.7`) — full responses on every pan are wasteful at city density | M | |
+| A4 | Auth | Hardcoded dev-secret fallbacks in `auth.service.ts` source — remove, require env vars in non-dev | S | |
+| OB1 | Observability | Sentry on both apps — minimum bar before public TestFlight (C3 critical debt) | M | |
 
 **Fix size legend:** XS <1h · S 1–4h · M 0.5–1d · L 1–3d
 
@@ -69,17 +70,17 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 
 | Legacy module | Verdict | Status | Notes |
 |---|---|---|---|
-| `auth` | REBUILD | ⚠️ partial in `apps/` | Need OAuth + DB-stored rotating refresh |
-| `users` | REBUILD | ❌ not started | P0 |
+| `auth` | REBUILD | ✅ done | Email/pw + Google OAuth; opaque rotating refresh tokens; Apple OAuth P2 |
+| `users` | REBUILD | ✅ done | `PATCH /users/me/profile`, S3 presigned upload, profile completion |
 | `locations` | DROP | n/a | Replaced by `discovery` + `presence` |
 | `discovery` (swipe deck) | DROP | n/a | New `discovery` is map-nearby; old swipe is a future dating feature |
-| `chat` | REBUILD | ❌ not started | P0 |
-| `interactions` (waves) | REBUILD | ⚠️ partial in `apps/` | Wire sender hydration + push fallback |
+| `chat` | REBUILD | ✅ done | Persist + REST endpoints + socket gateway |
+| `interactions` (waves) | REBUILD | ✅ done | Sender hydration + FCM push fallback |
 | `events` | DEFER | — | Schema already in `0001_initial.sql` |
 | `social` (follow/unfollow) | DEFER | — | |
 | `payments` (Stripe) | DEFER | — | |
 | `verification` (phone/photo/ID) | DEFER | — | Only `verification_level` enum survives |
-| `notifications` | PARTIAL REBUILD | ❌ not started | FCM for waves + chat; geofences deferred |
+| `notifications` | PARTIAL REBUILD | ✅ done | FCM token registration + send-on-offline; geofences deferred |
 | `analytics` / `trending` | DROP | n/a | |
 | `gamification` | DROP | n/a | |
 | `gifts` | DROP | n/a | |
@@ -91,7 +92,7 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 
 | Legacy feature | Verdict | Status | Notes |
 |---|---|---|---|
-| `auth/AuthScreen` | PORT | ❌ not started | UI is logic-free; quick port |
+| `auth/AuthScreen` | PORT | ✅ R3 done | Email/pw + Google OAuth button; auth gate in AppNavigator |
 | `map/*` | DROP | n/a | New `apps/mobile/src/screens/MapScreen.tsx` is better |
 | `discovery/*` (swipe) | DEFER | — | |
 | `profile/Profile{Creation,Edit}Screen` | PORT | ✅ R3 done | profileSlice, ProfileCreationScreen, ProfileEditScreen, ProfileScreen |
@@ -114,16 +115,15 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 
 ## Phased Execution Plan
 
-### Phase R1 — Reconcile (0.5d) — **IN FLIGHT**
+### Phase R1 — Reconcile (0.5d) — ✅ COMPLETE 2026-05-14
 
-- [ ] Move `mobile/` + `backend/` under `legacy/`
-- [ ] Update `pnpm-workspace.yaml` to exclude `legacy/**`
-- [ ] Tag: `git tag legacy-freeze-2026-05-14`
-- [ ] Add CI lint rule rejecting any import path containing `legacy/`
-- [ ] Move `bestRecentMVP.html` into `docs/marketing/`
-- [ ] Replace `CLAUDE.md` with the new version
-- [ ] Commit `STATUS.md` (this file)
-- [ ] Update `ARCHITECTURE.md` change log
+- [x] Move `mobile/` + `backend/` under `legacy/`
+- [x] Update `pnpm-workspace.yaml` to exclude `legacy/**`
+- [x] Tag: `git tag legacy-freeze-2026-05-14`
+- [x] Add CI lint rule rejecting any import path containing `legacy/`
+- [x] Move `bestRecentMVP.html` into `docs/marketing/`
+- [x] Replace `CLAUDE.md` with the new version
+- [x] Commit `STATUS.md` (this file)
 
 ### Phase R2 — P0 backend (3–4 days) — ✅ COMPLETE 2026-05-20
 
@@ -131,29 +131,31 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 - [x] **C2** — `apps/backend/src/modules/chat/chat.service.ts` (persist + last_message_at update)
 - [x] **C3** — Chat REST endpoints
 - [x] **C1** — Wire `chat.service.persist()` into `onChatSend`; kill `TODO_persisted_id`
-- [x] **W1** — Hydrate wave sender in `emitWaveReceived` (lookup in InteractionsService, fully hydrated event passed to gateway)
+- [x] **W1** — Hydrate wave sender in `emitWaveReceived`
 - [x] **N1** — Notifications module: FCM registration + send-on-offline-emit-failure
 - [x] **Pr1** — `presence:delta` emitted on cell boundary crossing
 - [x] **C5** — `conversation:join` socket handler
 
-### Phase R3 — P0 mobile (4–5 days)
+### Phase R3 — P0 mobile (4–5 days) — ✅ COMPLETE 2026-05-20
 
-- [ ] Port `AuthScreen`
-- [ ] Move profile types to `@g88/shared/src/profile.ts`
-- [ ] Port `Profile{Creation,Edit,View}Screen`
-- [ ] Rebuild `InboxScreen` against new chat endpoints
-- [ ] Port `ChatScreen` with socket-based send via `useSocket` ack
-- [ ] Implement `AppNavigator` auth gate (`!authed` → Auth, `!profile.completedAt` → ProfileCreation, else Main)
-- [ ] Port `Settings`/`Privacy` screens (logout + visibility toggle)
-- [ ] Port `ErrorBoundary` + `ScreenErrorBoundary`
+- [x] Port `AuthScreen` (email/pw; Google OAuth added in R4)
+- [x] Move profile types to `@g88/shared`
+- [x] Port `Profile{Creation,Edit,View}Screen`
+- [x] Rebuild `InboxScreen` against new chat endpoints
+- [x] Port `ChatScreen` with socket-based send via `useSocket` ack
+- [x] Implement `AppNavigator` auth gate
+- [x] Port `Settings`/`Privacy` screens (logout + visibility toggle)
+- [x] Port `ErrorBoundary` + `ScreenErrorBoundary`
 
-### Phase R4 — P1 hardening (3–4 days)
+### Phase R4 — P1 hardening — ✅ COMPLETE 2026-05-21
 
-- [ ] **A1** — Opaque DB-stored rotating refresh tokens
-- [ ] **A2** — `POST /auth/oauth/{google,apple}` endpoints
-- [ ] **Pr1** — Emit `presence:delta` on cell migration
-- [ ] **C5** — `conversation:join` handler
-- [ ] **C6** — Mobile chat outbox
+- [x] **A1** — Opaque DB-stored rotating refresh tokens (`0003_refresh_tokens.sql`)
+- [x] **A2** — `POST /auth/oauth/google` + mobile `loginWithGoogle` thunk + AuthScreen button (`0004_oauth.sql`)
+- [x] Android CI workflow with Maps key injection from secrets (`android-build.yml`)
+- [x] Fix `.gitignore` for `android/app/.cxx/` — untracked 514 build artifacts
+- [x] Patch 8/10 Dependabot vulnerabilities via pnpm overrides
+- [ ] **A3** — Apple Sign-In (`POST /auth/oauth/apple`) — P2, required before App Store submission
+- [ ] **C6** — Mobile chat outbox (P2)
 - [ ] Update `ARCHITECTURE.md` change log
 
 ---
@@ -171,12 +173,10 @@ All four must be true:
 
 ## Open Questions
 
-Update these as decisions are made.
-
 | # | Question | Default if no answer | Decided? |
 |---|---|---|---|
 | Q2 | Is anything in production today running against the old TypeORM schema? | No — `0001_initial.sql` is authoritative, greenfield | ❓ |
-| Q4 | Apple + Google OAuth both for P1, or email-only + OAuth as fast-follow? | Both for P1 (App Store requirement) | ❓ |
+| Q4 | Apple Sign-In for P1 or fast-follow? | Fast-follow — ship Google-only first, add Apple before App Store review | ✅ decided 2026-05-21 |
 
 ---
 
@@ -184,15 +184,17 @@ Update these as decisions are made.
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Legacy imports leak into `apps/` | M | M | CI lint rule on import paths |
-| Schema drift between `legacy/backend/src/migrations/` and `apps/backend/migrations/0001_initial.sql` | M | H | `0001_initial.sql` is the only source; mark legacy migrations folder with `README.deprecated.md` |
-| Half-ported features confuse the team | H | M | This file. Updated weekly. |
-| `bestRecentMVP.html` keeps influencing engineering | M | L | Moved to `docs/marketing/` in R1 |
-| FCM push for chat takes longer than estimated and blocks P1 ship | M | M | Feature-flag fallback to socket-only delivery; FCM ships as fast-follow if needed |
-| OAuth complexity blows out auth timeline | M | M | Email/pw is the floor; OAuth slips to fast-follow if R4 runs long |
+| Legacy imports leak into `apps/` | L | M | CI lint rule on import paths — enforced |
+| Schema drift between `legacy/backend/src/migrations/` and `apps/backend/migrations/0001_initial.sql` | L | H | `0001_initial.sql` is the only source; legacy migrations are read-only reference |
+| Half-ported features confuse the team | L | M | This file. Updated as work completes. |
+| Apple Sign-In missing at App Store submission | H | H | Tracked as A3 P2 — must ship before any social login goes live on iOS |
+| No production observability (C3 critical debt) | H | H | Tracked as OB1 P2 — Sentry minimum bar before public TestFlight |
+| Config.GOOGLE_WEB_CLIENT_ID placeholder not replaced before first run | M | H | TODO comment in `apps/mobile/src/config.ts`; `GOOGLE_CLIENT_ID` required in backend `.env` |
 
 ---
 
 ## Change Log
 
-- **2026-05-14** — Initial draft. R1 not yet started. Reconciliation verdicts locked per `bestRecentMVP.html` → README supersession decision. Q1, Q3, Q5 answered (keep legacy in repo · FCM for waves+chat · draft CLAUDE.md + STATUS.md).
+- **2026-05-14** — Initial draft. R1 not yet started. Reconciliation verdicts locked.
+- **2026-05-20** — R2 (P0 backend) + R3 (P0 mobile) complete.
+- **2026-05-21** — R4 complete. All six P1 pillars done. A1 (opaque refresh tokens) + A2 (Google OAuth) shipped. Apple OAuth deferred to P2 (A3). Android CI, .gitignore, and Dependabot fixes also landed.
