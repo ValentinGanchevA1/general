@@ -8,7 +8,7 @@ import {
   type DiscoveryResponse,
   type DiscoveryPoint,
   type EntityKind,
-  type VerificationLevel,
+  type UserMeta,
   type Viewport,
   h3ResolutionForZoom,
   isEntityZoom,
@@ -153,15 +153,15 @@ export class DiscoveryService {
 
     return rows.map((r) => {
       if (r.kind === 'user') {
+        const viewMeta = r.meta as unknown as UserMeta;
         return {
           kind: 'user',
           id: r.id,
           lat: r.lat,
           lng: r.lng,
           meta: {
-            ...(r.meta as unknown as Omit<UserMetaRow, 'online' | 'verification'>),
-            verification: (r.meta as unknown as UserMetaRow).verification as VerificationLevel,
-            online: onlineSet.has(r.id),
+            ...viewMeta,
+            online: onlineSet.has(r.id), // overlay live Redis presence; view hardcodes false
           },
         };
       }
@@ -209,19 +209,28 @@ export class DiscoveryService {
   }
 }
 
-// Internal row shapes (not exported — these match the materialized view).
-interface EntityRow {
+// ─── v_discoverable_entity column contract ───────────────────────────────────
+// Mirrors the view definition in 0001_initial.sql exactly.
+// Update this interface whenever the view's SELECT list changes.
+type ViewVisibility = 'public' | 'private' | 'blocked';
+
+interface DiscoverableEntityViewRow {
   id: string;
   kind: EntityKind;
-  lat: number;
-  lng: number;
+  location: unknown; // geography(Point,4326) — projected via ST_Y/ST_X, never read raw
+  location_h3_r4: string;
+  location_h3_r5: string;
+  location_h3_r6: string;
+  location_h3_r7: string;
+  location_h3_r8: string;
+  location_h3_r9: string;
+  location_h3_r10: string;
+  visibility: ViewVisibility;
   meta: Record<string, unknown>;
 }
 
-interface UserMetaRow {
-  displayName: string;
-  avatarUrl: string | null;
-  verification: string;
-  online: boolean;
-  lastSeenAt: string | null;
+// Projected columns returned by the entity-level SELECT; lat/lng are ST_Y/ST_X aliases.
+interface EntityRow extends Pick<DiscoverableEntityViewRow, 'id' | 'kind' | 'meta'> {
+  lat: number;
+  lng: number;
 }

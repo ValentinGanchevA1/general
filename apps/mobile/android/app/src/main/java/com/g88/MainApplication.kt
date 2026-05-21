@@ -23,11 +23,18 @@ class MainApplication : Application(), ReactApplication, OnMapsSdkInitializedCal
     )
   }
 
-  override fun onMapsSdkInitialized(renderer: Renderer) {}
+  override fun onMapsSdkInitialized(renderer: Renderer) {
+    android.util.Log.d("G88:Maps", "Maps SDK ready — renderer: $renderer")
+  }
 
   override fun onCreate() {
     super.onCreate()
-    MapsInitializer.initialize(applicationContext, Renderer.LATEST, this)
+    try {
+      MapsInitializer.initialize(applicationContext, Renderer.LATEST, this)
+    } catch (e: Exception) {
+      // Play Services unavailable (stock emulator, CI, etc.) — maps will degrade gracefully.
+      android.util.Log.e("G88:Maps", "MapsInitializer failed: ${e.message}")
+    }
     loadReactNative(this)
   }
 }

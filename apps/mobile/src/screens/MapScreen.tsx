@@ -29,6 +29,7 @@ import { useUserLocation } from '@/features/location/useUserLocation';
 import { ClusterMarker } from '@/components/map/ClusterMarker';
 import { EntityMarker } from '@/components/map/EntityMarker';
 import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 /**
  * MapScreen
@@ -133,42 +134,44 @@ export function MapScreen(): React.JSX.Element {
   // ─── Render ────────────────────────────────────────────────────────────
   return (
     <View style={styles.root}>
-      <MapView
-        ref={mapRef}
-        provider={PROVIDER_GOOGLE}
-        style={StyleSheet.absoluteFill}
-        showsUserLocation
-        showsMyLocationButton={false}
-        onRegionChangeComplete={setRegion}
-        initialRegion={{
-          latitude: 43.21,
-          longitude: 27.92,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }}
-      >
-        {(data?.points ?? []).map((p) =>
-          p.kind === 'cluster' ? (
-            <Marker
-              key={`c:${p.cellId}`}
-              coordinate={toRNLatLng(p)}
-              onPress={() => onClusterPress(p)}
-              tracksViewChanges={false}
-            >
-              <ClusterMarker point={p} />
-            </Marker>
-          ) : (
-            <Marker
-              key={`e:${p.kind}:${p.id}`}
-              coordinate={toRNLatLng(p)}
-              onPress={() => setSelected(p)}
-              tracksViewChanges={false}
-            >
-              <EntityMarker point={p} />
-            </Marker>
-          ),
-        )}
-      </MapView>
+      <ErrorBoundary fallback={<MapUnavailableFallback />}>
+        <MapView
+          ref={mapRef}
+          provider={PROVIDER_GOOGLE}
+          style={StyleSheet.absoluteFill}
+          showsUserLocation
+          showsMyLocationButton={false}
+          onRegionChangeComplete={setRegion}
+          initialRegion={{
+            latitude: 43.21,
+            longitude: 27.92,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }}
+        >
+          {(data?.points ?? []).map((p) =>
+            p.kind === 'cluster' ? (
+              <Marker
+                key={`c:${p.cellId}`}
+                coordinate={toRNLatLng(p)}
+                onPress={() => onClusterPress(p)}
+                tracksViewChanges={false}
+              >
+                <ClusterMarker point={p} />
+              </Marker>
+            ) : (
+              <Marker
+                key={`e:${p.kind}:${p.id}`}
+                coordinate={toRNLatLng(p)}
+                onPress={() => setSelected(p)}
+                tracksViewChanges={false}
+              >
+                <EntityMarker point={p} />
+              </Marker>
+            ),
+          )}
+        </MapView>
+      </ErrorBoundary>
 
       {loading && (
         <View style={styles.loading} pointerEvents="none">
@@ -192,6 +195,19 @@ export function MapScreen(): React.JSX.Element {
           {...(selected.kind === 'user' && { onWave: () => { void onWave(selected.id); } })}
         />
       )}
+    </View>
+  );
+}
+
+// ─── Fallback ─────────────────────────────────────────────────────────────
+
+function MapUnavailableFallback(): React.JSX.Element {
+  return (
+    <View style={[StyleSheet.absoluteFill, styles.unavailable]}>
+      <Text style={styles.unavailableTitle}>Map unavailable</Text>
+      <Text style={styles.unavailableBody}>
+        Google Maps could not be initialized.{'\n'}Verify your API key in local.properties.
+      </Text>
     </View>
   );
 }
@@ -224,6 +240,14 @@ function approxZoomFromRegion(r: Region): number {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
+  unavailable: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#0a0a0f',
+    padding: 24,
+  },
+  unavailableTitle: { color: '#ff6b6b', fontSize: 16, fontWeight: '700', marginBottom: 8 },
+  unavailableBody: { color: '#888', fontSize: 13, textAlign: 'center', lineHeight: 20 },
   loading: {
     position: 'absolute',
     top: 60,

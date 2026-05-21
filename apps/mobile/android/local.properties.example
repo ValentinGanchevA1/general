@@ -1,0 +1,9 @@
+# android/local.properties — copy to local.properties (gitignored) and fill in real keys.
+# SDK path is set automatically by Android Studio / React Native CLI.
+# sdk.dir=/Users/you/Library/Android/sdk
+
+# Google Maps API keys — obtain from Google Cloud Console.
+# Enable "Maps SDK for Android" for both keys.
+# Restrict the debug key to your debug certificate SHA-1 fingerprint.
+GOOGLE_MAPS_API_KEY_DEBUG=YOUR_DEBUG_KEY_HERE
+GOOGLE_MAPS_API_KEY_RELEASE=YOUR_RELEASE_KEY_HERE

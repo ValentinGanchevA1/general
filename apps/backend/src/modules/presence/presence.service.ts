@@ -1,8 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import type Redis from 'ioredis';
-import * as h3 from 'h3-js';
 
-import { fuzzLocation, type LatLng } from '@g88/shared';
+import { computeH3Cells, fuzzLocation, type LatLng } from '@g88/shared';
 
 import { REDIS_CLIENT } from '../../config/redis.provider';
 
@@ -26,14 +27,11 @@ import { REDIS_CLIENT } from '../../config/redis.provider';
 export class PresenceService {
   private readonly logger = new Logger(PresenceService.name);
   private static readonly TTL_SECONDS = 120;
-  /**
-   * H3 r8 cells are ~0.7 km² — a good unit for "nearby" presence fan-out.
-   * Coarser than the discovery storage resolution, intentionally:
-   * presence updates from a single neighborhood share a room.
-   */
-  private static readonly PRESENCE_RES = 8;
 
-  constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
+  constructor(
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    @InjectDataSource() private readonly db: DataSource,
+  ) {}
 
   /**
    * Record a heartbeat: mark user online and add to their current cell's set.
@@ -47,7 +45,8 @@ export class PresenceService {
     location: LatLng,
   ): Promise<{ cellId: string; prevCellId: string | null; lat: number; lng: number }> {
     const fuzzed = fuzzLocation(location, 10);
-    const cellId = h3.latLngToCell(fuzzed.lat, fuzzed.lng, PresenceService.PRESENCE_RES);
+    const cells = computeH3Cells(fuzzed.lat, fuzzed.lng);
+    const cellId = cells.r8; // r8 is the presence fan-out resolution
     const now = Date.now();
 
     const prevCellKey = `presence:user_cell:${userId}`;
@@ -63,6 +62,14 @@ export class PresenceService {
       pipe.zrem(`presence:cell:${prevCellId}`, userId);
     }
 
+    // Flush location + all H3 cells to Postgres when the r8 cell changes.
+    // Skipped when the user hasn't moved between cells to avoid per-heartbeat writes.
+    if (!prevCellId || prevCellId !== cellId) {
+      this.persistLocation(userId, fuzzed, cells).catch((err) =>
+        this.logger.error(`persistLocation failed user=${userId}: ${err}`),
+      );
+    }
+
     await pipe.exec();
 
     return {
@@ -71,6 +78,27 @@ export class PresenceService {
       lat: fuzzed.lat,
       lng: fuzzed.lng,
     };
+  }
+
+  private async persistLocation(
+    userId: string,
+    fuzzed: LatLng,
+    cells: ReturnType<typeof computeH3Cells>,
+  ): Promise<void> {
+    await this.db.query(
+      `UPDATE users
+          SET location        = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
+              location_h3_r4  = $4,
+              location_h3_r5  = $5,
+              location_h3_r6  = $6,
+              location_h3_r7  = $7,
+              location_h3_r8  = $8,
+              location_h3_r9  = $9,
+              location_h3_r10 = $10
+        WHERE id = $1
+          AND deleted_at IS NULL`,
+      [userId, fuzzed.lng, fuzzed.lat, cells.r4, cells.r5, cells.r6, cells.r7, cells.r8, cells.r9, cells.r10],
+    );
   }
 
   /** Mark a user offline immediately (called on socket disconnect). */
