@@ -62,14 +62,15 @@ export class UsersService {
     if (setClauses.length === 0) return this.getProfile(userId);
 
     setClauses.push('updated_at = NOW()');
-    const rows = await this.db.query<UserRow[]>(
+    // TypeORM 0.3.x returns [rowsArray, rowCount] for UPDATE queries
+    const [updatedRows] = await this.db.query<[UserRow[], number]>(
       `UPDATE users SET ${setClauses.join(', ')}
           WHERE id = $1 AND deleted_at IS NULL
        RETURNING id, email, display_name, avatar_url, bio, verification_level, visibility`,
       params,
     );
-    if (!rows[0]) throw new NotFoundException({ code: 'users.not_found', message: 'User not found' });
-    return this.toProfile(rows[0]);
+    if (!updatedRows[0]) throw new NotFoundException({ code: 'users.not_found', message: 'User not found' });
+    return this.toProfile(updatedRows[0]);
   }
 
   private toPublic(r: UserRow): AuthenticatedUser {

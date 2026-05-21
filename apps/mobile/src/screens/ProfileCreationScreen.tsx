@@ -8,7 +8,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
 } from 'react-native';
 
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
@@ -26,9 +25,14 @@ export function ProfileCreationScreen(): React.JSX.Element {
 
   const [displayName, setDisplayName] = useState(authUser?.displayName ?? '');
   const [bio, setBio] = useState('');
+  const [bioError, setBioError] = useState('');
 
   const submit = (): void => {
-    if (!bio.trim()) return;
+    if (!bio.trim()) {
+      setBioError('A short bio is required to continue.');
+      return;
+    }
+    setBioError('');
     void dispatch(updateProfile({ displayName: displayName.trim(), bio: bio.trim() }));
   };
 
@@ -66,6 +70,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
         />
         <Text style={styles.charCount}>{bio.length}/160</Text>
 
+        {bioError ? <Text style={styles.error}>{bioError}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <TouchableOpacity

@@ -1,4 +1,4 @@
-// Runs migrations/0001_initial.sql against the configured database.
+// Runs all migration files in apps/backend/migrations/ in filename order.
 // Usage: node scripts/migrate.js
 const { Client } = require('pg');
 const fs = require('fs');
@@ -10,11 +10,19 @@ async function run() {
   const client = new Client({ connectionString });
   await client.connect();
 
-  const sqlPath = path.join(__dirname, '..', 'migrations', '0001_initial.sql');
-  const sql = fs.readFileSync(sqlPath, 'utf8');
+  const migrationsDir = path.join(__dirname, '..', 'migrations');
+  const files = fs
+    .readdirSync(migrationsDir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
 
-  console.log('Running migration: 0001_initial.sql');
-  await client.query(sql);
+  for (const file of files) {
+    const sqlPath = path.join(migrationsDir, file);
+    const sql = fs.readFileSync(sqlPath, 'utf8');
+    console.log(`Running migration: ${file}`);
+    await client.query(sql);
+  }
+
   await client.end();
   console.log('Done.');
 }
