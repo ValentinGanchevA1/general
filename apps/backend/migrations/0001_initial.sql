@@ -29,8 +29,11 @@ CREATE TABLE users (
   -- Location is fuzzed at write-time in app code (snapped to r10 centroid).
   -- H3 cells are computed by app code via computeH3Cells() before each write.
   location            geography(Point, 4326),
+  location_h3_r4      text,
   location_h3_r5      text,
+  location_h3_r6      text,
   location_h3_r7      text,
+  location_h3_r8      text,
   location_h3_r9      text,
   location_h3_r10     text,
 
@@ -62,8 +65,11 @@ CREATE TABLE events (
                       CHECK (visibility IN ('public','private')),
 
   location            geography(Point, 4326) NOT NULL,
+  location_h3_r4      text,
   location_h3_r5      text,
+  location_h3_r6      text,
   location_h3_r7      text,
+  location_h3_r8      text,
   location_h3_r9      text,
   location_h3_r10     text,
 
@@ -94,8 +100,11 @@ CREATE TABLE listings (
                       CHECK (visibility IN ('public','private')),
 
   location            geography(Point, 4326) NOT NULL,
+  location_h3_r4      text,
   location_h3_r5      text,
+  location_h3_r6      text,
   location_h3_r7      text,
+  location_h3_r8      text,
   location_h3_r9      text,
   location_h3_r10     text,
 
@@ -167,7 +176,8 @@ CREATE OR REPLACE VIEW v_discoverable_entity AS
     u.id,
     'user'::text AS kind,
     u.location,
-    u.location_h3_r5, u.location_h3_r7, u.location_h3_r9, u.location_h3_r10,
+    u.location_h3_r4, u.location_h3_r5, u.location_h3_r6,
+    u.location_h3_r7, u.location_h3_r8, u.location_h3_r9, u.location_h3_r10,
     u.visibility,
     jsonb_build_object(
       'displayName',  u.display_name,
@@ -185,7 +195,8 @@ CREATE OR REPLACE VIEW v_discoverable_entity AS
     e.id,
     'event'::text AS kind,
     e.location,
-    e.location_h3_r5, e.location_h3_r7, e.location_h3_r9, e.location_h3_r10,
+    e.location_h3_r4, e.location_h3_r5, e.location_h3_r6,
+    e.location_h3_r7, e.location_h3_r8, e.location_h3_r9, e.location_h3_r10,
     e.visibility,
     jsonb_build_object(
       'title',         e.title,
@@ -203,7 +214,8 @@ CREATE OR REPLACE VIEW v_discoverable_entity AS
     l.id,
     'listing'::text AS kind,
     l.location,
-    l.location_h3_r5, l.location_h3_r7, l.location_h3_r9, l.location_h3_r10,
+    l.location_h3_r4, l.location_h3_r5, l.location_h3_r6,
+    l.location_h3_r7, l.location_h3_r8, l.location_h3_r9, l.location_h3_r10,
     l.visibility,
     jsonb_build_object(
       'title',         l.title,

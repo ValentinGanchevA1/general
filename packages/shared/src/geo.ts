@@ -84,23 +84,29 @@ export function fuzzLocation(
   return { lat, lng };
 }
 
-/** H3 cell values for the four index resolutions stored on every location row. */
+/** H3 cell values for all seven index resolutions stored on every location row. */
 export interface H3Cells {
+  r4: string;
   r5: string;
+  r6: string;
   r7: string;
+  r8: string;
   r9: string;
   r10: string;
 }
 
 /**
- * Compute the four H3 index columns for a (lat, lng) pair.
+ * Compute all seven H3 index columns for a (lat, lng) pair.
  * Call this before every INSERT/UPDATE that sets a `location` column so that
- * location_h3_r5/r7/r9/r10 stay in sync.
+ * location_h3_r4–r10 stay in sync.
  */
 export function computeH3Cells(lat: number, lng: number): H3Cells {
   return {
+    r4:  h3.latLngToCell(lat, lng, 4),
     r5:  h3.latLngToCell(lat, lng, 5),
+    r6:  h3.latLngToCell(lat, lng, 6),
     r7:  h3.latLngToCell(lat, lng, 7),
+    r8:  h3.latLngToCell(lat, lng, 8),
     r9:  h3.latLngToCell(lat, lng, 9),
     r10: h3.latLngToCell(lat, lng, 10),
   };
