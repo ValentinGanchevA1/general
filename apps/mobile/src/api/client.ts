@@ -82,7 +82,13 @@ async function refreshOnce(): Promise<AuthTokens | null> {
 
 function isAuthEndpoint(url?: string): boolean {
   if (!url) return false;
-  return url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/register');
+  return (
+    url.includes('/auth/login') ||
+    url.includes('/auth/refresh') ||
+    url.includes('/auth/register') ||
+    url.includes('/auth/logout') ||
+    url.includes('/auth/oauth/')
+  );
 }
 
 function normalizeError(err: unknown): ApiError {

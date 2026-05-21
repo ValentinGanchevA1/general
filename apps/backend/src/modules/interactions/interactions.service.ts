@@ -53,7 +53,7 @@ export class InteractionsService {
         [req.toUserId],
       );
       if (target.length === 0) {
-        throw new NotFoundException({ code: 'wave.target_missing', message: 'User not found' });
+        throw new BadRequestException({ code: 'wave.failed', message: 'Wave could not be sent' });
       }
 
       const recent = await tx.query(

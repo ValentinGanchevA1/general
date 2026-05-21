@@ -8,7 +8,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import * as bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
 
 import type { LoginResponse, AuthTokens, AuthenticatedUser } from '@g88/shared';
@@ -36,10 +36,15 @@ export class AuthService {
   private static readonly BCRYPT_ROUNDS = 12;
   private static readonly REFRESH_TTL_DAYS = 30;
 
+  private readonly googleClient: OAuth2Client;
+
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly jwt: JwtService,
-  ) {}
+  ) {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    this.googleClient = new OAuth2Client(clientId);
+  }
 
   async register(
     email: string,
@@ -141,14 +146,13 @@ export class AuthService {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     if (!clientId) throw new Error('GOOGLE_CLIENT_ID not configured');
 
-    const client = new OAuth2Client(clientId);
     let googleId: string;
     let email: string;
     let name: string | undefined;
     let picture: string | undefined;
 
     try {
-      const ticket = await client.verifyIdToken({ idToken, audience: clientId });
+      const ticket = await this.googleClient.verifyIdToken({ idToken, audience: clientId });
       const p = ticket.getPayload();
       if (!p?.sub || !p.email || p.email_verified !== true) {
         throw new Error('missing claims or unverified email');
