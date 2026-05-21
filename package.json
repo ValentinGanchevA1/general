@@ -24,7 +24,9 @@
       "ws@8": "8.20.1",
       "webpack@5": "5.104.1",
       "ajv@8": "8.20.0",
-      "tmp": "0.2.4"
+      "tmp": "0.2.4",
+      "@tootallnate/once": ">=3.0.1",
+      "fast-xml-parser": ">=5.7.0"
     }
   },
   "dependencies": {
