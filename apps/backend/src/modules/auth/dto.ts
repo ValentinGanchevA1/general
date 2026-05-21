@@ -32,3 +32,8 @@ export class LogoutDto {
   @IsString()
   refreshToken!: string;
 }
+
+export class GoogleOAuthDto {
+  @IsString()
+  idToken!: string;
+}

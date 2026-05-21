@@ -14,7 +14,7 @@ import type { LoginResponse, AuthTokens, AuthenticatedUser } from '@g88/shared';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
-import { LoginDto, LogoutDto, RefreshDto, RegisterDto } from './dto';
+import { GoogleOAuthDto, LoginDto, LogoutDto, RefreshDto, RegisterDto } from './dto';
 
 @Controller('auth')
 export class AuthController {
@@ -45,6 +45,13 @@ export class AuthController {
   @SkipThrottle()
   async logout(@Body() dto: LogoutDto): Promise<void> {
     return this.auth.logout(dto.refreshToken);
+  }
+
+  @Post('oauth/google')
+  @HttpCode(HttpStatus.OK)
+  @SkipThrottle()
+  async googleOAuth(@Body() dto: GoogleOAuthDto): Promise<LoginResponse> {
+    return this.auth.googleOAuth(dto.idToken);
   }
 
   @Get('me')

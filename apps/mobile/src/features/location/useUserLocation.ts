@@ -3,6 +3,18 @@ import { Alert, Platform } from 'react-native';
 import { PermissionsAndroid } from 'react-native';
 import type { LatLng } from '@g88/shared';
 
+// navigator.geolocation is still available at runtime in React Native but is
+// no longer typed in @types/react-native — declare the subset we use.
+declare const navigator: {
+  geolocation: {
+    getCurrentPosition(
+      success: (pos: { coords: { latitude: number; longitude: number } }) => void,
+      error?: (err: { message: string }) => void,
+      options?: { enableHighAccuracy?: boolean; timeout?: number },
+    ): void;
+  } | undefined;
+};
+
 interface UseUserLocationResult {
   coords: LatLng | null;
   requestPermission: () => Promise<void>;
@@ -28,15 +40,16 @@ export function useUserLocation(): UseUserLocationResult {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function startTracking() {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
+    const geo = typeof navigator !== 'undefined' ? navigator.geolocation : undefined;
+    if (!geo) return;
+    geo.getCurrentPosition(
       (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       (err) => Alert.alert('Location error', err.message),
       { enableHighAccuracy: true, timeout: 15_000 },
     );
 
     const id = setInterval(() => {
-      navigator.geolocation.getCurrentPosition(
+      geo.getCurrentPosition(
         (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
         () => undefined,
         { enableHighAccuracy: true, timeout: 10_000 },

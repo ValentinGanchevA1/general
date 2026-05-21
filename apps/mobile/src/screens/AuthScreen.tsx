@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { login, register, clearError } from '@/features/auth/authSlice';
+import { login, register, clearError, loginWithGoogle } from '@/features/auth/authSlice';
 
 export function AuthScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
@@ -97,6 +97,20 @@ export function AuthScreen(): React.JSX.Element {
               : 'Already have an account? Sign in'}
           </Text>
         </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <TouchableOpacity
+          style={styles.googleBtn}
+          onPress={() => { dispatch(clearError()); void dispatch(loginWithGoogle()); }}
+          disabled={loading}
+        >
+          <Text style={styles.googleBtnText}>Continue with Google</Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -127,4 +141,14 @@ const styles = StyleSheet.create({
   btnText: { color: '#000', fontWeight: '700', fontSize: 15 },
   toggle: { alignItems: 'center', marginTop: 8 },
   toggleText: { color: '#00d4ff', fontSize: 13 },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 16, gap: 8 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#2a2a4a' },
+  dividerText: { color: '#666', fontSize: 12 },
+  googleBtn: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+  },
+  googleBtnText: { color: '#000', fontWeight: '600', fontSize: 15 },
 });

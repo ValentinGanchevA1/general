@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
+import { OAuth2Client } from 'google-auth-library';
 
 import type { LoginResponse, AuthTokens, AuthenticatedUser } from '@g88/shared';
 
@@ -17,7 +18,7 @@ import type { JwtPayload } from './jwt.strategy';
 interface UserRow {
   id: string;
   email: string;
-  password_hash: string;
+  password_hash: string | null;
   display_name: string;
   avatar_url: string | null;
   verification_level: string;
@@ -75,7 +76,9 @@ export class AuthService {
       [email],
     );
     const user = rows[0];
-    const valid = user ? await bcrypt.compare(password, user.password_hash) : false;
+    const valid = user?.password_hash
+      ? await bcrypt.compare(password, user.password_hash)
+      : false;
 
     if (!user || !valid) {
       throw new UnauthorizedException({ code: 'auth.invalid_credentials', message: 'Invalid email or password' });
@@ -132,6 +135,63 @@ export class AuthService {
         WHERE token_hash = $1 AND revoked_at IS NULL`,
       [hash],
     );
+  }
+
+  async googleOAuth(idToken: string): Promise<LoginResponse> {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) throw new Error('GOOGLE_CLIENT_ID not configured');
+
+    const client = new OAuth2Client(clientId);
+    let googleId: string;
+    let email: string;
+    let name: string | undefined;
+    let picture: string | undefined;
+
+    try {
+      const ticket = await client.verifyIdToken({ idToken, audience: clientId });
+      const p = ticket.getPayload();
+      if (!p?.sub || !p.email) {
+        throw new Error('missing claims');
+      }
+      googleId = p.sub;
+      email = p.email;
+      name = p.name ?? undefined;
+      picture = p.picture ?? undefined;
+    } catch {
+      throw new UnauthorizedException({ code: 'auth.oauth_failed', message: 'Google token verification failed' });
+    }
+
+    // Find by google_id first; fall back to email to link existing email/pw accounts.
+    const existing = await this.db.query<UserRow[]>(
+      `SELECT id, email, display_name, avatar_url, verification_level
+         FROM users
+        WHERE (google_id = $1 OR email = $2) AND deleted_at IS NULL
+        LIMIT 1`,
+      [googleId, email],
+    );
+
+    let user: UserRow;
+    const found = existing[0];
+    if (found) {
+      user = found;
+      await this.db.query(
+        `UPDATE users SET google_id = $1 WHERE id = $2 AND google_id IS NULL`,
+        [googleId, user.id],
+      );
+    } else {
+      const rows = await this.db.query<UserRow[]>(
+        `INSERT INTO users (email, display_name, avatar_url, google_id)
+              VALUES ($1, $2, $3, $4)
+           RETURNING id, email, display_name, avatar_url, verification_level`,
+        [email, name ?? email.split('@')[0], picture ?? null, googleId],
+      );
+      const inserted = rows[0];
+      if (!inserted) throw new Error('Insert failed');
+      user = inserted;
+    }
+
+    const tokens = await this.issueTokens(user);
+    return { user: this.toPublic(user), tokens };
   }
 
   async me(userId: string): Promise<AuthenticatedUser> {

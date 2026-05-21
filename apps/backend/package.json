@@ -13,6 +13,9 @@
     "seed": "node scripts/seed.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/s3-request-presigner": "^3.600.0",
+    "@g88/shared": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/jwt": "^11.0.0",
@@ -23,9 +26,11 @@
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.0.0",
     "bcryptjs": "^2.4.3",
-    "dotenv": "^16.4.5",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "dotenv": "^16.4.5",
+    "firebase-admin": "^12.0.0",
+    "google-auth-library": "^10.6.2",
     "h3-js": "^4.1.0",
     "ioredis": "^5.3.2",
     "passport": "^0.7.0",
@@ -34,11 +39,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.7.5",
-    "typeorm": "^0.3.20",
-    "@g88/shared": "workspace:*",
-    "@aws-sdk/client-s3": "^3.600.0",
-    "@aws-sdk/s3-request-presigner": "^3.600.0",
-    "firebase-admin": "^12.0.0"
+    "typeorm": "^0.3.20"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.5",

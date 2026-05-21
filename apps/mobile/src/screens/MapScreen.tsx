@@ -189,7 +189,7 @@ export function MapScreen(): React.JSX.Element {
           point={selected}
           waving={waving === (selected.kind === 'user' ? selected.id : null)}
           onClose={() => setSelected(null)}
-          onWave={selected.kind === 'user' ? () => onWave(selected.id) : undefined}
+          {...(selected.kind === 'user' && { onWave: () => { void onWave(selected.id); } })}
         />
       )}
     </View>

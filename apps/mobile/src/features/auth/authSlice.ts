@@ -1,4 +1,5 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
 
 import type { AuthenticatedUser, LoginResponse } from '@g88/shared';
 
@@ -39,6 +40,26 @@ export const register = createAsyncThunk(
       return res.user;
     } catch (e: unknown) {
       return rejectWithValue(e instanceof Error ? e.message : 'Registration failed');
+    }
+  },
+);
+
+export const loginWithGoogle = createAsyncThunk(
+  'auth/loginWithGoogle',
+  async (_, { rejectWithValue }) => {
+    try {
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+      if (!isSuccessResponse(response)) {
+        return rejectWithValue('Google sign-in cancelled');
+      }
+      const idToken = response.data.idToken;
+      if (!idToken) return rejectWithValue('No ID token returned from Google');
+      const res = await postJson<{ idToken: string }, LoginResponse>('/auth/oauth/google', { idToken });
+      await tokenStore.set(res.tokens);
+      return res.user;
+    } catch (e: unknown) {
+      return rejectWithValue(e instanceof Error ? e.message : 'Google sign-in failed');
     }
   },
 );
@@ -102,6 +123,13 @@ const authSlice = createSlice({
         state.user = action.payload;
       })
       .addCase(register.rejected, rejected)
+
+      .addCase(loginWithGoogle.pending, pending)
+      .addCase(loginWithGoogle.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+      })
+      .addCase(loginWithGoogle.rejected, rejected)
 
       .addCase(restoreSession.pending, pending)
       .addCase(restoreSession.fulfilled, (state, action) => {

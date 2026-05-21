@@ -92,7 +92,7 @@ function normalizeError(err: unknown): ApiError {
       statusCode: err.response.status,
       code: data.code ?? 'unknown',
       message: data.message ?? err.message,
-      details: data.details,
+      ...(data.details !== undefined ? { details: data.details } : {}),
     };
   }
   return {
