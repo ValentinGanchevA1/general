@@ -76,6 +76,8 @@ export function AuthScreen(): React.JSX.Element {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
+          returnKeyType="done"
+          onSubmitEditing={submit}
         />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
