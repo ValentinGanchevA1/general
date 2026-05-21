@@ -15,7 +15,9 @@
     "typescript": "^5.5.4"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["@nestjs/core"],
+    "onlyBuiltDependencies": [
+      "@nestjs/core"
+    ],
     "overrides": {
       "glob@10": "10.5.0",
       "picomatch@4": "4.0.4",
@@ -24,5 +26,9 @@
       "ajv@8": "8.20.0",
       "tmp": "0.2.4"
     }
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.106.1"
   }
 }

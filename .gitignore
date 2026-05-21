@@ -69,7 +69,7 @@ apps/mobile/android/app/release/
 apps/mobile/android/captures/
 apps/mobile/android/local.properties
 apps/mobile/android/.idea/
-apps/mobile/android/.cxx/
+apps/mobile/android/**/.cxx/
 apps/mobile/android/.kotlin/
 *.apk
 *.aab

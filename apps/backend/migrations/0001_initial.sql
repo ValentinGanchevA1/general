@@ -5,14 +5,11 @@
 --   * UUID v7 ids (time-sortable) generated client-side or via gen_uuid_v7().
 --     Until pg_uuidv7 is widely available, gen_random_uuid() (UUID v4) is fine.
 --   * `location` is geography(Point, 4326). Always.
---   * H3 cell columns are GENERATED (not triggers): a write of `location`
---     automatically populates all resolutions. No app code can forget.
+--   * H3 cell columns are plain text, populated by app code via computeH3Cells()
+--     from @g88/shared before every INSERT/UPDATE that sets `location`.
 --   * Soft delete via `deleted_at`. Hard-delete pipelines run weekly.
 
 CREATE EXTENSION IF NOT EXISTS postgis CASCADE;
-CREATE EXTENSION IF NOT EXISTS postgis_raster CASCADE;
-CREATE EXTENSION IF NOT EXISTS h3;          -- pg_h3 from Zachary Deziel et al.
-CREATE EXTENSION IF NOT EXISTS h3_postgis;  -- glue between PostGIS and h3
 CREATE EXTENSION IF NOT EXISTS pgcrypto;    -- for gen_random_uuid()
 CREATE EXTENSION IF NOT EXISTS citext;
 
@@ -30,11 +27,12 @@ CREATE TABLE users (
                       CHECK (visibility IN ('public','private','blocked')),
 
   -- Location is fuzzed at write-time in app code (snapped to r10 centroid).
+  -- H3 cells are computed by app code via computeH3Cells() before each write.
   location            geography(Point, 4326),
-  location_h3_r5      text GENERATED ALWAYS AS (h3_lat_lng_to_cell(location::geometry, 5)::text)  STORED,
-  location_h3_r7      text GENERATED ALWAYS AS (h3_lat_lng_to_cell(location::geometry, 7)::text)  STORED,
-  location_h3_r9      text GENERATED ALWAYS AS (h3_lat_lng_to_cell(location::geometry, 9)::text)  STORED,
-  location_h3_r10     text GENERATED ALWAYS AS (h3_lat_lng_to_cell(location::geometry, 10)::text) STORED,
+  location_h3_r5      text,
+  location_h3_r7      text,
+  location_h3_r9      text,
+  location_h3_r10     text,
 
   created_at          timestamptz NOT NULL DEFAULT NOW(),
   updated_at          timestamptz NOT NULL DEFAULT NOW(),
@@ -64,10 +62,10 @@ CREATE TABLE events (
                       CHECK (visibility IN ('public','private')),
 
   location            geography(Point, 4326) NOT NULL,
-  location_h3_r5      text GENERATED ALWAYS AS (h3_lat_lng_to_cell(location::geometry, 5)::text)  STORED,
-  location_h3_r7      text GENERATED ALWAYS AS (h3_lat_lng_to_cell(location::geometry, 7)::text)  STORED,
-  location_h3_r9      text GENERATED ALWAYS AS (h3_lat_lng_to_cell(location::geometry, 9)::text)  STORED,
-  location_h3_r10     text GENERATED ALWAYS AS (h3_lat_lng_to_cell(location::geometry, 10)::text) STORED,
+  location_h3_r5      text,
+  location_h3_r7      text,
+  location_h3_r9      text,
+  location_h3_r10     text,
 
   created_at          timestamptz NOT NULL DEFAULT NOW(),
   updated_at          timestamptz NOT NULL DEFAULT NOW(),
@@ -96,10 +94,10 @@ CREATE TABLE listings (
                       CHECK (visibility IN ('public','private')),
 
   location            geography(Point, 4326) NOT NULL,
-  location_h3_r5      text GENERATED ALWAYS AS (h3_lat_lng_to_cell(location::geometry, 5)::text)  STORED,
-  location_h3_r7      text GENERATED ALWAYS AS (h3_lat_lng_to_cell(location::geometry, 7)::text)  STORED,
-  location_h3_r9      text GENERATED ALWAYS AS (h3_lat_lng_to_cell(location::geometry, 9)::text)  STORED,
-  location_h3_r10     text GENERATED ALWAYS AS (h3_lat_lng_to_cell(location::geometry, 10)::text) STORED,
+  location_h3_r5      text,
+  location_h3_r7      text,
+  location_h3_r9      text,
+  location_h3_r10     text,
 
   created_at          timestamptz NOT NULL DEFAULT NOW(),
   updated_at          timestamptz NOT NULL DEFAULT NOW(),
