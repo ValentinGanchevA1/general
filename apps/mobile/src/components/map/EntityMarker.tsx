@@ -24,9 +24,7 @@ export function EntityMarker({ point }: Props): React.JSX.Element {
   const label =
     point.kind === 'user'
       ? point.meta.displayName.slice(0, 8)
-      : point.kind === 'event'
-        ? point.meta.title.slice(0, 10)
-        : point.meta.title.slice(0, 10);
+      : point.meta.title.slice(0, 10);
 
   return (
     <View style={styles.wrapper}>

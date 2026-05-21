@@ -187,7 +187,7 @@ export function MapScreen(): React.JSX.Element {
       {selected && (
         <EntityBottomSheet
           point={selected}
-          waving={waving === (selected.kind === 'user' ? selected.id : null)}
+          waving={selected.kind === 'user' && waving === selected.id}
           onClose={() => setSelected(null)}
           {...(selected.kind === 'user' && { onWave: () => { void onWave(selected.id); } })}
         />
