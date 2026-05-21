@@ -15,6 +15,14 @@
     "typescript": "^5.5.4"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["@nestjs/core"]
+    "onlyBuiltDependencies": ["@nestjs/core"],
+    "overrides": {
+      "glob@10": "10.5.0",
+      "picomatch@4": "4.0.4",
+      "ws@8": "8.20.1",
+      "webpack@5": "5.104.1",
+      "ajv@8": "8.20.0",
+      "tmp": "0.2.4"
+    }
   }
 }
