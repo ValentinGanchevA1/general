@@ -24,7 +24,7 @@ export class WsJwtGuard implements CanActivate {
 
     try {
       const payload = this.jwt.verify<JwtPayload>(token, {
-        secret: process.env.JWT_SECRET ?? 'dev-jwt-secret-change-in-production',
+        secret: process.env.JWT_SECRET!,
       });
       client.data.userId = payload.sub;
       return true;

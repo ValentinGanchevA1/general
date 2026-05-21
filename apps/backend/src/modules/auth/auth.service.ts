@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 
 import {
   ConflictException,
@@ -91,30 +91,30 @@ export class AuthService {
   async refresh(rawToken: string): Promise<AuthTokens> {
     const hash = sha256(rawToken);
 
-    const rows = await this.db.query<RefreshTokenRow[]>(
-      `SELECT id, user_id, family, revoked_at
-         FROM refresh_tokens
-        WHERE token_hash = $1 AND expires_at > NOW()
-        LIMIT 1`,
+    // Atomically claim the token — prevents parallel-request race that would
+    // let two requests both pass the revoked_at check before either writes.
+    const claimed = await this.db.query<RefreshTokenRow[]>(
+      `UPDATE refresh_tokens
+          SET revoked_at = NOW()
+        WHERE token_hash = $1 AND expires_at > NOW() AND revoked_at IS NULL
+        RETURNING id, user_id, family, revoked_at`,
       [hash],
     );
-    const stored = rows[0];
+    const stored = claimed[0];
 
     if (!stored) {
+      // Token not claimed — either invalid/expired or already used (reuse attempt).
+      const existing = await this.db.query<Pick<RefreshTokenRow, 'family'>[]>(
+        `SELECT family FROM refresh_tokens WHERE token_hash = $1 LIMIT 1`,
+        [hash],
+      );
+      if (existing[0]) {
+        // Token existed but was already revoked → family is compromised.
+        await this.revokeFamily(existing[0].family);
+        throw new UnauthorizedException({ code: 'auth.refresh_reuse', message: 'Refresh token reuse detected' });
+      }
       throw new UnauthorizedException({ code: 'auth.invalid_refresh', message: 'Invalid or expired refresh token' });
     }
-
-    if (stored.revoked_at !== null) {
-      // Token was already used — family is compromised, revoke everything.
-      await this.revokeFamily(stored.family);
-      throw new UnauthorizedException({ code: 'auth.refresh_reuse', message: 'Refresh token reuse detected' });
-    }
-
-    // Revoke the presented token and issue a new one in the same family.
-    await this.db.query(
-      `UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1`,
-      [stored.id],
-    );
 
     const userRows = await this.db.query<UserRow[]>(
       `SELECT id, email FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
@@ -150,8 +150,8 @@ export class AuthService {
     try {
       const ticket = await client.verifyIdToken({ idToken, audience: clientId });
       const p = ticket.getPayload();
-      if (!p?.sub || !p.email) {
-        throw new Error('missing claims');
+      if (!p?.sub || !p.email || p.email_verified !== true) {
+        throw new Error('missing claims or unverified email');
       }
       googleId = p.sub;
       email = p.email;
@@ -210,7 +210,7 @@ export class AuthService {
   ): Promise<AuthTokens> {
     const rawRefreshToken = randomBytes(32).toString('hex');
     const tokenHash = sha256(rawRefreshToken);
-    const tokenFamily = family ?? randomUUID();
+    const tokenFamily = family ?? randomUUID(); // crypto.randomUUID — Node ≥14.17
     const expiresAt = new Date(Date.now() + AuthService.REFRESH_TTL_DAYS * 86_400_000);
 
     await this.db.query(
@@ -253,10 +253,4 @@ function sha256(input: string): string {
   return createHash('sha256').update(input).digest('hex');
 }
 
-function randomUUID(): string {
-  // Node ≥14.17 has crypto.randomUUID; fall back to hex for older envs.
-  return randomBytes(16).toString('hex').replace(
-    /^(.{8})(.{4})(.{4})(.{4})(.{12})$/,
-    '$1-$2-$3-$4-$5',
-  );
-}
+

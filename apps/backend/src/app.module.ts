@@ -21,6 +21,9 @@ import { RealtimeModule } from './realtime/realtime.module';
         if (url) {
           return { type: 'postgres' as const, url, synchronize: false, entities: [] };
         }
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error('DATABASE_URL must be set in production');
+        }
         return {
           type: 'postgres' as const,
           host: process.env.DB_HOST ?? 'localhost',

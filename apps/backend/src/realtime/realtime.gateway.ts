@@ -1,4 +1,4 @@
-import { ForbiddenException, Logger, NotFoundException, UseGuards } from '@nestjs/common';
+import { ForbiddenException, Logger, NotFoundException, UsePipes, ValidationPipe, UseGuards } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -14,23 +14,26 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
   SocketData,
-  PresenceUpdatePayload,
-  ChatSendPayload,
   AckResult,
   WaveReceivedEvent,
   ChatMessageEvent,
 } from '@g88/shared';
 
 import { WsJwtGuard } from './ws-jwt.guard';
+import { ChatSendDto, ConversationJoinDto, PresenceUpdateDto } from './realtime.dto';
 import { PresenceService } from '../modules/presence/presence.service';
 import { ChatService } from '../modules/chat/chat.service';
 
 type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 type G88Socket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 
+const wsAllowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
+  .split(',')
+  .filter(Boolean);
+
 @WebSocketGateway({
   namespace: '/realtime',
-  cors: { origin: true, credentials: true },
+  cors: { origin: wsAllowedOrigins, credentials: true },
   connectionStateRecovery: {
     maxDisconnectionDuration: 2 * 60 * 1000,
     skipMiddlewares: true,
@@ -74,9 +77,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   // ─── Inbound events ──────────────────────────────────────────────────────
 
   @SubscribeMessage('presence:update')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onPresenceUpdate(
     @ConnectedSocket() client: G88Socket,
-    @MessageBody() payload: PresenceUpdatePayload,
+    @MessageBody() payload: PresenceUpdateDto,
   ): Promise<AckResult<{ cellId: string }>> {
     try {
       const result = await this.presence.heartbeat(client.data.userId, payload.location);
@@ -92,7 +96,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       client.join(newRoom);
       client.data.rooms.add(newRoom);
 
-      // Emit presence:delta when the user crosses a cell boundary (gap Pr1).
+      // Emit presence:delta when the user crosses a cell boundary.
       if (result.prevCellId) {
         this.server.to(this.cellRoom(result.prevCellId)).emit('presence:delta', {
           cellId: result.prevCellId,
@@ -114,9 +118,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('conversation:join')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onConversationJoin(
     @ConnectedSocket() client: G88Socket,
-    @MessageBody() payload: { conversationId: string },
+    @MessageBody() payload: ConversationJoinDto,
   ): Promise<AckResult<{ joined: true }>> {
     try {
       const ok = await this.chat.isParticipant(payload.conversationId, client.data.userId);
@@ -134,10 +139,16 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('chat:send')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onChatSend(
     @ConnectedSocket() client: G88Socket,
-    @MessageBody() payload: ChatSendPayload,
+    @MessageBody() payload: ChatSendDto,
   ): Promise<AckResult<ChatMessageEvent>> {
+    // Enforce that the socket has joined the conversation room before sending.
+    if (!client.rooms.has(this.conversationRoom(payload.conversationId))) {
+      return { ok: false, code: 'chat.forbidden', message: 'Join the conversation first' };
+    }
+
     try {
       const msg = await this.chat.persist(
         payload.conversationId,
@@ -150,7 +161,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       return { ok: true, data: msg };
     } catch (err) {
-      const res = (err as any)?.response;
+      const res = (err as { response?: { code?: string; message?: string } })?.response;
       const code = res?.code ?? 'chat.failed';
       const message = res?.message ?? (err instanceof Error ? err.message : 'Unknown error');
       if (!(err instanceof ForbiddenException) && !(err instanceof NotFoundException)) {

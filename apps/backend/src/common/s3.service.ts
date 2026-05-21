@@ -26,7 +26,14 @@ export class S3Service {
   ): Promise<{ uploadUrl: string; publicUrl: string }> {
     if (!this.bucket) throw new Error('AWS_S3_BUCKET not configured');
 
-    const ext = contentType.split('/')[1] ?? 'jpg';
+    const EXT_MAP: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+      'image/heic': 'heic',
+    };
+    const ext = EXT_MAP[contentType];
+    if (!ext) throw new Error(`Unsupported content type: ${contentType}`);
     const key = `avatars/${userId}/${randomUUID()}.${ext}`;
 
     const cmd = new PutObjectCommand({

@@ -7,7 +7,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 
 import type { LoginResponse, AuthTokens, AuthenticatedUser } from '@g88/shared';
 
@@ -21,21 +21,21 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('register')
-  @SkipThrottle()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async register(@Body() dto: RegisterDto): Promise<LoginResponse> {
     return this.auth.register(dto.email, dto.password, dto.displayName);
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @SkipThrottle()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async login(@Body() dto: LoginDto): Promise<LoginResponse> {
     return this.auth.login(dto.email, dto.password);
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @SkipThrottle()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   async refresh(@Body() dto: RefreshDto): Promise<AuthTokens> {
     return this.auth.refresh(dto.refreshToken);
   }
@@ -49,13 +49,14 @@ export class AuthController {
 
   @Post('oauth/google')
   @HttpCode(HttpStatus.OK)
-  @SkipThrottle()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async googleOAuth(@Body() dto: GoogleOAuthDto): Promise<LoginResponse> {
     return this.auth.googleOAuth(dto.idToken);
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
+  @SkipThrottle()
   async me(@CurrentUser('id') userId: string): Promise<AuthenticatedUser> {
     return this.auth.me(userId);
   }

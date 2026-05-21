@@ -7,7 +7,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { IsOptional, IsString, Matches } from 'class-validator';
+import { IsIn, IsOptional, IsString, Matches } from 'class-validator';
 
 import type { PresignedUploadResponse, UpdateProfileRequest, UserProfile } from '@g88/shared';
 
@@ -20,6 +20,7 @@ class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @IsString() displayName?: string;
   @IsOptional() @IsString() bio?: string;
   @IsOptional() @IsString() avatarUrl?: string;
+  @IsOptional() @IsIn(['public', 'private']) visibility?: 'public' | 'private';
 }
 
 class PresignedUrlDto {
