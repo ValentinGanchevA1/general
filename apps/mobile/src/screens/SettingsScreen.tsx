@@ -33,7 +33,7 @@ export function SettingsScreen(): React.JSX.Element {
   };
 
   const handleLogout = (): void => {
-    dispatch(logout());
+    void dispatch(logout());
   };
 
   return (

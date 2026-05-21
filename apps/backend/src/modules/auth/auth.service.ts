@@ -1,3 +1,5 @@
+import { createHash, randomBytes } from 'crypto';
+
 import {
   ConflictException,
   Injectable,
@@ -21,10 +23,17 @@ interface UserRow {
   verification_level: string;
 }
 
+interface RefreshTokenRow {
+  id: string;
+  user_id: string;
+  family: string;
+  revoked_at: string | null;
+}
+
 @Injectable()
 export class AuthService {
   private static readonly BCRYPT_ROUNDS = 12;
-  private static readonly REFRESH_TTL = '30d';
+  private static readonly REFRESH_TTL_DAYS = 30;
 
   constructor(
     @InjectDataSource() private readonly db: DataSource,
@@ -55,7 +64,8 @@ export class AuthService {
     const user = rows[0];
     if (!user) throw new Error('Insert failed');
 
-    return { user: this.toPublic(user), tokens: this.issueTokens(user) };
+    const tokens = await this.issueTokens(user);
+    return { user: this.toPublic(user), tokens };
   }
 
   async login(email: string, password: string): Promise<LoginResponse> {
@@ -71,28 +81,57 @@ export class AuthService {
       throw new UnauthorizedException({ code: 'auth.invalid_credentials', message: 'Invalid email or password' });
     }
 
-    return { user: this.toPublic(user), tokens: this.issueTokens(user) };
+    const tokens = await this.issueTokens(user);
+    return { user: this.toPublic(user), tokens };
   }
 
-  async refresh(refreshToken: string): Promise<AuthTokens> {
-    let payload: JwtPayload;
-    try {
-      payload = this.jwt.verify<JwtPayload>(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET ?? 'dev-jwt-refresh-secret-change-in-production',
-      });
-    } catch {
+  async refresh(rawToken: string): Promise<AuthTokens> {
+    const hash = sha256(rawToken);
+
+    const rows = await this.db.query<RefreshTokenRow[]>(
+      `SELECT id, user_id, family, revoked_at
+         FROM refresh_tokens
+        WHERE token_hash = $1 AND expires_at > NOW()
+        LIMIT 1`,
+      [hash],
+    );
+    const stored = rows[0];
+
+    if (!stored) {
       throw new UnauthorizedException({ code: 'auth.invalid_refresh', message: 'Invalid or expired refresh token' });
     }
 
-    const rows = await this.db.query<UserRow[]>(
-      `SELECT id, email FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
-      [payload.sub],
+    if (stored.revoked_at !== null) {
+      // Token was already used — family is compromised, revoke everything.
+      await this.revokeFamily(stored.family);
+      throw new UnauthorizedException({ code: 'auth.refresh_reuse', message: 'Refresh token reuse detected' });
+    }
+
+    // Revoke the presented token and issue a new one in the same family.
+    await this.db.query(
+      `UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1`,
+      [stored.id],
     );
-    if (!rows[0]) {
+
+    const userRows = await this.db.query<UserRow[]>(
+      `SELECT id, email FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+      [stored.user_id],
+    );
+    if (!userRows[0]) {
       throw new UnauthorizedException({ code: 'auth.user_missing', message: 'User not found' });
     }
 
-    return this.issueTokens(rows[0] as UserRow);
+    return this.issueTokens(userRows[0] as UserRow, stored.family);
+  }
+
+  async logout(rawToken: string): Promise<void> {
+    const hash = sha256(rawToken);
+    // Best-effort revocation — ignore if token not found.
+    await this.db.query(
+      `UPDATE refresh_tokens SET revoked_at = NOW()
+        WHERE token_hash = $1 AND revoked_at IS NULL`,
+      [hash],
+    );
   }
 
   async me(userId: string): Promise<AuthenticatedUser> {
@@ -105,19 +144,38 @@ export class AuthService {
     return this.toPublic(rows[0]);
   }
 
-  private issueTokens(user: Pick<UserRow, 'id' | 'email'>): AuthTokens {
+  private async issueTokens(
+    user: Pick<UserRow, 'id' | 'email'>,
+    family?: string,
+  ): Promise<AuthTokens> {
+    const rawRefreshToken = randomBytes(32).toString('hex');
+    const tokenHash = sha256(rawRefreshToken);
+    const tokenFamily = family ?? randomUUID();
+    const expiresAt = new Date(Date.now() + AuthService.REFRESH_TTL_DAYS * 86_400_000);
+
+    await this.db.query(
+      `INSERT INTO refresh_tokens (user_id, token_hash, family, expires_at)
+            VALUES ($1, $2, $3, $4)`,
+      [user.id, tokenHash, tokenFamily, expiresAt.toISOString()],
+    );
+
     const payload: JwtPayload = { sub: user.id, email: user.email };
     const accessToken = this.jwt.sign(payload);
-    const refreshToken = this.jwt.sign(payload, {
-      secret: process.env.JWT_REFRESH_SECRET ?? 'dev-jwt-refresh-secret-change-in-production',
-      expiresIn: AuthService.REFRESH_TTL,
-    });
     const decoded = this.jwt.decode(accessToken) as { exp: number };
+
     return {
       accessToken,
-      refreshToken,
+      refreshToken: rawRefreshToken,
       expiresAt: new Date(decoded.exp * 1000).toISOString(),
     };
+  }
+
+  private async revokeFamily(family: string): Promise<void> {
+    await this.db.query(
+      `UPDATE refresh_tokens SET revoked_at = NOW()
+        WHERE family = $1 AND revoked_at IS NULL`,
+      [family],
+    );
   }
 
   private toPublic(user: UserRow): AuthenticatedUser {
@@ -129,4 +187,16 @@ export class AuthService {
       verification: user.verification_level as AuthenticatedUser['verification'],
     };
   }
+}
+
+function sha256(input: string): string {
+  return createHash('sha256').update(input).digest('hex');
+}
+
+function randomUUID(): string {
+  // Node ≥14.17 has crypto.randomUUID; fall back to hex for older envs.
+  return randomBytes(16).toString('hex').replace(
+    /^(.{8})(.{4})(.{4})(.{4})(.{12})$/,
+    '$1-$2-$3-$4-$5',
+  );
 }

@@ -2,7 +2,7 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 
 import type { AuthenticatedUser, LoginResponse } from '@g88/shared';
 
-import { postJson } from '@/api/client';
+import { api, postJson } from '@/api/client';
 import { tokenStore } from '@/api/tokenStore';
 import { disconnectSocket } from '@/realtime/useSocket';
 
@@ -43,6 +43,21 @@ export const register = createAsyncThunk(
   },
 );
 
+export const logout = createAsyncThunk('auth/logout', async () => {
+  // Fire-and-forget: revoke the refresh token server-side.
+  // If the network is down or the token is already expired, we still clear locally.
+  const refreshToken = await tokenStore.getRefreshToken();
+  if (refreshToken) {
+    try {
+      await api.post('/auth/logout', { refreshToken });
+    } catch {
+      // best-effort
+    }
+  }
+  disconnectSocket();
+  await tokenStore.clear();
+});
+
 export const restoreSession = createAsyncThunk('auth/restore', async () => {
   const token = await tokenStore.getAccessToken();
   if (!token) return null;
@@ -59,12 +74,6 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    logout(state) {
-      state.user = null;
-      state.error = null;
-      disconnectSocket();
-      void tokenStore.clear();
-    },
     clearError(state) {
       state.error = null;
     },
@@ -102,9 +111,24 @@ const authSlice = createSlice({
       .addCase(restoreSession.rejected, (state) => {
         state.loading = false;
         state.user = null;
+      })
+
+      .addCase(logout.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(logout.fulfilled, (state) => {
+        state.loading = false;
+        state.user = null;
+        state.error = null;
+      })
+      .addCase(logout.rejected, (state) => {
+        // Network failed but we still clear locally.
+        state.loading = false;
+        state.user = null;
+        state.error = null;
       });
   },
 });
 
-export const { logout, clearError } = authSlice.actions;
+export const { clearError } = authSlice.actions;
 export default authSlice.reducer;

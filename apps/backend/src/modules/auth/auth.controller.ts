@@ -14,7 +14,7 @@ import type { LoginResponse, AuthTokens, AuthenticatedUser } from '@g88/shared';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
-import { LoginDto, RefreshDto, RegisterDto } from './dto';
+import { LoginDto, LogoutDto, RefreshDto, RegisterDto } from './dto';
 
 @Controller('auth')
 export class AuthController {
@@ -38,6 +38,13 @@ export class AuthController {
   @SkipThrottle()
   async refresh(@Body() dto: RefreshDto): Promise<AuthTokens> {
     return this.auth.refresh(dto.refreshToken);
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @SkipThrottle()
+  async logout(@Body() dto: LogoutDto): Promise<void> {
+    return this.auth.logout(dto.refreshToken);
   }
 
   @Get('me')
