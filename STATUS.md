@@ -157,7 +157,7 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 - [x] pnpm 11 migration: move `overrides` + `onlyBuiltDependencies` from `package.json` to `pnpm-workspace.yaml`; bump Node 22 in all CI workflows; fix `gradlew` execute bit; opt into Node.js 24 action runners
 - [ ] **A3** — Apple Sign-In (`POST /auth/oauth/apple`) — P2, required before App Store submission
 - [ ] **C6** — Mobile chat outbox (P2)
-- [ ] Update `ARCHITECTURE.md` change log
+- [x] Update `ARCHITECTURE.md` change log
 
 ---
 
