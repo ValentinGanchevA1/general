@@ -1,6 +1,6 @@
 # STATUS — G88 Reconciliation & P1
 
-> **Last updated:** 2026-05-21
+> **Last updated:** 2026-05-22
 > **Current phase:** R4 complete — all P1 pillars done
 > **Owner:** [your name]
 >
@@ -153,7 +153,8 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 - [x] **A2** — `POST /auth/oauth/google` + mobile `loginWithGoogle` thunk + AuthScreen button (`0004_oauth.sql`)
 - [x] Android CI workflow with Maps key injection from secrets (`android-build.yml`)
 - [x] Fix `.gitignore` for `android/app/.cxx/` — untracked 514 build artifacts
-- [x] Patch 8/10 Dependabot vulnerabilities via pnpm overrides
+- [x] Patch 10/10 Dependabot vulnerabilities via pnpm overrides (uuid last, closed 2026-05-22)
+- [x] pnpm 11 migration: move `overrides` + `onlyBuiltDependencies` from `package.json` to `pnpm-workspace.yaml`; bump Node 22 in all CI workflows; fix `gradlew` execute bit; opt into Node.js 24 action runners
 - [ ] **A3** — Apple Sign-In (`POST /auth/oauth/apple`) — P2, required before App Store submission
 - [ ] **C6** — Mobile chat outbox (P2)
 - [ ] Update `ARCHITECTURE.md` change log
@@ -198,3 +199,4 @@ All four must be true:
 - **2026-05-14** — Initial draft. R1 not yet started. Reconciliation verdicts locked.
 - **2026-05-20** — R2 (P0 backend) + R3 (P0 mobile) complete.
 - **2026-05-21** — R4 complete. All six P1 pillars done. A1 (opaque refresh tokens) + A2 (Google OAuth) shipped. Apple OAuth deferred to P2 (A3). Android CI, .gitignore, and Dependabot fixes also landed.
+- **2026-05-22** — CI/tooling hardening. Migrated to pnpm 11 (workspace settings to `pnpm-workspace.yaml`). Bumped Node 22 (required by pnpm 11). Opted into Node.js 24 GitHub Actions runners ahead of June 2 deadline. Fixed `gradlew` execute bit (Android Build now green). Closed final Dependabot alert (uuid → 11.1.1, all 10/10 resolved).
