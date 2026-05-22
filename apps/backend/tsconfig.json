@@ -3,6 +3,7 @@
     "target": "ES2022",
     "module": "commonjs",
     "lib": ["ES2022"],
+    "baseUrl": ".",
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
@@ -12,6 +13,7 @@
     "forceConsistentCasingInFileNames": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
+      "@/*": ["src/*"],
       "@g88/shared": ["../../packages/shared/src"]
     }
   },
