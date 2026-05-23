@@ -3,20 +3,23 @@ import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
-import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { useAppDispatch } from '@/hooks/redux';
+import { setPendingFilter } from '@/features/pulse/pulseSlice';
 import { ACTION_HUB_ACTIONS, type ActionHubAction } from './actionHubActions';
-
-type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function ActionHub(): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const nav = useNavigation<Nav>();
+  // useNavigation returns Stack nav here (ActionHub is outside Tab.Navigator).
+  // Calling navigate('Pulse') propagates the action to the nested Tab navigator.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nav = useNavigation<any>();
+  const dispatch = useAppDispatch();
 
   const onAction = (a: ActionHubAction): void => {
     setOpen(false);
-    nav.navigate('Main', { screen: 'Pulse', params: { filter: a.filter } });
+    dispatch(setPendingFilter(a.filter));
+    nav.navigate('Main', { screen: 'Pulse' });
   };
 
   return (

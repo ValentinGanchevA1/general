@@ -13,7 +13,7 @@ import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { ActivityItem, ActivityType } from '@g88/shared';
 import type { RootStackParamList, TabParamList, PulseFilter } from '@/navigation/AppNavigator';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { fetchFeed } from '@/features/pulse/pulseSlice';
+import { fetchFeed, clearPendingFilter } from '@/features/pulse/pulseSlice';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type R = RouteProp<TabParamList, 'Pulse'>;
@@ -66,12 +66,19 @@ export function PulseScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<Nav>();
   const route = useRoute<R>();
-  const { items, loading, error } = useAppSelector((s) => s.pulse);
+  const { items, loading, error, pendingFilter } = useAppSelector((s) => s.pulse);
   const [filter, setFilter] = useState<PulseFilter>(route.params?.filter ?? 'all');
 
   useEffect(() => {
     if (route.params?.filter) setFilter(route.params.filter);
   }, [route.params?.filter]);
+
+  useEffect(() => {
+    if (pendingFilter) {
+      setFilter(pendingFilter as PulseFilter);
+      dispatch(clearPendingFilter());
+    }
+  }, [pendingFilter, dispatch]);
 
   const load = useCallback(() => {
     const f = FILTERS.find((x) => x.key === filter);

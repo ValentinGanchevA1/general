@@ -10,6 +10,7 @@ export interface PulseState {
   loading: boolean;
   error: string | null;
   lastFetchedAt: string | null;
+  pendingFilter: string | null;
 }
 
 const initialState: PulseState = {
@@ -17,6 +18,7 @@ const initialState: PulseState = {
   loading: false,
   error: null,
   lastFetchedAt: null,
+  pendingFilter: null,
 };
 
 export interface FetchFeedArgs {
@@ -44,6 +46,8 @@ const slice = createSlice({
   initialState,
   reducers: {
     clearPulse: (s) => { s.items = []; s.error = null; },
+    setPendingFilter: (s, a: PayloadAction<string>) => { s.pendingFilter = a.payload; },
+    clearPendingFilter: (s) => { s.pendingFilter = null; },
   },
   extraReducers: (b) => {
     b.addCase(fetchFeed.pending, (s) => { s.loading = true; s.error = null; });
@@ -57,5 +61,5 @@ const slice = createSlice({
   },
 });
 
-export const { clearPulse } = slice.actions;
+export const { clearPulse, setPendingFilter, clearPendingFilter } = slice.actions;
 export default slice.reducer;
