@@ -1,6 +1,8 @@
 services:
   postgres:
-    build: ./docker/postgres
+    build:
+      context: ./docker/postgres
+      dockerfile: Dockerfile
     container_name: g88-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-g88}
@@ -15,6 +17,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:7-alpine
@@ -28,6 +36,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   postgres_data:

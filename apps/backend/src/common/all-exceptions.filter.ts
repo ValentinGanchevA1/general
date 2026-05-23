@@ -31,7 +31,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (typeof body === 'object' && body !== null) {
         const b = body as Record<string, unknown>;
         code = typeof b['code'] === 'string' ? b['code'] : `http.${statusCode}`;
-        message = typeof b['message'] === 'string' ? b['message'] : exception.message;
+        // ValidationPipe puts constraint strings in message as an array.
+        message = typeof b['message'] === 'string'
+          ? b['message']
+          : Array.isArray(b['message'])
+            ? (b['message'] as unknown[]).map(String).join('; ')
+            : exception.message;
         details = typeof b['details'] === 'object' && b['details'] !== null
           ? (b['details'] as Record<string, unknown>)
           : undefined;

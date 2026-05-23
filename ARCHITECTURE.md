@@ -91,7 +91,18 @@ The Pulse tab surface aggregates heterogeneous event types (chats, waves, listin
 
 **ActionHub FAB.** The `+` button opens a bottom sheet of quick-action entries, each navigating to the Pulse tab with a `filter` param pre-set. Filter is a URL-like prop (`PulseFilter` in `TabParamList.Pulse`) rather than local state so deep-links and notification taps can land on a specific view.
 
-### 3.8 Viewport-diff protocol (Phase 1.5)
+### 3.8 Migration system
+
+`apps/backend/scripts/migrate.js` runs `.sql` files in `migrations/` in filename order. Applied migrations are recorded in a `schema_migrations` table (created on first run). Re-running `migration:run` skips already-applied files — the command is safe to call on any environment at any time.
+
+Migration files are append-only and never edited after merge. Schema invariants enforced in migrations:
+
+- **`0002_profile_fields.sql`** — adds `bio TEXT` to `users`. Profile completion = `bio IS NOT NULL AND avatar_url IS NOT NULL`.
+- **`0003_refresh_tokens.sql`** — opaque refresh token table (DB-stored, hashed, rotating).
+- **`0004_oauth.sql`** — OAuth provider linkage for Google (and Apple when it ships).
+- **`0005_h3_not_null_backfill.sql`** — enforces H3 cell completeness: CHECK constraint on `users` (location nullable, but if set all r4–r10 cells must be populated); NOT NULL on `events`/`listings`; adds missing r4/r6/r8 indexes for cluster queries at low/mid zoom.
+
+### 3.9 Viewport-diff protocol (Phase 1.5)
 
 First nearby query returns the full set plus a `viewportHash`. Subsequent queries within the same session send the previous hash; server returns `{added, removed, updated}` diff if the viewport overlaps. Cuts payload and battery further. Behind a feature flag for now — full responses are fine at MVP scale.
 
@@ -133,4 +144,4 @@ JWT access token (15min) + opaque refresh token (30d, rotating, stored hashed in
 - **2026-05-20** — R2 (P0 backend) + R3 (P0 mobile) complete. Chat persistence wired (`chat.service.ts` + `messages` table). REST endpoints for conversations/messages added. Wave sender fully hydrated in `emitWaveReceived`. FCM notifications module added (token registration + send-on-offline). `presence:delta` emitter implemented on H3 cell boundary cross. `conversation:join` socket handler added. Mobile: `AuthScreen`, `ProfileCreationScreen`, `ProfileEditScreen`, `InboxScreen`, `ChatScreen`, `SettingsScreen`, `ErrorBoundary` all ported/rebuilt. `AppNavigator` auth gate implemented.
 - **2026-05-21** — R4 (P1 hardening) complete. Auth §5 implemented: refresh tokens are now opaque, DB-stored, rotating, and revocable (`0003_refresh_tokens.sql`). Google OAuth added server + mobile (`0004_oauth.sql`, `POST /auth/oauth/google`). Apple OAuth deferred to P2 (A3) — required before App Store submission. Android CI workflow added with Maps key injection. All 10 Dependabot security advisories patched via pnpm overrides.
 - **2026-05-22** — Tooling hardening. Migrated to pnpm 11: workspace settings (`overrides`, `allowBuilds`) moved from `package.json` to `pnpm-workspace.yaml`. CI upgraded to Node 22 (minimum required by pnpm 11). All GitHub Actions workflows opted into Node.js 24 runners ahead of the June 2 forced cutover. Fixed `gradlew` execute-bit (Android Build green). Final Dependabot alert closed (uuid → 11.1.1).
-- **2026-05-23** — R5: Pulse v1. Added `GET /api/v1/feed` aggregator (`FeedService`, `FeedModule`). `ActivityItem` / `FeedResponse` shared types in `@g88/shared/activity`. Mobile: `PulseScreen` with filter chips, `pulseSlice` async thunk, `ActionHub` FAB bottom-sheet with `PulseFilter` deep-link routing. Tab bar renamed Map · Pulse · Profile. See §3.7 for design rationale.
+- **2026-05-23** — R5: Pulse v1. Added `GET /api/v1/feed` aggregator (`FeedService`, `FeedModule`). `ActivityItem` / `FeedResponse` shared types in `@g88/shared/activity`. Mobile: `PulseScreen` with filter chips, `pulseSlice` async thunk, `ActionHub` FAB bottom-sheet with `PulseFilter` deep-link routing. Tab bar renamed Map · Pulse · Profile. See §3.7 for design rationale. Added §3.8: migration system — `schema_migrations` tracking table, idempotent `migration:run`, documented per-migration invariants (`0002`–`0005`).

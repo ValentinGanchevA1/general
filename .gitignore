@@ -147,6 +147,5 @@ temp/
 
 # ─── Project-specific scratch ────────────────────────────────────────────────
 # Mirrors the .idea/g88.iml exclude folders
-.tmp/
 /temp/
 /tmp/

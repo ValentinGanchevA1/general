@@ -1,10 +1,11 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useCallback } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from '@/navigation/AppNavigator';
-import { useAppSelector } from '@/hooks/redux';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { fetchProfile } from '@/features/profile/profileSlice';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -23,9 +24,15 @@ function InitialsAvatar({ name }: { name: string }): React.JSX.Element {
 }
 
 export function ProfileScreen(): React.JSX.Element {
+  const dispatch = useAppDispatch();
   const navigation = useNavigation<Nav>();
-  const profile = useAppSelector((s) => s.profile.profile);
+  const { profile, loading } = useAppSelector((s) => s.profile);
 
+  useFocusEffect(useCallback(() => { void dispatch(fetchProfile()); }, [dispatch]));
+
+  if (loading && !profile) {
+    return <View style={styles.root}><ActivityIndicator style={{ flex: 1 }} color="#00d4ff" /></View>;
+  }
   if (!profile) return <View style={styles.root} />;
 
   return (

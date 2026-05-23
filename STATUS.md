@@ -162,6 +162,8 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 
 - [x] **A1** — Opaque DB-stored rotating refresh tokens (`0003_refresh_tokens.sql`)
 - [x] **A2** — `POST /auth/oauth/google` + mobile `loginWithGoogle` thunk + AuthScreen button (`0004_oauth.sql`)
+- [x] `0002_profile_fields.sql` — adds `bio TEXT` to `users`; profile completion = bio + avatar_url both non-null
+- [x] `0005_h3_not_null_backfill.sql` — H3 cell completeness constraint on `users`; NOT NULL enforcement on `events`/`listings`; missing r4/r6/r8 indexes added
 - [x] Android CI workflow with Maps key injection from secrets (`android-build.yml`)
 - [x] Fix `.gitignore` for `android/app/.cxx/` — untracked 514 build artifacts
 - [x] Patch 10/10 Dependabot vulnerabilities via pnpm overrides (uuid last, closed 2026-05-22)
@@ -211,4 +213,4 @@ All four must be true:
 - **2026-05-20** — R2 (P0 backend) + R3 (P0 mobile) complete.
 - **2026-05-21** — R4 complete. All six P1 pillars done. A1 (opaque refresh tokens) + A2 (Google OAuth) shipped. Apple OAuth deferred to P2 (A3). Android CI, .gitignore, and Dependabot fixes also landed.
 - **2026-05-22** — CI/tooling hardening. Migrated to pnpm 11 (workspace settings to `pnpm-workspace.yaml`). Bumped Node 22 (required by pnpm 11). Opted into Node.js 24 GitHub Actions runners ahead of June 2 deadline. Fixed `gradlew` execute bit (Android Build now green). Closed final Dependabot alert (uuid → 11.1.1, all 10/10 resolved).
-- **2026-05-23** — Pulse v1 shipped (R5). Activity feed backend (`GET /feed`, `FeedService` aggregating chats + waves). Mobile: `PulseScreen` with filter chips, `pulseSlice`, `ActionHub` FAB. Tab bar is now Map · Pulse · Profile. Shared `ActivityItem`/`FeedResponse` types in `@g88/shared`. All tests green, both typechecks clean.
+- **2026-05-23** — Pulse v1 shipped (R5). Activity feed backend (`GET /feed`, `FeedService` aggregating chats + waves). Mobile: `PulseScreen` with filter chips, `pulseSlice`, `ActionHub` FAB. Tab bar is now Map · Pulse · Profile. Shared `ActivityItem`/`FeedResponse` types in `@g88/shared`. All tests green, both typechecks clean. Post-R5 fixes: `ProfileScreen` dispatches `fetchProfile` on focus (stale profile on return from edit); `ActionHub` filter routing via Redux `pendingFilter` channel (navigation timing race); `AppNavigator` auth gate + `restoreSession` wired. Migration script made idempotent via `schema_migrations` tracking table — `migration:run` now skips already-applied files safely.

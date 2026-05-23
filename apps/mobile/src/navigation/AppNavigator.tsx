@@ -70,6 +70,7 @@ export function AppNavigator(): React.JSX.Element {
 	const dispatch = useAppDispatch();
 	const user = useAppSelector((s) => s.auth.user);
 	const loading = useAppSelector((s) => s.auth.loading);
+	const profileSetupComplete = useAppSelector((s) => s.auth.profileSetupComplete);
 
 	useEffect(() => {
 		void dispatch(restoreSession());
@@ -85,6 +86,9 @@ export function AppNavigator(): React.JSX.Element {
 			<Stack.Navigator screenOptions={{ headerShown: false }}>
 				{user ? (
 					<>
+						{!profileSetupComplete && (
+							<Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} />
+						)}
 						<Stack.Screen name="Main" component={MainTabs} />
 						<Stack.Screen name="Chat" component={ChatScreen} />
 						<Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
@@ -93,7 +97,6 @@ export function AppNavigator(): React.JSX.Element {
 				) : (
 					<>
 						<Stack.Screen name="Auth" component={AuthScreen} />
-						<Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} />
 					</>
 				)}
 			</Stack.Navigator>

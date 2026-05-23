@@ -11,9 +11,24 @@ interface AuthState {
   user: AuthenticatedUser | null;
   loading: boolean;
   error: string | null;
+  /** false immediately after register — drives ProfileCreation gate in AppNavigator. */
+  profileSetupComplete: boolean;
 }
 
-const initialState: AuthState = { user: null, loading: false, error: null };
+const initialState: AuthState = {
+  user: null,
+  loading: false,
+  error: null,
+  profileSetupComplete: true,
+};
+
+function extractMessage(e: unknown, fallback: string): string {
+  if (e !== null && typeof e === 'object' && 'message' in e) {
+    return String((e as { message: unknown }).message);
+  }
+  if (e instanceof Error) return e.message;
+  return fallback;
+}
 
 export const login = createAsyncThunk(
   'auth/login',
@@ -23,7 +38,7 @@ export const login = createAsyncThunk(
       await tokenStore.set(res.tokens);
       return res.user;
     } catch (e: unknown) {
-      return rejectWithValue(e instanceof Error ? e.message : 'Login failed');
+      return rejectWithValue(extractMessage(e, 'Login failed'));
     }
   },
 );
@@ -39,7 +54,7 @@ export const register = createAsyncThunk(
       await tokenStore.set(res.tokens);
       return res.user;
     } catch (e: unknown) {
-      return rejectWithValue(e instanceof Error ? e.message : 'Registration failed');
+      return rejectWithValue(extractMessage(e, 'Registration failed'));
     }
   },
 );
@@ -59,7 +74,7 @@ export const loginWithGoogle = createAsyncThunk(
       await tokenStore.set(res.tokens);
       return res.user;
     } catch (e: unknown) {
-      return rejectWithValue(e instanceof Error ? e.message : 'Google sign-in failed');
+      return rejectWithValue(extractMessage(e, 'Google sign-in failed'));
     }
   },
 );
@@ -114,6 +129,7 @@ const authSlice = createSlice({
       .addCase(login.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload;
+        state.profileSetupComplete = true;
       })
       .addCase(login.rejected, rejected)
 
@@ -121,6 +137,8 @@ const authSlice = createSlice({
       .addCase(register.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload;
+        // New user — drive them to ProfileCreation before Main.
+        state.profileSetupComplete = false;
       })
       .addCase(register.rejected, rejected)
 
@@ -128,6 +146,7 @@ const authSlice = createSlice({
       .addCase(loginWithGoogle.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload;
+        state.profileSetupComplete = true;
       })
       .addCase(loginWithGoogle.rejected, rejected)
 
@@ -135,6 +154,7 @@ const authSlice = createSlice({
       .addCase(restoreSession.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload;
+        state.profileSetupComplete = true;
       })
       .addCase(restoreSession.rejected, (state) => {
         state.loading = false;
@@ -148,13 +168,23 @@ const authSlice = createSlice({
         state.loading = false;
         state.user = null;
         state.error = null;
+        state.profileSetupComplete = true;
       })
       .addCase(logout.rejected, (state) => {
         // Network failed but we still clear locally.
         state.loading = false;
         state.user = null;
         state.error = null;
-      });
+        state.profileSetupComplete = true;
+      })
+      // When profile/update succeeds (bio saved), unlock Main.
+      // Uses string matcher to avoid circular import with profileSlice.
+      .addMatcher(
+        (action) => action.type === 'profile/update/fulfilled',
+        (state) => {
+          state.profileSetupComplete = true;
+        },
+      );
   },
 });
 

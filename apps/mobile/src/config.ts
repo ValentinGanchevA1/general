@@ -1,6 +1,11 @@
 import { Platform } from 'react-native';
 
-const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+// ─── Dev API host ─────────────────────────────────────────────────────────────
+// Android emulator     → '10.0.2.2'   (AVD special loopback to host machine)
+// Real device via USB  → 'localhost'   requires: adb reverse tcp:3001 tcp:3001
+// Real device via Wi-Fi→ '192.168.x.x' your machine's LAN IP
+// iOS simulator        → 'localhost'
+const DEV_HOST = Platform.OS === 'android' ? 'localhost' : 'localhost';
 
 export const Config = {
   API_BASE_URL: __DEV__

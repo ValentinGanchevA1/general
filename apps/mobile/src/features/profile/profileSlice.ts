@@ -5,6 +5,14 @@ import type { UserProfile, UpdateProfileRequest } from '@g88/shared';
 import { getJson, patchJson } from '@/api/client';
 import { logout } from '@/features/auth/authSlice';
 
+function extractMessage(e: unknown, fallback: string): string {
+  if (e !== null && typeof e === 'object' && 'message' in e) {
+    return String((e as { message: unknown }).message);
+  }
+  if (e instanceof Error) return e.message;
+  return fallback;
+}
+
 interface ProfileState {
   profile: UserProfile | null;
   loading: boolean;
@@ -24,7 +32,7 @@ export const fetchProfile = createAsyncThunk('profile/fetch', async (_, { reject
   try {
     return await getJson<UserProfile>('/users/me/profile');
   } catch (e) {
-    return rejectWithValue(e instanceof Error ? e.message : 'Failed to load profile');
+    return rejectWithValue(extractMessage(e, 'Failed to load profile'));
   }
 });
 
@@ -34,7 +42,7 @@ export const updateProfile = createAsyncThunk(
     try {
       return await patchJson<UpdateProfileRequest, UserProfile>('/users/me/profile', req);
     } catch (e) {
-      return rejectWithValue(e instanceof Error ? e.message : 'Failed to update profile');
+      return rejectWithValue(extractMessage(e, 'Failed to update profile'));
     }
   },
 );
