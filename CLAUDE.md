@@ -34,20 +34,20 @@ G88 is a **map-first, location-based social platform**. Users appear as interact
 
 ## Current Stack (in use)
 
-| Layer | Tech |
-|---|---|
-| Mobile | React Native 0.83 (CLI), React 19, TypeScript 5.8, Redux Toolkit 2, React Navigation 7 |
-| Backend (REST) | NestJS 11, TypeORM 0.3 (DataSource only, raw SQL), TypeScript 5.3, Node ≥20 |
-| Realtime gateway | NestJS, Socket.IO 4 with Redis adapter (separate deploy from REST) |
-| Database | PostgreSQL 16 + PostGIS + H3-PG (`geography(Point,4326)` + H3 cell columns r5/7/9/10, GIST indexes) |
-| Cache / Presence / Pub-Sub | Redis 7 (sorted sets per H3 r8 cell, 120s TTL) |
-| Spatial index | H3 (Uber hexagonal hierarchical), server-side clustering at zoom <14 |
-| Storage | AWS S3 (presigned URLs) |
-| Payments | Stripe (Connect Express) — scaffolded, deferred until commerce pillar |
-| Auth | JWT access 15m + refresh 30d (rotation to opaque DB-stored in flight — see STATUS.md) |
-| Push | Firebase Cloud Messaging (Android + iOS via APNs proxy) |
-| External | Twilio (SMS OTP), SendGrid (transactional email), AWS Rekognition (face compare, deferred) |
-| Deploy | Render.com (two services: `g88-api` and `g88-realtime`), managed Postgres, GitHub Actions CI |
+| Layer                      | Tech                                                                                                           |
+|----------------------------|----------------------------------------------------------------------------------------------------------------|
+| Mobile                     | React Native 0.83 (CLI), React 19, TypeScript 5.8, Redux Toolkit 2, React Navigation 7                         |
+| Backend (REST)             | NestJS 11, TypeORM 0.3 (DataSource only, raw SQL), TypeScript 5.3, Node ≥20                                    |
+| Realtime gateway           | NestJS, Socket.IO 4 with Redis adapter (separate deploy from REST)                                             |
+| Database                   | PostgreSQL 16 + PostGIS + H3-PG (`geography(Point,4326)` + H3 cell columns r5/7/9/10, GIST indexes)            |
+| Cache / Presence / Pub-Sub | Redis 7 (sorted sets per H3 r8 cell, 120s TTL)                                                                 |
+| Spatial index              | H3 (Uber hexagonal hierarchical), server-side clustering at zoom <14                                           |
+| Storage                    | AWS S3 (presigned URLs)                                                                                        |
+| Payments                   | Stripe (Connect Express) — scaffolded, deferred until commerce pillar                                          |
+| Auth                       | JWT access 15m + refresh 30d (rotation to opaque DB-stored in flight — see STATUS.md)                          |
+| Push                       | Firebase Cloud Messaging (Android + iOS via APNs proxy)                                                        |
+| External                   | Twilio (SMS OTP), SendGrid (transactional email), AWS Rekognition (face compare, deferred)                     |
+| Deploy                     | Render.com (two services: `g88-api` and `g88-realtime`), managed Postgres, GitHub Actions CI                   |
 
 ## Deferred Stack (not yet adopted)
 
@@ -90,16 +90,16 @@ g88/
 
 ## Where to Find Authoritative Info
 
-| Question | Source |
-|---|---|
-| System design, decisions, "why is it like this?" | `ARCHITECTURE.md` |
-| Current P1 pillar progress, what's blocked, what's next | `STATUS.md` |
-| Database schema | `apps/backend/migrations/0001_initial.sql` |
-| API DTOs and socket event contracts | `packages/shared/src/` |
-| Quick start, dev commands | `README.md` |
-| Tech debt backlog (legacy ranking still applies) | `TECH_DEBT_AUDIT.md` |
-| Product roadmap (post-P1) | `PRODUCT.md` |
-| Marketing/vision deck | `docs/marketing/bestRecentMVP.html` (not engineering source) |
+| Question                                                | Source                                                       |
+|---------------------------------------------------------|--------------------------------------------------------------|
+| System design, decisions, "why is it like this?"        | `ARCHITECTURE.md`                                            |
+| Current P1 pillar progress, what's blocked, what's next | `STATUS.md`                                                  |
+| Database schema                                         | `apps/backend/migrations/0001_initial.sql`                   |
+| API DTOs and socket event contracts                     | `packages/shared/src/`                                       |
+| Quick start, dev commands                               | `README.md`                                                  |
+| Tech debt backlog (legacy ranking still applies)        | `TECH_DEBT_AUDIT.md`                                         |
+| Product roadmap (post-P1)                               | `PRODUCT.md`                                                 |
+| Marketing/vision deck                                   | `docs/marketing/bestRecentMVP.html` (not engineering source) |
 
 ## Important Conventions
 
