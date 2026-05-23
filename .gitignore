@@ -149,3 +149,6 @@ temp/
 # Mirrors the .idea/g88.iml exclude folders
 /temp/
 /tmp/
+
+# ─── Claude Code local settings (may contain personal tokens / DB URLs) ──────
+.claude/settings.local.json
