@@ -11,6 +11,7 @@ import { InteractionsModule } from './modules/interactions/interactions.module';
 import { PresenceModule } from './modules/presence/presence.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { FeedModule } from './modules/feed/feed.module';
 import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
@@ -45,6 +46,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     PresenceModule,
     ChatModule,
     NotificationsModule,
+    FeedModule,
     RealtimeModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

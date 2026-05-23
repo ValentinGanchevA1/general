@@ -13,6 +13,7 @@ if (!process.env.DATABASE_URL && !process.env.DB_HOST && process.env.NODE_ENV ==
 
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import type { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
@@ -24,6 +25,20 @@ async function bootstrap(): Promise<void> {
   app.use(helmet());
 
   app.setGlobalPrefix('api/v1');
+
+  // Development request logger to help debug emulator <-> host networking
+  if (process.env.NODE_ENV !== 'production') {
+    app.use((req: Request, _res: Response, next: NextFunction) => {
+      // Log limited request info to avoid leaking sensitive data
+      // Timestamp, method, url, remote ip (from express) and content-length if present
+      const time = new Date().toISOString();
+      const ip = (req.headers['x-forwarded-for'] as string) || req.socket?.remoteAddress || 'unknown';
+      const len = req.headers['content-length'] ?? '-';
+      // eslint-disable-next-line no-console
+      console.log(`[HTTP] ${time} ${req.method} ${req.originalUrl} from ${ip} len=${len}`);
+      next();
+    });
+  }
 
   app.useGlobalFilters(new AllExceptionsFilter());
 
