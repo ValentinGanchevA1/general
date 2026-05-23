@@ -77,7 +77,21 @@ Sharing the codebase keeps DTOs and services consistent; deploying separately me
 
 `@g88/shared/events` defines `ClientToServerEvents` and `ServerToClientEvents`. Both the gateway and the mobile `useSocket` hook are generic over these types. Adding a new event without updating the shared types is a compile error.
 
-### 3.7 Viewport-diff protocol (Phase 1.5)
+### 3.7 Activity feed aggregator (`GET /feed`)
+
+The Pulse tab surface aggregates heterogeneous event types (chats, waves, listings, alerts, matches) into a single chronological `ActivityItem[]`. Design choices:
+
+**Pull, not push (v1).** The mobile client fetches on focus and on pull-to-refresh. A `since` cursor lets the client ask for only items newer than the last fetch. Socket push of `activity:new` events is planned for v1.5 — the `ActivityItem` shape is already socket-ready.
+
+**Schema-aware heuristics.** The schema has no `recipient_id` on `messages` (recipient is determined via `conversations.participant_ids`) and no `read_at` (unread is a 24h heuristic: `sender_id ≠ me AND created_at > NOW() - interval '24 hours'`). Waves use `responded_at IS NULL` as the unread proxy. These are acknowledged tech-debt shortcuts (C6 in P2 backlog).
+
+**Shared types, not duplicated DTOs.** `packages/shared/src/activity.ts` owns `ActivityItem`, `ActivityType`, and `FeedResponse`. Both the backend serializer and the mobile `pulseSlice` import from there — adding a new activity type requires one change, not two.
+
+**Deep-link routing.** Each `ActivityItem` carries a `deepLink: { screen, params }` that matches `RootStackParamList`. The mobile layer calls `navigation.navigate(screen, params)` without needing to know what produced the item.
+
+**ActionHub FAB.** The `+` button opens a bottom sheet of quick-action entries, each navigating to the Pulse tab with a `filter` param pre-set. Filter is a URL-like prop (`PulseFilter` in `TabParamList.Pulse`) rather than local state so deep-links and notification taps can land on a specific view.
+
+### 3.8 Viewport-diff protocol (Phase 1.5)
 
 First nearby query returns the full set plus a `viewportHash`. Subsequent queries within the same session send the previous hash; server returns `{added, removed, updated}` diff if the viewport overlaps. Cuts payload and battery further. Behind a feature flag for now — full responses are fine at MVP scale.
 
@@ -88,8 +102,8 @@ See `apps/backend/migrations/0001_initial.sql` for the canonical schema. Key ent
 - `users` — auth identity + profile + `location geometry(Point,4326)` + `location_h3_r{5,7,9,10}` + `verification_level`.
 - `events` — host, time window, location, capacity, RSVP count.
 - `listings` — seller, price, category, location, status.
-- `waves` — from_user_id, to_user_id, context, created_at, responded_at.
-- `conversations` + `messages` — chat; a wave becoming reciprocal upgrades to a conversation.
+- `waves` — from_user_id, to_user_id, context, created_at, responded_at (not acknowledged_at), conversation_id when reciprocal.
+- `conversations` + `messages` — chat; a wave becoming reciprocal upgrades to a conversation. `messages` has no `recipient_id` (use `participant_ids`) and no `read_at` (unread is a 24h heuristic).
 - `device_tokens` — FCM/APNs registration per user per device.
 
 A materialized view `v_discoverable_entity` unions `users`, `events`, `listings` into a single (id, kind, location, h3 cells, visibility) shape so discovery queries don't need three UNIONs at request time.
@@ -119,3 +133,4 @@ JWT access token (15min) + opaque refresh token (30d, rotating, stored hashed in
 - **2026-05-20** — R2 (P0 backend) + R3 (P0 mobile) complete. Chat persistence wired (`chat.service.ts` + `messages` table). REST endpoints for conversations/messages added. Wave sender fully hydrated in `emitWaveReceived`. FCM notifications module added (token registration + send-on-offline). `presence:delta` emitter implemented on H3 cell boundary cross. `conversation:join` socket handler added. Mobile: `AuthScreen`, `ProfileCreationScreen`, `ProfileEditScreen`, `InboxScreen`, `ChatScreen`, `SettingsScreen`, `ErrorBoundary` all ported/rebuilt. `AppNavigator` auth gate implemented.
 - **2026-05-21** — R4 (P1 hardening) complete. Auth §5 implemented: refresh tokens are now opaque, DB-stored, rotating, and revocable (`0003_refresh_tokens.sql`). Google OAuth added server + mobile (`0004_oauth.sql`, `POST /auth/oauth/google`). Apple OAuth deferred to P2 (A3) — required before App Store submission. Android CI workflow added with Maps key injection. All 10 Dependabot security advisories patched via pnpm overrides.
 - **2026-05-22** — Tooling hardening. Migrated to pnpm 11: workspace settings (`overrides`, `allowBuilds`) moved from `package.json` to `pnpm-workspace.yaml`. CI upgraded to Node 22 (minimum required by pnpm 11). All GitHub Actions workflows opted into Node.js 24 runners ahead of the June 2 forced cutover. Fixed `gradlew` execute-bit (Android Build green). Final Dependabot alert closed (uuid → 11.1.1).
+- **2026-05-23** — R5: Pulse v1. Added `GET /api/v1/feed` aggregator (`FeedService`, `FeedModule`). `ActivityItem` / `FeedResponse` shared types in `@g88/shared/activity`. Mobile: `PulseScreen` with filter chips, `pulseSlice` async thunk, `ActionHub` FAB bottom-sheet with `PulseFilter` deep-link routing. Tab bar renamed Map · Pulse · Profile. See §3.7 for design rationale.
