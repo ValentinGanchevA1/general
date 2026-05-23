@@ -103,7 +103,7 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 | `verification/*` | DEFER | — | |
 | `trading/*`, `gifts/*`, `gamification/*`, `events/*`, `trending/*`, `payments/*`, `market/*` | DEFER | — | |
 | `notifications/NotificationsScreen` | PARTIAL PORT | DEFER | Not P0 |
-| `inbox/InboxScreen` | REBUILD | ✅ R3 done | Superseded by PulseScreen (R5). File kept as rollback safety for one sprint. |
+| `inbox/InboxScreen` | REBUILD | ✅ R3 done | Superseded by PulseScreen (R5). Rollback file removed 2026-05-23. |
 | `settings/{Settings,Privacy}Screen` | PORT | ✅ R3 done | SettingsScreen: visibility toggle + logout |
 | `components/ErrorBoundary`, `ScreenErrorBoundary` | PORT | ✅ R3 done | `apps/mobile/src/components/ErrorBoundary.tsx` |
 | `components/ActionHub` (center FAB) | REBUILD | ✅ R5 done | FAB + bottom-sheet launcher; navigates to Pulse tab with filter preset |
