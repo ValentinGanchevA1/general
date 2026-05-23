@@ -1,7 +1,7 @@
 # STATUS — G88 Reconciliation & P1
 
-> **Last updated:** 2026-05-22
-> **Current phase:** R4 complete — all P1 pillars done
+> **Last updated:** 2026-05-23
+> **Current phase:** R5 complete — Pulse v1 shipped (activity tab + ActionHub FAB)
 > **Owner:** [your name]
 >
 > Update this file as work progresses. It's the single source of truth for "where are we?".
@@ -103,10 +103,10 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 | `verification/*` | DEFER | — | |
 | `trading/*`, `gifts/*`, `gamification/*`, `events/*`, `trending/*`, `payments/*`, `market/*` | DEFER | — | |
 | `notifications/NotificationsScreen` | PARTIAL PORT | DEFER | Not P0 |
-| `inbox/InboxScreen` | REBUILD | ✅ R3 done | InboxScreen with enriched ConversationSummary + socket refresh |
+| `inbox/InboxScreen` | REBUILD | ✅ R3 done | Superseded by PulseScreen (R5). File kept as rollback safety for one sprint. |
 | `settings/{Settings,Privacy}Screen` | PORT | ✅ R3 done | SettingsScreen: visibility toggle + logout |
 | `components/ErrorBoundary`, `ScreenErrorBoundary` | PORT | ✅ R3 done | `apps/mobile/src/components/ErrorBoundary.tsx` |
-| `components/ActionHub` (center FAB) | DEFER | — | P1 tab bar = Map · Inbox · Profile, no FAB |
+| `components/ActionHub` (center FAB) | REBUILD | ✅ R5 done | FAB + bottom-sheet launcher; navigates to Pulse tab with filter preset |
 | `components/VerificationBadge`, `SocialLinksDisplay` | DEFER | — | |
 | `utils/eventBus` | reconciled | ✅ R3 done | `authEvents` in `client.ts` is the bus; no separate eventBus needed |
 | `utils/logger` | DEFER | — | `console.*` used for now; production silencing is C3 debt |
@@ -146,6 +146,17 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 - [x] Implement `AppNavigator` auth gate
 - [x] Port `Settings`/`Privacy` screens (logout + visibility toggle)
 - [x] Port `ErrorBoundary` + `ScreenErrorBoundary`
+
+### Phase R5 — Pulse v1 — ✅ COMPLETE 2026-05-23
+
+- [x] `packages/shared/src/activity.ts` — `ActivityItem`, `ActivityType`, `FeedResponse` shared types
+- [x] `GET /api/v1/feed` — `FeedService` aggregates chats + waves (schema-aware: recipient via `participant_ids`, unread heuristic, `responded_at` for waves)
+- [x] `FeedModule` registered in `AppModule`
+- [x] `pulseSlice` — async thunk over `/feed` with `since`/`types` params
+- [x] `PulseScreen` — filter chips (All / Chats / Waves / Trades / Alerts / Matches), pull-to-refresh, deep-link tap routing
+- [x] `ActionHub` FAB — bottom-sheet launcher; tapping an action navigates to Pulse tab with filter preset
+- [x] Tab bar renamed: Map · **Pulse** · Profile (InboxScreen kept as rollback safety)
+- [x] 3 backend tests + 5 mobile tests passing; both typechecks clean
 
 ### Phase R4 — P1 hardening — ✅ COMPLETE 2026-05-21
 
@@ -200,3 +211,4 @@ All four must be true:
 - **2026-05-20** — R2 (P0 backend) + R3 (P0 mobile) complete.
 - **2026-05-21** — R4 complete. All six P1 pillars done. A1 (opaque refresh tokens) + A2 (Google OAuth) shipped. Apple OAuth deferred to P2 (A3). Android CI, .gitignore, and Dependabot fixes also landed.
 - **2026-05-22** — CI/tooling hardening. Migrated to pnpm 11 (workspace settings to `pnpm-workspace.yaml`). Bumped Node 22 (required by pnpm 11). Opted into Node.js 24 GitHub Actions runners ahead of June 2 deadline. Fixed `gradlew` execute bit (Android Build now green). Closed final Dependabot alert (uuid → 11.1.1, all 10/10 resolved).
+- **2026-05-23** — Pulse v1 shipped (R5). Activity feed backend (`GET /feed`, `FeedService` aggregating chats + waves). Mobile: `PulseScreen` with filter chips, `pulseSlice`, `ActionHub` FAB. Tab bar is now Map · Pulse · Profile. Shared `ActivityItem`/`FeedResponse` types in `@g88/shared`. All tests green, both typechecks clean.
