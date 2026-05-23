@@ -1,5 +1,5 @@
 // apps/mobile/src/navigation/AppNavigator.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View } from 'react-native';
 import { NavigationContainer, type NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -9,8 +9,14 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { MapScreen } from '@/screens/MapScreen';
 import { PulseScreen } from '@/features/pulse/PulseScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
+import { ProfileCreationScreen } from '@/screens/ProfileCreationScreen';
+import { ProfileEditScreen } from '@/screens/ProfileEditScreen';
+import { ChatScreen } from '@/screens/ChatScreen';
+import { SettingsScreen } from '@/screens/SettingsScreen';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { ActionHub } from '@/components/ActionHub';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { restoreSession } from '@/features/auth/authSlice';
 
 export type PulseFilter = 'all' | 'chats' | 'waves' | 'listings' | 'alerts' | 'matches';
 
@@ -61,12 +67,35 @@ function MainTabs(): React.JSX.Element {
 }
 
 export function AppNavigator(): React.JSX.Element {
+	const dispatch = useAppDispatch();
+	const user = useAppSelector((s) => s.auth.user);
+	const loading = useAppSelector((s) => s.auth.loading);
+
+	useEffect(() => {
+		void dispatch(restoreSession());
+	}, [dispatch]);
+
+	// Blank dark screen while we check for a stored session
+	if (loading && user === null) {
+		return <View style={{ flex: 1, backgroundColor: '#0a0a0f' }} />;
+	}
+
 	return (
 		<NavigationContainer>
-			<Stack.Navigator>
-				<Stack.Screen name="Auth" component={AuthScreen} options={{ headerShown: false }} />
-				<Stack.Screen name="ProfileCreation" component={ProfileScreen} options={{ headerShown: false }} />
-				<Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+			<Stack.Navigator screenOptions={{ headerShown: false }}>
+				{user ? (
+					<>
+						<Stack.Screen name="Main" component={MainTabs} />
+						<Stack.Screen name="Chat" component={ChatScreen} />
+						<Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
+						<Stack.Screen name="Settings" component={SettingsScreen} />
+					</>
+				) : (
+					<>
+						<Stack.Screen name="Auth" component={AuthScreen} />
+						<Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} />
+					</>
+				)}
 			</Stack.Navigator>
 		</NavigationContainer>
 	);
