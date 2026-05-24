@@ -6,14 +6,16 @@
 // - Double-tap   → also expand (a11y alternative)
 // - Backdrop tap → collapse
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated, Modal, Pressable, StyleSheet, Text, Vibration, View,
 } from 'react-native';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { DiscoveryPoint } from '@g88/shared';
+import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppDispatch } from '@/hooks/redux';
 import { setPendingFilter } from '@/features/pulse/pulseSlice';
 import { track } from '@/lib/analytics';
@@ -42,13 +44,19 @@ export function ContextualFab(props: Props): React.JSX.Element {
   const ctx = useFabContext({ zoom, points, nearestUserId });
 
   const [open, setOpen] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nav = useNavigation<any>();
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const dispatch = useAppDispatch();
 
   const anim = useRef(new Animated.Value(0)).current;
   const lastTapAt = useRef(0);
   const expandStartAt = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (tapTimerRef.current !== null) clearTimeout(tapTimerRef.current);
+    };
+  }, []);
 
   const animateTo = useCallback((toValue: number): void => {
     Animated.spring(anim, {
@@ -123,7 +131,7 @@ export function ContextualFab(props: Props): React.JSX.Element {
       return;
     }
     lastTapAt.current = now;
-    setTimeout(() => {
+    tapTimerRef.current = setTimeout(() => {
       if (lastTapAt.current && Date.now() - lastTapAt.current >= DOUBLE_TAP_MS) {
         void runAction(ctx.primary, 'primary');
         lastTapAt.current = 0;

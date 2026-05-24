@@ -145,9 +145,13 @@ export function MapScreen(): React.JSX.Element {
 
   // ─── Render ────────────────────────────────────────────────────────────
   const nearestUserId = useMemo(() => {
-    const users = (data?.points ?? []).filter((p) => p.kind === 'user');
-    return users[0]?.id ?? null;
-  }, [data]);
+    if (!myCoords) return null;
+    const users = (data?.points ?? []).filter((p): p is EntityPoint => p.kind === 'user');
+    if (!users.length) return null;
+    return users.reduce((best, p) =>
+      squaredDist(myCoords, p) < squaredDist(myCoords, best) ? p : best,
+    ).id;
+  }, [data, myCoords]);
 
   const onFabAction = useCallback(async (id: FabActionId, contextKey: string): Promise<boolean> => {
     if (id === 'wave_nearest' && nearestUserId) {
@@ -251,6 +255,12 @@ function MapUnavailableFallback(): React.JSX.Element {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
+
+function squaredDist(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const dlat = a.lat - b.lat;
+  const dlng = a.lng - b.lng;
+  return dlat * dlat + dlng * dlng;
+}
 
 function toRNLatLng(p: DiscoveryPoint): RNLatLng {
   return { latitude: p.lat, longitude: p.lng };

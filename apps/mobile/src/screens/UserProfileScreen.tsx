@@ -5,7 +5,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
-export function UserProfileScreen({ route, navigation }: Props): React.JSX.Element {
+export function UserProfileScreen({ route }: Props): React.JSX.Element {
 	// The userId parameter is strongly typed based on your AppNavigator setup
 	const { userId } = route.params;
 

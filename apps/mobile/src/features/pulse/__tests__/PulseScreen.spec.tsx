@@ -7,19 +7,29 @@ import { NavigationContainer } from '@react-navigation/native';
 
 import { PulseScreen } from '../PulseScreen';
 
-// Minimal mock for fetchFeed thunk + pulse slice shape
-const mockReducer = (state = {
-  pulse: { items: [], loading: false, error: null, pendingFilter: null },
-  discovery: { points: [] },
-}) => state;
-
+// Keep thunks as no-ops; use the real reducer so initial state stays accurate.
 jest.mock('../pulseSlice', () => ({
+  ...jest.requireActual('../pulseSlice'),
   fetchFeed: jest.fn(() => ({ type: 'pulse/fetch/pending' })),
   clearPendingFilter: jest.fn(() => ({ type: 'pulse/clearPendingFilter' })),
 }));
 
+import authReducer from '@/features/auth/authSlice';
+import profileReducer from '@/features/profile/profileSlice';
+import chatReducer from '@/features/chat/chatSlice';
+import pulseReducer from '@/features/pulse/pulseSlice';
+import discoveryReducer from '@/features/discovery/discoverySlice';
+
 function wrap(children: React.ReactElement) {
-  const store = configureStore({ reducer: mockReducer });
+  const store = configureStore({
+    reducer: {
+      auth: authReducer,
+      profile: profileReducer,
+      chat: chatReducer,
+      pulse: pulseReducer,
+      discovery: discoveryReducer,
+    },
+  });
   return (
     <Provider store={store}>
       <NavigationContainer>{children}</NavigationContainer>

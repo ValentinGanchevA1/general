@@ -51,7 +51,7 @@ function bandForZoom(z: number): ZoomBand {
 }
 
 function densityFor(points: DiscoveryPoint[]): Density {
-  const n = points.length;
+  const n = points.filter((p) => p.kind === 'user').length;
   if (n === 0) return 0;
   if (n < 5) return 1;
   if (n < 20) return 2;
@@ -63,9 +63,10 @@ function pickPrimary(
   density: Density,
   visibility: Visibility,
   goal: string,
+  nearestUserId: string | null,
 ): FabActionId {
   if (visibility === 'off') return 'toggle_visibility';
-  if (zoomBand === 'near' && density >= 1) return 'wave_nearest';
+  if (zoomBand === 'near' && density >= 1 && nearestUserId !== null) return 'wave_nearest';
   if (zoomBand !== 'far' && goal === 'trading') return 'create_listing';
   return POST_ALERT_READY ? 'post_alert' : 'open_pulse';
 }
@@ -100,7 +101,7 @@ export function useFabContext(args: UseFabContextArgs): FabContext {
     const zoomBand = bandForZoom(args.zoom);
     const density = densityFor(args.points);
     const visibility: Visibility = isVisible ? 'on' : 'off';
-    const primary = pickPrimary(zoomBand, density, visibility, goalsPrimary);
+    const primary = pickPrimary(zoomBand, density, visibility, goalsPrimary, args.nearestUserId);
     const secondary = secondaryRanked(primary, zoomBand);
     const key = `z:${zoomBand}|d:${density}|v:${visibility}|g:${goalsPrimary}`;
     return {

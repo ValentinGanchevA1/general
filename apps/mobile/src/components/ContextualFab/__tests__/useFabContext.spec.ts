@@ -34,7 +34,7 @@ describe('useFabContext', () => {
     expect(result.current.visibility).toBe('off');
   });
 
-  it('picks wave_nearest at near zoom when people are present', () => {
+  it('picks wave_nearest at near zoom when user points and nearestUserId are present', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const points = [{ kind: 'user', id: 'u1', lat: 0, lng: 0, meta: {} }] as any;
     const { result } = renderHook(
@@ -44,6 +44,32 @@ describe('useFabContext', () => {
     expect(result.current.primary).toBe('wave_nearest');
     expect(result.current.zoomBand).toBe('near');
     expect(result.current.density).toBeGreaterThan(0);
+  });
+
+  it('does not pick wave_nearest when nearestUserId is null (no target)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const points = [{ kind: 'user', id: 'u1', lat: 0, lng: 0, meta: {} }] as any;
+    const { result } = renderHook(
+      () => useFabContext({ zoom: 16, points, nearestUserId: null }),
+      { wrapper: wrap(makeStore(true)) },
+    );
+    expect(result.current.primary).not.toBe('wave_nearest');
+  });
+
+  it('counts only user-kind points for density (events and listings do not raise density)', () => {
+    const points = [
+      { kind: 'event', id: 'e1', lat: 0, lng: 0, meta: {} },
+      { kind: 'listing', id: 'l1', lat: 0, lng: 0, meta: {} },
+      { kind: 'listing', id: 'l2', lat: 0, lng: 0, meta: {} },
+      { kind: 'listing', id: 'l3', lat: 0, lng: 0, meta: {} },
+      { kind: 'listing', id: 'l4', lat: 0, lng: 0, meta: {} },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ] as any;
+    const { result } = renderHook(
+      () => useFabContext({ zoom: 16, points, nearestUserId: null }),
+      { wrapper: wrap(makeStore(true)) },
+    );
+    expect(result.current.density).toBe(0);
   });
 
   it('falls back to open_pulse while POST_ALERT_READY=false (C3 flag)', () => {
