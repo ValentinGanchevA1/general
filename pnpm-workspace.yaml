@@ -3,6 +3,7 @@ packages:
   - "packages/*"
 allowBuilds:
   '@nestjs/core': true
+  '@sentry/cli': true
   bcrypt: true
   protobufjs: true
 overrides:

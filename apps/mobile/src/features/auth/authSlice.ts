@@ -1,4 +1,4 @@
-import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
 
 import type { AuthenticatedUser, LoginResponse, UserProfile } from '@g88/shared';
@@ -178,8 +178,8 @@ const authSlice = createSlice({
         (action) =>
           action.type === 'profile/fetch/fulfilled' ||
           action.type === 'profile/update/fulfilled',
-        (state, action) => {
-          state.profileSetupComplete = (action.payload as UserProfile).profileComplete;
+        (state, action: PayloadAction<UserProfile>) => {
+          state.profileSetupComplete = action.payload.profileComplete;
         },
       );
   },

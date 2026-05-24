@@ -13,4 +13,7 @@ export const Config = {
     : 'https://api.g88.app',
   // OAuth 2.0 Web Client ID from Google Cloud Console (same value used by backend GOOGLE_CLIENT_ID)
   GOOGLE_WEB_CLIENT_ID: 'TODO_REPLACE_WITH_GOOGLE_WEB_CLIENT_ID',
+  // Sentry DSN for the mobile app — create a React Native project in Sentry and paste the DSN here.
+  // Public value (not a secret). Leave empty to disable Sentry in dev builds.
+  SENTRY_DSN: '',
 } as const;

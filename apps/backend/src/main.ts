@@ -1,7 +1,22 @@
 import 'reflect-metadata';
 import { config as loadEnv } from 'dotenv';
 import { join } from 'path';
+import * as Sentry from '@sentry/nestjs';
+import { NestFactory } from '@nestjs/core';
+import { Logger, ValidationPipe } from '@nestjs/common';
+import type { Request, Response, NextFunction } from 'express';
+import helmet from 'helmet';
+import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/all-exceptions.filter';
+
 loadEnv({ path: join(process.cwd(), '../../.env') });
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: process.env.NODE_ENV ?? 'development',
+  enabled: !!process.env.SENTRY_DSN,
+  sendDefaultPii: false,
+});
 
 // Fail fast on missing critical secrets before any module loads.
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
@@ -10,13 +25,6 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
 if (!process.env.DATABASE_URL && !process.env.DB_HOST && process.env.NODE_ENV === 'production') {
   throw new Error('DATABASE_URL or DB_HOST must be set in production');
 }
-
-import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe } from '@nestjs/common';
-import type { Request, Response, NextFunction } from 'express';
-import helmet from 'helmet';
-import { AppModule } from './app.module';
-import { AllExceptionsFilter } from './common/all-exceptions.filter';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');

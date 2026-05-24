@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import * as Sentry from '@sentry/nestjs';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -52,6 +53,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `Unhandled exception on ${req.method} ${req.url}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
+      Sentry.captureException(exception);
     }
 
     res.status(statusCode).json({
