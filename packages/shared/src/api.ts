@@ -127,6 +127,7 @@ export interface UpdateProfileRequest {
 export interface UserProfile extends AuthenticatedUser {
   bio: string | null;
   visibility: 'public' | 'private';
+  goals?: string[];
   /** true when bio IS NOT NULL */
   profileComplete: boolean;
 }

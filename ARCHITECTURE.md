@@ -145,3 +145,20 @@ JWT access token (15min) + opaque refresh token (30d, rotating, stored hashed in
 - **2026-05-21** — R4 (P1 hardening) complete. Auth §5 implemented: refresh tokens are now opaque, DB-stored, rotating, and revocable (`0003_refresh_tokens.sql`). Google OAuth added server + mobile (`0004_oauth.sql`, `POST /auth/oauth/google`). Apple OAuth deferred to P2 (A3) — required before App Store submission. Android CI workflow added with Maps key injection. All 10 Dependabot security advisories patched via pnpm overrides.
 - **2026-05-22** — Tooling hardening. Migrated to pnpm 11: workspace settings (`overrides`, `allowBuilds`) moved from `package.json` to `pnpm-workspace.yaml`. CI upgraded to Node 22 (minimum required by pnpm 11). All GitHub Actions workflows opted into Node.js 24 runners ahead of the June 2 forced cutover. Fixed `gradlew` execute-bit (Android Build green). Final Dependabot alert closed (uuid → 11.1.1).
 - **2026-05-23** — R5: Pulse v1. Added `GET /api/v1/feed` aggregator (`FeedService`, `FeedModule`). `ActivityItem` / `FeedResponse` shared types in `@g88/shared/activity`. Mobile: `PulseScreen` with filter chips, `pulseSlice` async thunk, `ActionHub` FAB bottom-sheet with `PulseFilter` deep-link routing. Tab bar renamed Map · Pulse · Profile. See §3.7 for design rationale. Added §3.8: migration system — `schema_migrations` tracking table, idempotent `migration:run`, documented per-migration invariants (`0002`–`0005`).
+
+
+- **2026-05-24** — R6 / P2.5 UX track: `ContextualFab` replaces static `ActionHub`. Context-aware
+  speed dial driven by `useFabContext({ zoom, points, nearestUserId })` →
+  `pickPrimary(zoomBand, density, visibility, goalsPrimary)`. Decision rule:
+  `visibility=off → toggle_visibility` · `near+density≥1 → wave_nearest` ·
+  `non-far+trading → create_listing` · else `post_alert` (currently staged to
+  `open_pulse` via `POST_ALERT_READY=false` until X3 ships the real composer).
+  Pulse screen redesigned card-style (Nextdoor-inspired) with `ShareCTA`,
+  `NearbyPeopleStrip` (reads `discovery.points`), `ActivityCard`, and
+  `TrendingStrip` (mock until X4 backend contract). Analytics scaffold via
+  `lib/analytics.ts` — single entry point, swap impl on OB1. `AlertComposerScreen`
+  registered as a modal route placeholder (X3 = real impl).
+  Schema: `UserProfile` in `@g88/shared` extended with `goals?: string[]` (optional;
+  backend field deferred — not yet persisted, defaults to `'dating'` in `useFabContext`).
+  State wiring: `useFabContext` reads from `s.profile.profile` (profile slice), not
+  the auth slice — `visibility` maps to `isVisible`, `goals[0]` drives `goalsPrimary`.

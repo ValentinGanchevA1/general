@@ -9,12 +9,14 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { MapScreen } from '@/screens/MapScreen';
 import { PulseScreen } from '@/features/pulse/PulseScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
+import { UserProfileScreen } from '@/screens/UserProfileScreen';
 import { ProfileCreationScreen } from '@/screens/ProfileCreationScreen';
 import { ProfileEditScreen } from '@/screens/ProfileEditScreen';
 import { ChatScreen } from '@/screens/ChatScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
+import { AlertComposerScreen } from '@/screens/AlertComposerScreen';
+import type { AreaCategory } from '@g88/shared';
 import { AuthScreen } from '@/screens/AuthScreen';
-import { ActionHub } from '@/components/ActionHub';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { restoreSession } from '@/features/auth/authSlice';
 
@@ -33,6 +35,8 @@ export type RootStackParamList = {
 	Chat: { conversationId: string; otherUserName: string };
 	ProfileEdit: undefined;
 	Settings: undefined;
+	AlertComposer: { presetCategory?: AreaCategory; presetTag?: string };
+	UserProfile: { userId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -40,29 +44,28 @@ const Tab = createBottomTabNavigator<TabParamList>();
 
 function MainTabs(): React.JSX.Element {
 	return (
-		<View style={{ flex: 1 }}>
-			<Tab.Navigator
-				screenOptions={({ route }) => ({
-					headerShown: false,
-					tabBarStyle: { backgroundColor: '#0a0a0f', borderTopColor: '#1a1a2e', height: 64, paddingTop: 6 },
-					tabBarActiveTintColor: '#00d4ff',
-					tabBarInactiveTintColor: '#555',
-					tabBarIcon: ({ color, size }) => {
-						const icons: Record<string, string> = {
-							Map: 'map-marker-radius',
-							Pulse: 'pulse',
-							Profile: 'account-circle-outline',
-						};
-						return <MaterialCommunityIcons name={icons[route.name] ?? 'circle'} size={size} color={color} />;
-					},
-				})}
-			>
-				<Tab.Screen name="Map" component={MapScreen} />
-				<Tab.Screen name="Pulse" component={PulseScreen} />
-				<Tab.Screen name="Profile" component={ProfileScreen} />
-			</Tab.Navigator>
-			<ActionHub />
-		</View>
+		<Tab.Navigator
+			screenOptions={({ route }) => ({
+				headerShown: false,
+				tabBarStyle: { backgroundColor: '#0a0a0f', borderTopColor: '#1a1a2e', height: 64, paddingTop: 6 },
+				tabBarActiveTintColor: '#00d4ff',
+				tabBarInactiveTintColor: '#555',
+				tabBarIcon: ({ color, size }) => {
+					const icons = {
+						Map: 'map-marker-radius',
+						Pulse: 'pulse',
+						Profile: 'account-circle-outline',
+					} as const;
+					
+					const iconName = icons[route.name as keyof typeof icons] ?? 'circle';
+					return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
+				},
+			})}
+		>
+			<Tab.Screen name="Map" component={MapScreen} />
+			<Tab.Screen name="Pulse" component={PulseScreen} />
+			<Tab.Screen name="Profile" component={ProfileScreen} />
+		</Tab.Navigator>
 	);
 }
 
@@ -93,6 +96,8 @@ export function AppNavigator(): React.JSX.Element {
 						<Stack.Screen name="Chat" component={ChatScreen} />
 						<Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
 						<Stack.Screen name="Settings" component={SettingsScreen} />
+						<Stack.Screen name="AlertComposer" component={AlertComposerScreen} />
+						<Stack.Screen name="UserProfile" component={UserProfileScreen} />
 					</>
 				) : (
 					<>

@@ -3,6 +3,7 @@ import authReducer from '@/features/auth/authSlice';
 import profileReducer from '@/features/profile/profileSlice';
 import chatReducer from '@/features/chat/chatSlice';
 import pulseReducer from '@/features/pulse/pulseSlice';
+import discoveryReducer from '@/features/discovery/discoverySlice';
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     profile: profileReducer,
     chat: chatReducer,
     pulse: pulseReducer,
+    discovery: discoveryReducer,
   },
 });
 

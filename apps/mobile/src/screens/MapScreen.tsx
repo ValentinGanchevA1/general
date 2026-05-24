@@ -23,13 +23,18 @@ import type {
 } from '@g88/shared';
 
 import { useDiscovery } from '@/features/discovery/useDiscovery';
+import { setPoints } from '@/features/discovery/discoverySlice';
 import { useSocket } from '@/realtime/useSocket';
 import { postJson } from '@/api/client';
+import { useAppDispatch } from '@/hooks/redux';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { ClusterMarker } from '@/components/map/ClusterMarker';
 import { EntityMarker } from '@/components/map/EntityMarker';
 import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ContextualFab } from '@/components/ContextualFab';
+import type { FabActionId } from '@/components/ContextualFab/useFabContext';
+import { track } from '@/lib/analytics';
 
 /**
  * MapScreen
@@ -46,6 +51,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
  *   • socket lifecycle (useSocket singleton)
  */
 export function MapScreen(): React.JSX.Element {
+  const dispatch = useAppDispatch();
   const { coords: myCoords, requestPermission } = useUserLocation();
   const [region, setRegion] = useState<Region | null>(null);
   const [selected, setSelected] = useState<EntityPoint | null>(null);
@@ -57,6 +63,11 @@ export function MapScreen(): React.JSX.Element {
   const zoom = useMemo(() => (region ? approxZoomFromRegion(region) : 12), [region]);
 
   const { data, loading, error, refresh } = useDiscovery({ viewport, zoom });
+
+  // Sync discovery points to Redux so PulseScreen's NearbyPeopleStrip can read them.
+  useEffect(() => {
+    dispatch(setPoints(data?.points ?? []));
+  }, [data, dispatch]);
 
   // ─── Centre on user on first location fix ──────────────────────────────
   useEffect(() => {
@@ -126,12 +137,32 @@ export function MapScreen(): React.JSX.Element {
     } catch (e) {
       // eslint-disable-next-line no-console
       console.warn('wave failed', e);
+      throw e; // re-throw so callers (fab.conversion) can record the real outcome
     } finally {
       setWaving(null);
     }
   }, []);
 
   // ─── Render ────────────────────────────────────────────────────────────
+  const nearestUserId = useMemo(() => {
+    const users = (data?.points ?? []).filter((p) => p.kind === 'user');
+    return users[0]?.id ?? null;
+  }, [data]);
+
+  const onFabAction = useCallback(async (id: FabActionId, contextKey: string): Promise<boolean> => {
+    if (id === 'wave_nearest' && nearestUserId) {
+      const t0 = Date.now();
+      try {
+        await onWave(nearestUserId);
+        track('fab.conversion', { contextKey, actionId: id, latencyMs: Date.now() - t0, success: true });
+      } catch {
+        track('fab.conversion', { contextKey, actionId: id, latencyMs: Date.now() - t0, success: false });
+      }
+      return true;
+    }
+    return false;
+  }, [nearestUserId, onWave]);
+
   return (
     <View style={styles.root}>
       <ErrorBoundary fallback={<MapUnavailableFallback />}>
@@ -195,6 +226,13 @@ export function MapScreen(): React.JSX.Element {
           {...(selected.kind === 'user' && { onWave: () => { void onWave(selected.id); } })}
         />
       )}
+
+      <ContextualFab
+        zoom={zoom}
+        points={data?.points ?? []}
+        nearestUserId={nearestUserId}
+        onAction={onFabAction}
+      />
     </View>
   );
 }
