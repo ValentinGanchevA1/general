@@ -1,17 +1,18 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
 
-import type { AuthenticatedUser, LoginResponse } from '@g88/shared';
+import type { AuthenticatedUser, LoginResponse, UserProfile } from '@g88/shared';
 
 import { api, postJson } from '@/api/client';
 import { tokenStore } from '@/api/tokenStore';
 import { disconnectSocket } from '@/realtime/useSocket';
+import { extractMessage } from '@/utils/extractMessage';
 
 interface AuthState {
   user: AuthenticatedUser | null;
   loading: boolean;
   error: string | null;
-  /** false immediately after register — drives ProfileCreation gate in AppNavigator. */
+  /** Derived from UserProfile.profileComplete (bio IS NOT NULL). False after register until profile is saved. */
   profileSetupComplete: boolean;
 }
 
@@ -22,13 +23,6 @@ const initialState: AuthState = {
   profileSetupComplete: true,
 };
 
-function extractMessage(e: unknown, fallback: string): string {
-  if (e !== null && typeof e === 'object' && 'message' in e) {
-    return String((e as { message: unknown }).message);
-  }
-  if (e instanceof Error) return e.message;
-  return fallback;
-}
 
 export const login = createAsyncThunk(
   'auth/login',
@@ -177,12 +171,15 @@ const authSlice = createSlice({
         state.error = null;
         state.profileSetupComplete = true;
       })
-      // When profile/update succeeds (bio saved), unlock Main.
-      // Uses string matcher to avoid circular import with profileSlice.
+      // Derive completion from the backend-computed profileComplete field (bio IS NOT NULL).
+      // Catches both fetch and update so any profile response keeps the gate in sync.
+      // String-matched to avoid a circular import with profileSlice.
       .addMatcher(
-        (action) => action.type === 'profile/update/fulfilled',
-        (state) => {
-          state.profileSetupComplete = true;
+        (action) =>
+          action.type === 'profile/fetch/fulfilled' ||
+          action.type === 'profile/update/fulfilled',
+        (state, action) => {
+          state.profileSetupComplete = (action.payload as UserProfile).profileComplete;
         },
       );
   },

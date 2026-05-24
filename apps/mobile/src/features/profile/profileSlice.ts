@@ -4,14 +4,7 @@ import type { UserProfile, UpdateProfileRequest } from '@g88/shared';
 
 import { getJson, patchJson } from '@/api/client';
 import { logout } from '@/features/auth/authSlice';
-
-function extractMessage(e: unknown, fallback: string): string {
-  if (e !== null && typeof e === 'object' && 'message' in e) {
-    return String((e as { message: unknown }).message);
-  }
-  if (e instanceof Error) return e.message;
-  return fallback;
-}
+import { extractMessage } from '@/utils/extractMessage';
 
 interface ProfileState {
   profile: UserProfile | null;
