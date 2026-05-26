@@ -145,3 +145,5 @@ temp/
 
 # ─── Claude Code local settings (may contain personal tokens / DB URLs) ──────
 .claude/settings.local.json
+# Ephemeral git worktrees Claude Code creates for isolated edits.
+.claude/worktrees/
