@@ -3,13 +3,20 @@ import {
   Controller,
   Get,
   HttpCode,
+  Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { IsIn, IsOptional, IsString, Matches } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString, Matches } from 'class-validator';
 
-import type { PresignedUploadResponse, UpdateProfileRequest, UserProfile } from '@g88/shared';
+import type {
+  PresignedUploadResponse,
+  PublicUserProfile,
+  UpdateProfileRequest,
+  UserProfile,
+} from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -21,6 +28,7 @@ class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @IsString() bio?: string;
   @IsOptional() @IsString() avatarUrl?: string;
   @IsOptional() @IsIn(['public', 'private']) visibility?: 'public' | 'private';
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) goals?: string[];
 }
 
 class PresignedUrlDto {
@@ -57,5 +65,12 @@ export class UsersController {
     @CurrentUser('id') userId: string,
   ): Promise<PresignedUploadResponse> {
     return this.s3.avatarPresignedUrl(userId, dto.contentType);
+  }
+
+  @Get(':id')
+  async getPublic(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) userId: string,
+  ): Promise<PublicUserProfile> {
+    return this.users.getPublicProfile(userId);
   }
 }

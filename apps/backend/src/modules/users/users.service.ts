@@ -2,7 +2,14 @@ import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/co
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
-import type { AuthenticatedUser, UpdateProfileRequest, UserProfile } from '@g88/shared';
+import type {
+  AuthenticatedUser,
+  PublicUserProfile,
+  UpdateProfileRequest,
+  UserProfile,
+} from '@g88/shared';
+
+import { PresenceService } from '../presence/presence.service';
 
 interface UserRow {
   id: string;
@@ -12,15 +19,31 @@ interface UserRow {
   bio: string | null;
   verification_level: string;
   visibility: 'public' | 'private';
+  goals: string[];
 }
+
+interface PublicUserRow {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  bio: string | null;
+  verification_level: string;
+  goals: string[];
+}
+
+const USER_COLUMNS =
+  'id, email, display_name, avatar_url, bio, verification_level, visibility, goals';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    private readonly presence: PresenceService,
+  ) {}
 
   async findById(id: string): Promise<AuthenticatedUser | null> {
     const rows = await this.db.query<UserRow[]>(
-      `SELECT id, email, display_name, avatar_url, bio, verification_level, visibility
+      `SELECT ${USER_COLUMNS}
          FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
       [id],
     );
@@ -30,12 +53,35 @@ export class UsersService {
 
   async getProfile(userId: string): Promise<UserProfile> {
     const rows = await this.db.query<UserRow[]>(
-      `SELECT id, email, display_name, avatar_url, bio, verification_level, visibility
+      `SELECT ${USER_COLUMNS}
          FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
       [userId],
     );
     if (!rows[0]) throw new UnauthorizedException();
     return this.toProfile(rows[0]);
+  }
+
+  async getPublicProfile(userId: string): Promise<PublicUserProfile> {
+    const rows = await this.db.query<PublicUserRow[]>(
+      `SELECT id, display_name, avatar_url, bio, verification_level, goals
+         FROM users
+        WHERE id = $1 AND deleted_at IS NULL AND visibility = 'public'
+        LIMIT 1`,
+      [userId],
+    );
+    if (!rows[0]) throw new NotFoundException({ code: 'users.not_found', message: 'User not found' });
+    const r = rows[0];
+    // Live "online" comes from Redis presence, not Postgres — see PresenceService.
+    const onlineSet = await this.presence.whichAreOnline([r.id]);
+    return {
+      id: r.id,
+      displayName: r.display_name,
+      avatarUrl: r.avatar_url,
+      bio: r.bio,
+      verification: r.verification_level as PublicUserProfile['verification'],
+      goals: r.goals ?? [],
+      online: onlineSet.has(r.id),
+    };
   }
 
   async updateProfile(userId: string, req: UpdateProfileRequest): Promise<UserProfile> {
@@ -58,6 +104,10 @@ export class UsersService {
       params.push(req.visibility);
       setClauses.push(`visibility = $${params.length}`);
     }
+    if (req.goals !== undefined) {
+      params.push(req.goals);
+      setClauses.push(`goals = $${params.length}`);
+    }
 
     if (setClauses.length === 0) return this.getProfile(userId);
 
@@ -66,7 +116,7 @@ export class UsersService {
     const [updatedRows] = await this.db.query<[UserRow[], number]>(
       `UPDATE users SET ${setClauses.join(', ')}
           WHERE id = $1 AND deleted_at IS NULL
-       RETURNING id, email, display_name, avatar_url, bio, verification_level, visibility`,
+       RETURNING ${USER_COLUMNS}`,
       params,
     );
     if (!updatedRows[0]) throw new NotFoundException({ code: 'users.not_found', message: 'User not found' });
@@ -88,6 +138,7 @@ export class UsersService {
       ...this.toPublic(r),
       bio: r.bio,
       visibility: r.visibility,
+      goals: r.goals ?? [],
       profileComplete: r.bio != null,
     };
   }

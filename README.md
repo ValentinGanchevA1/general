@@ -50,12 +50,46 @@ pnpm --filter @g88/mobile android   # or :ios
 | File | Contents |
 |---|---|
 | `ARCHITECTURE.md` | System design, key decisions, and the things that would otherwise bite us |
-| `STATUS.md` | Live P1 pillar progress, reconciliation verdicts, open questions |
+| `STATUS.md` | Live phase progress, reconciliation verdicts, open questions |
 | `PRODUCT.md` | Post-P1 feature roadmap |
 | `TECH_DEBT_AUDIT.md` | Ranked debt backlog |
-| `apps/backend/README.md` | Backend-specific setup, env vars, migrations |
-| `apps/mobile/README.md` | RN setup, native module notes, build commands |
 
-## Phase 1 scope (current sprint focus)
+## Current sprint
 
-Auth → profile → map discovery → presence → wave → chat. Everything else (marketplace, events, verification pipeline, gamification) lives behind feature flags until P1 is shipping cleanly.
+**P1 is complete** — all six pillars (auth · profile · map discovery · presence · wave · chat) are done and verified. See `STATUS.md` for details.
+
+**R6 (P2.5 UX track, in progress):** ContextualFab on the map + Pulse v2 card layout. Does not displace the P2 sequence (observability · Apple OAuth · chat outbox).
+
+## Mobile environment variables
+
+Build-time env vars for the mobile app are injected via `babel-plugin-transform-inline-environment-variables` and inlined at Metro bundle time.
+
+```bash
+# 1. Copy the template (file is gitignored)
+cp apps/mobile/.env.example apps/mobile/.env
+
+# 2. Edit .env — set API_HOST, GOOGLE_WEB_CLIENT_ID, SENTRY_DSN as needed
+
+# 3. Reset Metro's transform cache after any .env change
+pnpm --filter @g88/mobile start:reset
+```
+
+You can also pass a single variable inline without a `.env` file:
+
+```bash
+API_HOST=192.168.1.42 pnpm --filter @g88/mobile android
+```
+
+See `apps/mobile/.env.example` for all supported variables and their defaults.
+
+## Verify
+
+```bash
+# Type-check (both packages must stay clean)
+pnpm --filter @g88/backend typecheck
+pnpm --filter @g88/mobile typecheck
+
+# Unit tests
+pnpm --filter @g88/backend test
+pnpm --filter @g88/mobile test
+```

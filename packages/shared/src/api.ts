@@ -122,13 +122,26 @@ export interface UpdateProfileRequest {
   bio?: string;
   avatarUrl?: string;
   visibility?: 'public' | 'private';
+  goals?: string[];
 }
 
 export interface UserProfile extends AuthenticatedUser {
   bio: string | null;
   visibility: 'public' | 'private';
+  goals: string[];
   /** true when bio IS NOT NULL */
   profileComplete: boolean;
+}
+
+/** Public-facing profile returned by GET /users/:id */
+export interface PublicUserProfile {
+  id: string;
+  displayName: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  verification: VerificationLevel;
+  goals: string[];
+  online: boolean;
 }
 
 export interface PresignedUploadResponse {

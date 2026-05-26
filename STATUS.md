@@ -1,7 +1,7 @@
 # STATUS — G88 Reconciliation & P1
 
-> **Last updated:** 2026-05-23
-> **Current phase:** R5 complete — Pulse v1 shipped (activity tab + ActionHub FAB)
+> **Last updated:** 2026-05-24
+> **Current phase:** R6 in progress — Pulse v2 + ContextualFab (P2.5 UX track)
 > **Owner:** [your name]
 >
 > Update this file as work progresses. It's the single source of truth for "where are we?".
@@ -214,3 +214,35 @@ All four must be true:
 - **2026-05-21** — R4 complete. All six P1 pillars done. A1 (opaque refresh tokens) + A2 (Google OAuth) shipped. Apple OAuth deferred to P2 (A3). Android CI, .gitignore, and Dependabot fixes also landed.
 - **2026-05-22** — CI/tooling hardening. Migrated to pnpm 11 (workspace settings to `pnpm-workspace.yaml`). Bumped Node 22 (required by pnpm 11). Opted into Node.js 24 GitHub Actions runners ahead of June 2 deadline. Fixed `gradlew` execute bit (Android Build now green). Closed final Dependabot alert (uuid → 11.1.1, all 10/10 resolved).
 - **2026-05-23** — Pulse v1 shipped (R5). Activity feed backend (`GET /feed`, `FeedService` aggregating chats + waves). Mobile: `PulseScreen` with filter chips, `pulseSlice`, `ActionHub` FAB. Tab bar is now Map · Pulse · Profile. Shared `ActivityItem`/`FeedResponse` types in `@g88/shared`. All tests green, both typechecks clean. Post-R5 fixes: `ProfileScreen` dispatches `fetchProfile` on focus (stale profile on return from edit); `ActionHub` filter routing via Redux `pendingFilter` channel (navigation timing race); `AppNavigator` auth gate + `restoreSession` wired. Migration script made idempotent via `schema_migrations` tracking table — `migration:run` now skips already-applied files safely.
+- **2026-05-24** — R6 (P2.5) installed + typecheck fix. `install-pulse-v2.py` landed all ContextualFab + Pulse v2 files. Post-install: fixed three typecheck errors — `useFabContext.ts` selectors corrected from non-existent `s.auth.user?.profile` to `s.profile.profile` (profile slice); `UserProfile` in `@g88/shared` extended with `goals?: string[]`; `@testing-library/react-native` added to mobile devDependencies; test mock stores updated to the real Redux state shape. Typecheck now clean (`tsc --noEmit` exits 0).
+
+
+### Phase R6 — Pulse v2 + ContextualFab (P2.5) — 🚧 IN PROGRESS
+
+P2.5 = parallel UX track. Does **not** displace the P2 sequence (A4 · OB1 · A3 · C6 · M1).
+
+- [x] `apps/mobile/src/lib/analytics.ts` — single track() shim, swap to Sentry when OB1 lands
+- [x] `apps/mobile/src/components/ContextualFab/` — context-aware speed dial
+      replaces static `ActionHub` on `MapScreen`. Long-press OR double-tap → expand.
+      Primary action adapts to `(zoomBand, density, visibility, goalsPrimary)`.
+- [x] `apps/mobile/src/features/pulse/components/` — Nextdoor-style refactor:
+      `ShareCTA` · `ActivityCard` · `NearbyPeopleStrip` · `TrendingStrip`
+- [x] `apps/mobile/src/features/pulse/PulseScreen.tsx` — full visual replace
+- [x] `apps/mobile/src/screens/AlertComposerScreen.tsx` — **stub** (X3 = real impl)
+- [x] `AppNavigator.tsx` — register AlertComposer route, drop ActionHub render
+- [ ] **X3** — real AlertComposer implementation. When shipped, flip
+      `POST_ALERT_READY = true` in `useFabContext.ts` to honour Q1.
+- [ ] **X4** — backend `/trending/nearby?lat&lng` endpoint. When shipped,
+      remove `MOCK_TRENDING` in `PulseScreen.tsx` and use a real fetch hook.
+- [ ] **X5** — `/geofences/me/active` endpoint (Q2 option (a), v1.5 layer).
+- [x] **MapScreen patches** — applied by `install-pulse-v2.py` (3 edits: ContextualFab import, `useFabContext` hook, JSX mount replacing `ActionHub`).
+
+Analytics events shipped (privacy-safe aggregates only):
+`fab.context.computed` · `fab.tap.primary` · `fab.expand` · `fab.tap.secondary`
++ `fab.conversion` (host-emitted, e.g. wave success in MapScreen).
+
+Acceptance:
+- Single-tap on FAB executes primary action; long-press/double-tap expands.
+- Pulse v2 renders ShareCTA + chips + Nearby + cards + Trending without crash.
+- `fab.context.computed` fires exactly once per context-key flip.
+- 5/5 ContextualFab unit tests pass; 3/3 PulseScreen smoke tests pass.
