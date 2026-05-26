@@ -9,6 +9,8 @@ import type {
   UserProfile,
 } from '@g88/shared';
 
+import { PresenceService } from '../presence/presence.service';
+
 interface UserRow {
   id: string;
   email: string;
@@ -27,7 +29,6 @@ interface PublicUserRow {
   bio: string | null;
   verification_level: string;
   goals: string[];
-  online: boolean;
 }
 
 const USER_COLUMNS =
@@ -35,7 +36,10 @@ const USER_COLUMNS =
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    private readonly presence: PresenceService,
+  ) {}
 
   async findById(id: string): Promise<AuthenticatedUser | null> {
     const rows = await this.db.query<UserRow[]>(
@@ -59,8 +63,7 @@ export class UsersService {
 
   async getPublicProfile(userId: string): Promise<PublicUserProfile> {
     const rows = await this.db.query<PublicUserRow[]>(
-      `SELECT id, display_name, avatar_url, bio, verification_level, goals,
-              (last_seen_at > NOW() - INTERVAL '5 minutes') AS online
+      `SELECT id, display_name, avatar_url, bio, verification_level, goals
          FROM users
         WHERE id = $1 AND deleted_at IS NULL AND visibility = 'public'
         LIMIT 1`,
@@ -68,6 +71,8 @@ export class UsersService {
     );
     if (!rows[0]) throw new NotFoundException({ code: 'users.not_found', message: 'User not found' });
     const r = rows[0];
+    // Live "online" comes from Redis presence, not Postgres — see PresenceService.
+    const onlineSet = await this.presence.whichAreOnline([r.id]);
     return {
       id: r.id,
       displayName: r.display_name,
@@ -75,7 +80,7 @@ export class UsersService {
       bio: r.bio,
       verification: r.verification_level as PublicUserProfile['verification'],
       goals: r.goals ?? [],
-      online: r.online,
+      online: onlineSet.has(r.id),
     };
   }
 
