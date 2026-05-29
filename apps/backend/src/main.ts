@@ -18,12 +18,24 @@ Sentry.init({
   sendDefaultPii: false,
 });
 
-// Fail fast on missing critical secrets before any module loads.
+// Fail fast on missing or weak secrets before any module loads.
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   throw new Error('JWT_SECRET env var is missing or too short (min 32 chars)');
 }
-if (!process.env.DATABASE_URL && !process.env.DB_HOST && process.env.NODE_ENV === 'production') {
-  throw new Error('DATABASE_URL or DB_HOST must be set in production');
+
+if (process.env.NODE_ENV === 'production') {
+  // Dev placeholder 'dev-jwt-secret-change-in-production' is 36 chars and passes
+  // the 32-char check above. Require 64+ chars in production so `openssl rand -hex 64`
+  // is the natural path — any shorter value is almost certainly a copied dev default.
+  if (process.env.JWT_SECRET.length < 64) {
+    throw new Error('JWT_SECRET must be at least 64 chars in production (generate with: openssl rand -hex 64)');
+  }
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL must be set in production');
+  }
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    throw new Error('GOOGLE_CLIENT_ID must be set in production');
+  }
 }
 
 async function bootstrap(): Promise<void> {
