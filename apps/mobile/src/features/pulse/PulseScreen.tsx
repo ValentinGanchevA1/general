@@ -24,6 +24,7 @@ import { ShareCTA } from './components/ShareCTA';
 import { ActivityCard } from './components/ActivityCard';
 import { NearbyPeopleStrip } from './components/NearbyPeopleStrip';
 import { TrendingStrip } from './components/TrendingStrip';
+import { useTrendingNearby } from './useTrendingNearby';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type R = RouteProp<TabParamList, 'Pulse'>;
@@ -39,11 +40,6 @@ const FILTERS: FilterDef[] = [
   { key: 'matches',  label: 'Matches', type: 'match' },
 ];
 
-// TODO(P2.5/X4): swap to real `/trending/nearby` data.
-const MOCK_TRENDING: string[] = [
-  '#coffee', '#flea-market', '#yoga', '#beach-cleanup', '#open-mic',
-];
-
 export function PulseScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<Nav>();
@@ -51,6 +47,7 @@ export function PulseScreen(): React.JSX.Element {
 
   const { items, loading, error, pendingFilter } = useAppSelector((s) => s.pulse);
   const discoveryPoints = useAppSelector((s) => s.discovery.points);
+  const { topics: trendingTopics } = useTrendingNearby();
 
   const [filter, setFilter] = useState<PulseFilter>(route.params?.filter ?? 'all');
 
@@ -132,7 +129,7 @@ export function PulseScreen(): React.JSX.Element {
   const Footer = (
     <View style={S.footer}>
       <TrendingStrip
-        topics={MOCK_TRENDING}
+        topics={trendingTopics}
         onTapTopic={(t) =>
           navigation.navigate('AlertComposer', { presetCategory: 'general', presetTag: t })
         }

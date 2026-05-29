@@ -37,12 +37,7 @@ const ALL_ACTIONS: FabActionId[] = [
   'wave_nearest', 'post_alert', 'create_listing', 'toggle_visibility', 'open_pulse',
 ];
 
-// ─── C3 flag ──────────────────────────────────────────────────────────────
-// When AlertComposerScreen ships real impl (P2.5 / X3), flip to `true` and
-// the FAB's default-case primary becomes `post_alert` per the user's Q1 pick.
-// Until then the FAB falls back to `open_pulse` so the primary tap never
-// lands on a "Coming soon" stub.
-export const POST_ALERT_READY = false;
+export const POST_ALERT_READY = true;
 
 function bandForZoom(z: number): ZoomBand {
   if (z >= ENTITY_ZOOM_THRESHOLD) return 'near';

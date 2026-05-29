@@ -217,7 +217,7 @@ All four must be true:
 - **2026-05-24** — R6 (P2.5) installed + typecheck fix. `install-pulse-v2.py` landed all ContextualFab + Pulse v2 files. Post-install: fixed three typecheck errors — `useFabContext.ts` selectors corrected from non-existent `s.auth.user?.profile` to `s.profile.profile` (profile slice); `UserProfile` in `@g88/shared` extended with `goals?: string[]`; `@testing-library/react-native` added to mobile devDependencies; test mock stores updated to the real Redux state shape. Typecheck now clean (`tsc --noEmit` exits 0).
 
 
-### Phase R6 — Pulse v2 + ContextualFab (P2.5) — 🚧 IN PROGRESS
+### Phase R6 — Pulse v2 + ContextualFab (P2.5) — ✅ COMPLETE 2026-05-29
 
 P2.5 = parallel UX track. Does **not** displace the P2 sequence (A4 · OB1 · A3 · C6 · M1).
 
@@ -230,11 +230,12 @@ P2.5 = parallel UX track. Does **not** displace the P2 sequence (A4 · OB1 · A3
 - [x] `apps/mobile/src/features/pulse/PulseScreen.tsx` — full visual replace
 - [x] `apps/mobile/src/screens/AlertComposerScreen.tsx` — **stub** (X3 = real impl)
 - [x] `AppNavigator.tsx` — register AlertComposer route, drop ActionHub render
-- [ ] **X3** — real AlertComposer implementation. When shipped, flip
-      `POST_ALERT_READY = true` in `useFabContext.ts` to honour Q1.
-- [ ] **X4** — backend `/trending/nearby?lat&lng` endpoint. When shipped,
-      remove `MOCK_TRENDING` in `PulseScreen.tsx` and use a real fetch hook.
-- [ ] **X5** — `/geofences/me/active` endpoint (Q2 option (a), v1.5 layer).
+- [x] **X3** — real AlertComposer (category picker, body, tag, POST /alerts).
+      `POST_ALERT_READY = true` flipped. Alerts wired into GET /feed. Migration 0007_alerts.sql.
+- [x] **X4** — backend `/trending/nearby?lat&lng` endpoint. `TrendingModule` + Redis 5-min cache.
+      `useTrendingNearby` hook in mobile; `MOCK_TRENDING` removed from `PulseScreen`.
+- [x] **X5** — `POST /geofences` + `GET /geofences/me/active`. Migration 0008_geofences.sql.
+      `useActiveGeofences` hook in mobile (v1.5 FAB contract). Both typechecks clean.
 - [x] **MapScreen patches** — applied by `install-pulse-v2.py` (3 edits: ContextualFab import, `useFabContext` hook, JSX mount replacing `ActionHub`).
 
 Analytics events shipped (privacy-safe aggregates only):

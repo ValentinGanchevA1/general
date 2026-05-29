@@ -1,9 +1,4 @@
 // apps/mobile/src/features/pulse/components/TrendingStrip.tsx
-//
-// TODO(P2.5/X4): replace `topics` prop with `useTrendingNearby()` hook
-// fetching from `/trending/nearby?lat&lng`. Backend (`trending.service`)
-// already maintains geohash-bucketed Redis sorted sets — mobile contract
-// is the missing piece. Until then PulseScreen passes MOCK_TRENDING.
 
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';

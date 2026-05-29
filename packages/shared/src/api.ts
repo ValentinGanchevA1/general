@@ -1,4 +1,5 @@
 import type { LatLng, Viewport } from './geo';
+import type { AreaCategory } from './activity';
 
 // ─── Domain enums ──────────────────────────────────────────────────────────
 
@@ -186,6 +187,52 @@ export interface MessagePage {
 export interface RegisterDeviceTokenRequest {
   token: string;
   platform: 'ios' | 'android';
+}
+
+// ─── Geofences ─────────────────────────────────────────────────────────────
+
+export interface CreateGeofenceRequest {
+  /** Human label, e.g. 'home' or 'work'. Defaults to 'home'. Max 50 chars. */
+  label?: string;
+  /** H3 r7 ring count. 0 = single cell (~5 km²), 1 = 7 cells (~35 km²). Max 3. */
+  radiusRings?: number;
+}
+
+export interface GeofenceResponse {
+  id: string;
+  label: string;
+  centerH3R7: string;
+  radiusRings: number;
+  /** True when the calling user's current H3 r7 cell falls within this geofence's disk. */
+  inside: boolean;
+  active: boolean;
+  createdAt: string; // ISO
+}
+
+// ─── Alerts ────────────────────────────────────────────────────────────────
+
+export interface CreateAlertRequest {
+  category: AreaCategory;
+  /** 1–280 characters. */
+  body: string;
+  /** Optional hashtag topic, e.g. '#open-mic'. 1–60 characters. */
+  tag?: string;
+}
+
+export interface AlertResponse {
+  id: string;
+  category: AreaCategory;
+  body: string;
+  tag: string | null;
+  createdAt: string; // ISO
+}
+
+// ─── Trending ──────────────────────────────────────────────────────────────
+
+export interface TrendingResponse {
+  /** Hashtag-formatted topics, e.g. ['#open-mic', '#yoga']. Up to 10 entries. */
+  topics: string[];
+  generatedAt: string; // ISO
 }
 
 // ─── Error envelope ────────────────────────────────────────────────────────

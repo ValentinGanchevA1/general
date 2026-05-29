@@ -2,8 +2,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import * as h3 from 'h3-js';
 
-import type { ActivityItem, ActivityType, FeedResponse } from '@g88/shared';
+import type { ActivityItem, ActivityType, AreaCategory, FeedResponse } from '@g88/shared';
 
 @Injectable()
 export class FeedService {
@@ -19,19 +20,20 @@ export class FeedService {
     const t0 = Date.now();
     const wanted = (t: ActivityType): boolean => types.length === 0 || types.includes(t);
 
-    const [chats, waves] = await Promise.all([
-      wanted('chat') ? this.selectChats(userId, since, limit) : Promise.resolve<ActivityItem[]>([]),
-      wanted('wave') ? this.selectWaves(userId, since, limit) : Promise.resolve<ActivityItem[]>([]),
-      // v1.5 sources slot in here: listings, alerts, matches
+    const [chats, waves, alerts] = await Promise.all([
+      wanted('chat')  ? this.selectChats(userId, since, limit)  : Promise.resolve<ActivityItem[]>([]),
+      wanted('wave')  ? this.selectWaves(userId, since, limit)  : Promise.resolve<ActivityItem[]>([]),
+      wanted('alert') ? this.selectAlerts(userId, since, limit) : Promise.resolve<ActivityItem[]>([]),
+      // v1.5 sources slot in here: listings, matches
     ]);
 
-    const items = [...chats, ...waves]
+    const items = [...chats, ...waves, ...alerts]
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit);
 
     this.log.log(
       `feed.aggregate userId=${userId} latencyMs=${Date.now() - t0} ` +
-      `chats=${chats.length} waves=${waves.length} total=${items.length}`,
+      `chats=${chats.length} waves=${waves.length} alerts=${alerts.length} total=${items.length}`,
     );
 
     // Newest item's timestamp — clients pass it back as `since` to fetch what's even newer.
@@ -126,6 +128,61 @@ export class FeedService {
       deepLink: r.conversation_id
         ? { screen: 'Chat', params: { conversationId: r.conversation_id, otherUserName: r.actor_name ?? 'Chat' } }
         : { screen: 'Main', params: { screen: 'Map' } },
+    }));
+  }
+
+  /**
+   * Alerts posted by anyone in the H3 r7 cells surrounding the requester's
+   * last known location. Ring-1 disk = 7 cells ≈ 15km radius.
+   * Falls back to empty if the requester has no location on record.
+   */
+  private async selectAlerts(userId: string, since: Date, limit: number): Promise<ActivityItem[]> {
+    const [userRow] = await this.ds.query<Array<{ location_h3_r7: string | null }>>(
+      `SELECT location_h3_r7 FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      [userId],
+    );
+
+    if (!userRow?.location_h3_r7) return [];
+
+    const cells = h3.gridDisk(userRow.location_h3_r7, 1);
+
+    const rows = await this.ds.query<Array<{
+      id: string; alert_id: string; category: string;
+      body: string; tag: string | null;
+      actor_id: string; actor_name: string;
+      created_at: Date;
+    }>>(
+      `SELECT ('alert:' || a.id) AS id,
+              a.id               AS alert_id,
+              a.category,
+              a.body,
+              a.tag,
+              u.id               AS actor_id,
+              u.display_name     AS actor_name,
+              a.created_at
+         FROM alerts a
+         JOIN users u ON u.id = a.author_id AND u.deleted_at IS NULL
+        WHERE a.location_h3_r7 = ANY($1::text[])
+          AND a.created_at > $2
+          AND a.deleted_at IS NULL
+          AND a.visibility = 'public'
+        ORDER BY a.created_at DESC
+        LIMIT $3`,
+      [cells, since.toISOString(), limit],
+    );
+
+    return rows.map((r): ActivityItem => ({
+      id: r.id,
+      type: 'alert',
+      category: r.category as AreaCategory,
+      title: r.tag ?? r.category.charAt(0).toUpperCase() + r.category.slice(1),
+      preview: r.body,
+      actorId: r.actor_id,
+      actorName: r.actor_name,
+      distanceM: null,
+      createdAt: new Date(r.created_at).toISOString(),
+      unread: true,
+      deepLink: { screen: 'Main', params: { screen: 'Pulse' } },
     }));
   }
 }
