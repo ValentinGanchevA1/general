@@ -16,6 +16,9 @@ Sentry.init({
   environment: process.env.NODE_ENV ?? 'development',
   enabled: !!process.env.SENTRY_DSN,
   sendDefaultPii: false,
+  integrations: [Sentry.nestIntegration()],
+  // 10 % performance sampling in production; off in dev to keep noise low.
+  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 0,
 });
 
 // Fail fast on missing or weak secrets before any module loads.

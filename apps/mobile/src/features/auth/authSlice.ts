@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
+import * as Sentry from '@sentry/react-native';
 
 import type { AuthenticatedUser, LoginResponse, UserProfile } from '@g88/shared';
 
@@ -30,6 +31,7 @@ export const login = createAsyncThunk(
     try {
       const res = await postJson<typeof args, LoginResponse>('/auth/login', args);
       await tokenStore.set(res.tokens);
+      Sentry.setUser({ id: res.user.id });
       return res.user;
     } catch (e: unknown) {
       return rejectWithValue(extractMessage(e, 'Login failed'));
@@ -46,6 +48,7 @@ export const register = createAsyncThunk(
     try {
       const res = await postJson<typeof args, LoginResponse>('/auth/register', args);
       await tokenStore.set(res.tokens);
+      Sentry.setUser({ id: res.user.id });
       return res.user;
     } catch (e: unknown) {
       return rejectWithValue(extractMessage(e, 'Registration failed'));
@@ -66,6 +69,7 @@ export const loginWithGoogle = createAsyncThunk(
       if (!idToken) return rejectWithValue('No ID token returned from Google');
       const res = await postJson<{ idToken: string }, LoginResponse>('/auth/oauth/google', { idToken });
       await tokenStore.set(res.tokens);
+      Sentry.setUser({ id: res.user.id });
       return res.user;
     } catch (e: unknown) {
       return rejectWithValue(extractMessage(e, 'Google sign-in failed'));
@@ -86,6 +90,7 @@ export const logout = createAsyncThunk('auth/logout', async () => {
   }
   disconnectSocket();
   await tokenStore.clear();
+  Sentry.setUser(null);
 });
 
 export const restoreSession = createAsyncThunk('auth/restore', async () => {
@@ -93,7 +98,9 @@ export const restoreSession = createAsyncThunk('auth/restore', async () => {
   if (!token) return null;
   try {
     const { getJson } = await import('@/api/client');
-    return await getJson<AuthenticatedUser>('/auth/me');
+    const user = await getJson<AuthenticatedUser>('/auth/me');
+    Sentry.setUser({ id: user.id });
+    return user;
   } catch {
     await tokenStore.clear();
     return null;

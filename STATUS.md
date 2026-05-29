@@ -58,7 +58,7 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 | C6 | Chat | Mobile outbox — retry queue for messages sent during socket disconnect | M | |
 | M1 | Map | Viewport-diff protocol (`ARCHITECTURE.md §3.7`) — full responses on every pan are wasteful at city density | M | |
 | A4 | Auth | Hardcoded dev-secret fallbacks in `auth.service.ts` source — remove, require env vars in non-dev | S | ✅ done |
-| OB1 | Observability | Sentry on both apps — minimum bar before public TestFlight (C3 critical debt) | M | |
+| OB1 | Observability | Sentry on both apps — minimum bar before public TestFlight (C3 critical debt) | M | ✅ done |
 
 **Fix size legend:** XS <1h · S 1–4h · M 0.5–1d · L 1–3d
 

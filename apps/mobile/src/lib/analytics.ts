@@ -1,7 +1,9 @@
 // apps/mobile/src/lib/analytics.ts
 //
-// Single entry point for client-side analytics. Swap impl when OB1 (Sentry)
-// lands — call sites stay stable.
+// Single entry point for client-side analytics.
+// Call sites stay stable; the implementation swaps between environments.
+
+import * as Sentry from '@sentry/react-native';
 
 export type AnalyticsProps = Record<string, string | number | boolean | null>;
 
@@ -23,9 +25,14 @@ function redact(props: AnalyticsProps): AnalyticsProps {
 }
 
 export function track(event: string, props: AnalyticsProps = {}): void {
+  const safe = redact(props);
+
   if (__DEV__) {
     // eslint-disable-next-line no-console
-    console.log(`[analytics] ${event}`, redact(props));
+    console.log(`[analytics] ${event}`, safe);
   }
-  // TODO(OB1): Sentry.addBreadcrumb({ category: 'analytics', message: event, data: redact(props) });
+
+  // Breadcrumbs give Sentry the user's action trail leading up to an error.
+  // addBreadcrumb is a no-op when Sentry is disabled (no DSN set).
+  Sentry.addBreadcrumb({ category: 'analytics', message: event, data: safe, level: 'info' });
 }
