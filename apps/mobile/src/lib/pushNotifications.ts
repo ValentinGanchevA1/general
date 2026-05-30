@@ -74,6 +74,9 @@ function handleNotificationTap(
   if (!data) return;
   if (data['type'] === 'message' && data['conversationId']) {
     navigate('Chat', { conversationId: data['conversationId'], otherUserName: '' });
+  } else if (data['type'] === 'alert') {
+    // Open the Pulse tab pre-filtered to alerts.
+    navigate('Main', { screen: 'Pulse', params: { filter: 'alerts' } });
   }
 }
 
