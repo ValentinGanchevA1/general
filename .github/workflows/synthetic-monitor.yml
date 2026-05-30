@@ -1,0 +1,37 @@
+name: Synthetic Monitor
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # every 5 minutes
+  workflow_dispatch:         # manual trigger for first-run / debugging
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  monitor:
+    name: P1 critical path
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install socket.io-client
+        run: npm install --no-save socket.io-client@4
+
+      - name: Run synthetic monitor
+        run: node scripts/synthetic-monitor.mjs
+        env:
+          MONITOR_API_URL:          ${{ vars.MONITOR_API_URL }}
+          MONITOR_USER_A_EMAIL:     ${{ secrets.MONITOR_USER_A_EMAIL }}
+          MONITOR_USER_A_PASSWORD:  ${{ secrets.MONITOR_USER_A_PASSWORD }}
+          MONITOR_USER_B_EMAIL:     ${{ secrets.MONITOR_USER_B_EMAIL }}
+          MONITOR_USER_B_PASSWORD:  ${{ secrets.MONITOR_USER_B_PASSWORD }}
