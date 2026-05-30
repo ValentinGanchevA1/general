@@ -1,7 +1,7 @@
 # STATUS — G88 Reconciliation & P1
 
-> **Last updated:** 2026-05-24
-> **Current phase:** R6 in progress — Pulse v2 + ContextualFab (P2.5 UX track)
+> **Last updated:** 2026-05-30
+> **Current phase:** P2 hardening — C6 ✅ · M1 ✅ · synthetic monitor ✅ running · A3 partial · 7-day gate in progress
 > **Owner:** [your name]
 >
 > Update this file as work progresses. It's the single source of truth for "where are we?".
@@ -16,10 +16,10 @@ The only six things that must ship cleanly for "P1 done":
 |---|---|---|---|---|---|
 | 1 | **Auth** (email/pw + OAuth) | 🟦 Done | — | — | Email/pw + Google OAuth; opaque DB-stored rotating refresh tokens; Apple OAuth deferred (fast-follow before App Store) |
 | 2 | **Profile** | 🟦 Done | — | — | `PATCH /users/me/profile`, S3 presigned URL, ProfileCreation/Edit/Screen done |
-| 3 | **Map discovery** | ✅ Shipping | None | — | H3 + server-side clustering done. Viewport-diff (1.5) deferred. |
+| 3 | **Map discovery** | 🟦 Done | — | — | H3 + server-side clustering + viewport-diff (M1) done. |
 | 4 | **Presence** | 🟦 Done | — | — | `presence:delta` emitted on cell boundary cross |
 | 5 | **Wave** | 🟦 Done | — | — | Sender fully hydrated; FCM fallback wired |
-| 6 | **Chat** | 🟦 Done | — | — | Persist + REST + mobile Inbox + ChatScreen |
+| 6 | **Chat** | 🟦 Done | — | — | Persist + REST + mobile Inbox + ChatScreen + outbox retry (C6) |
 
 **Legend:** ✅ shipping · ⚠️ partial · ❌ blocked / not started · 🟦 done & verified
 
@@ -54,11 +54,13 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 
 | ID | Pillar | Gap | Fix size | |
 |---|---|---|---|---|
-| A3 | Auth | Apple Sign-In (`POST /auth/oauth/apple`) — required by App Store before any social login ships | M | next up |
-| C6 | Chat | Mobile outbox — retry queue for messages sent during socket disconnect | M | |
-| M1 | Map | Viewport-diff protocol (`ARCHITECTURE.md §3.7`) — full responses on every pan are wasteful at city density | M | |
+| A3 | Auth | Apple Sign-In (`POST /auth/oauth/apple`) — required by App Store before any social login ships | M | ⚠️ partial — backend + mobile code done; needs Xcode setup on Mac + Apple Developer Portal (Services ID + key) |
+| C6 | Chat | Mobile outbox — retry queue for messages sent during socket disconnect | M | ✅ done |
+| M1 | Map | Viewport-diff protocol (`ARCHITECTURE.md §3.7`) — full responses on every pan are wasteful at city density | M | ✅ done |
 | A4 | Auth | Hardcoded dev-secret fallbacks in `auth.service.ts` source — remove, require env vars in non-dev | S | ✅ done |
 | OB1 | Observability | Sentry on both apps — minimum bar before public TestFlight (C3 critical debt) | M | ✅ done |
+| DEPLOY | Infra | Production backend deployed to Render (`g88-api.onrender.com`) + Redis | M | ✅ done 2026-05-30 |
+| MON | CI | Synthetic P1 monitor (`scripts/synthetic-monitor.mjs`, cron `*/5 * * * *`) — 7-day gate for DoD item 2 | M | ✅ running — clock started 2026-05-30 |
 
 **Fix size legend:** XS <1h · S 1–4h · M 0.5–1d · L 1–3d
 
@@ -168,8 +170,9 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 - [x] Fix `.gitignore` for `android/app/.cxx/` — untracked 514 build artifacts
 - [x] Patch 10/10 Dependabot vulnerabilities via pnpm overrides (uuid last, closed 2026-05-22)
 - [x] pnpm 11 migration: move `overrides` + `onlyBuiltDependencies` from `package.json` to `pnpm-workspace.yaml`; bump Node 22 in all CI workflows; fix `gradlew` execute bit; opt into Node.js 24 action runners
-- [ ] **A3** — Apple Sign-In (`POST /auth/oauth/apple`) — P2, required before App Store submission
-- [ ] **C6** — Mobile chat outbox (P2)
+- [x] **C6** — Mobile chat outbox (P2) — `outbox[]` + `failedIds[]` in chatSlice; drain on reconnect; ⏱/retry UI
+- [x] **M1** — Viewport-diff (P2) — snapshot in Redis (30s TTL); diff returned when prevViewportHash valid
+- [ ] **A3** — Apple Sign-In (P2) — backend + mobile code done; Xcode + Apple Developer Portal setup pending
 - [x] Update `ARCHITECTURE.md` change log
 
 ---
@@ -178,10 +181,10 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 
 All four must be true:
 
-1. `pnpm install && pnpm --filter @g88/backend dev && pnpm --filter @g88/mobile android` boots an app that walks the full P1 flow on a clean DB: signup → profile → see map → send wave → reciprocal → chat → reconnect → message survives.
-2. The synthetic CI check (signup → discovery → wave → message, every 5 min against staging) passes for 7 consecutive days.
-3. A new contributor reading `README.md` + `ARCHITECTURE.md` + `STATUS.md` + `CLAUDE.md` gets one consistent story.
-4. `legacy/` is read-only, excluded from CI, with a `legacy/README.md` explaining what's there and why nothing imports from it.
+1. ✅ `pnpm install && pnpm --filter @g88/backend dev && pnpm --filter @g88/mobile android` boots an app that walks the full P1 flow on a clean DB: signup → profile → see map → send wave → reciprocal → chat → reconnect → message survives.
+2. ⏳ The synthetic CI check (signup → discovery → wave → message, every 5 min against prod) passes for 7 consecutive days. **Clock started 2026-05-30 — gate clears 2026-06-06.**
+3. ⚠️ A new contributor reading `README.md` + `ARCHITECTURE.md` + `STATUS.md` + `CLAUDE.md` gets one consistent story. *(STATUS.md updated 2026-05-30; ARCHITECTURE.md change log needs a 2026-05-30 entry for C6/M1/deploy.)*
+4. ✅ `legacy/` is read-only, excluded from CI, with a `legacy/README.md` explaining what's there and why nothing imports from it.
 
 ---
 
@@ -201,9 +204,10 @@ All four must be true:
 | Legacy imports leak into `apps/` | L | M | CI lint rule on import paths — enforced |
 | Schema drift between `legacy/backend/src/migrations/` and `apps/backend/migrations/0001_initial.sql` | L | H | `0001_initial.sql` is the only source; legacy migrations are read-only reference |
 | Half-ported features confuse the team | L | M | This file. Updated as work completes. |
-| Apple Sign-In missing at App Store submission | H | H | Tracked as A3 P2 — must ship before any social login goes live on iOS |
-| No production observability (C3 critical debt) | H | H | Tracked as OB1 P2 — Sentry minimum bar before public TestFlight |
-| Config.GOOGLE_WEB_CLIENT_ID placeholder not replaced before first run | M | H | TODO comment in `apps/mobile/src/config.ts`; `GOOGLE_CLIENT_ID` required in backend `.env` |
+| Apple Sign-In missing at App Store submission | H | H | A3 partial — backend done; Xcode capability + Apple Developer Portal (Services ID) still needed before TestFlight |
+| No production observability (C3 critical debt) | L | M | ✅ Mitigated — Sentry wired on both apps (OB1 done) |
+| Config.GOOGLE_WEB_CLIENT_ID placeholder not replaced before first run | L | M | ✅ Mitigated — set in `apps/mobile/.env` and `GOOGLE_CLIENT_ID` set in Render dashboard |
+| Render free tier cold starts (~55s) inflate synthetic monitor P99 | M | L | Acceptable at MVP — upgrade to Starter plan before TestFlight |
 
 ---
 
@@ -214,6 +218,7 @@ All four must be true:
 - **2026-05-21** — R4 complete. All six P1 pillars done. A1 (opaque refresh tokens) + A2 (Google OAuth) shipped. Apple OAuth deferred to P2 (A3). Android CI, .gitignore, and Dependabot fixes also landed.
 - **2026-05-22** — CI/tooling hardening. Migrated to pnpm 11 (workspace settings to `pnpm-workspace.yaml`). Bumped Node 22 (required by pnpm 11). Opted into Node.js 24 GitHub Actions runners ahead of June 2 deadline. Fixed `gradlew` execute bit (Android Build now green). Closed final Dependabot alert (uuid → 11.1.1, all 10/10 resolved).
 - **2026-05-23** — Pulse v1 shipped (R5). Activity feed backend (`GET /feed`, `FeedService` aggregating chats + waves). Mobile: `PulseScreen` with filter chips, `pulseSlice`, `ActionHub` FAB. Tab bar is now Map · Pulse · Profile. Shared `ActivityItem`/`FeedResponse` types in `@g88/shared`. All tests green, both typechecks clean. Post-R5 fixes: `ProfileScreen` dispatches `fetchProfile` on focus (stale profile on return from edit); `ActionHub` filter routing via Redux `pendingFilter` channel (navigation timing race); `AppNavigator` auth gate + `restoreSession` wired. Migration script made idempotent via `schema_migrations` tracking table — `migration:run` now skips already-applied files safely.
+- **2026-05-30** — P2 hardening sprint. **Deployed to Render**: `g88-api` live at `https://g88-api.onrender.com`; `g88-redis` (Frankfurt, free). Sentry project created (DE region), DSN wired in both apps and Render dashboard. Fixed `handleConnection` JWT guard gap (guards don't run on lifecycle hooks — token now verified directly in `handleConnection`). Added `GET /users/me` alias. **C6**: chat outbox retry queue — `outbox[]`/`failedIds[]` in chatSlice, drain on socket reconnect (up to 3 attempts), ⏱/retry UI in ChatScreen. **M1**: viewport-diff protocol — server stores snapshots in Redis (30s TTL), returns `diff:{added,removed}` on subsequent pans; client merges incrementally; `useDiscovery` is diff-unaware to callers. **A3** (partial): `POST /auth/oauth/apple` backend + `loginWithApple` mobile thunk + iOS entitlements scaffold; Xcode capability + Apple Developer Portal setup deferred to Mac. **Synthetic monitor**: `scripts/synthetic-monitor.mjs` + `.github/workflows/synthetic-monitor.yml` — cron `*/5 * * * *`, tests login→discovery→wave→chat, verified 4.6s on warm server, P1 DoD gate clock started.
 - **2026-05-24** — R6 (P2.5) installed + typecheck fix. `install-pulse-v2.py` landed all ContextualFab + Pulse v2 files. Post-install: fixed three typecheck errors — `useFabContext.ts` selectors corrected from non-existent `s.auth.user?.profile` to `s.profile.profile` (profile slice); `UserProfile` in `@g88/shared` extended with `goals?: string[]`; `@testing-library/react-native` added to mobile devDependencies; test mock stores updated to the real Redux state shape. Typecheck now clean (`tsc --noEmit` exits 0).
 
 
