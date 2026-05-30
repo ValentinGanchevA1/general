@@ -12,6 +12,7 @@ import type { WaveRequest, WaveResponse, WaveReceivedEvent } from '@g88/shared';
 
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
+import { GamificationService } from '../gamification/gamification.service';
 
 @Injectable()
 export class InteractionsService {
@@ -22,6 +23,7 @@ export class InteractionsService {
     @InjectDataSource() private readonly db: DataSource,
     private readonly realtime: RealtimeGateway,
     private readonly notifications: NotificationsService,
+    private readonly gamification: GamificationService,
   ) {}
 
   /**
@@ -130,6 +132,13 @@ export class InteractionsService {
         this.realtime
           .emitConversationOpened(conversationId, [fromUserId, req.toUserId], wave.id)
           .catch((err) => this.logger.error(`emitConversationOpened failed: ${err}`));
+
+        // A reciprocated wave = a match. Reward both participants once per match.
+        for (const uid of [fromUserId, req.toUserId]) {
+          void this.gamification
+            .award(uid, 'wave.reciprocated', { dedupeKey: `match:${conversationId}` })
+            .catch((err) => this.logger.error(`award wave.reciprocated failed: ${err}`));
+        }
       }
 
       return wave;

@@ -3,9 +3,10 @@ import { InteractionsService } from './interactions.service';
 import { InteractionsController } from './interactions.controller';
 import { RealtimeModule } from '../../realtime/realtime.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { GamificationModule } from '../gamification/gamification.module';
 
 @Module({
-  imports: [RealtimeModule, NotificationsModule],
+  imports: [RealtimeModule, NotificationsModule, GamificationModule],
   providers: [InteractionsService],
   controllers: [InteractionsController],
 })

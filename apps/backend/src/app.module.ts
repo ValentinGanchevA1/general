@@ -15,6 +15,7 @@ import { AlertsModule } from './modules/alerts/alerts.module';
 import { GeofencesModule } from './modules/geofences/geofences.module';
 import { FeedModule } from './modules/feed/feed.module';
 import { TrendingModule } from './modules/trending/trending.module';
+import { GamificationModule } from './modules/gamification/gamification.module';
 import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
@@ -53,6 +54,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     GeofencesModule,
     FeedModule,
     TrendingModule,
+    GamificationModule,
     RealtimeModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -20,6 +20,7 @@ import { AuthScreen } from '@/screens/AuthScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { restoreSession } from '@/features/auth/authSlice';
 import { registerPushToken, setupNotificationHandlers } from '@/lib/pushNotifications';
+import { pingGamification } from '@/features/gamification/useGamification';
 
 export type PulseFilter = 'all' | 'chats' | 'waves' | 'listings' | 'alerts' | 'matches';
 
@@ -87,6 +88,7 @@ export function AppNavigator(): React.JSX.Element {
 		if (user && prevUserRef.current !== user.id) {
 			prevUserRef.current = user.id;
 			void registerPushToken();
+			void pingGamification(); // advance daily streak on login/session restore
 			const cleanup = setupNotificationHandlers((screen, params) => {
 				if (navigationRef.isReady()) {
 					navigationRef.navigate(screen as keyof RootStackParamList, params as never);

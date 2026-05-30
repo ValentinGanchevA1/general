@@ -6,6 +6,7 @@ import type { AlertResponse } from '@g88/shared';
 
 import { CreateAlertDto } from './dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { GamificationService } from '../gamification/gamification.service';
 
 @Injectable()
 export class AlertsService {
@@ -14,6 +15,7 @@ export class AlertsService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly notifications: NotificationsService,
+    private readonly gamification: GamificationService,
   ) {}
 
   async create(authorId: string, dto: CreateAlertDto): Promise<AlertResponse> {
@@ -41,6 +43,11 @@ export class AlertsService {
     void this.notifications
       .notifyGeofenceMatch(row.location_h3_r7, authorId, dto.category, dto.body)
       .catch((err) => this.logger.error(`notifyGeofenceMatch failed: ${err}`));
+
+    // Reward the author for contributing to the local feed (capped per day).
+    void this.gamification
+      .award(authorId, 'alert.posted', { dedupeKey: `alert:${row.id}` })
+      .catch((err) => this.logger.error(`award alert.posted failed: ${err}`));
 
     return {
       id: row.id,
