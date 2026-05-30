@@ -25,7 +25,7 @@ export class AlertsController {
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   create(
-    @CurrentUser() userId: string,
+    @CurrentUser('id') userId: string,
     @Body() dto: CreateAlertDto,
   ): Promise<AlertResponse> {
     return this.alerts.create(userId, dto);

@@ -26,7 +26,7 @@ export class GeofencesController {
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   upsert(
-    @CurrentUser() userId: string,
+    @CurrentUser('id') userId: string,
     @Body() dto: CreateGeofenceDto,
   ): Promise<GeofenceResponse> {
     return this.geofences.upsert(userId, dto);
@@ -41,7 +41,7 @@ export class GeofencesController {
    */
   @Get('me/active')
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
-  getActive(@CurrentUser() userId: string): Promise<GeofenceResponse[]> {
+  getActive(@CurrentUser('id') userId: string): Promise<GeofenceResponse[]> {
     return this.geofences.getActive(userId);
   }
 }
