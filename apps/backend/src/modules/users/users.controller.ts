@@ -45,6 +45,11 @@ export class UsersController {
     private readonly s3: S3Service,
   ) {}
 
+  @Get('me')
+  async getMe(@CurrentUser('id') userId: string): Promise<UserProfile> {
+    return this.users.getProfile(userId);
+  }
+
   @Get('me/profile')
   async getProfile(@CurrentUser('id') userId: string): Promise<UserProfile> {
     return this.users.getProfile(userId);
