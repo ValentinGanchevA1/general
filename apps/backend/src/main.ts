@@ -36,9 +36,6 @@ if (process.env.NODE_ENV === 'production') {
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL must be set in production');
   }
-  if (!process.env.GOOGLE_CLIENT_ID) {
-    throw new Error('GOOGLE_CLIENT_ID must be set in production');
-  }
 }
 
 async function bootstrap(): Promise<void> {
