@@ -14,7 +14,7 @@ import type { LoginResponse, AuthTokens, AuthenticatedUser } from '@g88/shared';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
-import { GoogleOAuthDto, LoginDto, LogoutDto, RefreshDto, RegisterDto } from './dto';
+import { AppleOAuthDto, GoogleOAuthDto, LoginDto, LogoutDto, RefreshDto, RegisterDto } from './dto';
 
 @Controller('auth')
 export class AuthController {
@@ -52,6 +52,13 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async googleOAuth(@Body() dto: GoogleOAuthDto): Promise<LoginResponse> {
     return this.auth.googleOAuth(dto.idToken);
+  }
+
+  @Post('oauth/apple')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async appleOAuth(@Body() dto: AppleOAuthDto): Promise<LoginResponse> {
+    return this.auth.appleOAuth(dto.identityToken, dto.fullName, dto.email);
   }
 
   @Get('me')

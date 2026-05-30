@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, MaxLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MinLength, MaxLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -37,3 +37,18 @@ export class GoogleOAuthDto {
   @IsString()
   idToken!: string;
 }
+
+export class AppleOAuthDto {
+  @IsString()
+  identityToken!: string;
+
+  // Apple only sends these on the first sign-in; subsequent logins omit them.
+  @IsOptional()
+  @IsString()
+  fullName?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+}
+

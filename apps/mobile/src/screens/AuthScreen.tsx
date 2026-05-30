@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { login, register, clearError, loginWithGoogle } from '@/features/auth/authSlice';
+import { login, register, clearError, loginWithGoogle, loginWithApple } from '@/features/auth/authSlice';
 
 export function AuthScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
@@ -113,6 +113,16 @@ export function AuthScreen(): React.JSX.Element {
         >
           <Text style={styles.googleBtnText}>Continue with Google</Text>
         </TouchableOpacity>
+
+        {Platform.OS === 'ios' && (
+          <TouchableOpacity
+            style={styles.appleBtn}
+            onPress={() => { dispatch(clearError()); void dispatch(loginWithApple()); }}
+            disabled={loading}
+          >
+            <Text style={styles.appleBtnText}>🍎  Continue with Apple</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -153,4 +163,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   googleBtnText: { color: '#000', fontWeight: '600', fontSize: 15 },
+  appleBtn: {
+    backgroundColor: '#000',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  appleBtnText: { color: '#fff', fontWeight: '600', fontSize: 15 },
 });

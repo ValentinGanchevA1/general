@@ -1,4 +1,5 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { Platform } from 'react-native';
 import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
 import * as Sentry from '@sentry/react-native';
 
@@ -77,6 +78,32 @@ export const loginWithGoogle = createAsyncThunk(
   },
 );
 
+export const loginWithApple = createAsyncThunk(
+  'auth/loginWithApple',
+  async (_, { rejectWithValue }) => {
+    try {
+      if (Platform.OS !== 'ios') return rejectWithValue('Apple Sign-In is only available on iOS');
+      const { appleAuth } = await import('@invertase/react-native-apple-authentication');
+      const appleAuthRequest = await appleAuth.performRequest({
+        requestedOperation: appleAuth.Operation.LOGIN,
+        requestedScopes: [appleAuth.Scope.FULL_NAME, appleAuth.Scope.EMAIL],
+      });
+      const { identityToken, fullName, email } = appleAuthRequest;
+      if (!identityToken) return rejectWithValue('No identity token returned from Apple');
+      const displayName = [fullName?.givenName, fullName?.familyName].filter(Boolean).join(' ') || undefined;
+      const res = await postJson<{ identityToken: string; fullName?: string; email?: string }, LoginResponse>(
+        '/auth/oauth/apple',
+        { identityToken, ...(displayName ? { fullName: displayName } : {}), ...(email ? { email } : {}) },
+      );
+      await tokenStore.set(res.tokens);
+      Sentry.setUser({ id: res.user.id });
+      return res.user;
+    } catch (e: unknown) {
+      return rejectWithValue(extractMessage(e, 'Apple sign-in failed'));
+    }
+  },
+);
+
 export const logout = createAsyncThunk('auth/logout', async () => {
   // Fire-and-forget: revoke the refresh token server-side.
   // If the network is down or the token is already expired, we still clear locally.
@@ -150,6 +177,14 @@ const authSlice = createSlice({
         state.profileSetupComplete = true;
       })
       .addCase(loginWithGoogle.rejected, rejected)
+
+      .addCase(loginWithApple.pending, pending)
+      .addCase(loginWithApple.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+        state.profileSetupComplete = true;
+      })
+      .addCase(loginWithApple.rejected, rejected)
 
       .addCase(restoreSession.pending, pending)
       .addCase(restoreSession.fulfilled, (state, action) => {
