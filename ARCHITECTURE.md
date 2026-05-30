@@ -162,3 +162,39 @@ JWT access token (15min) + opaque refresh token (30d, rotating, stored hashed in
   backend field deferred — not yet persisted, defaults to `'dating'` in `useFabContext`).
   State wiring: `useFabContext` reads from `s.profile.profile` (profile slice), not
   the auth slice — `visibility` maps to `isVisible`, `goals[0]` drives `goalsPrimary`.
+
+- **2026-05-30** — P2 hardening + first production deployment.
+  **Deployment**: `g88-api` live at `https://g88-api.onrender.com` (Render Frankfurt, free tier);
+  `g88-redis` (Redis 8, Frankfurt) for presence + trending + discovery snapshots.
+  Sentry project created (DE region); DSN wired in both apps (OB1 complete).
+  Fixed a latent bug: `@UseGuards` on a NestJS WebSocket gateway class does not run
+  on `handleConnection` lifecycle hooks — only on `@SubscribeMessage` handlers.
+  JWT is now verified directly in `handleConnection` so `client.data.userId` is set
+  before the guard re-checks it per message.
+  **C6 — Chat outbox**: `chatSlice` gains `outbox: OutboxEntry[]` and `failedIds: string[]`.
+  When `chat:send` returns null (socket disconnected), the message is queued instead of
+  dropped. On every socket `connect` event, `useSocket` drains the outbox via dynamic
+  import (breaks the circular dep `useSocket ↔ chatSlice`), retrying up to 3 times.
+  Exhausted entries move to `failedIds`; `ChatScreen` renders ⏱ (pending) or
+  "Tap to retry" (failed). `clientMessageId` is threaded through as the optimistic ID
+  so the server can deduplicate retries.
+  **M1 — Viewport-diff**: `DiscoveryService` stores each response snapshot in Redis
+  (`discovery:snap:{viewportHash}`, TTL 30 s). When `POST /discovery/nearby` includes
+  `prevViewportHash`, the server fetches the previous snapshot and returns
+  `diff: { added, removed }` (by entity `id` / cluster `cellId`) instead of the full
+  point set — provided `removed < 60%` of the previous snapshot (otherwise the viewport
+  jumped far enough that a full response is smaller). `DiscoveryQuery` and
+  `DiscoveryResponse` in `@g88/shared` updated. `useDiscovery` tracks `prevHashRef` +
+  `cachedPointsRef`; applies diffs invisibly and exposes a merged `DiscoveryResponse`
+  to callers — MapScreen is diff-unaware.
+  **A3 — Apple Sign-In (partial)**: `POST /auth/oauth/apple` implemented using
+  `apple-signin-auth` for JWK-based identity-token verification; `apple_sub` column
+  added (`0009_apple_oauth.sql`); `loginWithApple` thunk added to `authSlice`
+  (platform-guarded, iOS only); Apple button rendered in `AuthScreen`.
+  iOS entitlements scaffold committed (`ios/G88/G88.entitlements`,
+  `ios/Podfile`, `ios/.xcode.env`). Xcode capability + Apple Developer Portal
+  (Services ID, key) setup deferred — requires macOS.
+  **Synthetic monitor**: `scripts/synthetic-monitor.mjs` tests the full P1 critical
+  path (login → discovery → wave → socket chat) every 5 minutes via GitHub Actions
+  cron against `g88-api.onrender.com`. P1 DoD gate (7 consecutive days) clock started
+  2026-05-30; clears 2026-06-06.
