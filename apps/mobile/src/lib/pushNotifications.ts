@@ -10,18 +10,28 @@
  * Call setupNotificationHandlers(navigate) once at app boot after login.
  */
 import { Platform, PermissionsAndroid } from 'react-native';
-import messaging from '@react-native-firebase/messaging';
+import {
+  getMessaging,
+  getToken,
+  onMessage,
+  onNotificationOpenedApp,
+  getInitialNotification,
+  requestPermission as firebaseRequestPermission,
+  AuthorizationStatus,
+} from '@react-native-firebase/messaging';
 
 import { api } from '@/api/client';
+
+const messaging = () => getMessaging();
 
 // ─── Permission ──────────────────────────────────────────────────────────────
 
 async function requestPermission(): Promise<boolean> {
   if (Platform.OS === 'ios') {
-    const status = await messaging().requestPermission();
+    const status = await firebaseRequestPermission(messaging());
     return (
-      status === messaging.AuthorizationStatus.AUTHORIZED ||
-      status === messaging.AuthorizationStatus.PROVISIONAL
+      status === AuthorizationStatus.AUTHORIZED ||
+      status === AuthorizationStatus.PROVISIONAL
     );
   }
   if (Platform.OS === 'android' && Platform.Version >= 33) {
@@ -40,13 +50,15 @@ export async function registerPushToken(): Promise<void> {
     const granted = await requestPermission();
     if (!granted) return;
 
-    const token = await messaging().getToken();
+    const token = await getToken(messaging());
     if (!token) return;
+
+    if (__DEV__) console.log('[push] FCM token acquired:', token.slice(0, 20) + '...');
 
     const platform = Platform.OS === 'ios' ? 'ios' : 'android';
     await api.post('/notifications/device-token', { token, platform });
+    if (__DEV__) console.log('[push] token registered with backend');
   } catch (err) {
-    // Non-fatal — push is best-effort
     if (__DEV__) console.warn('[push] registerPushToken failed:', err);
   }
 }
@@ -63,34 +75,26 @@ function handleNotificationTap(
   if (data['type'] === 'message' && data['conversationId']) {
     navigate('Chat', { conversationId: data['conversationId'], otherUserName: '' });
   }
-  // Wave tap → nothing actionable yet (no dedicated wave screen); map will show it.
 }
 
 // ─── Handler setup (call once after login) ───────────────────────────────────
 
 export function setupNotificationHandlers(navigate: NavigateFn): () => void {
-  // Foreground messages: Firebase doesn't show a notification UI by default —
-  // the app is open, so we just let the socket handle real-time delivery.
-  const unsubForeground = messaging().onMessage(async () => {
-    // No-op: socket delivers the message live; no duplicate notification needed.
+  const unsubForeground = onMessage(messaging(), async () => {
+    // No-op: socket delivers the message live.
   });
 
-  // Background / quit → app opened via notification tap.
-  const unsubBackgroundTap = messaging().onNotificationOpenedApp((remoteMessage) => {
+  const unsubBackgroundTap = onNotificationOpenedApp(messaging(), (remoteMessage) => {
     handleNotificationTap(remoteMessage.data as Record<string, string>, navigate);
   });
 
-  // Killed state: app was opened FROM a notification.
-  void messaging()
-    .getInitialNotification()
-    .then((remoteMessage) => {
-      if (remoteMessage) {
-        // Delay slightly so the navigator is mounted before we navigate.
-        setTimeout(() => {
-          handleNotificationTap(remoteMessage.data as Record<string, string>, navigate);
-        }, 300);
-      }
-    });
+  void getInitialNotification(messaging()).then((remoteMessage) => {
+    if (remoteMessage) {
+      setTimeout(() => {
+        handleNotificationTap(remoteMessage.data as Record<string, string>, navigate);
+      }, 300);
+    }
+  });
 
   return () => {
     unsubForeground();
