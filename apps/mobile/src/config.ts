@@ -16,7 +16,7 @@ const DEV_HOST: string =
 export const Config = {
   API_BASE_URL: __DEV__
     ? `http://${DEV_HOST}:3001`
-    : 'https://api.g88.app',
+    : 'https://g88-api.onrender.com',
   // OAuth 2.0 Web Client ID from Google Cloud Console (same value used by backend GOOGLE_CLIENT_ID)
   GOOGLE_WEB_CLIENT_ID:
     (process.env.GOOGLE_WEB_CLIENT_ID as string | undefined) ?? '',
