@@ -147,3 +147,4 @@ temp/
 .claude/settings.local.json
 # Ephemeral git worktrees Claude Code creates for isolated edits.
 .claude/worktrees/
+scripts/.fb-sa.json
