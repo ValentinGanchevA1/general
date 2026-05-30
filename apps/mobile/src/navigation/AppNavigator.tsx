@@ -1,7 +1,7 @@
 // apps/mobile/src/navigation/AppNavigator.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
-import { NavigationContainer, type NavigatorScreenParams } from '@react-navigation/native';
+import { NavigationContainer, type NavigatorScreenParams, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -19,6 +19,7 @@ import type { AreaCategory } from '@g88/shared';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { restoreSession } from '@/features/auth/authSlice';
+import { registerPushToken, setupNotificationHandlers } from '@/lib/pushNotifications';
 
 export type PulseFilter = 'all' | 'chats' | 'waves' | 'listings' | 'alerts' | 'matches';
 
@@ -41,6 +42,7 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 function MainTabs(): React.JSX.Element {
 	return (
@@ -74,10 +76,26 @@ export function AppNavigator(): React.JSX.Element {
 	const user = useAppSelector((s) => s.auth.user);
 	const loading = useAppSelector((s) => s.auth.loading);
 	const profileSetupComplete = useAppSelector((s) => s.auth.profileSetupComplete);
+	const prevUserRef = useRef<string | null>(null);
 
 	useEffect(() => {
 		void dispatch(restoreSession());
 	}, [dispatch]);
+
+	// Register FCM token whenever the user logs in (null → id transition).
+	useEffect(() => {
+		if (user && prevUserRef.current !== user.id) {
+			prevUserRef.current = user.id;
+			void registerPushToken();
+			const cleanup = setupNotificationHandlers((screen, params) => {
+				if (navigationRef.isReady()) {
+					navigationRef.navigate(screen as keyof RootStackParamList, params as never);
+				}
+			});
+			return cleanup;
+		}
+		if (!user) prevUserRef.current = null;
+	}, [user]);
 
 	// Blank dark screen while we check for a stored session
 	if (loading && user === null) {
@@ -85,7 +103,7 @@ export function AppNavigator(): React.JSX.Element {
 	}
 
 	return (
-		<NavigationContainer>
+		<NavigationContainer ref={navigationRef}>
 			<Stack.Navigator screenOptions={{ headerShown: false }}>
 				{user ? (
 					<>

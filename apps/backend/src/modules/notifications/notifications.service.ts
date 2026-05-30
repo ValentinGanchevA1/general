@@ -63,6 +63,24 @@ export class NotificationsService {
     }, { type: 'message', conversationId });
   }
 
+  /**
+   * Looks up the sender's display name then pushes to the recipient.
+   * Used by the realtime gateway where only the senderId is available.
+   */
+  async notifyMessageFrom(
+    toUserId: string,
+    senderId: string,
+    preview: string,
+    conversationId: string,
+  ): Promise<void> {
+    const [sender] = await this.db.query<Array<{ display_name: string }>>(
+      `SELECT display_name FROM users WHERE id = $1 LIMIT 1`,
+      [senderId],
+    );
+    const senderName = sender?.display_name ?? 'Someone';
+    await this.notifyMessage(toUserId, senderName, preview, conversationId);
+  }
+
   private async getTokens(userId: string): Promise<string[]> {
     const rows = await this.db.query<Array<{ token: string }>>(
       `SELECT token FROM device_tokens WHERE user_id = $1

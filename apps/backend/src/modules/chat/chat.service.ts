@@ -45,6 +45,15 @@ export class ChatService {
     return { ...msg!, createdAt: (msg as any).createdAt?.toISOString?.() ?? msg!.createdAt };
   }
 
+  /** Return participant IDs for a conversation — used by the realtime gateway for push routing. */
+  async getParticipantIds(conversationId: string): Promise<string[]> {
+    const [row] = await this.db.query<Array<{ participant_ids: string[] }>>(
+      `SELECT participant_ids FROM conversations WHERE id = $1 LIMIT 1`,
+      [conversationId],
+    );
+    return row?.participant_ids ?? [];
+  }
+
   /** Verify membership without persisting — used by conversation:join gateway handler. */
   async isParticipant(conversationId: string, userId: string): Promise<boolean> {
     const rows = await this.db.query(

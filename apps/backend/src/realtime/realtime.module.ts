@@ -4,9 +4,10 @@ import { WsJwtGuard } from './ws-jwt.guard';
 import { PresenceModule } from '../modules/presence/presence.module';
 import { AuthModule } from '../modules/auth/auth.module';
 import { ChatModule } from '../modules/chat/chat.module';
+import { NotificationsModule } from '../modules/notifications/notifications.module';
 
 @Module({
-  imports: [PresenceModule, AuthModule, ChatModule],
+  imports: [PresenceModule, AuthModule, ChatModule, NotificationsModule],
   providers: [RealtimeGateway, WsJwtGuard],
   exports: [RealtimeGateway],
 })

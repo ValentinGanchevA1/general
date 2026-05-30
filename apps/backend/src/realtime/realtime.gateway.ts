@@ -24,6 +24,7 @@ import { WsJwtGuard } from './ws-jwt.guard';
 import { ChatSendDto, ConversationJoinDto, PresenceUpdateDto } from './realtime.dto';
 import { PresenceService } from '../modules/presence/presence.service';
 import { ChatService } from '../modules/chat/chat.service';
+import { NotificationsService } from '../modules/notifications/notifications.service';
 import type { JwtPayload } from '../modules/auth/jwt.strategy';
 
 type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
@@ -51,6 +52,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   constructor(
     private readonly presence: PresenceService,
     private readonly chat: ChatService,
+    private readonly notifications: NotificationsService,
     private readonly jwt: JwtService,
   ) {}
 
@@ -172,6 +174,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       // Fan out to everyone in the conversation room (including sender's other devices).
       this.server.to(this.conversationRoom(payload.conversationId)).emit('chat:message', msg);
 
+      // Push to participants who have no active socket connection.
+      void this.pushToOfflineParticipants(payload.conversationId, client.data.userId, msg.body);
+
       return { ok: true, data: msg };
     } catch (err) {
       const res = (err as { response?: { code?: string; message?: string } })?.response;
@@ -201,6 +206,27 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         participantIds,
         triggeringWaveId,
       });
+    }
+  }
+
+  // ─── Push helpers ────────────────────────────────────────────────────────
+
+  private async pushToOfflineParticipants(
+    conversationId: string,
+    senderId: string,
+    body: string,
+  ): Promise<void> {
+    try {
+      const participantIds = await this.chat.getParticipantIds(conversationId);
+      for (const recipientId of participantIds) {
+        if (recipientId === senderId) continue;
+        const sockets = await this.server.in(this.userRoom(recipientId)).fetchSockets();
+        if (sockets.length === 0) {
+          await this.notifications.notifyMessageFrom(recipientId, senderId, body, conversationId);
+        }
+      }
+    } catch (err) {
+      this.logger.error(`pushToOfflineParticipants failed: ${err}`);
     }
   }
 
