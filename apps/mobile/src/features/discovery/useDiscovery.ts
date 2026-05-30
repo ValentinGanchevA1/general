@@ -4,6 +4,7 @@ import axios from 'axios';
 import {
   type DiscoveryResponse,
   type DiscoveryQuery,
+  type DiscoveryPoint,
   type EntityKind,
   type Viewport,
 } from '@g88/shared';
@@ -11,15 +12,10 @@ import {
 import { postJson } from '@/api/client';
 
 interface UseDiscoveryArgs {
-  /** Map zoom (0–22). Determines whether server returns clusters or entities. */
   zoom: number;
-  /** Current visible viewport. Hook debounces updates internally. */
   viewport: Viewport | null;
-  /** Optional kind filter. */
   kinds?: EntityKind[];
-  /** Debounce window for viewport changes (ms). */
   debounceMs?: number;
-  /** Auto-fetch on mount and viewport change. Default true. */
   enabled?: boolean;
 }
 
@@ -27,21 +23,21 @@ interface UseDiscoveryResult {
   data: DiscoveryResponse | null;
   loading: boolean;
   error: string | null;
-  /** Force a refetch ignoring debounce. */
   refresh: () => void;
 }
 
+function pointKey(p: DiscoveryPoint): string {
+  return p.kind === 'cluster' ? p.cellId : p.id;
+}
+
 /**
- * Viewport-driven discovery.
+ * Viewport-driven discovery with viewport-diff (M1).
  *
- * Behaviors:
- *  • Debounces viewport changes by `debounceMs` (default 250ms) — map pans
- *    fire dozens of viewport updates per second; we batch.
- *  • Cancels the previous in-flight request when a new viewport arrives.
- *    The user shouldn't see stale data from a viewport they already left.
- *  • Holds onto the last successful payload during loading so the map
- *    stays populated while we refetch.
- *  • Surfaces a normalized error string for UI.
+ * First request: sends viewport + zoom, receives full point set.
+ * Subsequent requests: sends prevViewportHash from last response.
+ * Server returns a diff ({added, removed}) when the viewport overlaps
+ * the previous one; the hook merges it into the cached point set.
+ * Falls back to full replace when diff is absent or null.
  */
 export function useDiscovery({
   zoom,
@@ -57,10 +53,13 @@ export function useDiscovery({
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const lastFetchKey = useRef<string>('');
+  // Hash from the last successful response — sent as prevViewportHash next time.
+  const prevHashRef = useRef<string | null>(null);
+  // Cached point set updated incrementally by diffs.
+  const cachedPointsRef = useRef<DiscoveryPoint[]>([]);
 
   const fetchNow = useCallback(
     async (vp: Viewport, z: number, k?: EntityKind[]) => {
-      // Dedupe: same viewport + zoom + kinds → skip.
       const key = JSON.stringify({ vp, z, k });
       if (key === lastFetchKey.current) return;
       lastFetchKey.current = key;
@@ -73,13 +72,36 @@ export function useDiscovery({
       setError(null);
 
       try {
-        const body: DiscoveryQuery = { viewport: vp, zoom: z, ...(k ? { kinds: k } : {}) };
+        const body: DiscoveryQuery = {
+          viewport: vp,
+          zoom: z,
+          ...(k ? { kinds: k } : {}),
+          ...(prevHashRef.current ? { prevViewportHash: prevHashRef.current } : {}),
+        };
+
         const res = await postJson<DiscoveryQuery, DiscoveryResponse>(
           '/discovery/nearby',
           body,
           { signal: ctrl.signal },
         );
-        if (!ctrl.signal.aborted) setData(res);
+
+        if (ctrl.signal.aborted) return;
+
+        prevHashRef.current = res.viewportHash;
+
+        if (res.diff) {
+          // Incremental update — apply diff to cached point set.
+          const removedSet = new Set(res.diff.removed);
+          const kept = cachedPointsRef.current.filter((p) => !removedSet.has(pointKey(p)));
+          const merged = [...res.diff.added, ...kept];
+          cachedPointsRef.current = merged;
+          // Expose a synthetic full response so consumers are diff-unaware.
+          setData({ ...res, points: merged, diff: null });
+        } else {
+          // Full response — replace.
+          cachedPointsRef.current = res.points;
+          setData(res);
+        }
       } catch (err) {
         if (axios.isCancel(err) || ctrl.signal.aborted) return;
         setError(err instanceof Error ? err.message : 'Discovery failed');
@@ -107,7 +129,9 @@ export function useDiscovery({
 
   const refresh = useCallback(() => {
     if (!viewport) return;
-    lastFetchKey.current = ''; // force
+    lastFetchKey.current = '';
+    prevHashRef.current = null;   // force full response on explicit refresh
+    cachedPointsRef.current = [];
     void fetchNow(viewport, zoom, kinds);
   }, [viewport, zoom, kinds, fetchNow]);
 

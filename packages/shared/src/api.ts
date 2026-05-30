@@ -13,6 +13,8 @@ export interface DiscoveryQuery {
   viewport: Viewport;
   zoom: number;
   kinds?: EntityKind[]; // default: all
+  /** Hash from the previous DiscoveryResponse. Server returns a diff when provided. */
+  prevViewportHash?: string;
 }
 
 /** A cluster bubble — one H3 cell aggregating N entities. */
@@ -64,14 +66,32 @@ export interface ListingMeta {
 
 export type DiscoveryPoint = ClusterPoint | EntityPoint;
 
+/** Incremental update returned when prevViewportHash is valid and overlaps. */
+export interface DiscoveryDiff {
+  /** New points not present in the previous snapshot. */
+  added: DiscoveryPoint[];
+  /** IDs (entities) or cellIds (clusters) no longer in the viewport. */
+  removed: string[];
+}
+
 export interface DiscoveryResponse {
+  /**
+   * Full point set. Empty when `diff` is present (diff mode).
+   * Client must fall back to full replace if diff is absent.
+   */
   points: DiscoveryPoint[];
   /** H3 resolution actually used (the server picks based on zoom). */
   resolution: number;
   /** Server time when the snapshot was computed. */
   generatedAt: string;
-  /** Opaque hash for the viewport-diff protocol (Phase 1.5). */
+  /** Opaque hash — send as prevViewportHash on the next request. */
   viewportHash: string;
+  /**
+   * Present when the server computed an incremental diff against prevViewportHash.
+   * Client applies added/removed on top of its cached points.
+   * Null/absent means this is a full response — replace all cached points.
+   */
+  diff?: DiscoveryDiff | null;
 }
 
 // ─── Interactions ──────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import {
   IsLongitude,
   IsNumber,
   IsOptional,
+  IsString,
   Max,
   Min,
   ValidateNested,
@@ -44,4 +45,8 @@ export class DiscoveryQueryDto {
   @IsArray()
   @IsIn(['user', 'event', 'listing'], { each: true })
   kinds?: EntityKind[];
+
+  @IsOptional()
+  @IsString()
+  prevViewportHash?: string;
 }

@@ -39,6 +39,7 @@ export class DiscoveryController {
       zoom: dto.zoom,
       kinds: dto.kinds,
       requesterId: userId,
+      prevViewportHash: dto.prevViewportHash,
     });
   }
 }

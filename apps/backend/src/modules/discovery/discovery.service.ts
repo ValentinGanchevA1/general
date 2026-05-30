@@ -1,11 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { createHash } from 'node:crypto';
 import * as h3 from 'h3-js';
+import type Redis from 'ioredis';
 
 import {
   type DiscoveryResponse,
+  type DiscoveryDiff,
   type DiscoveryPoint,
   type EntityKind,
   type UserMeta,
@@ -15,12 +17,19 @@ import {
   cellsForViewport,
 } from '@g88/shared';
 
+import { REDIS_CLIENT } from '../../config/redis.provider';
 import { PresenceService } from '../presence/presence.service';
 
 const DEFAULT_KINDS: EntityKind[] = ['user', 'event', 'listing'];
 
 /** Hard cap to keep one viewport from returning a runaway payload. */
 const MAX_POINTS_PER_RESPONSE = 500;
+
+/** Snapshot TTL — after 30s the diff baseline expires and clients get a full response. */
+const SNAPSHOT_TTL_SECONDS = 30;
+
+/** Fall back to full response if more than 60% of prev points were removed (big jump). */
+const DIFF_FALLBACK_THRESHOLD = 0.6;
 
 @Injectable()
 export class DiscoveryService {
@@ -29,6 +38,7 @@ export class DiscoveryService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly presence: PresenceService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
   async nearby(params: {
@@ -36,6 +46,7 @@ export class DiscoveryService {
     zoom: number;
     kinds?: EntityKind[];
     requesterId: string;
+    prevViewportHash?: string;
   }): Promise<DiscoveryResponse> {
     const kinds = params.kinds?.length ? params.kinds : DEFAULT_KINDS;
     const resolution = h3ResolutionForZoom(params.zoom);
@@ -45,8 +56,6 @@ export class DiscoveryService {
       return this.empty(resolution, params.viewport, kinds);
     }
 
-    // Guard: a wildly zoomed-out viewport can produce 10k+ cells.
-    // PostGIS handles it but the payload won't. Fall back to a coarser resolution.
     if (cells.length > 5_000) {
       this.logger.warn(`Viewport produced ${cells.length} cells at r${resolution} — refusing`);
       return this.empty(resolution, params.viewport, kinds);
@@ -56,12 +65,91 @@ export class DiscoveryService {
       ? await this.entitiesInCells(cells, resolution, kinds, params.requesterId)
       : await this.clusterByCell(cells, resolution, kinds, params.requesterId);
 
+    const viewportHash = this.hashViewport(params.viewport, params.zoom, kinds);
+
+    // Store this snapshot so the next request can diff against it.
+    await this.storeSnapshot(viewportHash, points);
+
+    // Attempt a diff against the previous snapshot if the client sent one.
+    if (params.prevViewportHash) {
+      const diff = await this.computeDiff(params.prevViewportHash, points);
+      if (diff) {
+        return {
+          points: [],      // client keeps its cached points and applies the diff
+          resolution,
+          generatedAt: new Date().toISOString(),
+          viewportHash,
+          diff,
+        };
+      }
+    }
+
     return {
       points,
       resolution,
       generatedAt: new Date().toISOString(),
-      viewportHash: this.hashViewport(params.viewport, params.zoom, kinds),
+      viewportHash,
+      diff: null,
     };
+  }
+
+  // ─── Snapshot + diff helpers ─────────────────────────────────────────────
+
+  private snapshotKey(hash: string): string {
+    return `discovery:snap:${hash}`;
+  }
+
+  private pointKey(p: DiscoveryPoint): string {
+    return p.kind === 'cluster' ? p.cellId : p.id;
+  }
+
+  private async storeSnapshot(hash: string, points: DiscoveryPoint[]): Promise<void> {
+    await this.redis.set(
+      this.snapshotKey(hash),
+      JSON.stringify(points),
+      'EX',
+      SNAPSHOT_TTL_SECONDS,
+    );
+  }
+
+  /**
+   * Returns a diff against the previous snapshot, or null if:
+   * - the previous snapshot has expired
+   * - the overlap is too small (big viewport jump → full response is smaller)
+   */
+  private async computeDiff(
+    prevHash: string,
+    currentPoints: DiscoveryPoint[],
+  ): Promise<DiscoveryDiff | null> {
+    const raw = await this.redis.get(this.snapshotKey(prevHash));
+    if (!raw) return null;
+
+    let prevPoints: DiscoveryPoint[];
+    try {
+      prevPoints = JSON.parse(raw) as DiscoveryPoint[];
+    } catch {
+      return null;
+    }
+
+    const currentKeys = new Set(currentPoints.map((p) => this.pointKey(p)));
+    const prevKeys = new Set(prevPoints.map((p) => this.pointKey(p)));
+
+    const removed = [...prevKeys].filter((k) => !currentKeys.has(k));
+
+    // If more than threshold of prev points were removed, the user jumped far —
+    // sending a diff would be larger than the full payload.
+    if (prevPoints.length > 0 && removed.length / prevPoints.length > DIFF_FALLBACK_THRESHOLD) {
+      return null;
+    }
+
+    const added = currentPoints.filter((p) => !prevKeys.has(this.pointKey(p)));
+
+    // Skip diff if nothing changed.
+    if (added.length === 0 && removed.length === 0) {
+      return { added: [], removed: [] };
+    }
+
+    return { added, removed };
   }
 
   // ─── Cluster aggregate (low/mid zoom) ────────────────────────────────────
