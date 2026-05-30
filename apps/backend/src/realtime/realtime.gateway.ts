@@ -1,4 +1,5 @@
-import { ForbiddenException, Logger, NotFoundException, UsePipes, ValidationPipe, UseGuards } from '@nestjs/common';
+import { ForbiddenException, Logger, NotFoundException, UsePipes, ValidationPipe, UseGuards, Inject } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import {
   ConnectedSocket,
   MessageBody,
@@ -23,6 +24,7 @@ import { WsJwtGuard } from './ws-jwt.guard';
 import { ChatSendDto, ConversationJoinDto, PresenceUpdateDto } from './realtime.dto';
 import { PresenceService } from '../modules/presence/presence.service';
 import { ChatService } from '../modules/chat/chat.service';
+import type { JwtPayload } from '../modules/auth/jwt.strategy';
 
 type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 type G88Socket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
@@ -49,16 +51,27 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   constructor(
     private readonly presence: PresenceService,
     private readonly chat: ChatService,
+    private readonly jwt: JwtService,
   ) {}
 
   // ─── Lifecycle ───────────────────────────────────────────────────────────
 
   async handleConnection(client: G88Socket): Promise<void> {
-    const userId = client.data.userId;
-    if (!userId) {
+    // Guards don't run for lifecycle hooks — verify the token here directly.
+    const token = client.handshake.auth?.['token'] as string | undefined;
+    if (!token) {
       client.disconnect(true);
       return;
     }
+    try {
+      const payload = this.jwt.verify<JwtPayload>(token, { secret: process.env.JWT_SECRET! });
+      client.data.userId = payload.sub;
+    } catch {
+      client.disconnect(true);
+      return;
+    }
+
+    const userId = client.data.userId;
     client.data.rooms = new Set();
     client.join(this.userRoom(userId));
     this.logger.log(`socket connected: user=${userId} sid=${client.id}`);
