@@ -27,10 +27,27 @@ interface UseSocketResult {
   ) => () => void;
   sendPresence: (payload: PresenceUpdatePayload) => Promise<{ cellId: string } | null>;
   joinConversation: (conversationId: string) => Promise<boolean>;
-  sendMessage: (conversationId: string, body: string) => Promise<ChatMessageEvent | null>;
+  sendMessage: (conversationId: string, body: string, clientMessageId?: string) => Promise<ChatMessageEvent | null>;
 }
 
 let sharedSocket: G88Socket | null = null;
+
+/** Module-level send — used by the hook and by the outbox drain. */
+export function socketSendMessage(
+  conversationId: string,
+  body: string,
+  clientMessageId: string,
+): Promise<ChatMessageEvent | null> {
+  return new Promise((resolve) => {
+    const s = sharedSocket;
+    if (!s?.connected) return resolve(null);
+    const timer = setTimeout(() => resolve(null), 5_000);
+    s.emit('chat:send', { conversationId, body, clientMessageId }, (res) => {
+      clearTimeout(timer);
+      resolve(res.ok ? res.data : null);
+    });
+  });
+}
 
 /**
  * Module-level singleton so every screen shares one socket connection.
@@ -65,7 +82,32 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
         reconnectionDelayMax: 5_000,
       }) as G88Socket;
 
-      sharedSocket.on('connect', () => !cancelled && setConnected(true));
+      sharedSocket.on('connect', () => {
+        if (!cancelled) setConnected(true);
+        // Drain the outbox on every reconnect. Dynamic import avoids a
+        // circular dep: useSocket ← store ← chatSlice ← useSocket.
+        void (async () => {
+          const { store } = await import('@/store');
+          const { outbox } = store.getState().chat;
+          if (outbox.length === 0) return;
+          const {
+            messageConfirmed,
+            outboxRetryIncremented,
+          } = await import('@/features/chat/chatSlice');
+          for (const entry of outbox) {
+            const result = await socketSendMessage(
+              entry.conversationId,
+              entry.body,
+              entry.optimisticId,
+            );
+            if (result) {
+              store.dispatch(messageConfirmed({ optimisticId: entry.optimisticId, confirmed: result }));
+            } else {
+              store.dispatch(outboxRetryIncremented(entry.optimisticId));
+            }
+          }
+        })();
+      });
       sharedSocket.on('disconnect', () => !cancelled && setConnected(false));
       sharedSocket.on('error:event', (e) => {
         console.warn(`[socket] server error: ${e.code} ${e.message}`);
@@ -133,20 +175,8 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
   );
 
   const sendMessage = useCallback(
-    (conversationId: string, body: string): Promise<ChatMessageEvent | null> =>
-      new Promise((resolve) => {
-        const s = sharedSocket;
-        if (!s?.connected) return resolve(null);
-        const timer = setTimeout(() => resolve(null), 5_000);
-        s.emit(
-          'chat:send',
-          { conversationId, body, clientMessageId: `${Date.now()}` },
-          (res) => {
-            clearTimeout(timer);
-            resolve(res.ok ? res.data : null);
-          },
-        );
-      }),
+    (conversationId: string, body: string, clientMessageId?: string): Promise<ChatMessageEvent | null> =>
+      socketSendMessage(conversationId, body, clientMessageId ?? `${Date.now()}`),
     [],
   );
 

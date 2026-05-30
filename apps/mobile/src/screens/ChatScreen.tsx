@@ -20,23 +20,39 @@ import {
   messageReceived,
   messageSentOptimistic,
   messageConfirmed,
+  messageQueued,
+  failedMessageCleared,
 } from '@/features/chat/chatSlice';
-import { useSocket } from '@/realtime/useSocket';
+import { socketSendMessage, useSocket } from '@/realtime/useSocket';
 
 type Route = RouteProp<RootStackParamList, 'Chat'>;
 
 function MessageBubble({
   msg,
   isMine,
+  isPending,
+  isFailed,
+  onRetry,
 }: {
   msg: ChatMessage;
   isMine: boolean;
+  isPending: boolean;
+  isFailed: boolean;
+  onRetry: () => void;
 }): React.JSX.Element {
   return (
     <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
       <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
         {msg.body}
       </Text>
+      {isPending && (
+        <Text style={styles.statusPending}>⏱</Text>
+      )}
+      {isFailed && (
+        <TouchableOpacity onPress={onRetry}>
+          <Text style={styles.statusFailed}>! Tap to retry</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -50,19 +66,21 @@ export function ChatScreen(): React.JSX.Element {
   const messages = useAppSelector((s) => s.chat.messages[conversationId] ?? []);
   const nextCursor = useAppSelector((s) => s.chat.nextCursor[conversationId] ?? null);
   const loading = useAppSelector((s) => s.chat.messagesLoading[conversationId] ?? false);
+  const outbox = useAppSelector((s) => s.chat.outbox);
+  const failedIds = useAppSelector((s) => s.chat.failedIds);
+
+  const pendingIds = outbox.map((e) => e.optimisticId);
 
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
   const { on, joinConversation, sendMessage } = useSocket();
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
-  // Initial load + join socket room.
   useEffect(() => {
     void dispatch(fetchMessages({ conversationId }));
     void joinConversation(conversationId);
   }, [conversationId, dispatch, joinConversation]);
 
-  // Listen for incoming messages.
   useEffect(() => {
     return on('chat:message', (msg) => {
       dispatch(messageReceived(msg));
@@ -85,12 +103,26 @@ export function ChatScreen(): React.JSX.Element {
     };
     dispatch(messageSentOptimistic(optimistic));
 
-    const confirmed = await sendMessage(conversationId, text);
+    const confirmed = await sendMessage(conversationId, text, optimisticId);
     if (confirmed) {
       dispatch(messageConfirmed({ optimisticId, confirmed }));
+    } else {
+      // Socket disconnected — queue for retry when socket reconnects.
+      dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
     }
     setSending(false);
   }, [body, sending, conversationId, myUserId, dispatch, sendMessage]);
+
+  const retry = useCallback(async (optimisticId: string, text: string): Promise<void> => {
+    dispatch(failedMessageCleared(optimisticId));
+    dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
+    const confirmed = await socketSendMessage(conversationId, text, optimisticId);
+    if (confirmed) {
+      dispatch(messageConfirmed({ optimisticId, confirmed }));
+    } else {
+      dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
+    }
+  }, [conversationId, dispatch]);
 
   const loadMore = (): void => {
     if (nextCursor && !loading) {
@@ -114,7 +146,13 @@ export function ChatScreen(): React.JSX.Element {
           data={messages}
           keyExtractor={(m) => m.id}
           renderItem={({ item }) => (
-            <MessageBubble msg={item} isMine={item.senderId === myUserId} />
+            <MessageBubble
+              msg={item}
+              isMine={item.senderId === myUserId}
+              isPending={pendingIds.includes(item.id)}
+              isFailed={failedIds.includes(item.id)}
+              onRetry={() => void retry(item.id, item.body)}
+            />
           )}
           inverted
           contentContainerStyle={styles.messageList}
@@ -162,6 +200,8 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: 15, lineHeight: 20 },
   bubbleTextMine: { color: '#000' },
   bubbleTextTheirs: { color: '#fff' },
+  statusPending: { fontSize: 11, color: '#00000066', marginTop: 2, textAlign: 'right' },
+  statusFailed: { fontSize: 11, color: '#ff4444', marginTop: 2, textAlign: 'right', fontWeight: '600' },
   inputRow: {
     flexDirection: 'row',
     padding: 10,
