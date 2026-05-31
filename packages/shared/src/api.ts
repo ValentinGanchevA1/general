@@ -220,6 +220,25 @@ export interface PresignedUploadResponse {
   publicUrl: string;
 }
 
+// ─── Verification ────────────────────────────────────────────────────────────
+
+export interface StartPhoneVerificationRequest {
+  /** E.164 format, e.g. +359888123456. */
+  phone: string;
+}
+
+export interface StartPhoneVerificationResponse {
+  sent: boolean;
+  /** 'sms' in prod; 'dev' when Twilio is unconfigured (local). */
+  channel: 'sms' | 'dev';
+}
+
+export interface CheckPhoneVerificationRequest {
+  phone: string;
+  /** OTP code entered by the user. */
+  code: string;
+}
+
 // ─── Chat (REST) ───────────────────────────────────────────────────────────
 
 export interface ChatMessage {

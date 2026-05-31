@@ -31,9 +31,6 @@ function ComingSoon({ title, icon, blurb }: { title: string; icon: string; blurb
   );
 }
 
-export const VerificationScreen = (): React.JSX.Element => (
-  <ComingSoon title="Verification" icon="shield-check" blurb="Verify your phone, photo, and ID to raise your trust score." />
-);
 export const SubscriptionScreen = (): React.JSX.Element => (
   <ComingSoon title="Premium" icon="crown" blurb="Unlock premium reach, see who viewed you, and more." />
 );

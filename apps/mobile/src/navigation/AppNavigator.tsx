@@ -15,8 +15,8 @@ import { ProfileEditScreen } from '@/screens/ProfileEditScreen';
 import { ChatScreen } from '@/screens/ChatScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { AlertComposerScreen } from '@/screens/AlertComposerScreen';
+import { VerificationScreen } from '@/screens/VerificationScreen';
 import {
-	VerificationScreen,
 	SubscriptionScreen,
 	SocialLinkingScreen,
 	AchievementsScreen,

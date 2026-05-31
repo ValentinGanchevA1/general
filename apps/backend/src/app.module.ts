@@ -18,6 +18,7 @@ import { TrendingModule } from './modules/trending/trending.module';
 import { GamificationModule } from './modules/gamification/gamification.module';
 import { ChallengesModule } from './modules/challenges/challenges.module';
 import { AchievementsModule } from './modules/achievements/achievements.module';
+import { VerificationModule } from './modules/verification/verification.module';
 import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
@@ -59,6 +60,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     GamificationModule,
     ChallengesModule,
     AchievementsModule,
+    VerificationModule,
     RealtimeModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
