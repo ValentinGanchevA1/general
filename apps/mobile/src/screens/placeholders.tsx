@@ -31,12 +31,6 @@ function ComingSoon({ title, icon, blurb }: { title: string; icon: string; blurb
   );
 }
 
-export const AchievementsScreen = (): React.JSX.Element => (
-  <ComingSoon title="Achievements" icon="trophy" blurb="Earn badges for milestones across the app." />
-);
-export const LeaderboardScreen = (): React.JSX.Element => (
-  <ComingSoon title="Leaderboard" icon="podium-gold" blurb="See how your XP stacks up against people nearby." />
-);
 export const ChallengesScreen = (): React.JSX.Element => (
   <ComingSoon title="Challenges" icon="checkbox-marked-circle-outline" blurb="Complete daily challenges to earn bonus XP." />
 );

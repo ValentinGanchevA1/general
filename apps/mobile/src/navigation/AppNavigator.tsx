@@ -18,9 +18,9 @@ import { AlertComposerScreen } from '@/screens/AlertComposerScreen';
 import { VerificationScreen } from '@/screens/VerificationScreen';
 import { SubscriptionScreen } from '@/screens/SubscriptionScreen';
 import { SocialLinkingScreen } from '@/screens/SocialLinkingScreen';
+import { AchievementsScreen } from '@/screens/AchievementsScreen';
+import { LeaderboardScreen } from '@/screens/LeaderboardScreen';
 import {
-	AchievementsScreen,
-	LeaderboardScreen,
 	ChallengesScreen,
 	PrivacyScreen,
 	HelpScreen,
