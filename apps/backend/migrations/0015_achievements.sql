@@ -1,4 +1,4 @@
--- 0012_achievements.sql — achievement unlocks + leaderboard indexes.
+-- 0015_achievements.sql — achievement unlocks + leaderboard indexes.
 --
 -- Achievement *definitions* live in code (@g88/shared, like the challenge
 -- catalog). This table records only the first-time unlock per (user, achievement).
