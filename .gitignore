@@ -148,3 +148,11 @@ temp/
 # Ephemeral git worktrees Claude Code creates for isolated edits.
 .claude/worktrees/
 scripts/.fb-sa.json
+
+# ─── AI agent tooling (local, per-tool scratch — not shared) ─────────────────
+.agents/
+.claude/skills/
+.junie/
+.tabnine/
+.windsurf/
+skills-lock.json
