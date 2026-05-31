@@ -4,6 +4,9 @@ import { DataSource } from 'typeorm';
 
 import {
   type GamificationSummary,
+  type LeaderboardEntry,
+  type LeaderboardPage,
+  type LeaderboardScope,
   type XpReason,
   XP_AMOUNTS,
   XP_DAILY_CAP,
@@ -122,5 +125,101 @@ export class GamificationService {
       row?.current_streak ?? 0,
       row?.longest_streak ?? 0,
     );
+  }
+
+  /**
+   * Ranked leaderboard for the given scope plus the caller's own rank (even when
+   * off the top page). MVP is direct SQL; at scale the weekly board moves to a
+   * Redis sorted set per ISO-week or a cron-refreshed materialized view.
+   */
+  async leaderboard(
+    userId: string,
+    scope: LeaderboardScope,
+    limit = 50,
+  ): Promise<LeaderboardPage> {
+    const entries =
+      scope === 'weekly'
+        ? await this.weeklyTop(userId, limit)
+        : await this.allTimeTop(userId, limit);
+
+    const me =
+      entries.find((e) => e.isMe) ??
+      (scope === 'weekly' ? await this.weeklyMe(userId) : await this.allTimeMe(userId));
+
+    return { scope, entries, me };
+  }
+
+  private allTimeTop(userId: string, limit: number): Promise<LeaderboardEntry[]> {
+    return this.db.query<LeaderboardEntry[]>(
+      `SELECT RANK() OVER (ORDER BY g.total_xp DESC)::int AS rank,
+              g.user_id AS "userId", g.total_xp AS xp, g.level,
+              u.display_name AS "displayName", u.avatar_url AS "avatarUrl",
+              (g.user_id = $1) AS "isMe"
+         FROM user_gamification g
+         JOIN users u ON u.id = g.user_id AND u.deleted_at IS NULL
+        WHERE g.total_xp > 0
+        ORDER BY g.total_xp DESC
+        LIMIT $2`,
+      [userId, limit],
+    );
+  }
+
+  private async allTimeMe(userId: string): Promise<LeaderboardEntry | null> {
+    const [row] = await this.db.query<LeaderboardEntry[]>(
+      `WITH ranked AS (
+          SELECT user_id, total_xp, level,
+                 RANK() OVER (ORDER BY total_xp DESC)::int AS rank
+            FROM user_gamification WHERE total_xp > 0)
+        SELECT r.rank, r.user_id AS "userId", r.total_xp AS xp, r.level,
+               u.display_name AS "displayName", u.avatar_url AS "avatarUrl",
+               true AS "isMe"
+          FROM ranked r
+          JOIN users u ON u.id = r.user_id AND u.deleted_at IS NULL
+         WHERE r.user_id = $1`,
+      [userId],
+    );
+    return row ?? null;
+  }
+
+  private weeklyTop(userId: string, limit: number): Promise<LeaderboardEntry[]> {
+    return this.db.query<LeaderboardEntry[]>(
+      `WITH weekly AS (
+          SELECT user_id, SUM(amount)::int AS xp
+            FROM xp_events
+           WHERE created_at >= date_trunc('week', NOW())
+           GROUP BY user_id)
+        SELECT RANK() OVER (ORDER BY w.xp DESC)::int AS rank,
+               w.user_id AS "userId", w.xp, COALESCE(g.level, 1) AS level,
+               u.display_name AS "displayName", u.avatar_url AS "avatarUrl",
+               (w.user_id = $1) AS "isMe"
+          FROM weekly w
+          JOIN users u ON u.id = w.user_id AND u.deleted_at IS NULL
+          LEFT JOIN user_gamification g ON g.user_id = w.user_id
+         ORDER BY w.xp DESC
+         LIMIT $2`,
+      [userId, limit],
+    );
+  }
+
+  private async weeklyMe(userId: string): Promise<LeaderboardEntry | null> {
+    const [row] = await this.db.query<LeaderboardEntry[]>(
+      `WITH weekly AS (
+          SELECT user_id, SUM(amount)::int AS xp
+            FROM xp_events
+           WHERE created_at >= date_trunc('week', NOW())
+           GROUP BY user_id),
+        ranked AS (
+          SELECT user_id, xp, RANK() OVER (ORDER BY xp DESC)::int AS rank
+            FROM weekly)
+        SELECT r.rank, r.user_id AS "userId", r.xp, COALESCE(g.level, 1) AS level,
+               u.display_name AS "displayName", u.avatar_url AS "avatarUrl",
+               true AS "isMe"
+          FROM ranked r
+          JOIN users u ON u.id = r.user_id AND u.deleted_at IS NULL
+          LEFT JOIN user_gamification g ON g.user_id = r.user_id
+         WHERE r.user_id = $1`,
+      [userId],
+    );
+    return row ?? null;
   }
 }

@@ -8,6 +8,7 @@ import { CreateAlertDto } from './dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { ChallengesService } from '../challenges/challenges.service';
+import { AchievementsService } from '../achievements/achievements.service';
 
 @Injectable()
 export class AlertsService {
@@ -18,6 +19,7 @@ export class AlertsService {
     private readonly notifications: NotificationsService,
     private readonly gamification: GamificationService,
     private readonly challenges: ChallengesService,
+    private readonly achievements: AchievementsService,
   ) {}
 
   async create(authorId: string, dto: CreateAlertDto): Promise<AlertResponse> {
@@ -55,6 +57,11 @@ export class AlertsService {
     void this.challenges
       .increment(authorId, 'alert_posted')
       .catch((err) => this.logger.error(`challenge alert_posted failed: ${err}`));
+
+    // Re-check achievements (alert-count milestones).
+    void this.achievements
+      .evaluate(authorId)
+      .catch((err) => this.logger.error(`achievement evaluate failed: ${err}`));
 
     return {
       id: row.id,

@@ -1,7 +1,7 @@
-import { Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 
-import type { GamificationSummary } from '@g88/shared';
+import type { GamificationSummary, LeaderboardPage, LeaderboardScope } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -25,5 +25,16 @@ export class GamificationController {
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   ping(@CurrentUser('id') userId: string): Promise<GamificationSummary> {
     return this.gamification.ping(userId);
+  }
+
+  /** Ranked leaderboard (default weekly) + the caller's own rank. */
+  @Get('leaderboard')
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  leaderboard(
+    @CurrentUser('id') userId: string,
+    @Query('scope') scope?: string,
+  ): Promise<LeaderboardPage> {
+    const resolved: LeaderboardScope = scope === 'all_time' ? 'all_time' : 'weekly';
+    return this.gamification.leaderboard(userId, resolved);
   }
 }

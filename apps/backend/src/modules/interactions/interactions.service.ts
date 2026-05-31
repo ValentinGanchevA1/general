@@ -14,6 +14,7 @@ import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { ChallengesService } from '../challenges/challenges.service';
+import { AchievementsService } from '../achievements/achievements.service';
 
 @Injectable()
 export class InteractionsService {
@@ -26,6 +27,7 @@ export class InteractionsService {
     private readonly notifications: NotificationsService,
     private readonly gamification: GamificationService,
     private readonly challenges: ChallengesService,
+    private readonly achievements: AchievementsService,
   ) {}
 
   /**
@@ -148,6 +150,11 @@ export class InteractionsService {
           void this.challenges
             .increment(uid, 'match_made')
             .catch((err) => this.logger.error(`challenge match_made failed: ${err}`));
+          // Re-check achievements: the reciprocated-wave count + any level-up
+          // from the XP just awarded may have crossed a threshold.
+          void this.achievements
+            .evaluate(uid)
+            .catch((err) => this.logger.error(`achievement evaluate failed: ${err}`));
         }
       }
 

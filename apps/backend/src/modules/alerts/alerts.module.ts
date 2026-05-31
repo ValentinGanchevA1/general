@@ -4,9 +4,10 @@ import { AlertsService } from './alerts.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { GamificationModule } from '../gamification/gamification.module';
 import { ChallengesModule } from '../challenges/challenges.module';
+import { AchievementsModule } from '../achievements/achievements.module';
 
 @Module({
-  imports: [NotificationsModule, GamificationModule, ChallengesModule],
+  imports: [NotificationsModule, GamificationModule, ChallengesModule, AchievementsModule],
   controllers: [AlertsController],
   providers: [AlertsService],
 })
