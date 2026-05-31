@@ -31,9 +31,6 @@ function ComingSoon({ title, icon, blurb }: { title: string; icon: string; blurb
   );
 }
 
-export const SocialLinkingScreen = (): React.JSX.Element => (
-  <ComingSoon title="Connected Accounts" icon="link-variant" blurb="Link your social accounts to boost your trust score." />
-);
 export const AchievementsScreen = (): React.JSX.Element => (
   <ComingSoon title="Achievements" icon="trophy" blurb="Earn badges for milestones across the app." />
 );

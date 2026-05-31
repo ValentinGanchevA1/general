@@ -17,8 +17,8 @@ import { SettingsScreen } from '@/screens/SettingsScreen';
 import { AlertComposerScreen } from '@/screens/AlertComposerScreen';
 import { VerificationScreen } from '@/screens/VerificationScreen';
 import { SubscriptionScreen } from '@/screens/SubscriptionScreen';
+import { SocialLinkingScreen } from '@/screens/SocialLinkingScreen';
 import {
-	SocialLinkingScreen,
 	AchievementsScreen,
 	LeaderboardScreen,
 	ChallengesScreen,

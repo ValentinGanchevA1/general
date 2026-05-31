@@ -294,6 +294,13 @@ export interface PortalSessionResponse {
   url: string;
 }
 
+// ─── Social linking ──────────────────────────────────────────────────────────
+
+export interface SocialAuthorizeResponse {
+  /** Provider OAuth authorize URL to open in the browser. */
+  url: string;
+}
+
 // ─── Chat (REST) ───────────────────────────────────────────────────────────
 
 export interface ChatMessage {
