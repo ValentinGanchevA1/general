@@ -231,3 +231,46 @@ JWT access token (15min) + opaque refresh token (30d, rotating, stored hashed in
   `challenge.completed`. `increment(metric)` is called fire-and-forget from the wave,
   match, alert, and chat write paths. `GET /challenges/today` merges catalog defs with
   per-user progress.
+
+- **2026-05-31 (P4)** — Profile & monetization surface (G1–G5). Theme: every new
+  integration is **env-gated** — the code ships inert and a provider/service only
+  goes live once its credentials are set (same degrade-gracefully pattern as FCM
+  and Sentry), so half-configured infra never reaches prod.
+  **G1 — profile data model**: migration `0012_profile_expansion` adds `phone`,
+  `date_of_birth`, `subscription_tier` (default `free`), `interests[]` to `users`,
+  plus `user_photos` (ordered gallery) and `social_links` (one row per provider).
+  `UserProfile` in `@g88/shared` is extended; `age`, `verificationScore` and the
+  `badges` object are **derived server-side, never stored** — age via SQL
+  `age(date_of_birth)`, score/badges from the cumulative verification ladder
+  (`none<email<phone<selfie<id`) + premium tier + a verified social link. The
+  ProfileScreen is a pure renderer of that payload.
+  **G2 — verification**: `VerificationModule` wraps **Twilio Verify**. `phone/start`
+  sends an SMS OTP; `phone/check` confirms it, stores the number, and promotes the
+  ladder to at least `phone` (CASE never downgrades selfie/id). Migration `0013`
+  adds a partial unique index on `users.phone` (verified numbers) → 409 on
+  collision. No creds in non-prod → fixed dev code; missing creds in prod hard-fail.
+  **G3 — subscriptions**: Stripe Checkout (hosted) + billing portal, opened from
+  mobile via `Linking`. Tier is authoritative **only** through the
+  signature-verified webhook (`customer.subscription.*` / `checkout.session.completed`),
+  keyed by `stripe_customer_id` — there is no client-trusted path to grant a tier.
+  Requires `NestFactory(rawBody:true)` so the webhook can verify the unparsed body
+  while JSON parsing still works everywhere else. Price↔tier mapping is env-driven
+  (`STRIPE_PRICE_*`), reverse-looked-up on the webhook. Migration `0014`.
+  **G4 — social linking**: provider-generic OAuth2 authorization-code linking
+  (instagram/twitter/tiktok/facebook/linkedin/spotify) via a server-side callback.
+  Authorization-request integrity uses an **HMAC-signed, 10-min stateless `state`**
+  (carries userId+provider, signed with `JWT_SECRET`) rather than server session
+  storage; the callback exchanges the code, reads the handle, and upserts a
+  `verified` `social_links` row, then 302s back to the app. Confidential-client
+  flow; providers mandating PKCE (X/Twitter) need a Redis-backed verifier before
+  going live. The mobile screen opens the authorize URL in the browser and
+  refetches the profile on focus to observe the browser-completed link.
+  **G5 — achievements + leaderboard**: backend (catalog in `@g88/shared`, unlock
+  `evaluate` wired fire-and-forget into wave-match + alert-post, `GET /achievements`,
+  weekly/all-time `GET /gamification/leaderboard`) landed separately; P4 adds the
+  mobile screens. Both typechecks clean; backend 7/7.
+  **Migration numbering wart**: `0012_achievements` (gamification) and
+  `0012_profile_expansion` (G1) collide on the `0012` prefix. Harmless — `migrate.js`
+  keys `schema_migrations` on the full filename and runs in filename-sort order, so
+  `profile_expansion` still applies before `0013`/`0014` depend on its columns. Left
+  as-is to avoid re-running on already-applied DBs; next free number is `0015`.

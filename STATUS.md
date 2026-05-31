@@ -1,7 +1,7 @@
 # STATUS — G88 Reconciliation & P1
 
 > **Last updated:** 2026-05-31
-> **Current phase:** P3 feature build-out — gamification ✅ · push notifications + geofence-alert pushes ✅ · P2 7-day synthetic gate in progress (clears 2026-06-06)
+> **Current phase:** P4 profile & monetization surface (G1–G5) ✅ code-complete — rich ProfileScreen + verification (Twilio), subscriptions (Stripe), social linking, achievements/leaderboard. External creds + migrations pending deploy. P2 7-day synthetic gate clears 2026-06-06.
 > **Owner:** [your name]
 >
 > Update this file as work progresses. It's the single source of truth for "where are we?".
@@ -81,6 +81,24 @@ First post-hardening features. All wired fire-and-forget so they never block the
 
 ---
 
+## P4 — Profile & monetization surface (G1–G5)
+
+Rich ProfileScreen redesign + the data and integrations behind it. Code-complete and on `master`; each integration is **env-gated** and inert until its credentials land (mirrors the FCM/Sentry pattern).
+
+| ID | Pillar | Deliverable | Migration | State |
+|---|---|---|---|---|
+| G1 | Profile | Rich ProfileScreen (hero photo, badges, verification bar, sections, menu); `users` + phone/dob/subscription_tier/interests; `user_photos` + `social_links`; UserProfile gains photoUrls/age/subscriptionTier/socialLinks + derived verificationScore/badges | 0012_profile_expansion | ✅ |
+| G2 | Verification | Twilio Verify phone OTP — `POST /verification/phone/{start,check}`, ladder promotion, unique verified phone, dev fallback code; VerificationScreen | 0013 | ✅ code; needs `TWILIO_*` |
+| G3 | Subscriptions | Stripe checkout + billing portal + signature-verified webhook → `subscription_tier`; SubscriptionScreen (hosted Checkout via Linking); `main.ts` rawBody | 0014 | ✅ code; needs `STRIPE_*` + webhook |
+| G4 | Social | Provider-generic OAuth linking (instagram/twitter/tiktok/facebook/linkedin/spotify), HMAC-signed-state server-side callback; SocialLinkingScreen | — (uses 0012 `social_links`) | ✅ code; needs per-provider creds; X/Twitter needs PKCE |
+| G5 | Gamification | Achievements + Leaderboard **mobile** screens over the existing backend (catalog, unlock evaluation wired into wave-match + alert-post, `GET /achievements`, `GET /gamification/leaderboard`) | 0012_achievements | ✅ |
+
+**Deploy checklist (P4):** run migrations 0012–0014; set `TWILIO_ACCOUNT_SID/AUTH_TOKEN/VERIFY_SERVICE_SID`, `STRIPE_SECRET_KEY/WEBHOOK_SECRET/PRICE_{BASIC,PREMIUM,VIP}` (+ optional URLs), `{PROVIDER}_CLIENT_ID/SECRET` + `API_PUBLIC_URL` + `SOCIAL_LINK_RETURN_URL`; register Stripe webhook → `/api/v1/subscriptions/webhook` and provider redirects → `/api/v1/social/callback`.
+
+> **Migration wart:** `0012_achievements.sql` (gamification) and `0012_profile_expansion.sql` (G1) share the `0012` prefix. Harmless — the runner keys on full filename and sorts so `profile_expansion` still applies before 0013/0014 depend on its columns. Left as-is to avoid breaking already-applied DBs; do not reuse `0012` for new work (next is `0015`).
+
+---
+
 ## Reconciliation Verdicts (legacy → `apps/`)
 
 ### Backend modules
@@ -94,12 +112,12 @@ First post-hardening features. All wired fire-and-forget so they never block the
 | `chat` | REBUILD | ✅ done | Persist + REST endpoints + socket gateway |
 | `interactions` (waves) | REBUILD | ✅ done | Sender hydration + FCM push fallback |
 | `events` | DEFER | — | Schema already in `0001_initial.sql` |
-| `social` (follow/unfollow) | DEFER | — | |
-| `payments` (Stripe) | DEFER | — | |
-| `verification` (phone/photo/ID) | DEFER | — | Only `verification_level` enum survives |
+| `social` (follow/unfollow) | DEFER | — | Follow graph still deferred. Separate: social **account linking** (OAuth, 6 providers) shipped P4/G4. |
+| `payments` (Stripe) | DEFER → PARTIAL | ✅ P4 | Subscriptions shipped P4/G3 (checkout + portal + webhook → `subscription_tier`). Connect/commerce escrow still deferred. |
+| `verification` (phone/photo/ID) | DEFER → PARTIAL | ✅ P4 | Phone OTP via Twilio shipped P4/G2 (promotes ladder to `phone`). selfie/ID + Rekognition still deferred. |
 | `notifications` | PARTIAL REBUILD | ✅ done | FCM token registration + send-on-offline; chat push + geofence-triggered alert pushes shipped (P3, 2026-05-31) |
 | `analytics` / `trending` | DROP | n/a | |
-| `gamification` | DROP → REBUILD | ✅ P3 | Legacy dropped; rebuilt fresh for P3 (2026-05-31) — XP ledger, levels, streak, daily challenges. Not ported from legacy. |
+| `gamification` | DROP → REBUILD | ✅ P3/P4 | Rebuilt fresh: XP ledger, levels, streak, daily challenges (P3); achievements + leaderboard backend & mobile screens (P4/G5). Not ported from legacy. |
 | `gifts` | DROP | n/a | |
 | `trading` | DEFER | — | `listings` table already in schema |
 | `skills` (scores) | DROP | n/a | |
@@ -235,6 +253,7 @@ All four must be true:
 - **2026-05-23** — Pulse v1 shipped (R5). Activity feed backend (`GET /feed`, `FeedService` aggregating chats + waves). Mobile: `PulseScreen` with filter chips, `pulseSlice`, `ActionHub` FAB. Tab bar is now Map · Pulse · Profile. Shared `ActivityItem`/`FeedResponse` types in `@g88/shared`. All tests green, both typechecks clean. Post-R5 fixes: `ProfileScreen` dispatches `fetchProfile` on focus (stale profile on return from edit); `ActionHub` filter routing via Redux `pendingFilter` channel (navigation timing race); `AppNavigator` auth gate + `restoreSession` wired. Migration script made idempotent via `schema_migrations` tracking table — `migration:run` now skips already-applied files safely.
 - **2026-05-30** — P2 hardening sprint. **Deployed to Render**: `g88-api` live at `https://g88-api.onrender.com`; `g88-redis` (Frankfurt, free). Sentry project created (DE region), DSN wired in both apps and Render dashboard. Fixed `handleConnection` JWT guard gap (guards don't run on lifecycle hooks — token now verified directly in `handleConnection`). Added `GET /users/me` alias. **C6**: chat outbox retry queue — `outbox[]`/`failedIds[]` in chatSlice, drain on socket reconnect (up to 3 attempts), ⏱/retry UI in ChatScreen. **M1**: viewport-diff protocol — server stores snapshots in Redis (30s TTL), returns `diff:{added,removed}` on subsequent pans; client merges incrementally; `useDiscovery` is diff-unaware to callers. **A3** (partial): `POST /auth/oauth/apple` backend + `loginWithApple` mobile thunk + iOS entitlements scaffold; Xcode capability + Apple Developer Portal setup deferred to Mac. **Synthetic monitor**: `scripts/synthetic-monitor.mjs` + `.github/workflows/synthetic-monitor.yml` — cron `*/5 * * * *`, tests login→discovery→wave→chat, verified 4.6s on warm server, P1 DoD gate clock started.
 - **2026-05-31** — P3 feature build-out begins. **Push**: FCM chat push wired + mobile setup, migrated to `@react-native-firebase` v22 modular API; firebase deps + CI `google-services.json` injection. **P3 #3**: geofence-triggered alert pushes — `NotificationsService.notifyGeofenceMatch` (gridDisk(3) pre-filter → exact ring test, skips author), fired fire-and-forget on `AlertsService.create`; mobile deep-links `type=alert` → Pulse/alerts. **P3 #1 gamification** (migrations 0010/0011): XP append-only ledger (idempotent via `(user_id, dedupe_key)`, daily-capped), levels (`50*(L-1)²`), daily streak; awards wired into match + alert-post. Slice 2 — daily challenges: 6-challenge catalog, 3/day seeded by date, per-user/day progress, bonus XP via ledger, `GET /challenges/today`, ProfileScreen card. **A3**: Apple Sign-In backend + mobile code complete (migration 0009); Xcode/Developer-Portal setup still pending. Both typechecks clean; migrations applied to prod DB. README + PRODUCT docs refreshed; mobile `API_HOST` now accepts a remote https host.
+- **2026-05-31 (P4)** — Profile & monetization surface, G1–G5. **G1**: rich ProfileScreen rebuild + data foundation (migration 0012_profile_expansion: phone, date_of_birth, subscription_tier, interests on `users`; `user_photos` + `social_links`; UserProfile extended with photoUrls/age/subscriptionTier/socialLinks + server-derived verificationScore/badges). **G2**: Twilio Verify phone OTP (`/verification/phone/{start,check}`, ladder promotion, migration 0013 unique verified phone, dev-code fallback). **G3**: Stripe subscriptions — checkout + billing portal + signature-verified webhook reconciling `subscription_tier` (migration 0014; `main.ts` rawBody:true; tier authoritative only via webhook). **G4**: provider-generic social OAuth linking (6 providers, HMAC-signed-state server-side `/social/callback`, verified `social_links`; X/Twitter still needs PKCE). **G5**: Achievements + Leaderboard mobile screens over the pre-existing backend (commit 72bbfb2; `evaluate` wired into wave-match + alert-post). All env-gated and inert until creds land. Both typechecks clean; backend 7/7. Also fixed a pre-existing feed.service.spec mock gap. **Note**: 0012 prefix collision (achievements vs profile_expansion) — harmless (runner keys on filename, sort order preserves deps); next migration is 0015.
 - **2026-05-24** — R6 (P2.5) installed + typecheck fix. `install-pulse-v2.py` landed all ContextualFab + Pulse v2 files. Post-install: fixed three typecheck errors — `useFabContext.ts` selectors corrected from non-existent `s.auth.user?.profile` to `s.profile.profile` (profile slice); `UserProfile` in `@g88/shared` extended with `goals?: string[]`; `@testing-library/react-native` added to mobile devDependencies; test mock stores updated to the real Redux state shape. Typecheck now clean (`tsc --noEmit` exits 0).
 
 
