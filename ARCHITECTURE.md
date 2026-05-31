@@ -268,9 +268,9 @@ JWT access token (15min) + opaque refresh token (30d, rotating, stored hashed in
   **G5 — achievements + leaderboard**: backend (catalog in `@g88/shared`, unlock
   `evaluate` wired fire-and-forget into wave-match + alert-post, `GET /achievements`,
   weekly/all-time `GET /gamification/leaderboard`) landed separately; P4 adds the
-  mobile screens. Both typechecks clean; backend 7/7.
-  **Migration numbering wart**: `0012_achievements` (gamification) and
-  `0012_profile_expansion` (G1) collide on the `0012` prefix. Harmless — `migrate.js`
-  keys `schema_migrations` on the full filename and runs in filename-sort order, so
-  `profile_expansion` still applies before `0013`/`0014` depend on its columns. Left
-  as-is to avoid re-running on already-applied DBs; next free number is `0015`.
+  mobile screens. Migration `0015_achievements`. Both typechecks clean; backend 7/7.
+  **Migration numbering**: the achievements migration was originally a second
+  `0012`, colliding with `0012_profile_expansion` (G1). Resolved by moving it to
+  `0015_achievements` — it has no dependencies and is the latest feature, while
+  `profile_expansion` must stay `0012` ahead of `0013`/`0014`. The `schema_migrations`
+  row was renamed in lockstep; all DDL is idempotent so re-applies are no-ops.
