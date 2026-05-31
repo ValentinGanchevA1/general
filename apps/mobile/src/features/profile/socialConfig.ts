@@ -17,12 +17,10 @@ export const TIER_LABEL: Record<SubscriptionTier, string> = {
   free: 'Free',
   basic: 'Basic',
   premium: 'Premium',
-  vip: 'VIP',
 };
 
 export const TIER_COLOR: Record<SubscriptionTier, string> = {
   free: '#666',
   basic: '#00d4ff',
   premium: '#9C27B0',
-  vip: '#FFD700',
 };

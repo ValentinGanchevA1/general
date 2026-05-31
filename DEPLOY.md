@@ -45,9 +45,8 @@ Without these in non-prod, phone verification accepts dev code `000000`; in prod
 |---|---|---|
 | `STRIPE_SECRET_KEY` | `sk_test_…` / `sk_live_…` | **yes** — API keys page |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` | **yes** — generated when the webhook endpoint is created |
-| `STRIPE_PRICE_BASIC` | `price_…` — create in **`acct_1SgYZq`** (see ⚠️ note below) | no |
-| `STRIPE_PRICE_PREMIUM` | `price_…` — create in **`acct_1SgYZq`** | no |
-| `STRIPE_PRICE_VIP` | `price_…` — create in **`acct_1SgYZq`** | no |
+| `STRIPE_PRICE_BASIC` | `price_…` (test, **`acct_1SgYZq`**) — ✅ wired | no |
+| `STRIPE_PRICE_PREMIUM` | `price_…` (test, **`acct_1SgYZq`**) — ✅ wired | no |
 | `STRIPE_SUCCESS_URL` | optional; default `https://g88.app/billing/success` | no |
 | `STRIPE_CANCEL_URL` | optional; default `https://g88.app/billing/cancel` | no |
 | `STRIPE_PORTAL_RETURN_URL` | optional; default `https://g88.app/billing` | no |
@@ -56,17 +55,15 @@ Without these in non-prod, phone verification accepts dev code `000000`; in prod
 - URL: `https://g88-api.onrender.com/api/v1/subscriptions/webhook`
 - Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`
 
-> ⚠️ **Account/mode mismatch — must fix before subscriptions work (found 2026-05-31).**
-> The backend's `STRIPE_SECRET_KEY` is a **live** key for account
-> **`acct_1SgYZqQrMz3BrdsU`** (confirmed via a `live_…` billing-portal session). The
-> three products/prices created via MCP live in a *different* account
-> (`acct_1SgCQLLBDaEFgrIH`, test mode), so those `price_…` IDs do **not** exist for the
-> backend's key — checkout 500s with "No such price". **Action:** create the
-> Basic/Premium/VIP products + prices in **`acct_1SgYZq`** in the mode that matches the
-> key (recommended: switch to a `sk_test_` key + test prices for staging; use live only
-> at launch), then set those IDs above. The stray test products in `acct_1SgCQL`
+> ✅ **Wired (2026-05-31).** Backend runs a **test** `sk_test_` key for
+> **`acct_1SgYZqQrMz3BrdsU`**; `STRIPE_PRICE_BASIC`/`PREMIUM` point at matching
+> **test** prices in that account. `checkout` returns `cs_test_…` sessions for both
+> tiers. The **VIP tier was removed** (migration `0016`) — delete the now-unused
+> `STRIPE_PRICE_VIP` var and archive the VIP product. Stray test products created
+> via MCP in the *other* account `acct_1SgCQL`
 > (`prod_UcPU40n5bbmHo0` / `prod_UcPUeqhS3U9rFw` / `prod_UcPUFODPjg3NeX`) can be archived.
-> Tier is set **only** by the verified webhook, never by the client.
+> Before launch, swap to a live key + live prices in `acct_1SgYZq`. Tier is set
+> **only** by the verified webhook, never by the client.
 
 ### G4 — Social linking (OAuth) — per provider, secrets
 A provider is inert until both its id+secret are set. Register each provider's

@@ -138,7 +138,7 @@ export interface LoginResponse {
 
 // ─── Profile ───────────────────────────────────────────────────────────────
 
-export type SubscriptionTier = 'free' | 'basic' | 'premium' | 'vip';
+export type SubscriptionTier = 'free' | 'basic' | 'premium';
 
 export type SocialProvider =
   | 'instagram'
@@ -271,12 +271,6 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     name: 'Premium',
     priceLabel: '$9.99/mo',
     features: ['Everything in Basic', 'Priority in discovery', 'Premium badge'],
-  },
-  {
-    tier: 'vip',
-    name: 'VIP',
-    priceLabel: '$19.99/mo',
-    features: ['Everything in Premium', 'Boosted presence', 'VIP badge & support'],
   },
 ];
 

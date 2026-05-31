@@ -25,7 +25,7 @@ import { fetchProfile } from '@/features/profile/profileSlice';
 import { TIER_COLOR } from '@/features/profile/socialConfig';
 import { extractMessage } from '@/utils/extractMessage';
 
-const TIER_RANK: Record<string, number> = { free: 0, basic: 1, premium: 2, vip: 3 };
+const TIER_RANK: Record<string, number> = { free: 0, basic: 1, premium: 2 };
 
 export function SubscriptionScreen(): React.JSX.Element {
   const navigation = useNavigation();

@@ -29,7 +29,6 @@ async function getStripe(): Promise<StripeClient | null> {
 const PRICE_ENV: Record<PaidTier, string> = {
   basic: 'STRIPE_PRICE_BASIC',
   premium: 'STRIPE_PRICE_PREMIUM',
-  vip: 'STRIPE_PRICE_VIP',
 };
 
 @Injectable()
