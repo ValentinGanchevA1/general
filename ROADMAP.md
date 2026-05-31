@@ -129,10 +129,11 @@ Ordering rationale: **daily-return triggers before utility before revenue.** Per
 Each epic gets a full spec in `SPECIFICATION.md` at the start of its sprint.
 
 ### P3.1 — Gamification surfacing
-- Backend exists (`gamification` module, achievements, challenges, leaderboard).
+- Backend exists for **XP, levels, daily streaks** (`gamification` module) and **daily challenges** (`challenges` module).
+- **Achievements and leaderboard have no backend** — no table, service, or endpoint. They need a full build (migration + service + controller + shared contracts), not just UI.
 - Mobile screens exist but aren't woven into the main flow.
-- Work: daily challenge surfaces on map open · XP indicator on profile · weekly leaderboard ribbon · achievement-earned toast with haptic.
-- Effort: ~5 days.
+- Work: daily challenge surfaces on map open · XP indicator on profile · build achievements (defs + `user_achievements` ledger off `xp_events`) with earned toast/haptic · build leaderboard query + weekly ribbon.
+- Effort: ~5 days surfacing + ~3–4 days net-new achievements/leaderboard backend.
 
 ### P3.2 — Gifts (free virtual, XP-funded)
 - Backend exists (`gifts`, `user-wallet`, `gift-transaction`).

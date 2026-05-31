@@ -455,8 +455,9 @@ Full specs land at start of each P3 sprint. These outlines anchor scope only.
 
 ### §4.1 — P3.1 Gamification surfacing
 - Surfaces: daily-challenge card on map open · XP bar on profile header · weekly leaderboard ribbon · achievement toast.
-- Existing backend: `gamification` module, `achievement`, `challenge`, `user-achievement`, `user-challenge` entities.
-- Endpoints exist; UI not yet wired into main flow.
+- Existing backend (raw SQL, no entities): `gamification` module — XP/levels/streaks (`xp_events`, `user_gamification`) — and `challenges` module — daily challenges (`challenge_progress`). Endpoints: `GET /gamification/me`, `POST /gamification/ping`, challenges.
+- **Not built:** achievements and leaderboard. No table, service, or endpoint exists — both require a full backend build before their surfaces (achievement toast, leaderboard ribbon) can be wired.
+- For what exists (XP/streaks/challenges), endpoints are live; UI not yet wired into main flow.
 
 ### §4.2 — P3.2 Gifts (XP-funded)
 - Wallet seeded by XP earned in gamification. **No money.**

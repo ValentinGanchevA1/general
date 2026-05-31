@@ -80,7 +80,9 @@ Single-city first lets us tune density, moderate edge cases manually, and avoid 
 | Create / join event with polls + Q&A           | `events`                   | Backend exists · UI polish P3 |
 | Send a gift                                    | `gifts`                    | Backend exists · UI polish P3 |
 | Post listing / make offer                      | `trading`, `market`        | Backend exists · UI polish P3 |
-| Earn achievement, climb leaderboard            | `gamification`             | Backend exists · UI polish P3 |
+| Earn XP, level up, keep a daily streak         | `gamification`             | Backend exists · UI polish P3 |
+| Complete daily challenges                      | `challenges`               | Backend exists · UI polish P3 |
+| Earn achievement, climb leaderboard            | `gamification`             | Not built · full build P3     |
 | Get notified when something happens nearby     | `notifications`, geofences | Backend exists · UI polish P3 |
 
 ## Feature scope by phase
@@ -102,7 +104,7 @@ See `ROADMAP.md` for sequence + acceptance criteria.
 
 Ordered to prioritize daily-return triggers over revenue/utility:
 
-1. **Gamification surfacing** — XP, daily challenges, weekly leaderboard ribbon on profile/map
+1. **Gamification surfacing** — surface existing XP/levels/streaks/daily-challenges on profile/map; build + surface achievements and weekly leaderboard (no backend yet)
 2. **Gifts (free virtual)** — earned via XP, sendable to other users; no money in v1
 3. **Push notifications + geofences** — "someone waved", "event 200m away starting", daily digests
 4. **Verification polish** — verification badges visible on map dots and profile cards
@@ -140,11 +142,11 @@ Documented to anchor "not now" decisions:
 
 Post-launch monetization model (introduced one tier at a time, validated for impact on retention before stacking):
 
-| Tier | What it is | Infra status | Earliest |
-|---|---|---|---|
-| 1 — Subscription | Boost, super-likes, see-who-liked-you, advanced filters | `subscriptionTier` field exists on `User`; Stripe wired | 60–90 days post-launch |
-| 2 — Marketplace fee | Stripe Connect Express on trade settlements; platform takes % | Stripe Connect wired in `payments` module | After Tier 1 stable + 1k+ listings/wk |
-| 3 — Paid gifts | Virtual currency purchase; gifts become real-money revenue | `gifts` module + `user-wallet` entity exist | After Tier 2 stable |
+| Tier                | What it is                                                    | Infra status                                            | Earliest                              |
+|---------------------|---------------------------------------------------------------|---------------------------------------------------------|---------------------------------------|
+| 1 — Subscription    | Boost, super-likes, see-who-liked-you, advanced filters       | `subscriptionTier` field exists on `User`; Stripe wired | 60–90 days post-launch                |
+| 2 — Marketplace fee | Stripe Connect Express on trade settlements; platform takes % | Stripe Connect wired in `payments` module               | After Tier 1 stable + 1k+ listings/wk |
+| 3 — Paid gifts      | Virtual currency purchase; gifts become real-money revenue    | `gifts` module + `user-wallet` entity exist             | After Tier 2 stable                   |
 
 **Never planned:** in-app advertising, selling user data, paywalling core safety features (blocking, reporting, verification).
 
@@ -159,7 +161,7 @@ Post-launch monetization model (introduced one tier at a time, validated for imp
 | `Event` / `Attendee` / `Poll` / `Question`                        | Geo-anchored event with engagement primitives                                           |
 | `Gift` / `GiftCatalog` / `UserWallet` / `GiftTransaction`         | Virtual goods + economy                                                                 |
 | `TradeListing` / `TradeOffer` / `TradeFavorite`                   | Local marketplace                                                                       |
-| `Achievement` / `Challenge` / `UserAchievement` / `UserChallenge` | Gamification                                                                            |
+| `xp_events` / `user_gamification` / `challenge_progress`          | Gamification — XP, levels, streaks, daily challenges (achievements + leaderboard not modeled yet) |
 | `Geofence` / `Notification`                                       | Hyperlocal push triggers                                                                |
 | `AdminUser` / `AuditLog`                                          | Moderation surface                                                                      |
 
@@ -194,18 +196,18 @@ Location is sensitive. Treated as a first-class privacy concern, not a feature f
 
 Keep small. The minimal set v1 launch is judged by:
 
-| Metric | Target by end of α (Varna) | Why |
-|---|---|---|
-| D1 retention | ≥ 40% | Onboarding works |
-| D7 retention | ≥ 25% | Core loop sticks |
-| D30 retention | ≥ 15% | Habit forms |
-| % verified users (any tier) | ≥ 60% | Map is real, not bots |
-| Wave → chat conversion | ≥ 20% | Low-cost outreach works |
-| Events with ≥ 3 attendees | ≥ 30% of created events | Supply-side health |
-| Listings with ≥ 1 offer (P3) | ≥ 25% of listings | Marketplace liquidity |
-| Crash-free sessions | ≥ 99.5% | OB1 (Sentry) measurable |
-| Median P50 map load | < 1.0s | Performance target met |
-| Battery drain per active hour | < 5% | Performance target met |
+| Metric                        | Target by end of α (Varna) | Why                     |
+|-------------------------------|----------------------------|-------------------------|
+| D1 retention                  | ≥ 40%                      | Onboarding works        |
+| D7 retention                  | ≥ 25%                      | Core loop sticks        |
+| D30 retention                 | ≥ 15%                      | Habit forms             |
+| % verified users (any tier)   | ≥ 60%                      | Map is real, not bots   |
+| Wave → chat conversion        | ≥ 20%                      | Low-cost outreach works |
+| Events with ≥ 3 attendees     | ≥ 30% of created events    | Supply-side health      |
+| Listings with ≥ 1 offer (P3)  | ≥ 25% of listings          | Marketplace liquidity   |
+| Crash-free sessions           | ≥ 99.5%                    | OB1 (Sentry) measurable |
+| Median P50 map load           | < 1.0s                     | Performance target met  |
+| Battery drain per active hour | < 5%                       | Performance target met  |
 
 **Not tracked as success metrics in v1:** MAU bragging numbers, time-in-app, ad impressions (none of these align with the product's actual value).
 
@@ -218,10 +220,10 @@ Keep small. The minimal set v1 launch is judged by:
 
 ## Decision log (key choices behind this doc)
 
-| Date | Decision | Source |
-|---|---|---|
-| 2026-05-23 | Launch market: Varna single-city → Sofia → BG → EU | Q4 → D |
-| 2026-05-23 | P3 priority order: gamification + gifts before marketplace | Q1 → D |
+| Date       | Decision                                                           | Source         |
+|------------|--------------------------------------------------------------------|----------------|
+| 2026-05-23 | Launch market: Varna single-city → Sofia → BG → EU                 | Q4 → D         |
+| 2026-05-23 | P3 priority order: gamification + gifts before marketplace         | Q1 → D         |
 | 2026-05-23 | No monetization in v1; post-launch tiers (sub → fees → paid gifts) | Q3 → D, then C |
-| 2026-05-23 | Live streaming = P4+ horizon, no work | Q2 → B |
-| 2026-05-23 | Three split docs: PRODUCT / ROADMAP / SPECIFICATION | Q5 → A |
+| 2026-05-23 | Live streaming = P4+ horizon, no work                              | Q2 → B         |
+| 2026-05-23 | Three split docs: PRODUCT / ROADMAP / SPECIFICATION                | Q5 → A         |
