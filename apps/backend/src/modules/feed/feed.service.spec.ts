@@ -10,7 +10,10 @@ describe('FeedService', () => {
   let query: jest.Mock;
 
   beforeEach(async () => {
-    query = jest.fn();
+    // Default any unstubbed query (e.g. selectAlerts' location lookup, plus
+    // future feed sources) to an empty result; tests override call-by-call
+    // with mockResolvedValueOnce where they assert specific rows.
+    query = jest.fn().mockResolvedValue([]);
     const dsMock = { query } as unknown as DataSource;
 
     const mod = await Test.createTestingModule({
