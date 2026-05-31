@@ -1,7 +1,7 @@
 # STATUS — G88 Reconciliation & P1
 
-> **Last updated:** 2026-05-30
-> **Current phase:** P2 hardening — C6 ✅ · M1 ✅ · synthetic monitor ✅ running · A3 partial · 7-day gate in progress
+> **Last updated:** 2026-05-31
+> **Current phase:** P3 feature build-out — gamification ✅ · push notifications + geofence-alert pushes ✅ · P2 7-day synthetic gate in progress (clears 2026-06-06)
 > **Owner:** [your name]
 >
 > Update this file as work progresses. It's the single source of truth for "where are we?".
@@ -66,6 +66,21 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 
 ---
 
+## P3 (feature build-out)
+
+First post-hardening features. All wired fire-and-forget so they never block the core action.
+
+| ID | Pillar | Deliverable | Migration | State |
+|---|---|---|---|---|
+| Push | Notifications | FCM chat push + mobile setup (migrated to `@react-native-firebase` v22 modular API); deep-link routing | — | ✅ 2026-05-31 |
+| P3 #3 | Notifications | Geofence-triggered alert pushes — `notifyGeofenceMatch` pre-filters with `gridDisk(alertCell, 3)` then confirms exact ring membership; skips author; fired on alert create | 0007/0008 (alerts/geofences) | ✅ 2026-05-31 |
+| P3 #1 | Gamification | XP ledger (idempotent + daily-capped), levels (`50*(L-1)²` curve), daily streak; awards wired into match + alert-post | 0010 | ✅ 2026-05-31 |
+| P3 #1 (slice 2) | Gamification | Daily challenges — 6-challenge catalog, 3/day chosen by seeded date shuffle, per-user/day progress, bonus XP via ledger; `GET /challenges/today`; ProfileScreen card | 0011 | ✅ 2026-05-31 |
+
+**Apple Sign-In (A3):** backend + mobile code complete (migration 0009); Xcode capability + Apple Developer Portal (Services ID + key) still pending on a Mac. Unchanged from P2 — still partial.
+
+---
+
 ## Reconciliation Verdicts (legacy → `apps/`)
 
 ### Backend modules
@@ -82,9 +97,9 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 | `social` (follow/unfollow) | DEFER | — | |
 | `payments` (Stripe) | DEFER | — | |
 | `verification` (phone/photo/ID) | DEFER | — | Only `verification_level` enum survives |
-| `notifications` | PARTIAL REBUILD | ✅ done | FCM token registration + send-on-offline; geofences deferred |
+| `notifications` | PARTIAL REBUILD | ✅ done | FCM token registration + send-on-offline; chat push + geofence-triggered alert pushes shipped (P3, 2026-05-31) |
 | `analytics` / `trending` | DROP | n/a | |
-| `gamification` | DROP | n/a | |
+| `gamification` | DROP → REBUILD | ✅ P3 | Legacy dropped; rebuilt fresh for P3 (2026-05-31) — XP ledger, levels, streak, daily challenges. Not ported from legacy. |
 | `gifts` | DROP | n/a | |
 | `trading` | DEFER | — | `listings` table already in schema |
 | `skills` (scores) | DROP | n/a | |
@@ -219,6 +234,7 @@ All four must be true:
 - **2026-05-22** — CI/tooling hardening. Migrated to pnpm 11 (workspace settings to `pnpm-workspace.yaml`). Bumped Node 22 (required by pnpm 11). Opted into Node.js 24 GitHub Actions runners ahead of June 2 deadline. Fixed `gradlew` execute bit (Android Build now green). Closed final Dependabot alert (uuid → 11.1.1, all 10/10 resolved).
 - **2026-05-23** — Pulse v1 shipped (R5). Activity feed backend (`GET /feed`, `FeedService` aggregating chats + waves). Mobile: `PulseScreen` with filter chips, `pulseSlice`, `ActionHub` FAB. Tab bar is now Map · Pulse · Profile. Shared `ActivityItem`/`FeedResponse` types in `@g88/shared`. All tests green, both typechecks clean. Post-R5 fixes: `ProfileScreen` dispatches `fetchProfile` on focus (stale profile on return from edit); `ActionHub` filter routing via Redux `pendingFilter` channel (navigation timing race); `AppNavigator` auth gate + `restoreSession` wired. Migration script made idempotent via `schema_migrations` tracking table — `migration:run` now skips already-applied files safely.
 - **2026-05-30** — P2 hardening sprint. **Deployed to Render**: `g88-api` live at `https://g88-api.onrender.com`; `g88-redis` (Frankfurt, free). Sentry project created (DE region), DSN wired in both apps and Render dashboard. Fixed `handleConnection` JWT guard gap (guards don't run on lifecycle hooks — token now verified directly in `handleConnection`). Added `GET /users/me` alias. **C6**: chat outbox retry queue — `outbox[]`/`failedIds[]` in chatSlice, drain on socket reconnect (up to 3 attempts), ⏱/retry UI in ChatScreen. **M1**: viewport-diff protocol — server stores snapshots in Redis (30s TTL), returns `diff:{added,removed}` on subsequent pans; client merges incrementally; `useDiscovery` is diff-unaware to callers. **A3** (partial): `POST /auth/oauth/apple` backend + `loginWithApple` mobile thunk + iOS entitlements scaffold; Xcode capability + Apple Developer Portal setup deferred to Mac. **Synthetic monitor**: `scripts/synthetic-monitor.mjs` + `.github/workflows/synthetic-monitor.yml` — cron `*/5 * * * *`, tests login→discovery→wave→chat, verified 4.6s on warm server, P1 DoD gate clock started.
+- **2026-05-31** — P3 feature build-out begins. **Push**: FCM chat push wired + mobile setup, migrated to `@react-native-firebase` v22 modular API; firebase deps + CI `google-services.json` injection. **P3 #3**: geofence-triggered alert pushes — `NotificationsService.notifyGeofenceMatch` (gridDisk(3) pre-filter → exact ring test, skips author), fired fire-and-forget on `AlertsService.create`; mobile deep-links `type=alert` → Pulse/alerts. **P3 #1 gamification** (migrations 0010/0011): XP append-only ledger (idempotent via `(user_id, dedupe_key)`, daily-capped), levels (`50*(L-1)²`), daily streak; awards wired into match + alert-post. Slice 2 — daily challenges: 6-challenge catalog, 3/day seeded by date, per-user/day progress, bonus XP via ledger, `GET /challenges/today`, ProfileScreen card. **A3**: Apple Sign-In backend + mobile code complete (migration 0009); Xcode/Developer-Portal setup still pending. Both typechecks clean; migrations applied to prod DB. README + PRODUCT docs refreshed; mobile `API_HOST` now accepts a remote https host.
 - **2026-05-24** — R6 (P2.5) installed + typecheck fix. `install-pulse-v2.py` landed all ContextualFab + Pulse v2 files. Post-install: fixed three typecheck errors — `useFabContext.ts` selectors corrected from non-existent `s.auth.user?.profile` to `s.profile.profile` (profile slice); `UserProfile` in `@g88/shared` extended with `goals?: string[]`; `@testing-library/react-native` added to mobile devDependencies; test mock stores updated to the real Redux state shape. Typecheck now clean (`tsc --noEmit` exits 0).
 
 
