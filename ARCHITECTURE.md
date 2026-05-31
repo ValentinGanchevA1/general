@@ -198,3 +198,36 @@ JWT access token (15min) + opaque refresh token (30d, rotating, stored hashed in
   path (login → discovery → wave → socket chat) every 5 minutes via GitHub Actions
   cron against `g88-api.onrender.com`. P1 DoD gate (7 consecutive days) clock started
   2026-05-30; clears 2026-06-06.
+
+- **2026-05-31** — P3 feature build-out. Common thread: all new awards/pushes are fired
+  **fire-and-forget** off the core write path — a failed push or XP award never blocks
+  (or rolls back) the wave/alert/chat that triggered it.
+  **Push notifications**: chat push wired end-to-end; mobile migrated to
+  `@react-native-firebase` v22 **modular API** (the namespaced API is removed in v22).
+  CI injects `google-services.json` from a secret.
+  **Geofence-triggered alert pushes (P3 #3)**: `NotificationsService.notifyGeofenceMatch`
+  uses a **two-stage spatial match** — a cheap `gridDisk(alertCell, 3)` `ANY`-query
+  pre-filters candidate geofences in SQL, then each candidate is confirmed in app code
+  with the exact test `alertCell ∈ gridDisk(center, radius_rings)`. Two stages because the
+  pre-filter's fixed ring-3 bound is index-friendly but coarse; the exact per-geofence
+  radius varies, so membership is re-checked precisely. Author is skipped.
+  Fired off `AlertsService.create` (which now `RETURN`s `location_h3_r7`). Mobile deep-links
+  `data.type='alert'` → Pulse tab, `alerts` filter.
+  **Gamification (P3 #1, `0010_gamification.sql`)**: `xp_events` is an **append-only ledger**,
+  not a counter — idempotency comes from a partial unique index on `(user_id, dedupe_key)`,
+  so a retried award is a no-op insert rather than a double-count. Daily caps are enforced by
+  counting same-day rows for a `reason` (indexed) before inserting. `user_gamification` holds
+  the denormalized `total_xp / level / streak` so reads don't re-aggregate the ledger.
+  Level curve: cumulative XP to reach level L is `50*(L-1)²`; `levelForXp`/`xpForLevel`/
+  `summaryForXp` live in `@g88/shared/gamification` so server and client agree. Economy:
+  `wave.reciprocated` 50 XP (both sides, once per match), `alert.posted` 20 XP (cap 3/day),
+  `trade.completed` 100 XP (reason reserved, no call site until trading ships).
+  **Daily challenges (slice 2, `0011_challenges.sql`)**: a fixed 6-challenge catalog; 3 are
+  surfaced per day chosen by a **date-seeded shuffle** so every user sees the same set without
+  storing a daily assignment. Progress is tracked per `(user_id, challenge_id, day)` PK;
+  completion stamps `completed_at` once and awards bonus XP via a new
+  `GamificationService.awardRaw(amount, reason, dedupeKey)` variable-amount path
+  (`award()` now delegates to it). `xp_events.reason` CHECK widened to admit
+  `challenge.completed`. `increment(metric)` is called fire-and-forget from the wave,
+  match, alert, and chat write paths. `GET /challenges/today` merges catalog defs with
+  per-user progress.
