@@ -9,7 +9,16 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString, Matches } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsIn,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  Matches,
+  ValidateIf,
+} from 'class-validator';
 
 import type {
   PresignedUploadResponse,
@@ -29,6 +38,9 @@ class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @IsString() avatarUrl?: string;
   @IsOptional() @IsIn(['public', 'private']) visibility?: 'public' | 'private';
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) goals?: string[];
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) interests?: string[];
+  // ISO date (YYYY-MM-DD); null clears it.
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsISO8601() dateOfBirth?: string | null;
 }
 
 class PresignedUrlDto {

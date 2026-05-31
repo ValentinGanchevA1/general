@@ -15,6 +15,17 @@ import { ProfileEditScreen } from '@/screens/ProfileEditScreen';
 import { ChatScreen } from '@/screens/ChatScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { AlertComposerScreen } from '@/screens/AlertComposerScreen';
+import {
+	VerificationScreen,
+	SubscriptionScreen,
+	SocialLinkingScreen,
+	AchievementsScreen,
+	LeaderboardScreen,
+	ChallengesScreen,
+	PrivacyScreen,
+	HelpScreen,
+	AboutScreen,
+} from '@/screens/placeholders';
 import type { AreaCategory } from '@g88/shared';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
@@ -39,6 +50,15 @@ export type RootStackParamList = {
 	Settings: undefined;
 	AlertComposer: { presetCategory?: AreaCategory; presetTag?: string };
 	UserProfile: { userId: string };
+	Verification: undefined;
+	Subscription: undefined;
+	SocialLinking: undefined;
+	Achievements: undefined;
+	Leaderboard: undefined;
+	Challenges: undefined;
+	Privacy: undefined;
+	Help: undefined;
+	About: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -118,6 +138,15 @@ export function AppNavigator(): React.JSX.Element {
 						<Stack.Screen name="Settings" component={SettingsScreen} />
 						<Stack.Screen name="AlertComposer" component={AlertComposerScreen} />
 						<Stack.Screen name="UserProfile" component={UserProfileScreen} />
+						<Stack.Screen name="Verification" component={VerificationScreen} />
+						<Stack.Screen name="Subscription" component={SubscriptionScreen} />
+						<Stack.Screen name="SocialLinking" component={SocialLinkingScreen} />
+						<Stack.Screen name="Achievements" component={AchievementsScreen} />
+						<Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+						<Stack.Screen name="Challenges" component={ChallengesScreen} />
+						<Stack.Screen name="Privacy" component={PrivacyScreen} />
+						<Stack.Screen name="Help" component={HelpScreen} />
+						<Stack.Screen name="About" component={AboutScreen} />
 					</>
 				) : (
 					<>

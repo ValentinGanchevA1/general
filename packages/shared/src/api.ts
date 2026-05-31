@@ -138,20 +138,68 @@ export interface LoginResponse {
 
 // ─── Profile ───────────────────────────────────────────────────────────────
 
+export type SubscriptionTier = 'free' | 'basic' | 'premium' | 'vip';
+
+export type SocialProvider =
+  | 'instagram'
+  | 'twitter'
+  | 'tiktok'
+  | 'facebook'
+  | 'linkedin'
+  | 'spotify';
+
+export interface SocialLink {
+  provider: SocialProvider;
+  username: string | null;
+  url: string | null;
+  verified: boolean;
+}
+
+/**
+ * Verification badges, derived server-side from the `verification` ladder
+ * (+ premium from subscriptionTier + social from a verified social link).
+ * The ladder is cumulative, so `id` implies `phone` implies `email`.
+ */
+export interface ProfileBadges {
+  email: boolean;
+  phone: boolean;
+  /** selfie verified */
+  photo: boolean;
+  id: boolean;
+  /** at least one verified social link */
+  social: boolean;
+  /** any paid subscription tier */
+  premium: boolean;
+}
+
 export interface UpdateProfileRequest {
   displayName?: string;
   bio?: string;
   avatarUrl?: string;
   visibility?: 'public' | 'private';
   goals?: string[];
+  interests?: string[];
+  /** ISO date (YYYY-MM-DD) or null to clear. */
+  dateOfBirth?: string | null;
 }
 
 export interface UserProfile extends AuthenticatedUser {
   bio: string | null;
   visibility: 'public' | 'private';
   goals: string[];
+  interests: string[];
   /** true when bio IS NOT NULL */
   profileComplete: boolean;
+  phone: string | null;
+  /** Derived from date_of_birth server-side; null when DOB unset. */
+  age: number | null;
+  /** Ordered gallery URLs; avatarUrl remains the primary thumbnail. */
+  photoUrls: string[];
+  subscriptionTier: SubscriptionTier;
+  socialLinks: SocialLink[];
+  /** 0–100, derived from the verification ladder. */
+  verificationScore: number;
+  badges: ProfileBadges;
 }
 
 /** Public-facing profile returned by GET /users/:id */
