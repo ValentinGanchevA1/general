@@ -112,7 +112,7 @@ function InitialsAvatar({ name }: { name: string }): React.JSX.Element {
 export function ProfileScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<Nav>();
-  const { profile, loading } = useAppSelector((s) => s.profile);
+  const { profile, loading, error } = useAppSelector((s) => s.profile);
   const { summary: gamification, refresh: refreshGamification } = useGamification();
   const { challenges, refresh: refreshChallenges } = useChallenges();
   const [refreshing, setRefreshing] = useState(false);
@@ -145,13 +145,37 @@ export function ProfileScreen(): React.JSX.Element {
       </View>
     );
   }
-  if (!profile) return <View style={styles.container} />;
+  if (!profile) {
+    return (
+      <View style={[styles.container, styles.centerFill]}>
+        <Icon name="alert-circle-outline" size={48} color="#555" />
+        <Text style={styles.errorTitle}>Couldn't load your profile</Text>
+        <Text style={styles.errorMsg}>{error ?? 'Something went wrong. Please try again.'}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={() => void dispatch(fetchProfile())}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleLogout} style={{ marginTop: 8 }}>
+          <Text style={styles.errorLogout}>Log out</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const p: UserProfile = profile;
-  const photos = p.photoUrls.length > 0 ? p.photoUrls : p.avatarUrl ? [p.avatarUrl] : [];
+  // Defensive: tolerate a partial payload (e.g. an older backend) without crashing.
+  const photoUrls = p.photoUrls ?? [];
+  const interests = p.interests ?? [];
+  const goals = p.goals ?? [];
+  const socialLinks = p.socialLinks ?? [];
+  const badges = p.badges ?? {
+    email: false, phone: false, photo: false, id: false, social: false, premium: false,
+  };
+  const tier = p.subscriptionTier ?? 'free';
+  const verificationScore = p.verificationScore ?? 0;
+  const photos = photoUrls.length > 0 ? photoUrls : p.avatarUrl ? [p.avatarUrl] : [];
   const mainPhoto = photos[activePhotoIndex] ?? p.avatarUrl;
-  const earnedBadges = BADGE_META.filter((b) => p.badges[b.key]);
-  const isPaid = p.subscriptionTier !== 'free';
+  const earnedBadges = BADGE_META.filter((b) => badges[b.key]);
+  const isPaid = tier !== 'free';
 
   return (
     <ScrollView
@@ -177,9 +201,9 @@ export function ProfileScreen(): React.JSX.Element {
         )}
 
         {isPaid ? (
-          <View style={[styles.tierBadge, { backgroundColor: TIER_COLOR[p.subscriptionTier] }]}>
+          <View style={[styles.tierBadge, { backgroundColor: TIER_COLOR[tier] }]}>
             <Icon name="crown" size={14} color="#fff" />
-            <Text style={styles.tierBadgeText}>{TIER_LABEL[p.subscriptionTier]}</Text>
+            <Text style={styles.tierBadgeText}>{TIER_LABEL[tier]}</Text>
           </View>
         ) : null}
 
@@ -203,7 +227,7 @@ export function ProfileScreen(): React.JSX.Element {
             {p.displayName}
             {p.age ? `, ${p.age}` : ''}
           </Text>
-          {p.verificationScore > 50 ? (
+          {verificationScore > 50 ? (
             <Icon name="check-decagram" size={24} color="#00d4ff" />
           ) : null}
         </View>
@@ -211,9 +235,9 @@ export function ProfileScreen(): React.JSX.Element {
         {/* Verification Score */}
         <View style={styles.verificationRow}>
           <View style={styles.verificationBar}>
-            <View style={[styles.verificationProgress, { width: `${p.verificationScore}%` }]} />
+            <View style={[styles.verificationProgress, { width: `${verificationScore}%` }]} />
           </View>
-          <Text style={styles.verificationText}>{p.verificationScore}% Verified</Text>
+          <Text style={styles.verificationText}>{verificationScore}% Verified</Text>
         </View>
 
         {/* Badges */}
@@ -297,9 +321,9 @@ export function ProfileScreen(): React.JSX.Element {
             <Icon name="email-outline" size={20} color="#888" />
             <Text style={styles.infoText}>{p.email}</Text>
             <Icon
-              name={p.badges.email ? 'check-circle' : 'circle-outline'}
+              name={badges.email ? 'check-circle' : 'circle-outline'}
               size={18}
-              color={p.badges.email ? '#4CAF50' : '#444'}
+              color={badges.email ? '#4CAF50' : '#444'}
             />
           </View>
           <View style={[styles.infoRow, styles.infoRowLast]}>
@@ -309,9 +333,9 @@ export function ProfileScreen(): React.JSX.Element {
             </Text>
             {p.phone ? (
               <Icon
-                name={p.badges.phone ? 'check-circle' : 'circle-outline'}
+                name={badges.phone ? 'check-circle' : 'circle-outline'}
                 size={18}
-                color={p.badges.phone ? '#4CAF50' : '#444'}
+                color={badges.phone ? '#4CAF50' : '#444'}
               />
             ) : (
               <TouchableOpacity onPress={() => navigation.navigate('Verification')}>
@@ -346,11 +370,11 @@ export function ProfileScreen(): React.JSX.Element {
       ) : null}
 
       {/* Interests */}
-      {p.interests.length > 0 ? (
+      {interests.length > 0 ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Interests</Text>
           <View style={styles.tagsContainer}>
-            {p.interests.map((interest, index) => (
+            {interests.map((interest, index) => (
               <View key={index} style={styles.tag}>
                 <Text style={styles.tagText}>{interest}</Text>
               </View>
@@ -360,11 +384,11 @@ export function ProfileScreen(): React.JSX.Element {
       ) : null}
 
       {/* Goals */}
-      {p.goals.length > 0 ? (
+      {goals.length > 0 ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Looking For</Text>
           <View style={styles.tagsContainer}>
-            {p.goals.map((goal, index) => {
+            {goals.map((goal, index) => {
               const cfg = GOAL_OPTIONS.find((g) => g.value === goal);
               return (
                 <View key={index} style={styles.goalTag}>
@@ -386,10 +410,10 @@ export function ProfileScreen(): React.JSX.Element {
           </TouchableOpacity>
         </View>
         <View style={styles.infoCard}>
-          {p.socialLinks.length > 0 ? (
-            p.socialLinks.map((link, index) => {
+          {socialLinks.length > 0 ? (
+            socialLinks.map((link, index) => {
               const cfg = SOCIAL_PROVIDER_CONFIG[link.provider];
-              const last = index === p.socialLinks.length - 1;
+              const last = index === socialLinks.length - 1;
               return (
                 <View key={index} style={[styles.socialLinkItem, last && styles.infoRowLast]}>
                   <View style={[styles.socialIcon, { backgroundColor: cfg.color }]}>
@@ -467,6 +491,18 @@ export function ProfileScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0f' },
+  centerFill: { alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
+  errorTitle: { color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 8 },
+  errorMsg: { color: '#888', fontSize: 14, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
+  retryBtn: {
+    marginTop: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#00d4ff',
+    borderRadius: 10,
+  },
+  retryText: { color: '#000', fontWeight: '700', fontSize: 15 },
+  errorLogout: { color: '#888', fontSize: 14, fontWeight: '600' },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
