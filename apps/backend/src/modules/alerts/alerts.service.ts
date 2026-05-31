@@ -7,6 +7,7 @@ import type { AlertResponse } from '@g88/shared';
 import { CreateAlertDto } from './dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { GamificationService } from '../gamification/gamification.service';
+import { ChallengesService } from '../challenges/challenges.service';
 
 @Injectable()
 export class AlertsService {
@@ -16,6 +17,7 @@ export class AlertsService {
     @InjectDataSource() private readonly db: DataSource,
     private readonly notifications: NotificationsService,
     private readonly gamification: GamificationService,
+    private readonly challenges: ChallengesService,
   ) {}
 
   async create(authorId: string, dto: CreateAlertDto): Promise<AlertResponse> {
@@ -48,6 +50,11 @@ export class AlertsService {
     void this.gamification
       .award(authorId, 'alert.posted', { dedupeKey: `alert:${row.id}` })
       .catch((err) => this.logger.error(`award alert.posted failed: ${err}`));
+
+    // Challenge progress: "post an alert" quests.
+    void this.challenges
+      .increment(authorId, 'alert_posted')
+      .catch((err) => this.logger.error(`challenge alert_posted failed: ${err}`));
 
     return {
       id: row.id,

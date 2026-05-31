@@ -13,6 +13,7 @@ import type { WaveRequest, WaveResponse, WaveReceivedEvent } from '@g88/shared';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { GamificationService } from '../gamification/gamification.service';
+import { ChallengesService } from '../challenges/challenges.service';
 
 @Injectable()
 export class InteractionsService {
@@ -24,6 +25,7 @@ export class InteractionsService {
     private readonly realtime: RealtimeGateway,
     private readonly notifications: NotificationsService,
     private readonly gamification: GamificationService,
+    private readonly challenges: ChallengesService,
   ) {}
 
   /**
@@ -128,6 +130,11 @@ export class InteractionsService {
         .notifyWave(req.toUserId, { id: fromUserId, displayName: sender.display_name }, req.context ?? 'map')
         .catch((err) => this.logger.error(`notifyWave failed: ${err}`));
 
+      // Challenge progress: every wave counts toward "send waves" quests.
+      void this.challenges
+        .increment(fromUserId, 'wave_sent')
+        .catch((err) => this.logger.error(`challenge wave_sent failed: ${err}`));
+
       if (conversationId) {
         this.realtime
           .emitConversationOpened(conversationId, [fromUserId, req.toUserId], wave.id)
@@ -138,6 +145,9 @@ export class InteractionsService {
           void this.gamification
             .award(uid, 'wave.reciprocated', { dedupeKey: `match:${conversationId}` })
             .catch((err) => this.logger.error(`award wave.reciprocated failed: ${err}`));
+          void this.challenges
+            .increment(uid, 'match_made')
+            .catch((err) => this.logger.error(`challenge match_made failed: ${err}`));
         }
       }
 

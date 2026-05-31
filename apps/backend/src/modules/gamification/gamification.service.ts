@@ -41,13 +41,29 @@ export class GamificationService {
       if ((rows[0]?.n ?? 0) >= cap) return;
     }
 
+    await this.awardRaw(userId, amount, reason, opts.dedupeKey);
+  }
+
+  /**
+   * Award an explicit XP amount under an arbitrary reason. Used for variable
+   * rewards (e.g. challenge completions) where the amount isn't a fixed
+   * per-reason constant. Idempotent when a dedupeKey is supplied.
+   */
+  async awardRaw(
+    userId: string,
+    amount: number,
+    reason: string,
+    dedupeKey?: string,
+  ): Promise<void> {
+    if (amount <= 0) return;
+
     const inserted = await this.db.query<Array<{ id: string }>>(
       `INSERT INTO xp_events (user_id, reason, amount, dedupe_key)
             VALUES ($1, $2, $3, $4)
        ON CONFLICT (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL
        DO NOTHING
        RETURNING id`,
-      [userId, reason, amount, opts.dedupeKey ?? null],
+      [userId, reason, amount, dedupeKey ?? null],
     );
     if (inserted.length === 0) return; // deduped — already awarded
 

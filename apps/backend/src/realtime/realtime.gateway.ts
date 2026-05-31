@@ -25,6 +25,7 @@ import { ChatSendDto, ConversationJoinDto, PresenceUpdateDto } from './realtime.
 import { PresenceService } from '../modules/presence/presence.service';
 import { ChatService } from '../modules/chat/chat.service';
 import { NotificationsService } from '../modules/notifications/notifications.service';
+import { ChallengesService } from '../modules/challenges/challenges.service';
 import type { JwtPayload } from '../modules/auth/jwt.strategy';
 
 type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
@@ -53,6 +54,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly presence: PresenceService,
     private readonly chat: ChatService,
     private readonly notifications: NotificationsService,
+    private readonly challenges: ChallengesService,
     private readonly jwt: JwtService,
   ) {}
 
@@ -176,6 +178,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       // Push to participants who have no active socket connection.
       void this.pushToOfflineParticipants(payload.conversationId, client.data.userId, msg.body);
+
+      // Challenge progress: "send messages" quests.
+      void this.challenges
+        .increment(client.data.userId, 'chat_sent')
+        .catch((err) => this.logger.error(`challenge chat_sent failed: ${err}`));
 
       return { ok: true, data: msg };
     } catch (err) {

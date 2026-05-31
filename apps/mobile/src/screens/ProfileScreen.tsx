@@ -7,9 +7,31 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { useGamification } from '@/features/gamification/useGamification';
-import type { GamificationSummary } from '@g88/shared';
+import { useChallenges } from '@/features/gamification/useChallenges';
+import type { GamificationSummary, ChallengeToday } from '@g88/shared';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+function ChallengesCard({ challenges }: { challenges: ChallengeToday[] }): React.JSX.Element {
+  return (
+    <View style={styles.challengeCard}>
+      <Text style={styles.challengeHeader}>Today's challenges</Text>
+      {challenges.map((c) => (
+        <View key={c.id} style={styles.challengeRow}>
+          <Text style={[styles.checkbox, c.completed && styles.checkboxDone]}>
+            {c.completed ? '☑' : '☐'}
+          </Text>
+          <Text style={[styles.challengeTitle, c.completed && styles.challengeTitleDone]}>
+            {c.title}
+          </Text>
+          <Text style={styles.challengeReward}>
+            {c.completed ? `+${c.rewardXp}` : `${c.progress}/${c.target}`}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 function ProgressCard({ summary }: { summary: GamificationSummary }): React.JSX.Element {
   const pct = summary.xpForNextLevel > 0
@@ -55,11 +77,13 @@ export function ProfileScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const { profile, loading } = useAppSelector((s) => s.profile);
   const { summary: gamification, refresh: refreshGamification } = useGamification();
+  const { challenges, refresh: refreshChallenges } = useChallenges();
 
   useFocusEffect(useCallback(() => {
     void dispatch(fetchProfile());
     refreshGamification();
-  }, [dispatch, refreshGamification]));
+    refreshChallenges();
+  }, [dispatch, refreshGamification, refreshChallenges]));
 
   if (loading && !profile) {
     return <View style={styles.root}><ActivityIndicator style={{ flex: 1 }} color="#00d4ff" /></View>;
@@ -80,6 +104,7 @@ export function ProfileScreen(): React.JSX.Element {
       </View>
 
       {gamification ? <ProgressCard summary={gamification} /> : null}
+      {challenges.length > 0 ? <ChallengesCard challenges={challenges} /> : null}
 
       <View style={styles.actions}>
         <TouchableOpacity
@@ -140,6 +165,23 @@ const styles = StyleSheet.create({
   barFill: { height: 8, backgroundColor: '#00d4ff', borderRadius: 4 },
   subText: { color: '#888', fontSize: 12 },
   streakText: { color: '#ff9d3c', fontSize: 12, fontWeight: '600' },
+  challengeCard: {
+    marginHorizontal: 24,
+    marginTop: 12,
+    backgroundColor: '#12121f',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#1f1f33',
+    gap: 10,
+  },
+  challengeHeader: { color: '#fff', fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  challengeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  checkbox: { color: '#555', fontSize: 18 },
+  checkboxDone: { color: '#00d4ff' },
+  challengeTitle: { color: '#ddd', fontSize: 14, flex: 1 },
+  challengeTitleDone: { color: '#666', textDecorationLine: 'line-through' },
+  challengeReward: { color: '#00d4ff', fontSize: 13, fontWeight: '600' },
   actions: { padding: 24, gap: 12 },
   actionBtn: {
     backgroundColor: '#00d4ff',
