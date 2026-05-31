@@ -15,7 +15,7 @@ CREATE EXTENSION IF NOT EXISTS citext;
 
 -- ─── Users ────────────────────────────────────────────────────────────────
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email               citext UNIQUE NOT NULL,
   password_hash       text NOT NULL,
@@ -42,16 +42,16 @@ CREATE TABLE users (
   deleted_at          timestamptz
 );
 
-CREATE INDEX users_location_gix      ON users USING GIST (location);
-CREATE INDEX users_h3_r5_idx         ON users (location_h3_r5);
-CREATE INDEX users_h3_r7_idx         ON users (location_h3_r7);
-CREATE INDEX users_h3_r9_idx         ON users (location_h3_r9);
-CREATE INDEX users_h3_r10_idx        ON users (location_h3_r10);
-CREATE INDEX users_visibility_idx    ON users (visibility) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS users_location_gix      ON users USING GIST (location);
+CREATE INDEX IF NOT EXISTS users_h3_r5_idx         ON users (location_h3_r5);
+CREATE INDEX IF NOT EXISTS users_h3_r7_idx         ON users (location_h3_r7);
+CREATE INDEX IF NOT EXISTS users_h3_r9_idx         ON users (location_h3_r9);
+CREATE INDEX IF NOT EXISTS users_h3_r10_idx        ON users (location_h3_r10);
+CREATE INDEX IF NOT EXISTS users_visibility_idx    ON users (visibility) WHERE deleted_at IS NULL;
 
 -- ─── Events ───────────────────────────────────────────────────────────────
 
-CREATE TABLE events (
+CREATE TABLE IF NOT EXISTS events (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   host_id             uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title               text NOT NULL,
@@ -78,14 +78,14 @@ CREATE TABLE events (
   deleted_at          timestamptz
 );
 
-CREATE INDEX events_location_gix     ON events USING GIST (location);
-CREATE INDEX events_h3_r7_idx        ON events (location_h3_r7);
-CREATE INDEX events_h3_r9_idx        ON events (location_h3_r9);
-CREATE INDEX events_starts_at_idx    ON events (starts_at) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS events_location_gix     ON events USING GIST (location);
+CREATE INDEX IF NOT EXISTS events_h3_r7_idx        ON events (location_h3_r7);
+CREATE INDEX IF NOT EXISTS events_h3_r9_idx        ON events (location_h3_r9);
+CREATE INDEX IF NOT EXISTS events_starts_at_idx    ON events (starts_at) WHERE deleted_at IS NULL;
 
 -- ─── Listings ─────────────────────────────────────────────────────────────
 
-CREATE TABLE listings (
+CREATE TABLE IF NOT EXISTS listings (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   seller_id           uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title               text NOT NULL,
@@ -113,36 +113,36 @@ CREATE TABLE listings (
   deleted_at          timestamptz
 );
 
-CREATE INDEX listings_location_gix   ON listings USING GIST (location);
-CREATE INDEX listings_h3_r7_idx      ON listings (location_h3_r7);
-CREATE INDEX listings_h3_r9_idx      ON listings (location_h3_r9);
-CREATE INDEX listings_status_idx     ON listings (status) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS listings_location_gix   ON listings USING GIST (location);
+CREATE INDEX IF NOT EXISTS listings_h3_r7_idx      ON listings (location_h3_r7);
+CREATE INDEX IF NOT EXISTS listings_h3_r9_idx      ON listings (location_h3_r9);
+CREATE INDEX IF NOT EXISTS listings_status_idx     ON listings (status) WHERE deleted_at IS NULL;
 
 -- ─── Conversations & messages ─────────────────────────────────────────────
 
-CREATE TABLE conversations (
+CREATE TABLE IF NOT EXISTS conversations (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   participant_ids     uuid[] NOT NULL,
   created_at          timestamptz NOT NULL DEFAULT NOW(),
   last_message_at     timestamptz
 );
 -- Sorted array gives us a stable uniqueness key for 1:1 chats.
-CREATE UNIQUE INDEX conversations_participants_uniq
+CREATE UNIQUE INDEX IF NOT EXISTS conversations_participants_uniq
   ON conversations (participant_ids)
   WHERE array_length(participant_ids, 1) = 2;
 
-CREATE TABLE messages (
+CREATE TABLE IF NOT EXISTS messages (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   conversation_id     uuid NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
   sender_id           uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   body                text NOT NULL,
   created_at          timestamptz NOT NULL DEFAULT NOW()
 );
-CREATE INDEX messages_convo_created_idx ON messages (conversation_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS messages_convo_created_idx ON messages (conversation_id, created_at DESC);
 
 -- ─── Waves ────────────────────────────────────────────────────────────────
 
-CREATE TABLE waves (
+CREATE TABLE IF NOT EXISTS waves (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   from_user_id        uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   to_user_id          uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -153,12 +153,12 @@ CREATE TABLE waves (
   created_at          timestamptz NOT NULL DEFAULT NOW(),
   CHECK (from_user_id <> to_user_id)
 );
-CREATE INDEX waves_from_to_created_idx ON waves (from_user_id, to_user_id, created_at DESC);
-CREATE INDEX waves_to_created_idx      ON waves (to_user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS waves_from_to_created_idx ON waves (from_user_id, to_user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS waves_to_created_idx      ON waves (to_user_id, created_at DESC);
 
 -- ─── Device tokens (push) ─────────────────────────────────────────────────
 
-CREATE TABLE device_tokens (
+CREATE TABLE IF NOT EXISTS device_tokens (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id             uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   platform            text NOT NULL CHECK (platform IN ('ios','android')),

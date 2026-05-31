@@ -7,7 +7,7 @@
 -- Level is derived from total_xp by formula (cumulative XP to reach level L =
 -- 50 * (L-1)^2), stored on the summary row so the client never recomputes.
 
-CREATE TABLE xp_events (
+CREATE TABLE IF NOT EXISTS xp_events (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   reason      text NOT NULL
@@ -22,14 +22,14 @@ CREATE TABLE xp_events (
 );
 
 -- One award per (user, source event). Partial so multiple NULL keys are allowed.
-CREATE UNIQUE INDEX xp_events_dedupe_idx
+CREATE UNIQUE INDEX IF NOT EXISTS xp_events_dedupe_idx
     ON xp_events (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
 
 -- Daily-cap counting: "how many alert.posted awards has this user had today?"
-CREATE INDEX xp_events_user_reason_created_idx
+CREATE INDEX IF NOT EXISTS xp_events_user_reason_created_idx
     ON xp_events (user_id, reason, created_at DESC);
 
-CREATE TABLE user_gamification (
+CREATE TABLE IF NOT EXISTS user_gamification (
   user_id        uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   total_xp       integer NOT NULL DEFAULT 0 CHECK (total_xp >= 0),
   level          integer NOT NULL DEFAULT 1 CHECK (level >= 1),

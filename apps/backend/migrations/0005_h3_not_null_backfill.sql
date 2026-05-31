@@ -15,6 +15,7 @@
 -- location is nullable for users; enforce that H3 cells are always populated
 -- together with location.
 
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_h3_location_sync;
 ALTER TABLE users
   ADD CONSTRAINT users_h3_location_sync CHECK (
     location IS NULL OR (

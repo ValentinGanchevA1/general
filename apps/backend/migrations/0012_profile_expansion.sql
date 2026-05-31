@@ -12,13 +12,13 @@
 -- in UsersService from the existing verification_level ladder + premium tier.
 
 ALTER TABLE users
-  ADD COLUMN phone             text,
-  ADD COLUMN date_of_birth     date,
-  ADD COLUMN subscription_tier text NOT NULL DEFAULT 'free'
+  ADD COLUMN IF NOT EXISTS phone             text,
+  ADD COLUMN IF NOT EXISTS date_of_birth     date,
+  ADD COLUMN IF NOT EXISTS subscription_tier text NOT NULL DEFAULT 'free'
              CHECK (subscription_tier IN ('free', 'basic', 'premium', 'vip')),
-  ADD COLUMN interests         text[] NOT NULL DEFAULT '{}';
+  ADD COLUMN IF NOT EXISTS interests         text[] NOT NULL DEFAULT '{}';
 
-CREATE TABLE user_photos (
+CREATE TABLE IF NOT EXISTS user_photos (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   url         text NOT NULL,
@@ -27,9 +27,9 @@ CREATE TABLE user_photos (
 );
 
 -- "Gallery for this user, in display order" — the only access pattern.
-CREATE INDEX user_photos_user_position_idx ON user_photos (user_id, position);
+CREATE INDEX IF NOT EXISTS user_photos_user_position_idx ON user_photos (user_id, position);
 
-CREATE TABLE social_links (
+CREATE TABLE IF NOT EXISTS social_links (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   provider    text NOT NULL

@@ -5,6 +5,6 @@
 -- prevents two accounts from claiming the same number. The verification
 -- service catches the unique-violation and returns 409 verification.phone_taken.
 
-CREATE UNIQUE INDEX users_phone_unique
+CREATE UNIQUE INDEX IF NOT EXISTS users_phone_unique
   ON users (phone)
   WHERE phone IS NOT NULL AND deleted_at IS NULL;

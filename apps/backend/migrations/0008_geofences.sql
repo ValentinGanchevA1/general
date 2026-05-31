@@ -3,7 +3,7 @@
 -- center_h3_r7 + radius_rings define which cells are "inside" at query time
 -- (computed in-process via h3.gridDisk rather than stored).
 
-CREATE TABLE geofences (
+CREATE TABLE IF NOT EXISTS geofences (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
@@ -28,4 +28,4 @@ CREATE TABLE geofences (
   UNIQUE (user_id, center_h3_r7)
 );
 
-CREATE INDEX geofences_user_active_idx ON geofences (user_id) WHERE active = true;
+CREATE INDEX IF NOT EXISTS geofences_user_active_idx ON geofences (user_id) WHERE active = true;

@@ -1,7 +1,7 @@
 -- 0007_alerts.sql — Alerts table (Nextdoor-style area posts)
 -- Location is copied from the author's last known fuzzed position at write time.
 
-CREATE TABLE alerts (
+CREATE TABLE IF NOT EXISTS alerts (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   author_id       uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   category        text NOT NULL
@@ -23,6 +23,6 @@ CREATE TABLE alerts (
   deleted_at      timestamptz
 );
 
-CREATE INDEX alerts_h3_r7_idx   ON alerts (location_h3_r7)  WHERE deleted_at IS NULL;
-CREATE INDEX alerts_created_idx ON alerts (created_at DESC)  WHERE deleted_at IS NULL;
-CREATE INDEX alerts_author_idx  ON alerts (author_id)        WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS alerts_h3_r7_idx   ON alerts (location_h3_r7)  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS alerts_created_idx ON alerts (created_at DESC)  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS alerts_author_idx  ON alerts (author_id)        WHERE deleted_at IS NULL;

@@ -6,10 +6,10 @@
 -- billing portal can be opened. tier itself is only ever written by the webhook.
 
 ALTER TABLE users
-  ADD COLUMN stripe_customer_id     text,
-  ADD COLUMN stripe_subscription_id text;
+  ADD COLUMN IF NOT EXISTS stripe_customer_id     text,
+  ADD COLUMN IF NOT EXISTS stripe_subscription_id text;
 
 -- Webhook looks the user up by customer id on subscription events.
-CREATE UNIQUE INDEX users_stripe_customer_idx
+CREATE UNIQUE INDEX IF NOT EXISTS users_stripe_customer_idx
   ON users (stripe_customer_id)
   WHERE stripe_customer_id IS NOT NULL;
