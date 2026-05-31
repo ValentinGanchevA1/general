@@ -58,7 +58,9 @@ pnpm --filter @g88/mobile android   # or :ios
 
 **P1 is complete** — all six pillars (auth · profile · map discovery · presence · wave · chat) are done and verified. See `STATUS.md` for details.
 
-**R6 (P2.5 UX track, in progress):** ContextualFab on the map + Pulse v2 card layout. Does not displace the P2 sequence (observability · Apple OAuth · chat outbox).
+**P2 hardening (done):** deployed to Render (`g88-api.onrender.com` + Redis), Sentry on both apps, chat outbox retry (C6), map viewport-diff protocol (M1), and a synthetic P1 monitor running every 5 min. The 7-day DoD gate clears **2026-06-06**.
+
+**P3 (in progress):** gamification — XP, levels, and daily streak, plus a daily-challenges system (`GET /challenges/today`, 3 seeded challenges/day, bonus XP on completion); geofence-triggered alert pushes. See `STATUS.md` for the full list.
 
 ## Mobile environment variables
 
