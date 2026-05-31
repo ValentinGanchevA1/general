@@ -16,13 +16,13 @@ A map-first social app: see who and what is nearby, then act on it — wave, cha
 
 Existing apps each solve one slice and ignore the rest:
 
-| App class | What it shows | What it misses |
-|---|---|---|
-| Instagram / TikTok | A feed of people you can't reach | Physical proximity, action |
-| Tinder / Bumble | Static swipe deck | Live presence, group activity, anything beyond dating |
-| Meetup / Eventbrite | Events | People in between events |
-| Nextdoor | Neighborhood text wall | Real-time presence, lightweight outreach |
-| Facebook Marketplace | Local listings | The social layer that closes the deal |
+| App class            | What it shows                    | What it misses                                        |
+|----------------------|----------------------------------|-------------------------------------------------------|
+| Instagram / TikTok   | A feed of people you can't reach | Physical proximity, action                            |
+| Tinder / Bumble      | Static swipe deck                | Live presence, group activity, anything beyond dating |
+| Meetup / Eventbrite  | Events                           | People in between events                              |
+| Nextdoor             | Neighborhood text wall           | Real-time presence, lightweight outreach              |
+| Facebook Marketplace | Local listings                   | The social layer that closes the deal                 |
 
 **G88 puts verified people and live events on a shared map and gives them lightweight, low-commitment ways to interact in the physical world.**
 
@@ -34,12 +34,12 @@ Existing apps each solve one slice and ignore the rest:
 
 ## Launch market (Q4 answer: D)
 
-| Stage | Geography | Trigger to advance |
-|---|---|---|
-| α | **Varna, BG** — single test city | 500 verified users · D7 ≥ 25% |
-| β | Sofia | Varna unit economics validated |
-| 1.0 | Bulgaria | Combined α+β D30 ≥ 15% · crash-free ≥ 99.5% |
-| 2.0 | EU | 1.0 retention sustained 3 mo |
+| Stage | Geography                        | Trigger to advance                          |
+|-------|----------------------------------|---------------------------------------------|
+| α     | **Varna, BG** — single test city | 500 verified users · D7 ≥ 25%               |
+| β     | Sofia                            | Varna unit economics validated              |
+| 1.0   | Bulgaria                         | Combined α+β D30 ≥ 15% · crash-free ≥ 99.5% |
+| 2.0   | EU                               | 1.0 retention sustained 3 mo                |
 
 Single-city first lets us tune density, moderate edge cases manually, and avoid the cold-start problem that kills location apps at wide launch.
 
@@ -51,21 +51,37 @@ Single-city first lets us tune density, moderate edge cases manually, and avoid 
 4. **Trade and transact locally** — listings + offers within walking/driving distance.
 5. **Build reputation over time** — gamification (achievements, challenges, leaderboard) rewards positive repeat behavior.
 
+## Product areas & detailed flows
+
+### Core surfaces
+- **Map/Discovery:** Viewport-driven nearby queries, clustering, and filters for people/events/listings.
+- **Auth & Verification:** Email/phone + social logins; progressive identity verification (selfie, ID, social links).
+- **Interactions:** Waves, gifts, lightweight offers, and 1:1 chat (Socket.IO + persistence).
+- **Events & RSVP:** Create, discover, join, polls, and Q&A.
+- **Marketplace:** Listings, offers, local trade flow, and basic Stripe integration.
+- **Gamification & Reputation:** Achievements, challenges, and leaderboards.
+
+### High-level user flows
+- **Onboard:** Signup → profile creation → optional verification → location permission.
+- **Discover:** Open map → viewport triggers `GET /discovery/nearby` → tap marker → open bottom sheet → wave/chat/listing/event actions.
+- **Interact:** Send wave → backend persists Wave + emits socket event → recipient receives push + socket update → convert to chat.
+- **Transact:** Create listing → buyer makes offer → accept → arrange local exchange; payments via Stripe for escrow or fees.
+
 ## Primary user flows
 
-| Flow | Module(s) | Status |
-|---|---|---|
-| Sign up + verify identity | `auth`, `verification` | P1 ✓ (Apple SSO in P2) |
-| Build profile (photos, interests, goals) | `profile` (multi-step) | P1 ✓ |
-| Appear on map (visibility toggle, presence) | `locations`, `map` | P1 ✓ |
-| Discover nearby (filter by category, distance) | `discovery`, `map` | P1 ✓ |
-| Wave at someone | `interactions` | P1 ✓ |
-| 1:1 chat | `chat` (Socket.IO + REST) | P1 ✓ (outbox in P2) |
-| Create / join event with polls + Q&A | `events` | Backend exists · UI polish P3 |
-| Send a gift | `gifts` | Backend exists · UI polish P3 |
-| Post listing / make offer | `trading`, `market` | Backend exists · UI polish P3 |
-| Earn achievement, climb leaderboard | `gamification` | Backend exists · UI polish P3 |
-| Get notified when something happens nearby | `notifications`, geofences | Backend exists · UI polish P3 |
+| Flow                                           | Module(s)                  | Status                        |
+|------------------------------------------------|----------------------------|-------------------------------|
+| Sign up + verify identity                      | `auth`, `verification`     | P1 ✓ (Apple SSO in P2)        |
+| Build profile (photos, interests, goals)       | `profile` (multi-step)     | P1 ✓                          |
+| Appear on map (visibility toggle, presence)    | `locations`, `map`         | P1 ✓                          |
+| Discover nearby (filter by category, distance) | `discovery`, `map`         | P1 ✓                          |
+| Wave at someone                                | `interactions`             | P1 ✓                          |
+| 1:1 chat                                       | `chat` (Socket.IO + REST)  | P1 ✓ (outbox in P2)           |
+| Create / join event with polls + Q&A           | `events`                   | Backend exists · UI polish P3 |
+| Send a gift                                    | `gifts`                    | Backend exists · UI polish P3 |
+| Post listing / make offer                      | `trading`, `market`        | Backend exists · UI polish P3 |
+| Earn achievement, climb leaderboard            | `gamification`             | Backend exists · UI polish P3 |
+| Get notified when something happens nearby     | `notifications`, geofences | Backend exists · UI polish P3 |
 
 ## Feature scope by phase
 
@@ -134,18 +150,18 @@ Post-launch monetization model (introduced one tier at a time, validated for imp
 
 ## Entities (high level)
 
-| Entity | Purpose |
-|---|---|
-| `User` | Identity, profile, photos, interests, goals, location, verification, wallet, XP, scores |
-| `Swipe` / `Match` | Discovery interactions |
-| `Conversation` / `Message` | 1:1 chat (REST + WS `/chat`) |
-| `Wave` | Lightweight outreach — the low-cost interaction |
-| `Event` / `Attendee` / `Poll` / `Question` | Geo-anchored event with engagement primitives |
-| `Gift` / `GiftCatalog` / `UserWallet` / `GiftTransaction` | Virtual goods + economy |
-| `TradeListing` / `TradeOffer` / `TradeFavorite` | Local marketplace |
-| `Achievement` / `Challenge` / `UserAchievement` / `UserChallenge` | Gamification |
-| `Geofence` / `Notification` | Hyperlocal push triggers |
-| `AdminUser` / `AuditLog` | Moderation surface |
+| Entity                                                            | Purpose                                                                                 |
+|-------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| `User`                                                            | Identity, profile, photos, interests, goals, location, verification, wallet, XP, scores |
+| `Swipe` / `Match`                                                 | Discovery interactions                                                                  |
+| `Conversation` / `Message`                                        | 1:1 chat (REST + WS `/chat`)                                                            |
+| `Wave`                                                            | Lightweight outreach — the low-cost interaction                                         |
+| `Event` / `Attendee` / `Poll` / `Question`                        | Geo-anchored event with engagement primitives                                           |
+| `Gift` / `GiftCatalog` / `UserWallet` / `GiftTransaction`         | Virtual goods + economy                                                                 |
+| `TradeListing` / `TradeOffer` / `TradeFavorite`                   | Local marketplace                                                                       |
+| `Achievement` / `Challenge` / `UserAchievement` / `UserChallenge` | Gamification                                                                            |
+| `Geofence` / `Notification`                                       | Hyperlocal push triggers                                                                |
+| `AdminUser` / `AuditLog`                                          | Moderation surface                                                                      |
 
 Detailed schemas: `ARCHITECTURE.md` → "Database" + per-module entity files.
 
