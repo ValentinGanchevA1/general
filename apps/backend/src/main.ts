@@ -40,7 +40,10 @@ if (process.env.NODE_ENV === 'production') {
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  // rawBody: keeps the unparsed body on req.rawBody for Stripe webhook
+  // signature verification (subscriptions/webhook), while JSON parsing still
+  // works for every other route.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.use(helmet());
 

@@ -19,6 +19,7 @@ import { GamificationModule } from './modules/gamification/gamification.module';
 import { ChallengesModule } from './modules/challenges/challenges.module';
 import { AchievementsModule } from './modules/achievements/achievements.module';
 import { VerificationModule } from './modules/verification/verification.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
@@ -61,6 +62,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     ChallengesModule,
     AchievementsModule,
     VerificationModule,
+    SubscriptionsModule,
     RealtimeModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

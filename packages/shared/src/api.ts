@@ -239,6 +239,61 @@ export interface CheckPhoneVerificationRequest {
   code: string;
 }
 
+// ─── Subscriptions ───────────────────────────────────────────────────────────
+
+/** Paid tiers a user can check out into (excludes 'free'). */
+export type PaidTier = Exclude<SubscriptionTier, 'free'>;
+
+export interface SubscriptionPlan {
+  tier: SubscriptionTier;
+  name: string;
+  /** Display-only, e.g. "$4.99/mo". Billing amount lives in Stripe. */
+  priceLabel: string;
+  features: string[];
+}
+
+/** Static plan metadata for display. Stripe price IDs live server-side (env). */
+export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
+  {
+    tier: 'free',
+    name: 'Free',
+    priceLabel: '$0',
+    features: ['Appear on the map', 'Waves & chat', 'Daily challenges'],
+  },
+  {
+    tier: 'basic',
+    name: 'Basic',
+    priceLabel: '$4.99/mo',
+    features: ['Everything in Free', 'See who viewed you', 'Wider map reach'],
+  },
+  {
+    tier: 'premium',
+    name: 'Premium',
+    priceLabel: '$9.99/mo',
+    features: ['Everything in Basic', 'Priority in discovery', 'Premium badge'],
+  },
+  {
+    tier: 'vip',
+    name: 'VIP',
+    priceLabel: '$19.99/mo',
+    features: ['Everything in Premium', 'Boosted presence', 'VIP badge & support'],
+  },
+];
+
+export interface CreateCheckoutRequest {
+  tier: PaidTier;
+}
+
+export interface CheckoutSessionResponse {
+  /** Hosted Stripe Checkout URL to open in the browser. */
+  url: string;
+}
+
+export interface PortalSessionResponse {
+  /** Stripe billing portal URL to manage/cancel the subscription. */
+  url: string;
+}
+
 // ─── Chat (REST) ───────────────────────────────────────────────────────────
 
 export interface ChatMessage {
