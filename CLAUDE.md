@@ -128,7 +128,7 @@ g88/
 - **State:** Redux Toolkit. Slices live in `src/features/{domain}/`. Persisted: `auth` only.
 - **Networking:** single Axios instance in `src/api/client.ts`. Single-flight refresh, no thundering herd.
 - **Sockets:** module-level singleton in `src/realtime/useSocket.ts`. Survives across screens. Disconnected only on logout.
-- **No `console.*`** — use `logger` from `@/utils/logger` (no-op in production builds).
+- **Logging:** `console.*` is currently permitted (tech debt **C3** — see `STATUS.md`). The target is a `logger` from `@/utils/logger` that no-ops in production builds; until that shim lands, don't add new `console.*` in hot paths. New code should prefer the eventual `logger` boundary.
 
 ### Shared (`packages/shared/`)
 
