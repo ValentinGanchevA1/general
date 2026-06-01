@@ -19,9 +19,11 @@ const makeStore = (isVisible: boolean, goal = 'dating') =>
   });
 
 const wrap = (store: ReturnType<typeof makeStore>) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return ({ children }: { children: React.ReactNode }) =>
+  const Wrapper = ({ children }: { children: React.ReactNode }) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     React.createElement(Provider, { store } as any, children);
+  Wrapper.displayName = 'TestStoreProvider';
+  return Wrapper;
 };
 
 describe('useFabContext', () => {

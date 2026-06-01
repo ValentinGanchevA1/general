@@ -47,13 +47,13 @@ pnpm --filter @g88/mobile android   # or :ios
 
 ## Documentation
 
-| File | Contents |
-|---|---|
-| `ARCHITECTURE.md` | System design, key decisions, and the things that would otherwise bite us |
-| `STATUS.md` | Live phase progress, reconciliation verdicts, open questions |
-| `PRODUCT.md` | Post-P1 feature roadmap |
-| `TECH_DEBT_AUDIT.md` | Ranked debt backlog |
-| `DEPLOY.md` | Production env vars + migrations per feature (Twilio, Stripe, social OAuth) |
+| File                 | Contents                                                                    |
+|----------------------|-----------------------------------------------------------------------------|
+| `ARCHITECTURE.md`    | System design, key decisions, and the things that would otherwise bite us   |
+| `STATUS.md`          | Live phase progress, reconciliation verdicts, open questions                |
+| `PRODUCT.md`         | Post-P1 feature roadmap                                                     |
+| `TECH_DEBT_AUDIT.md` | Ranked debt backlog                                                         |
+| `DEPLOY.md`          | Production env vars + migrations per feature (Twilio, Stripe, social OAuth) |
 
 ## Current sprint
 

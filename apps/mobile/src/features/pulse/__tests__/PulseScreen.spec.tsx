@@ -8,10 +8,32 @@ import { NavigationContainer } from '@react-navigation/native';
 import { PulseScreen } from '../PulseScreen';
 
 // Keep thunks as no-ops; use the real reducer so initial state stays accurate.
+// __esModule: true is required — it is non-enumerable on the real module so the
+// spread drops it, and without it babel interop treats the whole mock object as
+// the default export, breaking `import pulseReducer from './pulseSlice'`.
 jest.mock('../pulseSlice', () => ({
+  __esModule: true,
   ...jest.requireActual('../pulseSlice'),
   fetchFeed: jest.fn(() => ({ type: 'pulse/fetch/pending' })),
   clearPendingFilter: jest.fn(() => ({ type: 'pulse/clearPendingFilter' })),
+}));
+
+// PulseScreen reads navigation hooks (useNavigation/useRoute/useFocusEffect).
+// Outside a real navigator, useRoute throws "Couldn't find a route object", so
+// stub the hooks while keeping the rest of @react-navigation/native real.
+jest.mock('@react-navigation/native', () => ({
+  __esModule: true,
+  ...jest.requireActual('@react-navigation/native'),
+  useNavigation: () => ({ navigate: jest.fn(), goBack: jest.fn(), setOptions: jest.fn() }),
+  useRoute: () => ({ key: 'Pulse', name: 'Pulse', params: {} }),
+  useFocusEffect: jest.fn(),
+}));
+
+// The trending strip fetches from the API via location; supply fixed topics so
+// the "renders trending strip" assertion is deterministic.
+jest.mock('../useTrendingNearby', () => ({
+  __esModule: true,
+  useTrendingNearby: () => ({ topics: ['#coffee', '#nightlife', '#sale'], loading: false }),
 }));
 
 import authReducer from '@/features/auth/authSlice';

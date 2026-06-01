@@ -8,7 +8,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Animated, Modal, Pressable, StyleSheet, Text, Vibration, View,
+  Animated, Modal, Pressable, StyleSheet, Text, Vibration,
 } from 'react-native';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';

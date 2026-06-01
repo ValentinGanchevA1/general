@@ -23,33 +23,33 @@ tracked in `schema_migrations` by filename). Pending as of P4: `0012`–`0015`.
 ## Environment variables (`g88-api`)
 
 ### Core (already set)
-| Var | Notes |
-|---|---|
-| `DATABASE_URL` | Managed Postgres. Required in prod. |
-| `JWT_SECRET` | ≥64 chars in prod. Also signs social-link OAuth `state`. |
-| `SENTRY_DSN` | Both apps. |
-| `CORS_ORIGINS`, `PORT` | Standard. |
-| `API_PUBLIC_URL` | Public base, e.g. `https://g88-api.onrender.com`. Used to build the social OAuth `redirect_uri`. |
+| Var                    | Notes                                                                                            |
+|------------------------|--------------------------------------------------------------------------------------------------|
+| `DATABASE_URL`         | Managed Postgres. Required in prod.                                                              |
+| `JWT_SECRET`           | ≥64 chars in prod. Also signs social-link OAuth `state`.                                         |
+| `SENTRY_DSN`           | Both apps.                                                                                       |
+| `CORS_ORIGINS`, `PORT` | Standard.                                                                                        |
+| `API_PUBLIC_URL`       | Public base, e.g. `https://g88-api.onrender.com`. Used to build the social OAuth `redirect_uri`. |
 
 ### G2 — Verification (Twilio Verify) — secrets
-| Var | Value |
-|---|---|
-| `TWILIO_ACCOUNT_SID` | `…` |
-| `TWILIO_AUTH_TOKEN` | `…` |
+| Var                         | Value                      |
+|-----------------------------|----------------------------|
+| `TWILIO_ACCOUNT_SID`        | `…`                        |
+| `TWILIO_AUTH_TOKEN`         | `…`                        |
 | `TWILIO_VERIFY_SERVICE_SID` | `…` (Verify service `VA…`) |
 
 Without these in non-prod, phone verification accepts dev code `000000`; in prod it hard-fails.
 
 ### G3 — Subscriptions (Stripe)
-| Var | Value | Secret? |
-|---|---|---|
-| `STRIPE_SECRET_KEY` | `sk_test_…` / `sk_live_…` | **yes** — API keys page |
-| `STRIPE_WEBHOOK_SECRET` | `whsec_…` | **yes** — generated when the webhook endpoint is created |
-| `STRIPE_PRICE_BASIC` | `price_…` (test, **`acct_1SgYZq`**) — ✅ wired | no |
-| `STRIPE_PRICE_PREMIUM` | `price_…` (test, **`acct_1SgYZq`**) — ✅ wired | no |
-| `STRIPE_SUCCESS_URL` | optional; default `https://g88.app/billing/success` | no |
-| `STRIPE_CANCEL_URL` | optional; default `https://g88.app/billing/cancel` | no |
-| `STRIPE_PORTAL_RETURN_URL` | optional; default `https://g88.app/billing` | no |
+| Var                        | Value                                               | Secret?                                                  |
+|----------------------------|-----------------------------------------------------|----------------------------------------------------------|
+| `STRIPE_SECRET_KEY`        | `sk_test_…` / `sk_live_…`                           | **yes** — API keys page                                  |
+| `STRIPE_WEBHOOK_SECRET`    | `whsec_…`                                           | **yes** — generated when the webhook endpoint is created |
+| `STRIPE_PRICE_BASIC`       | `price_…` (test, **`acct_1SgYZq`**) — ✅ wired       | no                                                       |
+| `STRIPE_PRICE_PREMIUM`     | `price_…` (test, **`acct_1SgYZq`**) — ✅ wired       | no                                                       |
+| `STRIPE_SUCCESS_URL`       | optional; default `https://g88.app/billing/success` | no                                                       |
+| `STRIPE_CANCEL_URL`        | optional; default `https://g88.app/billing/cancel`  | no                                                       |
+| `STRIPE_PORTAL_RETURN_URL` | optional; default `https://g88.app/billing`         | no                                                       |
 
 **Webhook** (Stripe dashboard → Developers → Webhooks → Add endpoint):
 - URL: `https://g88-api.onrender.com/api/v1/subscriptions/webhook`
@@ -69,17 +69,17 @@ Without these in non-prod, phone verification accepts dev code `000000`; in prod
 A provider is inert until both its id+secret are set. Register each provider's
 OAuth **redirect URI** as `https://g88-api.onrender.com/api/v1/social/callback`.
 
-| Provider | Vars |
-|---|---|
-| Instagram | `INSTAGRAM_CLIENT_ID`, `INSTAGRAM_CLIENT_SECRET` |
+| Provider    | Vars                                                                         |
+|-------------|------------------------------------------------------------------------------|
+| Instagram   | `INSTAGRAM_CLIENT_ID`, `INSTAGRAM_CLIENT_SECRET`                             |
 | X / Twitter | `TWITTER_CLIENT_ID`, `TWITTER_CLIENT_SECRET` — ⚠️ needs PKCE before it works |
-| TikTok | `TIKTOK_CLIENT_ID`, `TIKTOK_CLIENT_SECRET` |
-| Facebook | `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET` |
-| LinkedIn | `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET` |
-| Spotify | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` |
+| TikTok      | `TIKTOK_CLIENT_ID`, `TIKTOK_CLIENT_SECRET`                                   |
+| Facebook    | `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET`                               |
+| LinkedIn    | `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`                               |
+| Spotify     | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`                                 |
 
-| Var | Notes |
-|---|---|
+| Var                      | Notes                                                                                 |
+|--------------------------|---------------------------------------------------------------------------------------|
 | `SOCIAL_LINK_RETURN_URL` | Where the callback bounces back, e.g. a deep link or `https://g88.app/social/linked`. |
 
 Several providers (Instagram/TikTok/Facebook) require app review before

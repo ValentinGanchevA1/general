@@ -1,4 +1,4 @@
-import { ForbiddenException, Logger, NotFoundException, UsePipes, ValidationPipe, UseGuards, Inject } from '@nestjs/common';
+import { ForbiddenException, Logger, NotFoundException, UsePipes, ValidationPipe, UseGuards } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
   ConnectedSocket,

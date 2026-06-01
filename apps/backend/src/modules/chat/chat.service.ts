@@ -42,7 +42,8 @@ export class ChatService {
       [conversationId],
     );
 
-    return { ...msg!, createdAt: (msg as any).createdAt?.toISOString?.() ?? msg!.createdAt };
+    const created = msg!.createdAt as Date | string;
+    return { ...msg!, createdAt: created instanceof Date ? created.toISOString() : created };
   }
 
   /** Return participant IDs for a conversation — used by the realtime gateway for push routing. */
@@ -143,10 +144,10 @@ export class ChatService {
     );
 
     const hasMore = rows.length > cap;
-    const page = rows.slice(0, cap).map((r) => ({
-      ...r,
-      createdAt: (r as any).createdAt?.toISOString?.() ?? r.createdAt,
-    }));
+    const page = rows.slice(0, cap).map((r) => {
+      const created = r.createdAt as Date | string;
+      return { ...r, createdAt: created instanceof Date ? created.toISOString() : created };
+    });
 
     return {
       messages: page,
