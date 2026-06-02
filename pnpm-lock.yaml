@@ -192,6 +192,9 @@ importers:
       '@g88/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@invertase/react-native-apple-authentication':
+        specifier: ^2.4.1
+        version: 2.5.1
       '@react-native-async-storage/async-storage':
         specifier: ^2.0.0
         version: 2.2.0(react-native@0.83.0(@babel/core@7.29.0)(@react-native-community/cli@15.1.3(typescript@5.9.3))(@react-native/metro-config@0.83.9(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.2.6))
@@ -1248,6 +1251,10 @@ packages:
   '@humanwhocodes/object-schema@2.0.3':
     resolution: {integrity: sha512-93zYdMES/c1D69yZiKDBj0V24vqNzB/koF26KPaagAfd3P/4gUlh3Dys5ogAK+Exi9QyzlD8x/08Zt7wIKcDcA==}
     deprecated: Use @eslint/object-schema instead
+
+  '@invertase/react-native-apple-authentication@2.5.1':
+    resolution: {integrity: sha512-KPKKc0wtRYpH4J0RkDfHzoKSZ+dYPEHmCXhpPdgHsT2MbK5AIkW1cYurjhAgev/kL7nOHFmWITjY1At5WhFEMQ==}
+    engines: {node: '>=14'}
 
   '@ioredis/commands@1.5.1':
     resolution: {integrity: sha512-JH8ZL/ywcJyR9MmJ5BNqZllXNZQqQbnVZOqpPQqE1vHiFgAw4NHbvE0FOduNU8IX9babitBT46571OnPTT0Zcw==}
@@ -7705,6 +7712,8 @@ snapshots:
   '@humanwhocodes/module-importer@1.0.1': {}
 
   '@humanwhocodes/object-schema@2.0.3': {}
+
+  '@invertase/react-native-apple-authentication@2.5.1': {}
 
   '@ioredis/commands@1.5.1': {}
 
