@@ -10,12 +10,12 @@
 
 ## Status snapshot
 
-| Phase | Status | Gate |
-|---|---|---|
-| P1 — foundation | ✅ shipped | Auth · Profile · Map Discovery · Presence · Wave · Chat |
-| P2 — pre-launch hardening | 🟡 active | TestFlight ready |
-| P3 — habit-forming features | ⏳ post-launch | TestFlight + App Store live |
-| P4+ — horizon | 📋 documented only | P3 retention sustained |
+| Phase                       | Status             | Gate                                                    |
+|-----------------------------|--------------------|---------------------------------------------------------|
+| P1 — foundation             | ✅ shipped          | Auth · Profile · Map Discovery · Presence · Wave · Chat |
+| P2 — pre-launch hardening   | 🟡 active          | TestFlight ready                                        |
+| P3 — habit-forming features | ⏳ post-launch      | TestFlight + App Store live                             |
+| P4+ — horizon               | 📋 documented only | P3 retention sustained                                  |
 
 Target launch market: **Varna, BG** (single test city — see `PRODUCT.md` § Launch market).
 
@@ -39,59 +39,59 @@ Five items, ordered. Each must close cleanly before the next starts.
 
 ### P2.A4 — Dev-secret cleanup
 
-| | |
-|---|---|
-| **Why** | Hardcoded dev secrets and example envs in repo create a leak surface and confuse Render env reality |
-| **Scope** | Audit `apps/backend/src/**` + `apps/mobile/src/**` for `JWT_SECRET`, `STRIPE_*`, `TWILIO_*`, `AWS_*` literals · move all to `.env` · rotate any committed values · update `.env.example` |
-| **Acceptance** | `git grep -E '(JWT_SECRET\|sk_test\|AC[0-9a-f]{32})'` returns 0 hits in non-`.env*` files · Render deploys green · CI passes |
-| **Risk** | Production deploy could fail if a Render env var is missing the new key name → mitigate with deploy preview |
-| **Effort** | 0.5 day |
-| **Blocks** | Nothing strictly, but should land before Sentry (OB1) to avoid sending secrets to Sentry breadcrumbs |
+|                |                                                                                                                                                                                          |
+|----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Why**        | Hardcoded dev secrets and example envs in repo create a leak surface and confuse Render env reality                                                                                      |
+| **Scope**      | Audit `apps/backend/src/**` + `apps/mobile/src/**` for `JWT_SECRET`, `STRIPE_*`, `TWILIO_*`, `AWS_*` literals · move all to `.env` · rotate any committed values · update `.env.example` |
+| **Acceptance** | `git grep -E '(JWT_SECRET\|sk_test\|AC[0-9a-f]{32})'` returns 0 hits in non-`.env*` files · Render deploys green · CI passes                                                             |
+| **Risk**       | Production deploy could fail if a Render env var is missing the new key name → mitigate with deploy preview                                                                              |
+| **Effort**     | 0.5 day                                                                                                                                                                                  |
+| **Blocks**     | Nothing strictly, but should land before Sentry (OB1) to avoid sending secrets to Sentry breadcrumbs                                                                                     |
 
 ### P2.OB1 — Sentry integration (TestFlight blocker)
 
-| | |
-|---|---|
-| **Why** | Crash visibility is non-negotiable for public TestFlight. C3 (no observability) is a Critical-severity debt item. |
-| **Scope** | `@sentry/react-native` in mobile · `@sentry/nestjs` in backend · DSN per env · source-map upload in mobile release script · PII scrubbing (no email/phone/location in breadcrumbs) · alert routing to Slack |
-| **Acceptance** | A deliberate test crash from mobile appears in Sentry within 60s with symbolicated stack · backend unhandled exception appears with request context (no PII) · alert fires |
-| **Risk** | Sentry quota burn from noisy errors → set traceSampleRate to 0.1 in prod, 1.0 in dev · PII leak via breadcrumb auto-capture → manual `beforeSend` scrubber |
-| **Effort** | 1.5 days |
-| **Blocks** | TestFlight release |
+|                |                                                                                                                                                                                                             |
+|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Why**        | Crash visibility is non-negotiable for public TestFlight. C3 (no observability) is a Critical-severity debt item.                                                                                           |
+| **Scope**      | `@sentry/react-native` in mobile · `@sentry/nestjs` in backend · DSN per env · source-map upload in mobile release script · PII scrubbing (no email/phone/location in breadcrumbs) · alert routing to Slack |
+| **Acceptance** | A deliberate test crash from mobile appears in Sentry within 60s with symbolicated stack · backend unhandled exception appears with request context (no PII) · alert fires                                  |
+| **Risk**       | Sentry quota burn from noisy errors → set traceSampleRate to 0.1 in prod, 1.0 in dev · PII leak via breadcrumb auto-capture → manual `beforeSend` scrubber                                                  |
+| **Effort**     | 1.5 days                                                                                                                                                                                                    |
+| **Blocks**     | TestFlight release                                                                                                                                                                                          |
 
 ### P2.A3 — Apple Sign-In (App Store blocker)
 
-| | |
-|---|---|
-| **Why** | Apple requires Sign in with Apple if the app offers any other social login (Google is live → Apple is mandatory) |
-| **Scope** | `@invertase/react-native-apple-authentication` on iOS · backend route `POST /auth/apple` verifies identity token against Apple public keys · upsert user (handle the email-relay case — Apple may return `private-relay` email) · return token pair |
-| **Acceptance** | iOS Sign-in-with-Apple button works on real device · returning user maps to same account · `private-relay` emails handled · Android build doesn't break |
-| **Risk** | Apple's "hide my email" relay → must not assume email = identity; rely on `sub` claim · iOS-only flow → no Android impact |
-| **Effort** | 1.5 days |
-| **Blocks** | App Store submission · public TestFlight |
-| **Spec** | See `SPECIFICATION.md` § Auth / A3 |
+|                |                                                                                                                                                                                                                                                     |
+|----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Why**        | Apple requires Sign in with Apple if the app offers any other social login (Google is live → Apple is mandatory)                                                                                                                                    |
+| **Scope**      | `@invertase/react-native-apple-authentication` on iOS · backend route `POST /auth/apple` verifies identity token against Apple public keys · upsert user (handle the email-relay case — Apple may return `private-relay` email) · return token pair |
+| **Acceptance** | iOS Sign-in-with-Apple button works on real device · returning user maps to same account · `private-relay` emails handled · Android build doesn't break                                                                                             |
+| **Risk**       | Apple's "hide my email" relay → must not assume email = identity; rely on `sub` claim · iOS-only flow → no Android impact                                                                                                                           |
+| **Effort**     | 1.5 days                                                                                                                                                                                                                                            |
+| **Blocks**     | App Store submission · public TestFlight                                                                                                                                                                                                            |
+| **Spec**       | See `SPECIFICATION.md` § Auth / A3                                                                                                                                                                                                                  |
 
 ### P2.C6 — Mobile chat outbox
 
-| | |
-|---|---|
-| **Why** | Chat sent over flaky mobile networks currently fails silently. The single biggest UX risk for the chat pillar. |
-| **Scope** | Local persistent queue (`@react-native-async-storage/async-storage`) of pending messages · UI states: `pending → sending → sent → failed (retry)` · automatic retry on network restore (NetInfo) · idempotency key on backend so retries don't double-send · WS reconnect drains the queue |
-| **Acceptance** | Airplane-mode send → message persists locally with `pending` indicator · network returns → auto-sends within 3s · backend receives same message exactly once (idempotency) · queue survives app kill |
-| **Risk** | Idempotency key collisions if generated client-side → use `uuid v4` + composite uniqueness `(senderId, clientMessageId)` |
-| **Effort** | 2 days |
-| **Spec** | See `SPECIFICATION.md` § Chat / C6 |
+|                |                                                                                                                                                                                                                                                                                            |
+|----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Why**        | Chat sent over flaky mobile networks currently fails silently. The single biggest UX risk for the chat pillar.                                                                                                                                                                             |
+| **Scope**      | Local persistent queue (`@react-native-async-storage/async-storage`) of pending messages · UI states: `pending → sending → sent → failed (retry)` · automatic retry on network restore (NetInfo) · idempotency key on backend so retries don't double-send · WS reconnect drains the queue |
+| **Acceptance** | Airplane-mode send → message persists locally with `pending` indicator · network returns → auto-sends within 3s · backend receives same message exactly once (idempotency) · queue survives app kill                                                                                       |
+| **Risk**       | Idempotency key collisions if generated client-side → use `uuid v4` + composite uniqueness `(senderId, clientMessageId)`                                                                                                                                                                   |
+| **Effort**     | 2 days                                                                                                                                                                                                                                                                                     |
+| **Spec**       | See `SPECIFICATION.md` § Chat / C6                                                                                                                                                                                                                                                         |
 
 ### P2.M1 — Viewport-diff protocol
 
-| | |
-|---|---|
-| **Why** | Mobile pulls full nearby-user payload on every viewport change. Wasteful on data + battery. |
-| **Scope** | Backend `GET /locations/map-data` accepts `?since=ts&previousIds=…` · returns `{ added: [], updated: [], removed: [] }` · mobile `mapSlice` applies diffs · WS `nearby:update` already does this for individual users — extend to viewport-level |
-| **Acceptance** | Median bytes/viewport-change drops ≥ 60% in dev measurement · no visible regression in map render · works correctly across viewport pan vs zoom |
-| **Risk** | Stale client state if a diff is dropped → fall back to full fetch on any missing-id signal |
-| **Effort** | 2 days |
-| **Spec** | See `SPECIFICATION.md` § Map / M1 |
+|                |                                                                                                                                                                                                                                                  |
+|----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Why**        | Mobile pulls full nearby-user payload on every viewport change. Wasteful on data + battery.                                                                                                                                                      |
+| **Scope**      | Backend `GET /locations/map-data` accepts `?since=ts&previousIds=…` · returns `{ added: [], updated: [], removed: [] }` · mobile `mapSlice` applies diffs · WS `nearby:update` already does this for individual users — extend to viewport-level |
+| **Acceptance** | Median bytes/viewport-change drops ≥ 60% in dev measurement · no visible regression in map render · works correctly across viewport pan vs zoom                                                                                                  |
+| **Risk**       | Stale client state if a diff is dropped → fall back to full fetch on any missing-id signal                                                                                                                                                       |
+| **Effort**     | 2 days                                                                                                                                                                                                                                           |
+| **Spec**       | See `SPECIFICATION.md` § Map / M1                                                                                                                                                                                                                |
 
 ### P2 total
 
@@ -180,11 +180,11 @@ Anchored here to give clear "not now" answers. Each is fully out of scope until 
 
 ### P4.M — Monetization (per Q3 → C, staged)
 
-| Tier | What | Trigger to start |
-|---|---|---|
-| M1 — Subscription | Boost, super-likes, see-who-liked, advanced filters | D30 retention ≥ 15% sustained 60 days post-launch |
-| M2 — Marketplace fee | Stripe Connect on settled trades, platform % | M1 stable + 1k+ listings/week in launch market |
-| M3 — Paid gifts | Real-money gift purchase tops up wallet | M2 stable + gift send rate ≥ 0.5/DAU |
+| Tier                 | What                                                | Trigger to start                                  |
+|----------------------|-----------------------------------------------------|---------------------------------------------------|
+| M1 — Subscription    | Boost, super-likes, see-who-liked, advanced filters | D30 retention ≥ 15% sustained 60 days post-launch |
+| M2 — Marketplace fee | Stripe Connect on settled trades, platform %        | M1 stable + 1k+ listings/week in launch market    |
+| M3 — Paid gifts      | Real-money gift purchase tops up wallet             | M2 stable + gift send rate ≥ 0.5/DAU              |
 
 ### P4.L — Live streaming (per Q2 → B)
 WebRTC, location-anchored streams. **Explicitly deferred.** Legacy roadmaps push this as a P2 feature; we don't have the infra budget or content-moderation pipeline to ship it safely pre-launch. Revisit at month 12 post-launch.
@@ -205,17 +205,17 @@ Bulgaria → EU first. Beyond EU triggers regulatory complexity (different payme
 
 ## Risk register
 
-| ID | Phase | Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|---|---|
-| R-P2-1 | P2 | App Store rejects on first submission (common) | High | 2-week delay | Pre-validate against current guidelines · keep demo account fresh · have rejection-response template ready |
-| R-P2-2 | P2 | Apple SSO email-relay edge cases corrupt account merge | Medium | Account-merge bugs in early users | Treat Apple `sub` (not email) as identity primary · test relay path explicitly |
-| R-P2-3 | P2 | Sentry quota blown by noisy first launch | Medium | Lost crashes from quota throttling | Conservative sample rate · alert on quota at 70% · scrubber tested |
-| R-P3-1 | P3 | Cold-start density in Varna too low for map to feel alive | High | Retention dies | Manual seeding via partner outreach · trending fakeout (highlight any activity) · invite-friends nudge in onboarding |
-| R-P3-2 | P3 | Notification overload kills opt-in rate | Medium | Channel becomes unusable | Per-channel granular opt-in · frequency caps · digest-mode option from launch |
-| R-P3-3 | P3 | Gamification → empty achievements → users feel hollow loop | Medium | Engagement drops post-novelty | Ship gifts alongside (P3.1 + P3.2 paired) so XP has a payoff |
-| R-P4-1 | P4 | Live streaming legal exposure (impersonation, CSAM, broadcast law) | High | Existential | Don't ship without moderation pipeline · keep deferred until staffed |
-| R-H1 | All | RN 0.83 + React 19 native lib compatibility (per tech debt H1) | Ongoing | Build break on dep update | Lock RN/React majors · vet every new native dep before merge · keep Expo modules off the table |
-| R-C2 | All | Zero-test backend means regressions ship invisibly | Critical (existing debt) | Bug whack-a-mole | TestFlight gate requires ≥1 `.spec.ts` per module · expand coverage in P3 · do not delete this row until coverage ≥ 60% |
+| ID     | Phase | Risk                                                               | Likelihood               | Impact                             | Mitigation                                                                                                              |
+|--------|-------|--------------------------------------------------------------------|--------------------------|------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| R-P2-1 | P2    | App Store rejects on first submission (common)                     | High                     | 2-week delay                       | Pre-validate against current guidelines · keep demo account fresh · have rejection-response template ready              |
+| R-P2-2 | P2    | Apple SSO email-relay edge cases corrupt account merge             | Medium                   | Account-merge bugs in early users  | Treat Apple `sub` (not email) as identity primary · test relay path explicitly                                          |
+| R-P2-3 | P2    | Sentry quota blown by noisy first launch                           | Medium                   | Lost crashes from quota throttling | Conservative sample rate · alert on quota at 70% · scrubber tested                                                      |
+| R-P3-1 | P3    | Cold-start density in Varna too low for map to feel alive          | High                     | Retention dies                     | Manual seeding via partner outreach · trending fakeout (highlight any activity) · invite-friends nudge in onboarding    |
+| R-P3-2 | P3    | Notification overload kills opt-in rate                            | Medium                   | Channel becomes unusable           | Per-channel granular opt-in · frequency caps · digest-mode option from launch                                           |
+| R-P3-3 | P3    | Gamification → empty achievements → users feel hollow loop         | Medium                   | Engagement drops post-novelty      | Ship gifts alongside (P3.1 + P3.2 paired) so XP has a payoff                                                            |
+| R-P4-1 | P4    | Live streaming legal exposure (impersonation, CSAM, broadcast law) | High                     | Existential                        | Don't ship without moderation pipeline · keep deferred until staffed                                                    |
+| R-H1   | All   | RN 0.83 + React 19 native lib compatibility (per tech debt H1)     | Ongoing                  | Build break on dep update          | Lock RN/React majors · vet every new native dep before merge · keep Expo modules off the table                          |
+| R-C2   | All   | Zero-test backend means regressions ship invisibly                 | Critical (existing debt) | Bug whack-a-mole                   | TestFlight gate requires ≥1 `.spec.ts` per module · expand coverage in P3 · do not delete this row until coverage ≥ 60% |
 
 ---
 
@@ -223,24 +223,24 @@ Bulgaria → EU first. Beyond EU triggers regulatory complexity (different payme
 
 Listed here so they don't keep resurfacing in planning conversations. Source: 13 legacy roadmap files audited 2026-05-23.
 
-| Cut | Why |
-|---|---|
-| K8s / Kubernetes | Render.com is sufficient for ≤ 100k DAU. K8s adds ops cost with no product benefit at this scale. |
-| Kafka / RabbitMQ event bus | NestJS events + Redis pub/sub cover current needs. Add when we have cross-service async fan-out that justifies it. |
-| GraphQL / GraphQL Federation | REST + WS is shipping. GraphQL would be a stack rewrite mid-flight. |
-| gRPC inter-service | Single backend service. Not applicable. |
-| Elasticsearch | Postgres FTS + Redis sorted sets handle current search/trending. Revisit at 1M+ listings. |
-| InfluxDB | No time-series workload exists. Aggregations live in Postgres. |
-| Prometheus / Grafana / ELK / Jaeger | Sentry + Render logs are the v1 observability surface. Self-hosted stack premature. |
-| Terraform / IaC | Render dashboard config is fine pre-multi-region. |
-| Microservices split | We have one backend. Splitting prematurely costs more than it saves. Revisit when team > 5 engineers. |
-| AR / VR | No product need. Battery + hardware support not there. |
-| Blockchain / NFT / crypto payments | No product need. Adds regulatory + UX complexity. |
-| AI-powered matching (transformer-scale) | Geographic proximity + interest overlap is the v1 ranking. ML matching is a P4 question after we have retention. |
-| Web / desktop client (v1) | Mobile-first by design. |
-| Group chat (v1) | 1:1 only. |
-| Live streaming (v1, v2, v3) | P4+ horizon — see R-P4-1. |
-| Multi-currency / international payments (v1) | EUR + BGN only at launch. |
+| Cut                                          | Why                                                                                                                |
+|----------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
+| K8s / Kubernetes                             | Render.com is sufficient for ≤ 100k DAU. K8s adds ops cost with no product benefit at this scale.                  |
+| Kafka / RabbitMQ event bus                   | NestJS events + Redis pub/sub cover current needs. Add when we have cross-service async fan-out that justifies it. |
+| GraphQL / GraphQL Federation                 | REST + WS is shipping. GraphQL would be a stack rewrite mid-flight.                                                |
+| gRPC inter-service                           | Single backend service. Not applicable.                                                                            |
+| Elasticsearch                                | Postgres FTS + Redis sorted sets handle current search/trending. Revisit at 1M+ listings.                          |
+| InfluxDB                                     | No time-series workload exists. Aggregations live in Postgres.                                                     |
+| Prometheus / Grafana / ELK / Jaeger          | Sentry + Render logs are the v1 observability surface. Self-hosted stack premature.                                |
+| Terraform / IaC                              | Render dashboard config is fine pre-multi-region.                                                                  |
+| Microservices split                          | We have one backend. Splitting prematurely costs more than it saves. Revisit when team > 5 engineers.              |
+| AR / VR                                      | No product need. Battery + hardware support not there.                                                             |
+| Blockchain / NFT / crypto payments           | No product need. Adds regulatory + UX complexity.                                                                  |
+| AI-powered matching (transformer-scale)      | Geographic proximity + interest overlap is the v1 ranking. ML matching is a P4 question after we have retention.   |
+| Web / desktop client (v1)                    | Mobile-first by design.                                                                                            |
+| Group chat (v1)                              | 1:1 only.                                                                                                          |
+| Live streaming (v1, v2, v3)                  | P4+ horizon — see R-P4-1.                                                                                          |
+| Multi-currency / international payments (v1) | EUR + BGN only at launch.                                                                                          |
 
 ---
 
@@ -252,10 +252,10 @@ Listed here so they don't keep resurfacing in planning conversations. Source: 13
 
 ## Decision log
 
-| Date | Decision | Rationale |
-|---|---|---|
-| 2026-05-23 | P3 ordering: gamification + gifts first | Q1 → D · habit-forming triggers ahead of utility/revenue |
-| 2026-05-23 | Live streaming → P4+ horizon | Q2 → B · infra + moderation cost too high pre-launch |
-| 2026-05-23 | Zero monetization in v1 | Q3 → D · removes regulatory + trust risk during retention validation |
-| 2026-05-23 | Post-launch monetization tiers in order: sub → fee → paid gifts | Q3 → C · validate each before stacking next |
-| 2026-05-23 | Single-city launch (Varna) → Sofia → BG → EU | Q4 → D · avoid cold-start density failure |
+| Date       | Decision                                                        | Rationale                                                            |
+|------------|-----------------------------------------------------------------|----------------------------------------------------------------------|
+| 2026-05-23 | P3 ordering: gamification + gifts first                         | Q1 → D · habit-forming triggers ahead of utility/revenue             |
+| 2026-05-23 | Live streaming → P4+ horizon                                    | Q2 → B · infra + moderation cost too high pre-launch                 |
+| 2026-05-23 | Zero monetization in v1                                         | Q3 → D · removes regulatory + trust risk during retention validation |
+| 2026-05-23 | Post-launch monetization tiers in order: sub → fee → paid gifts | Q3 → C · validate each before stacking next                          |
+| 2026-05-23 | Single-city launch (Varna) → Sofia → BG → EU                    | Q4 → D · avoid cold-start density failure                            |

@@ -14,6 +14,7 @@ import type {
 } from '@g88/shared';
 
 import { PresenceService } from '../presence/presence.service';
+import { MessagingService } from '../messaging/messaging.service';
 
 interface UserRow {
   id: string;
@@ -66,6 +67,7 @@ export class UsersService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly presence: PresenceService,
+    private readonly messaging: MessagingService,
   ) {}
 
   async findById(id: string): Promise<AuthenticatedUser | null> {
@@ -93,7 +95,13 @@ export class UsersService {
     return this.toProfile(rows[0], photoUrls, socialLinks);
   }
 
-  async getPublicProfile(userId: string): Promise<PublicUserProfile> {
+  /**
+   * Public profile card. When a `viewerId` is supplied (the authenticated
+   * caller) and differs from the subject, attach the viewer-relative
+   * `relationship` block so the client knows whether to show Wave vs Message —
+   * the gate itself is re-checked server-side on send, this is just for UI.
+   */
+  async getPublicProfile(userId: string, viewerId?: string): Promise<PublicUserProfile> {
     const rows = await this.db.query<PublicUserRow[]>(
       `SELECT id, display_name, avatar_url, bio, verification_level, goals
          FROM users
@@ -105,6 +113,17 @@ export class UsersService {
     const r = rows[0];
     // Live "online" comes from Redis presence, not Postgres — see PresenceService.
     const onlineSet = await this.presence.whichAreOnline([r.id]);
+
+    let relationship: PublicUserProfile['relationship'];
+    if (viewerId && viewerId !== r.id) {
+      const perm = await this.messaging.permissionFor(viewerId, r.id);
+      relationship = {
+        matched: perm.matched,
+        sharedInterests: perm.sharedInterests,
+        canMessage: perm.canMessage,
+      };
+    }
+
     return {
       id: r.id,
       displayName: r.display_name,
@@ -113,6 +132,7 @@ export class UsersService {
       verification: r.verification_level as PublicUserProfile['verification'],
       goals: r.goals ?? [],
       online: onlineSet.has(r.id),
+      ...(relationship ? { relationship } : {}),
     };
   }
 

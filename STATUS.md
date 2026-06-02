@@ -12,14 +12,14 @@
 
 The only six things that must ship cleanly for "P1 done":
 
-| # | Pillar | State | Blocker | Owner | Notes |
-|---|---|---|---|---|---|
-| 1 | **Auth** (email/pw + OAuth) | 🟦 Done | — | — | Email/pw + Google OAuth; opaque DB-stored rotating refresh tokens; Apple OAuth deferred (fast-follow before App Store) |
-| 2 | **Profile** | 🟦 Done | — | — | `PATCH /users/me/profile`, S3 presigned URL, ProfileCreation/Edit/Screen done |
-| 3 | **Map discovery** | 🟦 Done | — | — | H3 + server-side clustering + viewport-diff (M1) done. |
-| 4 | **Presence** | 🟦 Done | — | — | `presence:delta` emitted on cell boundary cross |
-| 5 | **Wave** | 🟦 Done | — | — | Sender fully hydrated; FCM fallback wired |
-| 6 | **Chat** | 🟦 Done | — | — | Persist + REST + mobile Inbox + ChatScreen + outbox retry (C6) |
+| # | Pillar                      | State   | Blocker | Owner | Notes                                                                                                                  |
+|---|-----------------------------|---------|---------|-------|------------------------------------------------------------------------------------------------------------------------|
+| 1 | **Auth** (email/pw + OAuth) | 🟦 Done | —       | —     | Email/pw + Google OAuth; opaque DB-stored rotating refresh tokens; Apple OAuth deferred (fast-follow before App Store) |
+| 2 | **Profile**                 | 🟦 Done | —       | —     | `PATCH /users/me/profile`, S3 presigned URL, ProfileCreation/Edit/Screen done                                          |
+| 3 | **Map discovery**           | 🟦 Done | —       | —     | H3 + server-side clustering + viewport-diff (M1) done.                                                                 |
+| 4 | **Presence**                | 🟦 Done | —       | —     | `presence:delta` emitted on cell boundary cross                                                                        |
+| 5 | **Wave**                    | 🟦 Done | —       | —     | Sender fully hydrated; FCM fallback wired                                                                              |
+| 6 | **Chat**                    | 🟦 Done | —       | —     | Persist + REST + mobile Inbox + ChatScreen + outbox retry (C6)                                                         |
 
 **Legend:** ✅ shipping · ⚠️ partial · ❌ blocked / not started · 🟦 done & verified
 
@@ -29,38 +29,38 @@ The only six things that must ship cleanly for "P1 done":
 
 Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 
-| ID | Pillar | File | Gap | Fix size | |
-|---|---|---|---|---|---|
-| C1 | Chat | `apps/backend/src/realtime/realtime.gateway.ts:onChatSend` | `id: 'TODO_persisted_id'` — messages emit but never persist | M | ✅ R2 |
-| C2 | Chat | (missing) `apps/backend/src/modules/chat/chat.service.ts` | No service writes `messages` table | M | ✅ R2 |
-| C3 | Chat | (missing) `apps/backend/src/modules/chat/chat.controller.ts` | No `GET /conversations`, `GET /conversations/:id/messages` | S | ✅ R2 |
-| C4 | Chat | (missing) `apps/mobile/src/screens/{InboxScreen,ChatScreen}.tsx` | No mobile UI for chat | L | ✅ R3 |
-| P1 | Profile | (missing) `apps/backend/src/modules/users/` | No `PATCH /users/me/profile`, no profile completion endpoint | M | ✅ R2 |
-| P2 | Profile | (missing) `apps/mobile/src/screens/ProfileCreationScreen.tsx` | No mobile screen; auth gate in `AppNavigator` not implemented | L | ✅ R3 |
-| P3 | Profile | (missing) `apps/backend/src/common/s3.service.ts` (or similar) | No presigned URL endpoint for avatar upload | S | ✅ R2 |
-| W1 | Wave | `apps/backend/src/realtime/realtime.gateway.ts:emitWaveReceived` | Hardcodes `displayName: '', avatarUrl: null` — recipient sees empty notification | S | ✅ R2 |
-| Pr1 | Presence | `apps/backend/src/realtime/realtime.gateway.ts` | No emitter for `presence:delta`. ZSETs updated; rooms joined; nothing broadcasts the delta. | M | ✅ R2 |
+| ID  | Pillar   | File                                                             | Gap                                                                                         | Fix size |      |
+|-----|----------|------------------------------------------------------------------|---------------------------------------------------------------------------------------------|----------|------|
+| C1  | Chat     | `apps/backend/src/realtime/realtime.gateway.ts:onChatSend`       | `id: 'TODO_persisted_id'` — messages emit but never persist                                 | M        | ✅ R2 |
+| C2  | Chat     | (missing) `apps/backend/src/modules/chat/chat.service.ts`        | No service writes `messages` table                                                          | M        | ✅ R2 |
+| C3  | Chat     | (missing) `apps/backend/src/modules/chat/chat.controller.ts`     | No `GET /conversations`, `GET /conversations/:id/messages`                                  | S        | ✅ R2 |
+| C4  | Chat     | (missing) `apps/mobile/src/screens/{InboxScreen,ChatScreen}.tsx` | No mobile UI for chat                                                                       | L        | ✅ R3 |
+| P1  | Profile  | (missing) `apps/backend/src/modules/users/`                      | No `PATCH /users/me/profile`, no profile completion endpoint                                | M        | ✅ R2 |
+| P2  | Profile  | (missing) `apps/mobile/src/screens/ProfileCreationScreen.tsx`    | No mobile screen; auth gate in `AppNavigator` not implemented                               | L        | ✅ R3 |
+| P3  | Profile  | (missing) `apps/backend/src/common/s3.service.ts` (or similar)   | No presigned URL endpoint for avatar upload                                                 | S        | ✅ R2 |
+| W1  | Wave     | `apps/backend/src/realtime/realtime.gateway.ts:emitWaveReceived` | Hardcodes `displayName: '', avatarUrl: null` — recipient sees empty notification            | S        | ✅ R2 |
+| Pr1 | Presence | `apps/backend/src/realtime/realtime.gateway.ts`                  | No emitter for `presence:delta`. ZSETs updated; rooms joined; nothing broadcasts the delta. | M        | ✅ R2 |
 
 ## P1 Gap List (close before public TestFlight)
 
-| ID | Pillar | File | Gap | Fix size | |
-|---|---|---|---|---|---|
-| A1 | Auth | `apps/backend/src/modules/auth/auth.service.ts` | Refresh tokens are stateless JWTs. Should be opaque, DB-stored, rotating, revocable per `ARCHITECTURE.md §5`. | L | ✅ R4 |
-| A2 | Auth | `apps/backend/src/modules/auth/auth.controller.ts` | No `POST /auth/oauth/google`. Apple deferred — required before App Store if social login ships. | M | ✅ R4 (Google); Apple = fast-follow |
-| C5 | Chat | `apps/backend/src/realtime/realtime.gateway.ts` | `conversation:join` handler missing (`@SubscribeMessage('conversation:join')`) | S | ✅ R2 |
-| N1 | Notifications | (missing) `apps/backend/src/modules/notifications/` | FCM token registration + send-on-offline for waves and chat | M | ✅ R2 |
+| ID | Pillar        | File                                                | Gap                                                                                                           | Fix size |                                    |
+|----|---------------|-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------|----------|------------------------------------|
+| A1 | Auth          | `apps/backend/src/modules/auth/auth.service.ts`     | Refresh tokens are stateless JWTs. Should be opaque, DB-stored, rotating, revocable per `ARCHITECTURE.md §5`. | L        | ✅ R4                               |
+| A2 | Auth          | `apps/backend/src/modules/auth/auth.controller.ts`  | No `POST /auth/oauth/google`. Apple deferred — required before App Store if social login ships.               | M        | ✅ R4 (Google); Apple = fast-follow |
+| C5 | Chat          | `apps/backend/src/realtime/realtime.gateway.ts`     | `conversation:join` handler missing (`@SubscribeMessage('conversation:join')`)                                | S        | ✅ R2                               |
+| N1 | Notifications | (missing) `apps/backend/src/modules/notifications/` | FCM token registration + send-on-offline for waves and chat                                                   | M        | ✅ R2                               |
 
 ## P2 (post-P1 hardening)
 
-| ID | Pillar | Gap | Fix size | |
-|---|---|---|---|---|
-| A3 | Auth | Apple Sign-In (`POST /auth/oauth/apple`) — required by App Store before any social login ships | M | ⚠️ partial — backend + mobile code done; needs Xcode setup on Mac + Apple Developer Portal (Services ID + key) |
-| C6 | Chat | Mobile outbox — retry queue for messages sent during socket disconnect | M | ✅ done |
-| M1 | Map | Viewport-diff protocol (`ARCHITECTURE.md §3.7`) — full responses on every pan are wasteful at city density | M | ✅ done |
-| A4 | Auth | Hardcoded dev-secret fallbacks in `auth.service.ts` source — remove, require env vars in non-dev | S | ✅ done |
-| OB1 | Observability | Sentry on both apps — minimum bar before public TestFlight (C3 critical debt) | M | ✅ done |
-| DEPLOY | Infra | Production backend deployed to Render (`g88-api.onrender.com`) + Redis | M | ✅ done 2026-05-30 |
-| MON | CI | Synthetic P1 monitor (`scripts/synthetic-monitor.mjs`, cron `*/5 * * * *`) — 7-day gate for DoD item 2 | M | ✅ running — clock started 2026-05-30 |
+| ID     | Pillar        | Gap                                                                                                        | Fix size |                                                                                                                |
+|--------|---------------|------------------------------------------------------------------------------------------------------------|----------|----------------------------------------------------------------------------------------------------------------|
+| A3     | Auth          | Apple Sign-In (`POST /auth/oauth/apple`) — required by App Store before any social login ships             | M        | ⚠️ partial — backend + mobile code done; needs Xcode setup on Mac + Apple Developer Portal (Services ID + key) |
+| C6     | Chat          | Mobile outbox — retry queue for messages sent during socket disconnect                                     | M        | ✅ done                                                                                                         |
+| M1     | Map           | Viewport-diff protocol (`ARCHITECTURE.md §3.7`) — full responses on every pan are wasteful at city density | M        | ✅ done                                                                                                         |
+| A4     | Auth          | Hardcoded dev-secret fallbacks in `auth.service.ts` source — remove, require env vars in non-dev           | S        | ✅ done                                                                                                         |
+| OB1    | Observability | Sentry on both apps — minimum bar before public TestFlight (C3 critical debt)                              | M        | ✅ done                                                                                                         |
+| DEPLOY | Infra         | Production backend deployed to Render (`g88-api.onrender.com`) + Redis                                     | M        | ✅ done 2026-05-30                                                                                              |
+| MON    | CI            | Synthetic P1 monitor (`scripts/synthetic-monitor.mjs`, cron `*/5 * * * *`) — 7-day gate for DoD item 2     | M        | ✅ running — clock started 2026-05-30                                                                           |
 
 **Fix size legend:** XS <1h · S 1–4h · M 0.5–1d · L 1–3d
 
@@ -70,12 +70,12 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 
 First post-hardening features. All wired fire-and-forget so they never block the core action.
 
-| ID | Pillar | Deliverable | Migration | State |
-|---|---|---|---|---|
-| Push | Notifications | FCM chat push + mobile setup (migrated to `@react-native-firebase` v22 modular API); deep-link routing | — | ✅ 2026-05-31 |
-| P3 #3 | Notifications | Geofence-triggered alert pushes — `notifyGeofenceMatch` pre-filters with `gridDisk(alertCell, 3)` then confirms exact ring membership; skips author; fired on alert create | 0007/0008 (alerts/geofences) | ✅ 2026-05-31 |
-| P3 #1 | Gamification | XP ledger (idempotent + daily-capped), levels (`50*(L-1)²` curve), daily streak; awards wired into match + alert-post | 0010 | ✅ 2026-05-31 |
-| P3 #1 (slice 2) | Gamification | Daily challenges — 6-challenge catalog, 3/day chosen by seeded date shuffle, per-user/day progress, bonus XP via ledger; `GET /challenges/today`; ProfileScreen card | 0011 | ✅ 2026-05-31 |
+| ID              | Pillar        | Deliverable                                                                                                                                                                | Migration                    | State        |
+|-----------------|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|--------------|
+| Push            | Notifications | FCM chat push + mobile setup (migrated to `@react-native-firebase` v22 modular API); deep-link routing                                                                     | —                            | ✅ 2026-05-31 |
+| P3 #3           | Notifications | Geofence-triggered alert pushes — `notifyGeofenceMatch` pre-filters with `gridDisk(alertCell, 3)` then confirms exact ring membership; skips author; fired on alert create | 0007/0008 (alerts/geofences) | ✅ 2026-05-31 |
+| P3 #1           | Gamification  | XP ledger (idempotent + daily-capped), levels (`50*(L-1)²` curve), daily streak; awards wired into match + alert-post                                                      | 0010                         | ✅ 2026-05-31 |
+| P3 #1 (slice 2) | Gamification  | Daily challenges — 6-challenge catalog, 3/day chosen by seeded date shuffle, per-user/day progress, bonus XP via ledger; `GET /challenges/today`; ProfileScreen card       | 0011                         | ✅ 2026-05-31 |
 
 **Apple Sign-In (A3):** backend + mobile code complete (migration 0009); Xcode capability + Apple Developer Portal (Services ID + key) still pending on a Mac. Unchanged from P2 — still partial.
 
@@ -85,17 +85,17 @@ First post-hardening features. All wired fire-and-forget so they never block the
 
 Rich ProfileScreen redesign + the data and integrations behind it. Code-complete and on `master`; each integration is **env-gated** and inert until its credentials land (mirrors the FCM/Sentry pattern).
 
-| ID | Pillar | Deliverable | Migration | State |
-|---|---|---|---|---|
-| G1 | Profile | Rich ProfileScreen (hero photo, badges, verification bar, sections, menu); `users` + phone/dob/subscription_tier/interests; `user_photos` + `social_links`; UserProfile gains photoUrls/age/subscriptionTier/socialLinks + derived verificationScore/badges | 0012_profile_expansion | ✅ |
-| G2 | Verification | Twilio Verify phone OTP — `POST /verification/phone/{start,check}`, ladder promotion, unique verified phone, dev fallback code; VerificationScreen | 0013 | ✅ code; needs `TWILIO_*` |
-| G3 | Subscriptions | Stripe checkout + billing portal + signature-verified webhook → `subscription_tier`; SubscriptionScreen (hosted Checkout via Linking); `main.ts` rawBody | 0014 | ✅ code; needs `STRIPE_*` + webhook |
-| G4 | Social | Provider-generic OAuth linking (instagram/twitter/tiktok/facebook/linkedin/spotify), HMAC-signed-state server-side callback; SocialLinkingScreen | — (uses 0012 `social_links`) | ✅ code; needs per-provider creds; X/Twitter needs PKCE |
-| G5 | Gamification | Achievements + Leaderboard **mobile** screens over the existing backend (catalog, unlock evaluation wired into wave-match + alert-post, `GET /achievements`, `GET /gamification/leaderboard`) | 0015_achievements | ✅ |
+| ID | Pillar        | Deliverable                                                                                                                                                                                                                                                 | Migration                    | State                                                  |
+|----|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|--------------------------------------------------------|
+| G1 | Profile       | Rich ProfileScreen (hero photo, badges, verification bar, sections, menu); `users` + phone/dob/subscription_tier/interests; `user_photos` + `social_links`; UserProfile gains photoUrls/age/subscriptionTier/socialLinks + derived verificationScore/badges | 0012_profile_expansion       | ✅                                                      |
+| G2 | Verification  | Twilio Verify phone OTP — `POST /verification/phone/{start,check}`, ladder promotion, unique verified phone, dev fallback code; VerificationScreen                                                                                                          | 0013                         | ✅ code; needs `TWILIO_*`                               |
+| G3 | Subscriptions | Stripe checkout + billing portal + signature-verified webhook → `subscription_tier`; SubscriptionScreen (hosted Checkout via Linking); `main.ts` rawBody                                                                                                    | 0014                         | ✅ code; needs `STRIPE_*` + webhook                     |
+| G4 | Social        | Provider-generic OAuth linking (instagram/twitter/tiktok/facebook/linkedin/spotify), HMAC-signed-state server-side callback; SocialLinkingScreen                                                                                                            | — (uses 0012 `social_links`) | ✅ code; needs per-provider creds; X/Twitter needs PKCE |
+| G5 | Gamification  | Achievements + Leaderboard **mobile** screens over the existing backend (catalog, unlock evaluation wired into wave-match + alert-post, `GET /achievements`, `GET /gamification/leaderboard`)                                                               | 0015_achievements            | ✅                                                      |
 
 **Deploy checklist (P4):** run migrations 0012–0016; set `TWILIO_ACCOUNT_SID/AUTH_TOKEN/VERIFY_SERVICE_SID`, `STRIPE_SECRET_KEY/WEBHOOK_SECRET/PRICE_{BASIC,PREMIUM}` (+ optional URLs), `{PROVIDER}_CLIENT_ID/SECRET` + `API_PUBLIC_URL` + `SOCIAL_LINK_RETURN_URL`; register Stripe webhook → `/api/v1/subscriptions/webhook` and provider redirects → `/api/v1/social/callback`. **Subscriptions verified** on prod (test mode): basic + premium return `cs_test_` checkout URLs. **VIP tier removed** (migration 0016).
 
-> **Migrations:** all 0001–0015 are idempotent (guarded DDL). The former `0012` prefix collision is resolved — the achievements migration moved to `0015_achievements.sql` (no deps, latest feature), while `0012_profile_expansion` stays ahead of `0013`/`0014` which depend on its columns. `schema_migrations` rows renamed in lockstep. Next free number is `0016`.
+> **Migrations:** all 0001–0015 are idempotent (guarded DDL). The former `0012` prefix collision is resolved — the achievements migration moved to `0015_achievements.sql` (no deps, latest feature), while `0012_profile_expansion` stays ahead of `0013`/`0014` which depend on its columns. `schema_migrations` rows renamed in lockstep. Next free number is `0018` (`0016` = drop VIP tier, `0017` = message requests).
 
 ---
 
@@ -103,48 +103,48 @@ Rich ProfileScreen redesign + the data and integrations behind it. Code-complete
 
 ### Backend modules
 
-| Legacy module | Verdict | Status | Notes |
-|---|---|---|---|
-| `auth` | REBUILD | ✅ done | Email/pw + Google OAuth; opaque rotating refresh tokens; Apple OAuth P2 |
-| `users` | REBUILD | ✅ done | `PATCH /users/me/profile`, S3 presigned upload, profile completion |
-| `locations` | DROP | n/a | Replaced by `discovery` + `presence` |
-| `discovery` (swipe deck) | DROP | n/a | New `discovery` is map-nearby; old swipe is a future dating feature |
-| `chat` | REBUILD | ✅ done | Persist + REST endpoints + socket gateway |
-| `interactions` (waves) | REBUILD | ✅ done | Sender hydration + FCM push fallback |
-| `events` | DEFER | — | Schema already in `0001_initial.sql` |
-| `social` (follow/unfollow) | DEFER | — | Follow graph still deferred. Separate: social **account linking** (OAuth, 6 providers) shipped P4/G4. |
-| `payments` (Stripe) | DEFER → PARTIAL | ✅ P4 | Subscriptions shipped P4/G3 (checkout + portal + webhook → `subscription_tier`). Connect/commerce escrow still deferred. |
-| `verification` (phone/photo/ID) | DEFER → PARTIAL | ✅ P4 | Phone OTP via Twilio shipped P4/G2 (promotes ladder to `phone`). selfie/ID + Rekognition still deferred. |
-| `notifications` | PARTIAL REBUILD | ✅ done | FCM token registration + send-on-offline; chat push + geofence-triggered alert pushes shipped (P3, 2026-05-31) |
-| `analytics` / `trending` | DROP | n/a | |
-| `gamification` | DROP → REBUILD | ✅ P3/P4 | Rebuilt fresh: XP ledger, levels, streak, daily challenges (P3); achievements + leaderboard backend & mobile screens (P4/G5). Not ported from legacy. |
-| `gifts` | DROP | n/a | |
-| `trading` | DEFER | — | `listings` table already in schema |
-| `skills` (scores) | DROP | n/a | |
-| `admin` | DEFER | — | Audit log table stays in schema |
+| Legacy module                   | Verdict         | Status  | Notes                                                                                                                                                 |
+|---------------------------------|-----------------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `auth`                          | REBUILD         | ✅ done  | Email/pw + Google OAuth; opaque rotating refresh tokens; Apple OAuth P2                                                                               |
+| `users`                         | REBUILD         | ✅ done  | `PATCH /users/me/profile`, S3 presigned upload, profile completion                                                                                    |
+| `locations`                     | DROP            | n/a     | Replaced by `discovery` + `presence`                                                                                                                  |
+| `discovery` (swipe deck)        | DROP            | n/a     | New `discovery` is map-nearby; old swipe is a future dating feature                                                                                   |
+| `chat`                          | REBUILD         | ✅ done  | Persist + REST endpoints + socket gateway                                                                                                             |
+| `interactions` (waves)          | REBUILD         | ✅ done  | Sender hydration + FCM push fallback                                                                                                                  |
+| `events`                        | DEFER           | —       | Schema already in `0001_initial.sql`                                                                                                                  |
+| `social` (follow/unfollow)      | DEFER           | —       | Follow graph still deferred. Separate: social **account linking** (OAuth, 6 providers) shipped P4/G4.                                                 |
+| `payments` (Stripe)             | DEFER → PARTIAL | ✅ P4    | Subscriptions shipped P4/G3 (checkout + portal + webhook → `subscription_tier`). Connect/commerce escrow still deferred.                              |
+| `verification` (phone/photo/ID) | DEFER → PARTIAL | ✅ P4    | Phone OTP via Twilio shipped P4/G2 (promotes ladder to `phone`). selfie/ID + Rekognition still deferred.                                              |
+| `notifications`                 | PARTIAL REBUILD | ✅ done  | FCM token registration + send-on-offline; chat push + geofence-triggered alert pushes shipped (P3, 2026-05-31)                                        |
+| `analytics` / `trending`        | DROP            | n/a     |                                                                                                                                                       |
+| `gamification`                  | DROP → REBUILD  | ✅ P3/P4 | Rebuilt fresh: XP ledger, levels, streak, daily challenges (P3); achievements + leaderboard backend & mobile screens (P4/G5). Not ported from legacy. |
+| `gifts`                         | DROP            | n/a     |                                                                                                                                                       |
+| `trading`                       | DEFER           | —       | `listings` table already in schema                                                                                                                    |
+| `skills` (scores)               | DROP            | n/a     |                                                                                                                                                       |
+| `admin`                         | DEFER           | —       | Audit log table stays in schema                                                                                                                       |
 
 ### Mobile screens
 
-| Legacy feature | Verdict | Status | Notes |
-|---|---|---|---|
-| `auth/AuthScreen` | PORT | ✅ R3 done | Email/pw + Google OAuth button; auth gate in AppNavigator |
-| `map/*` | DROP | n/a | New `apps/mobile/src/screens/MapScreen.tsx` is better |
-| `discovery/*` (swipe) | DEFER | — | |
-| `profile/Profile{Creation,Edit}Screen` | PORT | ✅ R3 done | profileSlice, ProfileCreationScreen, ProfileEditScreen, ProfileScreen |
-| `profile/types.ts` | REBUILD in `@g88/shared` | ✅ R2/R3 done | `UserProfile`, `UpdateProfileRequest` in `packages/shared/src/api.ts` |
-| `chat/ChatScreen` | PORT | ✅ R3 done | ChatScreen with optimistic send + cursor pagination |
-| `chat/chatSlice` | REBUILD | ✅ R3 done | Socket ack + REST fallback; `messageReceived / messageSentOptimistic / messageConfirmed` |
-| `interactions/interactionsSlice` | DROP | n/a | Wave logic now lives in `MapScreen` directly |
-| `verification/*` | DEFER | — | |
-| `trading/*`, `gifts/*`, `gamification/*`, `events/*`, `trending/*`, `payments/*`, `market/*` | DEFER | — | |
-| `notifications/NotificationsScreen` | PARTIAL PORT | DEFER | Not P0 |
-| `inbox/InboxScreen` | REBUILD | ✅ R3 done | Superseded by PulseScreen (R5). Rollback file removed 2026-05-23. |
-| `settings/{Settings,Privacy}Screen` | PORT | ✅ R3 done | SettingsScreen: visibility toggle + logout |
-| `components/ErrorBoundary`, `ScreenErrorBoundary` | PORT | ✅ R3 done | `apps/mobile/src/components/ErrorBoundary.tsx` |
-| `components/ActionHub` (center FAB) | REBUILD | ✅ R5 done | FAB + bottom-sheet launcher; navigates to Pulse tab with filter preset |
-| `components/VerificationBadge`, `SocialLinksDisplay` | DEFER | — | |
-| `utils/eventBus` | reconciled | ✅ R3 done | `authEvents` in `client.ts` is the bus; no separate eventBus needed |
-| `utils/logger` | DEFER | — | `console.*` used for now; production silencing is C3 debt |
+| Legacy feature                                                                               | Verdict                  | Status       | Notes                                                                                    |
+|----------------------------------------------------------------------------------------------|--------------------------|--------------|------------------------------------------------------------------------------------------|
+| `auth/AuthScreen`                                                                            | PORT                     | ✅ R3 done    | Email/pw + Google OAuth button; auth gate in AppNavigator                                |
+| `map/*`                                                                                      | DROP                     | n/a          | New `apps/mobile/src/screens/MapScreen.tsx` is better                                    |
+| `discovery/*` (swipe)                                                                        | DEFER                    | —            |                                                                                          |
+| `profile/Profile{Creation,Edit}Screen`                                                       | PORT                     | ✅ R3 done    | profileSlice, ProfileCreationScreen, ProfileEditScreen, ProfileScreen                    |
+| `profile/types.ts`                                                                           | REBUILD in `@g88/shared` | ✅ R2/R3 done | `UserProfile`, `UpdateProfileRequest` in `packages/shared/src/api.ts`                    |
+| `chat/ChatScreen`                                                                            | PORT                     | ✅ R3 done    | ChatScreen with optimistic send + cursor pagination                                      |
+| `chat/chatSlice`                                                                             | REBUILD                  | ✅ R3 done    | Socket ack + REST fallback; `messageReceived / messageSentOptimistic / messageConfirmed` |
+| `interactions/interactionsSlice`                                                             | DROP                     | n/a          | Wave logic now lives in `MapScreen` directly                                             |
+| `verification/*`                                                                             | DEFER                    | —            |                                                                                          |
+| `trading/*`, `gifts/*`, `gamification/*`, `events/*`, `trending/*`, `payments/*`, `market/*` | DEFER                    | —            |                                                                                          |
+| `notifications/NotificationsScreen`                                                          | PARTIAL PORT             | DEFER        | Not P0                                                                                   |
+| `inbox/InboxScreen`                                                                          | REBUILD                  | ✅ R3 done    | Superseded by PulseScreen (R5). Rollback file removed 2026-05-23.                        |
+| `settings/{Settings,Privacy}Screen`                                                          | PORT                     | ✅ R3 done    | SettingsScreen: visibility toggle + logout                                               |
+| `components/ErrorBoundary`, `ScreenErrorBoundary`                                            | PORT                     | ✅ R3 done    | `apps/mobile/src/components/ErrorBoundary.tsx`                                           |
+| `components/ActionHub` (center FAB)                                                          | REBUILD                  | ✅ R5 done    | FAB + bottom-sheet launcher; navigates to Pulse tab with filter preset                   |
+| `components/VerificationBadge`, `SocialLinksDisplay`                                         | DEFER                    | —            |                                                                                          |
+| `utils/eventBus`                                                                             | reconciled               | ✅ R3 done    | `authEvents` in `client.ts` is the bus; no separate eventBus needed                      |
+| `utils/logger`                                                                               | DEFER                    | —            | `console.*` used for now; production silencing is C3 debt                                |
 
 ---
 
@@ -223,29 +223,30 @@ All four must be true:
 
 ## Open Questions
 
-| # | Question | Default if no answer | Decided? |
-|---|---|---|---|
-| Q2 | Is anything in production today running against the old TypeORM schema? | No — `0001_initial.sql` is authoritative, greenfield | ❓ |
-| Q4 | Apple Sign-In for P1 or fast-follow? | Fast-follow — ship Google-only first, add Apple before App Store review | ✅ decided 2026-05-21 |
+| #  | Question                                                                | Default if no answer                                                    | Decided?             |
+|----|-------------------------------------------------------------------------|-------------------------------------------------------------------------|----------------------|
+| Q2 | Is anything in production today running against the old TypeORM schema? | No — `0001_initial.sql` is authoritative, greenfield                    | ❓                    |
+| Q4 | Apple Sign-In for P1 or fast-follow?                                    | Fast-follow — ship Google-only first, add Apple before App Store review | ✅ decided 2026-05-21 |
 
 ---
 
 ## Risks Currently Tracked
 
-| Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| Legacy imports leak into `apps/` | L | M | CI lint rule on import paths — enforced |
-| Schema drift between `legacy/backend/src/migrations/` and `apps/backend/migrations/0001_initial.sql` | L | H | `0001_initial.sql` is the only source; legacy migrations are read-only reference |
-| Half-ported features confuse the team | L | M | This file. Updated as work completes. |
-| Apple Sign-In missing at App Store submission | H | H | A3 partial — backend done; Xcode capability + Apple Developer Portal (Services ID) still needed before TestFlight |
-| No production observability (C3 critical debt) | L | M | ✅ Mitigated — Sentry wired on both apps (OB1 done) |
-| Config.GOOGLE_WEB_CLIENT_ID placeholder not replaced before first run | L | M | ✅ Mitigated — set in `apps/mobile/.env` and `GOOGLE_CLIENT_ID` set in Render dashboard |
-| Render free tier cold starts (~55s) inflate synthetic monitor P99 | M | L | Acceptable at MVP — upgrade to Starter plan before TestFlight |
+| Risk                                                                                                 | Likelihood | Impact | Mitigation                                                                                                        |
+|------------------------------------------------------------------------------------------------------|------------|--------|-------------------------------------------------------------------------------------------------------------------|
+| Legacy imports leak into `apps/`                                                                     | L          | M      | CI lint rule on import paths — enforced                                                                           |
+| Schema drift between `legacy/backend/src/migrations/` and `apps/backend/migrations/0001_initial.sql` | L          | H      | `0001_initial.sql` is the only source; legacy migrations are read-only reference                                  |
+| Half-ported features confuse the team                                                                | L          | M      | This file. Updated as work completes.                                                                             |
+| Apple Sign-In missing at App Store submission                                                        | H          | H      | A3 partial — backend done; Xcode capability + Apple Developer Portal (Services ID) still needed before TestFlight |
+| No production observability (C3 critical debt)                                                       | L          | M      | ✅ Mitigated — Sentry wired on both apps (OB1 done)                                                                |
+| Config.GOOGLE_WEB_CLIENT_ID placeholder not replaced before first run                                | L          | M      | ✅ Mitigated — set in `apps/mobile/.env` and `GOOGLE_CLIENT_ID` set in Render dashboard                            |
+| Render free tier cold starts (~55s) inflate synthetic monitor P99                                    | M          | L      | Acceptable at MVP — upgrade to Starter plan before TestFlight                                                     |
 
 ---
 
 ## Change Log
 
+- **2026-06-01** — **Interest-based messaging gate.** Dot-tap card is now state-aware: Wave (stranger) · Message (match → full chat) · Message + "you both like…" (shared interest/goal → request). Kept the wave→match ladder (option A) and added a shared-interest **message request** path — one message until the recipient replies, then it promotes to full chat. New `MessagingService` (`messagePermission` = match ∨ interest∪goal overlap) owns the gate, consumed by both `UsersService` (viewer-relative `relationship` block on `GET /users/:id`) and `POST /conversations` (mints a pending request or returns the match convo; `chat.locked` otherwise). `chat.persist` enforces the one-message cap + recipient-reply promotion in a `FOR UPDATE` tx; a reciprocal wave promotes any prior pending request. Migration **0017_message_requests** adds `conversations.status` (`pending`/`accepted`, default accepted) + `initiated_by`. Shared: `MessagePermission`, `ProfileRelationship`, `ConversationStatus`, `CreateConversation{Request,Response}`; `ConversationSummary` gains `status`/`initiatedBy`. Mobile: `EntityBottomSheet` Message button + shared-interest hint; `ChatScreen` request banner + composer lock. Backend 16/16 (9 new MessagingService specs), mobile 25/25, both typechecks clean. **Trade** and **friend/follow** dot-actions remain deferred pillars. Next migration is `0018`.
 - **2026-05-14** — Initial draft. R1 not yet started. Reconciliation verdicts locked.
 - **2026-05-20** — R2 (P0 backend) + R3 (P0 mobile) complete.
 - **2026-05-21** — R4 complete. All six P1 pillars done. A1 (opaque refresh tokens) + A2 (Google OAuth) shipped. Apple OAuth deferred to P2 (A3). Android CI, .gitignore, and Dependabot fixes also landed.

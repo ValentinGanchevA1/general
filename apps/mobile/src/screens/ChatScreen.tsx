@@ -60,7 +60,7 @@ function MessageBubble({
 export function ChatScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const { params } = useRoute<Route>();
-  const { conversationId } = params;
+  const { conversationId, requestPending } = params;
 
   const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
   const messages = useAppSelector((s) => s.chat.messages[conversationId] ?? []);
@@ -70,6 +70,14 @@ export function ChatScreen(): React.JSX.Element {
   const failedIds = useAppSelector((s) => s.chat.failedIds);
 
   const pendingIds = outbox.map((e) => e.optimisticId);
+
+  // A shared-interest request stays gated until the other person replies once.
+  // Mirror the server's one-message cap: once the initiator's request message is
+  // in, the composer locks until a reply arrives (server is still authoritative).
+  const theyReplied = messages.some((m) => m.senderId !== myUserId);
+  const iSent = messages.some((m) => m.senderId === myUserId);
+  const showRequestBanner = !!requestPending && !theyReplied;
+  const requestLocked = showRequestBanner && iSent;
 
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
@@ -136,6 +144,16 @@ export function ChatScreen(): React.JSX.Element {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      {showRequestBanner && (
+        <View style={styles.requestBanner}>
+          <Text style={styles.requestBannerText}>
+            {requestLocked
+              ? 'Request sent — you can send another message once they reply.'
+              : "Message request — they'll see one message until they reply."}
+          </Text>
+        </View>
+      )}
+
       {loading && messages.length === 0 ? (
         <View style={styles.centered}>
           <ActivityIndicator color="#00d4ff" />
@@ -166,8 +184,9 @@ export function ChatScreen(): React.JSX.Element {
           style={styles.input}
           value={body}
           onChangeText={setBody}
-          placeholder="Message…"
+          placeholder={requestLocked ? 'Waiting for a reply…' : 'Message…'}
           placeholderTextColor="#555"
+          editable={!requestLocked}
           multiline
           maxLength={2000}
           returnKeyType="send"
@@ -175,9 +194,9 @@ export function ChatScreen(): React.JSX.Element {
           blurOnSubmit={false}
         />
         <TouchableOpacity
-          style={[styles.sendBtn, (!body.trim() || sending) && styles.sendBtnDisabled]}
+          style={[styles.sendBtn, (!body.trim() || sending || requestLocked) && styles.sendBtnDisabled]}
           onPress={send}
-          disabled={!body.trim() || sending}
+          disabled={!body.trim() || sending || requestLocked}
         >
           {sending ? (
             <ActivityIndicator color="#000" size="small" />
@@ -193,6 +212,14 @@ export function ChatScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0a0a0f' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  requestBanner: {
+    backgroundColor: '#10261f',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1c3a30',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  requestBannerText: { color: '#7ee6bf', fontSize: 12, textAlign: 'center' },
   messageList: { paddingHorizontal: 12, paddingVertical: 8 },
   bubble: { maxWidth: '78%', borderRadius: 16, padding: 10, marginVertical: 3 },
   bubbleMine: { alignSelf: 'flex-end', backgroundColor: '#00d4ff' },

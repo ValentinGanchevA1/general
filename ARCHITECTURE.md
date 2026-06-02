@@ -13,18 +13,18 @@ Anti-goal: micro-services-from-day-one. Two deployable units (REST API, Realtime
 
 ## 2. Tier map
 
-| Tier | Component | Tech |
-|---|---|---|
-| Client | Mobile | React Native + TypeScript, RTK, react-native-maps |
-| Edge | TLS + LB | Render-provided (or Cloudflare in front) |
-| Application | REST API | NestJS, TypeORM |
-| Application | Realtime gateway | Socket.IO with Redis adapter |
-| Data | Primary store | Postgres 16 + PostGIS + H3-PG |
-| Data | Cache / presence / pubsub | Redis 7 |
-| Data | Object storage | S3 (or Cloudflare R2) with presigned URLs |
-| External | Push | FCM (Android + iOS via APNs proxy) |
-| External | Payments | Stripe |
-| External | Comms | Twilio (OTP), SendGrid (transactional) |
+| Tier        | Component                 | Tech                                              |
+|-------------|---------------------------|---------------------------------------------------|
+| Client      | Mobile                    | React Native + TypeScript, RTK, react-native-maps |
+| Edge        | TLS + LB                  | Render-provided (or Cloudflare in front)          |
+| Application | REST API                  | NestJS, TypeORM                                   |
+| Application | Realtime gateway          | Socket.IO with Redis adapter                      |
+| Data        | Primary store             | Postgres 16 + PostGIS + H3-PG                     |
+| Data        | Cache / presence / pubsub | Redis 7                                           |
+| Data        | Object storage            | S3 (or Cloudflare R2) with presigned URLs         |
+| External    | Push                      | FCM (Android + iOS via APNs proxy)                |
+| External    | Payments                  | Stripe                                            |
+| External    | Comms                     | Twilio (OTP), SendGrid (transactional)            |
 
 ## 3. Key design decisions
 

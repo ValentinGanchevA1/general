@@ -8,10 +8,21 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { EntityPoint, PublicUserProfile, UserMeta } from '@g88/shared';
+import type {
+  CreateConversationRequest,
+  CreateConversationResponse,
+  EntityPoint,
+  PublicUserProfile,
+  UserMeta,
+} from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
-import { getJson } from '@/api/client';
+import { getJson, postJson } from '@/api/client';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
+
+/** Map a raw interest/goal value to a human label, falling back to the value. */
+function labelFor(value: string): string {
+  return GOAL_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
 
 type UserEntityPoint = EntityPoint & { kind: 'user'; meta: UserMeta };
 
@@ -85,6 +96,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   const navigation = useNavigation<Nav>();
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [fetching, setFetching] = useState(true);
+  const [opening, setOpening] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +108,31 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   }, [point.id]);
 
   const meta = point.meta;
+  const canMessage = profile?.relationship?.canMessage ?? 'none';
+  const sharedInterests = profile?.relationship?.sharedInterests ?? [];
+
+  // Open (or fetch) the conversation server-side, then jump into the thread.
+  // The server is authoritative — it decides match vs request vs locked.
+  const onMessage = async (): Promise<void> => {
+    if (opening) return;
+    setOpening(true);
+    try {
+      const res = await postJson<CreateConversationRequest, CreateConversationResponse>(
+        '/conversations',
+        { targetUserId: point.id },
+      );
+      onClose();
+      navigation.navigate('Chat', {
+        conversationId: res.conversationId,
+        otherUserName: meta.displayName,
+        requestPending: res.status === 'pending' && res.permission === 'request',
+      });
+    } catch {
+      // Gate changed under us (e.g. they went private) — leave the sheet open.
+    } finally {
+      setOpening(false);
+    }
+  };
 
   return (
     <>
@@ -145,6 +182,13 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         </>
       )}
 
+      {canMessage === 'request' && sharedInterests.length > 0 && (
+        <Text style={styles.sharedHint}>
+          You both like {sharedInterests.slice(0, 2).map(labelFor).join(' · ')}
+          {' — say hi'}
+        </Text>
+      )}
+
       <View style={styles.actions}>
         {onWave && (
           <TouchableOpacity
@@ -159,16 +203,32 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
             )}
           </TouchableOpacity>
         )}
-        <TouchableOpacity
-          style={styles.profileBtn}
-          onPress={() => {
-            onClose();
-            navigation.navigate('UserProfile', { userId: point.id });
-          }}
-        >
-          <Text style={styles.profileBtnText}>View Profile</Text>
-        </TouchableOpacity>
+        {canMessage !== 'none' && (
+          <TouchableOpacity
+            style={[styles.messageBtn, opening && styles.btnDisabled]}
+            onPress={() => { void onMessage(); }}
+            disabled={opening}
+          >
+            {opening ? (
+              <ActivityIndicator color="#000" size="small" />
+            ) : (
+              <Text style={styles.waveBtnText}>
+                {canMessage === 'request' ? '✉️ Message' : '💬 Message'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
+
+      <TouchableOpacity
+        style={styles.profileBtn}
+        onPress={() => {
+          onClose();
+          navigation.navigate('UserProfile', { userId: point.id });
+        }}
+      >
+        <Text style={styles.profileBtnText}>View Profile</Text>
+      </TouchableOpacity>
     </>
   );
 }
@@ -276,6 +336,7 @@ const styles = StyleSheet.create({
   goalLabel: { color: '#aaa', fontSize: 12 },
 
   // Actions
+  sharedHint: { color: '#7ad7ff', fontSize: 13 },
   actions: { flexDirection: 'row', gap: 10 },
   waveBtn: {
     flex: 1,
@@ -284,9 +345,15 @@ const styles = StyleSheet.create({
     padding: 14,
     alignItems: 'center',
   },
+  messageBtn: {
+    flex: 1,
+    backgroundColor: '#34e0a1',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+  },
   waveBtnText: { color: '#000', fontWeight: '700', fontSize: 15 },
   profileBtn: {
-    flex: 1,
     backgroundColor: '#0a0a1a',
     borderRadius: 12,
     padding: 14,

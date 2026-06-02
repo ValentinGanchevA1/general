@@ -87,7 +87,8 @@ export class UsersController {
   @Get(':id')
   async getPublic(
     @Param('id', new ParseUUIDPipe({ version: '4' })) userId: string,
+    @CurrentUser('id') viewerId: string,
   ): Promise<PublicUserProfile> {
-    return this.users.getPublicProfile(userId);
+    return this.users.getPublicProfile(userId, viewerId);
   }
 }

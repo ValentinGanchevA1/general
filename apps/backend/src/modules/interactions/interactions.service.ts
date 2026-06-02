@@ -171,10 +171,18 @@ export class InteractionsService {
       `SELECT id FROM conversations WHERE participant_ids = $1::uuid[] LIMIT 1`,
       [sorted],
     );
-    if (existing.length > 0) return existing[0].id;
+    if (existing.length > 0) {
+      // A reciprocal wave is a match — promote any prior interest-request out of
+      // the pending state so messaging is unrestricted both ways.
+      await tx.query(
+        `UPDATE conversations SET status = 'accepted' WHERE id = $1 AND status <> 'accepted'`,
+        [existing[0].id],
+      );
+      return existing[0].id;
+    }
 
     const created = await tx.query(
-      `INSERT INTO conversations (participant_ids) VALUES ($1::uuid[]) RETURNING id`,
+      `INSERT INTO conversations (participant_ids, status) VALUES ($1::uuid[], 'accepted') RETURNING id`,
       [sorted],
     );
     return created[0].id;

@@ -45,7 +45,7 @@ export type RootStackParamList = {
 	Auth: undefined;
 	ProfileCreation: undefined;
 	Main: NavigatorScreenParams<TabParamList> | undefined;
-	Chat: { conversationId: string; otherUserName: string };
+	Chat: { conversationId: string; otherUserName: string; requestPending?: boolean };
 	ProfileEdit: undefined;
 	Settings: undefined;
 	AlertComposer: { presetCategory?: AreaCategory; presetTag?: string };

@@ -10,6 +10,7 @@ import { DiscoveryModule } from './modules/discovery/discovery.module';
 import { InteractionsModule } from './modules/interactions/interactions.module';
 import { PresenceModule } from './modules/presence/presence.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { MessagingModule } from './modules/messaging/messaging.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
 import { GeofencesModule } from './modules/geofences/geofences.module';
@@ -54,6 +55,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     InteractionsModule,
     PresenceModule,
     ChatModule,
+    MessagingModule,
     NotificationsModule,
     AlertsModule,
     GeofencesModule,

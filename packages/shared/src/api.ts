@@ -211,6 +211,29 @@ export interface PublicUserProfile {
   verification: VerificationLevel;
   goals: string[];
   online: boolean;
+  /**
+   * Viewer-relative messaging relationship. Present only when the profile is
+   * fetched by an authenticated viewer other than the subject. Computed
+   * server-side — never trust the client to decide what it may send.
+   */
+  relationship?: ProfileRelationship;
+}
+
+/**
+ * What the viewer is allowed to do toward this user, and why.
+ *  - `chat`    — a match exists (reciprocal wave) → full two-way conversation.
+ *  - `request` — no match, but a shared interest/goal → one message until the
+ *                recipient replies, then it promotes to `chat`.
+ *  - `none`    — neither → only a wave can be sent.
+ */
+export type MessagePermission = 'chat' | 'request' | 'none';
+
+export interface ProfileRelationship {
+  /** A reciprocated wave (accepted conversation) exists between the two users. */
+  matched: boolean;
+  /** Intersection of the two users' interests ∪ goals — drives the `request` path. */
+  sharedInterests: string[];
+  canMessage: MessagePermission;
 }
 
 export interface PresignedUploadResponse {
@@ -311,18 +334,41 @@ export interface ConversationParticipant {
   avatarUrl: string | null;
 }
 
+/**
+ * - `accepted` — full two-way chat (born from a match, or a request the
+ *   recipient replied to).
+ * - `pending`  — an interest-based message request: the initiator may send a
+ *   single message; the recipient's first reply promotes it to `accepted`.
+ */
+export type ConversationStatus = 'pending' | 'accepted';
+
 export interface ConversationSummary {
   id: string;
   participantIds: string[];
   participants: ConversationParticipant[];
   lastMessageAt: string | null;
   lastMessage: { senderId: string; body: string } | null;
+  status: ConversationStatus;
+  /** User who opened the conversation. Set for requests; null for legacy/match convos. */
+  initiatedBy: string | null;
 }
 
 export interface MessagePage {
   messages: ChatMessage[];
   /** Cursor for the next page (ISO timestamp of oldest message in this page). Null = no more pages. */
   nextCursor: string | null;
+}
+
+/** Open (or fetch) a 1:1 conversation toward another user from the map/profile. */
+export interface CreateConversationRequest {
+  targetUserId: string;
+}
+
+export interface CreateConversationResponse {
+  conversationId: string;
+  status: ConversationStatus;
+  /** Why it was allowed — `chat` for a match, `request` for shared-interest. */
+  permission: Exclude<MessagePermission, 'none'>;
 }
 
 // ─── Notifications ─────────────────────────────────────────────────────────

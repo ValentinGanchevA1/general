@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 
 import type {
   ChatMessage,
+  ConversationStatus,
   ConversationSummary,
   MessagePage,
 } from '@g88/shared';
@@ -14,36 +15,69 @@ export class ChatService {
 
   /**
    * Persist a message and bump last_message_at on the conversation.
-   * Verifies the sender is a participant before inserting.
+   * Verifies the sender is a participant, and enforces the message-request gate
+   * for `pending` conversations:
+   *   - initiator: may send only the single request message (blocked until reply)
+   *   - recipient: their first reply promotes the conversation to `accepted`
+   *
+   * Runs in a transaction with `FOR UPDATE` on the conversation row so two
+   * concurrent sends can't both slip past the one-message cap.
    */
   async persist(
     conversationId: string,
     senderId: string,
     body: string,
   ): Promise<ChatMessage> {
-    const convo = await this.db.query<Array<{ participant_ids: string[] }>>(
-      `SELECT participant_ids FROM conversations WHERE id = $1 LIMIT 1`,
-      [conversationId],
-    );
-    if (!convo[0]) throw new NotFoundException({ code: 'chat.not_found', message: 'Conversation not found' });
-    if (!convo[0].participant_ids.includes(senderId)) {
-      throw new ForbiddenException({ code: 'chat.forbidden', message: 'Not a participant' });
-    }
+    return this.db.transaction(async (tx) => {
+      const [convo] = await tx.query<
+        Array<{ participant_ids: string[]; status: string; initiated_by: string | null }>
+      >(
+        `SELECT participant_ids, status, initiated_by
+           FROM conversations WHERE id = $1 LIMIT 1 FOR UPDATE`,
+        [conversationId],
+      );
+      if (!convo) throw new NotFoundException({ code: 'chat.not_found', message: 'Conversation not found' });
+      if (!convo.participant_ids.includes(senderId)) {
+        throw new ForbiddenException({ code: 'chat.forbidden', message: 'Not a participant' });
+      }
 
-    const [msg] = await this.db.query<ChatMessage[]>(
-      `INSERT INTO messages (conversation_id, sender_id, body)
-            VALUES ($1, $2, $3)
-         RETURNING id, conversation_id AS "conversationId", sender_id AS "senderId", body, created_at AS "createdAt"`,
-      [conversationId, senderId, body],
-    );
+      if (convo.status === 'pending') {
+        if (convo.initiated_by === senderId) {
+          // Initiator of an unanswered request — cap at one message until reply.
+          const [counted] = await tx.query<Array<{ count: number }>>(
+            `SELECT COUNT(*)::int AS count FROM messages WHERE conversation_id = $1`,
+            [conversationId],
+          );
+          if ((counted?.count ?? 0) > 0) {
+            throw new ForbiddenException({
+              code: 'chat.request_pending',
+              message: 'Wait for them to reply before sending another message',
+            });
+          }
+        } else {
+          // Recipient is replying → consent given, promote to a full conversation.
+          await tx.query(
+            `UPDATE conversations SET status = 'accepted' WHERE id = $1`,
+            [conversationId],
+          );
+        }
+      }
 
-    await this.db.query(
-      `UPDATE conversations SET last_message_at = NOW() WHERE id = $1`,
-      [conversationId],
-    );
+      const [msg] = await tx.query<ChatMessage[]>(
+        `INSERT INTO messages (conversation_id, sender_id, body)
+              VALUES ($1, $2, $3)
+           RETURNING id, conversation_id AS "conversationId", sender_id AS "senderId", body, created_at AS "createdAt"`,
+        [conversationId, senderId, body],
+      );
 
-    const created = msg!.createdAt as Date | string;
-    return { ...msg!, createdAt: created instanceof Date ? created.toISOString() : created };
+      await tx.query(
+        `UPDATE conversations SET last_message_at = NOW() WHERE id = $1`,
+        [conversationId],
+      );
+
+      const created = msg!.createdAt as Date | string;
+      return { ...msg!, createdAt: created instanceof Date ? created.toISOString() : created };
+    });
   }
 
   /** Return participant IDs for a conversation — used by the realtime gateway for push routing. */
@@ -70,6 +104,8 @@ export class ChatService {
       Array<{
         id: string;
         participant_ids: string[];
+        status: ConversationStatus;
+        initiated_by: string | null;
         last_message_at: string | null;
         last_body: string | null;
         last_sender_id: string | null;
@@ -79,6 +115,8 @@ export class ChatService {
       `SELECT
          c.id,
          c.participant_ids,
+         c.status,
+         c.initiated_by,
          c.last_message_at,
          m.body         AS last_body,
          m.sender_id    AS last_sender_id,
@@ -98,7 +136,7 @@ export class ChatService {
        ) m ON true
        LEFT JOIN users u ON u.id = ANY(c.participant_ids) AND u.deleted_at IS NULL
        WHERE $1 = ANY(c.participant_ids)
-       GROUP BY c.id, c.last_message_at, m.body, m.sender_id
+       GROUP BY c.id, c.status, c.initiated_by, c.last_message_at, m.body, m.sender_id
        ORDER BY c.last_message_at DESC NULLS LAST`,
       [userId],
     );
@@ -111,6 +149,8 @@ export class ChatService {
       lastMessage: r.last_body != null && r.last_sender_id != null
         ? { senderId: r.last_sender_id, body: r.last_body }
         : null,
+      status: r.status,
+      initiatedBy: r.initiated_by,
     }));
   }
 

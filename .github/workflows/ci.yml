@@ -1,3 +1,4 @@
+# .github/workflows/ci.yml
 name: CI
 
 on:
@@ -24,9 +25,6 @@ jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/backend
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -36,22 +34,21 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        working-directory: .
-      - name: Lint (advisory)
-        run: pnpm lint
-        continue-on-error: true
-      - name: Typecheck (advisory)
-        run: pnpm typecheck
-        continue-on-error: true
+      # Backend jest + tsc resolve @g88/shared from packages/shared/dist — build it first.
+      - name: Build shared
+        run: pnpm --filter @g88/shared build
+      - name: Lint
+        run: pnpm --filter @g88/backend exec eslint src --ext .ts --max-warnings 0
+      - name: Typecheck
+        run: pnpm --filter @g88/backend typecheck
+      - name: Test
+        run: pnpm --filter @g88/backend test -- --ci --runInBand
       - name: Build
-        run: pnpm build
+        run: pnpm --filter @g88/backend build
 
   mobile:
     name: Mobile
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/mobile
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -61,10 +58,11 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        working-directory: .
-      - name: Lint (advisory)
-        run: pnpm lint
-        continue-on-error: true
-      - name: Typecheck (advisory)
-        run: pnpm typecheck
-        continue-on-error: true
+      - name: Build shared
+        run: pnpm --filter @g88/shared build
+      - name: Lint
+        run: pnpm --filter @g88/mobile exec eslint src --ext .ts,.tsx --max-warnings 0
+      - name: Typecheck
+        run: pnpm --filter @g88/mobile typecheck
+      - name: Test
+        run: pnpm --filter @g88/mobile test -- --ci

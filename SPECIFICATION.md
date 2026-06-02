@@ -46,10 +46,10 @@ Three tiers via `ThrottlerGuard`: 10/1s · 40/10s · 120/60s. Per-endpoint overr
 
 ### Common WS events (outbound from server)
 
-| Event | Payload | Trigger |
-|---|---|---|
-| `user:online` | `{ userId, at }` | User comes online |
-| `user:offline` | `{ userId, at }` | Heartbeat lapses |
+| Event           | Payload                    | Trigger           |
+|-----------------|----------------------------|-------------------|
+| `user:online`   | `{ userId, at }`           | User comes online |
+| `user:offline`  | `{ userId, at }`           | Heartbeat lapses  |
 | `nearby:update` | `{ userId, lat, lng, at }` | Nearby user moves |
 
 ### Shared response shapes
@@ -73,14 +73,14 @@ type Paginated<T>= { items: T[]; nextCursor: Cursor };
 
 **API**
 
-| Method | Path | Auth | Body / Notes |
-|---|---|---|---|
-| POST | `/auth/register` | No | `{ email, password, name? }` → token pair |
-| POST | `/auth/login` | No | `{ email, password }` → token pair |
-| POST | `/auth/google` | No | `{ idToken }` → verifies via google-auth-library → upsert → token pair |
-| POST | `/auth/refresh` | No | `{ refreshToken }` → rotates and returns new pair |
-| POST | `/auth/logout` | JWT | Revokes the refresh token (DB row deleted) |
-| GET  | `/auth/me` | JWT | Returns full `User` with `profile`, `badges`, `settings` |
+| Method | Path             | Auth | Body / Notes                                                           |
+|--------|------------------|------|------------------------------------------------------------------------|
+| POST   | `/auth/register` | No   | `{ email, password, name? }` → token pair                              |
+| POST   | `/auth/login`    | No   | `{ email, password }` → token pair                                     |
+| POST   | `/auth/google`   | No   | `{ idToken }` → verifies via google-auth-library → upsert → token pair |
+| POST   | `/auth/refresh`  | No   | `{ refreshToken }` → rotates and returns new pair                      |
+| POST   | `/auth/logout`   | JWT  | Revokes the refresh token (DB row deleted)                             |
+| GET    | `/auth/me`       | JWT  | Returns full `User` with `profile`, `badges`, `settings`               |
 
 **Data model**
 - `User` (see §5.1)
@@ -105,15 +105,15 @@ type Paginated<T>= { items: T[]; nextCursor: Cursor };
 
 **API**
 
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| GET   | `/users/me` | JWT | Current user |
-| PATCH | `/users/me` | JWT | Partial update of profile fields |
-| POST  | `/users/profile` | JWT | Create or update structured profile blob |
-| POST  | `/users/me/photos` | JWT | Returns S3 presigned PUT url; client uploads |
-| DELETE| `/users/me/photos/:idx` | JWT | Remove photo at slot |
-| PATCH | `/users/me/visibility` | JWT | `{ isVisible: boolean }` |
-| DELETE| `/users/me` | JWT | Account deletion (cascades) |
+| Method | Path                    | Auth | Notes                                        |
+|--------|-------------------------|------|----------------------------------------------|
+| GET    | `/users/me`             | JWT  | Current user                                 |
+| PATCH  | `/users/me`             | JWT  | Partial update of profile fields             |
+| POST   | `/users/profile`        | JWT  | Create or update structured profile blob     |
+| POST   | `/users/me/photos`      | JWT  | Returns S3 presigned PUT url; client uploads |
+| DELETE | `/users/me/photos/:idx` | JWT  | Remove photo at slot                         |
+| PATCH  | `/users/me/visibility`  | JWT  | `{ isVisible: boolean }`                     |
+| DELETE | `/users/me`             | JWT  | Account deletion (cascades)                  |
 
 **Data model**
 - `User.profile` is JSONB. Shape (`UserProfile`, see §5.2):
@@ -148,11 +148,11 @@ type Paginated<T>= { items: T[]; nextCursor: Cursor };
 
 **API**
 
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| POST | `/locations/update` | JWT | `{ latitude, longitude }` → writes PostGIS + Redis GEO |
-| GET  | `/locations/map-data` | JWT | `?latitude&longitude&radiusKm&limit` → `{ users[], events[], listings[] }` |
-| GET  | `/discovery/profiles` | JWT | Swipe deck (proximity + interests + filters) |
+| Method | Path                  | Auth | Notes                                                                      |
+|--------|-----------------------|------|----------------------------------------------------------------------------|
+| POST   | `/locations/update`   | JWT  | `{ latitude, longitude }` → writes PostGIS + Redis GEO                     |
+| GET    | `/locations/map-data` | JWT  | `?latitude&longitude&radiusKm&limit` → `{ users[], events[], listings[] }` |
+| GET    | `/discovery/profiles` | JWT  | Swipe deck (proximity + interests + filters)                               |
 
 **Geo writes (per `/locations/update`)**
 1. PostGIS: `UPDATE users SET location = ST_SetSRID(ST_MakePoint($lng,$lat),4326), last_seen=NOW() WHERE id=$uid`
@@ -188,9 +188,9 @@ type Paginated<T>= { items: T[]; nextCursor: Cursor };
 
 **API**
 
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| GET | `/users/online/nearby` | JWT | `?lat&lng&radiusKm` → online user IDs |
+| Method | Path                   | Auth | Notes                                 |
+|--------|------------------------|------|---------------------------------------|
+| GET    | `/users/online/nearby` | JWT  | `?lat&lng&radiusKm` → online user IDs |
 
 **Acceptance**
 - Closing the app → user shows offline to peers within 5 minutes (worst case).
@@ -204,13 +204,13 @@ type Paginated<T>= { items: T[]; nextCursor: Cursor };
 
 **API**
 
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| POST | `/interactions/wave` | JWT | `{ toUserId }` |
-| GET  | `/interactions/waves/received` | JWT | `?cursor&limit` |
-| GET  | `/interactions/waves/sent` | JWT | |
-| GET  | `/interactions/waves/unread/count` | JWT | |
-| POST | `/interactions/waves/:id/read` | JWT | Mark read |
+| Method | Path                               | Auth | Notes           |
+|--------|------------------------------------|------|-----------------|
+| POST   | `/interactions/wave`               | JWT  | `{ toUserId }`  |
+| GET    | `/interactions/waves/received`     | JWT  | `?cursor&limit` |
+| GET    | `/interactions/waves/sent`         | JWT  |                 |
+| GET    | `/interactions/waves/unread/count` | JWT  |                 |
+| POST   | `/interactions/waves/:id/read`     | JWT  | Mark read       |
 
 **Data model**
 ```typescript
@@ -240,12 +240,12 @@ Wave {
 
 **API**
 
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| GET  | `/chat/conversations` | JWT | `?cursor&limit` — sorted by `lastMessageAt` desc |
-| GET  | `/chat/conversations/:id/messages` | JWT | `?cursor&limit` — historical messages |
-| POST | `/chat/messages` | JWT | `{ recipientId, content, type? }` — fallback to REST when WS unavailable |
-| POST | `/chat/conversations/:id/read` | JWT | Marks all messages read up to now |
+| Method | Path                               | Auth | Notes                                                                    |
+|--------|------------------------------------|------|--------------------------------------------------------------------------|
+| GET    | `/chat/conversations`              | JWT  | `?cursor&limit` — sorted by `lastMessageAt` desc                         |
+| GET    | `/chat/conversations/:id/messages` | JWT  | `?cursor&limit` — historical messages                                    |
+| POST   | `/chat/messages`                   | JWT  | `{ recipientId, content, type? }` — fallback to REST when WS unavailable |
+| POST   | `/chat/conversations/:id/read`     | JWT  | Marks all messages read up to now                                        |
 
 **Data model**
 ```typescript
@@ -271,12 +271,12 @@ Message {
 
 **WS namespace `/chat`**
 
-| Direction | Event | Payload |
-|---|---|---|
-| in | `message:send` | `{ recipientId, content, type, clientMessageId }` |
-| out | `message:receive` | full `Message` (to both sender + recipient rooms) |
-| out | `message:ack` | `{ clientMessageId, serverId }` (echoed back to sender for outbox state) |
-| out | `message:typing` | `{ conversationId, userId }` |
+| Direction | Event             | Payload                                                                  |
+|-----------|-------------------|--------------------------------------------------------------------------|
+| in        | `message:send`    | `{ recipientId, content, type, clientMessageId }`                        |
+| out       | `message:receive` | full `Message` (to both sender + recipient rooms)                        |
+| out       | `message:ack`     | `{ clientMessageId, serverId }` (echoed back to sender for outbox state) |
+| out       | `message:typing`  | `{ conversationId, userId }`                                             |
 
 **Acceptance**
 - Message sent over WS is delivered to recipient within 1s when both online.
@@ -327,9 +327,9 @@ Message {
 
 **API**
 
-| Method | Path | Auth | Body |
-|---|---|---|---|
-| POST | `/auth/apple` | No | `{ identityToken, nonce, fullName? }` |
+| Method | Path          | Auth | Body                                  |
+|--------|---------------|------|---------------------------------------|
+| POST   | `/auth/apple` | No   | `{ identityToken, nonce, fullName? }` |
 
 **Backend logic**
 1. Fetch Apple JWKS, verify `identityToken` signature.
@@ -406,9 +406,9 @@ type OutboxItem = {
 
 **New behavior — diff mode**
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/locations/map-data` | First call (no `since`) returns full snapshot; subsequent calls return diff |
+| Method | Path                  | Notes                                                                       |
+|--------|-----------------------|-----------------------------------------------------------------------------|
+| GET    | `/locations/map-data` | First call (no `since`) returns full snapshot; subsequent calls return diff |
 
 **Query**
 - `?lat&lng&radiusKm&since=<timestamp>&previousIds=<comma-sep>` (or `since` only — server computes diff against last-known set if a session id is provided)
@@ -644,9 +644,9 @@ export const COLORS = {
 
 ## Decision log
 
-| Date | Decision | Source |
-|---|---|---|
-| 2026-05-23 | One file with §-numbered sections (vs many files) | Initial scoping with user — easier to grep, single source of truth |
-| 2026-05-23 | Document P1 retroactively rather than skip | Reduces onboarding cost for future contributors |
-| 2026-05-23 | Apple `sub`, not email, as identity primary | Apple private-relay design forces this |
-| 2026-05-23 | `clientMessageId` for outbox idempotency at `(senderId, clientMessageId)` | Standard pattern; survives device-clock skew |
+| Date       | Decision                                                                  | Source                                                             |
+|------------|---------------------------------------------------------------------------|--------------------------------------------------------------------|
+| 2026-05-23 | One file with §-numbered sections (vs many files)                         | Initial scoping with user — easier to grep, single source of truth |
+| 2026-05-23 | Document P1 retroactively rather than skip                                | Reduces onboarding cost for future contributors                    |
+| 2026-05-23 | Apple `sub`, not email, as identity primary                               | Apple private-relay design forces this                             |
+| 2026-05-23 | `clientMessageId` for outbox idempotency at `(senderId, clientMessageId)` | Standard pattern; survives device-clock skew                       |
