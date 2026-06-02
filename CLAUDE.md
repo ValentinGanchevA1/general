@@ -78,7 +78,6 @@ g88/
 ├── ARCHITECTURE.md     System design, key decisions, rationale
 ├── STATUS.md           Live progress on P1 pillars + reconciliation state
 ├── README.md           Quick start
-├── render.yaml         Render.com blueprint
 └── docker-compose.yml  Local Postgres + Redis
 ```
 

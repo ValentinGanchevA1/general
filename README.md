@@ -19,7 +19,6 @@ g88/
 ├── CLAUDE.md           AI assistant instructions and conventions
 ├── PRODUCT.md          Post-P1 roadmap
 ├── TECH_DEBT_AUDIT.md  Debt backlog
-├── render.yaml         Render.com blueprint
 └── docker-compose.yml  Local Postgres + Redis
 ```
 
