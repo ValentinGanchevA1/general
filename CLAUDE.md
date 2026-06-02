@@ -47,7 +47,7 @@ G88 is a **map-first, location-based social platform**. Users appear as interact
 | Auth                       | JWT access 15m + refresh 30d (rotation to opaque DB-stored in flight — see STATUS.md)                          |
 | Push                       | Firebase Cloud Messaging (Android + iOS via APNs proxy)                                                        |
 | External                   | Twilio (SMS OTP), SendGrid (transactional email), AWS Rekognition (face compare, deferred)                     |
-| Deploy                     | Render.com (two services: `g88-api` and `g88-realtime`), managed Postgres, GitHub Actions CI                   |
+| Deploy                     | Render.com web services (`g88-api`, `g88-realtime`) + Redis; **Supabase** managed Postgres; GitHub Actions CI  |
 
 ## Deferred Stack (not yet adopted)
 

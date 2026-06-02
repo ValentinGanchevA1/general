@@ -25,7 +25,7 @@ tracked in `schema_migrations` by filename). Pending as of P4: `0012`–`0015`.
 ### Core (already set)
 | Var                    | Notes                                                                                            |
 |------------------------|--------------------------------------------------------------------------------------------------|
-| `DATABASE_URL`         | Managed Postgres. Required in prod.                                                              |
+| `DATABASE_URL`         | Supabase managed Postgres (pooler, eu-west-1). Required in prod.                                 |
 | `JWT_SECRET`           | ≥64 chars in prod. Also signs social-link OAuth `state`.                                         |
 | `SENTRY_DSN`           | Both apps.                                                                                       |
 | `CORS_ORIGINS`, `PORT` | Standard.                                                                                        |
