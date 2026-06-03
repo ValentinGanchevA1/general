@@ -1,7 +1,7 @@
 // Placeholder destinations for ProfileScreen links whose real implementations
 // land in later slices:
 //   Verification → G2 · Subscription → G3 · SocialLinking → G4
-//   Achievements / Leaderboard / Challenges → G5
+//   Achievements / Leaderboard / Challenges → G5 (all now shipped)
 // Privacy / Help / About are static informational screens (low priority).
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -31,9 +31,6 @@ function ComingSoon({ title, icon, blurb }: { title: string; icon: string; blurb
   );
 }
 
-export const ChallengesScreen = (): React.JSX.Element => (
-  <ComingSoon title="Challenges" icon="checkbox-marked-circle-outline" blurb="Complete daily challenges to earn bonus XP." />
-);
 export const PrivacyScreen = (): React.JSX.Element => (
   <ComingSoon title="Privacy" icon="shield-lock" blurb="Control who can see you and how your data is used." />
 );

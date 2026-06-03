@@ -20,8 +20,8 @@ import { SubscriptionScreen } from '@/screens/SubscriptionScreen';
 import { SocialLinkingScreen } from '@/screens/SocialLinkingScreen';
 import { AchievementsScreen } from '@/screens/AchievementsScreen';
 import { LeaderboardScreen } from '@/screens/LeaderboardScreen';
+import { ChallengesScreen } from '@/screens/ChallengesScreen';
 import {
-	ChallengesScreen,
 	PrivacyScreen,
 	HelpScreen,
 	AboutScreen,
