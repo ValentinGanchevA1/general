@@ -5,3 +5,4 @@ export * from './activity';
 export * from './gamification';
 export * from './challenges';
 export * from './achievements';
+export * from './gifts';
