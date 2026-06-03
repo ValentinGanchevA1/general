@@ -1,7 +1,8 @@
 // apps/mobile/src/features/gifts/useGifts.ts
 //
 // Gift data hooks + the send mutation. Mirrors the gamification hooks: read via
-// getJson, keep stale data on error, expose a refresh().
+// getJson, keep stale data on error, expose a refresh(). State is set inside an
+// async IIFE (never synchronously in an effect) to satisfy react-hooks rules.
 
 import { useCallback, useEffect, useState } from 'react';
 
@@ -21,11 +22,17 @@ export function useGiftCatalog(): { catalog: GiftCatalogItem[]; loading: boolean
 
   useEffect(() => {
     let alive = true;
-    setLoading(true);
-    void getJson<GiftCatalogItem[]>('/gifts/catalog')
-      .then((c) => { if (alive) setCatalog(c); })
-      .catch(() => { /* keep empty on error */ })
-      .finally(() => { if (alive) setLoading(false); });
+    void (async () => {
+      setLoading(true);
+      try {
+        const c = await getJson<GiftCatalogItem[]>('/gifts/catalog');
+        if (alive) setCatalog(c);
+      } catch {
+        // keep empty on error
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
     return () => { alive = false; };
   }, []);
 
@@ -38,11 +45,17 @@ export function useGiftBalance(): { spendableXp: number; loading: boolean; refre
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(() => {
-    setLoading(true);
-    void getJson<GiftBalance>('/gifts/balance')
-      .then((b) => setSpendableXp(b.spendableXp))
-      .catch(() => { /* keep stale on error */ })
-      .finally(() => setLoading(false));
+    void (async () => {
+      setLoading(true);
+      try {
+        const b = await getJson<GiftBalance>('/gifts/balance');
+        setSpendableXp(b.spendableXp);
+      } catch {
+        // keep stale on error
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -55,11 +68,16 @@ export function useReceivedGifts(): { gifts: ReceivedGift[]; loading: boolean; r
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(() => {
-    setLoading(true);
-    void getJson<ReceivedGift[]>('/gifts/received')
-      .then(setGifts)
-      .catch(() => { /* keep stale on error */ })
-      .finally(() => setLoading(false));
+    void (async () => {
+      setLoading(true);
+      try {
+        setGifts(await getJson<ReceivedGift[]>('/gifts/received'));
+      } catch {
+        // keep stale on error
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
