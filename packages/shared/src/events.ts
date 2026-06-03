@@ -37,11 +37,26 @@ export interface ConversationOpenedEvent {
   triggeringWaveId: string | null;
 }
 
+export interface GiftReceivedEvent {
+  id: string;
+  giftId: string;
+  emoji: string;
+  label: string;
+  message: string | null;
+  sender: {
+    id: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+  createdAt: string;
+}
+
 export interface ServerToClientEvents {
   'wave:received': (e: WaveReceivedEvent) => void;
   'presence:delta': (e: PresenceDelta) => void;
   'chat:message': (e: ChatMessageEvent) => void;
   'conversation:opened': (e: ConversationOpenedEvent) => void;
+  'gift:received': (e: GiftReceivedEvent) => void;
   /** Server-side rate limit, validation error, or unrecoverable socket error. */
   'error:event': (e: { code: string; message: string }) => void;
 }

@@ -24,6 +24,7 @@ import {
   failedMessageCleared,
 } from '@/features/chat/chatSlice';
 import { socketSendMessage, useSocket } from '@/realtime/useSocket';
+import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
 
 type Route = RouteProp<RootStackParamList, 'Chat'>;
 
@@ -60,7 +61,7 @@ function MessageBubble({
 export function ChatScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const { params } = useRoute<Route>();
-  const { conversationId, requestPending } = params;
+  const { conversationId, requestPending, otherUserName } = params;
 
   const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
   const messages = useAppSelector((s) => s.chat.messages[conversationId] ?? []);
@@ -81,7 +82,12 @@ export function ChatScreen(): React.JSX.Element {
 
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+  const [giftOpen, setGiftOpen] = useState(false);
   const { on, joinConversation, sendMessage } = useSocket();
+
+  // The other participant — derived from any message they've sent. Null until
+  // they've sent at least one (so a brand-new request can't be gifted yet).
+  const otherUserId = messages.find((m) => m.senderId !== myUserId)?.senderId ?? null;
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
@@ -180,6 +186,11 @@ export function ChatScreen(): React.JSX.Element {
       )}
 
       <View style={styles.inputRow}>
+        {otherUserId ? (
+          <TouchableOpacity style={styles.giftBtn} onPress={() => setGiftOpen(true)}>
+            <Text style={styles.giftBtnText}>🎁</Text>
+          </TouchableOpacity>
+        ) : null}
         <TextInput
           style={styles.input}
           value={body}
@@ -205,6 +216,15 @@ export function ChatScreen(): React.JSX.Element {
           )}
         </TouchableOpacity>
       </View>
+
+      {otherUserId ? (
+        <SendGiftSheet
+          visible={giftOpen}
+          recipientId={otherUserId}
+          recipientName={otherUserName}
+          onClose={() => setGiftOpen(false)}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -221,6 +241,8 @@ const styles = StyleSheet.create({
   },
   requestBannerText: { color: '#7ee6bf', fontSize: 12, textAlign: 'center' },
   messageList: { paddingHorizontal: 12, paddingVertical: 8 },
+  giftBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6 },
+  giftBtnText: { fontSize: 22 },
   bubble: { maxWidth: '78%', borderRadius: 16, padding: 10, marginVertical: 3 },
   bubbleMine: { alignSelf: 'flex-end', backgroundColor: '#00d4ff' },
   bubbleTheirs: { alignSelf: 'flex-start', backgroundColor: '#1a1a2e' },

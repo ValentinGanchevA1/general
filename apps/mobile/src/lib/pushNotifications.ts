@@ -77,6 +77,8 @@ function handleNotificationTap(
   } else if (data['type'] === 'alert') {
     // Open the Pulse tab pre-filtered to alerts.
     navigate('Main', { screen: 'Pulse', params: { filter: 'alerts' } });
+  } else if (data['type'] === 'gift') {
+    navigate('GiftsInbox');
   }
 }
 

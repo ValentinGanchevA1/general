@@ -10,11 +10,13 @@ import { DataSource } from 'typeorm';
 import type {
   GiftBalance,
   GiftCatalogItem,
+  GiftReceivedEvent,
   GiftSentResult,
   ReceivedGift,
 } from '@g88/shared';
 
 import { GamificationService } from '../gamification/gamification.service';
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { SendGiftDto } from './dto';
 
 @Injectable()
@@ -24,6 +26,7 @@ export class GiftsService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly gamification: GamificationService,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   /** The active gift catalog, cheapest first. */
@@ -101,8 +104,10 @@ export class GiftsService {
       });
     }
 
-    const [item] = await this.db.query<Array<{ id: string; cost_xp: number }>>(
-      `SELECT id, cost_xp FROM gift_catalog WHERE id = $1 AND active = true`,
+    const [item] = await this.db.query<Array<{
+      id: string; cost_xp: number; emoji: string; label: string;
+    }>>(
+      `SELECT id, cost_xp, emoji, label FROM gift_catalog WHERE id = $1 AND active = true`,
       [dto.giftId],
     );
     if (!item) {
@@ -124,6 +129,7 @@ export class GiftsService {
     await qr.connect();
     await qr.startTransaction();
     let giftId: string;
+    let createdAt: string;
     let newBalance: number;
     try {
       // Lock the sender's wallet row; check + debit inside the transaction.
@@ -149,12 +155,13 @@ export class GiftsService {
       const [gift] = await qr.query(
         `INSERT INTO gifts (sender_id, recipient_id, gift_id, cost_xp, message)
               VALUES ($1, $2, $3, $4, $5)
-           RETURNING id`,
+           RETURNING id, created_at AS "createdAt"`,
         [senderId, dto.recipientId, item.id, item.cost_xp, dto.message ?? null],
       );
 
       await qr.commitTransaction();
       giftId = gift.id;
+      createdAt = gift.createdAt;
       newBalance = balance - item.cost_xp;
     } catch (err) {
       await qr.rollbackTransaction();
@@ -169,6 +176,42 @@ export class GiftsService {
       .award(dto.recipientId, 'gift.received', { dedupeKey: `gift:${giftId}` })
       .catch((e) => this.logger.error(`gift.received reward failed: ${e}`));
 
+    // Post-commit, best-effort: deliver live (socket) or via push if offline.
+    void this.deliver(giftId, createdAt, senderId, dto.recipientId, item, dto.message)
+      .catch((e) => this.logger.error(`gift delivery failed: ${e}`));
+
     return { giftId, spendableXp: newBalance };
+  }
+
+  /** Build the gift:received event (resolving the sender) and hand it to the gateway. */
+  private async deliver(
+    giftId: string,
+    createdAt: string,
+    senderId: string,
+    recipientId: string,
+    item: { id: string; emoji: string; label: string },
+    message?: string,
+  ): Promise<void> {
+    const [sender] = await this.db.query<Array<{
+      display_name: string; avatar_url: string | null;
+    }>>(
+      `SELECT display_name, avatar_url FROM users WHERE id = $1`,
+      [senderId],
+    );
+
+    const evt: GiftReceivedEvent = {
+      id: giftId,
+      giftId: item.id,
+      emoji: item.emoji,
+      label: item.label,
+      message: message ?? null,
+      sender: {
+        id: senderId,
+        displayName: sender?.display_name ?? 'Someone',
+        avatarUrl: sender?.avatar_url ?? null,
+      },
+      createdAt,
+    };
+    await this.realtime.emitGiftReceived(recipientId, evt);
   }
 }
