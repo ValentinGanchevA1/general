@@ -20,6 +20,7 @@ import { fetchProfile } from '@/features/profile/profileSlice';
 import { logout } from '@/features/auth/authSlice';
 import { useGamification } from '@/features/gamification/useGamification';
 import { useChallenges } from '@/features/gamification/useChallenges';
+import { useGiftBalance } from '@/features/gifts/useGifts';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { SOCIAL_PROVIDER_CONFIG, TIER_COLOR, TIER_LABEL } from '@/features/profile/socialConfig';
 import type {
@@ -115,6 +116,7 @@ export function ProfileScreen(): React.JSX.Element {
   const { profile, loading, error } = useAppSelector((s) => s.profile);
   const { summary: gamification, refresh: refreshGamification } = useGamification();
   const { challenges, refresh: refreshChallenges } = useChallenges();
+  const { spendableXp, refresh: refreshGiftBalance } = useGiftBalance();
   const [refreshing, setRefreshing] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
@@ -122,7 +124,8 @@ export function ProfileScreen(): React.JSX.Element {
     void dispatch(fetchProfile());
     refreshGamification();
     refreshChallenges();
-  }, [dispatch, refreshGamification, refreshChallenges]);
+    refreshGiftBalance();
+  }, [dispatch, refreshGamification, refreshChallenges, refreshGiftBalance]);
 
   useFocusEffect(useCallback(() => reload(), [reload]));
 
@@ -312,6 +315,16 @@ export function ProfileScreen(): React.JSX.Element {
           <Text style={styles.gamificationSubtitle}>View badges</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Gifts — wallet balance + inbox */}
+      <TouchableOpacity style={styles.giftsCard} onPress={() => navigation.navigate('GiftsInbox')}>
+        <Icon name="gift" size={24} color="#E91E63" />
+        <View style={styles.giftsCardBody}>
+          <Text style={styles.giftsCardTitle}>Gifts</Text>
+          <Text style={styles.giftsCardSubtitle}>{spendableXp.toLocaleString()} XP to spend · view inbox</Text>
+        </View>
+        <Icon name="chevron-right" size={24} color="#555" />
+      </TouchableOpacity>
 
       {/* Contact / account info */}
       <View style={styles.section}>
@@ -616,6 +629,19 @@ const styles = StyleSheet.create({
   challengeTitleDone: { color: '#666', textDecorationLine: 'line-through' },
   challengeReward: { color: '#00d4ff', fontSize: 13, fontWeight: '600' },
   gamificationRow: { flexDirection: 'row', paddingHorizontal: 20, marginTop: 16, gap: 10 },
+  giftsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 20,
+    marginTop: 10,
+    padding: 16,
+    backgroundColor: '#1a1a24',
+    borderRadius: 12,
+  },
+  giftsCardBody: { flex: 1 },
+  giftsCardTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  giftsCardSubtitle: { color: '#888', fontSize: 12, marginTop: 2 },
   gamificationCard: {
     flex: 1,
     alignItems: 'center',

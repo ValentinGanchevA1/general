@@ -13,6 +13,7 @@ import type { ApiError, PublicUserProfile, WaveRequest, WaveResponse } from '@g8
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson, postJson } from '@/api/client';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
+import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
@@ -35,6 +36,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [waving, setWaving] = useState(false);
+  const [giftSheetOpen, setGiftSheetOpen] = useState(false);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -133,6 +135,12 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 
       <View style={styles.footer}>
         <TouchableOpacity
+          style={[styles.giftBtn]}
+          onPress={() => setGiftSheetOpen(true)}
+        >
+          <Text style={styles.giftBtnText}>🎁 Gift</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={[styles.waveBtn, waving && styles.waveBtnDisabled]}
           onPress={sendWave}
           disabled={waving}
@@ -144,6 +152,13 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
           )}
         </TouchableOpacity>
       </View>
+
+      <SendGiftSheet
+        visible={giftSheetOpen}
+        recipientId={userId}
+        recipientName={profile.displayName}
+        onClose={() => setGiftSheetOpen(false)}
+      />
     </View>
   );
 }
@@ -208,8 +223,9 @@ const styles = StyleSheet.create({
   goalIcon: { fontSize: 15 },
   goalLabel: { color: '#ccc', fontSize: 13, fontWeight: '500' },
 
-  footer: { padding: 20, paddingBottom: 36 },
+  footer: { flexDirection: 'row', gap: 12, padding: 20, paddingBottom: 36 },
   waveBtn: {
+    flex: 1,
     backgroundColor: '#00d4ff',
     borderRadius: 14,
     padding: 16,
@@ -217,4 +233,14 @@ const styles = StyleSheet.create({
   },
   waveBtnDisabled: { opacity: 0.6 },
   waveBtnText: { color: '#000', fontWeight: '700', fontSize: 16 },
+  giftBtn: {
+    paddingHorizontal: 22,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a1a2e',
+    borderWidth: 1,
+    borderColor: '#00d4ff66',
+  },
+  giftBtnText: { color: '#00d4ff', fontWeight: '700', fontSize: 16 },
 });
