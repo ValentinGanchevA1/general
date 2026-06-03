@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { PublicUserProfile, WaveRequest, WaveResponse } from '@g88/shared';
+import type { ApiError, PublicUserProfile, WaveRequest, WaveResponse } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson, postJson } from '@/api/client';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
@@ -59,8 +59,12 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         context: 'profile',
       });
       Alert.alert('Wave sent! 👋', `You waved at ${profile?.displayName ?? 'this user'}.`);
-    } catch {
-      Alert.alert('Could not send wave', 'Try again in a moment.');
+    } catch (err) {
+      const e = err as ApiError;
+      Alert.alert(
+        e.code === 'wave.cooldown' ? 'Already waved' : 'Could not send wave',
+        e.message || 'Try again in a moment.',
+      );
     } finally {
       setWaving(false);
     }
