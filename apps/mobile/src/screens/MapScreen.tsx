@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -14,6 +15,7 @@ import MapView, {
 } from 'react-native-maps';
 
 import type {
+  ApiError,
   DiscoveryPoint,
   EntityPoint,
   ClusterPoint,
@@ -143,6 +145,19 @@ export function MapScreen(): React.JSX.Element {
     }
   }, []);
 
+  // Bottom-sheet wave is fire-and-forget: onWave re-throws so the FAB path can
+  // record conversion, so here we must swallow the rejection ourselves. A 409
+  // cooldown is an expected outcome — surface the (user-friendly) server message
+  // instead of letting it bubble up as an unhandled promise rejection.
+  const onSheetWave = useCallback((toUserId: string) => {
+    onWave(toUserId).catch((err: ApiError) => {
+      Alert.alert(
+        err.code === 'wave.cooldown' ? 'Already waved' : 'Could not send wave',
+        err.message || 'Try again in a moment.',
+      );
+    });
+  }, [onWave]);
+
   // ─── Render ────────────────────────────────────────────────────────────
   const nearestUserId = useMemo(() => {
     if (!myCoords) return null;
@@ -227,7 +242,7 @@ export function MapScreen(): React.JSX.Element {
           point={selected}
           waving={selected.kind === 'user' && waving === selected.id}
           onClose={() => setSelected(null)}
-          {...(selected.kind === 'user' && { onWave: () => { void onWave(selected.id); } })}
+          {...(selected.kind === 'user' && { onWave: () => onSheetWave(selected.id) })}
         />
       )}
 
