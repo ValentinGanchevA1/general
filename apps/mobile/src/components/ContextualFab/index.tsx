@@ -47,7 +47,10 @@ export function ContextualFab(props: Props): React.JSX.Element {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const dispatch = useAppDispatch();
 
-  const anim = useRef(new Animated.Value(0)).current;
+  // useState (not useRef) so the value is read-safe during render — a ref's
+  // .current must not be accessed in render (react-hooks/refs). Identity is
+  // still stable for the component's lifetime via the lazy initializer.
+  const [anim] = useState(() => new Animated.Value(0));
   const lastTapAt = useRef(0);
   const expandStartAt = useRef(0);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

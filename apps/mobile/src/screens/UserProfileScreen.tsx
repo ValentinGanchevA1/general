@@ -38,20 +38,22 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   const [waving, setWaving] = useState(false);
   const [giftSheetOpen, setGiftSheetOpen] = useState(false);
 
-  const loadProfile = useCallback(async () => {
-    try {
-      const data = await getJson<PublicUserProfile>(`/users/${userId}`);
-      setProfile(data);
-    } catch {
-      Alert.alert('Error', 'Could not load this profile.', [
-        { text: 'Go back', onPress: () => navigation.goBack() },
-      ]);
-    } finally {
-      setLoading(false);
-    }
+  const loadProfile = useCallback(() => {
+    void (async () => {
+      try {
+        const data = await getJson<PublicUserProfile>(`/users/${userId}`);
+        setProfile(data);
+      } catch {
+        Alert.alert('Error', 'Could not load this profile.', [
+          { text: 'Go back', onPress: () => navigation.goBack() },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [userId, navigation]);
 
-  useEffect(() => { void loadProfile(); }, [loadProfile]);
+  useEffect(() => { loadProfile(); }, [loadProfile]);
 
   const sendWave = async (): Promise<void> => {
     setWaving(true);

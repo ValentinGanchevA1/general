@@ -163,7 +163,7 @@ export class InteractionsService {
   }
 
   private async openConversation(
-    tx: { query: (sql: string, params?: unknown[]) => Promise<any[]> },
+    tx: { query: (sql: string, params?: unknown[]) => Promise<Array<{ id: string }>> },
     participantIds: string[],
   ): Promise<string> {
     const sorted = [...participantIds].sort();
@@ -176,15 +176,15 @@ export class InteractionsService {
       // the pending state so messaging is unrestricted both ways.
       await tx.query(
         `UPDATE conversations SET status = 'accepted' WHERE id = $1 AND status <> 'accepted'`,
-        [existing[0].id],
+        [existing[0]!.id],
       );
-      return existing[0].id;
+      return existing[0]!.id;
     }
 
     const created = await tx.query(
       `INSERT INTO conversations (participant_ids, status) VALUES ($1::uuid[], 'accepted') RETURNING id`,
       [sorted],
     );
-    return created[0].id;
+    return created[0]!.id;
   }
 }
