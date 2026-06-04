@@ -112,6 +112,16 @@ export function MapScreen(): React.JSX.Element {
     return unsub;
   }, [on, refresh]);
 
+  useEffect(() => {
+    const unsub = on('gift:received', (e) => {
+      Alert.alert(
+        `${e.sender.displayName} sent you a gift ${e.emoji}`,
+        e.message ? `${e.label} — “${e.message}”` : `You received a ${e.label}.`,
+      );
+    });
+    return unsub;
+  }, [on]);
+
   // ─── Cluster tap → zoom in ─────────────────────────────────────────────
   const onClusterPress = useCallback((c: ClusterPoint) => {
     mapRef.current?.animateToRegion(

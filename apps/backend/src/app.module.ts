@@ -19,6 +19,7 @@ import { TrendingModule } from './modules/trending/trending.module';
 import { GamificationModule } from './modules/gamification/gamification.module';
 import { ChallengesModule } from './modules/challenges/challenges.module';
 import { AchievementsModule } from './modules/achievements/achievements.module';
+import { GiftsModule } from './modules/gifts/gifts.module';
 import { VerificationModule } from './modules/verification/verification.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { SocialModule } from './modules/social/social.module';
@@ -64,6 +65,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     GamificationModule,
     ChallengesModule,
     AchievementsModule,
+    GiftsModule,
     VerificationModule,
     SubscriptionsModule,
     SocialModule,

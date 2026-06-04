@@ -71,14 +71,17 @@ export class GamificationService {
     if (inserted.length === 0) return; // deduped — already awarded
 
     // Bump the denormalized summary. Level recomputed in SQL from the new total
-    // so the DB stays authoritative even under concurrent awards.
+    // so the DB stays authoritative even under concurrent awards. Earning also
+    // funds the spendable wallet 1:1 — total_xp is the lifetime score (drives
+    // level/leaderboard, never spent); spendable_xp is what gifts draw down.
     await this.db.query(
-      `INSERT INTO user_gamification (user_id, total_xp, level)
-            VALUES ($1, $2, $3)
+      `INSERT INTO user_gamification (user_id, total_xp, spendable_xp, level)
+            VALUES ($1, $2, $2, $3)
        ON CONFLICT (user_id) DO UPDATE
-          SET total_xp   = user_gamification.total_xp + $2,
-              level      = FLOOR(SQRT((user_gamification.total_xp + $2) / 50.0)) + 1,
-              updated_at = NOW()`,
+          SET total_xp     = user_gamification.total_xp + $2,
+              spendable_xp = user_gamification.spendable_xp + $2,
+              level        = FLOOR(SQRT((user_gamification.total_xp + $2) / 50.0)) + 1,
+              updated_at   = NOW()`,
       [userId, amount, levelForXp(amount)],
     );
   }

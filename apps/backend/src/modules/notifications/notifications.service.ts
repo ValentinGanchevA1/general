@@ -51,6 +51,21 @@ export class NotificationsService {
     }, { type: 'wave', fromUserId: fromUser.id });
   }
 
+  async notifyGift(
+    toUserId: string,
+    fromName: string,
+    emoji: string,
+    label: string,
+  ): Promise<void> {
+    const tokens = await this.getTokens(toUserId);
+    if (!tokens.length) return;
+
+    await this.sendMulticast(tokens, {
+      title: `${fromName} sent you a gift ${emoji}`,
+      body: `You received a ${label}.`,
+    }, { type: 'gift' });
+  }
+
   async notifyMessage(
     toUserId: string,
     senderName: string,

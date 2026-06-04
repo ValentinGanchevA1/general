@@ -18,6 +18,7 @@ import type {
   AckResult,
   WaveReceivedEvent,
   ChatMessageEvent,
+  GiftReceivedEvent,
 } from '@g88/shared';
 
 import { WsJwtGuard } from './ws-jwt.guard';
@@ -213,6 +214,27 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         participantIds,
         triggeringWaveId,
       });
+    }
+  }
+
+  /**
+   * Deliver a gift to the recipient: emit live to any connected sockets, and fall
+   * back to a push notification when they have none (mirrors offline chat pushes).
+   */
+  async emitGiftReceived(toUserId: string, evt: GiftReceivedEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('gift:received', evt);
+    try {
+      const sockets = await this.server.in(this.userRoom(toUserId)).fetchSockets();
+      if (sockets.length === 0) {
+        await this.notifications.notifyGift(
+          toUserId,
+          evt.sender.displayName,
+          evt.emoji,
+          evt.label,
+        );
+      }
+    } catch (err) {
+      this.logger.error(`emitGiftReceived push failed: ${err}`);
     }
   }
 

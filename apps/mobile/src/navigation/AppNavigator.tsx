@@ -20,8 +20,9 @@ import { SubscriptionScreen } from '@/screens/SubscriptionScreen';
 import { SocialLinkingScreen } from '@/screens/SocialLinkingScreen';
 import { AchievementsScreen } from '@/screens/AchievementsScreen';
 import { LeaderboardScreen } from '@/screens/LeaderboardScreen';
+import { ChallengesScreen } from '@/screens/ChallengesScreen';
+import { GiftsInboxScreen } from '@/screens/GiftsInboxScreen';
 import {
-	ChallengesScreen,
 	PrivacyScreen,
 	HelpScreen,
 	AboutScreen,
@@ -56,6 +57,7 @@ export type RootStackParamList = {
 	Achievements: undefined;
 	Leaderboard: undefined;
 	Challenges: undefined;
+	GiftsInbox: undefined;
 	Privacy: undefined;
 	Help: undefined;
 	About: undefined;
@@ -144,6 +146,7 @@ export function AppNavigator(): React.JSX.Element {
 						<Stack.Screen name="Achievements" component={AchievementsScreen} />
 						<Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
 						<Stack.Screen name="Challenges" component={ChallengesScreen} />
+						<Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />
 						<Stack.Screen name="Privacy" component={PrivacyScreen} />
 						<Stack.Screen name="Help" component={HelpScreen} />
 						<Stack.Screen name="About" component={AboutScreen} />

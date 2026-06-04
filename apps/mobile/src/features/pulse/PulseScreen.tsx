@@ -52,12 +52,17 @@ export function PulseScreen(): React.JSX.Element {
   const [filter, setFilter] = useState<PulseFilter>(route.params?.filter ?? 'all');
 
   // ─── Filter sync ────────────────────────────────────────────────────────
+  // These effects intentionally sync local UI state from external sources
+  // (navigation params, and a one-shot Redux signal the effect also clears),
+  // which is a legitimate effect — not a render-derivable value.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (route.params?.filter) setFilter(route.params.filter);
   }, [route.params?.filter]);
 
   useEffect(() => {
     if (pendingFilter) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFilter(pendingFilter as PulseFilter);
       dispatch(clearPendingFilter());
     }
