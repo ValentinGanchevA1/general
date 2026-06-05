@@ -274,3 +274,53 @@ JWT access token (15min) + opaque refresh token (30d, rotating, stored hashed in
   `0015_achievements` — it has no dependencies and is the latest feature, while
   `profile_expansion` must stay `0012` ahead of `0013`/`0014`. The `schema_migrations`
   row was renamed in lockstep; all DDL is idempotent so re-applies are no-ops.
+
+- **2026-06-01** — Interest-based messaging gate. The dot-tap card is now
+  state-aware: **Wave** (stranger) · **Message** (match → full chat) ·
+  **Message + "you both like…"** (shared interest/goal → request). The wave→match
+  ladder is kept; on top of it a **shared-interest message-request** path allows
+  exactly one message until the recipient replies, then promotes to full chat.
+  A new `MessagingService` owns the single source of truth for the gate —
+  `messagePermission = match ∨ (interest ∪ goal overlap)` — and is consumed by both
+  `UsersService` (a viewer-relative `relationship` block on `GET /users/:id`) and
+  `POST /conversations` (mints a `pending` request or returns the existing match
+  convo; `chat.locked` otherwise). `chat.persist` enforces the one-message cap +
+  recipient-reply promotion inside a `FOR UPDATE` tx, so two racing sends can't both
+  pass the cap; a reciprocal wave promotes any prior pending request. Migration
+  `0017_message_requests` adds `conversations.status` (`pending`/`accepted`, default
+  `accepted`) + `initiated_by`. Shared: `MessagePermission`, `ProfileRelationship`,
+  `ConversationStatus`, `CreateConversation{Request,Response}`; `ConversationSummary`
+  gains `status`/`initiatedBy`. Mobile: `EntityBottomSheet` Message button + shared-
+  interest hint; `ChatScreen` request banner + composer lock. **Trade** and
+  **friend/follow** dot-actions remain deferred. Next migration `0018`.
+
+- **2026-06-02** — Docs correction (no code): production Postgres runs on **Supabase**
+  (`aws-0-eu-west-1.pooler.supabase.com`), not Render-managed Postgres as previously
+  documented. Both `.env` files and the migration runner target it; it holds the live
+  schema through `0017`. Render still hosts the **web services** (`g88-api`,
+  `g88-realtime`) + Redis. `CLAUDE.md`, `DEPLOY.md`, `STATUS.md` updated.
+
+- **2026-06-04** — P5: Gifts (XP-funded, v1) + Challenges mobile screen. Branch
+  `feat/gifts-and-challenges`, migration `0018_gifts`. **Design hinge — dual-balance
+  wallet**: XP was an append-only *score* (`total_xp`, drives level + leaderboard), so
+  gifts can't spend it directly without corrupting rank. Resolved by **decoupling spend
+  from score** — a new `spendable_xp` balance is funded 1:1 in `awardRaw` as XP is
+  earned (existing users' lifetime XP backfilled as an opening balance), while
+  `total_xp` is never debited. `gift_catalog` (6 seeded gifts) + `gifts` table;
+  `POST /gifts/send` debits the wallet inside a `FOR UPDATE` transaction (no double-
+  spend on concurrent sends), alongside catalog/balance/received reads. The recipient
+  earns a fixed **`gift.received`** reward (10 XP, **daily-capped at 5** via the
+  existing ledger cap) — this bounds XP minting from gift-trading rings. **No
+  refund/undo in v1 — a sent gift is final** (deliberate scope cut; revisit if
+  mistake-sends become a support burden). Realtime: `gift:received` server→client
+  event; the gateway emits live and falls back to FCM push **only** when the recipient
+  has no socket (mirrors the offline-chat push pattern). Mobile: `features/gifts/`
+  hooks + `SendGiftSheet` (affordability-gated catalog grid + optional note),
+  `GiftsInboxScreen` (balance + received list), entry points on UserProfile + a
+  chat-composer 🎁 affordance; push tap deep-links to GiftsInbox. **Challenges mobile
+  screen** replaces the "Coming soon" placeholder with a real `ChallengesScreen` over
+  the existing `GET /challenges/today` (no new migration; uses `0011`). Both typechecks
+  clean; `0018` applied to prod and curl-verified (atomic debit, insufficient-funds
+  rollback, self-gift reject, sender-score integrity, deduped recipient reward). The
+  realtime + offline-push path is **code-verified, not run-verified** (needs two socket
+  clients + `FIREBASE_CREDENTIALS`). Next migration `0019`.
