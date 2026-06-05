@@ -59,17 +59,11 @@ Five items, ordered. Each must close cleanly before the next starts.
 | **Effort**     | 1.5 days                                                                                                                                                                                                    |
 | **Blocks**     | TestFlight release                                                                                                                                                                                          |
 
-### P2.A3 — Apple Sign-In (App Store blocker)
+### ~~P2.A3 — Apple Sign-In~~ (removed from scope 2026-06-05)
 
-|                |                                                                                                                                                                                                                                                     |
-|----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Why**        | Apple requires Sign in with Apple if the app offers any other social login (Google is live → Apple is mandatory)                                                                                                                                    |
-| **Scope**      | `@invertase/react-native-apple-authentication` on iOS · backend route `POST /auth/apple` verifies identity token against Apple public keys · upsert user (handle the email-relay case — Apple may return `private-relay` email) · return token pair |
-| **Acceptance** | iOS Sign-in-with-Apple button works on real device · returning user maps to same account · `private-relay` emails handled · Android build doesn't break                                                                                             |
-| **Risk**       | Apple's "hide my email" relay → must not assume email = identity; rely on `sub` claim · iOS-only flow → no Android impact                                                                                                                           |
-| **Effort**     | 1.5 days                                                                                                                                                                                                                                            |
-| **Blocks**     | App Store submission · public TestFlight                                                                                                                                                                                                            |
-| **Spec**       | See `SPECIFICATION.md` § Auth / A3                                                                                                                                                                                                                  |
+**Removed.** Apple Sign-In was code-complete but never had working credentials; deleted on 2026-06-05 (code, deps, iOS entitlement, `apple_sub` column via migration `0019`). See `SPECIFICATION.md` §3.3 and the `STATUS.md` change log.
+
+**Still open for any iOS submission:** Apple Guideline 4.8 mandates Sign in with Apple when a third-party social login is offered. Google is live, so an iOS build must re-add Apple, drop Google on iOS, or go email-only on iOS. Android-first → deferred, not blocking now.
 
 ### P2.C6 — Mobile chat outbox
 
@@ -105,11 +99,10 @@ Cannot submit to TestFlight until **all** are true:
 
 - ✅ A4 closed (no committed secrets)
 - ✅ OB1 closed (Sentry receiving events)
-- ✅ A3 closed (Apple Sign-In working)
+- ⚠️ A3 removed (no Apple Sign-In). **iOS social-login compliance unresolved** — re-add Apple, drop Google on iOS, or ship email-only on iOS before any App Store submission (Guideline 4.8)
 - ✅ Crash-free rate ≥ 99% on internal dogfood for 7 consecutive days
 - ✅ At least one `.spec.ts` exists per backend module (closes worst of C2 debt) — minimum bar, not full coverage
 - ✅ Privacy nutrition labels filled in App Store Connect
-- ✅ Sign-in-with-Apple appears in app review build config
 
 ## App Store gate (on top of TestFlight gate)
 

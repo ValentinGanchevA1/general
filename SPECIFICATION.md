@@ -69,7 +69,7 @@ type Paginated<T>= { items: T[]; nextCursor: Cursor };
 
 **User story.** As a new user, I can create an account with email/password or Google. Returning users stay signed in across app restarts and survive token expiry without re-login.
 
-**Status.** ✅ Shipped. Opaque rotating refresh tokens (A1). Google OAuth (A2). Apple Sign-In = P2 (see §3.3).
+**Status.** ✅ Shipped. Opaque rotating refresh tokens (A1). Google OAuth (A2). Apple Sign-In removed from scope 2026-06-05 (see §3.3).
 
 **API**
 
@@ -316,45 +316,11 @@ Message {
 - Backend handler throwing `BadRequestException` → visible with request method, path, anonymized user, **no body**.
 - `grep -rE '(password|idToken|refreshToken).*sentry' apps/` returns no instances logging PII.
 
-### §3.3 — P2.A3: Apple Sign-In
+### §3.3 — ~~P2.A3: Apple Sign-In~~ (removed from scope 2026-06-05)
 
-**User story.** As an iOS user, I can sign in or register with Sign in with Apple. My account works the same as a Google or email user.
+**Removed from scope.** Apple Sign-In was previously code-complete (backend `POST /auth/oauth/apple`, mobile `loginWithApple`, migration `0009` adding `apple_sub`) but never had working Apple Developer credentials. On 2026-06-05 it was fully removed — code, the `apple-signin-auth` and `@invertase/react-native-apple-authentication` deps, the iOS entitlement, and the `apple_sub` column (reverted by migration `0019`).
 
-**Mobile**
-- Dep: `@invertase/react-native-apple-authentication` (vet for RN 0.83 + React 19 compat — H1 risk).
-- iOS only (button hidden on Android).
-- Button on `AuthScreen`, beneath existing Google + email/password.
-
-**API**
-
-| Method | Path          | Auth | Body                                  |
-|--------|---------------|------|---------------------------------------|
-| POST   | `/auth/apple` | No   | `{ identityToken, nonce, fullName? }` |
-
-**Backend logic**
-1. Fetch Apple JWKS, verify `identityToken` signature.
-2. Validate `aud` (bundle id), `iss` (`https://appleid.apple.com`), `exp`.
-3. Extract `sub` (stable user id) and `email` (may be private-relay `*@privaterelay.appleid.com`).
-4. Look up user by `appleUserId = sub` (new column on `User`, nullable, indexed unique).
-5. If new → create user with `appleUserId = sub`, `email = <relay or real>`, `name = fullName` (Apple only returns name on first sign-in).
-6. Issue token pair, return user.
-
-**New `User` columns**
-```sql
-ALTER TABLE users ADD COLUMN apple_user_id varchar UNIQUE NULL;
-CREATE UNIQUE INDEX idx_users_apple_user_id ON users(apple_user_id) WHERE apple_user_id IS NOT NULL;
-```
-
-**Edge cases**
-- Apple `private-relay` email → store and use as-is. Don't try to "resolve" it.
-- User signs in again later → only `sub` returned, no name → don't overwrite existing `name`.
-- User had email account first, then signs in with Apple using the same email → **don't auto-merge**. Show "an account exists for this email — sign in to link" flow (P3 polish — for P2, just create separate account and document the merge tool as P3 work).
-
-**Acceptance**
-- Sign in with Apple from cold app state → land on `ProfileCreation` (if new) or `Main` (if returning) within 3s.
-- Returning user with relay email gets the same `User.id`.
-- Android build links cleanly (the native module must be conditional).
-- Apple test reviewer account works end-to-end.
+**App Store consequence to revisit before any iOS submission.** Apple App Store Review Guideline 4.8 requires Sign in with Apple whenever an app offers a third-party or social login. Google OAuth is live, so an iOS build must do one of: (a) re-introduce Apple Sign-In, (b) drop Google on iOS, or (c) offer only email/password on iOS. Inert today — the product is Android-first (no Xcode project, Android-only CI).
 
 ### §3.4 — P2.C6: Mobile chat outbox
 
