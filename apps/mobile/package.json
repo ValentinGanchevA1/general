@@ -17,7 +17,6 @@
   "dependencies": {
     "@babel/runtime": "^7.29.2",
     "@g88/shared": "workspace:*",
-    "@invertase/react-native-apple-authentication": "^2.4.1",
     "@react-native-async-storage/async-storage": "^2.0.0",
     "@react-native-google-signin/google-signin": "^16.1.2",
     "@react-navigation/bottom-tabs": "^7.0.0",

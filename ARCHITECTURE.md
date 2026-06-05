@@ -324,3 +324,17 @@ JWT access token (15min) + opaque refresh token (30d, rotating, stored hashed in
   rollback, self-gift reject, sender-score integrity, deduped recipient reward). The
   realtime + offline-push path is **code-verified, not run-verified** (needs two socket
   clients + `FIREBASE_CREDENTIALS`). Next migration `0019`.
+
+- **2026-06-05** — Apple Sign-In (A3) removed from scope. Reverses the A3 work from
+  the 2026-05-30/05-31 entries above. Backend drops `POST /auth/oauth/apple`,
+  `AuthService.appleOAuth`, `AppleOAuthDto`, and the `apple-signin-auth` dep; mobile
+  drops the `loginWithApple` thunk + reducer cases, the "Continue with Apple" button,
+  and `@invertase/react-native-apple-authentication`; the iOS `G88.entitlements`
+  Apple-Sign-In capability is deleted (generic Podfile/.xcode.env kept). Migration
+  `0019_drop_apple_oauth` drops the `apple_sub` column + unique index (reverts `0009`,
+  `IF EXISTS`-guarded; the column was empty everywhere — Apple OAuth never had working
+  creds). **App Store consequence**: Apple's guideline 4.8 requires Sign in with Apple
+  whenever an app offers a third-party social login. Google OAuth is live, so a future
+  iOS submission must re-add Apple, drop Google on iOS, or offer email-only on iOS.
+  Inert today — the product is Android-first (no real Xcode project, Android-only CI).
+  Next migration `0020`.

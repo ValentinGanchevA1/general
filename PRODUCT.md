@@ -94,7 +94,7 @@ Six pillars, all live: **Auth · Profile · Map Discovery · Presence · Wave ·
 Five items, in order:
 1. **A4** — dev-secret cleanup
 2. **OB1** — Sentry on both apps *(TestFlight blocker)*
-3. **A3** — Apple Sign-In *(App Store blocker)*
+3. ~~**A3** — Apple Sign-In~~ — **removed from scope 2026-06-05** (iOS social-login compliance to revisit before App Store; see `ROADMAP.md`)
 4. **C6** — mobile chat outbox (offline send → retry)
 5. **M1** — viewport-diff protocol (reduces map data over wire)
 
