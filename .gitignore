@@ -142,6 +142,9 @@ temp/
 # Mirrors the .idea/g88.iml exclude folders
 /temp/
 /tmp/
+# Local debugging screenshots dropped at repo root (e.g. emulator captures)
+/_screen*.png
+/screenshot*.png
 
 # ─── Claude Code local settings (may contain personal tokens / DB URLs) ──────
 .claude/settings.local.json
