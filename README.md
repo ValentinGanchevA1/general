@@ -95,3 +95,43 @@ pnpm --filter @g88/mobile typecheck
 pnpm --filter @g88/backend test
 pnpm --filter @g88/mobile test
 ```
+
+## Troubleshooting
+
+### Metro crashes on Windows / red box: `Unable to resolve module @babel/runtime/...`
+
+On Windows, that red box is usually a **symptom**, not the real error. Check the Metro
+terminal for a crash like:
+
+```
+Error: ENOENT ... watch '...\.pnpm\<pkg>_tmp_<n>'
+  at FSWatcher ... FallbackWatcher.js
+```
+
+**Cause:** `apps/mobile/metro.config.js` watches the whole monorepo root (needed so Metro
+can resolve symlinks into the pnpm store). If Metro uses its Node **`FallbackWatcher`** instead
+of **Watchman**, it crashes when pnpm's transient `*_tmp_*` dirs vanish mid-crawl. Metro dies
+before finishing the file map, so resolution of hoisted deps (`@babel/runtime`, etc.) then fails.
+
+**Fix:** make Metro use Watchman, which tolerates disappearing files.
+
+```powershell
+# 1. Watchman must be installed and on PATH
+choco install watchman          # one-time, if missing
+where.exe watchman              # should print a path
+
+# 2. Reset stale watcher + Metro state
+watchman watch-del-all
+watchman shutdown-server
+Remove-Item -Recurse -Force $env:TEMP\metro-cache, $env:TEMP\metro-* -ErrorAction SilentlyContinue
+
+# 3. Start Metro in its OWN terminal first, then build in a second terminal
+#    (so `pnpm android` attaches to running Metro instead of spawning its own)
+pnpm --filter @g88/mobile start:reset      # terminal 1
+pnpm --filter @g88/mobile android          # terminal 2
+```
+
+The repo's `.watchmanconfig` keeps Watchman from crawling build outputs (it intentionally does
+**not** ignore `node_modules/.pnpm`, which Metro must resolve into). Confirm Watchman engaged with
+`watchman watch-list` while Metro runs — `roots` should list the repo path. If `roots` stays empty,
+Metro launched from a shell without `chocolatey\bin` on PATH and fell back to the Node watcher.
