@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -11,19 +12,24 @@ import {
 } from '@nestjs/common';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsIn,
   IsISO8601,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   ValidateIf,
 } from 'class-validator';
 
 import type {
+  AddPhotoRequest,
   PresignedUploadResponse,
   PublicUserProfile,
+  ReorderPhotosRequest,
   UpdateProfileRequest,
+  UserPhoto,
   UserProfile,
 } from '@g88/shared';
 
@@ -47,6 +53,20 @@ class PresignedUrlDto {
   @IsString()
   @Matches(/^image\/(jpeg|png|webp|heic)$/, { message: 'contentType must be an image MIME type' })
   contentType!: string;
+}
+
+class AddPhotoDto implements AddPhotoRequest {
+  @IsString()
+  @Matches(/^https:\/\/.+/, { message: 'url must be an https URL' })
+  url!: string;
+}
+
+class ReorderPhotosDto implements ReorderPhotosRequest {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(6)
+  @IsUUID('4', { each: true })
+  photoIds!: string[];
 }
 
 @Controller('users')
@@ -82,6 +102,47 @@ export class UsersController {
     @CurrentUser('id') userId: string,
   ): Promise<PresignedUploadResponse> {
     return this.s3.avatarPresignedUrl(userId, dto.contentType);
+  }
+
+  // ─── Gallery photos ─────────────────────────────────────────────────────────
+
+  @Get('me/photos')
+  async listPhotos(@CurrentUser('id') userId: string): Promise<UserPhoto[]> {
+    return this.users.listPhotos(userId);
+  }
+
+  @Post('me/photos/presigned-url')
+  @HttpCode(200)
+  async photoPresignedUrl(
+    @Body() dto: PresignedUrlDto,
+    @CurrentUser('id') userId: string,
+  ): Promise<PresignedUploadResponse> {
+    return this.s3.photoPresignedUrl(userId, dto.contentType);
+  }
+
+  @Post('me/photos')
+  @HttpCode(201)
+  async addPhoto(
+    @Body() dto: AddPhotoDto,
+    @CurrentUser('id') userId: string,
+  ): Promise<UserPhoto[]> {
+    return this.users.addPhoto(userId, dto.url);
+  }
+
+  @Patch('me/photos/order')
+  async reorderPhotos(
+    @Body() dto: ReorderPhotosDto,
+    @CurrentUser('id') userId: string,
+  ): Promise<UserPhoto[]> {
+    return this.users.reorderPhotos(userId, dto.photoIds);
+  }
+
+  @Delete('me/photos/:photoId')
+  async deletePhoto(
+    @Param('photoId', new ParseUUIDPipe({ version: '4' })) photoId: string,
+    @CurrentUser('id') userId: string,
+  ): Promise<UserPhoto[]> {
+    return this.users.deletePhoto(userId, photoId);
   }
 
   @Get(':id')

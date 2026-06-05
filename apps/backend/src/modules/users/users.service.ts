@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
@@ -9,6 +14,7 @@ import type {
   SocialLink,
   SubscriptionTier,
   UpdateProfileRequest,
+  UserPhoto,
   UserProfile,
   VerificationLevel,
 } from '@g88/shared';
@@ -61,6 +67,9 @@ const SCORE: Record<VerificationLevel, number> = {
   selfie: 70,
   id: 100,
 };
+
+// Mirrors the mobile gallery cap (ProfileScreen shows the add tile while < 6).
+const MAX_PHOTOS = 6;
 
 @Injectable()
 export class UsersService {
@@ -181,6 +190,102 @@ export class UsersService {
     );
     if (!updatedRows[0]) throw new NotFoundException({ code: 'users.not_found', message: 'User not found' });
     return this.getProfile(userId);
+  }
+
+  // ─── Gallery photos (G1/multi-photo) ───────────────────────────────────────
+
+  /** The user's gallery in display order. Position 0 is the primary (avatar). */
+  async listPhotos(userId: string): Promise<UserPhoto[]> {
+    const rows = await this.db.query<UserPhoto[]>(
+      `SELECT id, url, position FROM user_photos
+         WHERE user_id = $1 ORDER BY position, created_at`,
+      [userId],
+    );
+    return rows.map((r) => ({ id: r.id, url: r.url, position: r.position }));
+  }
+
+  /** Append a photo. The first photo becomes the avatar. Caps at MAX_PHOTOS. */
+  async addPhoto(userId: string, url: string): Promise<UserPhoto[]> {
+    const [{ count }] = await this.db.query<[{ count: number }]>(
+      `SELECT count(*)::int AS count FROM user_photos WHERE user_id = $1`,
+      [userId],
+    );
+    if (count >= MAX_PHOTOS) {
+      throw new BadRequestException({
+        code: 'photos.limit',
+        message: `You can have at most ${MAX_PHOTOS} photos`,
+      });
+    }
+    await this.db.query(
+      `INSERT INTO user_photos (user_id, url, position) VALUES ($1, $2, $3)`,
+      [userId, url, count],
+    );
+    // First photo doubles as the profile avatar when none is set.
+    if (count === 0) {
+      await this.db.query(
+        `UPDATE users SET avatar_url = $2, updated_at = NOW()
+           WHERE id = $1 AND avatar_url IS NULL`,
+        [userId, url],
+      );
+    }
+    return this.listPhotos(userId);
+  }
+
+  /** Delete one photo; repoint the avatar to the new primary (or null). */
+  async deletePhoto(userId: string, photoId: string): Promise<UserPhoto[]> {
+    // TypeORM 0.3.x returns [rowsArray, rowCount] for DELETE ... RETURNING.
+    const [deleted] = await this.db.query<[{ id: string }[], number]>(
+      `DELETE FROM user_photos WHERE id = $1 AND user_id = $2 RETURNING id`,
+      [photoId, userId],
+    );
+    if (!deleted[0]) {
+      throw new NotFoundException({ code: 'photos.not_found', message: 'Photo not found' });
+    }
+    await this.syncAvatar(userId);
+    return this.listPhotos(userId);
+  }
+
+  /**
+   * Reorder the whole gallery. `photoIds` must be exactly the user's photos.
+   * Index 0 becomes the primary and is mirrored to `users.avatar_url`.
+   */
+  async reorderPhotos(userId: string, photoIds: string[]): Promise<UserPhoto[]> {
+    const existing = await this.listPhotos(userId);
+    const ids = new Set(existing.map((p) => p.id));
+    const unique = new Set(photoIds);
+    if (
+      photoIds.length !== existing.length ||
+      unique.size !== photoIds.length ||
+      !photoIds.every((id) => ids.has(id))
+    ) {
+      throw new BadRequestException({
+        code: 'photos.reorder_mismatch',
+        message: 'photoIds must list every photo you own exactly once',
+      });
+    }
+
+    // One atomic statement: position = index in the supplied order.
+    // params: $1 userId, then ($2,$3,...) one id per row in a VALUES table.
+    const values = photoIds.map((_, i) => `($${i + 2}::uuid, ${i})`).join(', ');
+    await this.db.query(
+      `UPDATE user_photos AS up SET position = v.pos
+         FROM (VALUES ${values}) AS v(id, pos)
+        WHERE up.id = v.id AND up.user_id = $1`,
+      [userId, ...photoIds],
+    );
+    await this.syncAvatar(userId);
+    return this.listPhotos(userId);
+  }
+
+  /** Keep `users.avatar_url` pointing at the current primary photo (or null). */
+  private async syncAvatar(userId: string): Promise<void> {
+    await this.db.query(
+      `UPDATE users SET avatar_url = (
+           SELECT url FROM user_photos WHERE user_id = $1 ORDER BY position, created_at LIMIT 1
+         ), updated_at = NOW()
+         WHERE id = $1`,
+      [userId],
+    );
   }
 
   private async getPhotoUrls(userId: string): Promise<string[]> {

@@ -15,12 +15,28 @@ export class S3Service {
     this.client = new S3Client({ region: this.region });
   }
 
+  /** Presigned PUT URL for a user avatar. Key: avatars/{userId}/{uuid}.{ext} */
+  async avatarPresignedUrl(
+    userId: string,
+    contentType: string,
+  ): Promise<{ uploadUrl: string; publicUrl: string }> {
+    return this.presign('avatars', userId, contentType);
+  }
+
+  /** Presigned PUT URL for a gallery photo. Key: photos/{userId}/{uuid}.{ext} */
+  async photoPresignedUrl(
+    userId: string,
+    contentType: string,
+  ): Promise<{ uploadUrl: string; publicUrl: string }> {
+    return this.presign('photos', userId, contentType);
+  }
+
   /**
-   * Return a presigned PUT URL for a user avatar.
-   * Key: avatars/{userId}/{uuid}.{ext}
+   * Return a presigned PUT URL under `{prefix}/{userId}/{uuid}.{ext}`.
    * URL expires in 5 minutes — enough for a mobile upload.
    */
-  async avatarPresignedUrl(
+  private async presign(
+    prefix: string,
     userId: string,
     contentType: string,
   ): Promise<{ uploadUrl: string; publicUrl: string }> {
@@ -34,7 +50,7 @@ export class S3Service {
     };
     const ext = EXT_MAP[contentType];
     if (!ext) throw new Error(`Unsupported content type: ${contentType}`);
-    const key = `avatars/${userId}/${randomUUID()}.${ext}`;
+    const key = `${prefix}/${userId}/${randomUUID()}.${ext}`;
 
     const cmd = new PutObjectCommand({
       Bucket: this.bucket,
