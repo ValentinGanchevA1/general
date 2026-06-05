@@ -243,6 +243,25 @@ export interface PresignedUploadResponse {
   publicUrl: string;
 }
 
+// ─── Gallery photos ──────────────────────────────────────────────────────────
+
+/** One image in a user's ordered gallery. Position 0 is the primary (avatar). */
+export interface UserPhoto {
+  id: string;
+  url: string;
+  position: number;
+}
+
+export interface AddPhotoRequest {
+  /** Public CDN URL returned by the photos presigned-url upload. */
+  url: string;
+}
+
+export interface ReorderPhotosRequest {
+  /** Every photo id the user owns, in the desired order. Index 0 becomes primary. */
+  photoIds: string[];
+}
+
 // ─── Verification ────────────────────────────────────────────────────────────
 
 export interface StartPhoneVerificationRequest {

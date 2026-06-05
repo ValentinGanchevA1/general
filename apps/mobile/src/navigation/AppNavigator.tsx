@@ -12,6 +12,7 @@ import { ProfileScreen } from '@/screens/ProfileScreen';
 import { UserProfileScreen } from '@/screens/UserProfileScreen';
 import { ProfileCreationScreen } from '@/screens/ProfileCreationScreen';
 import { ProfileEditScreen } from '@/screens/ProfileEditScreen';
+import { PhotosScreen } from '@/screens/PhotosScreen';
 import { ChatScreen } from '@/screens/ChatScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { AlertComposerScreen } from '@/screens/AlertComposerScreen';
@@ -48,6 +49,7 @@ export type RootStackParamList = {
 	Main: NavigatorScreenParams<TabParamList> | undefined;
 	Chat: { conversationId: string; otherUserName: string; requestPending?: boolean };
 	ProfileEdit: undefined;
+	Photos: undefined;
 	Settings: undefined;
 	AlertComposer: { presetCategory?: AreaCategory; presetTag?: string };
 	UserProfile: { userId: string };
@@ -137,6 +139,7 @@ export function AppNavigator(): React.JSX.Element {
 						<Stack.Screen name="Main" component={MainTabs} />
 						<Stack.Screen name="Chat" component={ChatScreen} />
 						<Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
+						<Stack.Screen name="Photos" component={PhotosScreen} />
 						<Stack.Screen name="Settings" component={SettingsScreen} />
 						<Stack.Screen name="AlertComposer" component={AlertComposerScreen} />
 						<Stack.Screen name="UserProfile" component={UserProfileScreen} />

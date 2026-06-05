@@ -360,27 +360,30 @@ export function ProfileScreen(): React.JSX.Element {
       </View>
 
       {/* Photo Grid */}
-      {photos.length > 0 ? (
-        <View style={styles.section}>
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Photos</Text>
-          <View style={styles.photoGrid}>
-            {photos.map((photo, index) => (
-              <TouchableOpacity
-                key={index}
-                onPress={() => setActivePhotoIndex(index)}
-                style={[styles.gridPhoto, index === activePhotoIndex && styles.gridPhotoActive]}
-              >
-                <Image source={{ uri: photo }} style={styles.gridPhotoImage} />
-              </TouchableOpacity>
-            ))}
-            {photos.length < 6 ? (
-              <TouchableOpacity style={styles.addPhotoButton} onPress={() => navigation.navigate('ProfileEdit')}>
-                <Icon name="plus" size={24} color="#666" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
+          <TouchableOpacity onPress={() => navigation.navigate('Photos')}>
+            <Text style={styles.sectionAction}>Manage</Text>
+          </TouchableOpacity>
         </View>
-      ) : null}
+        <View style={styles.photoGrid}>
+          {photos.map((photo, index) => (
+            <TouchableOpacity
+              key={index}
+              onPress={() => setActivePhotoIndex(index)}
+              style={[styles.gridPhoto, index === activePhotoIndex && styles.gridPhotoActive]}
+            >
+              <Image source={{ uri: photo }} style={styles.gridPhotoImage} />
+            </TouchableOpacity>
+          ))}
+          {photos.length < 6 ? (
+            <TouchableOpacity style={styles.addPhotoButton} onPress={() => navigation.navigate('Photos')}>
+              <Icon name="plus" size={24} color="#666" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
 
       {/* Interests */}
       {interests.length > 0 ? (
