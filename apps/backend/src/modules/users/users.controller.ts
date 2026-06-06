@@ -15,10 +15,6 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 
-// multer v2 ships no bundled types — use require to avoid TS module-resolution errors.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { memoryStorage } = require('multer') as { memoryStorage: () => unknown };
-
 interface MulterFile {
   fieldname: string;
   originalname: string;
@@ -132,7 +128,7 @@ export class UsersController {
   @HttpCode(201)
   @UseInterceptors(
     FileInterceptor('photo', {
-      storage: memoryStorage(),
+      // No storage option → NestJS/multer keeps the file in memory (file.buffer).
       limits: { fileSize: 10 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
