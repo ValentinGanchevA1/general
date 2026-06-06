@@ -4,6 +4,7 @@ import { join } from 'path';
 import * as Sentry from '@sentry/nestjs';
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -43,7 +44,11 @@ async function bootstrap(): Promise<void> {
   // rawBody: keeps the unparsed body on req.rawBody for Stripe webhook
   // signature verification (subscriptions/webhook), while JSON parsing still
   // works for every other route.
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+
+  // Raise the JSON limit above the 100 KB default so the mobile base64 photo
+  // upload (POST /users/me/photos/base64, ~10 MB image → ~13.5 MB base64) fits.
+  app.useBodyParser('json', { limit: '15mb' });
 
   app.use(helmet());
 

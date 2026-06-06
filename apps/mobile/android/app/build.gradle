@@ -45,8 +45,14 @@ react {
     // extraPackagerArgs = []
 
     /* Hermes Commands */
-    //   The hermes compiler command to run. By default it is 'hermesc'
-    // hermesCommand = "$rootDir/my-custom-hermesc/bin/hermesc"
+    //   RN 0.83 ships the Hermes compiler in the separate `hermes-compiler` package
+    //   instead of `react-native/sdks/hermesc`. Under pnpm the default lookup path
+    //   doesn't exist, so the bundle task fails with "Couldn't determine Hermesc
+    //   location". Point it at the real binary in the pnpm store.
+    def osBin = org.gradle.internal.os.OperatingSystem.current().isWindows() ? "win64-bin" :
+                (org.gradle.internal.os.OperatingSystem.current().isMacOsX() ? "osx-bin" : "linux64-bin")
+    def hermescExe = org.gradle.internal.os.OperatingSystem.current().isWindows() ? "hermesc.exe" : "hermesc"
+    hermesCommand = "$rootDir/../../../node_modules/.pnpm/hermes-compiler@0.14.0/node_modules/hermes-compiler/hermesc/$osBin/$hermescExe"
     //
     //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
     // hermesFlags = ["-O", "-output-source-map"]

@@ -257,6 +257,15 @@ export interface AddPhotoRequest {
   url: string;
 }
 
+export interface UploadPhotoBase64Request {
+  /** Base64-encoded image bytes (no data-URI prefix). */
+  data: string;
+  /** Image MIME type: image/jpeg | image/png | image/webp | image/heic. */
+  contentType: string;
+  /** Original filename, for logging/diagnostics only. */
+  fileName?: string;
+}
+
 export interface ReorderPhotosRequest {
   /** Every photo id the user owns, in the desired order. Index 0 becomes primary. */
   photoIds: string[];

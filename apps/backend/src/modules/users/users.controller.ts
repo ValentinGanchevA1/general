@@ -29,6 +29,7 @@ import {
   IsArray,
   IsIn,
   IsISO8601,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
@@ -42,6 +43,7 @@ import type {
   PublicUserProfile,
   ReorderPhotosRequest,
   UpdateProfileRequest,
+  UploadPhotoBase64Request,
   UserPhoto,
   UserProfile,
 } from '@g88/shared';
@@ -72,6 +74,20 @@ class AddPhotoDto implements AddPhotoRequest {
   @IsString()
   @Matches(/^https:\/\/.+/, { message: 'url must be an https URL' })
   url!: string;
+}
+
+class UploadPhotoBase64Dto implements UploadPhotoBase64Request {
+  @IsString()
+  @IsNotEmpty()
+  data!: string;
+
+  @IsString()
+  @Matches(/^image\/(jpeg|png|webp|heic)$/, { message: 'contentType must be an image MIME type' })
+  contentType!: string;
+
+  @IsOptional()
+  @IsString()
+  fileName?: string;
 }
 
 class ReorderPhotosDto implements ReorderPhotosRequest {
@@ -142,6 +158,29 @@ export class UsersController {
   ): Promise<UserPhoto[]> {
     if (!file) throw new BadRequestException('No valid image file provided (jpeg/png/webp/heic, max 10 MB)');
     const url = await this.s3.uploadPhotoBuffer(userId, file.buffer, file.mimetype);
+    return this.users.addPhoto(userId, url);
+  }
+
+  /**
+   * Base64 JSON upload — the path the mobile client uses. React Native's multipart
+   * file upload streams a one-shot body that dev network inspectors close before
+   * it sends ("Stream Closed"); a JSON body is re-readable and uploads reliably.
+   * Field "data" is the raw base64 (no data-URI prefix). Max 10 MB decoded.
+   */
+  @Post('me/photos/base64')
+  @HttpCode(201)
+  async uploadPhotoBase64(
+    @Body() dto: UploadPhotoBase64Dto,
+    @CurrentUser('id') userId: string,
+  ): Promise<UserPhoto[]> {
+    const buffer = Buffer.from(dto.data, 'base64');
+    if (buffer.length === 0) {
+      throw new BadRequestException('Image data is empty or not valid base64');
+    }
+    if (buffer.length > 10 * 1024 * 1024) {
+      throw new BadRequestException('Image exceeds the 10 MB limit');
+    }
+    const url = await this.s3.uploadPhotoBuffer(userId, buffer, dto.contentType);
     return this.users.addPhoto(userId, url);
   }
 
