@@ -136,7 +136,7 @@ export class UsersController {
         if (allowed.includes(file.mimetype)) {
           cb(null, true);
         } else {
-          cb(new BadRequestException('File type not allowed (jpeg/png/webp/heic only)'));
+          cb(new BadRequestException('File type not allowed (jpeg/png/webp/heic only)'), false);
         }
       },
     }),
