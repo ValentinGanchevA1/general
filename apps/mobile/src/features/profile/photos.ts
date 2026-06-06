@@ -5,9 +5,7 @@ import type {
   UserPhoto,
 } from '@g88/shared';
 
-import { deleteJson, getJson, patchJson } from '@/api/client';
-import { tokenStore } from '@/api/tokenStore';
-import { Config } from '@/config';
+import { api, deleteJson, getJson, patchJson } from '@/api/client';
 
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic']);
 
@@ -32,11 +30,6 @@ export async function setPrimary(photoId: string, all: UserPhoto[]): Promise<Use
 /**
  * Full add flow: pick from the library → POST multipart to backend → backend writes to S3.
  *
- * Previously used a presigned-PUT flow but React Native on Android cannot reliably
- * send raw binary to S3 (fetch() fails on content:// URIs; XHR send({ uri }) returns
- * status 0 for PUT requests). Multipart POST through the backend is 100% reliable
- * in React Native and avoids all binary-upload edge cases.
- *
  * Returns the updated gallery, or null if the user cancelled the picker.
  */
 export async function pickAndUploadPhoto(): Promise<UserPhoto[] | null> {
@@ -57,26 +50,20 @@ export async function pickAndUploadPhoto(): Promise<UserPhoto[] | null> {
     name: asset.fileName ?? 'photo.jpg',
   } as unknown as Blob);
 
-  // Use fetch (not the axios `api`) so React Native sets Content-Type to
-  // `multipart/form-data; boundary=...` itself. Setting it manually omits the
-  // boundary and the request fails at the transport layer (net::ERR_FAILED).
-  const token = await tokenStore.getAccessToken();
-  const res = await fetch(`${Config.API_BASE_URL}/api/v1/users/me/photos/upload`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    body: formData,
+  // Use Axios (XHR) rather than native fetch. In RN's new architecture, passing
+  // any custom headers object to fetch() suppresses the automatic
+  // Content-Type: multipart/form-data; boundary=... injection, causing OkHttp to
+  // reject the request before it leaves the device (ERR_FAILED, 0 B, <10 ms).
+  // React Native's XHR always negotiates the multipart boundary correctly.
+  // Auth is injected by the Axios request interceptor; Content-Type is cleared
+  // here via transformRequest so XHR sets it (with the boundary) itself.
+  const { data } = await api.post('/users/me/photos/upload', formData, {
+    transformRequest: (d, headers) => {
+      headers.delete('Content-Type');
+      return d;
+    },
   });
-  if (!res.ok) {
-    let message = `Upload failed (${res.status})`;
-    try {
-      const body = (await res.json()) as { message?: string };
-      if (body?.message) message = body.message;
-    } catch {
-      // non-JSON error body; keep the status-based message
-    }
-    throw new Error(message);
-  }
-  return (await res.json()) as UserPhoto[];
+  return data as UserPhoto[];
 }
 
 function normalizeContentType(asset: Asset): string {
