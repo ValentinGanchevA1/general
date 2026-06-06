@@ -9,11 +9,8 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  UploadedFile,
   UseGuards,
-  UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -27,16 +24,6 @@ import {
   Matches,
   ValidateIf,
 } from 'class-validator';
-import { memoryStorage } from 'multer';
-
-interface MulterFile {
-  fieldname: string;
-  originalname: string;
-  encoding: string;
-  mimetype: string;
-  buffer: Buffer;
-  size: number;
-}
 
 import type {
   AddPhotoRequest,
@@ -135,36 +122,6 @@ export class UsersController {
   }
 
   // ─── Gallery photos ─────────────────────────────────────────────────────────
-
-  /**
-   * Mobile upload proxy — accepts multipart/form-data and writes directly to S3.
-   * Avoids React Native's unreliable binary PUT via presigned URL.
-   * Field name: "photo". Max 10 MB.
-   */
-  @Post('me/photos/upload')
-  @HttpCode(201)
-  @UseInterceptors(
-    FileInterceptor('photo', {
-      storage: memoryStorage(),
-      limits: { fileSize: 10 * 1024 * 1024 },
-      fileFilter: (_req, file, cb) => {
-        const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
-        if (allowed.includes(file.mimetype)) {
-          cb(null, true);
-        } else {
-          cb(new BadRequestException('File type not allowed (jpeg/png/webp/heic only)'), false);
-        }
-      },
-    }),
-  )
-  async uploadPhoto(
-    @UploadedFile() file: MulterFile | undefined,
-    @CurrentUser('id') userId: string,
-  ): Promise<UserPhoto[]> {
-    if (!file) throw new BadRequestException('No valid image file provided (jpeg/png/webp/heic, max 10 MB)');
-    const url = await this.s3.uploadPhotoBuffer(userId, file.buffer, file.mimetype);
-    return this.users.addPhoto(userId, url);
-  }
 
   /**
    * Base64 JSON upload — the path the mobile client uses. React Native's multipart
