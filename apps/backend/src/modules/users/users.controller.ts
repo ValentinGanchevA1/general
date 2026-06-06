@@ -14,15 +14,6 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-
-interface MulterFile {
-  fieldname: string;
-  originalname: string;
-  encoding: string;
-  mimetype: string;
-  buffer: Buffer;
-  size: number;
-}
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -35,6 +26,16 @@ import {
   Matches,
   ValidateIf,
 } from 'class-validator';
+import { memoryStorage } from 'multer';
+
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  buffer: Buffer;
+  size: number;
+}
 
 import type {
   AddPhotoRequest,
@@ -128,11 +129,15 @@ export class UsersController {
   @HttpCode(201)
   @UseInterceptors(
     FileInterceptor('photo', {
-      // No storage option → NestJS/multer keeps the file in memory (file.buffer).
+      storage: memoryStorage(),
       limits: { fileSize: 10 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
-        cb(null, allowed.includes(file.mimetype));
+        if (allowed.includes(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('File type not allowed (jpeg/png/webp/heic only)'));
+        }
       },
     }),
   )
