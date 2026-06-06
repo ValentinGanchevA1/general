@@ -2,10 +2,11 @@ import { launchImageLibrary, type Asset } from 'react-native-image-picker';
 
 import type {
   ReorderPhotosRequest,
+  UploadPhotoBase64Request,
   UserPhoto,
 } from '@g88/shared';
 
-import { api, deleteJson, getJson, patchJson } from '@/api/client';
+import { deleteJson, getJson, patchJson, postJson } from '@/api/client';
 
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic']);
 
@@ -28,7 +29,16 @@ export async function setPrimary(photoId: string, all: UserPhoto[]): Promise<Use
 }
 
 /**
- * Full add flow: pick from the library → POST multipart to backend → backend writes to S3.
+ * Full add flow: pick from the library → POST the image as base64 JSON → backend
+ * decodes and writes to S3.
+ *
+ * Why base64-over-JSON and not multipart: React Native's multipart file upload
+ * sends the file as a one-shot stream body. Dev-mode network inspectors (and some
+ * OkHttp interceptors) read that stream to log it, which closes it before OkHttp
+ * can transmit — the request then fails instantly with "Stream Closed" / status 0.
+ * A JSON body is a re-readable buffer, so it sends reliably in both debug and
+ * release builds. The previous presigned-PUT and multipart-proxy flows both hit
+ * this same wall.
  *
  * Returns the updated gallery, or null if the user cancelled the picker.
  */
@@ -37,33 +47,24 @@ export async function pickAndUploadPhoto(): Promise<UserPhoto[] | null> {
     mediaType: 'photo',
     selectionLimit: 1,
     quality: 0.8,
+    includeBase64: true,
   });
   if (result.didCancel) return null;
   const asset = result.assets?.[0];
   if (!asset?.uri) throw new Error(result.errorMessage ?? 'Could not read the selected image');
+  if (!asset.base64) throw new Error('Could not read the image data — please try another photo');
 
   const contentType = normalizeContentType(asset);
-  const formData = new FormData();
-  formData.append('photo', {
-    uri: asset.uri,
-    type: contentType,
-    name: asset.fileName ?? 'photo.jpg',
-  } as unknown as Blob);
-
-  // Use Axios (XHR) rather than native fetch. In RN's new architecture, passing
-  // any custom headers object to fetch() suppresses the automatic
-  // Content-Type: multipart/form-data; boundary=... injection, causing OkHttp to
-  // reject the request before it leaves the device (ERR_FAILED, 0 B, <10 ms).
-  // React Native's XHR always negotiates the multipart boundary correctly.
-  // Auth is injected by the Axios request interceptor; Content-Type is cleared
-  // here via transformRequest so XHR sets it (with the boundary) itself.
-  const { data } = await api.post('/users/me/photos/upload', formData, {
-    transformRequest: (d, headers) => {
-      headers.delete('Content-Type');
-      return d;
-    },
-  });
-  return data as UserPhoto[];
+  const body: UploadPhotoBase64Request = {
+    data: asset.base64,
+    contentType,
+    ...(asset.fileName ? { fileName: asset.fileName } : {}),
+  };
+  return postJson<UploadPhotoBase64Request, UserPhoto[]>(
+    '/users/me/photos/base64',
+    body,
+    { timeout: 60_000 }, // base64 payloads are larger than the 15s default allows for
+  );
 }
 
 function normalizeContentType(asset: Asset): string {
