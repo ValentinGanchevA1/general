@@ -68,14 +68,23 @@ function normalizeContentType(asset: Asset): string {
 /**
  * Raw PUT of the local file to the presigned S3 URL. Must bypass the axios `api`
  * instance — no auth header, and the body is the raw binary (not JSON/multipart).
+ *
+ * Uses XMLHttpRequest instead of fetch because React Native's fetch cannot read
+ * Android content:// URIs as blobs. XHR's { uri } body format is natively handled
+ * by RN's HTTP layer and works on both platforms.
  */
 async function putToS3(localUri: string, contentType: string, uploadUrl: string): Promise<void> {
-  const fileResp = await fetch(localUri);
-  const blob = await fileResp.blob();
-  const res = await fetch(uploadUrl, {
-    method: 'PUT',
-    body: blob,
-    headers: { 'Content-Type': contentType },
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', uploadUrl);
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState !== 4) return;
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Upload failed (${xhr.status})`));
+    };
+    xhr.onerror = () => reject(new Error('Upload failed — check your connection'));
+    // RN's XHR accepts { uri } and streams the file directly, bypassing the blob step
+    (xhr as any).send({ uri: localUri, type: contentType, name: 'photo' });
   });
-  if (!res.ok) throw new Error(`Upload failed (${res.status})`);
 }
