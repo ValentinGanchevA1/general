@@ -1,12 +1,13 @@
 import { launchImageLibrary, type Asset } from 'react-native-image-picker';
 
 import type {
-  AddPhotoRequest,
   ReorderPhotosRequest,
   UserPhoto,
 } from '@g88/shared';
 
-import { api, deleteJson, getJson, patchJson } from '@/api/client';
+import { deleteJson, getJson, patchJson } from '@/api/client';
+import { tokenStore } from '@/api/tokenStore';
+import { Config } from '@/config';
 
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic']);
 
@@ -56,10 +57,26 @@ export async function pickAndUploadPhoto(): Promise<UserPhoto[] | null> {
     name: asset.fileName ?? 'photo.jpg',
   } as unknown as Blob);
 
-  const res = await api.post<UserPhoto[]>('/users/me/photos/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+  // Use fetch (not the axios `api`) so React Native sets Content-Type to
+  // `multipart/form-data; boundary=...` itself. Setting it manually omits the
+  // boundary and the request fails at the transport layer (net::ERR_FAILED).
+  const token = await tokenStore.getAccessToken();
+  const res = await fetch(`${Config.API_BASE_URL}/api/v1/users/me/photos/upload`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: formData,
   });
-  return res.data;
+  if (!res.ok) {
+    let message = `Upload failed (${res.status})`;
+    try {
+      const body = (await res.json()) as { message?: string };
+      if (body?.message) message = body.message;
+    } catch {
+      // non-JSON error body; keep the status-based message
+    }
+    throw new Error(message);
+  }
+  return (await res.json()) as UserPhoto[];
 }
 
 function normalizeContentType(asset: Asset): string {
