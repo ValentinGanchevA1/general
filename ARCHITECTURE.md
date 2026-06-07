@@ -66,12 +66,16 @@ EXPIRE presence:cell:{h3r8} 120
 
 Reads: discovery joins the cluster aggregate from Postgres with a presence lookup from Redis to flag which entities are online *now*.
 
-### 3.5 Two services, not one
+### 3.5 Two services, not one (planned) — one process today
+
+**Target topology:**
 
 - **REST API** (`apps/backend`, NestJS over HTTP) — auth, CRUD, discovery query, write paths.
-- **Realtime gateway** (same repo, separate `main.ts` and Render service) — Socket.IO with the Redis adapter for cross-instance fan-out. Sticky sessions are required here, not on the REST tier.
+- **Realtime gateway** (same repo, separate `main.realtime.ts` and Render service) — Socket.IO with the Redis adapter for cross-instance fan-out. Sticky sessions are required here, not on the REST tier.
 
 Sharing the codebase keeps DTOs and services consistent; deploying separately means we can scale sockets independently of HTTP, and a socket-layer OOM doesn't take down `POST /listings`.
+
+**Current reality (as of 2026-06-07):** there is **one** entrypoint, `apps/backend/src/main.ts`, and **one** Render service (`g88-api`). `RealtimeModule` is imported into `AppModule`, so the Socket.IO gateway runs **in-process** with REST — Socket.IO attaches to the same HTTP server (`app.listen(3001)`, namespace `/realtime`). There is no `main.realtime.ts` yet. The split above is the plan for when socket load justifies independent scaling; until then, the single-process form is intentional (cheaper, one deploy). When the split lands, extract a `main.realtime.ts` that boots only `RealtimeModule` + its deps, and point a second Render service at it.
 
 ### 3.6 Typed socket contracts
 
@@ -139,6 +143,7 @@ JWT access token (15min) + opaque refresh token (30d, rotating, stored hashed in
 
 ## Change log
 
+- **2026-06-07** — Doc correction (no code): §3.5 reworded to reflect that the realtime gateway currently runs **in-process** with REST in a single `main.ts` / single Render service (`g88-api`), not as a separate `main.realtime.ts` deploy. The two-service split is retained as the planned topology. `CLAUDE.md` updated in lockstep (stack table, local realtime URL `:3001`, the "Single `main.ts`" convention). `DEPLOY.md` still references a `g88-realtime` service — stale; left for a separate pass.
 - 2026-05-13 — initial draft (H3, server-side clustering, location fuzzing, two-service split).
 - **2026-05-14** — Reconciliation Phase R1. Pre-monorepo `mobile/` and `backend/` moved under `legacy/` (frozen, read-only — see `legacy/README.md`). `pnpm-workspace.yaml` excludes `legacy/**`. ESLint and CI both block imports from `legacy/`. Tagged `legacy-freeze-2026-05-14`. P1 pillar progress tracked in `STATUS.md`. Old `CLAUDE.md` replaced — see updated version.
 - **2026-05-20** — R2 (P0 backend) + R3 (P0 mobile) complete. Chat persistence wired (`chat.service.ts` + `messages` table). REST endpoints for conversations/messages added. Wave sender fully hydrated in `emitWaveReceived`. FCM notifications module added (token registration + send-on-offline). `presence:delta` emitter implemented on H3 cell boundary cross. `conversation:join` socket handler added. Mobile: `AuthScreen`, `ProfileCreationScreen`, `ProfileEditScreen`, `InboxScreen`, `ChatScreen`, `SettingsScreen`, `ErrorBoundary` all ported/rebuilt. `AppNavigator` auth gate implemented.

@@ -38,7 +38,7 @@ G88 is a **map-first, location-based social platform**. Users appear as interact
 |----------------------------|----------------------------------------------------------------------------------------------------------------|
 | Mobile                     | React Native 0.83 (CLI), React 19, TypeScript 5.8, Redux Toolkit 2, React Navigation 7                         |
 | Backend (REST)             | NestJS 11, TypeORM 0.3 (DataSource only, raw SQL), TypeScript 5.3, Node ≥20                                    |
-| Realtime gateway           | NestJS, Socket.IO 4 with Redis adapter (separate deploy from REST)                                             |
+| Realtime gateway           | NestJS, Socket.IO 4 with Redis adapter (currently in-process with REST on one service; separate deploy planned) |
 | Database                   | PostgreSQL 16 + PostGIS + H3-PG (`geography(Point,4326)` + H3 cell columns r5/7/9/10, GIST indexes)            |
 | Cache / Presence / Pub-Sub | Redis 7 (sorted sets per H3 r8 cell, 120s TTL)                                                                 |
 | Spatial index              | H3 (Uber hexagonal hierarchical), server-side clustering at zoom <14                                           |
@@ -83,7 +83,7 @@ g88/
 
 **Key URLs:**
 - Local backend: `http://10.0.2.2:3001/api/v1` (Android emulator) or `http://localhost:3001/api/v1`
-- Local realtime: `ws://localhost:3002/realtime`
+- Local realtime: `ws://localhost:3001/realtime` (Socket.IO is attached to the REST HTTP server, same port)
 - Prod: `https://api.g88.app/api/v1`
 - Swagger: `/api/docs` (local dev only)
 
@@ -106,7 +106,7 @@ g88/
 
 - **TypeORM is wired but used only for `DataSource.query()`** — raw parameterized SQL. No entities, no `Repository<T>`. This is intentional: the schema uses H3 generated columns and materialized views that don't map cleanly to TypeORM.
 - **Path alias `@/` → `src/`** (via `tsconfig-paths` + Jest `moduleNameMapper`).
-- **Two `main.ts` files**: `main.ts` (REST) and `main.realtime.ts` (Socket.IO gateway). Each deploys independently.
+- **Single `main.ts`**: the Socket.IO gateway (`RealtimeModule`) is imported into `AppModule` and runs **in-process** with REST — Socket.IO attaches to the same HTTP server (port 3001, namespace `/realtime`). The two-service split (a separate `main.realtime.ts` + Render service) is the planned topology in `ARCHITECTURE.md §3.5`, not the current reality.
 - **All errors normalize to `{ statusCode, code, message, details? }`** via `AllExceptionsFilter`. The `code` is machine-readable (`'wave.cooldown'`), `message` is human-readable.
 - **DTO validation**: `ValidationPipe(whitelist, transform, forbidNonWhitelisted)`. Class-validator decorators on every DTO.
 - **Rate limiting**: 3 tiers via `@nestjs/throttler`. Auth endpoints `@SkipThrottle()`; sensitive write endpoints get tighter `@Throttle()` overrides.
