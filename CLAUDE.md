@@ -24,61 +24,82 @@ Act as a **Senior Full-Stack Architect** specialized in high-performance mobile 
 
 ## Product Context
 
-G88 is a **map-first, location-based social platform**. Users appear as interactive avatars on a real-time map. P1 surface area: nearby people · events · listings · lightweight interactions (wave, chat). Long-term: hyperlocal commerce, reputation, gamification.
+G88 is a **map-first, location-based social platform**. Users appear as interactive avatars on a real-time map. Shipped P1 surface: nearby people · presence · lightweight interactions (wave, chat). P3 surface (backend built, mobile not yet woven in): events · listings/trades · gifts · gamification · trending. Long-term: hyperlocal commerce, reputation, monetization.
 
 **Privacy is a hard constraint**: exact GPS never lands in the DB. Locations are fuzzed at write time to H3 r10 cell centroid (~120m). See `ARCHITECTURE.md §3.3`.
 
-## Phase 1 Scope (current sprint)
+## Phase Scope (where we are)
 
-**Auth → Profile → Map discovery → Presence → Wave → Chat.** Everything outside this critical path is feature-flagged or deferred. See `STATUS.md` for live progress.
+Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md`.
+
+- **P1 — foundation: ✅ shipped.** Auth → Profile → Map discovery → Presence → Wave → Chat.
+- **P2 — pre-launch hardening: 🟡 active (current focus).** Targeting TestFlight. Sentry ✅ and dev-secret cleanup ✅ done; remaining: chat outbox (C6), viewport-diff map protocol (M1), ≥1 `.spec.ts` per backend module (C2 gate).
+- **P3 — habit-forming features: ⏳ post-launch.** Backend for gamification, challenges, gifts, achievements, notifications/geofences, trending, social-linking, and trades **already exists in the repo** but is largely **not surfaced** in mobile. Don't treat a P3 module's existence as "done" — surfacing is the remaining work.
+- **P4+ — horizon: 📋 documented only.** Monetization (Stripe Connect, paid gifts), live streaming, group chat, web client. Don't build without explicit go-ahead — see the `ROADMAP.md` cuts list.
 
 ## Current Stack (in use)
 
-| Layer                      | Tech                                                                                                           |
-|----------------------------|----------------------------------------------------------------------------------------------------------------|
-| Mobile                     | React Native 0.83 (CLI), React 19, TypeScript 5.8, Redux Toolkit 2, React Navigation 7                         |
-| Backend (REST)             | NestJS 11, TypeORM 0.3 (DataSource only, raw SQL), TypeScript 5.3, Node ≥20                                    |
-| Realtime gateway           | NestJS, Socket.IO 4 with Redis adapter (currently in-process with REST on one service; separate deploy planned) |
-| Database                   | PostgreSQL 16 + PostGIS + H3-PG (`geography(Point,4326)` + H3 cell columns r5/7/9/10, GIST indexes)            |
-| Cache / Presence / Pub-Sub | Redis 7 (sorted sets per H3 r8 cell, 120s TTL)                                                                 |
-| Spatial index              | H3 (Uber hexagonal hierarchical), server-side clustering at zoom <14                                           |
-| Storage                    | AWS S3 (presigned URLs)                                                                                        |
-| Payments                   | Stripe (Connect Express) — scaffolded, deferred until commerce pillar                                          |
-| Auth                       | JWT access 15m + refresh 30d (rotation to opaque DB-stored in flight — see STATUS.md)                          |
-| Push                       | Firebase Cloud Messaging (Android + iOS via APNs proxy)                                                        |
-| External                   | Twilio (SMS OTP), SendGrid (transactional email), AWS Rekognition (face compare, deferred)                     |
-| Deploy                     | Render.com web services (`g88-api`, `g88-realtime`) + Redis; **Supabase** managed Postgres; GitHub Actions CI  |
+| Layer                      | Tech                                                                                                                                                                                |
+|----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Monorepo / tooling         | pnpm 11 workspaces (`apps/*`, `packages/*`). TypeScript 5.5 across all packages. Node ≥22.13.                                                                                       |
+| Mobile                     | React Native 0.83 (CLI), React 19, TypeScript 5.5, Redux Toolkit 2, React Navigation 7                                                                                              |
+| Backend (REST)             | NestJS 11, TypeORM 0.3 (DataSource only, raw SQL), TypeScript 5.5, Node ≥22.13                                                                                                      |
+| Realtime gateway           | NestJS, Socket.IO 4 (Redis adapter). Runs **in-process** with REST in a single `main.ts` / single `g88-api` service; separate deploy is planned, not built (`ARCHITECTURE.md §3.5`) |
+| Database                   | PostgreSQL 16 + PostGIS + H3-PG (`geography(Point,4326)` + H3 cell columns r5/7/9/10, GIST indexes). Schema = migrations `0001`–`0019`, next free `0020`                            |
+| Cache / Presence / Pub-Sub | Redis 7 (sorted sets per H3 r8 cell, 120s TTL)                                                                                                                                      |
+| Spatial index              | H3 (Uber hexagonal hierarchical), server-side clustering at zoom <14                                                                                                                |
+| Storage                    | AWS S3, presigned URLs (avatars + photo gallery; verified end-to-end)                                                                                                               |
+| Auth                       | JWT access 15m + refresh 30d, **rotating opaque DB-stored refresh tokens, family tracking + revocation (shipped)**. Google OAuth live; Apple Sign-In removed (migration `0019`)     |
+| Payments                   | Stripe **subscriptions** (Checkout + Billing portal + webhook) — wired, **test mode**, tier set only by verified webhook. Connect/marketplace deferred to P4                        |
+| Verification               | Twilio Verify (phone OTP) — wired. Photo/ID face-compare (AWS Rekognition) deferred (not in code)                                                                                   |
+| Push                       | Firebase Cloud Messaging (Android + iOS via APNs proxy)                                                                                                                             |
+| Observability              | Sentry on both apps (errors, PII-scrubbed). Structured request logging (Pino) still deferred — debt **C3**                                                                          |
+| Deploy                     | Render: `g88-api` (REST + in-process realtime) + `g88-redis`. **Supabase** managed Postgres. GitHub Actions CI                                                                      |
 
 ## Deferred Stack (not yet adopted)
 
-Reference these only when proposing post-P1 work. **Do not introduce without discussion.**
+Reference these only when proposing post-launch work. **Do not introduce without discussion.** Most are on the `ROADMAP.md` cuts list — they keep resurfacing from legacy roadmaps; the answer is "not now."
 
-- Search: Elasticsearch (listings, profile discovery at scale)
-- Streaming: Kafka / RabbitMQ
-- Observability: Prometheus + Grafana, Sentry + Pino (Sentry partially wired)
-- RPC: gRPC for internal service-to-service
-- Orchestration: Kubernetes, Terraform on AWS
-- Time-series: InfluxDB (engagement metrics)
-- API gateway: GraphQL (REST + WS is sufficient at MVP)
+- Payments: Stripe **Connect** (marketplace fees on trades) + paid gifts — P4 monetization, gated on retention
+- Search: Elasticsearch (Postgres FTS + Redis sorted sets cover current search/trending)
+- Streaming: Kafka / RabbitMQ event bus (NestJS events + Redis pub/sub suffice)
+- Observability: Prometheus + Grafana / Loki, structured Pino logs (Sentry is the v1 surface — **already shipped on both apps**)
+- RPC: gRPC for internal service-to-service (single backend service today)
+- Orchestration: Kubernetes, Terraform on AWS (Render is sufficient ≤100k DAU)
+- Time-series: InfluxDB (no time-series workload exists)
+- API gateway: GraphQL (REST + WS is shipping; a switch would be a mid-flight rewrite)
+- Email: SendGrid transactional email — referenced in older docs, **not wired in code**
 
-> **Critical debt C3** (no production observability) is the most realistic near-term aspirational item. Sentry on both apps is the minimum bar.
+> **Debt C3** is now narrowed: Sentry (errors) ships on both apps; the remaining gap is **structured request logging** (Pino → Loki/Grafana), deferred until log volume warrants it.
 
 ## Repo Layout
 
 ```
 g88/
 ├── apps/
-│   ├── backend/        NestJS REST API + Socket.IO realtime gateway
-│   └── mobile/         React Native + TypeScript client
+│   ├── backend/            NestJS REST API + in-process Socket.IO realtime gateway
+│   │   ├── src/modules/    Feature modules (auth, users, discovery, chat, messaging,
+│   │   │                     interactions, presence, notifications, geofences, social,
+│   │   │                     verification, subscriptions, gamification, challenges,
+│   │   │                     achievements, gifts, trending, feed, ...)
+│   │   ├── src/realtime/   Socket.IO gateway (top-level, not under modules/)
+│   │   └── migrations/     0001–0019 raw SQL (next free 0020)
+│   └── mobile/             React Native + TypeScript client (src/features/{domain}/)
 ├── packages/
-│   └── shared/         API DTOs, socket event shapes, geo helpers — both apps import from here
-├── legacy/             Read-only. Pre-monorepo flat layout. CI ignores. Reference only.
-├── docs/
-│   └── marketing/      Pitch artifacts (bestRecentMVP.html etc.) — never an engineering source
-├── ARCHITECTURE.md     System design, key decisions, rationale
-├── STATUS.md           Live progress on P1 pillars + reconciliation state
-├── README.md           Quick start
-└── docker-compose.yml  Local Postgres + Redis
+│   └── shared/             API DTOs, socket event shapes, geo helpers — both apps import this
+├── legacy/                 Read-only. Pre-monorepo flat layout. CI ignores. Never import.
+├── docs/marketing/         Pitch artifacts (bestRecentMVP.html) — never an engineering source
+├── ARCHITECTURE.md         System design, decisions, rationale (+ change log)
+├── ROADMAP.md              Authoritative phase sequence, gates, risk register, cuts list
+├── SPECIFICATION.md        Per-feature contracts (referenced by ROADMAP)
+├── PRODUCT.md              What/why, target users, scope, monetization
+├── STATUS.md               Live phase progress (P1 shipped, P2 active) + reconciliation
+├── DEPLOY.md               Render/Supabase config, env vars, migration + credential status
+├── AUDIT.md                Latest codebase audit snapshot
+├── AGENTS.md               Agent/tooling notes
+├── README.md               Quick start, dev commands
+├── pnpm-workspace.yaml     Workspace definition
+└── docker-compose.yml      Local Postgres + Redis
 ```
 
 **Key URLs:**
@@ -146,6 +167,6 @@ g88/
 
 ## Reconciliation State
 
-This repo recently consolidated two parallel codebases (`totalmvp/mobile` + `totalmvp/backend` flat layout) into the current `apps/` monorepo. The old code is preserved under `legacy/` as read-only reference. **Do not import from `legacy/`** — CI lint rule enforces this.
+This repo recently consolidated two parallel codebases (`apps/mobile` + `apps/backend` flat layout) into the current `g88/` monorepo. The old code is preserved under `legacy/` as read-only reference. **Do not import from `legacy/`** — CI lint rule enforces this.
 
 For the status of each P1 pillar and which legacy modules have been reconciled, see `STATUS.md`.
