@@ -47,6 +47,7 @@ const BADGE_META: Array<{
   { key: 'id', icon: 'card-account-details', label: 'ID', color: '#FF9800' },
   { key: 'social', icon: 'link-variant', label: 'Social', color: '#E91E63' },
   { key: 'premium', icon: 'crown', label: 'Premium', color: '#FFD700' },
+  { key: 'verified', icon: 'check-decagram', label: 'Verified', color: '#00d4ff' },
 ];
 
 function ProgressCard({ summary }: { summary: GamificationSummary }): React.JSX.Element {
@@ -171,7 +172,7 @@ export function ProfileScreen(): React.JSX.Element {
   const goals = p.goals ?? [];
   const socialLinks = p.socialLinks ?? [];
   const badges = p.badges ?? {
-    email: false, phone: false, photo: false, id: false, social: false, premium: false,
+    email: false, phone: false, photo: false, id: false, social: false, premium: false, verified: false,
   };
   const tier = p.subscriptionTier ?? 'free';
   const verificationScore = p.verificationScore ?? 0;
@@ -230,7 +231,7 @@ export function ProfileScreen(): React.JSX.Element {
             {p.displayName}
             {p.age ? `, ${p.age}` : ''}
           </Text>
-          {verificationScore > 50 ? (
+           {p.verifiedBadge || badges.verified ? (
             <Icon name="check-decagram" size={24} color="#00d4ff" />
           ) : null}
         </View>

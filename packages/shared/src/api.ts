@@ -46,6 +46,8 @@ export interface UserMeta {
   verification: VerificationLevel;
   online: boolean;
   lastSeenAt: string | null; // ISO
+  /** True if user's ID has been verified. */
+  verifiedBadge?: boolean;
 }
 
 export interface EventMeta {
@@ -170,6 +172,7 @@ export interface ProfileBadges {
   social: boolean;
   /** any paid subscription tier */
   premium: boolean;
+  verified: boolean;
 }
 
 export interface UpdateProfileRequest {
@@ -182,6 +185,8 @@ export interface UpdateProfileRequest {
   /** ISO date (YYYY-MM-DD) or null to clear. */
   dateOfBirth?: string | null;
 }
+
+export type IdVerificationStatus = 'none' | 'pending' | 'verified' | 'rejected';
 
 export interface UserProfile extends AuthenticatedUser {
   bio: string | null;
@@ -200,6 +205,9 @@ export interface UserProfile extends AuthenticatedUser {
   /** 0–100, derived from the verification ladder. */
   verificationScore: number;
   badges: ProfileBadges;
+  idVerificationStatus: IdVerificationStatus;
+  /** True when idVerificationStatus === 'verified'. Shorthand for badge access. */
+  verifiedBadge: boolean;
 }
 
 /** Public-facing profile returned by GET /users/:id */

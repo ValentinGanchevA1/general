@@ -9,6 +9,7 @@ import { DataSource } from 'typeorm';
 
 import type {
   AuthenticatedUser,
+  IdVerificationStatus,
   ProfileBadges,
   PublicUserProfile,
   SocialLink,
@@ -35,6 +36,7 @@ interface UserRow {
   phone: string | null;
   age: number | null;
   subscription_tier: SubscriptionTier;
+  id_verification_status: IdVerificationStatus;
 }
 
 interface PublicUserRow {
@@ -55,7 +57,7 @@ interface SocialLinkRow {
 
 const USER_COLUMNS = `
   id, email, display_name, avatar_url, bio, verification_level, visibility,
-  goals, interests, phone, subscription_tier,
+  goals, interests, phone, subscription_tier, id_verification_status,
   date_part('year', age(date_of_birth))::int AS age`;
 
 // Verification ladder is cumulative: none < email < phone < selfie < id.
@@ -324,6 +326,7 @@ export class UsersService {
     level: VerificationLevel,
     tier: SubscriptionTier,
     socialLinks: SocialLink[],
+    idVerificationStatus: IdVerificationStatus,
   ): ProfileBadges {
     const rank = LADDER.indexOf(level);
     return {
@@ -333,6 +336,7 @@ export class UsersService {
       id: rank >= LADDER.indexOf('id'),
       social: socialLinks.some((l) => l.verified),
       premium: tier !== 'free',
+      verified: idVerificationStatus === 'verified',
     };
   }
 
@@ -351,7 +355,9 @@ export class UsersService {
       subscriptionTier: r.subscription_tier ?? 'free',
       socialLinks,
       verificationScore: SCORE[level] ?? 0,
-      badges: this.deriveBadges(level, r.subscription_tier ?? 'free', socialLinks),
+      badges: this.deriveBadges(level, r.subscription_tier ?? 'free', socialLinks, r.id_verification_status),
+       idVerificationStatus: r.id_verification_status,
+       verifiedBadge: r.id_verification_status === 'verified',
     };
   }
 }

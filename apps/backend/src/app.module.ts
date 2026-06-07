@@ -24,7 +24,7 @@ import { VerificationModule } from './modules/verification/verification.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { SocialModule } from './modules/social/social.module';
 import { RealtimeModule } from './realtime/realtime.module';
-
+import { IdVerificationModule } from './modules/id-verification/id-verification.module';
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({

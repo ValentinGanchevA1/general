@@ -31,6 +31,20 @@ export class S3Service {
     return this.presign('photos', userId, contentType);
   }
 
+  /** Presigned PUT URL for ID verification uploads. */
+  async verificationPresignedUrl(
+    fileKey: string,
+  ): Promise<string> {
+    if (!this.bucket) throw new Error('AWS_S3_BUCKET not configured');
+    const cmd = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: fileKey,
+      ContentType: 'image/jpeg',
+    });
+    const uploadUrl = await getSignedUrl(this.client, cmd, { expiresIn: 3600 });
+    return uploadUrl;
+  }
+
   /**
    * Upload a photo buffer directly to S3 (no presigned URL round-trip).
    * Used by the mobile upload proxy endpoint — avoids React Native binary PUT quirks.
