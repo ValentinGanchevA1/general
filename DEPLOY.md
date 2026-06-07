@@ -1,6 +1,9 @@
 # DEPLOY — G88 production configuration
 
-Operational reference for the `g88-api` (REST) and `g88-realtime` Render services.
+Operational reference for the `g88-api` Render service + `g88-redis`. `g88-api`
+currently serves **both** REST and the in-process Socket.IO realtime gateway
+(single `main.ts`; see `ARCHITECTURE.md §3.5`). A separate `g88-realtime` service
+is planned but **not deployed** — there is no `main.realtime.ts` yet.
 Tracks the migrations and environment variables each feature needs to go live.
 **Secrets are never committed** — values shown as `…` are set in the Render
 dashboard (or via the Render MCP when it's healthy). Non-secret config (price
@@ -13,12 +16,14 @@ IDs, URLs) may carry real values.
 ## Migrations
 
 Run on every deploy via `pnpm --filter @g88/backend migration:run` (idempotent;
-tracked in `schema_migrations` by filename). Pending as of P4: `0012`–`0015`.
+tracked in `schema_migrations` by filename). **All migrations `0001`–`0019` are
+applied to prod Supabase** (verified live 2026-06-05). Nothing pending.
 
 > The former `0012` prefix collision (`achievements` + `profile_expansion`) is
 > resolved: achievements moved to `0015_achievements.sql` (it has no deps and is
 > the latest feature; `profile_expansion` stays `0012` ahead of `0013`/`0014`).
-> **Next free number is `0016`.**
+> `0016` = drop VIP tier, `0017` = message requests, `0018` = gifts,
+> `0019` = drop Apple OAuth. **Next free number is `0020`.**
 
 ## Environment variables (`g88-api`)
 
@@ -55,15 +60,16 @@ Without these in non-prod, phone verification accepts dev code `000000`; in prod
 - URL: `https://g88-api.onrender.com/api/v1/subscriptions/webhook`
 - Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`
 
-> ✅ **Wired (2026-05-31).** Backend runs a **test** `sk_test_` key for
-> **`acct_1SgYZqQrMz3BrdsU`**; `STRIPE_PRICE_BASIC`/`PREMIUM` point at matching
-> **test** prices in that account. `checkout` returns `cs_test_…` sessions for both
-> tiers. The **VIP tier was removed** (migration `0016`) — delete the now-unused
-> `STRIPE_PRICE_VIP` var and archive the VIP product. Stray test products created
-> via MCP in the *other* account `acct_1SgCQL`
-> (`prod_UcPU40n5bbmHo0` / `prod_UcPUeqhS3U9rFw` / `prod_UcPUFODPjg3NeX`) can be archived.
-> Before launch, swap to a live key + live prices in `acct_1SgYZq`. Tier is set
-> **only** by the verified webhook, never by the client.
+> ✅ **Creds landed (2026-06-05, test mode).** `STRIPE_SECRET_KEY` (`sk_test_`),
+> `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_BASIC` (`price_1TdFbRQrMz3BrdsUdNVcUPHm`)
+> and `STRIPE_PRICE_PREMIUM` (`price_1TdFceQrMz3BrdsUvK1RsKTo`) are set on `g88-api`.
+> A **test** webhook (`we_1TewGyQrMz3BrdsU1vKbM2JL`) points at
+> `/api/v1/subscriptions/webhook` for the 4 events above. The **VIP tier was removed**
+> (migration `0016`) — `STRIPE_PRICE_VIP` is unused. ⏳ **Pending live verify:** the
+> checkout → webhook → `subscription_tier` flip has not yet been exercised against the
+> deploy. Stays **test mode** (no real charges) until explicitly taken live: swap to a
+> live key + live prices before launch. Tier is set **only** by the verified webhook,
+> never by the client.
 
 ### G4 — Social linking (OAuth) — per provider, secrets
 A provider is inert until both its id+secret are set. Register each provider's
@@ -85,12 +91,16 @@ OAuth **redirect URI** as `https://g88-api.onrender.com/api/v1/social/callback`.
 Several providers (Instagram/TikTok/Facebook) require app review before
 non-test users can link.
 
-## Status (2026-05-31)
-- Stripe **products + prices**: created via MCP but in the **wrong account**
-  (`acct_1SgCQL`, test) — unusable by the backend key (`acct_1SgYZq`, live). Must be
-  recreated in `acct_1SgYZq`; see the ⚠️ note under G3. Migrations `0012`–`0015` verified
-  applied (profile endpoint returns 200).
-- Stripe **webhook + secret key**: dashboard-only (MCP has no webhook op; key not exposed).
-- **Render env vars**: blocked — Render MCP read/write ops return "unknown error" on
-  every call except `select_workspace` (persists across integration reconnects). Set the
-  vars in the Render dashboard. Service: `g88-api` (`srv-d8d8ujojs32c73fb1gfg`).
+## Status (2026-06-05)
+- **Migrations**: `0001`–`0019` applied to prod Supabase (verified live 2026-06-05).
+- **G2 Twilio**: `TWILIO_ACCOUNT_SID/AUTH_TOKEN/VERIFY_SERVICE_SID` set on `g88-api`.
+  ⏳ Phone OTP SMS not yet run-verified against the deploy.
+- **G3 Stripe** (test mode): secret key, webhook secret, both price IDs, and the test
+  webhook (`we_1TewGyQrMz3BrdsU1vKbM2JL`) set on `g88-api`. ⏳ checkout → webhook →
+  `subscription_tier` flip not yet run-verified.
+- **S3** (avatar + photo gallery): configured & verified end-to-end 2026-06-05 —
+  `AWS_S3_BUCKET=g88-uploads-dev`, `AWS_REGION=eu-north-1`, access keys set on `g88-api`
+  (presign → PUT → public GET round-trip passed).
+- **G4 Social**: deferred — no provider creds landed.
+- Env vars were set via the **Render dashboard** (the Render MCP was unreachable across
+  the session). Service: `g88-api` (`srv-d8d8ujojs32c73fb1gfg`).
