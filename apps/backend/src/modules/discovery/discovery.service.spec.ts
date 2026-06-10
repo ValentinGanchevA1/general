@@ -1,5 +1,3 @@
-
-/ apps/backend/src/modules/discovery/discovery.service.spec.ts
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { getDataSourceToken } from '@nestjs/typeorm';
