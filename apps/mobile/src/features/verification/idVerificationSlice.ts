@@ -9,7 +9,14 @@ export const startIdVerification = createAsyncThunk('verification/start', async 
 
 export const submitIdVerification = createAsyncThunk(
   'verification/submit',
-  async (payload: { selfieKey: string; idFrontKey: string; idBackKey?: string }) => {
+  async (payload: {
+    selfie: string;
+    selfieContentType: string;
+    idFront: string;
+    idFrontContentType: string;
+    idBack?: string;
+    idBackContentType?: string;
+  }) => {
     const { data } = await api.post('/verification/id/submit', payload);
     return data;
   }
@@ -41,7 +48,21 @@ const slice = createSlice({
       .addCase(fetchIdVerificationStatus.fulfilled, (state, action) => {
         state.status = action.payload.status;
       })
-      // add more cases for start/submit as needed
+      .addCase(startIdVerification.fulfilled, (state, action) => {
+        state.status = action.payload.status;
+      })
+      .addCase(submitIdVerification.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(submitIdVerification.fulfilled, (state, action) => {
+        state.loading = false;
+        state.status = action.payload.status;
+      })
+      .addCase(submitIdVerification.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message ?? 'Verification failed';
+      });
   },
 });
 

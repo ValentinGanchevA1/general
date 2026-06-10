@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,23 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
-import { useAppDispatch } from '@/hooks/redux';
-import { submitIdVerification } from '@/features/verification/idVerificationSlice';
-import { api } from '@/api/client';
+import {
+  launchImageLibrary,
+  launchCamera,
+  type CameraOptions,
+  type ImageLibraryOptions,
+} from 'react-native-image-picker';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import {
+  submitIdVerification,
+  fetchIdVerificationStatus,
+} from '@/features/verification/idVerificationSlice';
+import { fetchProfile } from '@/features/profile/profileSlice';
 
 type StepKey = 'selfie' | 'idFront' | 'idBack';
+
+/** A picked image: `uri` for preview, `base64` + `type` for the upload payload. */
+type PickedImage = { uri: string; base64: string; type: string };
 
 const STEPS: { key: StepKey; title: string; optional?: boolean }[] = [
   { key: 'selfie', title: 'Take a selfie' },
@@ -25,9 +36,16 @@ const STEPS: { key: StepKey; title: string; optional?: boolean }[] = [
 export default function VerificationIdScreen(): React.ReactElement {
   const navigation = useNavigation();
   const dispatch = useAppDispatch();
+  const status = useAppSelector((s) => s.idVerification.status);
+
+  // Pull the latest status on entry so a returning user sees "under review"
+  // instead of being able to re-submit a pending request.
+  useEffect(() => {
+    void dispatch(fetchIdVerificationStatus());
+  }, [dispatch]);
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [images, setImages] = useState<Record<StepKey, string | null>>({
+  const [images, setImages] = useState<Record<StepKey, PickedImage | null>>({
     selfie: null,
     idFront: null,
     idBack: null,
@@ -36,32 +54,34 @@ export default function VerificationIdScreen(): React.ReactElement {
 
   const currentStep = (STEPS[currentStepIndex] ?? STEPS[0]) as Readonly<{ key: StepKey; title: string; optional?: boolean }>;
 
-  function setImageForStep(step: StepKey, uri: string | null) {
-    setImages(prev => ({ ...prev, [step]: uri }));
+  function setImageForStep(step: StepKey, image: PickedImage | null) {
+    setImages(prev => ({ ...prev, [step]: image }));
   }
 
   async function pickForStep(step: StepKey) {
-    const options = {
-      mediaType: 'photo' as const,
-      quality: 0.9,
-      includeBase64: false,
+    // Bound the dimensions so the base64 payload stays well under the API's body
+    // limit even with selfie + ID front + back in one submission.
+    const options: ImageLibraryOptions = {
+      mediaType: 'photo',
+      quality: 0.8,
+      maxWidth: 1600,
+      maxHeight: 1600,
+      includeBase64: true,
     };
 
-    // Cast to any: react-native-image-picker's PhotoQuality type is incompatible with standard quality values.
-    // This is a known library typing issue; runtime behavior is correct.
     const result = step === 'selfie'
-      ? await launchCamera({ ...options, cameraType: 'front' } as any)
-      : await launchImageLibrary(options as any);
+      ? await launchCamera({ ...options, cameraType: 'front' } satisfies CameraOptions)
+      : await launchImageLibrary(options);
 
     if (result.didCancel) return;
-    
-    const uri = result.assets?.[0]?.uri;
-    if (!uri) {
+
+    const asset = result.assets?.[0];
+    if (!asset?.uri || !asset.base64) {
       Alert.alert('Error', 'Could not access image');
       return;
     }
 
-    setImageForStep(step, uri);
+    setImageForStep(step, { uri: asset.uri, base64: asset.base64, type: asset.type ?? 'image/jpeg' });
   }
 
   async function uploadAll() {
@@ -72,41 +92,28 @@ export default function VerificationIdScreen(): React.ReactElement {
 
     setUploading(true);
     try {
-      // 1. Get presigned URLs from backend
-      const { data: presigned } = await api.post('/verification/id/start');
-      
-      // Helper to upload to S3 via PUT
-      const uploadToS3 = async (uri: string, uploadUrl: string) => {
-        const response = await fetch(uri);
-        const blob = await response.blob();
-        await fetch(uploadUrl, {
-          method: 'PUT',
-          body: blob,
-          headers: { 'Content-Type': blob.type },
-        });
-      };
-
-      // 2. Perform uploads
-      await uploadToS3(images.selfie, presigned.selfieUploadUrl);
-      await uploadToS3(images.idFront, presigned.idFrontUploadUrl);
-      
-      // 3. Submit keys to mark as pending
-      // We extract the S3 key from the presigned URL
-      const selfieKey = presigned.selfieUploadUrl.split('?')[0].split('.com/')[1];
-      const idFrontKey = presigned.idFrontUploadUrl.split('?')[0].split('.com/')[1];
-
+      // Single base64 submission: the server decodes, uploads to S3 with the right
+      // Content-Type, and generates the keys. This is the same transport the photo
+      // gallery uses — React Native's binary PUT to a presigned URL is unreliable.
       await dispatch(submitIdVerification({
-        selfieKey,
-        idFrontKey,
-        // idBackKey remains optional and is currently not provided by startVerification API
+        selfie: images.selfie.base64,
+        selfieContentType: images.selfie.type,
+        idFront: images.idFront.base64,
+        idFrontContentType: images.idFront.type,
+        ...(images.idBack
+          ? { idBack: images.idBack.base64, idBackContentType: images.idBack.type }
+          : {}),
       })).unwrap();
+
+      // Refresh the profile so the ProfileScreen card reflects "Under review"
+      // (the submit flips id_verification_status to 'pending' server-side).
+      void dispatch(fetchProfile());
 
       Alert.alert('Success', 'Verification submitted for review.', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
-    } catch (err) {
+    } catch {
       Alert.alert('Upload Failed', 'There was an error uploading your documents. Please try again.');
-      console.error(err);
     } finally {
       setUploading(false);
     }
@@ -128,6 +135,20 @@ export default function VerificationIdScreen(): React.ReactElement {
     if (currentStepIndex > 0) setCurrentStepIndex(i => i - 1);
   }
 
+  if (status === 'pending') {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.title}>Under review</Text>
+        <Text style={styles.subtitle}>
+          Your documents have been submitted. We'll update your profile once they're reviewed.
+        </Text>
+        <TouchableOpacity style={styles.primary} onPress={() => navigation.goBack()}>
+          <Text style={styles.primaryText}>Done</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Verify your identity</Text>
@@ -135,7 +156,7 @@ export default function VerificationIdScreen(): React.ReactElement {
 
       <View style={styles.previewArea}>
         {images[currentStep.key] ? (
-          <Image source={{ uri: images[currentStep.key] as string }} style={styles.preview} />
+          <Image source={{ uri: images[currentStep.key]!.uri }} style={styles.preview} />
         ) : (
           <View style={styles.placeholder}>
             <Text style={styles.placeholderText}>No photo selected</Text>
@@ -189,6 +210,7 @@ export default function VerificationIdScreen(): React.ReactElement {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
+  centered: { justifyContent: 'center', alignItems: 'center', gap: 16 },
   title: { fontSize: 20, fontWeight: '600', marginBottom: 8 },
   subtitle: { color: '#444', marginBottom: 12 },
   previewArea: { height: 320, borderRadius: 8, overflow: 'hidden', backgroundColor: '#f2f2f2', alignItems: 'center', justifyContent: 'center' },

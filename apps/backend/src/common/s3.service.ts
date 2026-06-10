@@ -30,19 +30,36 @@ export class S3Service {
   ): Promise<{ uploadUrl: string; publicUrl: string }> {
     return this.presign('photos', userId, contentType);
   }
-
-  /** Presigned PUT URL for ID verification uploads. */
-  async verificationPresignedUrl(
-    fileKey: string,
+  /**
+   * Upload an ID-verification document buffer directly to S3 (no presigned URL).
+   * Mirrors uploadPhotoBuffer: avoids React Native binary-PUT quirks and lets the
+   * server sign the real Content-Type instead of guessing. Returns the S3 object
+   * key — verification docs are private, so we store the key, not a public URL.
+   */
+  async uploadVerificationBuffer(
+    userId: string,
+    kind: 'selfie' | 'id-front' | 'id-back',
+    buffer: Buffer,
+    contentType: string,
   ): Promise<string> {
     if (!this.bucket) throw new Error('AWS_S3_BUCKET not configured');
-    const cmd = new PutObjectCommand({
-      Bucket: this.bucket,
-      Key: fileKey,
-      ContentType: 'image/jpeg',
-    });
-    const uploadUrl = await getSignedUrl(this.client, cmd, { expiresIn: 3600 });
-    return uploadUrl;
+    const EXT_MAP: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+      'image/heic': 'heic',
+    };
+    const ext = EXT_MAP[contentType] ?? 'jpg';
+    const key = `verifications/${userId}/${kind}-${randomUUID()}.${ext}`;
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      }),
+    );
+    return key;
   }
 
   /**
