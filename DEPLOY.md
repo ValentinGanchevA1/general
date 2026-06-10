@@ -16,14 +16,18 @@ IDs, URLs) may carry real values.
 ## Migrations
 
 Run on every deploy via `pnpm --filter @g88/backend migration:run` (idempotent;
-tracked in `schema_migrations` by filename). **All migrations `0001`–`0019` are
-applied to prod Supabase** (verified live 2026-06-05). Nothing pending.
+tracked in `schema_migrations` by filename). **All migrations `0001`–`0021` are
+applied to prod Supabase** (`0001`–`0019` verified 2026-06-05; `0020`/`0021`
+applied 2026-06-09, verified 2026-06-10). Nothing pending.
 
 > The former `0012` prefix collision (`achievements` + `profile_expansion`) is
 > resolved: achievements moved to `0015_achievements.sql` (it has no deps and is
 > the latest feature; `profile_expansion` stays `0012` ahead of `0013`/`0014`).
 > `0016` = drop VIP tier, `0017` = message requests, `0018` = gifts,
-> `0019` = drop Apple OAuth. **Next free number is `0020`.**
+> `0019` = drop Apple OAuth, `0020` = ID-verification schema (enum/column +
+> `user_id_verifications`), `0021` = discovery view `verifiedBadge`.
+> **Next free number is `0022`.** ⚠️ `0020` is not idempotent (raw `CREATE TYPE`/
+> `ADD COLUMN`, no guards) — already applied, do not re-run.
 
 ## Environment variables (`g88-api`)
 

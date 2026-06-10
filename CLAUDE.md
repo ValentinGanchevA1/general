@@ -39,22 +39,22 @@ Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md`.
 
 ## Current Stack (in use)
 
-| Layer                      | Tech                                                                                                                                                                                |
-|----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Monorepo / tooling         | pnpm 11 workspaces (`apps/*`, `packages/*`). TypeScript 5.5 across all packages. Node ≥22.13.                                                                                       |
-| Mobile                     | React Native 0.83 (CLI), React 19, TypeScript 5.5, Redux Toolkit 2, React Navigation 7                                                                                              |
-| Backend (REST)             | NestJS 11, TypeORM 0.3 (DataSource only, raw SQL), TypeScript 5.5, Node ≥22.13                                                                                                      |
-| Realtime gateway           | NestJS, Socket.IO 4 (Redis adapter). Runs **in-process** with REST in a single `main.ts` / single `g88-api` service; separate deploy is planned, not built (`ARCHITECTURE.md §3.5`) |
-| Database                   | PostgreSQL 16 + PostGIS + H3-PG (`geography(Point,4326)` + H3 cell columns r5/7/9/10, GIST indexes). Schema = migrations `0001`–`0019`, next free `0020`                            |
-| Cache / Presence / Pub-Sub | Redis 7 (sorted sets per H3 r8 cell, 120s TTL)                                                                                                                                      |
-| Spatial index              | H3 (Uber hexagonal hierarchical), server-side clustering at zoom <14                                                                                                                |
-| Storage                    | AWS S3, presigned URLs (avatars + photo gallery; verified end-to-end)                                                                                                               |
-| Auth                       | JWT access 15m + refresh 30d, **rotating opaque DB-stored refresh tokens, family tracking + revocation (shipped)**. Google OAuth live; Apple Sign-In removed (migration `0019`)     |
-| Payments                   | Stripe **subscriptions** (Checkout + Billing portal + webhook) — wired, **test mode**, tier set only by verified webhook. Connect/marketplace deferred to P4                        |
-| Verification               | Twilio Verify (phone OTP) — wired. Photo/ID face-compare (AWS Rekognition) deferred (not in code)                                                                                   |
-| Push                       | Firebase Cloud Messaging (Android + iOS via APNs proxy)                                                                                                                             |
-| Observability              | Sentry on both apps (errors, PII-scrubbed). Structured request logging (Pino) still deferred — debt **C3**                                                                          |
-| Deploy                     | Render: `g88-api` (REST + in-process realtime) + `g88-redis`. **Supabase** managed Postgres. GitHub Actions CI                                                                      |
+| Layer                      | Tech                                                                                                                                                                                                                                                                                                                                    |
+|----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Monorepo / tooling         | pnpm 11 workspaces (`apps/*`, `packages/*`). TypeScript 5.5 across all packages. Node ≥22.13.                                                                                                                                                                                                                                           |
+| Mobile                     | React Native 0.83 (CLI), React 19, TypeScript 5.5, Redux Toolkit 2, React Navigation 7                                                                                                                                                                                                                                                  |
+| Backend (REST)             | NestJS 11, TypeORM 0.3 (DataSource only, raw SQL), TypeScript 5.5, Node ≥22.13                                                                                                                                                                                                                                                          |
+| Realtime gateway           | NestJS, Socket.IO 4 (Redis adapter). Runs **in-process** with REST in a single `main.ts` / single `g88-api` service; separate deploy is planned, not built (`ARCHITECTURE.md §3.5`)                                                                                                                                                     |
+| Database                   | PostgreSQL 16 + PostGIS + H3-PG (`geography(Point,4326)` + H3 cell columns r5/7/9/10, GIST indexes). Schema = migrations `0001`–`0021`, next free `0022`                                                                                                                                                                                |
+| Cache / Presence / Pub-Sub | Redis 7 (sorted sets per H3 r8 cell, 120s TTL)                                                                                                                                                                                                                                                                                          |
+| Spatial index              | H3 (Uber hexagonal hierarchical), server-side clustering at zoom <14                                                                                                                                                                                                                                                                    |
+| Storage                    | AWS S3, presigned URLs (avatars + photo gallery; verified end-to-end)                                                                                                                                                                                                                                                                   |
+| Auth                       | JWT access 15m + refresh 30d, **rotating opaque DB-stored refresh tokens, family tracking + revocation (shipped)**. Google OAuth live; Apple Sign-In removed (migration `0019`)                                                                                                                                                         |
+| Payments                   | Stripe **subscriptions** (Checkout + Billing portal + webhook) — wired, **test mode**, tier set only by verified webhook. Connect/marketplace deferred to P4                                                                                                                                                                            |
+| Verification               | Twilio Verify (phone OTP) — wired. ID-document verification (selfie + ID photo → S3 presigned upload, status `none/pending/verified/rejected`, verified badge on profile + map) — wired, **manual review** (`0020`/`0021`); no `pending→verified` automation yet. Automated face-compare (AWS Rekognition) still deferred (not in code) |
+| Push                       | Firebase Cloud Messaging (Android + iOS via APNs proxy)                                                                                                                                                                                                                                                                                 |
+| Observability              | Sentry on both apps (errors, PII-scrubbed). Structured request logging (Pino) still deferred — debt **C3**                                                                                                                                                                                                                              |
+| Deploy                     | Render: `g88-api` (REST + in-process realtime) + `g88-redis`. **Supabase** managed Postgres. GitHub Actions CI                                                                                                                                                                                                                          |
 
 ## Deferred Stack (not yet adopted)
 
@@ -79,11 +79,11 @@ g88/
 ├── apps/
 │   ├── backend/            NestJS REST API + in-process Socket.IO realtime gateway
 │   │   ├── src/modules/    Feature modules (auth, users, discovery, chat, messaging,
-│   │   │                     interactions, presence, notifications, geofences, social,
-│   │   │                     verification, subscriptions, gamification, challenges,
-│   │   │                     achievements, gifts, trending, feed, ...)
+│   │   │                     interactions, presence, notifications, alerts, geofences, social,
+│   │   │                     verification, id-verification, subscriptions, gamification,
+│   │   │                     challenges, achievements, gifts, trending, feed, ...)
 │   │   ├── src/realtime/   Socket.IO gateway (top-level, not under modules/)
-│   │   └── migrations/     0001–0019 raw SQL (next free 0020)
+│   │   └── migrations/     0001–0021 raw SQL (next free 0022)
 │   └── mobile/             React Native + TypeScript client (src/features/{domain}/)
 ├── packages/
 │   └── shared/             API DTOs, socket event shapes, geo helpers — both apps import this
