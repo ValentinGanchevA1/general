@@ -231,7 +231,9 @@ export function ProfileScreen(): React.JSX.Element {
             {p.displayName}
             {p.age ? `, ${p.age}` : ''}
           </Text>
-           {p.verifiedBadge || badges.verified ? (
+          {/* Decagram means ID-verified — consistent with the map marker and the
+              "Verified" badge row. (Not the same as the weaker email+phone score.) */}
+          {p.verifiedBadge ? (
             <Icon name="check-decagram" size={24} color="#00d4ff" />
           ) : null}
         </View>
