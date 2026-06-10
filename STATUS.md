@@ -1,10 +1,25 @@
 # STATUS — G88 Reconciliation & P1
 
 > **Last updated:** 2026-06-10
-> **Current phase:** P5 feature build-out — **Gifts (XP-funded, v1)** ✅ shipped end-to-end (backend + mobile + realtime/push), Challenges mobile screen shipped, **ID-document verification (manual review)** wired end-to-end (`0020`/`0021`, applied to prod 2026-06-09; app wiring committed 2026-06-10). P4 profile & monetization surface (G1–G5) code-complete; **all migrations applied to prod through `0021`**; **G2 (Twilio) + G3 (Stripe, test mode) creds landed 2026-06-05** (pending live verify), G4 social deferred. Apple Sign-In (A3) removed from scope 2026-06-05 (0019 applied). **CI Backend/Mobile jobs fixed 2026-06-05 — repo CI green.** P2 7-day synthetic gate clears 2026-06-06.
+> **Current phase (ROADMAP vocabulary):** **P2 — pre-launch hardening** closing (only the C2 spec-coverage gate remains; A4 · OB1 · C6 · M1 done), with **P3 — habit-forming** and parts of **P4+** backend already built ahead of schedule and partly surfaced in mobile.
+> **Recent build-out:** **Gifts (XP-funded, v1)** ✅ shipped end-to-end (backend + mobile + realtime/push), Challenges mobile screen shipped, **ID-document verification (manual review)** wired end-to-end (`0020`/`0021`, applied to prod 2026-06-09; app wiring committed 2026-06-10). Profile & monetization surface (G1–G5) code-complete; **all migrations applied to prod through `0021`**; **G2 (Twilio) + G3 (Stripe, test mode) creds landed 2026-06-05** (pending live verify), G4 social deferred. Apple Sign-In (A3) removed from scope 2026-06-05 (0019 applied). **CI Backend/Mobile jobs fixed 2026-06-05 — repo CI green.** P2 7-day synthetic gate clears 2026-06-06.
 > **Owner:** [your name]
 >
 > Update this file as work progresses. It's the single source of truth for "where are we?".
+
+> ### ⚠️ Phase-vocabulary reconciliation (read this before trusting any `P#` label below)
+>
+> `ROADMAP.md` is **authoritative for phase sequence**. It defines exactly four phases: **P1** foundation · **P2** pre-launch hardening · **P3** habit-forming features · **P4+** horizon.
+>
+> Historically, this file used `P3`/`P4`/`P5` as **ad-hoc sprint labels for feature build-out**, which do **not** map 1:1 onto ROADMAP's phases. There is **no P5** in ROADMAP. Translate the legacy section labels in this doc as follows:
+>
+> | Label used in this file                                | Means                                                  | ROADMAP phase      |
+> |--------------------------------------------------------|--------------------------------------------------------|--------------------|
+> | "P3 — feature build-out" (gamification, geofence push) | habit-forming features built early                     | **P3**             |
+> | "P4 — Profile & monetization surface (G1–G5)"          | profile expansion + Stripe/Twilio/verification surface | spans **P3 / P4+** |
+> | "P5 #1/#2 — Gifts, Challenges screen"                  | further habit-forming build-out                        | **P3**             |
+>
+> The `P0/P1/P2` **Gap List** IDs (C1, P1, W1, A4, OB1, C6, M1, C2 …) are item IDs, not phase numbers — they match ROADMAP's P2 item IDs and are unaffected. Section headers below are kept verbatim for changelog continuity; use this table to read them in ROADMAP terms.
 
 ---
 
@@ -12,14 +27,14 @@
 
 The only six things that must ship cleanly for "P1 done":
 
-| # | Pillar                      | State   | Blocker | Owner | Notes                                                                                                                  |
-|---|-----------------------------|---------|---------|-------|------------------------------------------------------------------------------------------------------------------------|
+| # | Pillar                      | State   | Blocker | Owner | Notes                                                                                                                                     |
+|---|-----------------------------|---------|---------|-------|-------------------------------------------------------------------------------------------------------------------------------------------|
 | 1 | **Auth** (email/pw + OAuth) | 🟦 Done | —       | —     | Email/pw + Google OAuth; opaque DB-stored rotating refresh tokens. Apple Sign-In removed from scope 2026-06-05 (see App Store risk below) |
-| 2 | **Profile**                 | 🟦 Done | —       | —     | `PATCH /users/me/profile`, S3 presigned URL, ProfileCreation/Edit/Screen done                                          |
-| 3 | **Map discovery**           | 🟦 Done | —       | —     | H3 + server-side clustering + viewport-diff (M1) done.                                                                 |
-| 4 | **Presence**                | 🟦 Done | —       | —     | `presence:delta` emitted on cell boundary cross                                                                        |
-| 5 | **Wave**                    | 🟦 Done | —       | —     | Sender fully hydrated; FCM fallback wired                                                                              |
-| 6 | **Chat**                    | 🟦 Done | —       | —     | Persist + REST + mobile Inbox + ChatScreen + outbox retry (C6)                                                         |
+| 2 | **Profile**                 | 🟦 Done | —       | —     | `PATCH /users/me/profile`, S3 presigned URL, ProfileCreation/Edit/Screen done                                                             |
+| 3 | **Map discovery**           | 🟦 Done | —       | —     | H3 + server-side clustering + viewport-diff (M1) done.                                                                                    |
+| 4 | **Presence**                | 🟦 Done | —       | —     | `presence:delta` emitted on cell boundary cross                                                                                           |
+| 5 | **Wave**                    | 🟦 Done | —       | —     | Sender fully hydrated; FCM fallback wired                                                                                                 |
+| 6 | **Chat**                    | 🟦 Done | —       | —     | Persist + REST + mobile Inbox + ChatScreen + outbox retry (C6)                                                                            |
 
 **Legend:** ✅ shipping · ⚠️ partial · ❌ blocked / not started · 🟦 done & verified
 
@@ -43,24 +58,24 @@ Ordered by critical-path impact. Each item maps to a file or absence-of-file.
 
 ## P1 Gap List (close before public TestFlight)
 
-| ID | Pillar        | File                                                | Gap                                                                                                           | Fix size |                                    |
-|----|---------------|-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------|----------|------------------------------------|
-| A1 | Auth          | `apps/backend/src/modules/auth/auth.service.ts`     | Refresh tokens are stateless JWTs. Should be opaque, DB-stored, rotating, revocable per `ARCHITECTURE.md §5`. | L        | ✅ R4                               |
-| A2 | Auth          | `apps/backend/src/modules/auth/auth.controller.ts`  | No `POST /auth/oauth/google`.                                                                                 | M        | ✅ R4 (Google)                       |
-| C5 | Chat          | `apps/backend/src/realtime/realtime.gateway.ts`     | `conversation:join` handler missing (`@SubscribeMessage('conversation:join')`)                                | S        | ✅ R2                               |
-| N1 | Notifications | (missing) `apps/backend/src/modules/notifications/` | FCM token registration + send-on-offline for waves and chat                                                   | M        | ✅ R2                               |
+| ID | Pillar        | File                                                | Gap                                                                                                           | Fix size |               |
+|----|---------------|-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------|----------|---------------|
+| A1 | Auth          | `apps/backend/src/modules/auth/auth.service.ts`     | Refresh tokens are stateless JWTs. Should be opaque, DB-stored, rotating, revocable per `ARCHITECTURE.md §5`. | L        | ✅ R4          |
+| A2 | Auth          | `apps/backend/src/modules/auth/auth.controller.ts`  | No `POST /auth/oauth/google`.                                                                                 | M        | ✅ R4 (Google) |
+| C5 | Chat          | `apps/backend/src/realtime/realtime.gateway.ts`     | `conversation:join` handler missing (`@SubscribeMessage('conversation:join')`)                                | S        | ✅ R2          |
+| N1 | Notifications | (missing) `apps/backend/src/modules/notifications/` | FCM token registration + send-on-offline for waves and chat                                                   | M        | ✅ R2          |
 
 ## P2 (post-P1 hardening)
 
-| ID     | Pillar        | Gap                                                                                                        | Fix size |                                                                                                                |
-|--------|---------------|------------------------------------------------------------------------------------------------------------|----------|----------------------------------------------------------------------------------------------------------------|
+| ID     | Pillar        | Gap                                                                                                        | Fix size |                                                                                                                                                        |
+|--------|---------------|------------------------------------------------------------------------------------------------------------|----------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
 | A3     | Auth          | ~~Apple Sign-In (`POST /auth/oauth/apple`)~~ — **removed from scope 2026-06-05**                           | —        | ❌ removed (code, deps, migration 0009 reverted by 0019 — **applied to prod 2026-06-05**). See App Store risk re: shipping Google without Apple on iOS. |
-| C6     | Chat          | Mobile outbox — retry queue for messages sent during socket disconnect                                     | M        | ✅ done                                                                                                         |
-| M1     | Map           | Viewport-diff protocol (`ARCHITECTURE.md §3.7`) — full responses on every pan are wasteful at city density | M        | ✅ done                                                                                                         |
-| A4     | Auth          | Hardcoded dev-secret fallbacks in `auth.service.ts` source — remove, require env vars in non-dev           | S        | ✅ done                                                                                                         |
-| OB1    | Observability | Sentry on both apps — minimum bar before public TestFlight (C3 critical debt)                              | M        | ✅ done                                                                                                         |
-| DEPLOY | Infra         | Render web services (`g88-api.onrender.com`) + Redis; **Postgres on Supabase** (`DATABASE_URL`)            | M        | ✅ done 2026-05-30                                                                                              |
-| MON    | CI            | Synthetic P1 monitor (`scripts/synthetic-monitor.mjs`, cron `*/5 * * * *`) — 7-day gate for DoD item 2     | M        | ✅ running — clock started 2026-05-30                                                                           |
+| C6     | Chat          | Mobile outbox — retry queue for messages sent during socket disconnect                                     | M        | ✅ done                                                                                                                                                 |
+| M1     | Map           | Viewport-diff protocol (`ARCHITECTURE.md §3.7`) — full responses on every pan are wasteful at city density | M        | ✅ done                                                                                                                                                 |
+| A4     | Auth          | Hardcoded dev-secret fallbacks in `auth.service.ts` source — remove, require env vars in non-dev           | S        | ✅ done                                                                                                                                                 |
+| OB1    | Observability | Sentry on both apps — minimum bar before public TestFlight (C3 critical debt)                              | M        | ✅ done                                                                                                                                                 |
+| DEPLOY | Infra         | Render web services (`g88-api.onrender.com`) + Redis; **Postgres on Supabase** (`DATABASE_URL`)            | M        | ✅ done 2026-05-30                                                                                                                                      |
+| MON    | CI            | Synthetic P1 monitor (`scripts/synthetic-monitor.mjs`, cron `*/5 * * * *`) — 7-day gate for DoD item 2     | M        | ✅ running — clock started 2026-05-30                                                                                                                   |
 
 **Fix size legend:** XS <1h · S 1–4h · M 0.5–1d · L 1–3d
 
@@ -87,13 +102,13 @@ First post-hardening features. All wired fire-and-forget so they never block the
 
 Rich ProfileScreen redesign + the data and integrations behind it. Code-complete and on `master`; each integration is **env-gated** and inert until its credentials land (mirrors the FCM/Sentry pattern).
 
-| ID | Pillar        | Deliverable                                                                                                                                                                                                                                                 | Migration                    | State                                                  |
-|----|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|--------------------------------------------------------|
-| G1 | Profile       | Rich ProfileScreen (hero photo, badges, verification bar, sections, menu); `users` + phone/dob/subscription_tier/interests; `user_photos` + `social_links`; UserProfile gains photoUrls/age/subscriptionTier/socialLinks + derived verificationScore/badges | 0012_profile_expansion       | ✅                                                      |
-| G2 | Verification  | Twilio Verify phone OTP — `POST /verification/phone/{start,check}`, ladder promotion, unique verified phone, dev fallback code; VerificationScreen                                                                                                          | 0013                         | ✅ code; **creds landed 2026-06-05** (`TWILIO_*` set on `g88-api`); ⏳ pending live verify |
+| ID | Pillar        | Deliverable                                                                                                                                                                                                                                                 | Migration                    | State                                                                                                                                                |
+|----|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
+| G1 | Profile       | Rich ProfileScreen (hero photo, badges, verification bar, sections, menu); `users` + phone/dob/subscription_tier/interests; `user_photos` + `social_links`; UserProfile gains photoUrls/age/subscriptionTier/socialLinks + derived verificationScore/badges | 0012_profile_expansion       | ✅                                                                                                                                                    |
+| G2 | Verification  | Twilio Verify phone OTP — `POST /verification/phone/{start,check}`, ladder promotion, unique verified phone, dev fallback code; VerificationScreen                                                                                                          | 0013                         | ✅ code; **creds landed 2026-06-05** (`TWILIO_*` set on `g88-api`); ⏳ pending live verify                                                             |
 | G3 | Subscriptions | Stripe checkout + billing portal + signature-verified webhook → `subscription_tier`; SubscriptionScreen (hosted Checkout via Linking); `main.ts` rawBody                                                                                                    | 0014                         | ✅ code; **creds landed 2026-06-05** (`STRIPE_*` + test webhook `we_1TewGyQrMz3BrdsU1vKbM2JL` set on `g88-api`, **test mode**); ⏳ pending live verify |
-| G4 | Social        | Provider-generic OAuth linking (instagram/twitter/tiktok/facebook/linkedin/spotify), HMAC-signed-state server-side callback; SocialLinkingScreen                                                                                                            | — (uses 0012 `social_links`) | ✅ code; needs per-provider creds; X/Twitter needs PKCE |
-| G5 | Gamification  | Achievements + Leaderboard **mobile** screens over the existing backend (catalog, unlock evaluation wired into wave-match + alert-post, `GET /achievements`, `GET /gamification/leaderboard`)                                                               | 0015_achievements            | ✅                                                      |
+| G4 | Social        | Provider-generic OAuth linking (instagram/twitter/tiktok/facebook/linkedin/spotify), HMAC-signed-state server-side callback; SocialLinkingScreen                                                                                                            | — (uses 0012 `social_links`) | ✅ code; needs per-provider creds; X/Twitter needs PKCE                                                                                               |
+| G5 | Gamification  | Achievements + Leaderboard **mobile** screens over the existing backend (catalog, unlock evaluation wired into wave-match + alert-post, `GET /achievements`, `GET /gamification/leaderboard`)                                                               | 0015_achievements            | ✅                                                                                                                                                    |
 
 **Deploy checklist (P4):**
 - ✅ **Migrations** — 0001–0021 all applied to prod Supabase (0001–0018 verified 2026-06-05; 0019 applied 2026-06-05; 0020/0021 applied 2026-06-09, verified 2026-06-10).

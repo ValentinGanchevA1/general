@@ -19,6 +19,10 @@
 
 Target launch market: **Varna, BG** (single test city — see `PRODUCT.md` § Launch market).
 
+> **Phase vocabulary is authoritative here.** These four phases (P1 · P2 · P3 · P4+) are the canonical sequence. **There is no P5.** `STATUS.md` historically used `P3`/`P4`/`P5` as ad-hoc *sprint* labels for feature build-out — see the "Phase-vocabulary reconciliation" table at the top of `STATUS.md` for the mapping back to these phases.
+>
+> **Heads-up (this table predates current reality, last revised 2026-05-23):** since then, substantial **P3 (habit-forming)** backend — gamification, challenges, achievements, gifts, geofence push — and parts of the **P4+** monetization surface (Stripe subscriptions, Twilio, ID-verification) have been **built ahead of schedule**. So "P3 — post-launch / work hasn't started" below is stale: the backend largely exists; the remaining P3 work is **mobile surfacing**, not greenfield. `STATUS.md` is the live truth for what's actually built.
+
 ## How to read this doc
 
 - **P2 is detailed** because work is active. Each item has scope, acceptance criteria, and risk notes.
