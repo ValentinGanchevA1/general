@@ -319,7 +319,7 @@ Raw parameterized SQL via `DataSource.query()` (no ORM entities — schema uses 
 
 ## Shared (`packages/shared/`)
 
-Single source of truth for API DTOs, socket contracts, and geo helpers — both apps import `@g88/shared`. Files: `api.ts` (+ `api/verification.ts`), `events.ts` (socket types), `geo.ts` (`fuzzLocation`, `h3ResolutionForZoom`, `cellsForViewport`), plus `activity.ts`, `achievements.ts`, `challenges.ts`, `gamification.ts`, `gifts.ts`. CI builds `packages/shared/dist` **before** backend/mobile typecheck+jest (they resolve the built output). No central brand/theme token file exists — UI colors are inline per component.
+Single source of truth for API DTOs, socket contracts, and geo helpers — both apps import `@g88/shared`. Files: `api.ts` (includes ID-verification DTOs + `IdVerificationStatus`), `events.ts` (socket types), `geo.ts` (`fuzzLocation`, `h3ResolutionForZoom`, `cellsForViewport`), plus `activity.ts`, `achievements.ts`, `challenges.ts`, `gamification.ts`, `gifts.ts`. CI builds `packages/shared/dist` **before** backend/mobile typecheck+jest (they resolve the built output). No central brand/theme token file exists — UI colors are inline per component.
 
 ---
 
