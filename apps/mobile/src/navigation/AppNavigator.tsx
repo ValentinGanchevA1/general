@@ -23,6 +23,7 @@ import { AchievementsScreen } from '@/screens/AchievementsScreen';
 import { LeaderboardScreen } from '@/screens/LeaderboardScreen';
 import { ChallengesScreen } from '@/screens/ChallengesScreen';
 import { GiftsInboxScreen } from '@/screens/GiftsInboxScreen';
+import VerificationIdScreen from '@/screens/VerificationIdScreen';
 import {
 	PrivacyScreen,
 	HelpScreen,
@@ -59,6 +60,7 @@ export type RootStackParamList = {
 	Achievements: undefined;
 	Leaderboard: undefined;
 	Challenges: undefined;
+	VerificationId: undefined;
 	GiftsInbox: undefined;
 	Privacy: undefined;
 	Help: undefined;
@@ -83,7 +85,7 @@ function MainTabs(): React.JSX.Element {
 						Pulse: 'pulse',
 						Profile: 'account-circle-outline',
 					} as const;
-					
+
 					const iconName = icons[route.name as keyof typeof icons] ?? 'circle';
 					return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
 				},
@@ -148,6 +150,11 @@ export function AppNavigator(): React.JSX.Element {
 						<Stack.Screen name="SocialLinking" component={SocialLinkingScreen} />
 						<Stack.Screen name="Achievements" component={AchievementsScreen} />
 						<Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+						<Stack.Screen
+							name="VerificationId"
+							component={VerificationIdScreen}
+							options={{ title: 'ID Verification', presentation: 'modal' }}
+						/>
 						<Stack.Screen name="Challenges" component={ChallengesScreen} />
 						<Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />
 						<Stack.Screen name="Privacy" component={PrivacyScreen} />

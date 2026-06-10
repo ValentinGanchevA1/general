@@ -70,6 +70,7 @@ import { IdVerificationModule } from './modules/id-verification/id-verification.
     SubscriptionsModule,
     SocialModule,
     RealtimeModule,
+    IdVerificationModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

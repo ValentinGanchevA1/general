@@ -263,6 +263,30 @@ export function ProfileScreen(): React.JSX.Element {
           ) : null}
         </View>
 
+		  {/* ID Verification Card */}
+		  <View style={styles.card}>
+			  <View style={styles.rowBetween}>
+				  <View>
+					  <Text style={styles.cardTitle}>ID Verification</Text>
+					  <Text style={styles.cardSubtitle}>
+						  {p.idVerificationStatus === 'verified' ? 'Verified ✓' :
+							  p.idVerificationStatus === 'pending' ? 'Under review' :
+								  p.idVerificationStatus === 'rejected' ? 'Rejected – resubmit' : 'Not verified'}
+					  </Text>
+				  </View>
+				  {p.idVerificationStatus !== 'verified' && (
+					  <TouchableOpacity
+						  style={styles.primaryBtn}
+						  onPress={() => navigation.navigate('VerificationId')}
+					  >
+						  <Text style={styles.primaryBtnText}>
+							  {p.idVerificationStatus === 'pending' ? 'Check status' : 'Verify now'}
+						  </Text>
+					  </TouchableOpacity>
+				  )}
+			  </View>
+		  </View>
+
         {p.bio ? <Text style={styles.bio}>{p.bio}</Text> : null}
 
         {/* Map visibility */}
@@ -609,6 +633,11 @@ const styles = StyleSheet.create({
   },
   actionButtonText: { color: '#fff', fontWeight: '600' },
   sectionPadded: { paddingHorizontal: 20, marginTop: 20 },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  cardSubtitle: { color: '#888', fontSize: 14, marginTop: 4 },
+  primaryBtn: { backgroundColor: '#00d4ff', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
+  primaryBtnText: { color: '#000', fontWeight: '700', fontSize: 14 },
   card: {
     backgroundColor: '#12121f',
     borderRadius: 14,
