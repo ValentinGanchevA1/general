@@ -170,3 +170,234 @@ g88/
 This repo recently consolidated two parallel codebases (`apps/mobile` + `apps/backend` flat layout) into the current `g88/` monorepo. The old code is preserved under `legacy/` as read-only reference. **Do not import from `legacy/`** — CI lint rule enforces this.
 
 For the status of each P1 pillar and which legacy modules have been reconciled, see `STATUS.md`.
+
+---
+
+# Codebase Reference
+
+> Documents the **actual** `apps/` monorepo state (verified against source). Update when architecture changes.
+> **Authority order:** `ARCHITECTURE.md` → `STATUS.md` → `SPECIFICATION.md` → `ROADMAP.md` → this section.
+> `docs/marketing/bestRecentMVP.html` is **not** engineering authority. Anything under `legacy/` describes the pre-reconciliation flat layout and must not be used as a reference for current code.
+
+## Quick facts
+
+- **Node** `>=22.13` (CI pins via `.nvmrc` = `22`). **pnpm 11** workspaces (`apps/*`, `packages/*`). **TypeScript 5.5** everywhere.
+- **Prod API:** `https://api.g88.app/api/v1` (Render `g88-api`, also `https://g88-api.onrender.com`). **Realtime:** same host+port, namespace `/realtime`.
+- **Local backend:** `http://10.0.2.2:3001/api/v1` (Android emulator) · `http://localhost:3001/api/v1` (iOS sim/desktop). Swagger `/api/docs` (dev only).
+- **Path alias `@/` → `src/`** on **both** apps (mobile uses absolute `@/...` imports — *not* relative).
+
+---
+
+## Mobile (`apps/mobile/`)
+
+**Stack:** React Native 0.83 (CLI) · React 19 · TypeScript 5.5 · Redux Toolkit 2 · React Navigation 7. New Architecture enabled.
+
+> ⚠️ RN 0.83 + React 19 is bleeding-edge — vet every native dep before adding (a native module needs an Android rebuild, not just a Metro reload).
+
+### Layout (`src/`)
+
+```
+api/        client.ts (axios singleton) · tokenStore.ts (AsyncStorage tokens)
+components/ ErrorBoundary · map markers (EntityMarker) · ContextualFab · ...
+features/   auth · chat · discovery · gamification · gifts · location · profile · pulse · verification
+hooks/      redux.ts (useAppDispatch/useAppSelector)
+lib/        analytics.ts (track() shim)
+navigation/ AppNavigator.tsx (RootStackParamList + auth gate + bottom tabs)
+realtime/   useSocket.ts (module-singleton Socket.IO client)
+screens/    Auth · Map · Profile{,Creation,Edit} · Photos · Chat · Subscription · Verification ·
+            VerificationId · SocialLinking · Achievements · Leaderboard · Challenges · GiftsInbox · AlertComposer · ...
+store/      index.ts (configureStore)
+utils/      ·  config.ts (build-time env)  ·  env.d.ts
+```
+
+### State — `store/index.ts`
+
+- **5 reducers:** `auth · profile · chat · pulse · discovery`.
+- **No `redux-persist`.** Slices start empty each launch. Auth survives restart because **tokens live in `AsyncStorage`** (`tokenStore`, keys `g88:access_token` / `g88:refresh_token`) and `authSlice.restoreSession` rehydrates on boot.
+- ⚠️ Tokens are **unencrypted** AsyncStorage — pre-TestFlight hardening item.
+- Always use typed `useAppDispatch` / `useAppSelector` (`src/hooks/redux.ts`), never raw RTK hooks.
+
+### Networking — `api/client.ts`
+
+- Single axios instance, `baseURL = ${Config.API_BASE_URL}/api/v1`, timeout **15 s**.
+- Request interceptor injects `Authorization: Bearer <accessToken>` from `tokenStore`.
+- On **401** (non-auth route): single-flight refresh via `POST /auth/refresh { refreshToken }` → retry once; refresh failure → `tokenStore.clear()` + `authEvents.emit('logout')`. `authEvents` (in `client.ts`) **is** the cross-module bus — there is no separate `eventBus`.
+- Errors normalized to `{ statusCode, code, message, details? }` (mirrors backend `AllExceptionsFilter`).
+
+### Realtime — `realtime/useSocket.ts`
+
+- **Module-level singleton** socket → `${API_BASE_URL}/realtime`, `transports: ['websocket']`. Survives navigation; torn down only by `disconnectSocket()` on logout.
+- **Function-form auth:** `auth: async (cb) => cb({ token: <fresh access token> })` so reconnects re-read the latest token.
+- Reconnect 500 ms → 5 s; resumes on `AppState` `active`; **drains the chat outbox on every `connect`**.
+- Fully typed against `@g88/shared` `ServerToClientEvents` / `ClientToServerEvents`; sends use ack promises (`chat:send`, `presence:update`, `conversation:join`).
+
+### Config — `config.ts`
+
+`API_BASE_URL` resolves: prod build → `https://g88-api.onrender.com`; dev → `10.0.2.2:3001` (Android) / `localhost:3001` (iOS) / LAN IP / full `https://` remote host. `GOOGLE_WEB_CLIENT_ID`, `SENTRY_DSN`. Env vars are inlined at bundle time (babel transform); set in `apps/mobile/.env` (gitignored, see `.env.example`).
+
+### Navigation / auth gate — `AppNavigator.tsx`
+
+`RootStackParamList` is declared here — **register new screens here first.** Gate: `restoreSession` (spinner) → unauthenticated ⇒ `Auth` only → authenticated but profile incomplete ⇒ `ProfileCreation` → else `Main` (Map · Pulse · Profile tabs) + full stack.
+
+### Conventions
+
+`console.*` is still permitted (debt **C3**) — prefer the eventual `@/utils/logger` boundary; don't add `console.*` in hot paths. No `any`. PascalCase screens/components, camelCase slices/hooks.
+
+---
+
+## Backend (`apps/backend/`)
+
+**Stack:** NestJS 11 · TypeORM 0.3 (**`DataSource.query()` only — no entities, no repositories**) · PostgreSQL 16 + PostGIS + H3-PG · Redis 7 · Socket.IO 4 · TS 5.5 · Node ≥22.13.
+
+### Layout (`src/`)
+
+```
+main.ts                      bootstrap (see below)
+app.module.ts                composes 20 feature modules + RealtimeModule + Throttler APP_GUARD
+common/  s3.service.ts        S3 presigned URLs (avatar, photos, verification)
+         all-exceptions.filter.ts   → { statusCode, code, message, details? }
+config/  redis.module.ts      (TypeOrmModule.forRootAsync lives inline in app.module)
+modules/ <20 feature modules> (table below)
+realtime/ realtime.gateway.ts · realtime.module.ts · ws-jwt.guard.ts · realtime.dto.ts
+migrations/ 0001–0021 raw SQL (next free 0022)
+```
+
+### `main.ts` cross-cutting
+
+| Concern | Implementation |
+|---|---|
+| Port / prefix | `PORT` (def 3001), global prefix `api/v1` |
+| Security | `helmet()`; CORS origins from `CORS_ORIGINS` (comma-split) |
+| Body | `rawBody: true` (Stripe webhook signature); JSON limit **15 mb** (base64 photo upload) |
+| Validation | `ValidationPipe({ whitelist, transform, forbidNonWhitelisted })` |
+| Errors | `AllExceptionsFilter` → `{ statusCode, code, message, details? }` |
+| Rate limit | `ThrottlerModule` single global tier **120 req / 60 s** (`APP_GUARD`); per-endpoint `@Throttle()` / `@SkipThrottle()` overrides (auth routes skip) |
+| Observability | `@sentry/nestjs`, `sendDefaultPii: false`, 10 % traces in prod |
+| Fail-fast | `JWT_SECRET` ≥32 chars (≥64 in prod); `DATABASE_URL` required in prod |
+
+### 20 feature modules (`src/modules/`)
+
+| Module | Route prefix | Responsibility |
+|---|---|---|
+| `auth` | `/auth` | Email/pw + Google OAuth; opaque DB-stored rotating refresh tokens (family + revocation) |
+| `users` | `/users` | Profile read/update, avatar + photo gallery (presigned S3 + base64), ID-verification status field |
+| `discovery` | `/discovery` | Map-nearby query (H3 + viewport-diff), server-side clustering |
+| `presence` | — (socket) | Redis presence ZSETs; driven by `presence:update` event (no REST controller) |
+| `interactions` | `/interactions` | Waves (send → match ladder) |
+| `chat` | `/conversations*` | Conversation list + message history (persisted) |
+| `messaging` | `/conversations` | `POST` — message-permission gate (match ∨ interest overlap), pending message requests |
+| `notifications` | `/notifications` | FCM device-token registration + send-on-offline |
+| `alerts` | `/alerts` | Geo alert posts (feed source) |
+| `geofences` | `/geofences` | Geofence create + active list; geofence-triggered pushes |
+| `feed` | `/feed` | Pulse activity aggregation (chats + waves + alerts) |
+| `trending` | `/trending` | Nearby trending (Redis 5-min cache) |
+| `gamification` | `/gamification` | XP ledger, levels, streak, leaderboard |
+| `challenges` | `/challenges` | Daily challenges (`GET /today`) |
+| `achievements` | `/achievements` | Achievement catalog + unlock state |
+| `gifts` | `/gifts` | XP-funded gifts: catalog/balance/received/send (dual-balance wallet) |
+| `verification` | `/verification` | Twilio phone OTP (`/phone/start`, `/phone/check`) |
+| `id-verification` | `/verification/id` | ID-document upload (selfie + ID → S3), manual review (`/start`, `/submit`, `/status`) |
+| `subscriptions` | `/subscriptions` | Stripe checkout + portal + signature-verified webhook → `subscription_tier` |
+| `social` | `/social` | Provider-generic OAuth account linking (HMAC-signed state) |
+
+### Auth chain
+
+`Bearer` → `JwtAuthGuard` → `@CurrentUser()` → handler. Refresh tokens: **access 15 m, refresh 30 d**, opaque + DB-stored + rotating (single-use; replay revokes the family). Google OAuth verified server-side. **WebSocket** auth: token verified directly in `handleConnection` (guards don't fire on lifecycle hooks) via `ws-jwt.guard` logic.
+
+### Realtime gateway (`src/realtime/`)
+
+- **One namespace `/realtime`.** Rooms: `user:{userId}` (direct fan-out), `cell:{h3r8}` (presence deltas), `convo:{conversationId}` (chat).
+- Contracts in `@g88/shared/events` — adding an untyped event is a compile error.
+  - **Server→Client:** `wave:received` · `presence:delta` · `chat:message` · `conversation:opened` · `gift:received` · `error:event`.
+  - **Client→Server (ack’d):** `presence:update` · `conversation:join` · `chat:typing` · `chat:send`.
+
+### Database
+
+Raw parameterized SQL via `DataSource.query()` (no ORM entities — schema uses H3 generated columns + materialized views that don't map cleanly). Migrations `0001`–`0021` (next `0022`), tracked in `schema_migrations` by filename; runner is idempotent (skips applied). `0001`–`0015` use guarded DDL; **`0020` is not idempotent — already applied, do not re-run.** Locations fuzzed to **H3 r10 centroid at write time** (privacy invariant). H3 cell columns r5/7/9/10 + PostGIS `geography(Point,4326)` + GIST indexes; `v_discoverable_entity` view feeds the map.
+
+---
+
+## Shared (`packages/shared/`)
+
+Single source of truth for API DTOs, socket contracts, and geo helpers — both apps import `@g88/shared`. Files: `api.ts` (+ `api/verification.ts`), `events.ts` (socket types), `geo.ts` (`fuzzLocation`, `h3ResolutionForZoom`, `cellsForViewport`), plus `activity.ts`, `achievements.ts`, `challenges.ts`, `gamification.ts`, `gifts.ts`. CI builds `packages/shared/dist` **before** backend/mobile typecheck+jest (they resolve the built output). No central brand/theme token file exists — UI colors are inline per component.
+
+---
+
+## Key API endpoints
+
+All under `/api/v1`. JWT unless noted.
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| POST | `/auth/register` · `/auth/login` | No | |
+| POST | `/auth/refresh` | No | opaque refresh, rotates on use |
+| POST | `/auth/logout` | JWT | revokes refresh family |
+| POST | `/auth/oauth/google` | No | Google ID token |
+| GET | `/auth/me` | JWT | |
+| GET | `/users/me` · `/users/me/profile` · `/users/:id` | JWT | |
+| PATCH | `/users/me/profile` | JWT | |
+| POST | `/users/me/avatar/presigned-url` · `/users/me/photos/presigned-url` · `/users/me/photos` · `/users/me/photos/base64` | JWT | S3 upload flow |
+| PATCH/DELETE | `/users/me/photos/order` · `/users/me/photos/:photoId` | JWT | gallery (6 cap, position-0 = avatar) |
+| POST | `/discovery/nearby` | JWT | viewport-diff capable |
+| POST | `/interactions/wave` | JWT | |
+| GET | `/conversations` · `/conversations/:id/messages` | JWT | history |
+| POST | `/conversations` | JWT | create/request (permission-gated) |
+| GET | `/feed` · `/trending/nearby` · `/challenges/today` | JWT | |
+| GET | `/gamification/me` · `/gamification/leaderboard` · `/achievements` | JWT | |
+| POST | `/gamification/ping` | JWT | |
+| GET | `/gifts/catalog` · `/gifts/balance` · `/gifts/received` | JWT | |
+| POST | `/gifts/send` | JWT | atomic wallet debit |
+| POST | `/notifications/device-token` | JWT | FCM register |
+| POST | `/alerts` · `/geofences` | JWT | |
+| GET | `/geofences/me/active` | JWT | |
+| POST | `/verification/phone/start` · `/verification/phone/check` | JWT | Twilio OTP |
+| POST | `/verification/id/start` · `/verification/id/submit` · GET `/verification/id/status` | JWT | manual review |
+| POST | `/subscriptions/checkout` · `/subscriptions/portal` | JWT | Stripe hosted |
+| POST | `/subscriptions/webhook` | No | Stripe signature-verified |
+| GET | `/social/:provider/start` · `/social/callback` · DELETE `/social/:provider` | JWT* | OAuth linking |
+
+## Realtime data-flow examples
+
+- **Wave:** `POST /interactions/wave` → insert + `server.to('user:{recipientId}').emit('wave:received', …)` → recipient `useSocket` handler dispatches into Redux; FCM fallback if no live socket.
+- **Chat send:** `chat:send` ack → server persists message → echoes ack to sender + `server.to('convo:{id}').emit('chat:message', …)`. Sent while disconnected ⇒ queued in `chatSlice.outbox`, drained on next socket `connect`.
+- **Presence:** `presence:update` → fuzz to H3 r10 → Redis ZSET (r8 cell) → `presence:delta` fan-out to `cell:{h3r8}` on cell-boundary crossing.
+
+---
+
+## CI/CD (`.github/workflows/`)
+
+- **`ci.yml`** — triggers: push `master` / `claude/**`, PR → `master`. Jobs: **`no-legacy-imports`** (blocks `legacy/` imports) · **`backend`** (install → build shared → `eslint --max-warnings 0` → typecheck → `jest --ci --runInBand` → `nest build`) · **`mobile`** (… → `jest --ci`). Node from `.nvmrc`. **Lint + typecheck are blocking** (not advisory).
+- Other workflows: `android-build.yml` (AAB + Maps key injection), `codeql.yml`, `synthetic-monitor.yml` (cron `*/5`, login→discovery→wave→chat against prod), `summary.yml`, `npm-publish-github-packages.yml`.
+- **Deploy:** Render `g88-api` (REST + in-process realtime) + `g88-redis` (Frankfurt). **Supabase** managed Postgres (`DATABASE_URL`). Secrets set on the `g88-api` dashboard. No `render.yaml` in the repo. See `DEPLOY.md`.
+
+---
+
+## External integrations
+
+| Service | Status | Entry point |
+|---|---|---|
+| AWS S3 | ✅ wired + verified (bucket `g88-uploads-dev`, eu-north-1) | `common/s3.service.ts` |
+| Google OAuth | ✅ live | `modules/auth` |
+| Sentry | ✅ both apps | `main.ts` · mobile `Config.SENTRY_DSN` |
+| Firebase FCM | ✅ wired | `modules/notifications` |
+| Twilio Verify | ✅ wired (creds set, pending live verify) | `modules/verification` |
+| Stripe | ✅ wired, **test mode** | `modules/subscriptions` |
+| AWS Rekognition | ❌ not in code (face-compare deferred) | — |
+| SendGrid | ❌ not wired (env var in example only) | — |
+| Apple Sign-In | ❌ removed from scope 2026-06-05 | — |
+
+## Privacy invariants (non-negotiable)
+
+1. Exact GPS never lands in the DB — fuzzed to H3 r10 centroid at write time.
+2. Location + tokens must never appear in Sentry payloads (`sendDefaultPii: false`; scrub before send).
+
+## Known debt (see `STATUS.md` / `TECH_DEBT_AUDIT.md`)
+
+- **C2** — ≥1 `.spec.ts` per backend module not yet met (`id-verification` and several modules lack specs).
+- **C3** — structured request logging (Pino → Loki/Grafana) deferred; Sentry is the v1 surface. `console.*` still permitted client-side until the `logger` shim lands.
+- Mobile tokens in unencrypted AsyncStorage (pre-TestFlight).
+- `0020_id_verification.sql` is not idempotent; ID-verification has no automated `pending → verified` path (manual review only).
+
+## Explicitly deferred (do not build without go-ahead)
+
+Stripe Connect / paid gifts · Elasticsearch · Kafka/RabbitMQ · gRPC · Kubernetes/Terraform · GraphQL · InfluxDB · Prometheus/Grafana/Loki · SendGrid email · live streaming · group chat · web/desktop client. (Most are on the `ROADMAP.md` cuts list.)
