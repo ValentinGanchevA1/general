@@ -14,6 +14,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { LeaderboardEntry, LeaderboardScope } from '@g88/shared';
 import { useLeaderboard } from '@/features/gamification/useLeaderboard';
+import { WeeklyRibbon } from '@/features/gamification/WeeklyRibbon';
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
@@ -85,6 +86,10 @@ export function LeaderboardScreen(): React.JSX.Element {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#00d4ff" />}
       >
+        {scope === 'weekly' && page?.resetsAt ? (
+          <WeeklyRibbon resetsAt={page.resetsAt} me={page.me} />
+        ) : null}
+
         {page == null && loading ? (
           <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
         ) : page && page.entries.length === 0 ? (
