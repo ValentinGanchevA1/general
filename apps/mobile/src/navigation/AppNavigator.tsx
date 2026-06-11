@@ -103,7 +103,7 @@ function MainTabs(): React.JSX.Element {
 export function AppNavigator(): React.JSX.Element {
 	const dispatch = useAppDispatch();
 	const user = useAppSelector((s) => s.auth.user);
-	const loading = useAppSelector((s) => s.auth.loading);
+	const restoring = useAppSelector((s) => s.auth.restoring);
 	const profileSetupComplete = useAppSelector((s) => s.auth.profileSetupComplete);
 	const prevUserRef = useRef<string | null>(null);
 
@@ -127,9 +127,11 @@ export function AppNavigator(): React.JSX.Element {
 		if (!user) prevUserRef.current = null;
 	}, [user]);
 
-	// Loading screen while we check for a stored session. Show a spinner so a
-	// slow/offline /auth/me reads as "loading" rather than a frozen black screen.
-	if (loading && user === null) {
+	// Loading screen while we check for a stored session. Gated on `restoring`
+	// (not the shared auth `loading`) so an in-progress login/register never
+	// unmounts the AuthScreen. Spinner so a slow/offline /auth/me reads as
+	// "loading" rather than a frozen black screen.
+	if (restoring && user === null) {
 		return (
 			<View style={{ flex: 1, backgroundColor: '#0a0a0f', alignItems: 'center', justifyContent: 'center' }}>
 				<ActivityIndicator size="large" color="#00d4ff" />

@@ -12,6 +12,12 @@ import { extractMessage } from '@/utils/extractMessage';
 interface AuthState {
   user: AuthenticatedUser | null;
   loading: boolean;
+  /**
+   * True only while the boot-time session restore is in flight. Kept separate
+   * from `loading` (which login/register/google share) so the splash gate never
+   * unmounts the AuthScreen mid-login and wipes typed input.
+   */
+  restoring: boolean;
   error: string | null;
   /** Derived from UserProfile.profileComplete (bio IS NOT NULL). False after register until profile is saved. */
   profileSetupComplete: boolean;
@@ -20,6 +26,9 @@ interface AuthState {
 const initialState: AuthState = {
   user: null,
   loading: false,
+  // Starts true: AppNavigator dispatches restoreSession unconditionally on mount,
+  // so the cold-boot first frame shows the splash spinner, not an AuthScreen flash.
+  restoring: true,
   error: null,
   profileSetupComplete: true,
 };
@@ -104,11 +113,11 @@ export const restoreSession = createAsyncThunk('auth/restore', async () => {
     Sentry.setUser({ id: user.id });
     return user;
   } catch (e: unknown) {
-    // Only drop the stored session on a real auth rejection (the server answered).
-    // A network/timeout error (statusCode 0) means we couldn't reach the server —
-    // keep the token so a later launch with connectivity can still restore the session.
+    // Only drop the stored session on a genuine auth failure (401/403). A
+    // network/timeout (statusCode 0) or transient server error (5xx, e.g. a
+    // cold-start 503) must keep the token so a later launch can still restore.
     const statusCode = (e as ApiError | undefined)?.statusCode;
-    if (typeof statusCode === 'number' && statusCode > 0) {
+    if (statusCode === 401 || statusCode === 403) {
       await tokenStore.clear();
     }
     return null;
@@ -159,14 +168,19 @@ const authSlice = createSlice({
       })
       .addCase(loginWithGoogle.rejected, rejected)
 
-      .addCase(restoreSession.pending, pending)
+      // Restore uses its own `restoring` flag (not the shared `loading`) so the
+      // splash gate can't fire during an active login/register on the AuthScreen.
+      .addCase(restoreSession.pending, (state) => {
+        state.restoring = true;
+        state.error = null;
+      })
       .addCase(restoreSession.fulfilled, (state, action) => {
-        state.loading = false;
+        state.restoring = false;
         state.user = action.payload;
         state.profileSetupComplete = true;
       })
       .addCase(restoreSession.rejected, (state) => {
-        state.loading = false;
+        state.restoring = false;
         state.user = null;
       })
 
