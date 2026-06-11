@@ -14,20 +14,24 @@ jest.mock('@g88/shared', () => {
 
 import { AchievementsService } from './achievements.service';
 import { GamificationService } from '../gamification/gamification.service';
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
 
 describe('AchievementsService', () => {
   let service: AchievementsService;
   let query: jest.Mock;
   let awardRaw: jest.Mock;
+  let emitAchievementUnlocked: jest.Mock;
 
   beforeEach(async () => {
     query = jest.fn().mockResolvedValue([]);
     awardRaw = jest.fn().mockResolvedValue(undefined);
+    emitAchievementUnlocked = jest.fn().mockResolvedValue(undefined);
     const mod = await Test.createTestingModule({
       providers: [
         AchievementsService,
         { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
         { provide: GamificationService, useValue: { awardRaw } },
+        { provide: RealtimeGateway, useValue: { emitAchievementUnlocked } },
       ],
     }).compile();
     service = mod.get(AchievementsService);
@@ -45,10 +49,28 @@ describe('AchievementsService', () => {
         .mockResolvedValueOnce([]) // have: none
         .mockResolvedValueOnce([{ level: 6, longest_streak: 0 }]) // summary -> level>=5
         .mockResolvedValueOnce([]) // grouped counts for pending count-achievements
-        .mockResolvedValueOnce([{ achievement_id: 'lvl5' }]) // INSERT user_achievements (won)
+        .mockResolvedValueOnce([{ unlocked_at: new Date('2026-06-11T00:00:00Z') }]) // INSERT (won)
         .mockResolvedValueOnce([]); // (waver count = 0 < 3 -> no unlock)
       await service.evaluate('u1');
       expect(awardRaw).toHaveBeenCalledWith('u1', 50, 'achievement.unlocked', 'achievement:lvl5');
+    });
+
+    it('emits a live achievement:unlocked event on a fresh unlock', async () => {
+      query
+        .mockResolvedValueOnce([]) // have: none
+        .mockResolvedValueOnce([{ level: 6, longest_streak: 0 }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ unlocked_at: new Date('2026-06-11T00:00:00Z') }]) // INSERT (won)
+        .mockResolvedValueOnce([]);
+      await service.evaluate('u1');
+      expect(emitAchievementUnlocked).toHaveBeenCalledWith('u1', {
+        id: 'lvl5',
+        title: 'L5',
+        description: '',
+        icon: 'star',
+        rewardXp: 50,
+        unlockedAt: '2026-06-11T00:00:00.000Z',
+      });
     });
 
     it('does not pay again when the unlock insert is a no-op (already had it)', async () => {
@@ -59,6 +81,7 @@ describe('AchievementsService', () => {
         .mockResolvedValueOnce([]); // INSERT ON CONFLICT DO NOTHING -> no row
       await service.evaluate('u1');
       expect(awardRaw).not.toHaveBeenCalled();
+      expect(emitAchievementUnlocked).not.toHaveBeenCalled();
     });
   });
 

@@ -51,12 +51,23 @@ export interface GiftReceivedEvent {
   createdAt: string;
 }
 
+export interface AchievementUnlockedEvent {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  /** Bonus XP paid on unlock (0 = cosmetic only). */
+  rewardXp: number;
+  unlockedAt: string;
+}
+
 export interface ServerToClientEvents {
   'wave:received': (e: WaveReceivedEvent) => void;
   'presence:delta': (e: PresenceDelta) => void;
   'chat:message': (e: ChatMessageEvent) => void;
   'conversation:opened': (e: ConversationOpenedEvent) => void;
   'gift:received': (e: GiftReceivedEvent) => void;
+  'achievement:unlocked': (e: AchievementUnlockedEvent) => void;
   /** Server-side rate limit, validation error, or unrecoverable socket error. */
   'error:event': (e: { code: string; message: string }) => void;
 }

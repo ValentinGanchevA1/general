@@ -1,7 +1,7 @@
 // apps/mobile/src/navigation/AppNavigator.tsx
 import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
-import { NavigationContainer, type NavigatorScreenParams, createNavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer, type NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -35,6 +35,8 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { restoreSession } from '@/features/auth/authSlice';
 import { registerPushToken, setupNotificationHandlers } from '@/lib/pushNotifications';
 import { pingGamification } from '@/features/gamification/useGamification';
+import { AchievementToastHost } from '@/components/AchievementToast';
+import { navigationRef } from './navigationRef';
 
 export type PulseFilter = 'all' | 'chats' | 'waves' | 'listings' | 'alerts' | 'matches';
 
@@ -69,7 +71,7 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
-export const navigationRef = createNavigationContainerRef<RootStackParamList>();
+export { navigationRef };
 
 function MainTabs(): React.JSX.Element {
 	return (
@@ -167,6 +169,7 @@ export function AppNavigator(): React.JSX.Element {
 					</>
 				)}
 			</Stack.Navigator>
+			{user ? <AchievementToastHost /> : null}
 		</NavigationContainer>
 	);
 }
