@@ -108,3 +108,46 @@ non-test users can link.
 - **G4 Social**: deferred — no provider creds landed.
 - Env vars were set via the **Render dashboard** (the Render MCP was unreachable across
   the session). Service: `g88-api` (`srv-d8d8ujojs32c73fb1gfg`).
+
+## Mobile release — Google Play closed testing (Android-first)
+
+> Decided 2026-06-11: **iOS/TestFlight is deferred** — the `ios/` native project does
+> not exist (only `Podfile` + `.xcode.env`), and archiving requires macOS. Android is
+> build-ready, so the beta path is **Google Play closed testing**. See `STATUS.md`.
+
+### What's in-repo (done)
+- `apps/mobile/android/app/build.gradle`: a **release signing config** reads the upload key
+  from `local.properties` (`RELEASE_STORE_FILE/_STORE_PASSWORD/_KEY_ALIAS/_KEY_PASSWORD`);
+  falls back to the debug key only when unset. `versionCode` auto-bumps via
+  `-PversionCodeOverride=<n>`.
+- `.github/workflows/android-release.yml`: builds a **signed AAB** (`bundleRelease`) on
+  manual dispatch or a `v*` tag, fails if the bundle is debug-signed, and uploads
+  `g88-release-aab`. `versionCode = github.run_number`.
+
+### One-time setup (manual — owner action)
+1. **Generate the upload keystore** (keep it safe + backed up — losing it requires a Play
+   key reset):
+   ```
+   keytool -genkeypair -v -keystore upload.keystore -alias g88-upload \
+     -keyalg RSA -keysize 2048 -validity 10000
+   ```
+2. **Set GitHub repo secrets** (Settings → Secrets → Actions):
+   - `ANDROID_UPLOAD_KEYSTORE_BASE64` — `base64 -w0 upload.keystore` (the file, base64'd)
+   - `ANDROID_UPLOAD_STORE_PASSWORD`, `ANDROID_UPLOAD_KEY_ALIAS` (`g88-upload`),
+     `ANDROID_UPLOAD_KEY_PASSWORD`
+   - (Reuses existing `GOOGLE_MAPS_API_KEY_RELEASE` + `GOOGLE_SERVICES_JSON` secrets.)
+3. **Play Console** ($25 one-time): create app `com.g88`, opt into **Play App Signing**
+   (Google holds the signing key; the keystore above is only the *upload* key), create a
+   **Closed testing** track + tester list.
+4. **Store listing minimums**: app name, short + full description, icon, feature graphic,
+   **privacy policy URL** (required — app collects location), and the **Data Safety form**
+   (declare: precise/approximate **location**, account info; note location is fuzzed to
+   ~120m server-side per `ARCHITECTURE.md §3.3`).
+5. **First upload is manual**: run `android-release.yml` (Actions → Run workflow), download
+   the `g88-release-aab` artifact, upload it to the closed track in the Console. Play
+   requires the first release to be created by hand.
+
+### After first upload (optional automation, follow-up)
+- Create a Play **service account** (JSON), grant release permissions, store as a secret,
+  and add an upload step (`r0adkll/upload-google-play` or fastlane `supply`) to publish to
+  the `internal`/closed track automatically. Deferred until the app exists in the Console.

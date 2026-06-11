@@ -33,7 +33,7 @@ G88 is a **map-first, location-based social platform**. Users appear as interact
 Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md`.
 
 - **P1 — foundation: ✅ shipped.** Auth → Profile → Map discovery → Presence → Wave → Chat.
-- **P2 — pre-launch hardening: 🟢 gate list complete (2026-06-11).** Targeting TestFlight. All gates done: Sentry ✅, dev-secret cleanup ✅, chat outbox (C6) ✅, viewport-diff map protocol (M1) ✅, ≥1 `.spec.ts` per backend module (C2) ✅. **Remaining P2-exit work is the 7-day synthetic-monitor soak — a clock, not a feature gate.** See `STATUS.md`.
+- **P2 — pre-launch hardening: 🟢 gate list complete (2026-06-11).** All gates done: Sentry ✅, dev-secret cleanup ✅, chat outbox (C6) ✅, viewport-diff map protocol (M1) ✅, ≥1 `.spec.ts` per backend module (C2) ✅; 7-day synthetic soak cleared. **Beta path = Android-first (Google Play closed testing); iOS/TestFlight deferred** — the `ios/` native project doesn't exist yet and archiving needs macOS. Android release signing + signed-AAB CI (`android-release.yml`) are in-repo; remaining is owner-side Play Console setup (see `DEPLOY.md` → "Mobile release"). See `STATUS.md`.
 - **P3 — habit-forming features: ⏳ post-launch.** Backend for gamification, challenges, gifts, achievements, notifications/geofences, trending, social-linking, and trades **already exists in the repo** but is largely **not surfaced** in mobile. Don't treat a P3 module's existence as "done" — surfacing is the remaining work.
 - **P4+ — horizon: 📋 documented only.** Monetization (Stripe Connect, paid gifts), live streaming, group chat, web client. Don't build without explicit go-ahead — see the `ROADMAP.md` cuts list.
 
