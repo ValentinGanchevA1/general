@@ -69,20 +69,23 @@ describe('GamificationService', () => {
   });
 
   describe('leaderboard', () => {
-    it('routes weekly scope and falls back to a separate "me" lookup', async () => {
+    it('routes weekly scope, falls back to a separate "me" lookup, and returns resetsAt', async () => {
       query
         .mockResolvedValueOnce([{ rank: 1, userId: 'other', isMe: false }]) // weeklyTop
-        .mockResolvedValueOnce([{ rank: 9, userId: 'u1', isMe: true }]); // weeklyMe
+        .mockResolvedValueOnce([{ rank: 9, userId: 'u1', isMe: true }]) // weeklyMe
+        .mockResolvedValueOnce([{ resets_at: new Date('2026-06-15T00:00:00Z') }]); // weekResetsAt
       const res = await service.leaderboard('u1', 'weekly');
       expect(res.scope).toBe('weekly');
       expect(res.me).toMatchObject({ userId: 'u1', rank: 9 });
+      expect(res.resetsAt).toBe('2026-06-15T00:00:00.000Z');
     });
 
-    it('uses the "me" row already present in the top page', async () => {
+    it('uses the "me" row already present in the top page and omits resetsAt for all-time', async () => {
       query.mockResolvedValueOnce([{ rank: 2, userId: 'u1', isMe: true }]); // allTimeTop
       const res = await service.leaderboard('u1', 'all_time');
       expect(res.me).toMatchObject({ userId: 'u1' });
-      expect(query).toHaveBeenCalledTimes(1); // no separate me-lookup needed
+      expect(res.resetsAt).toBeUndefined();
+      expect(query).toHaveBeenCalledTimes(1); // no separate me-lookup, no week-boundary query
     });
   });
 

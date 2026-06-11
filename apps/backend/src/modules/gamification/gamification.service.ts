@@ -149,7 +149,24 @@ export class GamificationService {
       entries.find((e) => e.isMe) ??
       (scope === 'weekly' ? await this.weeklyMe(userId) : await this.allTimeMe(userId));
 
+    if (scope === 'weekly') {
+      const resetsAt = await this.weekResetsAt();
+      return { scope, entries, me, ...(resetsAt ? { resetsAt } : {}) };
+    }
     return { scope, entries, me };
+  }
+
+  /**
+   * When the current weekly window rolls over — the next week boundary, matching
+   * `date_trunc('week', NOW())` used by the weekly SUM so the client countdown
+   * never drifts from the actual reset. Computed in SQL to honour the DB session
+   * time zone. Returns undefined only if the scalar query unexpectedly yields no row.
+   */
+  private async weekResetsAt(): Promise<string | undefined> {
+    const [row] = await this.db.query<Array<{ resets_at: Date }>>(
+      `SELECT date_trunc('week', NOW()) + interval '7 days' AS resets_at`,
+    );
+    return row?.resets_at ? new Date(row.resets_at).toISOString() : undefined;
   }
 
   private allTimeTop(userId: string, limit: number): Promise<LeaderboardEntry[]> {

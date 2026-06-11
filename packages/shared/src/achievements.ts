@@ -59,4 +59,10 @@ export interface LeaderboardPage {
   scope: LeaderboardScope;
   entries: LeaderboardEntry[];
   me: LeaderboardEntry | null;  // caller's rank, even when off the top page
+  /**
+   * Weekly scope only: ISO time when the current weekly window rolls over
+   * (next week boundary, server-computed to match the SUM window exactly).
+   * Drives the reset-countdown ribbon. Omitted for all-time.
+   */
+  resetsAt?: string;
 }
