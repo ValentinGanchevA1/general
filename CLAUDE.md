@@ -33,7 +33,7 @@ G88 is a **map-first, location-based social platform**. Users appear as interact
 Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md`.
 
 - **P1 — foundation: ✅ shipped.** Auth → Profile → Map discovery → Presence → Wave → Chat.
-- **P2 — pre-launch hardening: 🟡 active (current focus).** Targeting TestFlight. Sentry ✅ and dev-secret cleanup ✅ done; remaining: chat outbox (C6), viewport-diff map protocol (M1), ≥1 `.spec.ts` per backend module (C2 gate).
+- **P2 — pre-launch hardening: 🟢 gate list complete (2026-06-11).** Targeting TestFlight. All gates done: Sentry ✅, dev-secret cleanup ✅, chat outbox (C6) ✅, viewport-diff map protocol (M1) ✅, ≥1 `.spec.ts` per backend module (C2) ✅. **Remaining P2-exit work is the 7-day synthetic-monitor soak — a clock, not a feature gate.** See `STATUS.md`.
 - **P3 — habit-forming features: ⏳ post-launch.** Backend for gamification, challenges, gifts, achievements, notifications/geofences, trending, social-linking, and trades **already exists in the repo** but is largely **not surfaced** in mobile. Don't treat a P3 module's existence as "done" — surfacing is the remaining work.
 - **P4+ — horizon: 📋 documented only.** Monetization (Stripe Connect, paid gifts), live streaming, group chat, web client. Don't build without explicit go-ahead — see the `ROADMAP.md` cuts list.
 
@@ -393,7 +393,7 @@ All under `/api/v1`. JWT unless noted.
 
 ## Known debt (see `STATUS.md` / `TECH_DEBT_AUDIT.md`)
 
-- **C2** — ≥1 `.spec.ts` per backend module not yet met (`id-verification` and several modules lack specs).
+- **C2** — ✅ met (2026-06-11). Every backend module ships ≥1 `.spec.ts`, including `id-verification`.
 - **C3** — structured request logging (Pino → Loki/Grafana) deferred; Sentry is the v1 surface. `console.*` still permitted client-side until the `logger` shim lands.
 - Mobile tokens in unencrypted AsyncStorage (pre-TestFlight).
 - `0020_id_verification.sql` is not idempotent; ID-verification has no automated `pending → verified` path (manual review only).
