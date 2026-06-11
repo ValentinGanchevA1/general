@@ -36,6 +36,7 @@ import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ContextualFab } from '@/components/ContextualFab';
 import type { FabActionId } from '@/components/ContextualFab/useFabContext';
+import { DailyChallengeCard } from '@/features/gamification/DailyChallengeCard';
 import { track } from '@/lib/analytics';
 
 /**
@@ -247,6 +248,8 @@ export function MapScreen(): React.JSX.Element {
         </View>
       )}
 
+      <DailyChallengeCard />
+
       {selected && (
         <EntityBottomSheet
           point={selected}
@@ -323,7 +326,7 @@ const styles = StyleSheet.create({
   unavailableBody: { color: '#888', fontSize: 13, textAlign: 'center', lineHeight: 20 },
   loading: {
     position: 'absolute',
-    top: 60,
+    top: 120,
     alignSelf: 'center',
     padding: 8,
     borderRadius: 16,

@@ -19,6 +19,7 @@ import type {
   WaveReceivedEvent,
   ChatMessageEvent,
   GiftReceivedEvent,
+  AchievementUnlockedEvent,
 } from '@g88/shared';
 
 import { WsJwtGuard } from './ws-jwt.guard';
@@ -236,6 +237,16 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     } catch (err) {
       this.logger.error(`emitGiftReceived push failed: ${err}`);
     }
+  }
+
+  /**
+   * Notify a user that they just unlocked an achievement (drives the mobile
+   * toast + haptic). Best-effort live-only: an offline user simply sees the
+   * unlock on their next `GET /achievements` read — no push fallback needed,
+   * unlike waves/gifts which are person-to-person.
+   */
+  async emitAchievementUnlocked(toUserId: string, evt: AchievementUnlockedEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('achievement:unlocked', evt);
   }
 
   // ─── Push helpers ────────────────────────────────────────────────────────

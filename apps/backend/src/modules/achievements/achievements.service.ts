@@ -9,6 +9,7 @@ import {
 } from '@g88/shared';
 
 import { GamificationService } from '../gamification/gamification.service';
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
 
 @Injectable()
 export class AchievementsService {
@@ -17,6 +18,7 @@ export class AchievementsService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly gamification: GamificationService,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   /**
@@ -122,11 +124,11 @@ export class AchievementsService {
     def: AchievementDef,
     value: number,
   ): Promise<void> {
-    const ins = await this.db.query<Array<{ achievement_id: string }>>(
+    const ins = await this.db.query<Array<{ unlocked_at: Date }>>(
       `INSERT INTO user_achievements (user_id, achievement_id, unlocked_value)
             VALUES ($1, $2, $3)
        ON CONFLICT (user_id, achievement_id) DO NOTHING
-       RETURNING achievement_id`,
+       RETURNING unlocked_at`,
       [userId, def.id, value],
     );
     if (ins.length === 0) return; // already unlocked — idempotent
@@ -137,7 +139,18 @@ export class AchievementsService {
         .awardRaw(userId, def.rewardXp, 'achievement.unlocked', `achievement:${def.id}`)
         .catch((err) => this.logger.error(`achievement reward failed: ${err}`));
     }
-    // TODO: emit `achievement.unlocked` to room user:{userId} for the toast
-    // (typed ServerToClientEvents addition in @g88/shared/events).
+
+    // Live unlock event → mobile toast + haptic. Fire-and-forget: a delivery
+    // failure must never roll back the (already-committed) unlock.
+    void this.realtime
+      .emitAchievementUnlocked(userId, {
+        id: def.id,
+        title: def.title,
+        description: def.description,
+        icon: def.icon,
+        rewardXp: def.rewardXp,
+        unlockedAt: ins[0]!.unlocked_at.toISOString(),
+      })
+      .catch((err) => this.logger.error(`achievement emit failed: ${err}`));
   }
 }

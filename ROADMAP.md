@@ -127,10 +127,10 @@ Each epic gets a full spec in `SPECIFICATION.md` at the start of its sprint.
 
 ### P3.1 — Gamification surfacing
 - Backend exists for **XP, levels, daily streaks** (`gamification` module) and **daily challenges** (`challenges` module).
-- **Achievements and leaderboard have no backend** — no table, service, or endpoint. They need a full build (migration + service + controller + shared contracts), not just UI.
-- Mobile screens exist but aren't woven into the main flow.
-- Work: daily challenge surfaces on map open · XP indicator on profile · build achievements (defs + `user_achievements` ledger off `xp_events`) with earned toast/haptic · build leaderboard query + weekly ribbon.
-- Effort: ~5 days surfacing + ~3–4 days net-new achievements/leaderboard backend.
+- ~~**Achievements and leaderboard have no backend**~~ — **stale, corrected 2026-06-11.** Both shipped in the G5 sprint (2026-05-31): `achievements` module + `user_achievements` table (migration `0015_achievements`) + `GET /achievements`; leaderboard via `GET /gamification/leaderboard` (weekly + all_time) with supporting indexes in the same migration. Shared contracts in `@g88/shared/{achievements,gamification}`. `STATUS.md` is authoritative.
+- Mobile screens exist (Achievements + Leaderboard) but most surfacing is **done**: ProfileScreen already shows the XP/level `ProgressCard` and today's challenges. As of 2026-06-11 the **daily-challenge card on map open** and the **earned toast/haptic** (new `achievement:unlocked` realtime event) also shipped.
+- Remaining work: weekly-ribbon polish on the leaderboard; optional "complete your verification" / streak nudges. No net-new backend needed.
+- Effort: ~1–2 days remaining polish (was ~5d surfacing + ~3–4d backend — backend already built, core surfacing done).
 
 ### P3.2 — Gifts (free virtual, XP-funded)
 - Backend exists (`gifts`, `user-wallet`, `gift-transaction`).
