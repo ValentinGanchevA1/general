@@ -2,7 +2,7 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
 import * as Sentry from '@sentry/react-native';
 
-import type { AuthenticatedUser, LoginResponse, UserProfile } from '@g88/shared';
+import type { ApiError, AuthenticatedUser, LoginResponse, UserProfile } from '@g88/shared';
 
 import { api, postJson } from '@/api/client';
 import { tokenStore } from '@/api/tokenStore';
@@ -98,11 +98,19 @@ export const restoreSession = createAsyncThunk('auth/restore', async () => {
   if (!token) return null;
   try {
     const { getJson } = await import('@/api/client');
-    const user = await getJson<AuthenticatedUser>('/auth/me');
+    // Bound the boot-blocking check: if the network is slow/offline, fall through
+    // to the Auth screen quickly instead of holding the splash gate for the full 15s.
+    const user = await getJson<AuthenticatedUser>('/auth/me', { timeout: 8_000 });
     Sentry.setUser({ id: user.id });
     return user;
-  } catch {
-    await tokenStore.clear();
+  } catch (e: unknown) {
+    // Only drop the stored session on a real auth rejection (the server answered).
+    // A network/timeout error (statusCode 0) means we couldn't reach the server —
+    // keep the token so a later launch with connectivity can still restore the session.
+    const statusCode = (e as ApiError | undefined)?.statusCode;
+    if (typeof statusCode === 'number' && statusCode > 0) {
+      await tokenStore.clear();
+    }
     return null;
   }
 });

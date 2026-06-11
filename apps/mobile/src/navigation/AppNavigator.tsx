@@ -1,6 +1,6 @@
 // apps/mobile/src/navigation/AppNavigator.tsx
 import React, { useEffect, useRef } from 'react';
-import { View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer, type NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -127,9 +127,14 @@ export function AppNavigator(): React.JSX.Element {
 		if (!user) prevUserRef.current = null;
 	}, [user]);
 
-	// Blank dark screen while we check for a stored session
+	// Loading screen while we check for a stored session. Show a spinner so a
+	// slow/offline /auth/me reads as "loading" rather than a frozen black screen.
 	if (loading && user === null) {
-		return <View style={{ flex: 1, backgroundColor: '#0a0a0f' }} />;
+		return (
+			<View style={{ flex: 1, backgroundColor: '#0a0a0f', alignItems: 'center', justifyContent: 'center' }}>
+				<ActivityIndicator size="large" color="#00d4ff" />
+			</View>
+		);
 	}
 
 	return (
