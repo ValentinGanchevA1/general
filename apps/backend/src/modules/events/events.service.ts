@@ -224,19 +224,26 @@ export class EventsService {
         [eventId, userId, dto.status],
       );
 
-      // Recompute the cached going-count from the source of truth.
-      const [{ count }] = await qr.query(
+      // Recompute the cached going-count from the source of truth, then read it
+      // back with a SELECT. (TypeORM's queryRunner.query returns a
+      // [rows, affectedCount] tuple for UPDATE ... RETURNING — not a plain rows
+      // array like INSERT ... RETURNING — so RETURNING here would mis-read; a
+      // separate SELECT is unambiguous.)
+      await qr.query(
         `UPDATE events
             SET attendee_count = (
                   SELECT COUNT(*) FROM event_attendees
                    WHERE event_id = $1 AND status = 'going')
-          WHERE id = $1
-        RETURNING attendee_count AS count`,
+          WHERE id = $1`,
+        [eventId],
+      );
+      const [counted] = await qr.query(
+        `SELECT attendee_count FROM events WHERE id = $1`,
         [eventId],
       );
 
       await qr.commitTransaction();
-      return { eventId, status: dto.status, attendeeCount: count };
+      return { eventId, status: dto.status, attendeeCount: counted.attendee_count };
     } catch (err) {
       await qr.rollbackTransaction();
       throw err;
@@ -391,22 +398,20 @@ export class EventsService {
          RETURNING question_id`,
         [questionId, userId],
       );
-      // Only bump the cached count when this is a new (deduped) upvote.
+      // Only bump the cached count when this is a new (deduped) upvote. The
+      // UPDATE carries no RETURNING — queryRunner.query returns a tuple for
+      // UPDATE ... RETURNING (see rsvp) — so read the final count with a SELECT.
       if (inserted.length > 0) {
-        const [row] = await qr.query(
-          `UPDATE event_questions SET upvotes = upvotes + 1 WHERE id = $1 RETURNING upvotes`,
+        await qr.query(
+          `UPDATE event_questions SET upvotes = upvotes + 1 WHERE id = $1`,
           [questionId],
         );
-        if (!row) {
-          throw new NotFoundException({ code: 'question.not_found', message: 'Question not found.' });
-        }
-        await qr.commitTransaction();
-        return { id: questionId, upvotes: row.upvotes };
       }
-
       const [row] = await qr.query(`SELECT upvotes FROM event_questions WHERE id = $1`, [questionId]);
+      if (!row) {
+        throw new NotFoundException({ code: 'question.not_found', message: 'Question not found.' });
+      }
       await qr.commitTransaction();
-      if (!row) throw new NotFoundException({ code: 'question.not_found', message: 'Question not found.' });
       return { id: questionId, upvotes: row.upvotes };
     } catch (err) {
       await qr.rollbackTransaction();
