@@ -2,6 +2,7 @@ export * from './geo';
 export * from './api';
 export * from './events';
 export * from './event';
+export * from './listing';
 export * from './activity';
 export * from './gamification';
 export * from './challenges';
