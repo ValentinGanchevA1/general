@@ -22,6 +22,7 @@ import {
   CreateListingDto,
   MakeOfferDto,
 } from './dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /** Max offers inlined into a seller's listing detail. */
 const OFFER_PREVIEW = 50;
@@ -55,7 +56,10 @@ interface OfferRow {
 
 @Injectable()
 export class ListingsService {
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   // ─── Create / read ─────────────────────────────────────────────────────────
 
@@ -90,7 +94,17 @@ export class ListingsService {
       ],
     )) as ListingRow[];
 
-    return this.toSummary({ ...rows[0]!, favorited_by_me: false });
+    const summary = this.toSummary({ ...rows[0]!, favorited_by_me: false });
+
+    // Fan a push to geofence-watchers in this area (channel `listings`).
+    // Fire-and-forget — public listings only; never block create on FCM.
+    if ((dto.visibility ?? 'public') === 'public') {
+      void this.notifications
+        .notifyListingNearby(cells.r7, sellerId, summary.title, summary.id)
+        .catch(() => undefined);
+    }
+
+    return summary;
   }
 
   async browse(userId: string, dto: BrowseListingsDto): Promise<ListingSummary[]> {

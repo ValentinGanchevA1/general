@@ -58,6 +58,7 @@ pending.
 | `SENTRY_DSN`           | Both apps.                                                                                       |
 | `CORS_ORIGINS`, `PORT` | Standard.                                                                                        |
 | `API_PUBLIC_URL`       | Public base, e.g. `https://g88-api.onrender.com`. Used to build the social OAuth `redirect_uri`. |
+| `NOTIFICATIONS_DIGEST_SECRET` | **Optional.** Shared secret for `POST /notifications/digest/run` (P3.3 daily digest). Set the same value on `g88-api` **and** as the `NOTIFICATIONS_DIGEST_SECRET` GitHub repo secret (used by `.github/workflows/notification-digest.yml`, daily 17:00 UTC). Unset ⇒ digest endpoint 403s and the workflow skips — push digests simply don't send. |
 
 ### G2 — Verification (Twilio Verify) — secrets
 | Var                         | Value                      |
