@@ -232,17 +232,19 @@ export class ListingsService {
       throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
     }
 
-    // Seller sees every offer; a buyer sees only their own.
-    const scope = listing.seller_id === userId ? '' : 'AND o.buyer_id = $2';
+    // Seller sees every offer; a buyer sees only their own. Bind $2 only when
+    // the buyer scope actually references it — passing an unused parameter makes
+    // Postgres reject the bind ("supplies 2 parameters, statement requires 1").
+    const isSeller = listing.seller_id === userId;
     const rows = (await this.db.query(
       `SELECT o.id, o.listing_id, o.buyer_id, o.offer_cents, o.message, o.status, o.created_at,
               u.display_name AS buyer_display_name, u.avatar_url AS buyer_avatar_url
          FROM trade_offers o
          JOIN users u ON u.id = o.buyer_id
-        WHERE o.listing_id = $1 ${scope}
+        WHERE o.listing_id = $1 ${isSeller ? '' : 'AND o.buyer_id = $2'}
         ORDER BY o.created_at DESC
         LIMIT ${OFFER_PREVIEW}`,
-      [listingId, userId],
+      isSeller ? [listingId] : [listingId, userId],
     )) as OfferRow[];
 
     return rows.map((o) => this.toOffer(o));

@@ -132,6 +132,28 @@ describe('ListingsService', () => {
     });
   });
 
+  describe('listOffers', () => {
+    it('seller scope binds exactly one param (no $2) — regression for the bind mismatch', async () => {
+      query
+        .mockResolvedValueOnce([{ seller_id: 'me' }]) // listing lookup -> caller is seller
+        .mockResolvedValueOnce([]); // offers query
+      await service.listOffers('me', 'l1');
+      const [sql, params] = query.mock.calls[1]!;
+      expect(String(sql)).not.toContain('$2');
+      expect(params).toEqual(['l1']); // only the listing id — never an unused $2
+    });
+
+    it('buyer scope binds $2 and filters to their own offers', async () => {
+      query
+        .mockResolvedValueOnce([{ seller_id: 'someone-else' }]) // caller is not the seller
+        .mockResolvedValueOnce([]);
+      await service.listOffers('buyer', 'l1');
+      const [sql, params] = query.mock.calls[1]!;
+      expect(String(sql)).toContain('o.buyer_id = $2');
+      expect(params).toEqual(['l1', 'buyer']);
+    });
+  });
+
   describe('toggleFavorite', () => {
     it('adds a favorite when none exists and returns the fresh count', async () => {
       query
