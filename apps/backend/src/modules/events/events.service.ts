@@ -10,6 +10,7 @@ import { DataSource } from 'typeorm';
 
 import {
   computeH3Cells,
+  EVENT_LIMITS,
   type EventDetail,
   type EventQuestion,
   type EventSummary,
@@ -257,11 +258,17 @@ export class EventsService {
         `INSERT INTO event_polls (event_id, question) VALUES ($1, $2) RETURNING id`,
         [eventId, dto.question],
       );
-      for (let i = 0; i < dto.options.length; i++) {
+      // Bound the iteration by a constant cap (defence-in-depth — the DTO's
+      // @ArrayMaxSize already enforces this, but slicing makes the loop bound
+      // independent of the user-supplied array length).
+      const options = dto.options.slice(0, EVENT_LIMITS.pollOptionsMax);
+      let position = 0;
+      for (const label of options) {
         await qr.query(
           `INSERT INTO event_poll_options (poll_id, label, position) VALUES ($1, $2, $3)`,
-          [poll.id, dto.options[i], i],
+          [poll.id, label, position],
         );
+        position++;
       }
       await qr.commitTransaction();
       return this.pollResult(userId, poll.id);
