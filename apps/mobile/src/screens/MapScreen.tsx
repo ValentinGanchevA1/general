@@ -37,6 +37,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ContextualFab } from '@/components/ContextualFab';
 import type { FabActionId } from '@/components/ContextualFab/useFabContext';
 import { DailyChallengeCard } from '@/features/gamification/DailyChallengeCard';
+import { NudgeBanner } from '@/features/nudges/NudgeBanner';
 import { EventsRail } from '@/features/events/EventsRail';
 import { track } from '@/lib/analytics';
 
@@ -250,6 +251,7 @@ export function MapScreen(): React.JSX.Element {
       )}
 
       <DailyChallengeCard />
+      <NudgeBanner />
 
       {!selected && (
         <EventsRail location={region ? { lat: region.latitude, lng: region.longitude } : myCoords} />
