@@ -343,3 +343,86 @@ JWT access token (15min) + opaque refresh token (30d, rotating, stored hashed in
   iOS submission must re-add Apple, drop Google on iOS, or offer email-only on iOS.
   Inert today — the product is Android-first (no real Xcode project, Android-only CI).
   Next migration `0020`.
+
+- **2026-06-05** — Multi-photo profile gallery (write path). The display side already
+  existed (`ProfileScreen` renders `photoUrls`, `user_photos` from `0012`), but there
+  was no way to *add* photos. No migration — the table was already present. The design
+  invariant is **position-0 = avatar**: `UsersService.{listPhotos,addPhoto,deletePhoto,
+  reorderPhotos}` keep the avatar in sync on add(first)/delete/reorder via a single
+  atomic `UPDATE … FROM (VALUES …)`, with a 6-photo cap. New REST surface under
+  `/users/me/photos` (`GET`, `POST presigned-url`, `POST`, `PATCH order`, `DELETE
+  :photoId`) ordered before the `:id` catch-all. Mobile uploads bypass the axios `api`
+  and raw-`fetch` PUT straight to the S3 presigned URL (`features/profile/photos.ts`,
+  new `PhotosScreen`). `react-native-image-picker` is a **native module — Android needs
+  a rebuild**. Drag-reorder deferred (avoids a 2nd native lib); "set as main" covers it
+  via the reorder endpoint. **S3 verified end-to-end in prod** (bucket
+  `g88-uploads-dev`, eu-north-1): presign 200 → PUT 200 → public GET 200.
+
+- **2026-06-05** — P4 deploy: Twilio (G2) + Stripe (G3) credentials landed on
+  `g88-api`. The live `schema_migrations` table showed `0001`–`0018` already applied,
+  so the checklist's "run migrations" step was stale — the real remaining work was env
+  vars. Stripe stays **test mode** (`sk_test_`) with a signature-verified test webhook
+  (`we_…`) for the 4 events the handler processes. Both paths are **code-complete but
+  not yet run-verified** against the deploy (no live OTP SMS, no live checkout→webhook→
+  `subscription_tier` flip exercised). G4 social OAuth deferred (no provider creds).
+
+- **2026-06-07/06-10** — ID-document verification (manual review) wired live. Migrations
+  `0020_id_verification` (status enum `none/pending/verified/rejected` + column +
+  `user_id_verifications` table) and `0021` (`v_discoverable_entity` view gains
+  `verifiedBadge`) were found **already applied to prod** (2026-06-09). The feature
+  commit had landed the `id-verification` module + `VerificationIdScreen` +
+  `idVerificationSlice` but left activation **uncommitted** — `IdVerificationModule`
+  was never registered in `AppModule.imports` (endpoints un-mounted) and the screen had
+  no nav route. Committed the wiring: module registered, `VerificationId` modal route,
+  ProfileScreen status card + "Verify now" entry. **Carried gaps:** no `pending→verified`
+  path in code (review is manual DB-only, so the badge is currently unreachable without
+  an admin tool); `0020` is **not idempotent** (raw `CREATE TYPE`/`ADD COLUMN`, no
+  guards — already applied, do not re-run). Next free migration `0022`.
+
+- **2026-06-11** — P2 gate list complete. The C2 spec-coverage gate closed: every
+  backend module now ships ≥1 `.spec.ts` (final 10 modules added, 56 tests, eslint
+  clean at `--max-warnings 0`). With A4 · OB1 · C6 · M1 · C2 all done and the **7-day
+  synthetic soak cleared** (200/200 most-recent Synthetic Monitor runs green over
+  2026-06-03→06-11), P2's gate list **and** DoD soak (item 2) are both satisfied.
+  Cadence caveat: GitHub throttles the `*/5` cron to ~50 min median, so prod-alerting
+  latency is ~hourly — tighten with an external uptime monitor post-launch, not a P2
+  blocker.
+
+- **2026-06-11** — Beta path decided: **Android-first (Google Play closed testing);
+  iOS/TestFlight deferred.** The iOS native project does not exist — `apps/mobile/ios/`
+  holds only `Podfile` + `.xcode.env` (no `.xcodeproj`/`AppDelegate`/`Info.plist`), so
+  the app has never built for iOS and archiving needs macOS (Windows-only dev). Android
+  is build-ready. In-repo foundation landed: `android/app/build.gradle` gains a real
+  **release signing config** (upload key from `local.properties`, debug-key fallback)
+  + `versionCode` override; new `.github/workflows/android-release.yml` builds a
+  **signed AAB** on dispatch / `v*` tag and asserts the bundle is not debug-signed.
+  Owner-side remaining: keystore + 4 `ANDROID_UPLOAD_*` secrets + Play Console app
+  setup (Data Safety, privacy policy, first manual AAB upload).
+
+- **2026-06-11** — P3.1 gamification surfacing (no migration, no new endpoint). The
+  `ROADMAP.md` line "achievements/leaderboard have no backend" was **stale** — both
+  shipped in G5. The genuinely-missing surfaces were live/UX, not backend: (1) the
+  achievement **unlock realtime event** — replaced a `// TODO: emit` with a typed
+  `achievement:unlocked` `ServerToClientEvent` (live-only, no push fallback; offline
+  users see it on next `GET /achievements`), `AchievementsModule` now imports
+  `RealtimeModule` (no cycle); (2) a global mobile `AchievementToastHost` mounted once
+  in `AppNavigator` (extracted `navigationRef.ts` to break a circular import); (3) a
+  dismissible `DailyChallengeCard` on map open; (4) a weekly-reset **ribbon** on the
+  leaderboard — `weekResetsAt()` computes the next week boundary via
+  `date_trunc('week', NOW()) + interval '7 days'` so the client countdown matches the
+  exact SUM window the ranking uses; rides the existing `GET /gamification/leaderboard`
+  as an optional weekly-only `resetsAt`. Remaining P3.1 is optional streak/verification
+  nudges only.
+
+- **2026-06-11** — Mobile boot-gate fix (mobile-only: `authSlice.ts` +
+  `AppNavigator.tsx`, no migration). A blank dark screen on a slow/offline launch was
+  `AppNavigator`'s session-restore gate holding on a network-stalled `GET /auth/me`,
+  rendered as a bare dark `View`. Fixes: the gate now renders an `ActivityIndicator`;
+  `restoreSession` caps `/auth/me` at **8s** (vs the global 15s) so an offline boot
+  falls through to Auth quickly. Two follow-up correctness fixes: (1) the gate read the
+  **shared** `auth.loading`, which `login`/`register` also set — tapping Login flipped
+  it true while `user` was still null, **unmounting AuthScreen mid-login**; introduced a
+  dedicated `restoring` flag (driven only by `restoreSession`) for the gate, leaving
+  `loading` to drive button spinners. (2) `restoreSession` cleared tokens on **any**
+  positive status, so a transient `5xx` (Render cold-start `503`) logged the user out —
+  now clears **only on a genuine 401/403**; `5xx`/timeout/network keep the token.
