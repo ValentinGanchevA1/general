@@ -15,18 +15,37 @@ IDs, URLs) may carry real values.
 
 ## Migrations
 
-Run on every deploy via `pnpm --filter @g88/backend migration:run` (idempotent;
-tracked in `schema_migrations` by filename). **All migrations `0001`–`0021` are
-applied to prod Supabase** (`0001`–`0019` verified 2026-06-05; `0020`/`0021`
-applied 2026-06-09, verified 2026-06-10). Nothing pending.
+Applied with `pnpm --filter @g88/backend migration:run` (idempotent; tracked in
+`schema_migrations` by filename). **All migrations `0001`–`0022` are applied to
+prod Supabase** (`0001`–`0019` verified 2026-06-05; `0020`/`0021` applied
+2026-06-09, verified 2026-06-10; `0022_events.sql` applied 2026-06-12). Nothing
+pending.
+
+> ⚠️ **Migrations are NOT auto-run on deploy** (corrected 2026-06-12). Despite
+> the prior wording here, `g88-api` is on Render's **free** plan, whose build
+> command (`…npx nest build`) and start command (`node …/main.js`) do not invoke
+> `migration:run`, and free plans have no pre-deploy command. `main.ts` does not
+> migrate on boot either. Migrations have always been applied **manually**, and
+> `0022` shipped live (PR #35) without its tables until applied by hand — the
+> `/events` RSVP/poll/Q&A endpoints 500'd in the interim.
+>
+> **Fix (apply once, in the Render dashboard → Settings → Build Command):** append
+> the runner so a deploy applies migrations and fails fast (a failed migration
+> fails the build and leaves the previous version serving):
+> ```
+> npm install -g pnpm && pnpm install --frozen-lockfile --filter @g88/shared --filter @g88/backend && cd apps/backend && npx nest build && pnpm --filter @g88/backend migration:run
+> ```
+> Until that change lands, **run `migration:run` against the prod `DATABASE_URL`
+> by hand for every new migration** before/after merging to `master`.
 
 > The former `0012` prefix collision (`achievements` + `profile_expansion`) is
 > resolved: achievements moved to `0015_achievements.sql` (it has no deps and is
 > the latest feature; `profile_expansion` stays `0012` ahead of `0013`/`0014`).
 > `0016` = drop VIP tier, `0017` = message requests, `0018` = gifts,
 > `0019` = drop Apple OAuth, `0020` = ID-verification schema (enum/column +
-> `user_id_verifications`), `0021` = discovery view `verifiedBadge`.
-> **Next free number is `0022`.** ⚠️ `0020` is not idempotent (raw `CREATE TYPE`/
+> `user_id_verifications`), `0021` = discovery view `verifiedBadge`,
+> `0022` = events (RSVP/polls/Q&A tables).
+> **Next free number is `0023`.** ⚠️ `0020` is not idempotent (raw `CREATE TYPE`/
 > `ADD COLUMN`, no guards) — already applied, do not re-run.
 
 ## Environment variables (`g88-api`)
@@ -138,7 +157,7 @@ Several providers (Instagram/TikTok/Facebook) require app review before
 non-test users can link.
 
 ## Status (2026-06-05)
-- **Migrations**: `0001`–`0019` applied to prod Supabase (verified live 2026-06-05).
+- **Migrations**: `0001`–`0022` applied to prod Supabase (`0001`–`0019` verified live 2026-06-05; `0020`–`0022` applied 2026-06-09 / 06-12). See the Migrations section above — **migrations are applied manually, not on deploy.**
 - **G2 Twilio**: `TWILIO_ACCOUNT_SID/AUTH_TOKEN/VERIFY_SERVICE_SID` set on `g88-api`.
   ⏳ Phone OTP SMS not yet run-verified against the deploy.
 - **G3 Stripe** (test mode): secret key, webhook secret, both price IDs, and the test
