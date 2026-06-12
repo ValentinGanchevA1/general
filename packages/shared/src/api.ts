@@ -15,6 +15,12 @@ export interface DiscoveryQuery {
   kinds?: EntityKind[]; // default: all
   /** Hash from the previous DiscoveryResponse. Server returns a diff when provided. */
   prevViewportHash?: string;
+  /**
+   * Trending topic filter (hashtag, e.g. '#open-mic'). When set, results are
+   * restricted to events/listings whose title/category slugifies to this topic
+   * (users are excluded). Powers P3.6 "filter map by topic".
+   */
+  topic?: string;
 }
 
 /** A cluster bubble — one H3 cell aggregating N entities. */

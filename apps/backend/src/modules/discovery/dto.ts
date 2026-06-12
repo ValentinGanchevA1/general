@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -49,4 +50,10 @@ export class DiscoveryQueryDto {
   @IsOptional()
   @IsString()
   prevViewportHash?: string;
+
+  /** Trending topic filter (hashtag). Restricts results to matching events/listings. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  topic?: string;
 }

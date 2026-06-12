@@ -15,6 +15,8 @@ interface UseDiscoveryArgs {
   zoom: number;
   viewport: Viewport | null;
   kinds?: EntityKind[];
+  /** Trending topic filter (hashtag). Changing it forces a fresh full fetch. */
+  topic?: string | null;
   debounceMs?: number;
   enabled?: boolean;
 }
@@ -43,6 +45,7 @@ export function useDiscovery({
   zoom,
   viewport,
   kinds,
+  topic,
   debounceMs = 250,
   enabled = true,
 }: UseDiscoveryArgs): UseDiscoveryResult {
@@ -57,11 +60,23 @@ export function useDiscovery({
   const prevHashRef = useRef<string | null>(null);
   // Cached point set updated incrementally by diffs.
   const cachedPointsRef = useRef<DiscoveryPoint[]>([]);
+  // Last topic filter applied — used to detect a filter change and reset diffs.
+  const lastTopicRef = useRef<string | null>(null);
 
   const fetchNow = useCallback(
-    async (vp: Viewport, z: number, k?: EntityKind[]) => {
-      const key = JSON.stringify({ vp, z, k });
+    async (vp: Viewport, z: number, k?: EntityKind[], t?: string | null) => {
+      const key = JSON.stringify({ vp, z, k, t });
       if (key === lastFetchKey.current) return;
+
+      // A topic change swaps the entire result set, so the diff baseline from the
+      // previous (differently-filtered) snapshot is invalid — force a full fetch.
+      const topicChanged = lastTopicRef.current !== (t ?? null);
+      if (topicChanged) {
+        prevHashRef.current = null;
+        cachedPointsRef.current = [];
+        lastTopicRef.current = t ?? null;
+      }
+
       lastFetchKey.current = key;
 
       abortRef.current?.abort();
@@ -76,6 +91,7 @@ export function useDiscovery({
           viewport: vp,
           zoom: z,
           ...(k ? { kinds: k } : {}),
+          ...(t ? { topic: t } : {}),
           ...(prevHashRef.current ? { prevViewportHash: prevHashRef.current } : {}),
         };
 
@@ -116,12 +132,12 @@ export function useDiscovery({
     if (!enabled || !viewport) return;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
-      void fetchNow(viewport, zoom, kinds);
+      void fetchNow(viewport, zoom, kinds, topic);
     }, debounceMs);
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [enabled, viewport, zoom, kinds, debounceMs, fetchNow]);
+  }, [enabled, viewport, zoom, kinds, topic, debounceMs, fetchNow]);
 
   useEffect(() => {
     return () => abortRef.current?.abort();
@@ -132,8 +148,8 @@ export function useDiscovery({
     lastFetchKey.current = '';
     prevHashRef.current = null;   // force full response on explicit refresh
     cachedPointsRef.current = [];
-    void fetchNow(viewport, zoom, kinds);
-  }, [viewport, zoom, kinds, fetchNow]);
+    void fetchNow(viewport, zoom, kinds, topic);
+  }, [viewport, zoom, kinds, topic, fetchNow]);
 
   return { data, loading, error, refresh };
 }

@@ -54,7 +54,8 @@ export function DailyChallengeCard(): React.JSX.Element | null {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    top: 52,
+    // Below the trending filter bar (top: 52, ~52px tall).
+    top: 116,
     left: 16,
     right: 16,
     alignItems: 'center',

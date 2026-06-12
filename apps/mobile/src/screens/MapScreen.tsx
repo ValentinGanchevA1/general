@@ -39,6 +39,8 @@ import type { FabActionId } from '@/components/ContextualFab/useFabContext';
 import { DailyChallengeCard } from '@/features/gamification/DailyChallengeCard';
 import { NudgeBanner } from '@/features/nudges/NudgeBanner';
 import { EventsRail } from '@/features/events/EventsRail';
+import { TrendingFilterBar } from '@/features/discovery/TrendingFilterBar';
+import { useTrendingNearby } from '@/features/pulse/useTrendingNearby';
 import { track } from '@/lib/analytics';
 
 /**
@@ -61,13 +63,20 @@ export function MapScreen(): React.JSX.Element {
   const [region, setRegion] = useState<Region | null>(null);
   const [selected, setSelected] = useState<EntityPoint | null>(null);
   const [waving, setWaving] = useState<string | null>(null);
+  const [activeTopic, setActiveTopic] = useState<string | null>(null);
   const mapRef = useRef<MapView>(null);
 
   // ─── Viewport derivation ───────────────────────────────────────────────
   const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
   const zoom = useMemo(() => (region ? approxZoomFromRegion(region) : 12), [region]);
 
-  const { data, loading, error, refresh } = useDiscovery({ viewport, zoom });
+  const { topics: trendingTopics } = useTrendingNearby();
+  const { data, loading, error, refresh } = useDiscovery({ viewport, zoom, topic: activeTopic });
+
+  const onSelectTopic = useCallback((topic: string | null) => {
+    setActiveTopic(topic);
+    track('trending.filter', { topic: topic ?? 'cleared' });
+  }, []);
 
   // Sync discovery points to Redux so PulseScreen's NearbyPeopleStrip can read them.
   useEffect(() => {
@@ -250,6 +259,11 @@ export function MapScreen(): React.JSX.Element {
         </View>
       )}
 
+      <TrendingFilterBar
+        topics={trendingTopics}
+        activeTopic={activeTopic}
+        onSelect={onSelectTopic}
+      />
       <DailyChallengeCard />
       <NudgeBanner />
 

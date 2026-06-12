@@ -47,25 +47,34 @@ export class DiscoveryService {
     kinds?: EntityKind[];
     requesterId: string;
     prevViewportHash?: string;
+    topic?: string;
   }): Promise<DiscoveryResponse> {
-    const kinds = params.kinds?.length ? params.kinds : DEFAULT_KINDS;
+    // Normalise the topic filter to a bare slug ('#Open-Mic' → 'open-mic') so it
+    // compares to g88_slugify() output. Empty/whitespace → no filter.
+    const topicSlug = params.topic ? params.topic.replace(/^#/, '').trim().toLowerCase() : '';
+    // A topic filter only applies to events/listings (users have no topic), so
+    // intersect the requested kinds with those two.
+    const requested = params.kinds?.length ? params.kinds : DEFAULT_KINDS;
+    const kinds = topicSlug
+      ? requested.filter((k) => k === 'event' || k === 'listing')
+      : requested;
     const resolution = h3ResolutionForZoom(params.zoom);
     const cells = cellsForViewport(params.viewport, resolution);
 
-    if (cells.length === 0) {
-      return this.empty(resolution, params.viewport, kinds);
+    if (cells.length === 0 || (topicSlug && kinds.length === 0)) {
+      return this.empty(resolution, params.viewport, kinds, topicSlug);
     }
 
     if (cells.length > 5_000) {
       this.logger.warn(`Viewport produced ${cells.length} cells at r${resolution} — refusing`);
-      return this.empty(resolution, params.viewport, kinds);
+      return this.empty(resolution, params.viewport, kinds, topicSlug);
     }
 
     const points = isEntityZoom(params.zoom)
-      ? await this.entitiesInCells(cells, resolution, kinds, params.requesterId)
-      : await this.clusterByCell(cells, resolution, kinds, params.requesterId);
+      ? await this.entitiesInCells(cells, resolution, kinds, params.requesterId, topicSlug)
+      : await this.clusterByCell(cells, resolution, kinds, params.requesterId, topicSlug);
 
-    const viewportHash = this.hashViewport(params.viewport, params.zoom, kinds);
+    const viewportHash = this.hashViewport(params.viewport, params.zoom, kinds, topicSlug);
 
     // Store this snapshot so the next request can diff against it.
     await this.storeSnapshot(viewportHash, points);
@@ -159,11 +168,12 @@ export class DiscoveryService {
     resolution: number,
     kinds: EntityKind[],
     requesterId: string,
+    topicSlug: string,
   ): Promise<DiscoveryPoint[]> {
     const cellCol = this.cellColumn(resolution);
 
     // SECURITY: cellCol comes from a private helper that whitelists resolutions;
-    // it is never user-controlled. Other params are bound via $1, $2, $3.
+    // it is never user-controlled. Other params (incl. the topic slug) are bound.
     const rows: Array<{ cell: string; kind: EntityKind; n: string }> = await this.db.query(
       `
       SELECT ${cellCol} AS cell, kind, COUNT(*)::text AS n
@@ -172,9 +182,10 @@ export class DiscoveryService {
          AND kind = ANY($2::text[])
          AND visibility = 'public'
          AND id <> $3
+         ${topicSlug ? `AND ${TOPIC_MATCH_SQL('$4')}` : ''}
        GROUP BY ${cellCol}, kind
       `,
-      [cells, kinds, requesterId],
+      topicSlug ? [cells, kinds, requesterId, topicSlug] : [cells, kinds, requesterId],
     );
 
     // Roll up per cell, attach the by-kind breakdown the client uses for tinting.
@@ -214,6 +225,7 @@ export class DiscoveryService {
     resolution: number,
     kinds: EntityKind[],
     requesterId: string,
+    topicSlug: string,
   ): Promise<DiscoveryPoint[]> {
     const cellCol = this.cellColumn(resolution);
 
@@ -228,9 +240,12 @@ export class DiscoveryService {
          AND kind = ANY($2::text[])
          AND visibility = 'public'
          AND id <> $3
+         ${topicSlug ? `AND ${TOPIC_MATCH_SQL('$5')}` : ''}
        LIMIT $4
       `,
-      [cells, kinds, requesterId, MAX_POINTS_PER_RESPONSE],
+      topicSlug
+        ? [cells, kinds, requesterId, MAX_POINTS_PER_RESPONSE, topicSlug]
+        : [cells, kinds, requesterId, MAX_POINTS_PER_RESPONSE],
     );
 
     // Overlay live presence for user entities — only Redis knows who's online RIGHT NOW.
@@ -276,9 +291,14 @@ export class DiscoveryService {
     return `location_h3_r${resolution}`;
   }
 
-  private hashViewport(viewport: Viewport, zoom: number, kinds: EntityKind[]): string {
+  private hashViewport(
+    viewport: Viewport,
+    zoom: number,
+    kinds: EntityKind[],
+    topicSlug: string,
+  ): string {
     return createHash('sha1')
-      .update(JSON.stringify({ viewport, zoom, kinds: [...kinds].sort() }))
+      .update(JSON.stringify({ viewport, zoom, kinds: [...kinds].sort(), topicSlug }))
       .digest('hex')
       .slice(0, 12);
   }
@@ -287,15 +307,26 @@ export class DiscoveryService {
     resolution: number,
     viewport: Viewport,
     kinds: EntityKind[],
+    topicSlug: string,
   ): DiscoveryResponse {
     return {
       points: [],
       resolution,
       generatedAt: new Date().toISOString(),
-      viewportHash: this.hashViewport(viewport, 0, kinds),
+      viewportHash: this.hashViewport(viewport, 0, kinds, topicSlug),
     };
   }
 }
+
+/**
+ * SQL predicate: the entity matches the bound topic slug. Events match on their
+ * title, listings on their category — both slugified via g88_slugify (migration
+ * 0023) so they line up with how the trending service derives topics. `param` is
+ * the placeholder (e.g. '$4') holding the bare slug; users never match.
+ */
+const TOPIC_MATCH_SQL = (param: string): string =>
+  `((kind = 'event'   AND g88_slugify(meta->>'title')    = ${param})
+ OR (kind = 'listing' AND g88_slugify(meta->>'category') = ${param}))`;
 
 // ─── v_discoverable_entity column contract ───────────────────────────────────
 // Mirrors the view definition in 0001_initial.sql exactly.

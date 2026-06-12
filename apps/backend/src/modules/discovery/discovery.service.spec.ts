@@ -119,6 +119,30 @@ describe('DiscoveryService', () => {
     });
   });
 
+  describe('topic filter (P3.6)', () => {
+    it('restricts kinds to event/listing, slugifies, and binds the normalized topic', async () => {
+      await call({ topic: '#Open-Mic' });
+      const [sql, params] = query.mock.calls[0]!;
+      // users dropped (no topic), only event/listing remain
+      expect(params[1]).toEqual(['event', 'listing']);
+      // slug clause present, matching on g88_slugify of title/category
+      expect(sql).toContain('g88_slugify');
+      // '#Open-Mic' normalized to bare lowercase slug, bound as the last param
+      expect(params).toContain('open-mic');
+    });
+
+    it('does not add the slug clause when no topic is given', async () => {
+      await call();
+      expect(query.mock.calls[0]![0]).not.toContain('g88_slugify');
+    });
+
+    it('returns empty without querying when topic is set but kinds exclude event/listing', async () => {
+      const res = await call({ topic: '#yoga', kinds: ['user'] });
+      expect(res.points).toEqual([]);
+      expect(query).not.toHaveBeenCalled();
+    });
+  });
+
   describe('cluster zoom — per-cell rollup', () => {
     beforeEach(() => (isEntityZoom as jest.Mock).mockReturnValue(false));
 
