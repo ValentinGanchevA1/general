@@ -69,11 +69,53 @@ Without these in non-prod, phone verification accepts dev code `000000`; in prod
 > and `STRIPE_PRICE_PREMIUM` (`price_1TdFceQrMz3BrdsUvK1RsKTo`) are set on `g88-api`.
 > A **test** webhook (`we_1TewGyQrMz3BrdsU1vKbM2JL`) points at
 > `/api/v1/subscriptions/webhook` for the 4 events above. The **VIP tier was removed**
-> (migration `0016`) — `STRIPE_PRICE_VIP` is unused. ⏳ **Pending live verify:** the
-> checkout → webhook → `subscription_tier` flip has not yet been exercised against the
-> deploy. Stays **test mode** (no real charges) until explicitly taken live: swap to a
-> live key + live prices before launch. Tier is set **only** by the verified webhook,
-> never by the client.
+> (migration `0016`) — `STRIPE_PRICE_VIP` is unused. ✅ **Webhook path verified
+> end-to-end (2026-06-12, test mode):** real hosted Checkout (card `4242…`) →
+> `checkout.session.completed` + `customer.subscription.created` delivered to the prod
+> onrender endpoint → signature verified against `STRIPE_WEBHOOK_SECRET` → price matched
+> `STRIPE_PRICE_BASIC` → `subscription_tier` flipped `free → basic`; cancel →
+> `customer.subscription.deleted` flipped it back to `free`. Confirms webhook receipt,
+> signature verification, and DB reconciliation in prod. Stays **test mode** (no real
+> charges) until explicitly taken live: swap to a live key + live prices before launch,
+> then re-verify once against the live endpoint. Tier is set **only** by the verified
+> webhook, never by the client.
+> ⚠️ **Found during verify:** `STRIPE_SUCCESS_URL`/`STRIPE_CANCEL_URL`/`STRIPE_PORTAL_RETURN_URL`
+> default to `https://g88.app/…`, but the apex `g88.app` is **not owned** (parked/for-sale
+> on GoDaddy) — the post-checkout redirect lands on a domain-for-sale page. Set these env
+> vars to an owned destination (a `g88-api.onrender.com` route or app deep link) before
+> real users hit checkout. Cosmetic only — the webhook fires server-to-server regardless.
+
+#### Going live (test → live mode)
+
+Stripe scopes **keys, products/prices, and webhook endpoints per mode** — the test
+price IDs and webhook `we_1TewGy…` do **not** exist in live mode. Recreate the live-side
+objects, then flip all four env vars **together** (a live key with test price IDs →
+checkout fails `No such price`; a test webhook secret with live events → every event
+fails signature). Steps:
+
+1. **Activate the account** — live keys don't exist until business details + bank account
+   are submitted (Dashboard → Activate payments). Test mode needed none of this.
+2. **Recreate products + prices in live mode** (toggle Test mode off): €4.99 basic,
+   €9.99 premium → **new** `price_…` IDs (won't match the test ones). Record them.
+3. **Live secret key**: Developers → API keys → `sk_live_…`. *(Hardening: use a restricted
+   key with write access to only Customers, Checkout Sessions, Billing Portal,
+   Subscriptions, Webhooks — all `subscriptions.service.ts` touches.)*
+4. **Live webhook endpoint**: Developers → Webhooks → Add endpoint (live mode), URL
+   `https://g88-api.onrender.com/api/v1/subscriptions/webhook`, same 4 events
+   (`checkout.session.completed`, `customer.subscription.{created,updated,deleted}`).
+   Copy its new `whsec_…`.
+5. **Flip all four env vars on `g88-api` in one shot**, then redeploy:
+   `STRIPE_SECRET_KEY` → `sk_live_…` · `STRIPE_WEBHOOK_SECRET` → live endpoint's `whsec_…`
+   · `STRIPE_PRICE_BASIC` / `STRIPE_PRICE_PREMIUM` → new live price IDs. Also set
+   `STRIPE_SUCCESS_URL` / `STRIPE_CANCEL_URL` / `STRIPE_PORTAL_RETURN_URL` to an owned
+   destination (see ⚠️ above — don't ship the `g88.app` parked-domain default).
+6. **Redeploy** — the Stripe client is memoized at module level (`subscriptions.service.ts:16`),
+   so the key only takes effect in a fresh process. A Render env-var change auto-triggers a
+   redeploy, which suffices.
+7. **Re-verify once with a real card** (live = real money): subscribe on a low tier, confirm
+   the `free → basic` flip in Supabase, then **cancel** (billing portal or dashboard → `→ free`
+   flip) and **refund** the charge from the dashboard. One real cycle proves live key +
+   live webhook secret + live price mapping line up.
 
 ### G4 — Social linking (OAuth) — per provider, secrets
 A provider is inert until both its id+secret are set. Register each provider's
@@ -100,8 +142,10 @@ non-test users can link.
 - **G2 Twilio**: `TWILIO_ACCOUNT_SID/AUTH_TOKEN/VERIFY_SERVICE_SID` set on `g88-api`.
   ⏳ Phone OTP SMS not yet run-verified against the deploy.
 - **G3 Stripe** (test mode): secret key, webhook secret, both price IDs, and the test
-  webhook (`we_1TewGyQrMz3BrdsU1vKbM2JL`) set on `g88-api`. ⏳ checkout → webhook →
-  `subscription_tier` flip not yet run-verified.
+  webhook (`we_1TewGyQrMz3BrdsU1vKbM2JL`) set on `g88-api`. ✅ checkout → webhook →
+  `subscription_tier` flip **run-verified end-to-end 2026-06-12** (basic subscribe + cancel,
+  test mode). See G3 note above; one follow-up filed — fix `STRIPE_*_URL` defaults (`g88.app`
+  apex unowned).
 - **S3** (avatar + photo gallery): configured & verified end-to-end 2026-06-05 —
   `AWS_S3_BUCKET=g88-uploads-dev`, `AWS_REGION=eu-north-1`, access keys set on `g88-api`
   (presign → PUT → public GET round-trip passed).
