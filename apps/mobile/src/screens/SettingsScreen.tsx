@@ -7,13 +7,18 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { logout } from '@/features/auth/authSlice';
 import { updateProfile } from '@/features/profile/profileSlice';
 
 export function SettingsScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const profile = useAppSelector((s) => s.profile.profile);
   const { loading } = useAppSelector((s) => s.profile);
 
@@ -62,6 +67,17 @@ export function SettingsScreen(): React.JSX.Element {
             />
           )}
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Notifications</Text>
+        <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('NotificationSettings')}>
+          <View style={styles.rowContent}>
+            <Text style={styles.rowLabel}>Push notifications</Text>
+            <Text style={styles.rowSub}>Choose which alerts you receive</Text>
+          </View>
+          <Icon name="chevron-right" size={24} color="#555" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
