@@ -45,7 +45,7 @@ Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md`.
 | Mobile                     | React Native 0.83 (CLI), React 19, TypeScript 5.5, Redux Toolkit 2, React Navigation 7                                                                                                                                                                                                                                                  |
 | Backend (REST)             | NestJS 11, TypeORM 0.3 (DataSource only, raw SQL), TypeScript 5.5, Node ≥22.13                                                                                                                                                                                                                                                          |
 | Realtime gateway           | NestJS, Socket.IO 4 (Redis adapter). Runs **in-process** with REST in a single `main.ts` / single `g88-api` service; separate deploy is planned, not built (`ARCHITECTURE.md §3.5`)                                                                                                                                                     |
-| Database                   | PostgreSQL 16 + PostGIS + H3-PG (`geography(Point,4326)` + H3 cell columns r5/7/9/10, GIST indexes). Schema = migrations `0001`–`0024`, next free `0025`                                                                                                                                                                                |
+| Database                   | PostgreSQL 16 + PostGIS + H3-PG (`geography(Point,4326)` + H3 cell columns r5/7/9/10, GIST indexes). Schema = migrations `0001`–`0025`, next free `0026`                                                                                                                                                                                |
 | Cache / Presence / Pub-Sub | Redis 7 (sorted sets per H3 r8 cell, 120s TTL)                                                                                                                                                                                                                                                                                          |
 | Spatial index              | H3 (Uber hexagonal hierarchical), server-side clustering at zoom <14                                                                                                                                                                                                                                                                    |
 | Storage                    | AWS S3, presigned URLs (avatars + photo gallery; verified end-to-end)                                                                                                                                                                                                                                                                   |
@@ -83,7 +83,7 @@ g88/
 │   │   │                     verification, id-verification, subscriptions, gamification,
 │   │   │                     challenges, achievements, gifts, trending, feed, ...)
 │   │   ├── src/realtime/   Socket.IO gateway (top-level, not under modules/)
-│   │   └── migrations/     0001–0024 raw SQL (next free 0025)
+│   │   └── migrations/     0001–0025 raw SQL (next free 0026)
 │   └── mobile/             React Native + TypeScript client (src/features/{domain}/)
 ├── packages/
 │   └── shared/             API DTOs, socket event shapes, geo helpers — both apps import this
@@ -259,7 +259,7 @@ common/  s3.service.ts        S3 presigned URLs (avatar, photos, verification)
 config/  redis.module.ts      (TypeOrmModule.forRootAsync lives inline in app.module)
 modules/ <22 feature modules> (table below)
 realtime/ realtime.gateway.ts · realtime.module.ts · ws-jwt.guard.ts · realtime.dto.ts
-migrations/ 0001–0024 raw SQL (next free 0025)
+migrations/ 0001–0025 raw SQL (next free 0026)
 ```
 
 ### `main.ts` cross-cutting
@@ -286,7 +286,7 @@ migrations/ 0001–0024 raw SQL (next free 0025)
 | `interactions` | `/interactions` | Waves (send → match ladder) |
 | `chat` | `/conversations*` | Conversation list + message history (persisted) |
 | `messaging` | `/conversations` | `POST` — message-permission gate (match ∨ interest overlap), pending message requests |
-| `notifications` | `/notifications` | FCM device-token registration + send-on-offline |
+| `notifications` | `/notifications` | FCM device-token registration + send-on-offline. P3.3: per-channel opt-out (`/preferences`) + frequency caps (Redis) enforced on every push; channels waves/messages/gifts/nearby/events/listings/digest; daily digest via secret-guarded `/digest/run` (GitHub Actions cron) |
 | `alerts` | `/alerts` | Geo alert posts (feed source) |
 | `geofences` | `/geofences` | Geofence create + active list; geofence-triggered pushes |
 | `feed` | `/feed` | Pulse activity aggregation (chats + waves + alerts) |
@@ -315,7 +315,7 @@ migrations/ 0001–0024 raw SQL (next free 0025)
 
 ### Database
 
-Raw parameterized SQL via `DataSource.query()` (no ORM entities — schema uses H3 generated columns + materialized views that don't map cleanly). Migrations `0001`–`0024` (next `0025`), tracked in `schema_migrations` by filename; runner is idempotent (skips applied). `0001`–`0015` use guarded DDL; **`0020` is not idempotent — already applied, do not re-run.** Locations fuzzed to **H3 r10 centroid at write time** (privacy invariant). H3 cell columns r5/7/9/10 + PostGIS `geography(Point,4326)` + GIST indexes; `v_discoverable_entity` view feeds the map.
+Raw parameterized SQL via `DataSource.query()` (no ORM entities — schema uses H3 generated columns + materialized views that don't map cleanly). Migrations `0001`–`0025` (next `0026`), tracked in `schema_migrations` by filename; runner is idempotent (skips applied). `0001`–`0015` use guarded DDL; **`0020` is not idempotent — already applied, do not re-run.** Locations fuzzed to **H3 r10 centroid at write time** (privacy invariant). H3 cell columns r5/7/9/10 + PostGIS `geography(Point,4326)` + GIST indexes; `v_discoverable_entity` view feeds the map.
 
 ---
 
@@ -350,6 +350,8 @@ All under `/api/v1`. JWT unless noted.
 | GET | `/gifts/catalog` · `/gifts/balance` · `/gifts/received` | JWT | |
 | POST | `/gifts/send` | JWT | atomic wallet debit |
 | POST | `/notifications/device-token` | JWT | FCM register |
+| GET/PATCH | `/notifications/preferences` | JWT | per-channel push opt-out |
+| POST | `/notifications/digest/run` | secret | daily digest (GitHub Actions cron; `x-digest-secret`) |
 | POST | `/alerts` · `/geofences` | JWT | |
 | GET | `/geofences/me/active` | JWT | |
 | POST | `/verification/phone/start` · `/verification/phone/check` | JWT | Twilio OTP |

@@ -1,0 +1,43 @@
+name: Daily Notification Digest
+
+# Triggers the per-user daily-digest push. The g88-api free tier spins down, so an
+# in-process cron is unreliable — GitHub Actions calls the secret-guarded endpoint
+# instead (same pattern as the synthetic monitor). The endpoint is a no-op until
+# NOTIFICATIONS_DIGEST_SECRET is set on both the service and the repo secret.
+
+on:
+  schedule:
+    - cron: '0 17 * * *'   # 17:00 UTC daily (~evening in Varna)
+  workflow_dispatch:        # manual trigger for testing
+
+permissions:
+  contents: read
+
+jobs:
+  digest:
+    name: Send daily digest
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger digest
+        env:
+          API_BASE: ${{ vars.API_BASE_URL || 'https://g88-api.onrender.com' }}
+          SECRET: ${{ secrets.NOTIFICATIONS_DIGEST_SECRET }}
+        run: |
+          if [ -z "$SECRET" ]; then
+            echo "NOTIFICATIONS_DIGEST_SECRET not set — skipping (digest disabled)."
+            exit 0
+          fi
+          # Free-tier cold start can take ~50s; retry a few times.
+          for attempt in 1 2 3 4 5; do
+            code=$(curl -s -o /tmp/out -w '%{http_code}' --max-time 120 \
+              -X POST "$API_BASE/api/v1/notifications/digest/run" \
+              -H "x-digest-secret: $SECRET")
+            echo "attempt $attempt -> HTTP $code"
+            if [ "$code" = "200" ] || [ "$code" = "201" ]; then
+              cat /tmp/out
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "Digest trigger failed after retries"; cat /tmp/out; exit 1

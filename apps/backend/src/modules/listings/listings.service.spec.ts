@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 
 import { ListingsService } from './listings.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /** queryRunner whose query() drains a pre-seeded FIFO result queue. */
 function makeQueryRunner(results: unknown[]) {
@@ -38,6 +39,7 @@ describe('ListingsService', () => {
           provide: getDataSourceToken(),
           useValue: { query, createQueryRunner } as unknown as DataSource,
         },
+        { provide: NotificationsService, useValue: { notifyListingNearby: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
     service = mod.get(ListingsService);

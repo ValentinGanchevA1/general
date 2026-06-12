@@ -4,20 +4,24 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import * as h3 from 'h3-js';
 
 import { NotificationsService } from './notifications.service';
+import { REDIS_CLIENT } from '../../config/redis.provider';
 
 const CELL = h3.latLngToCell(51.5, -0.12, 7);
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
   let query: jest.Mock;
+  let redis: { incr: jest.Mock; expire: jest.Mock };
 
   beforeEach(async () => {
     delete process.env.FIREBASE_CREDENTIALS; // dev: FCM disabled -> sendMulticast no-ops
     query = jest.fn().mockResolvedValue([]);
+    redis = { incr: jest.fn().mockResolvedValue(1), expire: jest.fn().mockResolvedValue(1) };
     const mod = await Test.createTestingModule({
       providers: [
         NotificationsService,
         { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
+        { provide: REDIS_CLIENT, useValue: redis },
       ],
     }).compile();
     service = mod.get(NotificationsService);
@@ -30,12 +34,51 @@ describe('NotificationsService', () => {
     expect(query.mock.calls[0]![1]).toEqual(['u1', 'ios', 'tok']);
   });
 
-  it('notifyWave is a no-op (single token lookup) when the user has no devices', async () => {
-    query.mockResolvedValueOnce([]); // getTokens -> none
+  it('notifyWave checks the channel then no-ops when the user has no devices', async () => {
+    // allowed(): preference lookup (none) -> Redis cap (ok); then getTokens (none).
     await expect(
       service.notifyWave('u1', { id: 'me', displayName: 'Me' }, 'map'),
     ).resolves.toBeUndefined();
-    expect(query).toHaveBeenCalledTimes(1); // only getTokens; no send path
+    expect(query).toHaveBeenCalledTimes(2); // pref lookup + getTokens
+    expect(redis.incr).toHaveBeenCalled();
+  });
+
+  it('notifyWave skips entirely when the channel is opted out', async () => {
+    query.mockResolvedValueOnce([{ enabled: false }]); // preference: waves disabled
+    await service.notifyWave('u1', { id: 'me', displayName: 'Me' }, 'map');
+    expect(query).toHaveBeenCalledTimes(1); // pref lookup only — no getTokens / send
+    expect(redis.incr).not.toHaveBeenCalled();
+  });
+
+  describe('preferences', () => {
+    it('getPreferences defaults every channel to on, applying opt-out rows', async () => {
+      query.mockResolvedValueOnce([{ channel: 'gifts', enabled: false }]);
+      const prefs = await service.getPreferences('u1');
+      expect(prefs.waves).toBe(true);
+      expect(prefs.gifts).toBe(false);
+      expect(prefs.digest).toBe(true);
+    });
+
+    it('setPreferences upserts known channels and ignores junk', async () => {
+      query.mockResolvedValue([]);
+      await service.setPreferences('u1', { waves: false, bogus: true } as never);
+      const upserts = query.mock.calls.filter((c) => String(c[0]).includes('INSERT INTO notification_preferences'));
+      expect(upserts).toHaveLength(1); // only the valid 'waves' channel
+      expect(upserts[0]![1]).toEqual(['u1', 'waves', false]);
+    });
+  });
+
+  describe('runDigest', () => {
+    it('sends only to users with activity and counts them', async () => {
+      query.mockResolvedValueOnce([
+        { user_id: 'a', waves: '2', gifts: '1' }, // has activity -> send
+        { user_id: 'b', waves: '0', gifts: '0' }, // no activity -> skip
+      ]);
+      // user 'a': allowed() pref lookup (none) then getTokens (none) -> no FCM, still counts as attempted-but-no-token
+      query.mockResolvedValue([]);
+      const res = await service.runDigest();
+      expect(res.candidates).toBe(2);
+    });
   });
 
   it('notifyMessageFrom resolves the sender name then targets the recipient', async () => {

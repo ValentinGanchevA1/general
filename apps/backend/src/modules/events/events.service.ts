@@ -26,6 +26,7 @@ import {
   NearbyEventsDto,
   RsvpDto,
 } from './dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /** Max attendees inlined into an event detail payload. */
 const ATTENDEE_PREVIEW = 50;
@@ -48,7 +49,10 @@ interface EventRow {
 
 @Injectable()
 export class EventsService {
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   // ─── Create / read ─────────────────────────────────────────────────────────
 
@@ -98,7 +102,17 @@ export class EventsService {
       ],
     )) as EventRow[];
 
-    return this.toSummary({ ...rows[0]!, my_rsvp: null });
+    const summary = this.toSummary({ ...rows[0]!, my_rsvp: null });
+
+    // Fan a push to anyone watching this area via a geofence (channel `events`).
+    // Fire-and-forget — public events only; a slow/failed FCM never blocks create.
+    if (summary.visibility === 'public') {
+      void this.notifications
+        .notifyEventNearby(cells.r7, hostId, summary.title, summary.id)
+        .catch(() => undefined);
+    }
+
+    return summary;
   }
 
   async nearby(userId: string, dto: NearbyEventsDto): Promise<EventSummary[]> {
