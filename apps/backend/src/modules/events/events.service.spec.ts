@@ -111,7 +111,8 @@ describe('EventsService', () => {
         [], // no existing row
         // capacity null -> skips the going-count check
         [], // INSERT ... ON CONFLICT
-        [{ count: 5 }], // UPDATE events ... RETURNING attendee_count
+        [], // UPDATE events attendee_count (no RETURNING)
+        [{ attendee_count: 5 }], // SELECT attendee_count
       ]);
       createQueryRunner.mockReturnValue(runner);
 
@@ -156,7 +157,8 @@ describe('EventsService', () => {
     it('increments only on a new (deduped) upvote', async () => {
       const { runner } = makeQueryRunner([
         [{ question_id: 'q1' }], // INSERT ... RETURNING (new row)
-        [{ upvotes: 4 }], // UPDATE ... RETURNING upvotes
+        [], // UPDATE event_questions upvotes (no RETURNING)
+        [{ upvotes: 4 }], // SELECT upvotes
       ]);
       createQueryRunner.mockReturnValue(runner);
       const res = await service.upvoteQuestion('u1', 'q1');
