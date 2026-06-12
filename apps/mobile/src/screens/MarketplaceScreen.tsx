@@ -32,7 +32,7 @@ export function MarketplaceScreen(): React.JSX.Element {
   const [tab, setTab] = useState<'browse' | 'saved'>('browse');
 
   const browse = useBrowseListings(tab === 'browse' ? coords : null);
-  const saved = useFavorites();
+  const saved = useFavorites(tab === 'saved');
 
   const data = tab === 'browse' ? browse.listings : saved.favorites;
   const loading = tab === 'browse' ? browse.loading : saved.loading;

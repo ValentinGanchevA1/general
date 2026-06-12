@@ -132,6 +132,7 @@ export function ListingDetailScreen(): React.JSX.Element {
             listingId={listingId}
             status={listing.status}
             offers={offers}
+            currency={listing.currency}
             onChanged={() => { refresh(); refreshOffers(); }}
           />
         ) : (
@@ -194,11 +195,21 @@ function BuyerOffer({
   const [busy, setBusy] = useState(false);
 
   const submit = useCallback(async () => {
+    // A typed price must be valid — otherwise NaN would be dropped and silently
+    // submit an offer at the asking price. Empty = intentional "at asking price".
+    let offerCents: number | undefined;
+    if (amount.trim()) {
+      const parsed = parseFloat(amount);
+      if (Number.isNaN(parsed) || parsed < 0) {
+        Alert.alert('Invalid price', 'Please enter a valid offer price, or leave it blank to offer at the asking price.');
+        return;
+      }
+      offerCents = Math.round(parsed * 100);
+    }
     setBusy(true);
     try {
-      const cents = amount.trim() ? Math.round(parseFloat(amount) * 100) : undefined;
       await makeOffer(listingId, {
-        ...(cents != null && !Number.isNaN(cents) ? { offerCents: cents } : {}),
+        ...(offerCents != null ? { offerCents } : {}),
         ...(message.trim() ? { message: message.trim() } : {}),
       });
       setAmount(''); setMessage('');
@@ -277,11 +288,12 @@ function BuyerOffer({
 // ─── Seller controls ──────────────────────────────────────────────────────────
 
 function SellerControls({
-  listingId, status, offers, onChanged,
+  listingId, status, offers, currency, onChanged,
 }: {
   listingId: string;
   status: string;
   offers: ListingOffer[];
+  currency: string;
   onChanged: () => void;
 }): React.JSX.Element {
   const respond = useCallback(
@@ -336,7 +348,7 @@ function SellerControls({
             <View style={{ flex: 1 }}>
               <Text style={S.offerBuyer}>{o.buyerDisplayName}</Text>
               <Text style={S.offerAmount}>
-                {o.offerCents != null ? formatPrice(o.offerCents, 'USD') : 'At asking price'}
+                {o.offerCents != null ? formatPrice(o.offerCents, currency) : 'At asking price'}
                 {'  ·  '}<Text style={S.offerStatus}>{o.status}</Text>
               </Text>
               {o.message ? <Text style={S.offerMsg}>{o.message}</Text> : null}

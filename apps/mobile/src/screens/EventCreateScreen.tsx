@@ -6,7 +6,7 @@
 // per CLAUDE.md). The venue pin uses react-native-maps (already a dep) with a
 // draggable marker, defaulting to the user's current location.
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -74,6 +74,8 @@ function timeLabel(minutes: number): string {
 export function EventCreateScreen(): React.JSX.Element {
   const nav = useNavigation<Nav>();
   const { coords } = useUserLocation();
+  const mapRef = useRef<MapView>(null);
+  const hasCentered = useRef(false);
 
   const days = useMemo(() => nextDays(14), []);
   const slots = useMemo(() => timeSlots(), []);
@@ -132,6 +134,18 @@ export function EventCreateScreen(): React.JSX.Element {
   const onDragEnd = useCallback((c: RNLatLng) => {
     setPin({ lat: c.latitude, lng: c.longitude });
   }, []);
+
+  // Center on the user once when their location resolves; initialRegion (not a
+  // controlled region) keeps the map from snapping back to the pin on each drag.
+  useEffect(() => {
+    if (coords && !hasCentered.current) {
+      hasCentered.current = true;
+      mapRef.current?.animateToRegion(
+        { latitude: coords.lat, longitude: coords.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
+        400,
+      );
+    }
+  }, [coords]);
 
   return (
     <KeyboardAvoidingView style={S.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -197,9 +211,10 @@ export function EventCreateScreen(): React.JSX.Element {
         <Text style={S.label}>Location <Text style={S.optional}>(drag the pin)</Text></Text>
         <View style={S.mapWrap}>
           <MapView
+            ref={mapRef}
             provider={PROVIDER_GOOGLE}
             style={StyleSheet.absoluteFill}
-            region={{
+            initialRegion={{
               latitude: venue.lat,
               longitude: venue.lng,
               latitudeDelta: 0.02,

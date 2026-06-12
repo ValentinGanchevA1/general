@@ -103,11 +103,14 @@ export function useListing(listingId: string): UseListingResult {
 
 // ─── My saved listings ────────────────────────────────────────────────────────
 
-export function useFavorites(): { favorites: ListingSummary[]; loading: boolean; refresh: () => void } {
+export function useFavorites(
+  enabled = true,
+): { favorites: ListingSummary[]; loading: boolean; refresh: () => void } {
   const [favorites, setFavorites] = useState<ListingSummary[]>([]);
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(() => {
+    if (!enabled) return;
     void (async () => {
       setLoading(true);
       try {
@@ -118,7 +121,7 @@ export function useFavorites(): { favorites: ListingSummary[]; loading: boolean;
         setLoading(false);
       }
     })();
-  }, []);
+  }, [enabled]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
