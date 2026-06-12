@@ -87,7 +87,8 @@ export function PulseScreen(): React.JSX.Element {
     if (screen === 'Main') {
       navigation.navigate('Main', params as never);
     } else {
-      navigation.navigate(screen as keyof RootStackParamList, params as never);
+      // Dynamic deep-link target — bypass the per-screen navigate overloads.
+      (navigation.navigate as (s: string, p?: object) => void)(screen, params);
     }
   }, [navigation]);
 

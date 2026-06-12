@@ -29,6 +29,7 @@ import { EventCreateScreen } from '@/screens/EventCreateScreen';
 import { MarketplaceScreen } from '@/screens/MarketplaceScreen';
 import { ListingDetailScreen } from '@/screens/ListingDetailScreen';
 import { ListingCreateScreen } from '@/screens/ListingCreateScreen';
+import { NotificationSettingsScreen } from '@/screens/NotificationSettingsScreen';
 import {
 	PrivacyScreen,
 	HelpScreen,
@@ -73,6 +74,7 @@ export type RootStackParamList = {
 	Marketplace: undefined;
 	ListingDetail: { listingId: string };
 	ListingCreate: undefined;
+	NotificationSettings: undefined;
 	GiftsInbox: undefined;
 	Privacy: undefined;
 	Help: undefined;
@@ -129,7 +131,8 @@ export function AppNavigator(): React.JSX.Element {
 			void pingGamification(); // advance daily streak on login/session restore
 			const cleanup = setupNotificationHandlers((screen, params) => {
 				if (navigationRef.isReady()) {
-					navigationRef.navigate(screen as keyof RootStackParamList, params as never);
+					// Dynamic deep-link target — bypass the per-screen navigate overloads.
+					(navigationRef.navigate as (s: string, p?: object) => void)(screen, params);
 				}
 			});
 			return cleanup;
@@ -182,6 +185,7 @@ export function AppNavigator(): React.JSX.Element {
 							options={{ presentation: 'modal' }}
 						/>
 						<Stack.Screen name="Marketplace" component={MarketplaceScreen} />
+						<Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
 						<Stack.Screen name="ListingDetail" component={ListingDetailScreen} />
 						<Stack.Screen
 							name="ListingCreate"
