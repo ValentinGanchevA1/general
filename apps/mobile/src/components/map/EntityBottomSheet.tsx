@@ -244,11 +244,21 @@ function GenericCard({
   point: NonUserEntityPoint;
   onClose: () => void;
 }): React.JSX.Element {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const title = point.meta.title;
   const subtitle =
     point.kind === 'event'
       ? `Starts: ${new Date(point.meta.startsAt).toLocaleString()}`
       : `$${(point.meta.priceCents / 100).toFixed(2)} ${point.meta.currency}`;
+
+  const onView = (): void => {
+    onClose();
+    if (point.kind === 'event') {
+      navigation.navigate('EventDetail', { eventId: point.id });
+    } else {
+      navigation.navigate('ListingDetail', { listingId: point.id });
+    }
+  };
 
   return (
     <>
@@ -262,6 +272,9 @@ function GenericCard({
           <Text style={styles.closeText}>✕</Text>
         </TouchableOpacity>
       </View>
+      <TouchableOpacity style={styles.viewBtn} onPress={onView}>
+        <Text style={styles.viewBtnText}>{point.kind === 'event' ? 'View event' : 'View listing'}</Text>
+      </TouchableOpacity>
     </>
   );
 }
@@ -371,4 +384,9 @@ const styles = StyleSheet.create({
   subtitle: { color: '#aaa', fontSize: 13, marginTop: 2 },
   closeBtn: { padding: 4 },
   closeText: { color: '#aaa', fontSize: 16 },
+  viewBtn: {
+    marginTop: 14, backgroundColor: '#00d4ff', borderRadius: 12,
+    paddingVertical: 12, alignItems: 'center',
+  },
+  viewBtnText: { color: '#0a0a0f', fontSize: 14, fontWeight: '700' },
 });

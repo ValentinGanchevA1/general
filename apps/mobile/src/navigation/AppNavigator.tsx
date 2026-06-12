@@ -26,6 +26,9 @@ import { GiftsInboxScreen } from '@/screens/GiftsInboxScreen';
 import VerificationIdScreen from '@/screens/VerificationIdScreen';
 import { EventDetailScreen } from '@/screens/EventDetailScreen';
 import { EventCreateScreen } from '@/screens/EventCreateScreen';
+import { MarketplaceScreen } from '@/screens/MarketplaceScreen';
+import { ListingDetailScreen } from '@/screens/ListingDetailScreen';
+import { ListingCreateScreen } from '@/screens/ListingCreateScreen';
 import {
 	PrivacyScreen,
 	HelpScreen,
@@ -67,6 +70,9 @@ export type RootStackParamList = {
 	VerificationId: undefined;
 	EventDetail: { eventId: string };
 	EventCreate: undefined;
+	Marketplace: undefined;
+	ListingDetail: { listingId: string };
+	ListingCreate: undefined;
 	GiftsInbox: undefined;
 	Privacy: undefined;
 	Help: undefined;
@@ -173,6 +179,13 @@ export function AppNavigator(): React.JSX.Element {
 						<Stack.Screen
 							name="EventCreate"
 							component={EventCreateScreen}
+							options={{ presentation: 'modal' }}
+						/>
+						<Stack.Screen name="Marketplace" component={MarketplaceScreen} />
+						<Stack.Screen name="ListingDetail" component={ListingDetailScreen} />
+						<Stack.Screen
+							name="ListingCreate"
+							component={ListingCreateScreen}
 							options={{ presentation: 'modal' }}
 						/>
 						<Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />

@@ -41,6 +41,9 @@ import { NudgeBanner } from '@/features/nudges/NudgeBanner';
 import { EventsRail } from '@/features/events/EventsRail';
 import { TrendingFilterBar } from '@/features/discovery/TrendingFilterBar';
 import { useTrendingNearby } from '@/features/pulse/useTrendingNearby';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { track } from '@/lib/analytics';
 
 /**
@@ -59,6 +62,7 @@ import { track } from '@/lib/analytics';
  */
 export function MapScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { coords: myCoords, requestPermission } = useUserLocation();
   const [region, setRegion] = useState<Region | null>(null);
   const [selected, setSelected] = useState<EntityPoint | null>(null);
@@ -201,8 +205,12 @@ export function MapScreen(): React.JSX.Element {
       }
       return true;
     }
+    if (id === 'create_listing') {
+      navigation.navigate('Marketplace');
+      return true;
+    }
     return false;
-  }, [nearestUserId, onWave]);
+  }, [nearestUserId, onWave, navigation]);
 
   return (
     <View style={styles.root}>

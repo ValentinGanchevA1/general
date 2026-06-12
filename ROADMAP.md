@@ -163,8 +163,8 @@ Each epic gets a full spec in `SPECIFICATION.md` at the start of its sprint.
 ### P3.7 — Trading
 - ~~Backend complete (`trade-listing`, `trade-offer`, `trade-favorite`).~~ **Stale, corrected 2026-06-12.** Only a bare `listings` table existed in `0001`; there was no trading module and no offers/favorites tables — and `STATUS.md` had `trading/*` marked deferred. The "UI polish" framing was wrong.
 - **Backend built 2026-06-12** (greenfield, not polish): migration `0024_trading.sql` (`trade_offers`, `trade_favorites`) + `listings` module under `/listings`. REST: create · `POST /browse` (grid) · `GET /:id` detail · `PUT /:id/status` (mark sold/withdrawn) · `PUT /:id/favorite` (toggle) · `POST /:id/offers` + `GET /:id/offers` + `PUT /:id/offer/withdraw` · `PUT /offers/:offerId` (seller accept/decline → accepting marks the listing sold + declines the rest). **Offer-based v1 — no payment processing** (Stripe Connect stays P4).
-- **Remaining work: all mobile surfacing** — listing creation (price, category, location pin) · browsing grid · offer flow · favorite/save · listing detail with seller profile + wave.
-- Effort: ~4 days mobile remaining (backend ~2d done).
+- **Mobile shipped 2026-06-12** — `features/trading/` data layer + `MarketplaceScreen` (nearby browse grid + saved tab + sell entry) + `ListingDetailScreen` (favorite · buyer offer flow · seller offer management with accept/decline · wave the seller) + `ListingCreateScreen` (price/currency/category + draggable map-pin). Entry points: `create_listing` FAB → Marketplace; listing map markers → detail. Navigation registered (`Marketplace`, `ListingDetail`, `ListingCreate` modal).
+- **P3.7 core complete.** Deferred: real-money checkout (Stripe Connect, P4); listing photo upload (thumbnail-by-URL only in v1).
 - **Still no payment in v1.** Trades coordinated through chat / offers, settled offline. Revisit at monetization Tier 2 (Stripe Connect).
 
 ### P3 total
