@@ -40,6 +40,7 @@ export class DiscoveryController {
       kinds: dto.kinds,
       requesterId: userId,
       prevViewportHash: dto.prevViewportHash,
+      topic: dto.topic,
     });
   }
 }

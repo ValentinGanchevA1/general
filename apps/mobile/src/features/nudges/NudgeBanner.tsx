@@ -61,8 +61,8 @@ export function NudgeBanner(): React.JSX.Element | null {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    // Stacks directly under DailyChallengeCard (top: 52, ~44px tall).
-    top: 104,
+    // Stacks directly under DailyChallengeCard (top: 116, ~44px tall).
+    top: 168,
     left: 16,
     right: 16,
     alignItems: 'center',

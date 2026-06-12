@@ -65,6 +65,10 @@ export class TrendingService {
   }
 }
 
+// ⚠️ Keep byte-identical to the SQL g88_slugify() in migration 0023_slugify.sql
+// (minus the leading '#'). The P3.6 discovery topic filter slugs entity titles
+// via g88_slugify and compares to these topics; if the two drift, tapping a
+// trending topic on the map filters to nothing.
 function toHashtag(raw: string): string {
   const slug = raw
     .toLowerCase()
