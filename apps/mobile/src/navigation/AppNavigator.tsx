@@ -24,6 +24,8 @@ import { LeaderboardScreen } from '@/screens/LeaderboardScreen';
 import { ChallengesScreen } from '@/screens/ChallengesScreen';
 import { GiftsInboxScreen } from '@/screens/GiftsInboxScreen';
 import VerificationIdScreen from '@/screens/VerificationIdScreen';
+import { EventDetailScreen } from '@/screens/EventDetailScreen';
+import { EventCreateScreen } from '@/screens/EventCreateScreen';
 import {
 	PrivacyScreen,
 	HelpScreen,
@@ -63,6 +65,8 @@ export type RootStackParamList = {
 	Leaderboard: undefined;
 	Challenges: undefined;
 	VerificationId: undefined;
+	EventDetail: { eventId: string };
+	EventCreate: undefined;
 	GiftsInbox: undefined;
 	Privacy: undefined;
 	Help: undefined;
@@ -165,6 +169,12 @@ export function AppNavigator(): React.JSX.Element {
 							options={{ title: 'ID Verification', presentation: 'modal' }}
 						/>
 						<Stack.Screen name="Challenges" component={ChallengesScreen} />
+						<Stack.Screen name="EventDetail" component={EventDetailScreen} />
+						<Stack.Screen
+							name="EventCreate"
+							component={EventCreateScreen}
+							options={{ presentation: 'modal' }}
+						/>
 						<Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />
 						<Stack.Screen name="Privacy" component={PrivacyScreen} />
 						<Stack.Screen name="Help" component={HelpScreen} />

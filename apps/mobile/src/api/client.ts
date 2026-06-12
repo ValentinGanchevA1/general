@@ -148,6 +148,15 @@ export async function patchJson<TReq, TRes>(
   return res.data;
 }
 
+export async function putJson<TReq, TRes>(
+  path: string,
+  body: TReq,
+  config?: AxiosRequestConfig,
+): Promise<TRes> {
+  const res = await api.put<TRes>(path, body, config);
+  return res.data;
+}
+
 export async function deleteJson<TRes>(path: string, config?: AxiosRequestConfig): Promise<TRes> {
   const res = await api.delete<TRes>(path, config);
   return res.data;
