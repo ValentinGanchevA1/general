@@ -1,10 +1,8 @@
-// apps/mobile/src/screens/EventCreateScreen.tsx
+// apps/mobile/src/screens/ListingCreateScreen.tsx
 //
-// P3.5 event creation. Deliberately dependency-free on the datetime side —
-// day/time/duration chips instead of a native @react-native-community
-// datetimepicker (a native module = an Android rebuild on the RN 0.83 surface,
-// per CLAUDE.md). The venue pin uses react-native-maps (already a dep) with a
-// draggable marker, defaulting to the user's current location.
+// P3.7 listing creation. Dependency-free inputs + a draggable map pin for the
+// item location (react-native-maps, already a dep). No payment fields — price is
+// just a number; settlement is offline (offer-based v1).
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -23,120 +21,67 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { EVENT_LIMITS, type CreateEventRequest, type LatLng } from '@g88/shared';
+import { LISTING_LIMITS, type CreateListingRequest, type LatLng } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useUserLocation } from '@/features/location/useUserLocation';
-import { createEvent } from '@/features/events/useEvents';
+import { createListing } from '@/features/trading/useTrading';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-// Varna center — fallback pin before a location fix lands.
 const FALLBACK: LatLng = { lat: 43.21, lng: 27.92 };
+const CATEGORIES = ['Electronics', 'Furniture', 'Clothing', 'Sports', 'Home', 'Books', 'Other'] as const;
+const CURRENCIES = ['USD', 'EUR', 'BGN', 'GBP'] as const;
 
-const DURATIONS = [
-  { label: '1h', hours: 1 },
-  { label: '2h', hours: 2 },
-  { label: '3h', hours: 3 },
-  { label: 'All day', hours: 24 },
-] as const;
-
-function nextDays(count: number): Date[] {
-  const out: Date[] = [];
-  const base = new Date();
-  base.setHours(0, 0, 0, 0);
-  for (let i = 0; i < count; i++) {
-    out.push(new Date(base.getTime() + i * 86_400_000));
-  }
-  return out;
-}
-
-function dayLabel(d: Date, i: number): string {
-  if (i === 0) return 'Today';
-  if (i === 1) return 'Tomorrow';
-  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-}
-
-// 30-min slots, 06:00 → 23:30.
-function timeSlots(): number[] {
-  const out: number[] = [];
-  for (let m = 6 * 60; m <= 23 * 60 + 30; m += 30) out.push(m);
-  return out;
-}
-
-function timeLabel(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  const ampm = h < 12 ? 'AM' : 'PM';
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
-}
-
-export function EventCreateScreen(): React.JSX.Element {
+export function ListingCreateScreen(): React.JSX.Element {
   const nav = useNavigation<Nav>();
   const { coords } = useUserLocation();
   const mapRef = useRef<MapView>(null);
   const hasCentered = useRef(false);
 
-  const days = useMemo(() => nextDays(14), []);
-  const slots = useMemo(() => timeSlots(), []);
-
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [dayIdx, setDayIdx] = useState(0);
-  const [minutes, setMinutes] = useState(19 * 60); // default 7:00 PM
-  const [durationIdx, setDurationIdx] = useState(1);
-  const [capacity, setCapacity] = useState('');
-  const [visibility, setVisibility] = useState<'public' | 'private'>('public');
+  const [price, setPrice] = useState('');
+  const [currency, setCurrency] = useState<string>('USD');
+  const [category, setCategory] = useState<string>('Electronics');
   const [pin, setPin] = useState<LatLng | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const venue = pin ?? coords ?? FALLBACK;
+  const priceCents = useMemo(() => {
+    const n = parseFloat(price);
+    return Number.isNaN(n) ? NaN : Math.round(n * 100);
+  }, [price]);
 
-  const startsAt = useMemo(() => {
-    const d = new Date(days[dayIdx] ?? days[0]!);
-    d.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
-    return d;
-  }, [days, dayIdx, minutes]);
-
-  const canSubmit = title.trim().length > 0 && !submitting;
+  const canSubmit = title.trim().length > 0 && !Number.isNaN(priceCents) && priceCents >= 0 && !submitting;
 
   const onSubmit = useCallback(async () => {
     if (!canSubmit) return;
-    if (startsAt.getTime() <= Date.now()) {
-      setError('Pick a start time in the future.');
-      return;
-    }
     setSubmitting(true);
     setError(null);
     try {
-      const dur = DURATIONS[durationIdx] ?? DURATIONS[0];
-      const endsAt = new Date(startsAt.getTime() + dur.hours * 3_600_000);
-      const cap = capacity.trim() ? parseInt(capacity.trim(), 10) : undefined;
-      const req: CreateEventRequest = {
+      const req: CreateListingRequest = {
         title: title.trim(),
-        startsAt: startsAt.toISOString(),
-        endsAt: endsAt.toISOString(),
+        priceCents,
+        currency,
+        category,
         location: venue,
-        visibility,
         ...(description.trim() ? { description: description.trim() } : {}),
-        ...(cap != null && !Number.isNaN(cap) ? { capacity: cap } : {}),
       };
-      const created = await createEvent(req);
-      nav.replace('EventDetail', { eventId: created.id });
+      const created = await createListing(req);
+      nav.replace('ListingDetail', { listingId: created.id });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create the event. Please try again.');
+      setError(err instanceof Error ? err.message : 'Could not create the listing. Please try again.');
     } finally {
       setSubmitting(false);
     }
-  }, [canSubmit, durationIdx, startsAt, capacity, title, venue, visibility, description, nav]);
+  }, [canSubmit, title, priceCents, currency, category, venue, description, nav]);
 
-  const onDragEnd = useCallback((c: RNLatLng) => {
-    setPin({ lat: c.latitude, lng: c.longitude });
-  }, []);
+  const onDragEnd = useCallback((c: RNLatLng) => setPin({ lat: c.latitude, lng: c.longitude }), []);
 
-  // Center on the user once when their location resolves; initialRegion (not a
-  // controlled region) keeps the map from snapping back to the pin on each drag.
+  // Center on the user once when their location first resolves. Using
+  // initialRegion (not a controlled `region`) keeps the map from snapping back
+  // to the pin on every drag, so the user can pan freely to place it.
   useEffect(() => {
     if (coords && !hasCentered.current) {
       hasCentered.current = true;
@@ -153,12 +98,12 @@ export function EventCreateScreen(): React.JSX.Element {
         <TouchableOpacity onPress={() => nav.goBack()} hitSlop={8}>
           <Icon name="close" size={26} color="#fff" />
         </TouchableOpacity>
-        <Text style={S.headerTitle}>New event</Text>
+        <Text style={S.headerTitle}>Sell an item</Text>
         <TouchableOpacity onPress={() => void onSubmit()} disabled={!canSubmit} hitSlop={8}>
           {submitting ? (
             <ActivityIndicator size="small" color="#00d4ff" />
           ) : (
-            <Text style={[S.create, !canSubmit && S.createDisabled]}>Create</Text>
+            <Text style={[S.create, !canSubmit && S.createDisabled]}>List</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -167,46 +112,49 @@ export function EventCreateScreen(): React.JSX.Element {
         <Text style={S.label}>Title</Text>
         <TextInput
           style={S.input}
-          placeholder="What's the event?"
+          placeholder="What are you selling?"
           placeholderTextColor="#555"
           value={title}
           onChangeText={setTitle}
-          maxLength={EVENT_LIMITS.titleMax}
+          maxLength={LISTING_LIMITS.titleMax}
           autoFocus
         />
+
+        <Text style={S.label}>Price</Text>
+        <View style={S.priceRow}>
+          <TextInput
+            style={[S.input, { flex: 1 }]}
+            placeholder="0.00"
+            placeholderTextColor="#555"
+            value={price}
+            onChangeText={(t) => setPrice(t.replace(/[^0-9.]/g, ''))}
+            keyboardType="decimal-pad"
+          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.chips}>
+            {CURRENCIES.map((c) => (
+              <Chip key={c} active={c === currency} label={c} onPress={() => setCurrency(c)} />
+            ))}
+          </ScrollView>
+        </View>
+
+        <Text style={S.label}>Category</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.chips}>
+          {CATEGORIES.map((c) => (
+            <Chip key={c} active={c === category} label={c} onPress={() => setCategory(c)} />
+          ))}
+        </ScrollView>
 
         <Text style={S.label}>Description <Text style={S.optional}>(optional)</Text></Text>
         <TextInput
           style={[S.input, S.multiline]}
-          placeholder="Details, what to bring, who it's for…"
+          placeholder="Condition, details, pickup notes…"
           placeholderTextColor="#555"
           value={description}
           onChangeText={setDescription}
-          maxLength={EVENT_LIMITS.descriptionMax}
+          maxLength={LISTING_LIMITS.descriptionMax}
           multiline
           textAlignVertical="top"
         />
-
-        <Text style={S.label}>Day</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.chips}>
-          {days.map((d, i) => (
-            <Chip key={i} active={i === dayIdx} label={dayLabel(d, i)} onPress={() => setDayIdx(i)} />
-          ))}
-        </ScrollView>
-
-        <Text style={S.label}>Start time</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.chips}>
-          {slots.map((m) => (
-            <Chip key={m} active={m === minutes} label={timeLabel(m)} onPress={() => setMinutes(m)} />
-          ))}
-        </ScrollView>
-
-        <Text style={S.label}>Duration</Text>
-        <View style={S.row}>
-          {DURATIONS.map((d, i) => (
-            <Chip key={d.label} active={i === durationIdx} label={d.label} onPress={() => setDurationIdx(i)} />
-          ))}
-        </View>
 
         <Text style={S.label}>Location <Text style={S.optional}>(drag the pin)</Text></Text>
         <View style={S.mapWrap}>
@@ -214,12 +162,7 @@ export function EventCreateScreen(): React.JSX.Element {
             ref={mapRef}
             provider={PROVIDER_GOOGLE}
             style={StyleSheet.absoluteFill}
-            initialRegion={{
-              latitude: venue.lat,
-              longitude: venue.lng,
-              latitudeDelta: 0.02,
-              longitudeDelta: 0.02,
-            }}
+            initialRegion={{ latitude: venue.lat, longitude: venue.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 }}
           >
             <Marker
               draggable
@@ -227,23 +170,6 @@ export function EventCreateScreen(): React.JSX.Element {
               onDragEnd={(e) => onDragEnd(e.nativeEvent.coordinate)}
             />
           </MapView>
-        </View>
-
-        <Text style={S.label}>Capacity <Text style={S.optional}>(optional)</Text></Text>
-        <TextInput
-          style={S.input}
-          placeholder="Max attendees"
-          placeholderTextColor="#555"
-          value={capacity}
-          onChangeText={(t) => setCapacity(t.replace(/[^0-9]/g, ''))}
-          keyboardType="number-pad"
-          maxLength={6}
-        />
-
-        <Text style={S.label}>Visibility</Text>
-        <View style={S.row}>
-          <Chip active={visibility === 'public'} label="Public" onPress={() => setVisibility('public')} />
-          <Chip active={visibility === 'private'} label="Private" onPress={() => setVisibility('private')} />
         </View>
 
         {error ? (
@@ -281,20 +207,16 @@ const S = StyleSheet.create({
   headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   create: { color: '#00d4ff', fontSize: 16, fontWeight: '700' },
   createDisabled: { color: '#333' },
-
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 48 },
-
   label: { color: '#aaa', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 18, marginBottom: 8 },
   optional: { color: '#555', textTransform: 'none', fontWeight: '400' },
-
   input: {
     backgroundColor: '#12121f', borderWidth: 1, borderColor: '#1f1f33',
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#fff', fontSize: 16,
   },
   multiline: { minHeight: 90 },
-
-  row: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   chips: { gap: 8, paddingRight: 8 },
   chip: {
     paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20,
@@ -303,9 +225,7 @@ const S = StyleSheet.create({
   chipActive: { backgroundColor: '#00d4ff', borderColor: '#00d4ff' },
   chipText: { color: '#aaa', fontSize: 13, fontWeight: '600' },
   chipTextActive: { color: '#0a0a0f' },
-
   mapWrap: { height: 180, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#1f1f33' },
-
   errorBox: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,107,107,0.1)', borderWidth: 1, borderColor: 'rgba(255,107,107,0.3)',

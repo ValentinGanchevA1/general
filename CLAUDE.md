@@ -300,7 +300,7 @@ migrations/ 0001–0024 raw SQL (next free 0025)
 | `subscriptions` | `/subscriptions` | Stripe checkout + portal + signature-verified webhook → `subscription_tier` |
 | `social` | `/social` | Provider-generic OAuth account linking (HMAC-signed state) |
 | `events` | `/events` | P3.5 events: create + nearby + detail · RSVP (capacity-gated) · polls (vote tally) · Q&A (upvotes). Shipped + prod-verified (backend + mobile) |
-| `listings` | `/listings` | P3.7 trading: listing create + browse grid + detail · offers (upsert; seller accept/decline → marks sold) · favorites (toggle). Offer-based v1, **no payment processing** (Stripe Connect P4). Backend only — mobile surfacing pending |
+| `listings` | `/listings` | P3.7 trading: listing create + browse grid + detail · offers (upsert; seller accept/decline → marks sold) · favorites (toggle). Offer-based v1, **no payment processing** (Stripe Connect P4). Shipped (backend + mobile: Marketplace/ListingDetail/ListingCreate) |
 
 ### Auth chain
 
