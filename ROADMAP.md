@@ -152,8 +152,8 @@ Each epic gets a full spec in `SPECIFICATION.md` at the start of its sprint.
 ### P3.5 — Events
 - ~~Backend complete (events + attendees + polls + questions, WS `/events` gateway).~~ **Stale, corrected 2026-06-12.** Only a bare `events` table existed in `0001`; there was no events module, no attendees/polls/questions tables, and no `/events` gateway — and `STATUS.md` had `events` marked DEFER. The original "UI polish" framing was wrong.
 - **Backend built 2026-06-12** (greenfield, not polish): migration `0022_events.sql` (`event_attendees`, `event_polls`/`options`/`votes`, `event_questions`/`upvotes`) + `events` module under `/events`. REST surfaces: create · `POST /events/nearby` ("events near you") · `GET /events/:id` detail · `PUT /events/:id/rsvp` (capacity-gated) · poll create/list/vote · question ask/list/upvote. RSVP + Q&A are REST-polled in v1; live fan-out over `/realtime` is a follow-up.
-- **Remaining work: all mobile surfacing** — event creation flow (datetime, location pin, capacity, polls) · RSVP + attendee list · live polls + Q&A surfaces · "events near you" rail on map. Plus optional realtime poll/Q&A deltas.
-- Effort: ~4 days mobile remaining (backend ~2d done).
+- **Mobile shipped 2026-06-12** — `features/events/` data layer + `EventDetailScreen` (RSVP + attendee list + live polls with inline host composer + Q&A with upvotes) + `EventCreateScreen` (dependency-free day/time/duration chips, draggable map-pin venue, capacity, visibility) + "events near you" map rail (leads with a New-event card for cold-start density). Navigation registered (`EventDetail` + `EventCreate` modal).
+- **P3.5 core complete.** Deferred follow-ups: live `/realtime` poll/Q&A deltas (REST-polled today); polls during the creation flow (host adds them on the detail screen instead); FAB/rail overlap polish.
 
 ### P3.6 — Trending topics surfacing
 - Backend exists (trending service with geohash-bucketed Redis sorted sets, 24h TTL).
