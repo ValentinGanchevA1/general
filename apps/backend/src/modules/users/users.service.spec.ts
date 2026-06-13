@@ -104,3 +104,114 @@ describe('UsersService — gallery photos', () => {
     );
   });
 });
+
+describe('UsersService — public profile trust fields', () => {
+  let service: UsersService;
+  let query: jest.Mock;
+  const whichAreOnline = jest.fn().mockResolvedValue(new Set<string>());
+
+  beforeEach(async () => {
+    query = jest.fn().mockResolvedValue([]);
+    const mod = await Test.createTestingModule({
+      providers: [
+        UsersService,
+        { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
+        { provide: PresenceService, useValue: { whichAreOnline } },
+        { provide: MessagingService, useValue: {} },
+      ],
+    }).compile();
+    service = mod.get(UsersService);
+  });
+
+  it('exposes verificationScore + idVerified derived from the ladder/ID status', async () => {
+    query.mockResolvedValueOnce([
+      {
+        id: USER,
+        display_name: 'Ada',
+        avatar_url: null,
+        bio: null,
+        verification_level: 'phone',
+        id_verification_status: 'verified',
+        goals: [],
+      },
+    ]);
+    const profile = await service.getPublicProfile(USER);
+    expect(profile.verificationScore).toBe(45); // phone rung
+    expect(profile.idVerified).toBe(true);
+    // No viewerId passed → no relationship block (and no messaging call).
+    expect(profile.relationship).toBeUndefined();
+  });
+
+  it('reports idVerified=false when the ID is only pending', async () => {
+    query.mockResolvedValueOnce([
+      {
+        id: USER,
+        display_name: 'Grace',
+        avatar_url: null,
+        bio: null,
+        verification_level: 'none',
+        id_verification_status: 'pending',
+        goals: [],
+      },
+    ]);
+    const profile = await service.getPublicProfile(USER);
+    expect(profile.verificationScore).toBe(0);
+    expect(profile.idVerified).toBe(false);
+  });
+});
+
+describe('UsersService — profile createdAt', () => {
+  let service: UsersService;
+  let query: jest.Mock;
+
+  const buildRow = (createdAt: unknown) => ({
+    id: USER,
+    email: 'a@b.co',
+    display_name: 'Ada',
+    avatar_url: null,
+    bio: null,
+    verification_level: 'none',
+    visibility: 'public',
+    goals: [],
+    interests: [],
+    phone: null,
+    age: null,
+    subscription_tier: 'free',
+    id_verification_status: 'none',
+    created_at: createdAt,
+  });
+
+  beforeEach(async () => {
+    query = jest.fn();
+    const mod = await Test.createTestingModule({
+      providers: [
+        UsersService,
+        { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
+        { provide: PresenceService, useValue: {} },
+        { provide: MessagingService, useValue: {} },
+      ],
+    }).compile();
+    service = mod.get(UsersService);
+  });
+
+  // getProfile: user row → getPhotoUrls → getSocialLinks
+  const mockProfileReads = (createdAt: unknown): void => {
+    query
+      .mockResolvedValueOnce([buildRow(createdAt)]) // SELECT user
+      .mockResolvedValueOnce([]) // photos
+      .mockResolvedValueOnce([]); // social links
+  };
+
+  it('passes through a valid created_at as ISO', async () => {
+    mockProfileReads('2026-06-01T12:00:00.000Z');
+    const profile = await service.getProfile(USER);
+    expect(profile.createdAt).toBe('2026-06-01T12:00:00.000Z');
+  });
+
+  it('falls back to a valid ISO (no RangeError) when created_at is null/invalid', async () => {
+    mockProfileReads(null);
+    const profile = await service.getProfile(USER);
+    // Must not throw and must be a parseable ISO timestamp.
+    expect(Number.isNaN(Date.parse(profile.createdAt))).toBe(false);
+  });
+});

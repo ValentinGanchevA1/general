@@ -37,6 +37,7 @@ interface UserRow {
   age: number | null;
   subscription_tier: SubscriptionTier;
   id_verification_status: IdVerificationStatus;
+  created_at: string | Date;
 }
 
 interface PublicUserRow {
@@ -45,6 +46,7 @@ interface PublicUserRow {
   avatar_url: string | null;
   bio: string | null;
   verification_level: string;
+  id_verification_status: IdVerificationStatus;
   goals: string[];
 }
 
@@ -57,7 +59,7 @@ interface SocialLinkRow {
 
 const USER_COLUMNS = `
   id, email, display_name, avatar_url, bio, verification_level, visibility,
-  goals, interests, phone, subscription_tier, id_verification_status,
+  goals, interests, phone, subscription_tier, id_verification_status, created_at,
   date_part('year', age(date_of_birth))::int AS age`;
 
 // Verification ladder is cumulative: none < email < phone < selfie < id.
@@ -69,6 +71,17 @@ const SCORE: Record<VerificationLevel, number> = {
   selfie: 70,
   id: 100,
 };
+
+/**
+ * Safe ISO conversion for a DB timestamp. `created_at` is NOT NULL in schema,
+ * but a malformed/missing value must never `RangeError`-crash the core profile
+ * read. Falls back to "now" — treated as a fresh account, so the age-gated
+ * verification nudge stays suppressed rather than firing on bad data.
+ */
+function toIsoOrNow(value: string | Date | null | undefined): string {
+  const d = new Date(value as string | Date);
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
 
 // Mirrors the mobile gallery cap (ProfileScreen shows the add tile while < 6).
 const MAX_PHOTOS = 6;
@@ -114,7 +127,8 @@ export class UsersService {
    */
   async getPublicProfile(userId: string, viewerId?: string): Promise<PublicUserProfile> {
     const rows = await this.db.query<PublicUserRow[]>(
-      `SELECT id, display_name, avatar_url, bio, verification_level, goals
+      `SELECT id, display_name, avatar_url, bio, verification_level,
+              id_verification_status, goals
          FROM users
         WHERE id = $1 AND deleted_at IS NULL AND visibility = 'public'
         LIMIT 1`,
@@ -141,6 +155,8 @@ export class UsersService {
       avatarUrl: r.avatar_url,
       bio: r.bio,
       verification: r.verification_level as PublicUserProfile['verification'],
+      verificationScore: SCORE[r.verification_level as VerificationLevel] ?? 0,
+      idVerified: r.id_verification_status === 'verified',
       goals: r.goals ?? [],
       online: onlineSet.has(r.id),
       ...(relationship ? { relationship } : {}),
@@ -358,6 +374,7 @@ export class UsersService {
       badges: this.deriveBadges(level, r.subscription_tier ?? 'free', socialLinks, r.id_verification_status),
        idVerificationStatus: r.id_verification_status,
        verifiedBadge: r.id_verification_status === 'verified',
+       createdAt: toIsoOrNow(r.created_at),
     };
   }
 }

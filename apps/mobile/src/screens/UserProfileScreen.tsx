@@ -9,13 +9,35 @@ import {
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { ApiError, PublicUserProfile, WaveRequest, WaveResponse } from '@g88/shared';
+import type {
+  ApiError,
+  PublicUserProfile,
+  VerificationLevel,
+  WaveRequest,
+  WaveResponse,
+} from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson, postJson } from '@/api/client';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
+import { VerificationBadge } from '@/components/VerificationBadge';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
+
+// Cumulative verification ladder → the chips we show on someone else's card.
+// A user at level L has earned every rung up to and including L.
+const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
+const LADDER_BADGES: Array<{ level: VerificationLevel; label: string }> = [
+  { level: 'email', label: 'Email' },
+  { level: 'phone', label: 'Phone' },
+  { level: 'selfie', label: 'Photo' },
+  { level: 'id', label: 'ID' },
+];
+
+function earnedBadges(level: VerificationLevel): string[] {
+  const rank = LADDER.indexOf(level);
+  return LADDER_BADGES.filter((b) => rank >= LADDER.indexOf(b.level)).map((b) => b.label);
+}
 
 function InitialsAvatar({ name }: { name: string }): React.JSX.Element {
   const initials = name
@@ -98,11 +120,11 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
           <View style={styles.heroMeta}>
             <View style={styles.nameRow}>
               <Text style={styles.displayName}>{profile.displayName}</Text>
-              {profile.verification !== 'none' && (
-                <View style={styles.verifiedBadge}>
-                  <Text style={styles.verifiedText}>✓</Text>
-                </View>
-              )}
+              <VerificationBadge
+                verification={profile.verification}
+                idVerified={profile.idVerified}
+                size={20}
+              />
             </View>
             <Text style={[styles.onlineLabel, !profile.online && styles.offlineLabel]}>
               {profile.online ? 'Online now' : 'Recently nearby'}
@@ -133,6 +155,31 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
             </View>
           </View>
         ) : null}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Trust</Text>
+          <View style={styles.trustRow}>
+            <View style={styles.trustBar}>
+              <View style={[styles.trustProgress, { width: `${profile.verificationScore}%` }]} />
+            </View>
+            <Text style={styles.trustText}>{profile.verificationScore}% verified</Text>
+          </View>
+          <View style={styles.trustBadges}>
+            {profile.idVerified ? (
+              <View style={[styles.trustChip, styles.trustChipStrong]}>
+                <Text style={styles.trustChipStrongText}>ID-verified ✓</Text>
+              </View>
+            ) : null}
+            {earnedBadges(profile.verification).map((label) => (
+              <View key={label} style={styles.trustChip}>
+                <Text style={styles.trustChipText}>{label}</Text>
+              </View>
+            ))}
+            {profile.verification === 'none' && !profile.idVerified ? (
+              <Text style={styles.trustEmpty}>Not yet verified</Text>
+            ) : null}
+          </View>
+        </View>
       </ScrollView>
 
       <View style={styles.footer}>
@@ -190,15 +237,24 @@ const styles = StyleSheet.create({
   heroMeta: { flex: 1, gap: 4 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   displayName: { color: '#fff', fontSize: 24, fontWeight: '700' },
-  verifiedBadge: {
-    backgroundColor: '#00d4ff',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  verifiedText: { color: '#000', fontSize: 11, fontWeight: '700' },
   onlineLabel: { color: '#4caf50', fontSize: 13 },
   offlineLabel: { color: '#666' },
+
+  trustRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  trustBar: { flex: 1, height: 6, backgroundColor: '#1a1a24', borderRadius: 3, overflow: 'hidden' },
+  trustProgress: { height: '100%', backgroundColor: '#00d4ff', borderRadius: 3 },
+  trustText: { color: '#888', fontSize: 12 },
+  trustBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  trustChip: {
+    backgroundColor: '#15151f',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  trustChipText: { color: '#9aa', fontSize: 12, fontWeight: '600' },
+  trustChipStrong: { backgroundColor: '#00d4ff20' },
+  trustChipStrongText: { color: '#00d4ff', fontSize: 12, fontWeight: '700' },
+  trustEmpty: { color: '#666', fontSize: 12 },
 
   section: { gap: 10 },
   sectionLabel: {
