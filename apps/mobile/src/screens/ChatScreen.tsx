@@ -170,13 +170,11 @@ export function ChatScreen(): React.JSX.Element {
         <Text style={styles.headerName} numberOfLines={1}>
           {otherUserName || 'Chat'}
         </Text>
-        {otherUserVerification ? (
-          <VerificationBadge
-            verification={otherUserVerification}
-            idVerified={otherUserIdVerified}
-            size={18}
-          />
-        ) : null}
+        <VerificationBadge
+          verification={otherUserVerification ?? 'none'}
+          idVerified={otherUserIdVerified}
+          size={18}
+        />
       </View>
 
       {showRequestBanner && (

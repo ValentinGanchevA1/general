@@ -31,7 +31,7 @@ export function VerificationBadge({
     return <Icon name="check-decagram" size={size} color="#00d4ff" />;
   }
   if (verification !== 'none') {
-    const dim = size - 2;
+    const dim = Math.max(0, size - 2);
     return (
       <View
         style={[styles.partial, { width: dim, height: dim, borderRadius: dim / 2 }]}

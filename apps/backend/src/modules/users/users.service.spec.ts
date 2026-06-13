@@ -159,3 +159,59 @@ describe('UsersService — public profile trust fields', () => {
     expect(profile.idVerified).toBe(false);
   });
 });
+
+describe('UsersService — profile createdAt', () => {
+  let service: UsersService;
+  let query: jest.Mock;
+
+  const buildRow = (createdAt: unknown) => ({
+    id: USER,
+    email: 'a@b.co',
+    display_name: 'Ada',
+    avatar_url: null,
+    bio: null,
+    verification_level: 'none',
+    visibility: 'public',
+    goals: [],
+    interests: [],
+    phone: null,
+    age: null,
+    subscription_tier: 'free',
+    id_verification_status: 'none',
+    created_at: createdAt,
+  });
+
+  beforeEach(async () => {
+    query = jest.fn();
+    const mod = await Test.createTestingModule({
+      providers: [
+        UsersService,
+        { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
+        { provide: PresenceService, useValue: {} },
+        { provide: MessagingService, useValue: {} },
+      ],
+    }).compile();
+    service = mod.get(UsersService);
+  });
+
+  // getProfile: user row → getPhotoUrls → getSocialLinks
+  const mockProfileReads = (createdAt: unknown): void => {
+    query
+      .mockResolvedValueOnce([buildRow(createdAt)]) // SELECT user
+      .mockResolvedValueOnce([]) // photos
+      .mockResolvedValueOnce([]); // social links
+  };
+
+  it('passes through a valid created_at as ISO', async () => {
+    mockProfileReads('2026-06-01T12:00:00.000Z');
+    const profile = await service.getProfile(USER);
+    expect(profile.createdAt).toBe('2026-06-01T12:00:00.000Z');
+  });
+
+  it('falls back to a valid ISO (no RangeError) when created_at is null/invalid', async () => {
+    mockProfileReads(null);
+    const profile = await service.getProfile(USER);
+    // Must not throw and must be a parseable ISO timestamp.
+    expect(Number.isNaN(Date.parse(profile.createdAt))).toBe(false);
+  });
+});

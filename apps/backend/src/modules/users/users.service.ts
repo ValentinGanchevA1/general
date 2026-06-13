@@ -72,6 +72,17 @@ const SCORE: Record<VerificationLevel, number> = {
   id: 100,
 };
 
+/**
+ * Safe ISO conversion for a DB timestamp. `created_at` is NOT NULL in schema,
+ * but a malformed/missing value must never `RangeError`-crash the core profile
+ * read. Falls back to "now" — treated as a fresh account, so the age-gated
+ * verification nudge stays suppressed rather than firing on bad data.
+ */
+function toIsoOrNow(value: string | Date | null | undefined): string {
+  const d = new Date(value as string | Date);
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
 // Mirrors the mobile gallery cap (ProfileScreen shows the add tile while < 6).
 const MAX_PHOTOS = 6;
 
@@ -363,7 +374,7 @@ export class UsersService {
       badges: this.deriveBadges(level, r.subscription_tier ?? 'free', socialLinks, r.id_verification_status),
        idVerificationStatus: r.id_verification_status,
        verifiedBadge: r.id_verification_status === 'verified',
-       createdAt: new Date(r.created_at).toISOString(),
+       createdAt: toIsoOrNow(r.created_at),
     };
   }
 }
