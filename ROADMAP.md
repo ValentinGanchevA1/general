@@ -145,9 +145,11 @@ Each epic gets a full spec in `SPECIFICATION.md` at the start of its sprint.
 - Effort: ~4 days.
 
 ### P3.4 — Verification visibility polish
-- Backend complete (phone OTP, photo + ID via Rekognition).
-- Work: visible verification badges on map dots, profile cards, chat headers · "complete your verification" nudge for unverified accounts after D2 · trust-score indicator (composite of verification tiers).
-- Effort: ~3 days.
+- Backend complete (phone OTP, photo + ID via **manual review** — Rekognition face-compare stays deferred, not in code; the original "via Rekognition" line was stale).
+- ~~Work: visible verification badges on map dots, profile cards, chat headers · "complete your verification" nudge for unverified accounts after D2 · trust-score indicator.~~ **Shipped 2026-06-13.**
+- **Shipped:** shared `VerificationBadge` (two-tier: ID-verified decagram vs. partial ✓) now used on **map dots** (already had it), the **map bottom-sheet**, **other-user profile cards** (`UserProfileScreen`), and **chat headers** (`ChatScreen` gained a header row carrying the badge). Other-user cards now show a **trust-score bar** (0–100 ladder) + earned ladder badge chips — `PublicUserProfile` gained `verificationScore` + `idVerified`. The **"complete your verification" nudge** (`useNudges`) is now **gated on account age ≥ 2 days** (post-D2) for fresh `none` accounts; a `rejected` ID bypasses the hold. `UserProfile` gained `createdAt` to drive the gate.
+- **Deferred:** conversation-list participant badges (no Inbox screen consumes `ConversationSummary` yet — chat badge rides nav params from the map entry point instead); social/premium badges on *other-user* cards (kept the public query cheap — ladder + ID only); a true multi-tier composite trust score (the ladder score + badge chips cover v1).
+- Effort: ~1.5 days (was ~3d est; most surfacing already existed).
 
 ### P3.5 — Events
 - ~~Backend complete (events + attendees + polls + questions, WS `/events` gateway).~~ **Stale, corrected 2026-06-12.** Only a bare `events` table existed in `0001`; there was no events module, no attendees/polls/questions tables, and no `/events` gateway — and `STATUS.md` had `events` marked DEFER. The original "UI polish" framing was wrong.

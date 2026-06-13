@@ -41,6 +41,9 @@ export interface Nudge {
 
 const DISMISS_KEY = 'g88:nudges:dismissed';
 const DAY_MS = 24 * 60 * 60 * 1000;
+// Hold the verification nudge until the account is ~2 days old (post-D2). New
+// users get to explore before we ask them to verify (ROADMAP §P3.4).
+const VERIFY_NUDGE_MIN_AGE_MS = 2 * DAY_MS;
 
 type DismissMap = Record<string, number>; // nudge id → epoch ms of last dismiss
 
@@ -100,7 +103,13 @@ export function useNudges(): UseNudgesResult {
     const candidates: Nudge[] = [];
 
     const idStatus = profile?.idVerificationStatus;
-    if (idStatus === 'none' || idStatus === 'rejected') {
+    // Account age gate: only nudge once the user has had ~2 days to settle in.
+    // A rejected ID is time-sensitive, so it bypasses the age hold.
+    const createdAt = profile?.createdAt;
+    const oldEnoughToNudge = createdAt
+      ? now - Date.parse(createdAt) >= VERIFY_NUDGE_MIN_AGE_MS
+      : false;
+    if ((idStatus === 'none' && oldEnoughToNudge) || idStatus === 'rejected') {
       candidates.push({
         id: 'verify-id',
         icon: 'shield-alert',
@@ -136,7 +145,7 @@ export function useNudges(): UseNudgesResult {
         return !last || now - last >= c.cooldownDays * DAY_MS;
       }) ?? null
     );
-  }, [profile?.idVerificationStatus, summary?.currentStreak, dismissed, now]);
+  }, [profile?.idVerificationStatus, profile?.createdAt, summary?.currentStreak, dismissed, now]);
 
   return { nudge, dismiss };
 }

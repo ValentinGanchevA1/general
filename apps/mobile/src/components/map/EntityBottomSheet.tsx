@@ -18,6 +18,7 @@ import type {
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson, postJson } from '@/api/client';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
+import { VerificationBadge } from '@/components/VerificationBadge';
 
 /** Map a raw interest/goal value to a human label, falling back to the value. */
 function labelFor(value: string): string {
@@ -126,6 +127,8 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         conversationId: res.conversationId,
         otherUserName: meta.displayName,
         requestPending: res.status === 'pending' && res.permission === 'request',
+        otherUserVerification: meta.verification,
+        otherUserIdVerified: meta.verifiedBadge ?? false,
       });
     } catch {
       // Gate changed under us (e.g. they went private) — leave the sheet open.
@@ -143,11 +146,11 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         <View style={styles.userHeaderText}>
           <View style={styles.nameRow}>
             <Text style={styles.title}>{meta.displayName}</Text>
-            {meta.verification !== 'none' && (
-              <View style={styles.verifiedBadge}>
-                <Text style={styles.verifiedText}>✓</Text>
-              </View>
-            )}
+            <VerificationBadge
+              verification={meta.verification}
+              idVerified={meta.verifiedBadge}
+              size={16}
+            />
           </View>
           <Text style={[styles.onlineLabel, !meta.online && styles.offlineLabel]}>
             {meta.online ? 'Online now' : 'Recently nearby'}
@@ -324,14 +327,6 @@ const styles = StyleSheet.create({
   userHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   userHeaderText: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  verifiedBadge: {
-    backgroundColor: '#00d4ff',
-    borderRadius: 8,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    overflow: 'hidden',
-  },
-  verifiedText: { color: '#000', fontSize: 11, fontWeight: '700' },
   onlineLabel: { color: '#4caf50', fontSize: 12, marginTop: 2 },
   offlineLabel: { color: '#666' },
   bio: { color: '#ccc', fontSize: 14, lineHeight: 20 },

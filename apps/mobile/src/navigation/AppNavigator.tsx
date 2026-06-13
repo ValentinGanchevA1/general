@@ -35,7 +35,7 @@ import {
 	HelpScreen,
 	AboutScreen,
 } from '@/screens/placeholders';
-import type { AreaCategory } from '@g88/shared';
+import type { AreaCategory, VerificationLevel } from '@g88/shared';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { restoreSession } from '@/features/auth/authSlice';
@@ -56,7 +56,15 @@ export type RootStackParamList = {
 	Auth: undefined;
 	ProfileCreation: undefined;
 	Main: NavigatorScreenParams<TabParamList> | undefined;
-	Chat: { conversationId: string; otherUserName: string; requestPending?: boolean };
+	Chat: {
+		conversationId: string;
+		otherUserName: string;
+		requestPending?: boolean;
+		/** The other participant's verification ladder level (for the header badge). */
+		otherUserVerification?: VerificationLevel;
+		/** True when the other participant passed ID review (strong decagram badge). */
+		otherUserIdVerified?: boolean;
+	};
 	ProfileEdit: undefined;
 	Photos: undefined;
 	Settings: undefined;

@@ -37,6 +37,7 @@ interface UserRow {
   age: number | null;
   subscription_tier: SubscriptionTier;
   id_verification_status: IdVerificationStatus;
+  created_at: string | Date;
 }
 
 interface PublicUserRow {
@@ -45,6 +46,7 @@ interface PublicUserRow {
   avatar_url: string | null;
   bio: string | null;
   verification_level: string;
+  id_verification_status: IdVerificationStatus;
   goals: string[];
 }
 
@@ -57,7 +59,7 @@ interface SocialLinkRow {
 
 const USER_COLUMNS = `
   id, email, display_name, avatar_url, bio, verification_level, visibility,
-  goals, interests, phone, subscription_tier, id_verification_status,
+  goals, interests, phone, subscription_tier, id_verification_status, created_at,
   date_part('year', age(date_of_birth))::int AS age`;
 
 // Verification ladder is cumulative: none < email < phone < selfie < id.
@@ -114,7 +116,8 @@ export class UsersService {
    */
   async getPublicProfile(userId: string, viewerId?: string): Promise<PublicUserProfile> {
     const rows = await this.db.query<PublicUserRow[]>(
-      `SELECT id, display_name, avatar_url, bio, verification_level, goals
+      `SELECT id, display_name, avatar_url, bio, verification_level,
+              id_verification_status, goals
          FROM users
         WHERE id = $1 AND deleted_at IS NULL AND visibility = 'public'
         LIMIT 1`,
@@ -141,6 +144,8 @@ export class UsersService {
       avatarUrl: r.avatar_url,
       bio: r.bio,
       verification: r.verification_level as PublicUserProfile['verification'],
+      verificationScore: SCORE[r.verification_level as VerificationLevel] ?? 0,
+      idVerified: r.id_verification_status === 'verified',
       goals: r.goals ?? [],
       online: onlineSet.has(r.id),
       ...(relationship ? { relationship } : {}),
@@ -358,6 +363,7 @@ export class UsersService {
       badges: this.deriveBadges(level, r.subscription_tier ?? 'free', socialLinks, r.id_verification_status),
        idVerificationStatus: r.id_verification_status,
        verifiedBadge: r.id_verification_status === 'verified',
+       createdAt: new Date(r.created_at).toISOString(),
     };
   }
 }

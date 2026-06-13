@@ -104,3 +104,58 @@ describe('UsersService — gallery photos', () => {
     );
   });
 });
+
+describe('UsersService — public profile trust fields', () => {
+  let service: UsersService;
+  let query: jest.Mock;
+  const whichAreOnline = jest.fn().mockResolvedValue(new Set<string>());
+
+  beforeEach(async () => {
+    query = jest.fn().mockResolvedValue([]);
+    const mod = await Test.createTestingModule({
+      providers: [
+        UsersService,
+        { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
+        { provide: PresenceService, useValue: { whichAreOnline } },
+        { provide: MessagingService, useValue: {} },
+      ],
+    }).compile();
+    service = mod.get(UsersService);
+  });
+
+  it('exposes verificationScore + idVerified derived from the ladder/ID status', async () => {
+    query.mockResolvedValueOnce([
+      {
+        id: USER,
+        display_name: 'Ada',
+        avatar_url: null,
+        bio: null,
+        verification_level: 'phone',
+        id_verification_status: 'verified',
+        goals: [],
+      },
+    ]);
+    const profile = await service.getPublicProfile(USER);
+    expect(profile.verificationScore).toBe(45); // phone rung
+    expect(profile.idVerified).toBe(true);
+    // No viewerId passed → no relationship block (and no messaging call).
+    expect(profile.relationship).toBeUndefined();
+  });
+
+  it('reports idVerified=false when the ID is only pending', async () => {
+    query.mockResolvedValueOnce([
+      {
+        id: USER,
+        display_name: 'Grace',
+        avatar_url: null,
+        bio: null,
+        verification_level: 'none',
+        id_verification_status: 'pending',
+        goals: [],
+      },
+    ]);
+    const profile = await service.getPublicProfile(USER);
+    expect(profile.verificationScore).toBe(0);
+    expect(profile.idVerified).toBe(false);
+  });
+});

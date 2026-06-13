@@ -10,10 +10,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { type RouteProp, useRoute } from '@react-navigation/native';
+import { type RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { ChatMessage } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { VerificationBadge } from '@/components/VerificationBadge';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {
   fetchMessages,
@@ -60,8 +62,15 @@ function MessageBubble({
 
 export function ChatScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { params } = useRoute<Route>();
-  const { conversationId, requestPending, otherUserName } = params;
+  const {
+    conversationId,
+    requestPending,
+    otherUserName,
+    otherUserVerification,
+    otherUserIdVerified,
+  } = params;
 
   const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
   const messages = useAppSelector((s) => s.chat.messages[conversationId] ?? []);
@@ -150,6 +159,26 @@ export function ChatScreen(): React.JSX.Element {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.headerBack}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={styles.headerBackText}>‹</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerName} numberOfLines={1}>
+          {otherUserName || 'Chat'}
+        </Text>
+        {otherUserVerification ? (
+          <VerificationBadge
+            verification={otherUserVerification}
+            idVerified={otherUserIdVerified}
+            size={18}
+          />
+        ) : null}
+      </View>
+
       {showRequestBanner && (
         <View style={styles.requestBanner}>
           <Text style={styles.requestBannerText}>
@@ -231,6 +260,19 @@ export function ChatScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0a0a0f' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#16161f',
+    backgroundColor: '#0d0d14',
+  },
+  headerBack: { paddingHorizontal: 6 },
+  headerBackText: { color: '#00d4ff', fontSize: 28, lineHeight: 28, marginTop: -2 },
+  headerName: { flex: 1, color: '#fff', fontSize: 17, fontWeight: '600' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   requestBanner: {
     backgroundColor: '#10261f',

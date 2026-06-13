@@ -214,6 +214,8 @@ export interface UserProfile extends AuthenticatedUser {
   idVerificationStatus: IdVerificationStatus;
   /** True when idVerificationStatus === 'verified'. Shorthand for badge access. */
   verifiedBadge: boolean;
+  /** Account creation timestamp (ISO). Drives account-age gated nudges. */
+  createdAt: string;
 }
 
 /** Public-facing profile returned by GET /users/:id */
@@ -223,6 +225,10 @@ export interface PublicUserProfile {
   bio: string | null;
   avatarUrl: string | null;
   verification: VerificationLevel;
+  /** 0–100 verification ladder score, for the trust indicator on the card. */
+  verificationScore: number;
+  /** Passed ID-document review — the strong "decagram" badge. */
+  idVerified: boolean;
   goals: string[];
   online: boolean;
   /**
