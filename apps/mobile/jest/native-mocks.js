@@ -6,6 +6,25 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 
+// react-native-keychain: in-memory generic-password store, keyed by `service`.
+jest.mock('react-native-keychain', () => {
+  const store = new Map();
+  return {
+    setGenericPassword: jest.fn((username, password, options = {}) => {
+      store.set(options.service ?? 'default', { username, password });
+      return Promise.resolve(true);
+    }),
+    getGenericPassword: jest.fn((options = {}) =>
+      Promise.resolve(store.get(options.service ?? 'default') ?? false),
+    ),
+    resetGenericPassword: jest.fn((options = {}) => {
+      store.delete(options.service ?? 'default');
+      return Promise.resolve(true);
+    }),
+    __resetMockStore: () => store.clear(),
+  };
+});
+
 jest.mock('@react-native-google-signin/google-signin', () => ({
   GoogleSignin: {
     configure: jest.fn(),
