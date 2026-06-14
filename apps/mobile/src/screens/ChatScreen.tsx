@@ -94,6 +94,7 @@ export function ChatScreen(): React.JSX.Element {
   const [sending, setSending] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [fetchedPeer, setFetchedPeer] = useState<{
+    userId: string;
     verification: VerificationLevel;
     idVerified: boolean;
   } | null>(null);
@@ -114,14 +115,20 @@ export function ChatScreen(): React.JSX.Element {
     let cancelled = false;
     getJson<PublicUserProfile>(`/users/${otherUserId}`)
       .then((p) => {
-        if (!cancelled) setFetchedPeer({ verification: p.verification, idVerified: p.idVerified });
+        if (!cancelled) {
+          setFetchedPeer({ userId: otherUserId, verification: p.verification, idVerified: p.idVerified });
+        }
       })
       .catch(() => { /* badge just stays hidden — non-blocking */ });
     return () => { cancelled = true; };
   }, [haveBadgeParams, otherUserId]);
 
-  const badgeVerification = otherUserVerification ?? fetchedPeer?.verification ?? 'none';
-  const badgeIdVerified = otherUserIdVerified ?? fetchedPeer?.idVerified;
+  // Tag the fetch with its peer id and only trust it when it still matches the
+  // current peer — a reused ChatScreen (navigating peer→peer without a remount)
+  // then can't flash the previous peer's badge while the new fetch is in flight.
+  const peerBadge = fetchedPeer?.userId === otherUserId ? fetchedPeer : null;
+  const badgeVerification = otherUserVerification ?? peerBadge?.verification ?? 'none';
+  const badgeIdVerified = otherUserIdVerified ?? peerBadge?.idVerified;
 
   useEffect(() => {
     void dispatch(fetchMessages({ conversationId }));
