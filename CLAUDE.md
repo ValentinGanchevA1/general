@@ -213,8 +213,8 @@ utils/      ·  config.ts (build-time env)  ·  env.d.ts
 ### State — `store/index.ts`
 
 - **5 reducers:** `auth · profile · chat · pulse · discovery`.
-- **No `redux-persist`.** Slices start empty each launch. Auth survives restart because **tokens live in `AsyncStorage`** (`tokenStore`, keys `g88:access_token` / `g88:refresh_token`) and `authSlice.restoreSession` rehydrates on boot.
-- ⚠️ Tokens are **unencrypted** AsyncStorage — pre-TestFlight hardening item.
+- **No `redux-persist`.** Slices start empty each launch. Auth survives restart because **tokens live in the OS secure store** (`tokenStore` → `react-native-keychain`, Android Keystore / iOS Keychain, single JSON entry under service `g88.auth.tokens`) and `authSlice.restoreSession` rehydrates on boot.
+- Tokens are **encrypted at rest** (Keystore/Keychain) as of 2026-06-14. `tokenStore` keeps the same async interface (`getAccessToken`/`getRefreshToken`/`set`/`clear`) + an in-memory cache, and migrates legacy plaintext AsyncStorage tokens (keys `g88:access_token`/`g88:refresh_token`) into the keychain once on first read so existing sessions survive the upgrade.
 - Always use typed `useAppDispatch` / `useAppSelector` (`src/hooks/redux.ts`), never raw RTK hooks.
 
 ### Networking — `api/client.ts`
@@ -406,7 +406,7 @@ All under `/api/v1`. JWT unless noted.
 
 - **C2** — ✅ met (2026-06-11). Every backend module ships ≥1 `.spec.ts`, including `id-verification`.
 - **C3** — structured request logging (Pino → Loki/Grafana) deferred; Sentry is the v1 surface. `console.*` still permitted client-side until the `logger` shim lands.
-- Mobile tokens in unencrypted AsyncStorage (pre-TestFlight).
+- ~~Mobile tokens in unencrypted AsyncStorage (pre-TestFlight).~~ ✅ closed 2026-06-14 — tokens now in the OS secure store (`react-native-keychain`, Android Keystore / iOS Keychain) with one-time legacy migration.
 - `0020_id_verification.sql` is not idempotent; ID-verification has no automated `pending → verified` path (manual review only).
 
 ## Explicitly deferred (do not build without go-ahead)
