@@ -30,6 +30,9 @@ interface StoredTokens {
 // access token) doesn't hit the native bridge each time. `undefined` = not yet
 // loaded; `null` = loaded, nothing stored. Kept consistent on set/clear.
 let cache: StoredTokens | null | undefined;
+// Coalesces the concurrent first reads that fire at startup into one native
+// load (single-flight). Cleared once the load settles.
+let loadPromise: Promise<StoredTokens | null> | null = null;
 
 async function persist(tokens: StoredTokens): Promise<void> {
   await Keychain.setGenericPassword(ACCOUNT, JSON.stringify(tokens), { service: SERVICE });
@@ -43,7 +46,13 @@ async function migrateLegacy(): Promise<StoredTokens | null> {
     if (access && refresh) {
       const tokens: StoredTokens = { accessToken: access, refreshToken: refresh };
       await persist(tokens);
-      await AsyncStorage.multiRemove([LEGACY.access, LEGACY.refresh]);
+      try {
+        await AsyncStorage.multiRemove([LEGACY.access, LEGACY.refresh]);
+      } catch {
+        // Non-blocking: migration already succeeded (tokens are in the keychain).
+        // A failed plaintext cleanup must NOT discard the session — clear() will
+        // sweep the leftovers later.
+      }
       return tokens;
     }
   } catch {
@@ -58,17 +67,27 @@ async function migrateLegacy(): Promise<StoredTokens | null> {
  */
 async function load(): Promise<StoredTokens | null> {
   if (cache !== undefined) return cache;
-  try {
-    const creds = await Keychain.getGenericPassword({ service: SERVICE });
-    if (creds) {
-      cache = JSON.parse(creds.password) as StoredTokens;
-      return cache;
+  if (loadPromise) return loadPromise;
+  // Only adopt the loaded value if set()/clear() hasn't run in the meantime —
+  // otherwise an in-flight load could clobber freshly-written/cleared tokens.
+  loadPromise = (async () => {
+    try {
+      const creds = await Keychain.getGenericPassword({ service: SERVICE });
+      if (creds) {
+        const parsed = JSON.parse(creds.password) as StoredTokens;
+        if (cache === undefined) cache = parsed;
+        return cache;
+      }
+    } catch {
+      // Keychain read failed (e.g. no secure hardware) — fall through to legacy.
     }
-  } catch {
-    // Keychain read failed (e.g. no secure hardware) — fall through to legacy.
-  }
-  cache = await migrateLegacy();
-  return cache;
+    const migrated = await migrateLegacy();
+    if (cache === undefined) cache = migrated;
+    return cache;
+  })().finally(() => {
+    loadPromise = null;
+  });
+  return loadPromise;
 }
 
 export const tokenStore = {

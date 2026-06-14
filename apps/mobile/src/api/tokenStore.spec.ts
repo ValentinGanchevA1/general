@@ -40,6 +40,28 @@ describe('tokenStore (encrypted)', () => {
     expect(await AsyncStorage.getItem(LEGACY.access)).toBeNull();
   });
 
+  it('coalesces concurrent first reads into a single keychain load', async () => {
+    const { tokenStore, Keychain } = await freshModules();
+    // Seed the keychain directly (not via tokenStore.set) so the module cache is
+    // still unloaded when the concurrent reads fire — mirrors several API
+    // requests hitting the interceptor at startup before any token is read.
+    await Keychain.setGenericPassword(
+      'g88',
+      JSON.stringify({ accessToken: 'acc-1', refreshToken: 'ref-1' }),
+      { service: 'g88.auth.tokens' },
+    );
+    Keychain.getGenericPassword.mockClear();
+
+    const [a, b, c] = await Promise.all([
+      tokenStore.getAccessToken(),
+      tokenStore.getRefreshToken(),
+      tokenStore.getAccessToken(),
+    ]);
+
+    expect([a, b, c]).toEqual(['acc-1', 'ref-1', 'acc-1']);
+    expect(Keychain.getGenericPassword).toHaveBeenCalledTimes(1);
+  });
+
   it('returns null when nothing is stored', async () => {
     const { tokenStore } = await freshModules();
     expect(await tokenStore.getAccessToken()).toBeNull();
