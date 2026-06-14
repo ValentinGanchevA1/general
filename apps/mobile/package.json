@@ -10,6 +10,8 @@
     "ios": "react-native run-ios",
     "start": "react-native start",
     "start:reset": "react-native start --reset-cache",
+    "env:emulator": "node -e \"require('fs').copyFileSync('.env.emulator','.env');console.log('[env] active .env -> emulator preset (default host: 10.0.2.2). Now run: pnpm start:reset')\"",
+    "env:device": "node -e \"require('fs').copyFileSync('.env.device','.env');console.log('[env] active .env -> device preset (edit API_HOST for your LAN IP). Now run: pnpm start:reset')\"",
     "test": "jest",
     "lint": "eslint src --ext .ts,.tsx --fix",
     "typecheck": "tsc --noEmit"
