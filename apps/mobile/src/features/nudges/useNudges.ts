@@ -186,15 +186,20 @@ export function useNudges(): UseNudgesResult {
   );
 
   // Verification (trust) outranks the streak celebration; see selectNudge.
+  // Hold until `now` is initialized (>0) — on first render the dismissal map is
+  // still loading from AsyncStorage, so evaluating with `now=0`/empty dismissals
+  // could briefly flash a nudge the user already dismissed.
   const nudge = useMemo<Nudge | null>(
     () =>
-      selectNudge({
-        idVerificationStatus: profile?.idVerificationStatus,
-        createdAt: profile?.createdAt,
-        currentStreak: summary?.currentStreak ?? 0,
-        dismissed,
-        now,
-      }),
+      now === 0
+        ? null
+        : selectNudge({
+            idVerificationStatus: profile?.idVerificationStatus,
+            createdAt: profile?.createdAt,
+            currentStreak: summary?.currentStreak ?? 0,
+            dismissed,
+            now,
+          }),
     [profile?.idVerificationStatus, profile?.createdAt, summary?.currentStreak, dismissed, now],
   );
 
