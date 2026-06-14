@@ -100,7 +100,21 @@ const chatSlice = createSlice({
       const list = state.messages[conversationId];
       if (!list) return;
       const idx = list.findIndex((m) => m.id === action.payload.optimisticId);
-      if (idx !== -1) list[idx] = action.payload.confirmed;
+      if (idx !== -1) {
+        // The server fans `chat:message` to the whole convo room — including the
+        // sender — so the broadcast can beat the ack and `messageReceived` may have
+        // already inserted the confirmed message. Overwriting the optimistic slot
+        // would then duplicate that id (React "two children with the same key").
+        // If the confirmed id is already present, drop the optimistic entry instead.
+        const alreadyPresent = list.some(
+          (m, i) => i !== idx && m.id === action.payload.confirmed.id,
+        );
+        if (alreadyPresent) {
+          list.splice(idx, 1);
+        } else {
+          list[idx] = action.payload.confirmed;
+        }
+      }
       // Remove from outbox and failedIds if present.
       state.outbox = state.outbox.filter((e) => e.optimisticId !== action.payload.optimisticId);
       state.failedIds = state.failedIds.filter((id) => id !== action.payload.optimisticId);

@@ -21,8 +21,13 @@ out/
 .env.development
 .env.staging
 .env.production
+# Any .env* variant (local backups like .env.scrcpybak carry live secrets)
+.env*
 # Keep the committed template
 !.env.example
+
+# Local device-verification scratch (scrcpy/adb screenshots)
+.shots/
 
 # Certs / signing / service-account keys
 *.pem
