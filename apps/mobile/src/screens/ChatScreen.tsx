@@ -13,8 +13,9 @@ import {
 import { type RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import type { ChatMessage } from '@g88/shared';
+import type { ChatMessage, PublicUserProfile, VerificationLevel } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { getJson } from '@/api/client';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {
@@ -92,12 +93,42 @@ export function ChatScreen(): React.JSX.Element {
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
+  const [fetchedPeer, setFetchedPeer] = useState<{
+    userId: string;
+    verification: VerificationLevel;
+    idVerified: boolean;
+  } | null>(null);
   const { on, joinConversation, sendMessage } = useSocket();
 
   // The other participant — derived from any message they've sent. Null until
   // they've sent at least one (so a brand-new request can't be gifted yet).
   const otherUserId = messages.find((m) => m.senderId !== myUserId)?.senderId ?? null;
   const listRef = useRef<FlatList<ChatMessage>>(null);
+
+  // The header badge rides nav params from the map sheet. When the chat is opened
+  // another way (push deeplink, future Inbox) those are absent — fetch the peer's
+  // verification so an ID-verified contact still shows the decagram regardless of
+  // entry path. Skipped entirely when the params are already supplied.
+  const haveBadgeParams = otherUserVerification !== undefined || otherUserIdVerified !== undefined;
+  useEffect(() => {
+    if (haveBadgeParams || !otherUserId) return;
+    let cancelled = false;
+    getJson<PublicUserProfile>(`/users/${otherUserId}`)
+      .then((p) => {
+        if (!cancelled) {
+          setFetchedPeer({ userId: otherUserId, verification: p.verification, idVerified: p.idVerified });
+        }
+      })
+      .catch(() => { /* badge just stays hidden — non-blocking */ });
+    return () => { cancelled = true; };
+  }, [haveBadgeParams, otherUserId]);
+
+  // Tag the fetch with its peer id and only trust it when it still matches the
+  // current peer — a reused ChatScreen (navigating peer→peer without a remount)
+  // then can't flash the previous peer's badge while the new fetch is in flight.
+  const peerBadge = fetchedPeer?.userId === otherUserId ? fetchedPeer : null;
+  const badgeVerification = otherUserVerification ?? peerBadge?.verification ?? 'none';
+  const badgeIdVerified = otherUserIdVerified ?? peerBadge?.idVerified;
 
   useEffect(() => {
     void dispatch(fetchMessages({ conversationId }));
@@ -171,8 +202,8 @@ export function ChatScreen(): React.JSX.Element {
           {otherUserName || 'Chat'}
         </Text>
         <VerificationBadge
-          verification={otherUserVerification ?? 'none'}
-          idVerified={otherUserIdVerified}
+          verification={badgeVerification}
+          idVerified={badgeIdVerified}
           size={18}
         />
       </View>
