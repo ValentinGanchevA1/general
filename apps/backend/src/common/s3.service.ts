@@ -63,10 +63,32 @@ export class S3Service {
   }
 
   /**
-   * Upload a photo buffer directly to S3 (no presigned URL round-trip).
+   * Upload a gallery-photo buffer directly to S3 (no presigned URL round-trip).
    * Used by the mobile upload proxy endpoint — avoids React Native binary PUT quirks.
    */
   async uploadPhotoBuffer(
+    userId: string,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<string> {
+    return this.uploadImageBuffer('photos', userId, buffer, contentType);
+  }
+
+  /**
+   * Upload a listing image buffer directly to S3. Key: listings/{userId}/{uuid}.{ext}.
+   * Same base64-over-JSON path as photos (RN multipart "Stream Closed" quirk).
+   */
+  async uploadListingImageBuffer(
+    userId: string,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<string> {
+    return this.uploadImageBuffer('listings', userId, buffer, contentType);
+  }
+
+  /** Shared image-buffer upload: writes under `{prefix}/{userId}/{uuid}.{ext}`. */
+  private async uploadImageBuffer(
+    prefix: string,
     userId: string,
     buffer: Buffer,
     contentType: string,
@@ -79,7 +101,7 @@ export class S3Service {
       'image/heic': 'heic',
     };
     const ext = EXT_MAP[contentType] ?? 'jpg';
-    const key = `photos/${userId}/${randomUUID()}.${ext}`;
+    const key = `${prefix}/${userId}/${randomUUID()}.${ext}`;
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,

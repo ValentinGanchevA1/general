@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -15,6 +16,7 @@ import {
   type ListingSummary,
   type OfferStatus,
   type ToggleFavoriteResponse,
+  type UploadListingImageResponse,
 } from '@g88/shared';
 
 import {
@@ -23,6 +25,10 @@ import {
   MakeOfferDto,
 } from './dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { S3Service } from '../../common/s3.service';
+
+/** Decoded listing image cap — matches the gallery-photo limit. */
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 /** Max offers inlined into a seller's listing detail. */
 const OFFER_PREVIEW = 50;
@@ -59,7 +65,37 @@ export class ListingsService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly notifications: NotificationsService,
+    private readonly s3: S3Service,
   ) {}
+
+  // ─── Image upload ───────────────────────────────────────────────────────────
+
+  /**
+   * Decode a base64 listing image, validate size, push to S3, return its public
+   * URL — the seller then passes it as `thumbnailUrl` on create. Base64-over-JSON
+   * (not multipart) for the same RN "Stream Closed" reason as gallery photos.
+   */
+  async uploadImage(
+    userId: string,
+    data: string,
+    contentType: string,
+  ): Promise<UploadListingImageResponse> {
+    const buffer = Buffer.from(data, 'base64');
+    if (buffer.length === 0) {
+      throw new BadRequestException({
+        code: 'listing.image_empty',
+        message: 'Image data is empty or not valid base64.',
+      });
+    }
+    if (buffer.length > MAX_IMAGE_BYTES) {
+      throw new BadRequestException({
+        code: 'listing.image_too_large',
+        message: 'Image exceeds the 10 MB limit.',
+      });
+    }
+    const url = await this.s3.uploadListingImageBuffer(userId, buffer, contentType);
+    return { url };
+  }
 
   // ─── Create / read ─────────────────────────────────────────────────────────
 
