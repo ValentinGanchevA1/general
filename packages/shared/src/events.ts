@@ -1,4 +1,5 @@
 import type { LatLng, EntityKind, VerificationLevel } from './api';
+import type { EventQuestion, PollResult } from './event';
 
 // ─── Server → Client ───────────────────────────────────────────────────────
 
@@ -61,6 +62,26 @@ export interface AchievementUnlockedEvent {
   unlockedAt: string;
 }
 
+// ─── P3.5 Events: live poll / Q&A deltas (room `event:{eventId}`) ─────────────
+//
+// These are broadcast to *everyone* in an event room, so they carry only the
+// state that is shared across viewers. The per-viewer fields — `PollResult.myVote`
+// and `EventQuestion.upvotedByMe` — are intentionally omitted; each client keeps
+// its own and merges the shared counts on top (see mobile `eventMerge`).
+
+/** A poll snapshot after it was created or a vote was cast. `id` is the poll id. */
+export type EventPollDelta = Omit<PollResult, 'myVote'>;
+
+/** A newly-asked question (or an edit to its shared fields). */
+export type EventQuestionDelta = Omit<EventQuestion, 'upvotedByMe'>;
+
+/** A question's upvote count changed. */
+export interface EventQuestionUpvoteDelta {
+  eventId: string;
+  questionId: string;
+  upvotes: number;
+}
+
 export interface ServerToClientEvents {
   'wave:received': (e: WaveReceivedEvent) => void;
   'presence:delta': (e: PresenceDelta) => void;
@@ -68,6 +89,12 @@ export interface ServerToClientEvents {
   'conversation:opened': (e: ConversationOpenedEvent) => void;
   'gift:received': (e: GiftReceivedEvent) => void;
   'achievement:unlocked': (e: AchievementUnlockedEvent) => void;
+  /** Poll created or vote tally changed in an event the socket has joined. */
+  'event:poll': (e: EventPollDelta) => void;
+  /** New question asked in a joined event. */
+  'event:question': (e: EventQuestionDelta) => void;
+  /** A question's upvote count changed in a joined event. */
+  'event:question:upvote': (e: EventQuestionUpvoteDelta) => void;
   /** Server-side rate limit, validation error, or unrecoverable socket error. */
   'error:event': (e: { code: string; message: string }) => void;
 }
@@ -106,6 +133,16 @@ export interface ClientToServerEvents {
   'chat:send': (
     p: ChatSendPayload,
     ack: (r: AckResult<ChatMessageEvent>) => void,
+  ) => void;
+  /** Subscribe to live poll/Q&A deltas for an event (room `event:{eventId}`). */
+  'event:join': (
+    p: { eventId: string },
+    ack: (r: AckResult<{ joined: true }>) => void,
+  ) => void;
+  /** Unsubscribe from an event's live deltas. */
+  'event:leave': (
+    p: { eventId: string },
+    ack: (r: AckResult<{ left: true }>) => void,
   ) => void;
 }
 

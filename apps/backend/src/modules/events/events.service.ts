@@ -12,7 +12,9 @@ import {
   computeH3Cells,
   EVENT_LIMITS,
   type EventDetail,
+  type EventPollDelta,
   type EventQuestion,
+  type EventQuestionDelta,
   type EventSummary,
   type PollResult,
   type RsvpResponse,
@@ -27,6 +29,7 @@ import {
   RsvpDto,
 } from './dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
 
 /** Max attendees inlined into an event detail payload. */
 const ATTENDEE_PREVIEW = 50;
@@ -52,6 +55,7 @@ export class EventsService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly notifications: NotificationsService,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   // ─── Create / read ─────────────────────────────────────────────────────────
@@ -292,7 +296,9 @@ export class EventsService {
         position++;
       }
       await qr.commitTransaction();
-      return this.pollResult(userId, poll.id);
+      const result = await this.pollResult(userId, poll.id);
+      this.realtime.emitEventPoll(this.toPollDelta(result));
+      return result;
     } catch (err) {
       await qr.rollbackTransaction();
       throw err;
@@ -338,7 +344,9 @@ export class EventsService {
       [pollId, optionId, userId],
     );
 
-    return this.pollResult(userId, pollId);
+    const result = await this.pollResult(userId, pollId);
+    this.realtime.emitEventPoll(this.toPollDelta(result));
+    return result;
   }
 
   // ─── Q&A ─────────────────────────────────────────────────────────────────
@@ -358,7 +366,7 @@ export class EventsService {
     );
     const [user] = await this.db.query(`SELECT display_name FROM users WHERE id = $1`, [userId]);
 
-    return {
+    const question: EventQuestion = {
       id: row.id,
       eventId: row.event_id,
       userId: row.user_id,
@@ -369,6 +377,9 @@ export class EventsService {
       upvotedByMe: false,
       createdAt: new Date(row.created_at).toISOString(),
     };
+
+    this.realtime.emitEventQuestion(this.toQuestionDelta(question));
+    return question;
   }
 
   async listQuestions(userId: string, eventId: string): Promise<EventQuestion[]> {
@@ -421,11 +432,22 @@ export class EventsService {
           [questionId],
         );
       }
-      const [row] = await qr.query(`SELECT upvotes FROM event_questions WHERE id = $1`, [questionId]);
+      const [row] = await qr.query(
+        `SELECT upvotes, event_id FROM event_questions WHERE id = $1`,
+        [questionId],
+      );
       if (!row) {
         throw new NotFoundException({ code: 'question.not_found', message: 'Question not found.' });
       }
       await qr.commitTransaction();
+      // Only broadcast when this upvote actually changed the count (deduped).
+      if (inserted.length > 0) {
+        this.realtime.emitEventQuestionUpvote({
+          eventId: row.event_id,
+          questionId,
+          upvotes: row.upvotes,
+        });
+      }
       return { id: questionId, upvotes: row.upvotes };
     } catch (err) {
       await qr.rollbackTransaction();
@@ -449,6 +471,32 @@ export class EventsService {
         message: 'Only the host can do that.',
       });
     }
+  }
+
+  /** Strip the per-viewer `myVote` so a poll tally can be broadcast to a room. */
+  private toPollDelta(r: PollResult): EventPollDelta {
+    return {
+      id: r.id,
+      eventId: r.eventId,
+      question: r.question,
+      options: r.options,
+      totalVotes: r.totalVotes,
+      closedAt: r.closedAt,
+    };
+  }
+
+  /** Strip the per-viewer `upvotedByMe` so a new question can be broadcast. */
+  private toQuestionDelta(q: EventQuestion): EventQuestionDelta {
+    return {
+      id: q.id,
+      eventId: q.eventId,
+      userId: q.userId,
+      displayName: q.displayName,
+      body: q.body,
+      upvotes: q.upvotes,
+      answered: q.answered,
+      createdAt: q.createdAt,
+    };
   }
 
   private async pollResult(userId: string, pollId: string): Promise<PollResult> {

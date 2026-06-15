@@ -28,6 +28,8 @@ interface UseSocketResult {
   sendPresence: (payload: PresenceUpdatePayload) => Promise<{ cellId: string } | null>;
   joinConversation: (conversationId: string) => Promise<boolean>;
   sendMessage: (conversationId: string, body: string, clientMessageId?: string) => Promise<ChatMessageEvent | null>;
+  joinEvent: (eventId: string) => Promise<boolean>;
+  leaveEvent: (eventId: string) => Promise<boolean>;
 }
 
 let sharedSocket: G88Socket | null = null;
@@ -180,7 +182,44 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
     [],
   );
 
-  return { socket: sharedSocket, connected, on, sendPresence, joinConversation, sendMessage };
+  const joinEvent = useCallback(
+    (eventId: string): Promise<boolean> =>
+      new Promise((resolve) => {
+        const s = sharedSocket;
+        if (!s?.connected) return resolve(false);
+        const timer = setTimeout(() => resolve(false), 3_000);
+        s.emit('event:join', { eventId }, (res) => {
+          clearTimeout(timer);
+          resolve(res.ok);
+        });
+      }),
+    [],
+  );
+
+  const leaveEvent = useCallback(
+    (eventId: string): Promise<boolean> =>
+      new Promise((resolve) => {
+        const s = sharedSocket;
+        if (!s?.connected) return resolve(false);
+        const timer = setTimeout(() => resolve(false), 3_000);
+        s.emit('event:leave', { eventId }, (res) => {
+          clearTimeout(timer);
+          resolve(res.ok);
+        });
+      }),
+    [],
+  );
+
+  return {
+    socket: sharedSocket,
+    connected,
+    on,
+    sendPresence,
+    joinConversation,
+    sendMessage,
+    joinEvent,
+    leaveEvent,
+  };
 }
 
 export function disconnectSocket(): void {
