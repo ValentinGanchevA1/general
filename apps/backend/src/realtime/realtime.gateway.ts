@@ -1,5 +1,7 @@
 import { ForbiddenException, Logger, NotFoundException, UsePipes, ValidationPipe, UseGuards } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import {
   ConnectedSocket,
   MessageBody,
@@ -20,10 +22,13 @@ import type {
   ChatMessageEvent,
   GiftReceivedEvent,
   AchievementUnlockedEvent,
+  EventPollDelta,
+  EventQuestionDelta,
+  EventQuestionUpvoteDelta,
 } from '@g88/shared';
 
 import { WsJwtGuard } from './ws-jwt.guard';
-import { ChatSendDto, ConversationJoinDto, PresenceUpdateDto } from './realtime.dto';
+import { ChatSendDto, ConversationJoinDto, EventRoomDto, PresenceUpdateDto } from './realtime.dto';
 import { PresenceService } from '../modules/presence/presence.service';
 import { ChatService } from '../modules/chat/chat.service';
 import { NotificationsService } from '../modules/notifications/notifications.service';
@@ -58,6 +63,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly notifications: NotificationsService,
     private readonly challenges: ChallengesService,
     private readonly jwt: JwtService,
+    @InjectDataSource() private readonly db: DataSource,
   ) {}
 
   // ─── Lifecycle ───────────────────────────────────────────────────────────
@@ -157,6 +163,43 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+  @SubscribeMessage('event:join')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async onEventJoin(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() payload: EventRoomDto,
+  ): Promise<AckResult<{ joined: true }>> {
+    try {
+      // Mirror the REST detail gate: a private event is only visible to its host.
+      const [event] = (await this.db.query(
+        `SELECT host_id, visibility FROM events WHERE id = $1 AND deleted_at IS NULL`,
+        [payload.eventId],
+      )) as Array<{ host_id: string; visibility: 'public' | 'private' }>;
+      if (!event || (event.visibility === 'private' && event.host_id !== client.data.userId)) {
+        return { ok: false, code: 'event.not_found', message: 'Event not found' };
+      }
+      const room = this.eventRoom(payload.eventId);
+      client.join(room);
+      client.data.rooms.add(room);
+      return { ok: true, data: { joined: true } };
+    } catch (err) {
+      this.logger.error(`event:join failed: ${err}`);
+      return { ok: false, code: 'event.failed', message: 'Could not join event' };
+    }
+  }
+
+  @SubscribeMessage('event:leave')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async onEventLeave(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() payload: EventRoomDto,
+  ): Promise<AckResult<{ left: true }>> {
+    const room = this.eventRoom(payload.eventId);
+    client.leave(room);
+    client.data.rooms.delete(room);
+    return { ok: true, data: { left: true } };
+  }
+
   @SubscribeMessage('chat:send')
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onChatSend(
@@ -249,6 +292,25 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(this.userRoom(toUserId)).emit('achievement:unlocked', evt);
   }
 
+  /**
+   * P3.5 live event deltas — fan out poll/Q&A changes to everyone watching an
+   * event (room `event:{eventId}`). Best-effort live-only: a user not in the
+   * room simply sees the change on their next REST read. Payloads are
+   * viewer-agnostic (no `myVote`/`upvotedByMe`) — the client merges its own
+   * per-viewer state on top.
+   */
+  emitEventPoll(delta: EventPollDelta): void {
+    this.server.to(this.eventRoom(delta.eventId)).emit('event:poll', delta);
+  }
+
+  emitEventQuestion(delta: EventQuestionDelta): void {
+    this.server.to(this.eventRoom(delta.eventId)).emit('event:question', delta);
+  }
+
+  emitEventQuestionUpvote(delta: EventQuestionUpvoteDelta): void {
+    this.server.to(this.eventRoom(delta.eventId)).emit('event:question:upvote', delta);
+  }
+
   // ─── Push helpers ────────────────────────────────────────────────────────
 
   private async pushToOfflineParticipants(
@@ -280,5 +342,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
   private conversationRoom(convoId: string): string {
     return `convo:${convoId}`;
+  }
+  private eventRoom(eventId: string): string {
+    return `event:${eventId}`;
   }
 }

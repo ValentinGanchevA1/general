@@ -27,3 +27,7 @@ export class ChatSendDto {
   @IsString() @MaxLength(2000) body!: string;
   @IsString() @MaxLength(100) clientMessageId!: string;
 }
+
+export class EventRoomDto {
+  @IsUUID() eventId!: string;
+}

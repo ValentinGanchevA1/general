@@ -21,6 +21,8 @@ import type {
   RsvpStatus,
 } from '@g88/shared';
 import { getJson, postJson, putJson } from '@/api/client';
+import { useSocket } from '@/realtime/useSocket';
+import { applyQuestionUpvote, mergePoll, mergeQuestion } from './eventMerge';
 
 // ─── Nearby ("events near you") ──────────────────────────────────────────────
 
@@ -109,6 +111,35 @@ export function useEvent(eventId: string): UseEventResult {
   }, [eventId, refreshPolls, refreshQuestions]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Live deltas: join the event room and fold poll/Q&A broadcasts into local
+  // state so every viewer sees votes, new questions, and upvotes without a
+  // refetch. The payloads are viewer-agnostic — eventMerge preserves this
+  // client's own myVote / upvotedByMe (see eventMerge.ts).
+  const { connected, on, joinEvent, leaveEvent } = useSocket();
+  useEffect(() => {
+    if (!connected) return;
+    let active = true;
+    void joinEvent(eventId);
+
+    const offPoll = on('event:poll', (d) => {
+      if (active && d.eventId === eventId) setPolls((prev) => mergePoll(prev, d));
+    });
+    const offQuestion = on('event:question', (d) => {
+      if (active && d.eventId === eventId) setQuestions((prev) => mergeQuestion(prev, d));
+    });
+    const offUpvote = on('event:question:upvote', (d) => {
+      if (active && d.eventId === eventId) setQuestions((prev) => applyQuestionUpvote(prev, d));
+    });
+
+    return () => {
+      active = false;
+      offPoll();
+      offQuestion();
+      offUpvote();
+      void leaveEvent(eventId);
+    };
+  }, [connected, eventId, on, joinEvent, leaveEvent]);
 
   return { event, polls, questions, loading, refresh, refreshPolls, refreshQuestions };
 }
