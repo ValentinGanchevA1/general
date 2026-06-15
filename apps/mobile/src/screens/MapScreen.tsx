@@ -23,6 +23,7 @@ import type {
   WaveRequest,
   WaveResponse,
 } from '@g88/shared';
+import { fuzzLocation } from '@g88/shared';
 
 import { useDiscovery } from '@/features/discovery/useDiscovery';
 import { setPoints } from '@/features/discovery/discoverySlice';
@@ -110,9 +111,13 @@ export function MapScreen(): React.JSX.Element {
 
   useEffect(() => {
     if (!myCoords) return;
-    void sendPresence({ location: myCoords });
+    // Privacy: blur to the H3 r10 (~120m) centroid on-device so exact GPS never
+    // leaves the phone. The server re-fuzzes to r10 anyway (idempotent), so the
+    // stored position is unchanged — this just keeps precise GPS off the wire.
+    const fuzzed = fuzzLocation(myCoords, 10);
+    void sendPresence({ location: fuzzed });
     const t = setInterval(() => {
-      if (myCoords) void sendPresence({ location: myCoords });
+      void sendPresence({ location: fuzzed });
     }, 30_000);
     return () => clearInterval(t);
   }, [myCoords, sendPresence]);

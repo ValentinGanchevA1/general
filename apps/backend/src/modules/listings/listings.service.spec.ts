@@ -9,6 +9,8 @@ import {
 
 import { ListingsService } from './listings.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { S3Service } from '../../common/s3.service';
+import { BadRequestException } from '@nestjs/common';
 
 /** queryRunner whose query() drains a pre-seeded FIFO result queue. */
 function makeQueryRunner(results: unknown[]) {
@@ -28,10 +30,12 @@ describe('ListingsService', () => {
   let service: ListingsService;
   let query: jest.Mock;
   let createQueryRunner: jest.Mock;
+  let uploadListingImageBuffer: jest.Mock;
 
   beforeEach(async () => {
     query = jest.fn().mockResolvedValue([]);
     createQueryRunner = jest.fn();
+    uploadListingImageBuffer = jest.fn().mockResolvedValue('https://cdn.example/listings/s1/x.jpg');
     const mod = await Test.createTestingModule({
       providers: [
         ListingsService,
@@ -40,6 +44,7 @@ describe('ListingsService', () => {
           useValue: { query, createQueryRunner } as unknown as DataSource,
         },
         { provide: NotificationsService, useValue: { notifyListingNearby: jest.fn().mockResolvedValue(undefined) } },
+        { provide: S3Service, useValue: { uploadListingImageBuffer } as unknown as S3Service },
       ],
     }).compile();
     service = mod.get(ListingsService);
@@ -61,6 +66,27 @@ describe('ListingsService', () => {
       } as never);
       expect(res).toMatchObject({ id: 'l1', sellerId: 's1', priceCents: 5000, favoritedByMe: false });
       expect(res.location).toEqual(loc);
+    });
+  });
+
+  describe('uploadImage', () => {
+    const oneByteJpegB64 = Buffer.from([0xff]).toString('base64');
+
+    it('decodes, uploads, and returns the public URL', async () => {
+      const res = await service.uploadImage('s1', oneByteJpegB64, 'image/jpeg');
+      expect(res).toEqual({ url: 'https://cdn.example/listings/s1/x.jpg' });
+      expect(uploadListingImageBuffer).toHaveBeenCalledWith('s1', expect.any(Buffer), 'image/jpeg');
+    });
+
+    it('rejects empty/invalid base64 without hitting S3', async () => {
+      await expect(service.uploadImage('s1', '', 'image/jpeg')).rejects.toBeInstanceOf(BadRequestException);
+      expect(uploadListingImageBuffer).not.toHaveBeenCalled();
+    });
+
+    it('rejects an image over the 10 MB cap', async () => {
+      const big = Buffer.alloc(10 * 1024 * 1024 + 1).toString('base64');
+      await expect(service.uploadImage('s1', big, 'image/png')).rejects.toBeInstanceOf(BadRequestException);
+      expect(uploadListingImageBuffer).not.toHaveBeenCalled();
     });
   });
 

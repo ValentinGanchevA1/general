@@ -17,6 +17,7 @@ import type {
   ListingOffer,
   ListingSummary,
   ToggleFavoriteResponse,
+  UploadListingImageResponse,
 } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -28,6 +29,7 @@ import {
   MakeOfferDto,
   RespondOfferDto,
   UpdateListingStatusDto,
+  UploadListingImageDto,
 } from './dto';
 
 @Controller('listings')
@@ -44,6 +46,21 @@ export class ListingsController {
     @Body() dto: CreateListingDto,
   ): Promise<ListingSummary> {
     return this.listings.create(userId, dto);
+  }
+
+  /**
+   * POST /api/v1/listings/photo/base64 — upload a listing image, get back its
+   * public URL to pass as `thumbnailUrl` on create. Base64 JSON body (RN-safe).
+   * Declared before the `:id` routes so the literal path always wins.
+   */
+  @Post('photo/base64')
+  @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  uploadPhoto(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UploadListingImageDto,
+  ): Promise<UploadListingImageResponse> {
+    return this.listings.uploadImage(userId, dto.data, dto.contentType);
   }
 
   /** POST /api/v1/listings/browse — nearby browse grid (optional category). */
