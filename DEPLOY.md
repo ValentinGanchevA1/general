@@ -204,26 +204,14 @@ non-test users can link.
    (Google holds the signing key; the keystore above is only the *upload* key), create a
    **Closed testing** track + tester list.
 4. **Store listing minimums**: app name, short + full description, icon, feature graphic,
-   **privacy policy URL** (required — app collects location), and the **Data Safety form**.
-   Drafts are in-repo: `docs/legal/privacy-policy.md` (fill placeholders + host at a public
-   HTTPS URL) and `docs/legal/play-data-safety.md` (form answers, filled out field-by-field).
-   Note: precise location is declared "collected" because exact GPS transits to the server
-   before it is fuzzed to ~120m (`ARCHITECTURE.md §3.3`); the data sheet documents an
-   optional client-fuzz change that lets you declare approximate-only.
+   **privacy policy URL** (required — app collects location), and the **Data Safety form**
+   (declare: precise/approximate **location**, account info; note location is fuzzed to
+   ~120m server-side per `ARCHITECTURE.md §3.3`).
 5. **First upload is manual**: run `android-release.yml` (Actions → Run workflow), download
    the `g88-release-aab` artifact, upload it to the closed track in the Console. Play
    requires the first release to be created by hand.
 
-### After first upload — auto-publish (wired, gated on a secret)
-`android-release.yml` already contains the publish step (`r0adkll/upload-google-play`). It
-is **skipped** until the service-account secret exists, so today's build-and-upload-artifact
-flow is unchanged. To activate it:
-1. In **Google Cloud / Play Console**, create a **service account**, generate a **JSON key**,
-   and in Play Console → *Users and permissions* grant it **"Release apps to testing tracks"**
-   (the Play app must already exist — i.e. after the first manual upload).
-2. Add the JSON as repo secret **`PLAY_SERVICE_ACCOUNT_JSON`** (paste the file contents).
-3. That's it — the next `v*` tag (or manual dispatch) auto-publishes the signed AAB to the
-   `track` input (default `internal`). To build the artifact **without** publishing even when
-   the secret is set, dispatch with `publish=false`.
-
-`packageName` is pinned to `com.g88`; `versionCode = github.run_number`.
+### After first upload (optional automation, follow-up)
+- Create a Play **service account** (JSON), grant release permissions, store as a secret,
+  and add an upload step (`r0adkll/upload-google-play` or fastlane `supply`) to publish to
+  the `internal`/closed track automatically. Deferred until the app exists in the Console.

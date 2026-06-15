@@ -2,22 +2,16 @@ name: Android Release (AAB)
 
 # Builds a signed Android App Bundle for Google Play (closed testing / production).
 # Manual via the Actions tab, or automatically on a v* tag push.
-#
 # The first upload to the Play Console must be done by hand (Play requires it to
-# establish the app). After that, the auto-publish step below activates AUTOMATICALLY
-# the moment a `PLAY_SERVICE_ACCOUNT_JSON` repo secret exists — until then it is skipped
-# and this workflow only builds + uploads the .aab artifact (existing behavior). See DEPLOY.md.
+# establish the app); afterwards the .aab artifact from here can be uploaded
+# manually or wired to a service-account auto-publish step (see DEPLOY.md).
 on:
   workflow_dispatch:
     inputs:
       track:
-        description: "Play track to publish to when auto-publish is active (internal/alpha/beta/production)"
+        description: "Intended Play track (informational only — upload is manual for now)"
         required: false
         default: "internal"
-      publish:
-        description: "Publish to Play (only runs if PLAY_SERVICE_ACCOUNT_JSON is set). Set false to build artifact only."
-        required: false
-        default: "true"
   push:
     tags:
       - "v*"
@@ -107,35 +101,3 @@ jobs:
           name: g88-release-aab
           path: apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 14
-
-      # Detect whether the Play service-account secret is configured. We can't
-      # reference `secrets.*` directly in a step `if:`, and step-level `env` isn't
-      # available in its own `if:` — so map the secret to an output here first.
-      - name: Detect Play service-account secret
-        id: play
-        working-directory: .
-        env:
-          PLAY_SA_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-        run: |
-          if [ -n "$PLAY_SA_JSON" ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::PLAY_SERVICE_ACCOUNT_JSON not set — skipping auto-publish, artifact uploaded only."
-          fi
-
-      # Auto-publish to Google Play. Inert until the owner adds the
-      # PLAY_SERVICE_ACCOUNT_JSON secret (a Play service-account key JSON with
-      # "Release apps to testing tracks" permission, granted in Play Console →
-      # Users and permissions). Skipped when the secret is empty, so the build +
-      # artifact path above keeps working unchanged before the Play app exists.
-      # `uses:` actions ignore `working-directory`, so releaseFiles is repo-relative.
-      - name: Publish to Google Play
-        if: ${{ steps.play.outputs.configured == 'true' && github.event.inputs.publish != 'false' }}
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.g88
-          releaseFiles: apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
-          track: ${{ github.event.inputs.track || 'internal' }}
-          status: completed
