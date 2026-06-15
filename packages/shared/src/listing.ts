@@ -38,6 +38,19 @@ export interface CreateListingRequest {
   visibility?: ListingVisibility;
 }
 
+/** Base64-over-JSON listing image upload (same RN-safe path as gallery photos). */
+export interface UploadListingImageRequest {
+  /** Raw base64 (no data-URI prefix). */
+  data: string;
+  /** image/jpeg · image/png · image/webp · image/heic. */
+  contentType: string;
+}
+
+export interface UploadListingImageResponse {
+  /** Public S3 URL — pass as `thumbnailUrl` when creating the listing. */
+  url: string;
+}
+
 /** Compact listing for the browse grid. */
 export interface ListingSummary {
   id: string;

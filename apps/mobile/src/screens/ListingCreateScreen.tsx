@@ -7,6 +7,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -25,6 +26,7 @@ import { LISTING_LIMITS, type CreateListingRequest, type LatLng } from '@g88/sha
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { createListing } from '@/features/trading/useTrading';
+import { pickAndUploadListingImage } from '@/features/trading/listingImage';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -44,6 +46,8 @@ export function ListingCreateScreen(): React.JSX.Element {
   const [currency, setCurrency] = useState<string>('USD');
   const [category, setCategory] = useState<string>('Electronics');
   const [pin, setPin] = useState<LatLng | null>(null);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,7 +57,21 @@ export function ListingCreateScreen(): React.JSX.Element {
     return Number.isNaN(n) ? NaN : Math.round(n * 100);
   }, [price]);
 
-  const canSubmit = title.trim().length > 0 && !Number.isNaN(priceCents) && priceCents >= 0 && !submitting;
+  const canSubmit =
+    title.trim().length > 0 && !Number.isNaN(priceCents) && priceCents >= 0 && !submitting && !uploading;
+
+  const onPickPhoto = useCallback(async () => {
+    setUploading(true);
+    setError(null);
+    try {
+      const url = await pickAndUploadListingImage();
+      if (url) setThumbnailUrl(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not upload that photo. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  }, []);
 
   const onSubmit = useCallback(async () => {
     if (!canSubmit) return;
@@ -67,6 +85,7 @@ export function ListingCreateScreen(): React.JSX.Element {
         category,
         location: venue,
         ...(description.trim() ? { description: description.trim() } : {}),
+        ...(thumbnailUrl ? { thumbnailUrl } : {}),
       };
       const created = await createListing(req);
       nav.replace('ListingDetail', { listingId: created.id });
@@ -75,7 +94,7 @@ export function ListingCreateScreen(): React.JSX.Element {
     } finally {
       setSubmitting(false);
     }
-  }, [canSubmit, title, priceCents, currency, category, venue, description, nav]);
+  }, [canSubmit, title, priceCents, currency, category, venue, description, thumbnailUrl, nav]);
 
   const onDragEnd = useCallback((c: RNLatLng) => setPin({ lat: c.latitude, lng: c.longitude }), []);
 
@@ -109,6 +128,39 @@ export function ListingCreateScreen(): React.JSX.Element {
       </View>
 
       <ScrollView style={S.scroll} contentContainerStyle={S.content} keyboardShouldPersistTaps="handled">
+        <Text style={S.label}>Photo <Text style={S.optional}>(optional)</Text></Text>
+        <TouchableOpacity
+          style={S.photoWrap}
+          onPress={() => void onPickPhoto()}
+          disabled={uploading}
+          activeOpacity={0.8}
+        >
+          {thumbnailUrl ? (
+            <>
+              <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              {!uploading ? (
+                <View style={S.photoEditBadge}>
+                  <Icon name="camera" size={14} color="#fff" />
+                  <Text style={S.photoEditText}>Change</Text>
+                </View>
+              ) : null}
+            </>
+          ) : (
+            !uploading && (
+              <View style={S.photoEmpty}>
+                <Icon name="camera-plus-outline" size={28} color="#00d4ff" />
+                <Text style={S.photoEmptyText}>Add a photo</Text>
+              </View>
+            )
+          )}
+          {uploading ? (
+            <View style={S.photoUploading}>
+              <ActivityIndicator color="#00d4ff" />
+              <Text style={S.photoEmptyText}>Uploading…</Text>
+            </View>
+          ) : null}
+        </TouchableOpacity>
+
         <Text style={S.label}>Title</Text>
         <TextInput
           style={S.input}
@@ -216,6 +268,23 @@ const S = StyleSheet.create({
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#fff', fontSize: 16,
   },
   multiline: { minHeight: 90 },
+  photoWrap: {
+    height: 160, borderRadius: 12, overflow: 'hidden',
+    backgroundColor: '#12121f', borderWidth: 1, borderColor: '#1f1f33',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  photoEmpty: { alignItems: 'center', gap: 8 },
+  photoEmptyText: { color: '#aaa', fontSize: 13, fontWeight: '600' },
+  photoUploading: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: 'rgba(10,10,15,0.55)',
+  },
+  photoEditBadge: {
+    position: 'absolute', right: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(10,10,15,0.7)', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7,
+  },
+  photoEditText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   chips: { gap: 8, paddingRight: 8 },
   chip: {

@@ -3,9 +3,11 @@ import {
   IsInt,
   IsLatitude,
   IsLongitude,
+  IsNotEmpty,
   IsOptional,
   IsString,
   Length,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -18,6 +20,7 @@ import {
   LISTING_LIMITS,
   LISTING_VISIBILITIES,
   type ListingVisibility,
+  type UploadListingImageRequest,
 } from '@g88/shared';
 
 class LatLngDto {
@@ -112,4 +115,14 @@ export class MakeOfferDto {
 export class RespondOfferDto {
   @IsEnum(['accepted', 'declined'])
   status!: 'accepted' | 'declined';
+}
+
+export class UploadListingImageDto implements UploadListingImageRequest {
+  @IsString()
+  @IsNotEmpty()
+  data!: string;
+
+  @IsString()
+  @Matches(/^image\/(jpeg|png|webp|heic)$/, { message: 'contentType must be an image MIME type' })
+  contentType!: string;
 }
