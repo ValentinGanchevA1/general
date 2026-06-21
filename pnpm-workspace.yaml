@@ -13,6 +13,10 @@ overrides:
   'glob@10': '10.5.0'
   'picomatch@4': '4.0.4'
   'ws@8': '8.20.1'
+  'ws@6': '>=6.2.4 <7' # GHSA-96hv-2xvq-fx4p (DoS; transitive build-time via @react-native-community/cli)
+  'form-data@2': '>=2.5.6 <3' # GHSA-hmw2-7cc7-3qxx (CRLF; transitive via firebase-admin → @google-cloud/storage)
+  'multer@2': '>=2.2.0 <3' # GHSA-72gw-mp4g-v24j + GHSA-3p4h-7m6x-2hcm (DoS; transitive via @nestjs/platform-express; no multipart route in use)
+  'protobufjs@7': '>=7.6.3 <8' # GHSA-wcpc-wj8m-hjx6 + GHSA-f38q-mgvj-vph7 (DoS; transitive via firebase-admin + firebase)
   'webpack@5': '5.104.1'
   'ajv@8': '8.20.0'
   tmp: '0.2.7'
