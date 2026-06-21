@@ -13,11 +13,12 @@
 | Phase                       | Status             | Gate                                                    |
 |-----------------------------|--------------------|---------------------------------------------------------|
 | P1 — foundation             | ✅ shipped          | Auth · Profile · Map Discovery · Presence · Wave · Chat |
-| P2 — pre-launch hardening   | 🟡 active          | TestFlight ready                                        |
-| P3 — habit-forming features | ⏳ post-launch      | TestFlight + App Store live                             |
+| P2 — pre-launch hardening   | ✅ gate complete    | A4 · OB1 · C6 · M1 · C2 done; 7-day soak cleared (2026-06-11). Beta = **Android Play closed testing** (iOS/TestFlight deferred — no `ios/` native project) |
+| P3 — habit-forming features | 🟢 surfaced early   | **P3.1–P3.7 all shipped in mobile** (2026-06-15); backend built ahead of schedule. See per-epic sections below |
 | P4+ — horizon               | 📋 documented only | P3 retention sustained                                  |
 
 Target launch market: **Varna, BG** (single test city — see `PRODUCT.md` § Launch market).
+Immediate gate: **owner-side Android Play Console closed-testing setup** (keystore + secrets + listing + Data Safety + first AAB upload — see `DEPLOY.md` → "Mobile release"). `STATUS.md` is the live truth.
 
 > **Phase vocabulary is authoritative here.** These four phases (P1 · P2 · P3 · P4+) are the canonical sequence. **There is no P5.** `STATUS.md` historically used `P3`/`P4`/`P5` as ad-hoc *sprint* labels for feature build-out — see the "Phase-vocabulary reconciliation" table at the top of `STATUS.md` for the mapping back to these phases.
 >
