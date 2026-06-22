@@ -133,7 +133,10 @@ export class InteractionsService {
         .catch((err) => this.logger.error(`notifyWave failed: ${err}`));
 
       // Challenge progress: every wave counts toward "send waves" quests.
-      void this.challenges
+      // Awaited (but non-fatal) so the progress is committed before we return —
+      // the client refetches /challenges/today right after the wave resolves, and
+      // a fire-and-forget write here would race that refetch and read stale data.
+      await this.challenges
         .increment(fromUserId, 'wave_sent')
         .catch((err) => this.logger.error(`challenge wave_sent failed: ${err}`));
 

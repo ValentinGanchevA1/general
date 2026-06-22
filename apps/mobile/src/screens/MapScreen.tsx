@@ -37,6 +37,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ContextualFab } from '@/components/ContextualFab';
 import type { FabActionId } from '@/components/ContextualFab/useFabContext';
 import { DailyChallengeCard } from '@/features/gamification/DailyChallengeCard';
+import { challengeEvents } from '@/features/gamification/challengeEvents';
 import { NudgeBanner } from '@/features/nudges/NudgeBanner';
 import { EventsRail } from '@/features/events/EventsRail';
 import { TrendingFilterBar } from '@/features/discovery/TrendingFilterBar';
@@ -159,6 +160,8 @@ export function MapScreen(): React.JSX.Element {
         toUserId,
         context: 'map',
       });
+      // Nudge the daily-challenge banner to re-read progress (e.g. "Send 3 waves").
+      challengeEvents.emit('progress');
       if (res.conversationId) {
         // TODO: navigate to chat
       }

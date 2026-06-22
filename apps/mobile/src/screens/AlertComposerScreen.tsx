@@ -23,6 +23,7 @@ import type { CreateAlertRequest, AlertResponse } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppDispatch } from '@/hooks/redux';
 import { setPendingFilter } from '@/features/pulse/pulseSlice';
+import { challengeEvents } from '@/features/gamification/challengeEvents';
 import { postJson } from '@/api/client';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -67,6 +68,8 @@ export function AlertComposerScreen(): React.JSX.Element {
         ...(tag.trim() ? { tag: tag.trim() } : {}),
       };
       await postJson<CreateAlertRequest, AlertResponse>('/alerts', req);
+      // Nudge the daily-challenge banner ("Post an area alert" / "Post 2 area alerts").
+      challengeEvents.emit('progress');
       dispatch(setPendingFilter('alerts'));
       nav.navigate('Main', { screen: 'Pulse' });
     } catch (err) {

@@ -53,8 +53,10 @@ export class AlertsService {
       .award(authorId, 'alert.posted', { dedupeKey: `alert:${row.id}` })
       .catch((err) => this.logger.error(`award alert.posted failed: ${err}`));
 
-    // Challenge progress: "post an alert" quests.
-    void this.challenges
+    // Challenge progress: "post an alert" quests. Awaited (but non-fatal) so the
+    // progress is committed before we return — the client refetches
+    // /challenges/today right after, and a fire-and-forget write would race it.
+    await this.challenges
       .increment(authorId, 'alert_posted')
       .catch((err) => this.logger.error(`challenge alert_posted failed: ${err}`));
 
