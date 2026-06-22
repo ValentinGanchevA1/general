@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<!--
+  BEFORE PUBLISHING — replace these placeholders (search the file):
+    1. ⟨Legal entity / your name⟩        → who operates G88
+    2. PRIVACY_EMAIL  (2 mailto hrefs)   → your real contact email
+    3. ⟨privacy@your-domain⟩  (3 spots)  → same email, shown text
+    4. ⟨legal entity & address…⟩         → postal address if your jurisdiction needs one
+  Then host it at a stable public URL and use that URL in the Play Console
+  (Store listing → Privacy policy) and the Data Safety form.
+  Note: the apex g88.app is not owned yet (parked) — host on an owned domain or
+  a static host (e.g. GitHub Pages / Render static site) until then.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>G88 — Privacy Policy</title>
+  <meta name="robots" content="index,follow" />
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6; max-width: 760px; margin: 0 auto; padding: 32px 20px 80px;
+      color: #1a1a1a; background: #fff;
+    }
+    @media (prefers-color-scheme: dark) { body { color: #e6e6e6; background: #0f0f14; } a { color: #4fd0ff; } code { background: #1c1c28; } }
+    h1 { font-size: 1.8rem; margin-bottom: 4px; }
+    h2 { font-size: 1.2rem; margin-top: 36px; border-bottom: 1px solid rgba(127,127,127,.25); padding-bottom: 6px; }
+    .meta { color: #777; font-size: .9rem; margin-bottom: 28px; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: .95rem; }
+    th, td { border: 1px solid rgba(127,127,127,.3); padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: rgba(127,127,127,.12); }
+    code { padding: 1px 5px; border-radius: 4px; background: #f0f0f3; font-size: .9em; }
+    .callout { border-left: 4px solid #4fd0ff; padding: 10px 14px; margin: 16px 0; background: rgba(79,208,255,.08); }
+    .placeholder { color: #c0392b; font-weight: 600; }
+    footer { margin-top: 48px; color: #777; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <h1>G88 Privacy Policy</h1>
+  <p class="meta">
+    Last updated: <strong>23 June 2026</strong> &middot;
+    Operated by <span class="placeholder">&#x27E8;Legal entity / your name&#x27E9;</span>
+    (&ldquo;G88&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;).
+  </p>
+
+  <p>
+    G88 is a map-first, location-based social app: nearby people appear as avatars on a
+    live map so you can wave, chat, and discover local activity. This policy explains what
+    we collect, how we use it, who we share it with, and the choices and rights you have.
+    Privacy is a core design constraint of the product, not an afterthought &mdash; most
+    notably, <strong>your exact location is never shared with other users or stored on our
+    servers</strong> (see &ldquo;Location&rdquo; below).
+  </p>
+
+  <h2>1. Who this applies to</h2>
+  <p>
+    This policy covers the G88 mobile application and its backend services. By creating an
+    account or using G88 you agree to it. G88 is not directed to children; you must be at
+    least <strong>13</strong> (or the minimum digital-consent age in your country, if higher)
+    to use it.
+  </p>
+
+  <h2>2. Data we collect</h2>
+  <table>
+    <thead><tr><th>Category</th><th>Examples</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Account</td><td>Email address, password (stored only as a salted hash), or Google sign-in identifier; display name</td><td>Create and secure your account, authentication</td></tr>
+      <tr><td>Profile</td><td>Photos, bio, interests/goals, optional date of birth, social links you add</td><td>Build the profile other users see</td></tr>
+      <tr><td>Approximate location</td><td>A coarsened location (~120&nbsp;m) of where you are</td><td>Show nearby people, presence, and local content on the map</td></tr>
+      <tr><td>Messages &amp; interactions</td><td>Chat messages, waves, RSVPs, listings, gifts, challenges</td><td>Deliver the core social features</td></tr>
+      <tr><td>Verification (optional)</td><td>Phone number; selfie + ID document if you request ID verification</td><td>Trust &amp; safety badges you choose to obtain</td></tr>
+      <tr><td>Payment (optional)</td><td>Subscription status and identifiers; card details are handled by Stripe, never by us</td><td>Manage subscriptions</td></tr>
+      <tr><td>Device &amp; diagnostics</td><td>Crash reports, error diagnostics, app-usage events, push token</td><td>Keep the app stable, send notifications, improve the product</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3. Location &mdash; how we protect it</h2>
+  <div class="callout">
+    <p style="margin:0">
+      Your device determines your precise GPS position to place you on the map. That precise
+      position is transmitted to our server over an encrypted connection and is
+      <strong>immediately coarsened to roughly a 120-meter area</strong> (an H3 grid-cell
+      centroid) <strong>before anything is stored</strong>. We do not retain your exact GPS
+      coordinates, and other users only ever see the coarsened location. This means you appear
+      &ldquo;in the neighborhood,&rdquo; never at a precise point.
+    </p>
+  </div>
+  <p>
+    Location is used only while you are using the app (foreground); G88 does not track your
+    location in the background. You can hide yourself from discovery at any time in
+    <em>Settings &rarr; Appear on map</em>, and you can revoke the OS location permission in
+    your device settings (the map will stop working while it is off).
+  </p>
+
+  <h2>4. How we use your data</h2>
+  <ul>
+    <li>Operate core features: discovery, presence, waves, chat, events, listings, gifts, challenges.</li>
+    <li>Authenticate you and keep your account secure.</li>
+    <li>Send notifications you have not opted out of (you control these per-channel in Settings).</li>
+    <li>Maintain reliability and diagnose crashes and errors.</li>
+    <li>Understand aggregate product usage to improve G88.</li>
+    <li>Process verification and subscriptions when you choose to use them.</li>
+  </ul>
+  <p>We do <strong>not</strong> sell your personal data, and we do not show third-party advertising.</p>
+
+  <h2>5. Who we share with</h2>
+  <p><strong>Other users</strong> see your display name, avatar/photos, bio, interests, badges,
+  and your coarsened (~120&nbsp;m) location &mdash; not your email, phone, or precise location.</p>
+  <p><strong>Service providers</strong> process data on our behalf, under contract, only to run G88:</p>
+  <table>
+    <thead><tr><th>Provider</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Supabase</td><td>Managed database (account &amp; app data)</td></tr>
+      <tr><td>Render</td><td>Application hosting</td></tr>
+      <tr><td>Amazon Web Services (S3)</td><td>Photo &amp; document storage</td></tr>
+      <tr><td>Google (Firebase Cloud Messaging)</td><td>Push notifications</td></tr>
+      <tr><td>Google (OAuth, Maps)</td><td>Sign-in; map rendering</td></tr>
+      <tr><td>Sentry</td><td>Crash &amp; error diagnostics (scrubbed of location and tokens)</td></tr>
+      <tr><td>PostHog</td><td>Product analytics</td></tr>
+      <tr><td>Stripe</td><td>Subscription payments (card data handled entirely by Stripe)</td></tr>
+      <tr><td>Twilio</td><td>Phone-number verification codes</td></tr>
+    </tbody>
+  </table>
+  <p>We may also disclose data where required by law, to protect users&rsquo; safety, or in
+  connection with a business transfer.</p>
+
+  <h2>6. Data retention</h2>
+  <p>
+    We keep your data while your account is active. Diagnostic and analytics data are retained
+    for a limited period for security and product purposes. When you delete your account, your
+    data is removed as described below. Presence data is ephemeral and expires automatically
+    within minutes.
+  </p>
+
+  <h2>7. Deleting your account and data</h2>
+  <p>You can permanently delete your account and associated data at any time:</p>
+  <ul>
+    <li><strong>In the app:</strong> <em>Settings &rarr; Delete account</em>. This is immediate
+      and irreversible.</li>
+    <li><strong>By web/email request:</strong> email
+      <a href="mailto:PRIVACY_EMAIL"><span class="placeholder">&#x27E8;privacy@your-domain&#x27E9;</span></a>
+      from your account email with the subject &ldquo;Delete my account&rdquo; and we will
+      complete the deletion.</li>
+  </ul>
+  <p>
+    Deletion permanently removes your profile, photos and uploaded documents, messages, waves,
+    listings, events, gifts, gamification progress, verification records, and authentication
+    sessions. Some records may persist briefly in encrypted backups before being overwritten,
+    and we may retain the minimum needed to comply with legal obligations.
+  </p>
+
+  <h2>8. Your rights</h2>
+  <p>
+    Depending on where you live (e.g. the EEA/UK under GDPR, or California under the CCPA/CPRA),
+    you may have the right to access, correct, delete, or port your data, to object to or
+    restrict certain processing, and to withdraw consent. You can exercise most of these in the
+    app, or by contacting us at the address below. You also have the right to complain to your
+    local data-protection authority.
+  </p>
+
+  <h2>9. Security</h2>
+  <p>
+    Data is encrypted in transit (HTTPS/TLS, secure WebSockets). Passwords are stored only as
+    salted hashes; authentication tokens on your device are held in the OS secure keystore.
+    No system is perfectly secure, but we work to protect your information and to minimise what
+    we collect (for example, by coarsening location before storage).
+  </p>
+
+  <h2>10. International transfers</h2>
+  <p>
+    Our providers may process data in regions including the EU and the US. Where data is
+    transferred internationally, we rely on appropriate safeguards such as standard contractual
+    clauses.
+  </p>
+
+  <h2>11. Changes to this policy</h2>
+  <p>
+    We may update this policy as the product evolves. Material changes will be reflected by an
+    updated &ldquo;Last updated&rdquo; date and, where appropriate, an in-app notice.
+  </p>
+
+  <h2>12. Contact</h2>
+  <p>
+    Questions or requests:
+    <a href="mailto:PRIVACY_EMAIL"><span class="placeholder">&#x27E8;privacy@your-domain&#x27E9;</span></a>.
+    Postal address: <span class="placeholder">&#x27E8;legal entity &amp; address, if required by your jurisdiction&#x27E9;</span>.
+  </p>
+
+  <footer>
+    G88 Privacy Policy &middot; This page is the canonical privacy policy referenced by the
+    Google Play store listing and Data Safety form.
+  </footer>
+</body>
+</html>
