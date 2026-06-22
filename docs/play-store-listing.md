@@ -20,7 +20,7 @@
 | Tags | Social, Local, Map |
 | Contact email | ⟨support email⟩ |
 | Website | ⟨landing page URL, optional⟩ |
-| Privacy policy URL | ⟨REQUIRED — hosted privacy policy⟩ |
+| Privacy policy URL | `https://g88-legal.onrender.com/privacy` (live; Render static site `g88-legal`, source `docs/legal/`). ⚠️ Still has owner placeholders to fill before submitting — see the top-of-file comment in `docs/legal/privacy/index.html`. |
 
 ---
 
