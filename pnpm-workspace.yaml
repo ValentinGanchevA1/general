@@ -12,11 +12,17 @@ minimumReleaseAgeExclude:
 overrides:
   'glob@10': '10.5.0'
   'picomatch@4': '4.0.4'
-  'ws@8': '8.20.1'
+  'ws@8': '>=8.21.0 <9' # GHSA: ws memory-exhaustion DoS — backs the Socket.IO realtime gateway (prod-reachable). Was 8.20.1 (< patched 8.21.0).
+  'ws@7': '>=7.5.11 <8' # ws memory-exhaustion DoS (transitive build-time via @react-native-community/cli)
   'ws@6': '>=6.2.4 <7' # GHSA-96hv-2xvq-fx4p (DoS; transitive build-time via @react-native-community/cli)
+  'undici@6': '>=6.27.0 <7' # WS-fragment DoS + response-queue/Set-Cookie issues (transitive; outbound HTTP to trusted APIs only)
   'form-data@2': '>=2.5.6 <3' # GHSA-hmw2-7cc7-3qxx (CRLF; transitive via firebase-admin → @google-cloud/storage)
+  'form-data@4': '>=4.0.6 <5' # CRLF injection via multipart field names (transitive; base64 upload path, not outbound multipart)
   'multer@2': '>=2.2.0 <3' # GHSA-72gw-mp4g-v24j + GHSA-3p4h-7m6x-2hcm (DoS; transitive via @nestjs/platform-express; no multipart route in use)
   'protobufjs@7': '>=7.6.3 <8' # GHSA-wcpc-wj8m-hjx6 + GHSA-f38q-mgvj-vph7 (DoS; transitive via firebase-admin + firebase)
+  'js-yaml@4': '>=4.2.0 <5' # quadratic-complexity DoS in merge-key handling (build/config YAML, not untrusted runtime input)
+  '@babel/core': '>=7.29.6 <8' # arbitrary file read via sourceMappingURL (build-time transform only)
+  '@opentelemetry/core@2': '>=2.8.0 <3' # unbounded memory in W3C baggage propagation (Sentry tracing; needs untrusted baggage header)
   'webpack@5': '5.104.1'
   'ajv@8': '8.20.0'
   tmp: '0.2.7'
