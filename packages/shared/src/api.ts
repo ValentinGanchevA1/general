@@ -291,6 +291,13 @@ export interface ReorderPhotosRequest {
   photoIds: string[];
 }
 
+export interface DeleteAccountRequest {
+  /** Must be the literal string 'DELETE' — a deliberate confirmation gate. */
+  confirm: 'DELETE';
+  /** Current password. Required for password accounts; omit for OAuth-only accounts. */
+  password?: string;
+}
+
 // ─── Verification ────────────────────────────────────────────────────────────
 
 export interface StartPhoneVerificationRequest {

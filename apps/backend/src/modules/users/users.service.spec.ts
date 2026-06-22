@@ -7,6 +7,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { PresenceService } from '../presence/presence.service';
 import { MessagingService } from '../messaging/messaging.service';
+import { S3Service } from '../../common/s3.service';
 
 const USER = '11111111-1111-1111-1111-111111111111';
 const PHOTO_A = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
@@ -24,6 +25,7 @@ describe('UsersService — gallery photos', () => {
         { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
         { provide: PresenceService, useValue: {} },
         { provide: MessagingService, useValue: {} },
+        { provide: S3Service, useValue: {} },
       ],
     }).compile();
     service = mod.get(UsersService);
@@ -118,6 +120,7 @@ describe('UsersService — public profile trust fields', () => {
         { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
         { provide: PresenceService, useValue: { whichAreOnline } },
         { provide: MessagingService, useValue: {} },
+        { provide: S3Service, useValue: {} },
       ],
     }).compile();
     service = mod.get(UsersService);
@@ -189,6 +192,7 @@ describe('UsersService — profile createdAt', () => {
         { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
         { provide: PresenceService, useValue: {} },
         { provide: MessagingService, useValue: {} },
+        { provide: S3Service, useValue: {} },
       ],
     }).compile();
     service = mod.get(UsersService);
@@ -213,5 +217,68 @@ describe('UsersService — profile createdAt', () => {
     const profile = await service.getProfile(USER);
     // Must not throw and must be a parseable ISO timestamp.
     expect(Number.isNaN(Date.parse(profile.createdAt))).toBe(false);
+  });
+});
+
+describe('UsersService — deleteAccount', () => {
+  let service: UsersService;
+  let query: jest.Mock;
+  let runnerQuery: jest.Mock;
+  let markOffline: jest.Mock;
+  let deleteUserObjects: jest.Mock;
+
+  beforeEach(async () => {
+    query = jest.fn().mockResolvedValue([]);
+    runnerQuery = jest.fn().mockResolvedValue([]);
+    markOffline = jest.fn().mockResolvedValue(undefined);
+    deleteUserObjects = jest.fn().mockResolvedValue(0);
+    const createQueryRunner = jest.fn().mockReturnValue({
+      connect: jest.fn().mockResolvedValue(undefined),
+      startTransaction: jest.fn().mockResolvedValue(undefined),
+      commitTransaction: jest.fn().mockResolvedValue(undefined),
+      rollbackTransaction: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn().mockResolvedValue(undefined),
+      query: runnerQuery,
+    });
+    const mod = await Test.createTestingModule({
+      providers: [
+        UsersService,
+        {
+          provide: getDataSourceToken(),
+          useValue: { query, createQueryRunner } as unknown as DataSource,
+        },
+        { provide: PresenceService, useValue: { markOffline } },
+        { provide: MessagingService, useValue: {} },
+        { provide: S3Service, useValue: { deleteUserObjects } },
+      ],
+    }).compile();
+    service = mod.get(UsersService);
+  });
+
+  it('rejects without the literal confirm phrase and never touches the DB', async () => {
+    await expect(service.deleteAccount(USER, 'delete')).rejects.toBeInstanceOf(BadRequestException);
+    expect(query).not.toHaveBeenCalled();
+    expect(runnerQuery).not.toHaveBeenCalled();
+  });
+
+  it('deletes an OAuth-only account (null hash) — purges external state + cascades', async () => {
+    query.mockResolvedValueOnce([{ id: USER, password_hash: null }]); // SELECT user
+    await service.deleteAccount(USER, 'DELETE');
+
+    expect(markOffline).toHaveBeenCalledWith(USER);
+    expect(deleteUserObjects).toHaveBeenCalledWith(USER);
+    // conversations cleared (array isn't an FK) then the user row (cascades the rest).
+    expect(runnerQuery.mock.calls.some((c) => /DELETE FROM conversations/.test(c[0]))).toBe(true);
+    expect(runnerQuery.mock.calls.some((c) => /DELETE FROM users/.test(c[0]))).toBe(true);
+  });
+
+  it('rejects a password account when the password is wrong', async () => {
+    // bcrypt hash of 'correct-pw'; 'wrong-pw' will not match.
+    const hash = '$2b$10$N9qo8uLOickgx2ZMRZoMy.Mrq4n0Z5Q1l8t9xq1Z5Q1l8t9xq1Zu';
+    query.mockResolvedValueOnce([{ id: USER, password_hash: hash }]);
+    await expect(service.deleteAccount(USER, 'DELETE', 'wrong-pw')).rejects.toMatchObject({
+      response: { code: 'account.password_mismatch' },
+    });
+    expect(runnerQuery).not.toHaveBeenCalled();
   });
 });

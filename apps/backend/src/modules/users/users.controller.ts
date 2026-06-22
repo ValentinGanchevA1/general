@@ -27,6 +27,7 @@ import {
 
 import type {
   AddPhotoRequest,
+  DeleteAccountRequest,
   PresignedUploadResponse,
   PublicUserProfile,
   ReorderPhotosRequest,
@@ -35,6 +36,8 @@ import type {
   UserPhoto,
   UserProfile,
 } from '@g88/shared';
+
+import { Throttle } from '@nestjs/throttler';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -86,6 +89,18 @@ class ReorderPhotosDto implements ReorderPhotosRequest {
   photoIds!: string[];
 }
 
+class DeleteAccountDto implements DeleteAccountRequest {
+  // Deliberate friction: the client must echo the literal phrase so an account
+  // can't be deleted by an accidental/empty request.
+  @IsIn(['DELETE'], { message: "confirm must be the literal string 'DELETE'" })
+  confirm!: 'DELETE';
+
+  // Required for password accounts; ignored for OAuth-only accounts (no hash).
+  @IsOptional()
+  @IsString()
+  password?: string;
+}
+
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
@@ -110,6 +125,20 @@ export class UsersController {
     @CurrentUser('id') userId: string,
   ): Promise<UserProfile> {
     return this.users.updateProfile(userId, dto);
+  }
+
+  /**
+   * Permanently delete the caller's account and all associated data.
+   * Irreversible. Tightly throttled (5 attempts / hour) — destructive + re-auth.
+   */
+  @Delete('me')
+  @HttpCode(204)
+  @Throttle({ default: { limit: 5, ttl: 3_600_000 } })
+  async deleteAccount(
+    @Body() dto: DeleteAccountDto,
+    @CurrentUser('id') userId: string,
+  ): Promise<void> {
+    await this.users.deleteAccount(userId, dto.confirm, dto.password);
   }
 
   @Post('me/avatar/presigned-url')

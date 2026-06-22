@@ -2,7 +2,13 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
 import * as Sentry from '@sentry/react-native';
 
-import type { ApiError, AuthenticatedUser, LoginResponse, UserProfile } from '@g88/shared';
+import type {
+  ApiError,
+  AuthenticatedUser,
+  DeleteAccountRequest,
+  LoginResponse,
+  UserProfile,
+} from '@g88/shared';
 
 import { api, postJson } from '@/api/client';
 import { tokenStore } from '@/api/tokenStore';
@@ -102,6 +108,29 @@ export const logout = createAsyncThunk('auth/logout', async () => {
   Sentry.setUser(null);
 });
 
+/**
+ * Permanently delete the account, then tear down the local session. On success
+ * we clear locally exactly like logout (minus the `/auth/logout` POST, which
+ * would 401 now that the account is gone). On failure (e.g. wrong password) we
+ * surface the message and keep the session so the user can retry or cancel.
+ */
+export const deleteAccount = createAsyncThunk(
+  'auth/deleteAccount',
+  async (args: { password?: string }, { rejectWithValue }) => {
+    try {
+      const body: DeleteAccountRequest = args.password
+        ? { confirm: 'DELETE', password: args.password }
+        : { confirm: 'DELETE' };
+      await api.delete('/users/me', { data: body });
+    } catch (e: unknown) {
+      return rejectWithValue(extractMessage(e, 'Could not delete your account'));
+    }
+    disconnectSocket();
+    await tokenStore.clear();
+    Sentry.setUser(null);
+  },
+);
+
 export const restoreSession = createAsyncThunk('auth/restore', async () => {
   const token = await tokenStore.getAccessToken();
   if (!token) return null;
@@ -200,6 +229,16 @@ const authSlice = createSlice({
         state.error = null;
         state.profileSetupComplete = true;
       })
+
+      .addCase(deleteAccount.pending, pending)
+      .addCase(deleteAccount.fulfilled, (state) => {
+        state.loading = false;
+        state.user = null;
+        state.error = null;
+        state.profileSetupComplete = true;
+      })
+      // Keep the session on failure so the user can correct the password or cancel.
+      .addCase(deleteAccount.rejected, rejected)
       // Derive completion from the backend-computed profileComplete field (bio IS NOT NULL).
       // Catches both fetch and update so any profile response keeps the gate in sync.
       // String-matched to avoid a circular import with profileSlice.

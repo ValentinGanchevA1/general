@@ -6,6 +6,9 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+
+import { S3Service } from '../../common/s3.service';
 
 import type {
   AuthenticatedUser,
@@ -92,7 +95,81 @@ export class UsersService {
     @InjectDataSource() private readonly db: DataSource,
     private readonly presence: PresenceService,
     private readonly messaging: MessagingService,
+    private readonly s3: S3Service,
   ) {}
+
+  /**
+   * Permanently delete the caller's account (GDPR / Play "delete my data").
+   *
+   * Irreversible hard delete: the `users` row is removed, and every FK to it is
+   * `ON DELETE CASCADE` (refresh tokens, photos, social links, waves, messages,
+   * gifts, events/RSVPs, listings/offers, gamification, achievements, geofences,
+   * notifications, id-verification, …), so the row delete clears them. We
+   * additionally:
+   *   - delete conversations the user was in (the `participant_ids` array is not
+   *     an FK, so it can't cascade; deleting the conversation cascades its
+   *     messages), and
+   *   - purge out-of-Postgres state: Redis presence + the user's S3 blobs.
+   *
+   * Safety: requires the literal confirmation phrase, and — for password
+   * accounts — a matching password. OAuth-only accounts (no `password_hash`)
+   * rely on the bearer token + confirmation phrase.
+   */
+  async deleteAccount(userId: string, confirm: string, password?: string): Promise<void> {
+    if (confirm !== 'DELETE') {
+      throw new BadRequestException({
+        code: 'account.confirm_required',
+        message: "Send confirm: 'DELETE' to permanently delete your account.",
+      });
+    }
+
+    const rows = await this.db.query<{ id: string; password_hash: string | null }[]>(
+      `SELECT id, password_hash FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+      [userId],
+    );
+    const user = rows[0];
+    if (!user) throw new NotFoundException({ code: 'account.not_found', message: 'Account not found' });
+
+    // Re-auth password accounts; OAuth-only users (null hash) skip this gate.
+    if (user.password_hash) {
+      const ok = password ? await bcrypt.compare(password, user.password_hash) : false;
+      if (!ok) {
+        throw new UnauthorizedException({
+          code: 'account.password_mismatch',
+          message: 'Password is incorrect.',
+        });
+      }
+    }
+
+    // External state first — best-effort. A failure here must not block the DB
+    // delete (the user still gets removed); orphaned blobs are swept separately.
+    try {
+      await this.presence.markOffline(userId);
+    } catch {
+      /* presence is TTL'd (120s) — safe to ignore */
+    }
+    try {
+      await this.s3.deleteUserObjects(userId);
+    } catch {
+      /* swept by a later lifecycle/orphan job; never blocks deletion */
+    }
+
+    // Atomic Postgres delete: conversations (cascades their messages) then the
+    // user row (cascades everything else).
+    const runner = this.db.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      await runner.query(`DELETE FROM conversations WHERE $1 = ANY(participant_ids)`, [userId]);
+      await runner.query(`DELETE FROM users WHERE id = $1`, [userId]);
+      await runner.commitTransaction();
+    } catch (err) {
+      await runner.rollbackTransaction();
+      throw err;
+    } finally {
+      await runner.release();
+    }
+  }
 
   async findById(id: string): Promise<AuthenticatedUser | null> {
     const rows = await this.db.query<UserRow[]>(

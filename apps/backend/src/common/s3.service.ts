@@ -1,7 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
+
+// Every object a user owns is written under `{prefix}/{userId}/...` (see the
+// upload paths below), so account deletion can purge a user's blobs by prefix
+// without parsing stored URLs.
+const USER_OBJECT_PREFIXES = ['avatars', 'photos', 'listings', 'verifications'] as const;
 
 @Injectable()
 export class S3Service {
@@ -111,6 +121,44 @@ export class S3Service {
       }),
     );
     return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
+  }
+
+  /**
+   * Delete every object a user owns (avatars, gallery photos, listing images,
+   * ID-verification docs). Used by account deletion. Best-effort and idempotent:
+   * no-ops when the bucket is unconfigured (dev/test), and paginates each prefix
+   * in batches of 1000 (the DeleteObjects cap). Returns the number of objects
+   * removed so callers can log it.
+   */
+  async deleteUserObjects(userId: string): Promise<number> {
+    if (!this.bucket) return 0;
+    let deleted = 0;
+    for (const prefix of USER_OBJECT_PREFIXES) {
+      let continuationToken: string | undefined;
+      do {
+        const listed = await this.client.send(
+          new ListObjectsV2Command({
+            Bucket: this.bucket,
+            Prefix: `${prefix}/${userId}/`,
+            ContinuationToken: continuationToken,
+          }),
+        );
+        const objects = (listed.Contents ?? [])
+          .map((o) => o.Key)
+          .filter((k): k is string => Boolean(k));
+        if (objects.length > 0) {
+          await this.client.send(
+            new DeleteObjectsCommand({
+              Bucket: this.bucket,
+              Delete: { Objects: objects.map((Key) => ({ Key })), Quiet: true },
+            }),
+          );
+          deleted += objects.length;
+        }
+        continuationToken = listed.IsTruncated ? listed.NextContinuationToken : undefined;
+      } while (continuationToken);
+    }
+    return deleted;
   }
 
   /**
