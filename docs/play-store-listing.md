@@ -89,7 +89,7 @@ activity actually around you.
 |---|---|
 | Does your app collect or share any of the required user data types? | **Yes** |
 | Is all collected data encrypted in transit? | **Yes** (HTTPS/TLS; WSS for sockets) |
-| Do you provide a way for users to request data deletion? | **No / off-app only** ⚠️ — no in-app or backend account-deletion path exists today (verified: no `DELETE /users/me` or equivalent). Declare an **off-app** deletion request method (email) for now; ship in-app deletion before production. See §8. |
+| Do you provide a way for users to request data deletion? | **Yes — in-app** ✅ — Settings → "Delete account" calls `DELETE /users/me`, which permanently hard-deletes the account (DB cascade + S3 blobs + Redis presence). Optionally also declare a deletion-request email as a secondary channel. See §8. |
 
 ### 3b. Data types — declare these
 
@@ -185,19 +185,20 @@ The hosted policy URL must state, at minimum:
 
 ---
 
-## 8. Known gap — account deletion (do before production)
+## 8. Account deletion — ✅ shipped (in-app)
 
 Google Play's **User Data policy** requires apps that let users create an account
-to provide **in-app account deletion** plus a **web URL** to request deletion.
-**G88 has neither today** — there is no `DELETE /users/me` (or equivalent)
-endpoint in `apps/backend/src/modules`, and no profile-screen delete action.
+to provide **in-app account deletion** (and, for production, a **web URL** to
+request deletion). The in-app path is now **implemented** (commit `fc1f188`):
 
-- For **closed testing**, you can submit with an **off-app** deletion method
-  (a deletion-request email in the policy + Data Safety form) — closed tracks are
-  more lenient.
-- For **production**, this is a hard blocker. Plan: add a backend
-  `DELETE /users/me` that hard-deletes/anonymizes the account + cascades (photos
-  in S3, messages, presence keys, refresh-token families), and a "Delete account"
-  action on the Profile screen, plus a public deletion-request URL.
-- Until then, the privacy policy (§6) must list the email a user can write to
-  request deletion, and §3a is answered accordingly.
+- **Backend:** `DELETE /users/me` (JWT, throttled 5/hour) — re-auth (password
+  accounts; OAuth-only rely on bearer + `confirm: 'DELETE'`), then a permanent
+  hard delete: DB cascade across all `users` FKs (messages, photos rows, waves,
+  gifts, events, listings, gamification, refresh-token families, …), explicit
+  conversation cleanup, plus **S3 blob purge** and **Redis presence** clear.
+- **Mobile:** Settings → "Delete account" → confirm modal with password field.
+
+**Remaining (production only):** a **public web deletion-request URL** — Play
+asks account-based apps for a web link in addition to the in-app flow. For
+**closed testing** the in-app flow + a deletion-request email in the privacy
+policy (§6) suffices. Add the web URL before the production track.
