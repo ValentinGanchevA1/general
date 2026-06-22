@@ -211,7 +211,33 @@ non-test users can link.
    the `g88-release-aab` artifact, upload it to the closed track in the Console. Play
    requires the first release to be created by hand.
 
-### After first upload (optional automation, follow-up)
-- Create a Play **service account** (JSON), grant release permissions, store as a secret,
-  and add an upload step (`r0adkll/upload-google-play` or fastlane `supply`) to publish to
-  the `internal`/closed track automatically. Deferred until the app exists in the Console.
+### After first upload — automated publishing (wired)
+`android-release.yml` has a **Publish to Google Play** step (`r0adkll/upload-google-play`)
+that uploads the signed AAB to a Play track. It **auto-skips** until the service-account
+secret exists (the build still produces the artifact), so it's safe before setup.
+
+**Prerequisites (Play API rules):** the app `com.g88` must already exist in the Console
+**and** have had at least one **manual** release on the target track — the API cannot
+create the app or seed an empty track.
+
+**One-time setup:**
+1. **Google Cloud Console** (the project linked to Play): create a **service account**,
+   no roles needed in GCP. Create a **JSON key** for it.
+2. **Play Console → Users and permissions → Invite new user**: add the service-account
+   email; grant **app access** to `com.g88` with **Release → Manage testing track releases**
+   (and "Create and publish" as needed). Wait a few minutes for propagation.
+3. **GitHub secret:** `gh secret set PLAY_SERVICE_ACCOUNT_JSON < service-account.json`
+   (paste the whole JSON). Once present, the publish step activates automatically.
+
+**Running it:**
+- **Manual:** Actions → *Android Release (AAB)* → Run workflow. Inputs: `track` (your
+  closed-track name, or `alpha`/`internal`), `publish` (default true), `status`
+  (`completed` to go live to testers, or `draft`).
+- **On tag:** pushing a `v*` tag builds and publishes with the defaults
+  (`track=alpha`, `status=completed`).
+- **Release notes:** pulled from `apps/mobile/distribution/whatsnew/whatsnew-en-US`
+  (keep ≤ 500 chars; add `whatsnew-<lang>` files to localize).
+
+> ⚠️ Confirm your closed track's **track name** matches the `track` input. Internal
+> testing = `internal`; the default closed track = `alpha`; a custom closed track uses
+> the name you gave it. A wrong track name makes the API call fail.

@@ -9,9 +9,20 @@ on:
   workflow_dispatch:
     inputs:
       track:
-        description: "Intended Play track (informational only — upload is manual for now)"
+        description: "Play track to publish to (e.g. closed track name, 'alpha', or 'internal')"
         required: false
-        default: "internal"
+        default: "alpha"
+      publish:
+        description: "Upload the AAB to Play (requires PLAY_SERVICE_ACCOUNT_JSON secret)"
+        type: boolean
+        required: false
+        default: true
+      status:
+        description: "Release status on the track"
+        type: choice
+        required: false
+        default: "completed"
+        options: ["completed", "draft", "halted", "inProgress"]
   push:
     tags:
       - "v*"
@@ -26,6 +37,10 @@ jobs:
   release:
     name: Signed AAB
     runs-on: ubuntu-latest
+    # Surface secret presence as a plain env value so the publish step's `if:`
+    # can gate on it (the `secrets` context isn't allowed in `if:` directly).
+    env:
+      HAS_PLAY_SA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
     defaults:
       run:
         working-directory: apps/mobile
@@ -101,3 +116,24 @@ jobs:
           name: g88-release-aab
           path: apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 14
+
+      # Publishes to the Play track via a service account. Auto-skips until the
+      # PLAY_SERVICE_ACCOUNT_JSON secret exists, so the build stays green before
+      # automation is set up. Requires the app to already exist in the Console
+      # with at least one manual release on the target track (Play API rule).
+      - name: Publish to Google Play
+        if: >-
+          env.HAS_PLAY_SA == 'true' &&
+          (github.event_name == 'push' || inputs.publish == true)
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.g88
+          releaseFiles: apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+          track: ${{ inputs.track || 'alpha' }}
+          status: ${{ inputs.status || 'completed' }}
+          whatsNewDirectory: apps/mobile/distribution/whatsnew
+
+      - name: Note when publish was skipped
+        if: env.HAS_PLAY_SA != 'true'
+        run: echo "::notice::PLAY_SERVICE_ACCOUNT_JSON not set — built the AAB but skipped Play upload. Download the g88-release-aab artifact and upload manually, or add the secret to enable automation (see DEPLOY.md)."
