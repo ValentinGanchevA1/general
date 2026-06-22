@@ -203,11 +203,28 @@ non-test users can link.
 3. **Play Console** ($25 one-time): create app `com.g88`, opt into **Play App Signing**
    (Google holds the signing key; the keystore above is only the *upload* key), create a
    **Closed testing** track + tester list.
-4. **Store listing minimums**: app name, short + full description, icon, feature graphic,
+4. **Restrict the Maps release key to the Play App Signing SHA-1** (else testers get a
+   **blank/grey map**). A Maps Android key is keyed on *package name + the SHA-1 of the cert
+   that signed the **installed** app*. Play **re-signs** every download with its own **App
+   signing key**, so the cert testers run is *not* your upload key or debug key.
+   - **Get the SHA-1:** Play Console → app `com.g88` → *Test and release → Setup → App
+     integrity → App signing* → copy the **App signing key certificate** SHA-1. (You can't
+     compute this locally — Google holds that key.)
+   - **Apply it:** Google Cloud Console → *APIs & Services → Credentials* → open the key
+     behind `GOOGLE_MAPS_API_KEY_RELEASE` → **Application restrictions = Android apps**,
+     **API restrictions = Maps SDK for Android** → add row: package `com.g88` + the App
+     signing SHA-1. Recommended: add a **second** row with the *upload key* SHA-1 too (same
+     page in Play Console), so a sideloaded upload-signed AAB also renders.
+   - `GOOGLE_MAPS_API_KEY_DEBUG` is a separate key for local/emulator builds (restricted to
+     your debug cert) — leave it alone; it never ships.
+   - **Confirm:** install from the closed track and open the map. If still grey,
+     `adb logcat | grep -i "Authorization"` echoes the SHA-1 + `com.g88` the device
+     presented — compare it to the key's restriction.
+5. **Store listing minimums**: app name, short + full description, icon, feature graphic,
    **privacy policy URL** (required — app collects location), and the **Data Safety form**
    (declare: precise/approximate **location**, account info; note location is fuzzed to
    ~120m server-side per `ARCHITECTURE.md §3.3`).
-5. **First upload is manual**: run `android-release.yml` (Actions → Run workflow), download
+6. **First upload is manual**: run `android-release.yml` (Actions → Run workflow), download
    the `g88-release-aab` artifact, upload it to the closed track in the Console. Play
    requires the first release to be created by hand.
 
