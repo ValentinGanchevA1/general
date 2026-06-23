@@ -22,6 +22,7 @@ import { useGamification } from '@/features/gamification/useGamification';
 import { useChallenges } from '@/features/gamification/useChallenges';
 import { useGiftBalance } from '@/features/gifts/useGifts';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
+import { APP_VERSION } from '@/constants/app';
 import { SOCIAL_PROVIDER_CONFIG, TIER_COLOR, TIER_LABEL } from '@/features/profile/socialConfig';
 import type {
   GamificationSummary,
@@ -527,7 +528,7 @@ export function ProfileScreen(): React.JSX.Element {
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
 
-      <Text style={styles.version}>Version 1.0.0</Text>
+      <Text style={styles.version}>Version {APP_VERSION}</Text>
     </ScrollView>
   );
 }

@@ -30,11 +30,9 @@ import { MarketplaceScreen } from '@/screens/MarketplaceScreen';
 import { ListingDetailScreen } from '@/screens/ListingDetailScreen';
 import { ListingCreateScreen } from '@/screens/ListingCreateScreen';
 import { NotificationSettingsScreen } from '@/screens/NotificationSettingsScreen';
-import {
-	PrivacyScreen,
-	HelpScreen,
-	AboutScreen,
-} from '@/screens/placeholders';
+import { PrivacyScreen } from '@/screens/PrivacyScreen';
+import { HelpScreen } from '@/screens/HelpScreen';
+import { AboutScreen } from '@/screens/AboutScreen';
 import type { AreaCategory, VerificationLevel } from '@g88/shared';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
