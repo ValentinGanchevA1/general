@@ -164,3 +164,6 @@ scripts/.fb-sa.json
 .tabnine/
 .windsurf/
 skills-lock.json
+
+# Locally downloaded APK artifacts (not source)
+dist-apk/
