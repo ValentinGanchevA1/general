@@ -29,9 +29,11 @@ export const FAB_ACTIONS: Record<FabActionId, FabActionDef> = {
   },
   toggle_visibility: {
     id: 'toggle_visibility',
-    icon: 'eye-off',
-    label: 'Become visible',
-    primaryGlyph: 'eye-off',
+    icon: 'eye-settings',
+    // Routes to Settings (no inline toggle yet — that lands in the Phase-2 map
+    // pass). Labelled honestly so it doesn't promise a one-tap switch.
+    label: 'Visibility',
+    primaryGlyph: 'eye-settings',
   },
   open_pulse: {
     id: 'open_pulse',
