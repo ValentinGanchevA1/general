@@ -57,7 +57,8 @@ export function TrendingFilterBar({
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', top: 52, left: 0, right: 0 },
+  // Positioning is owned by MapTopStack; this is just the content row.
+  wrap: { width: '100%' },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, marginBottom: 6 },
   label: { color: '#ff9d3c', fontSize: 12, fontWeight: '700', letterSpacing: 0.4, flex: 1 },
   clear: {

@@ -36,11 +36,9 @@ import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ContextualFab } from '@/components/ContextualFab';
 import type { FabActionId } from '@/components/ContextualFab/useFabContext';
-import { DailyChallengeCard } from '@/features/gamification/DailyChallengeCard';
 import { challengeEvents } from '@/features/gamification/challengeEvents';
-import { NudgeBanner } from '@/features/nudges/NudgeBanner';
 import { EventsRail } from '@/features/events/EventsRail';
-import { TrendingFilterBar } from '@/features/discovery/TrendingFilterBar';
+import { MapTopStack } from '@/components/map/MapTopStack';
 import { useTrendingNearby } from '@/features/pulse/useTrendingNearby';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -270,13 +268,11 @@ export function MapScreen(): React.JSX.Element {
         </View>
       )}
 
-      <TrendingFilterBar
+      <MapTopStack
         topics={trendingTopics}
         activeTopic={activeTopic}
-        onSelect={onSelectTopic}
+        onSelectTopic={onSelectTopic}
       />
-      <DailyChallengeCard />
-      <NudgeBanner />
 
       {!selected && (
         <EventsRail location={region ? { lat: region.latitude, lng: region.longitude } : myCoords} />
