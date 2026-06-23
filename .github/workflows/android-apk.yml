@@ -1,0 +1,120 @@
+name: Android APK (sideload)
+
+# Builds a signed release **APK** for direct sharing / sideloading (not the Play
+# Store — that's android-release.yml's AAB). The APK is signed with the same
+# upload keystore as the AAB, so it has a stable signing identity: updates built
+# here install over previous ones, and you whitelist a single SHA-1 on the Maps
+# key.
+#
+# IMPORTANT (blank-map gotcha): a sideloaded APK keeps the *upload key's*
+# signature (unlike a Play-distributed build, which Google re-signs with the App
+# Signing key). So the SHA-1 that must be added to GOOGLE_MAPS_API_KEY_RELEASE's
+# Android app restriction is the **upload key's** SHA-1 — printed by the
+# "Print signing certificate fingerprints" step below — NOT the Play App Signing
+# SHA-1. Add it once in Google Cloud Console → Credentials → the release Maps key.
+#
+# Trigger: manual via the Actions tab (once this file is on the default branch),
+# or by pushing the ci/android-apk branch.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ci/android-apk
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  apk:
+    name: Signed APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Inject Maps keys
+        run: |
+          cat >> android/local.properties <<EOF
+          GOOGLE_MAPS_API_KEY_DEBUG=${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG }}
+          GOOGLE_MAPS_API_KEY_RELEASE=${{ secrets.GOOGLE_MAPS_API_KEY_RELEASE }}
+          EOF
+
+      - name: Inject google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > android/app/google-services.json
+
+      - name: Decode upload keystore
+        run: echo "${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload.keystore
+
+      - name: Inject release signing config
+        run: |
+          cat >> android/local.properties <<EOF
+          RELEASE_STORE_FILE=app/upload.keystore
+          RELEASE_STORE_PASSWORD=${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS=${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD=${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          EOF
+
+      - name: Print signing certificate fingerprints
+        run: |
+          echo "Add the SHA1 below to GOOGLE_MAPS_API_KEY_RELEASE's Android app restriction"
+          echo "(Cloud Console → APIs & Services → Credentials → the release Maps key)."
+          echo "package: com.g88"
+          keytool -list -v \
+            -keystore android/app/upload.keystore \
+            -storepass "${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}" \
+            -alias "${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}" \
+            | grep -E "SHA1:|SHA256:"
+
+      - name: Cache Gradle
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-
+
+      - name: Build signed release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon -PversionCodeOverride=${{ github.run_number }}
+
+      - name: Verify the APK is not debug-signed
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          test -f "$APK" || { echo "::error::APK not produced"; exit 1; }
+          # Fail loudly if the APK is still signed with the Android debug key
+          # (would mean the upload keystore secrets are missing/misconfigured).
+          if unzip -p "$APK" META-INF/*.RSA 2>/dev/null | keytool -printcert 2>/dev/null | grep -q "Android Debug"; then
+            echo "::error::APK is debug-signed — upload keystore secrets are missing or misconfigured."
+            exit 1
+          fi
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: g88-release-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
