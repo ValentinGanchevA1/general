@@ -1,15 +1,22 @@
 // apps/mobile/src/components/ContextualFab/index.tsx
 //
-// Contextual speed-dial FAB. Replaces ActionHub on the map surface.
-// - Single tap   → primary action (varies by context)
-// - Long-press   → expand secondary dial (350ms, haptic)
-// - Double-tap   → also expand (a11y alternative)
-// - Backdrop tap → collapse
+// Stable speed-dial FAB (Phase-1 UX pass).
+// - Fixed identity: a "Create" button, bottom-right, with an always-visible
+//   label pill. The button never changes meaning — it always opens the menu.
+// - Single tap → toggle the actions menu. No long-press, no double-tap, no
+//   tap-disambiguation delay (the old morphing-primary model made the button
+//   unpredictable and every tap felt laggy).
+// - Context (zoom/density/visibility/goal) is used ONLY to order the menu, so
+//   the most relevant action sits at the top — it no longer swaps what a tap
+//   does.
+// - Backdrop tap → collapse. Lightweight in-tree overlay (no full-screen Modal,
+//   so the map stays visible behind a light scrim).
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  Animated, Modal, Pressable, StyleSheet, Text, Vibration,
+  Animated, Pressable, StyleSheet, Text, Vibration, View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,6 +26,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppDispatch } from '@/hooks/redux';
 import { setPendingFilter } from '@/features/pulse/pulseSlice';
 import { track } from '@/lib/analytics';
+import { colors, radius, spacing, fontSize, shadow } from '@/theme';
 
 import { useFabContext, type FabActionId } from './useFabContext';
 import { FAB_ACTIONS } from './fabActions';
@@ -35,9 +43,10 @@ interface Props {
   onAction?: (id: FabActionId, ctxKey: string) => boolean | Promise<boolean>;
 }
 
-const DOUBLE_TAP_MS = 250;
-const LONG_PRESS_MS = 350;
-const STAGGER = [40, 92, 144];
+const FAB_SIZE = 56;
+const ITEM_SIZE = 48;
+const ITEM_GAP = 14;
+const FAB_BOTTOM = spacing.xxl; // 24 — clears the bottom tab bar (screen content sits above it)
 
 export function ContextualFab(props: Props): React.JSX.Element {
   const { zoom, points, nearestUserId, onAction } = props;
@@ -46,20 +55,11 @@ export function ContextualFab(props: Props): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const dispatch = useAppDispatch();
+  const insets = useSafeAreaInsets();
 
-  // useState (not useRef) so the value is read-safe during render — a ref's
-  // .current must not be accessed in render (react-hooks/refs). Identity is
-  // still stable for the component's lifetime via the lazy initializer.
+  // useState (not useRef) so identity is stable without a render-time ref read.
   const [anim] = useState(() => new Animated.Value(0));
-  const lastTapAt = useRef(0);
-  const expandStartAt = useRef(0);
-  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (tapTimerRef.current !== null) clearTimeout(tapTimerRef.current);
-    };
-  }, []);
+  const [expandAt, setExpandAt] = useState(0);
 
   const animateTo = useCallback((toValue: number): void => {
     Animated.spring(anim, {
@@ -67,31 +67,27 @@ export function ContextualFab(props: Props): React.JSX.Element {
     }).start();
   }, [anim]);
 
-  const expand = useCallback((gesture: 'long' | 'double'): void => {
-    if (open) return;
-    setOpen(true);
-    expandStartAt.current = Date.now();
-    animateTo(1);
-    try { Vibration.vibrate(10); } catch { /* no-op on web/sim */ }
-    track('fab.expand', {
-      contextKey: ctx.key,
-      primaryActionId: ctx.primary,
-      gesture,
-    });
-  }, [open, animateTo, ctx]);
-
   const collapse = useCallback((): void => {
     animateTo(0);
     setOpen(false);
   }, [animateTo]);
 
-  const runAction = useCallback(async (id: FabActionId, surface: 'primary' | 'secondary'): Promise<void> => {
-    const dwellMs = surface === 'secondary' ? Date.now() - expandStartAt.current : 0;
-    track(surface === 'primary' ? 'fab.tap.primary' : 'fab.tap.secondary', {
+  const toggle = useCallback((): void => {
+    if (open) { collapse(); return; }
+    setOpen(true);
+    setExpandAt(Date.now());
+    animateTo(1);
+    try { Vibration.vibrate(10); } catch { /* no-op on web/sim */ }
+    track('fab.expand', { contextKey: ctx.key, primaryActionId: ctx.primary, gesture: 'tap' });
+  }, [open, collapse, animateTo, ctx.key, ctx.primary]);
+
+  const runAction = useCallback(async (id: FabActionId): Promise<void> => {
+    const isPrimary = id === ctx.primary;
+    track(isPrimary ? 'fab.tap.primary' : 'fab.tap.secondary', {
       contextKey: ctx.key,
       primaryActionId: ctx.primary,
-      secondaryActionId: surface === 'secondary' ? id : null,
-      dwellMs,
+      secondaryActionId: isPrimary ? null : id,
+      dwellMs: Date.now() - expandAt,
     });
 
     if (onAction) {
@@ -109,7 +105,6 @@ export function ContextualFab(props: Props): React.JSX.Element {
         nav.navigate('AlertComposer', { presetCategory: 'general' });
         break;
       case 'create_listing':
-        // No dedicated screen yet — Pulse with listings filter until trading UI ships.
         dispatch(setPendingFilter('listings'));
         nav.navigate('Main', { screen: 'Pulse' });
         break;
@@ -117,114 +112,106 @@ export function ContextualFab(props: Props): React.JSX.Element {
         nav.navigate('Settings');
         break;
       default:
-        // wave_nearest should be intercepted by host; fall through safely
+        // wave_nearest should be intercepted by host; fall through safely.
         dispatch(setPendingFilter('all'));
         nav.navigate('Main', { screen: 'Pulse' });
     }
     collapse();
-  }, [ctx, onAction, dispatch, nav, collapse]);
+  }, [ctx.key, ctx.primary, expandAt, onAction, dispatch, nav, collapse]);
 
-  // Tap handling: distinguish single-tap (run primary after grace) from
-  // double-tap (expand). Long-press is independent via Pressable.
-  const onTap = useCallback((): void => {
-    const now = Date.now();
-    if (now - lastTapAt.current <= DOUBLE_TAP_MS) {
-      lastTapAt.current = 0;
-      expand('double');
-      return;
-    }
-    lastTapAt.current = now;
-    tapTimerRef.current = setTimeout(() => {
-      if (lastTapAt.current && Date.now() - lastTapAt.current >= DOUBLE_TAP_MS) {
-        void runAction(ctx.primary, 'primary');
-        lastTapAt.current = 0;
-      }
-    }, DOUBLE_TAP_MS + 10);
-  }, [ctx.primary, runAction, expand]);
-
-  const primaryDef = FAB_ACTIONS[ctx.primary];
+  // Context decides ORDER only: most relevant first, then ranked secondaries.
+  const menu: FabActionId[] = [ctx.primary, ...ctx.secondary];
 
   return (
     <>
+      {open && (
+        <Pressable style={S.backdrop} onPress={collapse} testID="fab-backdrop" />
+      )}
+
+      {open && menu.map((id, i) => {
+        const def = FAB_ACTIONS[id];
+        const bottom = FAB_BOTTOM + insets.bottom + FAB_SIZE + ITEM_GAP + i * (ITEM_SIZE + ITEM_GAP);
+        const opacity = anim;
+        const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] });
+        return (
+          <Animated.View
+            key={id}
+            style={[S.itemRow, { bottom, opacity, transform: [{ translateY }] }]}
+            pointerEvents="box-none"
+          >
+            <Text style={S.itemLabel}>{def.label}</Text>
+            <Pressable
+              testID={`fab-secondary-${id}`}
+              style={S.item}
+              onPress={() => { void runAction(id); }}
+              accessibilityRole="button"
+              accessibilityLabel={def.label}
+            >
+              <MCI name={def.icon} size={20} color={colors.primary} />
+            </Pressable>
+          </Animated.View>
+        );
+      })}
+
       <Pressable
-        style={({ pressed }) => [S.fab, pressed && S.fabPressed]}
-        onPress={onTap}
-        onLongPress={() => expand('long')}
-        delayLongPress={LONG_PRESS_MS}
+        style={({ pressed }) => [S.fabRow, { bottom: FAB_BOTTOM + insets.bottom }, pressed && S.pressed]}
+        onPress={toggle}
         testID="contextual-fab"
         accessibilityRole="button"
-        accessibilityLabel={`Primary action: ${primaryDef.label}. Long-press for more options.`}
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={open ? 'Close actions menu' : 'Create. Opens the actions menu.'}
         hitSlop={8}
       >
-        <MCI name={primaryDef.primaryGlyph} size={28} color="#0a0a0f" />
+        <Text style={S.fabLabel}>{open ? 'Close' : 'Create'}</Text>
+        <View style={S.fab}>
+          <MCI name={open ? 'close' : 'plus'} size={28} color={colors.onPrimary} />
+        </View>
       </Pressable>
-
-      <Modal
-        visible={open}
-        transparent
-        animationType="fade"
-        onRequestClose={collapse}
-      >
-        <Pressable style={S.backdrop} onPress={collapse} testID="fab-backdrop">
-          {ctx.secondary.map((id, i) => {
-            const def = FAB_ACTIONS[id];
-            const translateY = anim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, -(STAGGER[i] ?? 40)],
-            });
-            const opacity = anim.interpolate({
-              inputRange: [0, 1], outputRange: [0, 1],
-            });
-            return (
-              <Animated.View
-                key={id}
-                style={[S.secondaryWrap, { transform: [{ translateY }], opacity }]}
-                pointerEvents="box-none"
-              >
-                <Text style={S.secondaryLabel}>{def.label}</Text>
-                <Pressable
-                  testID={`fab-secondary-${id}`}
-                  style={S.secondary}
-                  onPress={() => { void runAction(id, 'secondary'); }}
-                >
-                  <MCI name={def.icon} size={20} color="#00d4ff" />
-                </Pressable>
-              </Animated.View>
-            );
-          })}
-        </Pressable>
-      </Modal>
     </>
   );
 }
 
 const S = StyleSheet.create({
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    zIndex: 90,
+  },
+
+  fabRow: {
+    position: 'absolute', right: spacing.lg,
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    zIndex: 102,
+  },
+  pressed: { opacity: 0.9, transform: [{ scale: 0.97 }] },
   fab: {
-    position: 'absolute', bottom: 90, alignSelf: 'center',
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: '#00d4ff', justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#00d4ff', shadowOpacity: 0.5, shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 }, elevation: 8, zIndex: 100,
+    width: FAB_SIZE, height: FAB_SIZE, borderRadius: radius.fab,
+    backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',
+    ...shadow.fab,
   },
-  fabPressed: { opacity: 0.85, transform: [{ scale: 0.95 }] },
-
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
-
-  secondaryWrap: {
-    position: 'absolute', bottom: 90, alignSelf: 'center',
-    flexDirection: 'row', alignItems: 'center', gap: 10,
+  fabLabel: {
+    color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '700',
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderRadius: radius.pill, overflow: 'hidden',
   },
-  secondary: {
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: '#1a1a2e',
-    borderWidth: 1, borderColor: '#2a2a4a',
+
+  itemRow: {
+    position: 'absolute', right: spacing.lg,
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    zIndex: 101,
+  },
+  item: {
+    width: ITEM_SIZE, height: ITEM_SIZE, borderRadius: ITEM_SIZE / 2,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1, borderColor: colors.borderStrong,
     justifyContent: 'center', alignItems: 'center',
     shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 6, elevation: 6,
   },
-  secondaryLabel: {
-    color: '#fff', fontSize: 13, fontWeight: '500',
+  itemLabel: {
+    color: colors.textPrimary, fontSize: fontSize.sm, fontWeight: '500',
     backgroundColor: 'rgba(26,26,46,0.9)',
-    paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 10, overflow: 'hidden',
+    paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+    borderRadius: radius.md, overflow: 'hidden',
   },
 });
