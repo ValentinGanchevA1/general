@@ -1,0 +1,40 @@
+name: Keep API Warm
+
+# Pings prod g88-api to prevent Render's free tier from spinning down after
+# ~15 min idle (which causes a 30-60s cold start on the next request — bad for
+# testers/demos). Hits /auth/me, which returns 401 instantly via the JWT guard
+# with no DB work; any HTTP response means the web process is awake.
+#
+# Self-contained: needs no secrets (unlike synthetic-monitor.yml). NOTE: GitHub
+# only runs `schedule` triggers from the DEFAULT branch — this has no effect
+# until it lands on master.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # every 10 min (under the ~15 min sleep window)
+  workflow_dispatch:          # manual trigger for testing
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    name: Wake prod API
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping /auth/me (cold-start tolerant)
+        run: |
+          URL="https://g88-api.onrender.com/api/v1/auth/me"
+          for attempt in 1 2 3; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 90 "$URL" || echo "000")
+            echo "attempt $attempt → HTTP $code"
+            # Any real HTTP response (incl. 401) means the service is awake.
+            if [ "$code" != "000" ] && [ "$code" -ge 100 ] 2>/dev/null; then
+              echo "::notice::g88-api is warm (HTTP $code)"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::g88-api did not respond after 3 attempts"
+          exit 1
