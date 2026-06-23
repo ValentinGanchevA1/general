@@ -204,9 +204,7 @@ export function AppNavigator(): React.JSX.Element {
 						<Stack.Screen name="About" component={AboutScreen} />
 					</>
 				) : (
-					<>
-						<Stack.Screen name="Auth" component={AuthScreen} />
-					</>
+					<Stack.Screen name="Auth" component={AuthScreen} />
 				)}
 			</Stack.Navigator>
 			{user ? <AchievementToastHost /> : null}
