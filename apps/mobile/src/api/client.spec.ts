@@ -52,7 +52,7 @@ function freshClient(refresh: RefreshSpec): Harness {
     const ok = config.validateStatus ? config.validateStatus(status) : status >= 200 && status < 300;
     return ok
       ? Promise.resolve(response)
-      : Promise.reject(new axios.AxiosError(`status ${status}`, 'ERR_BAD_RESPONSE', config, config.request, response));
+      : Promise.reject(new axios.AxiosError(`status ${status}`, 'ERR_BAD_RESPONSE', config, undefined, response));
   };
 
   let mainCalls = 0;
