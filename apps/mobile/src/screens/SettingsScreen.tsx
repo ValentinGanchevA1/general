@@ -18,10 +18,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { deleteAccount, logout } from '@/features/auth/authSlice';
 import { updateProfile } from '@/features/profile/profileSlice';
-
-// Canonical hosted privacy policy (Render static site `g88-legal`). The store
-// listing + Data Safety form point at the same URL.
-const PRIVACY_POLICY_URL = 'https://g88-legal.onrender.com/privacy';
+import { PRIVACY_POLICY_URL } from '@/constants/app';
 
 export function SettingsScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
