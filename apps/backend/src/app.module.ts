@@ -27,6 +27,7 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { IdVerificationModule } from './modules/id-verification/id-verification.module';
 import { EventsModule } from './modules/events/events.module';
 import { ListingsModule } from './modules/listings/listings.module';
+import { HealthModule } from './modules/health/health.module';
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
@@ -75,6 +76,7 @@ import { ListingsModule } from './modules/listings/listings.module';
     IdVerificationModule,
     EventsModule,
     ListingsModule,
+    HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

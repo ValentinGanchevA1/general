@@ -19,7 +19,17 @@ import { Config } from '@/config';
  *  4. If refresh itself fails, clears tokens and broadcasts a logout event.
  */
 
-let refreshInFlight: Promise<AuthTokens | null> | null = null;
+/**
+ * Result of a refresh attempt. `authFailed` distinguishes a genuine rejection
+ * (the refresh token is invalid/expired/revoked → 401/403, must re-auth) from a
+ * transient failure (timeout, offline, or a 5xx cold-start) where the tokens are
+ * still valid and must be preserved for a later retry.
+ */
+type RefreshOutcome =
+  | { ok: true; tokens: AuthTokens }
+  | { ok: false; authFailed: boolean };
+
+let refreshInFlight: Promise<RefreshOutcome> | null = null;
 
 export const api: AxiosInstance = axios.create({
   baseURL: `${Config.API_BASE_URL}/api/v1`,
@@ -46,33 +56,52 @@ api.interceptors.response.use(
       !isAuthEndpoint(original.url)
     ) {
       original._retry = true;
-      const tokens = await refreshOnce();
-      if (tokens && original.headers) {
-        original.headers.Authorization = `Bearer ${tokens.accessToken}`;
+      const outcome = await refreshOnce();
+      if (outcome.ok) {
+        if (original.headers) {
+          original.headers.Authorization = `Bearer ${outcome.tokens.accessToken}`;
+        }
         return api.request(original);
       }
-      tokenStore.clear();
-      authEvents.emit('logout', 'refresh_failed');
+      if (outcome.authFailed) {
+        // Refresh token is genuinely invalid → end the session.
+        tokenStore.clear();
+        authEvents.emit('logout', 'refresh_failed');
+        return Promise.reject(normalizeError(err));
+      }
+      // Transient refresh failure (timeout / offline / 5xx cold-start): keep the
+      // tokens and surface a network-style error so callers (e.g. restoreSession)
+      // don't mistake the original 401 for an auth failure and wipe the session.
+      const transient: ApiError = {
+        statusCode: 0,
+        code: 'refresh_unavailable',
+        message: 'Could not reach the server to refresh your session. Please try again.',
+      };
+      return Promise.reject(transient);
     }
     return Promise.reject(normalizeError(err));
   },
 );
 
-async function refreshOnce(): Promise<AuthTokens | null> {
+async function refreshOnce(): Promise<RefreshOutcome> {
   if (refreshInFlight) return refreshInFlight;
-  refreshInFlight = (async () => {
+  refreshInFlight = (async (): Promise<RefreshOutcome> => {
     try {
       const refreshToken = await tokenStore.getRefreshToken();
-      if (!refreshToken) return null;
+      // No stored refresh token → nothing to refresh; the user must re-auth.
+      if (!refreshToken) return { ok: false, authFailed: true };
       const res = await axios.post<AuthTokens>(
         `${Config.API_BASE_URL}/api/v1/auth/refresh`,
         { refreshToken },
         { timeout: 10_000 },
       );
       await tokenStore.set(res.data);
-      return res.data;
-    } catch {
-      return null;
+      return { ok: true, tokens: res.data };
+    } catch (e) {
+      // 401/403 → the refresh token is genuinely invalid (log out). Anything else
+      // (timeout, network, 5xx cold-start) is transient → keep the tokens.
+      const status = axios.isAxiosError(e) ? e.response?.status : undefined;
+      return { ok: false, authFailed: status === 401 || status === 403 };
     } finally {
       refreshInFlight = null;
     }
