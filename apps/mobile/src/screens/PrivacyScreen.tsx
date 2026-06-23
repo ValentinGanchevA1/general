@@ -1,10 +1,11 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { PRIVACY_POLICY_URL } from '@/constants/app';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -30,12 +31,16 @@ function Point({
 }
 
 /**
- * Native, self-contained summary of G88's privacy posture. Intentionally has no
- * external link (the full hosted policy isn't live yet) — the controls it points
- * to (Appear on map, Delete account) live in Settings.
+ * Native, self-contained summary of G88's privacy posture. Links out to the full
+ * hosted policy; the controls it points to (Appear on map, Delete account) live
+ * in Settings.
  */
 export function PrivacyScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
+
+  const openFullPolicy = (): void => {
+    void Linking.openURL(PRIVACY_POLICY_URL);
+  };
 
   return (
     <View style={styles.container}>
@@ -101,6 +106,15 @@ export function PrivacyScreen(): React.JSX.Element {
           <Icon name="chevron-right" size={24} color="#444" />
         </TouchableOpacity>
 
+        <TouchableOpacity style={[styles.actionRow, styles.actionRowSpaced]} onPress={openFullPolicy}>
+          <Icon name="file-document-outline" size={22} color="#888" />
+          <View style={styles.actionText}>
+            <Text style={styles.actionLabel}>Read the full policy</Text>
+            <Text style={styles.actionSub}>Opens our complete privacy policy</Text>
+          </View>
+          <Icon name="open-in-new" size={20} color="#444" />
+        </TouchableOpacity>
+
         <Text style={styles.footnote}>
           Deleting your account (Settings → Delete account) is immediate and
           permanently removes your profile, photos, messages, and activity.
@@ -147,6 +161,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2a2a4a',
   },
+  actionRowSpaced: { marginTop: 12 },
   actionText: { flex: 1, marginLeft: 12 },
   actionLabel: { color: '#fff', fontSize: 15, fontWeight: '500' },
   actionSub: { color: '#666', fontSize: 12, marginTop: 2 },

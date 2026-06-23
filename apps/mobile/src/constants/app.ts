@@ -7,3 +7,7 @@ export const APP_VERSION = '1.0.0';
 
 /** Support + data-request contact. Mirrors the privacy policy's contact email. */
 export const SUPPORT_EMAIL = 'vganchev6@gmail.com';
+
+/** Canonical hosted privacy policy (Render static site `g88-legal`). Same URL
+ *  used by the Play store listing + Data Safety form. */
+export const PRIVACY_POLICY_URL = 'https://g88-legal.onrender.com/privacy';
