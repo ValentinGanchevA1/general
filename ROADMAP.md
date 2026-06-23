@@ -18,7 +18,7 @@
 | P4+ — horizon               | 📋 documented only | P3 retention sustained                                  |
 
 Target launch market: **Varna, BG** (single test city — see `PRODUCT.md` § Launch market).
-Immediate gate: **owner-side Android Play Console closed-testing setup** (keystore + secrets + listing + Data Safety + first AAB upload — see `DEPLOY.md` → "Mobile release"). `STATUS.md` is the live truth.
+Immediate gate: **owner-side Android Play Console closed-testing setup**. As of **2026-06-23 the engineering prep is complete** — keystore + CI secrets set, **signed AAB built + verified**, automated Play upload wired, store-listing/Data-Safety/release-notes drafted (`docs/`), **privacy policy hosted + filled** (`https://g88-legal.onrender.com/privacy`), and **in-app account deletion shipped** (`DELETE /users/me`). Remaining is **Console-only**: $25 registration, create app `com.g88` + closed track, opt into Play App Signing + add its SHA-1 to the Maps key, **manual first AAB upload**, paste listing/Data-Safety/privacy URL. See `DEPLOY.md` → "Mobile release". `STATUS.md` is the live truth.
 
 > **Phase vocabulary is authoritative here.** These four phases (P1 · P2 · P3 · P4+) are the canonical sequence. **There is no P5.** `STATUS.md` historically used `P3`/`P4`/`P5` as ad-hoc *sprint* labels for feature build-out — see the "Phase-vocabulary reconciliation" table at the top of `STATUS.md` for the mapping back to these phases.
 >

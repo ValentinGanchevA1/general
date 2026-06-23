@@ -179,6 +179,17 @@ non-test users can link.
 > not exist (only `Podfile` + `.xcode.env`), and archiving requires macOS. Android is
 > build-ready, so the beta path is **Google Play closed testing**. See `STATUS.md`.
 
+> **Status (2026-06-23) — engineering prep COMPLETE; only owner-side Console steps remain.**
+> Done: upload keystore generated; all 4 `ANDROID_UPLOAD_*` + `GOOGLE_MAPS_API_KEY_RELEASE`
+> CI secrets set; **signed AAB built + verified** (`android-release.yml` run `27970075691`,
+> debug-signed guard passed); **automated Play upload step wired** (auto-skips until
+> `PLAY_SERVICE_ACCOUNT_JSON` exists); store listing + Data Safety + release-notes drafted
+> (`docs/play-store-listing.md`, `docs/play-release-notes.md`); **privacy policy hosted +
+> fully filled** at `https://g88-legal.onrender.com/privacy` (Render static site `g88-legal`,
+> serves `docs/legal/`, auto-deploys `master`); **in-app account deletion shipped**
+> (`DELETE /users/me` + Settings → Delete account) → Data Safety "deletion" = in-app Yes.
+> Below, steps **1, 2, 5 are done**; remaining is **3, 4, 6** (Console) + optional auto-publish.
+
 ### What's in-repo (done)
 - `apps/mobile/android/app/build.gradle`: a **release signing config** reads the upload key
   from `local.properties` (`RELEASE_STORE_FILE/_STORE_PASSWORD/_KEY_ALIAS/_KEY_PASSWORD`);
@@ -189,17 +200,17 @@ non-test users can link.
   `g88-release-aab`. `versionCode = github.run_number`.
 
 ### One-time setup (manual — owner action)
-1. **Generate the upload keystore** (keep it safe + backed up — losing it requires a Play
-   key reset):
+1. ✅ **Done (2026-06-22). Generate the upload keystore** (keep it safe + backed up — losing
+   it requires a Play key reset):
    ```
    keytool -genkeypair -v -keystore upload.keystore -alias g88-upload \
      -keyalg RSA -keysize 2048 -validity 10000
    ```
-2. **Set GitHub repo secrets** (Settings → Secrets → Actions):
+2. ✅ **Done (2026-06-22). Set GitHub repo secrets** (Settings → Secrets → Actions) — all set:
    - `ANDROID_UPLOAD_KEYSTORE_BASE64` — `base64 -w0 upload.keystore` (the file, base64'd)
    - `ANDROID_UPLOAD_STORE_PASSWORD`, `ANDROID_UPLOAD_KEY_ALIAS` (`g88-upload`),
      `ANDROID_UPLOAD_KEY_PASSWORD`
-   - (Reuses existing `GOOGLE_MAPS_API_KEY_RELEASE` + `GOOGLE_SERVICES_JSON` secrets.)
+   - `GOOGLE_MAPS_API_KEY_RELEASE` set; reuses existing `GOOGLE_SERVICES_JSON`.
 3. **Play Console** ($25 one-time): create app `com.g88`, opt into **Play App Signing**
    (Google holds the signing key; the keystore above is only the *upload* key), create a
    **Closed testing** track + tester list.
@@ -220,13 +231,17 @@ non-test users can link.
    - **Confirm:** install from the closed track and open the map. If still grey,
      `adb logcat | grep -i "Authorization"` echoes the SHA-1 + `com.g88` the device
      presented — compare it to the key's restriction.
-5. **Store listing minimums**: app name, short + full description, icon, feature graphic,
-   **privacy policy URL** (required — app collects location), and the **Data Safety form**
-   (declare: precise/approximate **location**, account info; note location is fuzzed to
-   ~120m server-side per `ARCHITECTURE.md §3.3`).
-6. **First upload is manual**: run `android-release.yml` (Actions → Run workflow), download
-   the `g88-release-aab` artifact, upload it to the closed track in the Console. Play
-   requires the first release to be created by hand.
+5. ✅ **Drafted — paste into the Console. Store listing minimums**: app name, short + full
+   description, icon, feature graphic, **privacy policy URL** and the **Data Safety form**
+   (declare: precise/approximate **location**, account info; location fuzzed to ~120m
+   server-side per `ARCHITECTURE.md §3.3`). Copy is ready: listing + Data-Safety answers in
+   `docs/play-store-listing.md`. **Privacy policy is live** at
+   `https://g88-legal.onrender.com/privacy` (fully filled — operator/email/address). Data
+   Safety "users can request deletion" = **Yes, in-app** (`DELETE /users/me`).
+6. **First upload is manual** (owner): the signed AAB is already built — run
+   `android-release.yml` (Actions → Run workflow) for a fresh one, download the
+   `g88-release-aab` artifact, and upload it to the closed track. Play requires the first
+   release to be created by hand; paste release notes from `docs/play-release-notes.md`.
 
 ### After first upload — automated publishing (wired)
 `android-release.yml` has a **Publish to Google Play** step (`r0adkll/upload-google-play`)
