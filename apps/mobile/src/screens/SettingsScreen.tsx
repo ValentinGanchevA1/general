@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Modal,
   StyleSheet,
   Switch,
@@ -17,6 +18,10 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { deleteAccount, logout } from '@/features/auth/authSlice';
 import { updateProfile } from '@/features/profile/profileSlice';
+
+// Canonical hosted privacy policy (Render static site `g88-legal`). The store
+// listing + Data Safety form point at the same URL.
+const PRIVACY_POLICY_URL = 'https://g88-legal.onrender.com/privacy';
 
 export function SettingsScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
@@ -46,6 +51,10 @@ export function SettingsScreen(): React.JSX.Element {
 
   const handleLogout = (): void => {
     void dispatch(logout());
+  };
+
+  const openPrivacyPolicy = (): void => {
+    void Linking.openURL(PRIVACY_POLICY_URL);
   };
 
   const confirmDelete = async (): Promise<void> => {
@@ -96,6 +105,17 @@ export function SettingsScreen(): React.JSX.Element {
             <Text style={styles.rowSub}>Choose which alerts you receive</Text>
           </View>
           <Icon name="chevron-right" size={24} color="#555" />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Legal</Text>
+        <TouchableOpacity style={styles.row} onPress={openPrivacyPolicy}>
+          <View style={styles.rowContent}>
+            <Text style={styles.rowLabel}>Privacy Policy</Text>
+            <Text style={styles.rowSub}>How we handle your data</Text>
+          </View>
+          <Icon name="open-in-new" size={20} color="#555" />
         </TouchableOpacity>
       </View>
 
