@@ -1,0 +1,4 @@
+# Shell scripts must check out with LF line endings. CRLF breaks them on the
+# Linux CI runners (e.g. `bash: $'\r': command not found`), and the guard
+# scripts under scripts/ci/ run there on every push/PR.
+*.sh text eol=lf
