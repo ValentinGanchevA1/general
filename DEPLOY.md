@@ -273,3 +273,51 @@ create the app or seed an empty track.
 > ⚠️ Confirm your closed track's **track name** matches the `track` input. Internal
 > testing = `internal`; the default closed track = `alpha`; a custom closed track uses
 > the name you gave it. A wrong track name makes the API call fail.
+
+## Sideload APK — direct sharing (no Play Store)
+
+> A second distribution channel, separate from Play closed testing above. Builds a signed
+> **APK** (not an AAB) for direct install — hand a download link to anyone, they sideload
+> it. Use this for quick demos / testers before (or alongside) the Play track.
+
+> **Status (2026-06-25) — live + verified end-to-end.** Workflow on `master`; per-run
+> GitHub Releases auto-published; map confirmed rendering on-device with the signed build
+> (no Maps auth errors in logcat).
+
+### What's in-repo (done)
+- `.github/workflows/android-apk.yml` ("Android APK (sideload)"): builds a **signed APK**
+  (`assembleRelease`) with the **same upload keystore** as the AAB, fails if the APK is
+  debug-signed, uploads the `g88-release-apk` artifact, and **publishes a GitHub Release**
+  per run. Needs `contents: write` (set in the workflow). `versionCode = github.run_number`.
+- Reuses the exact same secrets as the AAB workflow — no new setup:
+  `ANDROID_UPLOAD_KEYSTORE_BASE64`, `ANDROID_UPLOAD_STORE_PASSWORD`, `ANDROID_UPLOAD_KEY_ALIAS`,
+  `ANDROID_UPLOAD_KEY_PASSWORD`, `GOOGLE_MAPS_API_KEY_RELEASE`, `GOOGLE_SERVICES_JSON`.
+
+### Running it
+- **Trigger:** Actions → *Android APK (sideload)* → **Run workflow** (manual dispatch only —
+  the old `ci/android-apk` push trigger branch was deleted).
+- Each successful run creates a release at tag **`apk-v1.0.<run_number>`**, marked **Latest**,
+  with the APK attached as **`g88-v1.0.apk`**.
+- **Permanent share link** (always serves the newest build — repo is public, no login):
+  ```
+  https://github.com/ValentinGanchevA1/general/releases/latest/download/g88-v1.0.apk
+  ```
+  This resolves only to a **full** release (GitHub's `/latest/` ignores prereleases), which
+  is why the workflow publishes full releases, not prereleases.
+
+### Installing
+- **On device:** allow "install unknown apps" for your browser/file manager, download the
+  APK, tap to install. Or `adb install g88-v1.0.apk`.
+- If `adb install` fails with **`INSTALL_FAILED_UPDATE_INCOMPATIBLE` (signatures do not
+  match)**, a differently-signed `com.g88` is already installed (e.g. an old debug build) —
+  `adb uninstall com.g88` first, then reinstall. (Wipes that app's local data.)
+
+### Blank-map gotcha — different SHA-1 than the Play path
+A **sideloaded** APK keeps the **upload key's** signature (Google does **not** re-sign it,
+unlike a Play download). So the SHA-1 to whitelist on `GOOGLE_MAPS_API_KEY_RELEASE` is the
+**upload key's** SHA-1 — **not** the Play App Signing SHA-1 used for the closed track.
+- The workflow's **"Print signing certificate fingerprints"** step echoes it each run.
+- Current upload-key SHA-1 (already added, package `com.g88`):
+  `6B:AE:F5:01:20:69:5C:8B:40:AF:15:B2:ED:7F:C7:8C:54:4F:16:43`.
+- One key can hold both rows (upload-key SHA-1 for sideload + App-signing SHA-1 for Play),
+  so both distribution paths render the map off the same `GOOGLE_MAPS_API_KEY_RELEASE`.
