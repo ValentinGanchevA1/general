@@ -22,7 +22,7 @@ on:
       - ci/android-apk
 
 permissions:
-  contents: read
+  contents: write   # create/update the GitHub Release that hosts the shareable APK
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -118,3 +118,39 @@ jobs:
           name: g88-release-apk
           path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 14
+
+      # Give the APK a stable, human-friendly filename so the
+      # releases/latest/download/g88-v1.0.apk link is permanent.
+      - name: Stage APK for release
+        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/g88-v1.0.apk
+
+      # Publishes a GitHub Release per run with the signed APK attached. The
+      # per-run tag (apk-v1.0.<run_number>) is immutable history; make_latest
+      # keeps releases/latest/download/g88-v1.0.apk pointing at the newest build,
+      # so the share link never changes. Full release (not prerelease) is
+      # required for the /latest/ redirect to resolve.
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-v1.0.${{ github.run_number }}
+          name: "G88 v1.0 (build ${{ github.run_number }}) — Android sideload APK"
+          files: apps/mobile/android/app/build/outputs/apk/release/g88-v1.0.apk
+          make_latest: "true"
+          target_commitish: ${{ github.sha }}
+          body: |
+            Signed Android APK for direct install (sideload). Not the Play Store build.
+
+            **Permanent download link** (always the newest build):
+            https://github.com/${{ github.repository }}/releases/latest/download/g88-v1.0.apk
+
+            ## Install
+            1. On Android, allow installing from your browser/file manager (Settings → Apps → Special access → Install unknown apps).
+            2. Download **g88-v1.0.apk** below and tap it to install.
+            3. Or via ADB: `adb install g88-v1.0.apk`
+
+            ## Notes
+            - Signed with the G88 upload key (stable identity — builds install over each other).
+            - Connects to the production backend (`api.g88.app`).
+            - If the map is blank, the app's upload-key SHA-1 still needs whitelisting on the release Maps key.
+
+            Commit: ${{ github.sha }} · Build: ${{ github.run_number }}
