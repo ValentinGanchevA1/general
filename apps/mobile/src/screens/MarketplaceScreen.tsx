@@ -3,7 +3,7 @@
 // P3.7 trading hub: a nearby browse grid + a "Sell an item" entry + a saved
 // (favorites) toggle. Tapping a card opens ListingDetail.
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -28,8 +28,16 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function MarketplaceScreen(): React.JSX.Element {
   const nav = useNavigation<Nav>();
-  const { coords } = useUserLocation();
+  const { coords, requestPermission } = useUserLocation();
   const [tab, setTab] = useState<'browse' | 'saved'>('browse');
+
+  // useUserLocation only starts acquiring a fix once requestPermission() runs,
+  // and `coords` is local state that defaults to null. Without this, the nearby
+  // browse never gets a location and the grid is permanently empty. Mirrors
+  // MapScreen's mount effect.
+  useEffect(() => {
+    void requestPermission();
+  }, [requestPermission]);
 
   const browse = useBrowseListings(tab === 'browse' ? coords : null);
   const saved = useFavorites(tab === 'saved');
