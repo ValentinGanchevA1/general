@@ -97,6 +97,14 @@ jobs:
           restore-keys: gradle-
 
       - name: Build signed release APK
+        # GOOGLE_WEB_CLIENT_ID / SENTRY_DSN are read via process.env at JS bundle
+        # time (babel inline-env transform) — they must be present in the gradle
+        # process env, otherwise they inline as '' and Google Sign-In + Sentry are
+        # silently disabled in the APK. The web client id is public (OAuth web
+        # client); SENTRY_DSN is a public DSN kept as a secret for hygiene.
+        env:
+          GOOGLE_WEB_CLIENT_ID: 689098029576-r7hoijre01nvocb25elp2q0ufb5v0geu.apps.googleusercontent.com
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
           cd android
           ./gradlew assembleRelease --no-daemon -PversionCodeOverride=${{ github.run_number }}
