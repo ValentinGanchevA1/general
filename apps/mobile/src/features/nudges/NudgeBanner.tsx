@@ -1,9 +1,11 @@
 // apps/mobile/src/features/nudges/NudgeBanner.tsx
 //
-// Compact, dismissible map banner for the P3.1 leftover nudges (verification /
-// streak). Mirrors DailyChallengeCard's styling and sits just below it; shows at
-// most one nudge and self-hides when there's nothing to surface. Tapping opens
-// the relevant screen; the close button suppresses it for the nudge's cooldown.
+// Presentational P3.1 nudge banner (verification / streak). The nudge selection
+// and dismissal state live in `useNudges`, which is owned by the parent
+// (MapTopStack) so the map shows at most one promo at a time. This component is
+// pure render: given a nudge, draw it; tapping opens the target screen, the ✕
+// calls back to dismiss. Positioning is owned by the parent stack — no absolute
+// offsets here.
 
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -13,15 +15,17 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { track } from '@/lib/analytics';
-import { useNudges } from './useNudges';
+import type { Nudge } from './useNudges';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-export function NudgeBanner(): React.JSX.Element | null {
-  const navigation = useNavigation<Nav>();
-  const { nudge, dismiss } = useNudges();
+interface Props {
+  nudge: Nudge;
+  onDismiss: (id: string) => void;
+}
 
-  if (!nudge) return null;
+export function NudgeBanner({ nudge, onDismiss }: Props): React.JSX.Element {
+  const navigation = useNavigation<Nav>();
 
   return (
     <View style={styles.wrap} pointerEvents="box-none">
@@ -48,7 +52,7 @@ export function NudgeBanner(): React.JSX.Element | null {
           style={styles.close}
           onPress={() => {
             track('nudge.dismiss', { id: nudge.id });
-            dismiss(nudge.id);
+            onDismiss(nudge.id);
           }}
         >
           <Icon name="close" size={16} color="#888" />
@@ -59,14 +63,7 @@ export function NudgeBanner(): React.JSX.Element | null {
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    position: 'absolute',
-    // Stacks directly under DailyChallengeCard (top: 116, ~44px tall).
-    top: 168,
-    left: 16,
-    right: 16,
-    alignItems: 'center',
-  },
+  wrap: { paddingHorizontal: 16, alignItems: 'center' },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
