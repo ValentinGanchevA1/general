@@ -4,15 +4,13 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 
 // Mock the pure geo helpers so we can drive resolution / cell set / zoom branch
 // deterministically; everything else from @g88/shared stays real (types, etc.).
-jest.mock('@g88/shared', () => {
-  const actual = jest.requireActual('@g88/shared');
-  return {
-    ...actual,
-    h3ResolutionForZoom: jest.fn(),
-    isEntityZoom: jest.fn(),
-    cellsForViewport: jest.fn(),
-  };
-});
+const shared = jest.requireActual('@g88/shared');
+jest.mock('@g88/shared', () => ({
+  ...shared,
+  h3ResolutionForZoom: jest.fn(),
+  isEntityZoom: jest.fn(),
+  cellsForViewport: jest.fn(),
+}));
 jest.mock('h3-js', () => ({ cellToLatLng: jest.fn(() => [1.5, 2.5]) }));
 
 import { h3ResolutionForZoom, isEntityZoom, cellsForViewport } from '@g88/shared';
