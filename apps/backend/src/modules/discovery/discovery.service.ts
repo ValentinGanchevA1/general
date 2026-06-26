@@ -25,6 +25,25 @@ const DEFAULT_KINDS: EntityKind[] = ['user', 'event', 'listing'];
 /** Hard cap to keep one viewport from returning a runaway payload. */
 const MAX_POINTS_PER_RESPONSE = 500;
 
+/**
+ * Pre-allocation OOM bound — NOT the UX cap. The UX limit stays the existing
+ * `cells.length > 5_000` post-enumeration check below. This estimate guard only
+ * refuses a viewport so large that h3.polygonToCells would allocate enough
+ * cell-ids to threaten the process (~200k ids ≈ 30 MB). Real clients pair large
+ * viewports with coarse resolutions, so they never approach this; only a forged
+ * (huge bbox + fine zoom) request does.
+ */
+const MAX_CELLS_PER_VIEWPORT = 200_000;
+
+/**
+ * Average H3 hexagon area (km²) per resolution. Used to estimate how many cells
+ * a viewport spans WITHOUT enumerating them, so an oversized request is rejected
+ * before h3.polygonToCells allocates. Source: H3 resolution table.
+ */
+const H3_CELL_AREA_KM2: Record<number, number> = {
+  4: 1770.3, 5: 252.9, 6: 36.13, 7: 5.161, 8: 0.7373, 9: 0.1053, 10: 0.01504,
+};
+
 /** Snapshot TTL — after 30s the diff baseline expires and clients get a full response. */
 const SNAPSHOT_TTL_SECONDS = 30;
 
@@ -59,6 +78,17 @@ export class DiscoveryService {
       ? requested.filter((k) => k === 'event' || k === 'listing')
       : requested;
     const resolution = h3ResolutionForZoom(params.zoom);
+
+    // Guard BEFORE enumerating: a forged viewport (huge bbox + fine zoom) can make
+    // h3.polygonToCells allocate millions of cells and OOM the process — which also
+    // kills the in-process Socket.IO gateway. Reject using a cheap area estimate.
+    if (this.estimateCellCount(params.viewport, resolution) > MAX_CELLS_PER_VIEWPORT) {
+      this.logger.warn(
+        `Viewport too large at r${resolution} (estimated cells exceed ${MAX_CELLS_PER_VIEWPORT}) — refusing`,
+      );
+      return this.empty(resolution, params.viewport, kinds, topicSlug);
+    }
+
     const cells = cellsForViewport(params.viewport, resolution);
 
     if (cells.length === 0 || (topicSlug && kinds.length === 0)) {
@@ -241,6 +271,7 @@ export class DiscoveryService {
          AND visibility = 'public'
          AND id <> $3
          ${topicSlug ? `AND ${TOPIC_MATCH_SQL('$5')}` : ''}
+       ORDER BY id
        LIMIT $4
       `,
       topicSlug
@@ -279,6 +310,21 @@ export class DiscoveryService {
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
+
+  /**
+   * Cheap upper-bound estimate of how many H3 cells a viewport spans, from its
+   * bounding-box area ÷ average cell area — no enumeration, so it can't OOM.
+   */
+  private estimateCellCount(viewport: Viewport, resolution: number): number {
+    const KM_PER_DEG = 111.32;
+    const midLatRad = ((viewport.ne.lat + viewport.sw.lat) / 2) * (Math.PI / 180);
+    const latKm = Math.abs(viewport.ne.lat - viewport.sw.lat) * KM_PER_DEG;
+    const lngKm = Math.abs(viewport.ne.lng - viewport.sw.lng) * KM_PER_DEG * Math.cos(midLatRad);
+    const areaKm2 = latKm * lngKm;
+    // Fall back to the smallest cell area (largest estimate) for unknown resolutions.
+    const cellKm2 = H3_CELL_AREA_KM2[resolution] ?? 0.01504;
+    return areaKm2 / cellKm2;
+  }
 
   /** Strictly whitelist the H3 cell column name — never accept user input here. */
   private cellColumn(resolution: number): string {
