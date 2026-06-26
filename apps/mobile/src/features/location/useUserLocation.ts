@@ -1,19 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, Platform } from 'react-native';
-import { PermissionsAndroid } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, PermissionsAndroid, Platform } from 'react-native';
+import Geolocation from '@react-native-community/geolocation';
 import type { LatLng } from '@g88/shared';
 
-// navigator.geolocation is still available at runtime in React Native but is
-// no longer typed in @types/react-native — declare the subset we use.
-declare const navigator: {
-  geolocation: {
-    getCurrentPosition(
-      success: (pos: { coords: { latitude: number; longitude: number } }) => void,
-      error?: (err: { message: string }) => void,
-      options?: { enableHighAccuracy?: boolean; timeout?: number },
-    ): void;
-  } | undefined;
-};
+// Real GPS comes from @react-native-community/geolocation (a native module).
+// RN 0.83 no longer ships the legacy `navigator.geolocation` polyfill, so the
+// device never produced a fix and no user was ever written to the discovery
+// view — see useUserLocation history. This module is autolinked; it needs an
+// Android rebuild, not just a Metro reload.
 
 interface UseUserLocationResult {
   coords: LatLng | null;
@@ -22,26 +16,26 @@ interface UseUserLocationResult {
 
 export function useUserLocation(): UseUserLocationResult {
   const [coords, setCoords] = useState<LatLng | null>(null);
-  const [watchId, setWatchId] = useState<ReturnType<typeof setInterval> | null>(null);
+  const watchId = useRef<number | null>(null);
 
   const startTracking = useCallback(() => {
-    const geo = typeof navigator !== 'undefined' ? navigator.geolocation : undefined;
-    if (!geo) return;
-    geo.getCurrentPosition(
+    // Don't stack watchers if requestPermission runs more than once.
+    if (watchId.current !== null) return;
+
+    // Immediate first fix so the map can centre and presence can fire right away.
+    Geolocation.getCurrentPosition(
       (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       (err) => Alert.alert('Location error', err.message),
-      { enableHighAccuracy: true, timeout: 15_000 },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 10_000 },
     );
 
-    const id = setInterval(() => {
-      geo.getCurrentPosition(
-        (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => undefined,
-        { enableHighAccuracy: true, timeout: 10_000 },
-      );
-    }, 30_000);
-    setWatchId(id);
-  }, []); // setCoords and setWatchId are stable state setters
+    // Continuous updates; the library throttles by movement (distanceFilter).
+    watchId.current = Geolocation.watchPosition(
+      (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => undefined,
+      { enableHighAccuracy: true, distanceFilter: 25 },
+    );
+  }, []); // setCoords is a stable state setter; watchId is a ref
 
   const requestPermission = useCallback(async () => {
     if (Platform.OS === 'android') {
@@ -54,15 +48,20 @@ export function useUserLocation(): UseUserLocationResult {
         },
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
+    } else {
+      Geolocation.requestAuthorization();
     }
     startTracking();
   }, [startTracking]);
 
   useEffect(() => {
     return () => {
-      if (watchId !== null) clearInterval(watchId);
+      if (watchId.current !== null) {
+        Geolocation.clearWatch(watchId.current);
+        watchId.current = null;
+      }
     };
-  }, [watchId]);
+  }, []);
 
   return { coords, requestPermission };
 }
