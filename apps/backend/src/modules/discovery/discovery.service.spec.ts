@@ -79,6 +79,15 @@ describe('DiscoveryService', () => {
       expect(query).not.toHaveBeenCalled();
     });
 
+    it('does not refuse a narrow antimeridian-crossing viewport (normalized lng delta)', async () => {
+      // sw.lng=179, ne.lng=-179 is a ~2° span across the dateline. A naive
+      // ne.lng - sw.lng = -358° would inflate the area estimate past the cell
+      // cap and wrongly refuse; the normalized delta keeps it queryable.
+      const antimeridian: Viewport = { ne: { lat: 2, lng: -179 }, sw: { lat: 1, lng: 179 } };
+      await call({ viewport: antimeridian });
+      expect(query).toHaveBeenCalled();
+    });
+
     it('defaults to all kinds and excludes the requester / private rows', async () => {
       await call();
       const [, params] = query.mock.calls[0]!;
