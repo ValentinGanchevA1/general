@@ -3,14 +3,49 @@ import { config as loadEnv } from 'dotenv';
 import { join } from 'path';
 import * as Sentry from '@sentry/nestjs';
 import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe, RequestMethod } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 
+
 loadEnv({ path: join(process.cwd(), '../../.env') });
+
+// ── Sentry PII scrubber (OB1) ───────────────────────────────────────────────
+// Hard privacy invariant: coordinates, H3 cells, and tokens must never leave the
+// process. Redacts denylisted keys anywhere in the event/breadcrumb and strips
+// Bearer tokens from any string value. Fail-safe: over-redaction is acceptable.
+const SENTRY_DENY_KEYS = new Set([
+  'authorization', 'cookie', 'password', 'passwordhash',
+  'token', 'idtoken', 'refreshtoken', 'accesstoken',
+  'phone', 'email', 'latitude', 'longitude', 'lat', 'lng',
+  'location', 'iddocumenturl',
+]);
+const SENTRY_BEARER_RE = /Bearer\s+[A-Za-z0-9._-]+/g;
+
+function scrubSentry<T>(value: T, depth = 0): T {
+  if (value == null || depth > 8) return value;
+  if (typeof value === 'string') {
+    return value.replace(SENTRY_BEARER_RE, 'Bearer [redacted]') as unknown as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => scrubSentry(v, depth + 1)) as unknown as T;
+  }
+  if (typeof value === 'object') {
+    const proto = Object.getPrototypeOf(value);
+    if (proto !== Object.prototype && proto !== null) return value;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = SENTRY_DENY_KEYS.has(k.toLowerCase())
+        ? '[redacted]'
+        : scrubSentry(v, depth + 1);
+    }
+    return out as unknown as T;
+  }
+  return value;
+}
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
@@ -20,6 +55,8 @@ Sentry.init({
   integrations: [Sentry.nestIntegration()],
   // 10 % performance sampling in production; off in dev to keep noise low.
   tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 0,
+  beforeSend: (event) => scrubSentry(event),
+  beforeBreadcrumb: (breadcrumb) => scrubSentry(breadcrumb),
 });
 
 // Fail fast on missing or weak secrets before any module loads.
@@ -52,7 +89,9 @@ async function bootstrap(): Promise<void> {
 
   app.use(helmet());
 
-  app.setGlobalPrefix('api/v1');
+app.setGlobalPrefix('api/v1', {
+  exclude: [{ path: 'health', method: RequestMethod.GET }],
+});
 
   // Development request logger to help debug emulator <-> host networking
   if (process.env.NODE_ENV !== 'production') {
