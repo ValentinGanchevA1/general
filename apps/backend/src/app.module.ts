@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-
+import { BlocksModule } from './modules/blocks/blocks.module';
 import { RedisModule } from './config/redis.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -77,6 +77,7 @@ import { HealthModule } from './modules/health/health.module';
     EventsModule,
     ListingsModule,
     HealthModule,
+    BlocksModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

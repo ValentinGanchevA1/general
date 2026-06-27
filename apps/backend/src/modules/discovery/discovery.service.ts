@@ -212,6 +212,11 @@ export class DiscoveryService {
          AND kind = ANY($2::text[])
          AND visibility = 'public'
          AND id <> $3
+         AND NOT (kind = 'user' AND EXISTS (
+           SELECT 1 FROM user_blocks ub
+            WHERE (ub.blocker_id = $3 AND ub.blocked_id = id)
+               OR (ub.blocker_id = id AND ub.blocked_id = $3)
+         ))
          ${topicSlug ? `AND ${TOPIC_MATCH_SQL('$4')}` : ''}
        GROUP BY ${cellCol}, kind
       `,
@@ -270,6 +275,11 @@ export class DiscoveryService {
          AND kind = ANY($2::text[])
          AND visibility = 'public'
          AND id <> $3
+         AND NOT (kind = 'user' AND EXISTS (
+           SELECT 1 FROM user_blocks ub
+            WHERE (ub.blocker_id = $3 AND ub.blocked_id = id)
+               OR (ub.blocker_id = id AND ub.blocked_id = $3)
+         ))
          ${topicSlug ? `AND ${TOPIC_MATCH_SQL('$5')}` : ''}
        ORDER BY id
        LIMIT $4

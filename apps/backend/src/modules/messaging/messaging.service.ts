@@ -34,6 +34,24 @@ export interface MessagePermissionResult extends ProfileRelationship {
 export class MessagingService {
   constructor(@InjectDataSource() private readonly db: DataSource) {}
 
+  /**
+   * Symmetric: true if either direction has blocked the other. Self-contained
+   * (queries `user_blocks` directly via the existing DataSource) rather than
+   * depending on BlocksModule, so this module's wiring doesn't change. Mirrors
+   * BlocksService.isBlocked() — keep both in sync if the predicate changes.
+   */
+  private async isBlocked(userA: string, userB: string): Promise<boolean> {
+    const [row] = await this.db.query<Array<{ exists: boolean }>>(
+      `SELECT EXISTS (
+         SELECT 1 FROM user_blocks
+          WHERE (blocker_id = $1 AND blocked_id = $2)
+             OR (blocker_id = $2 AND blocked_id = $1)
+       ) AS exists`,
+      [userA, userB],
+    );
+    return row?.exists ?? false;
+  }
+
   /** Sorted participant pair — the stable uniqueness key for a 1:1 conversation. */
   private pairKey(a: string, b: string): string[] {
     return [a, b].sort();
@@ -46,6 +64,13 @@ export class MessagingService {
    * conversation) is the only thing that grants `chat`.
    */
   async permissionFor(viewerId: string, targetId: string): Promise<MessagePermissionResult> {
+    // Block check first: it overrides match/shared-interest state entirely.
+    // openForMessaging() already throws chat.locked when canMessage is 'none',
+    // so this alone closes the gate — no further change needed there.
+    if (await this.isBlocked(viewerId, targetId)) {
+      return { matched: false, sharedInterests: [], canMessage: 'none', conversation: null };
+    }
+
     const [sharedRow] = await this.db.query<Array<{ shared: string[] | null }>>(
       `SELECT array(
                 SELECT unnest(COALESCE(a.interests, '{}'::text[]) || COALESCE(a.goals, '{}'::text[]))
