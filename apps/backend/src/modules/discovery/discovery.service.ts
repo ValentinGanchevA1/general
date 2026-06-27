@@ -319,7 +319,11 @@ export class DiscoveryService {
     const KM_PER_DEG = 111.32;
     const midLatRad = ((viewport.ne.lat + viewport.sw.lat) / 2) * (Math.PI / 180);
     const latKm = Math.abs(viewport.ne.lat - viewport.sw.lat) * KM_PER_DEG;
-    const lngKm = Math.abs(viewport.ne.lng - viewport.sw.lng) * KM_PER_DEG * Math.cos(midLatRad);
+    // Normalize the longitude delta into [0, 360) so antimeridian-crossing
+    // viewports (e.g. sw.lng=179, ne.lng=-179) report their true ~2° width
+    // rather than a wildly inflated ~358°.
+    const lngDeg = (((viewport.ne.lng - viewport.sw.lng) % 360) + 360) % 360;
+    const lngKm = lngDeg * KM_PER_DEG * Math.cos(midLatRad);
     const areaKm2 = latKm * lngKm;
     // Fall back to the smallest cell area (largest estimate) for unknown resolutions.
     const cellKm2 = H3_CELL_AREA_KM2[resolution] ?? 0.01504;
