@@ -45,7 +45,7 @@ Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md`.
 | Mobile                     | React Native 0.83 (CLI), React 19, TypeScript 5.5, Redux Toolkit 2, React Navigation 7                                                                                                                                                                                                                                                  |
 | Backend (REST)             | NestJS 11, TypeORM 0.3 (DataSource only, raw SQL), TypeScript 5.5, Node ≥22.13                                                                                                                                                                                                                                                          |
 | Realtime gateway           | NestJS, Socket.IO 4 (Redis adapter). Runs **in-process** with REST in a single `main.ts` / single `g88-api` service; separate deploy is planned, not built (`ARCHITECTURE.md §3.5`)                                                                                                                                                     |
-| Database                   | PostgreSQL 16 + PostGIS + H3-PG (`geography(Point,4326)` + H3 cell columns r5/7/9/10, GIST indexes). Schema = migrations `0001`–`0025`, next free `0026`                                                                                                                                                                                |
+| Database                   | PostgreSQL 16 + PostGIS + H3-PG (`geography(Point,4326)` + H3 cell columns r5/7/9/10, GIST indexes). Schema = migrations `0001`–`0026`, next free `0027`                                                                                                                                                                                |
 | Cache / Presence / Pub-Sub | Redis 7 (sorted sets per H3 r8 cell, 120s TTL)                                                                                                                                                                                                                                                                                          |
 | Spatial index              | H3 (Uber hexagonal hierarchical), server-side clustering at zoom <14                                                                                                                                                                                                                                                                    |
 | Storage                    | AWS S3, presigned URLs (avatars + photo gallery; verified end-to-end)                                                                                                                                                                                                                                                                   |
@@ -81,9 +81,9 @@ g88/
 │   │   ├── src/modules/    Feature modules (auth, users, discovery, chat, messaging,
 │   │   │                     interactions, presence, notifications, alerts, geofences, social,
 │   │   │                     verification, id-verification, subscriptions, gamification,
-│   │   │                     challenges, achievements, gifts, trending, feed, ...)
+│   │   │                     challenges, achievements, gifts, trending, feed, blocks, ...)
 │   │   ├── src/realtime/   Socket.IO gateway (top-level, not under modules/)
-│   │   └── migrations/     0001–0025 raw SQL (next free 0026)
+│   │   └── migrations/     0001–0026 raw SQL (next free 0027)
 │   └── mobile/             React Native + TypeScript client (src/features/{domain}/)
 ├── packages/
 │   └── shared/             API DTOs, socket event shapes, geo helpers — both apps import this
@@ -253,13 +253,13 @@ utils/      ·  config.ts (build-time env)  ·  env.d.ts
 
 ```
 main.ts                      bootstrap (see below)
-app.module.ts                composes 22 feature modules + RealtimeModule + Throttler APP_GUARD
+app.module.ts                composes 23 feature modules + RealtimeModule + Throttler APP_GUARD
 common/  s3.service.ts        S3 presigned URLs (avatar, photos, verification)
          all-exceptions.filter.ts   → { statusCode, code, message, details? }
 config/  redis.module.ts      (TypeOrmModule.forRootAsync lives inline in app.module)
-modules/ <22 feature modules> (table below)
+modules/ <23 feature modules> (table below)
 realtime/ realtime.gateway.ts · realtime.module.ts · ws-jwt.guard.ts · realtime.dto.ts
-migrations/ 0001–0025 raw SQL (next free 0026)
+migrations/ 0001–0026 raw SQL (next free 0027)
 ```
 
 ### `main.ts` cross-cutting
@@ -275,7 +275,7 @@ migrations/ 0001–0025 raw SQL (next free 0026)
 | Observability | `@sentry/nestjs`, `sendDefaultPii: false`, 10 % traces in prod |
 | Fail-fast | `JWT_SECRET` ≥32 chars (≥64 in prod); `DATABASE_URL` required in prod |
 
-### 22 feature modules (`src/modules/`)
+### 23 feature modules (`src/modules/`)
 
 | Module | Route prefix | Responsibility |
 |---|---|---|
@@ -301,6 +301,7 @@ migrations/ 0001–0025 raw SQL (next free 0026)
 | `social` | `/social` | Provider-generic OAuth account linking (HMAC-signed state) |
 | `events` | `/events` | P3.5 events: create + nearby + detail · RSVP (capacity-gated) · polls (vote tally) · Q&A (upvotes). Shipped + prod-verified (backend + mobile) |
 | `listings` | `/listings` | P3.7 trading: listing create + browse grid + detail · offers (upsert; seller accept/decline → marks sold) · favorites (toggle). Offer-based v1, **no payment processing** (Stripe Connect P4). Shipped (backend + mobile: Marketplace/ListingDetail/ListingCreate) |
+| `blocks` | `/blocks` | User-to-user blocking (`POST`/`DELETE /blocks/:userId`, `GET /blocks` list). Directional storage (`user_blocks`), **symmetric effect**: blocked users (either direction) drop off the map (`discovery`) and the messaging gate returns `chat.locked` (`messaging` keeps its own self-contained `isBlocked()`). Migration `0026`. Backend only (mobile not yet woven in) |
 
 ### Auth chain
 
@@ -315,7 +316,7 @@ migrations/ 0001–0025 raw SQL (next free 0026)
 
 ### Database
 
-Raw parameterized SQL via `DataSource.query()` (no ORM entities — schema uses H3 generated columns + materialized views that don't map cleanly). Migrations `0001`–`0025` (next `0026`), tracked in `schema_migrations` by filename; runner is idempotent (skips applied). `0001`–`0015` use guarded DDL; **`0020` is not idempotent — already applied, do not re-run.** Locations fuzzed to **H3 r10 centroid at write time** (privacy invariant). H3 cell columns r5/7/9/10 + PostGIS `geography(Point,4326)` + GIST indexes; `v_discoverable_entity` view feeds the map.
+Raw parameterized SQL via `DataSource.query()` (no ORM entities — schema uses H3 generated columns + materialized views that don't map cleanly). Migrations `0001`–`0026` (next `0027`), tracked in `schema_migrations` by filename; runner is idempotent (skips applied). `0001`–`0015` use guarded DDL; **`0020` is not idempotent — already applied, do not re-run.** `0026_blocks.sql` adds `user_blocks` (directional, symmetric effect). Locations fuzzed to **H3 r10 centroid at write time** (privacy invariant). H3 cell columns r5/7/9/10 + PostGIS `geography(Point,4326)` + GIST indexes; `v_discoverable_entity` view feeds the map.
 
 ---
 
