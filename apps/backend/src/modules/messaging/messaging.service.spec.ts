@@ -25,9 +25,10 @@ describe('MessagingService', () => {
     service = mod.get(MessagingService);
   });
 
-  // permissionFor: query #1 = shared interests, query #2 = existing conversation.
+  // permissionFor: query #1 = block check, #2 = shared interests, #3 = existing conversation.
   const mockPermission = (shared: string[], convo: unknown[] = []): void => {
     query
+      .mockResolvedValueOnce([{ exists: false }]) // isBlocked → not blocked
       .mockResolvedValueOnce([{ shared }])
       .mockResolvedValueOnce(convo);
   };
@@ -51,6 +52,14 @@ describe('MessagingService', () => {
     mockPermission([], []);
     const res = await service.permissionFor(VIEWER, TARGET);
     expect(res.canMessage).toBe('none');
+  });
+
+  it('returns none when either side has blocked, without checking interests', async () => {
+    query.mockResolvedValueOnce([{ exists: true }]); // isBlocked → blocked
+    const res = await service.permissionFor(VIEWER, TARGET);
+    expect(res.canMessage).toBe('none');
+    expect(res.matched).toBe(false);
+    expect(query).toHaveBeenCalledTimes(1); // short-circuits before the interest/convo queries
   });
 
   it('caps the sender of an unanswered request to "request"', async () => {
