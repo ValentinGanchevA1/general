@@ -25,6 +25,7 @@ import type {
 
 import { PresenceService } from '../presence/presence.service';
 import { MessagingService } from '../messaging/messaging.service';
+import { BlocksService } from '../blocks/blocks.service';
 
 interface UserRow {
   id: string;
@@ -96,6 +97,7 @@ export class UsersService {
     private readonly presence: PresenceService,
     private readonly messaging: MessagingService,
     private readonly s3: S3Service,
+    private readonly blocks: BlocksService,
   ) {}
 
   /**
@@ -217,6 +219,7 @@ export class UsersService {
     const onlineSet = await this.presence.whichAreOnline([r.id]);
 
     let relationship: PublicUserProfile['relationship'];
+    let blockedByViewer: boolean | undefined;
     if (viewerId && viewerId !== r.id) {
       const perm = await this.messaging.permissionFor(viewerId, r.id);
       relationship = {
@@ -224,6 +227,9 @@ export class UsersService {
         sharedInterests: perm.sharedInterests,
         canMessage: perm.canMessage,
       };
+      // Directional: only whether *this viewer* blocked the subject, so the
+      // subject can never infer they were blocked from their own card.
+      blockedByViewer = await this.blocks.hasBlocked(viewerId, r.id);
     }
 
     return {
@@ -237,6 +243,7 @@ export class UsersService {
       goals: r.goals ?? [],
       online: onlineSet.has(r.id),
       ...(relationship ? { relationship } : {}),
+      ...(blockedByViewer !== undefined ? { blockedByViewer } : {}),
     };
   }
 

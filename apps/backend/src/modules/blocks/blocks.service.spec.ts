@@ -52,6 +52,15 @@ describe('BlocksService', () => {
     await expect(service.isBlocked(A, B)).resolves.toBe(false);
   });
 
+  it('hasBlocked() is directional — only the blocker→blocked direction', async () => {
+    query.mockResolvedValueOnce([{ exists: true }]);
+    await expect(service.hasBlocked(A, B)).resolves.toBe(true);
+    const [sql, params] = query.mock.calls[0]!;
+    expect(sql).toContain('blocker_id = $1 AND blocked_id = $2');
+    expect(sql).not.toContain('blocker_id = $2'); // not symmetric
+    expect(params).toEqual([A, B]);
+  });
+
   it('listBlockedBy() joins users and orders newest-first', async () => {
     await service.listBlockedBy(A);
     const [sql, params] = query.mock.calls[0]!;

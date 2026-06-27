@@ -7,6 +7,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { PresenceService } from '../presence/presence.service';
 import { MessagingService } from '../messaging/messaging.service';
+import { BlocksService } from '../blocks/blocks.service';
 import { S3Service } from '../../common/s3.service';
 
 const USER = '11111111-1111-1111-1111-111111111111';
@@ -26,6 +27,7 @@ describe('UsersService — gallery photos', () => {
         { provide: PresenceService, useValue: {} },
         { provide: MessagingService, useValue: {} },
         { provide: S3Service, useValue: {} },
+        { provide: BlocksService, useValue: {} },
       ],
     }).compile();
     service = mod.get(UsersService);
@@ -111,16 +113,22 @@ describe('UsersService — public profile trust fields', () => {
   let service: UsersService;
   let query: jest.Mock;
   const whichAreOnline = jest.fn().mockResolvedValue(new Set<string>());
+  const hasBlocked = jest.fn().mockResolvedValue(false);
+  const permissionFor = jest
+    .fn()
+    .mockResolvedValue({ matched: false, sharedInterests: [], canMessage: 'none', conversation: null });
 
   beforeEach(async () => {
     query = jest.fn().mockResolvedValue([]);
+    hasBlocked.mockClear().mockResolvedValue(false);
     const mod = await Test.createTestingModule({
       providers: [
         UsersService,
         { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
         { provide: PresenceService, useValue: { whichAreOnline } },
-        { provide: MessagingService, useValue: {} },
+        { provide: MessagingService, useValue: { permissionFor } },
         { provide: S3Service, useValue: {} },
+        { provide: BlocksService, useValue: { hasBlocked } },
       ],
     }).compile();
     service = mod.get(UsersService);
@@ -161,6 +169,42 @@ describe('UsersService — public profile trust fields', () => {
     expect(profile.verificationScore).toBe(0);
     expect(profile.idVerified).toBe(false);
   });
+
+  it('sets blockedByViewer (directional) when a viewer has blocked the subject', async () => {
+    hasBlocked.mockResolvedValueOnce(true);
+    query.mockResolvedValueOnce([
+      {
+        id: USER,
+        display_name: 'Ada',
+        avatar_url: null,
+        bio: null,
+        verification_level: 'none',
+        id_verification_status: 'none',
+        goals: [],
+      },
+    ]);
+    const VIEWER = '99999999-9999-4999-9999-999999999999';
+    const profile = await service.getPublicProfile(USER, VIEWER);
+    expect(profile.blockedByViewer).toBe(true);
+    expect(hasBlocked).toHaveBeenCalledWith(VIEWER, USER);
+  });
+
+  it('omits blockedByViewer when no viewer is supplied', async () => {
+    query.mockResolvedValueOnce([
+      {
+        id: USER,
+        display_name: 'Ada',
+        avatar_url: null,
+        bio: null,
+        verification_level: 'none',
+        id_verification_status: 'none',
+        goals: [],
+      },
+    ]);
+    const profile = await service.getPublicProfile(USER);
+    expect(profile.blockedByViewer).toBeUndefined();
+    expect(hasBlocked).not.toHaveBeenCalled();
+  });
 });
 
 describe('UsersService — profile createdAt', () => {
@@ -193,6 +237,7 @@ describe('UsersService — profile createdAt', () => {
         { provide: PresenceService, useValue: {} },
         { provide: MessagingService, useValue: {} },
         { provide: S3Service, useValue: {} },
+        { provide: BlocksService, useValue: {} },
       ],
     }).compile();
     service = mod.get(UsersService);
@@ -250,6 +295,7 @@ describe('UsersService — deleteAccount', () => {
         { provide: PresenceService, useValue: { markOffline } },
         { provide: MessagingService, useValue: {} },
         { provide: S3Service, useValue: { deleteUserObjects } },
+        { provide: BlocksService, useValue: {} },
       ],
     }).compile();
     service = mod.get(UsersService);

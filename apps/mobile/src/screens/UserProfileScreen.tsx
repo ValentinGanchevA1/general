@@ -17,7 +17,7 @@ import type {
   WaveResponse,
 } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
-import { getJson, postJson } from '@/api/client';
+import { deleteJson, getJson, postJson } from '@/api/client';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
 import { VerificationBadge } from '@/components/VerificationBadge';
@@ -59,6 +59,9 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   const [loading, setLoading] = useState(true);
   const [waving, setWaving] = useState(false);
   const [giftSheetOpen, setGiftSheetOpen] = useState(false);
+  const [blocking, setBlocking] = useState(false);
+
+  const blocked = profile?.blockedByViewer ?? false;
 
   const loadProfile = useCallback(() => {
     void (async () => {
@@ -96,6 +99,58 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     }
   };
 
+  const block = async (): Promise<void> => {
+    setBlocking(true);
+    try {
+      await postJson<undefined, { blocked: boolean }>(`/blocks/${userId}`, undefined);
+      // Off the map + chat locked from here on; bounce back to where they were.
+      Alert.alert('Blocked', `You won't see ${profile?.displayName ?? 'this user'} or hear from them.`, [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    } catch {
+      Alert.alert('Could not block', 'Try again in a moment.');
+    } finally {
+      setBlocking(false);
+    }
+  };
+
+  const unblock = async (): Promise<void> => {
+    setBlocking(true);
+    try {
+      await deleteJson<{ blocked: boolean }>(`/blocks/${userId}`);
+      setProfile((p) => (p ? { ...p, blockedByViewer: false } : p));
+    } catch {
+      Alert.alert('Could not unblock', 'Try again in a moment.');
+    } finally {
+      setBlocking(false);
+    }
+  };
+
+  const confirmBlock = (): void => {
+    Alert.alert(
+      `Block ${profile?.displayName ?? 'this user'}?`,
+      "They won't appear on your map and neither of you can message the other. You can undo this in Settings → Blocked users.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Block', style: 'destructive', onPress: () => void block() },
+      ],
+    );
+  };
+
+  const openMenu = (): void => {
+    if (blocked) {
+      Alert.alert('Unblock?', `Unblock ${profile?.displayName ?? 'this user'}?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Unblock', onPress: () => void unblock() },
+      ]);
+      return;
+    }
+    Alert.alert(profile?.displayName ?? 'Options', undefined, [
+      { text: 'Block user', style: 'destructive', onPress: confirmBlock },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -111,6 +166,18 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Text style={styles.backBtnText}>‹ Back</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.menuBtn}
+          onPress={openMenu}
+          disabled={blocking}
+          accessibilityLabel="More options"
+        >
+          {blocking ? (
+            <ActivityIndicator color="#888" size="small" />
+          ) : (
+            <Text style={styles.menuBtnText}>⋯</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -183,23 +250,39 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.giftBtn]}
-          onPress={() => setGiftSheetOpen(true)}
-        >
-          <Text style={styles.giftBtnText}>🎁 Gift</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.waveBtn, waving && styles.waveBtnDisabled]}
-          onPress={sendWave}
-          disabled={waving}
-        >
-          {waving ? (
-            <ActivityIndicator color="#000" size="small" />
-          ) : (
-            <Text style={styles.waveBtnText}>👋 Send Wave</Text>
-          )}
-        </TouchableOpacity>
+        {blocked ? (
+          <TouchableOpacity
+            style={[styles.unblockBtn, blocking && styles.waveBtnDisabled]}
+            onPress={() => void unblock()}
+            disabled={blocking}
+          >
+            {blocking ? (
+              <ActivityIndicator color="#ff6b6b" size="small" />
+            ) : (
+              <Text style={styles.unblockBtnText}>Unblock</Text>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[styles.giftBtn]}
+              onPress={() => setGiftSheetOpen(true)}
+            >
+              <Text style={styles.giftBtnText}>🎁 Gift</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.waveBtn, waving && styles.waveBtnDisabled]}
+              onPress={sendWave}
+              disabled={waving}
+            >
+              {waving ? (
+                <ActivityIndicator color="#000" size="small" />
+              ) : (
+                <Text style={styles.waveBtnText}>👋 Send Wave</Text>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       <SendGiftSheet
@@ -216,9 +299,18 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0a0a0f' },
   centered: { flex: 1, backgroundColor: '#0a0a0f', justifyContent: 'center', alignItems: 'center' },
 
-  topBar: { paddingTop: 52, paddingHorizontal: 20, paddingBottom: 8 },
+  topBar: {
+    paddingTop: 52,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   backBtn: { alignSelf: 'flex-start' },
   backBtnText: { color: '#00d4ff', fontSize: 17, fontWeight: '600' },
+  menuBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  menuBtnText: { color: '#888', fontSize: 26, fontWeight: '700', lineHeight: 28 },
 
   scroll: { paddingHorizontal: 24, paddingBottom: 24, gap: 24 },
 
@@ -301,4 +393,14 @@ const styles = StyleSheet.create({
     borderColor: '#00d4ff66',
   },
   giftBtnText: { color: '#00d4ff', fontWeight: '700', fontSize: 16 },
+  unblockBtn: {
+    flex: 1,
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+    backgroundColor: '#1a1a2e',
+    borderWidth: 1,
+    borderColor: '#ff6b6b66',
+  },
+  unblockBtnText: { color: '#ff6b6b', fontWeight: '700', fontSize: 16 },
 });

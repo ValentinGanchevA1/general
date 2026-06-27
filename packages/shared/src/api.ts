@@ -237,6 +237,22 @@ export interface PublicUserProfile {
    * server-side — never trust the client to decide what it may send.
    */
   relationship?: ProfileRelationship;
+  /**
+   * Directional: true when the *viewer* has blocked this user. Drives the
+   * Block ⇄ Unblock toggle. Present only for an authenticated viewer other
+   * than the subject. Note this is one-directional — it stays false when the
+   * subject blocked the viewer (the viewer must not learn they were blocked).
+   */
+  blockedByViewer?: boolean;
+}
+
+/** A user the caller has blocked — feeds the "Blocked users" settings list. */
+export interface BlockedUser {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+  /** ISO timestamp of when the block was created. */
+  blockedAt: string;
 }
 
 /**

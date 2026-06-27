@@ -40,6 +40,18 @@ export class BlocksService {
     ]);
   }
 
+  /** Directional: true only if `blockerId` has blocked `blockedId`. Drives the
+   *  viewer-relative Block ⇄ Unblock toggle (`PublicUserProfile.blockedByViewer`). */
+  async hasBlocked(blockerId: string, blockedId: string): Promise<boolean> {
+    const [row] = await this.db.query<Array<{ exists: boolean }>>(
+      `SELECT EXISTS (
+         SELECT 1 FROM user_blocks WHERE blocker_id = $1 AND blocked_id = $2
+       ) AS exists`,
+      [blockerId, blockedId],
+    );
+    return row?.exists ?? false;
+  }
+
   /** Symmetric: true if EITHER user has blocked the other. */
   async isBlocked(userA: string, userB: string): Promise<boolean> {
     const [row] = await this.db.query<Array<{ exists: boolean }>>(
