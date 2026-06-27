@@ -104,9 +104,13 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     try {
       await postJson<undefined, { blocked: boolean }>(`/blocks/${userId}`, undefined);
       // Off the map + chat locked from here on; bounce back to where they were.
-      Alert.alert('Blocked', `You won't see ${profile?.displayName ?? 'this user'} or hear from them.`, [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      // cancelable:false so an Android outside-tap can't strand them on this card.
+      Alert.alert(
+        'Blocked',
+        `You won't see ${profile?.displayName ?? 'this user'} or hear from them.`,
+        [{ text: 'OK', onPress: () => navigation.goBack() }],
+        { cancelable: false },
+      );
     } catch {
       Alert.alert('Could not block', 'Try again in a moment.');
     } finally {

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   StyleSheet,
   Text,
@@ -32,12 +33,16 @@ export function BlockedUsersScreen(): React.JSX.Element {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [users, setUsers] = useState<BlockedUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  // Track every in-flight unblock by id so rapid taps on different rows don't
+  // clobber each other's spinner state.
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(() => {
     void (async () => {
       try {
         setUsers(await getJson<BlockedUser[]>('/blocks'));
+      } catch {
+        Alert.alert('Error', 'Could not load blocked users. Try again in a moment.');
       } finally {
         setLoading(false);
       }
@@ -47,12 +52,18 @@ export function BlockedUsersScreen(): React.JSX.Element {
   useEffect(() => { load(); }, [load]);
 
   const unblock = async (id: string): Promise<void> => {
-    setPendingId(id);
+    setPendingIds((s) => new Set(s).add(id));
     try {
       await deleteJson<{ blocked: boolean }>(`/blocks/${id}`);
       setUsers((list) => list.filter((u) => u.id !== id));
+    } catch {
+      Alert.alert('Error', 'Could not unblock. Try again in a moment.');
     } finally {
-      setPendingId(null);
+      setPendingIds((s) => {
+        const next = new Set(s);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
@@ -85,11 +96,11 @@ export function BlockedUsersScreen(): React.JSX.Element {
               <InitialsAvatar name={item.displayName} />
               <Text style={styles.name} numberOfLines={1}>{item.displayName}</Text>
               <TouchableOpacity
-                style={[styles.unblockBtn, pendingId === item.id && styles.unblockBtnDisabled]}
+                style={[styles.unblockBtn, pendingIds.has(item.id) && styles.unblockBtnDisabled]}
                 onPress={() => void unblock(item.id)}
-                disabled={pendingId === item.id}
+                disabled={pendingIds.has(item.id)}
               >
-                {pendingId === item.id ? (
+                {pendingIds.has(item.id) ? (
                   <ActivityIndicator color="#00d4ff" size="small" />
                 ) : (
                   <Text style={styles.unblockText}>Unblock</Text>

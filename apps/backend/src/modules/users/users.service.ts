@@ -221,15 +221,19 @@ export class UsersService {
     let relationship: PublicUserProfile['relationship'];
     let blockedByViewer: boolean | undefined;
     if (viewerId && viewerId !== r.id) {
-      const perm = await this.messaging.permissionFor(viewerId, r.id);
+      // Independent reads — run them together to keep the profile fetch snappy.
+      const [perm, blocked] = await Promise.all([
+        this.messaging.permissionFor(viewerId, r.id),
+        // Directional: only whether *this viewer* blocked the subject, so the
+        // subject can never infer they were blocked from their own card.
+        this.blocks.hasBlocked(viewerId, r.id),
+      ]);
       relationship = {
         matched: perm.matched,
         sharedInterests: perm.sharedInterests,
         canMessage: perm.canMessage,
       };
-      // Directional: only whether *this viewer* blocked the subject, so the
-      // subject can never infer they were blocked from their own card.
-      blockedByViewer = await this.blocks.hasBlocked(viewerId, r.id);
+      blockedByViewer = blocked;
     }
 
     return {
