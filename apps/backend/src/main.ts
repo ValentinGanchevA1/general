@@ -89,9 +89,9 @@ async function bootstrap(): Promise<void> {
 
   app.use(helmet());
 
-app.setGlobalPrefix('api/v1', {
-  exclude: [{ path: 'health', method: RequestMethod.GET }],
-});
+  app.setGlobalPrefix('api/v1', {
+    exclude: [{ path: 'health', method: RequestMethod.GET }],
+  });
 
   // Development request logger to help debug emulator <-> host networking
   if (process.env.NODE_ENV !== 'production') {
