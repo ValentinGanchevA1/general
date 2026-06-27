@@ -281,7 +281,7 @@ export class DiscoveryService {
                OR (ub.blocker_id = id AND ub.blocked_id = $3)
          ))
          ${topicSlug ? `AND ${TOPIC_MATCH_SQL('$5')}` : ''}
-       ORDER BY id
+       ORDER BY v_discoverable_entity.id
        LIMIT $4
       `,
       topicSlug
