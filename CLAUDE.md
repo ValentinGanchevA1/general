@@ -301,7 +301,7 @@ migrations/ 0001–0026 raw SQL (next free 0027)
 | `social` | `/social` | Provider-generic OAuth account linking (HMAC-signed state) |
 | `events` | `/events` | P3.5 events: create + nearby + detail · RSVP (capacity-gated) · polls (vote tally) · Q&A (upvotes). Shipped + prod-verified (backend + mobile) |
 | `listings` | `/listings` | P3.7 trading: listing create + browse grid + detail · offers (upsert; seller accept/decline → marks sold) · favorites (toggle). Offer-based v1, **no payment processing** (Stripe Connect P4). Shipped (backend + mobile: Marketplace/ListingDetail/ListingCreate) |
-| `blocks` | `/blocks` | User-to-user blocking (`POST`/`DELETE /blocks/:userId`, `GET /blocks` list). Directional storage (`user_blocks`), **symmetric effect**: blocked users (either direction) drop off the map (`discovery`) and the messaging gate returns `chat.locked` (`messaging` keeps its own self-contained `isBlocked()`). Migration `0026`. Backend only (mobile not yet woven in) |
+| `blocks` | `/blocks` | User-to-user blocking (`POST`/`DELETE /blocks/:userId`, `GET /blocks` list). Directional storage (`user_blocks`), **symmetric effect**: blocked users (either direction) drop off the map (`discovery`) and the messaging gate returns `chat.locked` (`messaging` keeps its own self-contained `isBlocked()`). `PublicUserProfile.blockedByViewer` (directional, via `BlocksService.hasBlocked()`) drives the toggle. Migration `0026`. Backend + mobile (UserProfileScreen block/unblock menu + Settings -> Blocked users; on-device GUI pass pending) |
 
 ### Auth chain
 
