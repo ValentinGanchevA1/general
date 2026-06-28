@@ -30,6 +30,7 @@ import { MarketplaceScreen } from '@/screens/MarketplaceScreen';
 import { ListingDetailScreen } from '@/screens/ListingDetailScreen';
 import { ListingCreateScreen } from '@/screens/ListingCreateScreen';
 import { NotificationSettingsScreen } from '@/screens/NotificationSettingsScreen';
+import { BlockedUsersScreen } from '@/screens/BlockedUsersScreen';
 import { PrivacyScreen } from '@/screens/PrivacyScreen';
 import { HelpScreen } from '@/screens/HelpScreen';
 import { AboutScreen } from '@/screens/AboutScreen';
@@ -81,6 +82,7 @@ export type RootStackParamList = {
 	ListingDetail: { listingId: string };
 	ListingCreate: undefined;
 	NotificationSettings: undefined;
+	BlockedUsers: undefined;
 	GiftsInbox: undefined;
 	Privacy: undefined;
 	Help: undefined;
@@ -192,6 +194,7 @@ export function AppNavigator(): React.JSX.Element {
 						/>
 						<Stack.Screen name="Marketplace" component={MarketplaceScreen} />
 						<Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+						<Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
 						<Stack.Screen name="ListingDetail" component={ListingDetailScreen} />
 						<Stack.Screen
 							name="ListingCreate"

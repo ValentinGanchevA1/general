@@ -86,6 +86,16 @@ export function SettingsScreen(): React.JSX.Element {
             />
           )}
         </View>
+        <TouchableOpacity
+          style={[styles.row, styles.rowSpaced]}
+          onPress={() => navigation.navigate('BlockedUsers')}
+        >
+          <View style={styles.rowContent}>
+            <Text style={styles.rowLabel}>Blocked users</Text>
+            <Text style={styles.rowSub}>People you've hidden and muted</Text>
+          </View>
+          <Icon name="chevron-right" size={24} color="#555" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
@@ -198,6 +208,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2a2a4a',
   },
+  rowSpaced: { marginTop: 12 },
   rowContent: { flex: 1 },
   rowLabel: { color: '#fff', fontSize: 15, fontWeight: '500' },
   rowSub: { color: '#666', fontSize: 12, marginTop: 2 },
