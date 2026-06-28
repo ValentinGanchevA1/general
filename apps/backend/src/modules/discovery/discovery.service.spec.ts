@@ -88,6 +88,16 @@ describe('DiscoveryService', () => {
       expect(query).toHaveBeenCalled();
     });
 
+    it('still refuses a genuinely wide antimeridian-crossing viewport', async () => {
+      // sw.lng=179, ne.lng=-1 wraps the dateline by a real ~180° span. The raw
+      // ne.lng - sw.lng = -180° would give a negative area that slips under the
+      // cap; the normalized 180° delta correctly estimates it past the limit.
+      const wide: Viewport = { ne: { lat: 2, lng: -1 }, sw: { lat: 1, lng: 179 } };
+      const res = await call({ viewport: wide });
+      expect(res.points).toEqual([]);
+      expect(query).not.toHaveBeenCalled();
+    });
+
     it('defaults to all kinds and excludes the requester / private rows', async () => {
       await call();
       const [, params] = query.mock.calls[0]!;
