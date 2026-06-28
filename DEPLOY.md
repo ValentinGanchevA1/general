@@ -157,6 +157,30 @@ OAuth **redirect URI** as `https://g88-api.onrender.com/api/v1/social/callback`.
 Several providers (Instagram/TikTok/Facebook) require app review before
 non-test users can link.
 
+## Observability — Sentry data scrubbing (OB1)
+
+Three layers protect PII/secrets (coordinates, H3 cells, tokens). All three must
+stay on — they are defence-in-depth, not alternatives.
+
+1. **SDK `beforeSend` (in code).** Shared `scrubSentryPayload` (`packages/shared/src/scrub.ts`)
+   runs on backend (`apps/backend/src/main.ts`) and mobile (`apps/mobile/App.tsx`):
+   normalised key denylist + value redaction (Bearer/Basic, JWT, Stripe/AWS/Google
+   keys, URL credentials, sensitive query params). Plus `sendDefaultPii: false`.
+2. **Sentry server-side field scrubbing** (dashboard, **not** in repo — set once per
+   project). Project → **Settings → Security & Privacy → Data Scrubbing**:
+   - **Data Scrubber** ✅ · **Use Default Scrubbers** ✅ · **Prevent Storing of IP Addresses** ✅
+   - **Additional Sensitive Fields**: `email, latitude, longitude, lat, lng, location,
+     coordinates, h3, refreshToken, accessToken, idToken, idDocumentUrl, selfieUrl, phone`
+   - **Safe Fields**: must stay **empty** (Safe Fields = "never scrub"; anything here
+     silently un-scrubs that field).
+3. **Advanced Data Scrubbing** (same page). 4 rules, each **Method = Mask**,
+   **Source = `$string`**, Dataset = Errors/Transactions/Attachments:
+   `Password fields` · `Auth Tokens` · regex `Bearer\s+\S+` · regex `://[^:@/\s]+:[^:@/\s]+@`
+
+Project: org `g88`, project `g88`, EU region (`de.sentry.io`). The dashboard config
+(layers 2–3) lives only in Sentry — **reapply it if the project is ever recreated.**
+Settings URL: `https://g88.sentry.io/settings/projects/g88/security-and-privacy/`.
+
 ## Status (2026-06-05)
 - **Migrations**: `0001`–`0022` applied to prod Supabase (`0001`–`0019` verified live 2026-06-05; `0020`–`0022` applied 2026-06-09 / 06-12). See the Migrations section above — **migrations are applied manually, not on deploy.**
 - **G2 Twilio**: `TWILIO_ACCOUNT_SID/AUTH_TOKEN/VERIFY_SERVICE_SID` set on `g88-api`.
