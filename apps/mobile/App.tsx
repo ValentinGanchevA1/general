@@ -4,6 +4,8 @@ import { Provider } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
+import { scrubSentryPayload } from '@g88/shared';
+
 import { store } from '@/store';
 import { AppNavigator } from '@/navigation/AppNavigator';
 import { Config } from '@/config';
@@ -13,6 +15,10 @@ Sentry.init({
   enabled: !__DEV__ && !!Config.SENTRY_DSN,
   environment: __DEV__ ? 'development' : 'production',
   sendDefaultPii: false,
+  // Shared PII/secret scrubber (OB1) — same denylist + token redaction as the
+  // backend. Last line of defence before anything leaves the device.
+  beforeSend: (event) => scrubSentryPayload(event),
+  beforeBreadcrumb: (breadcrumb) => scrubSentryPayload(breadcrumb),
 });
 
 GoogleSignin.configure({ webClientId: Config.GOOGLE_WEB_CLIENT_ID });

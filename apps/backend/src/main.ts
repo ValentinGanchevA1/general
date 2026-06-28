@@ -7,46 +7,18 @@ import { Logger, ValidationPipe, RequestMethod } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
+import { scrubSentryPayload } from '@g88/shared';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 
 
 loadEnv({ path: join(process.cwd(), '../../.env') });
 
-// ── Sentry PII scrubber (OB1) ───────────────────────────────────────────────
-// Hard privacy invariant: coordinates, H3 cells, and tokens must never leave the
-// process. Redacts denylisted keys anywhere in the event/breadcrumb and strips
-// Bearer tokens from any string value. Fail-safe: over-redaction is acceptable.
-const SENTRY_DENY_KEYS = new Set([
-  'authorization', 'cookie', 'password', 'passwordhash',
-  'token', 'idtoken', 'refreshtoken', 'accesstoken',
-  'phone', 'email', 'latitude', 'longitude', 'lat', 'lng',
-  'location', 'iddocumenturl',
-]);
-const SENTRY_BEARER_RE = /Bearer\s+[A-Za-z0-9._-]+/g;
-
-function scrubSentry<T>(value: T, depth = 0): T {
-  if (value == null || depth > 8) return value;
-  if (typeof value === 'string') {
-    return value.replace(SENTRY_BEARER_RE, 'Bearer [redacted]') as unknown as T;
-  }
-  if (Array.isArray(value)) {
-    return value.map((v) => scrubSentry(v, depth + 1)) as unknown as T;
-  }
-  if (typeof value === 'object') {
-    const proto = Object.getPrototypeOf(value);
-    if (proto !== Object.prototype && proto !== null) return value;
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = SENTRY_DENY_KEYS.has(k.toLowerCase())
-        ? '[redacted]'
-        : scrubSentry(v, depth + 1);
-    }
-    return out as unknown as T;
-  }
-  return value;
-}
-
+// ── Sentry PII/secret scrubber (OB1) ────────────────────────────────────────
+// Hard privacy invariant: coordinates, H3 cells, tokens, and secrets must never
+// leave the process. The redaction logic lives in `@g88/shared` (scrubSentryPayload)
+// and is shared with the mobile app. `sendDefaultPii: false` plus dashboard-side
+// Data Scrubbing are the other defence layers — see scrub.ts.
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
   environment: process.env.NODE_ENV ?? 'development',
@@ -55,8 +27,8 @@ Sentry.init({
   integrations: [Sentry.nestIntegration()],
   // 10 % performance sampling in production; off in dev to keep noise low.
   tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 0,
-  beforeSend: (event) => scrubSentry(event),
-  beforeBreadcrumb: (breadcrumb) => scrubSentry(breadcrumb),
+  beforeSend: (event) => scrubSentryPayload(event),
+  beforeBreadcrumb: (breadcrumb) => scrubSentryPayload(breadcrumb),
 });
 
 // Fail fast on missing or weak secrets before any module loads.

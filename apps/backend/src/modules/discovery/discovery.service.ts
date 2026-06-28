@@ -337,7 +337,9 @@ export class DiscoveryService {
     const areaKm2 = latKm * lngKm;
     // Fall back to the smallest cell area (largest estimate) for unknown resolutions.
     const cellKm2 = H3_CELL_AREA_KM2[resolution] ?? 0.01504;
-    return areaKm2 / cellKm2;
+    // Round up so the estimate stays a conservative upper bound — avoids
+    // fractional counts slipping under MAX_CELLS_PER_VIEWPORT at the threshold.
+    return Math.ceil(areaKm2 / cellKm2);
   }
 
   /** Strictly whitelist the H3 cell column name — never accept user input here. */
