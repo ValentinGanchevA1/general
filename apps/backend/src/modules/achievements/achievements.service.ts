@@ -140,8 +140,9 @@ export class AchievementsService {
         .catch((err) => this.logger.error(`achievement reward failed: ${err}`));
     }
 
-    // Live unlock event → mobile toast + haptic. Fire-and-forget: a delivery
-    // failure must never roll back the (already-committed) unlock.
+    // Live unlock event → mobile toast + haptic (AchievementToastHost). Fire-and-forget:
+    // a delivery failure must never roll back the (already-committed) unlock. If the user is
+    // offline, they see the unlock on their next `GET /achievements` read.
     void this.realtime
       .emitAchievementUnlocked(userId, {
         id: def.id,

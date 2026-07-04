@@ -120,9 +120,14 @@ export function MapScreen(): React.JSX.Element {
 
   useEffect(() => {
     const unsub = on('wave:received', (e) => {
-      // TODO: toast + push to a "waves" badge in the tab bar.
-      // eslint-disable-next-line no-console
-      console.log(`👋 wave from ${e.fromUser.displayName}`);
+      if (__DEV__) {
+        console.log(`👋 wave from ${e.fromUser.displayName}`);
+      }
+      // Show a notification toast.
+      Alert.alert(
+        `${e.fromUser.displayName} waved at you 👋`,
+        'Wave back or chat with them on the map.',
+      );
       // A new wave from someone visible on the map may reflect new presence — refresh.
       refresh();
     });
@@ -163,16 +168,21 @@ export function MapScreen(): React.JSX.Element {
       // Nudge the daily-challenge banner to re-read progress (e.g. "Send 3 waves").
       challengeEvents.emit('progress');
       if (res.conversationId) {
-        // TODO: navigate to chat
+        // Navigate to the conversation after a successful wave match.
+        navigation.navigate('Chat', {
+          conversationId: res.conversationId,
+          otherUserName: '', // ChatScreen fetches full header info from message stream
+        });
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.warn('wave failed', e);
+      if (__DEV__) {
+        console.warn('wave failed', e);
+      }
       throw e; // re-throw so callers (fab.conversion) can record the real outcome
     } finally {
       setWaving(null);
     }
-  }, []);
+  }, [navigation]);
 
   // Bottom-sheet wave is fire-and-forget: onWave re-throws so the FAB path can
   // record conversion, so here we must swallow the rejection ourselves. A 409

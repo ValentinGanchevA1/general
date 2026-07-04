@@ -42,6 +42,31 @@ const wsAllowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
   .split(',')
   .filter(Boolean);
 
+// ─── Type-safe error extraction ───────────────────────────────────────────
+
+
+function extractApiError(err: unknown): { code: string; message: string } {
+  if (err instanceof ForbiddenException || err instanceof NotFoundException) {
+    const response = err.getResponse();
+    if (typeof response === 'object' && response !== null && 'message' in response) {
+      return {
+        code: err.constructor.name,
+        message: (response.message as string) ?? err.message,
+      };
+    }
+  }
+  if (err instanceof Error && 'response' in err) {
+    const resp = (err as { response?: { code?: string; message?: string } }).response;
+    if (resp?.code && resp?.message) {
+      return { code: resp.code, message: resp.message };
+    }
+  }
+  return {
+    code: 'unknown_error',
+    message: err instanceof Error ? err.message : String(err),
+  };
+}
+
 @WebSocketGateway({
   namespace: '/realtime',
   cors: { origin: wsAllowedOrigins, credentials: true },
@@ -231,13 +256,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       return { ok: true, data: msg };
     } catch (err) {
-      const res = (err as { response?: { code?: string; message?: string } })?.response;
-      const code = res?.code ?? 'chat.failed';
-      const message = res?.message ?? (err instanceof Error ? err.message : 'Unknown error');
+      const { code, message } = extractApiError(err);
       if (!(err instanceof ForbiddenException) && !(err instanceof NotFoundException)) {
         this.logger.error(`chat:send failed: ${err}`);
       }
-      return { ok: false, code, message };
+      return { ok: false, code: code === 'unknown_error' ? 'chat.failed' : code, message };
     }
   }
 

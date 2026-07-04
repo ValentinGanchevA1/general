@@ -68,7 +68,9 @@ export class AuthService {
     );
 
     const user = rows[0];
-    if (!user) throw new Error('Insert failed');
+    if (!user) {
+      throw new Error('Failed to create user account — database returned no rows');
+    }
 
     const tokens = await this.issueTokens(user);
     return { user: this.toPublic(user), tokens };
@@ -190,7 +192,9 @@ export class AuthService {
         [email, name ?? email.split('@')[0], picture ?? null, googleId],
       );
       const inserted = rows[0];
-      if (!inserted) throw new Error('Insert failed');
+      if (!inserted) {
+        throw new Error('Failed to create Google OAuth account — database returned no rows');
+      }
       user = inserted;
     }
 

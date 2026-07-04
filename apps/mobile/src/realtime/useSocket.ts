@@ -112,7 +112,9 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
       });
       sharedSocket.on('disconnect', () => !cancelled && setConnected(false));
       sharedSocket.on('error:event', (e) => {
-        console.warn(`[socket] server error: ${e.code} ${e.message}`);
+        if (__DEV__) {
+          console.warn(`[socket] server error: ${e.code} ${e.message}`);
+        }
       });
     };
 
