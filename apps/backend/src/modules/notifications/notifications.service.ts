@@ -181,7 +181,31 @@ export class NotificationsService {
     const senderName = sender?.display_name ?? 'Someone';
     await this.notifyMessage(toUserId, senderName, preview, conversationId);
   }
+/**
+   * ID-verification decision push. Bypasses the opt-out/rate-cap gate in
+   * `allowed()` — this is a one-off account-status result, not a discretionary
+   * engagement channel, so it isn't in `NotificationChannel`/`CHANNEL_CAPS`.
+   */
+  async notifyIdVerificationDecided(
+    toUserId: string,
+    decision: 'verified' | 'rejected',
+    reason?: string,
+  ): Promise<void> {
+    const tokens = await this.getTokens(toUserId);
+    if (!tokens.length) return;
 
+    await this.sendMulticast(
+      tokens,
+      {
+        title: decision === 'verified' ? 'ID Verified ✅' : 'Verification not approved',
+        body:
+          decision === 'verified'
+            ? 'Your identity has been verified.'
+            : `Verification rejected${reason ? `: ${reason}` : '.'} You can resubmit anytime.`,
+      },
+      { type: 'id_verification', decision },
+    );
+  }
   // ─── Geofence-matched (area) channels ──────────────────────────────────────
 
   /**

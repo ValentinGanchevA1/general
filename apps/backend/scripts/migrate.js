@@ -3,7 +3,7 @@
 const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
-
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 async function run(client) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (

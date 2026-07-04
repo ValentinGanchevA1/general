@@ -1,8 +1,10 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { IdVerificationService } from './id-verification.service';
 import { SubmitIdVerificationDto } from './dto/submit-id-verification.dto';
+import { DecideIdVerificationDto } from './dto/decide-id-verification.dto';
+import { AdminGuard } from './admin.guard';
 
 @Controller('verification/id')
 @UseGuards(JwtAuthGuard)
@@ -25,5 +27,15 @@ export class IdVerificationController {
   @Get('status')
   async status(@CurrentUser('id') userId: string) {
     return this.service.getStatus(userId);
+  }
+
+  @Post('admin/:userId/decide')
+  @UseGuards(AdminGuard)
+  async decide(
+    @CurrentUser('id') adminId: string,
+    @Param('userId') userId: string,
+    @Body() dto: DecideIdVerificationDto,
+  ) {
+    return this.service.decideVerification(adminId, userId, dto);
   }
 }
