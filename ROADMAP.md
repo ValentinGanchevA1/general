@@ -4,7 +4,7 @@
 
 > **Authoritative source for sequence and timing.**
 > Sibling docs: `PRODUCT.md` (what/why), `SPECIFICATION.md` (per-feature contracts), `ARCHITECTURE.md` (how), `STATUS.md` (live progress).
-> Last revised: 2026-05-23.
+> Last revised: 2026-07-04 (patched for confirmed drift — see decision log entries at bottom; original body dated 2026-05-23).
 
 ---
 
@@ -13,16 +13,11 @@
 | Phase                       | Status             | Gate                                                    |
 |-----------------------------|--------------------|---------------------------------------------------------|
 | P1 — foundation             | ✅ shipped          | Auth · Profile · Map Discovery · Presence · Wave · Chat |
-| P2 — pre-launch hardening   | ✅ gate complete    | A4 · OB1 · C6 · M1 · C2 done; 7-day soak cleared (2026-06-11). Beta = **Android Play closed testing** (iOS/TestFlight deferred — no `ios/` native project) |
-| P3 — habit-forming features | 🟢 surfaced early   | **P3.1–P3.7 all shipped in mobile** (2026-06-15); backend built ahead of schedule. See per-epic sections below |
+| P2 — pre-launch hardening   | 🟡 active          | TestFlight ready                                        |
+| P3 — habit-forming features | ⏳ post-launch      | TestFlight + App Store live                             |
 | P4+ — horizon               | 📋 documented only | P3 retention sustained                                  |
 
 Target launch market: **Varna, BG** (single test city — see `PRODUCT.md` § Launch market).
-Immediate gate: **owner-side Android Play Console closed-testing setup**. As of **2026-06-23 the engineering prep is complete** — keystore + CI secrets set, **signed AAB built + verified**, automated Play upload wired, store-listing/Data-Safety/release-notes drafted (`docs/`), **privacy policy hosted + filled** (`https://g88-legal.onrender.com/privacy`), and **in-app account deletion shipped** (`DELETE /users/me`). Remaining is **Console-only**: $25 registration, create app `com.g88` + closed track, opt into Play App Signing + add its SHA-1 to the Maps key, **manual first AAB upload**, paste listing/Data-Safety/privacy URL. See `DEPLOY.md` → "Mobile release". `STATUS.md` is the live truth.
-
-> **Phase vocabulary is authoritative here.** These four phases (P1 · P2 · P3 · P4+) are the canonical sequence. **There is no P5.** `STATUS.md` historically used `P3`/`P4`/`P5` as ad-hoc *sprint* labels for feature build-out — see the "Phase-vocabulary reconciliation" table at the top of `STATUS.md` for the mapping back to these phases.
->
-> **Heads-up (this table predates current reality, last revised 2026-05-23):** since then, substantial **P3 (habit-forming)** backend — gamification, challenges, achievements, gifts, geofence push — and parts of the **P4+** monetization surface (Stripe subscriptions, Twilio, ID-verification) have been **built ahead of schedule**. So "P3 — post-launch / work hasn't started" below is stale: the backend largely exists; the remaining P3 work is **mobile surfacing**, not greenfield. `STATUS.md` is the live truth for what's actually built.
 
 ## How to read this doc
 
@@ -40,7 +35,7 @@ Immediate gate: **owner-side Android Play Console closed-testing setup**. As of 
 
 ## P2 — Pre-launch hardening (active)
 
-Five items, ordered. Each must close cleanly before the next starts.
+Six items, ordered. Each must close cleanly before the next starts. B1 (Blocks) was added after this doc's original scoping — its backend landed alongside other June 2026 fixes and it belongs in P2 as a safety baseline, not P3.
 
 ### P2.A4 — Dev-secret cleanup
 
@@ -64,11 +59,18 @@ Five items, ordered. Each must close cleanly before the next starts.
 | **Effort**     | 1.5 days                                                                                                                                                                                                    |
 | **Blocks**     | TestFlight release                                                                                                                                                                                          |
 
-### ~~P2.A3 — Apple Sign-In~~ (removed from scope 2026-06-05)
+### P2.A3 — Apple Sign-In (App Store blocker)
 
-**Removed.** Apple Sign-In was code-complete but never had working credentials; deleted on 2026-06-05 (code, deps, iOS entitlement, `apple_sub` column via migration `0019`). See `SPECIFICATION.md` §3.3 and the `STATUS.md` change log.
-
-**Still open for any iOS submission:** Apple Guideline 4.8 mandates Sign in with Apple when a third-party social login is offered. Google is live, so an iOS build must re-add Apple, drop Google on iOS, or go email-only on iOS. Android-first → deferred, not blocking now.
+|                |                                                                                                                                                                                                                                                                                                                                                                             |
+|----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Why**        | Apple requires Sign in with Apple if the app offers any other social login (Google is live → Apple is mandatory)                                                                                                                                                                                                                                                            |
+| **Status**     | ⚠️ **Reset, not in-progress.** `0009_apple_oauth.sql` was dropped by `0019_drop_apple_oauth.sql`. There is no existing Apple OAuth schema or backend route to resume — this is a from-scratch implementation, not a re-enable.                                                                                                                                              |
+| **Scope**      | New migration for `appleUserId`/`appleSub` column(s) · `@invertase/react-native-apple-authentication` on iOS · backend route `POST /auth/apple` verifies identity token against Apple public keys · upsert user (handle the email-relay case — Apple may return `private-relay` email) · persist Apple-provided name on first auth (only returned once) · return token pair |
+| **Acceptance** | iOS Sign-in-with-Apple button works on real device · returning user maps to same account · `private-relay` emails handled · name captured on first auth · Android build doesn't break                                                                                                                                                                                       |
+| **Risk**       | Apple's "hide my email" relay → must not assume email = identity; rely on `sub` claim · iOS-only flow → no Android impact · Apple Developer Program enrollment ($99/yr) is a pending prerequisite, not yet confirmed                                                                                                                                                        |
+| **Effort**     | 1.5 days *(re-estimate once rebuild scope is confirmed — original estimate assumed reusable schema)*                                                                                                                                                                                                                                                                        |
+| **Blocks**     | App Store submission · public TestFlight                                                                                                                                                                                                                                                                                                                                    |
+| **Spec**       | See `SPECIFICATION.md` § Auth / A3                                                                                                                                                                                                                                                                                                                                          |
 
 ### P2.C6 — Mobile chat outbox
 
@@ -83,18 +85,29 @@ Five items, ordered. Each must close cleanly before the next starts.
 
 ### P2.M1 — Viewport-diff protocol
 
-|                |                                                                                                                                                                                                                                                  |
-|----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Why**        | Mobile pulls full nearby-user payload on every viewport change. Wasteful on data + battery.                                                                                                                                                      |
-| **Scope**      | Backend `GET /locations/map-data` accepts `?since=ts&previousIds=…` · returns `{ added: [], updated: [], removed: [] }` · mobile `mapSlice` applies diffs · WS `nearby:update` already does this for individual users — extend to viewport-level |
-| **Acceptance** | Median bytes/viewport-change drops ≥ 60% in dev measurement · no visible regression in map render · works correctly across viewport pan vs zoom                                                                                                  |
-| **Risk**       | Stale client state if a diff is dropped → fall back to full fetch on any missing-id signal                                                                                                                                                       |
-| **Effort**     | 2 days                                                                                                                                                                                                                                           |
-| **Spec**       | See `SPECIFICATION.md` § Map / M1                                                                                                                                                                                                                |
+|                |                                                                                                                                                                                                                                                                       |
+|----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Why**        | Mobile pulls full nearby-user payload on every viewport change. Wasteful on data + battery.                                                                                                                                                                           |
+| **Scope**      | Backend `POST /discovery/nearby` (viewport body) accepts `?since=ts&previousIds=…` · returns `{ added: [], updated: [], removed: [] }` · mobile `discoverySlice` applies diffs · WS `nearby:update` already does this for individual users — extend to viewport-level |
+| **Acceptance** | Median bytes/viewport-change drops ≥ 60% in dev measurement · no visible regression in map render · works correctly across viewport pan vs zoom                                                                                                                       |
+| **Risk**       | Stale client state if a diff is dropped → fall back to full fetch on any missing-id signal                                                                                                                                                                            |
+| **Effort**     | 2 days                                                                                                                                                                                                                                                                |
+| **Spec**       | See `SPECIFICATION.md` § Map / M1                                                                                                                                                                                                                                     |
+| **Doc note**   | There is no `locations` module. Geo/nearby logic lives in `modules/discovery`; the real endpoint is `POST /discovery/nearby` with a viewport body, not `GET /locations/map-data`.                                                                                     |
+
+### P2.B1 — Block/mute (pre-launch safety requirement)
+
+|                     |                                                                                                                                                                                                                                                                                                                  |
+|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Why**             | User blocking is a pre-launch safety baseline, not a deferred nicety. Its absence was identified as a genuine safety gap.                                                                                                                                                                                        |
+| **Status**          | 🟡 Partially shipped. `0026_blocks.sql` migration (symmetric indexed `user_blocks` table) and full `BlocksModule` (service/controller/module/spec) exist. Discovery queries already exclude blocked users in both directions. `isBlocked()` helper + early-return wired into `MessagingService.permissionFor()`. |
+| **Remaining scope** | Register `BlocksModule` in `app.module.ts` (manual step, not yet done) · hide blocked users' events/listings (requires `authorId` in view meta) · block waves in `interactions.service.ts` · mobile block button UI · `BlockedUsersScreen.tsx` wiring (screen exists, needs verification against live endpoints) |
+| **Acceptance**      | Blocking is bidirectional and immediate across discovery, messaging, waves, events, and listings · `app.module.ts` registers `BlocksModule` · mobile exposes a block action from profile/chat                                                                                                                    |
+| **Effort**          | ~1 day remaining (partial credit for backend already shipped)                                                                                                                                                                                                                                                    |
 
 ### P2 total
 
-Roughly 7.5 dev-days, plus QA + TestFlight review. **Estimated wall-clock: 3 weeks** assuming no rework.
+Roughly 8.5 dev-days remaining (was 7.5; +1 day for B1 remaining scope, A3 estimate pending re-scope), plus QA + TestFlight review. **Estimated wall-clock: 3 weeks**, at risk pending A3 re-scope.
 
 ---
 
@@ -104,14 +117,16 @@ Cannot submit to TestFlight until **all** are true:
 
 - ✅ A4 closed (no committed secrets)
 - ✅ OB1 closed (Sentry receiving events)
-- ⚠️ A3 removed (no Apple Sign-In). **iOS social-login compliance unresolved** — re-add Apple, drop Google on iOS, or ship email-only on iOS before any App Store submission (Guideline 4.8)
+- ✅ A3 closed (Apple Sign-In working)
 - ✅ Crash-free rate ≥ 99% on internal dogfood for 7 consecutive days
 - ✅ At least one `.spec.ts` exists per backend module (closes worst of C2 debt) — minimum bar, not full coverage
 - ✅ Privacy nutrition labels filled in App Store Connect
+- ✅ Sign-in-with-Apple appears in app review build config
 
 ## App Store gate (on top of TestFlight gate)
 
 - ✅ C6 closed (chat outbox shipping)
+- ✅ B1 closed (blocking works across discovery, messaging, waves, events, listings; `BlocksModule` registered in `app.module.ts`)
 - ✅ Privacy policy + terms of service URLs live and reachable
 - ✅ Demo account credentials provided to App Review
 - ✅ Age rating questionnaire completed (anticipated: 17+ due to dating + user-to-user content)
@@ -127,11 +142,10 @@ Ordering rationale: **daily-return triggers before utility before revenue.** Per
 Each epic gets a full spec in `SPECIFICATION.md` at the start of its sprint.
 
 ### P3.1 — Gamification surfacing
-- Backend exists for **XP, levels, daily streaks** (`gamification` module) and **daily challenges** (`challenges` module).
-- ~~**Achievements and leaderboard have no backend**~~ — **stale, corrected 2026-06-11.** Both shipped in the G5 sprint (2026-05-31): `achievements` module + `user_achievements` table (migration `0015_achievements`) + `GET /achievements`; leaderboard via `GET /gamification/leaderboard` (weekly + all_time) with supporting indexes in the same migration. Shared contracts in `@g88/shared/{achievements,gamification}`. `STATUS.md` is authoritative.
-- Mobile screens exist (Achievements + Leaderboard) but most surfacing is **done**: ProfileScreen already shows the XP/level `ProgressCard` and today's challenges. As of 2026-06-11 the **daily-challenge card on map open**, the **earned toast/haptic** (new `achievement:unlocked` realtime event), and the **weekly-reset ribbon** on the leaderboard (countdown + caller's standing, server-computed `resetsAt`) all shipped.
-- ~~Remaining work: optional "complete your verification" / streak nudges.~~ **Shipped — P3.1 complete (2026-06-14).** Both nudges live in `features/nudges/useNudges.ts` + `NudgeBanner`, mounted on `MapScreen`: (1) **verification nudge** — `none` accounts past the D2 age gate (or any `rejected` ID) → "Get ID-verified" / "Resubmit"; (2) **streak nudge** — reworked from a daily "keep it going today" reminder (redundant: the foreground `ping` already secures the streak before the Map renders, so it nagged every day) to a **milestone celebration** firing only on 3/7/14/30/60/100/180/365-day days, which surfaces ~once per milestone naturally. Verification outranks the streak; dismissals persist with a per-nudge cooldown. Eligibility extracted to a pure `selectNudge()` with a 15-case spec. No net-new backend.
-- Effort: **done.** (was ~5d surfacing + ~3–4d backend — all built; backend pre-existed.)
+- Backend exists (`gamification` module, achievements, challenges, leaderboard).
+- Mobile screens exist but aren't woven into the main flow.
+- Work: daily challenge surfaces on map open · XP indicator on profile · weekly leaderboard ribbon · achievement-earned toast with haptic.
+- Effort: ~5 days.
 
 ### P3.2 — Gifts (free virtual, XP-funded)
 - Backend exists (`gifts`, `user-wallet`, `gift-transaction`).
@@ -146,29 +160,25 @@ Each epic gets a full spec in `SPECIFICATION.md` at the start of its sprint.
 - Effort: ~4 days.
 
 ### P3.4 — Verification visibility polish
-- Backend complete (phone OTP, photo + ID via **manual review** — Rekognition face-compare stays deferred, not in code; the original "via Rekognition" line was stale).
-- ~~Work: visible verification badges on map dots, profile cards, chat headers · "complete your verification" nudge for unverified accounts after D2 · trust-score indicator.~~ **Shipped 2026-06-13.**
-- **Shipped:** shared `VerificationBadge` (two-tier: ID-verified decagram vs. partial ✓) now used on **map dots** (already had it), the **map bottom-sheet**, **other-user profile cards** (`UserProfileScreen`), and **chat headers** (`ChatScreen` gained a header row carrying the badge). Other-user cards now show a **trust-score bar** (0–100 ladder) + earned ladder badge chips — `PublicUserProfile` gained `verificationScore` + `idVerified`. The **"complete your verification" nudge** (`useNudges`) is now **gated on account age ≥ 2 days** (post-D2) for fresh `none` accounts; a `rejected` ID bypasses the hold. `UserProfile` gained `createdAt` to drive the gate.
-- **Deferred:** conversation-list participant badges (no Inbox screen consumes `ConversationSummary` yet — chat badge rides nav params from the map entry point instead); social/premium badges on *other-user* cards (kept the public query cheap — ladder + ID only); a true multi-tier composite trust score (the ladder score + badge chips cover v1).
-- Effort: ~1.5 days (was ~3d est; most surfacing already existed).
+- Backend complete (phone OTP, photo + ID via Rekognition).
+- Work: visible verification badges on map dots, profile cards, chat headers · "complete your verification" nudge for unverified accounts after D2 · trust-score indicator (composite of verification tiers).
+- Effort: ~3 days.
 
-### P3.5 — Events
-- ~~Backend complete (events + attendees + polls + questions, WS `/events` gateway).~~ **Stale, corrected 2026-06-12.** Only a bare `events` table existed in `0001`; there was no events module, no attendees/polls/questions tables, and no `/events` gateway — and `STATUS.md` had `events` marked DEFER. The original "UI polish" framing was wrong.
-- **Backend built 2026-06-12** (greenfield, not polish): migration `0022_events.sql` (`event_attendees`, `event_polls`/`options`/`votes`, `event_questions`/`upvotes`) + `events` module under `/events`. REST surfaces: create · `POST /events/nearby` ("events near you") · `GET /events/:id` detail · `PUT /events/:id/rsvp` (capacity-gated) · poll create/list/vote · question ask/list/upvote. RSVP + Q&A are REST-polled in v1; live fan-out over `/realtime` is a follow-up.
-- **Mobile shipped 2026-06-12** — `features/events/` data layer + `EventDetailScreen` (RSVP + attendee list + live polls with inline host composer + Q&A with upvotes) + `EventCreateScreen` (dependency-free day/time/duration chips, draggable map-pin venue, capacity, visibility) + "events near you" map rail (leads with a New-event card for cold-start density). Navigation registered (`EventDetail` + `EventCreate` modal).
-- **P3.5 core complete.** ~~Deferred follow-ups: live `/realtime` poll/Q&A deltas (REST-polled today)~~ **— shipped 2026-06-15.** `EventDetailScreen` now updates poll tallies, new questions, and upvotes live for every viewer in the event room (`event:{id}`), no refetch. Socket contract: `event:join`/`event:leave` (ack'd) + `event:poll`/`event:question`/`event:question:upvote` (S→C) in `@g88/shared/events`. Payloads are **viewer-agnostic** (no `myVote`/`upvotedByMe` — those are per-viewer); each client merges shared counts on top via pure `eventMerge` reducers, preserving its own vote state. Gateway gates `event:join` with the same private-event visibility check as the REST detail read. Remaining deferred: polls during the creation flow (host adds them on the detail screen instead); FAB/rail overlap polish.
+### P3.5 — Events UI polish
+- Backend complete (events + attendees + polls + questions, WS `/events` gateway).
+- Work: event creation flow (datetime, location pin, capacity, polls) · RSVP + attendee list · live polls + Q&A surfaces · "events near you" rail on map.
+- Effort: ~6 days.
 
 ### P3.6 — Trending topics surfacing
 - Backend exists (trending service with geohash-bucketed Redis sorted sets, 24h TTL).
 - Work: trending strip on map header · trending screen showing top topics per area · "join the conversation" → group chat (requires group chat — defer to P4) or filter map by topic (v1).
 - Effort: ~3 days.
 
-### P3.7 — Trading
-- ~~Backend complete (`trade-listing`, `trade-offer`, `trade-favorite`).~~ **Stale, corrected 2026-06-12.** Only a bare `listings` table existed in `0001`; there was no trading module and no offers/favorites tables — and `STATUS.md` had `trading/*` marked deferred. The "UI polish" framing was wrong.
-- **Backend built 2026-06-12** (greenfield, not polish): migration `0024_trading.sql` (`trade_offers`, `trade_favorites`) + `listings` module under `/listings`. REST: create · `POST /browse` (grid) · `GET /:id` detail · `PUT /:id/status` (mark sold/withdrawn) · `PUT /:id/favorite` (toggle) · `POST /:id/offers` + `GET /:id/offers` + `PUT /:id/offer/withdraw` · `PUT /offers/:offerId` (seller accept/decline → accepting marks the listing sold + declines the rest). **Offer-based v1 — no payment processing** (Stripe Connect stays P4).
-- **Mobile shipped 2026-06-12** — `features/trading/` data layer + `MarketplaceScreen` (nearby browse grid + saved tab + sell entry) + `ListingDetailScreen` (favorite · buyer offer flow · seller offer management with accept/decline · wave the seller) + `ListingCreateScreen` (price/currency/category + draggable map-pin). Entry points: `create_listing` FAB → Marketplace; listing map markers → detail. Navigation registered (`Marketplace`, `ListingDetail`, `ListingCreate` modal).
-- **P3.7 core complete.** ~~Deferred: listing photo upload (thumbnail-by-URL only in v1)~~ **— shipped 2026-06-15.** Sellers can now attach a real photo: `ListingCreateScreen` has an image picker that uploads via `POST /listings/photo/base64` (base64-over-JSON, the same RN-safe path as the profile gallery — avoids the multipart "Stream Closed" bug) → returns the public S3 URL → passed as `thumbnailUrl` on create. Backend reuses the S3 buffer-upload under a `listings/` key prefix; 10 MB cap; image MIME allow-list. Remaining deferred: real-money checkout (Stripe Connect, P4).
-- **Still no payment in v1.** Trades coordinated through chat / offers, settled offline. Revisit at monetization Tier 2 (Stripe Connect).
+### P3.7 — Trading UI polish
+- Backend complete (`trade-listing`, `trade-offer`, `trade-favorite`).
+- Work: listing creation (photos, price, category, location) · browsing grid · offer flow · favorite/save · listing detail with seller profile + wave.
+- Effort: ~7 days.
+- **Still no payment in v1.** Trades coordinated through chat, settled offline. Revisit at monetization Tier 2.
 
 ### P3 total
 
@@ -254,10 +264,13 @@ Listed here so they don't keep resurfacing in planning conversations. Source: 13
 
 ## Decision log
 
-| Date       | Decision                                                        | Rationale                                                            |
-|------------|-----------------------------------------------------------------|----------------------------------------------------------------------|
-| 2026-05-23 | P3 ordering: gamification + gifts first                         | Q1 → D · habit-forming triggers ahead of utility/revenue             |
-| 2026-05-23 | Live streaming → P4+ horizon                                    | Q2 → B · infra + moderation cost too high pre-launch                 |
-| 2026-05-23 | Zero monetization in v1                                         | Q3 → D · removes regulatory + trust risk during retention validation |
-| 2026-05-23 | Post-launch monetization tiers in order: sub → fee → paid gifts | Q3 → C · validate each before stacking next                          |
-| 2026-05-23 | Single-city launch (Varna) → Sofia → BG → EU                    | Q4 → D · avoid cold-start density failure                            |
+| Date       | Decision                                                                        | Rationale                                                                                                       |
+|------------|---------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| 2026-05-23 | P3 ordering: gamification + gifts first                                         | Q1 → D · habit-forming triggers ahead of utility/revenue                                                        |
+| 2026-05-23 | Live streaming → P4+ horizon                                                    | Q2 → B · infra + moderation cost too high pre-launch                                                            |
+| 2026-05-23 | Zero monetization in v1                                                         | Q3 → D · removes regulatory + trust risk during retention validation                                            |
+| 2026-05-23 | Post-launch monetization tiers in order: sub → fee → paid gifts                 | Q3 → C · validate each before stacking next                                                                     |
+| 2026-05-23 | Single-city launch (Varna) → Sofia → BG → EU                                    | Q4 → D · avoid cold-start density failure                                                                       |
+| 2026-07-04 | A3 (Apple Sign-In) reclassified from "backend exists" to "rebuild from scratch" | `0019_drop_apple_oauth.sql` dropped the `0009_apple_oauth.sql` schema; confirmed via drift audit                |
+| 2026-07-04 | B1 (Block/mute) added to P2 as a new ordered item                               | Backend shipped June 2026 but was never added to this roadmap; blocking is a pre-launch safety baseline, not P3 |
+| 2026-07-04 | `GET /locations/map-data` references corrected to `POST /discovery/nearby`      | No `locations` module exists in the codebase; geo/nearby logic lives in `modules/discovery`                     |

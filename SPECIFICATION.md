@@ -4,7 +4,7 @@
 
 > **Authoritative source for per-feature contracts: user story, API, data model, WS events, UI surface, acceptance.**
 > Sibling docs: `PRODUCT.md` (what/why), `ROADMAP.md` (when), `ARCHITECTURE.md` (how the system is wired).
-> Last revised: 2026-05-23.
+> Last revised: 2026-07-04 (patched for confirmed drift; original body dated 2026-05-23).
 
 ---
 
@@ -69,7 +69,7 @@ type Paginated<T>= { items: T[]; nextCursor: Cursor };
 
 **User story.** As a new user, I can create an account with email/password or Google. Returning users stay signed in across app restarts and survive token expiry without re-login.
 
-**Status.** ✅ Shipped. Opaque rotating refresh tokens (A1). Google OAuth (A2). Apple Sign-In removed from scope 2026-06-05 (see §3.3).
+**Status.** ✅ Shipped. Opaque rotating refresh tokens (A1). Google OAuth (A2). Apple Sign-In = P2 (see §3.3) — **note:** A3's prior migration (`0009_apple_oauth.sql`) was reverted by `0019_drop_apple_oauth.sql`; there is currently no Apple OAuth schema or route. A3 is a from-scratch build, not a resume.
 
 **API**
 
@@ -148,21 +148,24 @@ type Paginated<T>= { items: T[]; nextCursor: Cursor };
 
 **API**
 
-| Method | Path                  | Auth | Notes                                                                      |
-|--------|-----------------------|------|----------------------------------------------------------------------------|
-| POST   | `/locations/update`   | JWT  | `{ latitude, longitude }` → writes PostGIS + Redis GEO                     |
-| GET    | `/locations/map-data` | JWT  | `?latitude&longitude&radiusKm&limit` → `{ users[], events[], listings[] }` |
-| GET    | `/discovery/profiles` | JWT  | Swipe deck (proximity + interests + filters)                               |
+| Method | Path                  | Auth | Notes                                                                                                                                                                                                                               |
+|--------|-----------------------|------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| POST   | `/locations/update`   | JWT  | `{ latitude, longitude }` → writes PostGIS + Redis GEO                                                                                                                                                                              |
+| POST   | `/discovery/nearby`   | JWT  | Viewport body → `{ users[], events[], listings[] }`. **Corrected 2026-07-04:** this replaces `GET /locations/map-data` below, which does not exist — there is no `locations` module; nearby/geo logic lives in `modules/discovery`. |
+| GET    | `/discovery/profiles` | JWT  | Swipe deck (proximity + interests + filters)                                                                                                                                                                                        |
 
 **Geo writes (per `/locations/update`)**
 1. PostGIS: `UPDATE users SET location = ST_SetSRID(ST_MakePoint($lng,$lat),4326), last_seen=NOW() WHERE id=$uid`
 2. Redis: `GEOADD user:locations $lng $lat $uid`
 3. WS broadcast: `nearby:update` to all users with `$uid` in their viewport
+4. Location is fuzzed to H3 r10 cell centroid at write time — no raw coordinates persisted or logged (privacy hard invariant)
 
-**Geo reads (per `/locations/map-data`)**
+**Geo reads (per `POST /discovery/nearby`)**
 - Primary: `RedisService.geoRadius('user:locations', lng, lat, radiusKm)` → user IDs + distances
 - Hydrate from Postgres for `displayName`, primary photo, verification badges
 - Fallback to PostGIS `ST_DWithin` if Redis miss
+- Excludes blocked users in both directions (see §2.7 Blocks)
+- Bounded by an OOM guard before H3 `polygonToCells` enumeration (pre-enumeration area estimate cap `200_000`; separate UX display cap `5_000` — these two caps serve different purposes and must not be conflated)
 
 **UI**
 - `MapScreen` — single map, three overlay layers (users · events · listings), top filter bar.
@@ -285,6 +288,33 @@ Message {
 
 ---
 
+### §2.7 — Blocks (added 2026-07-04, undocumented until now)
+
+**User story.** I can block another user. Once blocked, we disappear from each other's map/discovery, can't message each other, and my waves to them are prevented.
+
+**Status.** 🟡 Partially shipped. Backend complete; mobile UI and remaining cross-module wiring pending — see `ROADMAP.md` P2.B1.
+
+**API**
+
+| Method | Path              | Auth | Notes                        |
+|--------|-------------------|------|------------------------------|
+| POST   | `/blocks`         | JWT  | `{ blockedUserId }`          |
+| DELETE | `/blocks/:userId` | JWT  | Unblock                      |
+| GET    | `/blocks`         | JWT  | List currently blocked users |
+
+**Data model**
+- `0026_blocks.sql` — `user_blocks` table, symmetric indexed (fast lookup from either direction)
+
+**Enforcement**
+- `discovery.service.ts` — excludes blocked users in both directions from nearby/viewport queries
+- `messaging.service.ts` — `isBlocked()` helper + early-return in `permissionFor()`
+- **Not yet enforced:** events/listings visibility (needs `authorId` in view meta), waves (`interactions.service.ts`)
+
+**Acceptance**
+- Blocking is bidirectional — neither party sees the other in discovery.
+- Blocked users cannot open new message threads with each other.
+- `BlocksModule` must be registered in `app.module.ts` for any of this to take effect (as of this writing it is implemented but not confirmed registered — verify before relying on it).
+
 ## §3 — P2 features (forward specs)
 
 ### §3.1 — P2.A4: Dev-secret cleanup
@@ -316,11 +346,45 @@ Message {
 - Backend handler throwing `BadRequestException` → visible with request method, path, anonymized user, **no body**.
 - `grep -rE '(password|idToken|refreshToken).*sentry' apps/` returns no instances logging PII.
 
-### §3.3 — ~~P2.A3: Apple Sign-In~~ (removed from scope 2026-06-05)
+### §3.3 — P2.A3: Apple Sign-In
 
-**Removed from scope.** Apple Sign-In was previously code-complete (backend `POST /auth/oauth/apple`, mobile `loginWithApple`, migration `0009` adding `apple_sub`) but never had working Apple Developer credentials. On 2026-06-05 it was fully removed — code, the `apple-signin-auth` and `@invertase/react-native-apple-authentication` deps, the iOS entitlement, and the `apple_sub` column (reverted by migration `0019`).
+**User story.** As an iOS user, I can sign in or register with Sign in with Apple. My account works the same as a Google or email user.
 
-**App Store consequence to revisit before any iOS submission.** Apple App Store Review Guideline 4.8 requires Sign in with Apple whenever an app offers a third-party or social login. Google OAuth is live, so an iOS build must do one of: (a) re-introduce Apple Sign-In, (b) drop Google on iOS, or (c) offer only email/password on iOS. Inert today — the product is Android-first (no Xcode project, Android-only CI).
+**Mobile**
+- Dep: `@invertase/react-native-apple-authentication` (vet for RN 0.83 + React 19 compat — H1 risk).
+- iOS only (button hidden on Android).
+- Button on `AuthScreen`, beneath existing Google + email/password.
+
+**API**
+
+| Method | Path          | Auth | Body                                  |
+|--------|---------------|------|---------------------------------------|
+| POST   | `/auth/apple` | No   | `{ identityToken, nonce, fullName? }` |
+
+**Backend logic**
+1. Fetch Apple JWKS, verify `identityToken` signature.
+2. Validate `aud` (bundle id), `iss` (`https://appleid.apple.com`), `exp`.
+3. Extract `sub` (stable user id) and `email` (may be private-relay `*@privaterelay.appleid.com`).
+4. Look up user by `appleUserId = sub` (new column on `User`, nullable, indexed unique).
+5. If new → create user with `appleUserId = sub`, `email = <relay or real>`, `name = fullName` (Apple only returns name on first sign-in).
+6. Issue token pair, return user.
+
+**New `User` columns**
+```sql
+ALTER TABLE users ADD COLUMN apple_user_id varchar UNIQUE NULL;
+CREATE UNIQUE INDEX idx_users_apple_user_id ON users(apple_user_id) WHERE apple_user_id IS NOT NULL;
+```
+
+**Edge cases**
+- Apple `private-relay` email → store and use as-is. Don't try to "resolve" it.
+- User signs in again later → only `sub` returned, no name → don't overwrite existing `name`.
+- User had email account first, then signs in with Apple using the same email → **don't auto-merge**. Show "an account exists for this email — sign in to link" flow (P3 polish — for P2, just create separate account and document the merge tool as P3 work).
+
+**Acceptance**
+- Sign in with Apple from cold app state → land on `ProfileCreation` (if new) or `Main` (if returning) within 3s.
+- Returning user with relay email gets the same `User.id`.
+- Android build links cleanly (the native module must be conditional).
+- Apple test reviewer account works end-to-end.
 
 ### §3.4 — P2.C6: Mobile chat outbox
 
@@ -367,14 +431,14 @@ type OutboxItem = {
 **User story (perf).** The map data payload shrinks substantially on viewport changes. Pan/zoom feels snappier; mobile data + battery savings measurable.
 
 **Current behavior**
-- `GET /locations/map-data?lat&lng&radiusKm` returns full snapshot every time.
+- `POST /discovery/nearby?lat&lng&radiusKm` returns full snapshot every time.
 - Median payload at 5km radius in dense area: ~80kB.
 
 **New behavior — diff mode**
 
-| Method | Path                  | Notes                                                                       |
-|--------|-----------------------|-----------------------------------------------------------------------------|
-| GET    | `/locations/map-data` | First call (no `since`) returns full snapshot; subsequent calls return diff |
+| Method | Path                | Notes                                                                       |
+|--------|---------------------|-----------------------------------------------------------------------------|
+| POST   | `/discovery/nearby` | First call (no `since`) returns full snapshot; subsequent calls return diff |
 
 **Query**
 - `?lat&lng&radiusKm&since=<timestamp>&previousIds=<comma-sep>` (or `since` only — server computes diff against last-known set if a session id is provided)
@@ -400,7 +464,7 @@ type MapEntity = {
 
 **Client (mobile) logic**
 - `mapSlice` tracks `lastFetchAt` and current `entityIds: Set<string>`.
-- On viewport change → `GET /locations/map-data?since=lastFetchAt&previousIds=<...>`
+- On viewport change → `POST /discovery/nearby?since=lastFetchAt&previousIds=<...>`
 - Apply diff: `added` → push · `updated` → replace · `removed` → drop
 - On any missing-id signal (e.g. cursor expired) → fall back to full fetch.
 
@@ -421,9 +485,8 @@ Full specs land at start of each P3 sprint. These outlines anchor scope only.
 
 ### §4.1 — P3.1 Gamification surfacing
 - Surfaces: daily-challenge card on map open · XP bar on profile header · weekly leaderboard ribbon · achievement toast.
-- Existing backend (raw SQL, no entities): `gamification` module — XP/levels/streaks (`xp_events`, `user_gamification`) — and `challenges` module — daily challenges (`challenge_progress`). Endpoints: `GET /gamification/me`, `POST /gamification/ping`, challenges.
-- **Not built:** achievements and leaderboard. No table, service, or endpoint exists — both require a full backend build before their surfaces (achievement toast, leaderboard ribbon) can be wired.
-- For what exists (XP/streaks/challenges), endpoints are live; UI not yet wired into main flow.
+- Existing backend: `gamification` module, `achievement`, `challenge`, `user-achievement`, `user-challenge` entities.
+- Endpoints exist; UI not yet wired into main flow.
 
 ### §4.2 — P3.2 Gifts (XP-funded)
 - Wallet seeded by XP earned in gamification. **No money.**
@@ -439,10 +502,10 @@ Full specs land at start of each P3 sprint. These outlines anchor scope only.
 
 ### §4.4 — P3.4 Verification visibility
 - Badges (email · phone · photo · ID · social) visible on:
-  - Map dot (subtle indicator)
-  - Profile card preview
-  - Chat header
-  - User profile screen
+    - Map dot (subtle indicator)
+    - Profile card preview
+    - Chat header
+    - User profile screen
 - "Verify to unlock" nudge after D2 if no verification done.
 - Composite `verificationScore` already on `User`.
 
@@ -477,7 +540,7 @@ type User = {
   email?: string;
   phone?: string;
   passwordHash: string;                        // @Column({ select: false })
-  appleUserId?: string;                        // new in P2.A3
+  appleUserId?: string;                        // planned for P2.A3 — column does not exist yet; 0009_apple_oauth.sql was dropped by 0019_drop_apple_oauth.sql
   googleUserId?: string;
   name: string;
   location?: { type: 'Point'; coordinates: [lng, lat] };  // geography(Point,4326)
@@ -610,9 +673,12 @@ export const COLORS = {
 
 ## Decision log
 
-| Date       | Decision                                                                  | Source                                                             |
-|------------|---------------------------------------------------------------------------|--------------------------------------------------------------------|
-| 2026-05-23 | One file with §-numbered sections (vs many files)                         | Initial scoping with user — easier to grep, single source of truth |
-| 2026-05-23 | Document P1 retroactively rather than skip                                | Reduces onboarding cost for future contributors                    |
-| 2026-05-23 | Apple `sub`, not email, as identity primary                               | Apple private-relay design forces this                             |
-| 2026-05-23 | `clientMessageId` for outbox idempotency at `(senderId, clientMessageId)` | Standard pattern; survives device-clock skew                       |
+| Date       | Decision                                                                                   | Source                                                                                                                                      |
+|------------|--------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| 2026-05-23 | One file with §-numbered sections (vs many files)                                          | Initial scoping with user — easier to grep, single source of truth                                                                          |
+| 2026-05-23 | Document P1 retroactively rather than skip                                                 | Reduces onboarding cost for future contributors                                                                                             |
+| 2026-05-23 | Apple `sub`, not email, as identity primary                                                | Apple private-relay design forces this                                                                                                      |
+| 2026-05-23 | `clientMessageId` for outbox idempotency at `(senderId, clientMessageId)`                  | Standard pattern; survives device-clock skew                                                                                                |
+| 2026-07-04 | Added §2.7 Blocks — backend shipped but was undocumented                                   | Drift audit found `BlocksModule`, `0026_blocks.sql`, and discovery/messaging enforcement already in the codebase with no corresponding spec |
+| 2026-07-04 | Corrected `GET /locations/map-data` → `POST /discovery/nearby` throughout                  | No `locations` module exists in the codebase                                                                                                |
+| 2026-07-04 | Reclassified A3 (Apple Sign-In) status from "in place" to "reverted, rebuild from scratch" | `0019_drop_apple_oauth.sql` dropped `0009_apple_oauth.sql`                                                                                  |
