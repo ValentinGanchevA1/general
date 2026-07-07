@@ -54,6 +54,17 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: .
 
+      - name: Ensure Hermes compiler is available
+        run: |
+          # Force reinstall of hermes-compiler to ensure binary is extracted
+          pnpm install hermes-compiler --force
+          # Verify the binary exists and is executable
+          if ! find node_modules -name "hermesc" -type f -executable 2>/dev/null | grep -q .; then
+            echo "::error::Hermes compiler binary not found or not executable"
+            exit 1
+          fi
+        working-directory: .
+
       - name: Inject Maps keys
         run: |
           cat >> android/local.properties <<EOF
