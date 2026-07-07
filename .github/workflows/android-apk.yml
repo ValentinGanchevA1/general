@@ -57,7 +57,8 @@ jobs:
       - name: Ensure Hermes compiler is available
         run: |
           # Force reinstall of hermes-compiler to ensure binary is extracted
-          pnpm install hermes-compiler --force
+          # Use -w flag because we're in a monorepo workspace
+          pnpm install hermes-compiler --force -w
           # Verify the binary exists and is executable
           if ! find node_modules -name "hermesc" -type f -executable 2>/dev/null | grep -q .; then
             echo "::error::Hermes compiler binary not found or not executable"
