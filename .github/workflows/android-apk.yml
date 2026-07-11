@@ -56,9 +56,15 @@ jobs:
 
       - name: Ensure Hermes compiler is available
         run: |
-          # Force reinstall of hermes-compiler to ensure binary is extracted
-          pnpm install hermes-compiler --force
-          # Verify the binary exists and is executable
+          # Force a clean reinstall to ensure the hermes-compiler binary is
+          # properly extracted (guards against a stale/corrupted pnpm store
+          # on the runner). Do NOT `pnpm install hermes-compiler --force` --
+          # that's a workspace-root dependency add and pnpm blocks it
+          # (ERR_PNPM_ADDING_TO_ROOT) unless -w is passed, which would
+          # incorrectly add it to root package.json.
+          pnpm store prune
+          rm -rf node_modules
+          pnpm install --frozen-lockfile
           if ! find node_modules -name "hermesc" -type f -executable 2>/dev/null | grep -q .; then
             echo "::error::Hermes compiler binary not found or not executable"
             exit 1
