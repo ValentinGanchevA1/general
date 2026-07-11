@@ -54,23 +54,15 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: .
 
-      - name: Rebuild native modules
-        run: pnpm run postinstall || true
-        working-directory: .
-
-      - name: Verify Hermes compiler is available
+      - name: Ensure Hermes compiler is available
         run: |
-          # Find and verify the hermesc binary exists and is executable
+          # Force reinstall of hermes-compiler to ensure binary is extracted
+          pnpm install hermes-compiler --force
+          # Verify the binary exists and is executable
           if ! find node_modules -name "hermesc" -type f -executable 2>/dev/null | grep -q .; then
-            echo "Hermes compiler binary not found in node_modules"
-            echo "Attempting to rebuild..."
-            pnpm install --no-frozen-lockfile
-            if ! find node_modules -name "hermesc" -type f -executable 2>/dev/null | grep -q .; then
-              echo "::error::Hermes compiler binary still not available after rebuild"
-              exit 1
-            fi
+            echo "::error::Hermes compiler binary not found or not executable"
+            exit 1
           fi
-          echo "✓ Hermes compiler is available"
         working-directory: .
 
       - name: Inject Maps keys
