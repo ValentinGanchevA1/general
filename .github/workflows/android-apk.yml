@@ -92,30 +92,45 @@ jobs:
             exit 1
           fi
 
-          HERMESC=""
+          # IMPORTANT: do NOT stop at the first ELF match. Multiple
+          # hermes-compiler versions can be installed side-by-side in the
+          # pnpm store simultaneously (e.g. one pinned transitively, another
+          # resolved directly by React Native) — which one Gradle actually
+          # invokes at build time depends on dependency resolution and isn't
+          # knowable here. Fixing permissions on only the first candidate
+          # found leaves other versions non-executable, causing "A problem
+          # occurred starting process" tens of minutes into the Gradle build
+          # if Gradle happens to resolve a different version than we picked.
+          # So: chmod +x every ELF candidate, and verify at least one runs.
+          ELF_COUNT=0
           while IFS= read -r candidate; do
             if file "$candidate" | grep -q "ELF"; then
-              HERMESC="$candidate"
-              break
+              echo "Found ELF hermesc: $candidate"
+              chmod +x "$candidate"
+              ELF_COUNT=$((ELF_COUNT + 1))
             fi
           done <<< "$CANDIDATES"
 
-          if [ -z "$HERMESC" ]; then
+          if [ "$ELF_COUNT" -eq 0 ]; then
             echo "::error::Found hermesc candidate(s) but none are ELF binaries runnable on this Linux runner:"
             echo "$CANDIDATES"
             exit 1
           fi
-          echo "Target hermesc: $HERMESC"
-          chmod +x "$HERMESC"
+          echo "chmod +x applied to $ELF_COUNT ELF hermesc candidate(s)"
 
           # chmod +x alone doesn't catch a missing shared lib or an arch
-          # mismatch — actually execute it and fail fast here (seconds),
-          # instead of discovering it 9+ minutes into the Gradle build.
-          if ! "$HERMESC" -version; then
-            echo "::error::hermesc is +x but won't run — check libz3-4/glibc or an architecture mismatch"
-            exit 1
-          fi
-          echo "✓ Hermes binary is executable and runs"
+          # mismatch — actually execute each one and fail fast here
+          # (seconds), instead of discovering it 9+ minutes into the Gradle
+          # build.
+          while IFS= read -r candidate; do
+            if file "$candidate" | grep -q "ELF"; then
+              if ! "$candidate" -version; then
+                echo "::error::$candidate is +x but won't run — check libz3-4/glibc or an architecture mismatch"
+                exit 1
+              fi
+              echo "✓ $candidate is executable and runs"
+            fi
+          done <<< "$CANDIDATES"
 
       - name: Inject Maps keys
         run: |
