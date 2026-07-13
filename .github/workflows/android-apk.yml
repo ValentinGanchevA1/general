@@ -71,6 +71,31 @@ jobs:
           fi
         working-directory: .
 
+      - name: Fix Hermes compiler permissions and dependencies
+        run: |
+          # Install system dependencies required by Hermes binary
+          sudo apt-get update
+          sudo apt-get install -y libz3-4
+          
+          # Find and fix permissions on the Hermes binary
+          HERMESC_PATH=$(find node_modules -name "hermesc" -type f 2>/dev/null | head -1)
+          if [ -n "$HERMESC_PATH" ]; then
+            echo "Found Hermes binary at: $HERMESC_PATH"
+            chmod +x "$HERMESC_PATH"
+            echo "Fixed permissions on Hermes binary"
+            # Verify it's executable
+            if [ -x "$HERMESC_PATH" ]; then
+              echo "✓ Hermes binary is now executable"
+            else
+              echo "::error::Failed to make Hermes binary executable"
+              exit 1
+            fi
+          else
+            echo "::error::Could not find Hermes compiler binary"
+            exit 1
+          fi
+        working-directory: .
+
       - name: Inject Maps keys
         run: |
           cat >> android/local.properties <<EOF
