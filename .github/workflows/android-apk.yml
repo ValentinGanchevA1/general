@@ -67,21 +67,42 @@ jobs:
           rm -rf node_modules
           pnpm install --frozen-lockfile
 
-          # Install system dependencies required by Hermes binary
+          # Only libz3-4 is confirmed required (Hermes links against Z3 for
+          # its SMT-based type checking). Don't add speculative packages here
+          # — an unavailable apt package on a future runner image would hard
+          # -fail this step for no real benefit.
           sudo apt-get update
-          sudo apt-get install -y libz3-4 icu-devtools libicu-dev
+          sudo apt-get install -y libz3-4
 
-          # Target the EXACT binary the RN Gradle plugin invokes on a Linux
-          # runner. Do NOT `find -name hermesc | head -1` — hermes-compiler
-          # ships a same-named "hermesc" binary under every platform folder
+          # Do NOT `find -name hermesc | head -1` — hermes-compiler ships a
+          # same-named "hermesc" binary under every platform folder
           # (linux64-bin, osx-bin, win64-bin), and find's traversal order is
-          # not guaranteed alphabetical. That can chmod the wrong platform's
-          # binary while leaving linux64-bin/hermesc without +x — which is
-          # exactly the "problem occurred starting process .../linux64-bin/hermesc"
-          # failure this step exists to prevent.
-          HERMESC=$(find node_modules -type f -path '*/hermesc/linux64-bin/hermesc' | head -1)
+          # not guaranteed alphabetical, so that can chmod the wrong
+          # platform's binary while the real Linux one stays without +x.
+          #
+          # Also don't hard-code the "linux64-bin" folder name — it's an
+          # implementation detail of hermes-compiler's packaging that isn't
+          # guaranteed stable across versions. Instead, filter every
+          # same-named candidate down to the one(s) that are actually ELF
+          # binaries (i.e. runnable on this Linux runner) — that's
+          # version-proof.
+          CANDIDATES=$(find node_modules -type f -name "hermesc" 2>/dev/null)
+          if [ -z "$CANDIDATES" ]; then
+            echo "::error::No file named hermesc found under node_modules"
+            exit 1
+          fi
+
+          HERMESC=""
+          while IFS= read -r candidate; do
+            if file "$candidate" | grep -q "ELF"; then
+              HERMESC="$candidate"
+              break
+            fi
+          done <<< "$CANDIDATES"
+
           if [ -z "$HERMESC" ]; then
-            echo "::error::linux64-bin/hermesc not found under node_modules"
+            echo "::error::Found hermesc candidate(s) but none are ELF binaries runnable on this Linux runner:"
+            echo "$CANDIDATES"
             exit 1
           fi
           echo "Target hermesc: $HERMESC"
