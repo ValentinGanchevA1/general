@@ -24,6 +24,9 @@ on:
 permissions:
   contents: write   # create/update the GitHub Release that hosts the shareable APK
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   apk:
     name: Signed APK
@@ -33,16 +36,16 @@ jobs:
         working-directory: apps/mobile
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: '.nvmrc'
           cache: pnpm
@@ -51,26 +54,47 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: .
 
-      - name: Fix Hermes compiler permissions and dependencies
+      - name: Ensure Hermes compiler is available and runnable
         working-directory: .
         run: |
+          # Force a clean reinstall to ensure the hermes-compiler binary is
+          # properly extracted (guards against a stale/corrupted pnpm store
+          # on the runner). Do NOT `pnpm install hermes-compiler --force` --
+          # that's a workspace-root dependency add and pnpm blocks it
+          # (ERR_PNPM_ADDING_TO_ROOT) unless -w is passed, which would
+          # incorrectly add it to root package.json.
+          pnpm store prune
+          rm -rf node_modules
+          pnpm install --frozen-lockfile
+
           # Install system dependencies required by Hermes binary
-          sudo apt-get update && sudo apt-get install -y libz3-4 icu-devtools libicu-dev
-          
-          # Fix permissions on all Hermes-related binaries (recursively)
-          echo "Fixing permissions on Hermes compiler directory..."
-          find node_modules -path "*hermes-compiler*" -type d -exec chmod +x {} \; 2>/dev/null || true
-          find node_modules -path "*hermes-compiler*" -name "hermesc" -type f -exec chmod +x {} \; 2>/dev/null || true
-          find node_modules -path "*hermes-compiler*" -name "hvm" -type f -exec chmod +x {} \; 2>/dev/null || true
-          
-          # Verify hermesc is executable
-          HERMESC_PATH=$(find node_modules -name "hermesc" -type f 2>/dev/null | head -1)
-          if [ -n "$HERMESC_PATH" ] && [ -x "$HERMESC_PATH" ]; then
-            echo "✓ Hermes compiler found and is executable at: $HERMESC_PATH"
-            "$HERMESC_PATH" --version 2>&1 | head -1 || echo "⚠ Warning: Could not verify Hermes version"
-          else
-            echo "⚠ Hermes compiler not found or not executable; gradle may fail if using Hermes"
+          sudo apt-get update
+          sudo apt-get install -y libz3-4 icu-devtools libicu-dev
+
+          # Target the EXACT binary the RN Gradle plugin invokes on a Linux
+          # runner. Do NOT `find -name hermesc | head -1` — hermes-compiler
+          # ships a same-named "hermesc" binary under every platform folder
+          # (linux64-bin, osx-bin, win64-bin), and find's traversal order is
+          # not guaranteed alphabetical. That can chmod the wrong platform's
+          # binary while leaving linux64-bin/hermesc without +x — which is
+          # exactly the "problem occurred starting process .../linux64-bin/hermesc"
+          # failure this step exists to prevent.
+          HERMESC=$(find node_modules -type f -path '*/hermesc/linux64-bin/hermesc' | head -1)
+          if [ -z "$HERMESC" ]; then
+            echo "::error::linux64-bin/hermesc not found under node_modules"
+            exit 1
           fi
+          echo "Target hermesc: $HERMESC"
+          chmod +x "$HERMESC"
+
+          # chmod +x alone doesn't catch a missing shared lib or an arch
+          # mismatch — actually execute it and fail fast here (seconds),
+          # instead of discovering it 9+ minutes into the Gradle build.
+          if ! "$HERMESC" -version; then
+            echo "::error::hermesc is +x but won't run — check libz3-4/glibc or an architecture mismatch"
+            exit 1
+          fi
+          echo "✓ Hermes binary is executable and runs"
 
       - name: Inject Maps keys
         run: |
@@ -106,7 +130,7 @@ jobs:
             | grep -E "SHA1:|SHA256:"
 
       - name: Cache Gradle
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -139,7 +163,7 @@ jobs:
           fi
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: g88-release-apk
           path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
