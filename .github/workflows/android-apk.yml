@@ -24,9 +24,6 @@ on:
 permissions:
   contents: write   # create/update the GitHub Release that hosts the shareable APK
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   apk:
     name: Signed APK
@@ -36,16 +33,16 @@ jobs:
         working-directory: apps/mobile
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
           cache: pnpm
@@ -54,38 +51,25 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: .
 
-      - name: Ensure Hermes compiler is available
-        run: |
-          # Force a clean reinstall to ensure the hermes-compiler binary is
-          # properly extracted (guards against a stale/corrupted pnpm store
-          # on the runner). Do NOT `pnpm install hermes-compiler --force` --
-          # that's a workspace-root dependency add and pnpm blocks it
-          # (ERR_PNPM_ADDING_TO_ROOT) unless -w is passed, which would
-          # incorrectly add it to root package.json.
-          pnpm store prune
-          rm -rf node_modules
-          pnpm install --frozen-lockfile
-          if ! find node_modules -name "hermesc" -type f -executable 2>/dev/null | grep -q .; then
-            echo "::error::Hermes compiler binary not found or not executable"
-            exit 1
-          fi
-        working-directory: .
-
       - name: Fix Hermes compiler permissions and dependencies
+        working-directory: .
         run: |
           # Install system dependencies required by Hermes binary
-          sudo apt-get update
-          sudo apt-get install -y libz3-4
+          sudo apt-get update && sudo apt-get install -y libz3-4 icu-devtools libicu-dev
           
           # Find and fix permissions on the Hermes binary
           HERMESC_PATH=$(find node_modules -name "hermesc" -type f 2>/dev/null | head -1)
           if [ -n "$HERMESC_PATH" ]; then
             echo "Found Hermes binary at: $HERMESC_PATH"
             chmod +x "$HERMESC_PATH"
+            # Also ensure parent directory has proper permissions
+            chmod +x "$(dirname "$HERMESC_PATH")"
             echo "Fixed permissions on Hermes binary"
             # Verify it's executable
             if [ -x "$HERMESC_PATH" ]; then
               echo "✓ Hermes binary is now executable"
+              # Extra verification: try running --version
+              "$HERMESC_PATH" --version || echo "⚠ Warning: Could not verify Hermes binary execution"
             else
               echo "::error::Failed to make Hermes binary executable"
               exit 1
@@ -94,7 +78,6 @@ jobs:
             echo "::error::Could not find Hermes compiler binary"
             exit 1
           fi
-        working-directory: .
 
       - name: Inject Maps keys
         run: |
@@ -130,7 +113,7 @@ jobs:
             | grep -E "SHA1:|SHA256:"
 
       - name: Cache Gradle
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
@@ -163,7 +146,7 @@ jobs:
           fi
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: g88-release-apk
           path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
