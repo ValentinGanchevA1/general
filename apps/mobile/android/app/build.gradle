@@ -49,10 +49,26 @@ react {
     //   instead of `react-native/sdks/hermesc`. Under pnpm the default lookup path
     //   doesn't exist, so the bundle task fails with "Couldn't determine Hermesc
     //   location". Point it at the real binary in the pnpm store.
+    //   The command to use to compile the hermes bytecode. Do NOT hardcode the
+    //   hermes-compiler version in this path — pnpm resolves whatever version
+    //   react-native's package.json currently pins (check apps/mobile/node_modules/
+    //   react-native/package.json's "hermes-compiler" dep), and that version
+    //   changes on every `pnpm update`/`pnpm install` that bumps react-native.
+    //   A hardcoded version here silently rots: the path stops existing, and
+    //   Gradle fails with "A problem occurred starting process" pointing at a
+    //   hermesc binary that was never there. Resolve it dynamically instead.
     def osBin = org.gradle.internal.os.OperatingSystem.current().isWindows() ? "win64-bin" :
                 (org.gradle.internal.os.OperatingSystem.current().isMacOsX() ? "osx-bin" : "linux64-bin")
     def hermescExe = org.gradle.internal.os.OperatingSystem.current().isWindows() ? "hermesc.exe" : "hermesc"
-    hermesCommand = "$rootDir/../../../node_modules/.pnpm/hermes-compiler@0.15.0/node_modules/hermes-compiler/hermesc/$osBin/$hermescExe"
+    def pnpmStoreDir = file("$rootDir/../../../node_modules/.pnpm")
+    def hermesCompilerDir = pnpmStoreDir.listFiles()?.find { it.name.startsWith("hermes-compiler@") }
+    if (hermesCompilerDir == null) {
+        throw new GradleException(
+            "No hermes-compiler@* directory found under ${pnpmStoreDir}. " +
+            "Run `pnpm install` at the repo root first."
+        )
+    }
+    hermesCommand = "${hermesCompilerDir}/node_modules/hermes-compiler/hermesc/$osBin/$hermescExe"
     //
     //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
     // hermesFlags = ["-O", "-output-source-map"]
