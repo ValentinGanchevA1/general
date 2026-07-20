@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { IdVerificationService } from './id-verification.service';
@@ -33,7 +33,7 @@ export class IdVerificationController {
   @UseGuards(AdminGuard)
   async decide(
     @CurrentUser('id') adminId: string,
-    @Param('userId') userId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
     @Body() dto: DecideIdVerificationDto,
   ) {
     return this.service.decideVerification(adminId, userId, dto);
