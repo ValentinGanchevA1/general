@@ -71,39 +71,48 @@ export class IdVerificationService {
     targetUserId: string,
     dto: DecideIdVerificationDto,
   ) {
-    const rows = await this.db.query<{ id: string; status: string }[]>(
-      `SELECT id, status FROM user_id_verifications
-       WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
-      [targetUserId],
-    );
-    if (!rows[0]) throw new NotFoundException('No verification submission found');
-    if (rows[0].status !== 'pending') {
-      throw new BadRequestException(`Submission already ${rows[0].status}`);
-    }
+    return this.db.transaction(async (queryRunner) => {
+      const rows = await queryRunner.query<{ id: string; status: string }[]>(
+        `SELECT id, status FROM user_id_verifications
+         WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+        [targetUserId],
+      );
+      if (!rows[0]) throw new NotFoundException('No verification submission found');
+      if (rows[0].status !== 'pending') {
+        throw new BadRequestException(`Submission already ${rows[0].status}`);
+      }
 
-    const newStatus = dto.decision === 'approved' ? 'verified' : 'rejected';
+      const newStatus = dto.decision === 'approved' ? 'verified' : 'rejected';
+      const verificationId = rows[0].id;
 
-    await this.db.query(
-      `UPDATE user_id_verifications
-       SET status = $1, reviewed_by = $2, reviewed_at = now(), rejection_reason = $3
-       WHERE id = $4`,
-      [newStatus, adminId, dto.decision === 'rejected' ? dto.reason ?? null : null, rows[0].id],
-    );
+      // Atomic conditional UPDATE: only update if status is still 'pending'
+      const updateResult = await queryRunner.query(
+        `UPDATE user_id_verifications
+         SET status = $1, reviewed_by = $2, reviewed_at = now(), rejection_reason = $3
+         WHERE id = $4 AND status = 'pending'`,
+        [newStatus, adminId, dto.decision === 'rejected' ? dto.reason ?? null : null, verificationId],
+      );
 
-    await this.db.query(
-      `UPDATE users
-       SET id_verification_status = $1, id_verified_at = CASE WHEN $1 = 'verified' THEN now() ELSE id_verified_at END
-       WHERE id = $2`,
-      [newStatus, targetUserId],
-    );
+      // Check if update actually occurred (should be 1 row affected in PostgreSQL driver)
+      if (!updateResult || updateResult === 0) {
+        throw new BadRequestException('Verification was already processed by another admin');
+      }
 
-    await this.notificationsService.notifyIdVerificationDecided(
-      targetUserId,
-      newStatus as 'verified' | 'rejected',
-      dto.decision === 'rejected' ? dto.reason : undefined,
-    );
+      await queryRunner.query(
+        `UPDATE users
+         SET id_verification_status = $1, id_verified_at = CASE WHEN $1 = 'verified' THEN now() ELSE id_verified_at END
+         WHERE id = $2`,
+        [newStatus, targetUserId],
+      );
 
-    return { status: newStatus };
+      await this.notificationsService.notifyIdVerificationDecided(
+        targetUserId,
+        newStatus as 'verified' | 'rejected',
+        dto.decision === 'rejected' ? dto.reason : undefined,
+      );
+
+      return { status: newStatus };
+    });
   }
 
   private async requireEligible(userId: string): Promise<IdVerificationStatus> {
