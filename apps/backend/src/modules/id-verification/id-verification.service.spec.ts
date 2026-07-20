@@ -1,6 +1,6 @@
 // apps/backend/src/modules/id-verification/id-verification.service.spec.ts
 import { Test } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryRunner } from 'typeorm';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
@@ -17,6 +17,7 @@ function userRow(status: string, verifiedAt: string | null = null) {
 describe('IdVerificationService', () => {
   let service: IdVerificationService;
   let query: jest.Mock;
+  let transaction: jest.Mock;
   let uploadVerificationBuffer: jest.Mock;
   let notifyIdVerificationDecided: jest.Mock;
 
@@ -24,6 +25,12 @@ describe('IdVerificationService', () => {
     // Unstubbed queries (INSERT, UPDATE) resolve empty; tests override the leading
     // SELECT call-by-call with mockResolvedValueOnce.
     query = jest.fn().mockResolvedValue([]);
+    
+    // Mock the transaction method to execute the callback directly
+    transaction = jest.fn().mockImplementation((callback) => callback({
+      query,
+    } as unknown as QueryRunner));
+    
     uploadVerificationBuffer = jest
       .fn()
       .mockImplementation((_userId: string, kind: string) =>
@@ -34,7 +41,7 @@ describe('IdVerificationService', () => {
     const mod = await Test.createTestingModule({
       providers: [
         IdVerificationService,
-        { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
+        { provide: getDataSourceToken(), useValue: { query, transaction } as unknown as DataSource },
         { provide: S3Service, useValue: { uploadVerificationBuffer } },
         { provide: NotificationsService, useValue: { notifyIdVerificationDecided } },
       ],
@@ -172,18 +179,23 @@ describe('IdVerificationService', () => {
       expect(notifyIdVerificationDecided).not.toHaveBeenCalled();
     });
 
-    it('approves: updates both tables and notifies with no reason', async () => {
+    it('approves: updates both tables in a transaction and notifies with no reason', async () => {
       query.mockResolvedValueOnce([{ id: 'v1', status: 'pending' }]); // SELECT
+      query.mockResolvedValueOnce(1); // UPDATE user_id_verifications (1 row affected)
+      query.mockResolvedValueOnce(1); // UPDATE users
 
       const res = await service.decideVerification('admin1', 'u1', { decision: 'approved' });
 
       expect(res).toEqual({ status: 'verified' });
 
-      // UPDATE user_id_verifications (2nd call)
+      // Verify transaction was called
+      expect(transaction).toHaveBeenCalled();
+
+      // UPDATE user_id_verifications (1st query inside transaction)
       const reviewParams = query.mock.calls[1]![1] as unknown[];
       expect(reviewParams).toEqual(['verified', 'admin1', null, 'v1']);
 
-      // UPDATE users (3rd call)
+      // UPDATE users (2nd query inside transaction)
       const userParams = query.mock.calls[2]![1] as unknown[];
       expect(userParams).toEqual(['verified', 'u1']);
 
@@ -192,6 +204,8 @@ describe('IdVerificationService', () => {
 
     it('rejects: stores the reason and notifies with it', async () => {
       query.mockResolvedValueOnce([{ id: 'v1', status: 'pending' }]);
+      query.mockResolvedValueOnce(1); // UPDATE user_id_verifications
+      query.mockResolvedValueOnce(1); // UPDATE users
 
       const res = await service.decideVerification('admin1', 'u1', {
         decision: 'rejected',
@@ -204,6 +218,16 @@ describe('IdVerificationService', () => {
       expect(reviewParams).toEqual(['rejected', 'admin1', 'Blurry ID photo', 'v1']);
 
       expect(notifyIdVerificationDecided).toHaveBeenCalledWith('u1', 'rejected', 'Blurry ID photo');
+    });
+
+    it('throws BadRequest if concurrent admin already processed the verification', async () => {
+      query.mockResolvedValueOnce([{ id: 'v1', status: 'pending' }]); // SELECT
+      query.mockResolvedValueOnce(0); // UPDATE user_id_verifications (0 rows affected - already processed)
+
+      await expect(
+        service.decideVerification('admin1', 'u1', { decision: 'approved' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(notifyIdVerificationDecided).not.toHaveBeenCalled();
     });
   });
 });
