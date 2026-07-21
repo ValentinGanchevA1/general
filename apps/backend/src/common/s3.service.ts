@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   S3Client,
   PutObjectCommand,
+  GetObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3';
@@ -70,6 +71,19 @@ export class S3Service {
       }),
     );
     return key;
+  }
+
+  /**
+   * Short-lived presigned GET URL for a private object stored by key (currently
+   * only ID-verification docs — selfie/id-front/id-back — are stored as bare keys
+   * rather than public URLs). Used solely by the admin review surface so a
+   * reviewer's browser can load the image directly from S3 without the bucket
+   * being public. Expires in 5 minutes.
+   */
+  async verificationReadUrl(key: string): Promise<string> {
+    if (!this.bucket) throw new Error('AWS_S3_BUCKET not configured');
+    const cmd = new GetObjectCommand({ Bucket: this.bucket, Key: key });
+    return getSignedUrl(this.client, cmd, { expiresIn: 300 });
   }
 
   /**

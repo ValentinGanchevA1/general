@@ -122,7 +122,7 @@ export class IdVerificationService {
     return { status: newStatus };
   }
 
-  async listPending(query: ListPendingVerificationsDto): Promise<ListPendingResponseDto> {
+  async listPendingVerifications(query: ListPendingVerificationsDto): Promise<ListPendingResponseDto> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const offset = (page - 1) * limit;
@@ -152,7 +152,7 @@ export class IdVerificationService {
     };
   }
 
-  async getAdminDetail(targetUserId: string): Promise<AdminVerificationDetailDto> {
+  async getVerificationDetail(targetUserId: string): Promise<AdminVerificationDetailDto> {
     const rows = await this.db.query<VerificationRow[]>(
       `SELECT id, user_id, status, selfie_url, id_front_url, id_back_url,
               created_at, reviewed_by, reviewed_at, rejection_reason
@@ -166,9 +166,9 @@ export class IdVerificationService {
     if (!row) throw new NotFoundException('No verification submission found');
 
     const [selfieUrl, idFrontUrl, idBackUrl] = await Promise.all([
-      this.s3Service.getSignedUrl(row.selfie_url),
-      this.s3Service.getSignedUrl(row.id_front_url),
-      row.id_back_url ? this.s3Service.getSignedUrl(row.id_back_url) : Promise.resolve(null),
+      this.s3Service.verificationReadUrl(row.selfie_url),
+      this.s3Service.verificationReadUrl(row.id_front_url),
+      row.id_back_url ? this.s3Service.verificationReadUrl(row.id_back_url) : Promise.resolve(null),
     ]);
 
     return {

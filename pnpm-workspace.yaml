@@ -1,13 +1,15 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+enable-pre-post-scripts: true
 allowBuilds:
   '@nestjs/core': true
   '@sentry/cli': true
   bcrypt: true
   protobufjs: true
   '@firebase/util': true
-  esbuild: set this to true or false
+  esbuild: false
 minimumReleaseAgeExclude:
   - joi@17.13.4
 overrides:
