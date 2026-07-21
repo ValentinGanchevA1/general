@@ -1,3 +1,85 @@
+#!/usr/bin/env py
+"""
+Installer: admin review endpoints for the ID verification module.
+
+Adds:
+  - GET  /verification/id/admin/pending   (paginated queue, AdminGuard)
+  - GET  /verification/id/admin/:userId   (submission detail w/ signed URLs, AdminGuard)
+
+Writes 3 new DTO files and overwrites service.ts / controller.ts with the
+admin-endpoint-enabled versions. No module wiring changes needed.
+
+Usage (from repo root, C:\\Users\\vganc\\g88):
+  py install_admin_id_verification.py
+"""
+
+import os
+
+REPO_ROOT = r"C:\Users\vganc\g88"
+MODULE_DIR = os.path.join(REPO_ROOT, "apps", "backend", "src", "modules", "id-verification")
+DTO_DIR = os.path.join(MODULE_DIR, "dto")
+
+FILES = {}
+
+# ---------------------------------------------------------------------------
+# DTOs
+# ---------------------------------------------------------------------------
+
+FILES[os.path.join(DTO_DIR, "list-pending-verifications.dto.ts")] = """\
+import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class ListPendingVerificationsDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+}
+"""
+
+FILES[os.path.join(DTO_DIR, "list-pending-response.dto.ts")] = """\
+export interface PendingVerificationSummary {
+  id: string;
+  userId: string;
+  submittedAt: string;
+}
+
+export interface ListPendingResponseDto {
+  items: PendingVerificationSummary[];
+  page: number;
+  limit: number;
+  total: number;
+}
+"""
+
+FILES[os.path.join(DTO_DIR, "admin-verification-detail.dto.ts")] = """\
+export interface AdminVerificationDetailDto {
+  id: string;
+  userId: string;
+  status: 'pending' | 'verified' | 'rejected';
+  selfieUrl: string;
+  idFrontUrl: string;
+  idBackUrl: string | null;
+  submittedAt: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+}
+"""
+
+# ---------------------------------------------------------------------------
+# Service (full overwrite)
+# ---------------------------------------------------------------------------
+
+FILES[os.path.join(MODULE_DIR, "id-verification.service.ts")] = """\
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -213,3 +295,100 @@ export class IdVerificationService {
     return this.s3Service.uploadVerificationBuffer(userId, kind, buffer, contentType);
   }
 }
+"""
+
+# ---------------------------------------------------------------------------
+# Controller (full overwrite)
+# ---------------------------------------------------------------------------
+
+FILES[os.path.join(MODULE_DIR, "id-verification.controller.ts")] = """\
+import { Controller, Post, Get, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { IdVerificationService } from './id-verification.service';
+import { SubmitIdVerificationDto } from './dto/submit-id-verification.dto';
+import { DecideIdVerificationDto } from './dto/decide-id-verification.dto';
+import { ListPendingVerificationsDto } from './dto/list-pending-verifications.dto';
+import { AdminGuard } from './admin.guard';
+
+@Controller('verification/id')
+@UseGuards(JwtAuthGuard)
+export class IdVerificationController {
+  constructor(private readonly service: IdVerificationService) {}
+
+  @Post('start')
+  async start(@CurrentUser('id') userId: string) {
+    return this.service.startVerification(userId);
+  }
+
+  @Post('submit')
+  async submit(
+    @CurrentUser('id') userId: string,
+    @Body() dto: SubmitIdVerificationDto,
+  ) {
+    return this.service.submitVerification(userId, dto);
+  }
+
+  @Get('status')
+  async status(@CurrentUser('id') userId: string) {
+    return this.service.getStatus(userId);
+  }
+
+  @Get('admin/pending')
+  @UseGuards(AdminGuard)
+  async listPending(@Query() query: ListPendingVerificationsDto) {
+    return this.service.listPending(query);
+  }
+
+  @Get('admin/:userId')
+  @UseGuards(AdminGuard)
+  async adminDetail(@Param('userId') userId: string) {
+    return this.service.getAdminDetail(userId);
+  }
+
+  @Post('admin/:userId/decide')
+  @UseGuards(AdminGuard)
+  async decide(
+    @CurrentUser('id') adminId: string,
+    @Param('userId') userId: string,
+    @Body() dto: DecideIdVerificationDto,
+  ) {
+    return this.service.decideVerification(adminId, userId, dto);
+  }
+}
+"""
+
+# ---------------------------------------------------------------------------
+# Installer logic
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    if not os.path.isdir(MODULE_DIR):
+        print(f"ERROR: module dir not found: {MODULE_DIR}")
+        print("Check REPO_ROOT at the top of this script.")
+        raise SystemExit(1)
+
+    os.makedirs(DTO_DIR, exist_ok=True)
+
+    written = []
+    for path, content in FILES.items():
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(content)
+        written.append(path)
+
+    print(f"Wrote {len(written)} files:")
+    for path in written:
+        print(f"  {os.path.relpath(path, REPO_ROOT)}")
+
+    print()
+    print("Next steps:")
+    print("  1. Confirm S3Service has a getSignedUrl(key) method (or adjust the one call site in")
+    print("     id-verification.service.ts -> getAdminDetail).")
+    print("  2. pnpm --filter @g88/backend typecheck")
+    print('  3. git add -A && git commit -m "feat(id-verification): admin pending list + detail endpoints"')
+    print("  4. gh pr create --fill")
+
+
+if __name__ == "__main__":
+    main()

@@ -7,6 +7,7 @@ allowBuilds:
   bcrypt: true
   protobufjs: true
   '@firebase/util': true
+  esbuild: set this to true or false
 minimumReleaseAgeExclude:
   - joi@17.13.4
 overrides:
