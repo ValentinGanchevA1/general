@@ -41,6 +41,15 @@ export class S3Service {
   ): Promise<{ uploadUrl: string; publicUrl: string }> {
     return this.presign('photos', userId, contentType);
   }
+
+  /** Presigned PUT URL for a listing image. Key: listings/{userId}/{uuid}.{ext} */
+  async listingPresignedUrl(
+    userId: string,
+    contentType: string,
+  ): Promise<{ uploadUrl: string; publicUrl: string }> {
+    return this.presign('listings', userId, contentType);
+  }
+
   /**
    * Upload an ID-verification document buffer directly to S3 (no presigned URL).
    * Mirrors uploadPhotoBuffer: avoids React Native binary-PUT quirks and lets the

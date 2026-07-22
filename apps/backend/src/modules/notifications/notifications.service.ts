@@ -181,7 +181,8 @@ export class NotificationsService {
     const senderName = sender?.display_name ?? 'Someone';
     await this.notifyMessage(toUserId, senderName, preview, conversationId);
   }
-/**
+
+  /**
    * ID-verification decision push. Bypasses the opt-out/rate-cap gate in
    * `allowed()` — this is a one-off account-status result, not a discretionary
    * engagement channel, so it isn't in `NotificationChannel`/`CHANNEL_CAPS`.
@@ -206,6 +207,7 @@ export class NotificationsService {
       { type: 'id_verification', decision },
     );
   }
+
   // ─── Geofence-matched (area) channels ──────────────────────────────────────
 
   /**
