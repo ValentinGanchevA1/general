@@ -28,6 +28,8 @@ export function useVerificationSocket() {
       queryClient.invalidateQueries({ queryKey: ['verifications', data.id] });
     });
 
-    return () => socket.disconnect();
+   return () => {
+     socket.disconnect();
+   };
   }, [queryClient]);
 }
