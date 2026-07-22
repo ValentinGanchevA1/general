@@ -48,6 +48,7 @@ export interface DecideIdVerificationDto {
 }
 
 export interface VerificationUpdatedEvent {
+  id: string;
   userId: string;
   status: 'pending' | 'verified' | 'rejected';
 }
