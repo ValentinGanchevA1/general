@@ -35,7 +35,7 @@ export function VerificationDetailModal({
 											onOpenChange,
 											onDecisionMade,
 										}: VerificationDetailModalProps) {
-	const [decision, setDecision] = React.useState<'approve' | 'reject' | null>(null);
+	const [decision, setDecision] = React.useState<'approved' | 'rejected' | null>(null);
 	const [reason, setReason] = React.useState('');
 	const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -55,12 +55,12 @@ export function VerificationDetailModal({
 		setIsSubmitting(true);
 		try {
 			await adminApi.decide(verification.userId, {
-				status: decision,
+				decision,
 				reason: reason.trim() || undefined,
 			});
 
 			toast.success(
-				`Verification ${decision === 'approve' ? 'approved' : 'rejected'} successfully`
+				`Verification ${decision === 'approved' ? 'approved' : 'rejected'} successfully`
 			);
 
 			onDecisionMade?.();
@@ -139,7 +139,10 @@ export function VerificationDetailModal({
 								<div>
 									<div className="flex items-center gap-2 mb-1">
 										<User className="w-4 h-4" />
-										<span className="font-medium">{verification.displayName}</span>
+										<div className="flex items-center gap-2 mb-1">
+											<User className="w-4 h-4" />
+											<span className="font-medium">{verification.userId}</span>
+										</div>
 									</div>
 									<div className="text-sm text-muted-foreground flex items-center gap-1">
 										<Clock className="w-4 h-4" />
@@ -155,25 +158,25 @@ export function VerificationDetailModal({
 
 									<div className="grid grid-cols-2 gap-3">
 										<Button
-											variant={decision === 'approve' ? 'default' : 'outline'}
-											className={`h-20 flex flex-col items-center justify-center gap-1 ${decision === 'approve' ? 'bg-green-600 hover:bg-green-700' : ''}`}
-											onClick={() => setDecision('approve')}
+											variant={decision === 'approved' ? 'default' : 'outline'}
+											className={`h-20 flex flex-col items-center justify-center gap-1 ${decision === 'approved' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+											onClick={() => setDecision('approved')}
 										>
 											<CheckCircle className="w-6 h-6" />
 											<span>Approve</span>
 										</Button>
 
 										<Button
-											variant={decision === 'reject' ? 'destructive' : 'outline'}
+											variant={decision === 'rejected' ? 'destructive' : 'outline'}
 											className={`h-20 flex flex-col items-center justify-center gap-1`}
-											onClick={() => setDecision('reject')}
+											onClick={() => setDecision('rejected')}
 										>
 											<XCircle className="w-6 h-6" />
 											<span>Reject</span>
 										</Button>
 									</div>
 
-									{decision === 'reject' && (
+									{decision === 'rejected' && (
 										<div>
 											<Label htmlFor="reason">Rejection Reason (optional)</Label>
 											<Textarea
@@ -197,11 +200,11 @@ export function VerificationDetailModal({
 							<Button
 								onClick={handleSubmit}
 								disabled={!decision || isSubmitting}
-								className={decision === 'approve' ? 'bg-green-600 hover:bg-green-700' : ''}
+								className={decision === 'approved' ? 'bg-green-600 hover:bg-green-700' : ''}
 							>
 								{isSubmitting
 									? 'Processing...'
-									: decision === 'approve'
+									: decision === 'approved'
 										? 'Approve Verification'
 										: 'Reject Verification'
 								}

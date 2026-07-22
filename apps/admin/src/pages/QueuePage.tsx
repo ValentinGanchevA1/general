@@ -1,16 +1,18 @@
 // apps/admin/src/pages/QueuePage.tsx
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { VerificationTable } from '../features/verification/components/VerificationTable';
-import { VerificationDetailModal } from '../features/verification/components/VerificationDetailModal';
+import { VerificationTable } from '@/features/verification/components/VerificationTable';
+import { VerificationDetailModal } from '@/features/verification/components/VerificationDetailModal';
 import { AdminVerificationDetailDto } from '@g88/shared';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Filter } from 'lucide-react';
 import { toast } from 'sonner';
+import { useVerificationSocket } from '@/features/verification/hooks/useVerificationSocket';
 
 export default function QueuePage() {
 	const queryClient = useQueryClient();
 
+	useVerificationSocket();  // Mounts listener
 	const [selectedVerification, setSelectedVerification] = useState<AdminVerificationDetailDto | null>(null);
 	const [modalOpen, setModalOpen] = useState(false);
 	const [isRefreshing, setIsRefreshing] = useState(false);

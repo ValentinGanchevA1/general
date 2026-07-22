@@ -55,7 +55,7 @@ export const adminApi = {
 export const transformVerificationList = (data: ListPendingResponseDto) => {
   return {
     ...data,
-    data: data.data.map(item => ({
+    data: data.items.map(item => ({
       ...item,
       submittedAt: new Date(item.submittedAt),
     })),
