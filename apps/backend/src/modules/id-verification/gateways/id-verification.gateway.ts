@@ -1,7 +1,7 @@
 import { WebSocketGateway, WebSocketServer, OnGatewayInit, SubscribeMessage } from '@nestjs/websockets';
 import { Server } from 'socket.io';
 import { Logger, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard'; // Admin guard
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { IdVerificationService } from '../id-verification.service';
 
 @WebSocketGateway({
@@ -11,7 +11,7 @@ import { IdVerificationService } from '../id-verification.service';
 @UseGuards(JwtAuthGuard)
 export class IdVerificationGateway implements OnGatewayInit {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private logger = new Logger('IdVerificationGateway');
 
