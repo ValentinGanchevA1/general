@@ -36,6 +36,7 @@ overrides:
   'joi@17': '>=17.13.4 <18' # GHSA-q7cg-457f-vx79 / CVE-2026-48038 (transitive via @react-native-community/cli)
   react: 19.2.7
   react-dom: 19.2.7
+  react-native-screens: 4.16.0
 # Explicitly NOT in the workspace:
 #   legacy/**   — frozen pre-monorepo layout (read-only reference)
 #                 See legacy/README.md and STATUS.md.
