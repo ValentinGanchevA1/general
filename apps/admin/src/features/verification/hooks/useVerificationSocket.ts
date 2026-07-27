@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { io, Socket } from 'socket.io-client';
 import type { VerificationUpdatedEvent } from '@g88/shared';
 
 export function useVerificationSocket() {
   const queryClient = useQueryClient();
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     const socket: Socket = io(import.meta.env.VITE_WS_URL || 'http://localhost:3000/admin', {
@@ -12,7 +13,15 @@ export function useVerificationSocket() {
       reconnection: true,
     });
 
-    socket.on('connect', () => console.log('Admin WS connected'));
+    socket.on('connect', () => {
+      console.log('Admin WS connected');
+      setIsConnected(true);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Admin WS disconnected');
+      setIsConnected(false);
+    });
 
     socket.on('verification:updated', (data: VerificationUpdatedEvent) => {
       // Update list cache
@@ -32,4 +41,6 @@ export function useVerificationSocket() {
      socket.disconnect();
    };
   }, [queryClient]);
+
+  return { isConnected };
 }
