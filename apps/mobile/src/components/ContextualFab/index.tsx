@@ -1,4 +1,4 @@
-// apps/mobile/src/components/ContextualFab/index.tsx
+	// apps/mobile/src/components/ContextualFab/index.tsx
 //
 // Stable speed-dial FAB (Phase-1 UX pass).
 // - Fixed identity: a "Create" button, bottom-right, with an always-visible
@@ -107,6 +107,10 @@ export function ContextualFab(props: Props): React.JSX.Element {
       case 'post_alert':
         nav.navigate('AlertComposer', { presetCategory: 'general' });
         break;
+		case 'create_event':
+			nav.navigate('EventCreate');
+			break;
+
       case 'create_listing':
         dispatch(setPendingFilter('listings'));
         nav.navigate('Main', { screen: 'Pulse' });

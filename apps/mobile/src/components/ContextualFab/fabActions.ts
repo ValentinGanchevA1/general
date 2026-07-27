@@ -21,6 +21,12 @@ export const FAB_ACTIONS: Record<FabActionId, FabActionDef> = {
     label: 'Post alert',
     primaryGlyph: 'bullhorn',
   },
+  create_event: {
+    id: 'create_event',
+    icon: 'calendar-plus',
+    label: 'Create event',
+    primaryGlyph: 'calendar-plus',
+  },
   create_listing: {
     id: 'create_listing',
     icon: 'tag-plus',

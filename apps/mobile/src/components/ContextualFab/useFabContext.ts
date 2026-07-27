@@ -1,4 +1,4 @@
-// apps/mobile/src/components/ContextualFab/useFabContext.ts
+    // apps/mobile/src/components/ContextualFab/useFabContext.ts
 //
 // Pure context computation for the Contextual FAB.
 // Inputs: viewport zoom, viewport entities, my visibility + primary goal.
@@ -18,6 +18,7 @@ export type Visibility = 'on' | 'off';
 export type FabActionId =
   | 'wave_nearest'
   | 'post_alert'
+  | 'create_event'
   | 'create_listing'
   | 'toggle_visibility'
   | 'open_pulse';
@@ -34,7 +35,7 @@ export interface FabContext {
 }
 
 const ALL_ACTIONS: FabActionId[] = [
-  'wave_nearest', 'post_alert', 'create_listing', 'toggle_visibility', 'open_pulse',
+  'wave_nearest', 'post_alert', 'create_event', 'create_listing', 'toggle_visibility', 'open_pulse',
 ];
 
 export const POST_ALERT_READY = true;
@@ -72,6 +73,8 @@ function secondaryRanked(primary: FabActionId, zoomBand: ZoomBand): FabActionId[
     if (a === 'open_pulse' && zoomBand === 'far') return 10;
     if (a === 'wave_nearest' && zoomBand !== 'near') return 0;
     if (a === 'create_listing' && zoomBand === 'far') return 1;
+    if (a === 'create_event' && zoomBand === 'far') return 2;   // ← prefer over listing at far
+    if (a === 'create_event') return 6;                        // ← solid secondary at mid/near
     if (a === 'post_alert' && zoomBand === 'far') return 2;
     return 5;
   };
