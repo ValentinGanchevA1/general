@@ -18,6 +18,13 @@ import { formatEventDayShort } from './eventFormat';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
+/**
+ * Rendered height of the rail (label row + one row of fixed-height cards),
+ * used by MapScreen to lift ContextualFab clear of this overlay. Re-measure
+ * and update this constant if EventCard's layout changes.
+ */
+export const EVENTS_RAIL_HEIGHT = 24 /* wrap.bottom */ + 22 /* labelRow */ + 178; /* card */
+
 export function EventsRail({ location }: { location: LatLng | null }): React.JSX.Element | null {
   const navigation = useNavigation<Nav>();
   const { events } = useNearbyEvents(location);
@@ -91,7 +98,7 @@ const styles = StyleSheet.create({
   wrap: { position: 'absolute', left: 0, right: 0, bottom: 24 },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, marginBottom: 8 },
   label: { color: '#00d4ff', fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
-  scroll: { paddingHorizontal: 16, gap: 12 },
+  scroll: { paddingLeft: 16, paddingRight: 16 + 56 /* FAB */ + 24 /* margin */, gap: 12 },
   card: {
     width: 150,
     padding: 10,

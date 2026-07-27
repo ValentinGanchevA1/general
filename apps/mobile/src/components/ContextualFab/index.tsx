@@ -41,6 +41,8 @@ interface Props {
    * through to default routing.
    */
   onAction?: (id: FabActionId, ctxKey: string) => boolean | Promise<boolean>;
+  /** Extra bottom clearance to sit above sibling overlays (e.g. EventsRail). */
+  bottomOffset?: number;
 }
 
 const FAB_SIZE = 56;
@@ -49,13 +51,14 @@ const ITEM_GAP = 14;
 const FAB_BOTTOM = spacing.xxl; // 24 — clears the bottom tab bar (screen content sits above it)
 
 export function ContextualFab(props: Props): React.JSX.Element {
-  const { zoom, points, nearestUserId, onAction } = props;
+  const { zoom, points, nearestUserId, onAction, bottomOffset = 0 } = props;
   const ctx = useFabContext({ zoom, points, nearestUserId });
 
   const [open, setOpen] = useState(false);
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
+  const fabBottom = FAB_BOTTOM + insets.bottom + bottomOffset;
 
   // useState (not useRef) so identity is stable without a render-time ref read.
   const [anim] = useState(() => new Animated.Value(0));
@@ -130,7 +133,7 @@ export function ContextualFab(props: Props): React.JSX.Element {
 
       {open && menu.map((id, i) => {
         const def = FAB_ACTIONS[id];
-        const bottom = FAB_BOTTOM + insets.bottom + FAB_SIZE + ITEM_GAP + i * (ITEM_SIZE + ITEM_GAP);
+        const bottom = fabBottom + FAB_SIZE + ITEM_GAP + i * (ITEM_SIZE + ITEM_GAP);
         const opacity = anim;
         const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] });
         return (
@@ -154,7 +157,7 @@ export function ContextualFab(props: Props): React.JSX.Element {
       })}
 
       <Pressable
-        style={({ pressed }) => [S.fabRow, { bottom: FAB_BOTTOM + insets.bottom }, pressed && S.pressed]}
+        style={({ pressed }) => [S.fabRow, { bottom: fabBottom }, pressed && S.pressed]}
         onPress={toggle}
         testID="contextual-fab"
         accessibilityRole="button"

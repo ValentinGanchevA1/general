@@ -33,13 +33,14 @@ import { useUserLocation } from '@/features/location/useUserLocation';
 import { ClusterMarker } from '@/components/map/ClusterMarker';
 import { EntityMarker } from '@/components/map/EntityMarker';
 import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
+import { useTracksViewChanges } from '@/components/map/useTracksViewChanges';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ContextualFab } from '@/components/ContextualFab';
 import type { FabActionId } from '@/components/ContextualFab/useFabContext';
 import { DailyChallengeCard } from '@/features/gamification/DailyChallengeCard';
 import { challengeEvents } from '@/features/gamification/challengeEvents';
 import { NudgeBanner } from '@/features/nudges/NudgeBanner';
-import { EventsRail } from '@/features/events/EventsRail';
+import { EventsRail, EVENTS_RAIL_HEIGHT } from '@/features/events/EventsRail';
 import { TrendingFilterBar } from '@/features/discovery/TrendingFilterBar';
 import { useTrendingNearby } from '@/features/pulse/useTrendingNearby';
 import { useNavigation } from '@react-navigation/native';
@@ -155,7 +156,7 @@ export function MapScreen(): React.JSX.Element {
       },
       300,
     );
-  }, [region]);
+  }, [region?.latitudeDelta, region?.longitudeDelta]);
 
   // ─── Wave (optimistic) ─────────────────────────────────────────────────
   const onWave = useCallback(async (toUserId: string) => {
@@ -205,7 +206,7 @@ export function MapScreen(): React.JSX.Element {
     return users.reduce((best, p) =>
       squaredDist(myCoords, p) < squaredDist(myCoords, best) ? p : best,
     ).id;
-  }, [data, myCoords]);
+  }, [myCoords, data?.points]);
 
   const onFabAction = useCallback(async (id: FabActionId, contextKey: string): Promise<boolean> => {
     if (id === 'wave_nearest' && nearestUserId) {
@@ -244,23 +245,9 @@ export function MapScreen(): React.JSX.Element {
         >
           {(data?.points ?? []).map((p) =>
             p.kind === 'cluster' ? (
-              <Marker
-                key={`c:${p.cellId}`}
-                coordinate={toRNLatLng(p)}
-                onPress={() => onClusterPress(p)}
-                tracksViewChanges={false}
-              >
-                <ClusterMarker point={p} />
-              </Marker>
+              <ClusterMarkerItem key={`c:${p.cellId}`} point={p} onPress={onClusterPress} />
             ) : (
-              <Marker
-                key={`e:${p.kind}:${p.id}`}
-                coordinate={toRNLatLng(p)}
-                onPress={() => setSelected(p)}
-                tracksViewChanges={false}
-              >
-                <EntityMarker point={p} />
-              </Marker>
+              <EntityMarkerItem key={`e:${p.kind}:${p.id}`} point={p} onPress={setSelected} />
             ),
           )}
         </MapView>
@@ -306,8 +293,54 @@ export function MapScreen(): React.JSX.Element {
         points={data?.points ?? []}
         nearestUserId={nearestUserId}
         onAction={onFabAction}
+        bottomOffset={selected ? 0 : EVENTS_RAIL_HEIGHT}
       />
     </View>
+  );
+}
+
+// ─── Markers (tracksViewChanges-safe wrappers) ────────────────────────────
+//
+// See useTracksViewChanges.ts: tracksViewChanges must not be hardcoded
+// false from mount, or the Marker's bitmap can freeze blank before the
+// child Text/icon paints.
+
+function ClusterMarkerItem({
+  point, onPress,
+}: {
+  point: ClusterPoint;
+  onPress: (p: ClusterPoint) => void;
+}): React.JSX.Element {
+  const tracksViewChanges = useTracksViewChanges([point.count]);
+  return (
+    <Marker
+      coordinate={toRNLatLng(point)}
+      onPress={() => onPress(point)}
+      tracksViewChanges={tracksViewChanges}
+    >
+      <ClusterMarker point={point} />
+    </Marker>
+  );
+}
+
+function EntityMarkerItem({
+  point, onPress,
+}: {
+  point: EntityPoint;
+  onPress: (p: EntityPoint) => void;
+}): React.JSX.Element {
+  const tracksViewChanges = useTracksViewChanges([
+    point.id,
+    point.kind === 'user' ? point.meta.verifiedBadge : undefined,
+  ]);
+  return (
+    <Marker
+      coordinate={toRNLatLng(point)}
+      onPress={() => onPress(point)}
+      tracksViewChanges={tracksViewChanges}
+    >
+      <EntityMarker point={point} />
+    </Marker>
   );
 }
 
