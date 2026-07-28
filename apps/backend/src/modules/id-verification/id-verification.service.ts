@@ -10,6 +10,7 @@ import { DecideIdVerificationDto } from './dto/decide-id-verification.dto';
 import { ListPendingVerificationsDto } from './dto/list-pending-verifications.dto';
 import { ListPendingResponseDto } from './dto/list-pending-response.dto';
 import { AdminVerificationDetailDto } from './dto/admin-verification-detail.dto';
+import { RekognitionService } from './rekognition.service';
 
 interface UserRow {
   id: string;
@@ -28,6 +29,14 @@ interface VerificationRow {
   reviewed_by: string | null;
   reviewed_at: string | null;
   rejection_reason: string | null;
+  face_similarity: number | null;
+  selfie_face_count: number | null;
+  id_front_face_count: number | null;
+  selfie_face_confidence: number | null;
+  id_front_face_confidence: number | null;
+  rekognition_status: string;
+  rekognition_error: string | null;
+  rekognition_at: string | null;
 }
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -38,6 +47,7 @@ export class IdVerificationService {
     @InjectDataSource() private readonly db: DataSource,
     private readonly s3Service: S3Service,
     private readonly notificationsService: NotificationsService,
+    private readonly rekognitionService: RekognitionService,
   ) {}
 
   async startVerification(userId: string) {
@@ -55,10 +65,32 @@ export class IdVerificationService {
         ? await this.uploadImage(userId, 'id-back', dto.idBack, dto.idBackContentType ?? 'image/jpeg')
         : null;
 
+    // Assist-only: never blocks submit; scores inform admin review.
+    const analysis = await this.rekognitionService.analyzeVerification(selfieKey, idFrontKey);
+
     await this.db.query(
-      `INSERT INTO user_id_verifications (user_id, selfie_url, id_front_url, id_back_url, status)
-       VALUES ($1, $2, $3, $4, 'pending')`,
-      [userId, selfieKey, idFrontKey, idBackKey],
+      `INSERT INTO user_id_verifications (
+         user_id, selfie_url, id_front_url, id_back_url, status,
+         face_similarity, selfie_face_count, id_front_face_count,
+         selfie_face_confidence, id_front_face_confidence,
+         rekognition_status, rekognition_error, rekognition_at
+       ) VALUES (
+         $1, $2, $3, $4, 'pending',
+         $5, $6, $7, $8, $9, $10, $11, now()
+       )`,
+      [
+        userId,
+        selfieKey,
+        idFrontKey,
+        idBackKey,
+        analysis.faceSimilarity,
+        analysis.selfieFaceCount,
+        analysis.idFrontFaceCount,
+        analysis.selfieFaceConfidence,
+        analysis.idFrontFaceConfidence,
+        analysis.status,
+        analysis.error,
+      ],
     );
 
     await this.db.query(
@@ -155,7 +187,10 @@ export class IdVerificationService {
   async getVerificationDetail(targetUserId: string): Promise<AdminVerificationDetailDto> {
     const rows = await this.db.query<VerificationRow[]>(
       `SELECT id, user_id, status, selfie_url, id_front_url, id_back_url,
-              created_at, reviewed_by, reviewed_at, rejection_reason
+              created_at, reviewed_by, reviewed_at, rejection_reason,
+              face_similarity, selfie_face_count, id_front_face_count,
+              selfie_face_confidence, id_front_face_confidence,
+              rekognition_status, rekognition_error, rekognition_at
        FROM user_id_verifications
        WHERE user_id = $1
        ORDER BY created_at DESC
@@ -182,6 +217,14 @@ export class IdVerificationService {
       reviewedBy: row.reviewed_by,
       reviewedAt: row.reviewed_at,
       rejectionReason: row.rejection_reason,
+      faceSimilarity: row.face_similarity,
+      selfieFaceCount: row.selfie_face_count,
+      idFrontFaceCount: row.id_front_face_count,
+      selfieFaceConfidence: row.selfie_face_confidence,
+      idFrontFaceConfidence: row.id_front_face_confidence,
+      rekognitionStatus: (row.rekognition_status ?? 'skipped') as AdminVerificationDetailDto['rekognitionStatus'],
+      rekognitionError: row.rekognition_error,
+      rekognitionAt: row.rekognition_at,
     };
   }
 

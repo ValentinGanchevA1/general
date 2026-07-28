@@ -16,6 +16,7 @@
     "seed": "node --env-file-if-exists=../../.env scripts/seed.js"
   },
   "dependencies": {
+    "@aws-sdk/client-rekognition": "^3.1075.0",
     "@aws-sdk/client-s3": "^3.1075.0",
     "@aws-sdk/s3-request-presigner": "^3.1075.0",
     "@g88/shared": "workspace:*",
