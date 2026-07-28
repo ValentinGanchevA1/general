@@ -14,11 +14,9 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { CheckCircle, XCircle, Clock, User } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, User, ScanFace } from 'lucide-react';
 
-import {
-	AdminVerificationDetailDto
-} from '@g88/shared';
+import { AdminVerificationDetailDto } from '@g88/shared';
 
 import { adminApi } from '../api';
 
@@ -29,12 +27,19 @@ interface VerificationDetailModalProps {
 	onDecisionMade?: () => void;
 }
 
+function matchBadgeClass(similarity: number | null): string {
+	if (similarity === null) return 'bg-muted text-muted-foreground';
+	if (similarity >= 90) return 'bg-green-100 text-green-800 border-green-200';
+	if (similarity >= 70) return 'bg-amber-100 text-amber-900 border-amber-200';
+	return 'bg-red-100 text-red-800 border-red-200';
+}
+
 export function VerificationDetailModal({
-											verification,
-											open,
-											onOpenChange,
-											onDecisionMade,
-										}: VerificationDetailModalProps) {
+	verification,
+	open,
+	onOpenChange,
+	onDecisionMade,
+}: VerificationDetailModalProps) {
 	const [decision, setDecision] = React.useState<'approved' | 'rejected' | null>(null);
 	const [reason, setReason] = React.useState('');
 	const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -65,7 +70,7 @@ export function VerificationDetailModal({
 
 			onDecisionMade?.();
 			handleClose();
-		} catch (error) {
+		} catch {
 			toast.error('Failed to process decision');
 		} finally {
 			setIsSubmitting(false);
@@ -74,13 +79,24 @@ export function VerificationDetailModal({
 
 	if (!verification) return null;
 
+	const similarity =
+		verification.faceSimilarity !== null && verification.faceSimilarity !== undefined
+			? Math.round(verification.faceSimilarity * 10) / 10
+			: null;
+
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="max-w-5xl max-h-[95vh] flex flex-col">
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-3">
+					<DialogTitle className="flex items-center gap-3 flex-wrap">
 						ID Verification Review
 						<Badge variant="outline">User ID: {verification.userId}</Badge>
+						{verification.rekognitionStatus === 'ok' && similarity !== null && (
+							<Badge className={`border ${matchBadgeClass(similarity)}`}>
+								<ScanFace className="w-3.5 h-3.5 mr-1 inline" />
+								Match {similarity}%
+							</Badge>
+						)}
 					</DialogTitle>
 				</DialogHeader>
 
@@ -95,7 +111,7 @@ export function VerificationDetailModal({
 									alt="Selfie"
 									className="w-full h-full object-contain bg-black"
 									onError={(e) => {
-										e.currentTarget.src = '/placeholder-selfie.png'; // fallback
+										e.currentTarget.src = '/placeholder-selfie.png';
 									}}
 								/>
 							</div>
@@ -139,14 +155,50 @@ export function VerificationDetailModal({
 								<div>
 									<div className="flex items-center gap-2 mb-1">
 										<User className="w-4 h-4" />
-										<div className="flex items-center gap-2 mb-1">
-											<User className="w-4 h-4" />
-											<span className="font-medium">{verification.userId}</span>
-										</div>
+										<span className="font-medium">{verification.userId}</span>
 									</div>
 									<div className="text-sm text-muted-foreground flex items-center gap-1">
 										<Clock className="w-4 h-4" />
 										Submitted {new Date(verification.submittedAt).toLocaleString()}
+									</div>
+								</div>
+
+								<Separator />
+
+								{/* Assist-only Rekognition — display only, not auto-decide */}
+								<div className="space-y-2 rounded-lg border p-3 bg-muted/40">
+									<div className="flex items-center gap-2 text-sm font-semibold">
+										<ScanFace className="w-4 h-4" />
+										Face assist
+									</div>
+									<p className="text-xs text-muted-foreground">
+										Assist only — not proof of document authenticity. Human decision required.
+									</p>
+									<div className="text-sm space-y-1">
+										<div>
+											Status:{' '}
+											<span className="font-mono">{verification.rekognitionStatus ?? 'skipped'}</span>
+										</div>
+										{similarity !== null && (
+											<div>
+												Similarity: <span className="font-semibold">{similarity}%</span>
+											</div>
+										)}
+										<div>
+											Selfie faces: {verification.selfieFaceCount ?? '—'} · ID faces:{' '}
+											{verification.idFrontFaceCount ?? '—'}
+										</div>
+										{(verification.rekognitionStatus === 'no_face_selfie' ||
+											verification.rekognitionStatus === 'no_face_id' ||
+											verification.rekognitionStatus === 'error') && (
+											<div className="text-amber-800 text-xs mt-1">
+												{verification.rekognitionStatus === 'error'
+													? `Analyze error: ${verification.rekognitionError ?? 'unknown'}`
+													: verification.rekognitionStatus === 'no_face_selfie'
+														? 'No face detected on selfie.'
+														: 'No face detected on ID photo.'}
+											</div>
+										)}
 									</div>
 								</div>
 
@@ -159,7 +211,9 @@ export function VerificationDetailModal({
 									<div className="grid grid-cols-2 gap-3">
 										<Button
 											variant={decision === 'approved' ? 'default' : 'outline'}
-											className={`h-20 flex flex-col items-center justify-center gap-1 ${decision === 'approved' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+											className={`h-20 flex flex-col items-center justify-center gap-1 ${
+												decision === 'approved' ? 'bg-green-600 hover:bg-green-700' : ''
+											}`}
 											onClick={() => setDecision('approved')}
 										>
 											<CheckCircle className="w-6 h-6" />
@@ -168,7 +222,7 @@ export function VerificationDetailModal({
 
 										<Button
 											variant={decision === 'rejected' ? 'destructive' : 'outline'}
-											className={`h-20 flex flex-col items-center justify-center gap-1`}
+											className="h-20 flex flex-col items-center justify-center gap-1"
 											onClick={() => setDecision('rejected')}
 										>
 											<XCircle className="w-6 h-6" />
@@ -206,8 +260,7 @@ export function VerificationDetailModal({
 									? 'Processing...'
 									: decision === 'approved'
 										? 'Approve Verification'
-										: 'Reject Verification'
-								}
+										: 'Reject Verification'}
 							</Button>
 						</DialogFooter>
 					</div>
