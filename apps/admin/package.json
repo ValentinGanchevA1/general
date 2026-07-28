@@ -15,6 +15,7 @@
     "@fontsource-variable/geist": "^5.3.0",
     "@g88/shared": "workspace:*",
     "@tanstack/react-query": "^5.28.8",
+    "axios": "^1.7.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.359.0",
