@@ -1,8 +1,8 @@
-// apps/admin/src/pages/QueuePage.tsx
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { VerificationTable } from '@/features/verification/components/VerificationTable';
 import { usePendingVerifications } from '@/features/verification/hooks/usePendingVerifications';
+import { pendingVerificationsPrefix } from '@/features/verification/query-keys';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,7 +19,7 @@ export default function QueuePage() {
     setIsRefreshing(true);
     try {
       await queryClient.invalidateQueries({
-        queryKey: ['verifications', 'pending'],
+        queryKey: [...pendingVerificationsPrefix],
       });
       toast.success('Queue refreshed');
     } catch {
@@ -56,7 +56,11 @@ export default function QueuePage() {
                   ? 'bg-green-50 text-green-800 border-green-200'
                   : 'bg-amber-50 text-amber-900 border-amber-200'
               }`}
-              title={isConnected ? 'Realtime updates connected' : 'Realtime reconnecting'}
+              title={
+                isConnected
+                  ? 'Realtime updates connected'
+                  : 'Realtime reconnecting'
+              }
             >
               {isConnected ? (
                 <Wifi className="w-4 h-4" />

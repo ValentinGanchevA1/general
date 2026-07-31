@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { AdminVerificationDetailDto, PendingVerificationSummary } from '@g88/shared';
+import type {
+  AdminVerificationDetailDto,
+  PendingVerificationSummary,
+} from '@g88/shared';
 import { usePendingVerifications } from '../hooks/usePendingVerifications';
 import { adminApi } from '../api';
+import { pendingVerificationsPrefix } from '../query-keys';
 import { VerificationDetailModal } from './VerificationDetailModal';
 import { ClipboardCopy, Inbox, Loader2 } from 'lucide-react';
 
@@ -182,7 +186,9 @@ export function VerificationTable() {
         open={modalOpen}
         onOpenChange={setModalOpen}
         onDecisionMade={() =>
-          queryClient.invalidateQueries({ queryKey: ['verifications', 'pending'] })
+          queryClient.invalidateQueries({
+            queryKey: [...pendingVerificationsPrefix],
+          })
         }
       />
     </>
