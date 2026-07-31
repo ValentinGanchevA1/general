@@ -1,14 +1,16 @@
-import { WebSocketGateway, WebSocketServer, OnGatewayInit, SubscribeMessage } from '@nestjs/websockets';
+import { WebSocketGateway, WebSocketServer, OnGatewayInit } from '@nestjs/websockets';
 import { Server } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { Logger } from '@nestjs/common';
 import { IdVerificationService } from '../id-verification.service';
+
+const wsAllowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
+  .split(',')
+  .filter(Boolean);
 
 @WebSocketGateway({
   namespace: '/admin',
-  cors: { origin: '*' }
+  cors: { origin: wsAllowedOrigins, credentials: true },
 })
-@UseGuards(JwtAuthGuard)
 export class IdVerificationGateway implements OnGatewayInit {
   @WebSocketServer()
   server!: Server;
