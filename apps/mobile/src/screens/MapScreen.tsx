@@ -8,8 +8,6 @@ import {
   View,
 } from 'react-native';
 import MapView, {
-  type LatLng as RNLatLng,
-  Marker,
   PROVIDER_GOOGLE,
   type Region,
 } from 'react-native-maps';
@@ -30,10 +28,8 @@ import { useSocket } from '@/realtime/useSocket';
 import { postJson } from '@/api/client';
 import { useAppDispatch } from '@/hooks/redux';
 import { useUserLocation } from '@/features/location/useUserLocation';
-import { ClusterMarker } from '@/components/map/ClusterMarker';
-import { EntityMarker } from '@/components/map/EntityMarker';
+import { MapMarkers } from '@/components/map/MapMarkers';
 import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
-import { useTracksViewChanges } from '@/components/map/useTracksViewChanges';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ContextualFab } from '@/components/ContextualFab';
 import type { FabActionId } from '@/components/ContextualFab/useFabContext';
@@ -48,6 +44,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { track } from '@/lib/analytics';
 
+/** Stable empty list — avoids new [] identity every render when data is null. */
+const EMPTY_POINTS: DiscoveryPoint[] = [];
+
 /**
  * MapScreen
  * ─────────
@@ -61,6 +60,7 @@ import { track } from '@/lib/analytics';
  *   • clustering math (server)
  *   • token refresh (axios interceptor)
  *   • socket lifecycle (useSocket singleton)
+ *   • marker reconcile (MapMarkers — isolated from chrome re-renders)
  */
 export function MapScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
@@ -79,15 +79,21 @@ export function MapScreen(): React.JSX.Element {
   const { topics: trendingTopics } = useTrendingNearby();
   const { data, loading, error, refresh } = useDiscovery({ viewport, zoom, topic: activeTopic });
 
+  const points = data?.points ?? EMPTY_POINTS;
+
   const onSelectTopic = useCallback((topic: string | null) => {
     setActiveTopic(topic);
     track('trending.filter', { topic: topic ?? 'cleared' });
   }, []);
 
+  const onCloseSheet = useCallback(() => {
+    setSelected(null);
+  }, []);
+
   // Sync discovery points to Redux so PulseScreen's NearbyPeopleStrip can read them.
   useEffect(() => {
-    dispatch(setPoints(data?.points ?? []));
-  }, [data, dispatch]);
+    dispatch(setPoints(points));
+  }, [points, dispatch]);
 
   // ─── Centre on user on first location fix ──────────────────────────────
   useEffect(() => {
@@ -124,12 +130,10 @@ export function MapScreen(): React.JSX.Element {
       if (__DEV__) {
         console.log(`👋 wave from ${e.fromUser.displayName}`);
       }
-      // Show a notification toast.
       Alert.alert(
         `${e.fromUser.displayName} waved at you 👋`,
         'Wave back or chat with them on the map.',
       );
-      // A new wave from someone visible on the map may reflect new presence — refresh.
       refresh();
     });
     return unsub;
@@ -166,29 +170,23 @@ export function MapScreen(): React.JSX.Element {
         toUserId,
         context: 'map',
       });
-      // Nudge the daily-challenge banner to re-read progress (e.g. "Send 3 waves").
       challengeEvents.emit('progress');
       if (res.conversationId) {
-        // Navigate to the conversation after a successful wave match.
         navigation.navigate('Chat', {
           conversationId: res.conversationId,
-          otherUserName: '', // ChatScreen fetches full header info from message stream
+          otherUserName: '',
         });
       }
     } catch (e) {
       if (__DEV__) {
         console.warn('wave failed', e);
       }
-      throw e; // re-throw so callers (fab.conversion) can record the real outcome
+      throw e;
     } finally {
       setWaving(null);
     }
   }, [navigation]);
 
-  // Bottom-sheet wave is fire-and-forget: onWave re-throws so the FAB path can
-  // record conversion, so here we must swallow the rejection ourselves. A 409
-  // cooldown is an expected outcome — surface the (user-friendly) server message
-  // instead of letting it bubble up as an unhandled promise rejection.
   const onSheetWave = useCallback((toUserId: string) => {
     onWave(toUserId).catch((err: ApiError) => {
       Alert.alert(
@@ -198,15 +196,21 @@ export function MapScreen(): React.JSX.Element {
     });
   }, [onWave]);
 
+  const onSheetWavePress = useCallback(() => {
+    if (selected?.kind === 'user') {
+      onSheetWave(selected.id);
+    }
+  }, [selected, onSheetWave]);
+
   // ─── Render ────────────────────────────────────────────────────────────
   const nearestUserId = useMemo(() => {
     if (!myCoords) return null;
-    const users = (data?.points ?? []).filter((p): p is EntityPoint => p.kind === 'user');
+    const users = points.filter((p): p is EntityPoint => p.kind === 'user');
     if (!users.length) return null;
     return users.reduce((best, p) =>
       squaredDist(myCoords, p) < squaredDist(myCoords, best) ? p : best,
     ).id;
-  }, [myCoords, data?.points]);
+  }, [myCoords, points]);
 
   const onFabAction = useCallback(async (id: FabActionId, contextKey: string): Promise<boolean> => {
     if (id === 'wave_nearest' && nearestUserId) {
@@ -243,13 +247,11 @@ export function MapScreen(): React.JSX.Element {
             longitudeDelta: 0.05,
           }}
         >
-          {(data?.points ?? []).map((p) =>
-            p.kind === 'cluster' ? (
-              <ClusterMarkerItem key={`c:${p.cellId}`} point={p} onPress={onClusterPress} />
-            ) : (
-              <EntityMarkerItem key={`e:${p.kind}:${p.id}`} point={p} onPress={setSelected} />
-            ),
-          )}
+          <MapMarkers
+            points={points}
+            onClusterPress={onClusterPress}
+            onEntityPress={setSelected}
+          />
         </MapView>
       </ErrorBoundary>
 
@@ -283,87 +285,19 @@ export function MapScreen(): React.JSX.Element {
         <EntityBottomSheet
           point={selected}
           waving={selected.kind === 'user' && waving === selected.id}
-          onClose={() => setSelected(null)}
-          {...(selected.kind === 'user' && { onWave: () => onSheetWave(selected.id) })}
+          onClose={onCloseSheet}
+          {...(selected.kind === 'user' && { onWave: onSheetWavePress })}
         />
       )}
 
       <ContextualFab
         zoom={zoom}
-        points={data?.points ?? []}
+        points={points}
         nearestUserId={nearestUserId}
         onAction={onFabAction}
         bottomOffset={selected ? 0 : EVENTS_RAIL_HEIGHT}
       />
     </View>
-  );
-}
-
-// ─── Markers (tracksViewChanges-safe wrappers) ────────────────────────────
-//
-// See useTracksViewChanges.ts: tracksViewChanges must not be hardcoded
-// false from mount, or the Marker's bitmap can freeze blank before the
-// child Text/icon paints. Deps must cover every visual field the child
-// renders so a discovery diff that only changes meta still re-snapshots.
-
-/** Stable fingerprint of fields ClusterMarker paints. */
-function clusterVisualKey(point: ClusterPoint): string {
-  const by = point.by;
-  return [
-    point.count,
-    by.user ?? 0,
-    by.event ?? 0,
-    by.listing ?? 0,
-  ].join('|');
-}
-
-/** Stable fingerprint of fields EntityMarker paints. */
-function entityVisualKey(point: EntityPoint): string {
-  if (point.kind === 'user') {
-    return [
-      point.id,
-      point.meta.displayName,
-      point.meta.verification,
-      point.meta.verifiedBadge === true ? '1' : '0',
-    ].join('|');
-  }
-  // event | listing — title drives the label under the bubble
-  return [point.id, point.kind, point.meta.title].join('|');
-}
-
-function ClusterMarkerItem({
-  point, onPress,
-}: {
-  point: ClusterPoint;
-  onPress: (p: ClusterPoint) => void;
-}): React.JSX.Element {
-  const tracksViewChanges = useTracksViewChanges([clusterVisualKey(point)]);
-  return (
-    <Marker
-      coordinate={toRNLatLng(point)}
-      onPress={() => onPress(point)}
-      tracksViewChanges={tracksViewChanges}
-    >
-      <ClusterMarker point={point} />
-    </Marker>
-  );
-}
-
-function EntityMarkerItem({
-  point, onPress,
-}: {
-  point: EntityPoint;
-  onPress: (p: EntityPoint) => void;
-}): React.JSX.Element {
-  const tracksViewChanges = useTracksViewChanges([entityVisualKey(point)]);
-  return (
-    <Marker
-      coordinate={toRNLatLng(point)}
-      onPress={() => onPress(point)}
-      tracksViewChanges={tracksViewChanges}
-    >
-      <EntityMarker point={point} />
-    </Marker>
   );
 }
 
@@ -386,10 +320,6 @@ function squaredDist(a: { lat: number; lng: number }, b: { lat: number; lng: num
   const dlat = a.lat - b.lat;
   const dlng = a.lng - b.lng;
   return dlat * dlat + dlng * dlng;
-}
-
-function toRNLatLng(p: DiscoveryPoint): RNLatLng {
-  return { latitude: p.lat, longitude: p.lng };
 }
 
 function regionToViewport(r: Region | null): Viewport | null {

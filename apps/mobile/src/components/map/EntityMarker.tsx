@@ -3,6 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { EntityPoint } from '@g88/shared';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import { entityVisualKey } from './markerVisualKeys';
+
 const KIND_COLOR: Record<EntityPoint['kind'], string> = {
   user: '#FF69B4',
   event: '#FF9800',
@@ -19,7 +21,7 @@ interface Props {
   point: EntityPoint;
 }
 
-export function EntityMarker({ point }: Props): React.JSX.Element {
+function EntityMarkerImpl({ point }: Props): React.JSX.Element {
   const color = KIND_COLOR[point.kind];
 
   const label =
@@ -47,6 +49,16 @@ export function EntityMarker({ point }: Props): React.JSX.Element {
     </View>
   );
 }
+
+function entityMarkerPropsEqual(prev: Props, next: Props): boolean {
+  return (
+    entityVisualKey(prev.point) === entityVisualKey(next.point) &&
+    prev.point.lat === next.point.lat &&
+    prev.point.lng === next.point.lng
+  );
+}
+
+export const EntityMarker = React.memo(EntityMarkerImpl, entityMarkerPropsEqual);
 
 const styles = StyleSheet.create({
   wrapper: { alignItems: 'center', gap: 2 },

@@ -2,6 +2,8 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { ClusterPoint } from '@g88/shared';
 
+import { clusterVisualKey } from './markerVisualKeys';
+
 const KIND_COLOR = {
   user: '#FF69B4',
   event: '#FF9800',
@@ -12,7 +14,7 @@ interface Props {
   point: ClusterPoint;
 }
 
-export function ClusterMarker({ point }: Props): React.JSX.Element {
+function ClusterMarkerImpl({ point }: Props): React.JSX.Element {
   // Pick the dominant kind for the ring color.
   const dominant = (Object.entries(point.by) as [keyof typeof KIND_COLOR, number][]).sort(
     (a, b) => b[1] - a[1],
@@ -29,6 +31,16 @@ export function ClusterMarker({ point }: Props): React.JSX.Element {
     </View>
   );
 }
+
+function clusterMarkerPropsEqual(prev: Props, next: Props): boolean {
+  return (
+    clusterVisualKey(prev.point) === clusterVisualKey(next.point) &&
+    prev.point.lat === next.point.lat &&
+    prev.point.lng === next.point.lng
+  );
+}
+
+export const ClusterMarker = React.memo(ClusterMarkerImpl, clusterMarkerPropsEqual);
 
 const styles = StyleSheet.create({
   ring: {
