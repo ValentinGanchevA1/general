@@ -3,28 +3,34 @@ import { Server } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { IdVerificationService } from '../id-verification.service';
 
-const wsAllowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
-  .split(',')
-  .filter(Boolean);
+function getWsOrigins(): string[] {
+  return (process.env.CORS_ORIGINS ?? 'http://127.0.0.1:5173,http://localhost:5173')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+}
 
 @WebSocketGateway({
   namespace: '/admin',
-  cors: { origin: wsAllowedOrigins, credentials: true },
+  cors: {
+    origin: getWsOrigins(),
+    credentials: true,
+  },
 })
 export class IdVerificationGateway implements OnGatewayInit {
   @WebSocketServer()
   server!: Server;
 
-  private logger = new Logger('IdVerificationGateway');
+  private readonly logger = new Logger(IdVerificationGateway.name);
 
-  constructor(private verificationService: IdVerificationService) {}
+  constructor(private readonly verificationService: IdVerificationService) {}
 
   afterInit() {
-    this.logger.log('Admin Verification WS Gateway initialized');
+    this.logger.log(`Admin WS ready. Origins: ${getWsOrigins().join(', ')}`);
   }
 
-  // Called from service after decide
   emitVerificationUpdate(update: { id: string; status: string; userId: string }) {
-    this.server.emit('verification:updated', update);
+    this.server.to('admins').emit('verification:updated', update);
+    // or this.server.emit if you are not using rooms yet
   }
 }
