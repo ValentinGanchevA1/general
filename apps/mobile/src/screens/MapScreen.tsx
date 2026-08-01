@@ -303,7 +303,33 @@ export function MapScreen(): React.JSX.Element {
 //
 // See useTracksViewChanges.ts: tracksViewChanges must not be hardcoded
 // false from mount, or the Marker's bitmap can freeze blank before the
-// child Text/icon paints.
+// child Text/icon paints. Deps must cover every visual field the child
+// renders so a discovery diff that only changes meta still re-snapshots.
+
+/** Stable fingerprint of fields ClusterMarker paints. */
+function clusterVisualKey(point: ClusterPoint): string {
+  const by = point.by;
+  return [
+    point.count,
+    by.user ?? 0,
+    by.event ?? 0,
+    by.listing ?? 0,
+  ].join('|');
+}
+
+/** Stable fingerprint of fields EntityMarker paints. */
+function entityVisualKey(point: EntityPoint): string {
+  if (point.kind === 'user') {
+    return [
+      point.id,
+      point.meta.displayName,
+      point.meta.verification,
+      point.meta.verifiedBadge === true ? '1' : '0',
+    ].join('|');
+  }
+  // event | listing — title drives the label under the bubble
+  return [point.id, point.kind, point.meta.title].join('|');
+}
 
 function ClusterMarkerItem({
   point, onPress,
@@ -311,7 +337,7 @@ function ClusterMarkerItem({
   point: ClusterPoint;
   onPress: (p: ClusterPoint) => void;
 }): React.JSX.Element {
-  const tracksViewChanges = useTracksViewChanges([point.count]);
+  const tracksViewChanges = useTracksViewChanges([clusterVisualKey(point)]);
   return (
     <Marker
       coordinate={toRNLatLng(point)}
@@ -329,10 +355,7 @@ function EntityMarkerItem({
   point: EntityPoint;
   onPress: (p: EntityPoint) => void;
 }): React.JSX.Element {
-  const tracksViewChanges = useTracksViewChanges([
-    point.id,
-    point.kind === 'user' ? point.meta.verifiedBadge : undefined,
-  ]);
+  const tracksViewChanges = useTracksViewChanges([entityVisualKey(point)]);
   return (
     <Marker
       coordinate={toRNLatLng(point)}
