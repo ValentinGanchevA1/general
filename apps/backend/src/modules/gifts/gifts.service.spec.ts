@@ -2,10 +2,11 @@
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { getDataSourceToken } from '@nestjs/typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
 import { GiftsService } from './gifts.service';
 import { GamificationService } from '../gamification/gamification.service';
+import { BlocksService } from '../blocks/blocks.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { SendGiftDto } from './dto';
 
@@ -25,6 +26,7 @@ describe('GiftsService', () => {
   };
   let award: jest.Mock;
   let emitGiftReceived: jest.Mock;
+  let isBlocked: jest.Mock;
 
   const GIFT = { id: 'g1', cost_xp: 100, emoji: '🎁', label: 'Box' };
 
@@ -42,6 +44,7 @@ describe('GiftsService', () => {
     const createQueryRunner = jest.fn(() => qr);
     award = jest.fn().mockResolvedValue(undefined);
     emitGiftReceived = jest.fn().mockResolvedValue(undefined);
+    isBlocked = jest.fn().mockResolvedValue(false);
 
     const mod = await Test.createTestingModule({
       providers: [
@@ -51,6 +54,7 @@ describe('GiftsService', () => {
           useValue: { query, createQueryRunner } as unknown as DataSource,
         },
         { provide: GamificationService, useValue: { award } },
+        { provide: BlocksService, useValue: { isBlocked } },
         { provide: RealtimeGateway, useValue: { emitGiftReceived } },
       ],
     }).compile();
@@ -68,6 +72,15 @@ describe('GiftsService', () => {
       await expect(
         service.send('me', dto({ recipientId: 'me' })),
       ).rejects.toBeInstanceOf(BadRequestException);
+      expect(query).not.toHaveBeenCalled();
+      expect(qr.connect).not.toHaveBeenCalled();
+      expect(isBlocked).not.toHaveBeenCalled();
+    });
+
+    it('refuses a gift when either side has blocked the other', async () => {
+      isBlocked.mockResolvedValueOnce(true);
+      await expect(service.send('me', dto())).rejects.toBeInstanceOf(ForbiddenException);
+      expect(isBlocked).toHaveBeenCalledWith('me', 'recipient');
       expect(query).not.toHaveBeenCalled();
       expect(qr.connect).not.toHaveBeenCalled();
     });
@@ -206,6 +219,29 @@ describe('GiftsService', () => {
       // mark-seen UPDATE fired (fire-and-forget).
       expect(query).toHaveBeenCalledTimes(2);
       expect(query.mock.calls[1]![0]).toContain('seen_at = NOW()');
+    });
+  });
+
+  describe('sent', () => {
+    it('maps rows with a nested recipient and does not mark seen', async () => {
+      query.mockResolvedValueOnce([
+        {
+          id: 's1', giftId: 'g1', emoji: '🎁', label: 'Box', costXp: 100,
+          message: null, createdAt: '2026-06-10T00:00:00Z',
+          recipientId: 'r1', recipientName: 'Sam', recipientAvatar: null,
+        },
+      ]);
+
+      const out = await service.sent('me');
+
+      expect(out[0]).toEqual(
+        expect.objectContaining({
+          id: 's1',
+          costXp: 100,
+          recipient: { id: 'r1', displayName: 'Sam', avatarUrl: null },
+        }),
+      );
+      expect(query).toHaveBeenCalledTimes(1);
     });
   });
 });

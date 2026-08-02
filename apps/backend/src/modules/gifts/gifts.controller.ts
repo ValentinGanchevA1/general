@@ -6,6 +6,7 @@ import type {
   GiftCatalogItem,
   GiftSentResult,
   ReceivedGift,
+  SentGift,
 } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -37,6 +38,13 @@ export class GiftsController {
   @SkipThrottle()
   received(@CurrentUser('id') userId: string): Promise<ReceivedGift[]> {
     return this.gifts.received(userId);
+  }
+
+  /** Gifts the caller has sent (no side effects). */
+  @Get('sent')
+  @SkipThrottle()
+  sent(@CurrentUser('id') userId: string): Promise<SentGift[]> {
+    return this.gifts.sent(userId);
   }
 
   /** Spend XP to send a gift. Tight throttle — it mutates the wallet. */

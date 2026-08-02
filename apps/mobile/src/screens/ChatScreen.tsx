@@ -82,9 +82,6 @@ export function ChatScreen(): React.JSX.Element {
 
   const pendingIds = outbox.map((e) => e.optimisticId);
 
-  // A shared-interest request stays gated until the other person replies once.
-  // Mirror the server's one-message cap: once the initiator's request message is
-  // in, the composer locks until a reply arrives (server is still authoritative).
   const theyReplied = messages.some((m) => m.senderId !== myUserId);
   const iSent = messages.some((m) => m.senderId === myUserId);
   const showRequestBanner = !!requestPending && !theyReplied;
@@ -97,38 +94,37 @@ export function ChatScreen(): React.JSX.Element {
     userId: string;
     verification: VerificationLevel;
     idVerified: boolean;
+    blockedByViewer: boolean;
   } | null>(null);
   const { on, joinConversation, sendMessage } = useSocket();
 
-  // The other participant — derived from any message they've sent. Null until
-  // they've sent at least one (so a brand-new request can't be gifted yet).
   const otherUserId = messages.find((m) => m.senderId !== myUserId)?.senderId ?? null;
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
-  // The header badge rides nav params from the map sheet. When the chat is opened
-  // another way (push deeplink, future Inbox) those are absent — fetch the peer's
-  // verification so an ID-verified contact still shows the decagram regardless of
-  // entry path. Skipped entirely when the params are already supplied.
-  const haveBadgeParams = otherUserVerification !== undefined || otherUserIdVerified !== undefined;
+  // Fetch peer for verification badge + block status (gift must hide when blocked).
   useEffect(() => {
-    if (haveBadgeParams || !otherUserId) return;
+    if (!otherUserId) return;
     let cancelled = false;
     getJson<PublicUserProfile>(`/users/${otherUserId}`)
       .then((p) => {
         if (!cancelled) {
-          setFetchedPeer({ userId: otherUserId, verification: p.verification, idVerified: p.idVerified });
+          setFetchedPeer({
+            userId: otherUserId,
+            verification: p.verification,
+            idVerified: p.idVerified,
+            blockedByViewer: p.blockedByViewer ?? false,
+          });
         }
       })
-      .catch(() => { /* badge just stays hidden — non-blocking */ });
+      .catch(() => { /* non-blocking */ });
     return () => { cancelled = true; };
-  }, [haveBadgeParams, otherUserId]);
+  }, [otherUserId]);
 
-  // Tag the fetch with its peer id and only trust it when it still matches the
-  // current peer — a reused ChatScreen (navigating peer→peer without a remount)
-  // then can't flash the previous peer's badge while the new fetch is in flight.
   const peerBadge = fetchedPeer?.userId === otherUserId ? fetchedPeer : null;
   const badgeVerification = otherUserVerification ?? peerBadge?.verification ?? 'none';
   const badgeIdVerified = otherUserIdVerified ?? peerBadge?.idVerified;
+  // Server enforces symmetric block; UI hides when viewer blocked peer.
+  const canGift = !!otherUserId && peerBadge != null && !peerBadge.blockedByViewer;
 
   useEffect(() => {
     void dispatch(fetchMessages({ conversationId }));
@@ -161,7 +157,6 @@ export function ChatScreen(): React.JSX.Element {
     if (confirmed) {
       dispatch(messageConfirmed({ optimisticId, confirmed }));
     } else {
-      // Socket disconnected — queue for retry when socket reconnects.
       dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
     }
     setSending(false);
@@ -244,7 +239,7 @@ export function ChatScreen(): React.JSX.Element {
       )}
 
       <View style={styles.inputRow}>
-        {otherUserId ? (
+        {canGift ? (
           <TouchableOpacity style={styles.giftBtn} onPress={() => setGiftOpen(true)}>
             <Text style={styles.giftBtnText}>🎁</Text>
           </TouchableOpacity>
@@ -275,7 +270,7 @@ export function ChatScreen(): React.JSX.Element {
         </TouchableOpacity>
       </View>
 
-      {otherUserId ? (
+      {canGift && otherUserId ? (
         <SendGiftSheet
           visible={giftOpen}
           recipientId={otherUserId}

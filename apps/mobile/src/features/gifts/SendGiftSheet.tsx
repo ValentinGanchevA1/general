@@ -67,7 +67,11 @@ export function SendGiftSheet({
     } catch (err) {
       const e = err as ApiError;
       Alert.alert(
-        e.code === 'gift.insufficient_xp' ? 'Not enough XP' : 'Could not send gift',
+        e.code === 'gift.insufficient_xp'
+          ? 'Not enough XP'
+          : e.code === 'gift.blocked'
+            ? 'Blocked'
+            : 'Could not send gift',
         e.message || 'Try again in a moment.',
       );
       if (e.code === 'gift.insufficient_xp') refresh();

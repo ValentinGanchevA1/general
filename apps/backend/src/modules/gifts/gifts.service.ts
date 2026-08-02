@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -13,9 +14,11 @@ import type {
   GiftReceivedEvent,
   GiftSentResult,
   ReceivedGift,
+  SentGift,
 } from '@g88/shared';
 
 import { GamificationService } from '../gamification/gamification.service';
+import { BlocksService } from '../blocks/blocks.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { SendGiftDto } from './dto';
 
@@ -26,6 +29,7 @@ export class GiftsService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly gamification: GamificationService,
+    private readonly blocks: BlocksService,
     private readonly realtime: RealtimeGateway,
   ) {}
 
@@ -92,6 +96,44 @@ export class GiftsService {
   }
 
   /**
+   * Gifts the caller has sent, newest first. No side effects (unlike received()).
+   */
+  async sent(userId: string, limit = 50): Promise<SentGift[]> {
+    const rows = await this.db.query<Array<{
+      id: string; giftId: string; emoji: string; label: string; costXp: number;
+      message: string | null; createdAt: string;
+      recipientId: string; recipientName: string; recipientAvatar: string | null;
+    }>>(
+      `SELECT g.id, g.gift_id AS "giftId", c.emoji, c.label, g.cost_xp AS "costXp",
+              g.message, g.created_at AS "createdAt",
+              u.id AS "recipientId", u.display_name AS "recipientName",
+              u.avatar_url AS "recipientAvatar"
+         FROM gifts g
+         JOIN gift_catalog c ON c.id = g.gift_id
+         JOIN users u ON u.id = g.recipient_id
+        WHERE g.sender_id = $1
+        ORDER BY g.created_at DESC
+        LIMIT $2`,
+      [userId, limit],
+    );
+
+    return rows.map((r) => ({
+      id: r.id,
+      giftId: r.giftId,
+      emoji: r.emoji,
+      label: r.label,
+      message: r.message,
+      costXp: r.costXp,
+      createdAt: r.createdAt,
+      recipient: {
+        id: r.recipientId,
+        displayName: r.recipientName,
+        avatarUrl: r.recipientAvatar,
+      },
+    }));
+  }
+
+  /**
    * Send a gift: debit the sender's wallet and create the gift atomically under a
    * row lock so a double-tap can't double-spend. The recipient reward is awarded
    * post-commit (best-effort, daily-capped, idempotent per gift).
@@ -101,6 +143,13 @@ export class GiftsService {
       throw new BadRequestException({
         code: 'gift.self',
         message: 'You cannot send a gift to yourself.',
+      });
+    }
+
+    if (await this.blocks.isBlocked(senderId, dto.recipientId)) {
+      throw new ForbiddenException({
+        code: 'gift.blocked',
+        message: 'You cannot send a gift to this user.',
       });
     }
 
