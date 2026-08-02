@@ -12,6 +12,7 @@ import type {
   GiftSentResult,
   ReceivedGift,
   SendGiftRequest,
+  SentGift,
 } from '@g88/shared';
 import { getJson, postJson } from '@/api/client';
 
@@ -72,6 +73,28 @@ export function useReceivedGifts(): { gifts: ReceivedGift[]; loading: boolean; r
       setLoading(true);
       try {
         setGifts(await getJson<ReceivedGift[]>('/gifts/received'));
+      } catch {
+        // keep stale on error
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+  return { gifts, loading, refresh };
+}
+
+/** Gifts the caller has sent (no side effects). */
+export function useSentGifts(): { gifts: SentGift[]; loading: boolean; refresh: () => void } {
+  const [gifts, setGifts] = useState<SentGift[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const refresh = useCallback(() => {
+    void (async () => {
+      setLoading(true);
+      try {
+        setGifts(await getJson<SentGift[]>('/gifts/sent'));
       } catch {
         // keep stale on error
       } finally {
