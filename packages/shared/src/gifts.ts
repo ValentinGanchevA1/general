@@ -44,3 +44,15 @@ export interface ReceivedGift {
   seenAt: string | null;
   createdAt: string;
 }
+
+/** A gift the caller sent (GET /gifts/sent), display-ready. */
+export interface SentGift {
+  id: string;
+  giftId: string;
+  emoji: string;
+  label: string;
+  message: string | null;
+  costXp: number;
+  recipient: { id: string; displayName: string; avatarUrl: string | null };
+  createdAt: string;
+}
