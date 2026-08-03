@@ -28,6 +28,7 @@ import { IdVerificationModule } from './modules/id-verification/id-verification.
 import { EventsModule } from './modules/events/events.module';
 import { ListingsModule } from './modules/listings/listings.module';
 import { HealthModule } from './modules/health/health.module';
+import { StoriesModule } from './modules/stories/stories.module';
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
@@ -78,6 +79,7 @@ import { HealthModule } from './modules/health/health.module';
     ListingsModule,
     HealthModule,
     BlocksModule,
+    StoriesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
