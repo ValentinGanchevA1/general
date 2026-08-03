@@ -9,6 +9,7 @@ export * from './gamification';
 export * from './challenges';
 export * from './achievements';
 export * from './gifts';
+export * from './story';
 export * from './scrub';
 
 export interface PendingVerificationSummary {
