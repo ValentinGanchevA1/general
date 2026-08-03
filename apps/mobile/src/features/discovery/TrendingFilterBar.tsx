@@ -12,10 +12,12 @@ interface Props {
   topics: string[];
   activeTopic: string | null;
   onSelect: (topic: string | null) => void;
+  /** Absolute top offset — raised when PulseStrip is mounted above. */
+  topOffset?: number;
 }
 
 export function TrendingFilterBar({
-  topics, activeTopic, onSelect,
+  topics, activeTopic, onSelect, topOffset = 52,
 }: Props): React.JSX.Element | null {
   // Nothing to surface unless there are topics or a filter is currently applied.
   if (topics.length === 0 && !activeTopic) return null;
@@ -26,7 +28,7 @@ export function TrendingFilterBar({
     : topics;
 
   return (
-    <View style={styles.wrap} pointerEvents="box-none">
+    <View style={[styles.wrap, { top: topOffset }]} pointerEvents="box-none">
       <View style={styles.labelRow}>
         <Icon name="fire" size={14} color="#ff9d3c" />
         <Text style={styles.label}>Trending nearby</Text>
@@ -57,7 +59,7 @@ export function TrendingFilterBar({
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', top: 52, left: 0, right: 0 },
+  wrap: { position: 'absolute', left: 0, right: 0 },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, marginBottom: 6 },
   label: { color: '#ff9d3c', fontSize: 12, fontWeight: '700', letterSpacing: 0.4, flex: 1 },
   clear: {
