@@ -5,6 +5,7 @@ import chatReducer from '@/features/chat/chatSlice';
 import pulseReducer from '@/features/pulse/pulseSlice';
 import discoveryReducer from '@/features/discovery/discoverySlice';
 import idVerificationReducer from '@/features/verification/idVerificationSlice';
+import storiesReducer from '@/features/stories/storiesSlice';
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +15,7 @@ export const store = configureStore({
     pulse: pulseReducer,
     discovery: discoveryReducer,
     idVerification: idVerificationReducer,
+    stories: storiesReducer,
   },
 });
 
