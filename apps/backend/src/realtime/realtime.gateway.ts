@@ -25,6 +25,7 @@ import type {
   EventPollDelta,
   EventQuestionDelta,
   EventQuestionUpvoteDelta,
+  StoryNewEvent,
 } from '@g88/shared';
 
 import { WsJwtGuard } from './ws-jwt.guard';
@@ -124,7 +125,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.logger.log(`socket disconnected: user=${userId} sid=${client.id}`);
   }
 
-  // ─── Inbound events ──────────────────────────────────────────────────────
+  // ─── Inbound events ────────────────────────────────────────────────────
 
   @SubscribeMessage('presence:update')
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
@@ -334,7 +335,12 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(this.eventRoom(delta.eventId)).emit('event:question:upvote', delta);
   }
 
-  // ─── Push helpers ────────────────────────────────────────────────────────
+  /** Fan a newly created story into the H3 cell room (r7). */
+  emitStoryNew(evt: StoryNewEvent): void {
+    this.server.to(this.cellRoom(evt.cellId)).emit('story:new', evt);
+  }
+
+  // ─── Push helpers ───────────────────────────────────────────────────────
 
   private async pushToOfflineParticipants(
     conversationId: string,
@@ -355,7 +361,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
-  // ─── Room naming ─────────────────────────────────────────────────────────
+  // ─── Room naming ───────────────────────────────────────────────────────
 
   private userRoom(userId: string): string {
     return `user:${userId}`;
