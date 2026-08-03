@@ -9,8 +9,11 @@
 --
 -- Unique view receipts (story_views) and heart/wave reactions ship in v1.
 -- Idempotent (guarded DDL).
+--
+-- Note: partial indexes must NOT use NOW() (not IMMUTABLE). Expiry is filtered
+-- in application queries; stories_expires_idx supports the cleanup job.
 
--- ─── Stories ──────────────────────────────────────────────────────────────
+-- --- Stories ---------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS stories (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   author_id       uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -45,19 +48,21 @@ CREATE INDEX IF NOT EXISTS stories_expires_idx
 CREATE INDEX IF NOT EXISTS stories_location_gix
   ON stories USING GIST (location) WHERE deleted_at IS NULL;
 
+-- H3 cell indexes for viewport nearby queries. Expiry filtered in SQL, not in
+-- the predicate (NOW() is STABLE, not IMMUTABLE — Postgres rejects it here).
 CREATE INDEX IF NOT EXISTS stories_h3_r7_idx
-  ON stories (location_h3_r7) WHERE deleted_at IS NULL AND expires_at > NOW();
+  ON stories (location_h3_r7) WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS stories_h3_r8_idx
-  ON stories (location_h3_r8) WHERE deleted_at IS NULL AND expires_at > NOW();
+  ON stories (location_h3_r8) WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS stories_h3_r9_idx
-  ON stories (location_h3_r9) WHERE deleted_at IS NULL AND expires_at > NOW();
+  ON stories (location_h3_r9) WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS stories_h3_r10_idx
-  ON stories (location_h3_r10) WHERE deleted_at IS NULL AND expires_at > NOW();
+  ON stories (location_h3_r10) WHERE deleted_at IS NULL;
 
--- ─── Unique view receipts ───────────────────────────────────────────────────
+-- --- Unique view receipts --------------------------------------------------
 CREATE TABLE IF NOT EXISTS story_views (
   story_id   uuid NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
   viewer_id  uuid NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
@@ -67,7 +72,7 @@ CREATE TABLE IF NOT EXISTS story_views (
 
 CREATE INDEX IF NOT EXISTS story_views_viewer_idx ON story_views (viewer_id);
 
--- ─── Reactions (heart | wave) ───────────────────────────────────────────────
+-- --- Reactions (heart | wave) ----------------------------------------------
 CREATE TABLE IF NOT EXISTS story_reactions (
   story_id    uuid NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
   user_id     uuid NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
