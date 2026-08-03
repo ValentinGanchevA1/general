@@ -61,19 +61,19 @@ const EMPTY_POINTS: DiscoveryPoint[] = [];
 
 /**
  * MapScreen
- * ─────────
+ * ---------
  * Owns:
- *   • map region state (debounced viewport handoff to useDiscovery)
- *   • a tap-to-open bottom sheet for the selected entity
- *   • the presence heartbeat (sends location every ~30s while screen mounted)
- *   • the wave-send action with optimistic UX
- *   • PulseStrip stories (viewport fetch + story:new realtime)
+ *   - map region state (debounced viewport handoff to useDiscovery)
+ *   - a tap-to-open bottom sheet for the selected entity
+ *   - the presence heartbeat (sends location every ~30s while screen mounted)
+ *   - the wave-send action with optimistic UX
+ *   - PulseStrip stories (viewport fetch + story:new realtime)
  *
  * Does NOT own:
- *   • clustering math (server)
- *   • token refresh (axios interceptor)
- *   • socket lifecycle (useSocket singleton)
- *   • marker reconcile (MapMarkers — isolated from chrome re-renders)
+ *   - clustering math (server)
+ *   - token refresh (axios interceptor)
+ *   - socket lifecycle (useSocket singleton)
+ *   - marker reconcile (MapMarkers — isolated from chrome re-renders)
  */
 export function MapScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
@@ -89,7 +89,7 @@ export function MapScreen(): React.JSX.Element {
   const mapRef = useRef<MapView>(null);
   const nearbyStories = useAppSelector((s) => s.stories.nearby);
 
-  // ─── Viewport derivation ───────────────────────────────────────────────
+  // --- Viewport derivation ------------------------------------------------
   const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
   const zoom = useMemo(() => (region ? approxZoomFromRegion(region) : 12), [region]);
 
@@ -112,7 +112,7 @@ export function MapScreen(): React.JSX.Element {
     dispatch(setPoints(points));
   }, [points, dispatch]);
 
-  // ─── Centre on user on first location fix ──────────────────────────────
+  // --- Centre on user on first location fix -------------------------------
   useEffect(() => {
     if (!myCoords || region) return;
     mapRef.current?.animateToRegion(
@@ -130,7 +130,7 @@ export function MapScreen(): React.JSX.Element {
     void requestPermission();
   }, [requestPermission]);
 
-  // ─── Realtime: send presence, react to incoming waves ──────────────────
+  // --- Realtime: send presence, react to incoming waves -------------------
   const { sendPresence, on } = useSocket();
 
   useEffect(() => {
@@ -145,10 +145,10 @@ export function MapScreen(): React.JSX.Element {
   useEffect(() => {
     const unsub = on('wave:received', (e) => {
       if (__DEV__) {
-        console.log(`👋 wave from ${e.fromUser.displayName}`);
+        console.log(`wave from ${e.fromUser.displayName}`);
       }
       Alert.alert(
-        `${e.fromUser.displayName} waved at you 👋`,
+        `${e.fromUser.displayName} waved at you`,
         'Wave back or chat with them on the map.',
       );
       refresh();
@@ -166,7 +166,7 @@ export function MapScreen(): React.JSX.Element {
     return unsub;
   }, [on]);
 
-  // ─── Stories: viewport fetch + realtime story:new ───────────────────────
+  // --- Stories: viewport fetch + realtime story:new -----------------------
   useEffect(() => {
     if (!viewport) return;
     const t = setTimeout(() => {
@@ -193,7 +193,7 @@ export function MapScreen(): React.JSX.Element {
     track('story.create_open', {});
   }, []);
 
-  // ─── Cluster tap → zoom in ─────────────────────────────────────────────
+  // --- Cluster tap → zoom in ----------------------------------------------
   const onClusterPress = useCallback((c: ClusterPoint) => {
     mapRef.current?.animateToRegion(
       {
@@ -206,7 +206,7 @@ export function MapScreen(): React.JSX.Element {
     );
   }, [region?.latitudeDelta, region?.longitudeDelta]);
 
-  // ─── Wave (optimistic) ─────────────────────────────────────────────────
+  // --- Wave (optimistic) --------------------------------------------------
   const onWave = useCallback(async (toUserId: string) => {
     setWaving(toUserId);
     try {
@@ -246,7 +246,7 @@ export function MapScreen(): React.JSX.Element {
     }
   }, [selected, onSheetWave]);
 
-  // ─── Render ────────────────────────────────────────────────────────────
+  // --- Render -------------------------------------------------------------
   const nearestUserId = useMemo(() => {
     if (!myCoords) return null;
     const users = points.filter((p): p is EntityPoint => p.kind === 'user');
@@ -366,20 +366,16 @@ export function MapScreen(): React.JSX.Element {
   );
 }
 
-// ─── Fallback ─────────────────────────────────────────────────────────────
-
 function MapUnavailableFallback(): React.JSX.Element {
   return (
     <View style={[StyleSheet.absoluteFill, styles.unavailable]}>
       <Text style={styles.unavailableTitle}>Map unavailable</Text>
       <Text style={styles.unavailableBody}>
-        Google Maps could not be initialized.{\n}Verify your API key in local.properties.
+        Google Maps could not be initialized.{'\n'}Verify your API key in local.properties.
       </Text>
     </View>
   );
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────
 
 function squaredDist(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
   const dlat = a.lat - b.lat;
@@ -397,11 +393,7 @@ function regionToViewport(r: Region | null): Viewport | null {
   };
 }
 
-/**
- * Rough mapping from latitudeDelta to zoom level.
- * Good enough for picking an H3 resolution; not used for any UI math.
- * Reference: at the equator, zoom z ≈ log2(360 / latitudeDelta).
- */
+/** Rough mapping from latitudeDelta to zoom level for H3 resolution. */
 function approxZoomFromRegion(r: Region): number {
   const z = Math.log2(360 / Math.max(r.latitudeDelta, 0.0001));
   return Math.max(0, Math.min(22, Math.round(z)));
