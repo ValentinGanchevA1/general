@@ -12,7 +12,7 @@ import { randomUUID } from 'crypto';
 // Every object a user owns is written under `{prefix}/{userId}/...` (see the
 // upload paths below), so account deletion can purge a user's blobs by prefix
 // without parsing stored URLs.
-const USER_OBJECT_PREFIXES = ['avatars', 'photos', 'listings', 'verifications'] as const;
+const USER_OBJECT_PREFIXES = ['avatars', 'photos', 'listings', 'verifications', 'stories'] as const;
 
 @Injectable()
 export class S3Service {
@@ -48,6 +48,34 @@ export class S3Service {
     contentType: string,
   ): Promise<{ uploadUrl: string; publicUrl: string }> {
     return this.presign('listings', userId, contentType);
+  }
+
+  /** Presigned PUT URL for a story media. Key: stories/{userId}/{uuid}.{ext} */
+  async storyPresignedUrl(
+    userId: string,
+    contentType: string,
+  ): Promise<{ uploadUrl: string; publicUrl: string }> {
+    return this.presignStory(userId, contentType);
+  }
+
+  /**
+   * Delete specific object keys (used by stories TTL cleanup).
+   * Best-effort; no-ops when bucket is unconfigured.
+   */
+  async deleteObjectsByKeys(keys: string[]): Promise<number> {
+    if (!this.bucket || keys.length === 0) return 0;
+    let deleted = 0;
+    for (let i = 0; i < keys.length; i += 1000) {
+      const batch = keys.slice(i, i + 1000);
+      await this.client.send(
+        new DeleteObjectsCommand({
+          Bucket: this.bucket,
+          Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
+        }),
+      );
+      deleted += batch.length;
+    }
+    return deleted;
   }
 
   /**
@@ -210,6 +238,36 @@ export class S3Service {
       Key: key,
       ContentType: contentType,
       // ACL: public-read would work but presigned URL + CF CDN is the right model.
+    });
+    const uploadUrl = await getSignedUrl(this.client, cmd, { expiresIn: 300 });
+    const publicUrl = `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
+
+    return { uploadUrl, publicUrl };
+  }
+
+  /** Story media allows video as well as images. */
+  private async presignStory(
+    userId: string,
+    contentType: string,
+  ): Promise<{ uploadUrl: string; publicUrl: string }> {
+    if (!this.bucket) throw new Error('AWS_S3_BUCKET not configured');
+
+    const EXT_MAP: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+      'image/heic': 'heic',
+      'video/mp4': 'mp4',
+      'video/quicktime': 'mov',
+    };
+    const ext = EXT_MAP[contentType];
+    if (!ext) throw new Error(`Unsupported content type: ${contentType}`);
+    const key = `stories/${userId}/${randomUUID()}.${ext}`;
+
+    const cmd = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      ContentType: contentType,
     });
     const uploadUrl = await getSignedUrl(this.client, cmd, { expiresIn: 300 });
     const publicUrl = `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
