@@ -193,7 +193,7 @@ export function MapScreen(): React.JSX.Element {
     track('story.create_open', {});
   }, []);
 
-  // --- Cluster tap → zoom in ----------------------------------------------
+  // --- Cluster tap to zoom in ---------------------------------------------
   const onClusterPress = useCallback((c: ClusterPoint) => {
     mapRef.current?.animateToRegion(
       {
@@ -371,7 +371,7 @@ function MapUnavailableFallback(): React.JSX.Element {
     <View style={[StyleSheet.absoluteFill, styles.unavailable]}>
       <Text style={styles.unavailableTitle}>Map unavailable</Text>
       <Text style={styles.unavailableBody}>
-        Google Maps could not be initialized.{'\n'}Verify your API key in local.properties.
+        Google Maps could not be initialized. Verify your API key in local.properties.
       </Text>
     </View>
   );
