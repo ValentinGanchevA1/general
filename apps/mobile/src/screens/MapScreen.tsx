@@ -17,6 +17,7 @@ import type {
   DiscoveryPoint,
   EntityPoint,
   ClusterPoint,
+  StoryCard,
   Viewport,
   WaveRequest,
   WaveResponse,
@@ -26,7 +27,7 @@ import { useDiscovery } from '@/features/discovery/useDiscovery';
 import { setPoints } from '@/features/discovery/discoverySlice';
 import { useSocket } from '@/realtime/useSocket';
 import { postJson } from '@/api/client';
-import { useAppDispatch } from '@/hooks/redux';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { MapMarkers } from '@/components/map/MapMarkers';
 import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
@@ -39,6 +40,17 @@ import { NudgeBanner } from '@/features/nudges/NudgeBanner';
 import { EventsRail, EVENTS_RAIL_HEIGHT } from '@/features/events/EventsRail';
 import { TrendingFilterBar } from '@/features/discovery/TrendingFilterBar';
 import { useTrendingNearby } from '@/features/pulse/useTrendingNearby';
+import {
+  PulseStrip,
+  PULSE_STRIP_HEIGHT,
+} from '@/features/stories/components/PulseStrip';
+import { StoryViewer } from '@/features/stories/components/StoryViewer';
+import { StoryCreateSheet } from '@/features/stories/components/StoryCreateSheet';
+import {
+  fetchNearbyStories,
+  storyReceived,
+} from '@/features/stories/storiesSlice';
+import { pickAndUploadStoryMedia } from '@/features/stories/storyMedia';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
@@ -55,6 +67,7 @@ const EMPTY_POINTS: DiscoveryPoint[] = [];
  *   • a tap-to-open bottom sheet for the selected entity
  *   • the presence heartbeat (sends location every ~30s while screen mounted)
  *   • the wave-send action with optimistic UX
+ *   • PulseStrip stories (viewport fetch + story:new realtime)
  *
  * Does NOT own:
  *   • clustering math (server)
@@ -70,7 +83,11 @@ export function MapScreen(): React.JSX.Element {
   const [selected, setSelected] = useState<EntityPoint | null>(null);
   const [waving, setWaving] = useState<string | null>(null);
   const [activeTopic, setActiveTopic] = useState<string | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [createOpen, setCreateOpen] = useState(false);
   const mapRef = useRef<MapView>(null);
+  const nearbyStories = useAppSelector((s) => s.stories.nearby);
 
   // ─── Viewport derivation ───────────────────────────────────────────────
   const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
@@ -148,6 +165,33 @@ export function MapScreen(): React.JSX.Element {
     });
     return unsub;
   }, [on]);
+
+  // ─── Stories: viewport fetch + realtime story:new ───────────────────────
+  useEffect(() => {
+    if (!viewport) return;
+    const t = setTimeout(() => {
+      void dispatch(fetchNearbyStories({ viewport, zoom }));
+    }, 350);
+    return () => clearTimeout(t);
+  }, [viewport, zoom, dispatch]);
+
+  useEffect(() => {
+    const unsub = on('story:new', (e) => {
+      dispatch(storyReceived(e));
+    });
+    return unsub;
+  }, [on, dispatch]);
+
+  const onOpenStory = useCallback((story: StoryCard, index: number) => {
+    setViewerIndex(index);
+    setViewerOpen(true);
+    track('story.open', { storyId: story.id, index });
+  }, []);
+
+  const onCreatePress = useCallback(() => {
+    setCreateOpen(true);
+    track('story.create_open', {});
+  }, []);
 
   // ─── Cluster tap → zoom in ─────────────────────────────────────────────
   const onClusterPress = useCallback((c: ClusterPoint) => {
@@ -269,10 +313,17 @@ export function MapScreen(): React.JSX.Element {
         </View>
       )}
 
+      {!selected && (
+        <View style={styles.pulseWrap} pointerEvents="box-none">
+          <PulseStrip onOpenStory={onOpenStory} onCreatePress={onCreatePress} />
+        </View>
+      )}
+
       <TrendingFilterBar
         topics={trendingTopics}
         activeTopic={activeTopic}
         onSelect={onSelectTopic}
+        topOffset={selected ? 52 : 48 + PULSE_STRIP_HEIGHT}
       />
       <DailyChallengeCard />
       <NudgeBanner />
@@ -297,6 +348,20 @@ export function MapScreen(): React.JSX.Element {
         onAction={onFabAction}
         bottomOffset={selected ? 0 : EVENTS_RAIL_HEIGHT}
       />
+
+      <StoryViewer
+        stories={nearbyStories}
+        initialIndex={viewerIndex}
+        visible={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+      />
+
+      <StoryCreateSheet
+        visible={createOpen}
+        onClose={() => setCreateOpen(false)}
+        location={myCoords}
+        pickAndUpload={pickAndUploadStoryMedia}
+      />
     </View>
   );
 }
@@ -308,7 +373,7 @@ function MapUnavailableFallback(): React.JSX.Element {
     <View style={[StyleSheet.absoluteFill, styles.unavailable]}>
       <Text style={styles.unavailableTitle}>Map unavailable</Text>
       <Text style={styles.unavailableBody}>
-        Google Maps could not be initialized.{'\n'}Verify your API key in local.properties.
+        Google Maps could not be initialized.{\n}Verify your API key in local.properties.
       </Text>
     </View>
   );
@@ -344,6 +409,13 @@ function approxZoomFromRegion(r: Region): number {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
+  pulseWrap: {
+    position: 'absolute',
+    top: 48,
+    left: 0,
+    right: 0,
+    zIndex: 5,
+  },
   unavailable: {
     justifyContent: 'center',
     alignItems: 'center',
