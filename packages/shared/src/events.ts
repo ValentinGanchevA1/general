@@ -1,7 +1,8 @@
 import type { LatLng, EntityKind, VerificationLevel } from './api';
 import type { EventQuestion, PollResult } from './event';
+import type { StoryNewEvent } from './story';
 
-// ─── Server → Client ───────────────────────────────────────────────────────
+// ─── Server → Client ─────────────────────────────────────────────────────
 
 export interface WaveReceivedEvent {
   waveId: string;
@@ -95,11 +96,13 @@ export interface ServerToClientEvents {
   'event:question': (e: EventQuestionDelta) => void;
   /** A question's upvote count changed in a joined event. */
   'event:question:upvote': (e: EventQuestionUpvoteDelta) => void;
+  /** A new story was posted into a cell the socket is present in. */
+  'story:new': (e: StoryNewEvent) => void;
   /** Server-side rate limit, validation error, or unrecoverable socket error. */
   'error:event': (e: { code: string; message: string }) => void;
 }
 
-// ─── Client → Server ───────────────────────────────────────────────────────
+// ─── Client → Server ─────────────────────────────────────────────────────
 
 export type AckResult<T> =
   | { ok: true; data: T }
