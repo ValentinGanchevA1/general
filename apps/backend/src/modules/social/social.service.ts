@@ -91,20 +91,16 @@ export class SocialService {
     const cfg = PROVIDERS[provider];
 
     // Retrieve and consume the code_verifier (one-time use)
-    const codeVerifier = await this.redis.getdel(`${PKCE_KEY_PREFIX}${nonce}`);
+    const key = `${PKCE_KEY_PREFIX}${nonce}`;
+    const codeVerifier = await this.redis.get(key);
+    if (codeVerifier) {
+      await this.redis.del(key);
+    }
     if (!codeVerifier) {
-      // Fallback for older Redis without GETDEL: GET + DEL
-      const fallback = await this.redis.get(`${PKCE_KEY_PREFIX}${nonce}`);
-      if (fallback) {
-        await this.redis.del(`${PKCE_KEY_PREFIX}${nonce}`);
-      }
-      if (!fallback) {
-        throw new BadRequestException({
-          code: 'social.pkce_missing',
-          message: 'Link request expired or already used',
-        });
-      }
-      return this.finishCallback(code, provider, userId, creds, cfg, fallback);
+      throw new BadRequestException({
+        code: 'social.pkce_missing',
+        message: 'Link request expired or already used',
+      });
     }
 
     return this.finishCallback(code, provider, userId, creds, cfg, codeVerifier);
@@ -129,11 +125,6 @@ export class SocialService {
       client_secret: creds.clientSecret,
       code_verifier: codeVerifier,
     });
-
-    // TikTok expects client_key (already set via clientIdParam) + client_secret
-    if (cfg.clientIdParam === 'client_key') {
-      // already handled
-    }
 
     const tokenRes = await fetch(cfg.tokenUrl, {
       method: 'POST',
