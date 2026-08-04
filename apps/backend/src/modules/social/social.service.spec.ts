@@ -20,7 +20,7 @@ describe('SocialService', () => {
   let service: SocialService;
   let query: jest.Mock;
   let getProfile: jest.Mock;
-  let redis: { set: jest.Mock; get: jest.Mock; del: jest.Mock; getdel: jest.Mock };
+  let redis: { set: jest.Mock; get: jest.Mock; del: jest.Mock };
 
   beforeEach(async () => {
     process.env.JWT_SECRET = SECRET;
@@ -33,7 +33,6 @@ describe('SocialService', () => {
       set: jest.fn().mockResolvedValue('OK'),
       get: jest.fn().mockResolvedValue(null),
       del: jest.fn().mockResolvedValue(1),
-      getdel: jest.fn().mockResolvedValue(null),
     };
     const mod = await Test.createTestingModule({
       providers: [
@@ -111,7 +110,6 @@ describe('SocialService', () => {
         exp: Date.now() + 1e6,
         n: 'missing-nonce',
       });
-      redis.getdel.mockResolvedValue(null);
       redis.get.mockResolvedValue(null);
 
       await expect(service.handleCallback('code', state)).rejects.toMatchObject({
