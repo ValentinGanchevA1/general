@@ -15,6 +15,8 @@ import { useAppSelector } from '@/hooks/redux';
 interface Props {
   onOpenStory: (story: StoryCard, index: number) => void;
   onCreatePress: () => void;
+  /** When false, create ring is muted; host still receives onCreatePress for nudge. */
+  canCreate?: boolean;
 }
 
 /**
@@ -24,7 +26,7 @@ interface Props {
 export const PULSE_STRIP_HEIGHT = 8 /* wrap py */ + 64 /* ring */ + 4 + 14 /* name */ + 8;
 
 /** Horizontal Pulse/Storyline strip for the map dashboard. */
-export function PulseStrip({ onOpenStory, onCreatePress }: Props) {
+export function PulseStrip({ onOpenStory, onCreatePress, canCreate = true }: Props) {
   const stories = useAppSelector((s) => s.stories.nearby);
   const loading = useAppSelector((s) => s.stories.loading);
 
@@ -68,11 +70,23 @@ export function PulseStrip({ onOpenStory, onCreatePress }: Props) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.list}
         ListHeaderComponent={
-          <Pressable style={styles.item} onPress={onCreatePress}>
-            <View style={[styles.ring, styles.ringCreate]}>
-              <Text style={styles.plus}>+</Text>
+          <Pressable
+            style={styles.item}
+            onPress={onCreatePress}
+            accessibilityLabel={canCreate ? 'Create your story' : 'Story posting locked'}
+          >
+            <View
+              style={[
+                styles.ring,
+                styles.ringCreate,
+                !canCreate && styles.ringCreateLocked,
+              ]}
+            >
+              <Text style={[styles.plus, !canCreate && styles.plusLocked]}>
+                {canCreate ? '+' : '🔒'}
+              </Text>
             </View>
-            <Text style={styles.name}>Your story</Text>
+            <Text style={styles.name}>{canCreate ? 'Your story' : 'Locked'}</Text>
           </Pressable>
         }
         ListEmptyComponent={
@@ -98,10 +112,12 @@ const styles = StyleSheet.create({
   ringUnseen: { borderWidth: 2, borderColor: '#7C5CFF' },
   ringSeen: { borderWidth: 2, borderColor: '#555' },
   ringCreate: { borderWidth: 2, borderColor: '#888', borderStyle: 'dashed' },
+  ringCreateLocked: { borderColor: '#555', opacity: 0.7 },
   avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#333' },
   avatarFallback: { justifyContent: 'center', alignItems: 'center' },
   avatarInitial: { color: '#fff', fontSize: 20, fontWeight: '600' },
   plus: { color: '#fff', fontSize: 28, fontWeight: '300' },
+  plusLocked: { fontSize: 20 },
   name: {
     marginTop: 4,
     fontSize: 11,
