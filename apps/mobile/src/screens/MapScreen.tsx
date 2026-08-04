@@ -22,6 +22,7 @@ import type {
   WaveRequest,
   WaveResponse,
 } from '@g88/shared';
+import { canPostStory, storyGateMessage } from '@g88/shared';
 
 import { useDiscovery } from '@/features/discovery/useDiscovery';
 import { setPoints } from '@/features/discovery/discoverySlice';
@@ -188,10 +189,23 @@ export function MapScreen(): React.JSX.Element {
     track('story.open', { storyId: story.id, index });
   }, []);
 
+  const profile = useAppSelector((s) => s.profile.profile);
+  const storyEligibility = useMemo(() => {
+    if (!profile) return { allowed: false as const, reason: 'email_unverified' as const };
+    return canPostStory({
+      verification: profile.verification,
+      createdAt: profile.createdAt,
+    });
+  }, [profile]);
+
   const onCreatePress = useCallback(() => {
+    if (!storyEligibility.allowed) {
+      Alert.alert('Stories', storyGateMessage(storyEligibility.reason));
+      return;
+    }
     setCreateOpen(true);
     track('story.create_open', {});
-  }, []);
+  }, [storyEligibility]);
 
   // --- Cluster tap to zoom in ---------------------------------------------
   const onClusterPress = useCallback((c: ClusterPoint) => {
@@ -315,7 +329,11 @@ export function MapScreen(): React.JSX.Element {
 
       {!selected && (
         <View style={styles.pulseWrap} pointerEvents="box-none">
-          <PulseStrip onOpenStory={onOpenStory} onCreatePress={onCreatePress} />
+          <PulseStrip
+            onOpenStory={onOpenStory}
+            onCreatePress={onCreatePress}
+            canCreate={storyEligibility.allowed}
+          />
         </View>
       )}
 
