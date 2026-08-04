@@ -29,20 +29,21 @@ function assertProvider(p: string): SocialProvider {
 export class SocialController {
   constructor(private readonly social: SocialService) {}
 
-  /** GET /api/v1/social/:provider/start — authorize URL to open in the browser. */
+  /** GET /api/v1/social/:provider/start — authorize URL (with PKCE) to open in the browser. */
   @Get(':provider/start')
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
-  start(
+  async start(
     @CurrentUser('id') userId: string,
     @Param('provider') provider: string,
-  ): SocialAuthorizeResponse {
-    return { url: this.social.buildStartUrl(userId, assertProvider(provider)) };
+  ): Promise<SocialAuthorizeResponse> {
+    const url = await this.social.buildStartUrl(userId, assertProvider(provider));
+    return { url };
   }
 
   /**
    * GET /api/v1/social/callback — OAuth redirect target (no JWT; CSRF-protected
-   * by the signed state). Bounces back to the app via a deep link / web page.
+   * by the signed state + PKCE verifier). Bounces back to the app via a deep link / web page.
    */
   @Get('callback')
   @SkipThrottle()
