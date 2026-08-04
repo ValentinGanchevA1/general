@@ -3,9 +3,10 @@ import type { SocialProvider } from '@g88/shared';
 /**
  * Per-provider OAuth2 config for account *linking* (not sign-in). A provider is
  * "active" only when both its client id and secret env vars are set — otherwise
- * the start endpoint 503s. Standard authorization-code (confidential client)
- * flow; providers that mandate PKCE (X/Twitter) need a Redis-backed verifier
- * added before they go live — see SocialService.
+ * the start endpoint 503s.
+ *
+ * All providers use Authorization Code + PKCE (S256). The code_verifier is
+ * stored in Redis for the lifetime of the signed state (see SocialService).
  */
 export interface ProviderConfig {
   authorizeUrl: string;
@@ -16,8 +17,10 @@ export interface ProviderConfig {
   clientSecretEnv: string;
   /** Some providers (Instagram/Facebook) take the token as a query param, not a Bearer header. */
   tokenInQuery?: boolean;
-  /** Extra static params appended to the authorize URL. */
+  /** Extra static params appended to the authorize URL (beyond PKCE). */
   extraAuthParams?: Record<string, string>;
+  /** TikTok uses client_key instead of client_id on some endpoints. */
+  clientIdParam?: 'client_id' | 'client_key';
   /** Pull a stable id + handle out of the provider's userinfo payload. */
   parseUser: (json: Record<string, unknown>) => { id: string; username: string | null };
 }
@@ -36,10 +39,11 @@ export const PROVIDERS: Record<SocialProvider, ProviderConfig> = {
     parseUser: (j) => ({ id: str(j.id) ?? '', username: str(j.username) }),
   },
   twitter: {
-    authorizeUrl: 'https://twitter.com/i/oauth2/authorize',
-    tokenUrl: 'https://api.twitter.com/2/oauth2/token',
-    userInfoUrl: 'https://api.twitter.com/2/users/me',
-    scope: 'users.read tweet.read',
+    // X rebrand: authorize lives on x.com; token on api.x.com
+    authorizeUrl: 'https://x.com/i/oauth2/authorize',
+    tokenUrl: 'https://api.x.com/2/oauth2/token',
+    userInfoUrl: 'https://api.x.com/2/users/me',
+    scope: 'users.read tweet.read offline.access',
     clientIdEnv: 'TWITTER_CLIENT_ID',
     clientSecretEnv: 'TWITTER_CLIENT_SECRET',
     parseUser: (j) => {
@@ -54,6 +58,7 @@ export const PROVIDERS: Record<SocialProvider, ProviderConfig> = {
     scope: 'user.info.basic',
     clientIdEnv: 'TIKTOK_CLIENT_ID',
     clientSecretEnv: 'TIKTOK_CLIENT_SECRET',
+    clientIdParam: 'client_key',
     parseUser: (j) => {
       const user = ((j.data as Record<string, unknown>)?.user ?? {}) as Record<string, unknown>;
       return { id: str(user.open_id) ?? '', username: str(user.display_name) };

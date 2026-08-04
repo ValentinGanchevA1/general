@@ -1,24 +1,31 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
+import type Redis from 'ioredis';
 import { DataSource } from 'typeorm';
 
 import type { SocialProvider, UserProfile } from '@g88/shared';
 
+import { REDIS_CLIENT } from '../../config/redis.provider';
 import { UsersService } from '../users/users.service';
 import { PROVIDERS, providerCreds } from './providers';
 
 const STATE_TTL_MS = 10 * 60 * 1000; // 10 min
+const STATE_TTL_SEC = Math.ceil(STATE_TTL_MS / 1000);
+const PKCE_KEY_PREFIX = 'social:pkce:';
 
 interface StatePayload {
   uid: string;
   p: SocialProvider;
   exp: number;
+  /** Random nonce used as Redis key for the code_verifier. */
+  n: string;
 }
 
 @Injectable()
@@ -28,10 +35,14 @@ export class SocialService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly users: UsersService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
-  /** Authorize URL to open in the browser; CSRF-protected via signed state. */
-  buildStartUrl(userId: string, provider: SocialProvider): string {
+  /**
+   * Authorize URL to open in the system browser.
+   * Includes PKCE (S256) code_challenge + HMAC-signed state (CSRF).
+   */
+  async buildStartUrl(userId: string, provider: SocialProvider): Promise<string> {
     const creds = providerCreds(provider);
     if (!creds) {
       throw new ServiceUnavailableException({
@@ -40,43 +51,98 @@ export class SocialService {
       });
     }
     const cfg = PROVIDERS[provider];
-    const state = this.signState({ uid: userId, p: provider, exp: Date.now() + STATE_TTL_MS });
 
+    const codeVerifier = this.generateCodeVerifier();
+    const codeChallenge = this.generateCodeChallenge(codeVerifier);
+    const nonce = randomBytes(16).toString('base64url');
+
+    const state = this.signState({
+      uid: userId,
+      p: provider,
+      exp: Date.now() + STATE_TTL_MS,
+      n: nonce,
+    });
+
+    // Store verifier server-side; single-use, short TTL
+    await this.redis.set(`${PKCE_KEY_PREFIX}${nonce}`, codeVerifier, 'EX', STATE_TTL_SEC);
+
+    const clientIdParam = cfg.clientIdParam ?? 'client_id';
     const params = new URLSearchParams({
       response_type: 'code',
-      client_id: creds.clientId,
+      [clientIdParam]: creds.clientId,
       redirect_uri: this.redirectUri(),
       scope: cfg.scope,
       state,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
       ...(cfg.extraAuthParams ?? {}),
     });
     return `${cfg.authorizeUrl}?${params.toString()}`;
   }
 
-  /** Exchange the code, fetch the handle, and link the account. Returns the linked provider. */
+  /** Exchange the code + PKCE verifier, fetch the handle, and link the account. */
   async handleCallback(code: string, state: string): Promise<SocialProvider> {
     const decoded = this.verifyState(state);
-    const { uid: userId, p: provider } = decoded;
+    const { uid: userId, p: provider, n: nonce } = decoded;
     const creds = providerCreds(provider);
     if (!creds) {
       throw new ServiceUnavailableException({ code: 'social.provider_unavailable', message: 'Not configured' });
     }
     const cfg = PROVIDERS[provider];
 
-    // 1. authorization_code → access_token
+    // Retrieve and consume the code_verifier (one-time use)
+    const codeVerifier = await this.redis.getdel(`${PKCE_KEY_PREFIX}${nonce}`);
+    if (!codeVerifier) {
+      // Fallback for older Redis without GETDEL: GET + DEL
+      const fallback = await this.redis.get(`${PKCE_KEY_PREFIX}${nonce}`);
+      if (fallback) {
+        await this.redis.del(`${PKCE_KEY_PREFIX}${nonce}`);
+      }
+      if (!fallback) {
+        throw new BadRequestException({
+          code: 'social.pkce_missing',
+          message: 'Link request expired or already used',
+        });
+      }
+      return this.finishCallback(code, provider, userId, creds, cfg, fallback);
+    }
+
+    return this.finishCallback(code, provider, userId, creds, cfg, codeVerifier);
+  }
+
+  private async finishCallback(
+    code: string,
+    provider: SocialProvider,
+    userId: string,
+    creds: { clientId: string; clientSecret: string },
+    cfg: (typeof PROVIDERS)[SocialProvider],
+    codeVerifier: string,
+  ): Promise<SocialProvider> {
+    const clientIdParam = cfg.clientIdParam ?? 'client_id';
+
+    // 1. authorization_code + code_verifier → access_token
+    const body = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: this.redirectUri(),
+      [clientIdParam]: creds.clientId,
+      client_secret: creds.clientSecret,
+      code_verifier: codeVerifier,
+    });
+
+    // TikTok expects client_key (already set via clientIdParam) + client_secret
+    if (cfg.clientIdParam === 'client_key') {
+      // already handled
+    }
+
     const tokenRes = await fetch(cfg.tokenUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: this.redirectUri(),
-        client_id: creds.clientId,
-        client_secret: creds.clientSecret,
-      }).toString(),
+      body: body.toString(),
     });
     if (!tokenRes.ok) {
-      this.logger.warn(`[social] ${provider} token exchange failed: ${tokenRes.status}`);
+      const errText = await tokenRes.text().catch(() => '');
+      this.logger.warn(`[social] ${provider} token exchange failed: ${tokenRes.status} ${errText}`);
       throw new BadRequestException({ code: 'social.token_exchange_failed', message: 'Could not link account' });
     }
     const tokenJson = (await tokenRes.json()) as { access_token?: string };
@@ -130,16 +196,35 @@ export class SocialService {
     return `${base}?${params.toString()}`;
   }
 
+  // ── PKCE helpers ──────────────────────────────────────────────────────────
+
+  /** High-entropy verifier (43–128 chars, unreserved set). */
+  private generateCodeVerifier(): string {
+    return randomBytes(64).toString('base64url');
+  }
+
+  /** S256 code_challenge = BASE64URL(SHA256(verifier)). */
+  private generateCodeChallenge(verifier: string): string {
+    return createHash('sha256').update(verifier).digest('base64url');
+  }
+
   private profileUrl(provider: SocialProvider, username: string | null): string | null {
     if (!username) return null;
     switch (provider) {
-      case 'instagram': return `https://instagram.com/${username}`;
-      case 'twitter': return `https://x.com/${username}`;
-      case 'tiktok': return `https://tiktok.com/@${username}`;
-      case 'facebook': return null;
-      case 'linkedin': return null;
-      case 'spotify': return null;
-      default: return null;
+      case 'instagram':
+        return `https://instagram.com/${username}`;
+      case 'twitter':
+        return `https://x.com/${username}`;
+      case 'tiktok':
+        return `https://tiktok.com/@${username}`;
+      case 'facebook':
+        return null;
+      case 'linkedin':
+        return null;
+      case 'spotify':
+        return null;
+      default:
+        return null;
     }
   }
 
@@ -167,6 +252,9 @@ export class SocialService {
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString()) as StatePayload;
     if (payload.exp < Date.now()) {
       throw new BadRequestException({ code: 'social.state_expired', message: 'Link request expired' });
+    }
+    if (!payload.n) {
+      throw new BadRequestException({ code: 'social.bad_state', message: 'Invalid state (missing nonce)' });
     }
     return payload;
   }
