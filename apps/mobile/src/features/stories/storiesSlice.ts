@@ -14,6 +14,18 @@ import type {
 
 import { getJson, postJson } from '@/api/client';
 
+function errorMessage(e: unknown, fallback: string): string {
+  if (typeof e === 'string' && e.trim()) return e;
+  if (e && typeof e === 'object') {
+    const o = e as { message?: unknown; code?: unknown; payload?: unknown };
+    if (typeof o.message === 'string' && o.message.trim()) return o.message;
+    if (typeof o.payload === 'string' && o.payload.trim()) return o.payload;
+    if (typeof o.code === 'string' && o.code.trim()) return o.code;
+  }
+  if (e instanceof Error && e.message) return e.message;
+  return fallback;
+}
+
 export interface StoriesState {
   nearby: StoryCard[];
   byAuthor: Record<string, StoryCard[]>;
@@ -52,7 +64,7 @@ export const fetchNearbyStories = createAsyncThunk<
     });
     return res.stories;
   } catch (e) {
-    return rejectWithValue(e instanceof Error ? e.message : 'Failed to load stories');
+    return rejectWithValue(errorMessage(e, 'Failed to load stories'));
   }
 });
 
@@ -64,7 +76,7 @@ export const fetchAuthorStories = createAsyncThunk<
     const stories = await getJson<StoryCard[]>(`/stories/author/${authorId}`);
     return { authorId, stories };
   } catch (e) {
-    return rejectWithValue(e instanceof Error ? e.message : 'Failed to load author stories');
+    return rejectWithValue(errorMessage(e, 'Failed to load author stories'));
   }
 });
 
@@ -77,7 +89,7 @@ export const presignStory = createAsyncThunk<
       contentType,
     });
   } catch (e) {
-    return rejectWithValue(e instanceof Error ? e.message : 'Presign failed');
+    return rejectWithValue(errorMessage(e, 'Presign failed'));
   }
 });
 
@@ -94,37 +106,35 @@ export const createStory = createAsyncThunk<
     const res = await postJson<typeof body, CreateStoryResponse>('/stories', body);
     return res.story;
   } catch (e) {
-    return rejectWithValue(e instanceof Error ? e.message : 'Create story failed');
+    return rejectWithValue(errorMessage(e, 'Failed to create story'));
   }
 });
 
 export const recordStoryView = createAsyncThunk<
-  { storyId: string; viewCount: number },
+  RecordViewResponse,
   string
 >('stories/view', async (storyId, { rejectWithValue }) => {
   try {
-    const res = await postJson<Record<string, never>, RecordViewResponse>(
+    return await postJson<Record<string, never>, RecordViewResponse>(
       `/stories/${storyId}/view`,
       {},
     );
-    return { storyId, viewCount: res.viewCount };
   } catch (e) {
-    return rejectWithValue(e instanceof Error ? e.message : 'View failed');
+    return rejectWithValue(errorMessage(e, 'Failed to record view'));
   }
 });
 
 export const reactToStory = createAsyncThunk<
-  { storyId: string; reaction: StoryReactionKind; reactionCount: number },
+  ReactStoryResponse,
   { storyId: string; kind: StoryReactionKind }
 >('stories/react', async ({ storyId, kind }, { rejectWithValue }) => {
   try {
-    const res = await postJson<{ kind: StoryReactionKind }, ReactStoryResponse>(
+    return await postJson<{ kind: StoryReactionKind }, ReactStoryResponse>(
       `/stories/${storyId}/react`,
       { kind },
     );
-    return { storyId, reaction: res.reaction, reactionCount: res.reactionCount };
   } catch (e) {
-    return rejectWithValue(e instanceof Error ? e.message : 'React failed');
+    return rejectWithValue(errorMessage(e, 'Failed to react'));
   }
 });
 
