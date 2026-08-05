@@ -93,12 +93,13 @@ export function EmailVerificationScreen(): React.JSX.Element {
         <Icon name="email-check" size={48} color="#00d4ff" />
         <Text style={styles.title}>Confirm your email</Text>
         <Text style={styles.blurb}>
-          We sent a 6-digit code to {masked || 'your inbox'}. Enter it to unlock stories and
-          the email badge.
+          {devHint
+            ? `No email was delivered (Twilio email channel off or unavailable). Use the dev code for ${masked || 'your account'}.`
+            : `We sent a 6-digit code to ${masked || 'your inbox'}. Enter it to unlock stories and the email badge.`}
         </Text>
         {devHint ? (
           <Text style={styles.devHint}>
-            Dev mode: use code 000000 (or DEV_OTP_CODE). Server also logs the code.
+            Dev code: 000000 (or DEV_OTP_CODE). Backend logs also print the code.
           </Text>
         ) : null}
         <TextInput
