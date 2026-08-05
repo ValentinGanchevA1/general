@@ -20,6 +20,7 @@ import { ChatScreen } from '@/screens/ChatScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { AlertComposerScreen } from '@/screens/AlertComposerScreen';
 import { VerificationScreen } from '@/screens/VerificationScreen';
+import EmailVerificationScreen from '@/screens/EmailVerificationScreen';
 import { SubscriptionScreen } from '@/screens/SubscriptionScreen';
 import { SocialLinkingScreen } from '@/screens/SocialLinkingScreen';
 import { AchievementsScreen } from '@/screens/AchievementsScreen';
@@ -71,9 +72,7 @@ export type RootStackParamList = {
     conversationId: string;
     otherUserName: string;
     requestPending?: boolean;
-    /** The other participant's verification ladder level (for the header badge). */
     otherUserVerification?: VerificationLevel;
-    /** True when the other participant passed ID review (strong decagram badge). */
     otherUserIdVerified?: boolean;
   };
   ProfileEdit: undefined;
@@ -82,6 +81,7 @@ export type RootStackParamList = {
   AlertComposer: { presetCategory?: AreaCategory; presetTag?: string };
   UserProfile: { userId: string };
   Verification: undefined;
+  EmailVerification: undefined;
   Subscription: undefined;
   SocialLinking: undefined;
   Achievements: undefined;
@@ -118,17 +118,15 @@ function MainTabs(): React.JSX.Element {
         },
         tabBarActiveTintColor: '#00d4ff',
         tabBarInactiveTintColor: '#555',
-        tabBarIcon: ({ color }) => {
-          const icons = {
-            Map: 'map-marker-radius',
-            Pulse: 'pulse',
-            Profile: 'account-circle-outline',
-          } as const;
-
-          const iconName = icons[route.name as keyof typeof icons] ?? 'circle';
-          return (
-            <MaterialCommunityIcons name={iconName} size={24} color={color} />
-          );
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarIcon: ({ color, size }) => {
+          const icon =
+            route.name === 'Map'
+              ? 'map-marker-radius'
+              : route.name === 'Pulse'
+                ? 'pulse'
+                : 'account-circle';
+          return <MaterialCommunityIcons name={icon} color={color} size={size} />;
         },
       })}
     >
@@ -141,129 +139,78 @@ function MainTabs(): React.JSX.Element {
 
 export function AppNavigator(): React.JSX.Element {
   const dispatch = useAppDispatch();
-  const user = useAppSelector(s => s.auth.user);
-  const restoring = useAppSelector(s => s.auth.restoring);
-  const profileSetupComplete = useAppSelector(s => s.auth.profileSetupComplete);
-  const prevUserRef = useRef<string | null>(null);
+  const { accessToken, restoring, profileSetupComplete } = useAppSelector((s) => s.auth);
+  const bootstrapped = useRef(false);
 
   useEffect(() => {
+    if (bootstrapped.current) return;
+    bootstrapped.current = true;
     void dispatch(restoreSession());
+    setupNotificationHandlers();
   }, [dispatch]);
 
-  // Register FCM token whenever the user logs in (null → id transition).
   useEffect(() => {
-    if (user && prevUserRef.current !== user.id) {
-      prevUserRef.current = user.id;
-      void registerPushToken();
-      void pingGamification(); // advance daily streak on login/session restore
-      return setupNotificationHandlers((screen, params) => {
-        if (navigationRef.isReady()) {
-          // Dynamic deep-link target — bypass the per-screen navigate overloads.
-          (navigationRef.navigate as (s: string, p?: object) => void)(
-            screen,
-            params,
-          );
-        }
-      });
-    }
-    if (!user) prevUserRef.current = null;
-  }, [user]);
+    if (!accessToken) return;
+    void registerPushToken();
+    void pingGamification();
+  }, [accessToken]);
 
-  // Loading screen while we check for a stored session. Gated on `restoring`
-  // (not the shared auth `loading`) so an in-progress login/register never
-  // unmounts the AuthScreen. Spinner so a slow/offline /auth/me reads as
-  // "loading" rather than a frozen black screen.
-  if (restoring && user === null) {
+  if (restoring) {
     return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: '#0a0a0f',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <ActivityIndicator size="large" color="#00d4ff" />
+      <View style={{ flex: 1, backgroundColor: '#0a0a0f', justifyContent: 'center' }}>
+        <ActivityIndicator color="#00d4ff" />
       </View>
     );
   }
 
   return (
     <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {user ? (
+      <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0a0a0f' } }}>
+        {!accessToken ? (
+          <Stack.Screen name="Auth" component={AuthScreen} />
+        ) : !profileSetupComplete ? (
+          <Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} />
+        ) : (
           <>
-            {!profileSetupComplete && (
-              <Stack.Screen
-                name="ProfileCreation"
-                component={ProfileCreationScreen}
-              />
-            )}
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="Chat" component={ChatScreen} />
             <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
             <Stack.Screen name="Photos" component={PhotosScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
-            <Stack.Screen
-              name="AlertComposer"
-              component={AlertComposerScreen}
-            />
+            <Stack.Screen name="AlertComposer" component={AlertComposerScreen} />
             <Stack.Screen name="UserProfile" component={UserProfileScreen} />
             <Stack.Screen name="Verification" component={VerificationScreen} />
             <Stack.Screen
-              name="Subscription"
-              component={SubscriptionScreen}
+              name="EmailVerification"
+              component={EmailVerificationScreen}
+              options={{ title: 'Verify email', presentation: 'modal' }}
             />
-            <Stack.Screen
-              name="SocialLinking"
-              component={SocialLinkingScreen}
-            />
-            <Stack.Screen
-              name="Achievements"
-              component={AchievementsScreen}
-            />
+            <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+            <Stack.Screen name="SocialLinking" component={SocialLinkingScreen} />
+            <Stack.Screen name="Achievements" component={AchievementsScreen} />
             <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+            <Stack.Screen name="Challenges" component={ChallengesScreen} />
             <Stack.Screen
               name="VerificationId"
               options={{ title: 'ID Verification', presentation: 'modal' }}
             >
               {() => <VerificationIdScreen />}
             </Stack.Screen>
-            <Stack.Screen name="Challenges" component={ChallengesScreen} />
             <Stack.Screen name="EventDetail" component={EventDetailScreen} />
-            <Stack.Screen
-              name="EventCreate"
-              component={EventCreateScreen}
-              options={{ presentation: 'modal' }}
-            />
+            <Stack.Screen name="EventCreate" component={EventCreateScreen} />
             <Stack.Screen name="Marketplace" component={MarketplaceScreen} />
-            <Stack.Screen
-              name="NotificationSettings"
-              component={NotificationSettingsScreen}
-            />
-            <Stack.Screen
-              name="BlockedUsers"
-              component={BlockedUsersScreen}
-            />
-            <Stack.Screen
-              name="ListingDetail"
-              component={ListingDetailScreen}
-            />
-            <Stack.Screen
-              name="ListingCreate"
-              component={ListingCreateScreen}
-              options={{ presentation: 'modal' }}
-            />
+            <Stack.Screen name="ListingDetail" component={ListingDetailScreen} />
+            <Stack.Screen name="ListingCreate" component={ListingCreateScreen} />
+            <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+            <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
             <Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />
             <Stack.Screen name="Privacy" component={PrivacyScreen} />
             <Stack.Screen name="Help" component={HelpScreen} />
             <Stack.Screen name="About" component={AboutScreen} />
           </>
-        ) : (
-          <Stack.Screen name="Auth" component={AuthScreen} />
         )}
       </Stack.Navigator>
-      {user ? <AchievementToastHost /> : null}
+      <AchievementToastHost />
     </NavigationContainer>
   );
 }
