@@ -1,6 +1,7 @@
 import { IsString, Length, Matches } from 'class-validator';
 
 import type {
+  CheckEmailVerificationRequest,
   CheckPhoneVerificationRequest,
   StartPhoneVerificationRequest,
 } from '@g88/shared';
@@ -16,6 +17,12 @@ export class CheckPhoneDto implements CheckPhoneVerificationRequest {
   @Matches(E164, { message: 'phone must be E.164 format, e.g. +359888123456' })
   phone!: string;
 
+  @IsString()
+  @Length(4, 10)
+  code!: string;
+}
+
+export class CheckEmailDto implements CheckEmailVerificationRequest {
   @IsString()
   @Length(4, 10)
   code!: string;
