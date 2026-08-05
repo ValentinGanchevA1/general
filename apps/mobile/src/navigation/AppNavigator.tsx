@@ -72,7 +72,9 @@ export type RootStackParamList = {
     conversationId: string;
     otherUserName: string;
     requestPending?: boolean;
+    /** The other participant's verification ladder level (for the header badge). */
     otherUserVerification?: VerificationLevel;
+    /** True when the other participant passed ID review (strong decagram badge). */
     otherUserIdVerified?: boolean;
   };
   ProfileEdit: undefined;
@@ -118,15 +120,17 @@ function MainTabs(): React.JSX.Element {
         },
         tabBarActiveTintColor: '#00d4ff',
         tabBarInactiveTintColor: '#555',
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
-        tabBarIcon: ({ color, size }) => {
-          const icon =
-            route.name === 'Map'
-              ? 'map-marker-radius'
-              : route.name === 'Pulse'
-                ? 'pulse'
-                : 'account-circle';
-          return <MaterialCommunityIcons name={icon} color={color} size={size} />;
+        tabBarIcon: ({ color }) => {
+          const icons = {
+            Map: 'map-marker-radius',
+            Pulse: 'pulse',
+            Profile: 'account-circle-outline',
+          } as const;
+
+          const iconName = icons[route.name as keyof typeof icons] ?? 'circle';
+          return (
+            <MaterialCommunityIcons name={iconName} size={24} color={color} />
+          );
         },
       })}
     >
@@ -139,45 +143,73 @@ function MainTabs(): React.JSX.Element {
 
 export function AppNavigator(): React.JSX.Element {
   const dispatch = useAppDispatch();
-  const { accessToken, restoring, profileSetupComplete } = useAppSelector((s) => s.auth);
-  const bootstrapped = useRef(false);
+  const user = useAppSelector(s => s.auth.user);
+  const restoring = useAppSelector(s => s.auth.restoring);
+  const profileSetupComplete = useAppSelector(s => s.auth.profileSetupComplete);
+  const prevUserRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (bootstrapped.current) return;
-    bootstrapped.current = true;
     void dispatch(restoreSession());
-    setupNotificationHandlers();
   }, [dispatch]);
 
+  // Register FCM token whenever the user logs in (null → id transition).
   useEffect(() => {
-    if (!accessToken) return;
-    void registerPushToken();
-    void pingGamification();
-  }, [accessToken]);
+    if (user && prevUserRef.current !== user.id) {
+      prevUserRef.current = user.id;
+      void registerPushToken();
+      void pingGamification(); // advance daily streak on login/session restore
+      return setupNotificationHandlers((screen, params) => {
+        if (navigationRef.isReady()) {
+          // Dynamic deep-link target — bypass the per-screen navigate overloads.
+          (navigationRef.navigate as (s: string, p?: object) => void)(
+            screen,
+            params,
+          );
+        }
+      });
+    }
+    if (!user) prevUserRef.current = null;
+  }, [user]);
 
-  if (restoring) {
+  // Loading screen while we check for a stored session. Gated on `restoring`
+  // (not the shared auth `loading`) so an in-progress login/register never
+  // unmounts the AuthScreen. Spinner so a slow/offline /auth/me reads as
+  // "loading" rather than a frozen black screen.
+  if (restoring && user === null) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0a0a0f', justifyContent: 'center' }}>
-        <ActivityIndicator color="#00d4ff" />
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: '#0a0a0f',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <ActivityIndicator size="large" color="#00d4ff" />
       </View>
     );
   }
 
   return (
     <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0a0a0f' } }}>
-        {!accessToken ? (
-          <Stack.Screen name="Auth" component={AuthScreen} />
-        ) : !profileSetupComplete ? (
-          <Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} />
-        ) : (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {user ? (
           <>
+            {!profileSetupComplete && (
+              <Stack.Screen
+                name="ProfileCreation"
+                component={ProfileCreationScreen}
+              />
+            )}
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="Chat" component={ChatScreen} />
             <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
             <Stack.Screen name="Photos" component={PhotosScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
-            <Stack.Screen name="AlertComposer" component={AlertComposerScreen} />
+            <Stack.Screen
+              name="AlertComposer"
+              component={AlertComposerScreen}
+            />
             <Stack.Screen name="UserProfile" component={UserProfileScreen} />
             <Stack.Screen name="Verification" component={VerificationScreen} />
             <Stack.Screen
@@ -185,9 +217,18 @@ export function AppNavigator(): React.JSX.Element {
               component={EmailVerificationScreen}
               options={{ title: 'Verify email', presentation: 'modal' }}
             />
-            <Stack.Screen name="Subscription" component={SubscriptionScreen} />
-            <Stack.Screen name="SocialLinking" component={SocialLinkingScreen} />
-            <Stack.Screen name="Achievements" component={AchievementsScreen} />
+            <Stack.Screen
+              name="Subscription"
+              component={SubscriptionScreen}
+            />
+            <Stack.Screen
+              name="SocialLinking"
+              component={SocialLinkingScreen}
+            />
+            <Stack.Screen
+              name="Achievements"
+              component={AchievementsScreen}
+            />
             <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
             <Stack.Screen name="Challenges" component={ChallengesScreen} />
             <Stack.Screen
@@ -201,16 +242,21 @@ export function AppNavigator(): React.JSX.Element {
             <Stack.Screen name="Marketplace" component={MarketplaceScreen} />
             <Stack.Screen name="ListingDetail" component={ListingDetailScreen} />
             <Stack.Screen name="ListingCreate" component={ListingCreateScreen} />
-            <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+            <Stack.Screen
+              name="NotificationSettings"
+              component={NotificationSettingsScreen}
+            />
             <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
             <Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />
             <Stack.Screen name="Privacy" component={PrivacyScreen} />
             <Stack.Screen name="Help" component={HelpScreen} />
             <Stack.Screen name="About" component={AboutScreen} />
           </>
+        ) : (
+          <Stack.Screen name="Auth" component={AuthScreen} />
         )}
       </Stack.Navigator>
-      <AchievementToastHost />
+      {user ? <AchievementToastHost /> : null}
     </NavigationContainer>
   );
 }
