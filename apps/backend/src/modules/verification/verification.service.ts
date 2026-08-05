@@ -52,11 +52,14 @@ export class VerificationService {
 
   constructor(
     @InjectDataSource() private readonly db: DataSource,
-    private readonly users: UsersService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    private readonly users: UsersService,
   ) {}
 
-  async startPhone(phone: string): Promise<StartPhoneVerificationResponse> {
+  async startPhone(
+    userId: string,
+    phone: string,
+  ): Promise<StartPhoneVerificationResponse> {
     const client = await getTwilio();
     if (!client) {
       if (isProd()) {
@@ -65,18 +68,21 @@ export class VerificationService {
           message: 'Phone verification is temporarily unavailable',
         });
       }
-      this.logger.warn(`[verify] DEV mode — no Twilio creds; use code ${DEV_CODE} for ${phone}`);
+      this.logger.warn(
+        `[verify] Twilio not configured — phone OTP for ${phone} uses DEV code`,
+      );
       return { sent: true, channel: 'dev' };
     }
 
     await client.verify.v2
       .services(process.env.TWILIO_VERIFY_SERVICE_SID as string)
       .verifications.create({ to: phone, channel: 'sms' });
+
     return { sent: true, channel: 'sms' };
   }
 
   async checkPhone(userId: string, phone: string, code: string): Promise<UserProfile> {
-    const approved = await this.approvePhone(phone, code);
+    const approved = await this.approvePhone(phone, code.trim());
     if (!approved) {
       throw new BadRequestException({
         code: 'verification.invalid_code',
@@ -131,6 +137,13 @@ export class VerificationService {
         await client.verify.v2
           .services(process.env.TWILIO_VERIFY_SERVICE_SID as string)
           .verifications.create({ to: row.email, channel: 'email' });
+        const backup = isProd()
+          ? String(randomInt(100_000, 999_999))
+          : (process.env.DEV_OTP_CODE ?? DEV_CODE);
+        await this.redis.setex(`${EMAIL_OTP_PREFIX}${userId}`, EMAIL_OTP_TTL_SEC, backup);
+        this.logger.log(
+          `[verify] Twilio email OTP started for ${maskEmail(row.email)}; Redis backup stored`,
+        );
         return { sent: true, channel: 'email', maskedEmail: maskEmail(row.email) };
       } catch (e) {
         this.logger.warn(`[verify] Twilio email channel failed: ${String(e)}`);
@@ -139,7 +152,7 @@ export class VerificationService {
 
     if (isProd() && !client) {
       this.logger.error(
-        `[verify] Email OTP for ${maskEmail(row.email)} issued without Twilio — configure TWILIO_*`,
+        `[verify] Email OTP for ${maskEmail(row.email)} issued without Twilio — configure TWILIO_* + email channel`,
       );
     }
 
@@ -148,11 +161,11 @@ export class VerificationService {
       : (process.env.DEV_OTP_CODE ?? DEV_CODE);
     await this.redis.setex(`${EMAIL_OTP_PREFIX}${userId}`, EMAIL_OTP_TTL_SEC, code);
     this.logger.warn(
-      `[verify] Email OTP for ${row.email} (user ${userId}): ${code} (ttl ${EMAIL_OTP_TTL_SEC}s)`,
+      `[verify] Email OTP (Redis/dev channel) for ${row.email} (user ${userId}): ${code} (ttl ${EMAIL_OTP_TTL_SEC}s)`,
     );
     return {
       sent: true,
-      channel: isProd() && client ? 'email' : 'dev',
+      channel: 'dev',
       maskedEmail: maskEmail(row.email),
     };
   }
@@ -220,21 +233,37 @@ export class VerificationService {
     email: string,
     code: string,
   ): Promise<boolean> {
+    const trimmed = code.trim();
+
+    const stored = await this.redis.get(`${EMAIL_OTP_PREFIX}${userId}`);
+    if (stored && stored === trimmed) return true;
+
+    if (!isProd() && trimmed === (process.env.DEV_OTP_CODE ?? DEV_CODE)) {
+      return true;
+    }
+
+    if (
+      process.env.ALLOW_DEV_EMAIL_OTP === 'true' &&
+      trimmed === (process.env.DEV_OTP_CODE ?? DEV_CODE)
+    ) {
+      this.logger.warn(
+        `[verify] ALLOW_DEV_EMAIL_OTP accepted for ${maskEmail(email)} (user ${userId})`,
+      );
+      return true;
+    }
+
     const client = await getTwilio();
     if (client) {
       try {
         const check = await client.verify.v2
           .services(process.env.TWILIO_VERIFY_SERVICE_SID as string)
-          .verificationChecks.create({ to: email, code });
+          .verificationChecks.create({ to: email, code: trimmed });
         if (check.status === 'approved') return true;
       } catch {
-        // Fall through to Redis check.
+        // invalid / expired
       }
     }
 
-    const stored = await this.redis.get(`${EMAIL_OTP_PREFIX}${userId}`);
-    if (stored && stored === code) return true;
-    if (!isProd() && code === (process.env.DEV_OTP_CODE ?? DEV_CODE)) return true;
     return false;
   }
 }
