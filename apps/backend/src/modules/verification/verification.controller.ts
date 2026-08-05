@@ -21,8 +21,11 @@ export class VerificationController {
   @Post('phone/start')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 3 } })
-  startPhone(@Body() dto: StartPhoneDto): Promise<StartPhoneVerificationResponse> {
-    return this.verification.startPhone(dto.phone);
+  startPhone(
+    @CurrentUser('id') userId: string,
+    @Body() dto: StartPhoneDto,
+  ): Promise<StartPhoneVerificationResponse> {
+    return this.verification.startPhone(userId, dto.phone);
   }
 
   /** POST /api/v1/verification/phone/check — confirm the OTP; returns the updated profile. */
