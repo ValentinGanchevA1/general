@@ -43,7 +43,7 @@ export function NearbyPeopleStrip(props: Props): React.JSX.Element | null {
             : `Nearby ${users.length} people. Tap to expand.`
         }
       >
-        <Text style={S.sectionTitle}>{\u{1F31F}'} Nearby</Text>
+        <Text style={S.sectionTitle}>⭐ Nearby</Text>
         <Text style={S.sectionCount}>{users.length}</Text>
         {users.length > maxVisible ? (
           <Text style={S.expandHint}>{expanded ? 'Show less' : 'See all'}</Text>
