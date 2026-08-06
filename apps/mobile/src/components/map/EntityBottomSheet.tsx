@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -16,7 +17,7 @@ import type {
   UserMeta,
 } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
-import { getJson, postJson } from '@/api/client';
+import { deleteJson, getJson, postJson } from '@/api/client';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { Avatar } from '@/components/Avatar';
@@ -48,6 +49,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [fetching, setFetching] = useState(true);
   const [opening, setOpening] = useState(false);
+  const [blocking, setBlocking] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +69,41 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   const meta = point.meta;
   const canMessage = profile?.relationship?.canMessage ?? 'none';
   const sharedInterests = profile?.relationship?.sharedInterests ?? [];
+  const blocked = profile?.blockedByViewer ?? false;
+  const status = profile?.status;
+
+  const onBlockToggle = (): void => {
+    if (blocking) return;
+    const doBlock = async (): Promise<void> => {
+      setBlocking(true);
+      try {
+        if (blocked) {
+          await deleteJson<{ blocked: boolean }>(`/blocks/${point.id}`);
+          setProfile((p) => (p ? { ...p, blockedByViewer: false } : p));
+        } else {
+          await postJson<undefined, { blocked: boolean }>(`/blocks/${point.id}`, undefined);
+          setProfile((p) => (p ? { ...p, blockedByViewer: true } : p));
+          onClose();
+        }
+      } catch {
+        Alert.alert('Could not update block', 'Try again in a moment.');
+      } finally {
+        setBlocking(false);
+      }
+    };
+    if (blocked) {
+      void doBlock();
+      return;
+    }
+    Alert.alert(
+      'Block this user?',
+      'They will disappear from your map, stories, and messages.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Block', style: 'destructive', onPress: () => void doBlock() },
+      ],
+    );
+  };
 
   const onMessage = async (): Promise<void> => {
     if (opening) return;
@@ -155,6 +192,31 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
             </Text>
           ) : null}
 
+          {status ? (
+            <View style={styles.statusBlock}>
+              <Text style={styles.statusLevel}>Lv {status.level}</Text>
+              <View style={styles.xpTrack}>
+                <View
+                  style={[
+                    styles.xpFill,
+                    {
+                      width: `${Math.min(
+                        100,
+                        status.xpForNextLevel > 0
+                          ? (status.xpIntoLevel / status.xpForNextLevel) * 100
+                          : 0,
+                      )}%`,
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.statusXp}>
+                {status.xpIntoLevel}/{status.xpForNextLevel} XP
+                {status.currentStreak > 0 ? ` · 🔥 ${status.currentStreak}` : ''}
+              </Text>
+            </View>
+          ) : null}
+
           <View style={styles.actions}>
             {canMessage === 'chat' || canMessage === 'request' ? (
               <TouchableOpacity
@@ -185,6 +247,16 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
               <Text style={styles.profileBtnText}>Profile</Text>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            style={styles.blockLink}
+            onPress={onBlockToggle}
+            disabled={blocking}
+          >
+            <Text style={[styles.blockLinkText, blocked && styles.unblockLinkText]}>
+              {blocking ? '…' : blocked ? 'Unblock' : 'Block'}
+            </Text>
+          </TouchableOpacity>
         </>
       )}
     </>
@@ -309,7 +381,30 @@ const styles = StyleSheet.create({
   goalIcon: { fontSize: 13 },
   goalLabel: { color: '#aaa', fontSize: 12 },
   sharedHint: { color: '#7ad7ff', fontSize: 13 },
+  statusBlock: {
+    backgroundColor: '#0a0a1a',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  statusLevel: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  xpTrack: {
+    height: 6,
+    backgroundColor: '#2a2a4a',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  xpFill: {
+    height: '100%',
+    backgroundColor: '#00d4ff',
+    borderRadius: 3,
+  },
+  statusXp: { color: '#888', fontSize: 12 },
   actions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  blockLink: { alignSelf: 'center', paddingVertical: 4 },
+  blockLinkText: { color: '#ff6b6b', fontSize: 13, fontWeight: '600' },
+  unblockLinkText: { color: '#7ad7ff' },
   primaryBtn: {
     flex: 1,
     borderRadius: 12,

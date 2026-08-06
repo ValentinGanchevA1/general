@@ -56,6 +56,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { track } from '@/lib/analytics';
+import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
@@ -72,6 +73,7 @@ export function MapScreen(): React.JSX.Element {
   const [createOpen, setCreateOpen] = useState(false);
   const mapRef = useRef<MapView>(null);
   const nearbyStories = useAppSelector((s) => s.stories.nearby);
+  const { unreadCount: interactionUnread } = useReceivedInteractions();
 
   const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
   const zoom = useMemo(() => (region ? approxZoomFromRegion(region) : 12), [region]);
@@ -330,6 +332,22 @@ export function MapScreen(): React.JSX.Element {
         topOffset={selected ? 52 : 48 + PULSE_STRIP_HEIGHT}
       />
       <DailyChallengeCard />
+      {/* Interactions entry — people who waved / reacted */}
+      <TouchableOpacity
+        style={styles.interactionBadge}
+        onPress={() => navigation.navigate('Interactions')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.interactionBadgeIcon}>👋</Text>
+        {interactionUnread > 0 ? (
+          <View style={styles.interactionBadgeDot}>
+            <Text style={styles.interactionBadgeCount}>
+              {interactionUnread > 9 ? '9+' : interactionUnread}
+            </Text>
+          </View>
+        ) : null}
+      </TouchableOpacity>
+
       <NudgeBanner />
 
       {!selected && (
@@ -444,4 +462,33 @@ const styles = StyleSheet.create({
   },
   errorText: { color: 'white', flex: 1 },
   retry: { color: 'white', fontWeight: '600' },
+
+  interactionBadge: {
+    position: 'absolute',
+    top: 52,
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1a1a2e',
+    borderWidth: 1,
+    borderColor: '#2a2a4a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 20,
+  },
+  interactionBadgeIcon: { fontSize: 20 },
+  interactionBadgeDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ff3b5c',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  interactionBadgeCount: { color: '#fff', fontSize: 10, fontWeight: '700' },
 });
