@@ -19,6 +19,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson, postJson } from '@/api/client';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { VerificationBadge } from '@/components/VerificationBadge';
+import { Avatar } from '@/components/Avatar';
 
 /** Map a raw interest/goal value to a human label, falling back to the value. */
 function labelFor(value: string): string {
@@ -43,54 +44,6 @@ interface UserCardProps {
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-function InitialsAvatar({
-  name,
-  online,
-}: {
-  name: string;
-  online: boolean;
-}): React.JSX.Element {
-  const initials = name
-    .split(' ')
-    .map((w) => w[0] ?? '')
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-  return (
-    <View>
-      <View style={avatarStyles.circle}>
-        <Text style={avatarStyles.text}>{initials}</Text>
-      </View>
-      {online && <View style={avatarStyles.onlineDot} />}
-    </View>
-  );
-}
-
-const avatarStyles = StyleSheet.create({
-  circle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#0a0a1a',
-    borderWidth: 2,
-    borderColor: '#00d4ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  text: { color: '#00d4ff', fontSize: 20, fontWeight: '700' },
-  onlineDot: {
-    position: 'absolute',
-    bottom: 1,
-    right: 1,
-    width: 13,
-    height: 13,
-    borderRadius: 7,
-    backgroundColor: '#4caf50',
-    borderWidth: 2,
-    borderColor: '#1a1a2e',
-  },
-});
-
 // ─── User card ─────────────────────────────────────────────────────────────
 
 function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.Element {
@@ -102,18 +55,24 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   useEffect(() => {
     let cancelled = false;
     getJson<PublicUserProfile>(`/users/${point.id}`)
-      .then((p) => { if (!cancelled) setProfile(p); })
-      .catch(() => { /* degrade gracefully */ })
-      .finally(() => { if (!cancelled) setFetching(false); });
-    return () => { cancelled = true; };
+      .then((p) => {
+        if (!cancelled) setProfile(p);
+      })
+      .catch(() => {
+        /* degrade gracefully */
+      })
+      .finally(() => {
+        if (!cancelled) setFetching(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [point.id]);
 
   const meta = point.meta;
   const canMessage = profile?.relationship?.canMessage ?? 'none';
   const sharedInterests = profile?.relationship?.sharedInterests ?? [];
 
-  // Open (or fetch) the conversation server-side, then jump into the thread.
-  // The server is authoritative — it decides match vs request vs locked.
   const onMessage = async (): Promise<void> => {
     if (opening) return;
     setOpening(true);
@@ -131,7 +90,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         otherUserIdVerified: meta.verifiedBadge ?? false,
       });
     } catch {
-      // Gate changed under us (e.g. they went private) — leave the sheet open.
+      // Gate changed under us
     } finally {
       setOpening(false);
     }
@@ -142,7 +101,13 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
       <View style={styles.handle} />
 
       <View style={styles.userHeader}>
-        <InitialsAvatar name={meta.displayName} online={meta.online} />
+        <Avatar
+          uri={profile?.avatarUrl ?? point.meta.avatarUrl}
+          name={meta.displayName}
+          size={56}
+          ring
+          online={meta.online}
+        />
         <View style={styles.userHeaderText}>
           <View style={styles.nameRow}>
             <Text style={styles.title}>{meta.displayName}</Text>
@@ -166,7 +131,9 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
       ) : (
         <>
           {profile?.bio ? (
-            <Text style={styles.bio} numberOfLines={2}>{profile.bio}</Text>
+            <Text style={styles.bio} numberOfLines={2}>
+              {profile.bio}
+            </Text>
           ) : null}
 
           {profile?.goals && profile.goals.length > 0 ? (
@@ -178,90 +145,75 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
                     <Text style={styles.goalIcon}>{opt.icon}</Text>
                     <Text style={styles.goalLabel}>{opt.label}</Text>
                   </View>
-                ) : null;
+                ) : (
+                  <View key={g} style={styles.goalChip}>
+                    <Text style={styles.goalLabel}>{labelFor(g)}</Text>
+                  </View>
+                );
               })}
             </View>
           ) : null}
+
+          {sharedInterests.length > 0 ? (
+            <Text style={styles.sharedHint}>
+              Shared: {sharedInterests.map(labelFor).join(', ')}
+            </Text>
+          ) : null}
+
+          <View style={styles.actions}>
+            {canMessage === 'chat' || canMessage === 'request' ? (
+              <TouchableOpacity
+                style={[styles.messageBtn, opening && styles.btnDisabled]}
+                onPress={() => void onMessage()}
+                disabled={opening}
+              >
+                <Text style={styles.waveBtnText}>
+                  {opening ? '…' : canMessage === 'request' ? 'Message' : 'Chat'}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.waveBtn, waving && styles.btnDisabled]}
+                onPress={onWave}
+                disabled={waving || !onWave}
+              >
+                <Text style={styles.waveBtnText}>{waving ? '…' : 'Wave'}</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.profileBtn}
+              onPress={() => {
+                onClose();
+                navigation.navigate('UserProfile', { userId: point.id });
+              }}
+            >
+              <Text style={styles.profileBtnText}>Profile</Text>
+            </TouchableOpacity>
+          </View>
         </>
       )}
-
-      {canMessage === 'request' && sharedInterests.length > 0 && (
-        <Text style={styles.sharedHint}>
-          You both like {sharedInterests.slice(0, 2).map(labelFor).join(' · ')}
-          {' — say hi'}
-        </Text>
-      )}
-
-      <View style={styles.actions}>
-        {onWave && (
-          <TouchableOpacity
-            style={[styles.waveBtn, waving && styles.btnDisabled]}
-            onPress={onWave}
-            disabled={waving}
-          >
-            {waving ? (
-              <ActivityIndicator color="#000" size="small" />
-            ) : (
-              <Text style={styles.waveBtnText}>👋 Wave</Text>
-            )}
-          </TouchableOpacity>
-        )}
-        {canMessage !== 'none' && (
-          <TouchableOpacity
-            style={[styles.messageBtn, opening && styles.btnDisabled]}
-            onPress={() => { void onMessage(); }}
-            disabled={opening}
-          >
-            {opening ? (
-              <ActivityIndicator color="#000" size="small" />
-            ) : (
-              <Text style={styles.waveBtnText}>
-                {canMessage === 'request' ? '✉️ Message' : '💬 Message'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <TouchableOpacity
-        style={styles.profileBtn}
-        onPress={() => {
-          onClose();
-          navigation.navigate('UserProfile', { userId: point.id });
-        }}
-      >
-        <Text style={styles.profileBtnText}>View Profile</Text>
-      </TouchableOpacity>
     </>
   );
 }
 
-// ─── Generic card (events / listings) ─────────────────────────────────────
+// ─── Generic (event / listing) card ────────────────────────────────────────
 
-type NonUserEntityPoint = EntityPoint & { kind: 'event' | 'listing' };
+type NonUserEntityPoint = Exclude<EntityPoint, UserEntityPoint>;
 
-function GenericCard({
-  point,
-  onClose,
-}: {
-  point: NonUserEntityPoint;
-  onClose: () => void;
-}): React.JSX.Element {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const title = point.meta.title;
+function GenericCard({ point, onClose }: { point: NonUserEntityPoint; onClose: () => void }): React.JSX.Element {
+  const navigation = useNavigation<Nav>();
+  const title =
+    point.kind === 'event'
+      ? point.meta.title
+      : point.kind === 'listing'
+        ? point.meta.title
+        : 'Nearby';
   const subtitle =
     point.kind === 'event'
-      ? `Starts: ${new Date(point.meta.startsAt).toLocaleString()}`
-      : `$${(point.meta.priceCents / 100).toFixed(2)} ${point.meta.currency}`;
-
-  const onView = (): void => {
-    onClose();
-    if (point.kind === 'event') {
-      navigation.navigate('EventDetail', { eventId: point.id });
-    } else {
-      navigation.navigate('ListingDetail', { listingId: point.id });
-    }
-  };
+      ? new Date(point.meta.startsAt).toLocaleString()
+      : point.kind === 'listing'
+        ? `${(point.meta.priceCents / 100).toFixed(0)} ${point.meta.currency}`
+        : undefined;
 
   return (
     <>
@@ -269,20 +221,37 @@ function GenericCard({
       <View style={styles.header}>
         <View style={styles.titleGroup}>
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         </View>
         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
           <Text style={styles.closeText}>✕</Text>
         </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.viewBtn} onPress={onView}>
-        <Text style={styles.viewBtnText}>{point.kind === 'event' ? 'View event' : 'View listing'}</Text>
-      </TouchableOpacity>
+      {point.kind === 'event' ? (
+        <TouchableOpacity
+          style={styles.viewBtn}
+          onPress={() => {
+            onClose();
+            navigation.navigate('EventDetail', { eventId: point.id });
+          }}
+        >
+          <Text style={styles.viewBtnText}>View event</Text>
+        </TouchableOpacity>
+      ) : null}
+      {point.kind === 'listing' ? (
+        <TouchableOpacity
+          style={styles.viewBtn}
+          onPress={() => {
+            onClose();
+            navigation.navigate('ListingDetail', { listingId: point.id });
+          }}
+        >
+          <Text style={styles.viewBtnText}>View listing</Text>
+        </TouchableOpacity>
+      ) : null}
     </>
   );
 }
-
-// ─── Export ────────────────────────────────────────────────────────────────
 
 export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): React.JSX.Element {
   return (
@@ -322,8 +291,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 4,
   },
-
-  // User card
   userHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   userHeaderText: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -342,8 +309,6 @@ const styles = StyleSheet.create({
   },
   goalIcon: { fontSize: 13 },
   goalLabel: { color: '#aaa', fontSize: 12 },
-
-  // Actions
   sharedHint: { color: '#7ad7ff', fontSize: 13 },
   actions: { flexDirection: 'row', gap: 10 },
   waveBtn: {
@@ -371,8 +336,6 @@ const styles = StyleSheet.create({
   },
   profileBtnText: { color: '#aaa', fontWeight: '600', fontSize: 15 },
   btnDisabled: { opacity: 0.6 },
-
-  // Generic card
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   titleGroup: { flex: 1 },
   title: { color: '#fff', fontSize: 18, fontWeight: '700' },
@@ -380,8 +343,11 @@ const styles = StyleSheet.create({
   closeBtn: { padding: 4 },
   closeText: { color: '#aaa', fontSize: 16 },
   viewBtn: {
-    marginTop: 14, backgroundColor: '#00d4ff', borderRadius: 12,
-    paddingVertical: 12, alignItems: 'center',
+    marginTop: 14,
+    backgroundColor: '#00d4ff',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
   },
   viewBtnText: { color: '#0a0a0f', fontSize: 14, fontWeight: '700' },
 });
