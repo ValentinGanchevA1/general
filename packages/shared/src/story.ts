@@ -81,6 +81,7 @@ export function storyGateMessage(
 }
 
 export type StoryMediaType = 'image' | 'video';
+/** Story reactions are first-class signals equal to waves for mutual unlock. */
 export type StoryReactionKind = 'heart' | 'wave';
 
 /** Lightweight card for Pulse strip / map indicators / profile rings. */
