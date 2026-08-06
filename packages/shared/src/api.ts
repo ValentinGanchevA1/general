@@ -218,6 +218,15 @@ export interface UserProfile extends AuthenticatedUser {
   createdAt: string;
 }
 
+/** Public status shown only inside EntityBottomSheet / profile (not on map markers). */
+export interface PublicUserStatus {
+  level: number;
+  /** XP progress within current level (0 .. xpForNextLevel). */
+  xpIntoLevel: number;
+  xpForNextLevel: number;
+  currentStreak: number;
+}
+
 /** Public-facing profile returned by GET /users/:id */
 export interface PublicUserProfile {
   id: string;
@@ -231,6 +240,11 @@ export interface PublicUserProfile {
   idVerified: boolean;
   goals: string[];
   online: boolean;
+  /**
+   * Local status (level / XP / streak). Shown only after the viewer taps the
+   * user (EntityBottomSheet / profile). Never rendered on map markers.
+   */
+  status?: PublicUserStatus;
   /**
    * Viewer-relative messaging relationship. Present only when the profile is
    * fetched by an authenticated viewer other than the subject. Computed
@@ -493,6 +507,38 @@ export interface TrendingResponse {
   /** Hashtag-formatted topics, e.g. ['#open-mic', '#yoga']. Up to 10 entries. */
   topics: string[];
   generatedAt: string; // ISO
+}
+
+// ─── Received interactions (waves + story reactions toward me) ─────────────
+
+export type ReceivedInteractionType = 'wave' | 'story_reaction';
+
+/**
+ * Unified inbound signal used by the "People who interacted with you" surface.
+ * Waves and story reactions are equal-weight for mutual unlock.
+ */
+export interface ReceivedInteraction {
+  id: string;
+  type: ReceivedInteractionType;
+  fromUser: {
+    id: string;
+    displayName: string;
+    avatarUrl: string | null;
+    verification: VerificationLevel;
+  };
+  /** Present when type === 'story_reaction'. */
+  storyId?: string;
+  /** Mirrors StoryReactionKind ('heart' | 'wave'). */
+  reactionKind?: 'heart' | 'wave';
+  createdAt: string;
+  /** Approximate distance in meters when available. */
+  distanceMeters?: number;
+  /** True when a reciprocal signal already exists (chat should be open). */
+  isMutual: boolean;
+}
+
+export interface ReceivedInteractionsResponse {
+  items: ReceivedInteraction[];
 }
 
 // ─── Error envelope ────────────────────────────────────────────────────────

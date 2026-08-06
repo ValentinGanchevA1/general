@@ -27,6 +27,7 @@ import { AchievementsScreen } from '@/screens/AchievementsScreen';
 import { LeaderboardScreen } from '@/screens/LeaderboardScreen';
 import { ChallengesScreen } from '@/screens/ChallengesScreen';
 import { GiftsInboxScreen } from '@/screens/GiftsInboxScreen';
+import { InteractionsScreen } from '@/screens/InteractionsScreen';
 import VerificationIdScreen from '@/screens/VerificationIdScreen';
 import { EventDetailScreen } from '@/screens/EventDetailScreen';
 import { EventCreateScreen } from '@/screens/EventCreateScreen';
@@ -98,6 +99,7 @@ export type RootStackParamList = {
   NotificationSettings: undefined;
   BlockedUsers: undefined;
   GiftsInbox: undefined;
+  Interactions: undefined;
   Privacy: undefined;
   Help: undefined;
   About: undefined;
@@ -248,6 +250,11 @@ export function AppNavigator(): React.JSX.Element {
             />
             <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
             <Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />
+            <Stack.Screen
+              name="Interactions"
+              component={InteractionsScreen}
+              options={{ title: 'Interactions', headerStyle: { backgroundColor: '#0a0a1a' }, headerTintColor: '#fff' }}
+            />
             <Stack.Screen name="Privacy" component={PrivacyScreen} />
             <Stack.Screen name="Help" component={HelpScreen} />
             <Stack.Screen name="About" component={AboutScreen} />

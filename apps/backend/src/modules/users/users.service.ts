@@ -15,6 +15,7 @@ import type {
   IdVerificationStatus,
   ProfileBadges,
   PublicUserProfile,
+  PublicUserStatus,
   SocialLink,
   SubscriptionTier,
   UpdateProfileRequest,
@@ -22,6 +23,7 @@ import type {
   UserProfile,
   VerificationLevel,
 } from '@g88/shared';
+import { summaryForXp } from '@g88/shared';
 
 import { PresenceService } from '../presence/presence.service';
 import { MessagingService } from '../messaging/messaging.service';
@@ -215,6 +217,9 @@ export class UsersService {
       blockedByViewer = blocked;
     }
 
+    // Public status (level/XP/streak) — only for sheet/profile, never map markers.
+    const status = await this.loadPublicStatus(r.id);
+
     return {
       id: r.id,
       displayName: r.display_name,
@@ -225,8 +230,33 @@ export class UsersService {
       idVerified: r.id_verification_status === 'verified',
       goals: r.goals ?? [],
       online: onlineSet.has(r.id),
+      ...(status ? { status } : {}),
       ...(relationship ? { relationship } : {}),
       ...(blockedByViewer !== undefined ? { blockedByViewer } : {}),
+    };
+  }
+
+  /** Lightweight public status for EntityBottomSheet / profile cards. */
+  private async loadPublicStatus(userId: string): Promise<PublicUserStatus | undefined> {
+    const rows = await this.db.query<
+      Array<{ total_xp: number; current_streak: number; longest_streak: number }>
+    >(
+      `SELECT total_xp, current_streak, longest_streak
+         FROM user_gamification
+        WHERE user_id = $1
+        LIMIT 1`,
+      [userId],
+    );
+    const row = rows[0];
+    if (!row) {
+      return { level: 1, xpIntoLevel: 0, xpForNextLevel: 50, currentStreak: 0 };
+    }
+    const summary = summaryForXp(row.total_xp, row.current_streak, row.longest_streak);
+    return {
+      level: summary.level,
+      xpIntoLevel: summary.xpIntoLevel,
+      xpForNextLevel: summary.xpForNextLevel,
+      currentStreak: summary.currentStreak,
     };
   }
 

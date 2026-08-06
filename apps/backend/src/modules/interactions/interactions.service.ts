@@ -8,7 +8,12 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
-import type { WaveRequest, WaveResponse, WaveReceivedEvent } from '@g88/shared';
+import type {
+  ReceivedInteraction,
+  WaveRequest,
+  WaveResponse,
+  WaveReceivedEvent,
+} from '@g88/shared';
 
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -189,5 +194,109 @@ export class InteractionsService {
       [sorted],
     );
     return created[0]!.id;
+  }
+
+  /**
+   * Unified inbound list: waves + story reactions received by `userId`.
+   * Used by the "People who interacted with you" surface.
+   * isMutual is true when a reciprocal wave already exists OR an accepted conversation.
+   */
+  async listReceived(userId: string, limit = 50): Promise<ReceivedInteraction[]> {
+    const rows = await this.db.query<
+      Array<{
+        id: string;
+        kind: 'wave' | 'story_reaction';
+        from_id: string;
+        display_name: string;
+        avatar_url: string | null;
+        verification_level: string;
+        story_id: string | null;
+        reaction_kind: string | null;
+        created_at: Date;
+        is_mutual: boolean;
+      }>
+    >(
+      `
+      WITH blocked AS (
+        SELECT blocked_id AS uid FROM user_blocks WHERE blocker_id = $1
+        UNION
+        SELECT blocker_id AS uid FROM user_blocks WHERE blocked_id = $1
+      ),
+      waves_in AS (
+        SELECT
+          w.id::text AS id,
+          'wave'::text AS kind,
+          w.from_user_id AS from_id,
+          u.display_name,
+          u.avatar_url,
+          u.verification_level,
+          NULL::text AS story_id,
+          NULL::text AS reaction_kind,
+          w.created_at,
+          EXISTS (
+            SELECT 1 FROM waves w2
+             WHERE w2.from_user_id = $1 AND w2.to_user_id = w.from_user_id
+          ) OR EXISTS (
+            SELECT 1 FROM conversations c
+             WHERE c.status = 'accepted'
+               AND c.participant_ids @> ARRAY[$1::uuid, w.from_user_id]::uuid[]
+          ) AS is_mutual
+        FROM waves w
+        JOIN users u ON u.id = w.from_user_id AND u.deleted_at IS NULL
+        WHERE w.to_user_id = $1
+          AND w.from_user_id NOT IN (SELECT uid FROM blocked)
+      ),
+      reactions_in AS (
+        SELECT
+          (sr.story_id::text || ':' || sr.user_id::text) AS id,
+          'story_reaction'::text AS kind,
+          sr.user_id AS from_id,
+          u.display_name,
+          u.avatar_url,
+          u.verification_level,
+          sr.story_id::text AS story_id,
+          sr.kind AS reaction_kind,
+          sr.created_at,
+          EXISTS (
+            SELECT 1 FROM waves w2
+             WHERE w2.from_user_id = $1 AND w2.to_user_id = sr.user_id
+          ) OR EXISTS (
+            SELECT 1 FROM conversations c
+             WHERE c.status = 'accepted'
+               AND c.participant_ids @> ARRAY[$1::uuid, sr.user_id]::uuid[]
+          ) AS is_mutual
+        FROM story_reactions sr
+        JOIN stories s ON s.id = sr.story_id AND s.deleted_at IS NULL AND s.expires_at > NOW()
+        JOIN users u ON u.id = sr.user_id AND u.deleted_at IS NULL
+        WHERE s.author_id = $1
+          AND sr.user_id NOT IN (SELECT uid FROM blocked)
+      )
+      SELECT * FROM (
+        SELECT * FROM waves_in
+        UNION ALL
+        SELECT * FROM reactions_in
+      ) combined
+      ORDER BY created_at DESC
+      LIMIT $2
+      `,
+      [userId, limit],
+    );
+
+    return rows.map((r) => ({
+      id: r.id,
+      type: r.kind,
+      fromUser: {
+        id: r.from_id,
+        displayName: r.display_name,
+        avatarUrl: r.avatar_url,
+        verification: r.verification_level as ReceivedInteraction['fromUser']['verification'],
+      },
+      ...(r.story_id ? { storyId: r.story_id } : {}),
+      ...(r.reaction_kind
+        ? { reactionKind: r.reaction_kind as 'heart' | 'wave' }
+        : {}),
+      createdAt: r.created_at.toISOString(),
+      isMutual: r.is_mutual,
+    }));
   }
 }
