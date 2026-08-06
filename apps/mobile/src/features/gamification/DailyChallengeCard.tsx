@@ -1,9 +1,8 @@
 // apps/mobile/src/features/gamification/DailyChallengeCard.tsx
 //
 // Compact, dismissible banner that surfaces the user's next incomplete daily
-// challenge on the map (the "daily-return trigger" per ROADMAP P3.1). Reads the
-// same GET /challenges/today the ProfileScreen uses; tapping opens the full
-// Challenges screen. Hides itself when all challenges are done or while loading.
+// challenge on the map. Anchored near the bottom (above Events rail) so Stories
+// stay clear. Tapping opens Challenges; close hides for the session.
 
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -22,7 +21,6 @@ export function DailyChallengeCard(): React.JSX.Element | null {
   const [dismissed, setDismissed] = useState(false);
 
   if (dismissed) return null;
-  // First still-open challenge; nothing to show while loading or once all done.
   const next = challenges.find((c) => !c.completed);
   if (!next) return null;
 
@@ -54,11 +52,12 @@ export function DailyChallengeCard(): React.JSX.Element | null {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    // Below the trending filter bar (top: 52, ~52px tall).
-    top: 116,
+    // Bottom stack: sits above the compact Events rail.
+    bottom: 100,
     left: 16,
     right: 16,
     alignItems: 'center',
+    zIndex: 21,
   },
   card: {
     flexDirection: 'row',

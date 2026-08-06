@@ -1,8 +1,8 @@
 // apps/mobile/src/features/events/EventsRail.tsx
 //
-// "Events near you" — compact horizontal rail on the bottom of the map.
-// Shows only real nearby events (create lives on the Contextual FAB).
-// Hidden entirely when there are none, and by the caller while a sheet is open.
+// Compact horizontal rail of nearby events on the map bottom edge.
+// No section label — cards speak for themselves. Create lives on the FAB.
+// Hidden when empty or while a map entity sheet is open (caller-gated).
 
 import React from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -17,11 +17,8 @@ import { formatEventDayShort } from './eventFormat';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-/**
- * Rendered height of the rail (label row + one row of fixed-height cards),
- * used by MapScreen to lift ContextualFab clear of this overlay.
- */
-export const EVENTS_RAIL_HEIGHT = 24 /* wrap.bottom */ + 22 /* labelRow */ + 178; /* card */
+/** Card row height + bottom inset — MapScreen lifts the FAB by this amount. */
+export const EVENTS_RAIL_HEIGHT = 16 /* bottom */ + 72; /* compact horizontal card */
 
 export function EventsRail({ location }: { location: LatLng | null }): React.JSX.Element | null {
   const navigation = useNavigation<Nav>();
@@ -31,10 +28,6 @@ export function EventsRail({ location }: { location: LatLng | null }): React.JSX
 
   return (
     <View style={styles.wrap} pointerEvents="box-none">
-      <View style={styles.labelRow}>
-        <Icon name="calendar-star" size={14} color="#00d4ff" />
-        <Text style={styles.label}>Events near you</Text>
-      </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -65,19 +58,16 @@ function EventCard({
         <Image source={{ uri: event.coverUrl }} style={styles.cover} />
       ) : (
         <View style={[styles.cover, styles.coverPlaceholder]}>
-          <Icon name="calendar-star" size={22} color="#00d4ff" />
+          <Icon name="calendar-star" size={18} color="#00d4ff" />
         </View>
       )}
-      <Text style={styles.title} numberOfLines={2}>
-        {event.title}
-      </Text>
-      <View style={styles.metaRow}>
-        <Icon name="clock-outline" size={12} color="#888" />
-        <Text style={styles.meta}>{formatEventDayShort(event.startsAt)}</Text>
-      </View>
-      <View style={styles.metaRow}>
-        <Icon name="account-group" size={12} color="#888" />
-        <Text style={styles.meta}>
+      <View style={styles.body}>
+        <Text style={styles.title} numberOfLines={1}>
+          {event.title}
+        </Text>
+        <Text style={styles.meta} numberOfLines={1}>
+          {formatEventDayShort(event.startsAt)}
+          {' · '}
           {event.attendeeCount}
           {event.capacity != null ? `/${event.capacity}` : ''}
           {event.myRsvp === 'going' ? ' · going' : ''}
@@ -88,33 +78,27 @@ function EventCard({
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', left: 0, right: 0, bottom: 24 },
-  labelRow: {
+  wrap: { position: 'absolute', left: 0, right: 0, bottom: 16 },
+  scroll: { paddingLeft: 12, paddingRight: 12 + 56 + 16, gap: 10 },
+  card: {
+    width: 168,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  label: { color: '#00d4ff', fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
-  scroll: { paddingLeft: 16, paddingRight: 16 + 56 /* FAB */ + 24, gap: 12 },
-  card: {
-    width: 150,
-    padding: 10,
+    gap: 10,
+    padding: 8,
     borderRadius: 14,
     backgroundColor: 'rgba(18,18,31,0.95)',
     borderWidth: 1,
     borderColor: '#1f1f33',
   },
   cover: {
-    width: '100%',
-    height: 70,
+    width: 48,
+    height: 48,
     borderRadius: 10,
     backgroundColor: '#1a1a2e',
-    marginBottom: 8,
   },
   coverPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  title: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
-  meta: { color: '#999', fontSize: 12 },
+  body: { flex: 1, minWidth: 0 },
+  title: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  meta: { color: '#999', fontSize: 11, marginTop: 3 },
 });

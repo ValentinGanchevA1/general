@@ -1,8 +1,8 @@
 // apps/mobile/src/features/nudges/NudgeBanner.tsx
 //
 // Compact, dismissible map banner for verification / streak nudges.
-// Anchored near the bottom of the map (above Events rail) so Stories + map
-// center stay clear. Tapping opens the target screen; close suppresses for cooldown.
+// Anchored near the bottom of the map (above challenge + events) so Stories
+// stay clear. Tapping opens the target screen; close suppresses for cooldown.
 
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -60,8 +60,7 @@ export function NudgeBanner(): React.JSX.Element | null {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    // Above Events rail (bottom ~24 + ~200) so map center + stories stay clear.
-    bottom: 240,
+    bottom: 168, // above DailyChallenge (bottom:100) + compact events
     left: 16,
     right: 16,
     alignItems: 'center',
