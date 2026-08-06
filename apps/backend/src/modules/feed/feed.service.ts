@@ -1,4 +1,3 @@
-// apps/backend/src/modules/feed/feed.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -20,39 +19,42 @@ export class FeedService {
     const t0 = Date.now();
     const wanted = (t: ActivityType): boolean => types.length === 0 || types.includes(t);
 
-    const [chats, waves, alerts] = await Promise.all([
-      wanted('chat')  ? this.selectChats(userId, since, limit)  : Promise.resolve<ActivityItem[]>([]),
-      wanted('wave')  ? this.selectWaves(userId, since, limit)  : Promise.resolve<ActivityItem[]>([]),
+    const [chats, waves, alerts, listings, matches] = await Promise.all([
+      wanted('chat') ? this.selectChats(userId, since, limit) : Promise.resolve<ActivityItem[]>([]),
+      wanted('wave') ? this.selectWaves(userId, since, limit) : Promise.resolve<ActivityItem[]>([]),
       wanted('alert') ? this.selectAlerts(userId, since, limit) : Promise.resolve<ActivityItem[]>([]),
-      // v1.5 sources slot in here: listings, matches
+      wanted('listing') ? this.selectListings(userId, since, limit) : Promise.resolve<ActivityItem[]>([]),
+      wanted('match') ? this.selectMatches(userId, since, limit) : Promise.resolve<ActivityItem[]>([]),
     ]);
 
-    const items = [...chats, ...waves, ...alerts]
+    const items = [...chats, ...waves, ...alerts, ...listings, ...matches]
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit);
 
     this.log.log(
       `feed.aggregate userId=${userId} latencyMs=${Date.now() - t0} ` +
-      `chats=${chats.length} waves=${waves.length} alerts=${alerts.length} total=${items.length}`,
+        `chats=${chats.length} waves=${waves.length} alerts=${alerts.length} ` +
+        `listings=${listings.length} matches=${matches.length} total=${items.length}`,
     );
 
-    // Newest item's timestamp — clients pass it back as `since` to fetch what's even newer.
     return {
       items,
       nextSince: items[0]?.createdAt ?? new Date().toISOString(),
     };
   }
 
-  /**
-   * One row per conversation I belong to: the latest message, the other participant.
-   * `unread` is a heuristic — we don't track read_at yet (P2/C6 outbox + read receipts).
-   */
   private async selectChats(userId: string, since: Date, limit: number): Promise<ActivityItem[]> {
-    const rows = await this.ds.query<Array<{
-      id: string; conversation_id: string;
-      actor_id: string; actor_name: string;
-      preview: string; created_at: Date; unread: boolean;
-    }>>(
+    const rows = await this.ds.query<
+      Array<{
+        id: string;
+        conversation_id: string;
+        actor_id: string;
+        actor_name: string;
+        preview: string;
+        created_at: Date;
+        unread: boolean;
+      }>
+    >(
       `SELECT ('chat:' || c.id)                                   AS id,
               c.id                                                  AS conversation_id,
               other.id                                              AS actor_id,
@@ -83,59 +85,90 @@ export class FeedService {
       [userId, since.toISOString(), limit],
     );
 
-    return rows.map((r): ActivityItem => ({
-      id: r.id, type: 'chat', category: null,
-      title: r.actor_name ?? 'Unknown', preview: r.preview,
-      actorId: r.actor_id, actorName: r.actor_name, distanceM: null,
-      createdAt: new Date(r.created_at).toISOString(),
-      unread: r.unread,
-      deepLink: { screen: 'Chat', params: { conversationId: r.conversation_id, otherUserName: r.actor_name ?? 'Chat' } },
-    }));
+    return rows.map(
+      (r): ActivityItem => ({
+        id: r.id,
+        type: 'chat',
+        category: null,
+        title: r.actor_name ?? 'Unknown',
+        preview: r.preview,
+        actorId: r.actor_id,
+        actorName: r.actor_name,
+        distanceM: null,
+        createdAt: new Date(r.created_at).toISOString(),
+        unread: r.unread,
+        deepLink: {
+          screen: 'Chat',
+          params: { conversationId: r.conversation_id, otherUserName: r.actor_name ?? 'Chat' },
+        },
+      }),
+    );
   }
 
-  /**
-   * Waves received. `unread` proxy: not yet reciprocated (responded_at IS NULL).
-   * If a reciprocal wave already opened a conversation, tap goes to that Chat.
-   */
   private async selectWaves(userId: string, since: Date, limit: number): Promise<ActivityItem[]> {
-    const rows = await this.ds.query<Array<{
-      id: string; conversation_id: string | null;
-      actor_id: string; actor_name: string;
-      created_at: Date; unread: boolean;
-    }>>(
-      `SELECT ('wave:' || w.id)        AS id,
-              w.conversation_id        AS conversation_id,
-              w.from_user_id           AS actor_id,
-              u.display_name           AS actor_name,
-              w.created_at             AS created_at,
-              (w.responded_at IS NULL) AS unread
+    const rows = await this.ds.query<
+      Array<{
+        id: string;
+        conversation_id: string | null;
+        actor_id: string;
+        actor_name: string;
+        created_at: Date;
+        unread: boolean;
+        direction: 'in' | 'out';
+      }>
+    >(
+      `SELECT ('wave:' || w.id)            AS id,
+              w.conversation_id            AS conversation_id,
+              CASE WHEN w.to_user_id = $1 THEN w.from_user_id ELSE w.to_user_id END AS actor_id,
+              u.display_name               AS actor_name,
+              w.created_at                 AS created_at,
+              (w.to_user_id = $1 AND w.responded_at IS NULL) AS unread,
+              CASE WHEN w.to_user_id = $1 THEN 'in' ELSE 'out' END AS direction
          FROM waves w
-         JOIN users u ON u.id = w.from_user_id AND u.deleted_at IS NULL
-        WHERE w.to_user_id = $1
+         JOIN users u ON u.id = CASE
+                WHEN w.to_user_id = $1 THEN w.from_user_id
+                ELSE w.to_user_id
+              END
+           AND u.deleted_at IS NULL
+        WHERE (w.to_user_id = $1 OR w.from_user_id = $1)
           AND w.created_at > $2
         ORDER BY w.created_at DESC
         LIMIT $3`,
       [userId, since.toISOString(), limit],
     );
 
-    return rows.map((r): ActivityItem => ({
-      id: r.id, type: 'wave', category: null,
-      title: `${r.actor_name ?? 'Someone'} waved`,
-      preview: r.conversation_id ? 'Conversation opened' : 'Wave back from the map',
-      actorId: r.actor_id, actorName: r.actor_name, distanceM: null,
-      createdAt: new Date(r.created_at).toISOString(),
-      unread: r.unread,
-      deepLink: r.conversation_id
-        ? { screen: 'Chat', params: { conversationId: r.conversation_id, otherUserName: r.actor_name ?? 'Chat' } }
-        : { screen: 'Main', params: { screen: 'Map' } },
-    }));
+    return rows.map((r): ActivityItem => {
+      const inbound = r.direction === 'in';
+      return {
+        id: r.id,
+        type: 'wave',
+        category: null,
+        title: inbound
+          ? `${r.actor_name ?? 'Someone'} waved`
+          : `You waved at ${r.actor_name ?? 'someone'}`,
+        preview: r.conversation_id
+          ? 'Match — conversation opened'
+          : inbound
+            ? 'Wave back from the map'
+            : 'Waiting for a wave back',
+        actorId: r.actor_id,
+        actorName: r.actor_name,
+        distanceM: null,
+        createdAt: new Date(r.created_at).toISOString(),
+        unread: r.unread,
+        deepLink: r.conversation_id
+          ? {
+              screen: 'Chat',
+              params: {
+                conversationId: r.conversation_id,
+                otherUserName: r.actor_name ?? 'Chat',
+              },
+            }
+          : { screen: 'Main', params: { screen: 'Map' } },
+      };
+    });
   }
 
-  /**
-   * Alerts posted by anyone in the H3 r7 cells surrounding the requester's
-   * last known location. Ring-1 disk = 7 cells ≈ 15km radius.
-   * Falls back to empty if the requester has no location on record.
-   */
   private async selectAlerts(userId: string, since: Date, limit: number): Promise<ActivityItem[]> {
     const [userRow] = await this.ds.query<Array<{ location_h3_r7: string | null }>>(
       `SELECT location_h3_r7 FROM users WHERE id = $1 AND deleted_at IS NULL`,
@@ -146,12 +179,18 @@ export class FeedService {
 
     const cells = h3.gridDisk(userRow.location_h3_r7, 1);
 
-    const rows = await this.ds.query<Array<{
-      id: string; alert_id: string; category: string;
-      body: string; tag: string | null;
-      actor_id: string; actor_name: string;
-      created_at: Date;
-    }>>(
+    const rows = await this.ds.query<
+      Array<{
+        id: string;
+        alert_id: string;
+        category: string;
+        body: string;
+        tag: string | null;
+        actor_id: string;
+        actor_name: string;
+        created_at: Date;
+      }>
+    >(
       `SELECT ('alert:' || a.id) AS id,
               a.id               AS alert_id,
               a.category,
@@ -171,18 +210,157 @@ export class FeedService {
       [cells, since.toISOString(), limit],
     );
 
-    return rows.map((r): ActivityItem => ({
-      id: r.id,
-      type: 'alert',
-      category: r.category as AreaCategory,
-      title: r.tag ?? r.category.charAt(0).toUpperCase() + r.category.slice(1),
-      preview: r.body,
-      actorId: r.actor_id,
-      actorName: r.actor_name,
-      distanceM: null,
-      createdAt: new Date(r.created_at).toISOString(),
-      unread: true,
-      deepLink: { screen: 'Main', params: { screen: 'Pulse' } },
-    }));
+    return rows.map(
+      (r): ActivityItem => ({
+        id: r.id,
+        type: 'alert',
+        category: r.category as AreaCategory,
+        title: r.tag ?? r.category.charAt(0).toUpperCase() + r.category.slice(1),
+        preview: r.body,
+        actorId: r.actor_id,
+        actorName: r.actor_name,
+        distanceM: null,
+        createdAt: new Date(r.created_at).toISOString(),
+        unread: true,
+        deepLink: { screen: 'Main', params: { screen: 'Pulse' } },
+      }),
+    );
+  }
+
+  private async selectListings(userId: string, since: Date, limit: number): Promise<ActivityItem[]> {
+    const [userRow] = await this.ds.query<Array<{ location_h3_r7: string | null }>>(
+      `SELECT location_h3_r7 FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      [userId],
+    );
+
+    const cells =
+      userRow?.location_h3_r7 != null ? h3.gridDisk(userRow.location_h3_r7, 1) : ([] as string[]);
+
+    const rows = await this.ds.query<
+      Array<{
+        id: string;
+        listing_id: string;
+        title: string;
+        price_cents: number;
+        currency: string;
+        category: string;
+        actor_id: string;
+        actor_name: string;
+        created_at: Date;
+        is_mine: boolean;
+      }>
+    >(
+      `SELECT ('listing:' || l.id) AS id,
+              l.id                 AS listing_id,
+              l.title,
+              l.price_cents,
+              l.currency,
+              l.category,
+              u.id                 AS actor_id,
+              u.display_name       AS actor_name,
+              l.created_at,
+              (l.seller_id = $1)   AS is_mine
+         FROM listings l
+         JOIN users u ON u.id = l.seller_id AND u.deleted_at IS NULL
+        WHERE l.deleted_at IS NULL
+          AND l.status = 'active'
+          AND l.visibility = 'public'
+          AND l.created_at > $2
+          AND (
+            l.seller_id = $1
+            OR (
+              cardinality($3::text[]) > 0
+              AND l.location_h3_r7 = ANY($3::text[])
+            )
+          )
+        ORDER BY l.created_at DESC
+        LIMIT $4`,
+      [userId, since.toISOString(), cells, limit],
+    );
+
+    return rows.map((r): ActivityItem => {
+      const price = `${(r.price_cents / 100).toFixed(r.price_cents % 100 === 0 ? 0 : 2)} ${r.currency}`;
+      return {
+        id: r.id,
+        type: 'listing',
+        category: null,
+        title: r.title,
+        preview: r.is_mine ? `Your listing · ${price}` : `${r.actor_name ?? 'Seller'} · ${price}`,
+        actorId: r.actor_id,
+        actorName: r.actor_name,
+        distanceM: null,
+        createdAt: new Date(r.created_at).toISOString(),
+        unread: !r.is_mine,
+        deepLink: { screen: 'ListingDetail', params: { listingId: r.listing_id } },
+      };
+    });
+  }
+
+  private async selectMatches(userId: string, since: Date, limit: number): Promise<ActivityItem[]> {
+    const rows = await this.ds.query<
+      Array<{
+        id: string;
+        conversation_id: string;
+        actor_id: string;
+        actor_name: string;
+        created_at: Date;
+        preview: string | null;
+      }>
+    >(
+      `SELECT ('match:' || c.id) AS id,
+              c.id                 AS conversation_id,
+              other.id             AS actor_id,
+              other.display_name   AS actor_name,
+              COALESCE(c.updated_at, c.created_at) AS created_at,
+              (
+                SELECT m.body
+                  FROM messages m
+                 WHERE m.conversation_id = c.id
+                 ORDER BY m.created_at DESC
+                 LIMIT 1
+              ) AS preview
+         FROM conversations c
+         JOIN LATERAL (
+           SELECT u.id, u.display_name
+             FROM users u
+            WHERE u.id = ANY(c.participant_ids)
+              AND u.id <> $1
+              AND u.deleted_at IS NULL
+            LIMIT 1
+         ) other ON true
+        WHERE $1 = ANY(c.participant_ids)
+          AND COALESCE(c.status, 'accepted') = 'accepted'
+          AND COALESCE(c.updated_at, c.created_at) > $2
+          AND EXISTS (
+            SELECT 1 FROM waves w
+             WHERE w.conversation_id = c.id
+                OR (
+                  (w.from_user_id = $1 AND w.to_user_id = other.id)
+                  OR (w.to_user_id = $1 AND w.from_user_id = other.id)
+                )
+          )
+        ORDER BY COALESCE(c.updated_at, c.created_at) DESC
+        LIMIT $3`,
+      [userId, since.toISOString(), limit],
+    );
+
+    return rows.map(
+      (r): ActivityItem => ({
+        id: r.id,
+        type: 'match',
+        category: null,
+        title: r.actor_name ?? 'Match',
+        preview: r.preview ?? 'You matched — say hi',
+        actorId: r.actor_id,
+        actorName: r.actor_name,
+        distanceM: null,
+        createdAt: new Date(r.created_at).toISOString(),
+        unread: false,
+        deepLink: {
+          screen: 'Chat',
+          params: { conversationId: r.conversation_id, otherUserName: r.actor_name ?? 'Chat' },
+        },
+      }),
+    );
   }
 }
