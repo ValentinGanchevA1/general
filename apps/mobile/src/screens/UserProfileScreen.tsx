@@ -70,7 +70,10 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   const sendWave = async (): Promise<void> => {
     setWaving(true);
     try {
-      await postJson<WaveRequest, WaveResponse>('/waves', { toUserId: userId });
+      await postJson<WaveRequest, WaveResponse>('/interactions/wave', {
+        toUserId: userId,
+        context: 'profile',
+      });
       Alert.alert('Wave sent', `You waved at ${profile?.displayName ?? 'them'}.`);
     } catch (e) {
       const msg =
@@ -187,7 +190,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
           <Text style={styles.sectionLabel}>Trust</Text>
           <View style={styles.trustRow}>
             <View style={styles.trustBar}>
-              <View style={[styles.trustProgress, { width: `${profile.verificationScore}%` }]} />
+              <View style={[styles.trustProgress, { width: `${profile.verificationScore}%` as unknown as number }]} />
             </View>
             <Text style={styles.trustText}>{profile.verificationScore}% verified</Text>
           </View>
@@ -196,15 +199,8 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
               <Text style={styles.trustEmpty}>No verification yet</Text>
             ) : (
               badges.map((b) => (
-                <View
-                  key={b}
-                  style={[styles.trustChip, b === 'ID' && styles.trustChipStrong]}
-                >
-                  <Text
-                    style={b === 'ID' ? styles.trustChipStrongText : styles.trustChipText}
-                  >
-                    {b}
-                  </Text>
+                <View key={b} style={[styles.trustChip, b === 'ID' && styles.trustChipStrong]}>
+                  <Text style={b === 'ID' ? styles.trustChipStrongText : styles.trustChipText}>{b}</Text>
                 </View>
               ))
             )}
@@ -243,11 +239,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
           </TouchableOpacity>
         ) : (
           <>
-            <TouchableOpacity
-              style={styles.giftBtn}
-              onPress={() => setGiftSheetOpen(true)}
-              accessibilityLabel="Send gift"
-            >
+            <TouchableOpacity style={styles.giftBtn} onPress={() => setGiftSheetOpen(true)}>
               <Text style={styles.giftBtnText}>🎁 Gift</Text>
             </TouchableOpacity>
             <TouchableOpacity
