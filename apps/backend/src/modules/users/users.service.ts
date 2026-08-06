@@ -100,23 +100,6 @@ export class UsersService {
     private readonly blocks: BlocksService,
   ) {}
 
-  /**
-   * Permanently delete the caller's account (GDPR / Play "delete my data").
-   *
-   * Irreversible hard delete: the `users` row is removed, and every FK to it is
-   * `ON DELETE CASCADE` (refresh tokens, photos, social links, waves, messages,
-   * gifts, events/RSVPs, listings/offers, gamification, achievements, geofences,
-   * notifications, id-verification, …), so the row delete clears them. We
-   * additionally:
-   *   - delete conversations the user was in (the `participant_ids` array is not
-   *     an FK, so it can't cascade; deleting the conversation cascades its
-   *     messages), and
-   *   - purge out-of-Postgres state: Redis presence + the user's S3 blobs.
-   *
-   * Safety: requires the literal confirmation phrase, and — for password
-   * accounts — a matching password. OAuth-only accounts (no `password_hash`)
-   * rely on the bearer token + confirmation phrase.
-   */
   async deleteAccount(userId: string, confirm: string, password?: string): Promise<void> {
     if (confirm !== 'DELETE') {
       throw new BadRequestException({
@@ -132,7 +115,6 @@ export class UsersService {
     const user = rows[0];
     if (!user) throw new NotFoundException({ code: 'account.not_found', message: 'Account not found' });
 
-    // Re-auth password accounts; OAuth-only users (null hash) skip this gate.
     if (user.password_hash) {
       const ok = password ? await bcrypt.compare(password, user.password_hash) : false;
       if (!ok) {
@@ -143,21 +125,17 @@ export class UsersService {
       }
     }
 
-    // External state first — best-effort. A failure here must not block the DB
-    // delete (the user still gets removed); orphaned blobs are swept separately.
     try {
       await this.presence.markOffline(userId);
     } catch {
-      /* presence is TTL'd (120s) — safe to ignore */
+      /* presence is TTL'd */
     }
     try {
       await this.s3.deleteUserObjects(userId);
     } catch {
-      /* swept by a later lifecycle/orphan job; never blocks deletion */
+      /* swept later */
     }
 
-    // Atomic Postgres delete: conversations (cascades their messages) then the
-    // user row (cascades everything else).
     const runner = this.db.createQueryRunner();
     await runner.connect();
     await runner.startTransaction();
@@ -201,12 +179,17 @@ export class UsersService {
   /**
    * Public profile card. When a `viewerId` is supplied (the authenticated
    * caller) and differs from the subject, attach the viewer-relative
-   * `relationship` block so the client knows whether to show Wave vs Message —
-   * the gate itself is re-checked server-side on send, this is just for UI.
+   * `relationship` block so the client knows whether to show Wave vs Message.
+   * Avatar falls back to the primary gallery photo when users.avatar_url is null.
    */
   async getPublicProfile(userId: string, viewerId?: string): Promise<PublicUserProfile> {
     const rows = await this.db.query<PublicUserRow[]>(
-      `SELECT id, display_name, avatar_url, bio, verification_level,
+      `SELECT id, display_name,
+              COALESCE(
+                avatar_url,
+                (SELECT url FROM user_photos WHERE user_id = users.id ORDER BY position ASC LIMIT 1)
+              ) AS avatar_url,
+              bio, verification_level,
               id_verification_status, goals
          FROM users
         WHERE id = $1 AND deleted_at IS NULL AND visibility = 'public'
@@ -215,17 +198,13 @@ export class UsersService {
     );
     if (!rows[0]) throw new NotFoundException({ code: 'users.not_found', message: 'User not found' });
     const r = rows[0];
-    // Live "online" comes from Redis presence, not Postgres — see PresenceService.
     const onlineSet = await this.presence.whichAreOnline([r.id]);
 
     let relationship: PublicUserProfile['relationship'];
     let blockedByViewer: boolean | undefined;
     if (viewerId && viewerId !== r.id) {
-      // Independent reads — run them together to keep the profile fetch snappy.
       const [perm, blocked] = await Promise.all([
         this.messaging.permissionFor(viewerId, r.id),
-        // Directional: only whether *this viewer* blocked the subject, so the
-        // subject can never infer they were blocked from their own card.
         this.blocks.hasBlocked(viewerId, r.id),
       ]);
       relationship = {
@@ -287,7 +266,6 @@ export class UsersService {
     if (setClauses.length === 0) return this.getProfile(userId);
 
     setClauses.push('updated_at = NOW()');
-    // TypeORM 0.3.x returns [rowsArray, rowCount] for UPDATE queries.
     const [updatedRows] = await this.db.query<[{ id: string }[], number]>(
       `UPDATE users SET ${setClauses.join(', ')}
           WHERE id = $1 AND deleted_at IS NULL
@@ -298,9 +276,6 @@ export class UsersService {
     return this.getProfile(userId);
   }
 
-  // ─── Gallery photos (G1/multi-photo) ───────────────────────────────────────
-
-  /** The user's gallery in display order. Position 0 is the primary (avatar). */
   async listPhotos(userId: string): Promise<UserPhoto[]> {
     const rows = await this.db.query<UserPhoto[]>(
       `SELECT id, url, position FROM user_photos
@@ -310,7 +285,6 @@ export class UsersService {
     return rows.map((r) => ({ id: r.id, url: r.url, position: r.position }));
   }
 
-  /** Append a photo. The first photo becomes the avatar. Caps at MAX_PHOTOS. */
   async addPhoto(userId: string, url: string): Promise<UserPhoto[]> {
     const [{ count }] = await this.db.query<[{ count: number }]>(
       `SELECT count(*)::int AS count FROM user_photos WHERE user_id = $1`,
@@ -326,7 +300,6 @@ export class UsersService {
       `INSERT INTO user_photos (user_id, url, position) VALUES ($1, $2, $3)`,
       [userId, url, count],
     );
-    // First photo doubles as the profile avatar when none is set.
     if (count === 0) {
       await this.db.query(
         `UPDATE users SET avatar_url = $2, updated_at = NOW()
@@ -337,9 +310,7 @@ export class UsersService {
     return this.listPhotos(userId);
   }
 
-  /** Delete one photo; repoint the avatar to the new primary (or null). */
   async deletePhoto(userId: string, photoId: string): Promise<UserPhoto[]> {
-    // TypeORM 0.3.x returns [rowsArray, rowCount] for DELETE ... RETURNING.
     const [deleted] = await this.db.query<[{ id: string }[], number]>(
       `DELETE FROM user_photos WHERE id = $1 AND user_id = $2 RETURNING id`,
       [photoId, userId],
@@ -351,10 +322,6 @@ export class UsersService {
     return this.listPhotos(userId);
   }
 
-  /**
-   * Reorder the whole gallery. `photoIds` must be exactly the user's photos.
-   * Index 0 becomes the primary and is mirrored to `users.avatar_url`.
-   */
   async reorderPhotos(userId: string, photoIds: string[]): Promise<UserPhoto[]> {
     const existing = await this.listPhotos(userId);
     const ids = new Set(existing.map((p) => p.id));
@@ -370,8 +337,6 @@ export class UsersService {
       });
     }
 
-    // One atomic statement: position = index in the supplied order.
-    // params: $1 userId, then ($2,$3,...) one id per row in a VALUES table.
     const values = photoIds.map((_, i) => `($${i + 2}::uuid, ${i})`).join(', ');
     await this.db.query(
       `UPDATE user_photos AS up SET position = v.pos
@@ -383,7 +348,6 @@ export class UsersService {
     return this.listPhotos(userId);
   }
 
-  /** Keep `users.avatar_url` pointing at the current primary photo (or null). */
   private async syncAvatar(userId: string): Promise<void> {
     await this.db.query(
       `UPDATE users SET avatar_url = (
@@ -460,9 +424,9 @@ export class UsersService {
       socialLinks,
       verificationScore: SCORE[level] ?? 0,
       badges: this.deriveBadges(level, r.subscription_tier ?? 'free', socialLinks, r.id_verification_status),
-       idVerificationStatus: r.id_verification_status,
-       verifiedBadge: r.id_verification_status === 'verified',
-       createdAt: toIsoOrNow(r.created_at),
+      idVerificationStatus: r.id_verification_status,
+      verifiedBadge: r.id_verification_status === 'verified',
+      createdAt: toIsoOrNow(r.created_at),
     };
   }
 }
