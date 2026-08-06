@@ -21,7 +21,6 @@ import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { Avatar } from '@/components/Avatar';
 
-/** Map a raw interest/goal value to a human label, falling back to the value. */
 function labelFor(value: string): string {
   return GOAL_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
@@ -44,8 +43,6 @@ interface UserCardProps {
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-// ─── User card ─────────────────────────────────────────────────────────────
-
 function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
@@ -58,9 +55,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
       .then((p) => {
         if (!cancelled) setProfile(p);
       })
-      .catch(() => {
-        /* degrade gracefully */
-      })
+      .catch(() => {})
       .finally(() => {
         if (!cancelled) setFetching(false);
       });
@@ -90,7 +85,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         otherUserIdVerified: meta.verifiedBadge ?? false,
       });
     } catch {
-      // Gate changed under us
+      // leave sheet open
     } finally {
       setOpening(false);
     }
@@ -163,21 +158,21 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
           <View style={styles.actions}>
             {canMessage === 'chat' || canMessage === 'request' ? (
               <TouchableOpacity
-                style={[styles.messageBtn, opening && styles.btnDisabled]}
+                style={[styles.primaryBtn, styles.messageBtn, opening && styles.btnDisabled]}
                 onPress={() => void onMessage()}
                 disabled={opening}
               >
-                <Text style={styles.waveBtnText}>
+                <Text style={styles.primaryBtnText}>
                   {opening ? '…' : canMessage === 'request' ? 'Message' : 'Chat'}
                 </Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                style={[styles.waveBtn, waving && styles.btnDisabled]}
+                style={[styles.primaryBtn, styles.waveBtn, (waving || !onWave) && styles.btnDisabled]}
                 onPress={onWave}
                 disabled={waving || !onWave}
               >
-                <Text style={styles.waveBtnText}>{waving ? '…' : 'Wave'}</Text>
+                <Text style={styles.primaryBtnText}>{waving ? '…' : '👋 Wave'}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -196,11 +191,15 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   );
 }
 
-// ─── Generic (event / listing) card ────────────────────────────────────────
-
 type NonUserEntityPoint = Exclude<EntityPoint, UserEntityPoint>;
 
-function GenericCard({ point, onClose }: { point: NonUserEntityPoint; onClose: () => void }): React.JSX.Element {
+function GenericCard({
+  point,
+  onClose,
+}: {
+  point: NonUserEntityPoint;
+  onClose: () => void;
+}): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const title =
     point.kind === 'event'
@@ -310,32 +309,32 @@ const styles = StyleSheet.create({
   goalIcon: { fontSize: 13 },
   goalLabel: { color: '#aaa', fontSize: 12 },
   sharedHint: { color: '#7ad7ff', fontSize: 13 },
-  actions: { flexDirection: 'row', gap: 10 },
-  waveBtn: {
+  actions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  primaryBtn: {
     flex: 1,
-    backgroundColor: '#00d4ff',
     borderRadius: 12,
-    padding: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
   },
-  messageBtn: {
-    flex: 1,
-    backgroundColor: '#34e0a1',
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-  },
-  waveBtnText: { color: '#000', fontWeight: '700', fontSize: 15 },
+  waveBtn: { backgroundColor: '#00d4ff' },
+  messageBtn: { backgroundColor: '#34e0a1' },
+  primaryBtnText: { color: '#000', fontWeight: '700', fontSize: 15 },
   profileBtn: {
-    backgroundColor: '#0a0a1a',
     borderRadius: 12,
-    padding: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0a0a1a',
     borderWidth: 1,
     borderColor: '#2a2a4a',
+    minHeight: 48,
   },
-  profileBtnText: { color: '#aaa', fontWeight: '600', fontSize: 15 },
-  btnDisabled: { opacity: 0.6 },
+  profileBtnText: { color: '#aaa', fontWeight: '600', fontSize: 14 },
+  btnDisabled: { opacity: 0.55 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   titleGroup: { flex: 1 },
   title: { color: '#fff', fontSize: 18, fontWeight: '700' },
