@@ -1,4 +1,3 @@
-// apps/backend/src/modules/feed/feed.service.spec.ts
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { getDataSourceToken } from '@nestjs/typeorm';
@@ -10,9 +9,6 @@ describe('FeedService', () => {
   let query: jest.Mock;
 
   beforeEach(async () => {
-    // Default any unstubbed query (e.g. selectAlerts' location lookup, plus
-    // future feed sources) to an empty result; tests override call-by-call
-    // with mockResolvedValueOnce where they assert specific rows.
     query = jest.fn().mockResolvedValue([]);
     const dsMock = { query } as unknown as DataSource;
 
@@ -42,6 +38,7 @@ describe('FeedService', () => {
           actor_id: 'u2', actor_name: 'Bob',
           created_at: new Date('2026-05-22T11:00:00Z'),
           unread: true,
+          direction: 'in',
         },
       ]);
 
@@ -58,8 +55,19 @@ describe('FeedService', () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
+  it('respects type filter (listing only)', async () => {
+    query.mockResolvedValueOnce([{ location_h3_r7: null }]);
+    await service.aggregate('me', new Date(), ['listing'], 50);
+    expect(query).toHaveBeenCalled();
+  });
+
+  it('respects type filter (match only)', async () => {
+    query.mockResolvedValueOnce([]);
+    await service.aggregate('me', new Date(), ['match'], 50);
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
   it('returns valid nextSince when empty', async () => {
-    query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     const res = await service.aggregate('me', new Date(), [], 50);
     expect(res.items).toHaveLength(0);
     expect(Date.parse(res.nextSince)).not.toBeNaN();

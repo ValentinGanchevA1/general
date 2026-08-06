@@ -51,10 +51,6 @@ export function PulseScreen(): React.JSX.Element {
 
   const [filter, setFilter] = useState<PulseFilter>(route.params?.filter ?? 'all');
 
-  // ─── Filter sync ────────────────────────────────────────────────────────
-  // These effects intentionally sync local UI state from external sources
-  // (navigation params, and a one-shot Redux signal the effect also clears),
-  // which is a legitimate effect — not a render-derivable value.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (route.params?.filter) setFilter(route.params.filter);
@@ -68,7 +64,6 @@ export function PulseScreen(): React.JSX.Element {
     }
   }, [pendingFilter, dispatch]);
 
-  // ─── Data load ──────────────────────────────────────────────────────────
   const load = useCallback(() => {
     const f = FILTERS.find((x) => x.key === filter);
     void dispatch(fetchFeed(f?.type ? { types: [f.type] } : {}));
@@ -81,13 +76,11 @@ export function PulseScreen(): React.JSX.Element {
     return f?.type ? items.filter((i) => i.type === f.type) : items;
   }, [items, filter]);
 
-  // ─── Tap routing ────────────────────────────────────────────────────────
   const onTap = useCallback((it: ActivityItem): void => {
     const { screen, params } = it.deepLink;
     if (screen === 'Main') {
       navigation.navigate('Main', params as never);
     } else {
-      // Dynamic deep-link target — bypass the per-screen navigate overloads.
       (navigation.navigate as (s: string, p?: object) => void)(screen, params);
     }
   }, [navigation]);
@@ -96,7 +89,41 @@ export function PulseScreen(): React.JSX.Element {
     navigation.navigate('AlertComposer', { presetCategory: 'general' });
   }, [navigation]);
 
-  // ─── Header (CTA + chips + nearby) ─────────────────────────────────────
+  const emptyCopy = useMemo(() => {
+    switch (filter) {
+      case 'chats':
+        return {
+          title: 'No chats yet',
+          hint: 'Wave someone on the map — when they wave back, your chat shows up here.',
+        };
+      case 'waves':
+        return {
+          title: 'No waves yet',
+          hint: 'Send a wave from the map or a profile. Incoming and outgoing waves land here.',
+        };
+      case 'listings':
+        return {
+          title: 'No trades nearby',
+          hint: 'Post a listing from Create, or wait for neighbours to list something.',
+        };
+      case 'alerts':
+        return {
+          title: 'No local alerts',
+          hint: "Share what's happening around you with the button above.",
+        };
+      case 'matches':
+        return {
+          title: 'No matches yet',
+          hint: 'A match appears when someone waves you back. Keep waving on the map.',
+        };
+      default:
+        return {
+          title: 'Quiet around here',
+          hint: "Pull to refresh, or share what's happening.",
+        };
+    }
+  }, [filter]);
+
   const Header = (
     <View>
       <View style={S.headerBar}>
@@ -131,7 +158,6 @@ export function PulseScreen(): React.JSX.Element {
     </View>
   );
 
-  // ─── Footer (trending) ─────────────────────────────────────────────────
   const Footer = (
     <View style={S.footer}>
       <TrendingStrip
@@ -143,7 +169,6 @@ export function PulseScreen(): React.JSX.Element {
     </View>
   );
 
-  // ─── Body ──────────────────────────────────────────────────────────────
   if (loading && items.length === 0) {
     return (
       <View style={S.container}>
@@ -177,8 +202,8 @@ export function PulseScreen(): React.JSX.Element {
         ListEmptyComponent={
           <View style={S.empty}>
             <MCI name="pulse" size={40} color="#2a2a4a" />
-            <Text style={S.emptyTitle}>Quiet around here</Text>
-            <Text style={S.emptyBody}>Pull to refresh, or share what's happening.</Text>
+            <Text style={S.emptyTitle}>{emptyCopy.title}</Text>
+            <Text style={S.emptyBody}>{emptyCopy.hint}</Text>
           </View>
         }
         refreshControl={
@@ -219,7 +244,7 @@ const S = StyleSheet.create({
 
   empty: { alignItems: 'center', paddingVertical: 60 },
   emptyTitle: { color: '#fff', fontSize: 16, fontWeight: '600', marginTop: 12 },
-  emptyBody: { color: '#666', fontSize: 13, marginTop: 4 },
+  emptyBody: { color: '#666', fontSize: 13, marginTop: 4, textAlign: 'center', paddingHorizontal: 32 },
 
   footer: { paddingTop: 20, paddingBottom: 30 },
 });
