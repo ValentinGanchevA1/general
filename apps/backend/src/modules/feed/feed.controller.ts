@@ -19,7 +19,8 @@ export class FeedController {
     @Query('types') types?: string,
     @Query('limit') limit?: string,
   ): Promise<FeedResponse> {
-    const sinceDate = since ? new Date(since) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    // 90d default so older chats/matches still surface in Pulse.
+    const sinceDate = since ? new Date(since) : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
     const typeList = (types ? types.split(',').filter(Boolean) : []) as ActivityType[];
     const cap = Math.min(Number(limit ?? 50) || 50, 100);
     return this.feed.aggregate(userId, sinceDate, typeList, cap);

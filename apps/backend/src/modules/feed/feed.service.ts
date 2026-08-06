@@ -43,6 +43,11 @@ export class FeedService {
     };
   }
 
+  /**
+   * Conversations I participate in — aligned with ChatService.findConversations.
+   * LEFT JOIN so wave-opened / empty threads still appear; activity time is
+   * COALESCE(last message, last_message_at, conversation created_at).
+   */
   private async selectChats(userId: string, since: Date, limit: number): Promise<ActivityItem[]> {
     const rows = await this.ds.query<
       Array<{
@@ -50,9 +55,10 @@ export class FeedService {
         conversation_id: string;
         actor_id: string;
         actor_name: string;
-        preview: string;
+        preview: string | null;
         created_at: Date;
         unread: boolean;
+        status: string;
       }>
     >(
       `SELECT ('chat:' || c.id)                                   AS id,
@@ -60,11 +66,16 @@ export class FeedService {
               other.id                                              AS actor_id,
               other.display_name                                    AS actor_name,
               m.body                                                AS preview,
-              m.created_at                                          AS created_at,
-              (m.sender_id <> $1 AND m.created_at > NOW() - interval '24 hours') AS unread
+              COALESCE(m.created_at, c.last_message_at, c.created_at) AS created_at,
+              (
+                m.sender_id IS NOT NULL
+                AND m.sender_id <> $1
+                AND m.created_at > NOW() - interval '24 hours'
+              ) AS unread,
+              COALESCE(c.status, 'accepted')                        AS status
          FROM conversations c
-         JOIN LATERAL (
-           SELECT id, sender_id, body, created_at
+         LEFT JOIN LATERAL (
+           SELECT sender_id, body, created_at
              FROM messages
             WHERE conversation_id = c.id
             ORDER BY created_at DESC
@@ -79,30 +90,38 @@ export class FeedService {
             LIMIT 1
          ) other ON true
         WHERE $1 = ANY(c.participant_ids)
-          AND m.created_at > $2
-        ORDER BY m.created_at DESC
+          AND COALESCE(m.created_at, c.last_message_at, c.created_at) > $2
+        ORDER BY COALESCE(m.created_at, c.last_message_at, c.created_at) DESC NULLS LAST
         LIMIT $3`,
       [userId, since.toISOString(), limit],
     );
 
-    return rows.map(
-      (r): ActivityItem => ({
+    return rows.map((r): ActivityItem => {
+      const isPending = r.status === 'pending';
+      const preview =
+        r.preview
+        ?? (isPending ? 'Message request' : 'Say hi — open the chat');
+      return {
         id: r.id,
         type: 'chat',
         category: null,
         title: r.actor_name ?? 'Unknown',
-        preview: r.preview,
+        preview,
         actorId: r.actor_id,
         actorName: r.actor_name,
         distanceM: null,
         createdAt: new Date(r.created_at).toISOString(),
-        unread: r.unread,
+        unread: Boolean(r.unread) || isPending,
         deepLink: {
           screen: 'Chat',
-          params: { conversationId: r.conversation_id, otherUserName: r.actor_name ?? 'Chat' },
+          params: {
+            conversationId: r.conversation_id,
+            otherUserName: r.actor_name ?? 'Chat',
+            ...(isPending ? { requestPending: true } : {}),
+          },
         },
-      }),
-    );
+      };
+    });
   }
 
   private async selectWaves(userId: string, since: Date, limit: number): Promise<ActivityItem[]> {
