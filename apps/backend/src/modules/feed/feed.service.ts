@@ -330,7 +330,7 @@ export class FeedService {
               c.id                 AS conversation_id,
               other.id             AS actor_id,
               other.display_name   AS actor_name,
-              COALESCE(c.updated_at, c.created_at) AS created_at,
+              COALESCE(c.last_message_at, c.created_at) AS created_at,
               (
                 SELECT m.body
                   FROM messages m
@@ -349,7 +349,7 @@ export class FeedService {
          ) other ON true
         WHERE $1 = ANY(c.participant_ids)
           AND COALESCE(c.status, 'accepted') = 'accepted'
-          AND COALESCE(c.updated_at, c.created_at) > $2
+          AND COALESCE(c.last_message_at, c.created_at) > $2
           AND EXISTS (
             SELECT 1 FROM waves w
              WHERE w.conversation_id = c.id
@@ -358,7 +358,7 @@ export class FeedService {
                   OR (w.to_user_id = $1 AND w.from_user_id = other.id)
                 )
           )
-        ORDER BY COALESCE(c.updated_at, c.created_at) DESC
+        ORDER BY COALESCE(c.last_message_at, c.created_at) DESC
         LIMIT $3`,
       [userId, since.toISOString(), limit],
     );
