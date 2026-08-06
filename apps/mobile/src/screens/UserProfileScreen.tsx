@@ -21,11 +21,10 @@ import { deleteJson, getJson, postJson } from '@/api/client';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
 import { VerificationBadge } from '@/components/VerificationBadge';
+import { Avatar } from '@/components/Avatar';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
-// Cumulative verification ladder → the chips we show on someone else's card.
-// A user at level L has earned every rung up to and including L.
 const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
 const LADDER_BADGES: Array<{ level: VerificationLevel; label: string }> = [
   { level: 'email', label: 'Email' },
@@ -37,20 +36,6 @@ const LADDER_BADGES: Array<{ level: VerificationLevel; label: string }> = [
 function earnedBadges(level: VerificationLevel): string[] {
   const rank = LADDER.indexOf(level);
   return LADDER_BADGES.filter((b) => rank >= LADDER.indexOf(b.level)).map((b) => b.label);
-}
-
-function InitialsAvatar({ name }: { name: string }): React.JSX.Element {
-  const initials = name
-    .split(' ')
-    .map((w) => w[0] ?? '')
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-  return (
-    <View style={styles.avatar}>
-      <Text style={styles.avatarText}>{initials}</Text>
-    </View>
-  );
 }
 
 export function UserProfileScreen({ route, navigation }: Props): React.JSX.Element {
@@ -78,22 +63,21 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     })();
   }, [userId, navigation]);
 
-  useEffect(() => { loadProfile(); }, [loadProfile]);
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   const sendWave = async (): Promise<void> => {
     setWaving(true);
     try {
-      await postJson<WaveRequest, WaveResponse>('/interactions/wave', {
-        toUserId: userId,
-        context: 'profile',
-      });
-      Alert.alert('Wave sent! 👋', `You waved at ${profile?.displayName ?? 'this user'}.`);
-    } catch (err) {
-      const e = err as ApiError;
-      Alert.alert(
-        e.code === 'wave.cooldown' ? 'Already waved' : 'Could not send wave',
-        e.message || 'Try again in a moment.',
-      );
+      await postJson<WaveRequest, WaveResponse>('/waves', { toUserId: userId });
+      Alert.alert('Wave sent', `You waved at ${profile?.displayName ?? 'them'}.`);
+    } catch (e) {
+      const msg =
+        typeof e === 'object' && e !== null && 'message' in e
+          ? String((e as ApiError).message)
+          : 'Could not send wave';
+      Alert.alert('Wave failed', msg);
     } finally {
       setWaving(false);
     }
@@ -103,8 +87,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     setBlocking(true);
     try {
       await postJson<undefined, { blocked: boolean }>(`/blocks/${userId}`, undefined);
-      // Off the map + chat locked from here on; bounce back to where they were.
-      // cancelable:false so an Android outside-tap can't strand them on this card.
       Alert.alert(
         'Blocked',
         `You won't see ${profile?.displayName ?? 'this user'} or hear from them.`,
@@ -165,6 +147,8 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 
   if (!profile) return <View style={styles.centered} />;
 
+  const badges = earnedBadges(profile.verification);
+
   return (
     <View style={styles.root}>
       <View style={styles.topBar}>
@@ -175,31 +159,55 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
           style={styles.menuBtn}
           onPress={openMenu}
           disabled={blocking}
-          accessibilityLabel="More options"
+          accessibilityLabel="Profile options"
         >
-          {blocking ? (
-            <ActivityIndicator color="#888" size="small" />
-          ) : (
-            <Text style={styles.menuBtnText}>⋯</Text>
-          )}
+          <Text style={styles.menuBtnText}>···</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.heroSection}>
-          <InitialsAvatar name={profile.displayName} />
+        <View style={styles.hero}>
+          <Avatar uri={profile.avatarUrl} name={profile.displayName} size={72} ring />
           <View style={styles.heroMeta}>
             <View style={styles.nameRow}>
               <Text style={styles.displayName}>{profile.displayName}</Text>
               <VerificationBadge
                 verification={profile.verification}
                 idVerified={profile.idVerified}
-                size={20}
+                size={18}
               />
             </View>
             <Text style={[styles.onlineLabel, !profile.online && styles.offlineLabel]}>
               {profile.online ? 'Online now' : 'Recently nearby'}
             </Text>
+          </View>
+        </View>
+
+        <View>
+          <Text style={styles.sectionLabel}>Trust</Text>
+          <View style={styles.trustRow}>
+            <View style={styles.trustBar}>
+              <View style={[styles.trustProgress, { width: `${profile.verificationScore}%` }]} />
+            </View>
+            <Text style={styles.trustText}>{profile.verificationScore}% verified</Text>
+          </View>
+          <View style={styles.trustBadges}>
+            {badges.length === 0 ? (
+              <Text style={styles.trustEmpty}>No verification yet</Text>
+            ) : (
+              badges.map((b) => (
+                <View
+                  key={b}
+                  style={[styles.trustChip, b === 'ID' && styles.trustChipStrong]}
+                >
+                  <Text
+                    style={b === 'ID' ? styles.trustChipStrongText : styles.trustChipText}
+                  >
+                    {b}
+                  </Text>
+                </View>
+              ))
+            )}
           </View>
         </View>
 
@@ -212,78 +220,42 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 
         {profile.goals.length > 0 ? (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Here for</Text>
+            <Text style={styles.sectionLabel}>Goals</Text>
             <View style={styles.goalsRow}>
               {profile.goals.map((g) => {
                 const opt = GOAL_OPTIONS.find((o) => o.value === g);
-                return opt ? (
+                return (
                   <View key={g} style={styles.goalChip}>
-                    <Text style={styles.goalIcon}>{opt.icon}</Text>
-                    <Text style={styles.goalLabel}>{opt.label}</Text>
+                    <Text style={styles.goalIcon}>{opt?.icon ?? '•'}</Text>
+                    <Text style={styles.goalLabel}>{opt?.label ?? g}</Text>
                   </View>
-                ) : null;
+                );
               })}
             </View>
           </View>
         ) : null}
-
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Trust</Text>
-          <View style={styles.trustRow}>
-            <View style={styles.trustBar}>
-              <View style={[styles.trustProgress, { width: `${profile.verificationScore}%` }]} />
-            </View>
-            <Text style={styles.trustText}>{profile.verificationScore}% verified</Text>
-          </View>
-          <View style={styles.trustBadges}>
-            {profile.idVerified ? (
-              <View style={[styles.trustChip, styles.trustChipStrong]}>
-                <Text style={styles.trustChipStrongText}>ID-verified ✓</Text>
-              </View>
-            ) : null}
-            {earnedBadges(profile.verification).map((label) => (
-              <View key={label} style={styles.trustChip}>
-                <Text style={styles.trustChipText}>{label}</Text>
-              </View>
-            ))}
-            {profile.verification === 'none' && !profile.idVerified ? (
-              <Text style={styles.trustEmpty}>Not yet verified</Text>
-            ) : null}
-          </View>
-        </View>
       </ScrollView>
 
       <View style={styles.footer}>
         {blocked ? (
-          <TouchableOpacity
-            style={[styles.unblockBtn, blocking && styles.waveBtnDisabled]}
-            onPress={() => void unblock()}
-            disabled={blocking}
-          >
-            {blocking ? (
-              <ActivityIndicator color="#ff6b6b" size="small" />
-            ) : (
-              <Text style={styles.unblockBtnText}>Unblock</Text>
-            )}
+          <TouchableOpacity style={styles.unblockBtn} onPress={() => void unblock()} disabled={blocking}>
+            <Text style={styles.unblockBtnText}>Unblock</Text>
           </TouchableOpacity>
         ) : (
           <>
             <TouchableOpacity
-              style={[styles.giftBtn]}
+              style={styles.giftBtn}
               onPress={() => setGiftSheetOpen(true)}
+              accessibilityLabel="Send gift"
             >
               <Text style={styles.giftBtnText}>🎁 Gift</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.waveBtn, waving && styles.waveBtnDisabled]}
-              onPress={sendWave}
+              onPress={() => void sendWave()}
               disabled={waving}
             >
-              {waving ? (
-                <ActivityIndicator color="#000" size="small" />
-              ) : (
-                <Text style={styles.waveBtnText}>👋 Send Wave</Text>
-              )}
+              <Text style={styles.waveBtnText}>{waving ? 'Sending…' : '👋 Send Wave'}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -291,9 +263,9 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 
       <SendGiftSheet
         visible={giftSheetOpen}
+        onClose={() => setGiftSheetOpen(false)}
         recipientId={userId}
         recipientName={profile.displayName}
-        onClose={() => setGiftSheetOpen(false)}
       />
     </View>
   );
@@ -302,40 +274,25 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0a0a0f' },
   centered: { flex: 1, backgroundColor: '#0a0a0f', justifyContent: 'center', alignItems: 'center' },
-
   topBar: {
-    paddingTop: 52,
-    paddingHorizontal: 20,
-    paddingBottom: 8,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  backBtn: { alignSelf: 'flex-start' },
-  backBtnText: { color: '#00d4ff', fontSize: 17, fontWeight: '600' },
-  menuBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  menuBtnText: { color: '#888', fontSize: 26, fontWeight: '700', lineHeight: 28 },
-
-  scroll: { paddingHorizontal: 24, paddingBottom: 24, gap: 24 },
-
-  heroSection: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingTop: 8 },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#1a1a2e',
-    borderWidth: 2,
-    borderColor: '#00d4ff',
-    justifyContent: 'center',
     alignItems: 'center',
+    paddingTop: 52,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
   },
-  avatarText: { color: '#00d4ff', fontSize: 28, fontWeight: '700' },
+  backBtn: { padding: 8 },
+  backBtnText: { color: '#00d4ff', fontSize: 16, fontWeight: '600' },
+  menuBtn: { padding: 8 },
+  menuBtnText: { color: '#888', fontSize: 22, letterSpacing: 2 },
+  scroll: { padding: 20, gap: 28, paddingBottom: 24 },
+  hero: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingTop: 8 },
   heroMeta: { flex: 1, gap: 4 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   displayName: { color: '#fff', fontSize: 24, fontWeight: '700' },
   onlineLabel: { color: '#4caf50', fontSize: 13 },
   offlineLabel: { color: '#666' },
-
   trustRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   trustBar: { flex: 1, height: 6, backgroundColor: '#1a1a24', borderRadius: 3, overflow: 'hidden' },
   trustProgress: { height: '100%', backgroundColor: '#00d4ff', borderRadius: 3 },
@@ -351,7 +308,6 @@ const styles = StyleSheet.create({
   trustChipStrong: { backgroundColor: '#00d4ff20' },
   trustChipStrongText: { color: '#00d4ff', fontSize: 12, fontWeight: '700' },
   trustEmpty: { color: '#666', fontSize: 12 },
-
   section: { gap: 10 },
   sectionLabel: {
     color: '#555',
@@ -361,7 +317,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   bioText: { color: '#ddd', fontSize: 15, lineHeight: 22 },
-
   goalsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   goalChip: {
     flexDirection: 'row',
@@ -376,7 +331,6 @@ const styles = StyleSheet.create({
   },
   goalIcon: { fontSize: 15 },
   goalLabel: { color: '#ccc', fontSize: 13, fontWeight: '500' },
-
   footer: { flexDirection: 'row', gap: 12, padding: 20, paddingBottom: 36 },
   waveBtn: {
     flex: 1,
