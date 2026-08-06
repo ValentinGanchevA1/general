@@ -1,9 +1,8 @@
 // apps/mobile/src/features/nudges/NudgeBanner.tsx
 //
-// Compact, dismissible map banner for the P3.1 leftover nudges (verification /
-// streak). Mirrors DailyChallengeCard's styling and sits just below it; shows at
-// most one nudge and self-hides when there's nothing to surface. Tapping opens
-// the relevant screen; the close button suppresses it for the nudge's cooldown.
+// Compact, dismissible map banner for verification / streak nudges.
+// Anchored near the bottom of the map (above Events rail) so Stories + map
+// center stay clear. Tapping opens the target screen; close suppresses for cooldown.
 
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -61,11 +60,12 @@ export function NudgeBanner(): React.JSX.Element | null {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    // Stacks directly under DailyChallengeCard (top: 116, ~44px tall).
-    top: 168,
+    // Above Events rail (bottom ~24 + ~200) so map center + stories stay clear.
+    bottom: 240,
     left: 16,
     right: 16,
     alignItems: 'center',
+    zIndex: 20,
   },
   card: {
     flexDirection: 'row',

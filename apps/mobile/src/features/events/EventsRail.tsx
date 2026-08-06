@@ -1,9 +1,8 @@
 // apps/mobile/src/features/events/EventsRail.tsx
 //
-// "Events near you" — a compact horizontal rail overlaid on the bottom of the
-// map. Always shows a "New" card (so the create flow is reachable even with
-// zero nearby events — helps cold-start density, ROADMAP R-P3-1), then the
-// nearby events. Hidden by the caller while a map entity sheet is open.
+// "Events near you" — compact horizontal rail on the bottom of the map.
+// Shows only real nearby events (create lives on the Contextual FAB).
+// Hidden entirely when there are none, and by the caller while a sheet is open.
 
 import React from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -20,8 +19,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 /**
  * Rendered height of the rail (label row + one row of fixed-height cards),
- * used by MapScreen to lift ContextualFab clear of this overlay. Re-measure
- * and update this constant if EventCard's layout changes.
+ * used by MapScreen to lift ContextualFab clear of this overlay.
  */
 export const EVENTS_RAIL_HEIGHT = 24 /* wrap.bottom */ + 22 /* labelRow */ + 178; /* card */
 
@@ -29,7 +27,7 @@ export function EventsRail({ location }: { location: LatLng | null }): React.JSX
   const navigation = useNavigation<Nav>();
   const { events } = useNearbyEvents(location);
 
-  if (!location) return null;
+  if (!location || events.length === 0) return null;
 
   return (
     <View style={styles.wrap} pointerEvents="box-none">
@@ -42,15 +40,6 @@ export function EventsRail({ location }: { location: LatLng | null }): React.JSX
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
       >
-        <TouchableOpacity
-          style={[styles.card, styles.newCard]}
-          activeOpacity={0.85}
-          onPress={() => navigation.navigate('EventCreate')}
-        >
-          <Icon name="plus-circle" size={26} color="#00d4ff" />
-          <Text style={styles.newText}>New event</Text>
-        </TouchableOpacity>
-
         {events.map((e) => (
           <EventCard
             key={e.id}
@@ -64,7 +53,8 @@ export function EventsRail({ location }: { location: LatLng | null }): React.JSX
 }
 
 function EventCard({
-  event, onPress,
+  event,
+  onPress,
 }: {
   event: EventSummary;
   onPress: () => void;
@@ -78,7 +68,9 @@ function EventCard({
           <Icon name="calendar-star" size={22} color="#00d4ff" />
         </View>
       )}
-      <Text style={styles.title} numberOfLines={2}>{event.title}</Text>
+      <Text style={styles.title} numberOfLines={2}>
+        {event.title}
+      </Text>
       <View style={styles.metaRow}>
         <Icon name="clock-outline" size={12} color="#888" />
         <Text style={styles.meta}>{formatEventDayShort(event.startsAt)}</Text>
@@ -86,7 +78,8 @@ function EventCard({
       <View style={styles.metaRow}>
         <Icon name="account-group" size={12} color="#888" />
         <Text style={styles.meta}>
-          {event.attendeeCount}{event.capacity != null ? `/${event.capacity}` : ''}
+          {event.attendeeCount}
+          {event.capacity != null ? `/${event.capacity}` : ''}
           {event.myRsvp === 'going' ? ' · going' : ''}
         </Text>
       </View>
@@ -96,9 +89,15 @@ function EventCard({
 
 const styles = StyleSheet.create({
   wrap: { position: 'absolute', left: 0, right: 0, bottom: 24 },
-  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, marginBottom: 8 },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
   label: { color: '#00d4ff', fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
-  scroll: { paddingLeft: 16, paddingRight: 16 + 56 /* FAB */ + 24 /* margin */, gap: 12 },
+  scroll: { paddingLeft: 16, paddingRight: 16 + 56 /* FAB */ + 24, gap: 12 },
   card: {
     width: 150,
     padding: 10,
@@ -107,9 +106,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1f1f33',
   },
-  newCard: { alignItems: 'center', justifyContent: 'center', gap: 8 },
-  newText: { color: '#00d4ff', fontSize: 14, fontWeight: '700' },
-  cover: { width: '100%', height: 70, borderRadius: 10, backgroundColor: '#1a1a2e', marginBottom: 8 },
+  cover: {
+    width: '100%',
+    height: 70,
+    borderRadius: 10,
+    backgroundColor: '#1a1a2e',
+    marginBottom: 8,
+  },
   coverPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   title: { color: '#fff', fontSize: 14, fontWeight: '700' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
