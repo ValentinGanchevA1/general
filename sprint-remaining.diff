@@ -1,1 +1,525 @@
-PLACEHOLDER
+diff --git a/apps/backend/src/modules/interactions/interactions.service.ts b/apps/backend/src/modules/interactions/interactions.service.ts
+index 3f930af..2109b50 100644
+--- a/apps/backend/src/modules/interactions/interactions.service.ts
++++ b/apps/backend/src/modules/interactions/interactions.service.ts
+@@ -8,7 +8,12 @@ import {
+ import { InjectDataSource } from '@nestjs/typeorm';
+ import { DataSource } from 'typeorm';
+ 
+-import type { WaveRequest, WaveResponse, WaveReceivedEvent } from '@g88/shared';
++import type {
++  ReceivedInteraction,
++  WaveRequest,
++  WaveResponse,
++  WaveReceivedEvent,
++} from '@g88/shared';
+ 
+ import { RealtimeGateway } from '../../realtime/realtime.gateway';
+ import { NotificationsService } from '../notifications/notifications.service';
+@@ -190,4 +195,108 @@ export class InteractionsService {
+     );
+     return created[0]!.id;
+   }
++
++  /**
++   * Unified inbound list: waves + story reactions received by `userId`.
++   * Used by the "People who interacted with you" surface.
++   * isMutual is true when a reciprocal wave already exists OR an accepted conversation.
++   */
++  async listReceived(userId: string, limit = 50): Promise<ReceivedInteraction[]> {
++    const rows = await this.db.query<
++      Array<{
++        id: string;
++        kind: 'wave' | 'story_reaction';
++        from_id: string;
++        display_name: string;
++        avatar_url: string | null;
++        verification_level: string;
++        story_id: string | null;
++        reaction_kind: string | null;
++        created_at: Date;
++        is_mutual: boolean;
++      }>
++    >(
++      `
++      WITH blocked AS (
++        SELECT blocked_id AS uid FROM user_blocks WHERE blocker_id = $1
++        UNION
++        SELECT blocker_id AS uid FROM user_blocks WHERE blocked_id = $1
++      ),
++      waves_in AS (
++        SELECT
++          w.id::text AS id,
++          'wave'::text AS kind,
++          w.from_user_id AS from_id,
++          u.display_name,
++          u.avatar_url,
++          u.verification_level,
++          NULL::text AS story_id,
++          NULL::text AS reaction_kind,
++          w.created_at,
++          EXISTS (
++            SELECT 1 FROM waves w2
++             WHERE w2.from_user_id = $1 AND w2.to_user_id = w.from_user_id
++          ) OR EXISTS (
++            SELECT 1 FROM conversations c
++             WHERE c.status = 'accepted'
++               AND c.participant_ids @> ARRAY[$1::uuid, w.from_user_id]::uuid[]
++          ) AS is_mutual
++        FROM waves w
++        JOIN users u ON u.id = w.from_user_id AND u.deleted_at IS NULL
++        WHERE w.to_user_id = $1
++          AND w.from_user_id NOT IN (SELECT uid FROM blocked)
++      ),
++      reactions_in AS (
++        SELECT
++          (sr.story_id::text || ':' || sr.user_id::text) AS id,
++          'story_reaction'::text AS kind,
++          sr.user_id AS from_id,
++          u.display_name,
++          u.avatar_url,
++          u.verification_level,
++          sr.story_id::text AS story_id,
++          sr.kind AS reaction_kind,
++          sr.created_at,
++          EXISTS (
++            SELECT 1 FROM waves w2
++             WHERE w2.from_user_id = $1 AND w2.to_user_id = sr.user_id
++          ) OR EXISTS (
++            SELECT 1 FROM conversations c
++             WHERE c.status = 'accepted'
++               AND c.participant_ids @> ARRAY[$1::uuid, sr.user_id]::uuid[]
++          ) AS is_mutual
++        FROM story_reactions sr
++        JOIN stories s ON s.id = sr.story_id AND s.deleted_at IS NULL AND s.expires_at > NOW()
++        JOIN users u ON u.id = sr.user_id AND u.deleted_at IS NULL
++        WHERE s.author_id = $1
++          AND sr.user_id NOT IN (SELECT uid FROM blocked)
++      )
++      SELECT * FROM (
++        SELECT * FROM waves_in
++        UNION ALL
++        SELECT * FROM reactions_in
++      ) combined
++      ORDER BY created_at DESC
++      LIMIT $2
++      `,
++      [userId, limit],
++    );
++
++    return rows.map((r) => ({
++      id: r.id,
++      type: r.kind,
++      fromUser: {
++        id: r.from_id,
++        displayName: r.display_name,
++        avatarUrl: r.avatar_url,
++        verification: r.verification_level as ReceivedInteraction['fromUser']['verification'],
++      },
++      ...(r.story_id ? { storyId: r.story_id } : {}),
++      ...(r.reaction_kind
++        ? { reactionKind: r.reaction_kind as 'heart' | 'wave' }
++        : {}),
++      createdAt: r.created_at.toISOString(),
++      isMutual: r.is_mutual,
++    }));
++  }
+ }
+diff --git a/apps/backend/src/modules/users/users.service.ts b/apps/backend/src/modules/users/users.service.ts
+index 188af5a..ff7ef62 100644
+--- a/apps/backend/src/modules/users/users.service.ts
++++ b/apps/backend/src/modules/users/users.service.ts
+@@ -15,6 +15,7 @@ import type {
+   IdVerificationStatus,
+   ProfileBadges,
+   PublicUserProfile,
++  PublicUserStatus,
+   SocialLink,
+   SubscriptionTier,
+   UpdateProfileRequest,
+@@ -22,6 +23,7 @@ import type {
+   UserProfile,
+   VerificationLevel,
+ } from '@g88/shared';
++import { summaryForXp } from '@g88/shared';
+ 
+ import { PresenceService } from '../presence/presence.service';
+ import { MessagingService } from '../messaging/messaging.service';
+@@ -215,6 +217,9 @@ export class UsersService {
+       blockedByViewer = blocked;
+     }
+ 
++    // Public status (level/XP/streak) — only for sheet/profile, never map markers.
++    const status = await this.loadPublicStatus(r.id);
++
+     return {
+       id: r.id,
+       displayName: r.display_name,
+@@ -225,11 +230,36 @@ export class UsersService {
+       idVerified: r.id_verification_status === 'verified',
+       goals: r.goals ?? [],
+       online: onlineSet.has(r.id),
++      ...(status ? { status } : {}),
+       ...(relationship ? { relationship } : {}),
+       ...(blockedByViewer !== undefined ? { blockedByViewer } : {}),
+     };
+   }
+ 
++  /** Lightweight public status for EntityBottomSheet / profile cards. */
++  private async loadPublicStatus(userId: string): Promise<PublicUserStatus | undefined> {
++    const rows = await this.db.query<
++      Array<{ total_xp: number; current_streak: number; longest_streak: number }>
++    >(
++      `SELECT total_xp, current_streak, longest_streak
++         FROM user_gamification
++        WHERE user_id = $1
++        LIMIT 1`,
++      [userId],
++    );
++    const row = rows[0];
++    if (!row) {
++      return { level: 1, xpIntoLevel: 0, xpForNextLevel: 50, currentStreak: 0 };
++    }
++    const summary = summaryForXp(row.total_xp, row.current_streak, row.longest_streak);
++    return {
++      level: summary.level,
++      xpIntoLevel: summary.xpIntoLevel,
++      xpForNextLevel: summary.xpForNextLevel,
++      currentStreak: summary.currentStreak,
++    };
++  }
++
+   async updateProfile(userId: string, req: UpdateProfileRequest): Promise<UserProfile> {
+     const setClauses: string[] = [];
+     const params: unknown[] = [userId];
+diff --git a/apps/mobile/src/components/map/EntityBottomSheet.tsx b/apps/mobile/src/components/map/EntityBottomSheet.tsx
+index c6a15cc..09ee0b7 100644
+--- a/apps/mobile/src/components/map/EntityBottomSheet.tsx
++++ b/apps/mobile/src/components/map/EntityBottomSheet.tsx
+@@ -1,6 +1,7 @@
+ import React, { useEffect, useState } from 'react';
+ import {
+   ActivityIndicator,
++  Alert,
+   StyleSheet,
+   Text,
+   TouchableOpacity,
+@@ -16,7 +17,7 @@ import type {
+   UserMeta,
+ } from '@g88/shared';
+ import type { RootStackParamList } from '@/navigation/AppNavigator';
+-import { getJson, postJson } from '@/api/client';
++import { deleteJson, getJson, postJson } from '@/api/client';
+ import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
+ import { VerificationBadge } from '@/components/VerificationBadge';
+ import { Avatar } from '@/components/Avatar';
+@@ -48,6 +49,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
+   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
+   const [fetching, setFetching] = useState(true);
+   const [opening, setOpening] = useState(false);
++  const [blocking, setBlocking] = useState(false);
+ 
+   useEffect(() => {
+     let cancelled = false;
+@@ -67,6 +69,41 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
+   const meta = point.meta;
+   const canMessage = profile?.relationship?.canMessage ?? 'none';
+   const sharedInterests = profile?.relationship?.sharedInterests ?? [];
++  const blocked = profile?.blockedByViewer ?? false;
++  const status = profile?.status;
++
++  const onBlockToggle = (): void => {
++    if (blocking) return;
++    const doBlock = async (): Promise<void> => {
++      setBlocking(true);
++      try {
++        if (blocked) {
++          await deleteJson<{ blocked: boolean }>(`/blocks/${point.id}`);
++          setProfile((p) => (p ? { ...p, blockedByViewer: false } : p));
++        } else {
++          await postJson<undefined, { blocked: boolean }>(`/blocks/${point.id}`, undefined);
++          setProfile((p) => (p ? { ...p, blockedByViewer: true } : p));
++          onClose();
++        }
++      } catch {
++        Alert.alert('Could not update block', 'Try again in a moment.');
++      } finally {
++        setBlocking(false);
++      }
++    };
++    if (blocked) {
++      void doBlock();
++      return;
++    }
++    Alert.alert(
++      'Block this user?',
++      'They will disappear from your map, stories, and messages.',
++      [
++        { text: 'Cancel', style: 'cancel' },
++        { text: 'Block', style: 'destructive', onPress: () => void doBlock() },
++      ],
++    );
++  };
+ 
+   const onMessage = async (): Promise<void> => {
+     if (opening) return;
+@@ -155,6 +192,31 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
+             </Text>
+           ) : null}
+ 
++          {status ? (
++            <View style={styles.statusBlock}>
++              <Text style={styles.statusLevel}>Lv {status.level}</Text>
++              <View style={styles.xpTrack}>
++                <View
++                  style={[
++                    styles.xpFill,
++                    {
++                      width: `${Math.min(
++                        100,
++                        status.xpForNextLevel > 0
++                          ? (status.xpIntoLevel / status.xpForNextLevel) * 100
++                          : 0,
++                      )}%`,
++                    },
++                  ]}
++                />
++              </View>
++              <Text style={styles.statusXp}>
++                {status.xpIntoLevel}/{status.xpForNextLevel} XP
++                {status.currentStreak > 0 ? ` · 🔥 ${status.currentStreak}` : ''}
++              </Text>
++            </View>
++          ) : null}
++
+           <View style={styles.actions}>
+             {canMessage === 'chat' || canMessage === 'request' ? (
+               <TouchableOpacity
+@@ -185,6 +247,16 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
+               <Text style={styles.profileBtnText}>Profile</Text>
+             </TouchableOpacity>
+           </View>
++
++          <TouchableOpacity
++            style={styles.blockLink}
++            onPress={onBlockToggle}
++            disabled={blocking}
++          >
++            <Text style={[styles.blockLinkText, blocked && styles.unblockLinkText]}>
++              {blocking ? '…' : blocked ? 'Unblock' : 'Block'}
++            </Text>
++          </TouchableOpacity>
+         </>
+       )}
+     </>
+@@ -309,7 +381,30 @@ const styles = StyleSheet.create({
+   goalIcon: { fontSize: 13 },
+   goalLabel: { color: '#aaa', fontSize: 12 },
+   sharedHint: { color: '#7ad7ff', fontSize: 13 },
++  statusBlock: {
++    backgroundColor: '#0a0a1a',
++    borderRadius: 12,
++    paddingHorizontal: 12,
++    paddingVertical: 10,
++    gap: 6,
++  },
++  statusLevel: { color: '#fff', fontWeight: '700', fontSize: 14 },
++  xpTrack: {
++    height: 6,
++    backgroundColor: '#2a2a4a',
++    borderRadius: 3,
++    overflow: 'hidden',
++  },
++  xpFill: {
++    height: '100%',
++    backgroundColor: '#00d4ff',
++    borderRadius: 3,
++  },
++  statusXp: { color: '#888', fontSize: 12 },
+   actions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
++  blockLink: { alignSelf: 'center', paddingVertical: 4 },
++  blockLinkText: { color: '#ff6b6b', fontSize: 13, fontWeight: '600' },
++  unblockLinkText: { color: '#7ad7ff' },
+   primaryBtn: {
+     flex: 1,
+     borderRadius: 12,
+diff --git a/apps/mobile/src/navigation/AppNavigator.tsx b/apps/mobile/src/navigation/AppNavigator.tsx
+index 68f5314..e5f063f 100644
+--- a/apps/mobile/src/navigation/AppNavigator.tsx
++++ b/apps/mobile/src/navigation/AppNavigator.tsx
+@@ -27,6 +27,7 @@ import { AchievementsScreen } from '@/screens/AchievementsScreen';
+ import { LeaderboardScreen } from '@/screens/LeaderboardScreen';
+ import { ChallengesScreen } from '@/screens/ChallengesScreen';
+ import { GiftsInboxScreen } from '@/screens/GiftsInboxScreen';
++import { InteractionsScreen } from '@/screens/InteractionsScreen';
+ import VerificationIdScreen from '@/screens/VerificationIdScreen';
+ import { EventDetailScreen } from '@/screens/EventDetailScreen';
+ import { EventCreateScreen } from '@/screens/EventCreateScreen';
+@@ -98,6 +99,7 @@ export type RootStackParamList = {
+   NotificationSettings: undefined;
+   BlockedUsers: undefined;
+   GiftsInbox: undefined;
++  Interactions: undefined;
+   Privacy: undefined;
+   Help: undefined;
+   About: undefined;
+@@ -248,6 +250,11 @@ export function AppNavigator(): React.JSX.Element {
+             />
+             <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
+             <Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />
++            <Stack.Screen
++              name="Interactions"
++              component={InteractionsScreen}
++              options={{ title: 'Interactions', headerStyle: { backgroundColor: '#0a0a1a' }, headerTintColor: '#fff' }}
++            />
+             <Stack.Screen name="Privacy" component={PrivacyScreen} />
+             <Stack.Screen name="Help" component={HelpScreen} />
+             <Stack.Screen name="About" component={AboutScreen} />
+diff --git a/apps/mobile/src/screens/MapScreen.tsx b/apps/mobile/src/screens/MapScreen.tsx
+index ba284aa..dab593b 100644
+--- a/apps/mobile/src/screens/MapScreen.tsx
++++ b/apps/mobile/src/screens/MapScreen.tsx
+@@ -56,6 +56,7 @@ import { useNavigation } from '@react-navigation/native';
+ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+ import type { RootStackParamList } from '@/navigation/AppNavigator';
+ import { track } from '@/lib/analytics';
++import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
+ 
+ const EMPTY_POINTS: DiscoveryPoint[] = [];
+ 
+@@ -72,6 +73,7 @@ export function MapScreen(): React.JSX.Element {
+   const [createOpen, setCreateOpen] = useState(false);
+   const mapRef = useRef<MapView>(null);
+   const nearbyStories = useAppSelector((s) => s.stories.nearby);
++  const { unreadCount: interactionUnread } = useReceivedInteractions();
+ 
+   const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
+   const zoom = useMemo(() => (region ? approxZoomFromRegion(region) : 12), [region]);
+@@ -330,6 +332,22 @@ export function MapScreen(): React.JSX.Element {
+         topOffset={selected ? 52 : 48 + PULSE_STRIP_HEIGHT}
+       />
+       <DailyChallengeCard />
++      {/* Interactions entry — people who waved / reacted */}
++      <TouchableOpacity
++        style={styles.interactionBadge}
++        onPress={() => navigation.navigate('Interactions')}
++        activeOpacity={0.85}
++      >
++        <Text style={styles.interactionBadgeIcon}>👋</Text>
++        {interactionUnread > 0 ? (
++          <View style={styles.interactionBadgeDot}>
++            <Text style={styles.interactionBadgeCount}>
++              {interactionUnread > 9 ? '9+' : interactionUnread}
++            </Text>
++          </View>
++        ) : null}
++      </TouchableOpacity>
++
+       <NudgeBanner />
+ 
+       {!selected && (
+@@ -444,4 +462,33 @@ const styles = StyleSheet.create({
+   },
+   errorText: { color: 'white', flex: 1 },
+   retry: { color: 'white', fontWeight: '600' },
++
++  interactionBadge: {
++    position: 'absolute',
++    top: 52,
++    right: 16,
++    width: 44,
++    height: 44,
++    borderRadius: 22,
++    backgroundColor: '#1a1a2e',
++    borderWidth: 1,
++    borderColor: '#2a2a4a',
++    alignItems: 'center',
++    justifyContent: 'center',
++    zIndex: 20,
++  },
++  interactionBadgeIcon: { fontSize: 20 },
++  interactionBadgeDot: {
++    position: 'absolute',
++    top: -2,
++    right: -2,
++    minWidth: 18,
++    height: 18,
++    borderRadius: 9,
++    backgroundColor: '#ff3b5c',
++    alignItems: 'center',
++    justifyContent: 'center',
++    paddingHorizontal: 4,
++  },
++  interactionBadgeCount: { color: '#fff', fontSize: 10, fontWeight: '700' },
+ });
+diff --git a/packages/shared/src/api.ts b/packages/shared/src/api.ts
+index 789d7c9..5fb1487 100644
+--- a/packages/shared/src/api.ts
++++ b/packages/shared/src/api.ts
+@@ -218,6 +218,15 @@ export interface UserProfile extends AuthenticatedUser {
+   createdAt: string;
+ }
+ 
++/** Public status shown only inside EntityBottomSheet / profile (not on map markers). */
++export interface PublicUserStatus {
++  level: number;
++  /** XP progress within current level (0 .. xpForNextLevel). */
++  xpIntoLevel: number;
++  xpForNextLevel: number;
++  currentStreak: number;
++}
++
+ /** Public-facing profile returned by GET /users/:id */
+ export interface PublicUserProfile {
+   id: string;
+@@ -231,6 +240,11 @@ export interface PublicUserProfile {
+   idVerified: boolean;
+   goals: string[];
+   online: boolean;
++  /**
++   * Local status (level / XP / streak). Shown only after the viewer taps the
++   * user (EntityBottomSheet / profile). Never rendered on map markers.
++   */
++  status?: PublicUserStatus;
+   /**
+    * Viewer-relative messaging relationship. Present only when the profile is
+    * fetched by an authenticated viewer other than the subject. Computed
+@@ -495,6 +509,38 @@ export interface TrendingResponse {
+   generatedAt: string; // ISO
+ }
+ 
++// ─── Received interactions (waves + story reactions toward me) ─────────────
++
++export type ReceivedInteractionType = 'wave' | 'story_reaction';
++
++/**
++ * Unified inbound signal used by the "People who interacted with you" surface.
++ * Waves and story reactions are equal-weight for mutual unlock.
++ */
++export interface ReceivedInteraction {
++  id: string;
++  type: ReceivedInteractionType;
++  fromUser: {
++    id: string;
++    displayName: string;
++    avatarUrl: string | null;
++    verification: VerificationLevel;
++  };
++  /** Present when type === 'story_reaction'. */
++  storyId?: string;
++  /** Mirrors StoryReactionKind ('heart' | 'wave'). */
++  reactionKind?: 'heart' | 'wave';
++  createdAt: string;
++  /** Approximate distance in meters when available. */
++  distanceMeters?: number;
++  /** True when a reciprocal signal already exists (chat should be open). */
++  isMutual: boolean;
++}
++
++export interface ReceivedInteractionsResponse {
++  items: ReceivedInteraction[];
++}
++
+ // ─── Error envelope ────────────────────────────────────────────────────────
+ 
+ export interface ApiError {
