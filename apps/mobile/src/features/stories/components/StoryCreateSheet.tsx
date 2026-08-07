@@ -55,12 +55,13 @@ export function StoryCreateSheet({
         setError('Upload cancelled');
         return;
       }
+      const trimmed = caption.trim();
       await dispatch(
         createStory({
           mediaUrl: uploaded.mediaUrl,
           mediaType: uploaded.mediaType,
-          caption: caption.trim() || undefined,
           location,
+          ...(trimmed ? { caption: trimmed } : {}),
         }),
       ).unwrap();
       setCaption('');
