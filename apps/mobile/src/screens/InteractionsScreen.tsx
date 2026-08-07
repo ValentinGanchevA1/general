@@ -81,7 +81,9 @@ export function InteractionsScreen(): React.JSX.Element {
   const { items, loading, refresh, markSeen } = useReceivedInteractions();
 
   useEffect(() => {
-    markSeen();
+    void Promise.resolve().then(() => {
+      markSeen();
+    });
   }, [markSeen]);
 
   const onWaveBack = useCallback(

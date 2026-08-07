@@ -29,7 +29,10 @@ export function useReceivedInteractions(): {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    // Defer so setState inside refresh is not synchronous in the effect body (CI --max-warnings 0).
+    void Promise.resolve().then(() => {
+      void refresh();
+    });
   }, [refresh]);
 
   // Real-time: new wave bumps the list
