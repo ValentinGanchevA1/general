@@ -18,7 +18,7 @@ export async function pickAndUploadStoryMedia(presign: {
   const result = await launchImageLibrary({
     mediaType: 'photo',
     selectionLimit: 1,
-    quality: 0.85,
+    quality: 0.8,
     includeBase64: true,
   });
   if (result.didCancel) return null;
@@ -66,7 +66,9 @@ function normalizeContentType(asset: Asset, fallback: string): string {
 
 function base64ToArrayBuffer(b64: string): ArrayBuffer {
   // RN provides pure base64 without data: prefix from image-picker.
-  const binary = globalThis.atob(b64);
+  // globalThis is not indexed in RN's TS lib; atob exists at runtime.
+  const atobFn = (globalThis as unknown as { atob: (data: string) => string }).atob;
+  const binary = atobFn(b64);
   const len = binary.length;
   const bytes = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
