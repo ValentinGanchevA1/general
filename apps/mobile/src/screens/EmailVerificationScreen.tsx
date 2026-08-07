@@ -56,7 +56,10 @@ export function EmailVerificationScreen(): React.JSX.Element {
   };
 
   useEffect(() => {
-    void send();
+    // Defer so setState inside send is not synchronous in the effect body (CI --max-warnings 0).
+    void Promise.resolve().then(() => {
+      void send();
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
