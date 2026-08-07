@@ -60,7 +60,7 @@ export const fetchNearbyStories = createAsyncThunk<
       ne: viewport.ne,
       sw: viewport.sw,
       zoom,
-      limit,
+      ...(limit !== undefined ? { limit } : {}),
     });
     return res.stories;
   } catch (e) {
@@ -193,9 +193,10 @@ const slice = createSlice({
     });
 
     b.addCase(recordStoryView.fulfilled, (s, a) => {
+      const storyId = a.meta.arg;
       const apply = (list: StoryCard[]) =>
         list.map((st) =>
-          st.id === a.payload.storyId
+          st.id === storyId
             ? { ...st, viewedByMe: true, viewCount: a.payload.viewCount }
             : st,
         );
@@ -206,9 +207,10 @@ const slice = createSlice({
     });
 
     b.addCase(reactToStory.fulfilled, (s, a) => {
+      const storyId = a.meta.arg.storyId;
       const apply = (list: StoryCard[]) =>
         list.map((st) =>
-          st.id === a.payload.storyId
+          st.id === storyId
             ? {
                 ...st,
                 myReaction: a.payload.reaction,
