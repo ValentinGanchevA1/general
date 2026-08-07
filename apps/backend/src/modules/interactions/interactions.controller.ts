@@ -1,8 +1,6 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
-import { Type } from 'class-transformer';
-
 import type {
   ReceivedInteractionsResponse,
   WaveRequest,
