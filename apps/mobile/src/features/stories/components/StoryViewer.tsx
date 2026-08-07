@@ -31,14 +31,19 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const current = stories[index];
 
+  const storyId = current?.id;
+
   useEffect(() => {
     if (!visible) return;
-    setIndex(initialIndex);
+    // Defer setState out of the effect body (CI --max-warnings 0 / set-state-in-effect).
+    void Promise.resolve().then(() => {
+      setIndex(initialIndex);
+    });
   }, [visible, initialIndex]);
 
   useEffect(() => {
-    if (!visible || !current) return;
-    void dispatch(recordStoryView(current.id));
+    if (!visible || !storyId) return;
+    void dispatch(recordStoryView(storyId));
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       if (index < stories.length - 1) setIndex((i) => i + 1);
@@ -47,7 +52,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [visible, current?.id, index, stories.length, dispatch, onClose]);
+  }, [visible, storyId, index, stories.length, dispatch, onClose]);
 
   if (!current) return null;
 
