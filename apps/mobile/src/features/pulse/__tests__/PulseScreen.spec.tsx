@@ -5,7 +5,44 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { NavigationContainer } from '@react-navigation/native';
 
-import { PulseScreen } from '../PulseScreen';
+// Native modules are not linked under Jest. Mock before any import that pulls them in.
+// jest.mock is hoisted, so these run before the PulseScreen import below.
+jest.mock('@react-native-community/geolocation', () => ({
+  __esModule: true,
+  default: {
+    getCurrentPosition: jest.fn(),
+    watchPosition: jest.fn(() => 1),
+    clearWatch: jest.fn(),
+    setRNConfiguration: jest.fn(),
+    requestAuthorization: jest.fn(),
+  },
+}));
+
+jest.mock('@/features/location/useUserLocation', () => ({
+  __esModule: true,
+  useUserLocation: () => ({
+    coords: { lat: 42.7, lng: 23.3 },
+    requestPermission: jest.fn(),
+  }),
+}));
+
+jest.mock('@/realtime/useSocket', () => ({
+  __esModule: true,
+  useSocket: () => ({
+    on: () => () => undefined,
+    sendPresence: jest.fn(),
+  }),
+}));
+
+jest.mock('@/features/stories/storyMedia', () => ({
+  __esModule: true,
+  pickAndUploadStoryMedia: jest.fn(),
+}));
+
+jest.mock('@/lib/analytics', () => ({
+  __esModule: true,
+  track: jest.fn(),
+}));
 
 // Keep thunks as no-ops; use the real reducer so initial state stays accurate.
 // __esModule: true is required — it is non-enumerable on the real module so the
@@ -16,6 +53,12 @@ jest.mock('../pulseSlice', () => ({
   ...jest.requireActual('../pulseSlice'),
   fetchFeed: jest.fn(() => ({ type: 'pulse/fetch/pending' })),
   clearPendingFilter: jest.fn(() => ({ type: 'pulse/clearPendingFilter' })),
+}));
+
+jest.mock('@/features/stories/storiesSlice', () => ({
+  __esModule: true,
+  ...jest.requireActual('@/features/stories/storiesSlice'),
+  fetchNearbyStories: jest.fn(() => ({ type: 'stories/nearby/pending' })),
 }));
 
 // PulseScreen reads navigation hooks (useNavigation/useRoute/useFocusEffect).
@@ -36,11 +79,13 @@ jest.mock('../useTrendingNearby', () => ({
   useTrendingNearby: () => ({ topics: ['#coffee', '#nightlife', '#sale'], loading: false }),
 }));
 
+import { PulseScreen } from '../PulseScreen';
 import authReducer from '@/features/auth/authSlice';
 import profileReducer from '@/features/profile/profileSlice';
 import chatReducer from '@/features/chat/chatSlice';
 import pulseReducer from '@/features/pulse/pulseSlice';
 import discoveryReducer from '@/features/discovery/discoverySlice';
+import storiesReducer from '@/features/stories/storiesSlice';
 
 function wrap(children: React.ReactElement) {
   const store = configureStore({
@@ -50,6 +95,7 @@ function wrap(children: React.ReactElement) {
       chat: chatReducer,
       pulse: pulseReducer,
       discovery: discoveryReducer,
+      stories: storiesReducer,
     },
   });
   return (
@@ -60,9 +106,10 @@ function wrap(children: React.ReactElement) {
 }
 
 describe('PulseScreen v2', () => {
-  it('renders the Share CTA and filter chips', () => {
-    const { getByTestId } = render(wrap(<PulseScreen />));
-    expect(getByTestId('share-cta')).toBeTruthy();
+  it('renders story strip and filter chips (no Share CTA)', () => {
+    const { getByTestId, queryByTestId, getByLabelText } = render(wrap(<PulseScreen />));
+    expect(queryByTestId('share-cta')).toBeNull();
+    expect(getByLabelText('Create your story')).toBeTruthy();
     expect(getByTestId('pulse-filter-all')).toBeTruthy();
     expect(getByTestId('pulse-filter-chats')).toBeTruthy();
   });
