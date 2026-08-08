@@ -12,29 +12,20 @@ export type VerificationLevel = 'none' | 'email' | 'phone' | 'selfie' | 'id';
 export interface DiscoveryQuery {
   viewport: Viewport;
   zoom: number;
-  kinds?: EntityKind[]; // default: all
-  /** Hash from the previous DiscoveryResponse. Server returns a diff when provided. */
+  kinds?: EntityKind[];
   prevViewportHash?: string;
-  /**
-   * Trending topic filter (hashtag, e.g. '#open-mic'). When set, results are
-   * restricted to events/listings whose title/category slugifies to this topic
-   * (users are excluded). Powers P3.6 "filter map by topic".
-   */
   topic?: string;
 }
 
-/** A cluster bubble — one H3 cell aggregating N entities. */
 export interface ClusterPoint {
   kind: 'cluster';
-  cellId: string;       // H3 cell id, stable for client-side dedupe
-  lat: number;          // cell centroid
+  cellId: string;
+  lat: number;
   lng: number;
-  count: number;        // total entities in cell
-  /** Breakdown by entity kind for icon tinting. */
+  count: number;
   by: Partial<Record<EntityKind, number>>;
 }
 
-/** A single discoverable entity. Meta is a discriminated union by kind. */
 export type EntityPoint =
   | (EntityBase & { kind: 'user'; meta: UserMeta })
   | (EntityBase & { kind: 'event'; meta: EventMeta })
@@ -51,15 +42,14 @@ export interface UserMeta {
   avatarUrl: string | null;
   verification: VerificationLevel;
   online: boolean;
-  lastSeenAt: string | null; // ISO
-  /** True if user's ID has been verified. */
+  lastSeenAt: string | null;
   verifiedBadge?: boolean;
 }
 
 export interface EventMeta {
   title: string;
   coverUrl: string | null;
-  startsAt: string;          // ISO
+  startsAt: string;
   attendeeCount: number;
   capacity: number | null;
 }
@@ -68,37 +58,22 @@ export interface ListingMeta {
   title: string;
   thumbnailUrl: string | null;
   priceCents: number;
-  currency: string;          // ISO 4217
+  currency: string;
   category: string;
 }
 
 export type DiscoveryPoint = ClusterPoint | EntityPoint;
 
-/** Incremental update returned when prevViewportHash is valid and overlaps. */
 export interface DiscoveryDiff {
-  /** New points not present in the previous snapshot. */
   added: DiscoveryPoint[];
-  /** IDs (entities) or cellIds (clusters) no longer in the viewport. */
   removed: string[];
 }
 
 export interface DiscoveryResponse {
-  /**
-   * Full point set. Empty when `diff` is present (diff mode).
-   * Client must fall back to full replace if diff is absent.
-   */
   points: DiscoveryPoint[];
-  /** H3 resolution actually used (the server picks based on zoom). */
   resolution: number;
-  /** Server time when the snapshot was computed. */
   generatedAt: string;
-  /** Opaque hash — send as prevViewportHash on the next request. */
   viewportHash: string;
-  /**
-   * Present when the server computed an incremental diff against prevViewportHash.
-   * Client applies added/removed on top of its cached points.
-   * Null/absent means this is a full response — replace all cached points.
-   */
   diff?: DiscoveryDiff | null;
 }
 
@@ -114,7 +89,6 @@ export interface WaveResponse {
   fromUserId: string;
   toUserId: string;
   createdAt: string;
-  /** Set if this wave reciprocates an existing one and a chat was opened. */
   conversationId: string | null;
 }
 
@@ -126,9 +100,9 @@ export interface LoginRequest {
 }
 
 export interface AuthTokens {
-  accessToken: string;       // JWT, ~15min
-  refreshToken: string;      // opaque, ~30d, rotating
-  expiresAt: string;         // ISO, access token expiry
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
 }
 
 export interface AuthenticatedUser {
@@ -163,20 +137,12 @@ export interface SocialLink {
   verified: boolean;
 }
 
-/**
- * Verification badges, derived server-side from the `verification` ladder
- * (+ premium from subscriptionTier + social from a verified social link).
- * The ladder is cumulative, so `id` implies `phone` implies `email`.
- */
 export interface ProfileBadges {
   email: boolean;
   phone: boolean;
-  /** selfie verified */
   photo: boolean;
   id: boolean;
-  /** at least one verified social link */
   social: boolean;
-  /** any paid subscription tier */
   premium: boolean;
   verified: boolean;
 }
@@ -188,7 +154,6 @@ export interface UpdateProfileRequest {
   visibility?: 'public' | 'private';
   goals?: string[];
   interests?: string[];
-  /** ISO date (YYYY-MM-DD) or null to clear. */
   dateOfBirth?: string | null;
 }
 
@@ -199,29 +164,22 @@ export interface UserProfile extends AuthenticatedUser {
   visibility: 'public' | 'private';
   goals: string[];
   interests: string[];
-  /** true when bio IS NOT NULL */
   profileComplete: boolean;
   phone: string | null;
-  /** Derived from date_of_birth server-side; null when DOB unset. */
   age: number | null;
-  /** Ordered gallery URLs; avatarUrl remains the primary thumbnail. */
   photoUrls: string[];
   subscriptionTier: SubscriptionTier;
   socialLinks: SocialLink[];
-  /** 0–100, derived from the verification ladder. */
   verificationScore: number;
   badges: ProfileBadges;
   idVerificationStatus: IdVerificationStatus;
-  /** True when idVerificationStatus === 'verified'. Shorthand for badge access. */
   verifiedBadge: boolean;
-  /** Account creation timestamp (ISO). Drives account-age gated nudges. */
   createdAt: string;
 }
 
 /** Public status shown only inside EntityBottomSheet / profile (not on map markers). */
 export interface PublicUserStatus {
   level: number;
-  /** XP progress within current level (0 .. xpForNextLevel). */
   xpIntoLevel: number;
   xpForNextLevel: number;
   currentStreak: number;
@@ -234,68 +192,42 @@ export interface PublicUserProfile {
   bio: string | null;
   avatarUrl: string | null;
   verification: VerificationLevel;
-  /** 0–100 verification ladder score, for the trust indicator on the card. */
   verificationScore: number;
-  /** Passed ID-document review — the strong "decagram" badge. */
   idVerified: boolean;
   goals: string[];
   online: boolean;
   /**
-   * Local status (level / XP / streak). Shown only after the viewer taps the
-   * user (EntityBottomSheet / profile). Never rendered on map markers.
+   * Ordered gallery URLs for the public profile photo album.
+   * Omitted or empty when the user has no gallery photos.
    */
+  photoUrls?: string[];
   status?: PublicUserStatus;
-  /**
-   * Viewer-relative messaging relationship. Present only when the profile is
-   * fetched by an authenticated viewer other than the subject. Computed
-   * server-side — never trust the client to decide what it may send.
-   */
   relationship?: ProfileRelationship;
-  /**
-   * Directional: true when the *viewer* has blocked this user. Drives the
-   * Block ⇄ Unblock toggle. Present only for an authenticated viewer other
-   * than the subject. Note this is one-directional — it stays false when the
-   * subject blocked the viewer (the viewer must not learn they were blocked).
-   */
   blockedByViewer?: boolean;
 }
 
-/** A user the caller has blocked — feeds the "Blocked users" settings list. */
 export interface BlockedUser {
   id: string;
   displayName: string;
   avatarUrl: string | null;
-  /** ISO timestamp of when the block was created. */
   blockedAt: string;
 }
 
-/**
- * What the viewer is allowed to do toward this user, and why.
- *  - `chat`    — a match exists (reciprocal wave) → full two-way conversation.
- *  - `request` — no match, but a shared interest/goal → one message until the
- *                recipient replies, then it promotes to `chat`.
- *  - `none`    — neither → only a wave can be sent.
- */
 export type MessagePermission = 'chat' | 'request' | 'none';
 
 export interface ProfileRelationship {
-  /** A reciprocated wave (accepted conversation) exists between the two users. */
   matched: boolean;
-  /** Intersection of the two users' interests ∪ goals — drives the `request` path. */
   sharedInterests: string[];
   canMessage: MessagePermission;
 }
 
 export interface PresignedUploadResponse {
-  /** Presigned S3 PUT URL — expires in 5 minutes. */
   uploadUrl: string;
-  /** Final CDN URL to store as avatarUrl after the PUT succeeds. */
   publicUrl: string;
 }
 
 // ─── Gallery photos ──────────────────────────────────────────────────────────
 
-/** One image in a user's ordered gallery. Position 0 is the primary (avatar). */
 export interface UserPhoto {
   id: string;
   url: string;
@@ -303,64 +235,51 @@ export interface UserPhoto {
 }
 
 export interface AddPhotoRequest {
-  /** Public CDN URL returned by the photos presigned-url upload. */
   url: string;
 }
 
 export interface UploadPhotoBase64Request {
-  /** Base64-encoded image bytes (no data-URI prefix). */
   data: string;
-  /** Image MIME type: image/jpeg | image/png | image/webp | image/heic. */
   contentType: string;
-  /** Original filename, for logging/diagnostics only. */
   fileName?: string;
 }
 
 export interface ReorderPhotosRequest {
-  /** Every photo id the user owns, in the desired order. Index 0 becomes primary. */
   photoIds: string[];
 }
 
 export interface DeleteAccountRequest {
-  /** Must be the literal string 'DELETE' — a deliberate confirmation gate. */
   confirm: 'DELETE';
-  /** Current password. Required for password accounts; omit for OAuth-only accounts. */
   password?: string;
 }
 
 // ─── Verification ────────────────────────────────────────────────────────────
 
 export interface StartPhoneVerificationRequest {
-  /** E.164 format, e.g. +359888123456. */
   phone: string;
 }
 
 export interface StartPhoneVerificationResponse {
   sent: boolean;
-  /** 'sms' in prod; 'dev' when Twilio is unconfigured (local). */
   channel: 'sms' | 'dev';
 }
 
 export interface CheckPhoneVerificationRequest {
   phone: string;
-  /** OTP code entered by the user. */
   code: string;
 }
 
 // ─── Subscriptions ───────────────────────────────────────────────────────────
 
-/** Paid tiers a user can check out into (excludes 'free'). */
 export type PaidTier = Exclude<SubscriptionTier, 'free'>;
 
 export interface SubscriptionPlan {
   tier: SubscriptionTier;
   name: string;
-  /** Display-only, e.g. "$4.99/mo". Billing amount lives in Stripe. */
   priceLabel: string;
   features: string[];
 }
 
-/** Static plan metadata for display. Stripe price IDs live server-side (env). */
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     tier: 'free',
@@ -387,19 +306,16 @@ export interface CreateCheckoutRequest {
 }
 
 export interface CheckoutSessionResponse {
-  /** Hosted Stripe Checkout URL to open in the browser. */
   url: string;
 }
 
 export interface PortalSessionResponse {
-  /** Stripe billing portal URL to manage/cancel the subscription. */
   url: string;
 }
 
 // ─── Social linking ──────────────────────────────────────────────────────────
 
 export interface SocialAuthorizeResponse {
-  /** Provider OAuth authorize URL to open in the browser. */
   url: string;
 }
 
@@ -410,7 +326,7 @@ export interface ChatMessage {
   conversationId: string;
   senderId: string;
   body: string;
-  createdAt: string;  // ISO
+  createdAt: string;
 }
 
 export interface ConversationParticipant {
@@ -419,12 +335,6 @@ export interface ConversationParticipant {
   avatarUrl: string | null;
 }
 
-/**
- * - `accepted` — full two-way chat (born from a match, or a request the
- *   recipient replied to).
- * - `pending`  — an interest-based message request: the initiator may send a
- *   single message; the recipient's first reply promotes it to `accepted`.
- */
 export type ConversationStatus = 'pending' | 'accepted';
 
 export interface ConversationSummary {
@@ -434,17 +344,14 @@ export interface ConversationSummary {
   lastMessageAt: string | null;
   lastMessage: { senderId: string; body: string } | null;
   status: ConversationStatus;
-  /** User who opened the conversation. Set for requests; null for legacy/match convos. */
   initiatedBy: string | null;
 }
 
 export interface MessagePage {
   messages: ChatMessage[];
-  /** Cursor for the next page (ISO timestamp of oldest message in this page). Null = no more pages. */
   nextCursor: string | null;
 }
 
-/** Open (or fetch) a 1:1 conversation toward another user from the map/profile. */
 export interface CreateConversationRequest {
   targetUserId: string;
 }
@@ -452,7 +359,6 @@ export interface CreateConversationRequest {
 export interface CreateConversationResponse {
   conversationId: string;
   status: ConversationStatus;
-  /** Why it was allowed — `chat` for a match, `request` for shared-interest. */
   permission: Exclude<MessagePermission, 'none'>;
 }
 
@@ -466,9 +372,7 @@ export interface RegisterDeviceTokenRequest {
 // ─── Geofences ─────────────────────────────────────────────────────────────
 
 export interface CreateGeofenceRequest {
-  /** Human label, e.g. 'home' or 'work'. Defaults to 'home'. Max 50 chars. */
   label?: string;
-  /** H3 r7 ring count. 0 = single cell (~5 km²), 1 = 7 cells (~35 km²). Max 3. */
   radiusRings?: number;
 }
 
@@ -477,19 +381,16 @@ export interface GeofenceResponse {
   label: string;
   centerH3R7: string;
   radiusRings: number;
-  /** True when the calling user's current H3 r7 cell falls within this geofence's disk. */
   inside: boolean;
   active: boolean;
-  createdAt: string; // ISO
+  createdAt: string;
 }
 
 // ─── Alerts ────────────────────────────────────────────────────────────────
 
 export interface CreateAlertRequest {
   category: AreaCategory;
-  /** 1–280 characters. */
   body: string;
-  /** Optional hashtag topic, e.g. '#open-mic'. 1–60 characters. */
   tag?: string;
 }
 
@@ -498,25 +399,20 @@ export interface AlertResponse {
   category: AreaCategory;
   body: string;
   tag: string | null;
-  createdAt: string; // ISO
+  createdAt: string;
 }
 
 // ─── Trending ──────────────────────────────────────────────────────────────
 
 export interface TrendingResponse {
-  /** Hashtag-formatted topics, e.g. ['#open-mic', '#yoga']. Up to 10 entries. */
   topics: string[];
-  generatedAt: string; // ISO
+  generatedAt: string;
 }
 
 // ─── Received interactions (waves + story reactions toward me) ─────────────
 
 export type ReceivedInteractionType = 'wave' | 'story_reaction';
 
-/**
- * Unified inbound signal used by the "People who interacted with you" surface.
- * Waves and story reactions are equal-weight for mutual unlock.
- */
 export interface ReceivedInteraction {
   id: string;
   type: ReceivedInteractionType;
@@ -526,14 +422,10 @@ export interface ReceivedInteraction {
     avatarUrl: string | null;
     verification: VerificationLevel;
   };
-  /** Present when type === 'story_reaction'. */
   storyId?: string;
-  /** Mirrors StoryReactionKind ('heart' | 'wave'). */
   reactionKind?: 'heart' | 'wave';
   createdAt: string;
-  /** Approximate distance in meters when available. */
   distanceMeters?: number;
-  /** True when a reciprocal signal already exists (chat should be open). */
   isMutual: boolean;
 }
 
@@ -545,8 +437,8 @@ export interface ReceivedInteractionsResponse {
 
 export interface ApiError {
   statusCode: number;
-  code: string;              // machine-readable, e.g. 'wave.rate_limited'
-  message: string;           // human-readable
+  code: string;
+  message: string;
   details?: Record<string, unknown>;
 }
 

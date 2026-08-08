@@ -70,10 +70,19 @@ export const fetchNearbyStories = createAsyncThunk<
 
 export const fetchAuthorStories = createAsyncThunk<
   { authorId: string; stories: StoryCard[] },
-  string
->('stories/byAuthor', async (authorId, { rejectWithValue }) => {
+  { authorId: string; includeExpired?: boolean; limit?: number } | string
+>('stories/byAuthor', async (arg, { rejectWithValue }) => {
+  const authorId = typeof arg === 'string' ? arg : arg.authorId;
+  const includeExpired = typeof arg === 'string' ? false : Boolean(arg.includeExpired);
+  const limit = typeof arg === 'string' ? 50 : (arg.limit ?? 50);
   try {
-    const stories = await getJson<StoryCard[]>(`/stories/author/${authorId}`);
+    const qs = new URLSearchParams();
+    if (includeExpired) qs.set('includeExpired', '1');
+    qs.set('limit', String(limit));
+    const q = qs.toString();
+    const stories = await getJson<StoryCard[]>(
+      `/stories/author/${authorId}${q ? `?${q}` : ''}`,
+    );
     return { authorId, stories };
   } catch (e) {
     return rejectWithValue(errorMessage(e, 'Failed to load author stories'));
