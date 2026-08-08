@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -22,6 +24,7 @@ import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { Avatar } from '@/components/Avatar';
+import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
@@ -230,6 +233,21 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
             </View>
           </View>
         ) : null}
+
+        {(profile.photoUrls?.length ?? 0) > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Photos</Text>
+            <View style={styles.photoGrid}>
+              {profile.photoUrls!.map((url, index) => (
+                <Image key={`${url}-${index}`} source={{ uri: url }} style={styles.gridPhoto} />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.section}>
+          <ProfileStoryline userId={userId} />
+        </View>
       </ScrollView>
 
       <View style={styles.footer}>
@@ -262,6 +280,8 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     </View>
   );
 }
+
+const PHOTO = (Dimensions.get('window').width - 48) / 3;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0a0a0f' },
@@ -301,6 +321,8 @@ const styles = StyleSheet.create({
   trustChipStrongText: { color: '#00d4ff', fontSize: 12, fontWeight: '700' },
   trustEmpty: { color: '#666', fontSize: 12 },
   section: { gap: 10 },
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  gridPhoto: { width: PHOTO, height: PHOTO, borderRadius: 10, backgroundColor: '#1a1a24' },
   sectionLabel: {
     color: '#555',
     fontSize: 11,
