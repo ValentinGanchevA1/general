@@ -67,8 +67,7 @@ export class StoriesService {
     await this.assertCanPost(userId);
 
     const active = (await this.db.query(
-      `SELECT COUNT(*)::int AS n FROM stories
-        WHERE author_id = $1 AND deleted_at IS NULL AND expires_at > NOW()`,
+      `SELECT COUNT(*)::int AS n FROM stories\n        WHERE author_id = $1 AND deleted_at IS NULL AND expires_at > NOW()`,
       [userId],
     )) as Array<{ n: number }>;
     if ((active[0]?.n ?? 0) >= STORY_LIMITS.maxActivePerUser) {
@@ -83,20 +82,7 @@ export class StoriesService {
     const expiresAt = new Date(Date.now() + STORY_LIMITS.ttlHours * 3_600_000);
 
     const rows = (await this.db.query(
-      `INSERT INTO stories (
-          author_id, media_url, media_type, caption,
-          location, location_h3_r4, location_h3_r5, location_h3_r6,
-          location_h3_r7, location_h3_r8, location_h3_r9, location_h3_r10,
-          approx_lat, approx_lng, expires_at
-        ) VALUES (
-          $1, $2, $3, $4,
-          ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography,
-          $7, $8, $9, $10, $11, $12, $13,
-          $14, $15, $16
-        )
-        RETURNING id, author_id, media_url, media_type, caption,
-                  approx_lat, approx_lng, expires_at, created_at,
-                  view_count, reaction_count, location_h3_r7`,
+      `INSERT INTO stories (\n          author_id, media_url, media_type, caption,\n          location, location_h3_r4, location_h3_r5, location_h3_r6,\n          location_h3_r7, location_h3_r8, location_h3_r9, location_h3_r10,\n          approx_lat, approx_lng, expires_at\n        ) VALUES (\n          $1, $2, $3, $4,\n          ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography,\n          $7, $8, $9, $10, $11, $12, $13,\n          $14, $15, $16\n        )\n        RETURNING id, author_id, media_url, media_type, caption,\n                  approx_lat, approx_lng, expires_at, created_at,\n                  view_count, reaction_count, location_h3_r7`,
       [
         userId,
         dto.mediaUrl,
@@ -140,30 +126,7 @@ export class StoriesService {
     const limit = dto.limit ?? STORY_LIMITS.nearbyLimit;
 
     const rows = (await this.db.query(
-      `SELECT s.id, s.author_id, s.media_url, s.media_type, s.caption,
-              s.approx_lat, s.approx_lng, s.expires_at, s.created_at,
-              s.view_count, s.reaction_count,
-              u.display_name, u.avatar_url, u.verification_level,
-              EXISTS (
-                SELECT 1 FROM story_views sv
-                 WHERE sv.story_id = s.id AND sv.viewer_id = $1
-              ) AS viewed_by_me,
-              (
-                SELECT sr.kind FROM story_reactions sr
-                 WHERE sr.story_id = s.id AND sr.user_id = $1
-              ) AS my_reaction
-         FROM stories s
-         JOIN users u ON u.id = s.author_id AND u.deleted_at IS NULL
-        WHERE s.deleted_at IS NULL
-          AND s.expires_at > NOW()
-          AND s.${h3Col} = ANY($2::text[])
-          AND NOT EXISTS (
-            SELECT 1 FROM user_blocks ub
-             WHERE (ub.blocker_id = $1 AND ub.blocked_id = s.author_id)
-                OR (ub.blocker_id = s.author_id AND ub.blocked_id = $1)
-          )
-        ORDER BY s.created_at DESC
-        LIMIT $3`,
+      `SELECT s.id, s.author_id, s.media_url, s.media_type, s.caption,\n              s.approx_lat, s.approx_lng, s.expires_at, s.created_at,\n              s.view_count, s.reaction_count,\n              u.display_name, u.avatar_url, u.verification_level,\n              EXISTS (\n                SELECT 1 FROM story_views sv\n                 WHERE sv.story_id = s.id AND sv.viewer_id = $1\n              ) AS viewed_by_me,\n              (\n                SELECT sr.kind FROM story_reactions sr\n                 WHERE sr.story_id = s.id AND sr.user_id = $1\n              ) AS my_reaction\n         FROM stories s\n         JOIN users u ON u.id = s.author_id AND u.deleted_at IS NULL\n        WHERE s.deleted_at IS NULL\n          AND s.expires_at > NOW()\n          AND s.${h3Col} = ANY($2::text[])\n          AND NOT EXISTS (\n            SELECT 1 FROM user_blocks ub\n             WHERE (ub.blocker_id = $1 AND ub.blocked_id = s.author_id)\n                OR (ub.blocker_id = s.author_id AND ub.blocked_id = $1)\n          )\n        ORDER BY s.created_at DESC\n        LIMIT $3`,
       [userId, cells, limit],
     )) as StoryRow[];
 
@@ -172,28 +135,7 @@ export class StoriesService {
 
   async getOne(userId: string, storyId: string): Promise<StoryCard> {
     const rows = (await this.db.query(
-      `SELECT s.id, s.author_id, s.media_url, s.media_type, s.caption,
-              s.approx_lat, s.approx_lng, s.expires_at, s.created_at,
-              s.view_count, s.reaction_count,
-              u.display_name, u.avatar_url, u.verification_level,
-              EXISTS (
-                SELECT 1 FROM story_views sv
-                 WHERE sv.story_id = s.id AND sv.viewer_id = $1
-              ) AS viewed_by_me,
-              (
-                SELECT sr.kind FROM story_reactions sr
-                 WHERE sr.story_id = s.id AND sr.user_id = $1
-              ) AS my_reaction
-         FROM stories s
-         JOIN users u ON u.id = s.author_id AND u.deleted_at IS NULL
-        WHERE s.id = $2
-          AND s.deleted_at IS NULL
-          AND s.expires_at > NOW()
-          AND NOT EXISTS (
-            SELECT 1 FROM user_blocks ub
-             WHERE (ub.blocker_id = $1 AND ub.blocked_id = s.author_id)
-                OR (ub.blocker_id = s.author_id AND ub.blocked_id = $1)
-          )`,
+      `SELECT s.id, s.author_id, s.media_url, s.media_type, s.caption,\n              s.approx_lat, s.approx_lng, s.expires_at, s.created_at,\n              s.view_count, s.reaction_count,\n              u.display_name, u.avatar_url, u.verification_level,\n              EXISTS (\n                SELECT 1 FROM story_views sv\n                 WHERE sv.story_id = s.id AND sv.viewer_id = $1\n              ) AS viewed_by_me,\n              (\n                SELECT sr.kind FROM story_reactions sr\n                 WHERE sr.story_id = s.id AND sr.user_id = $1\n              ) AS my_reaction\n         FROM stories s\n         JOIN users u ON u.id = s.author_id AND u.deleted_at IS NULL\n        WHERE s.id = $2\n          AND s.deleted_at IS NULL\n          AND s.expires_at > NOW()\n          AND NOT EXISTS (\n            SELECT 1 FROM user_blocks ub\n             WHERE (ub.blocker_id = $1 AND ub.blocked_id = s.author_id)\n                OR (ub.blocker_id = s.author_id AND ub.blocked_id = $1)\n          )`,
       [userId, storyId],
     )) as StoryRow[];
 
@@ -208,8 +150,7 @@ export class StoriesService {
     storyId: string,
   ): Promise<{ viewed: true; viewCount: number }> {
     const [story] = (await this.db.query(
-      `SELECT author_id FROM stories
-        WHERE id = $1 AND deleted_at IS NULL AND expires_at > NOW()`,
+      `SELECT author_id FROM stories\n        WHERE id = $1 AND deleted_at IS NULL AND expires_at > NOW()`,
       [storyId],
     )) as Array<{ author_id: string }>;
     if (!story) {
@@ -224,10 +165,7 @@ export class StoriesService {
     }
 
     const inserted = (await this.db.query(
-      `INSERT INTO story_views (story_id, viewer_id)
-       VALUES ($1, $2)
-       ON CONFLICT DO NOTHING
-       RETURNING story_id`,
+      `INSERT INTO story_views (story_id, viewer_id)\n       VALUES ($1, $2)\n       ON CONFLICT DO NOTHING\n       RETURNING story_id`,
       [storyId, userId],
     )) as Array<{ story_id: string }>;
 
@@ -251,8 +189,7 @@ export class StoriesService {
     kind: StoryReactionKind,
   ): Promise<{ reaction: StoryReactionKind; reactionCount: number }> {
     const [story] = (await this.db.query(
-      `SELECT author_id FROM stories
-        WHERE id = $1 AND deleted_at IS NULL AND expires_at > NOW()`,
+      `SELECT author_id FROM stories\n        WHERE id = $1 AND deleted_at IS NULL AND expires_at > NOW()`,
       [storyId],
     )) as Array<{ author_id: string }>;
     if (!story) {
@@ -281,8 +218,7 @@ export class StoriesService {
       );
     } else if (existing[0]!.kind !== kind) {
       await this.db.query(
-        `UPDATE story_reactions SET kind = $3, created_at = NOW()
-          WHERE story_id = $1 AND user_id = $2`,
+        `UPDATE story_reactions SET kind = $3, created_at = NOW()\n          WHERE story_id = $1 AND user_id = $2`,
         [storyId, userId, kind],
       );
     }
@@ -296,9 +232,7 @@ export class StoriesService {
 
   async remove(userId: string, storyId: string): Promise<void> {
     const result = (await this.db.query(
-      `UPDATE stories SET deleted_at = NOW()
-        WHERE id = $1 AND author_id = $2 AND deleted_at IS NULL
-        RETURNING id`,
+      `UPDATE stories SET deleted_at = NOW()\n        WHERE id = $1 AND author_id = $2 AND deleted_at IS NULL\n        RETURNING id`,
       [storyId, userId],
     )) as Array<{ id: string }>;
     if (result.length === 0) {
@@ -306,36 +240,29 @@ export class StoriesService {
     }
   }
 
-  async listByAuthor(viewerId: string, authorId: string): Promise<StoryCard[]> {
+  /**
+   * Profile storyline for an author.
+   * Active-only by default (profile ring). includeExpired returns recent history
+   * (still excludes soft-deleted); ordered newest-first for a wall/timeline.
+   */
+  async listByAuthor(
+    viewerId: string,
+    authorId: string,
+    opts: { includeExpired?: boolean; limit?: number } = {},
+  ): Promise<StoryCard[]> {
     const blocked = (await this.db.query(
-      `SELECT 1 FROM user_blocks
-        WHERE (blocker_id = $1 AND blocked_id = $2)
-           OR (blocker_id = $2 AND blocked_id = $1)
-        LIMIT 1`,
+      `SELECT 1 FROM user_blocks\n        WHERE (blocker_id = $1 AND blocked_id = $2)\n           OR (blocker_id = $2 AND blocked_id = $1)\n        LIMIT 1`,
       [viewerId, authorId],
     )) as unknown[];
     if (blocked.length > 0) return [];
 
+    const includeExpired = opts.includeExpired === true;
+    const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100);
+    const expireClause = includeExpired ? '' : 'AND s.expires_at > NOW()';
+
     const rows = (await this.db.query(
-      `SELECT s.id, s.author_id, s.media_url, s.media_type, s.caption,
-              s.approx_lat, s.approx_lng, s.expires_at, s.created_at,
-              s.view_count, s.reaction_count,
-              u.display_name, u.avatar_url, u.verification_level,
-              EXISTS (
-                SELECT 1 FROM story_views sv
-                 WHERE sv.story_id = s.id AND sv.viewer_id = $1
-              ) AS viewed_by_me,
-              (
-                SELECT sr.kind FROM story_reactions sr
-                 WHERE sr.story_id = s.id AND sr.user_id = $1
-              ) AS my_reaction
-         FROM stories s
-         JOIN users u ON u.id = s.author_id
-        WHERE s.author_id = $2
-          AND s.deleted_at IS NULL
-          AND s.expires_at > NOW()
-        ORDER BY s.created_at ASC`,
-      [viewerId, authorId],
+      `SELECT s.id, s.author_id, s.media_url, s.media_type, s.caption,\n              s.approx_lat, s.approx_lng, s.expires_at, s.created_at,\n              s.view_count, s.reaction_count,\n              u.display_name, u.avatar_url, u.verification_level,\n              EXISTS (\n                SELECT 1 FROM story_views sv\n                 WHERE sv.story_id = s.id AND sv.viewer_id = $1\n              ) AS viewed_by_me,\n              (\n                SELECT sr.kind FROM story_reactions sr\n                 WHERE sr.story_id = s.id AND sr.user_id = $1\n              ) AS my_reaction\n         FROM stories s\n         JOIN users u ON u.id = s.author_id\n        WHERE s.author_id = $2\n          AND s.deleted_at IS NULL\n          ` + expireClause + `\n        ORDER BY s.created_at DESC\n        LIMIT $3`,
+      [viewerId, authorId, limit],
     )) as StoryRow[];
 
     return rows.map((r) => this.toCard(r));
@@ -343,8 +270,7 @@ export class StoriesService {
 
   private async assertCanPost(userId: string): Promise<void> {
     const [u] = (await this.db.query(
-      `SELECT verification_level, created_at FROM users
-        WHERE id = $1 AND deleted_at IS NULL`,
+      `SELECT verification_level, created_at FROM users\n        WHERE id = $1 AND deleted_at IS NULL`,
       [userId],
     )) as Array<{ verification_level: VerificationLevel; created_at: Date | string }>;
     if (!u) {
@@ -368,7 +294,6 @@ export class StoriesService {
       });
     }
 
-    // Rolling 24h rate limit — tighter for email-only accounts.
     const rankPhone =
       u.verification_level === 'phone' ||
       u.verification_level === 'selfie' ||
@@ -378,9 +303,7 @@ export class StoriesService {
       : STORY_LIMITS.softerGateMaxPer24h;
 
     const [cnt] = (await this.db.query(
-      `SELECT COUNT(*)::int AS n FROM stories
-        WHERE author_id = $1
-          AND created_at > NOW() - INTERVAL '24 hours'`,
+      `SELECT COUNT(*)::int AS n FROM stories\n        WHERE author_id = $1\n          AND created_at > NOW() - INTERVAL '24 hours'`,
       [userId],
     )) as Array<{ n: number }>;
     if ((cnt?.n ?? 0) >= maxPer24h) {
@@ -396,8 +319,7 @@ export class StoriesService {
 
   private async enrichOne(row: StoryRow): Promise<StoryCard> {
     const [u] = (await this.db.query(
-      `SELECT display_name, avatar_url, verification_level
-         FROM users WHERE id = $1`,
+      `SELECT display_name, avatar_url, verification_level\n         FROM users WHERE id = $1`,
       [row.author_id],
     )) as Array<{
       display_name: string;
