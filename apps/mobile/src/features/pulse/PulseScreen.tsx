@@ -1,26 +1,44 @@
 // apps/mobile/src/features/pulse/PulseScreen.tsx
 //
-// Pulse v2 — Nextdoor-style activity hub.
-//   Layout: header + share-CTA + filter chips + nearby strip + cards + trending
-//   Data:   `/feed` (existing) for cards; `discovery.points` for nearby strip;
-//           mock array for trending until X4 lands.
+// Pulse — activity hub + stories.
+//   Layout: header + story strip + filter chips + nearby strip + cards + trending
+//   Data:   `/feed` for cards; stories.nearby for PulseStrip; discovery for nearby.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet,
-  Text, TouchableOpacity, View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 
-import type { ActivityItem, ActivityType } from '@g88/shared';
+import type { ActivityItem, ActivityType, StoryCard, Viewport } from '@g88/shared';
+import { canPostStory, storyGateMessage } from '@g88/shared';
+
 import type { PulseFilter, RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchFeed, clearPendingFilter } from './pulseSlice';
+import { useUserLocation } from '@/features/location/useUserLocation';
+import {
+  fetchNearbyStories,
+  storyReceived,
+} from '@/features/stories/storiesSlice';
+import { PulseStrip } from '@/features/stories/components/PulseStrip';
+import { StoryViewer } from '@/features/stories/components/StoryViewer';
+import { StoryCreateSheet } from '@/features/stories/components/StoryCreateSheet';
+import { pickAndUploadStoryMedia } from '@/features/stories/storyMedia';
+import { useSocket } from '@/realtime/useSocket';
+import { track } from '@/lib/analytics';
 
-import { ShareCTA } from './components/ShareCTA';
 import { ActivityCard } from './components/ActivityCard';
 import { NearbyPeopleStrip } from './components/NearbyPeopleStrip';
 import { TrendingStrip } from './components/TrendingStrip';
@@ -40,6 +58,18 @@ const FILTERS: FilterDef[] = [
   { key: 'matches',  label: 'Matches', type: 'match' },
 ];
 
+/** ~2km box around the user for nearby story query when map viewport is unavailable. */
+function viewportAround(
+  lat: number,
+  lng: number,
+  delta = 0.02,
+): Viewport {
+  return {
+    ne: { lat: lat + delta / 2, lng: lng + delta / 2 },
+    sw: { lat: lat - delta / 2, lng: lng - delta / 2 },
+  };
+}
+
 export function PulseScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<Nav>();
@@ -47,9 +77,16 @@ export function PulseScreen(): React.JSX.Element {
 
   const { items, loading, error, pendingFilter } = useAppSelector((s) => s.pulse);
   const discoveryPoints = useAppSelector((s) => s.discovery.points);
+  const nearbyStories = useAppSelector((s) => s.stories.nearby);
+  const profile = useAppSelector((s) => s.profile.profile);
   const { topics: trendingTopics } = useTrendingNearby();
+  const { coords: myCoords } = useUserLocation();
+  const { on } = useSocket();
 
   const [filter, setFilter] = useState<PulseFilter>(route.params?.filter ?? 'all');
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -69,7 +106,29 @@ export function PulseScreen(): React.JSX.Element {
     void dispatch(fetchFeed(f?.type ? { types: [f.type] } : {}));
   }, [dispatch, filter]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  const loadStories = useCallback(() => {
+    if (!myCoords) return;
+    void dispatch(
+      fetchNearbyStories({
+        viewport: viewportAround(myCoords.lat, myCoords.lng),
+        zoom: 14,
+      }),
+    );
+  }, [dispatch, myCoords]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+      loadStories();
+    }, [load, loadStories]),
+  );
+
+  useEffect(() => {
+    const unsub = on('story:new', (e) => {
+      dispatch(storyReceived(e));
+    });
+    return unsub;
+  }, [on, dispatch]);
 
   const filtered = useMemo(() => {
     const f = FILTERS.find((x) => x.key === filter);
@@ -85,9 +144,39 @@ export function PulseScreen(): React.JSX.Element {
     }
   }, [navigation]);
 
-  const openAlertComposer = useCallback(() => {
-    navigation.navigate('AlertComposer', { presetCategory: 'general' });
-  }, [navigation]);
+  const storyEligibility = useMemo(() => {
+    if (!profile) return { allowed: false as const, reason: 'email_unverified' as const };
+    return canPostStory({
+      verification: profile.verification,
+      createdAt: profile.createdAt,
+    });
+  }, [profile]);
+
+  const onOpenStory = useCallback((story: StoryCard, index: number) => {
+    setViewerIndex(index);
+    setViewerOpen(true);
+    track('story.open', { storyId: story.id, index, surface: 'pulse' });
+  }, []);
+
+  const onCreatePress = useCallback(() => {
+    if (!storyEligibility.allowed) {
+      const reason = storyEligibility.reason;
+      const buttons =
+        reason === 'email_unverified'
+          ? [
+              { text: 'Cancel', style: 'cancel' as const },
+              {
+                text: 'Verify email',
+                onPress: () => navigation.navigate('EmailVerification'),
+              },
+            ]
+          : [{ text: 'OK' }];
+      Alert.alert('Stories', storyGateMessage(reason), buttons);
+      return;
+    }
+    setCreateOpen(true);
+    track('story.create_open', { surface: 'pulse' });
+  }, [storyEligibility, navigation]);
 
   const emptyCopy = useMemo(() => {
     switch (filter) {
@@ -109,7 +198,7 @@ export function PulseScreen(): React.JSX.Element {
       case 'alerts':
         return {
           title: 'No local alerts',
-          hint: "Share what's happening around you with the button above.",
+          hint: 'Post an alert from the map Create button when something is happening nearby.',
         };
       case 'matches':
         return {
@@ -119,7 +208,7 @@ export function PulseScreen(): React.JSX.Element {
       default:
         return {
           title: 'Quiet around here',
-          hint: "Pull to refresh, or share what's happening.",
+          hint: 'Pull to refresh, or post a story above.',
         };
     }
   }, [filter]);
@@ -130,7 +219,11 @@ export function PulseScreen(): React.JSX.Element {
         <Text style={S.headerTitle}>Pulse</Text>
       </View>
 
-      <ShareCTA onPress={openAlertComposer} />
+      <PulseStrip
+        onOpenStory={onOpenStory}
+        onCreatePress={onCreatePress}
+        canCreate={storyEligibility.allowed}
+      />
 
       <ScrollView
         horizontal showsHorizontalScrollIndicator={false}
@@ -174,6 +267,18 @@ export function PulseScreen(): React.JSX.Element {
       <View style={S.container}>
         {Header}
         <View style={S.center}><ActivityIndicator color="#00d4ff" /></View>
+        <StoryViewer
+          stories={nearbyStories}
+          initialIndex={viewerIndex}
+          visible={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+        />
+        <StoryCreateSheet
+          visible={createOpen}
+          onClose={() => setCreateOpen(false)}
+          location={myCoords}
+          pickAndUpload={pickAndUploadStoryMedia}
+        />
       </View>
     );
   }
@@ -187,6 +292,18 @@ export function PulseScreen(): React.JSX.Element {
             <Text style={S.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
+        <StoryViewer
+          stories={nearbyStories}
+          initialIndex={viewerIndex}
+          visible={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+        />
+        <StoryCreateSheet
+          visible={createOpen}
+          onClose={() => setCreateOpen(false)}
+          location={myCoords}
+          pickAndUpload={pickAndUploadStoryMedia}
+        />
       </View>
     );
   }
@@ -207,9 +324,29 @@ export function PulseScreen(): React.JSX.Element {
           </View>
         }
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={load} tintColor="#00d4ff" />
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={() => {
+              load();
+              loadStories();
+            }}
+            tintColor="#00d4ff"
+          />
         }
         contentContainerStyle={{ paddingBottom: 140 }}
+      />
+
+      <StoryViewer
+        stories={nearbyStories}
+        initialIndex={viewerIndex}
+        visible={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+      />
+      <StoryCreateSheet
+        visible={createOpen}
+        onClose={() => setCreateOpen(false)}
+        location={myCoords}
+        pickAndUpload={pickAndUploadStoryMedia}
       />
     </View>
   );
