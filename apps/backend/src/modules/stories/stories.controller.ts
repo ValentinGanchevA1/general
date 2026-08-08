@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -69,13 +70,23 @@ export class StoriesController {
     return this.stories.nearby(userId, dto).then((stories) => ({ stories }));
   }
 
-  /** GET /api/v1/stories/author/:userId — active stories for profile ring. */
+  /**
+   * GET /api/v1/stories/author/:userId — profile storyline.
+   * Default: active only (expires_at > now). ?includeExpired=1 adds history (cap limit).
+   */
   @Get('author/:userId')
   listByAuthor(
     @CurrentUser('id') viewerId: string,
     @Param('userId', ParseUUIDPipe) authorId: string,
+    @Query('includeExpired') includeExpiredRaw?: string,
+    @Query('limit') limitRaw?: string,
   ): Promise<StoryCard[]> {
-    return this.stories.listByAuthor(viewerId, authorId);
+    const includeExpired =
+      includeExpiredRaw === '1' ||
+      includeExpiredRaw === 'true' ||
+      includeExpiredRaw === 'yes';
+    const limit = Math.min(Math.max(Number(limitRaw) || 50, 1), 100);
+    return this.stories.listByAuthor(viewerId, authorId, { includeExpired, limit });
   }
 
   /** GET /api/v1/stories/:id */
