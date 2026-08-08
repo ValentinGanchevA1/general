@@ -20,12 +20,12 @@ interface Props {
 }
 
 /**
- * Rendered height of the strip (padding + ring + name), used by MapScreen
- * to shift TrendingFilterBar clear of this overlay.
+ * Rendered height of the strip (padding + ring + name).
+ * Kept for layout consumers that reserve vertical space.
  */
 export const PULSE_STRIP_HEIGHT = 8 /* wrap py */ + 64 /* ring */ + 4 + 14 /* name */ + 8;
 
-/** Horizontal Pulse/Storyline strip for the map dashboard. */
+/** Horizontal stories strip — primary surface is the Pulse tab. */
 export function PulseStrip({ onOpenStory, onCreatePress, canCreate = true }: Props) {
   const stories = useAppSelector((s) => s.stories.nearby);
   const loading = useAppSelector((s) => s.stories.loading);
