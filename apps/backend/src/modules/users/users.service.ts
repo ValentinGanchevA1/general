@@ -68,7 +68,6 @@ const USER_COLUMNS = `
   goals, interests, phone, subscription_tier, id_verification_status, created_at,
   date_part('year', age(date_of_birth))::int AS age`;
 
-// Verification ladder is cumulative: none < email < phone < selfie < id.
 const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
 const SCORE: Record<VerificationLevel, number> = {
   none: 0,
@@ -78,18 +77,11 @@ const SCORE: Record<VerificationLevel, number> = {
   id: 100,
 };
 
-/**
- * Safe ISO conversion for a DB timestamp. `created_at` is NOT NULL in schema,
- * but a malformed/missing value must never `RangeError`-crash the core profile
- * read. Falls back to "now" — treated as a fresh account, so the age-gated
- * verification nudge stays suppressed rather than firing on bad data.
- */
 function toIsoOrNow(value: string | Date | null | undefined): string {
   const d = new Date(value as string | Date);
   return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
 }
 
-// Mirrors the mobile gallery cap (ProfileScreen shows the add tile while < 6).
 const MAX_PHOTOS = 6;
 
 @Injectable()
@@ -178,12 +170,6 @@ export class UsersService {
     return this.toProfile(rows[0], photoUrls, socialLinks);
   }
 
-  /**
-   * Public profile card. When a `viewerId` is supplied (the authenticated
-   * caller) and differs from the subject, attach the viewer-relative
-   * `relationship` block so the client knows whether to show Wave vs Message.
-   * Avatar falls back to the primary gallery photo when users.avatar_url is null.
-   */
   async getPublicProfile(userId: string, viewerId?: string): Promise<PublicUserProfile> {
     const rows = await this.db.query<PublicUserRow[]>(
       `SELECT id, display_name,
@@ -217,8 +203,11 @@ export class UsersService {
       blockedByViewer = blocked;
     }
 
-    // Public status (level/XP/streak) — only for sheet/profile, never map markers.
-    const status = await this.loadPublicStatus(r.id);
+    const [status, photos] = await Promise.all([
+      this.loadPublicStatus(r.id),
+      this.listPhotos(r.id),
+    ]);
+    const photoUrls = photos.map((ph) => ph.url);
 
     return {
       id: r.id,
@@ -230,13 +219,13 @@ export class UsersService {
       idVerified: r.id_verification_status === 'verified',
       goals: r.goals ?? [],
       online: onlineSet.has(r.id),
+      ...(photoUrls.length > 0 ? { photoUrls } : {}),
       ...(status ? { status } : {}),
       ...(relationship ? { relationship } : {}),
       ...(blockedByViewer !== undefined ? { blockedByViewer } : {}),
     };
   }
 
-  /** Lightweight public status for EntityBottomSheet / profile cards. */
   private async loadPublicStatus(userId: string): Promise<PublicUserStatus | undefined> {
     const rows = await this.db.query<
       Array<{ total_xp: number; current_streak: number; longest_streak: number }>
