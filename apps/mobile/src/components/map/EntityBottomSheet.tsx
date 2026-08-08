@@ -133,26 +133,37 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
       <View style={styles.handle} />
 
       <View style={styles.userHeader}>
-        <Avatar
-          uri={profile?.avatarUrl ?? point.meta.avatarUrl}
-          name={meta.displayName}
-          size={56}
-          ring
-          online={meta.online}
-        />
-        <View style={styles.userHeaderText}>
-          <View style={styles.nameRow}>
-            <Text style={styles.title}>{meta.displayName}</Text>
-            <VerificationBadge
-              verification={meta.verification}
-              idVerified={meta.verifiedBadge}
-              size={16}
-            />
+        <TouchableOpacity
+          style={styles.userHeaderTap}
+          activeOpacity={0.75}
+          onPress={() => {
+            onClose();
+            navigation.navigate('UserProfile', { userId: point.id });
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${meta.displayName} profile`}
+        >
+          <Avatar
+            uri={profile?.avatarUrl ?? point.meta.avatarUrl}
+            name={meta.displayName}
+            size={56}
+            ring
+            online={meta.online}
+          />
+          <View style={styles.userHeaderText}>
+            <View style={styles.nameRow}>
+              <Text style={styles.title}>{meta.displayName}</Text>
+              <VerificationBadge
+                verification={meta.verification}
+                idVerified={meta.verifiedBadge}
+                size={16}
+              />
+            </View>
+            <Text style={[styles.onlineLabel, !meta.online && styles.offlineLabel]}>
+              {meta.online ? 'Online now' : 'Recently nearby'}
+            </Text>
           </View>
-          <Text style={[styles.onlineLabel, !meta.online && styles.offlineLabel]}>
-            {meta.online ? 'Online now' : 'Recently nearby'}
-          </Text>
-        </View>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
           <Text style={styles.closeText}>✕</Text>
         </TouchableOpacity>
@@ -362,6 +373,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 4,
   },
+  userHeaderTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   userHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   userHeaderText: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
