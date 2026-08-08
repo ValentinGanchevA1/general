@@ -24,6 +24,7 @@ import { useGiftBalance } from '@/features/gifts/useGifts';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { APP_VERSION } from '@/constants/app';
 import { SOCIAL_PROVIDER_CONFIG, TIER_COLOR, TIER_LABEL } from '@/features/profile/socialConfig';
+import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline';
 import type {
   GamificationSummary,
   ChallengeToday,
@@ -167,7 +168,6 @@ export function ProfileScreen(): React.JSX.Element {
   }
 
   const p: UserProfile = profile;
-  // Defensive: tolerate a partial payload (e.g. an older backend) without crashing.
   const photoUrls = p.photoUrls ?? [];
   const interests = p.interests ?? [];
   const goals = p.goals ?? [];
@@ -189,7 +189,6 @@ export function ProfileScreen(): React.JSX.Element {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00d4ff" />
       }
     >
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
         <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.headerButton}>
@@ -197,7 +196,6 @@ export function ProfileScreen(): React.JSX.Element {
         </TouchableOpacity>
       </View>
 
-      {/* Main Photo */}
       <View style={styles.mainPhotoContainer}>
         {mainPhoto ? (
           <Image source={{ uri: mainPhoto }} style={styles.mainPhoto} />
@@ -225,21 +223,17 @@ export function ProfileScreen(): React.JSX.Element {
         ) : null}
       </View>
 
-      {/* User Info */}
       <View style={styles.userInfo}>
         <View style={styles.nameRow}>
           <Text style={styles.displayName}>
             {p.displayName}
             {p.age ? `, ${p.age}` : ''}
           </Text>
-          {/* Decagram means ID-verified — consistent with the map marker and the
-              "Verified" badge row. (Not the same as the weaker email+phone score.) */}
           {p.verifiedBadge ? (
             <Icon name="check-decagram" size={24} color="#00d4ff" />
           ) : null}
         </View>
 
-        {/* Verification Score */}
         <View style={styles.verificationRow}>
           <View style={styles.verificationBar}>
             <View style={[styles.verificationProgress, { width: `${verificationScore}%` }]} />
@@ -247,7 +241,6 @@ export function ProfileScreen(): React.JSX.Element {
           <Text style={styles.verificationText}>{verificationScore}% Verified</Text>
         </View>
 
-        {/* Badges */}
         <View style={styles.badgesRow}>
           {earnedBadges.map((badge) => (
             <View key={badge.key} style={[styles.badge, { backgroundColor: badge.color + '20' }]}>
@@ -266,33 +259,31 @@ export function ProfileScreen(): React.JSX.Element {
           ) : null}
         </View>
 
-		  {/* ID Verification Card */}
-		  <View style={styles.card}>
-			  <View style={styles.rowBetween}>
-				  <View>
-					  <Text style={styles.cardTitle}>ID Verification</Text>
-					  <Text style={styles.cardSubtitle}>
-						  {p.idVerificationStatus === 'verified' ? 'Verified ✓' :
-							  p.idVerificationStatus === 'pending' ? 'Under review' :
-								  p.idVerificationStatus === 'rejected' ? 'Rejected – resubmit' : 'Not verified'}
-					  </Text>
-				  </View>
-				  {p.idVerificationStatus !== 'verified' && (
-					  <TouchableOpacity
-						  style={styles.primaryBtn}
-						  onPress={() => navigation.navigate('VerificationId')}
-					  >
-						  <Text style={styles.primaryBtnText}>
-							  {p.idVerificationStatus === 'pending' ? 'Check status' : 'Verify now'}
-						  </Text>
-					  </TouchableOpacity>
-				  )}
-			  </View>
-		  </View>
+        <View style={styles.card}>
+          <View style={styles.rowBetween}>
+            <View>
+              <Text style={styles.cardTitle}>ID Verification</Text>
+              <Text style={styles.cardSubtitle}>
+                {p.idVerificationStatus === 'verified' ? 'Verified ✓' :
+                  p.idVerificationStatus === 'pending' ? 'Under review' :
+                    p.idVerificationStatus === 'rejected' ? 'Rejected – resubmit' : 'Not verified'}
+              </Text>
+            </View>
+            {p.idVerificationStatus !== 'verified' && (
+              <TouchableOpacity
+                style={styles.primaryBtn}
+                onPress={() => navigation.navigate('VerificationId')}
+              >
+                <Text style={styles.primaryBtnText}>
+                  {p.idVerificationStatus === 'pending' ? 'Check status' : 'Verify now'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
 
         {p.bio ? <Text style={styles.bio}>{p.bio}</Text> : null}
 
-        {/* Map visibility */}
         <View style={styles.visibilityPill}>
           <Icon
             name={p.visibility === 'private' ? 'eye-off' : 'eye'}
@@ -305,7 +296,6 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
       </View>
 
-      {/* Quick Actions */}
       <View style={styles.actionsRow}>
         <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('ProfileEdit')}>
           <Icon name="pencil" size={20} color="#fff" />
@@ -317,7 +307,6 @@ export function ProfileScreen(): React.JSX.Element {
         </TouchableOpacity>
       </View>
 
-      {/* Gamification — real XP / streak + today's challenges */}
       {gamification ? (
         <View style={styles.sectionPadded}>
           <ProgressCard summary={gamification} />
@@ -325,7 +314,6 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
       ) : null}
 
-      {/* Gamification shortcuts */}
       <View style={styles.gamificationRow}>
         <TouchableOpacity style={styles.gamificationCard} onPress={() => navigation.navigate('Challenges')}>
           <Icon name="checkbox-marked-circle-outline" size={28} color="#00d4ff" />
@@ -344,7 +332,6 @@ export function ProfileScreen(): React.JSX.Element {
         </TouchableOpacity>
       </View>
 
-      {/* Gifts — wallet balance + inbox */}
       <TouchableOpacity style={styles.giftsCard} onPress={() => navigation.navigate('GiftsInbox')}>
         <Icon name="gift" size={24} color="#E91E63" />
         <View style={styles.giftsCardBody}>
@@ -354,7 +341,6 @@ export function ProfileScreen(): React.JSX.Element {
         <Icon name="chevron-right" size={24} color="#555" />
       </TouchableOpacity>
 
-      {/* Contact / account info */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
         <View style={styles.infoCard}>
@@ -387,7 +373,6 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
       </View>
 
-      {/* Photo Grid */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Photos</Text>
@@ -413,7 +398,12 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
       </View>
 
-      {/* Interests */}
+      {p.id ? (
+        <View style={styles.section}>
+          <ProfileStoryline userId={p.id} isSelf />
+        </View>
+      ) : null}
+
       {interests.length > 0 ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Interests</Text>
@@ -427,7 +417,6 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
       ) : null}
 
-      {/* Goals */}
       {goals.length > 0 ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Looking For</Text>
@@ -445,7 +434,6 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
       ) : null}
 
-      {/* Social Links */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Connected Accounts</Text>
@@ -486,7 +474,6 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
       </View>
 
-      {/* Subscription */}
       {!isPaid ? (
         <TouchableOpacity style={styles.upgradeCard} onPress={() => navigation.navigate('Subscription')}>
           <View style={styles.upgradeContent}>
@@ -500,7 +487,6 @@ export function ProfileScreen(): React.JSX.Element {
         </TouchableOpacity>
       ) : null}
 
-      {/* Menu */}
       <View style={styles.menuSection}>
         {(
           [
@@ -522,7 +508,6 @@ export function ProfileScreen(): React.JSX.Element {
         ))}
       </View>
 
-      {/* Logout */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Icon name="logout" size={20} color="#ff4444" />
         <Text style={styles.logoutText}>Logout</Text>
