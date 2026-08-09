@@ -17,12 +17,10 @@ import type {
   DiscoveryPoint,
   EntityPoint,
   ClusterPoint,
-  StoryCard,
   Viewport,
   WaveRequest,
   WaveResponse,
 } from '@g88/shared';
-import { canPostStory, storyGateMessage } from '@g88/shared';
 
 import { useDiscovery } from '@/features/discovery/useDiscovery';
 import { setPoints } from '@/features/discovery/discoverySlice';
@@ -42,16 +40,9 @@ import { EventsRail, EVENTS_RAIL_HEIGHT } from '@/features/events/EventsRail';
 import { TrendingFilterBar } from '@/features/discovery/TrendingFilterBar';
 import { useTrendingNearby } from '@/features/pulse/useTrendingNearby';
 import {
-  PulseStrip,
-  PULSE_STRIP_HEIGHT,
-} from '@/features/stories/components/PulseStrip';
-import { StoryViewer } from '@/features/stories/components/StoryViewer';
-import { StoryCreateSheet } from '@/features/stories/components/StoryCreateSheet';
-import {
   fetchNearbyStories,
   storyReceived,
 } from '@/features/stories/storiesSlice';
-import { pickAndUploadStoryMedia } from '@/features/stories/storyMedia';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
@@ -68,11 +59,7 @@ export function MapScreen(): React.JSX.Element {
   const [selected, setSelected] = useState<EntityPoint | null>(null);
   const [waving, setWaving] = useState<string | null>(null);
   const [activeTopic, setActiveTopic] = useState<string | null>(null);
-  const [viewerOpen, setViewerOpen] = useState(false);
-  const [viewerIndex, setViewerIndex] = useState(0);
-  const [createOpen, setCreateOpen] = useState(false);
   const mapRef = useRef<MapView>(null);
-  const nearbyStories = useAppSelector((s) => s.stories.nearby);
   const { unreadCount: interactionUnread } = useReceivedInteractions();
 
   const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
@@ -162,41 +149,6 @@ export function MapScreen(): React.JSX.Element {
     });
     return unsub;
   }, [on, dispatch]);
-
-  const onOpenStory = useCallback((story: StoryCard, index: number) => {
-    setViewerIndex(index);
-    setViewerOpen(true);
-    track('story.open', { storyId: story.id, index });
-  }, []);
-
-  const profile = useAppSelector((s) => s.profile.profile);
-  const storyEligibility = useMemo(() => {
-    if (!profile) return { allowed: false as const, reason: 'email_unverified' as const };
-    return canPostStory({
-      verification: profile.verification,
-      createdAt: profile.createdAt,
-    });
-  }, [profile]);
-
-  const onCreatePress = useCallback(() => {
-    if (!storyEligibility.allowed) {
-      const reason = storyEligibility.reason;
-      const buttons =
-        reason === 'email_unverified'
-          ? [
-              { text: 'Cancel', style: 'cancel' as const },
-              {
-                text: 'Verify email',
-                onPress: () => navigation.navigate('EmailVerification'),
-              },
-            ]
-          : [{ text: 'OK' }];
-      Alert.alert('Stories', storyGateMessage(reason), buttons);
-      return;
-    }
-    setCreateOpen(true);
-    track('story.create_open', {});
-  }, [storyEligibility, navigation]);
 
   const onClusterPress = useCallback((c: ClusterPoint) => {
     mapRef.current?.animateToRegion(
@@ -315,23 +267,15 @@ export function MapScreen(): React.JSX.Element {
         </View>
       )}
 
-      {!selected && (
-        <View style={styles.pulseWrap} pointerEvents="box-none">
-          <PulseStrip
-            onOpenStory={onOpenStory}
-            onCreatePress={onCreatePress}
-            canCreate={storyEligibility.allowed}
-          />
-        </View>
-      )}
+      {/* Challenge sits at top; stories live on Pulse tab only. */}
+      {!selected && <DailyChallengeCard />}
 
       <TrendingFilterBar
         topics={trendingTopics}
         activeTopic={activeTopic}
         onSelect={onSelectTopic}
-        topOffset={selected ? 52 : 48 + PULSE_STRIP_HEIGHT}
+        topOffset={selected ? 52 : 112}
       />
-      <DailyChallengeCard />
       {/* Interactions entry — people who waved / reacted */}
       <TouchableOpacity
         style={styles.interactionBadge}
@@ -373,20 +317,6 @@ export function MapScreen(): React.JSX.Element {
           bottomOffset={EVENTS_RAIL_HEIGHT}
         />
       )}
-
-      <StoryViewer
-        stories={nearbyStories}
-        initialIndex={viewerIndex}
-        visible={viewerOpen}
-        onClose={() => setViewerOpen(false)}
-      />
-
-      <StoryCreateSheet
-        visible={createOpen}
-        onClose={() => setCreateOpen(false)}
-        location={myCoords}
-        pickAndUpload={pickAndUploadStoryMedia}
-      />
     </View>
   );
 }
@@ -425,13 +355,6 @@ function approxZoomFromRegion(r: Region): number {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
-  pulseWrap: {
-    position: 'absolute',
-    top: 48,
-    left: 0,
-    right: 0,
-    zIndex: 5,
-  },
   unavailable: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -465,7 +388,7 @@ const styles = StyleSheet.create({
 
   interactionBadge: {
     position: 'absolute',
-    top: 52,
+    top: 112,
     right: 16,
     width: 44,
     height: 44,
