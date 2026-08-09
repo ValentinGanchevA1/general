@@ -1,8 +1,8 @@
 // apps/mobile/src/features/gamification/DailyChallengeCard.tsx
 //
 // Compact, dismissible banner that surfaces the user's next incomplete daily
-// challenge on the map. Anchored near the bottom (above Events rail) so Stories
-// stay clear. Tapping opens Challenges; close hides for the session.
+// challenge on the map. Anchored at the top (stories live on Pulse tab).
+// Tapping opens Challenges; close hides for the session.
 
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -52,8 +52,8 @@ export function DailyChallengeCard(): React.JSX.Element | null {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    // Bottom stack: sits above the compact Events rail.
-    bottom: 100,
+    // Top of map — stories strip moved to Pulse tab.
+    top: 52,
     left: 16,
     right: 16,
     alignItems: 'center',
