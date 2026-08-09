@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, PermissionsAndroid, Platform } from 'react-native';
+import { PermissionsAndroid, Platform } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import type { LatLng } from '@g88/shared';
 
@@ -25,7 +25,8 @@ export function useUserLocation(): UseUserLocationResult {
     // Immediate first fix so the map can centre and presence can fire right away.
     Geolocation.getCurrentPosition(
       (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      (err) => Alert.alert('Location error', err.message),
+      // Soft fail — screens surface "Location unavailable" when coords stay null.
+      () => undefined,
       { enableHighAccuracy: true, timeout: 15_000, maximumAge: 10_000 },
     );
 
@@ -35,7 +36,7 @@ export function useUserLocation(): UseUserLocationResult {
       () => undefined,
       { enableHighAccuracy: true, distanceFilter: 25 },
     );
-  }, []); // setCoords is a stable state setter; watchId is a ref
+  }, []);
 
   const requestPermission = useCallback(async () => {
     if (Platform.OS === 'android') {
@@ -52,6 +53,27 @@ export function useUserLocation(): UseUserLocationResult {
       Geolocation.requestAuthorization();
     }
     startTracking();
+  }, [startTracking]);
+
+  // If the user already granted location (common on Pulse after visiting Map),
+  // start GPS without waiting for an explicit requestPermission() call.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (Platform.OS === 'android') {
+        const fine = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        );
+        if (cancelled || !fine) return;
+        startTracking();
+        return;
+      }
+      // iOS: attempt a quiet fix; authorization prompt is still via requestPermission.
+      startTracking();
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [startTracking]);
 
   useEffect(() => {

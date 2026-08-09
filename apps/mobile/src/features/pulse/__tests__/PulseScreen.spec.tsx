@@ -109,10 +109,12 @@ describe('PulseScreen v2', () => {
   it('renders story strip and filter chips (no Share CTA)', () => {
     const { getByTestId, queryByTestId, getByLabelText } = render(wrap(<PulseScreen />));
     expect(queryByTestId('share-cta')).toBeNull();
-    expect(getByLabelText('Create your story')).toBeTruthy();
+    // No profile in the test store → soft gate locks create; strip still mounts.
+    expect(getByLabelText(/Create your story|Story posting locked/)).toBeTruthy();
     expect(getByTestId('pulse-filter-all')).toBeTruthy();
     expect(getByTestId('pulse-filter-chats')).toBeTruthy();
   });
+});
 
   it('switches filter when a chip is tapped', () => {
     const { getByTestId } = render(wrap(<PulseScreen />));
