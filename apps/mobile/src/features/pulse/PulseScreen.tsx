@@ -80,7 +80,7 @@ export function PulseScreen(): React.JSX.Element {
   const nearbyStories = useAppSelector((s) => s.stories.nearby);
   const profile = useAppSelector((s) => s.profile.profile);
   const { topics: trendingTopics } = useTrendingNearby();
-  const { coords: myCoords } = useUserLocation();
+  const { coords: myCoords, requestPermission } = useUserLocation();
   const { on } = useSocket();
 
   const [filter, setFilter] = useState<PulseFilter>(route.params?.filter ?? 'all');
@@ -118,9 +118,10 @@ export function PulseScreen(): React.JSX.Element {
 
   useFocusEffect(
     useCallback(() => {
+      void requestPermission();
       load();
       loadStories();
-    }, [load, loadStories]),
+    }, [requestPermission, load, loadStories]),
   );
 
   useEffect(() => {
