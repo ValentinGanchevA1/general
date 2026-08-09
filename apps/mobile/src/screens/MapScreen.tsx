@@ -26,7 +26,7 @@ import { useDiscovery } from '@/features/discovery/useDiscovery';
 import { setPoints } from '@/features/discovery/discoverySlice';
 import { useSocket } from '@/realtime/useSocket';
 import { postJson } from '@/api/client';
-import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { useAppDispatch } from '@/hooks/redux';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { MapMarkers } from '@/components/map/MapMarkers';
 import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
