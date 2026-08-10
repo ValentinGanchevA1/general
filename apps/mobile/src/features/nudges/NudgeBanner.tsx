@@ -1,29 +1,35 @@
 // apps/mobile/src/features/nudges/NudgeBanner.tsx
 //
 // Compact, dismissible map banner for verification / streak nudges.
-// Anchored near the bottom of the map (above challenge + events) so Stories
-// stay clear. Tapping opens the target screen; close suppresses for cooldown.
+// Anchored at the top of the map, stacked under DailyChallengeCard.
+// Tapping opens the target screen; close suppresses for cooldown.
 
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { track } from '@/lib/analytics';
+import { CHALLENGE_CARD_HEIGHT } from '@/features/gamification/DailyChallengeCard';
 import { useNudges } from './useNudges';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function NudgeBanner(): React.JSX.Element | null {
   const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
   const { nudge, dismiss } = useNudges();
 
   if (!nudge) return null;
 
+  // Stack under challenge: safe top + gap + challenge height + gap.
+  const top = insets.top + 8 + CHALLENGE_CARD_HEIGHT + 8;
+
   return (
-    <View style={styles.wrap} pointerEvents="box-none">
+    <View style={[styles.wrap, { top }]} pointerEvents="box-none">
       <View style={styles.card}>
         <TouchableOpacity
           activeOpacity={0.85}
@@ -60,7 +66,6 @@ export function NudgeBanner(): React.JSX.Element | null {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    bottom: 168, // above DailyChallenge (bottom:100) + compact events
     left: 16,
     right: 16,
     alignItems: 'center',
