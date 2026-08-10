@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -25,6 +25,9 @@ import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { APP_VERSION } from '@/constants/app';
 import { SOCIAL_PROVIDER_CONFIG, TIER_COLOR, TIER_LABEL } from '@/features/profile/socialConfig';
 import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline';
+import { ProfileHeaderPhoto } from '@/components/Profile/ProfileHeaderPhoto';
+import { MapPresenceCard } from '@/components/Profile/MapPresenceCard';
+import { TrustStrip, type TrustChip } from '@/components/Profile/TrustStrip';
 import type {
   GamificationSummary,
   ChallengeToday,
@@ -99,20 +102,6 @@ function ChallengesCard({ challenges }: { challenges: ChallengeToday[] }): React
   );
 }
 
-function InitialsAvatar({ name }: { name: string }): React.JSX.Element {
-  const initials = name
-    .split(' ')
-    .map((w) => w[0] ?? '')
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-  return (
-    <View style={[styles.mainPhoto, styles.placeholderPhoto]}>
-      <Text style={styles.placeholderInitials}>{initials || '?'}</Text>
-    </View>
-  );
-}
-
 export function ProfileScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<Nav>();
@@ -181,6 +170,48 @@ export function ProfileScreen(): React.JSX.Element {
   const mainPhoto = photos[activePhotoIndex] ?? p.avatarUrl;
   const earnedBadges = BADGE_META.filter((b) => badges[b.key]);
   const isPaid = tier !== 'free';
+  const isVisibleOnMap = p.visibility !== 'private';
+
+  const trustChips: TrustChip[] = useMemo(() => {
+    const chips: TrustChip[] = [];
+    chips.push({
+      id: 'email',
+      label: badges.email ? 'Email ✓' : 'Email',
+      status: badges.email ? 'success' : 'missing',
+    });
+    const idStatus =
+      p.idVerificationStatus === 'verified'
+        ? 'success'
+        : p.idVerificationStatus === 'pending'
+        ? 'pending'
+        : p.idVerificationStatus === 'rejected'
+        ? 'error'
+        : 'missing';
+    const idLabel =
+      p.idVerificationStatus === 'verified'
+        ? 'ID Verified ✓'
+        : p.idVerificationStatus === 'pending'
+        ? 'ID Under review'
+        : p.idVerificationStatus === 'rejected'
+        ? 'ID Rejected'
+        : 'ID Verification';
+    chips.push({ id: 'id', label: idLabel, status: idStatus });
+    chips.push({
+      id: 'percent',
+      label: `${verificationScore}% Verified`,
+      status: verificationScore >= 100 ? 'success' : verificationScore > 0 ? 'pending' : 'missing',
+    });
+    return chips;
+  }, [badges.email, p.idVerificationStatus, verificationScore]);
+
+  const handleMapToggle = useCallback(
+    (_value: boolean) => {
+      // TODO: optimistic update + dispatch(updateProfile({ visibility: value ? 'public' : 'private' }))
+      // For now just navigate to Privacy so the user can change it.
+      navigation.navigate('Privacy');
+    },
+    [navigation],
+  );
 
   return (
     <ScrollView
@@ -189,6 +220,7 @@ export function ProfileScreen(): React.JSX.Element {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00d4ff" />
       }
     >
+      {/* Compact header bar */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
         <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.headerButton}>
@@ -196,77 +228,57 @@ export function ProfileScreen(): React.JSX.Element {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.mainPhotoContainer}>
-        {mainPhoto ? (
-          <Image source={{ uri: mainPhoto }} style={styles.mainPhoto} />
-        ) : (
-          <InitialsAvatar name={p.displayName} />
-        )}
+      {/* === OPTION A: Full-bleed photo with overlay === */}
+      <ProfileHeaderPhoto
+        photoUrl={mainPhoto ?? null}
+        displayName={p.displayName + (p.age ? `, ${p.age}` : '')}
+        handle={undefined}
+        verificationPercent={verificationScore}
+        isVisibleOnMap={isVisibleOnMap}
+        isPaid={isPaid}
+        tierLabel={TIER_LABEL[tier]}
+        onPressVerificationBadge={() => navigation.navigate('Verification')}
+      />
 
-        {isPaid ? (
-          <View style={[styles.tierBadge, { backgroundColor: TIER_COLOR[tier] }]}>
-            <Icon name="crown" size={14} color="#fff" />
-            <Text style={styles.tierBadgeText}>{TIER_LABEL[tier]}</Text>
-          </View>
-        ) : null}
+      {/* Photo indicators (kept when multiple photos) */}
+      {photos.length > 1 ? (
+        <View style={styles.photoIndicators}>
+          {photos.map((_, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[styles.photoIndicator, index === activePhotoIndex && styles.photoIndicatorActive]}
+              onPress={() => setActivePhotoIndex(index)}
+            />
+          ))}
+        </View>
+      ) : null}
 
-        {photos.length > 1 ? (
-          <View style={styles.photoIndicators}>
-            {photos.map((_, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.photoIndicator, index === activePhotoIndex && styles.photoIndicatorActive]}
-                onPress={() => setActivePhotoIndex(index)}
-              />
-            ))}
-          </View>
-        ) : null}
+      {/* Trust strip */}
+      <View style={styles.trustSection}>
+        <TrustStrip
+          chips={trustChips}
+          onChipPress={(id) => {
+            if (id === 'id' || id === 'percent') {
+              navigation.navigate(p.idVerificationStatus === 'pending' ? 'VerificationId' : 'Verification');
+            }
+          }}
+        />
       </View>
 
-      <View style={styles.userInfo}>
-        <View style={styles.nameRow}>
-          <Text style={styles.displayName}>
-            {p.displayName}
-            {p.age ? `, ${p.age}` : ''}
-          </Text>
-          {p.verifiedBadge ? (
-            <Icon name="check-decagram" size={24} color="#00d4ff" />
-          ) : null}
-        </View>
-
-        <View style={styles.verificationRow}>
-          <View style={styles.verificationBar}>
-            <View style={[styles.verificationProgress, { width: `${verificationScore}%` }]} />
-          </View>
-          <Text style={styles.verificationText}>{verificationScore}% Verified</Text>
-        </View>
-
-        <View style={styles.badgesRow}>
-          {earnedBadges.map((badge) => (
-            <View key={badge.key} style={[styles.badge, { backgroundColor: badge.color + '20' }]}>
-              <Icon name={badge.icon} size={16} color={badge.color} />
-              <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
-            </View>
-          ))}
-          {earnedBadges.length === 0 ? (
-            <TouchableOpacity
-              style={styles.verifyNowButton}
-              onPress={() => navigation.navigate('Verification')}
-            >
-              <Icon name="shield-check" size={16} color="#00d4ff" />
-              <Text style={styles.verifyNowText}>Get Verified</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
+      {/* ID Verification card (kept for explicit status + CTA) */}
+      <View style={styles.sectionPadded}>
         <View style={styles.card}>
           <View style={styles.rowBetween}>
             <View>
               <Text style={styles.cardTitle}>ID Verification</Text>
               <Text style={styles.cardSubtitle}>
-                {p.idVerificationStatus === 'verified' ? 'Verified ✓' :
-                  p.idVerificationStatus === 'pending' ? 'Under review' :
-                    p.idVerificationStatus === 'rejected' ? 'Rejected – resubmit' : 'Not verified'}
+                {p.idVerificationStatus === 'verified'
+                  ? 'Verified ✓'
+                  : p.idVerificationStatus === 'pending'
+                  ? 'Under review'
+                  : p.idVerificationStatus === 'rejected'
+                  ? 'Rejected – resubmit'
+                  : 'Not verified'}
               </Text>
             </View>
             {p.idVerificationStatus !== 'verified' && (
@@ -281,21 +293,24 @@ export function ProfileScreen(): React.JSX.Element {
             )}
           </View>
         </View>
-
-        {p.bio ? <Text style={styles.bio}>{p.bio}</Text> : null}
-
-        <View style={styles.visibilityPill}>
-          <Icon
-            name={p.visibility === 'private' ? 'eye-off' : 'eye'}
-            size={14}
-            color="#00d4ff"
-          />
-          <Text style={styles.visibilityText}>
-            {p.visibility === 'private' ? 'Invisible on map' : 'Visible on map'}
-          </Text>
-        </View>
       </View>
 
+      {/* === OPTION A: Map Presence hero card === */}
+      <View style={styles.mapPresenceSection}>
+        <MapPresenceCard
+          isVisible={isVisibleOnMap}
+          onToggle={handleMapToggle}
+          onViewPin={() => navigation.navigate('Map')}
+        />
+      </View>
+
+      {p.bio ? (
+        <View style={styles.bioSection}>
+          <Text style={styles.bio}>{p.bio}</Text>
+        </View>
+      ) : null}
+
+      {/* Actions */}
       <View style={styles.actionsRow}>
         <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('ProfileEdit')}>
           <Icon name="pencil" size={20} color="#fff" />
@@ -541,74 +556,19 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
   headerButton: { padding: 8 },
-  mainPhotoContainer: { width, height: width * 1.2, position: 'relative' },
-  mainPhoto: { width: '100%', height: '100%', resizeMode: 'cover' },
-  placeholderPhoto: { backgroundColor: '#1a1a24', justifyContent: 'center', alignItems: 'center' },
-  placeholderInitials: { color: '#00d4ff', fontSize: 72, fontWeight: '700' },
-  tierBadge: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 4,
-  },
-  tierBadgeText: { color: '#fff', fontWeight: '600', fontSize: 12 },
   photoIndicators: {
-    position: 'absolute',
-    bottom: 16,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
+    marginTop: 8,
   },
   photoIndicator: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.5)' },
   photoIndicatorActive: { backgroundColor: '#fff', width: 24 },
-  userInfo: { padding: 20 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  displayName: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
-  verificationRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 12 },
-  verificationBar: { flex: 1, height: 6, backgroundColor: '#1a1a24', borderRadius: 3, overflow: 'hidden' },
-  verificationProgress: { height: '100%', backgroundColor: '#00d4ff', borderRadius: 3 },
-  verificationText: { color: '#888', fontSize: 12 },
-  badgesRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, gap: 8 },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 4,
-  },
-  badgeText: { fontSize: 12, fontWeight: '600' },
-  verifyNowButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#00d4ff20',
-    borderRadius: 16,
-  },
-  verifyNowText: { color: '#00d4ff', fontWeight: '600' },
-  bio: { marginTop: 16, fontSize: 16, color: '#ccc', lineHeight: 24 },
-  visibilityPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    marginTop: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#1a1a24',
-    borderRadius: 16,
-  },
-  visibilityText: { color: '#00d4ff', fontSize: 12, fontWeight: '600' },
-  actionsRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 12 },
+  trustSection: { marginTop: 16 },
+  mapPresenceSection: { marginTop: 16 },
+  bioSection: { paddingHorizontal: 20, marginTop: 12 },
+  bio: { fontSize: 16, color: '#ccc', lineHeight: 24 },
+  actionsRow: { flexDirection: 'row', paddingHorizontal: 20, marginTop: 16, gap: 12 },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
@@ -620,7 +580,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   actionButtonText: { color: '#fff', fontWeight: '600' },
-  sectionPadded: { paddingHorizontal: 20, marginTop: 20 },
+  sectionPadded: { paddingHorizontal: 20, marginTop: 16 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
   cardSubtitle: { color: '#888', fontSize: 14, marginTop: 4 },
