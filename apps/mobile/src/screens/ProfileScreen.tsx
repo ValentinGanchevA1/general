@@ -90,15 +90,12 @@ function ChallengesCard({ challenges }: { challenges: ChallengeToday[] }): React
 export function ProfileScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<Nav>();
-  const { profile, loading, error } = useAppSelector((s) => s.profile);
+  const { profile, loading, error, saving } = useAppSelector((s) => s.profile);
   const { summary: gamification, refresh: refreshGamification } = useGamification();
   const { challenges, refresh: refreshChallenges } = useChallenges();
   const { spendableXp, refresh: refreshGiftBalance } = useGiftBalance();
   const [refreshing, setRefreshing] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
-  /** Optimistic map visibility while a toggle request is in flight. */
-  const [mapOptimistic, setMapOptimistic] = useState<boolean | null>(null);
-  const [mapSaving, setMapSaving] = useState(false);
 
   const reload = useCallback(() => {
     void dispatch(fetchProfile());
@@ -164,23 +161,12 @@ export function ProfileScreen(): React.JSX.Element {
     return chips;
   }, [profile]);
 
-  const serverMapVisible = profile ? profile.visibility !== 'private' : true;
-  const mapVisible = mapOptimistic ?? serverMapVisible;
+  // Redux applies visibility optimistically on updateProfile.pending.
+  const mapVisible = profile ? profile.visibility !== 'private' : true;
 
   const handleMapToggle = useCallback(
-    async (value: boolean) => {
-      setMapOptimistic(value);
-      setMapSaving(true);
-      try {
-        await dispatch(
-          updateProfile({ visibility: value ? 'public' : 'private' }),
-        ).unwrap();
-        setMapOptimistic(null);
-      } catch {
-        setMapOptimistic(null);
-      } finally {
-        setMapSaving(false);
-      }
+    (value: boolean) => {
+      void dispatch(updateProfile({ visibility: value ? 'public' : 'private' }));
     },
     [dispatch],
   );
@@ -246,7 +232,6 @@ export function ProfileScreen(): React.JSX.Element {
         onPressPhoto={() => navigation.navigate('Photos')}
       />
 
-      {/* Trust → Map (product priority) */}
       <View style={styles.trustSection}>
         <TrustStrip
           chips={trustChips}
@@ -263,8 +248,8 @@ export function ProfileScreen(): React.JSX.Element {
       <View style={styles.mapPresenceSection}>
         <MapPresenceCard
           isVisible={mapVisible}
-          saving={mapSaving}
-          onToggle={(v) => void handleMapToggle(v)}
+          saving={saving}
+          onToggle={handleMapToggle}
           onViewPin={() => navigation.navigate('Main', { screen: 'Map' })}
         />
       </View>
