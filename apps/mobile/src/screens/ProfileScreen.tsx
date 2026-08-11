@@ -31,7 +31,6 @@ import { TrustStrip, type TrustChip } from '@/components/Profile/TrustStrip';
 import type {
   GamificationSummary,
   ChallengeToday,
-  ProfileBadges,
   UserProfile,
 } from '@g88/shared';
 
@@ -39,21 +38,6 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const { width } = Dimensions.get('window');
 const PHOTO_SIZE = (width - 48) / 3;
-
-const BADGE_META: Array<{
-  key: keyof ProfileBadges;
-  icon: string;
-  label: string;
-  color: string;
-}> = [
-  { key: 'email', icon: 'email-check', label: 'Email', color: '#4CAF50' },
-  { key: 'phone', icon: 'phone-check', label: 'Phone', color: '#2196F3' },
-  { key: 'photo', icon: 'camera-account', label: 'Photo', color: '#9C27B0' },
-  { key: 'id', icon: 'card-account-details', label: 'ID', color: '#FF9800' },
-  { key: 'social', icon: 'link-variant', label: 'Social', color: '#E91E63' },
-  { key: 'premium', icon: 'crown', label: 'Premium', color: '#FFD700' },
-  { key: 'verified', icon: 'check-decagram', label: 'Verified', color: '#00d4ff' },
-];
 
 function ProgressCard({ summary }: { summary: GamificationSummary }): React.JSX.Element {
   const pct =
@@ -179,7 +163,6 @@ export function ProfileScreen(): React.JSX.Element {
 
   const handleMapToggle = useCallback(
     (_value: boolean) => {
-      // TODO: optimistic update + dispatch(updateProfile({ visibility: value ? 'public' : 'private' }))
       navigation.navigate('Privacy');
     },
     [navigation],
