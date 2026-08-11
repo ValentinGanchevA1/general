@@ -23,7 +23,7 @@ import { useChallenges } from '@/features/gamification/useChallenges';
 import { useGiftBalance } from '@/features/gifts/useGifts';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { APP_VERSION } from '@/constants/app';
-import { SOCIAL_PROVIDER_CONFIG, TIER_COLOR, TIER_LABEL } from '@/features/profile/socialConfig';
+import { SOCIAL_PROVIDER_CONFIG, TIER_LABEL } from '@/features/profile/socialConfig';
 import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline';
 import { ProfileHeaderPhoto } from '@/components/Profile/ProfileHeaderPhoto';
 import { MapPresenceCard } from '@/components/Profile/MapPresenceCard';
@@ -31,7 +31,6 @@ import { TrustStrip, type TrustChip } from '@/components/Profile/TrustStrip';
 import type {
   GamificationSummary,
   ChallengeToday,
-  ProfileBadges,
   UserProfile,
 } from '@g88/shared';
 
@@ -39,21 +38,6 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const { width } = Dimensions.get('window');
 const PHOTO_SIZE = (width - 48) / 3;
-
-const BADGE_META: Array<{
-  key: keyof ProfileBadges;
-  icon: string;
-  label: string;
-  color: string;
-}> = [
-  { key: 'email', icon: 'email-check', label: 'Email', color: '#4CAF50' },
-  { key: 'phone', icon: 'phone-check', label: 'Phone', color: '#2196F3' },
-  { key: 'photo', icon: 'camera-account', label: 'Photo', color: '#9C27B0' },
-  { key: 'id', icon: 'card-account-details', label: 'ID', color: '#FF9800' },
-  { key: 'social', icon: 'link-variant', label: 'Social', color: '#E91E63' },
-  { key: 'premium', icon: 'crown', label: 'Premium', color: '#FFD700' },
-  { key: 'verified', icon: 'check-decagram', label: 'Verified', color: '#00d4ff' },
-];
 
 function ProgressCard({ summary }: { summary: GamificationSummary }): React.JSX.Element {
   const pct =
@@ -133,6 +117,57 @@ export function ProfileScreen(): React.JSX.Element {
     void dispatch(logout());
   }, [dispatch]);
 
+  // Hooks must run unconditionally (before any early return).
+  const trustChips: TrustChip[] = useMemo(() => {
+    if (!profile) return [];
+    const badges = profile.badges ?? {
+      email: false,
+      phone: false,
+      photo: false,
+      id: false,
+      social: false,
+      premium: false,
+      verified: false,
+    };
+    const verificationScore = profile.verificationScore ?? 0;
+    const chips: TrustChip[] = [];
+    chips.push({
+      id: 'email',
+      label: badges.email ? 'Email ✓' : 'Email',
+      status: badges.email ? 'success' : 'missing',
+    });
+    const idStatus =
+      profile.idVerificationStatus === 'verified'
+        ? 'success'
+        : profile.idVerificationStatus === 'pending'
+          ? 'pending'
+          : profile.idVerificationStatus === 'rejected'
+            ? 'error'
+            : 'missing';
+    const idLabel =
+      profile.idVerificationStatus === 'verified'
+        ? 'ID Verified ✓'
+        : profile.idVerificationStatus === 'pending'
+          ? 'ID Under review'
+          : profile.idVerificationStatus === 'rejected'
+            ? 'ID Rejected'
+            : 'ID Verification';
+    chips.push({ id: 'id', label: idLabel, status: idStatus });
+    chips.push({
+      id: 'percent',
+      label: `${verificationScore}% Verified`,
+      status: verificationScore >= 100 ? 'success' : verificationScore > 0 ? 'pending' : 'missing',
+    });
+    return chips;
+  }, [profile]);
+
+  const handleMapToggle = useCallback(
+    (_value: boolean) => {
+      navigation.navigate('Privacy');
+    },
+    [navigation],
+  );
+
   if (loading && !profile) {
     return (
       <View style={styles.container}>
@@ -168,50 +203,8 @@ export function ProfileScreen(): React.JSX.Element {
   const verificationScore = p.verificationScore ?? 0;
   const photos = photoUrls.length > 0 ? photoUrls : p.avatarUrl ? [p.avatarUrl] : [];
   const mainPhoto = photos[activePhotoIndex] ?? p.avatarUrl;
-  const earnedBadges = BADGE_META.filter((b) => badges[b.key]);
   const isPaid = tier !== 'free';
   const isVisibleOnMap = p.visibility !== 'private';
-
-  const trustChips: TrustChip[] = useMemo(() => {
-    const chips: TrustChip[] = [];
-    chips.push({
-      id: 'email',
-      label: badges.email ? 'Email ✓' : 'Email',
-      status: badges.email ? 'success' : 'missing',
-    });
-    const idStatus =
-      p.idVerificationStatus === 'verified'
-        ? 'success'
-        : p.idVerificationStatus === 'pending'
-        ? 'pending'
-        : p.idVerificationStatus === 'rejected'
-        ? 'error'
-        : 'missing';
-    const idLabel =
-      p.idVerificationStatus === 'verified'
-        ? 'ID Verified ✓'
-        : p.idVerificationStatus === 'pending'
-        ? 'ID Under review'
-        : p.idVerificationStatus === 'rejected'
-        ? 'ID Rejected'
-        : 'ID Verification';
-    chips.push({ id: 'id', label: idLabel, status: idStatus });
-    chips.push({
-      id: 'percent',
-      label: `${verificationScore}% Verified`,
-      status: verificationScore >= 100 ? 'success' : verificationScore > 0 ? 'pending' : 'missing',
-    });
-    return chips;
-  }, [badges.email, p.idVerificationStatus, verificationScore]);
-
-  const handleMapToggle = useCallback(
-    (_value: boolean) => {
-      // TODO: optimistic update + dispatch(updateProfile({ visibility: value ? 'public' : 'private' }))
-      // For now just navigate to Privacy so the user can change it.
-      navigation.navigate('Privacy');
-    },
-    [navigation],
-  );
 
   return (
     <ScrollView
@@ -220,7 +213,6 @@ export function ProfileScreen(): React.JSX.Element {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00d4ff" />
       }
     >
-      {/* Compact header bar */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
         <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.headerButton}>
@@ -228,7 +220,6 @@ export function ProfileScreen(): React.JSX.Element {
         </TouchableOpacity>
       </View>
 
-      {/* === OPTION A: Full-bleed photo with overlay === */}
       <ProfileHeaderPhoto
         photoUrl={mainPhoto ?? null}
         displayName={p.displayName + (p.age ? `, ${p.age}` : '')}
@@ -240,7 +231,6 @@ export function ProfileScreen(): React.JSX.Element {
         onPressVerificationBadge={() => navigation.navigate('Verification')}
       />
 
-      {/* Photo indicators (kept when multiple photos) */}
       {photos.length > 1 ? (
         <View style={styles.photoIndicators}>
           {photos.map((_, index) => (
@@ -253,7 +243,6 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
       ) : null}
 
-      {/* Trust strip */}
       <View style={styles.trustSection}>
         <TrustStrip
           chips={trustChips}
@@ -265,7 +254,6 @@ export function ProfileScreen(): React.JSX.Element {
         />
       </View>
 
-      {/* ID Verification card (kept for explicit status + CTA) */}
       <View style={styles.sectionPadded}>
         <View style={styles.card}>
           <View style={styles.rowBetween}>
@@ -295,7 +283,6 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
       </View>
 
-      {/* === OPTION A: Map Presence hero card === */}
       <View style={styles.mapPresenceSection}>
         <MapPresenceCard
           isVisible={isVisibleOnMap}
@@ -310,7 +297,6 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
       ) : null}
 
-      {/* Actions */}
       <View style={styles.actionsRow}>
         <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('ProfileEdit')}>
           <Icon name="pencil" size={20} color="#fff" />

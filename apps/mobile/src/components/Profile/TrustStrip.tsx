@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
 export interface TrustChip {

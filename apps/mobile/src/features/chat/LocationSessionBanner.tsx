@@ -11,9 +11,9 @@ interface Props {
   onOpenMap: () => void;
 }
 
-function formatRemaining(endsAt: string | null): string | null {
+function formatRemaining(endsAt: string | null, nowMs: number): string | null {
   if (!endsAt) return null;
-  const ms = new Date(endsAt).getTime() - Date.now();
+  const ms = new Date(endsAt).getTime() - nowMs;
   if (ms <= 0) return 'ending…';
   const totalSec = Math.floor(ms / 1000);
   const m = Math.floor(totalSec / 60);
@@ -23,21 +23,21 @@ function formatRemaining(endsAt: string | null): string | null {
 
 export function LocationSessionBanner({
   session,
-  isSharer,
+  is Sharer b,
   peerName,
   onStop,
   onOpenMap,
 }: Props): React.JSX.Element {
-  const [remaining, setRemaining] = useState(() => formatRemaining(session.endsAt));
+  // Tick clock drives re-renders; remaining is derived (no setState of label in effect).
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
-    setRemaining(formatRemaining(session.endsAt));
     if (!session.endsAt) return;
-    const t = setInterval(() => {
-      setRemaining(formatRemaining(session.endsAt));
-    }, 1_000);
+    const t = setInterval(() => setNowMs(Date.now()), 1_000);
     return () => clearInterval(t);
   }, [session.endsAt, session.id]);
+
+  const remaining = formatRemaining(session.endsAt, nowMs);
 
   const title = isSharer
     ? 'You are sharing live location'
