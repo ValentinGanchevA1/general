@@ -223,7 +223,6 @@ export function ProfileScreen(): React.JSX.Element {
       <ProfileHeaderPhoto
         photoUrl={mainPhoto ?? null}
         displayName={p.displayName + (p.age ? `, ${p.age}` : '')}
-        handle={undefined}
         verificationPercent={verificationScore}
         isVisibleOnMap={isVisibleOnMap}
         isPaid={isPaid}
@@ -287,7 +286,7 @@ export function ProfileScreen(): React.JSX.Element {
         <MapPresenceCard
           isVisible={isVisibleOnMap}
           onToggle={handleMapToggle}
-          onViewPin={() => navigation.navigate('Map')}
+          onViewPin={() => navigation.navigate('Main', { screen: 'Map' })}
         />
       </View>
 
