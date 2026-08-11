@@ -1,4 +1,12 @@
-import { ForbiddenException, Logger, NotFoundException, UsePipes, ValidationPipe, UseGuards } from '@nestjs/common';
+import {
+  ForbiddenException,
+  GoneException,
+  Logger,
+  NotFoundException,
+  UsePipes,
+  ValidationPipe,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -26,12 +34,22 @@ import type {
   EventQuestionDelta,
   EventQuestionUpvoteDelta,
   StoryNewEvent,
+  LocationShareSession,
 } from '@g88/shared';
 
 import { WsJwtGuard } from './ws-jwt.guard';
-import { ChatSendDto, ConversationJoinDto, EventRoomDto, PresenceUpdateDto } from './realtime.dto';
+import {
+  ChatSendDto,
+  ConversationJoinDto,
+  EventRoomDto,
+  LocationShareStartDto,
+  LocationShareStopDto,
+  LocationShareUpdateDto,
+  PresenceUpdateDto,
+} from './realtime.dto';
 import { PresenceService } from '../modules/presence/presence.service';
 import { ChatService } from '../modules/chat/chat.service';
+import { LocationShareService } from '../modules/chat/location-share.service';
 import { NotificationsService } from '../modules/notifications/notifications.service';
 import { ChallengesService } from '../modules/challenges/challenges.service';
 import type { JwtPayload } from '../modules/auth/jwt.strategy';
@@ -45,14 +63,21 @@ const wsAllowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
 
 // ─── Type-safe error extraction ───────────────────────────────────────────
 
-
 function extractApiError(err: unknown): { code: string; message: string } {
-  if (err instanceof ForbiddenException || err instanceof NotFoundException) {
+  if (
+    err instanceof ForbiddenException ||
+    err instanceof NotFoundException ||
+    err instanceof GoneException
+  ) {
     const response = err.getResponse();
-    if (typeof response === 'object' && response !== null && 'message' in response) {
+    if (typeof response === 'object' && response !== null) {
+      const r = response as { code?: string; message?: string | string[] };
+      const message = Array.isArray(r.message)
+        ? r.message.join(', ')
+        : (r.message ?? err.message);
       return {
-        code: err.constructor.name,
-        message: (response.message as string) ?? err.message,
+        code: r.code ?? err.constructor.name,
+        message,
       };
     }
   }
@@ -86,6 +111,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   constructor(
     private readonly presence: PresenceService,
     private readonly chat: ChatService,
+    private readonly locationShare: LocationShareService,
     private readonly notifications: NotificationsService,
     private readonly challenges: ChallengesService,
     private readonly jwt: JwtService,
@@ -265,6 +291,130 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+  // ─── Live location share ─────────────────────────────────────────────────
+
+  @SubscribeMessage('location:share:start')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async onLocationShareStart(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() payload: LocationShareStartDto,
+  ): Promise<AckResult<LocationShareSession>> {
+    if (!client.rooms.has(this.conversationRoom(payload.conversationId))) {
+      return { ok: false, code: 'chat.forbidden', message: 'Join the conversation first' };
+    }
+
+    try {
+      const { session, message } = await this.locationShare.start(
+        client.data.userId,
+        payload.conversationId,
+        payload.duration,
+        payload.location,
+      );
+
+      const room = this.conversationRoom(payload.conversationId);
+      this.server.to(room).emit('location:share:started', { session, message });
+      // Keep message list in sync for clients that only listen to chat:message.
+      this.server.to(room).emit('chat:message', message);
+
+      void this.pushToOfflineParticipants(
+        payload.conversationId,
+        client.data.userId,
+        message.body,
+      );
+
+      return { ok: true, data: session };
+    } catch (err) {
+      const { code, message } = extractApiError(err);
+      if (
+        !(err instanceof ForbiddenException) &&
+        !(err instanceof NotFoundException) &&
+        !(err instanceof GoneException)
+      ) {
+        this.logger.error(`location:share:start failed: ${err}`);
+      }
+      return {
+        ok: false,
+        code: code === 'unknown_error' ? 'location.failed' : code,
+        message,
+      };
+    }
+  }
+
+  @SubscribeMessage('location:share:update')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async onLocationShareUpdate(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() payload: LocationShareUpdateDto,
+  ): Promise<AckResult<{ updatedAt: string }>> {
+    try {
+      const { updatedAt, conversationId } = await this.locationShare.update(
+        client.data.userId,
+        payload.sessionId,
+        payload.location,
+      );
+
+      this.server.to(this.conversationRoom(conversationId)).emit('location:share:update', {
+        sessionId: payload.sessionId,
+        conversationId,
+        location: payload.location,
+        updatedAt,
+      });
+
+      return { ok: true, data: { updatedAt } };
+    } catch (err) {
+      const { code, message } = extractApiError(err);
+      if (
+        !(err instanceof ForbiddenException) &&
+        !(err instanceof NotFoundException) &&
+        !(err instanceof GoneException)
+      ) {
+        this.logger.error(`location:share:update failed: ${err}`);
+      }
+      return {
+        ok: false,
+        code: code === 'unknown_error' ? 'location.failed' : code,
+        message,
+      };
+    }
+  }
+
+  @SubscribeMessage('location:share:stop')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async onLocationShareStop(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() payload: LocationShareStopDto,
+  ): Promise<AckResult<{ ended: true }>> {
+    try {
+      const { conversationId, endedAt } = await this.locationShare.stop(
+        client.data.userId,
+        payload.sessionId,
+      );
+
+      this.server.to(this.conversationRoom(conversationId)).emit('location:share:ended', {
+        sessionId: payload.sessionId,
+        conversationId,
+        reason: 'stopped',
+        endedAt,
+      });
+
+      return { ok: true, data: { ended: true } };
+    } catch (err) {
+      const { code, message } = extractApiError(err);
+      if (
+        !(err instanceof ForbiddenException) &&
+        !(err instanceof NotFoundException) &&
+        !(err instanceof GoneException)
+      ) {
+        this.logger.error(`location:share:stop failed: ${err}`);
+      }
+      return {
+        ok: false,
+        code: code === 'unknown_error' ? 'location.failed' : code,
+        message,
+      };
+    }
+  }
+
   // ─── Outbound APIs (called by other services) ────────────────────────────
 
   async emitWaveReceived(toUserId: string, evt: WaveReceivedEvent): Promise<void> {
@@ -338,6 +488,21 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   /** Fan a newly created story into the H3 cell room (r7). */
   emitStoryNew(evt: StoryNewEvent): void {
     this.server.to(this.cellRoom(evt.cellId)).emit('story:new', evt);
+  }
+
+  /** Emit location session end from sweep/cron (no connected sharer socket). */
+  emitLocationShareEnded(
+    conversationId: string,
+    sessionId: string,
+    reason: 'expired' | 'timeout' | 'blocked' | 'conversation_closed',
+    endedAt: string,
+  ): void {
+    this.server.to(this.conversationRoom(conversationId)).emit('location:share:ended', {
+      sessionId,
+      conversationId,
+      reason,
+      endedAt,
+    });
   }
 
   // ─── Push helpers ───────────────────────────────────────────────────────
