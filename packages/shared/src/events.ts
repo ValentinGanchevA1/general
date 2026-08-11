@@ -4,6 +4,7 @@ import type {
   VerificationLevel,
   ChatLocation,
   ChatMessage,
+  ChatMessageType,
   LocationShareDuration,
   LocationShareEndReason,
   LocationShareSession,
@@ -38,7 +39,7 @@ export interface ChatMessageEvent {
   conversationId: string;
   senderId: string;
   body: string;
-  type?: ChatMessage['type'];
+  type: ChatMessageType;
   location?: ChatLocation | null;
   locationSessionId?: string | null;
   createdAt: string;
