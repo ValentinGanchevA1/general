@@ -16,7 +16,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { fetchProfile } from '@/features/profile/profileSlice';
+import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
 import { logout } from '@/features/auth/authSlice';
 import { useGamification } from '@/features/gamification/useGamification';
 import { useChallenges } from '@/features/gamification/useChallenges';
@@ -111,6 +111,7 @@ export function ProfileScreen(): React.JSX.Element {
   const { spendableXp, refresh: refreshGiftBalance } = useGiftBalance();
   const [refreshing, setRefreshing] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [togglingVisibility, setTogglingVisibility] = useState(false);
 
   const reload = useCallback(() => {
     void dispatch(fetchProfile());
@@ -132,6 +133,21 @@ export function ProfileScreen(): React.JSX.Element {
   const handleLogout = useCallback(() => {
     void dispatch(logout());
   }, [dispatch]);
+
+  const handleMapToggle = useCallback(
+    async (value: boolean) => {
+      if (togglingVisibility || !profile) return;
+      setTogglingVisibility(true);
+      try {
+        await dispatch(
+          updateProfile({ visibility: value ? 'public' : 'private' }),
+        );
+      } finally {
+        setTogglingVisibility(false);
+      }
+    },
+    [dispatch, profile, togglingVisibility],
+  );
 
   if (loading && !profile) {
     return (
@@ -168,7 +184,6 @@ export function ProfileScreen(): React.JSX.Element {
   const verificationScore = p.verificationScore ?? 0;
   const photos = photoUrls.length > 0 ? photoUrls : p.avatarUrl ? [p.avatarUrl] : [];
   const mainPhoto = photos[activePhotoIndex] ?? p.avatarUrl;
-  const earnedBadges = BADGE_META.filter((b) => badges[b.key]);
   const isPaid = tier !== 'free';
   const isVisibleOnMap = p.visibility !== 'private';
 
@@ -203,15 +218,6 @@ export function ProfileScreen(): React.JSX.Element {
     });
     return chips;
   }, [badges.email, p.idVerificationStatus, verificationScore]);
-
-  const handleMapToggle = useCallback(
-    (_value: boolean) => {
-      // TODO: optimistic update + dispatch(updateProfile({ visibility: value ? 'public' : 'private' }))
-      // For now just navigate to Privacy so the user can change it.
-      navigation.navigate('Privacy');
-    },
-    [navigation],
-  );
 
   return (
     <ScrollView
@@ -295,12 +301,13 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
       </View>
 
-      {/* === OPTION A: Map Presence hero card === */}
+      {/* === OPTION A: Map Presence hero card — real toggle === */}
       <View style={styles.mapPresenceSection}>
         <MapPresenceCard
           isVisible={isVisibleOnMap}
           onToggle={handleMapToggle}
           onViewPin={() => navigation.navigate('Map')}
+          disabled={togglingVisibility}
         />
       </View>
 

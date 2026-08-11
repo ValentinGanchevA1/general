@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Switch, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Switch, Pressable, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
@@ -7,12 +7,15 @@ interface MapPresenceCardProps {
   isVisible: boolean;
   onToggle: (value: boolean) => void;
   onViewPin?: () => void;
+  /** When true, switch is disabled (request in flight). */
+  disabled?: boolean;
 }
 
 export function MapPresenceCard({
   isVisible,
   onToggle,
   onViewPin,
+  disabled = false,
 }: MapPresenceCardProps): React.JSX.Element {
   return (
     <View style={styles.card}>
@@ -27,17 +30,22 @@ export function MapPresenceCard({
               : 'You are currently hidden from the map'}
           </Text>
         </View>
-        <Switch
-          value={isVisible}
-          onValueChange={onToggle}
-          trackColor={{ false: colors.textFaint, true: colors.primary }}
-          thumbColor="#FFFFFF"
-          ios_backgroundColor={colors.textFaint}
-        />
+        {disabled ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : (
+          <Switch
+            value={isVisible}
+            onValueChange={onToggle}
+            disabled={disabled}
+            trackColor={{ false: colors.textFaint, true: colors.primary }}
+            thumbColor="#FFFFFF"
+            ios_backgroundColor={colors.textFaint}
+          />
+        )}
       </View>
 
       {isVisible && onViewPin ? (
-        <Pressable onPress={onViewPin} style={styles.viewPinButton}>
+        <Pressable onPress={onViewPin} style={styles.viewPinButton} disabled={disabled}>
           <Icon name="map-marker" size={16} color={colors.primary} />
           <Text style={styles.viewPinText}>View my pin on map</Text>
         </Pressable>
