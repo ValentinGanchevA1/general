@@ -6,6 +6,7 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
   PresenceUpdatePayload,
+  ChatMessage,
   ChatMessageEvent,
   ChatLocation,
   LocationShareDuration,
@@ -36,6 +37,20 @@ interface UseSocketResult {
 }
 
 let sharedSocket: G88Socket | null = null;
+
+/** Normalize socket payload to ChatMessage (type required under exactOptionalPropertyTypes). */
+function toChatMessage(e: ChatMessageEvent): ChatMessage {
+  return {
+    id: e.id,
+    conversationId: e.conversationId,
+    senderId: e.senderId,
+    body: e.body,
+    type: e.type ?? 'text',
+    location: e.location ?? null,
+    locationSessionId: e.locationSessionId ?? null,
+    createdAt: e.createdAt,
+  };
+}
 
 /** Module-level send — used by the hook and by the outbox drain. */
 export function socketSendMessage(
@@ -149,7 +164,12 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
               entry.optimisticId,
             );
             if (result) {
-              store.dispatch(messageConfirmed({ optimisticId: entry.optimisticId, confirmed: result }));
+              store.dispatch(
+                messageConfirmed({
+                  optimisticId: entry.optimisticId,
+                  confirmed: toChatMessage(result),
+                }),
+              );
             } else {
               store.dispatch(outboxRetryIncremented(entry.optimisticId));
             }
