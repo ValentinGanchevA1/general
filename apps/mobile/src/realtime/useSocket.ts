@@ -7,6 +7,9 @@ import type {
   ServerToClientEvents,
   PresenceUpdatePayload,
   ChatMessageEvent,
+  ChatLocation,
+  LocationShareDuration,
+  LocationShareSession,
 } from '@g88/shared';
 
 import { tokenStore } from '@/api/tokenStore';
@@ -47,6 +50,49 @@ export function socketSendMessage(
     s.emit('chat:send', { conversationId, body, clientMessageId }, (res) => {
       clearTimeout(timer);
       resolve(res.ok ? res.data : null);
+    });
+  });
+}
+
+export function locationShareStart(
+  conversationId: string,
+  duration: LocationShareDuration,
+  location: ChatLocation,
+): Promise<LocationShareSession | null> {
+  return new Promise((resolve) => {
+    const s = sharedSocket;
+    if (!s?.connected) return resolve(null);
+    const timer = setTimeout(() => resolve(null), 5_000);
+    s.emit('location:share:start', { conversationId, duration, location }, (res) => {
+      clearTimeout(timer);
+      resolve(res.ok ? res.data : null);
+    });
+  });
+}
+
+export function locationShareUpdate(
+  sessionId: string,
+  location: ChatLocation,
+): Promise<{ updatedAt: string } | null> {
+  return new Promise((resolve) => {
+    const s = sharedSocket;
+    if (!s?.connected) return resolve(null);
+    const timer = setTimeout(() => resolve(null), 3_000);
+    s.emit('location:share:update', { sessionId, location }, (res) => {
+      clearTimeout(timer);
+      resolve(res.ok ? res.data : null);
+    });
+  });
+}
+
+export function locationShareStop(sessionId: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const s = sharedSocket;
+    if (!s?.connected) return resolve(false);
+    const timer = setTimeout(() => resolve(false), 3_000);
+    s.emit('location:share:stop', { sessionId }, (res) => {
+      clearTimeout(timer);
+      resolve(res.ok);
     });
   });
 }
