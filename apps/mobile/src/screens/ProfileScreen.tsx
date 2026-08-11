@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -96,7 +96,8 @@ export function ProfileScreen(): React.JSX.Element {
   const { spendableXp, refresh: refreshGiftBalance } = useGiftBalance();
   const [refreshing, setRefreshing] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
-  const [mapVisible, setMapVisible] = useState(true);
+  /** Optimistic map visibility while a toggle request is in flight. */
+  const [mapOptimistic, setMapOptimistic] = useState<boolean | null>(null);
   const [mapSaving, setMapSaving] = useState(false);
 
   const reload = useCallback(() => {
@@ -163,24 +164,20 @@ export function ProfileScreen(): React.JSX.Element {
     return chips;
   }, [profile]);
 
-  // Keep local switch in sync with server visibility.
-  useEffect(() => {
-    if (profile) {
-      setMapVisible(profile.visibility !== 'private');
-    }
-  }, [profile?.visibility, profile]);
+  const serverMapVisible = profile ? profile.visibility !== 'private' : true;
+  const mapVisible = mapOptimistic ?? serverMapVisible;
 
   const handleMapToggle = useCallback(
     async (value: boolean) => {
-      setMapVisible(value);
+      setMapOptimistic(value);
       setMapSaving(true);
       try {
         await dispatch(
           updateProfile({ visibility: value ? 'public' : 'private' }),
         ).unwrap();
+        setMapOptimistic(null);
       } catch {
-        // Revert optimistic flip on failure.
-        setMapVisible(!value);
+        setMapOptimistic(null);
       } finally {
         setMapSaving(false);
       }
@@ -234,18 +231,6 @@ export function ProfileScreen(): React.JSX.Element {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
       }
     >
-      {/* Compact top bar */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Settings')}
-          style={styles.headerButton}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Icon name="cog" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
-      </View>
-
       <ProfileHeaderPhoto
         photoUrl={mainPhoto ?? null}
         displayName={p.displayName + (p.age ? `, ${p.age}` : '')}
@@ -253,22 +238,15 @@ export function ProfileScreen(): React.JSX.Element {
         isVisibleOnMap={mapVisible}
         isPaid={isPaid}
         tierLabel={TIER_LABEL[tier]}
+        photoCount={photos.length}
+        activePhotoIndex={activePhotoIndex}
+        onSelectPhoto={setActivePhotoIndex}
+        onPressSettings={() => navigation.navigate('Settings')}
         onPressVerificationBadge={() => navigation.navigate('Verification')}
+        onPressPhoto={() => navigation.navigate('Photos')}
       />
 
-      {photos.length > 1 ? (
-        <View style={styles.photoIndicators}>
-          {photos.map((_, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[styles.photoIndicator, index === activePhotoIndex && styles.photoIndicatorActive]}
-              onPress={() => setActivePhotoIndex(index)}
-            />
-          ))}
-        </View>
-      ) : null}
-
-      {/* Trust — compact horizontal chips */}
+      {/* Trust → Map (product priority) */}
       <View style={styles.trustSection}>
         <TrustStrip
           chips={trustChips}
@@ -282,7 +260,6 @@ export function ProfileScreen(): React.JSX.Element {
         />
       </View>
 
-      {/* Map presence — primary control for this product */}
       <View style={styles.mapPresenceSection}>
         <MapPresenceCard
           isVisible={mapVisible}
@@ -292,7 +269,6 @@ export function ProfileScreen(): React.JSX.Element {
         />
       </View>
 
-      {/* ID CTA only when still needed (trust strip already shows status) */}
       {showIdCta ? (
         <View style={styles.sectionPadded}>
           <TouchableOpacity
@@ -302,7 +278,7 @@ export function ProfileScreen(): React.JSX.Element {
           >
             <View style={styles.idCtaLeft}>
               <Icon name="card-account-details" size={20} color={colors.warning} />
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={styles.idCtaTitle}>
                   {p.idVerificationStatus === 'pending'
                     ? 'ID under review'
@@ -345,6 +321,7 @@ export function ProfileScreen(): React.JSX.Element {
 
       {gamification ? (
         <View style={styles.sectionPadded}>
+          <Text style={styles.blockLabel}>Activity</Text>
           <ProgressCard summary={gamification} />
           {challenges.length > 0 ? <ChallengesCard challenges={challenges} /> : null}
         </View>
@@ -352,16 +329,16 @@ export function ProfileScreen(): React.JSX.Element {
 
       <View style={styles.gamificationRow}>
         <TouchableOpacity style={styles.gamificationCard} onPress={() => navigation.navigate('Challenges')}>
-          <Icon name="checkbox-marked-circle-outline" size={26} color={colors.primary} />
+          <Icon name="checkbox-marked-circle-outline" size={24} color={colors.primary} />
           <Text style={styles.gamificationTitle}>Challenges</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.gamificationCard} onPress={() => navigation.navigate('Leaderboard')}>
-          <Icon name="podium-gold" size={26} color="#FFD700" />
-          <Text style={styles.gamificationTitle}>Leaderboard</Text>
+          <Icon name="podium-gold" size={24} color="#FFD700" />
+          <Text style={styles.gamificationTitle}>Ranks</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.gamificationCard} onPress={() => navigation.navigate('Achievements')}>
-          <Icon name="trophy" size={26} color="#E91E63" />
-          <Text style={styles.gamificationTitle}>Achievements</Text>
+          <Icon name="trophy" size={24} color="#E91E63" />
+          <Text style={styles.gamificationTitle}>Badges</Text>
         </TouchableOpacity>
       </View>
 
@@ -373,38 +350,6 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
         <Icon name="chevron-right" size={22} color={colors.textFaint} />
       </TouchableOpacity>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Icon name="email-outline" size={20} color={colors.textMuted} />
-            <Text style={styles.infoText}>{p.email}</Text>
-            <Icon
-              name={badges.email ? 'check-circle' : 'circle-outline'}
-              size={18}
-              color={badges.email ? colors.success : colors.borderStrong}
-            />
-          </View>
-          <View style={[styles.infoRow, styles.infoRowLast]}>
-            <Icon name="phone-outline" size={20} color={colors.textMuted} />
-            <Text style={[styles.infoText, !p.phone && styles.infoTextMuted]}>
-              {p.phone ?? 'No phone added'}
-            </Text>
-            {p.phone ? (
-              <Icon
-                name={badges.phone ? 'check-circle' : 'circle-outline'}
-                size={18}
-                color={badges.phone ? colors.success : colors.borderStrong}
-              />
-            ) : (
-              <TouchableOpacity onPress={() => navigation.navigate('Verification')}>
-                <Text style={styles.sectionAction}>Add</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </View>
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
@@ -468,6 +413,38 @@ export function ProfileScreen(): React.JSX.Element {
       ) : null}
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Account</Text>
+        <View style={styles.infoCard}>
+          <View style={styles.infoRow}>
+            <Icon name="email-outline" size={20} color={colors.textMuted} />
+            <Text style={styles.infoText}>{p.email}</Text>
+            <Icon
+              name={badges.email ? 'check-circle' : 'circle-outline'}
+              size={18}
+              color={badges.email ? colors.success : colors.borderStrong}
+            />
+          </View>
+          <View style={[styles.infoRow, styles.infoRowLast]}>
+            <Icon name="phone-outline" size={20} color={colors.textMuted} />
+            <Text style={[styles.infoText, !p.phone && styles.infoTextMuted]}>
+              {p.phone ?? 'No phone added'}
+            </Text>
+            {p.phone ? (
+              <Icon
+                name={badges.phone ? 'check-circle' : 'circle-outline'}
+                size={18}
+                color={badges.phone ? colors.success : colors.borderStrong}
+              />
+            ) : (
+              <TouchableOpacity onPress={() => navigation.navigate('Verification')}>
+                <Text style={styles.sectionAction}>Add</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Connected accounts</Text>
           <TouchableOpacity onPress={() => navigation.navigate('SocialLinking')}>
@@ -482,7 +459,7 @@ export function ProfileScreen(): React.JSX.Element {
               return (
                 <View key={index} style={[styles.socialLinkItem, last && styles.infoRowLast]}>
                   <View style={[styles.socialIcon, { backgroundColor: cfg.color }]}>
-                    <Icon name={cfg.icon} size={20} color="#fff" />
+                    <Icon name={cfg.icon} size={18} color="#fff" />
                   </View>
                   <View style={styles.socialLinkInfo}>
                     <Text style={styles.socialLinkName}>{cfg.label}</Text>
@@ -510,7 +487,7 @@ export function ProfileScreen(): React.JSX.Element {
       {!isPaid ? (
         <TouchableOpacity style={styles.upgradeCard} onPress={() => navigation.navigate('Subscription')}>
           <View style={styles.upgradeContent}>
-            <Icon name="crown" size={28} color="#FFD700" />
+            <Icon name="crown" size={26} color="#FFD700" />
             <View style={styles.upgradeText}>
               <Text style={styles.upgradeTitle}>Upgrade to Premium</Text>
               <Text style={styles.upgradeSubtitle}>More reach · who viewed you</Text>
@@ -534,9 +511,9 @@ export function ProfileScreen(): React.JSX.Element {
             style={[styles.menuItem, index === arr.length - 1 && styles.infoRowLast]}
             onPress={() => navigation.navigate(item.route)}
           >
-            <Icon name={item.icon} size={22} color={colors.textMuted} />
+            <Icon name={item.icon} size={20} color={colors.textMuted} />
             <Text style={styles.menuItemText}>{item.label}</Text>
-            <Icon name="chevron-right" size={22} color={colors.borderStrong} />
+            <Icon name="chevron-right" size={20} color={colors.borderStrong} />
           </TouchableOpacity>
         ))}
       </View>
@@ -553,7 +530,7 @@ export function ProfileScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: spacing.xl },
+  content: { paddingBottom: spacing.xxl },
   centerFill: { alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
   errorTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginTop: 8 },
   errorMsg: { color: colors.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
@@ -566,27 +543,17 @@ const styles = StyleSheet.create({
   },
   retryText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
   errorLogout: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingTop: 52,
-    paddingBottom: spacing.sm,
-  },
-  headerTitle: { fontSize: fontSize.xl, fontWeight: '700', color: colors.textPrimary },
-  headerButton: { padding: 6 },
-  photoIndicators: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: spacing.sm,
-  },
-  photoIndicator: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.35)' },
-  photoIndicatorActive: { backgroundColor: colors.textPrimary, width: 20 },
   trustSection: { marginTop: spacing.md },
-  mapPresenceSection: { marginTop: spacing.md },
+  mapPresenceSection: { marginTop: spacing.sm },
   sectionPadded: { paddingHorizontal: spacing.xl, marginTop: spacing.md },
+  blockLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
   idCta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -668,8 +635,8 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.surfaceRaised,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
     marginTop: spacing.lg,
   },
   sectionHeader: {
@@ -679,14 +646,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: { fontSize: 17, fontWeight: '600', color: colors.textPrimary, marginBottom: 12 },
-  sectionAction: { color: colors.primary, fontWeight: '600' },
+  sectionAction: { color: colors.primary, fontWeight: '600', fontSize: 14 },
   infoCard: { backgroundColor: colors.surfaceRaised, borderRadius: radius.md, overflow: 'hidden' },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     padding: spacing.md,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderStrong,
   },
   infoRowLast: { borderBottomWidth: 0 },
@@ -737,10 +704,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderStrong,
   },
-  socialIcon: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  socialIcon: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
   socialLinkInfo: { flex: 1, marginLeft: 12 },
   socialLinkName: { color: colors.textPrimary, fontWeight: '600' },
   socialLinkUsername: { color: colors.textMuted, fontSize: 12 },
@@ -773,7 +740,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderStrong,
   },
   menuItemText: { flex: 1, marginLeft: 12, color: colors.textPrimary, fontSize: 15 },
@@ -789,5 +756,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   logoutText: { color: colors.danger, fontWeight: '600', fontSize: 15 },
-  version: { textAlign: 'center', color: colors.textFaint, marginVertical: spacing.xl },
+  version: { textAlign: 'center', color: colors.textFaint, marginVertical: spacing.xl, fontSize: fontSize.xs },
 });
