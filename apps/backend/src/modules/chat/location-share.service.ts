@@ -33,6 +33,14 @@ interface SessionRow {
   end_reason: LocationShareEndReason | null;
 }
 
+/** One session closed by the sweep job. */
+export interface SweptLocationSession {
+  id: string;
+  conversationId: string;
+  reason: Extract<LocationShareEndReason, 'expired' | 'timeout'>;
+  endedAt: string;
+}
+
 @Injectable()
 export class LocationShareService {
   private readonly logger = new Logger(LocationShareService.name);
@@ -161,34 +169,54 @@ export class LocationShareService {
 
   /**
    * End sessions past ends_at or with stale last_updated_at.
-   * Returns number of sessions closed (for ops metrics).
+   * Returns closed sessions so the caller can fan-out socket events.
    */
-  async sweepExpired(): Promise<number> {
+  async sweepExpired(): Promise<SweptLocationSession[]> {
     const staleCutoff = new Date(Date.now() - LocationShareService.STALE_MS).toISOString();
 
-    const expired = await this.db.query<Array<{ id: string }>>(
+    const expired = await this.db.query<
+      Array<{ id: string; conversation_id: string; ended_at: Date | string }>
+    >(
       `UPDATE chat_location_sessions
           SET status = 'ended', ended_at = NOW(), end_reason = 'expired'
         WHERE status = 'active'
           AND ends_at IS NOT NULL
           AND ends_at <= NOW()
-        RETURNING id`,
+        RETURNING id, conversation_id, ended_at`,
     );
 
-    const timedOut = await this.db.query<Array<{ id: string }>>(
+    const timedOut = await this.db.query<
+      Array<{ id: string; conversation_id: string; ended_at: Date | string }>
+    >(
       `UPDATE chat_location_sessions
           SET status = 'ended', ended_at = NOW(), end_reason = 'timeout'
         WHERE status = 'active'
           AND last_updated_at < $1::timestamptz
-        RETURNING id`,
+        RETURNING id, conversation_id, ended_at`,
       [staleCutoff],
     );
 
-    const n = expired.length + timedOut.length;
-    if (n > 0) {
-      this.logger.log(`sweepExpired closed ${n} sessions (${expired.length} expired, ${timedOut.length} timeout)`);
+    const closed: SweptLocationSession[] = [
+      ...expired.map((r) => ({
+        id: r.id,
+        conversationId: r.conversation_id,
+        reason: 'expired' as const,
+        endedAt: this.toIso(r.ended_at),
+      })),
+      ...timedOut.map((r) => ({
+        id: r.id,
+        conversationId: r.conversation_id,
+        reason: 'timeout' as const,
+        endedAt: this.toIso(r.ended_at),
+      })),
+    ];
+
+    if (closed.length > 0) {
+      this.logger.log(
+        `sweepExpired closed ${closed.length} sessions (${expired.length} expired, ${timedOut.length} timeout)`,
+      );
     }
-    return n;
+    return closed;
   }
 
   // ─── Internals ─────────────────────────────────────────────────────────────
