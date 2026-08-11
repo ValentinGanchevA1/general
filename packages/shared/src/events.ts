@@ -1,4 +1,13 @@
-import type { LatLng, EntityKind, VerificationLevel } from './api';
+import type {
+  LatLng,
+  EntityKind,
+  VerificationLevel,
+  ChatLocation,
+  ChatMessage,
+  LocationShareDuration,
+  LocationShareEndReason,
+  LocationShareSession,
+} from './api';
 import type { EventQuestion, PollResult } from './event';
 import type { StoryNewEvent } from './story';
 
@@ -29,6 +38,9 @@ export interface ChatMessageEvent {
   conversationId: string;
   senderId: string;
   body: string;
+  type?: ChatMessage['type'];
+  location?: ChatLocation | null;
+  locationSessionId?: string | null;
   createdAt: string;
 }
 
@@ -63,12 +75,28 @@ export interface AchievementUnlockedEvent {
   unlockedAt: string;
 }
 
+// ─── Live location share ───────────────────────────────────────────────────
+
+export interface LocationShareStartedEvent {
+  session: LocationShareSession;
+  message: ChatMessage;
+}
+
+export interface LocationShareUpdateEvent {
+  sessionId: string;
+  conversationId: string;
+  location: ChatLocation;
+  updatedAt: string;
+}
+
+export interface LocationShareEndedEvent {
+  sessionId: string;
+  conversationId: string;
+  reason: LocationShareEndReason;
+  endedAt: string;
+}
+
 // ─── P3.5 Events: live poll / Q&A deltas (room `event:{eventId}`) ─────────────
-//
-// These are broadcast to *everyone* in an event room, so they carry only the
-// state that is shared across viewers. The per-viewer fields — `PollResult.myVote`
-// and `EventQuestion.upvotedByMe` — are intentionally omitted; each client keeps
-// its own and merges the shared counts on top (see mobile `eventMerge`).
 
 /** A poll snapshot after it was created or a vote was cast. `id` is the poll id. */
 export type EventPollDelta = Omit<PollResult, 'myVote'>;
@@ -90,6 +118,9 @@ export interface ServerToClientEvents {
   'conversation:opened': (e: ConversationOpenedEvent) => void;
   'gift:received': (e: GiftReceivedEvent) => void;
   'achievement:unlocked': (e: AchievementUnlockedEvent) => void;
+  'location:share:started': (e: LocationShareStartedEvent) => void;
+  'location:share:update': (e: LocationShareUpdateEvent) => void;
+  'location:share:ended': (e: LocationShareEndedEvent) => void;
   /** Poll created or vote tally changed in an event the socket has joined. */
   'event:poll': (e: EventPollDelta) => void;
   /** New question asked in a joined event. */
@@ -123,6 +154,21 @@ export interface ChatSendPayload {
   clientMessageId: string;
 }
 
+export interface LocationShareStartPayload {
+  conversationId: string;
+  duration: LocationShareDuration;
+  location: ChatLocation;
+}
+
+export interface LocationShareUpdatePayload {
+  sessionId: string;
+  location: ChatLocation;
+}
+
+export interface LocationShareStopPayload {
+  sessionId: string;
+}
+
 export interface ClientToServerEvents {
   'presence:update': (
     p: PresenceUpdatePayload,
@@ -136,6 +182,18 @@ export interface ClientToServerEvents {
   'chat:send': (
     p: ChatSendPayload,
     ack: (r: AckResult<ChatMessageEvent>) => void,
+  ) => void;
+  'location:share:start': (
+    p: LocationShareStartPayload,
+    ack: (r: AckResult<LocationShareSession>) => void,
+  ) => void;
+  'location:share:update': (
+    p: LocationShareUpdatePayload,
+    ack: (r: AckResult<{ updatedAt: string }>) => void,
+  ) => void;
+  'location:share:stop': (
+    p: LocationShareStopPayload,
+    ack: (r: AckResult<{ ended: true }>) => void,
   ) => void;
   /** Subscribe to live poll/Q&A deltas for an event (room `event:{eventId}`). */
   'event:join': (

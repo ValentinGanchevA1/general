@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
 import type {
+  ChatLocation,
   ChatMessage,
   ConversationStatus,
   ConversationSummary,
@@ -29,44 +30,19 @@ export class ChatService {
     body: string,
   ): Promise<ChatMessage> {
     return this.db.transaction(async (tx) => {
-      const [convo] = await tx.query<
-        Array<{ participant_ids: string[]; status: string; initiated_by: string | null }>
-      >(
-        `SELECT participant_ids, status, initiated_by
-           FROM conversations WHERE id = $1 LIMIT 1 FOR UPDATE`,
-        [conversationId],
-      );
-      if (!convo) throw new NotFoundException({ code: 'chat.not_found', message: 'Conversation not found' });
-      if (!convo.participant_ids.includes(senderId)) {
-        throw new ForbiddenException({ code: 'chat.forbidden', message: 'Not a participant' });
-      }
-
-      if (convo.status === 'pending') {
-        if (convo.initiated_by === senderId) {
-          // Initiator of an unanswered request — cap at one message until reply.
-          const [counted] = await tx.query<Array<{ count: number }>>(
-            `SELECT COUNT(*)::int AS count FROM messages WHERE conversation_id = $1`,
-            [conversationId],
-          );
-          if ((counted?.count ?? 0) > 0) {
-            throw new ForbiddenException({
-              code: 'chat.request_pending',
-              message: 'Wait for them to reply before sending another message',
-            });
-          }
-        } else {
-          // Recipient is replying → consent given, promote to a full conversation.
-          await tx.query(
-            `UPDATE conversations SET status = 'accepted' WHERE id = $1`,
-            [conversationId],
-          );
-        }
-      }
+      await this.enforceParticipantAndRequestGate(tx, conversationId, senderId);
 
       const [msg] = await tx.query<ChatMessage[]>(
-        `INSERT INTO messages (conversation_id, sender_id, body)
-              VALUES ($1, $2, $3)
-           RETURNING id, conversation_id AS "conversationId", sender_id AS "senderId", body, created_at AS "createdAt"`,
+        `INSERT INTO messages (conversation_id, sender_id, body, type)
+              VALUES ($1, $2, $3, 'text')
+           RETURNING id,
+                     conversation_id AS "conversationId",
+                     sender_id AS "senderId",
+                     body,
+                     type,
+                     location,
+                     location_session_id AS "locationSessionId",
+                     created_at AS "createdAt"`,
         [conversationId, senderId, body],
       );
 
@@ -75,9 +51,95 @@ export class ChatService {
         [conversationId],
       );
 
-      const created = msg!.createdAt as Date | string;
-      return { ...msg!, createdAt: created instanceof Date ? created.toISOString() : created };
+      return this.normalizeMessage(msg!);
     });
+  }
+
+  /**
+   * Persist a location_session system message (counts toward pending-request quota).
+   */
+  async persistLocationSession(
+    conversationId: string,
+    senderId: string,
+    sessionId: string,
+    body: string,
+    location: ChatLocation,
+  ): Promise<ChatMessage> {
+    return this.db.transaction(async (tx) => {
+      await this.enforceParticipantAndRequestGate(tx, conversationId, senderId);
+
+      const [msg] = await tx.query<ChatMessage[]>(
+        `INSERT INTO messages
+           (conversation_id, sender_id, body, type, location, location_session_id)
+         VALUES ($1, $2, $3, 'location_session', $4::jsonb, $5)
+         RETURNING id,
+                   conversation_id AS "conversationId",
+                   sender_id AS "senderId",
+                   body,
+                   type,
+                   location,
+                   location_session_id AS "locationSessionId",
+                   created_at AS "createdAt"`,
+        [conversationId, senderId, body, JSON.stringify(location), sessionId],
+      );
+
+      await tx.query(
+        `UPDATE conversations SET last_message_at = NOW() WHERE id = $1`,
+        [conversationId],
+      );
+
+      return this.normalizeMessage(msg!);
+    });
+  }
+
+  private async enforceParticipantAndRequestGate(
+    tx: DataSource['manager'],
+    conversationId: string,
+    senderId: string,
+  ): Promise<void> {
+    const [convo] = await tx.query<
+      Array<{ participant_ids: string[]; status: string; initiated_by: string | null }>
+    >(
+      `SELECT participant_ids, status, initiated_by
+         FROM conversations WHERE id = $1 LIMIT 1 FOR UPDATE`,
+      [conversationId],
+    );
+    if (!convo) {
+      throw new NotFoundException({ code: 'chat.not_found', message: 'Conversation not found' });
+    }
+    if (!convo.participant_ids.includes(senderId)) {
+      throw new ForbiddenException({ code: 'chat.forbidden', message: 'Not a participant' });
+    }
+
+    if (convo.status === 'pending') {
+      if (convo.initiated_by === senderId) {
+        const [counted] = await tx.query<Array<{ count: number }>>(
+          `SELECT COUNT(*)::int AS count FROM messages WHERE conversation_id = $1`,
+          [conversationId],
+        );
+        if ((counted?.count ?? 0) > 0) {
+          throw new ForbiddenException({
+            code: 'chat.request_pending',
+            message: 'Wait for them to reply before sending another message',
+          });
+        }
+      } else {
+        await tx.query(`UPDATE conversations SET status = 'accepted' WHERE id = $1`, [
+          conversationId,
+        ]);
+      }
+    }
+  }
+
+  private normalizeMessage(msg: ChatMessage): ChatMessage {
+    const created = msg.createdAt as Date | string;
+    return {
+      ...msg,
+      type: msg.type ?? 'text',
+      location: msg.location ?? null,
+      locationSessionId: msg.locationSessionId ?? null,
+      createdAt: created instanceof Date ? created.toISOString() : created,
+    };
   }
 
   /** Return participant IDs for a conversation — used by the realtime gateway for push routing. */
@@ -146,9 +208,10 @@ export class ChatService {
       participantIds: r.participant_ids,
       participants: r.participants,
       lastMessageAt: r.last_message_at ?? null,
-      lastMessage: r.last_body != null && r.last_sender_id != null
-        ? { senderId: r.last_sender_id, body: r.last_body }
-        : null,
+      lastMessage:
+        r.last_body != null && r.last_sender_id != null
+          ? { senderId: r.last_sender_id, body: r.last_body }
+          : null,
       status: r.status,
       initiatedBy: r.initiated_by,
     }));
@@ -174,6 +237,9 @@ export class ChatService {
               conversation_id AS "conversationId",
               sender_id       AS "senderId",
               body,
+              type,
+              location,
+              location_session_id AS "locationSessionId",
               created_at      AS "createdAt"
          FROM messages
         WHERE conversation_id = $1
@@ -184,10 +250,7 @@ export class ChatService {
     );
 
     const hasMore = rows.length > cap;
-    const page = rows.slice(0, cap).map((r) => {
-      const created = r.createdAt as Date | string;
-      return { ...r, createdAt: created instanceof Date ? created.toISOString() : created };
-    });
+    const page = rows.slice(0, cap).map((r) => this.normalizeMessage(r));
 
     return {
       messages: page,
