@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -88,7 +88,16 @@ export function ChatScreen(): React.JSX.Element {
   const outbox = useAppSelector((s) => s.chat.outbox);
   const failedIds = useAppSelector((s) => s.chat.failedIds);
 
-  const pendingIds = outbox.map((e) => e.optimisticId);
+  // Pending = outbox OR still-local opt-* (in-flight before ack / queue).
+  const pendingIds = useMemo(() => {
+    const ids = new Set(outbox.map((e) => e.optimisticId));
+    for (const m of messages) {
+      if (m.id.startsWith('opt-') && !failedIds.includes(m.id)) {
+        ids.add(m.id);
+      }
+    }
+    return ids;
+  }, [outbox, messages, failedIds]);
 
   const theyReplied = messages.some((m) => m.senderId !== myUserId);
   const iSent = messages.some((m) => m.senderId === myUserId);
@@ -119,7 +128,6 @@ export function ChatScreen(): React.JSX.Element {
   const otherUserId = messages.find((m) => m.senderId !== myUserId)?.senderId ?? null;
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
-  // Fetch peer for verification badge + block status (gift must hide when blocked).
   useEffect(() => {
     if (!otherUserId) return;
     let cancelled = false;
@@ -141,7 +149,6 @@ export function ChatScreen(): React.JSX.Element {
   const peerBadge = fetchedPeer?.userId === otherUserId ? fetchedPeer : null;
   const badgeVerification = otherUserVerification ?? peerBadge?.verification ?? 'none';
   const badgeIdVerified = otherUserIdVerified ?? peerBadge?.idVerified;
-  // Server enforces symmetric block; UI hides when viewer blocked peer.
   const canGift = !!otherUserId && peerBadge != null && !peerBadge.blockedByViewer;
   const canShareLocation = !requestLocked;
 
@@ -291,7 +298,7 @@ export function ChatScreen(): React.JSX.Element {
             <MessageBubble
               msg={item}
               isMine={item.senderId === myUserId}
-              isPending={pendingIds.includes(item.id)}
+              isPending={pendingIds.has(item.id)}
               isFailed={failedIds.includes(item.id)}
               onRetry={() => void retry(item.id, item.body)}
             />

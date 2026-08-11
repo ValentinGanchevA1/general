@@ -1,22 +1,28 @@
 import React from 'react';
-import { View, Text, StyleSheet, Switch, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Switch, Pressable, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
 interface MapPresenceCardProps {
   isVisible: boolean;
+  saving?: boolean;
   onToggle: (value: boolean) => void;
   onViewPin?: () => void;
 }
 
 export function MapPresenceCard({
   isVisible,
+  saving = false,
   onToggle,
   onViewPin,
 }: MapPresenceCardProps): React.JSX.Element {
   return (
-    <View style={styles.card}>
-      <Text style={styles.title}>How others see you</Text>
+    <View style={[styles.card, isVisible ? styles.cardOn : styles.cardOff]}>
+      <View style={styles.titleRow}>
+        <View style={[styles.statusDot, { backgroundColor: isVisible ? colors.success : colors.textFaint }]} />
+        <Text style={styles.title}>How others see you</Text>
+        {saving ? <ActivityIndicator size="small" color={colors.primary} style={styles.saving} /> : null}
+      </View>
 
       <View style={styles.row}>
         <View style={styles.left}>
@@ -30,6 +36,7 @@ export function MapPresenceCard({
         <Switch
           value={isVisible}
           onValueChange={onToggle}
+          disabled={saving}
           trackColor={{ false: colors.textFaint, true: colors.primary }}
           thumbColor="#FFFFFF"
           ios_backgroundColor={colors.textFaint}
@@ -37,7 +44,7 @@ export function MapPresenceCard({
       </View>
 
       {isVisible && onViewPin ? (
-        <Pressable onPress={onViewPin} style={styles.viewPinButton}>
+        <Pressable onPress={onViewPin} style={styles.viewPinButton} accessibilityRole="button">
           <Icon name="map-marker" size={16} color={colors.primary} />
           <Text style={styles.viewPinText}>View my pin on map</Text>
         </Pressable>
@@ -53,14 +60,27 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+  },
+  cardOn: { borderColor: 'rgba(0, 212, 255, 0.35)' },
+  cardOff: { borderColor: colors.border },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+    gap: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   title: {
+    flex: 1,
     color: colors.textPrimary,
     fontSize: fontSize.md,
     fontWeight: '600',
-    marginBottom: 14,
   },
+  saving: { marginLeft: 4 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
