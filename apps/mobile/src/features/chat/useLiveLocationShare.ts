@@ -24,6 +24,7 @@ const FALLBACK_INTERVAL_MS = 15_000;
 interface UseLiveLocationShareResult {
   session: LocationShareSession | null;
   starting: boolean;
+  stopping: boolean;
   isSharer: boolean;
   start: (duration: LocationShareDuration) => Promise<void>;
   stop: () => Promise<void>;
@@ -37,6 +38,7 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
 
   const [session, setSession] = useState<LocationShareSession | null>(null);
   const [starting, setStarting] = useState(false);
+  const [stopping, setStopping] = useState(false);
 
   const sessionRef = useRef<LocationShareSession | null>(null);
   const lastEmitRef = useRef(0);
@@ -107,6 +109,12 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
       const now = Date.now();
       if (now - lastEmitRef.current < MIN_EMIT_MS) return;
       lastEmitRef.current = now;
+      // Optimistic local pin before ack
+      setSession((prev) =>
+        prev && prev.id === s.id
+          ? { ...prev, lastLocation: location, lastUpdatedAt: new Date().toISOString() }
+          : prev,
+      );
       const ok = await locationShareUpdate(s.id, location);
       if (ok) {
         setSession((prev) =>
@@ -193,6 +201,7 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
           Alert.alert('Could not share location', 'Check your connection and try again.');
           return;
         }
+        // Server assigns session id — apply as soon as ack arrives (socket may also fan-out).
         setSession(result);
       } finally {
         setStarting(false);
@@ -203,14 +212,25 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
 
   const stop = useCallback(async (): Promise<void> => {
     const s = sessionRef.current;
-    if (!s || s.sharerId !== myUserId) return;
-    const ok = await locationShareStop(s.id);
-    if (ok) {
-      setSession(null);
-    } else {
+    if (!s || s.sharerId !== myUserId || stopping) return;
+
+    // Optimistic: hide banner/session immediately; restore if stop fails.
+    const snapshot = s;
+    setSession(null);
+    setStopping(true);
+    try {
+      const ok = await locationShareStop(snapshot.id);
+      if (!ok) {
+        setSession(snapshot);
+        Alert.alert('Could not stop sharing', 'Try again in a moment.');
+      }
+    } catch {
+      setSession(snapshot);
       Alert.alert('Could not stop sharing', 'Try again in a moment.');
+    } finally {
+      setStopping(false);
     }
-  }, [myUserId]);
+  }, [myUserId, stopping]);
 
   const openInMaps = useCallback((): void => {
     const loc = session?.lastLocation;
@@ -228,6 +248,7 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
   return {
     session,
     starting,
+    stopping,
     isSharer,
     start,
     stop,
