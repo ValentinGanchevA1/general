@@ -321,12 +321,48 @@ export interface SocialAuthorizeResponse {
 
 // ─── Chat (REST) ───────────────────────────────────────────────────────────
 
+export type ChatMessageType = 'text' | 'location' | 'location_session';
+
+export type LocationShareDuration = '15m' | '60m' | 'until_off';
+
+export type LocationShareStatus = 'active' | 'ended';
+
+export type LocationShareEndReason =
+  | 'expired'
+  | 'stopped'
+  | 'timeout'
+  | 'blocked'
+  | 'conversation_closed';
+
+export interface ChatLocation {
+  lat: number;
+  lng: number;
+}
+
 export interface ChatMessage {
   id: string;
   conversationId: string;
   senderId: string;
   body: string;
+  /** Defaults to 'text' for messages created before live-location shipped. */
+  type: ChatMessageType;
+  location?: ChatLocation | null;
+  locationSessionId?: string | null;
   createdAt: string;
+}
+
+export interface LocationShareSession {
+  id: string;
+  conversationId: string;
+  sharerId: string;
+  status: LocationShareStatus;
+  duration: LocationShareDuration;
+  startedAt: string;
+  endsAt: string | null;
+  lastLocation: ChatLocation;
+  lastUpdatedAt: string;
+  endedAt?: string | null;
+  endReason?: LocationShareEndReason | null;
 }
 
 export interface ConversationParticipant {
