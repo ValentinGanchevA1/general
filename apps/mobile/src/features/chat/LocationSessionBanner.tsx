@@ -23,7 +23,7 @@ function formatRemaining(endsAt: string | null, nowMs: number): string | null {
 
 export function LocationSessionBanner({
   session,
-  is Sharer b,
+  isSharer,
   peerName,
   onStop,
   onOpenMap,
