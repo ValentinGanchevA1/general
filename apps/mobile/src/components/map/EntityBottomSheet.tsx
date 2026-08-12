@@ -152,13 +152,21 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
           />
           <View style={styles.userHeaderText}>
             <View style={styles.nameRow}>
-              <Text style={styles.title}>{meta.displayName}</Text>
+              <Text style={styles.title}>
+                {meta.displayName}
+                {profile?.age != null ? `, ${profile.age}` : ''}
+              </Text>
               <VerificationBadge
                 verification={meta.verification}
                 idVerified={meta.verifiedBadge}
                 size={16}
               />
             </View>
+            {(profile?.hometownCity || profile?.hometownCountry) ? (
+              <Text style={styles.originLine}>
+                {[profile?.hometownCity, profile?.hometownCountry].filter(Boolean).join(', ')}
+              </Text>
+            ) : null}
             <Text style={[styles.onlineLabel, !meta.online && styles.offlineLabel]}>
               {meta.online ? 'Online now' : 'Recently nearby'}
             </Text>
@@ -377,6 +385,7 @@ const styles = StyleSheet.create({
   userHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   userHeaderText: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  originLine: { color: '#888', fontSize: 12, marginTop: 2 },
   onlineLabel: { color: '#4caf50', fontSize: 12, marginTop: 2 },
   offlineLabel: { color: '#666' },
   bio: { color: '#ccc', fontSize: 14, lineHeight: 20 },
