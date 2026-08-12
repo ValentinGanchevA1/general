@@ -28,18 +28,20 @@ import {
 } from 'class-validator';
 import { Throttle } from '@nestjs/throttler';
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CurrentUser } from '../auth/current-user.decorator';
-import { UsersService } from './users.service';
-import { S3Service } from '../../common/s3.service';
-
 import type {
   AddPhotoRequest,
   DeleteAccountRequest,
   ReorderPhotosRequest,
   UpdateProfileRequest,
   UploadPhotoBase64Request,
+  UserPhoto,
+  UserProfile,
 } from '@g88/shared';
+
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { UsersService } from './users.service';
+import { S3Service } from '../../common/s3.service';
 
 class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @IsString() displayName?: string;
@@ -107,40 +109,50 @@ export class UsersController {
   ) {}
 
   @Get('me')
-  getMe(@CurrentUser('sub') userId: string) {
+  async getMe(@CurrentUser('id') userId: string): Promise<UserProfile> {
     return this.users.getProfile(userId);
   }
 
-  @Patch('me')
-  updateMe(@CurrentUser('sub') userId: string, @Body() body: UpdateProfileDto) {
-    return this.users.updateProfile(userId, body);
+  @Get('me/profile')
+  async getProfile(@CurrentUser('id') userId: string): Promise<UserProfile> {
+    return this.users.getProfile(userId);
   }
 
-  @Get(':id')
-  getPublic(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser('sub') viewerId: string,
-  ) {
-    return this.users.getPublicProfile(id, viewerId);
+  @Patch('me/profile')
+  async updateProfile(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateProfileDto,
+  ): Promise<UserProfile> {
+    return this.users.updateProfile(userId, dto);
   }
 
-  @Post('me/photos/presign')
+  @Delete('me')
+  @HttpCode(204)
+  async deleteAccount(
+    @CurrentUser('id') userId: string,
+    @Body() dto: DeleteAccountDto,
+  ): Promise<void> {
+    await this.users.deleteAccount(userId, dto.confirm, dto.password);
+  }
+
+  @Post('me/avatar/presigned-url')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  async presign(@CurrentUser('sub') userId: string, @Body() body: PresignedUrlDto) {
-    return this.s3.createPresignedUpload(userId, body.contentType);
-  }
-
-  @Post('me/photos')
-  addPhoto(@CurrentUser('sub') userId: string, @Body() body: AddPhotoDto) {
-    return this.users.addPhoto(userId, body.url);
+  async avatarPresignedUrl(
+    @CurrentUser('id') userId: string,
+    @Body() dto: PresignedUrlDto,
+  ) {
+    return this.s3.createPresignedUpload(userId, dto.contentType);
   }
 
   @Post('me/photos/base64')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  async uploadBase64(@CurrentUser('sub') userId: string, @Body() body: UploadPhotoBase64Dto) {
+  async uploadPhotoBase64(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UploadPhotoBase64Dto,
+  ): Promise<UserPhoto[]> {
     let buf: Buffer;
     try {
-      buf = Buffer.from(body.data, 'base64');
+      buf = Buffer.from(dto.data, 'base64');
     } catch {
       throw new BadRequestException('Image data is empty or not valid base64');
     }
@@ -150,31 +162,53 @@ export class UsersController {
     if (buf.length > 10 * 1024 * 1024) {
       throw new BadRequestException('Image exceeds the 10 MB limit');
     }
-    const { publicUrl } = await this.s3.uploadUserPhoto(userId, buf, body.contentType, body.fileName);
+    const { publicUrl } = await this.s3.uploadUserPhoto(userId, buf, dto.contentType, dto.fileName);
     return this.users.addPhoto(userId, publicUrl);
   }
 
   @Get('me/photos')
-  listPhotos(@CurrentUser('sub') userId: string) {
+  async listPhotos(@CurrentUser('id') userId: string): Promise<UserPhoto[]> {
     return this.users.listPhotos(userId);
   }
 
-  @Delete('me/photos/:photoId')
-  deletePhoto(
-    @CurrentUser('sub') userId: string,
-    @Param('photoId', ParseUUIDPipe) photoId: string,
+  @Post('me/photos/presigned-url')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async photoPresignedUrl(
+    @CurrentUser('id') userId: string,
+    @Body() dto: PresignedUrlDto,
   ) {
+    return this.s3.createPresignedUpload(userId, dto.contentType);
+  }
+
+  @Post('me/photos')
+  async addPhoto(
+    @CurrentUser('id') userId: string,
+    @Body() dto: AddPhotoDto,
+  ): Promise<UserPhoto[]> {
+    return this.users.addPhoto(userId, dto.url);
+  }
+
+  @Patch('me/photos/order')
+  async reorderPhotos(
+    @CurrentUser('id') userId: string,
+    @Body() dto: ReorderPhotosDto,
+  ): Promise<UserPhoto[]> {
+    return this.users.reorderPhotos(userId, dto.photoIds);
+  }
+
+  @Delete('me/photos/:photoId')
+  async deletePhoto(
+    @CurrentUser('id') userId: string,
+    @Param('photoId', ParseUUIDPipe) photoId: string,
+  ): Promise<UserPhoto[]> {
     return this.users.deletePhoto(userId, photoId);
   }
 
-  @Patch('me/photos/reorder')
-  reorder(@CurrentUser('sub') userId: string, @Body() body: ReorderPhotosDto) {
-    return this.users.reorderPhotos(userId, body.photoIds);
-  }
-
-  @Delete('me')
-  @HttpCode(204)
-  async deleteAccount(@CurrentUser('sub') userId: string, @Body() body: DeleteAccountDto) {
-    await this.users.deleteAccount(userId, body.confirm, body.password);
+  @Get(':id')
+  async getPublic(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') viewerId: string,
+  ) {
+    return this.users.getPublicProfile(id, viewerId);
   }
 }
