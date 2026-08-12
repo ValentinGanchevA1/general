@@ -23,27 +23,39 @@ type Faq = { q: string; a: string };
 const FAQS: Faq[] = [
   {
     q: 'How does G88 know who is nearby?',
-    a: 'Your device shares an approximate location (coarsened to about a 120-meter area) while the app is open. We use it to place nearby people and activity on the map. Your exact position is never stored.',
+    a: 'While the app is open, your device shares an approximate location (coarsened to about a 120-meter area). We use it for the map, Pulse stories, and nearby activity. Your exact position is never stored.',
   },
   {
     q: 'How do I hide myself from the map?',
-    a: 'Go to Settings → Appear on map and turn it off. You stay logged in and can still browse, but others will not see you in discovery.',
+    a: 'Settings → Appear on map → turn it off. You stay logged in and can still browse; others will not see you in discovery.',
+  },
+  {
+    q: 'What is Pulse?',
+    a: 'Pulse is your activity hub: chats, waves, trades, alerts, matches, and nearby story rings. Post a story from the strip at the top of Pulse.',
+  },
+  {
+    q: 'How do stories work?',
+    a: 'Stories are visible to people nearby and disappear after 24 hours. Posting needs a verified email and an account at least 24 hours old (phone-verified accounts can post sooner). Reactions on stories count like waves.',
   },
   {
     q: 'Why can’t I message someone?',
-    a: 'Messaging opens once you match (mutual wave) or share an interest, which keeps conversations consensual. Send a wave first — if they wave back, the chat unlocks.',
+    a: 'Chat unlocks after mutual interest — a mutual wave, or a wave matched with a story reaction. Send a wave or react first; when they reciprocate, the chat opens.',
   },
   {
-    q: 'What do the verification badges mean?',
-    a: 'Badges show a user has confirmed their phone number or passed ID review. They are optional and help build trust. Start yours from Profile → Verification.',
+    q: 'What do verification badges mean?',
+    a: 'They show confirmed email, phone, or ID review. Optional, but they raise trust. Start from Profile → Verification. Email verification also unlocks story posting.',
+  },
+  {
+    q: 'How does local trade work?',
+    a: 'Create listings and negotiate in the app. Settlement is offline between you and the other person — G88 does not charge fees or process payments for local trade.',
   },
   {
     q: 'How do I delete my account?',
-    a: 'Settings → Delete account. This is immediate and permanently removes your profile, photos, messages, and activity. It cannot be undone.',
+    a: 'Settings → Delete account. Immediate and permanent: profile, photos, stories, messages, and activity are removed.',
   },
   {
     q: 'I found a bug or something feels wrong.',
-    a: 'Tap “Email support” below and tell us what happened. Including the screen you were on and what you expected helps us fix it faster.',
+    a: 'Tap “Email support” below. Include the screen you were on and what you expected — that helps us fix it faster.',
   },
 ];
 

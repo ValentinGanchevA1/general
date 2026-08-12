@@ -114,6 +114,7 @@ describe('PulseScreen v2', () => {
     expect(getByTestId('pulse-filter-all')).toBeTruthy();
     expect(getByTestId('pulse-filter-chats')).toBeTruthy();
   });
+});
 
   it('switches filter when a chip is tapped', () => {
     const { getByTestId } = render(wrap(<PulseScreen />));
