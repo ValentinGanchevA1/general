@@ -16,6 +16,7 @@ Anti-goal: micro-services-from-day-one. Two deployable units (REST API, Realtime
 | Tier        | Component                 | Tech                                              |
 |-------------|---------------------------|---------------------------------------------------|
 | Client      | Mobile                    | React Native + TypeScript, RTK, react-native-maps |
+| Client      | Admin dashboard (`apps/admin`, added 2026-08, undocumented until now) | Vite + React + shadcn/ui — verification queue, live socket feed |
 | Edge        | TLS + LB                  | Render-provided (or Cloudflare in front)          |
 | Application | REST API                  | NestJS, TypeORM                                   |
 | Application | Realtime gateway          | Socket.IO with Redis adapter                      |
@@ -110,6 +111,28 @@ Migration files are append-only and never edited after merge. Schema invariants 
 
 First nearby query returns the full set plus a `viewportHash`. Subsequent queries within the same session send the previous hash; server returns `{added, removed, updated}` diff if the viewport overlaps. Cuts payload and battery further. Behind a feature flag for now — full responses are fine at MVP scale.
 
+### 3.10 Ephemeral stories — exact-write, fuzzed-read (P4.S)
+
+Stories follow the same location-fuzzing invariant as everything else (§3.3): the exact GPS point is stored (for future ranking use) but every client-facing payload exposes only `approx_lat`/`approx_lng` — the centroid of the H3 r10 cell. TTL is handled two ways: a scheduled `stories-cleanup.service.ts` sweep does the actual delete + S3 purge, while `expires_at` is filtered in application queries rather than baked into a partial index predicate, because `NOW()` isn't `IMMUTABLE` and Postgres rejects it in an index predicate.
+
+Post-eligibility (`canPostStory`, `packages/shared/src/story.ts`) is a **soft gate**, not a hard phone-verification requirement: email-verified + 24h account age is enough, with phone+ accounts skipping the age floor. This was a deliberate downgrade from an originally-stricter design, made to avoid phone verification being a creation-blocker for a low-stakes, ephemeral surface — see `SPECIFICATION.md` §2.9.
+
+### 3.11 Chat live-location share — a scoped exception to location fuzzing
+
+§3.3's "exact GPS never lands anywhere but the fuzzed write" rule has exactly one carved-out exception: a `chat_location_sessions` row stores exact `last_lat`/`last_lng`, and that exact point is relayed to the other chat participant in real time. This is intentional — the share is explicit, consensual, time-boxed (15m / 60m / until-off), and scoped to two people already in a private 1:1 conversation, not the public map. It does not write to `users.visibility` and is fully independent of map/discovery presence. Full design at `docs/SPEC_CHAT_LIVE_LOCATION.md`.
+
+### 3.12 ID-verification: Rekognition is assist-only
+
+`RekognitionService.analyzeVerification` runs AWS Rekognition face-compare between the submitted ID document and the account's existing selfie/photo, but the resulting similarity score is surfaced to a human admin as a decision aid — nothing in the pipeline auto-approves or auto-rejects on that score. `decideVerification()` stays a manual `AdminGuard`-protected action; Rekognition only makes that action faster to reason about. The decide path is transaction-wrapped with an atomic conditional `UPDATE ... WHERE status = 'pending'` so two admins can't double-process the same submission.
+
+### 3.13 OAuth PKCE (S256) for social login
+
+Social OAuth start now generates a PKCE `code_verifier`/`code_challenge` pair (S256), with the verifier held server-side in Redis (`GET`+`DEL` on consumption, chosen over `GETDEL` for broader Redis-version compatibility) rather than trusting the client to round-trip it unmodified. Closes an authorization-code-interception gap in the original OAuth flow.
+
+### 3.14 Admin dashboard — separate client, shared backend contract
+
+`apps/admin` (Vite + React + shadcn/ui) is a fourth workspace app, added without a prior architectural decision recorded here — flagged now rather than left invisible. It talks to the same `g88-api` REST + Socket.IO surface as mobile (no separate backend), authenticates via `AdminGuard`-protected routes, and gets live queue updates over the existing realtime gateway rather than polling. Today it's a single feature (ID-verification review queue); nothing about the setup assumes it stays that narrow.
+
 ## 4. Data model (high level)
 
 See `apps/backend/migrations/0001_initial.sql` for the canonical schema. Key entities:
@@ -120,6 +143,8 @@ See `apps/backend/migrations/0001_initial.sql` for the canonical schema. Key ent
 - `waves` — from_user_id, to_user_id, context, created_at, responded_at (not acknowledged_at), conversation_id when reciprocal.
 - `conversations` + `messages` — chat; a wave becoming reciprocal upgrades to a conversation. `messages` has no `recipient_id` (use `participant_ids`) and no `read_at` (unread is a 24h heuristic).
 - `device_tokens` — FCM/APNs registration per user per device.
+- `stories` — 24h ephemeral posts; H3-indexed + fuzzed like `users` (§3.10).
+- `chat_location_sessions` — timed live-location sessions inside 1:1 chat; **exact** coordinates, the one deliberate exception to location fuzzing (§3.11).
 
 A materialized view `v_discoverable_entity` unions `users`, `events`, `listings` into a single (id, kind, location, h3 cells, visibility) shape so discovery queries don't need three UNIONs at request time.
 
@@ -129,7 +154,7 @@ JWT access token (15min) + opaque refresh token (30d, rotating, stored hashed in
 
 ## 6. Observability
 
-- Sentry on both apps (mobile JS errors, backend exceptions).
+- Sentry on both apps (mobile JS errors, backend exceptions). PII/secret scrubbing is a shared implementation (`packages/shared/src/scrub.ts`, PR #80, 2026-08-11) — both apps' `beforeSend` hooks call the same scrubber, with a dedicated spec (`sentry-scrub.spec.ts`) so the rule set can't silently drift between mobile and backend.
 - Pino structured logs from NestJS → Render log aggregation; ship to Loki/Grafana once we outgrow it.
 - Request metrics via `@nestjs/terminus` + Prometheus exporter.
 - One synthetic check: signup → discovery → wave → message. Runs every 5 min from CI cron against staging.
@@ -143,6 +168,7 @@ JWT access token (15min) + opaque refresh token (30d, rotating, stored hashed in
 
 ## Change log
 
+- **2026-08-13** — Backfilled six weeks of undocumented architectural changes (168 commits, 2026-06-26 → 2026-08-12): added §3.10–§3.14 (Stories, chat live-location exception to fuzzing, Rekognition assist-only, OAuth PKCE, admin dashboard topology); added `apps/admin` to the tier map; documented the Sentry PII scrubber. Full narrative detail lives in `STATUS.md`'s "Build-out since 2026-06-26" section — this doc only captures the *how/why*, per the doc-hierarchy split.
 - **2026-06-07** — Doc correction (no code): §3.5 reworded to reflect that the realtime gateway currently runs **in-process** with REST in a single `main.ts` / single Render service (`g88-api`), not as a separate `main.realtime.ts` deploy. The two-service split is retained as the planned topology. `CLAUDE.md` updated in lockstep (stack table, local realtime URL `:3001`, the "Single `main.ts`" convention). `DEPLOY.md` updated too (`g88-realtime` reference, stale migrations section now `0001`–`0019`/next `0020`, and the 2026-06-05 status block).
 - 2026-05-13 — initial draft (H3, server-side clustering, location fuzzing, two-service split).
 - **2026-05-14** — Reconciliation Phase R1. Pre-monorepo `mobile/` and `backend/` moved under `legacy/` (frozen, read-only — see `legacy/README.md`). `pnpm-workspace.yaml` excludes `legacy/**`. ESLint and CI both block imports from `legacy/`. Tagged `legacy-freeze-2026-05-14`. P1 pillar progress tracked in `STATUS.md`. Old `CLAUDE.md` replaced — see updated version.
