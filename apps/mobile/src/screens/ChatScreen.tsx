@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -28,6 +28,10 @@ import {
 } from '@/features/chat/chatSlice';
 import { socketSendMessage, useSocket } from '@/realtime/useSocket';
 import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
+import { useLiveLocationShare } from '@/features/chat/useLiveLocationShare';
+import { LocationShareSheet } from '@/features/chat/LocationShareSheet';
+import { LocationSessionBanner } from '@/features/chat/LocationSessionBanner';
+import { LocationSessionBubble } from '@/features/chat/LocationSessionBubble';
 
 type Route = RouteProp<RootStackParamList, 'Chat'>;
 
@@ -44,6 +48,10 @@ function MessageBubble({
   isFailed: boolean;
   onRetry: () => void;
 }): React.JSX.Element {
+  if (msg.type === 'location_session') {
+    return <LocationSessionBubble msg={msg} isMine={isMine} />;
+  }
+
   return (
     <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
       <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
@@ -80,7 +88,16 @@ export function ChatScreen(): React.JSX.Element {
   const outbox = useAppSelector((s) => s.chat.outbox);
   const failedIds = useAppSelector((s) => s.chat.failedIds);
 
-  const pendingIds = outbox.map((e) => e.optimisticId);
+  // Pending = outbox OR still-local opt-* (in-flight before ack / queue).
+  const pendingIds = useMemo(() => {
+    const ids = new Set(outbox.map((e) => e.optimisticId));
+    for (const m of messages) {
+      if (m.id.startsWith('opt-') && !failedIds.includes(m.id)) {
+        ids.add(m.id);
+      }
+    }
+    return ids;
+  }, [outbox, messages, failedIds]);
 
   const theyReplied = messages.some((m) => m.senderId !== myUserId);
   const iSent = messages.some((m) => m.senderId === myUserId);
@@ -90,6 +107,7 @@ export function ChatScreen(): React.JSX.Element {
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [fetchedPeer, setFetchedPeer] = useState<{
     userId: string;
     verification: VerificationLevel;
@@ -98,10 +116,18 @@ export function ChatScreen(): React.JSX.Element {
   } | null>(null);
   const { on, joinConversation, sendMessage } = useSocket();
 
+  const {
+    session: liveSession,
+    starting: shareStarting,
+    isSharer,
+    start: startShare,
+    stop: stopShare,
+    openInMaps,
+  } = useLiveLocationShare(conversationId);
+
   const otherUserId = messages.find((m) => m.senderId !== myUserId)?.senderId ?? null;
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
-  // Fetch peer for verification badge + block status (gift must hide when blocked).
   useEffect(() => {
     if (!otherUserId) return;
     let cancelled = false;
@@ -123,8 +149,8 @@ export function ChatScreen(): React.JSX.Element {
   const peerBadge = fetchedPeer?.userId === otherUserId ? fetchedPeer : null;
   const badgeVerification = otherUserVerification ?? peerBadge?.verification ?? 'none';
   const badgeIdVerified = otherUserIdVerified ?? peerBadge?.idVerified;
-  // Server enforces symmetric block; UI hides when viewer blocked peer.
   const canGift = !!otherUserId && peerBadge != null && !peerBadge.blockedByViewer;
+  const canShareLocation = !requestLocked;
 
   useEffect(() => {
     void dispatch(fetchMessages({ conversationId }));
@@ -133,7 +159,14 @@ export function ChatScreen(): React.JSX.Element {
 
   useEffect(() => {
     return on('chat:message', (msg) => {
-      dispatch(messageReceived(msg));
+      dispatch(
+        messageReceived({
+          ...msg,
+          type: msg.type ?? 'text',
+          location: msg.location ?? null,
+          locationSessionId: msg.locationSessionId ?? null,
+        }),
+      );
     });
   }, [on, dispatch]);
 
@@ -149,13 +182,24 @@ export function ChatScreen(): React.JSX.Element {
       conversationId,
       senderId: myUserId,
       body: text,
+      type: 'text',
       createdAt: new Date().toISOString(),
     };
     dispatch(messageSentOptimistic(optimistic));
 
     const confirmed = await sendMessage(conversationId, text, optimisticId);
     if (confirmed) {
-      dispatch(messageConfirmed({ optimisticId, confirmed }));
+      dispatch(
+        messageConfirmed({
+          optimisticId,
+          confirmed: {
+            ...confirmed,
+            type: confirmed.type ?? 'text',
+            location: confirmed.location ?? null,
+            locationSessionId: confirmed.locationSessionId ?? null,
+          },
+        }),
+      );
     } else {
       dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
     }
@@ -167,7 +211,17 @@ export function ChatScreen(): React.JSX.Element {
     dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
     const confirmed = await socketSendMessage(conversationId, text, optimisticId);
     if (confirmed) {
-      dispatch(messageConfirmed({ optimisticId, confirmed }));
+      dispatch(
+        messageConfirmed({
+          optimisticId,
+          confirmed: {
+            ...confirmed,
+            type: confirmed.type ?? 'text',
+            location: confirmed.location ?? null,
+            locationSessionId: confirmed.locationSessionId ?? null,
+          },
+        }),
+      );
     } else {
       dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
     }
@@ -178,6 +232,14 @@ export function ChatScreen(): React.JSX.Element {
       void dispatch(fetchMessages({ conversationId, cursor: nextCursor }));
     }
   };
+
+  const onShareDuration = useCallback(
+    async (duration: '15m' | '60m' | 'until_off') => {
+      await startShare(duration);
+      setShareOpen(false);
+    },
+    [startShare],
+  );
 
   return (
     <KeyboardAvoidingView
@@ -213,6 +275,16 @@ export function ChatScreen(): React.JSX.Element {
         </View>
       )}
 
+      {liveSession ? (
+        <LocationSessionBanner
+          session={liveSession}
+          isSharer={isSharer}
+          peerName={otherUserName}
+          onStop={() => void stopShare()}
+          onOpenMap={openInMaps}
+        />
+      ) : null}
+
       {loading && messages.length === 0 ? (
         <View style={styles.centered}>
           <ActivityIndicator color="#00d4ff" />
@@ -226,7 +298,7 @@ export function ChatScreen(): React.JSX.Element {
             <MessageBubble
               msg={item}
               isMine={item.senderId === myUserId}
-              isPending={pendingIds.includes(item.id)}
+              isPending={pendingIds.has(item.id)}
               isFailed={failedIds.includes(item.id)}
               onRetry={() => void retry(item.id, item.body)}
             />
@@ -239,6 +311,15 @@ export function ChatScreen(): React.JSX.Element {
       )}
 
       <View style={styles.inputRow}>
+        {canShareLocation ? (
+          <TouchableOpacity
+            style={styles.locBtn}
+            onPress={() => setShareOpen(true)}
+            disabled={shareStarting}
+          >
+            <Text style={styles.locBtnText}>📍</Text>
+          </TouchableOpacity>
+        ) : null}
         {canGift ? (
           <TouchableOpacity style={styles.giftBtn} onPress={() => setGiftOpen(true)}>
             <Text style={styles.giftBtnText}>🎁</Text>
@@ -278,6 +359,13 @@ export function ChatScreen(): React.JSX.Element {
           onClose={() => setGiftOpen(false)}
         />
       ) : null}
+
+      <LocationShareSheet
+        visible={shareOpen}
+        starting={shareStarting}
+        onClose={() => setShareOpen(false)}
+        onShare={(d) => void onShareDuration(d)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -307,6 +395,8 @@ const styles = StyleSheet.create({
   },
   requestBannerText: { color: '#7ee6bf', fontSize: 12, textAlign: 'center' },
   messageList: { paddingHorizontal: 12, paddingVertical: 8 },
+  locBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
+  locBtnText: { fontSize: 20 },
   giftBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6 },
   giftBtnText: { fontSize: 22 },
   bubble: { maxWidth: '78%', borderRadius: 16, padding: 10, marginVertical: 3 },

@@ -1,11 +1,12 @@
 // apps/mobile/src/features/gamification/DailyChallengeCard.tsx
 //
 // Compact, dismissible banner that surfaces the user's next incomplete daily
-// challenge on the map. Anchored at the top (stories live on Pulse tab).
+// challenge on the map. Anchored at the absolute top (stories live on Pulse).
 // Tapping opens Challenges; close hides for the session.
 
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -15,8 +16,12 @@ import { useChallenges } from './useChallenges';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
+/** Approx card height used by MapScreen / NudgeBanner for stacking. */
+export const CHALLENGE_CARD_HEIGHT = 56;
+
 export function DailyChallengeCard(): React.JSX.Element | null {
   const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
   const { challenges } = useChallenges();
   const [dismissed, setDismissed] = useState(false);
 
@@ -25,7 +30,10 @@ export function DailyChallengeCard(): React.JSX.Element | null {
   if (!next) return null;
 
   return (
-    <View style={styles.wrap} pointerEvents="box-none">
+    <View
+      style={[styles.wrap, { top: insets.top + 8 }]}
+      pointerEvents="box-none"
+    >
       <View style={styles.card}>
         <TouchableOpacity
           activeOpacity={0.85}
@@ -52,8 +60,6 @@ export function DailyChallengeCard(): React.JSX.Element | null {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    // Top of map — stories strip moved to Pulse tab.
-    top: 52,
     left: 16,
     right: 16,
     alignItems: 'center',

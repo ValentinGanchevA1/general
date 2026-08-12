@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsIn,
   IsLatitude,
   IsLongitude,
   IsNumber,
@@ -30,4 +31,19 @@ export class ChatSendDto {
 
 export class EventRoomDto {
   @IsUUID() eventId!: string;
+}
+
+export class LocationShareStartDto {
+  @IsUUID() conversationId!: string;
+  @IsIn(['15m', '60m', 'until_off']) duration!: '15m' | '60m' | 'until_off';
+  @ValidateNested() @Type(() => LocationDto) location!: LocationDto;
+}
+
+export class LocationShareUpdateDto {
+  @IsUUID() sessionId!: string;
+  @ValidateNested() @Type(() => LocationDto) location!: LocationDto;
+}
+
+export class LocationShareStopDto {
+  @IsUUID() sessionId!: string;
 }

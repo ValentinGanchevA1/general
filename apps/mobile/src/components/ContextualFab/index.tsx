@@ -1,4 +1,4 @@
-	// apps/mobile/src/components/ContextualFab/index.tsx
+// apps/mobile/src/components/ContextualFab/index.tsx
 //
 // Stable speed-dial FAB (Phase-1 UX pass).
 // - Fixed identity: a "Create" button, bottom-right, with an always-visible
@@ -11,6 +11,7 @@
 //   does.
 // - Backdrop tap → collapse. Lightweight in-tree overlay (no full-screen Modal,
 //   so the map stays visible behind a light scrim).
+// - Placed maximum bottom (tab-bar clearance only) unless host passes bottomOffset.
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -48,7 +49,8 @@ interface Props {
 const FAB_SIZE = 56;
 const ITEM_SIZE = 48;
 const ITEM_GAP = 14;
-const FAB_BOTTOM = spacing.xxl; // 24 — clears the bottom tab bar (screen content sits above it)
+/** Minimum clearance above tab bar — maximum bottom placement. */
+const FAB_BOTTOM = spacing.md; // 12 — was spacing.xxl (24)
 
 export function ContextualFab(props: Props): React.JSX.Element {
   const { zoom, points, nearestUserId, onAction, bottomOffset = 0 } = props;
@@ -107,10 +109,9 @@ export function ContextualFab(props: Props): React.JSX.Element {
       case 'post_alert':
         nav.navigate('AlertComposer', { presetCategory: 'general' });
         break;
-		case 'create_event':
-			nav.navigate('EventCreate');
-			break;
-
+      case 'create_event':
+        nav.navigate('EventCreate');
+        break;
       case 'create_listing':
         dispatch(setPendingFilter('listings'));
         nav.navigate('Main', { screen: 'Pulse' });

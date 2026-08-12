@@ -11,6 +11,7 @@ import MapView, {
   PROVIDER_GOOGLE,
   type Region,
 } from 'react-native-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type {
   ApiError,
@@ -33,10 +34,10 @@ import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ContextualFab } from '@/components/ContextualFab';
 import type { FabActionId } from '@/components/ContextualFab/useFabContext';
-import { DailyChallengeCard } from '@/features/gamification/DailyChallengeCard';
+import { DailyChallengeCard, CHALLENGE_CARD_HEIGHT } from '@/features/gamification/DailyChallengeCard';
 import { challengeEvents } from '@/features/gamification/challengeEvents';
 import { NudgeBanner } from '@/features/nudges/NudgeBanner';
-import { EventsRail, EVENTS_RAIL_HEIGHT } from '@/features/events/EventsRail';
+import { EventsRail } from '@/features/events/EventsRail';
 import { TrendingFilterBar } from '@/features/discovery/TrendingFilterBar';
 import { useTrendingNearby } from '@/features/pulse/useTrendingNearby';
 import {
@@ -51,9 +52,13 @@ import { useReceivedInteractions } from '@/features/interactions/useReceivedInte
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
+/** Nudge card approx height for stacking filters under challenge + streak. */
+const NUDGE_CARD_HEIGHT = 56;
+
 export function MapScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
   const { coords: myCoords, requestPermission } = useUserLocation();
   const [region, setRegion] = useState<Region | null>(null);
   const [selected, setSelected] = useState<EntityPoint | null>(null);
@@ -69,6 +74,11 @@ export function MapScreen(): React.JSX.Element {
   const { data, loading, error, refresh } = useDiscovery({ viewport, zoom, topic: activeTopic });
 
   const points = data?.points ?? EMPTY_POINTS;
+
+  // Challenge + optional streak stack at top; filters sit below both.
+  const topStackHeight =
+    insets.top + 8 + CHALLENGE_CARD_HEIGHT + 8 + NUDGE_CARD_HEIGHT + 8;
+  const filterTopOffset = selected ? insets.top + 8 : topStackHeight;
 
   const onSelectTopic = useCallback((topic: string | null) => {
     setActiveTopic(topic);
@@ -267,18 +277,19 @@ export function MapScreen(): React.JSX.Element {
         </View>
       )}
 
-      {/* Challenge sits at top; stories live on Pulse tab only. */}
+      {/* Challenge max top; streak/achievements under it; stories on Pulse only. */}
       {!selected && <DailyChallengeCard />}
+      {!selected && <NudgeBanner />}
 
       <TrendingFilterBar
         topics={trendingTopics}
         activeTopic={activeTopic}
         onSelect={onSelectTopic}
-        topOffset={selected ? 52 : 112}
+        topOffset={filterTopOffset}
       />
       {/* Interactions entry — people who waved / reacted */}
       <TouchableOpacity
-        style={styles.interactionBadge}
+        style={[styles.interactionBadge, { top: filterTopOffset }]}
         onPress={() => navigation.navigate('Interactions')}
         activeOpacity={0.85}
       >
@@ -291,8 +302,6 @@ export function MapScreen(): React.JSX.Element {
           </View>
         ) : null}
       </TouchableOpacity>
-
-      <NudgeBanner />
 
       {!selected && (
         <EventsRail location={region ? { lat: region.latitude, lng: region.longitude } : myCoords} />
@@ -307,14 +316,14 @@ export function MapScreen(): React.JSX.Element {
         />
       )}
 
-      {/* Hide Create FAB while a map entity sheet is open — avoids overlapping Wave/actions. */}
+      {/* FAB maximum bottom — no EventsRail lift. Hide while entity sheet open. */}
       {!selected && (
         <ContextualFab
           zoom={zoom}
           points={points}
           nearestUserId={nearestUserId}
           onAction={onFabAction}
-          bottomOffset={EVENTS_RAIL_HEIGHT}
+          bottomOffset={0}
         />
       )}
     </View>
@@ -388,7 +397,6 @@ const styles = StyleSheet.create({
 
   interactionBadge: {
     position: 'absolute',
-    top: 112,
     right: 16,
     width: 44,
     height: 44,

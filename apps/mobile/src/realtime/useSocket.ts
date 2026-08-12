@@ -6,7 +6,11 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
   PresenceUpdatePayload,
+  ChatMessage,
   ChatMessageEvent,
+  ChatLocation,
+  LocationShareDuration,
+  LocationShareSession,
 } from '@g88/shared';
 
 import { tokenStore } from '@/api/tokenStore';
@@ -34,6 +38,20 @@ interface UseSocketResult {
 
 let sharedSocket: G88Socket | null = null;
 
+/** Normalize socket payload to ChatMessage (type required under exactOptionalPropertyTypes). */
+function toChatMessage(e: ChatMessageEvent): ChatMessage {
+  return {
+    id: e.id,
+    conversationId: e.conversationId,
+    senderId: e.senderId,
+    body: e.body,
+    type: e.type ?? 'text',
+    location: e.location ?? null,
+    locationSessionId: e.locationSessionId ?? null,
+    createdAt: e.createdAt,
+  };
+}
+
 /** Module-level send — used by the hook and by the outbox drain. */
 export function socketSendMessage(
   conversationId: string,
@@ -47,6 +65,49 @@ export function socketSendMessage(
     s.emit('chat:send', { conversationId, body, clientMessageId }, (res) => {
       clearTimeout(timer);
       resolve(res.ok ? res.data : null);
+    });
+  });
+}
+
+export function locationShareStart(
+  conversationId: string,
+  duration: LocationShareDuration,
+  location: ChatLocation,
+): Promise<LocationShareSession | null> {
+  return new Promise((resolve) => {
+    const s = sharedSocket;
+    if (!s?.connected) return resolve(null);
+    const timer = setTimeout(() => resolve(null), 5_000);
+    s.emit('location:share:start', { conversationId, duration, location }, (res) => {
+      clearTimeout(timer);
+      resolve(res.ok ? res.data : null);
+    });
+  });
+}
+
+export function locationShareUpdate(
+  sessionId: string,
+  location: ChatLocation,
+): Promise<{ updatedAt: string } | null> {
+  return new Promise((resolve) => {
+    const s = sharedSocket;
+    if (!s?.connected) return resolve(null);
+    const timer = setTimeout(() => resolve(null), 3_000);
+    s.emit('location:share:update', { sessionId, location }, (res) => {
+      clearTimeout(timer);
+      resolve(res.ok ? res.data : null);
+    });
+  });
+}
+
+export function locationShareStop(sessionId: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const s = sharedSocket;
+    if (!s?.connected) return resolve(false);
+    const timer = setTimeout(() => resolve(false), 3_000);
+    s.emit('location:share:stop', { sessionId }, (res) => {
+      clearTimeout(timer);
+      resolve(res.ok);
     });
   });
 }
@@ -103,7 +164,12 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
               entry.optimisticId,
             );
             if (result) {
-              store.dispatch(messageConfirmed({ optimisticId: entry.optimisticId, confirmed: result }));
+              store.dispatch(
+                messageConfirmed({
+                  optimisticId: entry.optimisticId,
+                  confirmed: toChatMessage(result),
+                }),
+              );
             } else {
               store.dispatch(outboxRetryIncremented(entry.optimisticId));
             }

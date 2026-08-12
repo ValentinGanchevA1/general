@@ -10,7 +10,14 @@ const convoId = 'c1';
 const me = 'me';
 
 function msg(id: string, body = 'hi'): ChatMessage {
-  return { id, conversationId: convoId, senderId: me, body, createdAt: '2026-06-14T00:00:00Z' };
+  return {
+    id,
+    conversationId: convoId,
+    senderId: me,
+    body,
+    type: 'text',
+    createdAt: '2026-06-14T00:00:00Z',
+  };
 }
 
 describe('chatSlice.messageConfirmed', () => {

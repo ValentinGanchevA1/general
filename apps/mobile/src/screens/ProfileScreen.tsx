@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -16,19 +16,22 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { fetchProfile } from '@/features/profile/profileSlice';
+import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
 import { logout } from '@/features/auth/authSlice';
 import { useGamification } from '@/features/gamification/useGamification';
 import { useChallenges } from '@/features/gamification/useChallenges';
 import { useGiftBalance } from '@/features/gifts/useGifts';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { APP_VERSION } from '@/constants/app';
-import { SOCIAL_PROVIDER_CONFIG, TIER_COLOR, TIER_LABEL } from '@/features/profile/socialConfig';
+import { SOCIAL_PROVIDER_CONFIG, TIER_LABEL } from '@/features/profile/socialConfig';
 import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline';
+import { ProfileHeaderPhoto } from '@/components/Profile/ProfileHeaderPhoto';
+import { MapPresenceCard } from '@/components/Profile/MapPresenceCard';
+import { TrustStrip, type TrustChip } from '@/components/Profile/TrustStrip';
+import { colors, spacing, radius, fontSize } from '@/theme';
 import type {
   GamificationSummary,
   ChallengeToday,
-  ProfileBadges,
   UserProfile,
 } from '@g88/shared';
 
@@ -36,21 +39,6 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const { width } = Dimensions.get('window');
 const PHOTO_SIZE = (width - 48) / 3;
-
-const BADGE_META: Array<{
-  key: keyof ProfileBadges;
-  icon: string;
-  label: string;
-  color: string;
-}> = [
-  { key: 'email', icon: 'email-check', label: 'Email', color: '#4CAF50' },
-  { key: 'phone', icon: 'phone-check', label: 'Phone', color: '#2196F3' },
-  { key: 'photo', icon: 'camera-account', label: 'Photo', color: '#9C27B0' },
-  { key: 'id', icon: 'card-account-details', label: 'ID', color: '#FF9800' },
-  { key: 'social', icon: 'link-variant', label: 'Social', color: '#E91E63' },
-  { key: 'premium', icon: 'crown', label: 'Premium', color: '#FFD700' },
-  { key: 'verified', icon: 'check-decagram', label: 'Verified', color: '#00d4ff' },
-];
 
 function ProgressCard({ summary }: { summary: GamificationSummary }): React.JSX.Element {
   const pct =
@@ -91,7 +79,7 @@ function ChallengesCard({ challenges }: { challenges: ChallengeToday[] }): React
             {c.title}
           </Text>
           <Text style={styles.challengeReward}>
-            {c.completed ? `+${c.rewardXp}` : `${c.progress}/${c.target}`}
+            {c.completed ? `+${c.rewardXp}` : `${c.progress}/{c.target}`}
           </Text>
         </View>
       ))}
@@ -99,24 +87,10 @@ function ChallengesCard({ challenges }: { challenges: ChallengeToday[] }): React
   );
 }
 
-function InitialsAvatar({ name }: { name: string }): React.JSX.Element {
-  const initials = name
-    .split(' ')
-    .map((w) => w[0] ?? '')
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-  return (
-    <View style={[styles.mainPhoto, styles.placeholderPhoto]}>
-      <Text style={styles.placeholderInitials}>{initials || '?'}</Text>
-    </View>
-  );
-}
-
 export function ProfileScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<Nav>();
-  const { profile, loading, error } = useAppSelector((s) => s.profile);
+  const { profile, loading, error, saving } = useAppSelector((s) => s.profile);
   const { summary: gamification, refresh: refreshGamification } = useGamification();
   const { challenges, refresh: refreshChallenges } = useChallenges();
   const { spendableXp, refresh: refreshGiftBalance } = useGiftBalance();
@@ -144,17 +118,70 @@ export function ProfileScreen(): React.JSX.Element {
     void dispatch(logout());
   }, [dispatch]);
 
+  const trustChips: TrustChip[] = useMemo(() => {
+    if (!profile) return [];
+    const badges = profile.badges ?? {
+      email: false,
+      phone: false,
+      photo: false,
+      id: false,
+      social: false,
+      premium: false,
+      verified: false,
+    };
+    const verificationScore = profile.verificationScore ?? 0;
+    const chips: TrustChip[] = [];
+    chips.push({
+      id: 'email',
+      label: badges.email ? 'Email ✓' : 'Email',
+      status: badges.email ? 'success' : 'missing',
+    });
+    const idStatus =
+      profile.idVerificationStatus === 'verified'
+        ? 'success'
+        : profile.idVerificationStatus === 'pending'
+          ? 'pending'
+          : profile.idVerificationStatus === 'rejected'
+            ? 'error'
+            : 'missing';
+    const idLabel =
+      profile.idVerificationStatus === 'verified'
+        ? 'ID Verified ✓'
+        : profile.idVerificationStatus === 'pending'
+          ? 'ID Under review'
+          : profile.idVerificationStatus === 'rejected'
+            ? 'ID Rejected'
+            : 'ID Verification';
+    chips.push({ id: 'id', label: idLabel, status: idStatus });
+    chips.push({
+      id: 'percent',
+      label: `${verificationScore}% Verified`,
+      status: verificationScore >= 100 ? 'success' : verificationScore > 0 ? 'pending' : 'missing',
+    });
+    return chips;
+  }, [profile]);
+
+  // Redux applies visibility optimistically on updateProfile.pending.
+  const mapVisible = profile ? profile.visibility !== 'private' : true;
+
+  const handleMapToggle = useCallback(
+    (value: boolean) => {
+      void dispatch(updateProfile({ visibility: value ? 'public' : 'private' }));
+    },
+    [dispatch],
+  );
+
   if (loading && !profile) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator style={{ flex: 1 }} color="#00d4ff" />
+        <ActivityIndicator style={{ flex: 1 }} color={colors.primary} />
       </View>
     );
   }
   if (!profile) {
     return (
       <View style={[styles.container, styles.centerFill]}>
-        <Icon name="alert-circle-outline" size={48} color="#555" />
+        <Icon name="alert-circle-outline" size={48} color={colors.textFaint} />
         <Text style={styles.errorTitle}>Couldn't load your profile</Text>
         <Text style={styles.errorMsg}>{error ?? 'Something went wrong. Please try again.'}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={() => void dispatch(fetchProfile())}>
@@ -179,136 +206,107 @@ export function ProfileScreen(): React.JSX.Element {
   const verificationScore = p.verificationScore ?? 0;
   const photos = photoUrls.length > 0 ? photoUrls : p.avatarUrl ? [p.avatarUrl] : [];
   const mainPhoto = photos[activePhotoIndex] ?? p.avatarUrl;
-  const earnedBadges = BADGE_META.filter((b) => badges[b.key]);
   const isPaid = tier !== 'free';
+  const showIdCta = p.idVerificationStatus !== 'verified';
 
   return (
     <ScrollView
       style={styles.container}
+      contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00d4ff" />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
       }
     >
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.headerButton}>
-          <Icon name="cog" size={24} color="#fff" />
-        </TouchableOpacity>
+      <ProfileHeaderPhoto
+        photoUrl={mainPhoto ?? null}
+        displayName={p.displayName + (p.age ? `, ${p.age}` : '')}
+        verificationPercent={verificationScore}
+        isVisibleOnMap={mapVisible}
+        isPaid={isPaid}
+        tierLabel={TIER_LABEL[tier]}
+        photoCount={photos.length}
+        activePhotoIndex={activePhotoIndex}
+        onSelectPhoto={setActivePhotoIndex}
+        onPressSettings={() => navigation.navigate('Settings')}
+        onPressVerificationBadge={() => navigation.navigate('Verification')}
+        onPressPhoto={() => navigation.navigate('Photos')}
+      />
+
+      <View style={styles.trustSection}>
+        <TrustStrip
+          chips={trustChips}
+          onChipPress={(id) => {
+            if (id === 'id' || id === 'percent') {
+              navigation.navigate(
+                p.idVerificationStatus === 'pending' ? 'VerificationId' : 'Verification',
+              );
+            }
+          }}
+        />
       </View>
 
-      <View style={styles.mainPhotoContainer}>
-        {mainPhoto ? (
-          <Image source={{ uri: mainPhoto }} style={styles.mainPhoto} />
-        ) : (
-          <InitialsAvatar name={p.displayName} />
-        )}
-
-        {isPaid ? (
-          <View style={[styles.tierBadge, { backgroundColor: TIER_COLOR[tier] }]}>
-            <Icon name="crown" size={14} color="#fff" />
-            <Text style={styles.tierBadgeText}>{TIER_LABEL[tier]}</Text>
-          </View>
-        ) : null}
-
-        {photos.length > 1 ? (
-          <View style={styles.photoIndicators}>
-            {photos.map((_, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.photoIndicator, index === activePhotoIndex && styles.photoIndicatorActive]}
-                onPress={() => setActivePhotoIndex(index)}
-              />
-            ))}
-          </View>
-        ) : null}
+      <View style={styles.mapPresenceSection}>
+        <MapPresenceCard
+          isVisible={mapVisible}
+          saving={saving}
+          onToggle={handleMapToggle}
+          onViewPin={() => navigation.navigate('Main', { screen: 'Map' })}
+        />
       </View>
 
-      <View style={styles.userInfo}>
-        <View style={styles.nameRow}>
-          <Text style={styles.displayName}>
-            {p.displayName}
-            {p.age ? `, ${p.age}` : ''}
-          </Text>
-          {p.verifiedBadge ? (
-            <Icon name="check-decagram" size={24} color="#00d4ff" />
-          ) : null}
-        </View>
-
-        <View style={styles.verificationRow}>
-          <View style={styles.verificationBar}>
-            <View style={[styles.verificationProgress, { width: `${verificationScore}%` }]} />
-          </View>
-          <Text style={styles.verificationText}>{verificationScore}% Verified</Text>
-        </View>
-
-        <View style={styles.badgesRow}>
-          {earnedBadges.map((badge) => (
-            <View key={badge.key} style={[styles.badge, { backgroundColor: badge.color + '20' }]}>
-              <Icon name={badge.icon} size={16} color={badge.color} />
-              <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
-            </View>
-          ))}
-          {earnedBadges.length === 0 ? (
-            <TouchableOpacity
-              style={styles.verifyNowButton}
-              onPress={() => navigation.navigate('Verification')}
-            >
-              <Icon name="shield-check" size={16} color="#00d4ff" />
-              <Text style={styles.verifyNowText}>Get Verified</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.rowBetween}>
-            <View>
-              <Text style={styles.cardTitle}>ID Verification</Text>
-              <Text style={styles.cardSubtitle}>
-                {p.idVerificationStatus === 'verified' ? 'Verified ✓' :
-                  p.idVerificationStatus === 'pending' ? 'Under review' :
-                    p.idVerificationStatus === 'rejected' ? 'Rejected – resubmit' : 'Not verified'}
-              </Text>
-            </View>
-            {p.idVerificationStatus !== 'verified' && (
-              <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={() => navigation.navigate('VerificationId')}
-              >
-                <Text style={styles.primaryBtnText}>
-                  {p.idVerificationStatus === 'pending' ? 'Check status' : 'Verify now'}
+      {showIdCta ? (
+        <View style={styles.sectionPadded}>
+          <TouchableOpacity
+            style={styles.idCta}
+            onPress={() => navigation.navigate('VerificationId')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.idCtaLeft}>
+              <Icon name="card-account-details" size={20} color={colors.warning} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.idCtaTitle}>
+                  {p.idVerificationStatus === 'pending'
+                    ? 'ID under review'
+                    : p.idVerificationStatus === 'rejected'
+                      ? 'ID rejected — resubmit'
+                      : 'Verify your ID'}
                 </Text>
-              </TouchableOpacity>
-            )}
-          </View>
+                <Text style={styles.idCtaSub}>
+                  {p.idVerificationStatus === 'pending'
+                    ? 'We’ll notify you when it’s done'
+                    : 'Boost trust and unlock more reach'}
+                </Text>
+              </View>
+            </View>
+            <Icon name="chevron-right" size={22} color={colors.textFaint} />
+          </TouchableOpacity>
         </View>
+      ) : null}
 
-        {p.bio ? <Text style={styles.bio}>{p.bio}</Text> : null}
-
-        <View style={styles.visibilityPill}>
-          <Icon
-            name={p.visibility === 'private' ? 'eye-off' : 'eye'}
-            size={14}
-            color="#00d4ff"
-          />
-          <Text style={styles.visibilityText}>
-            {p.visibility === 'private' ? 'Invisible on map' : 'Visible on map'}
-          </Text>
+      {p.bio ? (
+        <View style={styles.bioSection}>
+          <Text style={styles.bio}>{p.bio}</Text>
         </View>
-      </View>
+      ) : null}
 
       <View style={styles.actionsRow}>
         <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('ProfileEdit')}>
-          <Icon name="pencil" size={20} color="#fff" />
-          <Text style={styles.actionButtonText}>Edit Profile</Text>
+          <Icon name="pencil" size={18} color={colors.textPrimary} />
+          <Text style={styles.actionButtonText}>Edit</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Photos')}>
+          <Icon name="image-multiple" size={18} color={colors.textPrimary} />
+          <Text style={styles.actionButtonText}>Photos</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Verification')}>
-          <Icon name="shield-check" size={20} color="#fff" />
-          <Text style={styles.actionButtonText}>Verification</Text>
+          <Icon name="shield-check" size={18} color={colors.textPrimary} />
+          <Text style={styles.actionButtonText}>Trust</Text>
         </TouchableOpacity>
       </View>
 
       {gamification ? (
         <View style={styles.sectionPadded}>
+          <Text style={styles.blockLabel}>Activity</Text>
           <ProgressCard summary={gamification} />
           {challenges.length > 0 ? <ChallengesCard challenges={challenges} /> : null}
         </View>
@@ -316,62 +314,27 @@ export function ProfileScreen(): React.JSX.Element {
 
       <View style={styles.gamificationRow}>
         <TouchableOpacity style={styles.gamificationCard} onPress={() => navigation.navigate('Challenges')}>
-          <Icon name="checkbox-marked-circle-outline" size={28} color="#00d4ff" />
+          <Icon name="checkbox-marked-circle-outline" size={24} color={colors.primary} />
           <Text style={styles.gamificationTitle}>Challenges</Text>
-          <Text style={styles.gamificationSubtitle}>Daily goals</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.gamificationCard} onPress={() => navigation.navigate('Leaderboard')}>
-          <Icon name="podium-gold" size={28} color="#FFD700" />
-          <Text style={styles.gamificationTitle}>Leaderboard</Text>
-          <Text style={styles.gamificationSubtitle}>Compete</Text>
+          <Icon name="podium-gold" size={24} color="#FFD700" />
+          <Text style={styles.gamificationTitle}>Ranks</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.gamificationCard} onPress={() => navigation.navigate('Achievements')}>
-          <Icon name="trophy" size={28} color="#E91E63" />
-          <Text style={styles.gamificationTitle}>Achievements</Text>
-          <Text style={styles.gamificationSubtitle}>View badges</Text>
+          <Icon name="trophy" size={24} color="#E91E63" />
+          <Text style={styles.gamificationTitle}>Badges</Text>
         </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.giftsCard} onPress={() => navigation.navigate('GiftsInbox')}>
-        <Icon name="gift" size={24} color="#E91E63" />
+        <Icon name="gift" size={22} color="#E91E63" />
         <View style={styles.giftsCardBody}>
           <Text style={styles.giftsCardTitle}>Gifts</Text>
-          <Text style={styles.giftsCardSubtitle}>{spendableXp.toLocaleString()} XP to spend · view inbox</Text>
+          <Text style={styles.giftsCardSubtitle}>{spendableXp.toLocaleString()} XP · inbox</Text>
         </View>
-        <Icon name="chevron-right" size={24} color="#555" />
+        <Icon name="chevron-right" size={22} color={colors.textFaint} />
       </TouchableOpacity>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Icon name="email-outline" size={20} color="#888" />
-            <Text style={styles.infoText}>{p.email}</Text>
-            <Icon
-              name={badges.email ? 'check-circle' : 'circle-outline'}
-              size={18}
-              color={badges.email ? '#4CAF50' : '#444'}
-            />
-          </View>
-          <View style={[styles.infoRow, styles.infoRowLast]}>
-            <Icon name="phone-outline" size={20} color="#888" />
-            <Text style={[styles.infoText, !p.phone && styles.infoTextMuted]}>
-              {p.phone ?? 'No phone added'}
-            </Text>
-            {p.phone ? (
-              <Icon
-                name={badges.phone ? 'check-circle' : 'circle-outline'}
-                size={18}
-                color={badges.phone ? '#4CAF50' : '#444'}
-              />
-            ) : (
-              <TouchableOpacity onPress={() => navigation.navigate('Verification')}>
-                <Text style={styles.sectionAction}>Add</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </View>
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
@@ -392,7 +355,7 @@ export function ProfileScreen(): React.JSX.Element {
           ))}
           {photos.length < 6 ? (
             <TouchableOpacity style={styles.addPhotoButton} onPress={() => navigation.navigate('Photos')}>
-              <Icon name="plus" size={24} color="#666" />
+              <Icon name="plus" size={24} color={colors.textMuted} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -419,7 +382,7 @@ export function ProfileScreen(): React.JSX.Element {
 
       {goals.length > 0 ? (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Looking For</Text>
+          <Text style={styles.sectionTitle}>Looking for</Text>
           <View style={styles.tagsContainer}>
             {goals.map((goal, index) => {
               const cfg = GOAL_OPTIONS.find((g) => g.value === goal);
@@ -435,8 +398,40 @@ export function ProfileScreen(): React.JSX.Element {
       ) : null}
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Account</Text>
+        <View style={styles.infoCard}>
+          <View style={styles.infoRow}>
+            <Icon name="email-outline" size={20} color={colors.textMuted} />
+            <Text style={styles.infoText}>{p.email}</Text>
+            <Icon
+              name={badges.email ? 'check-circle' : 'circle-outline'}
+              size={18}
+              color={badges.email ? colors.success : colors.borderStrong}
+            />
+          </View>
+          <View style={[styles.infoRow, styles.infoRowLast]}>
+            <Icon name="phone-outline" size={20} color={colors.textMuted} />
+            <Text style={[styles.infoText, !p.phone && styles.infoTextMuted]}>
+              {p.phone ?? 'No phone added'}
+            </Text>
+            {p.phone ? (
+              <Icon
+                name={badges.phone ? 'check-circle' : 'circle-outline'}
+                size={18}
+                color={badges.phone ? colors.success : colors.borderStrong}
+              />
+            ) : (
+              <TouchableOpacity onPress={() => navigation.navigate('Verification')}>
+                <Text style={styles.sectionAction}>Add</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Connected Accounts</Text>
+          <Text style={styles.sectionTitle}>Connected accounts</Text>
           <TouchableOpacity onPress={() => navigation.navigate('SocialLinking')}>
             <Text style={styles.sectionAction}>Manage</Text>
           </TouchableOpacity>
@@ -449,7 +444,7 @@ export function ProfileScreen(): React.JSX.Element {
               return (
                 <View key={index} style={[styles.socialLinkItem, last && styles.infoRowLast]}>
                   <View style={[styles.socialIcon, { backgroundColor: cfg.color }]}>
-                    <Icon name={cfg.icon} size={20} color="#fff" />
+                    <Icon name={cfg.icon} size={18} color="#fff" />
                   </View>
                   <View style={styles.socialLinkInfo}>
                     <Text style={styles.socialLinkName}>{cfg.label}</Text>
@@ -457,7 +452,7 @@ export function ProfileScreen(): React.JSX.Element {
                       <Text style={styles.socialLinkUsername}>@{link.username}</Text>
                     ) : null}
                   </View>
-                  {link.verified ? <Icon name="check-circle" size={18} color="#4CAF50" /> : null}
+                  {link.verified ? <Icon name="check-circle" size={18} color={colors.success} /> : null}
                 </View>
               );
             })
@@ -466,8 +461,8 @@ export function ProfileScreen(): React.JSX.Element {
               style={styles.connectSocialButton}
               onPress={() => navigation.navigate('SocialLinking')}
             >
-              <Icon name="link-plus" size={24} color="#00d4ff" />
-              <Text style={styles.connectSocialText}>Connect Social Accounts</Text>
+              <Icon name="link-plus" size={22} color={colors.primary} />
+              <Text style={styles.connectSocialText}>Connect social accounts</Text>
               <Text style={styles.connectSocialSubtext}>Boost your trust score</Text>
             </TouchableOpacity>
           )}
@@ -477,13 +472,13 @@ export function ProfileScreen(): React.JSX.Element {
       {!isPaid ? (
         <TouchableOpacity style={styles.upgradeCard} onPress={() => navigation.navigate('Subscription')}>
           <View style={styles.upgradeContent}>
-            <Icon name="crown" size={32} color="#FFD700" />
+            <Icon name="crown" size={26} color="#FFD700" />
             <View style={styles.upgradeText}>
               <Text style={styles.upgradeTitle}>Upgrade to Premium</Text>
-              <Text style={styles.upgradeSubtitle}>Unlock more reach, see who viewed you, and more</Text>
+              <Text style={styles.upgradeSubtitle}>More reach · who viewed you</Text>
             </View>
           </View>
-          <Icon name="chevron-right" size={24} color="#666" />
+          <Icon name="chevron-right" size={22} color={colors.textMuted} />
         </TouchableOpacity>
       ) : null}
 
@@ -501,16 +496,16 @@ export function ProfileScreen(): React.JSX.Element {
             style={[styles.menuItem, index === arr.length - 1 && styles.infoRowLast]}
             onPress={() => navigation.navigate(item.route)}
           >
-            <Icon name={item.icon} size={24} color="#888" />
+            <Icon name={item.icon} size={20} color={colors.textMuted} />
             <Text style={styles.menuItemText}>{item.label}</Text>
-            <Icon name="chevron-right" size={24} color="#444" />
+            <Icon name="chevron-right" size={20} color={colors.borderStrong} />
           </TouchableOpacity>
         ))}
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Icon name="logout" size={20} color="#ff4444" />
-        <Text style={styles.logoutText}>Logout</Text>
+        <Icon name="logout" size={18} color={colors.danger} />
+        <Text style={styles.logoutText}>Log out</Text>
       </TouchableOpacity>
 
       <Text style={styles.version}>Version {APP_VERSION}</Text>
@@ -519,180 +514,136 @@ export function ProfileScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingBottom: spacing.xxl },
   centerFill: { alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
-  errorTitle: { color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 8 },
-  errorMsg: { color: '#888', fontSize: 14, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
+  errorTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginTop: 8 },
+  errorMsg: { color: colors.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
   retryBtn: {
     marginTop: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#00d4ff',
+    backgroundColor: colors.primary,
     borderRadius: 10,
   },
-  retryText: { color: '#000', fontWeight: '700', fontSize: 15 },
-  errorLogout: { color: '#888', fontSize: 14, fontWeight: '600' },
-  header: {
+  retryText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
+  errorLogout: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
+  trustSection: { marginTop: spacing.md },
+  mapPresenceSection: { marginTop: spacing.sm },
+  sectionPadded: { paddingHorizontal: spacing.xl, marginTop: spacing.md },
+  blockLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  idCta: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    paddingTop: 60,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 157, 60, 0.25)',
   },
-  headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
-  headerButton: { padding: 8 },
-  mainPhotoContainer: { width, height: width * 1.2, position: 'relative' },
-  mainPhoto: { width: '100%', height: '100%', resizeMode: 'cover' },
-  placeholderPhoto: { backgroundColor: '#1a1a24', justifyContent: 'center', alignItems: 'center' },
-  placeholderInitials: { color: '#00d4ff', fontSize: 72, fontWeight: '700' },
-  tierBadge: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
+  idCtaLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  idCtaTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
+  idCtaSub: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  bioSection: { paddingHorizontal: spacing.xl, marginTop: spacing.md },
+  bio: { fontSize: 15, color: colors.textSecondary, lineHeight: 22 },
+  actionsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 4,
+    paddingHorizontal: spacing.xl,
+    marginTop: spacing.lg,
+    gap: spacing.sm,
   },
-  tierBadgeText: { color: '#fff', fontWeight: '600', fontSize: 12 },
-  photoIndicators: {
-    position: 'absolute',
-    bottom: 16,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  photoIndicator: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.5)' },
-  photoIndicatorActive: { backgroundColor: '#fff', width: 24 },
-  userInfo: { padding: 20 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  displayName: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
-  verificationRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 12 },
-  verificationBar: { flex: 1, height: 6, backgroundColor: '#1a1a24', borderRadius: 3, overflow: 'hidden' },
-  verificationProgress: { height: '100%', backgroundColor: '#00d4ff', borderRadius: 3 },
-  verificationText: { color: '#888', fontSize: 12 },
-  badgesRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, gap: 8 },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 4,
-  },
-  badgeText: { fontSize: 12, fontWeight: '600' },
-  verifyNowButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#00d4ff20',
-    borderRadius: 16,
-  },
-  verifyNowText: { color: '#00d4ff', fontWeight: '600' },
-  bio: { marginTop: 16, fontSize: 16, color: '#ccc', lineHeight: 24 },
-  visibilityPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    marginTop: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#1a1a24',
-    borderRadius: 16,
-  },
-  visibilityText: { color: '#00d4ff', fontSize: 12, fontWeight: '600' },
-  actionsRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 12 },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#1a1a24',
-    paddingVertical: 14,
-    borderRadius: 12,
+    gap: 6,
+    backgroundColor: colors.surfaceRaised,
+    paddingVertical: 12,
+    borderRadius: radius.md,
   },
-  actionButtonText: { color: '#fff', fontWeight: '600' },
-  sectionPadded: { paddingHorizontal: 20, marginTop: 20 },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  cardSubtitle: { color: '#888', fontSize: 14, marginTop: 4 },
-  primaryBtn: { backgroundColor: '#00d4ff', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  primaryBtnText: { color: '#000', fontWeight: '700', fontSize: 14 },
+  actionButtonText: { color: colors.textPrimary, fontWeight: '600', fontSize: 13 },
   card: {
-    backgroundColor: '#12121f',
+    backgroundColor: colors.surface,
     borderRadius: 14,
-    padding: 16,
+    padding: spacing.lg,
     borderWidth: 1,
-    borderColor: '#1f1f33',
+    borderColor: colors.border,
     gap: 8,
   },
   cardSpaced: { marginTop: 12, gap: 10 },
-  cardHeader: { color: '#fff', fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  cardHeader: { color: colors.textPrimary, fontSize: 14, fontWeight: '700', marginBottom: 2 },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  levelText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  xpText: { color: '#00d4ff', fontSize: 14, fontWeight: '600' },
-  barTrack: { height: 8, backgroundColor: '#1f1f33', borderRadius: 4, overflow: 'hidden' },
-  barFill: { height: 8, backgroundColor: '#00d4ff', borderRadius: 4 },
-  subText: { color: '#888', fontSize: 12 },
-  streakText: { color: '#ff9d3c', fontSize: 12, fontWeight: '600' },
+  levelText: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
+  xpText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  barTrack: { height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: 'hidden' },
+  barFill: { height: 8, backgroundColor: colors.primary, borderRadius: 4 },
+  subText: { color: colors.textMuted, fontSize: 12 },
+  streakText: { color: colors.warning, fontSize: 12, fontWeight: '600' },
   challengeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  checkbox: { color: '#555', fontSize: 18 },
-  checkboxDone: { color: '#00d4ff' },
+  checkbox: { color: colors.textFaint, fontSize: 18 },
+  checkboxDone: { color: colors.primary },
   challengeTitle: { color: '#ddd', fontSize: 14, flex: 1 },
-  challengeTitleDone: { color: '#666', textDecorationLine: 'line-through' },
-  challengeReward: { color: '#00d4ff', fontSize: 13, fontWeight: '600' },
-  gamificationRow: { flexDirection: 'row', paddingHorizontal: 20, marginTop: 16, gap: 10 },
+  challengeTitleDone: { color: colors.textMuted, textDecorationLine: 'line-through' },
+  challengeReward: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  gamificationRow: { flexDirection: 'row', paddingHorizontal: spacing.xl, marginTop: spacing.md, gap: 10 },
+  gamificationCard: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: colors.surfaceRaised,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    gap: 6,
+  },
+  gamificationTitle: { color: colors.textPrimary, fontWeight: '600', fontSize: 11 },
   giftsCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginHorizontal: 20,
-    marginTop: 10,
-    padding: 16,
-    backgroundColor: '#1a1a24',
-    borderRadius: 12,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.md,
   },
   giftsCardBody: { flex: 1 },
-  giftsCardTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  giftsCardSubtitle: { color: '#888', fontSize: 12, marginTop: 2 },
-  gamificationCard: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: '#1a1a24',
-    paddingVertical: 16,
-    borderRadius: 12,
+  giftsCardTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
+  giftsCardSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  section: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    marginTop: spacing.lg,
   },
-  gamificationTitle: { color: '#fff', fontWeight: '600', fontSize: 12, marginTop: 8 },
-  gamificationSubtitle: { color: '#666', fontSize: 10, marginTop: 2 },
-  section: { padding: 20, borderTopWidth: 1, borderTopColor: '#1a1a24', marginTop: 20 },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#fff', marginBottom: 12 },
-  sectionAction: { color: '#00d4ff', fontWeight: '600' },
-  infoCard: { backgroundColor: '#1a1a24', borderRadius: 12, overflow: 'hidden' },
+  sectionTitle: { fontSize: 17, fontWeight: '600', color: colors.textPrimary, marginBottom: 12 },
+  sectionAction: { color: colors.primary, fontWeight: '600', fontSize: 14 },
+  infoCard: { backgroundColor: colors.surfaceRaised, borderRadius: radius.md, overflow: 'hidden' },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2a2a34',
+    padding: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderStrong,
   },
   infoRowLast: { borderBottomWidth: 0 },
-  infoText: { flex: 1, color: '#fff', fontSize: 15 },
-  infoTextMuted: { color: '#666' },
+  infoText: { flex: 1, color: colors.textPrimary, fontSize: 15 },
+  infoTextMuted: { color: colors.textMuted },
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   gridPhoto: {
     width: PHOTO_SIZE,
@@ -702,80 +653,93 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  gridPhotoActive: { borderColor: '#00d4ff' },
+  gridPhotoActive: { borderColor: colors.primary },
   gridPhotoImage: { width: '100%', height: '100%' },
   addPhotoButton: {
     width: PHOTO_SIZE,
     height: PHOTO_SIZE,
     borderRadius: 8,
-    backgroundColor: '#1a1a24',
+    backgroundColor: colors.surfaceRaised,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#2a2a34',
+    borderColor: colors.borderStrong,
     borderStyle: 'dashed',
   },
   tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: { backgroundColor: '#1a1a24', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
-  tagText: { color: '#fff', fontSize: 14 },
+  tag: {
+    backgroundColor: colors.surfaceRaised,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+  },
+  tagText: { color: colors.textPrimary, fontSize: 14 },
   goalTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a24',
-    paddingHorizontal: 16,
+    backgroundColor: colors.surfaceRaised,
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 20,
+    borderRadius: radius.pill,
     gap: 8,
   },
-  goalIcon: { fontSize: 18 },
-  goalText: { color: '#fff', fontSize: 14, fontWeight: '500' },
+  goalIcon: { fontSize: 16 },
+  goalText: { color: colors.textPrimary, fontSize: 14, fontWeight: '500' },
   socialLinkItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2a2a34',
+    padding: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderStrong,
   },
-  socialIcon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  socialIcon: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
   socialLinkInfo: { flex: 1, marginLeft: 12 },
-  socialLinkName: { color: '#fff', fontWeight: '600' },
-  socialLinkUsername: { color: '#888', fontSize: 12 },
-  connectSocialButton: { alignItems: 'center', padding: 24, gap: 8 },
-  connectSocialText: { color: '#00d4ff', fontWeight: '600', fontSize: 16 },
-  connectSocialSubtext: { color: '#666', fontSize: 12 },
+  socialLinkName: { color: colors.textPrimary, fontWeight: '600' },
+  socialLinkUsername: { color: colors.textMuted, fontSize: 12 },
+  connectSocialButton: { alignItems: 'center', padding: 20, gap: 6 },
+  connectSocialText: { color: colors.primary, fontWeight: '600', fontSize: 15 },
+  connectSocialSubtext: { color: colors.textMuted, fontSize: 12 },
   upgradeCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    margin: 20,
-    padding: 16,
-    backgroundColor: '#1a1a24',
-    borderRadius: 12,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.lg,
+    padding: spacing.md,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: '#FFD70040',
   },
   upgradeContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   upgradeText: { flex: 1 },
-  upgradeTitle: { color: '#FFD700', fontWeight: '700', fontSize: 16 },
-  upgradeSubtitle: { color: '#888', fontSize: 12, marginTop: 2 },
-  menuSection: { margin: 20, backgroundColor: '#1a1a24', borderRadius: 12, overflow: 'hidden' },
+  upgradeTitle: { color: '#FFD700', fontWeight: '700', fontSize: 15 },
+  upgradeSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  menuSection: {
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.lg,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+  },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2a2a34',
+    padding: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderStrong,
   },
-  menuItemText: { flex: 1, marginLeft: 12, color: '#fff', fontSize: 16 },
+  menuItemText: { flex: 1, marginLeft: 12, color: colors.textPrimary, fontSize: 15 },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginHorizontal: 20,
-    padding: 16,
-    backgroundColor: '#ff444420',
-    borderRadius: 12,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.lg,
+    padding: 14,
+    backgroundColor: 'rgba(255, 68, 68, 0.12)',
+    borderRadius: radius.md,
   },
-  logoutText: { color: '#ff4444', fontWeight: '600', fontSize: 16 },
-  version: { textAlign: 'center', color: '#444', marginVertical: 24 },
+  logoutText: { color: colors.danger, fontWeight: '600', fontSize: 15 },
+  version: { textAlign: 'center', color: colors.textFaint, marginVertical: spacing.xl, fontSize: fontSize.xs },
 });
