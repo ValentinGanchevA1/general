@@ -27,6 +27,18 @@ function LinkRow({
   );
 }
 
+function Feature({ icon, title, body }: { icon: string; title: string; body: string }): React.JSX.Element {
+  return (
+    <View style={styles.feature}>
+      <Icon name={icon} size={20} color="#00d4ff" style={styles.featureIcon} />
+      <View style={styles.featureText}>
+        <Text style={styles.featureTitle}>{title}</Text>
+        <Text style={styles.featureBody}>{body}</Text>
+      </View>
+    </View>
+  );
+}
+
 export function AboutScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
 
@@ -46,16 +58,51 @@ export function AboutScreen(): React.JSX.Element {
             <Icon name="map-marker-radius" size={44} color="#00d4ff" />
           </View>
           <Text style={styles.appName}>G88</Text>
-          <Text style={styles.tagline}>See who and what is nearby — then act on it.</Text>
+          <Text style={styles.tagline}>
+            Map-first local social — meet people nearby, build status through real interactions.
+          </Text>
           <Text style={styles.version}>Version {APP_VERSION}</Text>
         </View>
 
         <Text style={styles.about}>
-          G88 is a map-first, location-based social app. Nearby people appear as
-          avatars on a live map so you can wave, chat, and discover local activity —
-          events, listings, and more — all around you. Your exact location is never
-          stored: it is coarsened to roughly a 120-meter area before anything is saved.
+          G88 puts nearby people and activity on a live map. Wave, react to stories,
+          chat after mutual interest, trade locally, and join events — all around you.
+          Your exact GPS is never stored: positions are coarsened before anything is saved.
         </Text>
+
+        <Text style={styles.sectionTitle}>What you can do</Text>
+        <View style={styles.featureGroup}>
+          <Feature
+            icon="map"
+            title="Map & discovery"
+            body="Live map of people and places nearby. Filters, clusters, and presence while the app is open."
+          />
+          <Feature
+            icon="pulse"
+            title="Pulse"
+            body="Activity feed of chats, waves, trades, alerts, and matches — plus nearby story rings."
+          />
+          <Feature
+            icon="circle-outline"
+            title="Stories"
+            body="24-hour posts visible to people nearby. Reactions count like waves for mutual unlock."
+          />
+          <Feature
+            icon="hand-wave"
+            title="Waves & chat"
+            body="Lightweight signals first. Chat unlocks when interest is mutual (wave or story reaction)."
+          />
+          <Feature
+            icon="storefront-outline"
+            title="Local trade"
+            body="Listings and offers stay free and settle offline — no in-app payments required."
+          />
+          <Feature
+            icon="shield-check"
+            title="Trust ladder"
+            body="Email → phone → ID review builds verification. Soft gates protect the network without blocking exploration."
+          />
+        </View>
 
         <Text style={styles.sectionTitle}>Legal</Text>
         <View style={styles.group}>
@@ -103,9 +150,9 @@ const styles = StyleSheet.create({
     borderColor: '#00d4ff33',
   },
   appName: { color: '#fff', fontSize: 28, fontWeight: '800', marginTop: 16, letterSpacing: 1 },
-  tagline: { color: '#888', fontSize: 14, textAlign: 'center', marginTop: 6, maxWidth: 260 },
+  tagline: { color: '#888', fontSize: 14, textAlign: 'center', marginTop: 6, maxWidth: 280, lineHeight: 20 },
   version: { color: '#555', fontSize: 12, marginTop: 10 },
-  about: { color: '#aaa', fontSize: 14, lineHeight: 21, marginBottom: 28 },
+  about: { color: '#aaa', fontSize: 14, lineHeight: 21, marginBottom: 24 },
   sectionTitle: {
     color: '#555',
     fontSize: 11,
@@ -114,6 +161,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 12,
   },
+  featureGroup: { marginBottom: 28 },
+  feature: { flexDirection: 'row', marginBottom: 16 },
+  featureIcon: { marginTop: 2, width: 28 },
+  featureText: { flex: 1 },
+  featureTitle: { color: '#fff', fontSize: 14, fontWeight: '600', marginBottom: 2 },
+  featureBody: { color: '#888', fontSize: 13, lineHeight: 18 },
   group: {
     backgroundColor: '#1a1a2e',
     borderRadius: 10,
