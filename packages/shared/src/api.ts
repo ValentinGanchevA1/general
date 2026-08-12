@@ -154,7 +154,13 @@ export interface UpdateProfileRequest {
   visibility?: 'public' | 'private';
   goals?: string[];
   interests?: string[];
+  /** ISO date YYYY-MM-DD; null clears. Must yield age >= 18. */
   dateOfBirth?: string | null;
+  hometownCity?: string | null;
+  /** ISO 3166-1 alpha-2 preferred (e.g. BG), or short country name. */
+  hometownCountry?: string | null;
+  showAge?: boolean;
+  showHometown?: boolean;
 }
 
 export type IdVerificationStatus = 'none' | 'pending' | 'verified' | 'rejected';
@@ -166,7 +172,14 @@ export interface UserProfile extends AuthenticatedUser {
   interests: string[];
   profileComplete: boolean;
   phone: string | null;
+  /** Derived from dateOfBirth; null when unset. */
   age: number | null;
+  /** ISO date YYYY-MM-DD for the owner only (edit form). */
+  dateOfBirth: string | null;
+  hometownCity: string | null;
+  hometownCountry: string | null;
+  showAge: boolean;
+  showHometown: boolean;
   photoUrls: string[];
   subscriptionTier: SubscriptionTier;
   socialLinks: SocialLink[];
@@ -196,6 +209,11 @@ export interface PublicUserProfile {
   idVerified: boolean;
   goals: string[];
   online: boolean;
+  /** Present only when the user opted to show age. */
+  age?: number | null;
+  /** Present only when the user opted to show hometown. */
+  hometownCity?: string | null;
+  hometownCountry?: string | null;
   /**
    * Ordered gallery URLs for the public profile photo album.
    * Omitted or empty when the user has no gallery photos.
