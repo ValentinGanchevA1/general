@@ -5,6 +5,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -15,16 +16,29 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { updateProfile } from '@/features/profile/profileSlice';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 interface OnboardingState {
   displayName: string;
   bio: string;
+  dateOfBirth: string;
+  hometownCity: string;
+  hometownCountry: string;
+  showAge: boolean;
+  showHometown: boolean;
   goals: string[];
   visibility: 'public' | 'private';
 }
 
-// ─── Step components ───────────────────────────────────────────────────────
+function isAdult(isoDate: string): boolean {
+  const dob = new Date(isoDate);
+  if (Number.isNaN(dob.getTime())) return false;
+  const today = new Date();
+  let years = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) years -= 1;
+  return years >= 18;
+}
 
 function StepName({
   value,
@@ -74,6 +88,83 @@ function StepBio({
         textAlignVertical="top"
       />
       <Text style={styles.charCount}>{value.length}/160</Text>
+    </View>
+  );
+}
+
+function StepOrigin({
+  dateOfBirth,
+  hometownCity,
+  hometownCountry,
+  showAge,
+  showHometown,
+  onChange,
+  error,
+}: {
+  dateOfBirth: string;
+  hometownCity: string;
+  hometownCountry: string;
+  showAge: boolean;
+  showHometown: boolean;
+  onChange: (patch: Partial<OnboardingState>) => void;
+  error: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.stepBody}>
+      <Text style={styles.stepHeading}>Age & origin</Text>
+      <Text style={styles.stepSub}>
+        You must be 18+. Others only see your age and place if you allow it.
+      </Text>
+      <Text style={styles.fieldLabel}>Date of birth</Text>
+      <TextInput
+        style={styles.input}
+        value={dateOfBirth}
+        onChangeText={(v) => onChange({ dateOfBirth: v })}
+        placeholder="YYYY-MM-DD"
+        placeholderTextColor="#555"
+        keyboardType="numbers-and-punctuation"
+        maxLength={10}
+        autoCapitalize="none"
+      />
+      <Text style={styles.fieldLabel}>City of origin</Text>
+      <TextInput
+        style={styles.input}
+        value={hometownCity}
+        onChangeText={(v) => onChange({ hometownCity: v })}
+        placeholder="e.g. Sofia"
+        placeholderTextColor="#555"
+        autoCapitalize="words"
+        maxLength={80}
+      />
+      <Text style={styles.fieldLabel}>Country</Text>
+      <TextInput
+        style={styles.input}
+        value={hometownCountry}
+        onChangeText={(v) => onChange({ hometownCountry: v })}
+        placeholder="e.g. BG"
+        placeholderTextColor="#555"
+        autoCapitalize="characters"
+        maxLength={40}
+      />
+      <View style={styles.toggleRow}>
+        <Text style={styles.toggleLabel}>Show age on profile</Text>
+        <Switch
+          value={showAge}
+          onValueChange={(v) => onChange({ showAge: v })}
+          trackColor={{ false: '#2a2a4a', true: '#0095b3' }}
+          thumbColor={showAge ? '#00d4ff' : '#555'}
+        />
+      </View>
+      <View style={styles.toggleRow}>
+        <Text style={styles.toggleLabel}>Show place of origin</Text>
+        <Switch
+          value={showHometown}
+          onValueChange={(v) => onChange({ showHometown: v })}
+          trackColor={{ false: '#2a2a4a', true: '#0095b3' }}
+          thumbColor={showHometown ? '#00d4ff' : '#555'}
+        />
+      </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
 }
@@ -152,8 +243,6 @@ function StepVisibility({
   );
 }
 
-// ─── Main screen ───────────────────────────────────────────────────────────
-
 export function ProfileCreationScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((s) => s.auth.user);
@@ -163,10 +252,16 @@ export function ProfileCreationScreen(): React.JSX.Element {
   const [form, setForm] = useState<OnboardingState>({
     displayName: authUser?.displayName ?? '',
     bio: '',
+    dateOfBirth: '',
+    hometownCity: '',
+    hometownCountry: '',
+    showAge: true,
+    showHometown: true,
     goals: [],
     visibility: 'public',
   });
   const [bioError, setBioError] = useState('');
+  const [originError, setOriginError] = useState('');
 
   const toggleGoal = (v: string): void => {
     setForm((f) => ({
@@ -178,6 +273,10 @@ export function ProfileCreationScreen(): React.JSX.Element {
   const canAdvance = (): boolean => {
     if (step === 1) return form.displayName.trim().length > 0;
     if (step === 2) return form.bio.trim().length > 0;
+    if (step === 3) {
+      const dob = form.dateOfBirth.trim();
+      return /^\d{4}-\d{2}-\d{2}$/.test(dob) && isAdult(dob);
+    }
     return true;
   };
 
@@ -185,6 +284,18 @@ export function ProfileCreationScreen(): React.JSX.Element {
     if (step === 2 && !form.bio.trim()) {
       setBioError('A short bio is required to continue.');
       return;
+    }
+    if (step === 3) {
+      const dob = form.dateOfBirth.trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+        setOriginError('Enter date of birth as YYYY-MM-DD');
+        return;
+      }
+      if (!isAdult(dob)) {
+        setOriginError('You must be at least 18 years old');
+        return;
+      }
+      setOriginError('');
     }
     setBioError('');
     if (step < TOTAL_STEPS) {
@@ -194,6 +305,11 @@ export function ProfileCreationScreen(): React.JSX.Element {
         updateProfile({
           displayName: form.displayName.trim(),
           bio: form.bio.trim(),
+          dateOfBirth: form.dateOfBirth.trim(),
+          hometownCity: form.hometownCity.trim() || null,
+          hometownCountry: form.hometownCountry.trim() || null,
+          showAge: form.showAge,
+          showHometown: form.showHometown,
           goals: form.goals,
           visibility: form.visibility,
         }),
@@ -201,7 +317,6 @@ export function ProfileCreationScreen(): React.JSX.Element {
     }
   };
 
-  // ── Welcome splash ────────────────────────────────────────────────────────
   if (step === 0) {
     return (
       <View style={styles.root}>
@@ -210,7 +325,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
           <Text style={styles.welcomeHeading}>Welcome to G88</Text>
           <Text style={styles.welcomeSub}>
             A map-first social space for the people around you.{'\n'}
-            Let's set up your profile in 4 quick steps.
+            Let's set up your profile in a few quick steps.
           </Text>
         </View>
         <View style={styles.welcomeFooter}>
@@ -222,7 +337,6 @@ export function ProfileCreationScreen(): React.JSX.Element {
     );
   }
 
-  // ── Data steps ────────────────────────────────────────────────────────────
   const isLastStep = step === TOTAL_STEPS;
 
   return (
@@ -260,9 +374,20 @@ export function ProfileCreationScreen(): React.JSX.Element {
           />
         )}
         {step === 3 && (
-          <StepGoals selected={form.goals} onToggle={toggleGoal} />
+          <StepOrigin
+            dateOfBirth={form.dateOfBirth}
+            hometownCity={form.hometownCity}
+            hometownCountry={form.hometownCountry}
+            showAge={form.showAge}
+            showHometown={form.showHometown}
+            onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+            error={originError}
+          />
         )}
         {step === 4 && (
+          <StepGoals selected={form.goals} onToggle={toggleGoal} />
+        )}
+        {step === 5 && (
           <StepVisibility
             value={form.visibility}
             onChange={(v) => setForm((f) => ({ ...f, visibility: v }))}
@@ -295,15 +420,11 @@ export function ProfileCreationScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0a0a0f' },
-
-  // Welcome
   welcomeBody: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, gap: 16 },
   logo: { color: '#00d4ff', fontSize: 48, fontWeight: '800', letterSpacing: 4 },
   welcomeHeading: { color: '#fff', fontSize: 26, fontWeight: '700', textAlign: 'center' },
   welcomeSub: { color: '#aaa', fontSize: 15, textAlign: 'center', lineHeight: 22 },
   welcomeFooter: { padding: 24 },
-
-  // Progress
   progressRow: {
     flexDirection: 'row',
     gap: 6,
@@ -313,14 +434,30 @@ const styles = StyleSheet.create({
   },
   progressSegment: { flex: 1, height: 3, borderRadius: 2, backgroundColor: '#1a1a2e' },
   progressSegmentFilled: { backgroundColor: '#00d4ff' },
-
-  // Steps
   scroll: { padding: 24, paddingBottom: 8, flexGrow: 1 },
   stepBody: { gap: 12 },
   stepHeading: { color: '#fff', fontSize: 28, fontWeight: '700', lineHeight: 36, marginBottom: 4 },
   stepSub: { color: '#888', fontSize: 14, lineHeight: 20, marginBottom: 8 },
-
-  // Inputs
+  fieldLabel: {
+    color: '#aaa',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: 4,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1a1a2e',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#2a2a4a',
+    marginTop: 4,
+  },
+  toggleLabel: { color: '#fff', fontSize: 15, fontWeight: '500', flex: 1, marginRight: 12 },
   input: {
     backgroundColor: '#1a1a2e',
     color: '#fff',
@@ -333,8 +470,6 @@ const styles = StyleSheet.create({
   bioInput: { minHeight: 120 },
   charCount: { color: '#555', fontSize: 12, textAlign: 'right' },
   error: { color: '#ff6b6b', fontSize: 13, marginTop: 4 },
-
-  // Goals
   goalsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   goalChip: {
     flexDirection: 'row',
@@ -351,8 +486,6 @@ const styles = StyleSheet.create({
   goalIcon: { fontSize: 18 },
   goalLabel: { color: '#aaa', fontSize: 14, fontWeight: '500' },
   goalLabelActive: { color: '#00d4ff' },
-
-  // Visibility
   visibilityCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -371,8 +504,6 @@ const styles = StyleSheet.create({
   visibilityTitleActive: { color: '#fff' },
   visibilitySub: { color: '#555', fontSize: 13 },
   visibilityCheck: { color: '#00d4ff', fontSize: 18, fontWeight: '700' },
-
-  // Footer
   footer: { flexDirection: 'row', gap: 12, padding: 24, paddingTop: 12 },
   backBtn: {
     paddingHorizontal: 20,
