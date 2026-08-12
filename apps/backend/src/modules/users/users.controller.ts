@@ -15,6 +15,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsISO8601,
   IsNotEmpty,
@@ -22,27 +23,23 @@ import {
   IsString,
   IsUUID,
   Matches,
+  MaxLength,
   ValidateIf,
 } from 'class-validator';
-
-import type {
-  AddPhotoRequest,
-  DeleteAccountRequest,
-  PresignedUploadResponse,
-  PublicUserProfile,
-  ReorderPhotosRequest,
-  UpdateProfileRequest,
-  UploadPhotoBase64Request,
-  UserPhoto,
-  UserProfile,
-} from '@g88/shared';
-
 import { Throttle } from '@nestjs/throttler';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UsersService } from './users.service';
 import { S3Service } from '../../common/s3.service';
+
+import type {
+  AddPhotoRequest,
+  DeleteAccountRequest,
+  ReorderPhotosRequest,
+  UpdateProfileRequest,
+  UploadPhotoBase64Request,
+} from '@g88/shared';
 
 class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @IsString() displayName?: string;
@@ -51,8 +48,12 @@ class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @IsIn(['public', 'private']) visibility?: 'public' | 'private';
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) goals?: string[];
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) interests?: string[];
-  // ISO date (YYYY-MM-DD); null clears it.
+  // ISO date (YYYY-MM-DD); null clears it. Server enforces age >= 18.
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsISO8601() dateOfBirth?: string | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(80) hometownCity?: string | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(40) hometownCountry?: string | null;
+  @IsOptional() @IsBoolean() showAge?: boolean;
+  @IsOptional() @IsBoolean() showHometown?: boolean;
 }
 
 class PresignedUrlDto {
@@ -84,18 +85,14 @@ class UploadPhotoBase64Dto implements UploadPhotoBase64Request {
 class ReorderPhotosDto implements ReorderPhotosRequest {
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(6)
   @IsUUID('4', { each: true })
   photoIds!: string[];
 }
 
 class DeleteAccountDto implements DeleteAccountRequest {
-  // Deliberate friction: the client must echo the literal phrase so an account
-  // can't be deleted by an accidental/empty request.
   @IsIn(['DELETE'], { message: "confirm must be the literal string 'DELETE'" })
   confirm!: 'DELETE';
 
-  // Required for password accounts; ignored for OAuth-only accounts (no hash).
   @IsOptional()
   @IsString()
   password?: string;
@@ -110,115 +107,74 @@ export class UsersController {
   ) {}
 
   @Get('me')
-  async getMe(@CurrentUser('id') userId: string): Promise<UserProfile> {
+  getMe(@CurrentUser('sub') userId: string) {
     return this.users.getProfile(userId);
   }
 
-  @Get('me/profile')
-  async getProfile(@CurrentUser('id') userId: string): Promise<UserProfile> {
-    return this.users.getProfile(userId);
-  }
-
-  @Patch('me/profile')
-  async updateProfile(
-    @Body() dto: UpdateProfileDto,
-    @CurrentUser('id') userId: string,
-  ): Promise<UserProfile> {
-    return this.users.updateProfile(userId, dto);
-  }
-
-  /**
-   * Permanently delete the caller's account and all associated data.
-   * Irreversible. Tightly throttled (5 attempts / hour) — destructive + re-auth.
-   */
-  @Delete('me')
-  @HttpCode(204)
-  @Throttle({ default: { limit: 5, ttl: 3_600_000 } })
-  async deleteAccount(
-    @Body() dto: DeleteAccountDto,
-    @CurrentUser('id') userId: string,
-  ): Promise<void> {
-    await this.users.deleteAccount(userId, dto.confirm, dto.password);
-  }
-
-  @Post('me/avatar/presigned-url')
-  @HttpCode(200)
-  async avatarPresignedUrl(
-    @Body() dto: PresignedUrlDto,
-    @CurrentUser('id') userId: string,
-  ): Promise<PresignedUploadResponse> {
-    return this.s3.avatarPresignedUrl(userId, dto.contentType);
-  }
-
-  // ─── Gallery photos ─────────────────────────────────────────────────────────
-
-  /**
-   * Base64 JSON upload — the path the mobile client uses. React Native's multipart
-   * file upload streams a one-shot body that dev network inspectors close before
-   * it sends ("Stream Closed"); a JSON body is re-readable and uploads reliably.
-   * Field "data" is the raw base64 (no data-URI prefix). Max 10 MB decoded.
-   */
-  @Post('me/photos/base64')
-  @HttpCode(201)
-  async uploadPhotoBase64(
-    @Body() dto: UploadPhotoBase64Dto,
-    @CurrentUser('id') userId: string,
-  ): Promise<UserPhoto[]> {
-    const buffer = Buffer.from(dto.data, 'base64');
-    if (buffer.length === 0) {
-      throw new BadRequestException('Image data is empty or not valid base64');
-    }
-    if (buffer.length > 10 * 1024 * 1024) {
-      throw new BadRequestException('Image exceeds the 10 MB limit');
-    }
-    const url = await this.s3.uploadPhotoBuffer(userId, buffer, dto.contentType);
-    return this.users.addPhoto(userId, url);
-  }
-
-  @Get('me/photos')
-  async listPhotos(@CurrentUser('id') userId: string): Promise<UserPhoto[]> {
-    return this.users.listPhotos(userId);
-  }
-
-  @Post('me/photos/presigned-url')
-  @HttpCode(200)
-  async photoPresignedUrl(
-    @Body() dto: PresignedUrlDto,
-    @CurrentUser('id') userId: string,
-  ): Promise<PresignedUploadResponse> {
-    return this.s3.photoPresignedUrl(userId, dto.contentType);
-  }
-
-  @Post('me/photos')
-  @HttpCode(201)
-  async addPhoto(
-    @Body() dto: AddPhotoDto,
-    @CurrentUser('id') userId: string,
-  ): Promise<UserPhoto[]> {
-    return this.users.addPhoto(userId, dto.url);
-  }
-
-  @Patch('me/photos/order')
-  async reorderPhotos(
-    @Body() dto: ReorderPhotosDto,
-    @CurrentUser('id') userId: string,
-  ): Promise<UserPhoto[]> {
-    return this.users.reorderPhotos(userId, dto.photoIds);
-  }
-
-  @Delete('me/photos/:photoId')
-  async deletePhoto(
-    @Param('photoId', new ParseUUIDPipe({ version: '4' })) photoId: string,
-    @CurrentUser('id') userId: string,
-  ): Promise<UserPhoto[]> {
-    return this.users.deletePhoto(userId, photoId);
+  @Patch('me')
+  updateMe(@CurrentUser('sub') userId: string, @Body() body: UpdateProfileDto) {
+    return this.users.updateProfile(userId, body);
   }
 
   @Get(':id')
-  async getPublic(
-    @Param('id', new ParseUUIDPipe({ version: '4' })) userId: string,
-    @CurrentUser('id') viewerId: string,
-  ): Promise<PublicUserProfile> {
-    return this.users.getPublicProfile(userId, viewerId);
+  getPublic(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') viewerId: string,
+  ) {
+    return this.users.getPublicProfile(id, viewerId);
+  }
+
+  @Post('me/photos/presign')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async presign(@CurrentUser('sub') userId: string, @Body() body: PresignedUrlDto) {
+    return this.s3.createPresignedUpload(userId, body.contentType);
+  }
+
+  @Post('me/photos')
+  addPhoto(@CurrentUser('sub') userId: string, @Body() body: AddPhotoDto) {
+    return this.users.addPhoto(userId, body.url);
+  }
+
+  @Post('me/photos/base64')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async uploadBase64(@CurrentUser('sub') userId: string, @Body() body: UploadPhotoBase64Dto) {
+    let buf: Buffer;
+    try {
+      buf = Buffer.from(body.data, 'base64');
+    } catch {
+      throw new BadRequestException('Image data is empty or not valid base64');
+    }
+    if (buf.length === 0) {
+      throw new BadRequestException('Image data is empty or not valid base64');
+    }
+    if (buf.length > 10 * 1024 * 1024) {
+      throw new BadRequestException('Image exceeds the 10 MB limit');
+    }
+    const { publicUrl } = await this.s3.uploadUserPhoto(userId, buf, body.contentType, body.fileName);
+    return this.users.addPhoto(userId, publicUrl);
+  }
+
+  @Get('me/photos')
+  listPhotos(@CurrentUser('sub') userId: string) {
+    return this.users.listPhotos(userId);
+  }
+
+  @Delete('me/photos/:photoId')
+  deletePhoto(
+    @CurrentUser('sub') userId: string,
+    @Param('photoId', ParseUUIDPipe) photoId: string,
+  ) {
+    return this.users.deletePhoto(userId, photoId);
+  }
+
+  @Patch('me/photos/reorder')
+  reorder(@CurrentUser('sub') userId: string, @Body() body: ReorderPhotosDto) {
+    return this.users.reorderPhotos(userId, body.photoIds);
+  }
+
+  @Delete('me')
+  @HttpCode(204)
+  async deleteAccount(@CurrentUser('sub') userId: string, @Body() body: DeleteAccountDto) {
+    await this.users.deleteAccount(userId, body.confirm, body.password);
   }
 }
