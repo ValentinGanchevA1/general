@@ -9,7 +9,6 @@ import { PRIVACY_POLICY_URL } from '@/constants/app';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-/** One privacy commitment: icon + headline + plain-language detail. */
 function Point({
   icon,
   title,
@@ -31,9 +30,8 @@ function Point({
 }
 
 /**
- * Native, self-contained summary of G88's privacy posture. Links out to the full
- * hosted policy; the controls it points to (Appear on map, Delete account) live
- * in Settings.
+ * Native summary of G88's privacy posture aligned with current product:
+ * map discovery, Pulse, stories, soft post gates, offline trade.
  */
 export function PrivacyScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
@@ -54,34 +52,49 @@ export function PrivacyScreen(): React.JSX.Element {
 
       <ScrollView contentContainerStyle={styles.body}>
         <Text style={styles.intro}>
-          Privacy is a core design constraint of G88, not an afterthought. Here is
-          what that means in practice.
+          Privacy is a core design constraint of G88. Here is what that means with
+          the features we ship today.
         </Text>
 
         <Point
           icon="map-marker-off"
           title="Your exact location is never stored"
-          body="Your precise GPS position is coarsened to roughly a 120-meter area before anything is saved. We never keep your exact coordinates, and other users only ever see the coarsened location — you appear in the neighborhood, never at a point."
-        />
-        <Point
-          icon="eye-off"
-          title="You control who sees you"
-          body="Hide yourself from discovery any time in Settings → Appear on map. You can also revoke the OS location permission in your device settings."
+          body="Precise GPS is coarsened to roughly a 120-meter area before anything is saved. Other users only ever see that coarsened neighborhood — never a point on your doorstep."
         />
         <Point
           icon="map-clock"
           title="Foreground only"
-          body="Location is used only while you have the app open. G88 does not track your location in the background."
+          body="Location is used only while the app is open (map, Pulse stories, nearby feed). G88 does not track you in the background."
+        />
+        <Point
+          icon="eye-off"
+          title="You control who sees you"
+          body="Hide from discovery any time in Settings → Appear on map. You can also revoke OS location permission in device settings."
+        />
+        <Point
+          icon="circle-outline"
+          title="Stories stay local and temporary"
+          body="Stories are visible to people nearby and expire after 24 hours. Posting requires a verified email and a minimum account age (or phone+). Media is not kept as a permanent public archive."
+        />
+        <Point
+          icon="hand-wave"
+          title="Interactions are intentional"
+          body="Waves and story reactions are first-class signals. Chat unlocks only after mutual interest — not cold outreach from strangers."
         />
         <Point
           icon="account-eye"
           title="What others can see"
-          body="Other users see your display name, photos, bio, interests, badges, and coarsened location — never your email, phone number, or precise position."
+          body="Display name, photos, bio, interests, badges, coarsened location, and public storyline — never your email, phone number, or precise position."
+        />
+        <Point
+          icon="storefront-outline"
+          title="Trading stays offline"
+          body="Listings and offers are free. Settlement happens between people offline — we do not process payments or store card data for local trade."
         />
         <Point
           icon="shield-lock"
           title="Encrypted and minimized"
-          body="Data is encrypted in transit. Passwords are stored only as salted hashes, and your sign-in tokens stay in your device's secure keystore. Diagnostics are scrubbed of location and tokens."
+          body="Data is encrypted in transit. Passwords are salted hashes only. Sign-in tokens stay in your device keystore. Diagnostics are scrubbed of location and tokens."
         />
         <Point
           icon="cancel"
@@ -100,7 +113,7 @@ export function PrivacyScreen(): React.JSX.Element {
           <View style={styles.actionText}>
             <Text style={styles.actionLabel}>Visibility &amp; account</Text>
             <Text style={styles.actionSub}>
-              Appear on map, delete account, and more in Settings
+              Appear on map, blocked users, delete account
             </Text>
           </View>
           <Icon name="chevron-right" size={24} color="#444" />
@@ -117,7 +130,7 @@ export function PrivacyScreen(): React.JSX.Element {
 
         <Text style={styles.footnote}>
           Deleting your account (Settings → Delete account) is immediate and
-          permanently removes your profile, photos, messages, and activity.
+          permanently removes your profile, photos, stories, messages, and activity.
         </Text>
       </ScrollView>
     </View>
