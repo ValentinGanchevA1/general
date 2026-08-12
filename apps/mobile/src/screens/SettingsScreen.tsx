@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -32,6 +33,8 @@ export function SettingsScreen(): React.JSX.Element {
   const [deletePassword, setDeletePassword] = useState('');
   const isVisible = profile?.visibility !== 'private';
 
+  const emailVerified = profile != null && profile.verification !== 'none';
+
   const toggleVisibility = async (): Promise<void> => {
     if (toggling || !profile) return;
     setToggling(true);
@@ -49,9 +52,6 @@ export function SettingsScreen(): React.JSX.Element {
   };
 
   const confirmDelete = async (): Promise<void> => {
-    // On success the thunk clears the session → AppNavigator routes to Auth, so
-    // this screen unmounts; no manual navigation needed. On failure the modal
-    // stays open and surfaces the error (e.g. wrong password).
     const pw = deletePassword.trim();
     const result = await dispatch(deleteAccount(pw ? { password: pw } : {}));
     if (deleteAccount.fulfilled.match(result)) {
@@ -62,79 +62,138 @@ export function SettingsScreen(): React.JSX.Element {
 
   return (
     <View style={styles.root}>
-      <Text style={styles.heading}>Settings</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
+          <Icon name="chevron-left" size={28} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Settings</Text>
+        <View style={styles.back} />
+      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Privacy</Text>
-        <View style={styles.row}>
-          <View style={styles.rowContent}>
-            <Text style={styles.rowLabel}>Appear on map</Text>
-            <Text style={styles.rowSub}>
-              {isVisible
-                ? 'Others can see you nearby'
-                : 'You are hidden from discovery'}
-            </Text>
+      <ScrollView contentContainerStyle={styles.body}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Discovery</Text>
+          <View style={styles.row}>
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Appear on map</Text>
+              <Text style={styles.rowSub}>
+                {isVisible
+                  ? 'Others can see you nearby on the map'
+                  : 'Hidden from discovery — you can still browse'}
+              </Text>
+            </View>
+            {toggling || loading ? (
+              <ActivityIndicator color="#00d4ff" />
+            ) : (
+              <Switch
+                value={isVisible}
+                onValueChange={toggleVisibility}
+                trackColor={{ false: '#2a2a4a', true: '#0095b3' }}
+                thumbColor={isVisible ? '#00d4ff' : '#555'}
+              />
+            )}
           </View>
-          {toggling || loading ? (
-            <ActivityIndicator color="#00d4ff" />
-          ) : (
-            <Switch
-              value={isVisible}
-              onValueChange={toggleVisibility}
-              trackColor={{ false: '#2a2a4a', true: '#0095b3' }}
-              thumbColor={isVisible ? '#00d4ff' : '#555'}
-            />
-          )}
+          <TouchableOpacity
+            style={[styles.row, styles.rowSpaced]}
+            onPress={() => navigation.navigate('BlockedUsers')}
+          >
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Blocked users</Text>
+              <Text style={styles.rowSub}>People you have hidden and muted</Text>
+            </View>
+            <Icon name="chevron-right" size={24} color="#555" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={[styles.row, styles.rowSpaced]}
-          onPress={() => navigation.navigate('BlockedUsers')}
-        >
-          <View style={styles.rowContent}>
-            <Text style={styles.rowLabel}>Blocked users</Text>
-            <Text style={styles.rowSub}>People you've hidden and muted</Text>
-          </View>
-          <Icon name="chevron-right" size={24} color="#555" />
-        </TouchableOpacity>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Notifications</Text>
-        <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('NotificationSettings')}>
-          <View style={styles.rowContent}>
-            <Text style={styles.rowLabel}>Push notifications</Text>
-            <Text style={styles.rowSub}>Choose which alerts you receive</Text>
-          </View>
-          <Icon name="chevron-right" size={24} color="#555" />
-        </TouchableOpacity>
-      </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Trust &amp; posting</Text>
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => navigation.navigate('Verification')}
+          >
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Verification</Text>
+              <Text style={styles.rowSub}>
+                Email, phone, and ID review — builds trust and unlocks stories
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={24} color="#555" />
+          </TouchableOpacity>
+          {!emailVerified ? (
+            <TouchableOpacity
+              style={[styles.row, styles.rowSpaced]}
+              onPress={() => navigation.navigate('EmailVerification')}
+            >
+              <View style={styles.rowContent}>
+                <Text style={styles.rowLabel}>Verify email</Text>
+                <Text style={styles.rowSub}>Required to post stories on Pulse</Text>
+              </View>
+              <Icon name="chevron-right" size={24} color="#555" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Legal</Text>
-        <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('Privacy')}>
-          <View style={styles.rowContent}>
-            <Text style={styles.rowLabel}>Privacy Policy</Text>
-            <Text style={styles.rowSub}>How we handle your data</Text>
-          </View>
-          <Icon name="chevron-right" size={24} color="#555" />
-        </TouchableOpacity>
-      </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Notifications</Text>
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => navigation.navigate('NotificationSettings')}
+          >
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Push notifications</Text>
+              <Text style={styles.rowSub}>Waves, chats, stories, trades, and more</Text>
+            </View>
+            <Icon name="chevron-right" size={24} color="#555" />
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Log out</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteBtn}
-          onPress={() => {
-            setDeletePassword('');
-            setDeleteOpen(true);
-          }}
-        >
-          <Text style={styles.deleteText}>Delete account</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Legal</Text>
+          <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('Privacy')}>
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Privacy</Text>
+              <Text style={styles.rowSub}>Location, stories, data, and account deletion</Text>
+            </View>
+            <Icon name="chevron-right" size={24} color="#555" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.row, styles.rowSpaced]}
+            onPress={() => navigation.navigate('About')}
+          >
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>About G88</Text>
+              <Text style={styles.rowSub}>What the app does and version info</Text>
+            </View>
+            <Icon name="chevron-right" size={24} color="#555" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.row, styles.rowSpaced]}
+            onPress={() => navigation.navigate('Help')}
+          >
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Help &amp; Support</Text>
+              <Text style={styles.rowSub}>FAQs and contact</Text>
+            </View>
+            <Icon name="chevron-right" size={24} color="#555" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Text style={styles.logoutText}>Log out</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={() => {
+              setDeletePassword('');
+              setDeleteOpen(true);
+            }}
+          >
+            <Text style={styles.deleteText}>Delete account</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       <Modal
         visible={deleteOpen}
@@ -146,8 +205,8 @@ export function SettingsScreen(): React.JSX.Element {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Delete account?</Text>
             <Text style={styles.modalBody}>
-              This permanently deletes your profile, photos, messages, and activity.
-              It cannot be undone.
+              This permanently deletes your profile, photos, stories, messages, and
+              activity. It cannot be undone.
             </Text>
             <TextInput
               style={styles.input}
@@ -188,9 +247,18 @@ export function SettingsScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a0a0f', padding: 24 },
-  heading: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 24 },
-  section: { marginBottom: 32 },
+  root: { flex: 1, backgroundColor: '#0a0a0f' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    paddingTop: 56,
+  },
+  back: { width: 40, alignItems: 'flex-start' },
+  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  body: { padding: 24, paddingBottom: 48 },
+  section: { marginBottom: 28 },
   sectionTitle: {
     color: '#555',
     fontSize: 11,
