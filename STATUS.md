@@ -1,6 +1,6 @@
 # STATUS — G88 Reconciliation & P1
 
-> **Last updated:** 2026-06-26
+> **Last updated:** 2026-08-13
 > **Current phase (ROADMAP vocabulary):** **P2 — pre-launch hardening** gate list **complete** (A4 · OB1 · C6 · M1 · C2 all done) — every backend module now ships ≥1 `.spec.ts` (C2 spec-coverage gate closed 2026-06-11, `94fd594`), with **P3 — habit-forming** and parts of **P4+** backend built ahead of schedule and **now fully surfaced in mobile** (P3.1–P3.7 all shipped — see below).
 >
 > ### ✅ Where we are / ⏭️ What's next (read this first)
@@ -25,6 +25,36 @@
 > **Owner:** [your name]
 >
 > Update this file as work progresses. It's the single source of truth for "where are we?".
+
+> ### 🆕 Build-out since 2026-06-26 (168 commits, undocumented until now)
+>
+> This block backfills six weeks of shipped work that landed without a STATUS.md update. Grouped by area; all items below are on `master` as of `0885a5a` (2026-08-12).
+>
+> **P2.B1 (Blocks) — CLOSED.** Remaining scope from the 2026-06-26 entry is done: `BlocksModule` registered in `app.module.ts`, mobile block button + `BlockedUsersScreen` wired against live endpoints (PR #79), discovery/messaging exclusion confirmed bidirectional.
+>
+> **P2.OB1 (Sentry) — hardened.** Shared PII/secret scrubber (`packages/shared/src/scrub.ts`) landed with backend + mobile `beforeSend` wiring and a dedicated spec (`sentry-scrub.spec.ts`) (#80). Discovery module hardened alongside it: OOM guard (`estimateCellCount` rounds up for a conservative cell bound, #81) and antimeridian-crossing viewport rejection (deterministic edge-case coverage).
+>
+> **ID verification — admin review shipped.** Dedicated `AdminIdVerificationController` (pending-list + detail endpoints, pagination DTOs, presigned URLs) plus **assist-only AWS Rekognition face-match** (`rekognition.service.ts`) wired into the admin detail UI — assist score only, no auto-decision. `decideVerification()` fixed for a race condition: atomic conditional `UPDATE ... WHERE status = 'pending'` wrapped in a transaction; notification call stays outside the transaction boundary per convention.
+>
+> **New workspace app: `apps/admin`.** A Vite + React + shadcn/ui admin dashboard was added — not part of the original three-app monorepo shape (`backend` / `mobile` / `shared`). Ships login (`useAuth`, `LoginPage`), a verification queue (`QueuePage`, `VerificationTable`, `VerificationDetailModal`), and a live socket feed (`useVerificationSocket`) for real-time queue updates. **`CLAUDE.md` and `ARCHITECTURE.md` monorepo-structure sections do not yet mention this app — flagged for a follow-up doc pass.**
+>
+> **P4.S Stories — shipped end-to-end**, well ahead of its P4 horizon placement (originally scoped as "documented, not committed" in `ROADMAP.md`). Backend: `StoriesModule` (create/nearby/view/react/delete), migration `0029_stories.sql`, S3 presigned upload + batch delete, `story:new`/`story:expired` WS events, a cleanup sweep service. Mobile: `PulseStrip`, `StoryViewer`, `StoryCreateSheet`, `ProfileStoryRing`, `ProfileStoryline`. **Softer post-gate than originally specced**: email verification + account age (not phone), with rate limits (`assertCanPost`) — matches the `StoryEligibilityGuard` design already in memory. Stories were briefly surfaced on `MapScreen`, then pulled back to Pulse-only (`da690ff`) as the final placement.
+>
+> **Email verification — new feature, not in original scope.** `EmailVerificationScreen` + backend email-OTP service (Redis-backed, delivered via Twilio's email channel). Google OAuth sign-in now auto-promotes `verification_level` to `email`. Added specifically to support the Stories soft-gate above.
+>
+> **Social OAuth — PKCE (S256) added.** `code_verifier` now stored in Redis (GET+DEL, chosen for broad Redis-version compatibility) instead of the prior flow, closing an OAuth interception-attack gap ahead of any App Store submission requirement.
+>
+> **Core-loop / Interactions surface — new.** `InteractionsScreen` (received interactions, public status, block+status actions) plus Pulse feed wiring for Trades/Matches/Chats/Waves with filter-specific empty states.
+>
+> **Gifts — sent history + send-time block guard** (`d7e94b6`): `POST /gifts/send` now rejects sends to a blocked/blocking counterpart.
+>
+> **Chat — timed live location share (new feature).** Migration `0030_chat_location_share.sql`, `LocationShareService`, a sweep job (`location-share.sweep.ts`) that emits `location:share:ended` on expiry/timeout, and mobile `LocationShareSheet` / `LocationSessionBanner` / `LocationSessionBubble`. Spec at `docs/SPEC_CHAT_LIVE_LOCATION.md`.
+>
+> **Profile — hometown, DOB, and age-gating (new).** Migration `0030_profile_origin.sql` adds hometown + DOB with 18+ enforcement and public age/origin **visibility toggles** — surfaced in `ProfileEditScreen` and on `EntityBottomSheet`'s user card. **⚠️ Migration numbering collision:** both `0030_chat_location_share.sql` and `0030_profile_origin.sql` share the prefix `0030` — confirm actual applied order against prod before treating either number as canonical; the next new migration should be `0031`, not a second `0030`.
+>
+> **CI — Hermes compiler fix, final form.** The Hermes-availability issue noted in memory as "identified" went through several more iterations (ELF-binary chmod, dynamic version resolution instead of a hardcoded `hermes-compiler` version, ELF-filtering detection logic) before landing on `master`. Confirm current `android-apk.yml` still builds green — this had multiple false-fix commits.
+>
+> **Dependency bumps** — safe in-major bumps applied (`#74`/`#76`/`#87`/`#88`), stray `@types/bcryptjs` dropped.
 
 > ### ⚠️ Phase-vocabulary reconciliation (read this before trusting any `P#` label below)
 >
