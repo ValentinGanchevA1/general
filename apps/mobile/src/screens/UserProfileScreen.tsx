@@ -176,13 +176,21 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
           <Avatar uri={profile.avatarUrl} name={profile.displayName} size={72} ring />
           <View style={styles.heroMeta}>
             <View style={styles.nameRow}>
-              <Text style={styles.displayName}>{profile.displayName}</Text>
+              <Text style={styles.displayName}>
+                {profile.displayName}
+                {profile.age != null ? `, ${profile.age}` : ''}
+              </Text>
               <VerificationBadge
                 verification={profile.verification}
                 idVerified={profile.idVerified}
                 size={18}
               />
             </View>
+            {(profile.hometownCity || profile.hometownCountry) ? (
+              <Text style={styles.originLine}>
+                {[profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ')}
+              </Text>
+            ) : null}
             <Text style={[styles.onlineLabel, !profile.online && styles.offlineLabel]}>
               {profile.online ? 'Online now' : 'Recently nearby'}
             </Text>
@@ -303,6 +311,7 @@ const styles = StyleSheet.create({
   heroMeta: { flex: 1, gap: 4 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   displayName: { color: '#fff', fontSize: 24, fontWeight: '700' },
+  originLine: { color: '#888', fontSize: 13, marginTop: 2 },
   onlineLabel: { color: '#4caf50', fontSize: 13 },
   offlineLabel: { color: '#666' },
   trustRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
