@@ -141,7 +141,7 @@ export class UsersController {
     @CurrentUser('id') userId: string,
     @Body() dto: PresignedUrlDto,
   ) {
-    return this.s3.createPresignedUpload(userId, dto.contentType);
+    return this.s3.avatarPresignedUrl(userId, dto.contentType);
   }
 
   @Post('me/photos/base64')
@@ -162,7 +162,7 @@ export class UsersController {
     if (buf.length > 10 * 1024 * 1024) {
       throw new BadRequestException('Image exceeds the 10 MB limit');
     }
-    const { publicUrl } = await this.s3.uploadUserPhoto(userId, buf, dto.contentType, dto.fileName);
+    const publicUrl = await this.s3.uploadPhotoBuffer(userId, buf, dto.contentType);
     return this.users.addPhoto(userId, publicUrl);
   }
 
@@ -177,7 +177,7 @@ export class UsersController {
     @CurrentUser('id') userId: string,
     @Body() dto: PresignedUrlDto,
   ) {
-    return this.s3.createPresignedUpload(userId, dto.contentType);
+    return this.s3.photoPresignedUrl(userId, dto.contentType);
   }
 
   @Post('me/photos')

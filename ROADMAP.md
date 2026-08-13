@@ -4,7 +4,7 @@
 
 > **Authoritative source for sequence and timing.**
 > Sibling docs: `PRODUCT.md` (what/why), `SPECIFICATION.md` (per-feature contracts), `ARCHITECTURE.md` (how), `STATUS.md` (live progress).
-> Last revised: 2026-07-04 (patched for confirmed drift — see decision log entries at bottom; original body dated 2026-05-23).
+> Last revised: 2026-08-13 (P2 + P3 phase status closed out; P4.S reclassified as shipped; see decision log entries at bottom; original body dated 2026-05-23).
 
 ---
 
@@ -13,9 +13,9 @@
 | Phase                       | Status             | Gate                                                    |
 |-----------------------------|--------------------|---------------------------------------------------------|
 | P1 — foundation             | ✅ shipped          | Auth · Profile · Map Discovery · Presence · Wave · Chat |
-| P2 — pre-launch hardening   | 🟡 active          | TestFlight ready                                        |
-| P3 — habit-forming features | ⏳ post-launch      | TestFlight + App Store live                             |
-| P4+ — horizon               | 📋 documented only | P3 retention sustained                                  |
+| P2 — pre-launch hardening   | ✅ shipped          | Android beta gate — see STATUS.md for remaining owner-side Play Console steps |
+| P3 — habit-forming features | ✅ shipped          | All P3.1–P3.7 surfaced in mobile as of 2026-06-15       |
+| P4+ — horizon               | 🟡 active (partial) | P4.S (Stories) shipped ahead of gate; rest still gated on P3 retention |
 
 Target launch market: **Varna, BG** (single test city — see `PRODUCT.md` § Launch market).
 
@@ -49,6 +49,8 @@ Six items, ordered. Each must close cleanly before the next starts. B1 (Blocks) 
 | **Blocks**     | Nothing strictly, but should land before Sentry (OB1) to avoid sending secrets to Sentry breadcrumbs                                                                                     |
 
 ### P2.OB1 — Sentry integration (TestFlight blocker)
+
+**✅ Shipped + hardened (2026-08-11, PR #80).** Shared PII/secret scrubber (`packages/shared/src/scrub.ts`) with a dedicated spec; backend + mobile `beforeSend` wired. See STATUS.md build-out section.
 
 |                |                                                                                                                                                                                                             |
 |----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -100,7 +102,7 @@ Six items, ordered. Each must close cleanly before the next starts. B1 (Blocks) 
 |                     |                                                                                                                                                                                                                                                                                                                  |
 |---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Why**             | User blocking is a pre-launch safety baseline, not a deferred nicety. Its absence was identified as a genuine safety gap.                                                                                                                                                                                        |
-| **Status**          | 🟡 Partially shipped. `0026_blocks.sql` migration (symmetric indexed `user_blocks` table) and full `BlocksModule` (service/controller/module/spec) exist. Discovery queries already exclude blocked users in both directions. `isBlocked()` helper + early-return wired into `MessagingService.permissionFor()`. |
+| **Status**          | ✅ Shipped (2026-06-28, closed out 2026-08-xx). `0026_blocks.sql`, full `BlocksModule` registered in `app.module.ts`, mobile block button + `BlockedUsersScreen` wired against live endpoints (PR #79). Discovery/messaging exclusion confirmed bidirectional. |
 | **Remaining scope** | Register `BlocksModule` in `app.module.ts` (manual step, not yet done) · hide blocked users' events/listings (requires `authorId` in view meta) · block waves in `interactions.service.ts` · mobile block button UI · `BlockedUsersScreen.tsx` wiring (screen exists, needs verification against live endpoints) |
 | **Acceptance**      | Blocking is bidirectional and immediate across discovery, messaging, waves, events, and listings · `app.module.ts` registers `BlocksModule` · mobile exposes a block action from profile/chat                                                                                                                    |
 | **Effort**          | ~1 day remaining (partial credit for backend already shipped)                                                                                                                                                                                                                                                    |
@@ -140,6 +142,8 @@ Cannot submit to TestFlight until **all** are true:
 Ordering rationale: **daily-return triggers before utility before revenue.** Per Q1 → D.
 
 Each epic gets a full spec in `SPECIFICATION.md` at the start of its sprint.
+
+**✅ All of P3.1–P3.7 shipped and surfaced in mobile as of 2026-06-15 — see STATUS.md.** Per-epic detail below is kept for historical scoping reference.
 
 ### P3.1 — Gamification surfacing
 - Backend exists (`gamification` module, achievements, challenges, leaderboard).
@@ -205,6 +209,8 @@ WebRTC, location-anchored streams. **Explicitly deferred.** Legacy roadmaps push
 1:1 only in v1. Group chat unlocks event chat, neighborhood threads, and trade negotiation rooms. Likely first P4 feature after monetization.
 
 ### P4.S — Stories / ephemeral content
+**✅ Shipped end-to-end (2026-08-xx), ahead of its horizon placement — see STATUS.md build-out section.** Softer post-gate than the original 24h-account-age concept: email verification + account age, with rate limits. Original framing kept below for context.
+
 24h location-tagged stories. Hooks into discovery and gives passive users a creation surface.
 
 ### P4.W — Web / desktop client
@@ -266,6 +272,9 @@ Listed here so they don't keep resurfacing in planning conversations. Source: 13
 
 | Date       | Decision                                                                        | Rationale                                                                                                       |
 |------------|---------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| 2026-08-13 | P2 and P3 phase status closed out in the snapshot table                        | All P2 gate items + all P3.1–P3.7 confirmed shipped per STATUS.md; table was stale since 2026-06-26            |
+| 2026-08-13 | P4.S (Stories) reclassified from horizon to shipped                            | Built and shipped end-to-end ahead of the P3-retention gate; not re-sequenced retroactively, just marked done   |
+| 2026-08-13 | New `apps/admin` workspace app, email verification, and OAuth PKCE noted as unplanned but shipped | None of the three were scoped in this roadmap; added here so they stop being invisible in planning |
 | 2026-05-23 | P3 ordering: gamification + gifts first                                         | Q1 → D · habit-forming triggers ahead of utility/revenue                                                        |
 | 2026-05-23 | Live streaming → P4+ horizon                                                    | Q2 → B · infra + moderation cost too high pre-launch                                                            |
 | 2026-05-23 | Zero monetization in v1                                                         | Q3 → D · removes regulatory + trust risk during retention validation                                            |

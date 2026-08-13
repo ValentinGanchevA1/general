@@ -4,7 +4,7 @@
 
 > **Authoritative source for per-feature contracts: user story, API, data model, WS events, UI surface, acceptance.**
 > Sibling docs: `PRODUCT.md` (what/why), `ROADMAP.md` (when), `ARCHITECTURE.md` (how the system is wired).
-> Last revised: 2026-07-04 (patched for confirmed drift; original body dated 2026-05-23).
+> Last revised: 2026-08-13 (added §2.8–§2.11 for shipped-but-undocumented features; §2.7 and §3.2 status corrected; §4 outlines marked shipped; original body dated 2026-05-23).
 
 ---
 
@@ -292,7 +292,7 @@ Message {
 
 **User story.** I can block another user. Once blocked, we disappear from each other's map/discovery, can't message each other, and my waves to them are prevented.
 
-**Status.** 🟡 Partially shipped. Backend complete; mobile UI and remaining cross-module wiring pending — see `ROADMAP.md` P2.B1.
+**Status.** 🟡 Mostly shipped (backend + mobile UI live since PR #78/#79, 2026-06-28). Confirmed enforced in code as of 2026-08-13: discovery, messaging, `gifts.service.ts` (send-time guard, PR #89), `users.service.ts`. **Not confirmed enforced:** no `isBlocked` call found in `interactions.service.ts` (waves) — `ROADMAP.md` P2.B1 marks this item fully closed, which this doesn't match; verify waves before trusting that closure.
 
 **API**
 
@@ -308,12 +308,100 @@ Message {
 **Enforcement**
 - `discovery.service.ts` — excludes blocked users in both directions from nearby/viewport queries
 - `messaging.service.ts` — `isBlocked()` helper + early-return in `permissionFor()`
-- **Not yet enforced:** events/listings visibility (needs `authorId` in view meta), waves (`interactions.service.ts`)
+- **Not yet enforced (unchanged as of 2026-08-13):** events/listings visibility (needs `authorId` in view meta), waves (`interactions.service.ts`)
 
 **Acceptance**
 - Blocking is bidirectional — neither party sees the other in discovery.
 - Blocked users cannot open new message threads with each other.
 - `BlocksModule` must be registered in `app.module.ts` for any of this to take effect (as of this writing it is implemented but not confirmed registered — verify before relying on it).
+
+### §2.8 — Chat live location share (added 2026-08-13, shipped ahead of the spec doc's own status line)
+
+**User story.** From an open 1:1 chat, I can share my live location for 15 minutes, 1 hour, or until I turn it off. My chat partner sees it update in near-real-time and can open it in Maps. Either of us can stop it; it also auto-ends on timeout or if we block each other.
+
+**Status.** ✅ Shipped (migration `0030_chat_location_share.sql`, PRs #109/#110). **Full design doc:** `docs/SPEC_CHAT_LIVE_LOCATION.md` — note its own header still reads "Status: Design locked · Implementation not started"; that line is now stale and should be updated to Shipped alongside this entry (this script does that — see below).
+
+**Key departure from generic chat:** coordinates are **exact**, not H3-fuzzed — this is a deliberate exception to the location-fuzzing invariant in `ARCHITECTURE.md` §3.3, scoped to an explicit, consensual, time-boxed share between two participants who are already in a 1:1 conversation. Does not touch `users.visibility` / the public map.
+
+**API**
+
+| Method | Path                                    | Auth | Notes                                    |
+|--------|------------------------------------------|------|-------------------------------------------|
+| GET    | `/chat/conversations/:id/location-session` | JWT | Active session (if any) — cold-open hydrate |
+
+**WS `/realtime`** — `location:share:start` / `:update` / `:stop` (client→server, ack-based) and `location:share:started` / `:update` / `:ended` (server→client). Full payload shapes in `docs/SPEC_CHAT_LIVE_LOCATION.md` §3.
+
+**Data model** — `chat_location_sessions` (status `active|ended`, duration `15m|60m|until_off`, `last_lat`/`last_lng`, `end_reason`); `messages.type` gains `'location' | 'location_session'` alongside `'text'`, plus `messages.location_session_id`. At most one active session per `(conversation_id, sharer_id)` — starting a new one ends the previous.
+
+**Enforcement** — `LocationShareService` (`apps/backend/src/modules/chat/location-share.service.ts`) plus a sweep job (`location-share.sweep.ts`) that ends sessions past `ends_at` or with a stale (>90s) `last_updated_at`, emitting `location:share:ended`.
+
+---
+
+### §2.9 — Stories / ephemeral content (P4.S — shipped 2026-08, ahead of its horizon placement)
+
+**User story.** I can post a photo or short video that's visible to nearby users for 24 hours, then disappears. I can view stories from people near me, react, and see who's viewed mine.
+
+**Status.** ✅ Shipped end-to-end. Backend: `StoriesModule` (`apps/backend/src/modules/stories/`), migration `0029_stories.sql`. Mobile: `PulseStrip`, `StoryViewer`, `StoryCreateSheet`, `ProfileStoryRing`, `ProfileStoryline` (Pulse tab only — briefly surfaced on `MapScreen`, pulled back per commit `da690ff`).
+
+**API**
+
+| Method | Path                     | Auth | Notes                                                    |
+|--------|--------------------------|------|------------------------------------------------------------|
+| POST   | `/stories/presign`       | JWT  | `{ contentType }` → S3 presigned upload URL                |
+| POST   | `/stories`               | JWT  | `{ mediaUrl, mediaType, caption? }` → gated by `canPostStory` |
+| POST   | `/stories/nearby`        | JWT  | Viewport body → nearby, non-expired, non-blocked stories   |
+| GET    | `/stories/author/:userId`| JWT  | A user's active stories (for `ProfileStoryline`)            |
+| GET    | `/stories/:id`           | JWT  | Single story detail                                        |
+| POST   | `/stories/:id/view`      | JWT  | Records a view receipt                                     |
+| POST   | `/stories/:id/react`     | JWT  | Heart/wave-style reaction                                   |
+| DELETE | `/stories/:id`           | JWT  | Author-only soft delete                                    |
+
+**Data model** — `stories` table: exact write-time `location geography(Point,4326)` + H3 cells r4–r10 (server-trusted, never returned as-is), plus `approx_lat`/`approx_lng` (centroid of the r10 cell — the only coordinates clients ever see, per the §3.3 fuzzing invariant). `expires_at = created_at + 24h`; `deleted_at` for soft delete. `story_views` for unique view receipts. Limits (`packages/shared/src/story.ts`, `STORY_LIMITS`): 200-char caption, 15s max video, 10 max concurrent active stories/user, 50-row nearby-query cap.
+
+**Post gate — softer than the original 24h-account-age design.** `canPostStory({ verification, createdAt })`: email-verified is the floor; email-only accounts also need ≥24h account age (`minAccountAgeMs`) and are capped at 3 posts/24h (`softerGateMaxPer24h`); phone-verified+ accounts skip the age floor entirely and get a 20-post/24h cap. Ladder: `none < email < phone < selfie < id` (`VerificationLevel`, see §5.7 below). Mirrors the `StoryEligibilityGuard` design.
+
+**Cleanup** — `stories-cleanup.service.ts` sweeps expired rows (S3 object deletion via `deleteObjectsByKeys`). **WS** — `story:new` / `story:expired` on `ServerToClientEvents`.
+
+---
+
+### §2.10 — ID verification: admin review + Rekognition assist (added 2026-08-13)
+
+**User story (operator).** As an admin, I can see the queue of pending ID-verification submissions, open one to see the document + a face-match assist score, and approve or reject it — the decision can't be double-processed by two admins racing each other.
+
+**Status.** ✅ Shipped. `AdminIdVerificationController` (`apps/backend/src/modules/id-verification/`), guarded by `AdminGuard`. Consumed by the new `apps/admin` Vite dashboard — see `ARCHITECTURE.md` §2 tier map / §3.14.
+
+**API** (all under `admin/verifications`, `AdminGuard`)
+
+| Method | Path                          | Notes                                              |
+|--------|--------------------------------|------------------------------------------------------|
+| GET    | `/admin/verifications/pending`         | Paginated queue                            |
+| GET    | `/admin/verifications/pending/:userId` | Detail — presigned doc URLs + Rekognition assist score |
+| POST   | `/admin/verifications/pending/:userId/decide` | `{ decision, reason? }` — approve/reject |
+
+**Rekognition — assist-only, never auto-decides.** `RekognitionService.analyzeVerification` runs AWS Rekognition face-compare between the ID document and the account's selfie/photo, surfacing a similarity score in the admin detail view. The score is advisory; the admin makes the call. Wired into the detail response, not into the decide endpoint's logic.
+
+**Concurrency safety.** `decideVerification()` is wrapped in a DB transaction with an atomic conditional `UPDATE ... WHERE status = 'pending' RETURNING id` — two admins deciding the same submission concurrently, only one wins; the second gets a clean already-decided error instead of a double-write. Matches the transaction-boundary convention (notification call fires outside the transaction).
+
+---
+
+### §2.11 — Email verification (added 2026-08-13, new — not in original A1/A2/A3 scope)
+
+**User story.** I can verify my email with a one-time code, both as a standalone step and automatically (Google OAuth sign-in promotes me to `email`-level verification without a separate step). Built specifically to support the Stories soft-gate (§2.9).
+
+**Status.** ✅ Shipped. `VerificationController` (`/verification`), Redis-backed OTP store, delivered via Twilio's email channel. Mobile: `EmailVerificationScreen`.
+
+**API**
+
+| Method | Path                     | Auth | Notes                                    |
+|--------|--------------------------|------|--------------------------------------------|
+| POST   | `/verification/email/start` | JWT | Sends OTP to account email via Twilio     |
+| POST   | `/verification/email/check` | JWT | `{ code }` → promotes `verification_level` to `email` |
+| POST   | `/verification/phone/start` | JWT | Existing phone OTP (unchanged)             |
+| POST   | `/verification/phone/check` | JWT | Existing phone OTP (unchanged)             |
+
+**Side effect.** `AuthService` now auto-promotes `verification_level` to `email` on successful Google OAuth sign-in — a Google-authenticated user never needs to run the email flow manually.
+
+---
 
 ## §3 — P2 features (forward specs)
 
@@ -322,6 +410,8 @@ Message {
 **No new spec.** This is a code-hygiene + ops task. Acceptance is in `ROADMAP.md` § P2.A4. Tracked here for completeness only.
 
 ### §3.2 — P2.OB1: Sentry observability
+
+**Status.** ✅ Shipped + hardened (PR #80, 2026-08-11). Shared scrubber lives at `packages/shared/src/scrub.ts` with its own spec (`sentry-scrub.spec.ts`); wired into both `beforeSend` hooks per the scope below.
 
 **User story (operator).** When a crash happens in production, I see it in Sentry within 60s with full stack trace, user-scoped (anonymized), and zero PII leaked.
 
@@ -481,6 +571,8 @@ type MapEntity = {
 
 ## §4 — P3 features (outlines)
 
+**✅ All of §4.1–§4.7 shipped and surfaced in mobile as of 2026-06-15 — see `STATUS.md`.** Outlines below were never replaced with full specs per the §6 change protocol; kept as-is for historical scope reference rather than rewritten after the fact.
+
 Full specs land at start of each P3 sprint. These outlines anchor scope only.
 
 ### §4.1 — P3.1 Gamification surfacing
@@ -543,6 +635,11 @@ type User = {
   appleUserId?: string;                        // planned for P2.A3 — column does not exist yet; 0009_apple_oauth.sql was dropped by 0019_drop_apple_oauth.sql
   googleUserId?: string;
   name: string;
+  verificationLevel: VerificationLevel;        // 'none'|'email'|'phone'|'selfie'|'id' — see §5.7. Existed since 0001_initial.sql; wasn't in this type doc until 2026-08-13
+  hometownCity?: string;                       // 0030_profile_origin.sql
+  hometownCountry?: string;                    // 0030_profile_origin.sql
+  showAge: boolean;                            // default true — public-profile visibility toggle, 0030_profile_origin.sql
+  showHometown: boolean;                        // default true — public-profile visibility toggle, 0030_profile_origin.sql
   location?: { type: 'Point'; coordinates: [lng, lat] };  // geography(Point,4326)
   lastLatitude?: number;
   lastLongitude?: number;
@@ -664,6 +761,16 @@ export const COLORS = {
 
 ---
 
+### §5.7 — `VerificationLevel` enum (added 2026-08-13)
+
+```typescript
+// packages/shared/src/api.ts
+type VerificationLevel = 'none' | 'email' | 'phone' | 'selfie' | 'id';
+```
+Ladder order (low→high): `none < email < phone < selfie < id`. Existed in the schema since `0001_initial.sql` (`users.verification_level`) but wasn't in this doc until the Stories gate (§2.9) made the ranking logic load-bearing. Drives `canPostStory` and the `StoryEligibilityGuard` mentioned elsewhere.
+
+---
+
 ## §6 — Change protocol for this doc
 
 - **P1 sections** — update only when implementation actually changes.
@@ -675,6 +782,9 @@ export const COLORS = {
 
 | Date       | Decision                                                                                   | Source                                                                                                                                      |
 |------------|--------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| 2026-08-13 | Added §2.8–§2.11 for Chat live-location share, Stories, ID-verification admin+Rekognition assist, and Email verification | All four shipped on `master` with no corresponding spec entry |
+| 2026-08-13 | §2.7 Blocks downgraded from an implied "done" to "mostly shipped" with an explicit enforcement gap noted | `interactions.service.ts` (waves) has no `isBlocked` call in the current codebase, contradicting `ROADMAP.md` P2.B1's "closed" status |
+| 2026-08-13 | Added §5.7 `VerificationLevel` and four missing `User` fields (`verificationLevel`, hometown, show-age/hometown toggles) | Fields existed in the DB schema (some since `0001_initial.sql`) but were never added to this type reference |
 | 2026-05-23 | One file with §-numbered sections (vs many files)                                          | Initial scoping with user — easier to grep, single source of truth                                                                          |
 | 2026-05-23 | Document P1 retroactively rather than skip                                                 | Reduces onboarding cost for future contributors                                                                                             |
 | 2026-05-23 | Apple `sub`, not email, as identity primary                                                | Apple private-relay design forces this                                                                                                      |
