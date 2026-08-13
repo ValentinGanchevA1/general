@@ -42,9 +42,10 @@ import {
   fetchNearbyStories,
   storyReceived,
 } from '@/features/stories/storiesSlice';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '@/navigation/AppNavigator';
+import type { RouteProp } from '@react-navigation/native';
+import type { RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
 import { track } from '@/lib/analytics';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
 
@@ -56,6 +57,7 @@ const NUDGE_CARD_HEIGHT = 56;
 export function MapScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<TabParamList, 'Map'>>();
   const insets = useSafeAreaInsets();
   const { coords: myCoords, requestPermission } = useUserLocation();
   const [region, setRegion] = useState<Region | null>(null);
@@ -63,6 +65,7 @@ export function MapScreen(): React.JSX.Element {
   const [waving, setWaving] = useState<string | null>(null);
   const mapRef = useRef<MapView>(null);
   const { unreadCount: interactionUnread } = useReceivedInteractions();
+  const focusMyPin = route.params?.focusMyPin === true;
 
   const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
   const zoom = useMemo(() => (region ? approxZoomFromRegion(region) : 12), [region]);
@@ -84,8 +87,9 @@ export function MapScreen(): React.JSX.Element {
     dispatch(setPoints(points));
   }, [points, dispatch]);
 
+  // Initial centre when we first get GPS and the user has not panned yet.
   useEffect(() => {
-    if (!myCoords || region) return;
+    if (!myCoords || region || focusMyPin) return;
     mapRef.current?.animateToRegion(
       {
         latitude: myCoords.lat,
@@ -95,7 +99,25 @@ export function MapScreen(): React.JSX.Element {
       },
       400,
     );
-  }, [myCoords, region]);
+  }, [myCoords, region, focusMyPin]);
+
+  // Profile → "View my pin on map": force-centre on the user once GPS is ready, then clear the flag.
+  useFocusEffect(
+    useCallback(() => {
+      if (!focusMyPin || !myCoords) return;
+      mapRef.current?.animateToRegion(
+        {
+          latitude: myCoords.lat,
+          longitude: myCoords.lng,
+          latitudeDelta: 0.015,
+          longitudeDelta: 0.015,
+        },
+        450,
+      );
+      // Clear so a later tab switch does not re-fire.
+      navigation.setParams({ focusMyPin: undefined });
+    }, [focusMyPin, myCoords, navigation]),
+  );
 
   useEffect(() => {
     void requestPermission();

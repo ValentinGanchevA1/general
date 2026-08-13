@@ -250,7 +250,7 @@ export function ProfileScreen(): React.JSX.Element {
           isVisible={mapVisible}
           saving={saving}
           onToggle={handleMapToggle}
-          onViewPin={() => navigation.navigate('Main', { screen: 'Map' })}
+          onViewPin={() => navigation.navigate('Main', { screen: 'Map', params: { focusMyPin: true } })}
         />
       </View>
 

@@ -60,7 +60,7 @@ export type PulseFilter =
   | 'matches';
 
 export type TabParamList = {
-  Map: undefined;
+  Map: { focusMyPin?: boolean } | undefined;
   Pulse: { filter?: PulseFilter } | undefined;
   Profile: undefined;
 };
