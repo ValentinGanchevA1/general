@@ -41,6 +41,25 @@ async function run(client) {
     }
   }
 
+  // Filename renames when a migration was renumbered after already applying
+  // under the old name (tracked by filename PRIMARY KEY). Idempotent.
+  const RENAMES = [
+    { from: '0030_profile_origin.sql', to: '0031_profile_origin.sql' },
+  ];
+  for (const { from, to } of RENAMES) {
+    const renamed = await client.query(
+      `UPDATE schema_migrations SET filename = $1
+         WHERE filename = $2
+           AND NOT EXISTS (
+             SELECT 1 FROM schema_migrations WHERE filename = $1
+           )`,
+      [to, from],
+    );
+    if (renamed.rowCount > 0) {
+      console.log(`Renamed schema_migrations: ${from} → ${to}`);
+    }
+  }
+
   const { rows: applied } = await client.query(
     'SELECT filename FROM schema_migrations',
   );
