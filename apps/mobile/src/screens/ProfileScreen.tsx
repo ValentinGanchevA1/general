@@ -79,7 +79,7 @@ function ChallengesCard({ challenges }: { challenges: ChallengeToday[] }): React
             {c.title}
           </Text>
           <Text style={styles.challengeReward}>
-            {c.completed ? `+${c.rewardXp}` : `${c.progress}/{c.target}`}
+            {c.completed ? `+${c.rewardXp}` : String(c.progress) + '/' + String(c.target)}
           </Text>
         </View>
       ))}
