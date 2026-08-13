@@ -38,8 +38,6 @@ import { DailyChallengeCard, CHALLENGE_CARD_HEIGHT } from '@/features/gamificati
 import { challengeEvents } from '@/features/gamification/challengeEvents';
 import { NudgeBanner } from '@/features/nudges/NudgeBanner';
 import { EventsRail } from '@/features/events/EventsRail';
-import { TrendingFilterBar } from '@/features/discovery/TrendingFilterBar';
-import { useTrendingNearby } from '@/features/pulse/useTrendingNearby';
 import {
   fetchNearbyStories,
   storyReceived,
@@ -52,7 +50,7 @@ import { useReceivedInteractions } from '@/features/interactions/useReceivedInte
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
-/** Nudge card approx height for stacking filters under challenge + streak. */
+/** Nudge card approx height for stacking interactions badge under challenge + streak. */
 const NUDGE_CARD_HEIGHT = 56;
 
 export function MapScreen(): React.JSX.Element {
@@ -63,27 +61,20 @@ export function MapScreen(): React.JSX.Element {
   const [region, setRegion] = useState<Region | null>(null);
   const [selected, setSelected] = useState<EntityPoint | null>(null);
   const [waving, setWaving] = useState<string | null>(null);
-  const [activeTopic, setActiveTopic] = useState<string | null>(null);
   const mapRef = useRef<MapView>(null);
   const { unreadCount: interactionUnread } = useReceivedInteractions();
 
   const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
   const zoom = useMemo(() => (region ? approxZoomFromRegion(region) : 12), [region]);
 
-  const { topics: trendingTopics } = useTrendingNearby();
-  const { data, loading, error, refresh } = useDiscovery({ viewport, zoom, topic: activeTopic });
+  const { data, loading, error, refresh } = useDiscovery({ viewport, zoom });
 
   const points = data?.points ?? EMPTY_POINTS;
 
-  // Challenge + optional streak stack at top; filters sit below both.
+  // Challenge + optional streak stack at top; interactions badge sits below both.
   const topStackHeight =
     insets.top + 8 + CHALLENGE_CARD_HEIGHT + 8 + NUDGE_CARD_HEIGHT + 8;
-  const filterTopOffset = selected ? insets.top + 8 : topStackHeight;
-
-  const onSelectTopic = useCallback((topic: string | null) => {
-    setActiveTopic(topic);
-    track('trending.filter', { topic: topic ?? 'cleared' });
-  }, []);
+  const badgeTop = selected ? insets.top + 8 : topStackHeight;
 
   const onCloseSheet = useCallback(() => {
     setSelected(null);
@@ -247,6 +238,8 @@ export function MapScreen(): React.JSX.Element {
           style={StyleSheet.absoluteFill}
           showsUserLocation
           showsMyLocationButton={false}
+          showsCompass={false}
+          toolbarEnabled={false}
           onRegionChangeComplete={setRegion}
           initialRegion={{
             latitude: 43.21,
@@ -277,19 +270,13 @@ export function MapScreen(): React.JSX.Element {
         </View>
       )}
 
-      {/* Challenge max top; streak/achievements under it; stories on Pulse only. */}
+      {/* Challenge max top; streak under it; stories on Pulse only. */}
       {!selected && <DailyChallengeCard />}
       {!selected && <NudgeBanner />}
 
-      <TrendingFilterBar
-        topics={trendingTopics}
-        activeTopic={activeTopic}
-        onSelect={onSelectTopic}
-        topOffset={filterTopOffset}
-      />
       {/* Interactions entry — people who waved / reacted */}
       <TouchableOpacity
-        style={[styles.interactionBadge, { top: filterTopOffset }]}
+        style={[styles.interactionBadge, { top: badgeTop }]}
         onPress={() => navigation.navigate('Interactions')}
         activeOpacity={0.85}
       >
