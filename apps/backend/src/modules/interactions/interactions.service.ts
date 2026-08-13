@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -20,6 +21,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { ChallengesService } from '../challenges/challenges.service';
 import { AchievementsService } from '../achievements/achievements.service';
+import { BlocksService } from '../blocks/blocks.service';
 
 @Injectable()
 export class InteractionsService {
@@ -33,21 +35,31 @@ export class InteractionsService {
     private readonly gamification: GamificationService,
     private readonly challenges: ChallengesService,
     private readonly achievements: AchievementsService,
+    private readonly blocks: BlocksService,
   ) {}
 
   /**
    * Wave flow:
    *   1. Validate target exists and isn't self.
-   *   2. Check cooldown window.
-   *   3. If target has an OUTSTANDING wave to me → reciprocal. Open a conversation.
-   *   4. Otherwise → insert wave row.
-   *   5. Emit socket event to recipient (push fallback if offline).
+   *   2. Reject if either user has blocked the other (symmetric).
+   *   3. Check cooldown window.
+   *   4. If target has an OUTSTANDING wave to me → reciprocal. Open a conversation.
+   *   5. Otherwise → insert wave row.
+   *   6. Emit socket event to recipient (push fallback if offline).
    *
    * Runs in a single transaction so partial state never escapes.
    */
   async wave(fromUserId: string, req: WaveRequest): Promise<WaveResponse> {
     if (fromUserId === req.toUserId) {
       throw new BadRequestException({ code: 'wave.self', message: 'Cannot wave to yourself' });
+    }
+
+    // Symmetric block — either direction suppresses waves (mirrors gifts/messaging).
+    if (await this.blocks.isBlocked(fromUserId, req.toUserId)) {
+      throw new ForbiddenException({
+        code: 'wave.blocked',
+        message: 'You cannot wave at this user.',
+      });
     }
 
     // Fetch sender for hydrated notification — single lookup, outside the tx.
