@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { getDataSourceToken } from '@nestjs/typeorm';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
 import { InteractionsService } from './interactions.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
@@ -9,6 +9,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { ChallengesService } from '../challenges/challenges.service';
 import { AchievementsService } from '../achievements/achievements.service';
+import { BlocksService } from '../blocks/blocks.service';
 
 describe('InteractionsService', () => {
   let service: InteractionsService;
@@ -20,6 +21,8 @@ describe('InteractionsService', () => {
   let award: jest.Mock;
   let increment: jest.Mock;
   let evaluate: jest.Mock;
+  let isBlocked: jest.Mock;
+  let transaction: jest.Mock;
 
   const SENDER = { display_name: 'Me', avatar_url: null, verification_level: 'email' };
 
@@ -27,7 +30,7 @@ describe('InteractionsService', () => {
     // Sender lookup succeeds by default (overridden in the sender-missing test).
     query = jest.fn().mockResolvedValue([SENDER]);
     txQuery = jest.fn().mockResolvedValue([]);
-    const transaction = jest.fn(async (cb: (tx: { query: jest.Mock }) => unknown) =>
+    transaction = jest.fn(async (cb: (tx: { query: jest.Mock }) => unknown) =>
       cb({ query: txQuery }),
     );
 
@@ -37,6 +40,7 @@ describe('InteractionsService', () => {
     award = jest.fn().mockResolvedValue(undefined);
     increment = jest.fn().mockResolvedValue(undefined);
     evaluate = jest.fn().mockResolvedValue(undefined);
+    isBlocked = jest.fn().mockResolvedValue(false);
 
     const mod = await Test.createTestingModule({
       providers: [
@@ -50,6 +54,7 @@ describe('InteractionsService', () => {
         { provide: GamificationService, useValue: { award } },
         { provide: ChallengesService, useValue: { increment } },
         { provide: AchievementsService, useValue: { evaluate } },
+        { provide: BlocksService, useValue: { isBlocked } },
       ],
     }).compile();
     service = mod.get(InteractionsService);
@@ -63,6 +68,17 @@ describe('InteractionsService', () => {
         BadRequestException,
       );
       expect(query).not.toHaveBeenCalled();
+    });
+
+    it('rejects when either side has blocked the other (symmetric)', async () => {
+      isBlocked.mockResolvedValueOnce(true);
+      await expect(service.wave('me', { toUserId: 'target' })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(isBlocked).toHaveBeenCalledWith('me', 'target');
+      // No sender lookup / transaction when blocked.
+      expect(query).not.toHaveBeenCalled();
+      expect(transaction).not.toHaveBeenCalled();
     });
 
     it('throws NotFound when the sender no longer exists', async () => {
