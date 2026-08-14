@@ -2,9 +2,10 @@
 // Returns publicUrl + mediaType for POST /stories.
 //
 // Photos: base64 JSON (includeBase64 works; same path as profile photos).
-// Videos: multipart FormData — image-picker never returns base64 for video
-// (docs: "PHOTO ONLY"). RN FormData streams the local uri without fetch()
-// which fails on Android content:// / file:// ("Network request failed").
+// Videos: multipart FormData via fetch — image-picker never returns base64
+// for video (docs: "PHOTO ONLY"). Avoid axios for FormData on Android:
+// default Content-Type / bare multipart/form-data → Network Error before
+// the request leaves the device. RN fetch sets the boundary correctly.
 
 import { Alert } from 'react-native';
 import {
@@ -17,7 +18,9 @@ import {
 
 import { STORY_LIMITS } from '@g88/shared';
 
-import { api, postJson } from '@/api/client';
+import { postJson } from '@/api/client';
+import { tokenStore } from '@/api/tokenStore';
+import { Config } from '@/config';
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime']);
@@ -82,37 +85,64 @@ async function uploadVideoMultipart(
     throw new Error('Could not read the video. Try again or pick from Library.');
   }
 
+  const token = await tokenStore.getAccessToken();
+  if (!token) {
+    throw new Error('Not signed in — sign in again and retry.');
+  }
+
   const form = new FormData();
-  // RN FormData file shape — streams from disk; do not fetch(uri).
+  // RN FormData file shape — streams from disk; do not fetch(uri) into JS.
   form.append('file', {
     uri: asset.uri,
     type: contentType,
     name: asset.fileName ?? guessVideoName(contentType),
   } as unknown as Blob);
 
-  const res = await api.post<{ publicUrl: string; mediaType: 'image' | 'video' }>(
-    '/stories/media/upload',
-    form,
-    {
-      timeout: 120_000,
-      // Let axios set multipart boundary; do not force application/json.
-      headers: { 'Content-Type': 'multipart/form-data' },
-      transformRequest: [
-        (data, headers) => {
-          // axios instance defaults Content-Type: application/json — strip so
-          // the runtime sets multipart/form-data; boundary=...
-          if (headers && typeof headers === 'object') {
-            const h = headers as Record<string, unknown>;
-            delete h['Content-Type'];
-            delete h['content-type'];
-          }
-          return data;
-        },
-      ],
-    },
-  );
+  // fetch — not axios. Do NOT set Content-Type; RN must attach the boundary.
+  const url = `${Config.API_BASE_URL}/api/v1/stories/media/upload`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 120_000);
 
-  return { mediaUrl: res.data.publicUrl, mediaType: res.data.mediaType };
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+      body: form,
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error('Upload timed out. Try a shorter clip.');
+    }
+    const msg = e instanceof Error ? e.message : 'Network request failed';
+    throw new Error(`Video upload failed (${msg}). Check connection and try again.`);
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const text = await response.text();
+  let body: { publicUrl?: string; mediaType?: 'image' | 'video'; message?: string; code?: string } =
+    {};
+  try {
+    body = text ? (JSON.parse(text) as typeof body) : {};
+  } catch {
+    // non-JSON error page
+  }
+
+  if (!response.ok) {
+    const detail = body.message ?? body.code ?? text.slice(0, 120) ?? response.statusText;
+    throw new Error(`Upload failed (${response.status}): ${detail}`);
+  }
+
+  if (!body.publicUrl || !body.mediaType) {
+    throw new Error('Upload succeeded but server returned an incomplete response.');
+  }
+
+  return { mediaUrl: body.publicUrl, mediaType: body.mediaType };
 }
 
 function guessVideoName(contentType: string): string {
@@ -154,7 +184,7 @@ async function pickAsset(source: Source): Promise<Asset | null> {
     mediaType: 'video',
     videoQuality: 'low',
     durationLimit: STORY_LIMITS.videoMaxSeconds,
-    includeBase64: false, // never returned for video anyway
+    includeBase64: false,
     saveToPhotos: false,
   };
 
