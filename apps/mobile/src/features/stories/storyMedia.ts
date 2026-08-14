@@ -5,8 +5,11 @@
 // Videos: image-picker never returns base64 (PHOTO ONLY). fetch/XHR cannot
 // read Android content:// or many file:// paths → Network / "could not read".
 // Use react-native-blob-util (ContentResolver-backed) → base64 → same endpoint.
+//
+// Android: if CAMERA is declared in the app manifest, image-picker requires
+// the host to request the runtime permission before launchCamera.
 
-import { Alert, Platform } from 'react-native';
+import { Alert, PermissionsAndroid, Platform } from 'react-native';
 import {
   launchCamera,
   launchImageLibrary,
@@ -132,7 +135,6 @@ function uniquePaths(paths: Array<string | undefined | null>): string[] {
   const seen = new Set<string>();
   for (const p of paths) {
     if (!p) continue;
-    // blob-util accepts content:// as-is; file:// should drop the scheme for some APIs
     const normalized = p.startsWith('file://') ? p.replace('file://', '') : p;
     if (seen.has(normalized)) continue;
     seen.add(normalized);
@@ -154,7 +156,59 @@ function chooseSource(): Promise<Source | null> {
   });
 }
 
+/**
+ * image-picker rule: if CAMERA is in the app manifest, the host must request
+ * the runtime permission before launchCamera or it throws a hard error.
+ */
+async function ensureCameraPermission(forVideo: boolean): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  const needed = [PermissionsAndroid.PERMISSIONS.CAMERA];
+  if (forVideo) {
+    needed.push(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+  }
+
+  const results = await PermissionsAndroid.requestMultiple(needed);
+  const denied = needed.filter(
+    (p) => results[p] !== PermissionsAndroid.RESULTS.GRANTED,
+  );
+  if (denied.length > 0) {
+    throw new Error(
+      forVideo
+        ? 'Camera and microphone permission are required to record a story video.'
+        : 'Camera permission is required to take a story photo.',
+    );
+  }
+}
+
+async function ensureLibraryPermission(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  // Android 13+ granular media; older uses READ_EXTERNAL_STORAGE (maxSdk 32 in manifest).
+  const api = typeof Platform.Version === 'number' ? Platform.Version : 0;
+  if (api >= 33) {
+    const results = await PermissionsAndroid.requestMultiple([
+      PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
+      PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO,
+    ]);
+    const ok =
+      results[PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES] ===
+        PermissionsAndroid.RESULTS.GRANTED ||
+      results[PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO] ===
+        PermissionsAndroid.RESULTS.GRANTED;
+    if (!ok) {
+      throw new Error('Media library permission is required to pick a story.');
+    }
+  }
+}
+
 async function pickAsset(source: Source): Promise<Asset | null> {
+  if (source === 'library') {
+    await ensureLibraryPermission();
+  } else {
+    await ensureCameraPermission(source === 'camera_video');
+  }
+
   const libraryOpts: ImageLibraryOptions = {
     mediaType: 'mixed',
     selectionLimit: 1,
