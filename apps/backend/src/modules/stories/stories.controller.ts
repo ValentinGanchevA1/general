@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,9 +10,13 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
+import { memoryStorage } from 'multer';
 
 import type {
   CreateStoryResponse,
@@ -51,7 +56,7 @@ export class StoriesController {
 
   /**
    * POST /api/v1/stories/media/base64 — upload story media via base64 JSON.
-   * Preferred mobile path (Android cannot fetch(local video uri)).
+   * Preferred mobile path for photos (Android cannot fetch(local video uri)).
    */
   @Post('media/base64')
   @HttpCode(HttpStatus.OK)
@@ -61,6 +66,33 @@ export class StoriesController {
     @Body() dto: UploadStoryBase64Dto,
   ): Promise<{ publicUrl: string; mediaType: 'image' | 'video' }> {
     return this.stories.uploadMediaBase64(userId, dto);
+  }
+
+  /**
+   * POST /api/v1/stories/media/upload — multipart file upload (video preferred).
+   * RN image-picker does not return base64 for video; FormData streams the file.
+   */
+  @Post('media/upload')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 18 * 1024 * 1024 },
+    }),
+  )
+  uploadMediaFile(
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ): Promise<{ publicUrl: string; mediaType: 'image' | 'video' }> {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException({
+        code: 'story.media_invalid',
+        message: 'No media file received.',
+      });
+    }
+    const contentType = (file.mimetype || '').toLowerCase();
+    return this.stories.uploadMediaBuffer(userId, file.buffer, contentType);
   }
 
   /** POST /api/v1/stories — create a 24h story after media is uploaded. */

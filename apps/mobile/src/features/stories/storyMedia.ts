@@ -1,11 +1,10 @@
-// Pick story photo or video and upload via base64 JSON → Nest → S3.
+// Pick story photo or video and upload to Nest → S3.
 // Returns publicUrl + mediaType for POST /stories.
 //
-// Why not presigned PUT + fetch(local uri)?
-// React Native Android fails fetch(content://...) / fetch(file://...) with
-// "Network request failed" — same class of bug that forced photos to
-// POST /users/me/photos/base64. Short clips (≤15s, low quality) stay under
-// the Nest JSON body limit.
+// Photos: base64 JSON (includeBase64 works; same path as profile photos).
+// Videos: multipart FormData — image-picker never returns base64 for video
+// (docs: "PHOTO ONLY"). RN FormData streams the local uri without fetch()
+// which fails on Android content:// / file:// ("Network request failed").
 
 import { Alert } from 'react-native';
 import {
@@ -18,7 +17,7 @@ import {
 
 import { STORY_LIMITS } from '@g88/shared';
 
-import { postJson } from '@/api/client';
+import { api, postJson } from '@/api/client';
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime']);
@@ -29,9 +28,8 @@ export type StoryPresignFn = (contentType: string) => Promise<{
 }>;
 
 /**
- * Shows source chooser, picks media, uploads base64 to backend, returns create fields.
- * `getPresign` is accepted for API compatibility with StoryCreateSheet but unused —
- * media goes through POST /stories/media/base64 instead of client S3 PUT.
+ * Shows source chooser, picks media, uploads, returns create fields.
+ * `getPresign` kept for StoryCreateSheet API compatibility (unused).
  */
 export async function pickAndUploadStoryMedia(
   _getPresign?: StoryPresignFn,
@@ -47,14 +45,19 @@ export async function pickAndUploadStoryMedia(
     assertVideoDuration(asset);
   }
 
-  if (!asset.base64) {
-    throw new Error(
-      classified.mediaType === 'video'
-        ? 'Could not read the video data. Try a shorter clip or pick from Library.'
-        : 'Could not read the image data — please try another photo',
-    );
+  if (classified.mediaType === 'video') {
+    return uploadVideoMultipart(asset, classified.contentType);
   }
+  return uploadImageBase64(asset, classified.contentType);
+}
 
+async function uploadImageBase64(
+  asset: Asset,
+  contentType: string,
+): Promise<{ mediaUrl: string; mediaType: 'image' | 'video' }> {
+  if (!asset.base64) {
+    throw new Error('Could not read the image data — please try another photo');
+  }
   const approxBytes = Math.floor((asset.base64.length * 3) / 4);
   if (approxBytes > 18 * 1024 * 1024) {
     throw new Error('Media is too large. Use a shorter clip or lower quality.');
@@ -65,11 +68,55 @@ export async function pickAndUploadStoryMedia(
     { publicUrl: string; mediaType: 'image' | 'video' }
   >(
     '/stories/media/base64',
-    { data: asset.base64, contentType: classified.contentType },
+    { data: asset.base64, contentType },
     { timeout: 120_000 },
   );
-
   return { mediaUrl: res.publicUrl, mediaType: res.mediaType };
+}
+
+async function uploadVideoMultipart(
+  asset: Asset,
+  contentType: string,
+): Promise<{ mediaUrl: string; mediaType: 'image' | 'video' }> {
+  if (!asset.uri) {
+    throw new Error('Could not read the video. Try again or pick from Library.');
+  }
+
+  const form = new FormData();
+  // RN FormData file shape — streams from disk; do not fetch(uri).
+  form.append('file', {
+    uri: asset.uri,
+    type: contentType,
+    name: asset.fileName ?? guessVideoName(contentType),
+  } as unknown as Blob);
+
+  const res = await api.post<{ publicUrl: string; mediaType: 'image' | 'video' }>(
+    '/stories/media/upload',
+    form,
+    {
+      timeout: 120_000,
+      // Let axios set multipart boundary; do not force application/json.
+      headers: { 'Content-Type': 'multipart/form-data' },
+      transformRequest: [
+        (data, headers) => {
+          // axios instance defaults Content-Type: application/json — strip so
+          // the runtime sets multipart/form-data; boundary=...
+          if (headers && typeof headers === 'object') {
+            const h = headers as Record<string, unknown>;
+            delete h['Content-Type'];
+            delete h['content-type'];
+          }
+          return data;
+        },
+      ],
+    },
+  );
+
+  return { mediaUrl: res.data.publicUrl, mediaType: res.data.mediaType };
+}
+
+function guessVideoName(contentType: string): string {
+  return contentType === 'video/quicktime' ? 'story.mov' : 'story.mp4';
 }
 
 type Source = 'library' | 'camera_photo' | 'camera_video';
@@ -107,7 +154,7 @@ async function pickAsset(source: Source): Promise<Asset | null> {
     mediaType: 'video',
     videoQuality: 'low',
     durationLimit: STORY_LIMITS.videoMaxSeconds,
-    includeBase64: true,
+    includeBase64: false, // never returned for video anyway
     saveToPhotos: false,
   };
 
