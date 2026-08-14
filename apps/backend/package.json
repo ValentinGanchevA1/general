@@ -3,19 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=22.13"
+    "node": ">=20"
   },
   "scripts": {
-    "dev": "nest start --watch",
     "build": "nest build",
-    "start": "node -r tsconfig-paths/register dist/main",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts --fix",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
-    "migration:run": "node --env-file-if-exists=../../.env scripts/migrate.js",
-    "migration:check-prefixes": "node scripts/check-migration-prefixes.mjs",
-    "migration:check-schema": "node scripts/check-schema-migrations.mjs",
-    "seed": "node --env-file-if-exists=../../.env scripts/seed.js"
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "typecheck": "tsc --noEmit",
+    "migration:run": "node ./scripts/migrate.js"
   },
   "dependencies": {
     "@aws-sdk/client-rekognition": "^3.1075.0",
@@ -36,38 +36,35 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "dotenv": "^16.4.5",
-    "firebase-admin": "^12.0.0",
-    "google-auth-library": "^10.9.0",
     "h3-js": "^4.1.0",
-    "helmet": "^8.2.0",
-    "ioredis": "^5.11.1",
+    "helmet": "^8.0.0",
+    "ioredis": "^5.4.1",
+    "multer": "1.4.5-lts.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
-    "pg": "^8.22.0",
+    "pg": "^8.13.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "socket.io": "^4.7.5",
-    "stripe": "^17.5.0",
-    "twilio": "^5.3.0",
-    "typeorm": "^0.3.20"
+    "socket.io": "^4.8.1",
+    "twilio": "^5.3.5",
+    "typeorm": "^0.3.20",
+    "uuid": "^11.0.3"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.5",
     "@nestjs/schematics": "^10.1.4",
     "@nestjs/testing": "^11.1.27",
-    "@types/bcrypt": "^6.0.0",
+    "@types/bcrypt": "^5.0.2",
     "@types/express": "^5.0.6",
     "@types/jest": "^29.5.14",
-    "@types/node": "^22.0.0",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^22.10.1",
     "@types/passport-jwt": "^4.0.1",
-    "@typescript-eslint/eslint-plugin": "^7.18.0",
-    "@typescript-eslint/parser": "^7.18.0",
+    "@types/uuid": "^10.0.0",
     "eslint": "^8.57.1",
     "jest": "^29.7.0",
-    "ts-jest": "^29.4.11",
-    "ts-loader": "^9.6.2",
-    "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.5.4",
-    "webpack-node-externals": "^3.0.0"
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
   }
 }
