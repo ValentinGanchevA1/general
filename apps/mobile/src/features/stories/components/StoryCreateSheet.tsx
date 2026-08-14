@@ -18,14 +18,16 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   location: { lat: number; lng: number } | null;
-  pickAndUpload: (presign: {
-    uploadUrl: string;
-    publicUrl: string;
-    contentType: string;
-  }) => Promise<{ mediaUrl: string; mediaType: 'image' | 'video' } | null>;
+  /** Pick media first, then call getPresign(contentType) for the real type. */
+  pickAndUpload: (
+    getPresign: (contentType: string) => Promise<{
+      uploadUrl: string;
+      publicUrl: string;
+    }>,
+  ) => Promise<{ mediaUrl: string; mediaType: 'image' | 'video' } | null>;
 }
 
-/** Create sheet: caption + post. Media pick/upload injected by host. */
+/** Create sheet: caption + pick photo/video + post. */
 export function StoryCreateSheet({
   visible,
   onClose,
@@ -44,12 +46,8 @@ export function StoryCreateSheet({
       return;
     }
     try {
-      const contentType = 'image/jpeg';
-      const presign = await dispatch(presignStory({ contentType })).unwrap();
-      const uploaded = await pickAndUpload({
-        uploadUrl: presign.uploadUrl,
-        publicUrl: presign.publicUrl,
-        contentType,
+      const uploaded = await pickAndUpload(async (contentType) => {
+        return dispatch(presignStory({ contentType })).unwrap();
       });
       if (!uploaded) {
         setError('Upload cancelled');
@@ -67,19 +65,7 @@ export function StoryCreateSheet({
       setCaption('');
       onClose();
     } catch (e) {
-      // RTK unwrap / ApiError are plain objects, not always Error instances.
-      const msg =
-        (typeof e === 'object' &&
-          e !== null &&
-          'payload' in e &&
-          typeof (e as { payload: unknown }).payload === 'string' &&
-          (e as { payload: string }).payload) ||
-        (typeof e === 'object' &&
-          e !== null &&
-          'message' in e &&
-          typeof (e as { message: unknown }).message === 'string' &&
-          (e as { message: string }).message) ||
-        (e instanceof Error ? e.message : null);
+      const msg = extractErrorMessage(e);
       setError(msg && msg !== 'Rejected' ? msg : 'Failed to post');
     }
   };
@@ -89,7 +75,9 @@ export function StoryCreateSheet({
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <Text style={styles.title}>New story</Text>
-          <Text style={styles.hint}>Visible to people nearby · disappears in 24h</Text>
+          <Text style={styles.hint}>
+            Photo or video (max {STORY_LIMITS.videoMaxSeconds}s) · nearby · 24h
+          </Text>
           <TextInput
             style={styles.caption}
             placeholder="Add a caption (optional)"
@@ -120,6 +108,17 @@ export function StoryCreateSheet({
       </View>
     </Modal>
   );
+}
+
+function extractErrorMessage(e: unknown): string | null {
+  if (typeof e === 'string' && e.trim()) return e;
+  if (e && typeof e === 'object') {
+    const o = e as { payload?: unknown; message?: unknown };
+    if (typeof o.payload === 'string' && o.payload.trim()) return o.payload;
+    if (typeof o.message === 'string' && o.message.trim()) return o.message;
+  }
+  if (e instanceof Error && e.message) return e.message;
+  return null;
 }
 
 const styles = StyleSheet.create({

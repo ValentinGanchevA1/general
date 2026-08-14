@@ -10,12 +10,15 @@ import {
 } from 'react-native';
 
 import type { StoryCard, StoryReactionKind } from '@g88/shared';
+import { STORY_LIMITS } from '@g88/shared';
 
 import { useAppDispatch } from '@/hooks/redux';
 import { reactToStory, recordStoryView } from '../storiesSlice';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
-const PROGRESS_MS = 5_000;
+const IMAGE_PROGRESS_MS = 5_000;
+/** Until react-native-video is wired, advance video stories on a fixed timer. */
+const VIDEO_PROGRESS_MS = Math.min(STORY_LIMITS.videoMaxSeconds, 15) * 1_000;
 
 interface Props {
   stories: StoryCard[];
@@ -32,6 +35,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   const current = stories[index];
 
   const storyId = current?.id;
+  const mediaType = current?.mediaType;
 
   useEffect(() => {
     if (!visible) return;
@@ -45,14 +49,15 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
     if (!visible || !storyId) return;
     void dispatch(recordStoryView(storyId));
     if (timer.current) clearTimeout(timer.current);
+    const ms = mediaType === 'video' ? VIDEO_PROGRESS_MS : IMAGE_PROGRESS_MS;
     timer.current = setTimeout(() => {
       if (index < stories.length - 1) setIndex((i) => i + 1);
       else onClose();
-    }, PROGRESS_MS);
+    }, ms);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [visible, storyId, index, stories.length, dispatch, onClose]);
+  }, [visible, storyId, index, stories.length, dispatch, onClose, mediaType]);
 
   if (!current) return null;
 
@@ -97,7 +102,8 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
             <Image source={{ uri: current.mediaUrl }} style={styles.media} resizeMode="cover" />
           ) : (
             <View style={[styles.media, styles.videoPlaceholder]}>
-              <Text style={styles.videoLabel}>Video</Text>
+              <Text style={styles.videoLabel}>▶ Video</Text>
+              <Text style={styles.videoHint}>Playback player ships next</Text>
             </View>
           )}
         </View>
@@ -157,7 +163,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  videoLabel: { color: '#aaa' },
+  videoLabel: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  videoHint: { color: '#888', fontSize: 12, marginTop: 8 },
   tapLeft: {
     position: 'absolute',
     left: 0,
