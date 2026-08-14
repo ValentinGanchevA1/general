@@ -57,7 +57,7 @@ async function bootstrap(): Promise<void> {
 
   // Raise the JSON limit above the 100 KB default so the mobile base64 photo
   // upload (POST /users/me/photos/base64, ~10 MB image → ~13.5 MB base64) fits.
-  app.useBodyParser('json', { limit: '15mb' });
+  app.useBodyParser('json', { limit: '25mb' }); // story video base64 (15s) + photos
 
   app.use(helmet());
 

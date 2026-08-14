@@ -30,6 +30,7 @@ import {
   NearbyStoriesDto,
   PresignStoryDto,
   ReactStoryDto,
+  UploadStoryBase64Dto,
 } from './dto';
 
 @Controller('stories')
@@ -46,6 +47,20 @@ export class StoriesController {
     @Body() dto: PresignStoryDto,
   ): Promise<StoryPresignResponse> {
     return this.stories.presign(userId, dto);
+  }
+
+  /**
+   * POST /api/v1/stories/media/base64 — upload story media via base64 JSON.
+   * Preferred mobile path (Android cannot fetch(local video uri)).
+   */
+  @Post('media/base64')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  uploadMediaBase64(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UploadStoryBase64Dto,
+  ): Promise<{ publicUrl: string; mediaType: 'image' | 'video' }> {
+    return this.stories.uploadMediaBase64(userId, dto);
   }
 
   /** POST /api/v1/stories — create a 24h story after media is uploaded. */
