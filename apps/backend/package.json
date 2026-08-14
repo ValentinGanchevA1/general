@@ -13,6 +13,8 @@
     "lint": "eslint src --ext .ts --fix",
     "test": "jest",
     "migration:run": "node --env-file-if-exists=../../.env scripts/migrate.js",
+    "migration:check-prefixes": "node scripts/check-migration-prefixes.mjs",
+    "migration:check-schema": "node scripts/check-schema-migrations.mjs",
     "seed": "node --env-file-if-exists=../../.env scripts/seed.js"
   },
   "dependencies": {
