@@ -29,7 +29,7 @@ import {
 import { S3Service } from '../../common/s3.service';
 import { REDIS_CLIENT } from '../../config/redis.provider';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
-import { CreateStoryDto, NearbyStoriesDto, PresignStoryDto } from './dto';
+import { CreateStoryDto, NearbyStoriesDto, PresignStoryDto, UploadStoryBase64Dto } from './dto';
 
 /** Matches S3 presigned URL lifetime in S3Service.presignStory (300s). */
 const PRESIGN_TTL_SECONDS = 300;
@@ -69,8 +69,6 @@ export class StoriesService {
   ): Promise<{ uploadUrl: string; publicUrl: string }> {
     await this.assertCanPost(userId);
     const result = await this.s3.storyPresignedUrl(userId, dto.contentType);
-    // Bind this publicUrl to the user for PRESIGN_TTL_SECONDS so create() can
-    // reject arbitrary external mediaUrl values that skip the upload path.
     await this.redis.set(
       this.presignRedisKey(userId, result.publicUrl),
       result.publicUrl,
@@ -78,6 +76,55 @@ export class StoriesService {
       PRESIGN_TTL_SECONDS,
     );
     return result;
+  }
+
+  /**
+   * Mobile-safe media upload: base64 JSON → S3 (stories/{userId}/…).
+   * Binds Redis token so create() accepts the returned publicUrl.
+   * Prefer this over client presigned PUT — RN cannot reliably read local
+   * video URIs on Android (fetch → Network request failed).
+   */
+  async uploadMediaBase64(
+    userId: string,
+    dto: UploadStoryBase64Dto,
+  ): Promise<{ publicUrl: string; mediaType: 'image' | 'video' }> {
+    await this.assertCanPost(userId);
+
+    let buf: Buffer;
+    try {
+      buf = Buffer.from(dto.data, 'base64');
+    } catch {
+      throw new BadRequestException({
+        code: 'story.media_invalid',
+        message: 'Media data is not valid base64.',
+      });
+    }
+    if (buf.length === 0) {
+      throw new BadRequestException({
+        code: 'story.media_invalid',
+        message: 'Media data is empty.',
+      });
+    }
+    const maxBytes = 18 * 1024 * 1024;
+    if (buf.length > maxBytes) {
+      throw new BadRequestException({
+        code: 'story.media_too_large',
+        message: 'Media is too large. Use a shorter clip or lower quality.',
+      });
+    }
+
+    const publicUrl = await this.s3.uploadStoryBuffer(userId, buf, dto.contentType);
+    await this.redis.set(
+      this.presignRedisKey(userId, publicUrl),
+      publicUrl,
+      'EX',
+      PRESIGN_TTL_SECONDS,
+    );
+
+    const mediaType: 'image' | 'video' = dto.contentType.startsWith('video/')
+      ? 'video'
+      : 'image';
+    return { publicUrl, mediaType };
   }
 
   async create(userId: string, dto: CreateStoryDto): Promise<StoryCard> {
@@ -368,11 +415,6 @@ export class StoriesService {
     return rows.map((r) => this.toCard(r));
   }
 
-  /**
-   * mediaUrl must (1) path under stories/{userId}/ and (2) match a live
-   * Redis token issued by presign() within PRESIGN_TTL_SECONDS. Token is
-   * single-use (deleted on successful check) so a URL cannot be reused.
-   */
   private async assertMediaUrlFromPresign(userId: string, mediaUrl: string): Promise<void> {
     let path: string;
     try {
