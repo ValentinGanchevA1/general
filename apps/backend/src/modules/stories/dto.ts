@@ -73,3 +73,12 @@ export class ReactStoryDto {
   @IsIn(['heart', 'wave'])
   kind!: 'heart' | 'wave';
 }
+
+export class UploadStoryBase64Dto {
+  /** Raw base64 payload (no data: prefix). */
+  @IsString()
+  data!: string;
+
+  @IsIn(['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/quicktime'])
+  contentType!: string;
+}
