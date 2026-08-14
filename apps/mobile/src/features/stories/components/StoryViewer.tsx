@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import Video, { type OnLoadData } from 'react-native-video';
 
 import type { StoryCard, StoryReactionKind } from '@g88/shared';
 import { STORY_LIMITS } from '@g88/shared';
@@ -17,8 +18,8 @@ import { reactToStory, recordStoryView } from '../storiesSlice';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const IMAGE_PROGRESS_MS = 5_000;
-/** Until react-native-video is wired, advance video stories on a fixed timer. */
-const VIDEO_PROGRESS_MS = Math.min(STORY_LIMITS.videoMaxSeconds, 15) * 1_000;
+/** Safety cap if onEnd never fires (corrupt/remote failure). */
+const VIDEO_SAFETY_MS = (STORY_LIMITS.videoMaxSeconds + 3) * 1_000;
 
 interface Props {
   stories: StoryCard[];
@@ -37,9 +38,17 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   const storyId = current?.id;
   const mediaType = current?.mediaType;
 
+  const goNext = () => {
+    if (index < stories.length - 1) setIndex((i) => i + 1);
+    else onClose();
+  };
+
+  const goPrev = () => {
+    if (index > 0) setIndex((i) => i - 1);
+  };
+
   useEffect(() => {
     if (!visible) return;
-    // Defer setState out of the effect body (CI --max-warnings 0 / set-state-in-effect).
     void Promise.resolve().then(() => {
       setIndex(initialIndex);
     });
@@ -49,20 +58,35 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
     if (!visible || !storyId) return;
     void dispatch(recordStoryView(storyId));
     if (timer.current) clearTimeout(timer.current);
-    const ms = mediaType === 'video' ? VIDEO_PROGRESS_MS : IMAGE_PROGRESS_MS;
-    timer.current = setTimeout(() => {
-      if (index < stories.length - 1) setIndex((i) => i + 1);
-      else onClose();
-    }, ms);
+
+    // Images: fixed dwell. Videos: advance on onEnd; safety timer as backup.
+    const ms = mediaType === 'video' ? VIDEO_SAFETY_MS : IMAGE_PROGRESS_MS;
+    timer.current = setTimeout(goNext, ms);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- goNext closes over index
   }, [visible, storyId, index, stories.length, dispatch, onClose, mediaType]);
 
   if (!current) return null;
 
   const onReact = (kind: StoryReactionKind) => {
     void dispatch(reactToStory({ storyId: current.id, kind }));
+  };
+
+  const onVideoEnd = () => {
+    if (timer.current) clearTimeout(timer.current);
+    goNext();
+  };
+
+  const onVideoLoad = (data: OnLoadData) => {
+    // Tighten safety timer to actual duration + 1s when metadata is available.
+    if (timer.current) clearTimeout(timer.current);
+    const durationMs = Math.min(
+      Math.ceil((data.duration || STORY_LIMITS.videoMaxSeconds) * 1000) + 1_000,
+      VIDEO_SAFETY_MS,
+    );
+    timer.current = setTimeout(goNext, durationMs);
   };
 
   return (
@@ -88,23 +112,31 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
           </Pressable>
         </View>
         <View style={styles.mediaWrap}>
-          <Pressable
-            style={styles.tapLeft}
-            onPress={() => (index > 0 ? setIndex(index - 1) : undefined)}
-          />
-          <Pressable
-            style={styles.tapRight}
-            onPress={() =>
-              index < stories.length - 1 ? setIndex(index + 1) : onClose()
-            }
-          />
+          <Pressable style={styles.tapLeft} onPress={goPrev} />
+          <Pressable style={styles.tapRight} onPress={goNext} />
           {current.mediaType === 'image' ? (
             <Image source={{ uri: current.mediaUrl }} style={styles.media} resizeMode="cover" />
           ) : (
-            <View style={[styles.media, styles.videoPlaceholder]}>
-              <Text style={styles.videoLabel}>▶ Video</Text>
-              <Text style={styles.videoHint}>Playback player ships next</Text>
-            </View>
+            <Video
+              key={current.id}
+              source={{ uri: current.mediaUrl }}
+              style={styles.media}
+              resizeMode="cover"
+              controls={false}
+              muted={false}
+              repeat={false}
+              paused={!visible}
+              playInBackground={false}
+              playWhenInactive={false}
+              ignoreSilentSwitch="ignore"
+              onEnd={onVideoEnd}
+              onLoad={onVideoLoad}
+              onError={() => {
+                // Still advance so the strip isn't stuck on a broken clip.
+                if (timer.current) clearTimeout(timer.current);
+                timer.current = setTimeout(goNext, 1_500);
+              }}
+            />
           )}
         </View>
         {current.caption ? (
@@ -158,13 +190,6 @@ const styles = StyleSheet.create({
   close: { color: '#fff', fontSize: 18 },
   mediaWrap: { flex: 1, justifyContent: 'center' },
   media: { width: SCREEN_W, height: SCREEN_H * 0.65 },
-  videoPlaceholder: {
-    backgroundColor: '#222',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  videoLabel: { color: '#fff', fontSize: 18, fontWeight: '600' },
-  videoHint: { color: '#888', fontSize: 12, marginTop: 8 },
   tapLeft: {
     position: 'absolute',
     left: 0,
