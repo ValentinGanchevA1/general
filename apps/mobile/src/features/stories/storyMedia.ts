@@ -1,4 +1,4 @@
- // Pick story photo or video and PUT to a presigned S3 URL.
+// Pick story photo or video and PUT to a presigned S3 URL.
 // Returns publicUrl + mediaType for POST /stories.
 //
 // Flow: pick first (so content-type is known) → caller presigns → we upload.
