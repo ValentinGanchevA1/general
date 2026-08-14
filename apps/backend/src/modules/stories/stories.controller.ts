@@ -16,7 +16,6 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
-import { memoryStorage } from 'multer';
 
 import type {
   CreateStoryResponse,
@@ -37,6 +36,12 @@ import {
   ReactStoryDto,
   UploadStoryBase64Dto,
 } from './dto';
+
+/** Minimal shape from FileInterceptor (memory storage) — avoids multer types. */
+interface UploadedMediaFile {
+  buffer: Buffer;
+  mimetype?: string;
+}
 
 @Controller('stories')
 @UseGuards(JwtAuthGuard)
@@ -71,19 +76,19 @@ export class StoriesController {
   /**
    * POST /api/v1/stories/media/upload — multipart file upload (video preferred).
    * RN image-picker does not return base64 for video; FormData streams the file.
+   * FileInterceptor defaults to memory storage (no direct multer import).
    */
   @Post('media/upload')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: memoryStorage(),
       limits: { fileSize: 18 * 1024 * 1024 },
     }),
   )
   uploadMediaFile(
     @CurrentUser('id') userId: string,
-    @UploadedFile() file: Express.Multer.File | undefined,
+    @UploadedFile() file: UploadedMediaFile | undefined,
   ): Promise<{ publicUrl: string; mediaType: 'image' | 'video' }> {
     if (!file?.buffer?.length) {
       throw new BadRequestException({
