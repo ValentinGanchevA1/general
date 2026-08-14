@@ -7,7 +7,7 @@
 // POST /users/me/photos/base64. Short clips (≤15s, low quality) stay under
 // the Nest JSON body limit.
 
-import { Alert, Platform } from 'react-native';
+import { Alert } from 'react-native';
 import {
   launchCamera,
   launchImageLibrary,
@@ -55,7 +55,6 @@ export async function pickAndUploadStoryMedia(
     );
   }
 
-  // Guard oversized payloads before hitting the API (decoded ≈ base64 * 0.75).
   const approxBytes = Math.floor((asset.base64.length * 3) / 4);
   if (approxBytes > 18 * 1024 * 1024) {
     throw new Error('Media is too large. Use a shorter clip or lower quality.');
@@ -103,7 +102,6 @@ async function pickAsset(source: Source): Promise<Asset | null> {
     saveToPhotos: false,
   };
 
-  // low quality + base64: required so we never fetch() the local file URI on Android.
   const cameraVideo: CameraOptions = {
     mediaType: 'video',
     videoQuality: 'low',
