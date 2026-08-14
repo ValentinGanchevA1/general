@@ -39,6 +39,8 @@ jobs:
       # Backend jest + tsc resolve @g88/shared from packages/shared/dist — build it first.
       - name: Build shared
         run: pnpm --filter @g88/shared build
+      - name: Migration prefix uniqueness
+        run: node apps/backend/scripts/check-migration-prefixes.mjs
       - name: Lint
         run: pnpm --filter @g88/backend exec eslint src --ext .ts --max-warnings 0
       - name: Typecheck
