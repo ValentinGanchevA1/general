@@ -30,6 +30,7 @@ import {
   NearbyStoriesDto,
   PresignStoryDto,
   ReactStoryDto,
+  UploadStoryBase64Dto,
 } from './dto';
 
 @Controller('stories')
@@ -46,6 +47,20 @@ export class StoriesController {
     @Body() dto: PresignStoryDto,
   ): Promise<StoryPresignResponse> {
     return this.stories.presign(userId, dto);
+  }
+
+  /**
+   * POST /api/v1/stories/media/base64 — upload story media via base64 JSON.
+   * Preferred mobile path (Android cannot fetch(local video uri)).
+   */
+  @Post('media/base64')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  uploadMediaBase64(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UploadStoryBase64Dto,
+  ): Promise<{ publicUrl: string; mediaType: 'image' | 'video' }> {
+    return this.stories.uploadMediaBase64(userId, dto);
   }
 
   /** POST /api/v1/stories — create a 24h story after media is uploaded. */
@@ -70,10 +85,6 @@ export class StoriesController {
     return this.stories.nearby(userId, dto).then((stories) => ({ stories }));
   }
 
-  /**
-   * GET /api/v1/stories/author/:userId — profile storyline.
-   * Default: active only (expires_at > now). ?includeExpired=1 adds history (cap limit).
-   */
   @Get('author/:userId')
   listByAuthor(
     @CurrentUser('id') viewerId: string,
@@ -89,7 +100,6 @@ export class StoriesController {
     return this.stories.listByAuthor(viewerId, authorId, { includeExpired, limit });
   }
 
-  /** GET /api/v1/stories/:id */
   @Get(':id')
   getOne(
     @CurrentUser('id') userId: string,
@@ -98,7 +108,6 @@ export class StoriesController {
     return this.stories.getOne(userId, storyId);
   }
 
-  /** POST /api/v1/stories/:id/view — unique view receipt. */
   @Post(':id/view')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
@@ -109,7 +118,6 @@ export class StoriesController {
     return this.stories.recordView(userId, storyId);
   }
 
-  /** POST /api/v1/stories/:id/react — heart or wave. */
   @Post(':id/react')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
@@ -121,7 +129,6 @@ export class StoriesController {
     return this.stories.react(userId, storyId, dto.kind);
   }
 
-  /** DELETE /api/v1/stories/:id — author soft-delete. */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(

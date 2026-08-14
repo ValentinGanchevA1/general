@@ -1,11 +1,13 @@
-// Pick story photo or video and PUT to a presigned S3 URL.
+// Pick story photo or video and upload via base64 JSON → Nest → S3.
 // Returns publicUrl + mediaType for POST /stories.
 //
-// Flow: pick first (so content-type is known) → caller presigns → we upload.
-// Images: base64 → ArrayBuffer PUT (Android content:// fetch is unreliable).
-// Video: uri → ArrayBuffer PUT (base64 of video is too large / often absent).
+// Why not presigned PUT + fetch(local uri)?
+// React Native Android fails fetch(content://...) / fetch(file://...) with
+// "Network request failed" — same class of bug that forced photos to
+// POST /users/me/photos/base64. Short clips (≤15s, low quality) stay under
+// the Nest JSON body limit.
 
-import { Alert, Platform } from 'react-native';
+import { Alert } from 'react-native';
 import {
   launchCamera,
   launchImageLibrary,
@@ -16,6 +18,8 @@ import {
 
 import { STORY_LIMITS } from '@g88/shared';
 
+import { postJson } from '@/api/client';
+
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime']);
 
@@ -25,11 +29,12 @@ export type StoryPresignFn = (contentType: string) => Promise<{
 }>;
 
 /**
- * Shows source chooser, picks media, requests presign for the real content-type,
- * uploads, returns create payload fields. Null = user cancelled.
+ * Shows source chooser, picks media, uploads base64 to backend, returns create fields.
+ * `getPresign` is accepted for API compatibility with StoryCreateSheet but unused —
+ * media goes through POST /stories/media/base64 instead of client S3 PUT.
  */
 export async function pickAndUploadStoryMedia(
-  getPresign: StoryPresignFn,
+  _getPresign?: StoryPresignFn,
 ): Promise<{ mediaUrl: string; mediaType: 'image' | 'video' } | null> {
   const source = await chooseSource();
   if (!source) return null;
@@ -42,16 +47,29 @@ export async function pickAndUploadStoryMedia(
     assertVideoDuration(asset);
   }
 
-  const contentType = classified.contentType;
-  const presign = await getPresign(contentType);
-
-  if (classified.mediaType === 'image') {
-    await putImage(presign.uploadUrl, asset, contentType);
-  } else {
-    await putVideo(presign.uploadUrl, asset, contentType);
+  if (!asset.base64) {
+    throw new Error(
+      classified.mediaType === 'video'
+        ? 'Could not read the video data. Try a shorter clip or pick from Library.'
+        : 'Could not read the image data — please try another photo',
+    );
   }
 
-  return { mediaUrl: presign.publicUrl, mediaType: classified.mediaType };
+  const approxBytes = Math.floor((asset.base64.length * 3) / 4);
+  if (approxBytes > 18 * 1024 * 1024) {
+    throw new Error('Media is too large. Use a shorter clip or lower quality.');
+  }
+
+  const res = await postJson<
+    { data: string; contentType: string },
+    { publicUrl: string; mediaType: 'image' | 'video' }
+  >(
+    '/stories/media/base64',
+    { data: asset.base64, contentType: classified.contentType },
+    { timeout: 120_000 },
+  );
+
+  return { mediaUrl: res.publicUrl, mediaType: res.mediaType };
 }
 
 type Source = 'library' | 'camera_photo' | 'camera_video';
@@ -72,8 +90,7 @@ async function pickAsset(source: Source): Promise<Asset | null> {
     mediaType: 'mixed',
     selectionLimit: 1,
     quality: 0.8,
-    videoQuality: 'medium',
-    // iOS enforces; Android still validated in assertVideoDuration
+    videoQuality: 'low',
     durationLimit: STORY_LIMITS.videoMaxSeconds,
     includeBase64: true,
   };
@@ -87,9 +104,9 @@ async function pickAsset(source: Source): Promise<Asset | null> {
 
   const cameraVideo: CameraOptions = {
     mediaType: 'video',
-    videoQuality: 'medium',
+    videoQuality: 'low',
     durationLimit: STORY_LIMITS.videoMaxSeconds,
-    includeBase64: false,
+    includeBase64: true,
     saveToPhotos: false,
   };
 
@@ -124,7 +141,6 @@ function classifyAsset(asset: Asset): {
     if (!VIDEO_TYPES.has(contentType)) {
       contentType = name.endsWith('.mov') ? 'video/quicktime' : 'video/mp4';
     }
-    // Backend allow-list is video/mp4 | video/quicktime only
     if (!VIDEO_TYPES.has(contentType)) {
       contentType = 'video/mp4';
     }
@@ -140,7 +156,6 @@ function classifyAsset(asset: Asset): {
 }
 
 function assertVideoDuration(asset: Asset): void {
-  // image-picker reports duration in seconds (float)
   const seconds = asset.duration;
   if (seconds == null || !Number.isFinite(seconds)) return;
   if (seconds > STORY_LIMITS.videoMaxSeconds + 0.5) {
@@ -148,92 +163,4 @@ function assertVideoDuration(asset: Asset): void {
       `Video must be ${STORY_LIMITS.videoMaxSeconds} seconds or shorter (this one is ${Math.ceil(seconds)}s).`,
     );
   }
-}
-
-async function putImage(
-  uploadUrl: string,
-  asset: Asset,
-  contentType: string,
-): Promise<void> {
-  if (!asset.base64) {
-    // Fallback: try URI read (may fail on Android content://)
-    if (asset.uri) {
-      await putFromUri(uploadUrl, asset.uri, contentType, 'photo');
-      return;
-    }
-    throw new Error('Could not read the image data — please try another photo');
-  }
-  const body = base64ToArrayBuffer(asset.base64);
-  await putBody(uploadUrl, body, contentType, 'photo');
-}
-
-async function putVideo(
-  uploadUrl: string,
-  asset: Asset,
-  contentType: string,
-): Promise<void> {
-  if (!asset.uri) {
-    throw new Error('Could not read the video file');
-  }
-  await putFromUri(uploadUrl, asset.uri, contentType, 'video');
-}
-
-async function putFromUri(
-  uploadUrl: string,
-  uri: string,
-  contentType: string,
-  kind: 'photo' | 'video',
-): Promise<void> {
-  let body: ArrayBuffer;
-  try {
-    const res = await fetch(uri);
-    if (!res.ok) {
-      throw new Error(`Read failed (${res.status})`);
-    }
-    body = await res.arrayBuffer();
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'read failed';
-    throw new Error(
-      `Could not read ${kind} (${msg}).${Platform.OS === 'android' ? ' Try a different file or re-record.' : ''}`,
-    );
-  }
-  if (body.byteLength === 0) {
-    throw new Error(`${kind === 'video' ? 'Video' : 'Photo'} file is empty`);
-  }
-  await putBody(uploadUrl, body, contentType, kind);
-}
-
-async function putBody(
-  uploadUrl: string,
-  body: ArrayBuffer,
-  contentType: string,
-  kind: 'photo' | 'video',
-): Promise<void> {
-  let putRes: Response;
-  try {
-    putRes = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': contentType },
-      body,
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Network request failed';
-    throw new Error(
-      `Could not upload ${kind} (${msg}). Check connection and S3/CORS config.`,
-    );
-  }
-  if (!putRes.ok) {
-    throw new Error(`Upload failed (${putRes.status})`);
-  }
-}
-
-function base64ToArrayBuffer(b64: string): ArrayBuffer {
-  const atobFn = (globalThis as unknown as { atob: (data: string) => string }).atob;
-  const binary = atobFn(b64);
-  const len = binary.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes.buffer;
 }
