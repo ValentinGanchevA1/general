@@ -1,11 +1,10 @@
 // Pick story photo or video and upload to Nest → S3.
 // Returns publicUrl + mediaType for POST /stories.
 //
-// Photos: base64 JSON (includeBase64 works; same path as profile photos).
-// Videos: multipart FormData via fetch — image-picker never returns base64
-// for video (docs: "PHOTO ONLY"). Avoid axios for FormData on Android:
-// default Content-Type / bare multipart/form-data → Network Error before
-// the request leaves the device. RN fetch sets the boundary correctly.
+// Photos: image-picker includeBase64 → POST /stories/media/base64.
+// Videos: image-picker does NOT return base64 (docs: PHOTO ONLY).
+//   FormData + fetch/axios fails on Android local URIs (Network request failed).
+//   Read file with XHR → blob → FileReader → base64, then same base64 endpoint.
 
 import { Alert } from 'react-native';
 import {
@@ -19,11 +18,10 @@ import {
 import { STORY_LIMITS } from '@g88/shared';
 
 import { postJson } from '@/api/client';
-import { tokenStore } from '@/api/tokenStore';
-import { Config } from '@/config';
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime']);
+const MAX_BYTES = 18 * 1024 * 1024;
 
 export type StoryPresignFn = (contentType: string) => Promise<{
   uploadUrl: string;
@@ -48,21 +46,13 @@ export async function pickAndUploadStoryMedia(
     assertVideoDuration(asset);
   }
 
-  if (classified.mediaType === 'video') {
-    return uploadVideoMultipart(asset, classified.contentType);
-  }
-  return uploadImageBase64(asset, classified.contentType);
-}
+  const base64 =
+    classified.mediaType === 'video'
+      ? await readVideoAsBase64(asset)
+      : requireImageBase64(asset);
 
-async function uploadImageBase64(
-  asset: Asset,
-  contentType: string,
-): Promise<{ mediaUrl: string; mediaType: 'image' | 'video' }> {
-  if (!asset.base64) {
-    throw new Error('Could not read the image data — please try another photo');
-  }
-  const approxBytes = Math.floor((asset.base64.length * 3) / 4);
-  if (approxBytes > 18 * 1024 * 1024) {
+  const approxBytes = Math.floor((base64.length * 3) / 4);
+  if (approxBytes > MAX_BYTES) {
     throw new Error('Media is too large. Use a shorter clip or lower quality.');
   }
 
@@ -71,82 +61,103 @@ async function uploadImageBase64(
     { publicUrl: string; mediaType: 'image' | 'video' }
   >(
     '/stories/media/base64',
-    { data: asset.base64, contentType },
+    { data: base64, contentType: classified.contentType },
     { timeout: 120_000 },
   );
+
   return { mediaUrl: res.publicUrl, mediaType: res.mediaType };
 }
 
-async function uploadVideoMultipart(
-  asset: Asset,
-  contentType: string,
-): Promise<{ mediaUrl: string; mediaType: 'image' | 'video' }> {
-  if (!asset.uri) {
+function requireImageBase64(asset: Asset): string {
+  if (!asset.base64) {
+    throw new Error('Could not read the image data — please try another photo');
+  }
+  return asset.base64;
+}
+
+/**
+ * Read local video into base64 without FormData.
+ * Prefer originalPath (real FS path on Android) over content:// uri.
+ */
+async function readVideoAsBase64(asset: Asset): Promise<string> {
+  const candidates = uniqueUris([
+    // Android gallery sometimes exposes a real path here
+    (asset as Asset & { originalPath?: string }).originalPath,
+    asset.uri,
+  ]);
+
+  if (candidates.length === 0) {
     throw new Error('Could not read the video. Try again or pick from Library.');
   }
 
-  const token = await tokenStore.getAccessToken();
-  if (!token) {
-    throw new Error('Not signed in — sign in again and retry.');
-  }
-
-  const form = new FormData();
-  // RN FormData file shape — streams from disk; do not fetch(uri) into JS.
-  form.append('file', {
-    uri: asset.uri,
-    type: contentType,
-    name: asset.fileName ?? guessVideoName(contentType),
-  } as unknown as Blob);
-
-  // fetch — not axios. Do NOT set Content-Type; RN must attach the boundary.
-  const url = `${Config.API_BASE_URL}/api/v1/stories/media/upload`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 120_000);
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-      body: form,
-      signal: controller.signal,
-    });
-  } catch (e) {
-    if (e instanceof Error && e.name === 'AbortError') {
-      throw new Error('Upload timed out. Try a shorter clip.');
+  let lastError: Error | null = null;
+  for (const uri of candidates) {
+    try {
+      return await xhrReadAsBase64(uri);
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
     }
-    const msg = e instanceof Error ? e.message : 'Network request failed';
-    throw new Error(`Video upload failed (${msg}). Check connection and try again.`);
-  } finally {
-    clearTimeout(timer);
   }
 
-  const text = await response.text();
-  let body: { publicUrl?: string; mediaType?: 'image' | 'video'; message?: string; code?: string } =
-    {};
-  try {
-    body = text ? (JSON.parse(text) as typeof body) : {};
-  } catch {
-    // non-JSON error page
-  }
-
-  if (!response.ok) {
-    const detail = body.message ?? body.code ?? text.slice(0, 120) ?? response.statusText;
-    throw new Error(`Upload failed (${response.status}): ${detail}`);
-  }
-
-  if (!body.publicUrl || !body.mediaType) {
-    throw new Error('Upload succeeded but server returned an incomplete response.');
-  }
-
-  return { mediaUrl: body.publicUrl, mediaType: body.mediaType };
+  throw new Error(
+    lastError?.message ??
+      'Could not read the video data. Try a shorter clip or pick from Library.',
+  );
 }
 
-function guessVideoName(contentType: string): string {
-  return contentType === 'video/quicktime' ? 'story.mov' : 'story.mp4';
+function uniqueUris(uris: Array<string | undefined | null>): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const u of uris) {
+    if (!u) continue;
+    const normalized = u.startsWith('/') && !u.startsWith('file:') ? `file://${u}` : u;
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
+/**
+ * XHR GET local uri → Blob → FileReader data URL → pure base64.
+ * More reliable than fetch(uri) on Android for file:// and many content://.
+ */
+function xhrReadAsBase64(uri: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = () => {
+      if (xhr.status !== 0 && xhr.status !== 200) {
+        reject(new Error(`Could not read video (status ${xhr.status})`));
+        return;
+      }
+      const blob = xhr.response as Blob | null;
+      if (!blob || !(blob instanceof Blob) && typeof Blob !== 'undefined') {
+        // RN may return a blob-like object
+      }
+      if (!xhr.response) {
+        reject(new Error('Could not read video (empty response)'));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result;
+        if (typeof result !== 'string' || result.length === 0) {
+          reject(new Error('Could not encode video data'));
+          return;
+        }
+        const comma = result.indexOf(',');
+        resolve(comma >= 0 ? result.slice(comma + 1) : result);
+      };
+      reader.onerror = () => reject(new Error('Could not encode video data'));
+      reader.readAsDataURL(xhr.response);
+    };
+    xhr.onerror = () => reject(new Error('Could not read the video file'));
+    xhr.ontimeout = () => reject(new Error('Reading video timed out'));
+    xhr.responseType = 'blob';
+    xhr.timeout = 60_000;
+    xhr.open('GET', uri, true);
+    xhr.send();
+  });
 }
 
 type Source = 'library' | 'camera_photo' | 'camera_video';
@@ -164,7 +175,6 @@ function chooseSource(): Promise<Source | null> {
 
 async function pickAsset(source: Source): Promise<Asset | null> {
   // durationLimit is CameraOptions-only in react-native-image-picker@8 types.
-  // Library videos are capped by assertVideoDuration after pick.
   const libraryOpts: ImageLibraryOptions = {
     mediaType: 'mixed',
     selectionLimit: 1,
