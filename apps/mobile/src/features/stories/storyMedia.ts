@@ -2,11 +2,11 @@
 // Returns publicUrl + mediaType for POST /stories.
 //
 // Photos: image-picker includeBase64 → POST /stories/media/base64.
-// Videos: image-picker does NOT return base64 (docs: PHOTO ONLY).
-//   FormData + fetch/axios fails on Android local URIs (Network request failed).
-//   Read file with XHR → blob → FileReader → base64, then same base64 endpoint.
+// Videos: image-picker never returns base64 (PHOTO ONLY). fetch/XHR cannot
+// read Android content:// or many file:// paths → Network / "could not read".
+// Use react-native-blob-util (ContentResolver-backed) → base64 → same endpoint.
 
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import {
   launchCamera,
   launchImageLibrary,
@@ -14,6 +14,7 @@ import {
   type CameraOptions,
   type ImageLibraryOptions,
 } from 'react-native-image-picker';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 
 import { STORY_LIMITS } from '@g88/shared';
 
@@ -76,12 +77,11 @@ function requireImageBase64(asset: Asset): string {
 }
 
 /**
- * Read local video into base64 without FormData.
- * Prefer originalPath (real FS path on Android) over content:// uri.
+ * Read local video bytes via native FS / ContentResolver.
+ * Tries originalPath, then uri (content:// supported by blob-util on Android).
  */
 async function readVideoAsBase64(asset: Asset): Promise<string> {
-  const candidates = uniqueUris([
-    // Android gallery sometimes exposes a real path here
+  const candidates = uniquePaths([
     (asset as Asset & { originalPath?: string }).originalPath,
     asset.uri,
   ]);
@@ -91,73 +91,54 @@ async function readVideoAsBase64(asset: Asset): Promise<string> {
   }
 
   let lastError: Error | null = null;
-  for (const uri of candidates) {
+  for (const path of candidates) {
     try {
-      return await xhrReadAsBase64(uri);
+      const base64 = await ReactNativeBlobUtil.fs.readFile(path, 'base64');
+      if (base64 && base64.length > 0) return base64;
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
     }
   }
 
+  // Last resort: copy content:// into app cache, then read.
+  if (Platform.OS === 'android') {
+    for (const path of candidates) {
+      if (!path.startsWith('content://')) continue;
+      try {
+        const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/story_${Date.now()}.mp4`;
+        await ReactNativeBlobUtil.fs.cp(path, dest);
+        const base64 = await ReactNativeBlobUtil.fs.readFile(dest, 'base64');
+        try {
+          await ReactNativeBlobUtil.fs.unlink(dest);
+        } catch {
+          // best-effort cleanup
+        }
+        if (base64 && base64.length > 0) return base64;
+      } catch (e) {
+        lastError = e instanceof Error ? e : new Error(String(e));
+      }
+    }
+  }
+
   throw new Error(
-    lastError?.message ??
-      'Could not read the video data. Try a shorter clip or pick from Library.',
+    lastError?.message
+      ? `Could not read the video file (${lastError.message})`
+      : 'Could not read the video file',
   );
 }
 
-function uniqueUris(uris: Array<string | undefined | null>): string[] {
+function uniquePaths(paths: Array<string | undefined | null>): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
-  for (const u of uris) {
-    if (!u) continue;
-    const normalized = u.startsWith('/') && !u.startsWith('file:') ? `file://${u}` : u;
+  for (const p of paths) {
+    if (!p) continue;
+    // blob-util accepts content:// as-is; file:// should drop the scheme for some APIs
+    const normalized = p.startsWith('file://') ? p.replace('file://', '') : p;
     if (seen.has(normalized)) continue;
     seen.add(normalized);
     out.push(normalized);
   }
   return out;
-}
-
-/**
- * XHR GET local uri → Blob → FileReader data URL → pure base64.
- * More reliable than fetch(uri) on Android for file:// and many content://.
- */
-function xhrReadAsBase64(uri: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.onload = () => {
-      if (xhr.status !== 0 && xhr.status !== 200) {
-        reject(new Error(`Could not read video (status ${xhr.status})`));
-        return;
-      }
-      const blob = xhr.response as Blob | null;
-      if (!blob || !(blob instanceof Blob) && typeof Blob !== 'undefined') {
-        // RN may return a blob-like object
-      }
-      if (!xhr.response) {
-        reject(new Error('Could not read video (empty response)'));
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result;
-        if (typeof result !== 'string' || result.length === 0) {
-          reject(new Error('Could not encode video data'));
-          return;
-        }
-        const comma = result.indexOf(',');
-        resolve(comma >= 0 ? result.slice(comma + 1) : result);
-      };
-      reader.onerror = () => reject(new Error('Could not encode video data'));
-      reader.readAsDataURL(xhr.response);
-    };
-    xhr.onerror = () => reject(new Error('Could not read the video file'));
-    xhr.ontimeout = () => reject(new Error('Reading video timed out'));
-    xhr.responseType = 'blob';
-    xhr.timeout = 60_000;
-    xhr.open('GET', uri, true);
-    xhr.send();
-  });
 }
 
 type Source = 'library' | 'camera_photo' | 'camera_video';
@@ -174,7 +155,6 @@ function chooseSource(): Promise<Source | null> {
 }
 
 async function pickAsset(source: Source): Promise<Asset | null> {
-  // durationLimit is CameraOptions-only in react-native-image-picker@8 types.
   const libraryOpts: ImageLibraryOptions = {
     mediaType: 'mixed',
     selectionLimit: 1,
