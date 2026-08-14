@@ -337,6 +337,9 @@ importers:
       react-native:
         specifier: 0.83.0
         version: 0.83.0(@babel/core@7.29.7)(@react-native-community/cli@15.1.3(typescript@5.9.3))(@react-native/metro-config@0.83.10(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.7)
+      react-native-blob-util:
+        specifier: ^0.22.2
+        version: 0.22.2(react-native@0.83.0(@babel/core@7.29.7)(@react-native-community/cli@15.1.3(typescript@5.9.3))(@react-native/metro-config@0.83.10(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.7))(react@19.2.7)
       react-native-image-picker:
         specifier: ^8.2.1
         version: 8.2.1(react-native@0.83.0(@babel/core@7.29.7)(@react-native-community/cli@15.1.3(typescript@5.9.3))(@react-native/metro-config@0.83.10(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.7))(react@19.2.7)
@@ -3401,6 +3404,9 @@ packages:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
 
+  base-64@0.1.0:
+    resolution: {integrity: sha512-Y5gU45svrR5tI2Vt/X9GPd3L0HNIKzGu202EjxrXMpuc2V2CiKgemAbUUsqYmZJvPtCXoUKjNZwBJzsNScUbXA==}
+
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
@@ -6176,6 +6182,12 @@ packages:
 
   react-is@19.2.8:
     resolution: {integrity: sha512-s5un28nYxKJw5gvUHyW5PCC28CvBqLu9r3cWgzHT4Vo/5fqqkFcdRYsGcKf50WMPpjjFZS5d76fn3YCo2njKwQ==}
+
+  react-native-blob-util@0.22.2:
+    resolution: {integrity: sha512-Czx01QMg7aLsm/4F/7+eqoRAi1q/qjLY2Kao16g+n2SRnTH1+qkD8Qhx2q9okB+VNQvZKB1LbiXhktzYQV52xQ==}
+    peerDependencies:
+      react: 19.2.7
+      react-native: '*'
 
   react-native-image-picker@8.2.1:
     resolution: {integrity: sha512-FBeGYJGFDjMdGCcyubDJgBAPCQ4L1D3hwLXyUU91jY9ahOZMTbluceVvRmrEKqnDPFJ0gF1NVhJ0nr1nROFLdg==}
@@ -11145,6 +11157,8 @@ snapshots:
 
   balanced-match@4.0.4: {}
 
+  base-64@0.1.0: {}
+
   base64-js@1.5.1: {}
 
   base64id@2.0.0: {}
@@ -14476,6 +14490,13 @@ snapshots:
   react-is@18.3.1: {}
 
   react-is@19.2.8: {}
+
+  react-native-blob-util@0.22.2(react-native@0.83.0(@babel/core@7.29.7)(@react-native-community/cli@15.1.3(typescript@5.9.3))(@react-native/metro-config@0.83.10(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.7))(react@19.2.7):
+    dependencies:
+      base-64: 0.1.0
+      glob: 10.5.0
+      react: 19.2.7
+      react-native: 0.83.0(@babel/core@7.29.7)(@react-native-community/cli@15.1.3(typescript@5.9.3))(@react-native/metro-config@0.83.10(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.7)
 
   react-native-image-picker@8.2.1(react-native@0.83.0(@babel/core@7.29.7)(@react-native-community/cli@15.1.3(typescript@5.9.3))(@react-native/metro-config@0.83.10(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.7))(react@19.2.7):
     dependencies:
