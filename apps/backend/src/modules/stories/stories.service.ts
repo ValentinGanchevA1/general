@@ -80,7 +80,7 @@ export class StoriesService {
 
   /**
    * Mobile-safe media upload: base64 JSON → S3 (stories/{userId}/…).
-   * Binds Redis token so create() accepts the returned publicUrl.
+   * Photos only — image-picker never returns base64 for video.
    */
   async uploadMediaBase64(
     userId: string,
@@ -111,7 +111,54 @@ export class StoriesService {
       });
     }
 
-    const publicUrl = await this.s3.uploadStoryBuffer(userId, buf, dto.contentType);
+    return this.bindAndReturnUploaded(userId, buf, dto.contentType);
+  }
+
+  /**
+   * Multipart / raw buffer upload (video path — image-picker never returns
+   * base64 for video). Same Redis bind as presign/base64 so create() accepts it.
+   */
+  async uploadMediaBuffer(
+    userId: string,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<{ publicUrl: string; mediaType: 'image' | 'video' }> {
+    await this.assertCanPost(userId);
+    if (buffer.length === 0) {
+      throw new BadRequestException({
+        code: 'story.media_invalid',
+        message: 'Media data is empty.',
+      });
+    }
+    const maxBytes = 18 * 1024 * 1024;
+    if (buffer.length > maxBytes) {
+      throw new BadRequestException({
+        code: 'story.media_too_large',
+        message: 'Media is too large. Use a shorter clip or lower quality.',
+      });
+    }
+    const allowed = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'video/mp4',
+      'video/quicktime',
+    ]);
+    if (!allowed.has(contentType)) {
+      throw new BadRequestException({
+        code: 'story.media_type_unsupported',
+        message: `Unsupported content type: ${contentType}`,
+      });
+    }
+    return this.bindAndReturnUploaded(userId, buffer, contentType);
+  }
+
+  private async bindAndReturnUploaded(
+    userId: string,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<{ publicUrl: string; mediaType: 'image' | 'video' }> {
+    const publicUrl = await this.s3.uploadStoryBuffer(userId, buffer, contentType);
     await this.redis.set(
       this.presignRedisKey(userId, publicUrl),
       publicUrl,
@@ -119,7 +166,7 @@ export class StoriesService {
       PRESIGN_TTL_SECONDS,
     );
 
-    const mediaType: 'image' | 'video' = dto.contentType.startsWith('video/')
+    const mediaType: 'image' | 'video' = contentType.startsWith('video/')
       ? 'video'
       : 'image';
     return { publicUrl, mediaType };
