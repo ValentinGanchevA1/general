@@ -90,10 +90,11 @@ async function uploadVideoMultipart(
     throw new Error('Not signed in — sign in again and retry.');
   }
 
+  const uri = resolveMediaUri(asset);
   const form = new FormData();
   // RN FormData file shape — streams from disk; do not fetch(uri) into JS.
   form.append('file', {
-    uri: asset.uri,
+    uri,
     type: contentType,
     name: asset.fileName ?? guessVideoName(contentType),
   } as unknown as Blob);
@@ -145,6 +146,16 @@ async function uploadVideoMultipart(
   return { mediaUrl: body.publicUrl, mediaType: body.mediaType };
 }
 
+/** Prefer Android originalPath (real file) over content:// when available. */
+function resolveMediaUri(asset: Asset): string {
+  const orig = asset.originalPath?.trim();
+  if (orig) {
+    if (orig.startsWith('file://') || orig.startsWith('content://')) return orig;
+    return `file://${orig}`;
+  }
+  return asset.uri!;
+}
+
 function guessVideoName(contentType: string): string {
   return contentType === 'video/quicktime' ? 'story.mov' : 'story.mp4';
 }
@@ -163,8 +174,6 @@ function chooseSource(): Promise<Source | null> {
 }
 
 async function pickAsset(source: Source): Promise<Asset | null> {
-  // durationLimit is CameraOptions-only in react-native-image-picker@8 types.
-  // Library videos are capped by assertVideoDuration after pick.
   const libraryOpts: ImageLibraryOptions = {
     mediaType: 'mixed',
     selectionLimit: 1,
