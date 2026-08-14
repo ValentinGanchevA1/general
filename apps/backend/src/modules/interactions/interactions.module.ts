@@ -6,9 +6,17 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { GamificationModule } from '../gamification/gamification.module';
 import { ChallengesModule } from '../challenges/challenges.module';
 import { AchievementsModule } from '../achievements/achievements.module';
+import { BlocksModule } from '../blocks/blocks.module';
 
 @Module({
-  imports: [RealtimeModule, NotificationsModule, GamificationModule, ChallengesModule, AchievementsModule],
+  imports: [
+    RealtimeModule,
+    NotificationsModule,
+    GamificationModule,
+    ChallengesModule,
+    AchievementsModule,
+    BlocksModule,
+  ],
   providers: [InteractionsService],
   controllers: [InteractionsController],
 })

@@ -1,3 +1,4 @@
+-- 0031_profile_origin.sql (renamed from 0030_profile_origin to resolve dual-0030 collision)
 -- Profile origin + public visibility for age / hometown.
 -- date_of_birth already exists (0012); age is derived server-side.
 
