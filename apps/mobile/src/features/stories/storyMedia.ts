@@ -86,12 +86,13 @@ function chooseSource(): Promise<Source | null> {
 }
 
 async function pickAsset(source: Source): Promise<Asset | null> {
+  // durationLimit is CameraOptions-only in react-native-image-picker@8 types.
+  // Library videos are capped by assertVideoDuration after pick.
   const libraryOpts: ImageLibraryOptions = {
     mediaType: 'mixed',
     selectionLimit: 1,
     quality: 0.8,
     videoQuality: 'low',
-    durationLimit: STORY_LIMITS.videoMaxSeconds,
     includeBase64: true,
   };
 
