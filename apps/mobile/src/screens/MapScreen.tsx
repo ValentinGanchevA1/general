@@ -48,6 +48,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
 import { track } from '@/lib/analytics';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
+import { MapCoachMarks } from '@/components/map/MapCoachMarks';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
@@ -335,6 +336,9 @@ export function MapScreen(): React.JSX.Element {
           bottomOffset={0}
         />
       )}
+
+      {/* First-session coach: people → wave → create. Once dismissed, never again. */}
+      {!selected && <MapCoachMarks mapReady={region != null} />}
     </View>
   );
 }
