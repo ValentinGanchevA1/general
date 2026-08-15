@@ -17,6 +17,7 @@ import type { ChatMessage, PublicUserProfile, VerificationLevel } from '@g88/sha
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson } from '@/api/client';
 import { VerificationBadge } from '@/components/VerificationBadge';
+import { Avatar } from '@/components/Avatar';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {
   fetchMessages,
@@ -114,6 +115,7 @@ export function ChatScreen(): React.JSX.Element {
     verification: VerificationLevel;
     idVerified: boolean;
     blockedByViewer: boolean;
+    avatarUrl: string | null;
   } | null>(null);
   const { on, joinConversation, sendMessage } = useSocket();
 
@@ -143,6 +145,7 @@ export function ChatScreen(): React.JSX.Element {
             verification: p.verification,
             idVerified: p.idVerified,
             blockedByViewer: p.blockedByViewer ?? false,
+            avatarUrl: p.avatarUrl ?? p.photoUrls?.[0] ?? null,
           });
         }
       })
@@ -270,6 +273,11 @@ export function ChatScreen(): React.JSX.Element {
           accessibilityLabel={`Open profile for ${otherUserName || 'user'}`}
           activeOpacity={0.7}
         >
+          <Avatar
+            uri={peerBadge?.avatarUrl}
+            name={otherUserName || 'Chat'}
+            size={32}
+          />
           <Text style={styles.headerName} numberOfLines={1}>
             {otherUserName || 'Chat'}
           </Text>
