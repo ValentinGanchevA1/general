@@ -44,7 +44,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
     setIndex((i) => {
       if (i < stories.length - 1) return i + 1;
       // Side-effect outside the updater body
-      queueMicrotask(() => onClose());
+      void Promise.resolve().then(() => onClose());
       return i;
     });
   }, [stories.length, onClose]);
@@ -65,7 +65,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   // Sync index when sheet opens on a different story
   useEffect(() => {
     if (!visible) return;
-    queueMicrotask(() => {
+    void Promise.resolve().then(() => {
       setIndex(initialIndex);
       setHeld(false);
       setChromeDimmed(false);
@@ -76,7 +76,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   useEffect(() => {
     if (!visible || !storyId) return;
     void dispatch(recordStoryView(storyId));
-    queueMicrotask(() => {
+    void Promise.resolve().then(() => {
       setHeld(false);
       setChromeDimmed(false);
     });
