@@ -1,1 +1,397 @@
-PLACEHOLDER
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type {
+  CreateConversationRequest,
+  CreateConversationResponse,
+  EntityPoint,
+  PublicUserProfile,
+  UserMeta,
+} from '@g88/shared';
+import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { deleteJson, getJson, postJson } from '@/api/client';
+import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
+import { VerificationBadge } from '@/components/VerificationBadge';
+import { Avatar } from '@/components/Avatar';
+import { colors } from '@/theme';
+
+function labelFor(value: string): string {
+  return GOAL_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
+type UserEntityPoint = EntityPoint & { kind: 'user'; meta: UserMeta };
+
+interface Props {
+  point: EntityPoint;
+  waving: boolean;
+  onClose: () => void;
+  onWave?: () => void;
+}
+
+interface UserCardProps {
+  point: UserEntityPoint;
+  waving: boolean;
+  onClose: () => void;
+  onWave?: (() => void) | undefined;
+}
+
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.Element {
+  const navigation = useNavigation<Nav>();
+  const [profile, setProfile] = useState<PublicUserProfile | null>(null);
+  const [fetching, setFetching] = useState(true);
+  const [opening, setOpening] = useState(false);
+  const [blocking, setBlocking] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getJson<PublicUserProfile>(`/users/${point.id}`)
+      .then((p) => {
+        if (!cancelled) setProfile(p);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setFetching(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [point.id]);
+
+  const meta = point.meta;
+  const canMessage = profile?.relationship?.canMessage ?? 'none';
+  const sharedInterests = profile?.relationship?.sharedInterests ?? [];
+  const blocked = profile?.blockedByViewer ?? false;
+  const status = profile?.status;
+
+  const onBlockToggle = (): void => {
+    if (blocking) return;
+    const doBlock = async (): Promise<void> => {
+      setBlocking(true);
+      try {
+        if (blocked) {
+          await deleteJson<{ blocked: boolean }>(`/blocks/${point.id}`);
+          setProfile((p) => (p ? { ...p, blockedByViewer: false } : p));
+        } else {
+          await postJson<undefined, { blocked: boolean }>(`/blocks/${point.id}`, undefined);
+          setProfile((p) => (p ? { ...p, blockedByViewer: true } : p));
+          onClose();
+        }
+      } catch {
+        Alert.alert('Could not update block', 'Try again in a moment.');
+      } finally {
+        setBlocking(false);
+      }
+    };
+    if (blocked) {
+      void doBlock();
+      return;
+    }
+    Alert.alert(
+      'Block this user?',
+      'They will not be able to wave or message you. You can unblock later in Settings.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Block', style: 'destructive', onPress: () => void doBlock() },
+      ],
+    );
+  };
+
+  const onMessage = async (): Promise<void> => {
+    if (opening || canMessage === 'none' || blocked) return;
+    setOpening(true);
+    try {
+      const res = await postJson<
+        CreateConversationRequest,
+        CreateConversationResponse
+      >('/chat/conversations', { targetUserId: point.id });
+      onClose();
+      navigation.navigate('Chat', {
+        conversationId: res.conversationId,
+        otherUserName: meta.displayName,
+        otherUserId: point.id,
+        requestPending: res.status === 'pending',
+      });
+    } catch {
+      Alert.alert('Could not open chat', 'Try again in a moment.');
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  return (
+    <View style={styles.sheet}>
+      <View style={styles.handle} />
+      <View style={styles.userHeader}>
+        <TouchableOpacity
+          style={styles.userHeaderTap}
+          onPress={() => {
+            onClose();
+            navigation.navigate('UserProfile', { userId: point.id });
+          }}
+          activeOpacity={0.85}
+        >
+          <Avatar uri={meta.avatarUrl ?? null} name={meta.displayName} size={56} />
+          <View style={styles.userHeaderText}>
+            <View style={styles.nameRow}>
+              <Text style={styles.title} numberOfLines={1}>
+                {meta.displayName}
+              </Text>
+              <VerificationBadge
+                verification={meta.verification}
+                idVerified={profile?.idVerified}
+                size={16}
+              />
+            </View>
+            {profile?.age != null ? (
+              <Text style={styles.originLine}>{profile.age} years</Text>
+            ) : null}
+            {(profile?.hometownCity || profile?.hometownCountry) ? (
+              <Text style={styles.originLine} numberOfLines={1}>
+                {[profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ')}
+              </Text>
+            ) : null}
+            {meta.online ? (
+              <Text style={styles.onlineLabel}>Online</Text>
+            ) : (
+              <Text style={[styles.onlineLabel, styles.offlineLabel]}>Offline</Text>
+            )}
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={12}>
+          <Text style={styles.closeText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+
+      {fetching ? (
+        <ActivityIndicator color={colors.primary} size="small" style={{ alignSelf: 'flex-start' }} />
+      ) : null}
+
+      {profile?.bio ? (
+        <Text style={styles.bio} numberOfLines={3}>
+          {profile.bio}
+        </Text>
+      ) : null}
+
+      {sharedInterests.length > 0 ? (
+        <View style={styles.goalsRow}>
+          {sharedInterests.slice(0, 4).map((g) => (
+            <View key={g} style={styles.goalChip}>
+              <Text style={styles.goalIcon}>✓</Text>
+              <Text style={styles.goalLabel}>{labelFor(g)}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {status ? (
+        <View style={styles.statusBlock}>
+          <Text style={styles.statusLevel}>Level {status.level}</Text>
+          <View style={styles.xpTrack}>
+            <View
+              style={[
+                styles.xpFill,
+                {
+                  width: `${Math.min(100, Math.round((status.xpIntoLevel / Math.max(1, status.xpForNextLevel)) * 100))}%`,
+                },
+              ]}
+            />
+          </View>
+          <Text style={styles.statusXp}>
+            {status.xpIntoLevel}/{status.xpForNextLevel} XP
+          </Text>
+        </View>
+      ) : null}
+
+      <View style={styles.actions}>
+        {onWave && !blocked ? (
+          <TouchableOpacity
+            style={[styles.primaryBtn, styles.waveBtn, waving && styles.btnDisabled]}
+            onPress={onWave}
+            disabled={waving}
+          >
+            <Text style={styles.primaryBtnText}>{waving ? '…' : 'Wave'}</Text>
+          </TouchableOpacity>
+        ) : null}
+        {canMessage !== 'none' && !blocked ? (
+          <TouchableOpacity
+            style={[styles.primaryBtn, styles.messageBtn, opening && styles.btnDisabled]}
+            onPress={() => void onMessage()}
+            disabled={opening}
+          >
+            <Text style={styles.primaryBtnText}>{opening ? '…' : 'Message'}</Text>
+          </TouchableOpacity>
+        ) : null}
+        <TouchableOpacity
+          style={styles.profileBtn}
+          onPress={() => {
+            onClose();
+            navigation.navigate('UserProfile', { userId: point.id });
+          }}
+        >
+          <Text style={styles.profileBtnText}>Profile</Text>
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity style={styles.blockLink} onPress={onBlockToggle} disabled={blocking}>
+        <Text style={[styles.blockLinkText, blocked && styles.unblockLinkText]}>
+          {blocked ? 'Unblock' : 'Block'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): React.JSX.Element {
+  if (point.kind === 'user') {
+    return (
+      <UserCard
+        point={point as UserEntityPoint}
+        waving={waving}
+        onClose={onClose}
+        onWave={onWave}
+      />
+    );
+  }
+
+  const title =
+    point.kind === 'event'
+      ? (point.meta as { title?: string }).title ?? 'Event'
+      : point.kind === 'listing'
+        ? (point.meta as { title?: string }).title ?? 'Listing'
+        : 'Place';
+
+  return (
+    <View style={styles.sheet}>
+      <View style={styles.handle} />
+      <View style={styles.header}>
+        <View style={styles.titleGroup}>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subtitle}>{point.kind}</Text>
+        </View>
+        <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={12}>
+          <Text style={styles.closeText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+      <TouchableOpacity style={styles.viewBtn} onPress={onClose}>
+        <Text style={styles.viewBtnText}>Close</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  sheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.surfaceAlt,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 36,
+    gap: 14,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.textFaint,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 4,
+  },
+  userHeaderTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  userHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  userHeaderText: { flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  originLine: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  onlineLabel: { color: colors.success, fontSize: 12, marginTop: 2 },
+  offlineLabel: { color: colors.textMuted },
+  bio: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  goalsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  goalChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.bg,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  goalIcon: { fontSize: 13 },
+  goalLabel: { color: colors.textSecondary, fontSize: 12 },
+  sharedHint: { color: colors.info, fontSize: 13 },
+  statusBlock: {
+    backgroundColor: colors.bg,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  statusLevel: { color: colors.textPrimary, fontWeight: '700', fontSize: 14 },
+  xpTrack: {
+    height: 6,
+    backgroundColor: colors.borderStrong,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  xpFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 3,
+  },
+  statusXp: { color: colors.textMuted, fontSize: 12 },
+  actions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  blockLink: { alignSelf: 'center', paddingVertical: 4 },
+  blockLinkText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
+  unblockLinkText: { color: colors.info },
+  primaryBtn: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  waveBtn: { backgroundColor: colors.primary },
+  messageBtn: { backgroundColor: colors.action },
+  primaryBtnText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
+  profileBtn: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    minHeight: 48,
+  },
+  profileBtnText: { color: colors.textSecondary, fontWeight: '600', fontSize: 14 },
+  btnDisabled: { opacity: 0.55 },
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  titleGroup: { flex: 1 },
+  title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
+  subtitle: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
+  closeBtn: { padding: 4 },
+  closeText: { color: colors.textSecondary, fontSize: 16 },
+  viewBtn: {
+    marginTop: 14,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  viewBtnText: { color: colors.onPrimary, fontSize: 14, fontWeight: '700' },
+});
