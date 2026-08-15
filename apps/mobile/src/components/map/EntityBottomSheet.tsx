@@ -21,6 +21,7 @@ import { deleteJson, getJson, postJson } from '@/api/client';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { Avatar } from '@/components/Avatar';
+import { colors } from '@/theme';
 
 function labelFor(value: string): string {
   return GOAL_OPTIONS.find((o) => o.value === value)?.label ?? value;
@@ -97,7 +98,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
     }
     Alert.alert(
       'Block this user?',
-      'They will disappear from your map, stories, and messages.',
+      'They will not be able to wave or message you. You can unblock later in Settings.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Block', style: 'destructive', onPress: () => void doBlock() },
@@ -106,256 +107,183 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   };
 
   const onMessage = async (): Promise<void> => {
-    if (opening) return;
+    if (opening || canMessage === 'none' || blocked) return;
     setOpening(true);
     try {
-      const res = await postJson<CreateConversationRequest, CreateConversationResponse>(
-        '/conversations',
-        { targetUserId: point.id },
-      );
+      const res = await postJson<
+        CreateConversationRequest,
+        CreateConversationResponse
+      >('/chat/conversations', { otherUserId: point.id });
       onClose();
       navigation.navigate('Chat', {
-        conversationId: res.conversationId,
+        conversationId: res.id,
         otherUserName: meta.displayName,
-        requestPending: res.status === 'pending' && res.permission === 'request',
-        otherUserVerification: meta.verification,
-        otherUserIdVerified: meta.verifiedBadge ?? false,
+        requestPending: res.status === 'pending',
       });
     } catch {
-      // leave sheet open
+      Alert.alert('Could not open chat', 'Try again in a moment.');
     } finally {
       setOpening(false);
     }
   };
 
   return (
-    <>
+    <View style={styles.sheet}>
       <View style={styles.handle} />
-
       <View style={styles.userHeader}>
         <TouchableOpacity
           style={styles.userHeaderTap}
-          activeOpacity={0.75}
           onPress={() => {
             onClose();
             navigation.navigate('UserProfile', { userId: point.id });
           }}
-          accessibilityRole="button"
-          accessibilityLabel={`Open ${meta.displayName} profile`}
+          activeOpacity={0.85}
         >
-          <Avatar
-            uri={profile?.avatarUrl ?? point.meta.avatarUrl}
-            name={meta.displayName}
-            size={56}
-            ring
-            online={meta.online}
-          />
+          <Avatar uri={meta.avatarUrl} name={meta.displayName} size={56} />
           <View style={styles.userHeaderText}>
             <View style={styles.nameRow}>
-              <Text style={styles.title}>
+              <Text style={styles.title} numberOfLines={1}>
                 {meta.displayName}
-                {profile?.age != null ? `, ${profile.age}` : ''}
               </Text>
               <VerificationBadge
-                verification={meta.verification}
-                idVerified={meta.verifiedBadge}
-                size={16}
+                level={meta.verification}
+                idVerified={meta.idVerified}
+                size="sm"
               />
             </View>
-            {(profile?.hometownCity || profile?.hometownCountry) ? (
-              <Text style={styles.originLine}>
-                {[profile?.hometownCity, profile?.hometownCountry].filter(Boolean).join(', ')}
+            {profile?.showAge && profile.age != null ? (
+              <Text style={styles.originLine}>{profile.age} years</Text>
+            ) : null}
+            {profile?.showHometown && (profile.hometownCity || profile.hometownCountry) ? (
+              <Text style={styles.originLine} numberOfLines={1}>
+                {[profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ')}
               </Text>
             ) : null}
-            <Text style={[styles.onlineLabel, !meta.online && styles.offlineLabel]}>
-              {meta.online ? 'Online now' : 'Recently nearby'}
-            </Text>
+            {meta.isOnline ? (
+              <Text style={styles.onlineLabel}>Online</Text>
+            ) : (
+              <Text style={[styles.onlineLabel, styles.offlineLabel]}>Offline</Text>
+            )}
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+        <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={12}>
           <Text style={styles.closeText}>✕</Text>
         </TouchableOpacity>
       </View>
 
       {fetching ? (
-        <ActivityIndicator color="#00d4ff" size="small" style={{ alignSelf: 'flex-start' }} />
-      ) : (
-        <>
-          {profile?.bio ? (
-            <Text style={styles.bio} numberOfLines={2}>
-              {profile.bio}
-            </Text>
-          ) : null}
+        <ActivityIndicator color={colors.primary} size="small" style={{ alignSelf: 'flex-start' }} />
+      ) : null}
 
-          {profile?.goals && profile.goals.length > 0 ? (
-            <View style={styles.goalsRow}>
-              {profile.goals.slice(0, 3).map((g) => {
-                const opt = GOAL_OPTIONS.find((o) => o.value === g);
-                return opt ? (
-                  <View key={g} style={styles.goalChip}>
-                    <Text style={styles.goalIcon}>{opt.icon}</Text>
-                    <Text style={styles.goalLabel}>{opt.label}</Text>
-                  </View>
-                ) : (
-                  <View key={g} style={styles.goalChip}>
-                    <Text style={styles.goalLabel}>{labelFor(g)}</Text>
-                  </View>
-                );
-              })}
+      {profile?.bio ? (
+        <Text style={styles.bio} numberOfLines={3}>
+          {profile.bio}
+        </Text>
+      ) : null}
+
+      {sharedInterests.length > 0 ? (
+        <View style={styles.goalsRow}>
+          {sharedInterests.slice(0, 4).map((g) => (
+            <View key={g} style={styles.goalChip}>
+              <Text style={styles.goalIcon}>✓</Text>
+              <Text style={styles.goalLabel}>{labelFor(g)}</Text>
             </View>
-          ) : null}
-
-          {sharedInterests.length > 0 ? (
-            <Text style={styles.sharedHint}>
-              Shared: {sharedInterests.map(labelFor).join(', ')}
-            </Text>
-          ) : null}
-
-          {status ? (
-            <View style={styles.statusBlock}>
-              <Text style={styles.statusLevel}>Lv {status.level}</Text>
-              <View style={styles.xpTrack}>
-                <View
-                  style={[
-                    styles.xpFill,
-                    {
-                      width: `${Math.min(
-                        100,
-                        status.xpForNextLevel > 0
-                          ? (status.xpIntoLevel / status.xpForNextLevel) * 100
-                          : 0,
-                      )}%`,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={styles.statusXp}>
-                {status.xpIntoLevel}/{status.xpForNextLevel} XP
-                {status.currentStreak > 0 ? ` · 🔥 ${status.currentStreak}` : ''}
-              </Text>
-            </View>
-          ) : null}
-
-          <View style={styles.actions}>
-            {canMessage === 'chat' || canMessage === 'request' ? (
-              <TouchableOpacity
-                style={[styles.primaryBtn, styles.messageBtn, opening && styles.btnDisabled]}
-                onPress={() => void onMessage()}
-                disabled={opening}
-              >
-                <Text style={styles.primaryBtnText}>
-                  {opening ? '…' : canMessage === 'request' ? 'Message' : 'Chat'}
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.primaryBtn, styles.waveBtn, (waving || !onWave) && styles.btnDisabled]}
-                onPress={onWave}
-                disabled={waving || !onWave}
-              >
-                <Text style={styles.primaryBtnText}>{waving ? '…' : '👋 Wave'}</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={styles.profileBtn}
-              onPress={() => {
-                onClose();
-                navigation.navigate('UserProfile', { userId: point.id });
-              }}
-            >
-              <Text style={styles.profileBtnText}>Profile</Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            style={styles.blockLink}
-            onPress={onBlockToggle}
-            disabled={blocking}
-          >
-            <Text style={[styles.blockLinkText, blocked && styles.unblockLinkText]}>
-              {blocking ? '…' : blocked ? 'Unblock' : 'Block'}
-            </Text>
-          </TouchableOpacity>
-        </>
-      )}
-    </>
-  );
-}
-
-type NonUserEntityPoint = Exclude<EntityPoint, UserEntityPoint>;
-
-function GenericCard({
-  point,
-  onClose,
-}: {
-  point: NonUserEntityPoint;
-  onClose: () => void;
-}): React.JSX.Element {
-  const navigation = useNavigation<Nav>();
-  const title =
-    point.kind === 'event'
-      ? point.meta.title
-      : point.kind === 'listing'
-        ? point.meta.title
-        : 'Nearby';
-  const subtitle =
-    point.kind === 'event'
-      ? new Date(point.meta.startsAt).toLocaleString()
-      : point.kind === 'listing'
-        ? `${(point.meta.priceCents / 100).toFixed(0)} ${point.meta.currency}`
-        : undefined;
-
-  return (
-    <>
-      <View style={styles.handle} />
-      <View style={styles.header}>
-        <View style={styles.titleGroup}>
-          <Text style={styles.title}>{title}</Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          ))}
         </View>
-        <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-          <Text style={styles.closeText}>✕</Text>
+      ) : null}
+
+      {status ? (
+        <View style={styles.statusBlock}>
+          <Text style={styles.statusLevel}>Level {status.level}</Text>
+          <View style={styles.xpTrack}>
+            <View
+              style={[
+                styles.xpFill,
+                {
+                  width: `${Math.min(100, Math.round((status.xpIntoLevel / Math.max(1, status.xpForNextLevel)) * 100))}%`,
+                },
+              ]}
+            />
+          </View>
+          <Text style={styles.statusXp}>
+            {status.xpIntoLevel}/{status.xpForNextLevel} XP
+          </Text>
+        </View>
+      ) : null}
+
+      <View style={styles.actions}>
+        {onWave && !blocked ? (
+          <TouchableOpacity
+            style={[styles.primaryBtn, styles.waveBtn, waving && styles.btnDisabled]}
+            onPress={onWave}
+            disabled={waving}
+          >
+            <Text style={styles.primaryBtnText}>{waving ? '…' : 'Wave'}</Text>
+          </TouchableOpacity>
+        ) : null}
+        {canMessage !== 'none' && !blocked ? (
+          <TouchableOpacity
+            style={[styles.primaryBtn, styles.messageBtn, opening && styles.btnDisabled]}
+            onPress={() => void onMessage()}
+            disabled={opening}
+          >
+            <Text style={styles.primaryBtnText}>{opening ? '…' : 'Message'}</Text>
+          </TouchableOpacity>
+        ) : null}
+        <TouchableOpacity
+          style={styles.profileBtn}
+          onPress={() => {
+            onClose();
+            navigation.navigate('UserProfile', { userId: point.id });
+          }}
+        >
+          <Text style={styles.profileBtnText}>Profile</Text>
         </TouchableOpacity>
       </View>
-      {point.kind === 'event' ? (
-        <TouchableOpacity
-          style={styles.viewBtn}
-          onPress={() => {
-            onClose();
-            navigation.navigate('EventDetail', { eventId: point.id });
-          }}
-        >
-          <Text style={styles.viewBtnText}>View event</Text>
-        </TouchableOpacity>
-      ) : null}
-      {point.kind === 'listing' ? (
-        <TouchableOpacity
-          style={styles.viewBtn}
-          onPress={() => {
-            onClose();
-            navigation.navigate('ListingDetail', { listingId: point.id });
-          }}
-        >
-          <Text style={styles.viewBtnText}>View listing</Text>
-        </TouchableOpacity>
-      ) : null}
-    </>
+
+      <TouchableOpacity style={styles.blockLink} onPress={onBlockToggle} disabled={blocking}>
+        <Text style={[styles.blockLinkText, blocked && styles.unblockLinkText]}>
+          {blocked ? 'Unblock' : 'Block'}
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): React.JSX.Element {
+  if (point.kind === 'user') {
+    return (
+      <UserCard
+        point={point as UserEntityPoint}
+        waving={waving}
+        onClose={onClose}
+        onWave={onWave}
+      />
+    );
+  }
+
+  const title =
+    point.kind === 'event'
+      ? (point.meta as { title?: string }).title ?? 'Event'
+      : point.kind === 'listing'
+        ? (point.meta as { title?: string }).title ?? 'Listing'
+        : 'Place';
+
   return (
     <View style={styles.sheet}>
-      {point.kind === 'user' ? (
-        <UserCard
-          point={point as UserEntityPoint}
-          waving={waving}
-          onClose={onClose}
-          onWave={onWave}
-        />
-      ) : (
-        <GenericCard point={point as NonUserEntityPoint} onClose={onClose} />
-      )}
+      <View style={styles.handle} />
+      <View style={styles.header}>
+        <View style={styles.titleGroup}>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subtitle}>{point.kind}</Text>
+        </View>
+        <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={12}>
+          <Text style={styles.closeText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+      <TouchableOpacity style={styles.viewBtn} onPress={onClose}>
+        <Text style={styles.viewBtnText}>Close</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -366,7 +294,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -376,7 +304,7 @@ const styles = StyleSheet.create({
   handle: {
     width: 40,
     height: 4,
-    backgroundColor: '#444',
+    backgroundColor: colors.textFaint,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 4,
@@ -385,47 +313,47 @@ const styles = StyleSheet.create({
   userHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   userHeaderText: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  originLine: { color: '#888', fontSize: 12, marginTop: 2 },
-  onlineLabel: { color: '#4caf50', fontSize: 12, marginTop: 2 },
-  offlineLabel: { color: '#666' },
-  bio: { color: '#ccc', fontSize: 14, lineHeight: 20 },
+  originLine: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  onlineLabel: { color: colors.success, fontSize: 12, marginTop: 2 },
+  offlineLabel: { color: colors.textMuted },
+  bio: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
   goalsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   goalChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#0a0a1a',
+    backgroundColor: colors.bg,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 14,
   },
   goalIcon: { fontSize: 13 },
-  goalLabel: { color: '#aaa', fontSize: 12 },
-  sharedHint: { color: '#7ad7ff', fontSize: 13 },
+  goalLabel: { color: colors.textSecondary, fontSize: 12 },
+  sharedHint: { color: colors.info, fontSize: 13 },
   statusBlock: {
-    backgroundColor: '#0a0a1a',
+    backgroundColor: colors.bg,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 6,
   },
-  statusLevel: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  statusLevel: { color: colors.textPrimary, fontWeight: '700', fontSize: 14 },
   xpTrack: {
     height: 6,
-    backgroundColor: '#2a2a4a',
+    backgroundColor: colors.borderStrong,
     borderRadius: 3,
     overflow: 'hidden',
   },
   xpFill: {
     height: '100%',
-    backgroundColor: '#00d4ff',
+    backgroundColor: colors.primary,
     borderRadius: 3,
   },
-  statusXp: { color: '#888', fontSize: 12 },
+  statusXp: { color: colors.textMuted, fontSize: 12 },
   actions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   blockLink: { alignSelf: 'center', paddingVertical: 4 },
-  blockLinkText: { color: '#ff6b6b', fontSize: 13, fontWeight: '600' },
-  unblockLinkText: { color: '#7ad7ff' },
+  blockLinkText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
+  unblockLinkText: { color: colors.info },
   primaryBtn: {
     flex: 1,
     borderRadius: 12,
@@ -435,34 +363,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 48,
   },
-  waveBtn: { backgroundColor: '#00d4ff' },
-  messageBtn: { backgroundColor: '#34e0a1' },
-  primaryBtnText: { color: '#000', fontWeight: '700', fontSize: 15 },
+  waveBtn: { backgroundColor: colors.primary },
+  messageBtn: { backgroundColor: colors.action },
+  primaryBtnText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
   profileBtn: {
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0a0a1a',
+    backgroundColor: colors.bg,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
     minHeight: 48,
   },
-  profileBtnText: { color: '#aaa', fontWeight: '600', fontSize: 14 },
+  profileBtnText: { color: colors.textSecondary, fontWeight: '600', fontSize: 14 },
   btnDisabled: { opacity: 0.55 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   titleGroup: { flex: 1 },
-  title: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  subtitle: { color: '#aaa', fontSize: 13, marginTop: 2 },
+  title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
+  subtitle: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
   closeBtn: { padding: 4 },
-  closeText: { color: '#aaa', fontSize: 16 },
+  closeText: { color: colors.textSecondary, fontSize: 16 },
   viewBtn: {
     marginTop: 14,
-    backgroundColor: '#00d4ff',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
   },
-  viewBtnText: { color: '#0a0a0f', fontSize: 14, fontWeight: '700' },
+  viewBtnText: { color: colors.onPrimary, fontSize: 14, fontWeight: '700' },
 });

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { colors } from '@/theme';
 import {
   ActivityIndicator,
   Modal,
@@ -81,7 +82,7 @@ export function StoryCreateSheet({
           <TextInput
             style={styles.caption}
             placeholder="Add a caption (optional)"
-            placeholderTextColor="#888"
+            placeholderTextColor={colors.textMuted}
             value={caption}
             onChangeText={setCaption}
             maxLength={STORY_LIMITS.captionMax}
@@ -98,7 +99,7 @@ export function StoryCreateSheet({
               disabled={posting}
             >
               {posting ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={colors.textPrimary} />
               ) : (
                 <Text style={styles.postText}>Pick & post</Text>
               )}
@@ -128,29 +129,29 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#1a1a24',
+    backgroundColor: colors.surfaceRaised,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: 20,
     paddingBottom: 32,
   },
-  title: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 4 },
-  hint: { color: '#999', fontSize: 13, marginBottom: 12 },
+  title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginBottom: 4 },
+  hint: { color: colors.textMuted, fontSize: 13, marginBottom: 12 },
   caption: {
-    backgroundColor: '#2a2a36',
+    backgroundColor: colors.surfaceAlt,
     borderRadius: 12,
-    color: '#fff',
+    color: colors.textPrimary,
     padding: 12,
     minHeight: 72,
     textAlignVertical: 'top',
     marginBottom: 12,
   },
-  error: { color: '#ff6b6b', marginBottom: 8, fontSize: 13 },
+  error: { color: colors.danger, marginBottom: 8, fontSize: 13 },
   row: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 12 },
   cancelBtn: { paddingVertical: 12, paddingHorizontal: 16 },
-  cancelText: { color: '#aaa', fontSize: 15 },
+  cancelText: { color: colors.textSecondary, fontSize: 15 },
   postBtn: {
-    backgroundColor: '#7C5CFF',
+    backgroundColor: colors.accent,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 20,
@@ -158,5 +159,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   postBtnDisabled: { opacity: 0.6 },
-  postText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  postText: { color: colors.textPrimary, fontWeight: '700', fontSize: 15 },
 });

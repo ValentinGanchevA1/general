@@ -33,6 +33,7 @@ import {
   storyReceived,
 } from '@/features/stories/storiesSlice';
 import { PulseStrip } from '@/features/stories/components/PulseStrip';
+import { colors } from '@/theme';
 import { StoryViewer } from '@/features/stories/components/StoryViewer';
 import { StoryCreateSheet } from '@/features/stories/components/StoryCreateSheet';
 import { pickAndUploadStoryMedia } from '@/features/stories/storyMedia';
@@ -267,7 +268,7 @@ export function PulseScreen(): React.JSX.Element {
     return (
       <View style={S.container}>
         {Header}
-        <View style={S.center}><ActivityIndicator color="#00d4ff" /></View>
+        <View style={S.center}><ActivityIndicator color={colors.primary} /></View>
         <StoryViewer
           stories={nearbyStories}
           initialIndex={viewerIndex}
@@ -319,7 +320,7 @@ export function PulseScreen(): React.JSX.Element {
         ListFooterComponent={Footer}
         ListEmptyComponent={
           <View style={S.empty}>
-            <MCI name="pulse" size={40} color="#2a2a4a" />
+            <MCI name="pulse" size={40} color={colors.borderStrong} />
             <Text style={S.emptyTitle}>{emptyCopy.title}</Text>
             <Text style={S.emptyBody}>{emptyCopy.hint}</Text>
           </View>
@@ -331,7 +332,7 @@ export function PulseScreen(): React.JSX.Element {
               load();
               loadStories();
             }}
-            tintColor="#00d4ff"
+            tintColor={colors.primary}
           />
         }
         contentContainerStyle={{ paddingBottom: 140 }}
@@ -354,35 +355,35 @@ export function PulseScreen(): React.JSX.Element {
 }
 
 const S = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
+  container: { flex: 1, backgroundColor: colors.bg },
 
   headerBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4,
   },
-  headerTitle: { color: '#fff', fontSize: 28, fontWeight: '700' },
+  headerTitle: { color: colors.textPrimary, fontSize: 28, fontWeight: '700' },
 
   chips: { maxHeight: 50 },
   chipsContent: { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
   chip: {
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16,
-    backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#2a2a4a',
+    backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong,
   },
-  chipActive: { backgroundColor: '#00d4ff', borderColor: '#00d4ff' },
-  chipText: { color: '#aaa', fontSize: 13, fontWeight: '500' },
-  chipTextActive: { color: '#0a0a0f', fontWeight: '700' },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: colors.textSecondary, fontSize: 13, fontWeight: '500' },
+  chipTextActive: { color: colors.onPrimary, fontWeight: '700' },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  errorText: { color: '#ff6b6b', fontSize: 14, marginBottom: 12, textAlign: 'center' },
+  errorText: { color: colors.danger, fontSize: 14, marginBottom: 12, textAlign: 'center' },
   retry: {
-    backgroundColor: '#00d4ff',
+    backgroundColor: colors.primary,
     paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8,
   },
-  retryText: { color: '#0a0a0f', fontWeight: '700' },
+  retryText: { color: colors.onPrimary, fontWeight: '700' },
 
   empty: { alignItems: 'center', paddingVertical: 60 },
-  emptyTitle: { color: '#fff', fontSize: 16, fontWeight: '600', marginTop: 12 },
-  emptyBody: { color: '#666', fontSize: 13, marginTop: 4, textAlign: 'center', paddingHorizontal: 32 },
+  emptyTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginTop: 12 },
+  emptyBody: { color: colors.textMuted, fontSize: 13, marginTop: 4, textAlign: 'center', paddingHorizontal: 32 },
 
   footer: { paddingTop: 20, paddingBottom: 30 },
 });

@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { colors } from '@/theme';
 
 import type { StoryCard } from '@g88/shared';
 
@@ -109,21 +110,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  ringUnseen: { borderWidth: 2, borderColor: '#7C5CFF' },
-  ringSeen: { borderWidth: 2, borderColor: '#555' },
-  ringCreate: { borderWidth: 2, borderColor: '#888', borderStyle: 'dashed' },
-  ringCreateLocked: { borderColor: '#555', opacity: 0.7 },
-  avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#333' },
+  ringUnseen: { borderWidth: 2, borderColor: colors.accent },
+  ringSeen: { borderWidth: 2, borderColor: colors.textFaint },
+  ringCreate: { borderWidth: 2, borderColor: colors.textMuted, borderStyle: 'dashed' },
+  ringCreateLocked: { borderColor: colors.textFaint, opacity: 0.7 },
+  avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.surfaceRaised },
   avatarFallback: { justifyContent: 'center', alignItems: 'center' },
-  avatarInitial: { color: '#fff', fontSize: 20, fontWeight: '600' },
-  plus: { color: '#fff', fontSize: 28, fontWeight: '300' },
+  avatarInitial: { color: colors.textPrimary, fontSize: 20, fontWeight: '600' },
+  plus: { color: colors.textPrimary, fontSize: 28, fontWeight: '300' },
   plusLocked: { fontSize: 20 },
   name: {
     marginTop: 4,
     fontSize: 11,
-    color: '#ddd',
+    color: colors.textSecondary,
     maxWidth: 72,
     textAlign: 'center',
   },
-  empty: { color: '#888', fontSize: 13, paddingHorizontal: 8, alignSelf: 'center' },
+  empty: { color: colors.textMuted, fontSize: 13, paddingHorizontal: 8, alignSelf: 'center' },
 });

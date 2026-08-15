@@ -9,6 +9,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import { colors } from '@/theme';
+
 import { MapScreen } from '@/screens/MapScreen';
 import { PulseScreen } from '@/features/pulse/PulseScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
@@ -115,13 +117,13 @@ function MainTabs(): React.JSX.Element {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#0a0a0f',
-          borderTopColor: '#1a1a2e',
+          backgroundColor: colors.bg,
+          borderTopColor: colors.surfaceAlt,
           height: 64,
           paddingTop: 6,
         },
-        tabBarActiveTintColor: '#00d4ff',
-        tabBarInactiveTintColor: '#555',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textFaint,
         tabBarIcon: ({ color }) => {
           const icons = {
             Map: 'map-marker-radius',
@@ -182,12 +184,12 @@ export function AppNavigator(): React.JSX.Element {
       <View
         style={{
           flex: 1,
-          backgroundColor: '#0a0a0f',
+          backgroundColor: colors.bg,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <ActivityIndicator size="large" color="#00d4ff" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -253,7 +255,7 @@ export function AppNavigator(): React.JSX.Element {
             <Stack.Screen
               name="Interactions"
               component={InteractionsScreen}
-              options={{ title: 'Interactions', headerStyle: { backgroundColor: '#0a0a1a' }, headerTintColor: '#fff' }}
+              options={{ title: 'Interactions', headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.textPrimary }}
             />
             <Stack.Screen name="Privacy" component={PrivacyScreen} />
             <Stack.Screen name="Help" component={HelpScreen} />
