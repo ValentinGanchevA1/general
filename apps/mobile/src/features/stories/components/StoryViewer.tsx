@@ -9,18 +9,16 @@ import {
   Text,
   View,
 } from 'react-native';
-import Video, { type OnLoadData, type OnProgressData } from 'react-native-video';
+import Video from 'react-native-video';
 
 import type { StoryCard, StoryReactionKind } from '@g88/shared';
-import { STORY_LIMITS } from '@g88/shared';
 
 import { colors } from '@/theme';
 import { useAppDispatch } from '@/hooks/redux';
 import { reactToStory, recordStoryView } from '../storiesSlice';
+import { useStoryProgress } from './useStoryProgress';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
-const IMAGE_PROGRESS_MS = 5_000;
-const VIDEO_SAFETY_MS = (STORY_LIMITS.videoMaxSeconds + 3) * 1_000;
 
 interface Props {
   stories: StoryCard[];
@@ -29,133 +27,85 @@ interface Props {
   onClose: () => void;
 }
 
-/** Full-screen sequential story viewer with animated progress, hold-to-pause, mute. */
+/** Full-screen sequential story viewer — progress logic lives in useStoryProgress. */
 export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) {
   const dispatch = useAppDispatch();
   const [index, setIndex] = useState(initialIndex);
-  const [paused, setPaused] = useState(false);
+  const [held, setHeld] = useState(false);
   const [muted, setMuted] = useState(false);
   const [chromeDimmed, setChromeDimmed] = useState(false);
-
-  // useState (not useRef.current) so eslint react-hooks/refs is happy during render.
-  const [progressAnim] = useState(() => new Animated.Value(0));
-  const progressValue = useRef(0);
-  const animRef = useRef<Animated.CompositeAnimation | null>(null);
-  const durationMsRef = useRef(IMAGE_PROGRESS_MS);
-  const safetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chromeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const current = stories[index];
   const storyId = current?.id;
   const mediaType = current?.mediaType;
 
-  const clearSafety = () => {
-    if (safetyTimer.current) {
-      clearTimeout(safetyTimer.current);
-      safetyTimer.current = null;
-    }
-  };
-
   const goNext = useCallback(() => {
-    animRef.current?.stop();
-    clearSafety();
-    if (index < stories.length - 1) setIndex((i) => i + 1);
-    else onClose();
-  }, [index, stories.length, onClose]);
+    setIndex((i) => {
+      if (i < stories.length - 1) return i + 1;
+      // Side-effect outside the updater body
+      queueMicrotask(() => onClose());
+      return i;
+    });
+  }, [stories.length, onClose]);
 
   const goPrev = useCallback(() => {
-    animRef.current?.stop();
-    clearSafety();
-    if (index > 0) setIndex((i) => i - 1);
-  }, [index]);
+    setIndex((i) => (i > 0 ? i - 1 : i));
+  }, []);
 
-  useEffect(() => {
-    const id = progressAnim.addListener(({ value }) => {
-      progressValue.current = value;
+  const { progressAnim, onVideoLoad, onVideoProgress, onVideoEnd, onVideoError, hardStop } =
+    useStoryProgress({
+      visible,
+      storyId,
+      mediaType,
+      held,
+      onComplete: goNext,
     });
-    return () => {
-      progressAnim.removeListener(id);
-    };
-  }, [progressAnim]);
 
+  // Sync index when sheet opens on a different story
   useEffect(() => {
     if (!visible) return;
-    // Defer setState out of the effect body (react-hooks/set-state-in-effect).
     queueMicrotask(() => {
       setIndex(initialIndex);
-      setPaused(false);
+      setHeld(false);
       setChromeDimmed(false);
     });
   }, [visible, initialIndex]);
 
-  const startImageProgress = useCallback(
-    (from: number) => {
-      animRef.current?.stop();
-      const duration = durationMsRef.current;
-      const remaining = Math.max(80, duration * (1 - from));
-      progressAnim.setValue(from);
-      animRef.current = Animated.timing(progressAnim, {
-        toValue: 1,
-        duration: remaining,
-        useNativeDriver: false,
-      });
-      animRef.current.start(({ finished }) => {
-        if (finished) goNext();
-      });
-    },
-    [progressAnim, goNext],
-  );
-
-  // Reset progress + timers when story changes
+  // Record view + reset chrome dim on story change
   useEffect(() => {
     if (!visible || !storyId) return;
     void dispatch(recordStoryView(storyId));
-
     queueMicrotask(() => {
-      setPaused(false);
+      setHeld(false);
       setChromeDimmed(false);
     });
-
-    progressAnim.setValue(0);
-    progressValue.current = 0;
-    animRef.current?.stop();
-    clearSafety();
-
-    if (mediaType === 'video') {
-      durationMsRef.current = VIDEO_SAFETY_MS;
-      // Safety only — real advance is onEnd / onProgress completion
-      safetyTimer.current = setTimeout(goNext, VIDEO_SAFETY_MS);
-    } else {
-      durationMsRef.current = IMAGE_PROGRESS_MS;
-      startImageProgress(0);
-    }
-
     if (chromeTimer.current) clearTimeout(chromeTimer.current);
     chromeTimer.current = setTimeout(() => setChromeDimmed(true), 1_200);
-
     return () => {
-      animRef.current?.stop();
-      clearSafety();
       if (chromeTimer.current) clearTimeout(chromeTimer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, storyId, index, mediaType, dispatch, goNext, startImageProgress]);
+  }, [visible, storyId, index, dispatch]);
+
+  const scheduleChromeDim = () => {
+    if (chromeTimer.current) clearTimeout(chromeTimer.current);
+    chromeTimer.current = setTimeout(() => setChromeDimmed(true), 1_200);
+  };
 
   const onHoldStart = () => {
-    setPaused(true);
+    setHeld(true);
     setChromeDimmed(false);
-    if (mediaType === 'image') {
-      animRef.current?.stop();
-    }
   };
 
   const onHoldEnd = () => {
-    setPaused(false);
-    if (mediaType === 'image') {
-      startImageProgress(progressValue.current);
-    }
-    if (chromeTimer.current) clearTimeout(chromeTimer.current);
-    chromeTimer.current = setTimeout(() => setChromeDimmed(true), 1_200);
+    setHeld(false);
+    scheduleChromeDim();
+  };
+
+  const onTapNav = (dir: 'prev' | 'next') => {
+    hardStop();
+    if (dir === 'prev') goPrev();
+    else goNext();
   };
 
   if (!current) return null;
@@ -164,54 +114,15 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
     void dispatch(reactToStory({ storyId: current.id, kind }));
   };
 
-  const onVideoEnd = () => {
-    clearSafety();
-    goNext();
-  };
-
-  const onVideoLoad = (data: OnLoadData) => {
-    clearSafety();
-    const durationMs = Math.min(
-      Math.ceil((data.duration || STORY_LIMITS.videoMaxSeconds) * 1000) + 1_000,
-      VIDEO_SAFETY_MS,
-    );
-    durationMsRef.current = durationMs;
-    safetyTimer.current = setTimeout(goNext, durationMs);
-  };
-
-  const onVideoProgress = (data: OnProgressData) => {
-    const total = data.seekableDuration || data.playableDuration;
-    if (total > 0) {
-      progressAnim.setValue(Math.min(1, data.currentTime / total));
-    }
-  };
-
   return (
     <Modal visible={visible} animationType="fade" statusBarTranslucent>
       <View style={styles.root}>
-        <View style={[styles.progressRow, chromeDimmed && styles.chromeDim]}>
-          {stories.map((s, i) => (
-            <View key={s.id} style={styles.progressTrack}>
-              {i < index ? (
-                <View style={[styles.progressFill, styles.progressDone]} />
-              ) : i === index ? (
-                <Animated.View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: progressAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0%', '100%'],
-                      }),
-                    },
-                  ]}
-                />
-              ) : (
-                <View style={styles.progressFill} />
-              )}
-            </View>
-          ))}
-        </View>
+        <ProgressRow
+          stories={stories}
+          index={index}
+          progressAnim={progressAnim}
+          dimmed={chromeDimmed}
+        />
 
         <View style={[styles.header, chromeDimmed && styles.chromeDim]}>
           <Text style={styles.author}>{current.authorDisplayName}</Text>
@@ -234,14 +145,14 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
         <View style={styles.mediaWrap}>
           <Pressable
             style={styles.tapLeft}
-            onPress={goPrev}
+            onPress={() => onTapNav('prev')}
             onLongPress={onHoldStart}
             onPressOut={onHoldEnd}
             delayLongPress={150}
           />
           <Pressable
             style={styles.tapRight}
-            onPress={goNext}
+            onPress={() => onTapNav('next')}
             onLongPress={onHoldStart}
             onPressOut={onHoldEnd}
             delayLongPress={150}
@@ -257,26 +168,20 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
               controls={false}
               muted={muted}
               repeat={false}
-              paused={!visible || paused}
+              paused={!visible || held}
               playInBackground={false}
               playWhenInactive={false}
               ignoreSilentSwitch="ignore"
               onEnd={onVideoEnd}
               onLoad={onVideoLoad}
               onProgress={onVideoProgress}
-              onError={() => {
-                clearSafety();
-                safetyTimer.current = setTimeout(goNext, 1_500);
-              }}
+              onError={onVideoError}
             />
           )}
         </View>
 
         {current.caption ? (
-          <Text
-            style={[styles.caption, chromeDimmed && styles.chromeDim]}
-            numberOfLines={3}
-          >
+          <Text style={[styles.caption, chromeDimmed && styles.chromeDim]} numberOfLines={3}>
             {current.caption}
           </Text>
         ) : null}
@@ -300,6 +205,44 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
         </View>
       </View>
     </Modal>
+  );
+}
+
+function ProgressRow({
+  stories,
+  index,
+  progressAnim,
+  dimmed,
+}: {
+  stories: StoryCard[];
+  index: number;
+  progressAnim: Animated.Value;
+  dimmed: boolean;
+}) {
+  return (
+    <View style={[styles.progressRow, dimmed && styles.chromeDim]}>
+      {stories.map((s, i) => (
+        <View key={s.id} style={styles.progressTrack}>
+          {i < index ? (
+            <View style={[styles.progressFill, styles.progressDone]} />
+          ) : i === index ? (
+            <Animated.View
+              style={[
+                styles.progressFill,
+                {
+                  width: progressAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0%', '100%'],
+                  }),
+                },
+              ]}
+            />
+          ) : (
+            <View style={styles.progressFill} />
+          )}
+        </View>
+      ))}
+    </View>
   );
 }
 
