@@ -100,7 +100,7 @@ export function useStoryProgress({
       safetyTimer.current = setTimeout(() => onCompleteRef.current(), VIDEO_SAFETY_MS);
     } else {
       durationMsRef.current = IMAGE_PROGRESS_MS;
-      queueMicrotask(() => {
+      void Promise.resolve().then(() => {
         if (!heldRef.current) startImageProgress(0);
       });
     }
