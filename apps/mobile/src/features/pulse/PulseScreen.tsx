@@ -1,8 +1,9 @@
 // apps/mobile/src/features/pulse/PulseScreen.tsx
 //
 // Pulse — activity hub + stories.
-//   Layout: header + story strip + filter chips + nearby strip + cards + trending
+//   Layout: header + story strip + filter chips + activity feed.
 //   Data:   `/feed` for cards; stories.nearby for PulseStrip; discovery for nearby.
+//   Stories live here (not on Map) so Map stays map-first.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -17,153 +18,116 @@ import {
   View,
 } from 'react-native';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 
-import type { ActivityItem, ActivityType, StoryCard, Viewport } from '@g88/shared';
+import type { FeedItem, StoryCard } from '@g88/shared';
 import { canPostStory, storyGateMessage } from '@g88/shared';
 
-import type { PulseFilter, RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
+import type { RootStackParamList, TabParamList, PulseFilter } from '@/navigation/AppNavigator';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { fetchFeed, clearPendingFilter } from './pulseSlice';
 import { useUserLocation } from '@/features/location/useUserLocation';
-import {
-  fetchNearbyStories,
-  storyReceived,
-} from '@/features/stories/storiesSlice';
+import { fetchNearbyStories } from '@/features/stories/storiesSlice';
 import { PulseStrip } from '@/features/stories/components/PulseStrip';
+import { colors } from '@/theme';
 import { StoryViewer } from '@/features/stories/components/StoryViewer';
 import { StoryCreateSheet } from '@/features/stories/components/StoryCreateSheet';
 import { pickAndUploadStoryMedia } from '@/features/stories/storyMedia';
-import { useSocket } from '@/realtime/useSocket';
-import { track } from '@/lib/analytics';
+import { ActivityCard } from './ActivityCard';
+import { TrendingStrip } from './TrendingStrip';
+import { usePulseFeed } from './usePulseFeed';
 
-import { ActivityCard } from './components/ActivityCard';
-import { NearbyPeopleStrip } from './components/NearbyPeopleStrip';
-import { TrendingStrip } from './components/TrendingStrip';
-import { useTrendingNearby } from './useTrendingNearby';
-
-type Nav = NativeStackNavigationProp<RootStackParamList>;
-type R = RouteProp<TabParamList, 'Pulse'>;
-
-interface FilterDef { key: PulseFilter; label: string; type: ActivityType | null }
-
-const FILTERS: FilterDef[] = [
-  { key: 'all',      label: 'All',     type: null },
-  { key: 'chats',    label: 'Chats',   type: 'chat' },
-  { key: 'waves',    label: 'Waves',   type: 'wave' },
-  { key: 'listings', label: 'Trades',  type: 'listing' },
-  { key: 'alerts',   label: 'Alerts',  type: 'alert' },
-  { key: 'matches',  label: 'Matches', type: 'match' },
+const FILTERS: { key: PulseFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'chats', label: 'Chats' },
+  { key: 'waves', label: 'Waves' },
+  { key: 'listings', label: 'Trades' },
+  { key: 'alerts', label: 'Alerts' },
+  { key: 'matches', label: 'Matches' },
 ];
 
-/** ~2km box around the user for nearby story query when map viewport is unavailable. */
-function viewportAround(
-  lat: number,
-  lng: number,
-  delta = 0.02,
-): Viewport {
-  return {
-    ne: { lat: lat + delta / 2, lng: lng + delta / 2 },
-    sw: { lat: lat - delta / 2, lng: lng - delta / 2 },
-  };
-}
-
 export function PulseScreen(): React.JSX.Element {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<TabParamList, 'Pulse'>>();
   const dispatch = useAppDispatch();
-  const navigation = useNavigation<Nav>();
-  const route = useRoute<R>();
-
-  const { items, loading, error, pendingFilter } = useAppSelector((s) => s.pulse);
-  const discoveryPoints = useAppSelector((s) => s.discovery.points);
+  const { coords: myCoords } = useUserLocation();
+  const { items, trendingTopics, loading, error, load } = usePulseFeed();
   const nearbyStories = useAppSelector((s) => s.stories.nearby);
-  const profile = useAppSelector((s) => s.profile.profile);
-  const { topics: trendingTopics } = useTrendingNearby();
-  const { coords: myCoords, requestPermission } = useUserLocation();
-  const { on } = useSocket();
+  const me = useAppSelector((s) => s.auth.user);
 
-  const [filter, setFilter] = useState<PulseFilter>(route.params?.filter ?? 'all');
+  const filter = route.params?.filter ?? 'all';
+  const setFilter = (f: PulseFilter) => {
+    navigation.setParams({ filter: f });
+  };
+
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (route.params?.filter) setFilter(route.params.filter);
-  }, [route.params?.filter]);
-
-  useEffect(() => {
-    if (pendingFilter) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFilter(pendingFilter as PulseFilter);
-      dispatch(clearPendingFilter());
-    }
-  }, [pendingFilter, dispatch]);
-
-  const load = useCallback(() => {
-    const f = FILTERS.find((x) => x.key === filter);
-    void dispatch(fetchFeed(f?.type ? { types: [f.type] } : {}));
-  }, [dispatch, filter]);
+  const storyEligibility = useMemo(() => {
+    if (!me) return { allowed: false as const, reason: 'auth' as const };
+    return canPostStory({
+      emailVerified: Boolean((me as { emailVerified?: boolean }).emailVerified),
+      createdAt: (me as { createdAt?: string }).createdAt ?? new Date().toISOString(),
+    });
+  }, [me]);
 
   const loadStories = useCallback(() => {
     if (!myCoords) return;
     void dispatch(
       fetchNearbyStories({
-        viewport: viewportAround(myCoords.lat, myCoords.lng),
-        zoom: 14,
+        viewport: {
+          ne: { lat: myCoords.lat + 0.05, lng: myCoords.lng + 0.05 },
+          sw: { lat: myCoords.lat - 0.05, lng: myCoords.lng - 0.05 },
+        },
+        zoom: 12,
       }),
     );
   }, [dispatch, myCoords]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void requestPermission();
-      load();
-      loadStories();
-    }, [requestPermission, load, loadStories]),
-  );
-
   useEffect(() => {
-    const unsub = on('story:new', (e) => {
-      dispatch(storyReceived(e));
-    });
-    return unsub;
-  }, [on, dispatch]);
+    load();
+    loadStories();
+  }, [load, loadStories]);
 
   const filtered = useMemo(() => {
-    const f = FILTERS.find((x) => x.key === filter);
-    return f?.type ? items.filter((i) => i.type === f.type) : items;
+    if (filter === 'all') return items;
+    if (filter === 'chats') return items.filter((i) => i.kind === 'chat');
+    if (filter === 'waves') return items.filter((i) => i.kind === 'wave');
+    if (filter === 'listings') return items.filter((i) => i.kind === 'listing');
+    if (filter === 'alerts') return items.filter((i) => i.kind === 'alert');
+    if (filter === 'matches') return items.filter((i) => i.kind === 'match');
+    return items;
   }, [items, filter]);
 
-  const onTap = useCallback((it: ActivityItem): void => {
-    const { screen, params } = it.deepLink;
-    if (screen === 'Main') {
-      navigation.navigate('Main', params as never);
-    } else {
-      (navigation.navigate as (s: string, p?: object) => void)(screen, params);
+  const onTap = (item: FeedItem) => {
+    if (item.kind === 'chat' && item.conversationId) {
+      navigation.navigate('Chat', {
+        conversationId: item.conversationId,
+        otherUserName: item.title,
+      });
+    } else if (item.kind === 'wave' && item.otherUserId) {
+      navigation.navigate('UserProfile', { userId: item.otherUserId });
+    } else if (item.kind === 'listing' && item.listingId) {
+      navigation.navigate('ListingDetail', { listingId: item.listingId });
+    } else if (item.kind === 'alert') {
+      // stay on pulse
+    } else if (item.kind === 'match' && item.otherUserId) {
+      navigation.navigate('UserProfile', { userId: item.otherUserId });
     }
-  }, [navigation]);
+  };
 
-  const storyEligibility = useMemo(() => {
-    if (!profile) return { allowed: false as const, reason: 'email_unverified' as const };
-    return canPostStory({
-      verification: profile.verification,
-      createdAt: profile.createdAt,
-    });
-  }, [profile]);
-
-  const onOpenStory = useCallback((story: StoryCard, index: number) => {
+  const onOpenStory = (story: StoryCard, index: number) => {
     setViewerIndex(index);
     setViewerOpen(true);
-    track('story.open', { storyId: story.id, index, surface: 'pulse' });
-  }, []);
+  };
 
-  const onCreatePress = useCallback(() => {
+  const onCreatePress = () => {
     if (!storyEligibility.allowed) {
       const reason = storyEligibility.reason;
       const buttons =
-        reason === 'email_unverified'
+        reason === 'email'
           ? [
               { text: 'Cancel', style: 'cancel' as const },
               {
@@ -171,13 +135,12 @@ export function PulseScreen(): React.JSX.Element {
                 onPress: () => navigation.navigate('EmailVerification'),
               },
             ]
-          : [{ text: 'OK' }];
+          : [{ text: 'OK', style: 'cancel' as const }];
       Alert.alert('Stories', storyGateMessage(reason), buttons);
       return;
     }
     setCreateOpen(true);
-    track('story.create_open', { surface: 'pulse' });
-  }, [storyEligibility, navigation]);
+  };
 
   const emptyCopy = useMemo(() => {
     switch (filter) {
@@ -227,28 +190,20 @@ export function PulseScreen(): React.JSX.Element {
       />
 
       <ScrollView
-        horizontal showsHorizontalScrollIndicator={false}
-        style={S.chips} contentContainerStyle={S.chipsContent}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={S.chips}
       >
-        {FILTERS.map((f) => {
-          const active = filter === f.key;
-          return (
-            <TouchableOpacity
-              key={f.key}
-              style={[S.chip, active && S.chipActive]}
-              onPress={() => setFilter(f.key)}
-              testID={`pulse-filter-${f.key}`}
-            >
-              <Text style={[S.chipText, active && S.chipTextActive]}>{f.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
+        {FILTERS.map((f) => (
+          <TouchableOpacity
+            key={f.key}
+            style={[S.chip, filter === f.key && S.chipActive]}
+            onPress={() => setFilter(f.key)}
+          >
+            <Text style={[S.chipText, filter === f.key && S.chipTextActive]}>{f.label}</Text>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
-
-      <NearbyPeopleStrip
-        points={discoveryPoints}
-        onTapUser={(userId) => navigation.navigate('UserProfile', { userId })}
-      />
     </View>
   );
 
@@ -267,7 +222,7 @@ export function PulseScreen(): React.JSX.Element {
     return (
       <View style={S.container}>
         {Header}
-        <View style={S.center}><ActivityIndicator color="#00d4ff" /></View>
+        <View style={S.center}><ActivityIndicator color={colors.primary} /></View>
         <StoryViewer
           stories={nearbyStories}
           initialIndex={viewerIndex}
@@ -319,7 +274,7 @@ export function PulseScreen(): React.JSX.Element {
         ListFooterComponent={Footer}
         ListEmptyComponent={
           <View style={S.empty}>
-            <MCI name="pulse" size={40} color="#2a2a4a" />
+            <MCI name="pulse" size={40} color={colors.borderStrong} />
             <Text style={S.emptyTitle}>{emptyCopy.title}</Text>
             <Text style={S.emptyBody}>{emptyCopy.hint}</Text>
           </View>
@@ -331,12 +286,11 @@ export function PulseScreen(): React.JSX.Element {
               load();
               loadStories();
             }}
-            tintColor="#00d4ff"
+            tintColor={colors.primary}
           />
         }
-        contentContainerStyle={{ paddingBottom: 140 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
       />
-
       <StoryViewer
         stories={nearbyStories}
         initialIndex={viewerIndex}
@@ -354,35 +308,41 @@ export function PulseScreen(): React.JSX.Element {
 }
 
 const S = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
-
-  headerBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4,
-  },
-  headerTitle: { color: '#fff', fontSize: 28, fontWeight: '700' },
-
-  chips: { maxHeight: 50 },
-  chipsContent: { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
-  chip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16,
-    backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#2a2a4a',
-  },
-  chipActive: { backgroundColor: '#00d4ff', borderColor: '#00d4ff' },
-  chipText: { color: '#aaa', fontSize: 13, fontWeight: '500' },
-  chipTextActive: { color: '#0a0a0f', fontWeight: '700' },
-
+  container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  errorText: { color: '#ff6b6b', fontSize: 14, marginBottom: 12, textAlign: 'center' },
-  retry: {
-    backgroundColor: '#00d4ff',
-    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8,
+  headerBar: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
   },
-  retryText: { color: '#0a0a0f', fontWeight: '700' },
-
+  headerTitle: { color: colors.textPrimary, fontSize: 28, fontWeight: '700' },
+  chips: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: colors.textSecondary, fontSize: 13, fontWeight: '500' },
+  chipTextActive: { color: colors.onPrimary, fontWeight: '700' },
+  errorText: { color: colors.danger, fontSize: 14, marginBottom: 12, textAlign: 'center' },
+  retry: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  retryText: { color: colors.onPrimary, fontWeight: '700' },
   empty: { alignItems: 'center', paddingVertical: 60 },
-  emptyTitle: { color: '#fff', fontSize: 16, fontWeight: '600', marginTop: 12 },
-  emptyBody: { color: '#666', fontSize: 13, marginTop: 4, textAlign: 'center', paddingHorizontal: 32 },
+  emptyTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginTop: 12 },
+  emptyBody: { color: colors.textMuted, fontSize: 13, marginTop: 4, textAlign: 'center', paddingHorizontal: 32 },
 
   footer: { paddingTop: 20, paddingBottom: 30 },
 });
