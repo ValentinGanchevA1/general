@@ -37,7 +37,8 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   const [muted, setMuted] = useState(false);
   const [chromeDimmed, setChromeDimmed] = useState(false);
 
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  // useState (not useRef.current) so eslint react-hooks/refs is happy during render.
+  const [progressAnim] = useState(() => new Animated.Value(0));
   const progressValue = useRef(0);
   const animRef = useRef<Animated.CompositeAnimation | null>(null);
   const durationMsRef = useRef(IMAGE_PROGRESS_MS);
@@ -79,7 +80,8 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
 
   useEffect(() => {
     if (!visible) return;
-    void Promise.resolve().then(() => {
+    // Defer setState out of the effect body (react-hooks/set-state-in-effect).
+    queueMicrotask(() => {
       setIndex(initialIndex);
       setPaused(false);
       setChromeDimmed(false);
@@ -108,8 +110,12 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   useEffect(() => {
     if (!visible || !storyId) return;
     void dispatch(recordStoryView(storyId));
-    setPaused(false);
-    setChromeDimmed(false);
+
+    queueMicrotask(() => {
+      setPaused(false);
+      setChromeDimmed(false);
+    });
+
     progressAnim.setValue(0);
     progressValue.current = 0;
     animRef.current?.stop();
