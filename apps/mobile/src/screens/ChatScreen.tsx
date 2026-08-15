@@ -18,6 +18,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson } from '@/api/client';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { Avatar } from '@/components/Avatar';
+import { colors } from '@/theme';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {
   fetchMessages,
@@ -311,7 +312,7 @@ export function ChatScreen(): React.JSX.Element {
 
       {loading && messages.length === 0 ? (
         <View style={styles.centered}>
-          <ActivityIndicator color="#00d4ff" />
+          <ActivityIndicator color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -354,7 +355,7 @@ export function ChatScreen(): React.JSX.Element {
           value={body}
           onChangeText={setBody}
           placeholder={requestLocked ? 'Waiting for a reply…' : 'Message…'}
-          placeholderTextColor="#555"
+          placeholderTextColor={colors.textFaint}
           editable={!requestLocked}
           multiline
           maxLength={2000}
@@ -368,7 +369,7 @@ export function ChatScreen(): React.JSX.Element {
           disabled={!body.trim() || sending || requestLocked}
         >
           {sending ? (
-            <ActivityIndicator color="#000" size="small" />
+            <ActivityIndicator color={colors.onPrimary} size="small" />
           ) : (
             <Text style={styles.sendBtnText}>↑</Text>
           )}
@@ -395,7 +396,7 @@ export function ChatScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a0a0f' },
+  root: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -403,11 +404,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#16161f',
-    backgroundColor: '#0d0d14',
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
   },
   headerBack: { paddingHorizontal: 6 },
-  headerBackText: { color: '#00d4ff', fontSize: 28, lineHeight: 28, marginTop: -2 },
+  headerBackText: { color: colors.primary, fontSize: 28, lineHeight: 28, marginTop: -2 },
   headerTitleTap: {
     flex: 1,
     flexDirection: 'row',
@@ -415,58 +416,58 @@ const styles = StyleSheet.create({
     gap: 8,
     minHeight: 44,
   },
-  headerName: { flexShrink: 1, color: '#fff', fontSize: 17, fontWeight: '600' },
+  headerName: { flexShrink: 1, color: colors.textPrimary, fontSize: 17, fontWeight: '600' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   requestBanner: {
-    backgroundColor: '#10261f',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#1c3a30',
+    borderBottomColor: colors.border,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  requestBannerText: { color: '#7ee6bf', fontSize: 12, textAlign: 'center' },
+  requestBannerText: { color: colors.action, fontSize: 12, textAlign: 'center' },
   messageList: { paddingHorizontal: 12, paddingVertical: 8 },
   locBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
   locBtnText: { fontSize: 20 },
   giftBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6 },
   giftBtnText: { fontSize: 22 },
   bubble: { maxWidth: '78%', borderRadius: 16, padding: 10, marginVertical: 3 },
-  bubbleMine: { alignSelf: 'flex-end', backgroundColor: '#00d4ff' },
-  bubbleTheirs: { alignSelf: 'flex-start', backgroundColor: '#1a1a2e' },
+  bubbleMine: { alignSelf: 'flex-end', backgroundColor: colors.primary },
+  bubbleTheirs: { alignSelf: 'flex-start', backgroundColor: colors.surfaceAlt },
   bubbleText: { fontSize: 15, lineHeight: 20 },
-  bubbleTextMine: { color: '#000' },
-  bubbleTextTheirs: { color: '#fff' },
-  statusPending: { fontSize: 11, color: '#00000066', marginTop: 2, textAlign: 'right' },
-  statusFailed: { fontSize: 11, color: '#ff4444', marginTop: 2, textAlign: 'right', fontWeight: '600' },
+  bubbleTextMine: { color: colors.onPrimary },
+  bubbleTextTheirs: { color: colors.textPrimary },
+  statusPending: { fontSize: 11, color: 'rgba(10,10,15,0.4)', marginTop: 2, textAlign: 'right' },
+  statusFailed: { fontSize: 11, color: colors.danger, marginTop: 2, textAlign: 'right', fontWeight: '600' },
   inputRow: {
     flexDirection: 'row',
     padding: 10,
     gap: 8,
     borderTopWidth: 1,
-    borderTopColor: '#1a1a2e',
-    backgroundColor: '#0a0a0f',
+    borderTopColor: colors.surfaceAlt,
+    backgroundColor: colors.bg,
     alignItems: 'flex-end',
   },
   input: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
-    color: '#fff',
+    backgroundColor: colors.surfaceAlt,
+    color: colors.textPrimary,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
     maxHeight: 120,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
   },
   sendBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#00d4ff',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   sendBtnDisabled: { opacity: 0.4 },
-  sendBtnText: { color: '#000', fontSize: 18, fontWeight: '700' },
+  sendBtnText: { color: colors.onPrimary, fontSize: 18, fontWeight: '700' },
 });
