@@ -54,21 +54,17 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
   const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
-  const [loaded, setLoaded] = useState(false);
+  /** null = still loading; true = should show when map ready; false = already done */
+  const [shouldShow, setShouldShow] = useState<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (cancelled) return;
-        if (raw === 'done') {
-          setLoaded(true);
-          return;
-        }
-        setLoaded(true);
+        if (!cancelled) setShouldShow(raw !== 'done');
       } catch {
-        if (!cancelled) setLoaded(true);
+        if (!cancelled) setShouldShow(false);
       }
     })();
     return () => {
@@ -76,28 +72,14 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
     };
   }, []);
 
-  // Show after map is ready + storage checked, slight delay so markers paint.
   useEffect(() => {
-    if (!loaded || !mapReady) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (cancelled || raw === 'done') return;
-        const t = setTimeout(() => {
-          if (cancelled) return;
-          setVisible(true);
-          track('map.coach_shown', { step: STEPS[0]!.id });
-        }, 600);
-        return () => clearTimeout(t);
-      } catch {
-        // fail closed — don't block map
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [loaded, mapReady]);
+    if (shouldShow !== true || !mapReady || visible) return;
+    const t = setTimeout(() => {
+      setVisible(true);
+      track('map.coach_shown', { step: STEPS[0]!.id });
+    }, 600);
+    return () => clearTimeout(t);
+  }, [shouldShow, mapReady, visible]);
 
   const persistDone = useCallback(async (reason: 'completed' | 'skipped') => {
     try {
@@ -106,6 +88,7 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
       // still hide UI
     }
     track('map.coach_dismissed', { reason, step: STEPS[step]?.id ?? 'unknown' });
+    setShouldShow(false);
     setVisible(false);
   }, [step]);
 
