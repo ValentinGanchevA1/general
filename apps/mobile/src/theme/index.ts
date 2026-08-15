@@ -25,6 +25,12 @@ export const colors = {
 
   /** Brand accent (cyan). */
   primary: '#00d4ff',
+  /** Secondary brand (stories rings / CTAs). */
+  accent: '#7C5CFF',
+  /** Soft info / shared-goal highlight. */
+  info: '#7ad7ff',
+  /** Action green (message / positive CTA). */
+  action: '#34e0a1',
   /** Text/!icon color when placed on top of `primary`. */
   onPrimary: '#0a0a0f',
 
