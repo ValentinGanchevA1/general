@@ -34,12 +34,13 @@ export function PulseStrip({ onOpenStory, onCreatePress, canCreate = true }: Pro
   const renderItem = useCallback(
     ({ item, index }: { item: StoryCard; index: number }) => {
       const unseen = !item.viewedByMe;
+      const isVideo = item.mediaType === 'video';
       return (
         <Pressable
           style={styles.item}
           onPress={() => onOpenStory(item, index)}
           accessibilityRole="button"
-          accessibilityLabel={`Story by ${item.authorDisplayName}`}
+          accessibilityLabel={`${isVideo ? 'Video story' : 'Story'} by ${item.authorDisplayName}`}
         >
           <View style={[styles.ring, unseen ? styles.ringUnseen : styles.ringSeen]}>
             {item.authorAvatarUrl ? (
@@ -51,6 +52,11 @@ export function PulseStrip({ onOpenStory, onCreatePress, canCreate = true }: Pro
                 </Text>
               </View>
             )}
+            {isVideo ? (
+              <View style={styles.videoBadge} pointerEvents="none">
+                <Text style={styles.videoBadgeText}>▶</Text>
+              </View>
+            ) : null}
           </View>
           <Text style={styles.name} numberOfLines={1}>
             {item.authorDisplayName}
@@ -117,6 +123,18 @@ const styles = StyleSheet.create({
   avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.surfaceRaised },
   avatarFallback: { justifyContent: 'center', alignItems: 'center' },
   avatarInitial: { color: colors.textPrimary, fontSize: 20, fontWeight: '600' },
+  videoBadge: {
+    position: 'absolute',
+    right: 2,
+    bottom: 2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoBadgeText: { color: '#fff', fontSize: 9, marginLeft: 1 },
   plus: { color: colors.textPrimary, fontSize: 28, fontWeight: '300' },
   plusLocked: { fontSize: 20 },
   name: {
