@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { colors } from '@/theme';
 import {
   ActivityIndicator,
@@ -48,17 +48,17 @@ export function StoryCreateSheet({
   const [pending, setPending] = useState<PendingMedia | null>(null);
   const [picking, setPicking] = useState(false);
 
-  // Reset transient error when reopening; keep nothing across full close.
-  useEffect(() => {
-    if (!visible) {
-      setError(null);
-      setPicking(false);
-      // Keep caption/pending only while sheet stays mounted after failed post;
-      // full close clears so next open is clean.
-      setCaption('');
-      setPending(null);
-    }
-  }, [visible]);
+  const resetForm = () => {
+    setError(null);
+    setPicking(false);
+    setCaption('');
+    setPending(null);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
 
   const onPick = async () => {
     setError(null);
@@ -99,8 +99,7 @@ export function StoryCreateSheet({
           ...(trimmed ? { caption: trimmed } : {}),
         }),
       ).unwrap();
-      setCaption('');
-      setPending(null);
+      resetForm();
       onClose();
     } catch (e) {
       // Keep caption + pending so user can retry without re-picking.
@@ -163,7 +162,7 @@ export function StoryCreateSheet({
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <View style={styles.row}>
-            <Pressable onPress={onClose} style={styles.cancelBtn} disabled={busy}>
+            <Pressable onPress={handleClose} style={styles.cancelBtn} disabled={busy}>
               <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
 
