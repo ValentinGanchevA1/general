@@ -35,7 +35,16 @@ export function useStoryProgress({
   const durationMsRef = useRef(IMAGE_PROGRESS_MS);
   const safetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
+  const heldRef = useRef(held);
+
+  // Keep latest callbacks/flags in refs — update only in effects (react-hooks/refs).
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
+    heldRef.current = held;
+  }, [held]);
 
   const clearSafety = useCallback(() => {
     if (safetyTimer.current) {
@@ -77,7 +86,7 @@ export function useStoryProgress({
     [progressAnim, stopAnim],
   );
 
-  // Reset + start when the active story changes
+  // Reset + start when the active story changes (held via heldRef — avoid restart-on-hold).
   useEffect(() => {
     if (!visible || !storyId || !mediaType) return;
 
@@ -91,9 +100,8 @@ export function useStoryProgress({
       safetyTimer.current = setTimeout(() => onCompleteRef.current(), VIDEO_SAFETY_MS);
     } else {
       durationMsRef.current = IMAGE_PROGRESS_MS;
-      // Defer start so hold state from prior story doesn't race
       queueMicrotask(() => {
-        if (!held) startImageProgress(0);
+        if (!heldRef.current) startImageProgress(0);
       });
     }
 
@@ -101,16 +109,7 @@ export function useStoryProgress({
       stopAnim();
       clearSafety();
     };
-  }, [
-    visible,
-    storyId,
-    mediaType,
-    progressAnim,
-    stopAnim,
-    clearSafety,
-    startImageProgress,
-    // intentionally omit `held` — hold is handled below
-  ]);
+  }, [visible, storyId, mediaType, progressAnim, stopAnim, clearSafety, startImageProgress]);
 
   // Pause / resume image progress when hold changes
   useEffect(() => {
