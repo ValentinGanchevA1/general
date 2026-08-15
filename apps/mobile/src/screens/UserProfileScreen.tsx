@@ -2,8 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,11 +18,13 @@ import type {
 } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { deleteJson, getJson, postJson } from '@/api/client';
-import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { Avatar } from '@/components/Avatar';
 import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline';
+import { ProfileBio } from '@/components/Profile/ProfileBio';
+import { ProfileTagsSection } from '@/components/Profile/ProfileTagsSection';
+import { ProfilePhotosSection } from '@/components/Profile/ProfilePhotosSection';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
@@ -219,39 +219,20 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         </View>
 
         {profile.bio ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>About</Text>
-            <Text style={styles.bioText}>{profile.bio}</Text>
-          </View>
+          <ProfileBio bio={profile.bio} showTitle padded={false} />
         ) : null}
 
-        {profile.goals.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Goals</Text>
-            <View style={styles.goalsRow}>
-              {profile.goals.map((g) => {
-                const opt = GOAL_OPTIONS.find((o) => o.value === g);
-                return (
-                  <View key={g} style={styles.goalChip}>
-                    <Text style={styles.goalIcon}>{opt?.icon ?? '•'}</Text>
-                    <Text style={styles.goalLabel}>{opt?.label ?? g}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        ) : null}
+        <ProfileTagsSection
+          goals={profile.goals ?? []}
+          goalsTitle="Goals"
+          padded={false}
+        />
 
-        {(profile.photoUrls?.length ?? 0) > 0 ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Photos</Text>
-            <View style={styles.photoGrid}>
-              {profile.photoUrls!.map((url, index) => (
-                <Image key={`${url}-${index}`} source={{ uri: url }} style={styles.gridPhoto} />
-              ))}
-            </View>
-          </View>
-        ) : null}
+        <ProfilePhotosSection
+          photos={profile.photoUrls ?? []}
+          isSelf={false}
+          padded={false}
+        />
 
         <View style={styles.section}>
           <ProfileStoryline userId={userId} />
@@ -288,8 +269,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     </View>
   );
 }
-
-const PHOTO = (Dimensions.get('window').width - 48) / 3;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0a0a0f' },
@@ -330,8 +309,6 @@ const styles = StyleSheet.create({
   trustChipStrongText: { color: '#00d4ff', fontSize: 12, fontWeight: '700' },
   trustEmpty: { color: '#666', fontSize: 12 },
   section: { gap: 10 },
-  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  gridPhoto: { width: PHOTO, height: PHOTO, borderRadius: 10, backgroundColor: '#1a1a24' },
   sectionLabel: {
     color: '#555',
     fontSize: 11,
@@ -339,21 +316,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  bioText: { color: '#ddd', fontSize: 15, lineHeight: 22 },
-  goalsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  goalChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#1a1a2e',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#2a2a4a',
-  },
-  goalIcon: { fontSize: 15 },
-  goalLabel: { color: '#ccc', fontSize: 13, fontWeight: '500' },
   footer: { flexDirection: 'row', gap: 12, padding: 20, paddingBottom: 36 },
   waveBtn: {
     flex: 1,
