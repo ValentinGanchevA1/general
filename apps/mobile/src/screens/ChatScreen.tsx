@@ -91,7 +91,6 @@ export function ChatScreen(): React.JSX.Element {
   const outbox = useAppSelector((s) => s.chat.outbox);
   const failedIds = useAppSelector((s) => s.chat.failedIds);
 
-  // Pending = outbox OR still-local opt-* (in-flight before ack / queue).
   const pendingIds = useMemo(() => {
     const ids = new Set(outbox.map((e) => e.optimisticId));
     for (const m of messages) {
@@ -275,7 +274,7 @@ export function ChatScreen(): React.JSX.Element {
           activeOpacity={0.7}
         >
           <Avatar
-            uri={peerBadge?.avatarUrl}
+            uri={peerBadge?.avatarUrl ?? null}
             name={otherUserName || 'Chat'}
             size={32}
           />

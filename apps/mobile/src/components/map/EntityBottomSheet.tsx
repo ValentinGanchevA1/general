@@ -113,10 +113,10 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
       const res = await postJson<
         CreateConversationRequest,
         CreateConversationResponse
-      >('/chat/conversations', { otherUserId: point.id });
+      >('/chat/conversations', { targetUserId: point.id });
       onClose();
       navigation.navigate('Chat', {
-        conversationId: res.id,
+        conversationId: res.conversationId,
         otherUserName: meta.displayName,
         otherUserId: point.id,
         requestPending: res.status === 'pending',
@@ -140,27 +140,27 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
           }}
           activeOpacity={0.85}
         >
-          <Avatar uri={meta.avatarUrl} name={meta.displayName} size={56} />
+          <Avatar uri={meta.avatarUrl ?? null} name={meta.displayName} size={56} />
           <View style={styles.userHeaderText}>
             <View style={styles.nameRow}>
               <Text style={styles.title} numberOfLines={1}>
                 {meta.displayName}
               </Text>
               <VerificationBadge
-                level={meta.verification}
-                idVerified={meta.idVerified}
-                size="sm"
+                verification={meta.verification}
+                idVerified={profile?.idVerified}
+                size={16}
               />
             </View>
-            {profile?.showAge && profile.age != null ? (
+            {profile?.age != null ? (
               <Text style={styles.originLine}>{profile.age} years</Text>
             ) : null}
-            {profile?.showHometown && (profile.hometownCity || profile.hometownCountry) ? (
+            {(profile?.hometownCity || profile?.hometownCountry) ? (
               <Text style={styles.originLine} numberOfLines={1}>
                 {[profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ')}
               </Text>
             ) : null}
-            {meta.isOnline ? (
+            {meta.online ? (
               <Text style={styles.onlineLabel}>Online</Text>
             ) : (
               <Text style={[styles.onlineLabel, styles.offlineLabel]}>Offline</Text>
