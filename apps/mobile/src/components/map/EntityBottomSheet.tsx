@@ -118,6 +118,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
       navigation.navigate('Chat', {
         conversationId: res.id,
         otherUserName: meta.displayName,
+        otherUserId: point.id,
         requestPending: res.status === 'pending',
       });
     } catch {

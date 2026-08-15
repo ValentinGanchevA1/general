@@ -79,6 +79,7 @@ export function ChatScreen(): React.JSX.Element {
     otherUserName,
     otherUserVerification,
     otherUserIdVerified,
+    otherUserId: paramOtherUserId,
   } = params;
 
   const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
@@ -125,7 +126,10 @@ export function ChatScreen(): React.JSX.Element {
     openInMaps,
   } = useLiveLocationShare(conversationId);
 
-  const otherUserId = messages.find((m) => m.senderId !== myUserId)?.senderId ?? null;
+  const otherUserId =
+    paramOtherUserId ??
+    messages.find((m) => m.senderId !== myUserId)?.senderId ??
+    null;
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
@@ -255,14 +259,26 @@ export function ChatScreen(): React.JSX.Element {
         >
           <Text style={styles.headerBackText}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerName} numberOfLines={1}>
-          {otherUserName || 'Chat'}
-        </Text>
-        <VerificationBadge
-          verification={badgeVerification}
-          idVerified={badgeIdVerified}
-          size={18}
-        />
+        <TouchableOpacity
+          style={styles.headerTitleTap}
+          onPress={() => {
+            if (!otherUserId) return;
+            navigation.navigate('UserProfile', { userId: otherUserId });
+          }}
+          disabled={!otherUserId}
+          accessibilityRole="button"
+          accessibilityLabel={`Open profile for ${otherUserName || 'user'}`}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.headerName} numberOfLines={1}>
+            {otherUserName || 'Chat'}
+          </Text>
+          <VerificationBadge
+            verification={badgeVerification}
+            idVerified={badgeIdVerified}
+            size={18}
+          />
+        </TouchableOpacity>
       </View>
 
       {showRequestBanner && (
@@ -384,7 +400,14 @@ const styles = StyleSheet.create({
   },
   headerBack: { paddingHorizontal: 6 },
   headerBackText: { color: '#00d4ff', fontSize: 28, lineHeight: 28, marginTop: -2 },
-  headerName: { flex: 1, color: '#fff', fontSize: 17, fontWeight: '600' },
+  headerTitleTap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 44,
+  },
+  headerName: { flexShrink: 1, color: '#fff', fontSize: 17, fontWeight: '600' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   requestBanner: {
     backgroundColor: '#10261f',

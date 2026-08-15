@@ -75,6 +75,8 @@ export type RootStackParamList = {
     conversationId: string;
     otherUserName: string;
     requestPending?: boolean;
+    /** Peer user id — enables header → profile without waiting for messages. */
+    otherUserId?: string;
     /** The other participant's verification ladder level (for the header badge). */
     otherUserVerification?: VerificationLevel;
     /** True when the other participant passed ID review (strong decagram badge). */
