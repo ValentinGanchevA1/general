@@ -24,6 +24,7 @@ import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline
 import { ProfileHeaderPhoto } from '@/components/Profile/ProfileHeaderPhoto';
 import { MapPresenceCard } from '@/components/Profile/MapPresenceCard';
 import { TrustStrip, type TrustChip } from '@/components/Profile/TrustStrip';
+import { ProfileBio } from '@/components/Profile/ProfileBio';
 import { ProfileIdCta } from '@/components/Profile/ProfileIdCta';
 import { ProfileQuickActions } from '@/components/Profile/ProfileQuickActions';
 import { ProfileActivityLinks } from '@/components/Profile/ProfileActivityLinks';
@@ -220,11 +221,7 @@ export function ProfileScreen(): React.JSX.Element {
         />
       ) : null}
 
-      {p.bio ? (
-        <View style={styles.bioSection}>
-          <Text style={styles.bio}>{p.bio}</Text>
-        </View>
-      ) : null}
+      {p.bio ? <ProfileBio bio={p.bio} /> : null}
 
       <ProfileQuickActions
         onEdit={() => navigation.navigate('ProfileEdit')}
@@ -244,6 +241,7 @@ export function ProfileScreen(): React.JSX.Element {
 
       <ProfilePhotosSection
         photos={photos}
+        isSelf
         activeIndex={activePhotoIndex}
         onSelect={setActivePhotoIndex}
         onManage={() => navigation.navigate('Photos')}
@@ -293,9 +291,8 @@ const styles = StyleSheet.create({
   },
   retryText: { color: colors.onPrimary, fontWeight: '700' },
   errorLogout: { color: colors.danger, fontWeight: '600' },
-  trustSection: { paddingHorizontal: spacing.xl, marginTop: spacing.md },
-  mapPresenceSection: { paddingHorizontal: spacing.xl, marginTop: spacing.md },
-  bioSection: { paddingHorizontal: spacing.xl, marginTop: spacing.md },
-  bio: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  // TrustStrip + MapPresenceCard already self-pad horizontally
+  trustSection: { marginTop: spacing.md },
+  mapPresenceSection: { marginTop: spacing.sm },
   section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl },
 });
