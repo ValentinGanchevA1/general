@@ -12,41 +12,80 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, spacing, radius } from '@/theme';
 
 const { width } = Dimensions.get('window');
-const PHOTO_SIZE = (width - 48) / 3;
+/** Self profile uses full width minus 2× xl + gaps; public parent may already pad. */
+const PHOTO_SIZE_SELF = (width - spacing.xl * 2 - 16) / 3;
 
 interface Props {
   photos: string[];
-  activeIndex: number;
-  onSelect: (index: number) => void;
-  onManage: () => void;
+  /** Self profile: selection + manage. Public: read-only grid. Default true. */
+  isSelf?: boolean;
+  activeIndex?: number;
+  onSelect?: (index: number) => void;
+  onManage?: () => void;
+  /** When false, skip horizontal padding. Default true. */
+  padded?: boolean;
 }
 
 export function ProfilePhotosSection({
   photos,
-  activeIndex,
+  isSelf = true,
+  activeIndex = 0,
   onSelect,
   onManage,
-}: Props): React.JSX.Element {
+  padded = true,
+}: Props): React.JSX.Element | null {
+  if (photos.length === 0 && !isSelf) return null;
+
+  const photoSize = padded ? PHOTO_SIZE_SELF : (width - 40 - 16) / 3;
+
   return (
-    <View style={styles.section}>
+    <View style={[styles.section, padded && styles.padded]}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Photos</Text>
-        <TouchableOpacity onPress={onManage}>
-          <Text style={styles.sectionAction}>Manage</Text>
-        </TouchableOpacity>
+        {isSelf && onManage ? (
+          <TouchableOpacity onPress={onManage}>
+            <Text style={styles.sectionAction}>Manage</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
       <View style={styles.photoGrid}>
-        {photos.map((photo, index) => (
+        {photos.map((photo, index) => {
+          const active = isSelf && index === activeIndex;
+          const body = (
+            <Image
+              source={{ uri: photo }}
+              style={[styles.gridPhotoImage, { width: photoSize, height: photoSize }]}
+            />
+          );
+          if (isSelf && onSelect) {
+            return (
+              <TouchableOpacity
+                key={`${photo}-${index}`}
+                onPress={() => onSelect(index)}
+                style={[
+                  styles.gridPhoto,
+                  { width: photoSize, height: photoSize },
+                  active && styles.gridPhotoActive,
+                ]}
+              >
+                {body}
+              </TouchableOpacity>
+            );
+          }
+          return (
+            <View
+              key={`${photo}-${index}`}
+              style={[styles.gridPhoto, { width: photoSize, height: photoSize }]}
+            >
+              {body}
+            </View>
+          );
+        })}
+        {isSelf && photos.length < 6 && onManage ? (
           <TouchableOpacity
-            key={index}
-            onPress={() => onSelect(index)}
-            style={[styles.gridPhoto, index === activeIndex && styles.gridPhotoActive]}
+            style={[styles.addPhotoButton, { width: photoSize, height: photoSize }]}
+            onPress={onManage}
           >
-            <Image source={{ uri: photo }} style={styles.gridPhotoImage} />
-          </TouchableOpacity>
-        ))}
-        {photos.length < 6 ? (
-          <TouchableOpacity style={styles.addPhotoButton} onPress={onManage}>
             <Icon name="plus" size={24} color={colors.textMuted} />
           </TouchableOpacity>
         ) : null}
@@ -56,7 +95,8 @@ export function ProfilePhotosSection({
 }
 
 const styles = StyleSheet.create({
-  section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl },
+  section: { marginTop: spacing.lg },
+  padded: { paddingHorizontal: spacing.xl },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -67,18 +107,14 @@ const styles = StyleSheet.create({
   sectionAction: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   gridPhoto: {
-    width: PHOTO_SIZE,
-    height: PHOTO_SIZE,
     borderRadius: radius.sm,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: 'transparent',
   },
   gridPhotoActive: { borderColor: colors.primary },
-  gridPhotoImage: { width: '100%', height: '100%' },
+  gridPhotoImage: { borderRadius: radius.sm - 2 },
   addPhotoButton: {
-    width: PHOTO_SIZE,
-    height: PHOTO_SIZE,
     borderRadius: radius.sm,
     backgroundColor: colors.surfaceRaised,
     alignItems: 'center',
