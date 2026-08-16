@@ -113,8 +113,8 @@ export function ContextualFab(props: Props): React.JSX.Element {
         nav.navigate('EventCreate');
         break;
       case 'create_listing':
-        dispatch(setPendingFilter('listings'));
-        nav.navigate('Main', { screen: 'Pulse' });
+        // Single destination — matches MapScreen onFabAction intercept.
+        nav.navigate('Marketplace');
         break;
       case 'toggle_visibility':
         nav.navigate('Settings');
