@@ -11,6 +11,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { openRootScreen } from '@/navigation/openRootScreen';
 import { useChallenges } from './useChallenges';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -41,7 +42,7 @@ export function DailyChallengeCard({ top }: Props): React.JSX.Element | null {
         <TouchableOpacity
           activeOpacity={0.85}
           style={styles.main}
-          onPress={() => navigation.navigate('Challenges')}
+          onPress={() => openRootScreen(navigation, 'Challenges')}
         >
           <Icon name="target" size={20} color="#00d4ff" />
           <View style={styles.body}>
