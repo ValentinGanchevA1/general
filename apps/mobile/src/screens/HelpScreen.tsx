@@ -12,11 +12,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { RootStackParamList } from '@/navigation/AppNavigator';
+import type { AccountStackParamList } from '@/navigation/stacks';
 import { SUPPORT_EMAIL, APP_VERSION } from '@/constants/app';
 import { track } from '@/lib/analytics';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
 type Faq = { q: string; a: string };
 
@@ -100,7 +100,7 @@ export function HelpScreen(): React.JSX.Element {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
           <Icon name="chevron-left" size={28} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Help &amp; Support</Text>
+        <Text style={styles.headerTitle}>Help & Support</Text>
         <View style={styles.back} />
       </View>
 
