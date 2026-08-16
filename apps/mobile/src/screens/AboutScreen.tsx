@@ -4,10 +4,10 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { RootStackParamList } from '@/navigation/AppNavigator';
+import type { AccountStackParamList } from '@/navigation/stacks';
 import { APP_VERSION } from '@/constants/app';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
 function LinkRow({
   icon,
