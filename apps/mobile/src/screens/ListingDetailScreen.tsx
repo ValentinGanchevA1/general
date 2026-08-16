@@ -21,7 +21,7 @@ import type { RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { ApiError, ListingOffer, WaveRequest, WaveResponse } from '@g88/shared';
-import type { RootStackParamList } from '@/navigation/AppNavigator';
+import type { CommerceStackParamList } from '@/navigation/stacks';
 import { useAppSelector } from '@/hooks/redux';
 import { postJson } from '@/api/client';
 import {
@@ -34,7 +34,7 @@ import {
 } from '@/features/trading/useTrading';
 import { formatPrice } from '@/features/trading/formatPrice';
 
-type R = RouteProp<RootStackParamList, 'ListingDetail'>;
+type R = RouteProp<CommerceStackParamList, 'ListingDetail'>;
 
 export function ListingDetailScreen(): React.JSX.Element {
   const route = useRoute<R>();
