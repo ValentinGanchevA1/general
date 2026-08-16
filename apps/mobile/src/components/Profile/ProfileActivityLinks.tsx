@@ -25,10 +25,23 @@ export function ProfileActivityLinks({
   onLeaderboard,
   onAchievements,
   onGifts,
-}: Props): React.JSX.Element {
+}: Props): React.JSX.Element | null {
+  // Progressive disclosure: hide gamification chrome until the user has real signal.
+  const challengeStarted = challenges.some((c) => (c.progress ?? 0) > 0);
+  const hasXp = (gamification?.totalXp ?? 0) > 0;
+  const leveledUp = (gamification?.level ?? 1) > 1;
+  const showGamificationRow = leveledUp || challengeStarted || hasXp;
+  const showProgress = gamification != null && (showGamificationRow || challenges.length > 0);
+  // Gifts inbox is useful once wallet/activity exists; hide pure-empty new accounts.
+  const showGifts = spendableXp > 0 || showGamificationRow;
+
+  if (!showProgress && !showGamificationRow && !showGifts) {
+    return null;
+  }
+
   return (
     <>
-      {gamification ? (
+      {showProgress && gamification ? (
         <View style={styles.sectionPadded}>
           <Text style={styles.blockLabel}>Activity</Text>
           <ProfileProgressCard summary={gamification} />
@@ -36,29 +49,33 @@ export function ProfileActivityLinks({
         </View>
       ) : null}
 
-      <View style={styles.gamificationRow}>
-        <TouchableOpacity style={styles.gamificationCard} onPress={onChallenges}>
-          <Icon name="checkbox-marked-circle-outline" size={24} color={colors.primary} />
-          <Text style={styles.gamificationTitle}>Challenges</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.gamificationCard} onPress={onLeaderboard}>
-          <Icon name="podium-gold" size={24} color="#FFD700" />
-          <Text style={styles.gamificationTitle}>Ranks</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.gamificationCard} onPress={onAchievements}>
-          <Icon name="trophy" size={24} color="#E91E63" />
-          <Text style={styles.gamificationTitle}>Badges</Text>
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity style={styles.giftsCard} onPress={onGifts}>
-        <Icon name="gift" size={22} color="#E91E63" />
-        <View style={styles.giftsCardBody}>
-          <Text style={styles.giftsCardTitle}>Gifts</Text>
-          <Text style={styles.giftsCardSubtitle}>{spendableXp.toLocaleString()} XP · inbox</Text>
+      {showGamificationRow ? (
+        <View style={styles.gamificationRow}>
+          <TouchableOpacity style={styles.gamificationCard} onPress={onChallenges}>
+            <Icon name="checkbox-marked-circle-outline" size={24} color={colors.primary} />
+            <Text style={styles.gamificationTitle}>Challenges</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.gamificationCard} onPress={onLeaderboard}>
+            <Icon name="podium-gold" size={24} color={colors.warning} />
+            <Text style={styles.gamificationTitle}>Ranks</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.gamificationCard} onPress={onAchievements}>
+            <Icon name="trophy" size={24} color={colors.accent} />
+            <Text style={styles.gamificationTitle}>Badges</Text>
+          </TouchableOpacity>
         </View>
-        <Icon name="chevron-right" size={22} color={colors.textFaint} />
-      </TouchableOpacity>
+      ) : null}
+
+      {showGifts ? (
+        <TouchableOpacity style={styles.giftsCard} onPress={onGifts}>
+          <Icon name="gift" size={22} color={colors.accent} />
+          <View style={styles.giftsCardBody}>
+            <Text style={styles.giftsCardTitle}>Gifts</Text>
+            <Text style={styles.giftsCardSubtitle}>{spendableXp.toLocaleString()} XP · inbox</Text>
+          </View>
+          <Icon name="chevron-right" size={22} color={colors.textFaint} />
+        </TouchableOpacity>
+      ) : null}
     </>
   );
 }

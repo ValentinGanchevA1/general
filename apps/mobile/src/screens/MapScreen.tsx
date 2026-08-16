@@ -11,7 +11,6 @@ import MapView, {
   PROVIDER_GOOGLE,
   type Region,
 } from 'react-native-maps';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type {
   ApiError,
@@ -34,9 +33,7 @@ import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ContextualFab } from '@/components/ContextualFab';
 import type { FabActionId } from '@/components/ContextualFab/useFabContext';
-import { DailyChallengeCard, CHALLENGE_CARD_HEIGHT } from '@/features/gamification/DailyChallengeCard';
 import { challengeEvents } from '@/features/gamification/challengeEvents';
-import { NudgeBanner } from '@/features/nudges/NudgeBanner';
 import { EventsRail } from '@/features/events/EventsRail';
 import {
   fetchNearbyStories,
@@ -47,19 +44,17 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
 import { track } from '@/lib/analytics';
+import { colors } from '@/theme';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
 import { MapCoachMarks } from '@/components/map/MapCoachMarks';
+import { MapChrome } from '@/components/map/MapChrome';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
-
-/** Nudge card approx height for stacking interactions badge under challenge + streak. */
-const NUDGE_CARD_HEIGHT = 56;
 
 export function MapScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<TabParamList, 'Map'>>();
-  const insets = useSafeAreaInsets();
   const { coords: myCoords, requestPermission } = useUserLocation();
   const [region, setRegion] = useState<Region | null>(null);
   const [selected, setSelected] = useState<EntityPoint | null>(null);
@@ -74,11 +69,6 @@ export function MapScreen(): React.JSX.Element {
   const { data, loading, error, refresh } = useDiscovery({ viewport, zoom });
 
   const points = data?.points ?? EMPTY_POINTS;
-
-  // Challenge + optional streak stack at top; interactions badge sits below both.
-  const topStackHeight =
-    insets.top + 8 + CHALLENGE_CARD_HEIGHT + 8 + NUDGE_CARD_HEIGHT + 8;
-  const badgeTop = selected ? insets.top + 8 : topStackHeight;
 
   const onCloseSheet = useCallback(() => {
     setSelected(null);
@@ -271,25 +261,11 @@ export function MapScreen(): React.JSX.Element {
         </View>
       )}
 
-      {/* Challenge max top; streak under it; stories on Pulse only. */}
-      {!selected && <DailyChallengeCard />}
-      {!selected && <NudgeBanner />}
-
-      {/* Interactions entry — people who waved / reacted */}
-      <TouchableOpacity
-        style={[styles.interactionBadge, { top: badgeTop }]}
-        onPress={() => navigation.navigate('Interactions')}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.interactionBadgeIcon}>👋</Text>
-        {interactionUnread > 0 ? (
-          <View style={styles.interactionBadgeDot}>
-            <Text style={styles.interactionBadgeCount}>
-              {interactionUnread > 9 ? '9+' : interactionUnread}
-            </Text>
-          </View>
-        ) : null}
-      </TouchableOpacity>
+      <MapChrome
+        sheetOpen={selected != null}
+        interactionUnread={interactionUnread}
+        onPressInteractions={() => navigation.navigate('Interactions')}
+      />
 
       {!selected && (
         <EventsRail location={region ? { lat: region.latitude, lng: region.longitude } : myCoords} />
@@ -354,15 +330,15 @@ function approxZoomFromRegion(r: Region): number {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000' },
+  root: { flex: 1, backgroundColor: colors.bg },
   unavailable: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0a0a0f',
+    backgroundColor: colors.bg,
     padding: 24,
   },
-  unavailableTitle: { color: '#ff6b6b', fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  unavailableBody: { color: '#888', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  unavailableTitle: { color: colors.danger, fontSize: 16, fontWeight: '700', marginBottom: 8 },
+  unavailableBody: { color: colors.textMuted, fontSize: 13, textAlign: 'center', lineHeight: 20 },
   loading: {
     position: 'absolute',
     top: 120,
@@ -378,39 +354,11 @@ const styles = StyleSheet.create({
     right: 16,
     padding: 12,
     borderRadius: 12,
-    backgroundColor: '#a32d2d',
+    backgroundColor: colors.danger,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  errorText: { color: 'white', flex: 1 },
-  retry: { color: 'white', fontWeight: '600' },
-
-  interactionBadge: {
-    position: 'absolute',
-    right: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1a1a2e',
-    borderWidth: 1,
-    borderColor: '#2a2a4a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 20,
-  },
-  interactionBadgeIcon: { fontSize: 20 },
-  interactionBadgeDot: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#ff3b5c',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  interactionBadgeCount: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  errorText: { color: colors.textPrimary, flex: 1 },
+  retry: { color: colors.textPrimary, fontWeight: '600' },
 });
