@@ -43,6 +43,7 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
+import { openRootScreen } from '@/navigation/openRootScreen';
 import { track } from '@/lib/analytics';
 import { colors } from '@/theme';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
@@ -109,12 +110,6 @@ export function MapScreen(): React.JSX.Element {
       navigation.setParams({ focusMyPin: undefined });
     }, [focusMyPin, myCoords, navigation]),
   );
-
-  useEffect(() => {
-    void requestPermission();
-  }, [requestPermission]);
-
-  const { sendPresence, on } = useSocket();
 
   useEffect(() => {
     if (!myCoords) return;
@@ -214,7 +209,7 @@ export function MapScreen(): React.JSX.Element {
       return true;
     }
     if (id === 'create_listing') {
-      navigation.navigate('Marketplace');
+      openRootScreen(navigation, 'Marketplace');
       return true;
     }
     return false;
@@ -264,7 +259,7 @@ export function MapScreen(): React.JSX.Element {
       <MapChrome
         sheetOpen={selected != null}
         interactionUnread={interactionUnread}
-        onPressInteractions={() => navigation.navigate('Interactions')}
+        onPressInteractions={() => openRootScreen(navigation, 'Interactions')}
       />
 
       {!selected && (
