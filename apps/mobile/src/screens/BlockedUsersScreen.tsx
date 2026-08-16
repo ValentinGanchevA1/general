@@ -12,7 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BlockedUser } from '@g88/shared';
 
-import type { RootStackParamList } from '@/navigation/AppNavigator';
+import type { AccountStackParamList } from '@/navigation/stacks';
 import { deleteJson, getJson } from '@/api/client';
 
 function InitialsAvatar({ name }: { name: string }): React.JSX.Element {
@@ -30,7 +30,7 @@ function InitialsAvatar({ name }: { name: string }): React.JSX.Element {
 }
 
 export function BlockedUsersScreen(): React.JSX.Element {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<AccountStackParamList>>();
   const [users, setUsers] = useState<BlockedUser[]>([]);
   const [loading, setLoading] = useState(true);
   // Track every in-flight unblock by id so rapid taps on different rows don't
