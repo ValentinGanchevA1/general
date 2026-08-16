@@ -13,6 +13,7 @@ import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { openRootScreen } from '@/navigation/openRootScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
 import { logout } from '@/features/auth/authSlice';
@@ -185,9 +186,9 @@ export function ProfileScreen(): React.JSX.Element {
         photoCount={photos.length}
         activePhotoIndex={activePhotoIndex}
         onSelectPhoto={setActivePhotoIndex}
-        onPressSettings={() => navigation.navigate('Settings')}
-        onPressVerificationBadge={() => navigation.navigate('Verification')}
-        onPressPhoto={() => navigation.navigate('Photos')}
+        onPressSettings={() => openRootScreen(navigation, 'Settings')}
+        onPressVerificationBadge={() => openRootScreen(navigation, 'Verification')}
+        onPressPhoto={() => openRootScreen(navigation, 'Photos')}
       />
 
       <View style={styles.trustSection}>
@@ -195,7 +196,8 @@ export function ProfileScreen(): React.JSX.Element {
           chips={trustChips}
           onChipPress={(id) => {
             if (id === 'id' || id === 'percent') {
-              navigation.navigate(
+              openRootScreen(
+                navigation,
                 p.idVerificationStatus === 'pending' ? 'VerificationId' : 'Verification',
               );
             }
@@ -217,26 +219,26 @@ export function ProfileScreen(): React.JSX.Element {
       {showIdCta ? (
         <ProfileIdCta
           status={p.idVerificationStatus}
-          onPress={() => navigation.navigate('VerificationId')}
+          onPress={() => openRootScreen(navigation, 'VerificationId')}
         />
       ) : null}
 
       {p.bio ? <ProfileBio bio={p.bio} /> : null}
 
       <ProfileQuickActions
-        onEdit={() => navigation.navigate('ProfileEdit')}
-        onPhotos={() => navigation.navigate('Photos')}
-        onTrust={() => navigation.navigate('Verification')}
+        onEdit={() => openRootScreen(navigation, 'ProfileEdit')}
+        onPhotos={() => openRootScreen(navigation, 'Photos')}
+        onTrust={() => openRootScreen(navigation, 'Verification')}
       />
 
       <ProfileActivityLinks
         gamification={gamification ?? null}
         challenges={challenges}
         spendableXp={spendableXp}
-        onChallenges={() => navigation.navigate('Challenges')}
-        onLeaderboard={() => navigation.navigate('Leaderboard')}
-        onAchievements={() => navigation.navigate('Achievements')}
-        onGifts={() => navigation.navigate('GiftsInbox')}
+        onChallenges={() => openRootScreen(navigation, 'Challenges')}
+        onLeaderboard={() => openRootScreen(navigation, 'Leaderboard')}
+        onAchievements={() => openRootScreen(navigation, 'Achievements')}
+        onGifts={() => openRootScreen(navigation, 'GiftsInbox')}
       />
 
       <ProfilePhotosSection
@@ -244,7 +246,7 @@ export function ProfileScreen(): React.JSX.Element {
         isSelf
         activeIndex={activePhotoIndex}
         onSelect={setActivePhotoIndex}
-        onManage={() => navigation.navigate('Photos')}
+        onManage={() => openRootScreen(navigation, 'Photos')}
       />
 
       {p.id ? (
@@ -260,17 +262,17 @@ export function ProfileScreen(): React.JSX.Element {
         phone={p.phone}
         emailVerified={!!badges.email}
         phoneVerified={!!badges.phone}
-        onAddPhone={() => navigation.navigate('Verification')}
+        onAddPhone={() => openRootScreen(navigation, 'Verification')}
       />
 
       <ProfileSocialSection
         links={socialLinks}
-        onManage={() => navigation.navigate('SocialLinking')}
+        onManage={() => openRootScreen(navigation, 'SocialLinking')}
       />
 
       <ProfileMenuSection
         isPaid={isPaid}
-        onNavigate={(route) => navigation.navigate(route)}
+        onNavigate={(route) => openRootScreen(navigation, route)}
         onLogout={handleLogout}
       />
     </ScrollView>

@@ -23,12 +23,12 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { LISTING_LIMITS, type CreateListingRequest, type LatLng } from '@g88/shared';
-import type { RootStackParamList } from '@/navigation/AppNavigator';
+import type { CommerceStackParamList } from '@/navigation/stacks';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { createListing } from '@/features/trading/useTrading';
 import { pickAndUploadListingImage } from '@/features/trading/listingImage';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Nav = NativeStackNavigationProp<CommerceStackParamList>;
 
 const FALLBACK: LatLng = { lat: 43.21, lng: 27.92 };
 const CATEGORIES = ['Electronics', 'Furniture', 'Clothing', 'Sports', 'Home', 'Books', 'Other'] as const;

@@ -25,6 +25,7 @@ import type { ActivityItem, ActivityType, StoryCard, Viewport } from '@g88/share
 import { canPostStory, storyGateMessage } from '@g88/shared';
 
 import type { PulseFilter, RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
+import { openRootScreen } from '@/navigation/openRootScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchFeed, clearPendingFilter } from './pulseSlice';
 import { useUserLocation } from '@/features/location/useUserLocation';
@@ -169,7 +170,7 @@ export function PulseScreen(): React.JSX.Element {
               { text: 'Cancel', style: 'cancel' as const },
               {
                 text: 'Verify email',
-                onPress: () => navigation.navigate('EmailVerification'),
+                onPress: () => openRootScreen(navigation, 'EmailVerification'),
               },
             ]
           : [{ text: 'OK' }];

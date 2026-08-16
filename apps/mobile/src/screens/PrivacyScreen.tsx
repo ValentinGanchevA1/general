@@ -4,10 +4,10 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { RootStackParamList } from '@/navigation/AppNavigator';
+import type { AccountStackParamList } from '@/navigation/stacks';
 import { PRIVACY_POLICY_URL } from '@/constants/app';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
 function Point({
   icon,
@@ -111,7 +111,7 @@ export function PrivacyScreen(): React.JSX.Element {
         >
           <Icon name="cog" size={22} color="#888" />
           <View style={styles.actionText}>
-            <Text style={styles.actionLabel}>Visibility &amp; account</Text>
+            <Text style={styles.actionLabel}>Visibility & account</Text>
             <Text style={styles.actionSub}>
               Appear on map, blocked users, delete account
             </Text>

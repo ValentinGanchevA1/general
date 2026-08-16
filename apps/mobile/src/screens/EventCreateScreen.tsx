@@ -24,11 +24,11 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { EVENT_LIMITS, type CreateEventRequest, type LatLng } from '@g88/shared';
-import type { RootStackParamList } from '@/navigation/AppNavigator';
+import type { EventsStackParamList } from '@/navigation/stacks';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { createEvent } from '@/features/events/useEvents';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Nav = NativeStackNavigationProp<EventsStackParamList>;
 
 // Varna center — fallback pin before a location fix lands.
 const FALLBACK: LatLng = { lat: 43.21, lng: 27.92 };

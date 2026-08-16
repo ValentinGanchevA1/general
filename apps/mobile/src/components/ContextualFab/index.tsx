@@ -24,6 +24,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { DiscoveryPoint } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { openRootScreen } from '@/navigation/openRootScreen';
 import { useAppDispatch } from '@/hooks/redux';
 import { setPendingFilter } from '@/features/pulse/pulseSlice';
 import { track } from '@/lib/analytics';
@@ -110,14 +111,14 @@ export function ContextualFab(props: Props): React.JSX.Element {
         nav.navigate('AlertComposer', { presetCategory: 'general' });
         break;
       case 'create_event':
-        nav.navigate('EventCreate');
+        openRootScreen(nav, 'EventCreate');
         break;
       case 'create_listing':
         // Single destination — matches MapScreen onFabAction intercept.
-        nav.navigate('Marketplace');
+        openRootScreen(nav, 'Marketplace');
         break;
       case 'toggle_visibility':
-        nav.navigate('Settings');
+        openRootScreen(nav, 'Settings');
         break;
       default:
         // wave_nearest should be intercepted by host; fall through safely.

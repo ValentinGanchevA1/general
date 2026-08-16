@@ -19,12 +19,12 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { ListingSummary } from '@g88/shared';
-import type { RootStackParamList } from '@/navigation/AppNavigator';
+import type { CommerceStackParamList } from '@/navigation/stacks';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { useBrowseListings, useFavorites } from '@/features/trading/useTrading';
 import { formatPrice } from '@/features/trading/formatPrice';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Nav = NativeStackNavigationProp<CommerceStackParamList>;
 
 export function MarketplaceScreen(): React.JSX.Element {
   const nav = useNavigation<Nav>();

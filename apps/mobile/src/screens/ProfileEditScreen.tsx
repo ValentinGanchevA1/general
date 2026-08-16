@@ -14,11 +14,11 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import type { RootStackParamList } from '@/navigation/AppNavigator';
+import type { AccountStackParamList } from '@/navigation/stacks';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { updateProfile } from '@/features/profile/profileSlice';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
 function isAdult(isoDate: string): boolean {
   const dob = new Date(isoDate);

@@ -15,16 +15,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { useGamification } from '@/features/gamification/useGamification';
 
-/** Param-less screens a nudge can deep-link to. */
-type NudgeTarget = Extract<
-  keyof RootStackParamList,
-  'VerificationId' | 'Challenges'
->;
+/** Logical screens a nudge can deep-link to (resolved via openRootScreen). */
+type NudgeTarget = 'VerificationId' | 'Challenges';
 
 export interface Nudge {
   id: string;

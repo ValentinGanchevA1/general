@@ -21,7 +21,7 @@ import type { RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { EVENT_LIMITS, RSVP_STATUSES, type PollResult, type RsvpStatus } from '@g88/shared';
-import type { RootStackParamList } from '@/navigation/AppNavigator';
+import type { EventsStackParamList } from '@/navigation/stacks';
 import { useAppSelector } from '@/hooks/redux';
 import {
   askQuestion,
@@ -33,7 +33,7 @@ import {
 } from '@/features/events/useEvents';
 import { formatEventWhen } from '@/features/events/eventFormat';
 
-type R = RouteProp<RootStackParamList, 'EventDetail'>;
+type R = RouteProp<EventsStackParamList, 'EventDetail'>;
 
 const RSVP_META: Record<RsvpStatus, { label: string; icon: string }> = {
   going: { label: 'Going', icon: 'check-circle' },
