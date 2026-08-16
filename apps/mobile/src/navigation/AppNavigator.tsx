@@ -52,6 +52,13 @@ import {
 import { pingGamification } from '@/features/gamification/useGamification';
 import { AchievementToastHost } from '@/components/AchievementToast';
 import { navigationRef } from './navigationRef';
+import { openViaRef } from './openRootScreen';
+import type {
+  AccountStackParamList,
+  CommerceStackParamList,
+  EventsStackParamList,
+  GamificationStackParamList,
+} from './stacks';
 
 export type PulseFilter =
   | 'all'
@@ -82,36 +89,87 @@ export type RootStackParamList = {
     /** True when the other participant passed ID review (strong decagram badge). */
     otherUserIdVerified?: boolean;
   };
-  ProfileEdit: undefined;
-  Photos: undefined;
-  Settings: undefined;
-  AlertComposer: { presetCategory?: AreaCategory; presetTag?: string };
   UserProfile: { userId: string };
-  Verification: undefined;
-  EmailVerification: undefined;
-  Subscription: undefined;
-  SocialLinking: undefined;
-  Achievements: undefined;
-  Leaderboard: undefined;
-  Challenges: undefined;
-  VerificationId: undefined;
-  EventDetail: { eventId: string };
-  EventCreate: undefined;
-  Marketplace: undefined;
-  ListingDetail: { listingId: string };
-  ListingCreate: undefined;
-  NotificationSettings: undefined;
-  BlockedUsers: undefined;
+  AlertComposer: { presetCategory?: AreaCategory; presetTag?: string };
   GiftsInbox: undefined;
   Interactions: undefined;
-  Privacy: undefined;
-  Help: undefined;
-  About: undefined;
+  Gamification: NavigatorScreenParams<GamificationStackParamList>;
+  Commerce: NavigatorScreenParams<CommerceStackParamList>;
+  Account: NavigatorScreenParams<AccountStackParamList>;
+  Events: NavigatorScreenParams<EventsStackParamList>;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
+const GamificationStack = createNativeStackNavigator<GamificationStackParamList>();
+const CommerceStack = createNativeStackNavigator<CommerceStackParamList>();
+const AccountStack = createNativeStackNavigator<AccountStackParamList>();
+const EventsStack = createNativeStackNavigator<EventsStackParamList>();
 export { navigationRef };
+
+const stackScreenOpts = {
+  headerStyle: { backgroundColor: colors.bg },
+  headerTintColor: colors.textPrimary,
+  contentStyle: { backgroundColor: colors.bg },
+} as const;
+
+function GamificationNavigator(): React.JSX.Element {
+  return (
+    <GamificationStack.Navigator screenOptions={stackScreenOpts}>
+      <GamificationStack.Screen name="Challenges" component={ChallengesScreen} />
+      <GamificationStack.Screen name="Leaderboard" component={LeaderboardScreen} />
+      <GamificationStack.Screen name="Achievements" component={AchievementsScreen} />
+    </GamificationStack.Navigator>
+  );
+}
+
+function CommerceNavigator(): React.JSX.Element {
+  return (
+    <CommerceStack.Navigator screenOptions={stackScreenOpts}>
+      <CommerceStack.Screen name="Marketplace" component={MarketplaceScreen} />
+      <CommerceStack.Screen name="ListingDetail" component={ListingDetailScreen} />
+      <CommerceStack.Screen name="ListingCreate" component={ListingCreateScreen} />
+    </CommerceStack.Navigator>
+  );
+}
+
+function AccountNavigator(): React.JSX.Element {
+  return (
+    <AccountStack.Navigator screenOptions={stackScreenOpts}>
+      <AccountStack.Screen name="Settings" component={SettingsScreen} />
+      <AccountStack.Screen name="Privacy" component={PrivacyScreen} />
+      <AccountStack.Screen name="Help" component={HelpScreen} />
+      <AccountStack.Screen name="About" component={AboutScreen} />
+      <AccountStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+      <AccountStack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
+      <AccountStack.Screen name="Verification" component={VerificationScreen} />
+      <AccountStack.Screen
+        name="EmailVerification"
+        component={EmailVerificationScreen}
+        options={{ title: 'Verify email', presentation: 'modal' }}
+      />
+      <AccountStack.Screen
+        name="VerificationId"
+        options={{ title: 'ID Verification', presentation: 'modal' }}
+      >
+        {() => <VerificationIdScreen />}
+      </AccountStack.Screen>
+      <AccountStack.Screen name="Subscription" component={SubscriptionScreen} />
+      <AccountStack.Screen name="SocialLinking" component={SocialLinkingScreen} />
+      <AccountStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
+      <AccountStack.Screen name="Photos" component={PhotosScreen} />
+    </AccountStack.Navigator>
+  );
+}
+
+function EventsNavigator(): React.JSX.Element {
+  return (
+    <EventsStack.Navigator screenOptions={stackScreenOpts}>
+      <EventsStack.Screen name="EventDetail" component={EventDetailScreen} />
+      <EventsStack.Screen name="EventCreate" component={EventCreateScreen} />
+    </EventsStack.Navigator>
+  );
+}
 
 function MainTabs(): React.JSX.Element {
   return (
@@ -165,13 +223,7 @@ export function AppNavigator(): React.JSX.Element {
       void registerPushToken();
       void pingGamification(); // advance daily streak on login/session restore
       return setupNotificationHandlers((screen, params) => {
-        if (navigationRef.isReady()) {
-          // Dynamic deep-link target — bypass the per-screen navigate overloads.
-          (navigationRef.navigate as (s: string, p?: object) => void)(
-            screen,
-            params,
-          );
-        }
+        openViaRef(screen as Parameters<typeof openViaRef>[0], params);
       });
     }
     if (!user) prevUserRef.current = null;
@@ -209,59 +261,42 @@ export function AppNavigator(): React.JSX.Element {
             )}
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="Chat" component={ChatScreen} />
-            <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
-            <Stack.Screen name="Photos" component={PhotosScreen} />
-            <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen
               name="AlertComposer"
               component={AlertComposerScreen}
             />
             <Stack.Screen name="UserProfile" component={UserProfileScreen} />
-            <Stack.Screen name="Verification" component={VerificationScreen} />
-            <Stack.Screen
-              name="EmailVerification"
-              component={EmailVerificationScreen}
-              options={{ title: 'Verify email', presentation: 'modal' }}
-            />
-            <Stack.Screen
-              name="Subscription"
-              component={SubscriptionScreen}
-            />
-            <Stack.Screen
-              name="SocialLinking"
-              component={SocialLinkingScreen}
-            />
-            <Stack.Screen
-              name="Achievements"
-              component={AchievementsScreen}
-            />
-            <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
-            <Stack.Screen name="Challenges" component={ChallengesScreen} />
-            <Stack.Screen
-              name="VerificationId"
-              options={{ title: 'ID Verification', presentation: 'modal' }}
-            >
-              {() => <VerificationIdScreen />}
-            </Stack.Screen>
-            <Stack.Screen name="EventDetail" component={EventDetailScreen} />
-            <Stack.Screen name="EventCreate" component={EventCreateScreen} />
-            <Stack.Screen name="Marketplace" component={MarketplaceScreen} />
-            <Stack.Screen name="ListingDetail" component={ListingDetailScreen} />
-            <Stack.Screen name="ListingCreate" component={ListingCreateScreen} />
-            <Stack.Screen
-              name="NotificationSettings"
-              component={NotificationSettingsScreen}
-            />
-            <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
             <Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />
             <Stack.Screen
               name="Interactions"
               component={InteractionsScreen}
-              options={{ title: 'Interactions', headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.textPrimary }}
+              options={{
+                headerShown: true,
+                title: 'Interactions',
+                headerStyle: { backgroundColor: colors.bg },
+                headerTintColor: colors.textPrimary,
+              }}
             />
-            <Stack.Screen name="Privacy" component={PrivacyScreen} />
-            <Stack.Screen name="Help" component={HelpScreen} />
-            <Stack.Screen name="About" component={AboutScreen} />
+            <Stack.Screen
+              name="Gamification"
+              component={GamificationNavigator}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Commerce"
+              component={CommerceNavigator}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Account"
+              component={AccountNavigator}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Events"
+              component={EventsNavigator}
+              options={{ headerShown: false }}
+            />
           </>
         ) : (
           <Stack.Screen name="Auth" component={AuthScreen} />
