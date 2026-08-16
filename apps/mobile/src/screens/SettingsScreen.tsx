@@ -14,14 +14,14 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { RootStackParamList } from '@/navigation/AppNavigator';
+import type { AccountStackParamList } from '@/navigation/stacks';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { deleteAccount, logout } from '@/features/auth/authSlice';
 import { updateProfile } from '@/features/profile/profileSlice';
 
 export function SettingsScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<AccountStackParamList>>();
   const profile = useAppSelector((s) => s.profile.profile);
   const { loading } = useAppSelector((s) => s.profile);
 
@@ -106,7 +106,7 @@ export function SettingsScreen(): React.JSX.Element {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Trust &amp; posting</Text>
+          <Text style={styles.sectionTitle}>Trust & posting</Text>
           <TouchableOpacity
             style={styles.row}
             onPress={() => navigation.navigate('Verification')}
@@ -171,7 +171,7 @@ export function SettingsScreen(): React.JSX.Element {
             onPress={() => navigation.navigate('Help')}
           >
             <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Help &amp; Support</Text>
+              <Text style={styles.rowLabel}>Help & Support</Text>
               <Text style={styles.rowSub}>FAQs and contact</Text>
             </View>
             <Icon name="chevron-right" size={24} color="#555" />
