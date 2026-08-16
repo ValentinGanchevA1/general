@@ -135,29 +135,7 @@ export function MapScreen(): React.JSX.Element {
     return () => clearInterval(t);
   }, [myCoords, sendPresence]);
 
-  useEffect(() => {
-    const unsub = on('wave:received', (e) => {
-      if (__DEV__) {
-        console.log(`wave from ${e.fromUser.displayName}`);
-      }
-      Alert.alert(
-        `${e.fromUser.displayName} waved at you`,
-        'Wave back or chat with them on the map.',
-      );
-      refresh();
-    });
-    return unsub;
-  }, [on, refresh]);
-
-  useEffect(() => {
-    const unsub = on('gift:received', (e) => {
-      Alert.alert(
-        `${e.sender.displayName} sent you a gift ${e.emoji}`,
-        e.message ? `${e.label} — “${e.message}”` : `You received a ${e.label}.`,
-      );
-    });
-    return unsub;
-  }, [on]);
+  // wave:received + gift:received → AchievementToastHost (non-blocking global queue)
 
   useEffect(() => {
     if (!viewport) return;
