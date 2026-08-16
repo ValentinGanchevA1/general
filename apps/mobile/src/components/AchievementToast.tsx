@@ -25,7 +25,7 @@ import type {
   WaveReceivedEvent,
 } from '@g88/shared';
 
-import { navigationRef } from '@/navigation/navigationRef';
+import { openViaRef } from '@/navigation/openRootScreen';
 import { useSocket } from '@/realtime/useSocket';
 import { colors } from '@/theme';
 
@@ -144,16 +144,15 @@ export function AchievementToastHost(): React.JSX.Element | null {
     if (!current) return;
     const item = current;
     dismiss();
-    if (!navigationRef.isReady()) return;
     switch (item.kind) {
       case 'achievement':
-        navigationRef.navigate('Achievements');
+        openViaRef('Achievements');
         break;
       case 'wave':
-        navigationRef.navigate('UserProfile', { userId: item.data.fromUser.id });
+        openViaRef('UserProfile', { userId: item.data.fromUser.id });
         break;
       case 'gift':
-        navigationRef.navigate('GiftsInbox');
+        openViaRef('GiftsInbox');
         break;
     }
   }, [current, dismiss]);
