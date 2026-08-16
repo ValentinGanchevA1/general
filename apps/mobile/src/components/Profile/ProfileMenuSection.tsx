@@ -2,14 +2,11 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { APP_VERSION } from '@/constants/app';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
-type MenuRoute = Extract<
-  keyof RootStackParamList,
-  'Settings' | 'Privacy' | 'Help' | 'About' | 'Subscription'
->;
+/** Logical menu destinations — resolved via openRootScreen → Account stack. */
+type MenuRoute = 'Settings' | 'Privacy' | 'Help' | 'About' | 'Subscription';
 
 interface Props {
   isPaid: boolean;
