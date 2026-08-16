@@ -12,6 +12,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { EventSummary, LatLng } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { openRootScreen } from '@/navigation/openRootScreen';
 import { useNearbyEvents } from './useEvents';
 import { formatEventDayShort } from './eventFormat';
 
@@ -37,7 +38,7 @@ export function EventsRail({ location }: { location: LatLng | null }): React.JSX
           <EventCard
             key={e.id}
             event={e}
-            onPress={() => navigation.navigate('EventDetail', { eventId: e.id })}
+            onPress={() => openRootScreen(navigation, 'EventDetail', { eventId: e.id })}
           />
         ))}
       </ScrollView>
