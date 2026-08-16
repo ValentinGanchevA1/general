@@ -1,5 +1,5 @@
 // Top-of-map chrome: challenge, streak nudge, interactions entry.
-// Owns stack visibility + badge offset so MapScreen does not hand-roll heights.
+// Owns stack visibility + absolute tops so cards never self-compute offsets.
 
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -12,6 +12,8 @@ import { colors } from '@/theme';
 import {
   INTERACTION_BADGE_SIZE,
   mapBadgeTop,
+  mapChallengeTop,
+  mapNudgeTop,
 } from './mapChromeLayout';
 
 interface Props {
@@ -27,12 +29,14 @@ export function MapChrome({
   onPressInteractions,
 }: Props): React.JSX.Element {
   const insets = useSafeAreaInsets();
+  const challengeTop = mapChallengeTop(insets.top);
+  const nudgeTop = mapNudgeTop(insets.top);
   const badgeTop = mapBadgeTop(insets.top, sheetOpen);
 
   return (
     <>
-      {!sheetOpen ? <DailyChallengeCard /> : null}
-      {!sheetOpen ? <NudgeBanner /> : null}
+      {!sheetOpen ? <DailyChallengeCard top={challengeTop} /> : null}
+      {!sheetOpen ? <NudgeBanner top={nudgeTop} /> : null}
 
       <TouchableOpacity
         style={[styles.interactionBadge, { top: badgeTop }]}

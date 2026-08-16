@@ -6,27 +6,26 @@
 
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { track } from '@/lib/analytics';
-import { CHALLENGE_CARD_HEIGHT } from '@/features/gamification/DailyChallengeCard';
 import { useNudges } from './useNudges';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-export function NudgeBanner(): React.JSX.Element | null {
+interface Props {
+  /** Absolute top offset — owned by MapChrome layout. */
+  top: number;
+}
+
+export function NudgeBanner({ top }: Props): React.JSX.Element | null {
   const navigation = useNavigation<Nav>();
-  const insets = useSafeAreaInsets();
   const { nudge, dismiss } = useNudges();
 
   if (!nudge) return null;
-
-  // Stack under challenge: safe top + gap + challenge height + gap.
-  const top = insets.top + 8 + CHALLENGE_CARD_HEIGHT + 8;
 
   return (
     <View style={[styles.wrap, { top }]} pointerEvents="box-none">

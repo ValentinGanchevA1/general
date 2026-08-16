@@ -6,7 +6,6 @@
 
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -19,9 +18,13 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 /** Approx card height used by MapScreen / NudgeBanner for stacking. */
 export const CHALLENGE_CARD_HEIGHT = 56;
 
-export function DailyChallengeCard(): React.JSX.Element | null {
+interface Props {
+  /** Absolute top offset — owned by MapChrome layout. */
+  top: number;
+}
+
+export function DailyChallengeCard({ top }: Props): React.JSX.Element | null {
   const navigation = useNavigation<Nav>();
-  const insets = useSafeAreaInsets();
   const { challenges } = useChallenges();
   const [dismissed, setDismissed] = useState(false);
 
@@ -31,7 +34,7 @@ export function DailyChallengeCard(): React.JSX.Element | null {
 
   return (
     <View
-      style={[styles.wrap, { top: insets.top + 8 }]}
+      style={[styles.wrap, { top }]}
       pointerEvents="box-none"
     >
       <View style={styles.card}>
