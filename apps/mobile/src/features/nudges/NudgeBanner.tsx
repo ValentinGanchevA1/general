@@ -11,7 +11,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { RootStackParamList } from '@/navigation/AppNavigator';
-import { openRootScreen } from '@/navigation/openRootScreen';
 import { track } from '@/lib/analytics';
 import { useNudges } from './useNudges';
 
@@ -36,7 +35,7 @@ export function NudgeBanner({ top }: Props): React.JSX.Element | null {
           style={styles.main}
           onPress={() => {
             track('nudge.tap', { id: nudge.id });
-            openRootScreen(navigation, nudge.target);
+            navigation.navigate(nudge.target);
           }}
         >
           <Icon name={nudge.icon} size={20} color={nudge.accent} />
