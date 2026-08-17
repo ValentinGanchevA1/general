@@ -7,9 +7,17 @@ import { AuthModule } from '../modules/auth/auth.module';
 import { ChatModule } from '../modules/chat/chat.module';
 import { NotificationsModule } from '../modules/notifications/notifications.module';
 import { ChallengesModule } from '../modules/challenges/challenges.module';
+import { FriendsModule } from '../modules/friends/friends.module';
 
 @Module({
-  imports: [PresenceModule, AuthModule, ChatModule, NotificationsModule, ChallengesModule],
+  imports: [
+    PresenceModule,
+    AuthModule,
+    ChatModule,
+    NotificationsModule,
+    ChallengesModule,
+    FriendsModule,
+  ],
   providers: [RealtimeGateway, WsJwtGuard, LocationShareSweepService],
   exports: [RealtimeGateway],
 })

@@ -25,9 +25,11 @@ import {
   acceptFriendRequest,
   declineFriendRequest,
   fetchFriendsTab,
+  friendOnlineChanged,
   type FriendsTab,
   unfriendUser,
 } from '@/features/friends/friendsSlice';
+import { useSocket } from '@/realtime/useSocket';
 import { Avatar } from '@/components/Avatar';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
@@ -43,6 +45,7 @@ const TABS: { key: FriendsTab; label: string }[] = [
 export function FriendsListScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const dispatch = useAppDispatch();
+  const { on } = useSocket();
   const [tab, setTab] = useState<FriendsTab>('friends');
   const list = useAppSelector((s) => s.friends[tab]);
   const pendingActionIds = useAppSelector((s) => s.friends.pendingActionIds);
@@ -57,6 +60,14 @@ export function FriendsListScreen(): React.JSX.Element {
   useEffect(() => {
     load(tab);
   }, [tab, load]);
+
+  // Live online dots for the close-friends tab.
+  useEffect(() => {
+    const unsub = on('friend:presence', (e) => {
+      dispatch(friendOnlineChanged({ userId: e.userId, online: e.online }));
+    });
+    return unsub;
+  }, [on, dispatch]);
 
   const onRefresh = useCallback(() => {
     load(tab);
@@ -79,7 +90,6 @@ export function FriendsListScreen(): React.JSX.Element {
     (id: string) => {
       void dispatch(acceptFriendRequest(id)).then((r) => {
         if (acceptFriendRequest.fulfilled.match(r)) {
-          // Refresh friends list so accepted peer appears.
           void dispatch(fetchFriendsTab({ tab: 'friends' }));
         } else {
           Alert.alert('Could not accept', (r.payload as string) ?? 'Try again.');

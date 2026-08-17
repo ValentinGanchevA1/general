@@ -1,4 +1,4 @@
-import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import type {
   FriendCard,
@@ -112,7 +112,17 @@ export const unfriendUser = createAsyncThunk(
 const friendsSlice = createSlice({
   name: 'friends',
   initialState,
-  reducers: {},
+  reducers: {
+    /** Live update from `friend:presence` WS (close-friends tab only). */
+    friendOnlineChanged(
+      state,
+      action: PayloadAction<{ userId: string; online: boolean }>,
+    ) {
+      const { userId, online } = action.payload;
+      const row = state.friends.items.find((f) => f.userId === userId);
+      if (row) row.online = online;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchFriendsTab.pending, (state, action) => {
@@ -181,4 +191,5 @@ const friendsSlice = createSlice({
   },
 });
 
+export const { friendOnlineChanged } = friendsSlice.actions;
 export default friendsSlice.reducer;

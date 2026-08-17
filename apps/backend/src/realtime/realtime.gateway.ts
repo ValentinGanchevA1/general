@@ -52,6 +52,7 @@ import { ChatService } from '../modules/chat/chat.service';
 import { LocationShareService } from '../modules/chat/location-share.service';
 import { NotificationsService } from '../modules/notifications/notifications.service';
 import { ChallengesService } from '../modules/challenges/challenges.service';
+import { FriendsService } from '../modules/friends/friends.service';
 import type { JwtPayload } from '../modules/auth/jwt.strategy';
 
 type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
@@ -114,6 +115,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly locationShare: LocationShareService,
     private readonly notifications: NotificationsService,
     private readonly challenges: ChallengesService,
+    private readonly friends: FriendsService,
     private readonly jwt: JwtService,
     @InjectDataSource() private readonly db: DataSource,
   ) {}
@@ -137,6 +139,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     const userId = client.data.userId;
     client.data.rooms = new Set();
+    client.data.friendPresenceAnnounced = false;
     client.join(this.userRoom(userId));
     this.logger.log(`socket connected: user=${userId} sid=${client.id}`);
   }
@@ -145,8 +148,13 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     const userId = client.data.userId;
     if (!userId) return;
     const remaining = await this.server.in(this.userRoom(userId)).fetchSockets();
-    if (remaining.length === 0) {
+    // fetchSockets still includes the disconnecting socket in some versions — filter it out.
+    const others = remaining.filter((s) => s.id !== client.id);
+    if (others.length === 0) {
       await this.presence.markOffline(userId);
+      if (client.data.friendPresenceAnnounced) {
+        void this.notifyFriendsPresence(userId, false);
+      }
     }
     this.logger.log(`socket disconnected: user=${userId} sid=${client.id}`);
   }
@@ -185,6 +193,12 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
           added: [{ userId: client.data.userId, lat: result.lat, lng: result.lng }],
           removed: [],
         });
+      }
+
+      // First heartbeat this connection → announce online to close friends once.
+      if (!client.data.friendPresenceAnnounced) {
+        client.data.friendPresenceAnnounced = true;
+        void this.notifyFriendsPresence(client.data.userId, true);
       }
 
       return { ok: true, data: { cellId: result.cellId } };
@@ -503,6 +517,23 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       reason,
       endedAt,
     });
+  }
+
+  // ─── Friend presence ─────────────────────────────────────────────────────
+
+  /** Notify each close friend that `userId` went online/offline. */
+  private async notifyFriendsPresence(userId: string, online: boolean): Promise<void> {
+    try {
+      const friendIds = await this.friends.listFriendIds(userId);
+      for (const friendId of friendIds) {
+        this.server.to(this.userRoom(friendId)).emit('friend:presence', {
+          userId,
+          online,
+        });
+      }
+    } catch (err) {
+      this.logger.error(`notifyFriendsPresence failed user=${userId}: ${err}`);
+    }
   }
 
   // ─── Push helpers ───────────────────────────────────────────────────────
