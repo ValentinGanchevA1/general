@@ -25,7 +25,9 @@ import {
   acceptFriendRequest,
   declineFriendRequest,
   fetchFriendsTab,
+  fetchPendingCount,
   friendOnlineChanged,
+  pendingCountSet,
   type FriendsTab,
   unfriendUser,
 } from '@/features/friends/friendsSlice';
@@ -49,6 +51,7 @@ export function FriendsListScreen(): React.JSX.Element {
   const [tab, setTab] = useState<FriendsTab>('friends');
   const list = useAppSelector((s) => s.friends[tab]);
   const pendingActionIds = useAppSelector((s) => s.friends.pendingActionIds);
+  const pendingCount = useAppSelector((s) => s.friends.pendingCount);
 
   const load = useCallback(
     (t: FriendsTab = tab) => {
@@ -61,17 +64,27 @@ export function FriendsListScreen(): React.JSX.Element {
     load(tab);
   }, [tab, load]);
 
-  // Live online dots for the close-friends tab.
   useEffect(() => {
-    const unsub = on('friend:presence', (e) => {
+    void dispatch(fetchPendingCount());
+  }, [dispatch]);
+
+  useEffect(() => {
+    const unsubPresence = on('friend:presence', (e) => {
       dispatch(friendOnlineChanged({ userId: e.userId, online: e.online }));
     });
-    return unsub;
+    const unsubRequest = on('friend:request', (e) => {
+      dispatch(pendingCountSet(e.pendingCount));
+    });
+    return () => {
+      unsubPresence();
+      unsubRequest();
+    };
   }, [on, dispatch]);
 
   const onRefresh = useCallback(() => {
     load(tab);
-  }, [load, tab]);
+    void dispatch(fetchPendingCount());
+  }, [load, tab, dispatch]);
 
   const onEndReached = useCallback(() => {
     if (list.nextCursor && !list.loadingMore && !list.loading) {
@@ -270,7 +283,16 @@ export function FriendsListScreen(): React.JSX.Element {
               style={[S.tab, active && S.tabActive]}
               onPress={() => setTab(t.key)}
             >
-              <Text style={[S.tabText, active && S.tabTextActive]}>{t.label}</Text>
+              <View style={S.tabInner}>
+                <Text style={[S.tabText, active && S.tabTextActive]}>{t.label}</Text>
+                {t.key === 'requests' && pendingCount > 0 ? (
+                  <View style={S.tabBadge}>
+                    <Text style={S.tabBadgeText}>
+                      {pendingCount > 99 ? '99+' : String(pendingCount)}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
             </TouchableOpacity>
           );
         })}
@@ -369,8 +391,19 @@ const S = StyleSheet.create({
     alignItems: 'center',
   },
   tabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  tabInner: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   tabText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
   tabTextActive: { color: colors.onPrimary, fontWeight: '700' },
+  tabBadge: {
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  tabBadgeText: { color: colors.onPrimary, fontSize: 10, fontWeight: '800' },
 
   listContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: 40, gap: 10 },
   row: {
