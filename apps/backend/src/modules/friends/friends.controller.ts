@@ -73,6 +73,11 @@ export class FriendsController {
     return this.friends.cancelRequest(requestId, userId);
   }
 
+  @Get('requests/pending/count')
+  pendingCount(@CurrentUser('id') userId: string) {
+    return this.friends.countPendingIncoming(userId);
+  }
+
   @Get('requests/pending')
   pending(
     @CurrentUser('id') userId: string,

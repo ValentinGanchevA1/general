@@ -40,6 +40,27 @@ export interface FriendPresenceEvent {
   online: boolean;
 }
 
+/** Incoming friend request (room `user:{addresseeId}`). */
+export interface FriendRequestEvent {
+  requestId: string;
+  fromUser: {
+    id: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+  createdAt: string;
+  /** Current pending incoming count for the recipient (for badge). */
+  pendingCount: number;
+}
+
+/** Friend request accepted — delivered to the original requester. */
+export interface FriendAcceptedEvent {
+  peerUserId: string;
+  peerDisplayName: string;
+  peerAvatarUrl: string | null;
+  acceptedAt: string;
+}
+
 export interface ChatMessageEvent {
   id: string;
   conversationId: string;
@@ -123,6 +144,10 @@ export interface ServerToClientEvents {
   'presence:delta': (e: PresenceDelta) => void;
   /** A close friend went online/offline (delivered to each friend's user room). */
   'friend:presence': (e: FriendPresenceEvent) => void;
+  /** Someone sent you a friend request. */
+  'friend:request': (e: FriendRequestEvent) => void;
+  /** Your friend request was accepted. */
+  'friend:accepted': (e: FriendAcceptedEvent) => void;
   'chat:message': (e: ChatMessageEvent) => void;
   'conversation:opened': (e: ConversationOpenedEvent) => void;
   'gift:received': (e: GiftReceivedEvent) => void;

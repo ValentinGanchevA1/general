@@ -35,6 +35,8 @@ import type {
   EventQuestionUpvoteDelta,
   StoryNewEvent,
   LocationShareSession,
+  FriendRequestEvent,
+  FriendAcceptedEvent,
 } from '@g88/shared';
 
 import { WsJwtGuard } from './ws-jwt.guard';
@@ -474,6 +476,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       reason,
       endedAt,
     });
+  }
+
+  async emitFriendRequest(toUserId: string, evt: FriendRequestEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('friend:request', evt);
+  }
+
+  async emitFriendAccepted(toUserId: string, evt: FriendAcceptedEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('friend:accepted', evt);
   }
 
   /** Notify each close friend that `userId` went online/offline. */

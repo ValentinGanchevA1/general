@@ -35,6 +35,7 @@ const CHANNEL_CAPS: Record<NotificationChannel, { limit: number; windowSec: numb
   waves: { limit: 12, windowSec: 3600 },
   messages: { limit: 40, windowSec: 3600 },
   gifts: { limit: 12, windowSec: 3600 },
+  friends: { limit: 20, windowSec: 3600 },
   nearby: { limit: 6, windowSec: 3600 },
   events: { limit: 6, windowSec: 3600 },
   listings: { limit: 6, windowSec: 3600 },
@@ -59,9 +60,6 @@ export class NotificationsService {
     );
   }
 
-  // ─── Preferences ─────────────────────────────────────────────────────────
-
-  /** All channels with their on/off state (defaults to on; a row records an opt-out). */
   async getPreferences(userId: string): Promise<NotificationPreferences> {
     const rows = await this.db.query<Array<{ channel: string; enabled: boolean }>>(
       `SELECT channel, enabled FROM notification_preferences WHERE user_id = $1`,
@@ -96,10 +94,6 @@ export class NotificationsService {
     return this.getPreferences(userId);
   }
 
-  /**
-   * Gate a push to one recipient on a channel: respects the opt-out preference
-   * and a per-channel frequency cap (Redis rolling window). Returns false to skip.
-   */
   private async allowed(userId: string, channel: NotificationChannel): Promise<boolean> {
     const [pref] = await this.db.query<Array<{ enabled: boolean }>>(
       `SELECT enabled FROM notification_preferences WHERE user_id = $1 AND channel = $2`,
@@ -114,8 +108,6 @@ export class NotificationsService {
     if (n === 1) await this.redis.expire(key, cap.windowSec);
     return n <= cap.limit;
   }
-
-  // ─── Direct (single-recipient) channels ────────────────────────────────────
 
   async notifyWave(
     toUserId: string,
@@ -164,10 +156,6 @@ export class NotificationsService {
     }, { type: 'message', conversationId });
   }
 
-  /**
-   * Looks up the sender's display name then pushes to the recipient.
-   * Used by the realtime gateway where only the senderId is available.
-   */
   async notifyMessageFrom(
     toUserId: string,
     senderId: string,
@@ -182,11 +170,6 @@ export class NotificationsService {
     await this.notifyMessage(toUserId, senderName, preview, conversationId);
   }
 
-  /**
-   * ID-verification decision push. Bypasses the opt-out/rate-cap gate in
-   * `allowed()` — this is a one-off account-status result, not a discretionary
-   * engagement channel, so it isn't in `NotificationChannel`/`CHANNEL_CAPS`.
-   */
   async notifyIdVerificationDecided(
     toUserId: string,
     decision: 'verified' | 'rejected',
@@ -208,16 +191,44 @@ export class NotificationsService {
     );
   }
 
-  // ─── Geofence-matched (area) channels ──────────────────────────────────────
+  async notifyFriendRequest(
+    toUserId: string,
+    fromUser: { id: string; displayName: string },
+  ): Promise<void> {
+    if (!(await this.allowed(toUserId, 'friends'))) return;
+    const tokens = await this.getTokens(toUserId);
+    if (!tokens.length) return;
 
-  /**
-   * Every user whose active geofence contains the given H3 r7 cell.
-   * Pre-filters candidates with one gridDisk(cell, MAX_RINGS) query, then
-   * confirms each match in-process (a radius-1 geofence must not match a cell
-   * 3 rings away).
-   */
+    await this.sendMulticast(
+      tokens,
+      {
+        title: 'Friend request',
+        body: `${fromUser.displayName} wants to be friends`,
+      },
+      { type: 'friend_request', fromUserId: fromUser.id },
+    );
+  }
+
+  async notifyFriendAccepted(
+    toUserId: string,
+    peer: { id: string; displayName: string },
+  ): Promise<void> {
+    if (!(await this.allowed(toUserId, 'friends'))) return;
+    const tokens = await this.getTokens(toUserId);
+    if (!tokens.length) return;
+
+    await this.sendMulticast(
+      tokens,
+      {
+        title: 'Friend request accepted',
+        body: `${peer.displayName} accepted your friend request`,
+      },
+      { type: 'friend_accepted', peerUserId: peer.id },
+    );
+  }
+
   private async geofenceRecipients(cellH3R7: string, authorId: string): Promise<string[]> {
-    const MAX_RINGS = 3; // matches geofences.radius_rings CHECK (0..3)
+    const MAX_RINGS = 3;
     const candidateCells = h3.gridDisk(cellH3R7, MAX_RINGS);
 
     const rows = await this.db.query<Array<{
@@ -236,7 +247,6 @@ export class NotificationsService {
       .map((g) => g.user_id);
   }
 
-  /** Fan a notification out to recipients, gating each on its channel. */
   private async fanOut(
     recipientIds: string[],
     channel: NotificationChannel,
@@ -251,7 +261,6 @@ export class NotificationsService {
     }
   }
 
-  /** "New alert nearby" — channel `nearby`. */
   async notifyGeofenceMatch(
     alertCellH3R7: string | null,
     authorId: string,
@@ -267,7 +276,6 @@ export class NotificationsService {
     await this.fanOut(recipients, 'nearby', { title, body: preview }, { type: 'alert' });
   }
 
-  /** "New event nearby" — channel `events`. */
   async notifyEventNearby(
     cellH3R7: string | null,
     hostId: string,
@@ -285,7 +293,6 @@ export class NotificationsService {
     );
   }
 
-  /** "New item for sale nearby" — channel `listings`. */
   async notifyListingNearby(
     cellH3R7: string | null,
     sellerId: string,
@@ -303,13 +310,6 @@ export class NotificationsService {
     );
   }
 
-  // ─── Daily digest ──────────────────────────────────────────────────────────
-
-  /**
-   * One push per opted-in user summarising the last 24h (waves + gifts). Skips
-   * users with no activity. Triggered by a scheduled GitHub Actions workflow
-   * (the free-tier service spins down, so an in-process cron is unreliable).
-   */
   async runDigest(): Promise<{ candidates: number; sent: number }> {
     const rows = await this.db.query<Array<{ user_id: string; waves: string; gifts: string }>>(
       `WITH recipients AS (
@@ -348,8 +348,6 @@ export class NotificationsService {
     }
     return { candidates: rows.length, sent };
   }
-
-  // ─── Internals ────────────────────────────────────────────────────────────
 
   private async getTokens(userId: string): Promise<string[]> {
     const rows = await this.db.query<Array<{ token: string }>>(
