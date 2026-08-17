@@ -82,3 +82,8 @@ export interface SuggestionCard {
   /** Incoming pending friend request exists. */
   hasPendingIncoming: boolean;
 }
+
+/** Pending incoming friend-request count (badge). */
+export interface FriendPendingCount {
+  count: number;
+}
