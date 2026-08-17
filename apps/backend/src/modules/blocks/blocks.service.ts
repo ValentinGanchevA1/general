@@ -1,6 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, forwardRef } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+
+import { FriendsService } from '../friends/friends.service';
 
 export interface BlockedUserRow {
   id: string;
@@ -16,10 +18,16 @@ export interface BlockedUserRow {
  *  - MessagingService: keeps its own self-contained isBlocked() (same predicate,
  *    queried directly) so MessagingModule's wiring doesn't need to change —
  *    keep the two in sync if this predicate ever changes.
+ *  - FriendsService: follow/request create paths call isBlocked(); on block we
+ *    hard-delete follows, friendships, and cancel pending friend_requests.
  */
 @Injectable()
 export class BlocksService {
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    @Inject(forwardRef(() => FriendsService))
+    private readonly friends: FriendsService,
+  ) {}
 
   async block(blockerId: string, blockedId: string): Promise<void> {
     if (blockerId === blockedId) {
@@ -31,6 +39,8 @@ export class BlocksService {
        ON CONFLICT (blocker_id, blocked_id) DO NOTHING`,
       [blockerId, blockedId],
     );
+    // Hard-delete social graph edges (follows, friendships, pending requests).
+    await this.friends.onBlock(blockerId, blockedId);
   }
 
   async unblock(blockerId: string, blockedId: string): Promise<void> {

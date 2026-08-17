@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { BlocksModule } from './modules/blocks/blocks.module';
+import { FriendsModule } from './modules/friends/friends.module';
 import { RedisModule } from './config/redis.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -79,6 +80,7 @@ import { StoriesModule } from './modules/stories/stories.module';
     ListingsModule,
     HealthModule,
     BlocksModule,
+    FriendsModule,
     StoriesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

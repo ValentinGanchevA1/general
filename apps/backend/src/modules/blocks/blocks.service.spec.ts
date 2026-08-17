@@ -2,19 +2,26 @@ import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 
+import { FriendsService } from '../friends/friends.service';
 import { BlocksService } from './blocks.service';
 
 describe('BlocksService', () => {
   let service: BlocksService;
   let query: jest.Mock;
+  let onBlock: jest.Mock;
 
   const A = '11111111-1111-1111-1111-111111111111';
   const B = '22222222-2222-2222-2222-222222222222';
 
   beforeEach(async () => {
     query = jest.fn().mockResolvedValue([]);
+    onBlock = jest.fn().mockResolvedValue(undefined);
     const mod = await Test.createTestingModule({
-      providers: [BlocksService, { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource }],
+      providers: [
+        BlocksService,
+        { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
+        { provide: FriendsService, useValue: { onBlock } },
+      ],
     }).compile();
     service = mod.get(BlocksService);
   });
@@ -22,13 +29,15 @@ describe('BlocksService', () => {
   it('rejects blocking yourself without querying', async () => {
     await expect(service.block(A, A)).rejects.toThrow();
     expect(query).not.toHaveBeenCalled();
+    expect(onBlock).not.toHaveBeenCalled();
   });
 
-  it('block() upserts via ON CONFLICT DO NOTHING', async () => {
+  it('block() upserts via ON CONFLICT DO NOTHING then cascades graph delete', async () => {
     await service.block(A, B);
     const [sql, params] = query.mock.calls[0]!;
     expect(sql).toContain('ON CONFLICT (blocker_id, blocked_id) DO NOTHING');
     expect(params).toEqual([A, B]);
+    expect(onBlock).toHaveBeenCalledWith(A, B);
   });
 
   it('unblock() deletes the directional row', async () => {
