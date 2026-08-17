@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -6,6 +6,10 @@ import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { fetchProfile } from '@/features/profile/profileSlice';
+import {
+  fetchPendingCount,
+  pendingCountSet,
+} from '@/features/friends/friendsSlice';
 import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline';
 import { ProfileHeaderPhoto } from '@/components/Profile/ProfileHeaderPhoto';
 import { MapPresenceCard } from '@/components/Profile/MapPresenceCard';
@@ -22,6 +26,8 @@ import { ProfileSocialSection } from '@/components/Profile/ProfileSocialSection'
 import { ProfileMenuSection } from '@/components/Profile/ProfileMenuSection';
 import { ProfileLoadingState, ProfileErrorState } from '@/components/Profile/ProfileScreenStates';
 import { useProfileScreenData } from '@/features/profile/useProfileScreenData';
+import { useAppSelector } from '@/hooks/redux';
+import { useSocket } from '@/realtime/useSocket';
 import { colors, spacing } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -29,6 +35,8 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 /** Self profile — pure composition over Profile/* sections. */
 export function ProfileScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
+  const { on } = useSocket();
+  const pendingCount = useAppSelector((s) => s.friends.pendingCount);
   const {
     loading,
     error,
@@ -47,6 +55,23 @@ export function ProfileScreen(): React.JSX.Element {
     handleMapToggle,
     dispatch,
   } = useProfileScreenData();
+
+  useEffect(() => {
+    void dispatch(fetchPendingCount());
+  }, [dispatch]);
+
+  useEffect(() => {
+    const unsubReq = on('friend:request', (e) => {
+      dispatch(pendingCountSet(e.pendingCount));
+    });
+    const unsubAcc = on('friend:accepted', () => {
+      // no badge change for acceptor; requester gets toast later
+    });
+    return () => {
+      unsubReq();
+      unsubAcc();
+    };
+  }, [on, dispatch]);
 
   if (loading && !derived) {
     return <ProfileLoadingState />;
@@ -81,7 +106,14 @@ export function ProfileScreen(): React.JSX.Element {
       style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            onRefresh();
+            void dispatch(fetchPendingCount());
+          }}
+          tintColor={colors.primary}
+        />
       }
     >
       <ProfileHeaderPhoto
@@ -139,7 +171,10 @@ export function ProfileScreen(): React.JSX.Element {
         onTrust={() => openRootScreen(navigation, 'Verification')}
       />
 
-      <ProfileFriendsCard onPress={() => openRootScreen(navigation, 'FriendsList')} />
+      <ProfileFriendsCard
+        pendingCount={pendingCount}
+        onPress={() => openRootScreen(navigation, 'FriendsList')}
+      />
 
       <ProfileActivityLinks
         gamification={gamification ?? null}
