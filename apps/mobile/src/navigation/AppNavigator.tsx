@@ -41,6 +41,7 @@ import { BlockedUsersScreen } from '@/screens/BlockedUsersScreen';
 import { PrivacyScreen } from '@/screens/PrivacyScreen';
 import { HelpScreen } from '@/screens/HelpScreen';
 import { AboutScreen } from '@/screens/AboutScreen';
+import { FriendsListScreen } from '@/screens/FriendsListScreen';
 import type { AreaCategory, VerificationLevel } from '@g88/shared';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
@@ -158,6 +159,11 @@ function AccountNavigator(): React.JSX.Element {
       <AccountStack.Screen name="SocialLinking" component={SocialLinkingScreen} />
       <AccountStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
       <AccountStack.Screen name="Photos" component={PhotosScreen} />
+      <AccountStack.Screen
+        name="FriendsList"
+        component={FriendsListScreen}
+        options={{ headerShown: false, title: 'Friends' }}
+      />
     </AccountStack.Navigator>
   );
 }
