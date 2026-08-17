@@ -20,6 +20,7 @@ import type {
 } from '@g88/shared';
 
 import { BlocksService } from '../blocks/blocks.service';
+import { PresenceService } from '../presence/presence.service';
 
 const DEFAULT_LIMIT = 30;
 const MAX_LIMIT = 100;
@@ -34,6 +35,7 @@ export class FriendsService {
     @InjectDataSource() private readonly db: DataSource,
     @Inject(forwardRef(() => BlocksService))
     private readonly blocks: BlocksService,
+    private readonly presence: PresenceService,
   ) {}
 
   // ─── Follow ───────────────────────────────────────────────────────────────
@@ -302,18 +304,34 @@ export class FriendsService {
       [actorId, cursor ?? null, take],
     );
 
-    // online: null until Slice B (friend-presence rooms + friendsSeeOnlineStatus).
+    const ids = rows.map((r) => r.user_id);
+    const onlineSet = await this.presence.whichAreOnline(ids);
+
     const items: FriendCard[] = rows.map((r) => ({
       userId: r.user_id,
       displayName: r.display_name,
       avatarUrl: r.avatar_url,
-      online: null,
+      online: onlineSet.has(r.user_id),
       createdAt: r.created_at.toISOString(),
     }));
 
     const nextCursor =
       items.length === take ? items[items.length - 1]!.createdAt : null;
     return { items, nextCursor };
+  }
+
+  /** All close-friend user ids for presence fan-out (no pagination). */
+  async listFriendIds(userId: string): Promise<string[]> {
+    const rows = await this.db.query<Array<{ uid: string }>>(
+      `SELECT CASE
+                WHEN user_low_id = $1 THEN user_high_id
+                ELSE user_low_id
+              END AS uid
+         FROM friendships
+        WHERE user_low_id = $1 OR user_high_id = $1`,
+      [userId],
+    );
+    return rows.map((r) => r.uid);
   }
 
   async listFollowing(
@@ -462,6 +480,7 @@ export class FriendsService {
       [actorId, cursor ?? null, take],
     );
 
+    // Follow edges: online only meaningful for close friends list; leave null here.
     const items: FriendCard[] = rows.map((r) => ({
       userId: r.user_id,
       displayName: r.display_name,
