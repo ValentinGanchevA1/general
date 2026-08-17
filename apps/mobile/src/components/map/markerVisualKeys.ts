@@ -24,6 +24,7 @@ export function entityVisualKey(point: EntityPoint): string {
       point.meta.displayName,
       point.meta.verification,
       point.meta.verifiedBadge === true ? '1' : '0',
+      point.meta.isFriend === true ? 'f' : '0',
     ].join('|');
   }
   return [point.id, point.kind, point.meta.title].join('|');
