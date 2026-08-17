@@ -115,6 +115,18 @@ export class FriendsController {
     return this.friends.listFollowers(userId, cursor, limit);
   }
 
+  /** Mutual close friends of the current user and :userId (intersection only). */
+  @Get('mutual/:userId')
+  mutual(
+    @CurrentUser('id') userId: string,
+    @Param('userId', ParseUUIDPipe) peerId: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limitRaw?: string,
+  ) {
+    const limit = limitRaw ? Number(limitRaw) : undefined;
+    return this.friends.listMutual(userId, peerId, cursor, limit);
+  }
+
   @Get('relationship/:userId')
   relationship(
     @CurrentUser('id') userId: string,
