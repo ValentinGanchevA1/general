@@ -10,20 +10,15 @@ import type {
   MessagePage,
 } from '@g88/shared';
 
+import { PresenceService } from '../presence/presence.service';
+
 @Injectable()
 export class ChatService {
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    private readonly presence: PresenceService,
+  ) {}
 
-  /**
-   * Persist a message and bump last_message_at on the conversation.
-   * Verifies the sender is a participant, and enforces the message-request gate
-   * for `pending` conversations:
-   *   - initiator: may send only the single request message (blocked until reply)
-   *   - recipient: their first reply promotes the conversation to `accepted`
-   *
-   * Runs in a transaction with `FOR UPDATE` on the conversation row so two
-   * concurrent sends can't both slip past the one-message cap.
-   */
   async persist(
     conversationId: string,
     senderId: string,
@@ -55,9 +50,6 @@ export class ChatService {
     });
   }
 
-  /**
-   * Persist a location_session system message (counts toward pending-request quota).
-   */
   async persistLocationSession(
     conversationId: string,
     senderId: string,
@@ -142,7 +134,6 @@ export class ChatService {
     };
   }
 
-  /** Return participant IDs for a conversation — used by the realtime gateway for push routing. */
   async getParticipantIds(conversationId: string): Promise<string[]> {
     const [row] = await this.db.query<Array<{ participant_ids: string[] }>>(
       `SELECT participant_ids FROM conversations WHERE id = $1 LIMIT 1`,
@@ -151,7 +142,6 @@ export class ChatService {
     return row?.participant_ids ?? [];
   }
 
-  /** Verify membership without persisting — used by conversation:join gateway handler. */
   async isParticipant(conversationId: string, userId: string): Promise<boolean> {
     const rows = await this.db.query(
       `SELECT 1 FROM conversations WHERE id = $1 AND $2 = ANY(participant_ids) LIMIT 1`,
@@ -160,7 +150,10 @@ export class ChatService {
     return rows.length > 0;
   }
 
-  /** List conversations the user participates in, newest activity first. Includes participant display names. */
+  /**
+   * Order: close friends first, then online friends, then last activity.
+   * peerOnline respects friends_see_online_status.
+   */
   async findConversations(userId: string): Promise<ConversationSummary[]> {
     const rows = await this.db.query<
       Array<{
@@ -171,6 +164,9 @@ export class ChatService {
         last_message_at: string | null;
         last_body: string | null;
         last_sender_id: string | null;
+        is_friend: boolean;
+        peer_id: string | null;
+        peer_allows_online: boolean;
         participants: Array<{ id: string; displayName: string; avatarUrl: string | null }>;
       }>
     >(
@@ -182,6 +178,29 @@ export class ChatService {
          c.last_message_at,
          m.body         AS last_body,
          m.sender_id    AS last_sender_id,
+         EXISTS (
+           SELECT 1
+             FROM friendships f
+            WHERE (f.user_low_id = $1 AND f.user_high_id = ANY (c.participant_ids) AND f.user_high_id <> $1)
+               OR (f.user_high_id = $1 AND f.user_low_id = ANY (c.participant_ids) AND f.user_low_id <> $1)
+         ) AS is_friend,
+         (
+           SELECT p
+             FROM unnest(c.participant_ids) AS p
+            WHERE p <> $1
+            LIMIT 1
+         ) AS peer_id,
+         COALESCE(
+           (
+             SELECT u.friends_see_online_status
+               FROM users u
+              WHERE u.id = (
+                SELECT p FROM unnest(c.participant_ids) AS p WHERE p <> $1 LIMIT 1
+              )
+                AND u.deleted_at IS NULL
+           ),
+           true
+         ) AS peer_allows_online,
          COALESCE(
            json_agg(
              json_build_object('id', u.id, 'displayName', u.display_name, 'avatarUrl', u.avatar_url)
@@ -198,29 +217,61 @@ export class ChatService {
        ) m ON true
        LEFT JOIN users u ON u.id = ANY(c.participant_ids) AND u.deleted_at IS NULL
        WHERE $1 = ANY(c.participant_ids)
-       GROUP BY c.id, c.status, c.initiated_by, c.last_message_at, m.body, m.sender_id
+       GROUP BY c.id, c.status, c.initiated_by, c.last_message_at, m.body, m.sender_id, c.participant_ids
        ORDER BY c.last_message_at DESC NULLS LAST`,
       [userId],
     );
 
-    return rows.map((r) => ({
-      id: r.id,
-      participantIds: r.participant_ids,
-      participants: r.participants,
-      lastMessageAt: r.last_message_at ?? null,
-      lastMessage:
-        r.last_body != null && r.last_sender_id != null
-          ? { senderId: r.last_sender_id, body: r.last_body }
-          : null,
-      status: r.status,
-      initiatedBy: r.initiated_by,
-    }));
+    const peerIds = [
+      ...new Set(
+        rows
+          .filter((r) => r.is_friend && r.peer_id && r.peer_allows_online)
+          .map((r) => r.peer_id as string),
+      ),
+    ];
+    const onlineSet = peerIds.length
+      ? await this.presence.whichAreOnline(peerIds)
+      : new Set<string>();
+
+    const mapped: ConversationSummary[] = rows.map((r) => {
+      const isFriend = r.is_friend === true;
+      let peerOnline: boolean | null = null;
+      if (isFriend && r.peer_id && r.peer_allows_online) {
+        peerOnline = onlineSet.has(r.peer_id);
+      }
+      return {
+        id: r.id,
+        participantIds: r.participant_ids,
+        participants: r.participants,
+        lastMessageAt: r.last_message_at ?? null,
+        lastMessage:
+          r.last_body != null && r.last_sender_id != null
+            ? { senderId: r.last_sender_id, body: r.last_body }
+            : null,
+        status: r.status,
+        initiatedBy: r.initiated_by,
+        isFriend,
+        peerOnline,
+      };
+    });
+
+    mapped.sort((a, b) => {
+      const af = a.isFriend ? 1 : 0;
+      const bf = b.isFriend ? 1 : 0;
+      if (af !== bf) return bf - af;
+      if (af === 1) {
+        const ao = a.peerOnline === true ? 1 : 0;
+        const bo = b.peerOnline === true ? 1 : 0;
+        if (ao !== bo) return bo - ao;
+      }
+      const at = a.lastMessageAt ? Date.parse(a.lastMessageAt) : 0;
+      const bt = b.lastMessageAt ? Date.parse(b.lastMessageAt) : 0;
+      return bt - at;
+    });
+
+    return mapped;
   }
 
-  /**
-   * Paginated message history, newest-first.
-   * Cursor = ISO timestamp of the oldest message on the previous page.
-   */
   async findMessages(
     conversationId: string,
     userId: string,
