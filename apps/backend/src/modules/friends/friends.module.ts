@@ -1,11 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 
 import { BlocksModule } from '../blocks/blocks.module';
 import { FriendsController } from './friends.controller';
 import { FriendsService } from './friends.service';
 
 @Module({
-  imports: [BlocksModule],
+  imports: [forwardRef(() => BlocksModule)],
   controllers: [FriendsController],
   providers: [FriendsService],
   exports: [FriendsService],
