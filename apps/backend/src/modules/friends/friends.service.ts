@@ -2,8 +2,10 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -30,6 +32,7 @@ function orderedPair(a: string, b: string): [string, string] {
 export class FriendsService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
+    @Inject(forwardRef(() => BlocksService))
     private readonly blocks: BlocksService,
   ) {}
 
@@ -281,16 +284,12 @@ export class FriendsService {
         display_name: string;
         avatar_url: string | null;
         created_at: Date;
-        friends_see_online: boolean | null;
-        last_seen_at: Date | null;
       }>
     >(
       `SELECT u.id AS user_id,
               u.display_name,
               u.avatar_url,
-              f.created_at,
-              (u.settings->'privacy'->>'friendsSeeOnlineStatus')::boolean AS friends_see_online,
-              u.last_seen_at
+              f.created_at
          FROM friendships f
          JOIN users u ON u.id = CASE
            WHEN f.user_low_id = $1 THEN f.user_high_id
@@ -303,11 +302,12 @@ export class FriendsService {
       [actorId, cursor ?? null, take],
     );
 
+    // online: null until Slice B (friend-presence rooms + friendsSeeOnlineStatus).
     const items: FriendCard[] = rows.map((r) => ({
       userId: r.user_id,
       displayName: r.display_name,
       avatarUrl: r.avatar_url,
-      online: this.computeOnline(r.friends_see_online, r.last_seen_at),
+      online: null,
       createdAt: r.created_at.toISOString(),
     }));
 
@@ -447,16 +447,12 @@ export class FriendsService {
         display_name: string;
         avatar_url: string | null;
         created_at: Date;
-        friends_see_online: boolean | null;
-        last_seen_at: Date | null;
       }>
     >(
       `SELECT u.id AS user_id,
               u.display_name,
               u.avatar_url,
-              f.created_at,
-              (u.settings->'privacy'->>'friendsSeeOnlineStatus')::boolean AS friends_see_online,
-              u.last_seen_at
+              f.created_at
          FROM follows f
          JOIN users u ON u.id = f.${otherCol} AND u.deleted_at IS NULL
         WHERE f.${selfCol} = $1
@@ -470,7 +466,6 @@ export class FriendsService {
       userId: r.user_id,
       displayName: r.display_name,
       avatarUrl: r.avatar_url,
-      // Follow lists do not surface online status (friends-only signal).
       online: null,
       createdAt: r.created_at.toISOString(),
     }));
@@ -495,17 +490,6 @@ export class FriendsService {
       [a, b],
     );
     return Number(row?.n ?? 0);
-  }
-
-  private computeOnline(
-    friendsSeeOnline: boolean | null,
-    lastSeenAt: Date | null,
-  ): boolean | null {
-    // Default true when setting absent (additive JSONB).
-    if (friendsSeeOnline === false) return null;
-    if (!lastSeenAt) return false;
-    const ageMs = Date.now() - lastSeenAt.getTime();
-    return ageMs < 5 * 60_000; // 5 min heartbeat window
   }
 
   private async assertUserExists(userId: string): Promise<void> {
