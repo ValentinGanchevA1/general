@@ -46,6 +46,7 @@ interface UserRow {
   hometown_country: string | null;
   show_age: boolean;
   show_hometown: boolean;
+  friends_see_online_status: boolean;
   subscription_tier: SubscriptionTier;
   id_verification_status: IdVerificationStatus;
   created_at: string | Date;
@@ -78,6 +79,7 @@ const USER_COLUMNS = `
   goals, interests, phone, subscription_tier, id_verification_status, created_at,
   date_of_birth::text AS date_of_birth,
   hometown_city, hometown_country, show_age, show_hometown,
+  COALESCE(friends_see_online_status, true) AS friends_see_online_status,
   date_part('year', age(date_of_birth))::int AS age`;
 
 const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
@@ -342,6 +344,10 @@ export class UsersService {
       params.push(req.showHometown);
       setClauses.push(`show_hometown = $${params.length}`);
     }
+    if (req.friendsSeeOnlineStatus !== undefined) {
+      params.push(req.friendsSeeOnlineStatus);
+      setClauses.push(`friends_see_online_status = $${params.length}`);
+    }
 
     if (setClauses.length === 0) return this.getProfile(userId);
 
@@ -504,6 +510,7 @@ export class UsersService {
       hometownCountry: r.hometown_country,
       showAge: r.show_age ?? true,
       showHometown: r.show_hometown ?? true,
+      friendsSeeOnlineStatus: r.friends_see_online_status ?? true,
       photoUrls,
       subscriptionTier: r.subscription_tier ?? 'free',
       socialLinks,
