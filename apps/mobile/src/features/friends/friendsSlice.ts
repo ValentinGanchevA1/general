@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 
 import type {
   FriendCard,
+  FriendPendingCount,
   FriendRequestCard,
   FriendRequestsPage,
   FriendsPage,
@@ -25,6 +26,8 @@ interface FriendsState {
   following: ListState<FriendCard>;
   followers: ListState<FriendCard>;
   requests: ListState<FriendRequestCard>;
+  /** Incoming pending friend-request count (badge). */
+  pendingCount: number;
   /** In-flight accept/decline/unfriend ids for row spinners. */
   pendingActionIds: string[];
 }
@@ -38,6 +41,7 @@ const initialState: FriendsState = {
   following: emptyList(),
   followers: emptyList(),
   requests: emptyList(),
+  pendingCount: 0,
   pendingActionIds: [],
 };
 
@@ -61,6 +65,17 @@ export const fetchFriendsTab = createAsyncThunk(
       }
       const page = await getJson<FriendsPage>(`${pathForTab(args.tab)}${qs}`);
       return { tab: args.tab, page, append: Boolean(args.cursor) } as const;
+    } catch (e) {
+      return rejectWithValue(extractMessage(e));
+    }
+  },
+);
+
+export const fetchPendingCount = createAsyncThunk(
+  'friends/fetchPendingCount',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await getJson<FriendPendingCount>('/friends/requests/pending/count');
     } catch (e) {
       return rejectWithValue(extractMessage(e));
     }
@@ -122,6 +137,13 @@ const friendsSlice = createSlice({
       const row = state.friends.items.find((f) => f.userId === userId);
       if (row) row.online = online;
     },
+    /** Live badge from `friend:request` WS. */
+    pendingCountSet(state, action: PayloadAction<number>) {
+      state.pendingCount = Math.max(0, action.payload);
+    },
+    pendingCountDelta(state, action: PayloadAction<number>) {
+      state.pendingCount = Math.max(0, state.pendingCount + action.payload);
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -145,6 +167,7 @@ const friendsSlice = createSlice({
         if (tab === 'requests') {
           const items = (page as FriendRequestsPage).items;
           state.requests.items = append ? [...state.requests.items, ...items] : items;
+          if (!append) state.pendingCount = items.length;
         } else {
           const items = (page as FriendsPage).items;
           const target = state[tab];
@@ -158,12 +181,16 @@ const friendsSlice = createSlice({
         list.loadingMore = false;
         list.error = (action.payload as string) ?? 'Failed to load';
       })
+      .addCase(fetchPendingCount.fulfilled, (state, action) => {
+        state.pendingCount = action.payload.count;
+      })
       .addCase(acceptFriendRequest.pending, (state, action) => {
         state.pendingActionIds.push(action.meta.arg);
       })
       .addCase(acceptFriendRequest.fulfilled, (state, action) => {
         state.pendingActionIds = state.pendingActionIds.filter((id) => id !== action.payload);
         state.requests.items = state.requests.items.filter((r) => r.id !== action.payload);
+        state.pendingCount = Math.max(0, state.pendingCount - 1);
       })
       .addCase(acceptFriendRequest.rejected, (state, action) => {
         state.pendingActionIds = state.pendingActionIds.filter((id) => id !== action.meta.arg);
@@ -174,6 +201,7 @@ const friendsSlice = createSlice({
       .addCase(declineFriendRequest.fulfilled, (state, action) => {
         state.pendingActionIds = state.pendingActionIds.filter((id) => id !== action.payload);
         state.requests.items = state.requests.items.filter((r) => r.id !== action.payload);
+        state.pendingCount = Math.max(0, state.pendingCount - 1);
       })
       .addCase(declineFriendRequest.rejected, (state, action) => {
         state.pendingActionIds = state.pendingActionIds.filter((id) => id !== action.meta.arg);
@@ -191,5 +219,5 @@ const friendsSlice = createSlice({
   },
 });
 
-export const { friendOnlineChanged } = friendsSlice.actions;
+export const { friendOnlineChanged, pendingCountSet, pendingCountDelta } = friendsSlice.actions;
 export default friendsSlice.reducer;
