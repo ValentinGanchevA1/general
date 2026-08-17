@@ -34,6 +34,12 @@ export interface PresenceDelta {
   removed: string[];
 }
 
+/** Close-friend online change (room `user:{friendId}`). */
+export interface FriendPresenceEvent {
+  userId: string;
+  online: boolean;
+}
+
 export interface ChatMessageEvent {
   id: string;
   conversationId: string;
@@ -115,6 +121,8 @@ export interface EventQuestionUpvoteDelta {
 export interface ServerToClientEvents {
   'wave:received': (e: WaveReceivedEvent) => void;
   'presence:delta': (e: PresenceDelta) => void;
+  /** A close friend went online/offline (delivered to each friend's user room). */
+  'friend:presence': (e: FriendPresenceEvent) => void;
   'chat:message': (e: ChatMessageEvent) => void;
   'conversation:opened': (e: ConversationOpenedEvent) => void;
   'gift:received': (e: GiftReceivedEvent) => void;
@@ -213,4 +221,6 @@ export interface SocketData {
   userId: string;
   /** Set when the gateway joins the socket to user/cell-scoped rooms. */
   rooms: Set<string>;
+  /** True after first successful presence:update this connection (friend online fan-out). */
+  friendPresenceAnnounced?: boolean;
 }
