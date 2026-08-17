@@ -11,6 +11,9 @@ const KIND_COLOR: Record<EntityPoint['kind'], string> = {
   listing: '#4CAF50',
 };
 
+/** Close-friend pin — brand cyan so trusted people read above strangers. */
+const FRIEND_COLOR = '#00d4ff';
+
 const KIND_ICON: Record<EntityPoint['kind'], string> = {
   user: '👤',
   event: '📅',
@@ -22,7 +25,8 @@ interface Props {
 }
 
 function EntityMarkerImpl({ point }: Props): React.JSX.Element {
-  const color = KIND_COLOR[point.kind];
+  const isFriend = point.kind === 'user' && point.meta.isFriend === true;
+  const color = isFriend ? FRIEND_COLOR : KIND_COLOR[point.kind];
 
   const label =
     point.kind === 'user'
@@ -35,7 +39,7 @@ function EntityMarkerImpl({ point }: Props): React.JSX.Element {
 
   return (
     <View style={styles.wrapper}>
-      <View style={[styles.bubble, { borderColor: color }]}>
+      <View style={[styles.bubble, { borderColor: color }, isFriend && styles.friendBubble]}>
         <Text style={styles.icon}>{KIND_ICON[point.kind]}</Text>
         {isVerified && (
           <View style={styles.verifiedBadge}>
@@ -70,6 +74,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10,10,15,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  friendBubble: {
+    borderWidth: 3,
+    backgroundColor: 'rgba(0,212,255,0.12)',
   },
   icon: { fontSize: 16 },
   label: { fontSize: 10, fontWeight: '600', maxWidth: 60 },

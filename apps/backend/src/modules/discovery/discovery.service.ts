@@ -19,6 +19,7 @@ import {
 
 import { REDIS_CLIENT } from '../../config/redis.provider';
 import { PresenceService } from '../presence/presence.service';
+import { FriendsService } from '../friends/friends.service';
 
 const DEFAULT_KINDS: EntityKind[] = ['user', 'event', 'listing'];
 
@@ -57,6 +58,7 @@ export class DiscoveryService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly presence: PresenceService,
+    private readonly friends: FriendsService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
@@ -289,23 +291,28 @@ export class DiscoveryService {
         : [cells, kinds, requesterId, MAX_POINTS_PER_RESPONSE],
     );
 
-    // Overlay live presence for user entities — only Redis knows who's online RIGHT NOW.
+    // Overlay live presence + friend tier for user entities.
     const userIds = rows.filter((r) => r.kind === 'user').map((r) => r.id);
     const onlineSet = userIds.length
       ? await this.presence.whichAreOnline(userIds)
       : new Set<string>();
+    const friendIds =
+      userIds.length > 0
+        ? new Set(await this.friends.listFriendIds(requesterId))
+        : new Set<string>();
 
     return rows.map((r) => {
       if (r.kind === 'user') {
         const viewMeta = r.meta as unknown as UserMeta;
         return {
-          kind: 'user',
+          kind: 'user' as const,
           id: r.id,
           lat: r.lat,
           lng: r.lng,
           meta: {
             ...viewMeta,
-            online: onlineSet.has(r.id), // overlay live Redis presence; view hardcodes false
+            online: onlineSet.has(r.id),
+            isFriend: friendIds.has(r.id),
           },
         };
       }

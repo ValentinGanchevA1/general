@@ -160,7 +160,10 @@ export class ChatService {
     return rows.length > 0;
   }
 
-  /** List conversations the user participates in, newest activity first. Includes participant display names. */
+  /**
+   * List conversations the user participates in.
+   * Order: close friends first, then newest activity.
+   */
   async findConversations(userId: string): Promise<ConversationSummary[]> {
     const rows = await this.db.query<
       Array<{
@@ -171,6 +174,7 @@ export class ChatService {
         last_message_at: string | null;
         last_body: string | null;
         last_sender_id: string | null;
+        is_friend: boolean;
         participants: Array<{ id: string; displayName: string; avatarUrl: string | null }>;
       }>
     >(
@@ -182,6 +186,12 @@ export class ChatService {
          c.last_message_at,
          m.body         AS last_body,
          m.sender_id    AS last_sender_id,
+         EXISTS (
+           SELECT 1
+             FROM friendships f
+            WHERE (f.user_low_id = $1 AND f.user_high_id = ANY (c.participant_ids) AND f.user_high_id <> $1)
+               OR (f.user_high_id = $1 AND f.user_low_id = ANY (c.participant_ids) AND f.user_low_id <> $1)
+         ) AS is_friend,
          COALESCE(
            json_agg(
              json_build_object('id', u.id, 'displayName', u.display_name, 'avatarUrl', u.avatar_url)
@@ -198,8 +208,8 @@ export class ChatService {
        ) m ON true
        LEFT JOIN users u ON u.id = ANY(c.participant_ids) AND u.deleted_at IS NULL
        WHERE $1 = ANY(c.participant_ids)
-       GROUP BY c.id, c.status, c.initiated_by, c.last_message_at, m.body, m.sender_id
-       ORDER BY c.last_message_at DESC NULLS LAST`,
+       GROUP BY c.id, c.status, c.initiated_by, c.last_message_at, m.body, m.sender_id, c.participant_ids
+       ORDER BY is_friend DESC, c.last_message_at DESC NULLS LAST`,
       [userId],
     );
 
@@ -214,6 +224,7 @@ export class ChatService {
           : null,
       status: r.status,
       initiatedBy: r.initiated_by,
+      isFriend: r.is_friend === true,
     }));
   }
 
