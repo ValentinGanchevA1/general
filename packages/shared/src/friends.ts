@@ -64,3 +64,21 @@ export interface FriendRequestsPage {
   items: FriendRequestCard[];
   nextCursor: string | null;
 }
+
+/** Why a user appears in friend suggestions. */
+export type SuggestionReason = 'mutual_friends' | 'recent_wave' | 'recent_chat';
+
+/** Ranked "people you may know" card. */
+export interface SuggestionCard {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  mutualFriendsCount: number;
+  reason: SuggestionReason;
+  /** Viewer already follows this user. */
+  isFollowing: boolean;
+  /** Outgoing pending friend request exists. */
+  hasPendingOutgoing: boolean;
+  /** Incoming pending friend request exists. */
+  hasPendingIncoming: boolean;
+}

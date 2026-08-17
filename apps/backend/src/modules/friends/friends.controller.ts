@@ -115,6 +115,16 @@ export class FriendsController {
     return this.friends.listFollowers(userId, cursor, limit);
   }
 
+  /** Ranked people-you-may-know (FoF + recent wave/chat). */
+  @Get('suggestions')
+  suggestions(
+    @CurrentUser('id') userId: string,
+    @Query('limit') limitRaw?: string,
+  ) {
+    const limit = limitRaw ? Number(limitRaw) : undefined;
+    return this.friends.listSuggestions(userId, limit);
+  }
+
   /** Mutual close friends of the current user and :userId (intersection only). */
   @Get('mutual/:userId')
   mutual(
