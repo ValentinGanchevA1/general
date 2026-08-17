@@ -19,8 +19,10 @@ import type {
   RelationshipState,
 } from '@g88/shared';
 
+import type { FriendPendingCount } from '@g88/shared';
 import { BlocksService } from '../blocks/blocks.service';
 import { PresenceService } from '../presence/presence.service';
+import { FriendsNotifyService } from './friends-notify.service';
 
 const DEFAULT_LIMIT = 30;
 const MAX_LIMIT = 100;
@@ -36,6 +38,7 @@ export class FriendsService {
     @Inject(forwardRef(() => BlocksService))
     private readonly blocks: BlocksService,
     private readonly presence: PresenceService,
+    private readonly notify: FriendsNotifyService,
   ) {}
 
   // ─── Follow ───────────────────────────────────────────────────────────────
@@ -117,7 +120,9 @@ export class FriendsService {
            RETURNING id`,
         [actorId, targetId],
       );
-      return { requestId: rows[0]!.id };
+      const requestId = rows[0]!.id;
+      void this.notify.onRequestCreated(actorId, targetId, requestId);
+      return { requestId };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '';
       if (msg.includes('friend_requests_pending_unique')) {
@@ -131,7 +136,7 @@ export class FriendsService {
   }
 
   async acceptRequest(requestId: string, actorId: string): Promise<{ friends: true }> {
-    return this.db.transaction(async (tx) => {
+    const result = await this.db.transaction(async (tx) => {
       const rows = await tx.query<
         Array<{ id: string; requester_id: string; addressee_id: string; status: string }>
       >(
@@ -177,8 +182,15 @@ export class FriendsService {
         [req.addressee_id, req.requester_id],
       );
 
-      return { friends: true as const };
+      return {
+        friends: true as const,
+        requesterId: req.requester_id,
+        addresseeId: req.addressee_id,
+      };
     });
+
+    void this.notify.onRequestAccepted(result.requesterId, result.addresseeId);
+    return { friends: true };
   }
 
   async declineRequest(requestId: string, actorId: string): Promise<{ declined: true }> {
@@ -463,6 +475,11 @@ export class FriendsService {
     const nextCursor =
       items.length === take ? items[items.length - 1]!.createdAt : null;
     return { items, nextCursor };
+  }
+
+  async countPendingIncoming(actorId: string): Promise<FriendPendingCount> {
+    const count = await this.notify.countPending(actorId);
+    return { count };
   }
 
   async relationship(viewerId: string, targetId: string): Promise<RelationshipSummary> {
