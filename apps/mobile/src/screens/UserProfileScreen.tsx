@@ -192,23 +192,19 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     }
   };
 
+  /** Follow is independent of friendship — can toggle even when state === 'friends'. */
   const onFollowToggle = (): void => {
     if (socialBusy || blocked) return;
-    const following =
-      rel?.state === 'following' ||
-      rel?.state === 'mutual_follow' ||
-      rel?.state === 'friends';
-    if (following && rel?.state !== 'friends') {
+    const following = rel?.isFollowing === true;
+    if (following) {
       void runSocial(async () => {
         await deleteJson<{ following: false }>(`/friends/follow/${userId}`);
       });
       return;
     }
-    if (!following) {
-      void runSocial(async () => {
-        await postJson<{ userId: string }, { following: true }>('/friends/follow', { userId });
-      });
-    }
+    void runSocial(async () => {
+      await postJson<{ userId: string }, { following: true }>('/friends/follow', { userId });
+    });
   };
 
   const onFriendAction = (): void => {
@@ -254,10 +250,8 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   if (!profile) return <View style={styles.centered} />;
 
   const badges = earnedBadges(profile.verification);
-  const isFollowing =
-    rel?.state === 'following' ||
-    rel?.state === 'mutual_follow' ||
-    rel?.state === 'friends';
+  // Follow edge only — not derived from friendship state.
+  const isFollowing = rel?.isFollowing === true;
   const friendLabel =
     rel?.state === 'friends'
       ? 'Friends'
@@ -319,7 +313,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
             <TouchableOpacity
               style={[styles.socialBtn, isFollowing && styles.socialBtnSecondary]}
               onPress={onFollowToggle}
-              disabled={socialBusy || rel?.state === 'friends'}
+              disabled={socialBusy}
             >
               {socialBusy ? (
                 <ActivityIndicator size="small" color={isFollowing ? colors.primary : colors.onPrimary} />

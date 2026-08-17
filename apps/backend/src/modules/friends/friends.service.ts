@@ -165,6 +165,7 @@ export class FriendsService {
       );
       await tx.query(`DELETE FROM friend_requests WHERE id = $1`, [requestId]);
 
+      // Bootstrap mutual follows on accept; either side may later unfollow without unfriending.
       await tx.query(
         `INSERT INTO follows (follower_id, followee_id) VALUES ($1, $2)
          ON CONFLICT DO NOTHING`,
@@ -235,6 +236,10 @@ export class FriendsService {
     return { cancelled: true };
   }
 
+  /**
+   * Removes the friendship only. Mutual follows are intentionally kept
+   * (product rule: unfriend does not tear down the public follow graph).
+   */
   async unfriend(actorId: string, targetId: string): Promise<{ friends: false }> {
     const [low, high] = orderedPair(actorId, targetId);
     await this.db.query(
@@ -398,8 +403,15 @@ export class FriendsService {
 
   async relationship(viewerId: string, targetId: string): Promise<RelationshipSummary> {
     if (viewerId === targetId) {
-      return { state: 'none', mutualFriendsCount: 0 };
+      return {
+        state: 'none',
+        mutualFriendsCount: 0,
+        isFollowing: false,
+        isFollowedBy: false,
+      };
     }
+
+    const followFlags = await this.loadFollowFlags(viewerId, targetId);
 
     const [low, high] = orderedPair(viewerId, targetId);
     const [friendRow] = await this.db.query<Array<{ exists: boolean }>>(
@@ -410,7 +422,11 @@ export class FriendsService {
     );
     if (friendRow?.exists) {
       const mutual = await this.mutualFriendsCount(viewerId, targetId);
-      return { state: 'friends', mutualFriendsCount: mutual };
+      return {
+        state: 'friends',
+        mutualFriendsCount: mutual,
+        ...followFlags,
+      };
     }
 
     const pending = await this.db.query<
@@ -430,24 +446,33 @@ export class FriendsService {
         state: (outgoing ? 'request_outgoing' : 'request_incoming') as RelationshipState,
         requestId: pending[0].id,
         mutualFriendsCount: mutual,
+        ...followFlags,
       };
     }
 
+    let state: RelationshipState = 'none';
+    if (followFlags.isFollowing && followFlags.isFollowedBy) state = 'mutual_follow';
+    else if (followFlags.isFollowing) state = 'following';
+    else if (followFlags.isFollowedBy) state = 'followed_by';
+
+    const mutual = await this.mutualFriendsCount(viewerId, targetId);
+    return { state, mutualFriendsCount: mutual, ...followFlags };
+  }
+
+  private async loadFollowFlags(
+    viewerId: string,
+    targetId: string,
+  ): Promise<{ isFollowing: boolean; isFollowedBy: boolean }> {
     const edges = await this.db.query<Array<{ dir: string }>>(
       `SELECT 'out' AS dir FROM follows WHERE follower_id = $1 AND followee_id = $2
        UNION ALL
        SELECT 'in'  AS dir FROM follows WHERE follower_id = $2 AND followee_id = $1`,
       [viewerId, targetId],
     );
-    const hasOut = edges.some((e) => e.dir === 'out');
-    const hasIn = edges.some((e) => e.dir === 'in');
-    let state: RelationshipState = 'none';
-    if (hasOut && hasIn) state = 'mutual_follow';
-    else if (hasOut) state = 'following';
-    else if (hasIn) state = 'followed_by';
-
-    const mutual = await this.mutualFriendsCount(viewerId, targetId);
-    return { state, mutualFriendsCount: mutual };
+    return {
+      isFollowing: edges.some((e) => e.dir === 'out'),
+      isFollowedBy: edges.some((e) => e.dir === 'in'),
+    };
   }
 
   private async listFollowEdge(
