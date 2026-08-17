@@ -15,13 +15,15 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { TargetUserDto } from './dto';
 import { FriendsService } from './friends.service';
+import { FriendsSuggestionsService } from './friends-suggestions.service';
 
 @Controller('friends')
 @UseGuards(JwtAuthGuard)
 export class FriendsController {
-  constructor(private readonly friends: FriendsService) {}
-
-  // ─── Follow ───────────────────────────────────────────────────────────────
+  constructor(
+    private readonly friends: FriendsService,
+    private readonly suggestions: FriendsSuggestionsService,
+  ) {}
 
   @Post('follow')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
@@ -37,8 +39,6 @@ export class FriendsController {
   ) {
     return this.friends.unfollow(userId, targetId);
   }
-
-  // ─── Requests ─────────────────────────────────────────────────────────────
 
   @Post('requests')
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
@@ -83,8 +83,6 @@ export class FriendsController {
     return this.friends.listPendingIncoming(userId, cursor, limit);
   }
 
-  // ─── Graph lists ──────────────────────────────────────────────────────────
-
   @Get()
   listFriends(
     @CurrentUser('id') userId: string,
@@ -117,15 +115,14 @@ export class FriendsController {
 
   /** Ranked people-you-may-know (FoF + recent wave/chat). */
   @Get('suggestions')
-  suggestions(
+  listSuggestions(
     @CurrentUser('id') userId: string,
     @Query('limit') limitRaw?: string,
   ) {
     const limit = limitRaw ? Number(limitRaw) : undefined;
-    return this.friends.listSuggestions(userId, limit);
+    return this.suggestions.listSuggestions(userId, limit);
   }
 
-  /** Mutual close friends of the current user and :userId (intersection only). */
   @Get('mutual/:userId')
   mutual(
     @CurrentUser('id') userId: string,
