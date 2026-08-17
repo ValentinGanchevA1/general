@@ -239,6 +239,14 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     }
   };
 
+  const openMutualFriends = (): void => {
+    if (!rel || rel.mutualFriendsCount < 1) return;
+    navigation.navigate('MutualFriends', {
+      peerUserId: userId,
+      peerName: profile?.displayName,
+    });
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -301,9 +309,12 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
               {profile.online ? 'Online now' : 'Recently nearby'}
             </Text>
             {rel && rel.mutualFriendsCount > 0 ? (
-              <Text style={styles.mutualLine}>
-                {rel.mutualFriendsCount} mutual friend{rel.mutualFriendsCount === 1 ? '' : 's'}
-              </Text>
+              <TouchableOpacity onPress={openMutualFriends} accessibilityRole="button">
+                <Text style={styles.mutualLine}>
+                  {rel.mutualFriendsCount} mutual friend
+                  {rel.mutualFriendsCount === 1 ? '' : 's'}
+                </Text>
+              </TouchableOpacity>
             ) : null}
           </View>
         </View>
@@ -455,7 +466,7 @@ const styles = StyleSheet.create({
   originLine: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
   onlineLabel: { color: colors.success, fontSize: 13 },
   offlineLabel: { color: colors.textFaint },
-  mutualLine: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
+  mutualLine: { color: colors.primary, fontSize: 12, marginTop: 2, fontWeight: '600' },
 
   socialRow: { flexDirection: 'row', gap: 10 },
   socialBtn: {

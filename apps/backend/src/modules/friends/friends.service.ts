@@ -320,6 +320,70 @@ export class FriendsService {
     return { items, nextCursor };
   }
 
+  /**
+   * Mutual close friends of viewer and peer.
+   * Privacy: only returns users who are friends of the *viewer* (intersection).
+   * Never exposes peer-only friends.
+   * Cursor is the last returned userId (UUID order).
+   */
+  async listMutual(
+    viewerId: string,
+    peerId: string,
+    cursor?: string,
+    limit = DEFAULT_LIMIT,
+  ): Promise<FriendsPage> {
+    if (viewerId === peerId) {
+      return { items: [], nextCursor: null };
+    }
+    await this.assertUserExists(peerId);
+
+    const take = Math.min(Math.max(limit, 1), MAX_LIMIT);
+    const rows = await this.db.query<
+      Array<{
+        user_id: string;
+        display_name: string;
+        avatar_url: string | null;
+        friends_see_online: boolean;
+      }>
+    >(
+      `WITH viewer_friends AS (
+         SELECT CASE WHEN user_low_id = $1 THEN user_high_id ELSE user_low_id END AS uid
+           FROM friendships WHERE user_low_id = $1 OR user_high_id = $1
+       ),
+       peer_friends AS (
+         SELECT CASE WHEN user_low_id = $2 THEN user_high_id ELSE user_low_id END AS uid
+           FROM friendships WHERE user_low_id = $2 OR user_high_id = $2
+       )
+       SELECT u.id AS user_id,
+              u.display_name,
+              u.avatar_url,
+              COALESCE(u.friends_see_online_status, true) AS friends_see_online
+         FROM viewer_friends vf
+         JOIN peer_friends pf ON pf.uid = vf.uid
+         JOIN users u ON u.id = vf.uid AND u.deleted_at IS NULL
+        WHERE ($3::uuid IS NULL OR u.id > $3::uuid)
+        ORDER BY u.id ASC
+        LIMIT $4`,
+      [viewerId, peerId, cursor ?? null, take],
+    );
+
+    const ids = rows.map((r) => r.user_id);
+    const onlineSet = await this.presence.whichAreOnline(ids);
+
+    const items: FriendCard[] = rows.map((r) => ({
+      userId: r.user_id,
+      displayName: r.display_name,
+      avatarUrl: r.avatar_url,
+      online: r.friends_see_online ? onlineSet.has(r.user_id) : null,
+      // Mutual list has no friendship-created-at for the pair; use epoch placeholder.
+      createdAt: new Date(0).toISOString(),
+    }));
+
+    const nextCursor =
+      items.length === take ? items[items.length - 1]!.userId : null;
+    return { items, nextCursor };
+  }
+
   async listFriendIds(userId: string): Promise<string[]> {
     const rows = await this.db.query<Array<{ uid: string }>>(
       `SELECT CASE
