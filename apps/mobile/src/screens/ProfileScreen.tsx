@@ -34,7 +34,7 @@ import { ProfileTagsSection } from '@/components/Profile/ProfileTagsSection';
 import { ProfileAccountSection } from '@/components/Profile/ProfileAccountSection';
 import { ProfileSocialSection } from '@/components/Profile/ProfileSocialSection';
 import { ProfileMenuSection } from '@/components/Profile/ProfileMenuSection';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, radius } from '@/theme';
 import type { UserProfile } from '@g88/shared';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -231,6 +231,20 @@ export function ProfileScreen(): React.JSX.Element {
         onTrust={() => openRootScreen(navigation, 'Verification')}
       />
 
+      <TouchableOpacity
+        style={styles.friendsCard}
+        onPress={() => openRootScreen(navigation, 'FriendsList')}
+        accessibilityRole="button"
+        accessibilityLabel="Friends list"
+      >
+        <Icon name="account-group" size={22} color={colors.primary} />
+        <View style={styles.friendsCardBody}>
+          <Text style={styles.friendsCardTitle}>Friends</Text>
+          <Text style={styles.friendsCardSubtitle}>Close friends · following · requests</Text>
+        </View>
+        <Icon name="chevron-right" size={22} color={colors.textFaint} />
+      </TouchableOpacity>
+
       <ProfileActivityLinks
         gamification={gamification ?? null}
         challenges={challenges}
@@ -297,4 +311,17 @@ const styles = StyleSheet.create({
   trustSection: { marginTop: spacing.md },
   mapPresenceSection: { marginTop: spacing.sm },
   section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl },
+  friendsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.md,
+    gap: 12,
+  },
+  friendsCardBody: { flex: 1 },
+  friendsCardTitle: { color: colors.textPrimary, fontWeight: '700', fontSize: 15 },
+  friendsCardSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
 });
