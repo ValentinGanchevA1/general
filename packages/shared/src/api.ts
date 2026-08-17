@@ -44,6 +44,8 @@ export interface UserMeta {
   online: boolean;
   lastSeenAt: string | null;
   verifiedBadge?: boolean;
+  /** True when viewer and this user are close friends (map tier styling). */
+  isFriend?: boolean;
 }
 
 export interface EventMeta {
@@ -399,6 +401,8 @@ export interface ConversationSummary {
   lastMessage: { senderId: string; body: string } | null;
   status: ConversationStatus;
   initiatedBy: string | null;
+  /** True when the other participant is a close friend (list prioritization). */
+  isFriend?: boolean;
 }
 
 export interface MessagePage {
