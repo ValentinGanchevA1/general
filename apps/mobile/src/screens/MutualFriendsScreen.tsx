@@ -11,6 +11,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  InteractionManager,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -55,7 +56,12 @@ export function MutualFriendsScreen({ route, navigation }: Props): React.JSX.Ele
   );
 
   useEffect(() => {
-    void load();
+    const handle = InteractionManager.runAfterInteractions(() => {
+      void load();
+    });
+    return () => {
+      if (typeof handle?.cancel === 'function') handle.cancel();
+    };
   }, [load]);
 
   const openProfile = useCallback(
