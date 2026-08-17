@@ -99,7 +99,6 @@ export class FriendsService {
       });
     }
 
-    // If the other side already has a pending request to us, auto-accept.
     const inbound = await this.db.query<Array<{ id: string }>>(
       `SELECT id FROM friend_requests
         WHERE requester_id = $1 AND addressee_id = $2 AND status = 'pending'
@@ -120,7 +119,6 @@ export class FriendsService {
       );
       return { requestId: rows[0]!.id };
     } catch (e: unknown) {
-      // Unique partial index on pending pair
       const msg = e instanceof Error ? e.message : '';
       if (msg.includes('friend_requests_pending_unique')) {
         throw new ConflictException({
@@ -165,10 +163,8 @@ export class FriendsService {
          ON CONFLICT (user_low_id, user_high_id) DO NOTHING`,
         [low, high],
       );
-      // Hard-delete the request after materializing the friendship (no audit trail for MVP).
       await tx.query(`DELETE FROM friend_requests WHERE id = $1`, [requestId]);
 
-      // Ensure mutual follows exist (social graph density).
       await tx.query(
         `INSERT INTO follows (follower_id, followee_id) VALUES ($1, $2)
          ON CONFLICT DO NOTHING`,
@@ -248,10 +244,6 @@ export class FriendsService {
     return { friends: false };
   }
 
-  /**
-   * Called from BlocksService.block — hard-delete graph edges both directions.
-   * Safe to call even when no edges exist.
-   */
   async onBlock(userA: string, userB: string): Promise<void> {
     const [low, high] = orderedPair(userA, userB);
     await this.db.transaction(async (tx) => {
@@ -286,12 +278,14 @@ export class FriendsService {
         display_name: string;
         avatar_url: string | null;
         created_at: Date;
+        friends_see_online: boolean;
       }>
     >(
       `SELECT u.id AS user_id,
               u.display_name,
               u.avatar_url,
-              f.created_at
+              f.created_at,
+              COALESCE(u.friends_see_online_status, true) AS friends_see_online
          FROM friendships f
          JOIN users u ON u.id = CASE
            WHEN f.user_low_id = $1 THEN f.user_high_id
@@ -311,7 +305,8 @@ export class FriendsService {
       userId: r.user_id,
       displayName: r.display_name,
       avatarUrl: r.avatar_url,
-      online: onlineSet.has(r.user_id),
+      // Privacy: only report online when the friend allows friends to see status.
+      online: r.friends_see_online ? onlineSet.has(r.user_id) : null,
       createdAt: r.created_at.toISOString(),
     }));
 
@@ -320,7 +315,6 @@ export class FriendsService {
     return { items, nextCursor };
   }
 
-  /** All close-friend user ids for presence fan-out (no pagination). */
   async listFriendIds(userId: string): Promise<string[]> {
     const rows = await this.db.query<Array<{ uid: string }>>(
       `SELECT CASE
@@ -332,6 +326,16 @@ export class FriendsService {
       [userId],
     );
     return rows.map((r) => r.uid);
+  }
+
+  /** Whether this user allows close friends to see online status. */
+  async friendsSeeOnlineStatus(userId: string): Promise<boolean> {
+    const rows = await this.db.query<Array<{ allowed: boolean }>>(
+      `SELECT COALESCE(friends_see_online_status, true) AS allowed
+         FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+      [userId],
+    );
+    return rows[0]?.allowed !== false;
   }
 
   async listFollowing(
@@ -392,7 +396,6 @@ export class FriendsService {
     return { items, nextCursor };
   }
 
-  /** Viewer → target relationship + mutual friends count (public profile). */
   async relationship(viewerId: string, targetId: string): Promise<RelationshipSummary> {
     if (viewerId === targetId) {
       return { state: 'none', mutualFriendsCount: 0 };
@@ -447,8 +450,6 @@ export class FriendsService {
     return { state, mutualFriendsCount: mutual };
   }
 
-  // ─── Internals ────────────────────────────────────────────────────────────
-
   private async listFollowEdge(
     actorId: string,
     mode: 'following' | 'followers',
@@ -480,7 +481,6 @@ export class FriendsService {
       [actorId, cursor ?? null, take],
     );
 
-    // Follow edges: online only meaningful for close friends list; leave null here.
     const items: FriendCard[] = rows.map((r) => ({
       userId: r.user_id,
       displayName: r.display_name,
