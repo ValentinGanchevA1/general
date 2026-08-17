@@ -7,6 +7,7 @@ import { RealtimeModule } from '../../realtime/realtime.module';
 import { FriendsController } from './friends.controller';
 import { FriendsService } from './friends.service';
 import { FriendsSuggestionsService } from './friends-suggestions.service';
+import { FriendsNotifyService } from './friends-notify.service';
 
 @Module({
   imports: [
@@ -16,7 +17,7 @@ import { FriendsSuggestionsService } from './friends-suggestions.service';
     forwardRef(() => RealtimeModule),
   ],
   controllers: [FriendsController],
-  providers: [FriendsService, FriendsSuggestionsService],
+  providers: [FriendsService, FriendsSuggestionsService, FriendsNotifyService],
   exports: [FriendsService, FriendsSuggestionsService],
 })
 export class FriendsModule {}
