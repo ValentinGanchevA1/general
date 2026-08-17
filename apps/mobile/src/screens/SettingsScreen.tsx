@@ -29,9 +29,11 @@ export function SettingsScreen(): React.JSX.Element {
   const authLoading = useAppSelector((s) => s.auth.loading);
 
   const [toggling, setToggling] = useState(false);
+  const [togglingOnline, setTogglingOnline] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const isVisible = profile?.visibility !== 'private';
+  const friendsSeeOnline = profile?.friendsSeeOnlineStatus !== false;
 
   const emailVerified = profile != null && profile.verification !== 'none';
 
@@ -44,6 +46,18 @@ export function SettingsScreen(): React.JSX.Element {
       );
     } finally {
       setToggling(false);
+    }
+  };
+
+  const toggleFriendsOnline = async (): Promise<void> => {
+    if (togglingOnline || !profile) return;
+    setTogglingOnline(true);
+    try {
+      await dispatch(
+        updateProfile({ friendsSeeOnlineStatus: !friendsSeeOnline }),
+      );
+    } finally {
+      setTogglingOnline(false);
     }
   };
 
@@ -90,6 +104,26 @@ export function SettingsScreen(): React.JSX.Element {
                 onValueChange={toggleVisibility}
                 trackColor={{ false: '#2a2a4a', true: '#0095b3' }}
                 thumbColor={isVisible ? '#00d4ff' : '#555'}
+              />
+            )}
+          </View>
+          <View style={[styles.row, styles.rowSpaced]}>
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Friends can see when I\'m online</Text>
+              <Text style={styles.rowSub}>
+                {friendsSeeOnline
+                  ? 'Close friends see you as online in chat and friends list'
+                  : 'Hidden from friends — you still appear in lists without a green dot'}
+              </Text>
+            </View>
+            {togglingOnline || loading ? (
+              <ActivityIndicator color="#00d4ff" />
+            ) : (
+              <Switch
+                value={friendsSeeOnline}
+                onValueChange={toggleFriendsOnline}
+                trackColor={{ false: '#2a2a4a', true: '#0095b3' }}
+                thumbColor={friendsSeeOnline ? '#00d4ff' : '#555'}
               />
             )}
           </View>

@@ -163,6 +163,8 @@ export interface UpdateProfileRequest {
   hometownCountry?: string | null;
   showAge?: boolean;
   showHometown?: boolean;
+  /** When false, close friends cannot see you as online. Default true. */
+  friendsSeeOnlineStatus?: boolean;
 }
 
 export type IdVerificationStatus = 'none' | 'pending' | 'verified' | 'rejected';
@@ -182,6 +184,8 @@ export interface UserProfile extends AuthenticatedUser {
   hometownCountry: string | null;
   showAge: boolean;
   showHometown: boolean;
+  /** Close friends may see online status when true. */
+  friendsSeeOnlineStatus: boolean;
   photoUrls: string[];
   subscriptionTier: SubscriptionTier;
   socialLinks: SocialLink[];
@@ -401,8 +405,13 @@ export interface ConversationSummary {
   lastMessage: { senderId: string; body: string } | null;
   status: ConversationStatus;
   initiatedBy: string | null;
-  /** True when the other participant is a close friend (list prioritization). */
+  /** True when the other participant is a close friend. */
   isFriend?: boolean;
+  /**
+   * Peer online for friend threads only (respects friendsSeeOnlineStatus).
+   * null/undefined for non-friends or when privacy hides status.
+   */
+  peerOnline?: boolean | null;
 }
 
 export interface MessagePage {

@@ -62,8 +62,6 @@ const wsAllowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
   .split(',')
   .filter(Boolean);
 
-// ─── Type-safe error extraction ───────────────────────────────────────────
-
 function extractApiError(err: unknown): { code: string; message: string } {
   if (
     err instanceof ForbiddenException ||
@@ -120,10 +118,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     @InjectDataSource() private readonly db: DataSource,
   ) {}
 
-  // ─── Lifecycle ───────────────────────────────────────────────────────────
-
   async handleConnection(client: G88Socket): Promise<void> {
-    // Guards don't run for lifecycle hooks — verify the token here directly.
     const token = client.handshake.auth?.['token'] as string | undefined;
     if (!token) {
       client.disconnect(true);
@@ -148,7 +143,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     const userId = client.data.userId;
     if (!userId) return;
     const remaining = await this.server.in(this.userRoom(userId)).fetchSockets();
-    // fetchSockets still includes the disconnecting socket in some versions — filter it out.
     const others = remaining.filter((s) => s.id !== client.id);
     if (others.length === 0) {
       await this.presence.markOffline(userId);
@@ -158,8 +152,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
     this.logger.log(`socket disconnected: user=${userId} sid=${client.id}`);
   }
-
-  // ─── Inbound events ────────────────────────────────────────────────────
 
   @SubscribeMessage('presence:update')
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
@@ -171,7 +163,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       const result = await this.presence.heartbeat(client.data.userId, payload.location);
       const newRoom = this.cellRoom(result.cellId);
 
-      // Swap socket into the right cell room.
       for (const room of client.data.rooms) {
         if (room.startsWith('cell:')) {
           client.leave(room);
@@ -181,7 +172,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       client.join(newRoom);
       client.data.rooms.add(newRoom);
 
-      // Emit presence:delta when the user crosses a cell boundary.
       if (result.prevCellId) {
         this.server.to(this.cellRoom(result.prevCellId)).emit('presence:delta', {
           cellId: result.prevCellId,
@@ -195,7 +185,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         });
       }
 
-      // First heartbeat this connection → announce online to close friends once.
       if (!client.data.friendPresenceAnnounced) {
         client.data.friendPresenceAnnounced = true;
         void this.notifyFriendsPresence(client.data.userId, true);
@@ -236,7 +225,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     @MessageBody() payload: EventRoomDto,
   ): Promise<AckResult<{ joined: true }>> {
     try {
-      // Mirror the REST detail gate: a private event is only visible to its host.
       const [event] = (await this.db.query(
         `SELECT host_id, visibility FROM events WHERE id = $1 AND deleted_at IS NULL`,
         [payload.eventId],
@@ -272,7 +260,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: G88Socket,
     @MessageBody() payload: ChatSendDto,
   ): Promise<AckResult<ChatMessageEvent>> {
-    // Enforce that the socket has joined the conversation room before sending.
     if (!client.rooms.has(this.conversationRoom(payload.conversationId))) {
       return { ok: false, code: 'chat.forbidden', message: 'Join the conversation first' };
     }
@@ -284,13 +271,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         payload.body,
       );
 
-      // Fan out to everyone in the conversation room (including sender's other devices).
       this.server.to(this.conversationRoom(payload.conversationId)).emit('chat:message', msg);
-
-      // Push to participants who have no active socket connection.
       void this.pushToOfflineParticipants(payload.conversationId, client.data.userId, msg.body);
-
-      // Challenge progress: "send messages" quests.
       void this.challenges
         .increment(client.data.userId, 'chat_sent')
         .catch((err) => this.logger.error(`challenge chat_sent failed: ${err}`));
@@ -304,8 +286,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       return { ok: false, code: code === 'unknown_error' ? 'chat.failed' : code, message };
     }
   }
-
-  // ─── Live location share ─────────────────────────────────────────────────
 
   @SubscribeMessage('location:share:start')
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
@@ -327,9 +307,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       const room = this.conversationRoom(payload.conversationId);
       this.server.to(room).emit('location:share:started', { session, message });
-      // Keep message list in sync for clients that only listen to chat:message.
       this.server.to(room).emit('chat:message', message);
-
       void this.pushToOfflineParticipants(
         payload.conversationId,
         client.data.userId,
@@ -429,8 +407,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
-  // ─── Outbound APIs (called by other services) ────────────────────────────
-
   async emitWaveReceived(toUserId: string, evt: WaveReceivedEvent): Promise<void> {
     this.server.to(this.userRoom(toUserId)).emit('wave:received', evt);
   }
@@ -449,10 +425,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
-  /**
-   * Deliver a gift to the recipient: emit live to any connected sockets, and fall
-   * back to a push notification when they have none (mirrors offline chat pushes).
-   */
   async emitGiftReceived(toUserId: string, evt: GiftReceivedEvent): Promise<void> {
     this.server.to(this.userRoom(toUserId)).emit('gift:received', evt);
     try {
@@ -470,23 +442,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
-  /**
-   * Notify a user that they just unlocked an achievement (drives the mobile
-   * toast + haptic). Best-effort live-only: an offline user simply sees the
-   * unlock on their next `GET /achievements` read — no push fallback needed,
-   * unlike waves/gifts which are person-to-person.
-   */
   async emitAchievementUnlocked(toUserId: string, evt: AchievementUnlockedEvent): Promise<void> {
     this.server.to(this.userRoom(toUserId)).emit('achievement:unlocked', evt);
   }
 
-  /**
-   * P3.5 live event deltas — fan out poll/Q&A changes to everyone watching an
-   * event (room `event:{eventId}`). Best-effort live-only: a user not in the
-   * room simply sees the change on their next REST read. Payloads are
-   * viewer-agnostic (no `myVote`/`upvotedByMe`) — the client merges its own
-   * per-viewer state on top.
-   */
   emitEventPoll(delta: EventPollDelta): void {
     this.server.to(this.eventRoom(delta.eventId)).emit('event:poll', delta);
   }
@@ -499,12 +458,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(this.eventRoom(delta.eventId)).emit('event:question:upvote', delta);
   }
 
-  /** Fan a newly created story into the H3 cell room (r7). */
   emitStoryNew(evt: StoryNewEvent): void {
     this.server.to(this.cellRoom(evt.cellId)).emit('story:new', evt);
   }
 
-  /** Emit location session end from sweep/cron (no connected sharer socket). */
   emitLocationShareEnded(
     conversationId: string,
     sessionId: string,
@@ -519,11 +476,13 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     });
   }
 
-  // ─── Friend presence ─────────────────────────────────────────────────────
-
   /** Notify each close friend that `userId` went online/offline. */
   private async notifyFriendsPresence(userId: string, online: boolean): Promise<void> {
     try {
+      // Privacy: never broadcast online when the user opted out.
+      if (online && !(await this.friends.friendsSeeOnlineStatus(userId))) {
+        return;
+      }
       const friendIds = await this.friends.listFriendIds(userId);
       for (const friendId of friendIds) {
         this.server.to(this.userRoom(friendId)).emit('friend:presence', {
@@ -535,8 +494,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.logger.error(`notifyFriendsPresence failed user=${userId}: ${err}`);
     }
   }
-
-  // ─── Push helpers ───────────────────────────────────────────────────────
 
   private async pushToOfflineParticipants(
     conversationId: string,
@@ -556,8 +513,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.logger.error(`pushToOfflineParticipants failed: ${err}`);
     }
   }
-
-  // ─── Room naming ───────────────────────────────────────────────────────
 
   private userRoom(userId: string): string {
     return `user:${userId}`;
