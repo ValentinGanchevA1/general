@@ -1,5 +1,9 @@
 // packages/shared/src/friends.ts
 // Two-tier social graph contracts (follows + close friends).
+//
+// Product rules (2026-08-17):
+// - Unfriend keeps mutual follows (friendship row only is deleted).
+// - Follow is independent of friendship: you can unfollow while still friends.
 
 export type FriendRequestStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
 
@@ -37,6 +41,10 @@ export interface RelationshipSummary {
   requestId?: string;
   /** Mutual friends count (friends of both viewer and target). */
   mutualFriendsCount: number;
+  /** Viewer follows target (independent of friendship). */
+  isFollowing: boolean;
+  /** Target follows viewer (independent of friendship). */
+  isFollowedBy: boolean;
 }
 
 export interface FollowRequest {
