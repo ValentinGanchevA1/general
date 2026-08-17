@@ -15,6 +15,7 @@ import { MapScreen } from '@/screens/MapScreen';
 import { PulseScreen } from '@/features/pulse/PulseScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { UserProfileScreen } from '@/screens/UserProfileScreen';
+import { MutualFriendsScreen } from '@/screens/MutualFriendsScreen';
 import { ProfileCreationScreen } from '@/screens/ProfileCreationScreen';
 import { ProfileEditScreen } from '@/screens/ProfileEditScreen';
 import { PhotosScreen } from '@/screens/PhotosScreen';
@@ -91,6 +92,7 @@ export type RootStackParamList = {
     otherUserIdVerified?: boolean;
   };
   UserProfile: { userId: string };
+  MutualFriends: { peerUserId: string; peerName?: string };
   AlertComposer: { presetCategory?: AreaCategory; presetTag?: string };
   GiftsInbox: undefined;
   Interactions: undefined;
@@ -272,6 +274,11 @@ export function AppNavigator(): React.JSX.Element {
               component={AlertComposerScreen}
             />
             <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+            <Stack.Screen
+              name="MutualFriends"
+              component={MutualFriendsScreen}
+              options={{ headerShown: false }}
+            />
             <Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />
             <Stack.Screen
               name="Interactions"
