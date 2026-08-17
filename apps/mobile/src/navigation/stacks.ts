@@ -29,6 +29,7 @@ export type AccountStackParamList = {
   SocialLinking: undefined;
   ProfileEdit: undefined;
   Photos: undefined;
+  FriendsList: undefined;
 };
 
 export type EventsStackParamList = {

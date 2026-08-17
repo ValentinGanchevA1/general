@@ -23,6 +23,7 @@ type Leaf =
   | 'SocialLinking'
   | 'ProfileEdit'
   | 'Photos'
+  | 'FriendsList'
   | 'EventDetail'
   | 'EventCreate'
   | 'GiftsInbox'
@@ -53,6 +54,7 @@ const NEST: Partial<
   SocialLinking: { stack: 'Account', screen: 'SocialLinking' },
   ProfileEdit: { stack: 'Account', screen: 'ProfileEdit' },
   Photos: { stack: 'Account', screen: 'Photos' },
+  FriendsList: { stack: 'Account', screen: 'FriendsList' },
   EventDetail: { stack: 'Events', screen: 'EventDetail' },
   EventCreate: { stack: 'Events', screen: 'EventCreate' },
 };
