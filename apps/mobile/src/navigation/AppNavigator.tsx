@@ -43,6 +43,7 @@ import { PrivacyScreen } from '@/screens/PrivacyScreen';
 import { HelpScreen } from '@/screens/HelpScreen';
 import { AboutScreen } from '@/screens/AboutScreen';
 import { FriendsListScreen } from '@/screens/FriendsListScreen';
+import { SuggestionsScreen } from '@/screens/SuggestionsScreen';
 import type { AreaCategory, VerificationLevel } from '@g88/shared';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
@@ -165,6 +166,11 @@ function AccountNavigator(): React.JSX.Element {
         name="FriendsList"
         component={FriendsListScreen}
         options={{ headerShown: false, title: 'Friends' }}
+      />
+      <AccountStack.Screen
+        name="Suggestions"
+        component={SuggestionsScreen}
+        options={{ headerShown: false, title: 'Suggestions' }}
       />
     </AccountStack.Navigator>
   );

@@ -86,6 +86,10 @@ export function FriendsListScreen(): React.JSX.Element {
     [navigation],
   );
 
+  const openSuggestions = useCallback(() => {
+    navigation.navigate('Suggestions');
+  }, [navigation]);
+
   const onAccept = useCallback(
     (id: string) => {
       void dispatch(acceptFriendRequest(id)).then((r) => {
@@ -136,21 +140,25 @@ export function FriendsListScreen(): React.JSX.Element {
         return {
           title: 'No close friends yet',
           hint: 'Send a friend request from someone’s profile. Accepted friends show here.',
+          showSuggestions: true,
         };
       case 'following':
         return {
           title: 'Not following anyone',
           hint: 'Follow people from their profile to build your public graph.',
+          showSuggestions: true,
         };
       case 'followers':
         return {
           title: 'No followers yet',
           hint: 'When others follow you, they’ll appear here.',
+          showSuggestions: false,
         };
       case 'requests':
         return {
           title: 'No pending requests',
           hint: 'Incoming friend requests land here for you to accept or decline.',
+          showSuggestions: false,
         };
     }
   }, [tab]);
@@ -248,7 +256,9 @@ export function FriendsListScreen(): React.JSX.Element {
           <Text style={S.back}>‹ Back</Text>
         </TouchableOpacity>
         <Text style={S.heading}>Friends</Text>
-        <View style={S.spacer} />
+        <TouchableOpacity onPress={openSuggestions} hitSlop={8} accessibilityRole="button">
+          <Text style={S.suggestLink}>Suggest</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={S.tabs}>
@@ -299,6 +309,11 @@ export function FriendsListScreen(): React.JSX.Element {
             <View style={S.empty}>
               <Text style={S.emptyTitle}>{emptyCopy.title}</Text>
               <Text style={S.emptyHint}>{emptyCopy.hint}</Text>
+              {emptyCopy.showSuggestions ? (
+                <TouchableOpacity style={S.suggestCta} onPress={openSuggestions}>
+                  <Text style={S.suggestCtaText}>See suggestions</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           }
           ListFooterComponent={
@@ -330,7 +345,13 @@ const S = StyleSheet.create({
   },
   back: { color: colors.primary, fontSize: 17, fontWeight: '600', width: 64 },
   heading: { color: colors.textPrimary, fontSize: 17, fontWeight: '700' },
-  spacer: { width: 64 },
+  suggestLink: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '600',
+    width: 64,
+    textAlign: 'right',
+  },
 
   tabs: {
     flexDirection: 'row',
@@ -398,6 +419,14 @@ const S = StyleSheet.create({
     marginTop: 8,
     lineHeight: 20,
   },
+  suggestCta: {
+    marginTop: 16,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: radius.sm,
+  },
+  suggestCtaText: { color: colors.onPrimary, fontWeight: '700', fontSize: 14 },
   errorText: { color: colors.danger, marginBottom: 12, textAlign: 'center' },
   retry: {
     backgroundColor: colors.primary,
