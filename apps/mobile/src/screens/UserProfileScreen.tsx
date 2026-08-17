@@ -12,6 +12,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type {
   ApiError,
   PublicUserProfile,
+  RelationshipSummary,
   VerificationLevel,
   WaveRequest,
   WaveResponse,
@@ -25,6 +26,7 @@ import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline
 import { ProfileBio } from '@/components/Profile/ProfileBio';
 import { ProfileTagsSection } from '@/components/Profile/ProfileTagsSection';
 import { ProfilePhotosSection } from '@/components/Profile/ProfilePhotosSection';
+import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
@@ -41,21 +43,41 @@ function earnedBadges(level: VerificationLevel): string[] {
   return LADDER_BADGES.filter((b) => rank >= LADDER.indexOf(b.level)).map((b) => b.label);
 }
 
+function errMessage(e: unknown, fallback: string): string {
+  if (typeof e === 'object' && e !== null && 'message' in e) {
+    return String((e as ApiError).message);
+  }
+  return fallback;
+}
+
 export function UserProfileScreen({ route, navigation }: Props): React.JSX.Element {
   const { userId } = route.params;
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
+  const [rel, setRel] = useState<RelationshipSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [waving, setWaving] = useState(false);
   const [giftSheetOpen, setGiftSheetOpen] = useState(false);
   const [blocking, setBlocking] = useState(false);
+  const [socialBusy, setSocialBusy] = useState(false);
 
   const blocked = profile?.blockedByViewer ?? false;
+
+  const loadRelationship = useCallback(async () => {
+    try {
+      const data = await getJson<RelationshipSummary>(`/friends/relationship/${userId}`);
+      setRel(data);
+    } catch {
+      // Non-fatal — social buttons stay in neutral state.
+      setRel(null);
+    }
+  }, [userId]);
 
   const loadProfile = useCallback(() => {
     void (async () => {
       try {
         const data = await getJson<PublicUserProfile>(`/users/${userId}`);
         setProfile(data);
+        await loadRelationship();
       } catch {
         Alert.alert('Error', 'Could not load this profile.', [
           { text: 'Go back', onPress: () => navigation.goBack() },
@@ -64,7 +86,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         setLoading(false);
       }
     })();
-  }, [userId, navigation]);
+  }, [userId, navigation, loadRelationship]);
 
   useEffect(() => {
     loadProfile();
@@ -79,11 +101,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
       });
       Alert.alert('Wave sent', `You waved at ${profile?.displayName ?? 'them'}.`);
     } catch (e) {
-      const msg =
-        typeof e === 'object' && e !== null && 'message' in e
-          ? String((e as ApiError).message)
-          : 'Could not send wave';
-      Alert.alert('Wave failed', msg);
+      Alert.alert('Wave failed', errMessage(e, 'Could not send wave'));
     } finally {
       setWaving(false);
     }
@@ -111,6 +129,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     try {
       await deleteJson<{ blocked: boolean }>(`/blocks/${userId}`);
       setProfile((p) => (p ? { ...p, blockedByViewer: false } : p));
+      await loadRelationship();
     } catch {
       Alert.alert('Could not unblock', 'Try again in a moment.');
     } finally {
@@ -137,16 +156,97 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
       ]);
       return;
     }
-    Alert.alert(profile?.displayName ?? 'Options', undefined, [
-      { text: 'Block user', style: 'destructive', onPress: confirmBlock },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    const options: Array<{ text: string; style?: 'destructive' | 'cancel'; onPress?: () => void }> = [];
+    if (rel?.state === 'friends') {
+      options.push({
+        text: 'Unfriend',
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert('Unfriend', `Remove ${profile?.displayName ?? 'them'} from friends?`, [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Unfriend',
+              style: 'destructive',
+              onPress: () => void runSocial(async () => {
+                await deleteJson<{ friends: false }>(`/friends/${userId}`);
+              }),
+            },
+          ]);
+        },
+      });
+    }
+    options.push({ text: 'Block user', style: 'destructive', onPress: confirmBlock });
+    options.push({ text: 'Cancel', style: 'cancel' });
+    Alert.alert(profile?.displayName ?? 'Options', undefined, options);
+  };
+
+  const runSocial = async (fn: () => Promise<void>): Promise<void> => {
+    setSocialBusy(true);
+    try {
+      await fn();
+      await loadRelationship();
+    } catch (e) {
+      Alert.alert('Could not update', errMessage(e, 'Try again in a moment.'));
+    } finally {
+      setSocialBusy(false);
+    }
+  };
+
+  const onFollowToggle = (): void => {
+    if (socialBusy || blocked) return;
+    const following =
+      rel?.state === 'following' ||
+      rel?.state === 'mutual_follow' ||
+      rel?.state === 'friends';
+    if (following && rel?.state !== 'friends') {
+      void runSocial(async () => {
+        await deleteJson<{ following: false }>(`/friends/follow/${userId}`);
+      });
+      return;
+    }
+    if (!following) {
+      void runSocial(async () => {
+        await postJson<{ userId: string }, { following: true }>('/friends/follow', { userId });
+      });
+    }
+  };
+
+  const onFriendAction = (): void => {
+    if (socialBusy || blocked || !rel) return;
+    switch (rel.state) {
+      case 'friends':
+        // Unfriend lives in ··· menu to avoid accidents.
+        return;
+      case 'request_outgoing':
+        if (rel.requestId) {
+          void runSocial(async () => {
+            await deleteJson<{ cancelled: true }>(`/friends/requests/${rel.requestId}`);
+          });
+        }
+        return;
+      case 'request_incoming':
+        if (rel.requestId) {
+          void runSocial(async () => {
+            await postJson<Record<string, never>, { friends: true }>(
+              `/friends/requests/${rel.requestId}/accept`,
+              {},
+            );
+          });
+        }
+        return;
+      default:
+        void runSocial(async () => {
+          await postJson<{ userId: string }, { requestId: string }>('/friends/requests', {
+            userId,
+          });
+        });
+    }
   };
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#00d4ff" size="large" />
+        <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
   }
@@ -154,6 +254,18 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   if (!profile) return <View style={styles.centered} />;
 
   const badges = earnedBadges(profile.verification);
+  const isFollowing =
+    rel?.state === 'following' ||
+    rel?.state === 'mutual_follow' ||
+    rel?.state === 'friends';
+  const friendLabel =
+    rel?.state === 'friends'
+      ? 'Friends'
+      : rel?.state === 'request_outgoing'
+        ? 'Requested'
+        : rel?.state === 'request_incoming'
+          ? 'Accept'
+          : 'Add friend';
 
   return (
     <View style={styles.root}>
@@ -194,8 +306,59 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
             <Text style={[styles.onlineLabel, !profile.online && styles.offlineLabel]}>
               {profile.online ? 'Online now' : 'Recently nearby'}
             </Text>
+            {rel && rel.mutualFriendsCount > 0 ? (
+              <Text style={styles.mutualLine}>
+                {rel.mutualFriendsCount} mutual friend{rel.mutualFriendsCount === 1 ? '' : 's'}
+              </Text>
+            ) : null}
           </View>
         </View>
+
+        {!blocked ? (
+          <View style={styles.socialRow}>
+            <TouchableOpacity
+              style={[styles.socialBtn, isFollowing && styles.socialBtnSecondary]}
+              onPress={onFollowToggle}
+              disabled={socialBusy || rel?.state === 'friends'}
+            >
+              {socialBusy ? (
+                <ActivityIndicator size="small" color={isFollowing ? colors.primary : colors.onPrimary} />
+              ) : (
+                <Text
+                  style={[styles.socialBtnText, isFollowing && styles.socialBtnTextSecondary]}
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.socialBtn,
+                (rel?.state === 'friends' || rel?.state === 'request_outgoing') &&
+                  styles.socialBtnSecondary,
+                rel?.state === 'request_incoming' && styles.socialBtnAccent,
+              ]}
+              onPress={onFriendAction}
+              disabled={socialBusy || rel?.state === 'friends'}
+            >
+              {socialBusy ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text
+                  style={[
+                    styles.socialBtnText,
+                    (rel?.state === 'friends' ||
+                      rel?.state === 'request_outgoing' ||
+                      rel?.state === 'request_incoming') &&
+                      styles.socialBtnTextSecondary,
+                  ]}
+                >
+                  {friendLabel}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <View>
           <Text style={styles.sectionLabel}>Trust</Text>
@@ -271,8 +434,13 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a0a0f' },
-  centered: { flex: 1, backgroundColor: '#0a0a0f', justifyContent: 'center', alignItems: 'center' },
+  root: { flex: 1, backgroundColor: colors.bg },
+  centered: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -282,66 +450,97 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   backBtn: { padding: 8 },
-  backBtnText: { color: '#00d4ff', fontSize: 16, fontWeight: '600' },
+  backBtnText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
   menuBtn: { padding: 8 },
-  menuBtnText: { color: '#888', fontSize: 22, letterSpacing: 2 },
-  scroll: { padding: 20, gap: 28, paddingBottom: 24 },
+  menuBtnText: { color: colors.textMuted, fontSize: 22, letterSpacing: 2 },
+  scroll: { padding: spacing.xl, gap: 28, paddingBottom: 24 },
   hero: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingTop: 8 },
   heroMeta: { flex: 1, gap: 4 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  displayName: { color: '#fff', fontSize: 24, fontWeight: '700' },
-  originLine: { color: '#888', fontSize: 13, marginTop: 2 },
-  onlineLabel: { color: '#4caf50', fontSize: 13 },
-  offlineLabel: { color: '#666' },
+  displayName: { color: colors.textPrimary, fontSize: 24, fontWeight: '700' },
+  originLine: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
+  onlineLabel: { color: colors.success, fontSize: 13 },
+  offlineLabel: { color: colors.textFaint },
+  mutualLine: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
+
+  socialRow: { flexDirection: 'row', gap: 10 },
+  socialBtn: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  socialBtnSecondary: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  socialBtnAccent: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  socialBtnText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
+  socialBtnTextSecondary: { color: colors.primary },
+
   trustRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  trustBar: { flex: 1, height: 6, backgroundColor: '#1a1a24', borderRadius: 3, overflow: 'hidden' },
-  trustProgress: { height: '100%', backgroundColor: '#00d4ff', borderRadius: 3 },
-  trustText: { color: '#888', fontSize: 12 },
+  trustBar: {
+    flex: 1,
+    height: 6,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  trustProgress: { height: '100%', backgroundColor: colors.primary, borderRadius: 3 },
+  trustText: { color: colors.textMuted, fontSize: 12 },
   trustBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   trustChip: {
-    backgroundColor: '#15151f',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  trustChipText: { color: '#9aa', fontSize: 12, fontWeight: '600' },
+  trustChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
   trustChipStrong: { backgroundColor: '#00d4ff20' },
-  trustChipStrongText: { color: '#00d4ff', fontSize: 12, fontWeight: '700' },
-  trustEmpty: { color: '#666', fontSize: 12 },
+  trustChipStrongText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  trustEmpty: { color: colors.textFaint, fontSize: 12 },
   section: { gap: 10 },
   sectionLabel: {
-    color: '#555',
+    color: colors.textFaint,
     fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  footer: { flexDirection: 'row', gap: 12, padding: 20, paddingBottom: 36 },
+  footer: { flexDirection: 'row', gap: 12, padding: spacing.xl, paddingBottom: 36 },
   waveBtn: {
     flex: 1,
-    backgroundColor: '#00d4ff',
+    backgroundColor: colors.primary,
     borderRadius: 14,
     padding: 16,
     alignItems: 'center',
   },
   waveBtnDisabled: { opacity: 0.6 },
-  waveBtnText: { color: '#000', fontWeight: '700', fontSize: 16 },
+  waveBtnText: { color: colors.onPrimary, fontWeight: '700', fontSize: 16 },
   giftBtn: {
     paddingHorizontal: 22,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: '#00d4ff66',
   },
-  giftBtnText: { color: '#00d4ff', fontWeight: '700', fontSize: 16 },
+  giftBtnText: { color: colors.primary, fontWeight: '700', fontSize: 16 },
   unblockBtn: {
     flex: 1,
     borderRadius: 14,
     padding: 16,
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: '#ff6b6b66',
   },
