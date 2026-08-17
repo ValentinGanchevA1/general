@@ -2,12 +2,19 @@ import { Module, forwardRef } from '@nestjs/common';
 
 import { BlocksModule } from '../blocks/blocks.module';
 import { PresenceModule } from '../presence/presence.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { RealtimeModule } from '../../realtime/realtime.module';
 import { FriendsController } from './friends.controller';
 import { FriendsService } from './friends.service';
 import { FriendsSuggestionsService } from './friends-suggestions.service';
 
 @Module({
-  imports: [forwardRef(() => BlocksModule), PresenceModule],
+  imports: [
+    forwardRef(() => BlocksModule),
+    PresenceModule,
+    NotificationsModule,
+    forwardRef(() => RealtimeModule),
+  ],
   controllers: [FriendsController],
   providers: [FriendsService, FriendsSuggestionsService],
   exports: [FriendsService, FriendsSuggestionsService],
