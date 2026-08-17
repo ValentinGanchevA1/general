@@ -12,6 +12,7 @@ export * from './gifts';
 export * from './story';
 export * from './scrub';
 export * from './verification';
+export * from './friends';
 
 export interface PendingVerificationSummary {
   id: string;

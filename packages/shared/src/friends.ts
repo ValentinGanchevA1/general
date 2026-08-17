@@ -1,0 +1,58 @@
+// packages/shared/src/friends.ts
+// Two-tier social graph contracts (follows + close friends).
+
+export type FriendRequestStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
+
+/** Close friend or follow edge as shown in list UIs. */
+export interface FriendCard {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  /** null when the friend's privacy hides online status from friends. */
+  online: boolean | null;
+  createdAt: string;
+}
+
+export interface FriendRequestCard {
+  id: string;
+  fromUserId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  createdAt: string;
+}
+
+/** Relationship of the viewer toward a public profile target. */
+export type RelationshipState =
+  | 'none'
+  | 'following'
+  | 'followed_by'
+  | 'mutual_follow'
+  | 'friends'
+  | 'request_outgoing'
+  | 'request_incoming';
+
+export interface RelationshipSummary {
+  state: RelationshipState;
+  /** Pending request id when state is request_outgoing or request_incoming. */
+  requestId?: string;
+  /** Mutual friends count (friends of both viewer and target). */
+  mutualFriendsCount: number;
+}
+
+export interface FollowRequest {
+  userId: string;
+}
+
+export interface CreateFriendRequestBody {
+  userId: string;
+}
+
+export interface FriendsPage {
+  items: FriendCard[];
+  nextCursor: string | null;
+}
+
+export interface FriendRequestsPage {
+  items: FriendRequestCard[];
+  nextCursor: string | null;
+}
