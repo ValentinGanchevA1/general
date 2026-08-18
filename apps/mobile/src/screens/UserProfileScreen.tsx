@@ -63,12 +63,14 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 
   const blocked = profile?.blockedByViewer ?? false;
 
-  const loadRelationship = useCallback(async () => {
+  const loadRelationship = useCallback(async (): Promise<boolean> => {
     try {
       const data = await getJson<RelationshipSummary>(`/friends/relationship/${userId}`);
       setRel(data);
+      return true;
     } catch {
-      setRel(null);
+      // Keep prior / optimistic rel — wiping here made Follow/Add friend look stuck.
+      return false;
     }
   }, [userId]);
 
