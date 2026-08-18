@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import {
-  Modal,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetView,
+  type BottomSheetBackdropProps,
+} from '@gorhom/bottom-sheet';
 import { useNavigation } from '@react-navigation/native';
 import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -44,7 +43,9 @@ export function ProfileScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const { on } = useSocket();
   const pendingCount = useAppSelector((s) => s.friends.pendingCount);
-  const [mapPresenceOpen, setMapPresenceOpen] = useState(false);
+  const mapPresenceRef = useRef<BottomSheetModal>(null);
+  const snapPoints = useMemo(() => ['34%'], []);
+
   const {
     loading,
     error,
@@ -81,6 +82,27 @@ export function ProfileScreen(): React.JSX.Element {
     };
   }, [on, dispatch]);
 
+  const openMapPresence = useCallback(() => {
+    mapPresenceRef.current?.present();
+  }, []);
+
+  const closeMapPresence = useCallback(() => {
+    mapPresenceRef.current?.dismiss();
+  }, []);
+
+  const renderBackdrop = useCallback(
+    (props: BottomSheetBackdropProps) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.55}
+        pressBehavior="close"
+      />
+    ),
+    [],
+  );
+
   if (loading && !derived) {
     return <ProfileLoadingState />;
   }
@@ -110,139 +132,140 @@ export function ProfileScreen(): React.JSX.Element {
 
   return (
     <>
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-      }
-    >
-      <ProfileHeaderPhoto
-        photoUrl={mainPhoto ?? null}
-        displayName={displayName}
-        verificationPercent={verificationScore}
-        isVisibleOnMap={mapVisible}
-        isPaid={isPaid}
-        tierLabel={tierLabel}
-        photoCount={photos.length}
-        activePhotoIndex={activePhotoIndex}
-        onSelectPhoto={setActivePhotoIndex}
-        onPressSettings={() => openRootScreen(navigation, 'Settings')}
-        onPressVerificationBadge={() => openRootScreen(navigation, 'Verification')}
-        onPressPhoto={() => openRootScreen(navigation, 'Photos')}
-        onPressVisibility={() => setMapPresenceOpen(true)}
-      />
-
-      <View style={styles.trustSection}>
-        <TrustStrip
-          chips={trustChips}
-          onChipPress={(id) => {
-            if (id === 'email') {
-              openRootScreen(navigation, 'EmailVerification');
-              return;
-            }
-            if (id === 'phone') {
-              openRootScreen(navigation, 'Verification', {
-                initialPhone: p.phone ?? undefined,
-              });
-              return;
-            }
-            if (id === 'id' || id === 'percent') {
-              openRootScreen(
-                navigation,
-                p.idVerificationStatus === 'pending' ? 'VerificationId' : 'Verification',
-              );
-            }
-          }}
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
+      >
+        <ProfileHeaderPhoto
+          photoUrl={mainPhoto ?? null}
+          displayName={displayName}
+          verificationPercent={verificationScore}
+          isVisibleOnMap={mapVisible}
+          isPaid={isPaid}
+          tierLabel={tierLabel}
+          photoCount={photos.length}
+          activePhotoIndex={activePhotoIndex}
+          onSelectPhoto={setActivePhotoIndex}
+          onPressSettings={() => openRootScreen(navigation, 'Settings')}
+          onPressVerificationBadge={() => openRootScreen(navigation, 'Verification')}
+          onPressPhoto={() => openRootScreen(navigation, 'Photos')}
+          onPressVisibility={openMapPresence}
         />
-      </View>
 
-      {showIdCta ? (
-        <ProfileIdCta
-          status={p.idVerificationStatus}
-          onPress={() => openRootScreen(navigation, 'VerificationId')}
-        />
-      ) : null}
-
-      {p.bio ? <ProfileBio bio={p.bio} /> : null}
-
-      <ProfileQuickActions
-        onEdit={() => openRootScreen(navigation, 'ProfileEdit')}
-        onPhotos={() => openRootScreen(navigation, 'Photos')}
-        onTrust={() => openRootScreen(navigation, 'Verification')}
-      />
-
-      <ProfileFriendsCard
-        pendingCount={pendingCount}
-        onPress={() => openRootScreen(navigation, 'FriendsList')}
-      />
-
-      <ProfileActivityLinks
-        gamification={gamification ?? null}
-        challenges={challenges}
-        spendableXp={spendableXp}
-        onChallenges={() => openRootScreen(navigation, 'Challenges')}
-        onLeaderboard={() => openRootScreen(navigation, 'Leaderboard')}
-        onAchievements={() => openRootScreen(navigation, 'Achievements')}
-        onGifts={() => openRootScreen(navigation, 'GiftsInbox')}
-      />
-
-      <ProfilePhotosSection
-        photos={photos}
-        isSelf
-        activeIndex={activePhotoIndex}
-        onSelect={setActivePhotoIndex}
-        onManage={() => openRootScreen(navigation, 'Photos')}
-      />
-
-      {p.id ? (
-        <View style={styles.section}>
-          <ProfileStoryline userId={p.id} isSelf />
+        <View style={styles.trustSection}>
+          <TrustStrip
+            chips={trustChips}
+            onChipPress={(id) => {
+              if (id === 'email') {
+                openRootScreen(navigation, 'EmailVerification');
+                return;
+              }
+              if (id === 'phone') {
+                openRootScreen(navigation, 'Verification', {
+                  initialPhone: p.phone ?? undefined,
+                });
+                return;
+              }
+              if (id === 'id' || id === 'percent') {
+                openRootScreen(
+                  navigation,
+                  p.idVerificationStatus === 'pending' ? 'VerificationId' : 'Verification',
+                );
+              }
+            }}
+          />
         </View>
-      ) : null}
 
-      <ProfileTagsSection interests={interests} goals={goals} />
+        {showIdCta ? (
+          <ProfileIdCta
+            status={p.idVerificationStatus}
+            onPress={() => openRootScreen(navigation, 'VerificationId')}
+          />
+        ) : null}
 
-      <ProfileAccountSection
-        email={p.email}
-        phone={p.phone}
-        emailVerified={!!badges.email}
-        phoneVerified={!!badges.phone}
-        onAddPhone={() => openRootScreen(navigation, 'Verification')}
-      />
+        {p.bio ? <ProfileBio bio={p.bio} /> : null}
 
-      <ProfileSocialSection
-        links={socialLinks}
-        onManage={() => openRootScreen(navigation, 'SocialLinking')}
-      />
+        <ProfileQuickActions
+          onEdit={() => openRootScreen(navigation, 'ProfileEdit')}
+          onPhotos={() => openRootScreen(navigation, 'Photos')}
+          onTrust={() => openRootScreen(navigation, 'Verification')}
+        />
 
-      <ProfileMenuSection
-        isPaid={isPaid}
-        onNavigate={(route) => openRootScreen(navigation, route)}
-        onLogout={handleLogout}
-      />
-    </ScrollView>
+        <ProfileFriendsCard
+          pendingCount={pendingCount}
+          onPress={() => openRootScreen(navigation, 'FriendsList')}
+        />
 
-    <Modal
-      visible={mapPresenceOpen}
-      transparent
-      animationType="fade"
-      onRequestClose={() => setMapPresenceOpen(false)}
-    >
-      <Pressable style={styles.modalBackdrop} onPress={() => setMapPresenceOpen(false)}>
-        <View style={styles.modalCardWrap}>
+        <ProfileActivityLinks
+          gamification={gamification ?? null}
+          challenges={challenges}
+          spendableXp={spendableXp}
+          onChallenges={() => openRootScreen(navigation, 'Challenges')}
+          onLeaderboard={() => openRootScreen(navigation, 'Leaderboard')}
+          onAchievements={() => openRootScreen(navigation, 'Achievements')}
+          onGifts={() => openRootScreen(navigation, 'GiftsInbox')}
+        />
+
+        <ProfilePhotosSection
+          photos={photos}
+          isSelf
+          activeIndex={activePhotoIndex}
+          onSelect={setActivePhotoIndex}
+          onManage={() => openRootScreen(navigation, 'Photos')}
+        />
+
+        {p.id ? (
+          <View style={styles.section}>
+            <ProfileStoryline userId={p.id} isSelf />
+          </View>
+        ) : null}
+
+        <ProfileTagsSection interests={interests} goals={goals} />
+
+        <ProfileAccountSection
+          email={p.email}
+          phone={p.phone}
+          emailVerified={!!badges.email}
+          phoneVerified={!!badges.phone}
+          onAddPhone={() => openRootScreen(navigation, 'Verification')}
+        />
+
+        <ProfileSocialSection
+          links={socialLinks}
+          onManage={() => openRootScreen(navigation, 'SocialLinking')}
+        />
+
+        <ProfileMenuSection
+          isPaid={isPaid}
+          onNavigate={(route) => openRootScreen(navigation, route)}
+          onLogout={handleLogout}
+        />
+      </ScrollView>
+
+      <BottomSheetModal
+        ref={mapPresenceRef}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        enableDynamicSizing={false}
+        backdropComponent={renderBackdrop}
+        backgroundStyle={styles.sheetBackground}
+        handleIndicatorStyle={styles.sheetHandle}
+      >
+        <BottomSheetView style={styles.sheetContent}>
           <MapPresenceCard
             isVisible={mapVisible}
             saving={saving}
             onToggle={handleMapToggle}
             onViewPin={() => {
-              setMapPresenceOpen(false);
+              closeMapPresence();
               navigation.navigate('Main', { screen: 'Map', params: { focusMyPin: true } });
             }}
           />
-        </View>
-      </Pressable>
-    </Modal>
+        </BottomSheetView>
+      </BottomSheetModal>
     </>
   );
 }
@@ -252,15 +275,14 @@ const styles = StyleSheet.create({
   content: { paddingBottom: spacing.xxl },
   trustSection: { marginTop: spacing.md },
   section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl,
+  sheetBackground: {
+    backgroundColor: colors.surfaceRaised,
   },
-  modalCardWrap: {
-    borderRadius: 16,
-    overflow: 'hidden',
+  sheetHandle: {
+    backgroundColor: colors.textMuted,
+    width: 40,
+  },
+  sheetContent: {
+    paddingBottom: spacing.xl,
   },
 });

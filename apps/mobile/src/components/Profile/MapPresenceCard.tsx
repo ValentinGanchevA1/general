@@ -55,7 +55,7 @@ export function MapPresenceCard({
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: spacing.xl,
+    marginHorizontal: spacing.md,
     backgroundColor: colors.surfaceRaised,
     borderRadius: radius.lg,
     padding: spacing.lg,
