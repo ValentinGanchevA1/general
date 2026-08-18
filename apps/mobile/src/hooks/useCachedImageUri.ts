@@ -14,7 +14,7 @@ export function useCachedImageUri(
   useEffect(() => {
     let cancelled = false;
     // Defer setState so react-hooks/set-state-in-effect stays clean (CI --max-warnings 0).
-    queue Promise.resolve().then(() => {
+    void Promise.resolve().then(() => {
       if (cancelled) return;
       if (!uri) {
         setResolved(null);
