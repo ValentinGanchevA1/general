@@ -12,6 +12,7 @@ import {
 
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { login, register, clearError, loginWithGoogle } from '@/features/auth/authSlice';
+import { setPendingPhoneVerify } from '@/services/pendingPhone';
 
 export function AuthScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
@@ -21,14 +22,22 @@ export function AuthScreen(): React.JSX.Element {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [phone, setPhone] = useState('');
 
   const submit = () => {
-    dispatch(clearError());
-    if (mode === 'login') {
-      void dispatch(login({ email: email.trim(), password }));
-    } else {
-      void dispatch(register({ email: email.trim(), password, displayName: displayName.trim() }));
-    }
+    void (async () => {
+      dispatch(clearError());
+      if (mode === 'login') {
+        void dispatch(login({ email: email.trim(), password }));
+        return;
+      }
+      const action = await dispatch(
+        register({ email: email.trim(), password, displayName: displayName.trim() }),
+      );
+      if (register.fulfilled.match(action) && phone.trim().length >= 8) {
+        await setPendingPhoneVerify(phone.trim());
+      }
+    })();
   };
 
   const toggleMode = () => {
@@ -69,6 +78,18 @@ export function AuthScreen(): React.JSX.Element {
           autoComplete="email"
         />
 
+        {mode === 'register' ? (
+          <TextInput
+            style={styles.input}
+            placeholder="Phone (optional) e.g. +359888123456"
+            placeholderTextColor="#666"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            autoComplete="tel"
+          />
+        ) : null}
+
         <TextInput
           style={styles.input}
           placeholder="Password"
@@ -86,32 +107,18 @@ export function AuthScreen(): React.JSX.Element {
           {loading ? (
             <ActivityIndicator color="#000" />
           ) : (
-            <Text style={styles.btnText}>
-              {mode === 'login' ? 'Sign in' : 'Create account'}
-            </Text>
+            <Text style={styles.btnText}>{mode === 'login' ? 'Sign in' : 'Create account'}</Text>
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={toggleMode} style={styles.toggle}>
-          <Text style={styles.toggleText}>
-            {mode === 'login'
-              ? "Don't have an account? Sign up"
-              : 'Already have an account? Sign in'}
-          </Text>
+        <TouchableOpacity style={styles.googleBtn} onPress={() => void dispatch(loginWithGoogle())} disabled={loading}>
+          <Text style={styles.googleText}>Continue with Google</Text>
         </TouchableOpacity>
 
-        <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <TouchableOpacity
-          style={styles.googleBtn}
-          onPress={() => { dispatch(clearError()); void dispatch(loginWithGoogle()); }}
-          disabled={loading}
-        >
-          <Text style={styles.googleBtnText}>Continue with Google</Text>
+        <TouchableOpacity onPress={toggleMode} style={styles.switch}>
+          <Text style={styles.switchText}>
+            {mode === 'login' ? "Don't have an account? Register" : 'Already have an account? Sign in'}
+          </Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -119,10 +126,29 @@ export function AuthScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a0a0f', justifyContent: 'center', padding: 24 },
-  card: { gap: 12 },
-  logo: { color: '#00d4ff', fontSize: 40, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
-  subtitle: { color: '#aaa', fontSize: 14, textAlign: 'center', marginBottom: 12 },
+  root: {
+    flex: 1,
+    backgroundColor: '#0a0a0f',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  card: {
+    backgroundColor: '#12121a',
+    borderRadius: 16,
+    padding: 24,
+    gap: 12,
+  },
+  logo: {
+    color: '#00d4ff',
+    fontSize: 32,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  subtitle: {
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
   input: {
     backgroundColor: '#1a1a2e',
     color: '#fff',
@@ -132,7 +158,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2a2a4a',
   },
-  error: { color: '#ff6b6b', fontSize: 13, textAlign: 'center' },
+  error: { color: '#ff6b6b', fontSize: 13 },
   btn: {
     backgroundColor: '#00d4ff',
     borderRadius: 10,
@@ -140,17 +166,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
   },
-  btnText: { color: '#000', fontWeight: '700', fontSize: 15 },
-  toggle: { alignItems: 'center', marginTop: 8 },
-  toggleText: { color: '#00d4ff', fontSize: 13 },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 16, gap: 8 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#2a2a4a' },
-  dividerText: { color: '#666', fontSize: 12 },
+  btnText: { color: '#000', fontWeight: '700', fontSize: 16 },
   googleBtn: {
-    backgroundColor: '#fff',
     borderRadius: 10,
     padding: 14,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2a2a4a',
   },
-  googleBtnText: { color: '#000', fontWeight: '600', fontSize: 15 },
+  googleText: { color: '#fff', fontWeight: '600' },
+  switch: { marginTop: 8, alignItems: 'center' },
+  switchText: { color: '#00d4ff', fontSize: 13 },
 });
