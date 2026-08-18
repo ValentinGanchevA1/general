@@ -17,6 +17,7 @@ import { h3ResolutionForZoom, isEntityZoom, cellsForViewport } from '@g88/shared
 import type { Viewport } from '@g88/shared';
 import { DiscoveryService } from './discovery.service';
 import { PresenceService } from '../presence/presence.service';
+import { FriendsService } from '../friends/friends.service';
 import { REDIS_CLIENT } from '../../config/redis.provider';
 
 const VIEWPORT: Viewport = { ne: { lat: 2, lng: 2 }, sw: { lat: 1, lng: 1 } };
@@ -36,6 +37,7 @@ describe('DiscoveryService', () => {
   let service: DiscoveryService;
   let query: jest.Mock;
   let whichAreOnline: jest.Mock;
+  let listFriendIds: jest.Mock;
   let redisGet: jest.Mock;
   let redisSet: jest.Mock;
 
@@ -46,6 +48,7 @@ describe('DiscoveryService', () => {
 
     query = jest.fn().mockResolvedValue([]);
     whichAreOnline = jest.fn().mockResolvedValue(new Set<string>());
+    listFriendIds = jest.fn().mockResolvedValue([]);
     redisGet = jest.fn().mockResolvedValue(null);
     redisSet = jest.fn().mockResolvedValue('OK');
 
@@ -54,6 +57,7 @@ describe('DiscoveryService', () => {
         DiscoveryService,
         { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
         { provide: PresenceService, useValue: { whichAreOnline } },
+        { provide: FriendsService, useValue: { listFriendIds } },
         { provide: REDIS_CLIENT, useValue: { get: redisGet, set: redisSet } },
       ],
     }).compile();
@@ -118,14 +122,17 @@ describe('DiscoveryService', () => {
         { id: 'e1', kind: 'event', lat: 11, lng: 21, meta: { title: 'Party' } },
       ]);
       whichAreOnline.mockResolvedValue(new Set(['u1']));
+      listFriendIds.mockResolvedValue(['u1']);
 
       const res = await call();
 
       expect(whichAreOnline).toHaveBeenCalledWith(['u1']);
+      expect(listFriendIds).toHaveBeenCalledWith('me');
       const points = asPoints(res.points);
       const user = points.find((p) => p.kind === 'user');
       const event = points.find((p) => p.kind === 'event');
       expect(user?.meta?.online).toBe(true); // view hardcodes false; Redis overrides
+      expect(user?.meta?.isFriend).toBe(true);
       expect(event?.meta).toEqual({ title: 'Party' });
     });
 
@@ -133,6 +140,7 @@ describe('DiscoveryService', () => {
       query.mockResolvedValueOnce([{ id: 'e1', kind: 'event', lat: 11, lng: 21, meta: {} }]);
       await call();
       expect(whichAreOnline).not.toHaveBeenCalled();
+      expect(listFriendIds).not.toHaveBeenCalled();
     });
   });
 
