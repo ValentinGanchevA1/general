@@ -40,6 +40,9 @@ describe('ChatService', () => {
       conversationId: 'c1',
       senderId: 'me',
       body: 'hi',
+      type: 'text',
+      location: null,
+      locationSessionId: null,
       createdAt: new Date('2026-06-10T00:00:00Z'),
     },
   ];
@@ -84,12 +87,13 @@ describe('ChatService', () => {
     });
 
     it('promotes the conversation to accepted when the recipient replies', async () => {
+      // Gate order for recipient on pending: SELECT → UPDATE status → INSERT → UPDATE last_message_at
       txQuery
         .mockResolvedValueOnce([
           { participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'other' },
         ])
+        .mockResolvedValueOnce([]) // UPDATE status → accepted (before insert)
         .mockResolvedValueOnce(MSG) // INSERT
-        .mockResolvedValueOnce([]) // UPDATE status → accepted
         .mockResolvedValueOnce([]); // UPDATE last_message_at
 
       await service.persist('c1', 'me', 'reply');
@@ -114,13 +118,14 @@ describe('ChatService', () => {
 
   describe('findMessages', () => {
     it('forbids non-participants', async () => {
-      query.mockResolvedValueOnce([{ exists: false }]);
+      // isParticipant returns rows.length > 0 — empty result means not a participant
+      query.mockResolvedValueOnce([]);
       await expect(service.findMessages('c1', 'me')).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('pages newest-first and exposes nextCursor when more rows exist', async () => {
       query
-        .mockResolvedValueOnce([{ exists: true }])
+        .mockResolvedValueOnce([{ exists: true }]) // any non-empty row set = participant
         .mockResolvedValueOnce([
           {
             id: 'm2',
