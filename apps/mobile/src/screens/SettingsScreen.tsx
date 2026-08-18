@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -40,9 +41,12 @@ export function SettingsScreen(): React.JSX.Element {
     if (toggling || !profile) return;
     setToggling(true);
     try {
-      await dispatch(
+      const result = await dispatch(
         updateProfile({ visibility: isVisible ? 'private' : 'public' }),
       );
+      if (updateProfile.rejected.match(result)) {
+        Alert.alert('Could not update', (result.payload as string) || 'Try again.');
+      }
     } finally {
       setToggling(false);
     }
@@ -52,9 +56,12 @@ export function SettingsScreen(): React.JSX.Element {
     if (togglingOnline || !profile) return;
     setTogglingOnline(true);
     try {
-      await dispatch(
+      const result = await dispatch(
         updateProfile({ friendsSeeOnlineStatus: !friendsSeeOnline }),
       );
+      if (updateProfile.rejected.match(result)) {
+        Alert.alert('Could not update', (result.payload as string) || 'Try again.');
+      }
     } finally {
       setTogglingOnline(false);
     }
@@ -273,15 +280,6 @@ export function SettingsScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0a0a0f' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    paddingTop: 56,
-  },
-  back: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   body: { padding: 24, paddingBottom: 48 },
   section: { marginBottom: 28 },
   sectionTitle: {

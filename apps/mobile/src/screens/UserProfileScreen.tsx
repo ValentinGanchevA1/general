@@ -58,7 +58,8 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   const [waving, setWaving] = useState(false);
   const [giftSheetOpen, setGiftSheetOpen] = useState(false);
   const [blocking, setBlocking] = useState(false);
-  const [socialBusy, setSocialBusy] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [friendBusy, setFriendBusy] = useState(false);
 
   const blocked = profile?.blockedByViewer ?? false;
 
@@ -147,6 +148,22 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     );
   };
 
+  const runSocial = async (
+    fn: () => Promise<void>,
+    setBusy: (v: boolean) => void,
+  ): Promise<void> => {
+    setBusy(true);
+    try {
+      await fn();
+    } catch (e) {
+      Alert.alert('Could not update', errMessage(e, 'Try again in a moment.'));
+    } finally {
+      // Always re-sync from server so optimistic UI cannot stick after a failed write.
+      await loadRelationship();
+      setBusy(false);
+    }
+  };
+
   const openMenu = (): void => {
     if (blocked) {
       Alert.alert('Unblock?', `Unblock ${profile?.displayName ?? 'this user'}?`, [
@@ -166,9 +183,10 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
             {
               text: 'Unfriend',
               style: 'destructive',
-              onPress: () => void runSocial(async () => {
-                await deleteJson<{ friends: false }>(`/friends/${userId}`);
-              }),
+              onPress: () =>
+                void runSocial(async () => {
+                  await deleteJson<{ friends: false }>(`/friends/${userId}`);
+                }, setFriendBusy),
             },
           ]);
         },
@@ -179,22 +197,9 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     Alert.alert(profile?.displayName ?? 'Options', undefined, options);
   };
 
-  const runSocial = async (fn: () => Promise<void>): Promise<void> => {
-    setSocialBusy(true);
-    try {
-      await fn();
-    } catch (e) {
-      Alert.alert('Could not update', errMessage(e, 'Try again in a moment.'));
-    } finally {
-      // Always re-sync from server so optimistic UI cannot stick after a failed write.
-      await loadRelationship();
-      setSocialBusy(false);
-    }
-  };
-
   const onFollowToggle = (): void => {
-    if (socialBusy || blocked) return;
-    const following = rel?.isFollowing === true;
+    if (followBusy || friendBusy || blocked) return;
+    const following = Boolean(rel?.isFollowing);
     if (following) {
       void runSocial(async () => {
         setRel((prev) =>
@@ -212,7 +217,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
             : prev,
         );
         await deleteJson<{ following: false }>(`/friends/follow/${userId}`);
-      });
+      }, setFollowBusy);
       return;
     }
     void runSocial(async () => {
@@ -231,11 +236,11 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
           : prev,
       );
       await postJson<{ userId: string }, { following: true }>('/friends/follow', { userId });
-    });
+    }, setFollowBusy);
   };
 
   const onFriendAction = (): void => {
-    if (socialBusy || blocked || !rel) return;
+    if (friendBusy || followBusy || blocked || !rel) return;
     switch (rel.state) {
       case 'friends':
         return;
@@ -243,7 +248,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         if (rel.requestId) {
           void runSocial(async () => {
             await deleteJson<{ cancelled: true }>(`/friends/requests/${rel.requestId}`);
-          });
+          }, setFriendBusy);
         }
         return;
       case 'request_incoming':
@@ -253,7 +258,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
               `/friends/requests/${rel.requestId}/accept`,
               {},
             );
-          });
+          }, setFriendBusy);
         }
         return;
       default:
@@ -272,7 +277,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
               ? { ...prev, state: 'request_outgoing', requestId: res.requestId }
               : prev,
           );
-        });
+        }, setFriendBusy);
     }
   };
 
@@ -295,7 +300,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   if (!profile) return <View style={styles.centered} />;
 
   const badges = earnedBadges(profile.verification);
-  const isFollowing = rel?.isFollowing === true;
+  const isFollowing = Boolean(rel?.isFollowing);
   const friendLabel =
     rel?.state === 'friends'
       ? 'Friends'
@@ -360,9 +365,9 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
             <TouchableOpacity
               style={[styles.socialBtn, isFollowing && styles.socialBtnSecondary]}
               onPress={onFollowToggle}
-              disabled={socialBusy}
+              disabled={followBusy || friendBusy}
             >
-              {socialBusy ? (
+              {followBusy ? (
                 <ActivityIndicator size="small" color={isFollowing ? colors.primary : colors.onPrimary} />
               ) : (
                 <Text
@@ -380,9 +385,9 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
                 rel?.state === 'request_incoming' && styles.socialBtnAccent,
               ]}
               onPress={onFriendAction}
-              disabled={socialBusy || rel?.state === 'friends'}
+              disabled={friendBusy || followBusy || rel?.state === 'friends'}
             >
-              {socialBusy ? (
+              {friendBusy ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
                 <Text
