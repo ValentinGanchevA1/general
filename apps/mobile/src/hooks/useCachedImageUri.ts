@@ -9,26 +9,27 @@ import { resolveAvatarUri } from '@/services/avatarCache';
 export function useCachedImageUri(
   uri: string | null | undefined,
 ): string | null {
-  const [resolved, setResolved] = useState<string | null>(uri ?? null);
+  const remote = uri ?? null;
+  const [resolved, setResolved] = useState<string | null>(remote);
+  const [trackedUri, setTrackedUri] = useState<string | null>(remote);
+
+  // Adjust state when the uri prop changes — during render, not in an effect
+  // (avoids react-hooks/set-state-in-effect and keeps CI --max-warnings 0).
+  if (remote !== trackedUri) {
+    setTrackedUri(remote);
+    setResolved(remote);
+  }
 
   useEffect(() => {
+    if (!remote) return;
     let cancelled = false;
-    // Defer setState so react-hooks/set-state-in-effect stays clean (CI --max-warnings 0).
-    queue Promise.resolve().then(() => {
-      if (cancelled) return;
-      if (!uri) {
-        setResolved(null);
-        return;
-      }
-      setResolved(uri);
-      void resolveAvatarUri(uri).then((local) => {
-        if (!cancelled && local) setResolved(local);
-      });
+    resolveAvatarUri(remote).then((local) => {
+      if (!cancelled && local) setResolved(local);
     });
     return () => {
       cancelled = true;
     };
-  }, [uri]);
+  }, [remote]);
 
   return resolved;
 }
