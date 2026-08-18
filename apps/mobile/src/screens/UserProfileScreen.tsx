@@ -50,6 +50,15 @@ function errMessage(e: unknown, fallback: string): string {
   return fallback;
 }
 
+function emptyRel(): RelationshipSummary {
+  return {
+    state: 'none',
+    mutualFriendsCount: 0,
+    isFollowing: false,
+    isFollowedBy: false,
+  };
+}
+
 export function UserProfileScreen({ route, navigation }: Props): React.JSX.Element {
   const { userId } = route.params;
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
@@ -204,57 +213,56 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     const following = Boolean(rel?.isFollowing);
     if (following) {
       void runSocial(async () => {
-        setRel((prev) =>
-          prev
-            ? {
-                ...prev,
-                isFollowing: false,
-                state:
-                  prev.state === 'following'
-                    ? 'none'
-                    : prev.state === 'mutual_follow'
-                      ? 'followed_by'
-                      : prev.state,
-              }
-            : prev,
-        );
+        setRel((prev) => {
+          const base = prev ?? emptyRel();
+          return {
+            ...base,
+            isFollowing: false,
+            state:
+              base.state === 'following'
+                ? 'none'
+                : base.state === 'mutual_follow'
+                  ? 'followed_by'
+                  : base.state,
+          };
+        });
         await deleteJson<{ following: false }>(`/friends/follow/${userId}`);
       }, setFollowBusy);
       return;
     }
     void runSocial(async () => {
-      setRel((prev) =>
-        prev
-          ? {
-              ...prev,
-              isFollowing: true,
-              state:
-                prev.state === 'none' || prev.state === 'followed_by'
-                  ? prev.state === 'followed_by'
-                    ? 'mutual_follow'
-                    : 'following'
-                  : prev.state,
-            }
-          : prev,
-      );
+      setRel((prev) => {
+        const base = prev ?? emptyRel();
+        return {
+          ...base,
+          isFollowing: true,
+          state:
+            base.state === 'none' || base.state === 'followed_by'
+              ? base.state === 'followed_by'
+                ? 'mutual_follow'
+                : 'following'
+              : base.state,
+        };
+      });
       await postJson<{ userId: string }, { following: true }>('/friends/follow', { userId });
     }, setFollowBusy);
   };
 
   const onFriendAction = (): void => {
-    if (friendBusy || followBusy || blocked || !rel) return;
-    switch (rel.state) {
+    if (friendBusy || followBusy || blocked) return;
+    const state = rel?.state ?? 'none';
+    switch (state) {
       case 'friends':
         return;
       case 'request_outgoing':
-        if (rel.requestId) {
+        if (rel?.requestId) {
           void runSocial(async () => {
             await deleteJson<{ cancelled: true }>(`/friends/requests/${rel.requestId}`);
           }, setFriendBusy);
         }
         return;
       case 'request_incoming':
-        if (rel.requestId) {
+        if (rel?.requestId) {
           void runSocial(async () => {
             await postJson<Record<string, never>, { friends: true }>(
               `/friends/requests/${rel.requestId}/accept`,
@@ -265,20 +273,20 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         return;
       default:
         void runSocial(async () => {
-          setRel((prev) =>
-            prev
-              ? { ...prev, state: 'request_outgoing' as const, requestId: prev.requestId }
-              : prev,
-          );
+          setRel((prev) => ({
+            ...(prev ?? emptyRel()),
+            state: 'request_outgoing' as const,
+            ...(prev?.requestId ? { requestId: prev.requestId } : {}),
+          }));
           const res = await postJson<{ userId: string }, { requestId: string }>(
             '/friends/requests',
             { userId },
           );
-          setRel((prev) =>
-            prev
-              ? { ...prev, state: 'request_outgoing', requestId: res.requestId }
-              : prev,
-          );
+          setRel((prev) => ({
+            ...(prev ?? emptyRel()),
+            state: 'request_outgoing' as const,
+            requestId: res.requestId,
+          }));
         }, setFriendBusy);
     }
   };
