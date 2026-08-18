@@ -75,7 +75,7 @@ export class FriendsSuggestionsService {
              FROM conversations
             WHERE $1 = ANY (participant_ids)
               AND status = 'accepted'
-              AND COALESCE(updated_at, created_at) > NOW() - interval '30 days'
+              AND COALESCE(last_message_at, created_at) > NOW() - interval '30 days'
          ),
          candidates AS (
            SELECT uid, mutual_count, 'mutual_friends'::text AS reason, 0 AS rank_tier
