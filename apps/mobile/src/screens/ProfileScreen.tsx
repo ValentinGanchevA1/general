@@ -101,95 +101,121 @@ export function ProfileScreen(): React.JSX.Element {
   } = derived;
 
   return (
-    <View style={styles.root}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-          />
-        }
-      >
-        <ProfileHeaderPhoto
-          photos={photos}
-          mainPhoto={mainPhoto}
-          activeIndex={activePhotoIndex}
-          onIndexChange={setActivePhotoIndex}
-          displayName={displayName}
-          verification={p.verification}
-          idVerified={p.idVerified}
-          online={p.online}
-          age={p.age}
-          hometownCity={p.hometownCity}
-          hometownCountry={p.hometownCountry}
-          showAge={p.showAge}
-          showHometown={p.showHometown}
-        />
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+      }
+    >
+      <ProfileHeaderPhoto
+        photos={photos}
+        mainPhoto={mainPhoto}
+        activeIndex={activePhotoIndex}
+        onIndexChange={setActivePhotoIndex}
+        displayName={displayName}
+        verification={p.verification}
+        idVerified={p.idVerified}
+        online={p.online}
+        age={p.age}
+        hometownCity={p.hometownCity}
+        hometownCountry={p.hometownCountry}
+        showAge={p.showAge}
+        showHometown={p.showHometown}
+      />
 
-        <MapPresenceCard visible={mapVisible} onToggle={handleMapToggle} saving={saving} />
-
+      <View style={styles.trustSection}>
         <TrustStrip
           verificationScore={verificationScore}
           badges={badges}
           isPaid={isPaid}
           trustChips={trustChips}
         />
+      </View>
 
-        <ProfileBio bio={p.bio} />
-
-        {showIdCta ? (
-          <ProfileIdCta onPress={() => navigation.navigate('Verification')} />
-        ) : null}
-
-        <ProfileQuickActions
-          onEdit={() => navigation.navigate('ProfileEdit')}
-          onViewPin={() => openRootScreen(navigation, 'Map', { focusMyPin: true })}
-          onSettings={() => navigation.navigate('Settings')}
+      <View style={styles.mapPresenceSection}>
+        <MapPresenceCard
+          visible={mapVisible}
+          saving={saving}
+          onToggle={handleMapToggle}
+          onViewPin={() =>
+            navigation.navigate('Main', { screen: 'Map', params: { focusMyPin: true } })
+          }
         />
+      </View>
 
-        <ProfileFriendsCard
-          pendingCount={pendingCount}
-          onFriends={() => navigation.navigate('FriendsList')}
-          onRequests={() => navigation.navigate('FriendsList', { initialTab: 'requests' })}
+      {showIdCta ? (
+        <ProfileIdCta
+          status={p.idVerificationStatus}
+          onPress={() => openRootScreen(navigation, 'VerificationId')}
         />
+      ) : null}
 
-        <ProfileActivityLinks
-          spendableXp={spendableXp}
-          challenges={challenges}
-          gamification={gamification}
-          onGifts={() => navigation.navigate('MyGifts')}
-          onAchievements={() => navigation.navigate('Achievements')}
-        />
+      {p.bio ? <ProfileBio bio={p.bio} /> : null}
 
-        <ProfilePhotosSection photos={photos} isSelf />
+      <ProfileQuickActions
+        onEdit={() => openRootScreen(navigation, 'ProfileEdit')}
+        onPhotos={() => openRootScreen(navigation, 'Photos')}
+        onTrust={() => openRootScreen(navigation, 'Verification')}
+      />
 
+      <ProfileFriendsCard
+        pendingCount={pendingCount}
+        onPress={() => openRootScreen(navigation, 'FriendsList')}
+      />
+
+      <ProfileActivityLinks
+        gamification={gamification ?? null}
+        challenges={challenges}
+        spendableXp={spendableXp}
+        onChallenges={() => openRootScreen(navigation, 'Challenges')}
+        onLeaderboard={() => openRootScreen(navigation, 'Leaderboard')}
+        onAchievements={() => openRootScreen(navigation, 'Achievements')}
+        onGifts={() => openRootScreen(navigation, 'GiftsInbox')}
+      />
+
+      <ProfilePhotosSection
+        photos={photos}
+        isSelf
+        activeIndex={activePhotoIndex}
+        onSelect={setActivePhotoIndex}
+        onManage={() => openRootScreen(navigation, 'Photos')}
+      />
+
+      {p.id ? (
         <View style={styles.section}>
-          <ProfileStoryline userId={p.id} />
+          <ProfileStoryline userId={p.id} isSelf />
         </View>
+      ) : null}
 
-        <ProfileTagsSection interests={interests} goals={goals} />
+      <ProfileTagsSection interests={interests} goals={goals} />
 
-        <ProfileAccountSection
-          email={p.email}
-          phone={p.phone}
-          onEdit={() => navigation.navigate('ProfileEdit')}
-        />
+      <ProfileAccountSection
+        email={p.email}
+        phone={p.phone}
+        emailVerified={!!badges.email}
+        phoneVerified={!!badges.phone}
+        onAddPhone={() => openRootScreen(navigation, 'Verification')}
+      />
 
-        <ProfileSocialSection links={socialLinks} />
+      <ProfileSocialSection
+        links={socialLinks}
+        onManage={() => openRootScreen(navigation, 'SocialLinking')}
+      />
 
-        <ProfileMenuSection
-          onSettings={() => navigation.navigate('Settings')}
-          onLogout={handleLogout}
-        />
-      </ScrollView>
-    </View>
+      <ProfileMenuSection
+        isPaid={isPaid}
+        onNavigate={(route) => openRootScreen(navigation, route)}
+        onLogout={handleLogout}
+      />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  scroll: { paddingBottom: spacing.xxl },
-  section: { paddingHorizontal: spacing.lg, marginTop: spacing.md },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingBottom: spacing.xxl },
+  trustSection: { marginTop: spacing.md },
+  mapPresenceSection: { marginTop: spacing.sm },
+  section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl },
 });
