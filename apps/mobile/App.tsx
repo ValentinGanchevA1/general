@@ -1,6 +1,9 @@
 import * as Sentry from '@sentry/react-native';
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { Provider } from 'react-redux';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
@@ -25,12 +28,20 @@ GoogleSignin.configure({ webClientId: Config.GOOGLE_WEB_CLIENT_ID });
 
 function App(): React.JSX.Element {
   return (
-    <Provider store={store}>
-      <SafeAreaProvider>
-        <AppNavigator />
-      </SafeAreaProvider>
-    </Provider>
+    <GestureHandlerRootView style={styles.root}>
+      <Provider store={store}>
+        <SafeAreaProvider>
+          <BottomSheetModalProvider>
+            <AppNavigator />
+          </BottomSheetModalProvider>
+        </SafeAreaProvider>
+      </Provider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+});
 
 export default Sentry.wrap(App);

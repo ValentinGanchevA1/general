@@ -40,5 +40,7 @@ module.exports = {
     // Inlines process.env.* at bundle time. The IIFE above ensures .env is loaded
     // (shell env still wins, e.g. `API_HOST=x pnpm android`).
     'transform-inline-environment-variables',
+    // Reanimated 4: worklets plugin MUST be listed last.
+    'react-native-worklets/plugin',
   ],
 };
