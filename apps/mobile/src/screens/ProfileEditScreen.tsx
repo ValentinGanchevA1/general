@@ -17,6 +17,7 @@ import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { updateProfile } from '@/features/profile/profileSlice';
+import { openRootScreen } from '@/navigation/openRootScreen';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
@@ -31,31 +32,27 @@ function isAdult(isoDate: string): boolean {
 }
 
 export function ProfileEditScreen(): React.JSX.Element {
-  const dispatch = useAppDispatch();
   const navigation = useNavigation<Nav>();
-  const { profile, loading, error } = useAppSelector((s) => s.profile);
+  const dispatch = useAppDispatch();
+  const profile = useAppSelector((s) => s.profile.profile);
+  const loading = useAppSelector((s) => s.profile.loading);
+  const error = useAppSelector((s) => s.profile.error);
 
   const [displayName, setDisplayName] = useState(profile?.displayName ?? '');
   const [bio, setBio] = useState(profile?.bio ?? '');
-  const [dateOfBirth, setDateOfBirth] = useState(profile?.dateOfBirth?.slice(0, 10) ?? '');
+  const [dateOfBirth, setDateOfBirth] = useState(profile?.dateOfBirth ?? '');
   const [hometownCity, setHometownCity] = useState(profile?.hometownCity ?? '');
   const [hometownCountry, setHometownCountry] = useState(profile?.hometownCountry ?? '');
   const [showAge, setShowAge] = useState(profile?.showAge ?? true);
   const [showHometown, setShowHometown] = useState(profile?.showHometown ?? true);
-  const [localError, setLocalError] = useState('');
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const save = async (): Promise<void> => {
-    setLocalError('');
+    setLocalError(null);
     const dob = dateOfBirth.trim();
-    if (dob) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
-        setLocalError('Date of birth must be YYYY-MM-DD');
-        return;
-      }
-      if (!isAdult(dob)) {
-        setLocalError('You must be at least 18 years old');
-        return;
-      }
+    if (dob && !isAdult(dob)) {
+      setLocalError('You must be at least 18 years old.');
+      return;
     }
     const result = await dispatch(
       updateProfile({
@@ -79,7 +76,7 @@ export function ProfileEditScreen(): React.JSX.Element {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={styles.heading}>Edit Profile</Text>
+        <Text style={styles.heading}>Edit profile</Text>
 
         <Text style={styles.label}>Display name</Text>
         <TextInput
@@ -87,9 +84,8 @@ export function ProfileEditScreen(): React.JSX.Element {
           value={displayName}
           onChangeText={setDisplayName}
           placeholder="Your name"
-          placeholderTextColor="#666"
-          autoCapitalize="words"
-          maxLength={40}
+          placeholderTextColor="#555"
+          maxLength={50}
         />
 
         <Text style={styles.label}>Bio</Text>
@@ -97,38 +93,32 @@ export function ProfileEditScreen(): React.JSX.Element {
           style={[styles.input, styles.bioInput]}
           value={bio}
           onChangeText={setBio}
-          placeholder="Tell others about yourself"
-          placeholderTextColor="#666"
+          placeholder="A short intro"
+          placeholderTextColor="#555"
           multiline
           maxLength={160}
-          textAlignVertical="top"
         />
         <Text style={styles.charCount}>{bio.length}/160</Text>
 
-        <Text style={styles.section}>Age & origin</Text>
-
-        <Text style={styles.label}>Date of birth</Text>
+        <Text style={styles.section}>ORIGIN</Text>
+        <Text style={styles.label}>Date of birth (YYYY-MM-DD)</Text>
         <TextInput
           style={styles.input}
           value={dateOfBirth}
           onChangeText={setDateOfBirth}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor="#666"
-          keyboardType="numbers-and-punctuation"
-          maxLength={10}
+          placeholder="1990-01-15"
+          placeholderTextColor="#555"
           autoCapitalize="none"
         />
-        <Text style={styles.hint}>Must be 18+. Only your age is shown publicly (if enabled).</Text>
+        <Text style={styles.hint}>Used for age only. Must be 18+.</Text>
 
-        <Text style={styles.label}>City of origin</Text>
+        <Text style={styles.label}>City</Text>
         <TextInput
           style={styles.input}
           value={hometownCity}
           onChangeText={setHometownCity}
-          placeholder="e.g. Sofia"
-          placeholderTextColor="#666"
-          autoCapitalize="words"
-          maxLength={80}
+          placeholder="Varna"
+          placeholderTextColor="#555"
         />
 
         <Text style={styles.label}>Country</Text>
@@ -136,8 +126,8 @@ export function ProfileEditScreen(): React.JSX.Element {
           style={styles.input}
           value={hometownCountry}
           onChangeText={setHometownCountry}
-          placeholder="e.g. BG or Bulgaria"
-          placeholderTextColor="#666"
+          placeholder="BG"
+          placeholderTextColor="#555"
           autoCapitalize="characters"
           maxLength={40}
         />
@@ -166,6 +156,32 @@ export function ProfileEditScreen(): React.JSX.Element {
             trackColor={{ false: '#2a2a4a', true: '#0095b3' }}
             thumbColor={showHometown ? '#00d4ff' : '#555'}
           />
+        </View>
+
+        <Text style={styles.section}>PHONE</Text>
+        <Text style={styles.hint}>
+          {profile?.phone
+            ? profile.badges?.phone
+              ? 'Verified — you can change it anytime (re-verification required).'
+              : 'Saved but not verified yet. Confirm with a code to unlock Phone trust.'
+            : 'Add a number and verify it to show Phone ✓ on your profile.'}
+        </Text>
+        <View style={styles.phoneRow}>
+          <Text style={[styles.phoneText, !profile?.phone && styles.phoneMuted]}>
+            {profile?.phone ?? 'No phone on file'}
+          </Text>
+          <TouchableOpacity
+            style={styles.phoneBtn}
+            onPress={() =>
+              openRootScreen(navigation, 'Verification', {
+                initialPhone: profile?.phone ?? undefined,
+              })
+            }
+          >
+            <Text style={styles.phoneBtnText}>
+              {profile?.phone ? (profile.badges?.phone ? 'Change' : 'Verify') : 'Add phone'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {localError ? <Text style={styles.error}>{localError}</Text> : null}
@@ -218,22 +234,40 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a2e',
     borderRadius: 10,
     padding: 14,
+    marginTop: 8,
+    gap: 12,
+  },
+  toggleText: { flex: 1 },
+  toggleLabel: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  toggleSub: { color: '#888', fontSize: 12, marginTop: 2 },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a2e',
+    borderRadius: 10,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#2a2a4a',
-    marginTop: 8,
+    gap: 12,
   },
-  toggleText: { flex: 1, marginRight: 12 },
-  toggleLabel: { color: '#fff', fontSize: 15, fontWeight: '500' },
-  toggleSub: { color: '#666', fontSize: 12, marginTop: 2 },
-  error: { color: '#ff6b6b', fontSize: 13, textAlign: 'center' },
+  phoneText: { flex: 1, color: '#fff', fontSize: 15 },
+  phoneMuted: { color: '#666' },
+  phoneBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,212,255,0.15)',
+  },
+  phoneBtnText: { color: '#00d4ff', fontWeight: '700', fontSize: 13 },
+  error: { color: '#ff6b6b', fontSize: 13, marginTop: 8 },
   btn: {
     backgroundColor: '#00d4ff',
     borderRadius: 10,
     padding: 14,
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 16,
   },
   btnText: { color: '#000', fontWeight: '700', fontSize: 15 },
-  cancelBtn: { alignItems: 'center', marginTop: 8 },
-  cancelText: { color: '#555', fontSize: 14 },
+  cancelBtn: { alignItems: 'center', padding: 12 },
+  cancelText: { color: '#888', fontSize: 14 },
 });
