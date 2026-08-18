@@ -67,7 +67,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
       const data = await getJson<RelationshipSummary>(`/friends/relationship/${userId}`);
       setRel(data);
     } catch {
-      // Non-fatal — social buttons stay in neutral state.
       setRel(null);
     }
   }, [userId]);
@@ -192,7 +191,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     }
   };
 
-  /** Follow is independent of friendship — can toggle even when state === 'friends'. */
   const onFollowToggle = (): void => {
     if (socialBusy || blocked) return;
     const following = rel?.isFollowing === true;
@@ -211,7 +209,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     if (socialBusy || blocked || !rel) return;
     switch (rel.state) {
       case 'friends':
-        // Unfriend lives in ··· menu to avoid accidents.
         return;
       case 'request_outgoing':
         if (rel.requestId) {
@@ -243,7 +240,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     if (!rel || rel.mutualFriendsCount < 1) return;
     navigation.navigate('MutualFriends', {
       peerUserId: userId,
-      peerName: profile?.displayName,
+      ...(profile?.displayName ? { peerName: profile.displayName } : {}),
     });
   };
 
@@ -258,7 +255,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   if (!profile) return <View style={styles.centered} />;
 
   const badges = earnedBadges(profile.verification);
-  // Follow edge only — not derived from friendship state.
   const isFollowing = rel?.isFollowing === true;
   const friendLabel =
     rel?.state === 'friends'

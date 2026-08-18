@@ -66,7 +66,7 @@ export const fetchFriendsTab = createAsyncThunk(
       const page = await getJson<FriendsPage>(`${pathForTab(args.tab)}${qs}`);
       return { tab: args.tab, page, append: Boolean(args.cursor) } as const;
     } catch (e) {
-      return rejectWithValue(extractMessage(e));
+      return rejectWithValue(extractMessage(e, 'Failed to load'));
     }
   },
 );
@@ -77,7 +77,7 @@ export const fetchPendingCount = createAsyncThunk(
     try {
       return await getJson<FriendPendingCount>('/friends/requests/pending/count');
     } catch (e) {
-      return rejectWithValue(extractMessage(e));
+      return rejectWithValue(extractMessage(e, 'Failed to load pending count'));
     }
   },
 );
@@ -92,7 +92,7 @@ export const acceptFriendRequest = createAsyncThunk(
       );
       return requestId;
     } catch (e) {
-      return rejectWithValue(extractMessage(e));
+      return rejectWithValue(extractMessage(e, 'Could not accept request'));
     }
   },
 );
@@ -107,7 +107,7 @@ export const declineFriendRequest = createAsyncThunk(
       );
       return requestId;
     } catch (e) {
-      return rejectWithValue(extractMessage(e));
+      return rejectWithValue(extractMessage(e, 'Could not decline request'));
     }
   },
 );
@@ -119,7 +119,7 @@ export const unfriendUser = createAsyncThunk(
       await deleteJson<{ friends: false }>(`/friends/${userId}`);
       return userId;
     } catch (e) {
-      return rejectWithValue(extractMessage(e));
+      return rejectWithValue(extractMessage(e, 'Could not unfriend'));
     }
   },
 );
