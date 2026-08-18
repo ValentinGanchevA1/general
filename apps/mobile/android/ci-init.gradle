@@ -1,0 +1,19 @@
+// CI-only init script: inject Google Maven Central mirror into every
+// subproject buildscript. Autolinked RN libraries (e.g. gesture-handler)
+// often declare only mavenCentral() for their plugin classpath, which
+// fails hard on GHA when Central returns HTTP 429.
+//
+// Applied via: ./gradlew ... --init-script ci-init.gradle
+
+allprojects {
+    buildscript {
+        repositories {
+            google()
+            maven {
+                url = uri("https://maven-central.storage-download.googleapis.com/maven2/")
+                name = "GoogleMavenCentralMirror"
+            }
+            mavenCentral()
+        }
+    }
+}
