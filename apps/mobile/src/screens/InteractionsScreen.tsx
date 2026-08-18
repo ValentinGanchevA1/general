@@ -22,8 +22,8 @@ import {
 } from '@/features/friends/friendsSlice';
 import { useInboxInteractions } from '@/features/interactions/useInboxInteractions';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
+import { useAppDispatch } from '@/hooks/redux';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
-import { useAppDispatch } from '@/store/hooks';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
