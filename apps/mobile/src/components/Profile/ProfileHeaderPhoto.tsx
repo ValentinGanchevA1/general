@@ -47,29 +47,29 @@ export function ProfileHeaderPhoto({
   onSelectPhoto,
   onPressVisibility,
 }: ProfileHeaderPhotoProps): React.JSX.Element {
-  const initials = displayName
-    .trim()
-    .split(/\s+/)
-    .map((w) => w[0] ?? '')
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-
   return (
     <Pressable onPress={onPressPhoto} style={styles.container}>
       {photoUrl ? (
         <Image source={{ uri: photoUrl }} style={styles.photo} resizeMode="cover" />
       ) : (
         <View style={[styles.photo, styles.placeholder]}>
-          <Text style={styles.placeholderInitials}>{initials || '?'}</Text>
+          <Text style={styles.placeholderInitials}>
+            {displayName
+              .split(' ')
+              .map((w) => w[0] ?? '')
+              .join('')
+              .toUpperCase()
+              .slice(0, 2) || '?'}
+          </Text>
         </View>
       )}
 
-      <View style={styles.topChrome}>
+      {/* Top chrome */}
+      <View style={styles.topChrome} pointerEvents="box-none">
         {isPaid && tierLabel ? (
           <View style={styles.tierBadge}>
-            <Icon name="crown" size={14} color="#FFD700" />
-            <Text style={styles.tierText}>{tierLabel}</Text>
+            <Icon name="crown" size={13} color="#000" />
+            <Text style={styles.tierBadgeText}>{tierLabel}</Text>
           </View>
         ) : (
           <View />
@@ -78,32 +78,30 @@ export function ProfileHeaderPhoto({
           <Pressable
             onPress={onPressSettings}
             style={styles.settingsBtn}
-            hitSlop={8}
+            hitSlop={10}
             accessibilityRole="button"
             accessibilityLabel="Settings"
           >
-            <Icon name="cog" size={20} color="#fff" />
+            <Icon name="cog" size={20} color={colors.textPrimary} />
           </Pressable>
         ) : null}
       </View>
 
-      {photoCount > 1 ? (
-        <View style={styles.dots}>
-          {Array.from({ length: photoCount }).map((_, index) => (
-            <Pressable
-              key={index}
-              onPress={() => onSelectPhoto?.(index)}
-              style={[
-                styles.dot,
-                index === activePhotoIndex && styles.dotActive,
-              ]}
-              hitSlop={6}
-            />
-          ))}
-        </View>
-      ) : null}
+      {/* Bottom readability + identity */}
+      <View style={styles.overlayContent}>
+        {photoCount > 1 ? (
+          <View style={styles.dots}>
+            {Array.from({ length: photoCount }).map((_, index) => (
+              <Pressable
+                key={index}
+                onPress={() => onSelectPhoto?.(index)}
+                style={[styles.dot, index === activePhotoIndex && styles.dotActive]}
+                hitSlop={6}
+              />
+            ))}
+          </View>
+        ) : null}
 
-      <View style={styles.bottomGradient}>
         <View style={styles.nameRow}>
           <View style={styles.leftInfo}>
             <Text style={styles.name} numberOfLines={1}>
@@ -132,12 +130,7 @@ export function ProfileHeaderPhoto({
                 {isVisibleOnMap ? 'Visible on map' : 'Hidden from map'}
               </Text>
               {onPressVisibility ? (
-                <Icon
-                  name="chevron-down"
-                  size={14}
-                  color={colors.textMuted}
-                  style={{ marginLeft: 2 }}
-                />
+                <Icon name="chevron-down" size={14} color={colors.textMuted} />
               ) : null}
             </Pressable>
           </View>
@@ -203,20 +196,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: '#FFD700',
     gap: 4,
   },
-  tierText: {
-    color: '#FFD700',
+  tierBadgeText: {
+    color: '#000',
     fontSize: 12,
     fontWeight: '700',
   },
-  dots: {
+  overlayContent: {
     position: 'absolute',
-    top: 100,
-    alignSelf: 'center',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    paddingTop: 40,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  dots: {
     flexDirection: 'row',
     gap: 6,
+    marginBottom: 10,
   },
   dot: {
     width: 6,
@@ -227,16 +228,6 @@ const styles = StyleSheet.create({
   dotActive: {
     backgroundColor: '#fff',
     width: 8,
-  },
-  bottomGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    paddingTop: 48,
-    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   nameRow: {
     flexDirection: 'row',
