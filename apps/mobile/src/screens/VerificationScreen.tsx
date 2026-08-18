@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -9,7 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import type { AccountStackParamList } from '@/navigation/stacks';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type {
@@ -28,13 +29,19 @@ type Step = 'phone' | 'code';
 
 export function VerificationScreen(): React.JSX.Element {
   const navigation = useNavigation();
+  const route = useRoute<RouteProp<AccountStackParamList, 'Verification'>>();
   const dispatch = useAppDispatch();
   const [step, setStep] = useState<Step>('phone');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(route.params?.initialPhone ?? '');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [devHint, setDevHint] = useState(false);
+
+  useEffect(() => {
+    const initial = route.params?.initialPhone?.trim();
+    if (initial) setPhone(initial);
+  }, [route.params?.initialPhone]);
 
   const start = async (): Promise<void> => {
     setBusy(true);
@@ -121,9 +128,7 @@ export function VerificationScreen(): React.JSX.Element {
                 Change number
               </Text>
             </Text>
-            {devHint ? (
-              <Text style={styles.devHint}>Dev mode: use 000000</Text>
-            ) : null}
+            {devHint ? <Text style={styles.devHint}>Dev mode: use 000000</Text> : null}
             <TextInput
               style={[styles.input, styles.codeInput]}
               value={code}
