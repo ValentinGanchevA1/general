@@ -11,13 +11,19 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import type { ReceivedInteraction, WaveRequest, WaveResponse } from '@g88/shared';
+import type { FollowRequest, InboxItem, WaveRequest, WaveResponse } from '@g88/shared';
 
 import { postJson } from '@/api/client';
 import { Avatar } from '@/components/Avatar';
 import { VerificationBadge } from '@/components/VerificationBadge';
+import {
+  acceptFriendRequest,
+  declineFriendRequest,
+} from '@/features/friends/friendsSlice';
+import { useInboxInteractions } from '@/features/interactions/useInboxInteractions';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { useAppDispatch } from '@/store/hooks';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -31,8 +37,10 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-function signalLabel(item: ReceivedInteraction): string {
+function signalLabel(item: InboxItem): string {
   if (item.type === 'wave') return 'waved at you';
+  if (item.type === 'friend_request') return 'sent you a friend request';
+  if (item.type === 'follow') return 'started following you';
   if (item.reactionKind === 'heart') return '❤️ reacted to your story';
   if (item.reactionKind === 'wave') return '👋 reacted to your story';
   return 'reacted to your story';
@@ -40,15 +48,27 @@ function signalLabel(item: ReceivedInteraction): string {
 
 function Row({
   item,
-  onWaveBack,
+  busy,
+  onMatch,
+  onAccept,
+  onDecline,
+  onFollowBack,
   onOpenProfile,
 }: {
-  item: ReceivedInteraction;
-  onWaveBack: (userId: string) => void;
+  item: InboxItem;
+  busy: boolean;
+  onMatch: (userId: string) => void;
+  onAccept: (requestId: string) => void;
+  onDecline: (requestId: string) => void;
+  onFollowBack: (userId: string) => void;
   onOpenProfile: (userId: string) => void;
 }): React.JSX.Element {
   return (
-    <TouchableOpacity style={styles.row} onPress={() => onOpenProfile(item.fromUser.id)} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={styles.row}
+      onPress={() => onOpenProfile(item.fromUser.id)}
+      activeOpacity={0.7}
+    >
       <Avatar uri={item.fromUser.avatarUrl} name={item.fromUser.displayName} size={48} />
       <View style={styles.info}>
         <View style={styles.nameRow}>
@@ -60,25 +80,77 @@ function Row({
         <Text style={styles.signal}>{signalLabel(item)}</Text>
         <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>
       </View>
-      {item.isMutual ? (
-        <View style={styles.mutualBadge}>
-          <Text style={styles.mutualText}>Match</Text>
+
+      {item.type === 'wave' &&
+        (item.isMutual ? (
+          <View style={styles.mutualBadge}>
+            <Text style={styles.mutualText}>Match</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            disabled={busy}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              onMatch(item.fromUser.id);
+            }}
+          >
+            <Text style={styles.primaryBtnText}>Match</Text>
+          </TouchableOpacity>
+        ))}
+
+      {item.type === 'friend_request' && item.requestId && (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.declineBtn}
+            disabled={busy}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              onDecline(item.requestId!);
+            }}
+          >
+            <Text style={styles.declineBtnText}>Decline</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            disabled={busy}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              onAccept(item.requestId!);
+            }}
+          >
+            <Text style={styles.primaryBtnText}>Accept</Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <TouchableOpacity
-          style={styles.waveBackBtn}
-          onPress={() => onWaveBack(item.fromUser.id)}
-        >
-          <Text style={styles.waveBackText}>👋</Text>
-        </TouchableOpacity>
       )}
+
+      {item.type === 'follow' &&
+        (item.isFollowingBack ? (
+          <View style={styles.mutualBadge}>
+            <Text style={styles.mutualText}>Following</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            disabled={busy}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              onFollowBack(item.fromUser.id);
+            }}
+          >
+            <Text style={styles.primaryBtnText}>Follow back</Text>
+          </TouchableOpacity>
+        ))}
     </TouchableOpacity>
   );
 }
 
 export function InteractionsScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
-  const { items, loading, refresh, markSeen } = useReceivedInteractions();
+  const dispatch = useAppDispatch();
+  const { items, loading, refresh } = useInboxInteractions();
+  const { markSeen } = useReceivedInteractions();
+  const [busyIds, setBusyIds] = React.useState<string[]>([]);
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -86,8 +158,13 @@ export function InteractionsScreen(): React.JSX.Element {
     });
   }, [markSeen]);
 
-  const onWaveBack = useCallback(
+  const setBusy = useCallback((id: string, on: boolean) => {
+    setBusyIds((prev) => (on ? [...prev, id] : prev.filter((x) => x !== id)));
+  }, []);
+
+  const onMatch = useCallback(
     async (userId: string): Promise<void> => {
+      setBusy(userId, true);
       try {
         await postJson<WaveRequest, WaveResponse>('/interactions/wave', {
           toUserId: userId,
@@ -95,10 +172,59 @@ export function InteractionsScreen(): React.JSX.Element {
         });
         await refresh();
       } catch {
-        // toast handled by global error path if any
+        // global error path
+      } finally {
+        setBusy(userId, false);
       }
     },
-    [refresh],
+    [refresh, setBusy],
+  );
+
+  const onAccept = useCallback(
+    async (requestId: string): Promise<void> => {
+      setBusy(requestId, true);
+      try {
+        await dispatch(acceptFriendRequest(requestId)).unwrap();
+        await refresh();
+      } catch {
+        // slice surfaces error
+      } finally {
+        setBusy(requestId, false);
+      }
+    },
+    [dispatch, refresh, setBusy],
+  );
+
+  const onDecline = useCallback(
+    async (requestId: string): Promise<void> => {
+      setBusy(requestId, true);
+      try {
+        await dispatch(declineFriendRequest(requestId)).unwrap();
+        await refresh();
+      } catch {
+        // slice surfaces error
+      } finally {
+        setBusy(requestId, false);
+      }
+    },
+    [dispatch, refresh, setBusy],
+  );
+
+  const onFollowBack = useCallback(
+    async (userId: string): Promise<void> => {
+      setBusy(userId, true);
+      try {
+        await postJson<FollowRequest, { following: true }>('/friends/follow', {
+          userId,
+        });
+        await refresh();
+      } catch {
+        // global error path
+      } finally {
+        setBusy(userId, false);
+      }
+    },
+    [refresh, setBusy],
   );
 
   const onOpenProfile = useCallback(
@@ -129,12 +255,20 @@ export function InteractionsScreen(): React.JSX.Element {
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>No interactions yet</Text>
             <Text style={styles.emptyBody}>
-              When someone waves at you or reacts to your story, they show up here.
+              Waves, friend requests, and new followers show up here.
             </Text>
           </View>
         }
         renderItem={({ item }) => (
-          <Row item={item} onWaveBack={(id) => void onWaveBack(id)} onOpenProfile={onOpenProfile} />
+          <Row
+            item={item}
+            busy={busyIds.includes(item.requestId ?? item.fromUser.id)}
+            onMatch={(id) => void onMatch(id)}
+            onAccept={(id) => void onAccept(id)}
+            onDecline={(id) => void onDecline(id)}
+            onFollowBack={(id) => void onFollowBack(id)}
+            onOpenProfile={onOpenProfile}
+          />
         )}
       />
     </View>
@@ -160,18 +294,26 @@ const styles = StyleSheet.create({
   },
   info: { flex: 1, gap: 2 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: { color: '#fff', fontWeight: '600', fontSize: 15, maxWidth: 180 },
+  name: { color: '#fff', fontWeight: '600', fontSize: 15, maxWidth: 160 },
   signal: { color: '#aaa', fontSize: 13 },
   time: { color: '#666', fontSize: 12 },
-  waveBackBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#00d4ff',
-    alignItems: 'center',
-    justifyContent: 'center',
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  primaryBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: '#1dbf73',
   },
-  waveBackText: { fontSize: 20 },
+  primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  declineBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: '#1a1a2e',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#333',
+  },
+  declineBtnText: { color: '#aaa', fontWeight: '600', fontSize: 13 },
   mutualBadge: {
     paddingHorizontal: 10,
     paddingVertical: 6,

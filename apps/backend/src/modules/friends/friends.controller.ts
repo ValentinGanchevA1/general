@@ -108,6 +108,18 @@ export class FriendsController {
     return this.friends.listFollowing(userId, cursor, limit);
   }
 
+  /** Recent people who started following the viewer (Interactions inbox). */
+  @Get('followers/recent')
+  recentFollowers(
+    @CurrentUser('id') userId: string,
+    @Query('sinceDays') sinceDaysRaw?: string,
+    @Query('limit') limitRaw?: string,
+  ) {
+    const sinceDays = sinceDaysRaw ? Number(sinceDaysRaw) : undefined;
+    const limit = limitRaw ? Number(limitRaw) : undefined;
+    return this.friends.listRecentFollowers(userId, sinceDays, limit);
+  }
+
   @Get('followers')
   followers(
     @CurrentUser('id') userId: string,
