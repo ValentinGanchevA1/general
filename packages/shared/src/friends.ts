@@ -121,5 +121,6 @@ export interface InboxItem {
   isMutual?: boolean;
   requestId?: string;
   isFollowingBack?: boolean;
-  reactionKind?: string;
+  /** Story reaction only; omit (do not set undefined) under exactOptionalPropertyTypes. */
+  reactionKind?: 'heart' | 'wave';
 }
