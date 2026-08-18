@@ -117,4 +117,34 @@ describe('FriendsService', () => {
       });
     });
   });
+
+  describe('listRecentFollowers', () => {
+    it('maps rows and clamps window/limit', async () => {
+      const ts = new Date('2026-08-18T12:00:00.000Z');
+      query.mockResolvedValueOnce([
+        {
+          user_id: B,
+          display_name: 'Bob',
+          avatar_url: null,
+          created_at: ts,
+          is_following_back: false,
+        },
+      ]);
+      const res = await service.listRecentFollowers(A, 999, 999);
+      expect(res.items).toEqual([
+        {
+          userId: B,
+          displayName: 'Bob',
+          avatarUrl: null,
+          createdAt: ts.toISOString(),
+          isFollowingBack: false,
+        },
+      ]);
+      const [sql, params] = query.mock.calls[0]!;
+      expect(sql).toContain('follows f');
+      expect(sql).toContain('blocks');
+      // sinceDays clamped to 90, limit to 50
+      expect(params).toEqual([A, 90, 50]);
+    });
+  });
 });
