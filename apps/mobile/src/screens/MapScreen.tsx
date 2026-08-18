@@ -29,6 +29,7 @@ import { postJson } from '@/api/client';
 import { useAppDispatch } from '@/hooks/redux';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { MapMarkers } from '@/components/map/MapMarkers';
+import { prefetchAvatars } from '@/services/avatarCache';
 import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ContextualFab } from '@/components/ContextualFab';
@@ -78,6 +79,17 @@ export function MapScreen(): React.JSX.Element {
   useEffect(() => {
     dispatch(setPoints(points));
   }, [points, dispatch]);
+
+  // Warm disk cache for faces currently on the map (offline-friendly re-open).
+  useEffect(() => {
+    const uris: Array<string | null> = [];
+    for (const p of points) {
+      if (p.kind === 'user') uris.push(p.meta.avatarUrl);
+      else if (p.kind === 'event') uris.push(p.meta.coverUrl);
+      else if (p.kind === 'listing') uris.push(p.meta.thumbnailUrl);
+    }
+    prefetchAvatars(uris);
+  }, [points]);
 
   // Initial centre when we first get GPS and the user has not panned yet.
   useEffect(() => {

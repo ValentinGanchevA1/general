@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useCachedImageUri } from '@/hooks/useCachedImageUri';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import type { EntityPoint } from '@g88/shared';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -51,9 +52,14 @@ function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element 
     point.kind === 'user' &&
     (point.meta.verifiedBadge === true || point.meta.verification === 'id');
 
-  const avatarUrl = point.kind === 'user' ? point.meta.avatarUrl : null;
+  const remoteAvatar = point.kind === 'user' ? point.meta.avatarUrl : null;
+  const cachedAvatar = useCachedImageUri(remoteAvatar);
+  const coverUri = point.kind === 'event' ? point.meta.coverUrl : null;
+  const thumbUri = point.kind === 'listing' ? point.meta.thumbnailUrl : null;
+  const cachedCover = useCachedImageUri(coverUri);
+  const cachedThumb = useCachedImageUri(thumbUri);
   const [imgFailed, setImgFailed] = useState(false);
-  const showPhoto = Boolean(avatarUrl) && !imgFailed;
+  const showPhoto = Boolean(cachedAvatar) && !imgFailed;
 
   const settle = (): void => {
     onVisualSettled?.();
@@ -64,7 +70,8 @@ function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element 
       <View style={[styles.bubble, { borderColor: color }, isFriend && styles.friendBubble]}>
         {point.kind === 'user' && showPhoto ? (
           <Image
-            source={{ uri: avatarUrl as string }}
+            key={cachedAvatar ?? 'none'}
+            source={{ uri: cachedAvatar as string }}
             style={styles.photo}
             onLoad={settle}
             onError={() => {
@@ -77,16 +84,18 @@ function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element 
           <Text style={[styles.initials, { color }]} onLayout={settle}>
             {initialsFromName(point.meta.displayName) || '?'}
           </Text>
-        ) : point.kind === 'event' && point.meta.coverUrl ? (
+        ) : point.kind === 'event' && cachedCover ? (
           <Image
-            source={{ uri: point.meta.coverUrl }}
+            key={cachedCover}
+            source={{ uri: cachedCover }}
             style={styles.photo}
             onLoad={settle}
             onError={settle}
           />
-        ) : point.kind === 'listing' && point.meta.thumbnailUrl ? (
+        ) : point.kind === 'listing' && cachedThumb ? (
           <Image
-            source={{ uri: point.meta.thumbnailUrl }}
+            key={cachedThumb}
+            source={{ uri: cachedThumb }}
             style={styles.photo}
             onLoad={settle}
             onError={settle}

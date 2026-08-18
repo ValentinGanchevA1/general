@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useCachedImageUri } from '@/hooks/useCachedImageUri';
 import { Image, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 export interface AvatarProps {
@@ -14,6 +15,7 @@ export interface AvatarProps {
 /**
  * Circular avatar: primary photo when available, initials fallback.
  * Image load errors fall back to initials so a broken CDN URL never blanks the UI.
+ * Remote URLs resolve through offline disk cache (file:// when warmed).
  */
 export function Avatar({
   uri,
@@ -23,8 +25,9 @@ export function Avatar({
   online = false,
   style,
 }: AvatarProps): React.JSX.Element {
+  const cachedUri = useCachedImageUri(uri);
   const [failed, setFailed] = useState(false);
-  const showImage = Boolean(uri) && !failed;
+  const showImage = Boolean(cachedUri) && !failed;
 
   const initials = name
     .trim()
@@ -54,7 +57,8 @@ export function Avatar({
       >
         {showImage ? (
           <Image
-            source={{ uri: uri as string }}
+            key={cachedUri ?? 'none'}
+            source={{ uri: cachedUri as string }}
             style={{
               width: size - ringWidth * 2,
               height: size - ringWidth * 2,
