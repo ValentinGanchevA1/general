@@ -93,8 +93,10 @@ describe('ChatService', () => {
         .mockResolvedValueOnce([]); // UPDATE last_message_at
 
       await service.persist('c1', 'me', 'reply');
-      const statusSql = txQuery.mock.calls.find((c) => String(c[0]).includes("status = 'accepted'"));
-      expect(statusSql).toBeTruthy();
+      const statusCall = txQuery.mock.calls.find((c) =>
+        String(c[0]).includes("status = 'accepted'"),
+      );
+      expect(statusCall).toBeTruthy();
     });
 
     it('inserts and bumps last_message_at on an accepted conversation', async () => {
