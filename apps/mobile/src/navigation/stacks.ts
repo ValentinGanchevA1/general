@@ -22,7 +22,7 @@ export type AccountStackParamList = {
   About: undefined;
   NotificationSettings: undefined;
   BlockedUsers: undefined;
-  Verification: undefined;
+  Verification: { initialPhone?: string } | undefined;
   EmailVerification: undefined;
   VerificationId: undefined;
   Subscription: undefined;

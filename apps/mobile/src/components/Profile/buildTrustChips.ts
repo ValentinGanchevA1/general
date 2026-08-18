@@ -23,6 +23,11 @@ export function buildTrustChips(profile: UserProfile | null | undefined): TrustC
       label: badges.email ? 'Email ✓' : 'Email',
       status: badges.email ? 'success' : 'missing',
     },
+    {
+      id: 'phone',
+      label: badges.phone ? 'Phone ✓' : 'Phone',
+      status: badges.phone ? 'success' : 'missing',
+    },
   ];
 
   const idStatus: TrustChip['status'] =
