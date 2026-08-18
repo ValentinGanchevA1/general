@@ -79,7 +79,7 @@ export function ProfileScreen(): React.JSX.Element {
   if (!derived) {
     return (
       <ProfileErrorState
-        message={error}
+        message={error ?? 'Could not load profile'}
         onRetry={() => void dispatch(fetchProfile())}
         onLogout={handleLogout}
       />
@@ -98,7 +98,6 @@ export function ProfileScreen(): React.JSX.Element {
     isPaid,
     showIdCta,
     displayName,
-    tierLabel,
   } = derived;
 
   return (
@@ -106,48 +105,37 @@ export function ProfileScreen(): React.JSX.Element {
       style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            onRefresh();
-            void dispatch(fetchPendingCount());
-          }}
-          tintColor={colors.primary}
-        />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
       }
     >
       <ProfileHeaderPhoto
-        photoUrl={mainPhoto ?? null}
+        photos={photos}
+        mainPhoto={mainPhoto}
+        activeIndex={activePhotoIndex}
+        onIndexChange={setActivePhotoIndex}
         displayName={displayName}
-        verificationPercent={verificationScore}
-        isVisibleOnMap={mapVisible}
-        isPaid={isPaid}
-        tierLabel={tierLabel}
-        photoCount={photos.length}
-        activePhotoIndex={activePhotoIndex}
-        onSelectPhoto={setActivePhotoIndex}
-        onPressSettings={() => openRootScreen(navigation, 'Settings')}
-        onPressVerificationBadge={() => openRootScreen(navigation, 'Verification')}
-        onPressPhoto={() => openRootScreen(navigation, 'Photos')}
+        verification={p.verification}
+        idVerified={p.idVerified}
+        online={p.online}
+        age={p.age}
+        hometownCity={p.hometownCity}
+        hometownCountry={p.hometownCountry}
+        showAge={p.showAge}
+        showHometown={p.showHometown}
       />
 
       <View style={styles.trustSection}>
         <TrustStrip
-          chips={trustChips}
-          onChipPress={(id) => {
-            if (id === 'id' || id === 'percent') {
-              openRootScreen(
-                navigation,
-                p.idVerificationStatus === 'pending' ? 'VerificationId' : 'Verification',
-              );
-            }
-          }}
+          verificationScore={verificationScore}
+          badges={badges}
+          isPaid={isPaid}
+          trustChips={trustChips}
         />
       </View>
 
       <View style={styles.mapPresenceSection}>
         <MapPresenceCard
-          isVisible={mapVisible}
+          visible={mapVisible}
           saving={saving}
           onToggle={handleMapToggle}
           onViewPin={() =>
