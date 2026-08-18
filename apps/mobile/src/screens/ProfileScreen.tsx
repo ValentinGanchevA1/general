@@ -81,7 +81,6 @@ export function ProfileScreen(): React.JSX.Element {
       <ProfileErrorState
         message={error ?? 'Could not load profile'}
         onRetry={() => void dispatch(fetchProfile())}
-        onLogout={handleLogout}
       />
     );
   }
@@ -98,6 +97,7 @@ export function ProfileScreen(): React.JSX.Element {
     isPaid,
     showIdCta,
     displayName,
+    tierLabel,
   } = derived;
 
   return (
@@ -109,33 +109,37 @@ export function ProfileScreen(): React.JSX.Element {
       }
     >
       <ProfileHeaderPhoto
-        photos={photos}
-        mainPhoto={mainPhoto}
-        activeIndex={activePhotoIndex}
-        onIndexChange={setActivePhotoIndex}
+        photoUrl={mainPhoto ?? null}
         displayName={displayName}
-        verification={p.verification}
-        idVerified={p.idVerified}
-        online={p.online}
-        age={p.age}
-        hometownCity={p.hometownCity}
-        hometownCountry={p.hometownCountry}
-        showAge={p.showAge}
-        showHometown={p.showHometown}
+        verificationPercent={verificationScore}
+        isVisibleOnMap={mapVisible}
+        isPaid={isPaid}
+        tierLabel={tierLabel}
+        photoCount={photos.length}
+        activePhotoIndex={activePhotoIndex}
+        onSelectPhoto={setActivePhotoIndex}
+        onPressSettings={() => openRootScreen(navigation, 'Settings')}
+        onPressVerificationBadge={() => openRootScreen(navigation, 'Verification')}
+        onPressPhoto={() => openRootScreen(navigation, 'Photos')}
       />
 
       <View style={styles.trustSection}>
         <TrustStrip
-          verificationScore={verificationScore}
-          badges={badges}
-          isPaid={isPaid}
-          trustChips={trustChips}
+          chips={trustChips}
+          onChipPress={(id) => {
+            if (id === 'id' || id === 'percent') {
+              openRootScreen(
+                navigation,
+                p.idVerificationStatus === 'pending' ? 'VerificationId' : 'Verification',
+              );
+            }
+          }}
         />
       </View>
 
       <View style={styles.mapPresenceSection}>
         <MapPresenceCard
-          visible={mapVisible}
+          isVisible={mapVisible}
           saving={saving}
           onToggle={handleMapToggle}
           onViewPin={() =>
