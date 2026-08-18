@@ -75,7 +75,7 @@ function Row({
           <Text style={styles.name} numberOfLines={1}>
             {item.fromUser.displayName}
           </Text>
-          <VerificationBadge verification={item.fromUser.verification} size={14} />
+          <VerificationBadge verification={item.fromUser.verification ?? 'none'} size={14} />
         </View>
         <Text style={styles.signal}>{signalLabel(item)}</Text>
         <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>

@@ -102,8 +102,9 @@ function EntityMarkerItemImpl({ point, onPress }: EntityItemProps): React.JSX.El
 
   // Reset settle when the painted media identity changes (new avatar URL).
   // Defer setState so react-hooks/set-state-in-effect stays clean (CI --max-warnings 0).
+  // Prefer Promise microtask over queueMicrotask — RN tsc libs omit the latter.
   useEffect(() => {
-    queueMicrotask(() => {
+    void Promise.resolve().then(() => {
       setMediaSettled(false);
     });
   }, [visualKey]);
