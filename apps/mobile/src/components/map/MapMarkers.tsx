@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Marker } from 'react-native-maps';
 import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
 
@@ -96,12 +96,22 @@ interface EntityItemProps {
 }
 
 function EntityMarkerItemImpl({ point, onPress }: EntityItemProps): React.JSX.Element {
-  const tracksViewChanges = useTracksViewChanges([entityVisualKey(point)]);
+  const [mediaSettled, setMediaSettled] = useState(false);
+  const visualKey = entityVisualKey(point);
+  const tracksFromKey = useTracksViewChanges([visualKey]);
+
+  // Reset settle when the painted media identity changes (new avatar URL).
+  useEffect(() => {
+    setMediaSettled(false);
+  }, [visualKey]);
+
+  const tracksViewChanges = tracksFromKey || !mediaSettled;
   const coordinate = useMemo(
     () => ({ latitude: point.lat, longitude: point.lng }),
     [point.lat, point.lng],
   );
   const handlePress = useCallback(() => onPress(point), [onPress, point]);
+  const onVisualSettled = useCallback(() => setMediaSettled(true), []);
 
   return (
     <Marker
@@ -109,7 +119,7 @@ function EntityMarkerItemImpl({ point, onPress }: EntityItemProps): React.JSX.El
       onPress={handlePress}
       tracksViewChanges={tracksViewChanges}
     >
-      <EntityMarker point={point} />
+      <EntityMarker point={point} onVisualSettled={onVisualSettled} />
     </Marker>
   );
 }

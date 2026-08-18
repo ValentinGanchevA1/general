@@ -22,10 +22,14 @@ export function entityVisualKey(point: EntityPoint): string {
     return [
       point.id,
       point.meta.displayName,
+      point.meta.avatarUrl ?? '',
       point.meta.verification,
       point.meta.verifiedBadge === true ? '1' : '0',
       point.meta.isFriend === true ? 'f' : '0',
     ].join('|');
   }
-  return [point.id, point.kind, point.meta.title].join('|');
+  if (point.kind === 'event') {
+    return [point.id, point.kind, point.meta.title, point.meta.coverUrl ?? ''].join('|');
+  }
+  return [point.id, point.kind, point.meta.title, point.meta.thumbnailUrl ?? ''].join('|');
 }
