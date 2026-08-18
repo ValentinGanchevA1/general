@@ -185,7 +185,23 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
           cd android
-          ./gradlew assembleRelease --no-daemon -PversionCodeOverride=${{ github.run_number }}
+          # Maven Central rate-limits GHA (HTTP 429). Mirror + init-script reduce
+          # hits; outer retry absorbs residual transient failures.
+          ATTEMPTS=5
+          for i in $(seq 1 "$ATTEMPTS"); do
+            if ./gradlew assembleRelease --no-daemon \
+              --init-script ci-init.gradle \
+              -PversionCodeOverride=${{ github.run_number }}; then
+              exit 0
+            fi
+            if [ "$i" -eq "$ATTEMPTS" ]; then
+              echo "::error::assembleRelease failed after $ATTEMPTS attempts"
+              exit 1
+            fi
+            sleep_s=$((i * 45))
+            echo "::warning::Gradle failed (attempt $i/$ATTEMPTS) — sleeping ${sleep_s}s (Maven 429 is common on GHA)"
+            sleep "$sleep_s"
+          done
 
       - name: Verify the APK is not debug-signed
         run: |

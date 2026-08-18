@@ -1,14 +1,14 @@
 pluginManagement {
     repositories {
         google()
-        mavenCentral()
-        gradlePluginPortal()
-        // GHA runners occasionally get HTTP 403 from repo.maven.apache.org;
-        // Google's public mirror keeps plugin resolution working.
+        // Prefer Google's public Central mirror before repo.maven.apache.org —
+        // GHA runners regularly hit HTTP 429/403 from Maven Central.
         maven {
             url = uri("https://maven-central.storage-download.googleapis.com/maven2/")
             name = "GoogleMavenCentralMirror"
         }
+        mavenCentral()
+        gradlePluginPortal()
     }
     includeBuild("../node_modules/@react-native/gradle-plugin")
 }
@@ -19,16 +19,16 @@ include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')
 
 // Project dependency resolution. Prefer google() for AndroidX/Material so those
-// never hit Maven Central. Mirror covers intermittent 403s from Central on GHA.
+// never hit Maven Central. Mirror covers intermittent 429/403s from Central on GHA.
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         google()
-        mavenCentral()
         maven {
             url = uri("https://maven-central.storage-download.googleapis.com/maven2/")
             name = "GoogleMavenCentralMirror"
         }
+        mavenCentral()
         maven { url = uri("https://www.jitpack.io") }
     }
 }
