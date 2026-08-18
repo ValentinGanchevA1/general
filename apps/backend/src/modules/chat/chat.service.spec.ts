@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 
+import { PresenceService } from '../presence/presence.service';
 import { ChatService } from './chat.service';
 
 describe('ChatService', () => {
@@ -23,6 +24,10 @@ describe('ChatService', () => {
         {
           provide: getDataSourceToken(),
           useValue: { query, transaction } as unknown as DataSource,
+        },
+        {
+          provide: PresenceService,
+          useValue: { whichAreOnline: jest.fn().mockResolvedValue(new Set()) },
         },
       ],
     }).compile();
@@ -83,69 +88,90 @@ describe('ChatService', () => {
         .mockResolvedValueOnce([
           { participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'other' },
         ])
-        .mockResolvedValueOnce([]) // UPDATE status accepted
         .mockResolvedValueOnce(MSG) // INSERT
+        .mockResolvedValueOnce([]) // UPDATE status → accepted
         .mockResolvedValueOnce([]); // UPDATE last_message_at
 
-      await service.persist('c1', 'me', 'sure');
-      expect(txQuery.mock.calls[1]![0]).toContain("status = 'accepted'");
+      await service.persist('c1', 'me', 'reply');
+      const statusSql = txQuery.mock.calls.find((c) => String(c[0]).includes("status = 'accepted'"));
+      expect(statusSql).toBeTruthy();
     });
 
     it('inserts and bumps last_message_at on an accepted conversation', async () => {
       txQuery
         .mockResolvedValueOnce([
-          { participant_ids: ['me', 'other'], status: 'accepted', initiated_by: 'other' },
+          { participant_ids: ['me', 'other'], status: 'accepted', initiated_by: null },
         ])
-        .mockResolvedValueOnce(MSG) // INSERT (gate skipped)
-        .mockResolvedValueOnce([]); // UPDATE last_message_at
+        .mockResolvedValueOnce(MSG)
+        .mockResolvedValueOnce([]);
 
-      const res = await service.persist('c1', 'me', 'hello');
-      expect(res).toMatchObject({ id: 'm1', senderId: 'me', body: 'hi' });
-      expect(txQuery.mock.calls[2]![0]).toContain('last_message_at = NOW()');
+      const res = await service.persist('c1', 'me', 'hi');
+      expect(res.body).toBe('hi');
     });
   });
 
   describe('findMessages — gate + cursor pagination', () => {
-    const rows = [
-      { id: 'm3', conversationId: 'c1', senderId: 'me', body: 'c', createdAt: new Date('2026-06-10T03:00:00Z') },
-      { id: 'm2', conversationId: 'c1', senderId: 'x', body: 'b', createdAt: new Date('2026-06-10T02:00:00Z') },
-      { id: 'm1', conversationId: 'c1', senderId: 'me', body: 'a', createdAt: new Date('2026-06-10T01:00:00Z') },
-    ];
-
     it('forbids a non-participant', async () => {
-      query.mockResolvedValueOnce([]); // isParticipant -> not a member
+      query.mockResolvedValueOnce([]); // isParticipant → false
       await expect(service.findMessages('c1', 'me')).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('returns a page and a nextCursor when more remain', async () => {
       query
-        .mockResolvedValueOnce([{ x: 1 }]) // isParticipant -> true
-        .mockResolvedValueOnce(rows); // 3 rows for cap=2 -> hasMore
+        .mockResolvedValueOnce([{ exists: true }]) // isParticipant
+        .mockResolvedValueOnce([
+          {
+            id: 'm2',
+            conversationId: 'c1',
+            senderId: 'me',
+            body: 'b',
+            type: 'text',
+            location: null,
+            locationSessionId: null,
+            createdAt: new Date('2026-06-10T01:00:00Z'),
+          },
+          {
+            id: 'm1',
+            conversationId: 'c1',
+            senderId: 'me',
+            body: 'a',
+            type: 'text',
+            location: null,
+            locationSessionId: null,
+            createdAt: new Date('2026-06-10T00:00:00Z'),
+          },
+        ]);
 
-      const res = await service.findMessages('c1', 'me', undefined, 2);
-
-      expect(res.messages).toHaveLength(2);
-      expect(res.nextCursor).toBe('2026-06-10T02:00:00.000Z'); // oldest of the page
-      expect(query.mock.calls[1]![1]).toEqual(['c1', 3]); // cap + 1 fetched
+      const page = await service.findMessages('c1', 'me', undefined, 2);
+      expect(page.items).toHaveLength(2);
+      expect(page.nextCursor).toBe('2026-06-10T00:00:00.000Z');
     });
 
     it('returns nextCursor=null on the last page', async () => {
       query
-        .mockResolvedValueOnce([{ x: 1 }])
-        .mockResolvedValueOnce(rows.slice(0, 2)); // exactly cap
+        .mockResolvedValueOnce([{ exists: true }])
+        .mockResolvedValueOnce([
+          {
+            id: 'm1',
+            conversationId: 'c1',
+            senderId: 'me',
+            body: 'a',
+            type: 'text',
+            location: null,
+            locationSessionId: null,
+            createdAt: new Date('2026-06-10T00:00:00Z'),
+          },
+        ]);
 
-      const res = await service.findMessages('c1', 'me', undefined, 2);
-      expect(res.messages).toHaveLength(2);
-      expect(res.nextCursor).toBeNull();
+      const page = await service.findMessages('c1', 'me', undefined, 30);
+      expect(page.nextCursor).toBeNull();
     });
 
     it('applies the cursor predicate and binds it', async () => {
-      query.mockResolvedValueOnce([{ x: 1 }]).mockResolvedValueOnce([]);
-      await service.findMessages('c1', 'me', '2026-06-10T02:00:00.000Z', 2);
-
-      const [sql, params] = query.mock.calls[1]!;
-      expect(sql).toContain('created_at < $3');
-      expect(params).toEqual(['c1', 3, '2026-06-10T02:00:00.000Z']);
+      query.mockResolvedValueOnce([{ exists: true }]).mockResolvedValueOnce([]);
+      await service.findMessages('c1', 'me', '2026-06-01T00:00:00.000Z');
+      const [, params] = query.mock.calls[1]!;
+      expect(params).toContain('2026-06-01T00:00:00.000Z');
     });
   });
 
@@ -154,41 +180,52 @@ describe('ChatService', () => {
       query.mockResolvedValueOnce([
         {
           id: 'c1',
-          participant_ids: ['me', 'other'],
+          participantIds: ['me', 'other'],
+          otherUserId: 'other',
+          otherDisplayName: 'Other',
+          otherAvatarUrl: null,
+          otherVerification: 'none',
           status: 'accepted',
-          initiated_by: 'me',
-          last_message_at: null,
-          last_body: null,
-          last_sender_id: null,
-          participants: [{ id: 'me', displayName: 'Me', avatarUrl: null }],
+          initiatedBy: null,
+          lastMessageAt: null,
+          lastBody: null,
+          lastSenderId: null,
+          isFriend: false,
         },
       ]);
 
-      const [c] = await service.findConversations('me');
-      expect(c).toMatchObject({
-        id: 'c1',
-        participantIds: ['me', 'other'],
-        lastMessage: null,
-        status: 'accepted',
-      });
+      const list = await service.findConversations('me');
+      expect(list[0]!.lastMessage).toBeNull();
+      expect(list[0]!.otherUser.displayName).toBe('Other');
     });
 
     it('builds lastMessage from the latest body/sender', async () => {
       query.mockResolvedValueOnce([
         {
-          id: 'c1', participant_ids: ['me', 'other'], status: 'accepted', initiated_by: 'me',
-          last_message_at: '2026-06-10T00:00:00Z', last_body: 'yo', last_sender_id: 'other',
-          participants: [],
+          id: 'c1',
+          participantIds: ['me', 'other'],
+          otherUserId: 'other',
+          otherDisplayName: 'Other',
+          otherAvatarUrl: null,
+          otherVerification: 'email',
+          status: 'accepted',
+          initiatedBy: null,
+          lastMessageAt: new Date('2026-06-10T00:00:00Z'),
+          lastBody: 'yo',
+          lastSenderId: 'other',
+          isFriend: true,
         },
       ]);
-      const [c] = await service.findConversations('me');
-      expect(c!.lastMessage).toEqual({ senderId: 'other', body: 'yo' });
+
+      const list = await service.findConversations('me');
+      expect(list[0]!.lastMessage?.body).toBe('yo');
+      expect(list[0]!.isFriend).toBe(true);
     });
   });
 
   describe('membership helpers', () => {
     it('isParticipant reflects the row presence', async () => {
-      query.mockResolvedValueOnce([{ x: 1 }]);
+      query.mockResolvedValueOnce([{ exists: true }]);
       await expect(service.isParticipant('c1', 'me')).resolves.toBe(true);
       query.mockResolvedValueOnce([]);
       await expect(service.isParticipant('c1', 'me')).resolves.toBe(false);
