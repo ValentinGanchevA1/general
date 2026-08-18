@@ -99,7 +99,7 @@ describe('ChatService', () => {
       expect(statusCall).toBeTruthy();
     });
 
-    it('inserts and bumps last_message_at on an accepted conversation', async () => {
+    it('allows free messaging once the conversation is accepted', async () => {
       txQuery
         .mockResolvedValueOnce([
           { participant_ids: ['me', 'other'], status: 'accepted', initiated_by: null },
@@ -112,25 +112,25 @@ describe('ChatService', () => {
     });
   });
 
-  describe('findMessages — gate + cursor pagination', () => {
-    it('forbids a non-participant', async () => {
-      query.mockResolvedValueOnce([]); // isParticipant → false
+  describe('findMessages', () => {
+    it('forbids non-participants', async () => {
+      query.mockResolvedValueOnce([{ exists: false }]);
       await expect(service.findMessages('c1', 'me')).rejects.toBeInstanceOf(ForbiddenException);
     });
 
-    it('returns a page and a nextCursor when more remain', async () => {
+    it('pages newest-first and exposes nextCursor when more rows exist', async () => {
       query
-        .mockResolvedValueOnce([{ exists: true }]) // isParticipant
+        .mockResolvedValueOnce([{ exists: true }])
         .mockResolvedValueOnce([
           {
             id: 'm2',
             conversationId: 'c1',
-            senderId: 'me',
+            senderId: 'other',
             body: 'b',
             type: 'text',
             location: null,
             locationSessionId: null,
-            createdAt: new Date('2026-06-10T01:00:00Z'),
+            createdAt: new Date('2026-06-11T00:00:00Z'),
           },
           {
             id: 'm1',
@@ -142,10 +142,20 @@ describe('ChatService', () => {
             locationSessionId: null,
             createdAt: new Date('2026-06-10T00:00:00Z'),
           },
+          {
+            id: 'm0',
+            conversationId: 'c1',
+            senderId: 'other',
+            body: 'z',
+            type: 'text',
+            location: null,
+            locationSessionId: null,
+            createdAt: new Date('2026-06-09T00:00:00Z'),
+          },
         ]);
 
       const page = await service.findMessages('c1', 'me', undefined, 2);
-      expect(page.items).toHaveLength(2);
+      expect(page.messages).toHaveLength(2);
       expect(page.nextCursor).toBe('2026-06-10T00:00:00.000Z');
     });
 
@@ -182,40 +192,44 @@ describe('ChatService', () => {
       query.mockResolvedValueOnce([
         {
           id: 'c1',
-          participantIds: ['me', 'other'],
-          otherUserId: 'other',
-          otherDisplayName: 'Other',
-          otherAvatarUrl: null,
-          otherVerification: 'none',
+          participant_ids: ['me', 'other'],
           status: 'accepted',
-          initiatedBy: null,
-          lastMessageAt: null,
-          lastBody: null,
-          lastSenderId: null,
-          isFriend: false,
+          initiated_by: null,
+          last_message_at: null,
+          last_body: null,
+          last_sender_id: null,
+          is_friend: false,
+          peer_id: 'other',
+          peer_allows_online: true,
+          participants: [
+            { id: 'me', displayName: 'Me', avatarUrl: null },
+            { id: 'other', displayName: 'Other', avatarUrl: null },
+          ],
         },
       ]);
 
       const list = await service.findConversations('me');
       expect(list[0]!.lastMessage).toBeNull();
-      expect(list[0]!.otherUser.displayName).toBe('Other');
+      expect(list[0]!.participants.find((p) => p.id === 'other')?.displayName).toBe('Other');
     });
 
     it('builds lastMessage from the latest body/sender', async () => {
       query.mockResolvedValueOnce([
         {
           id: 'c1',
-          participantIds: ['me', 'other'],
-          otherUserId: 'other',
-          otherDisplayName: 'Other',
-          otherAvatarUrl: null,
-          otherVerification: 'email',
+          participant_ids: ['me', 'other'],
           status: 'accepted',
-          initiatedBy: null,
-          lastMessageAt: new Date('2026-06-10T00:00:00Z'),
-          lastBody: 'yo',
-          lastSenderId: 'other',
-          isFriend: true,
+          initiated_by: null,
+          last_message_at: '2026-06-10T00:00:00.000Z',
+          last_body: 'yo',
+          last_sender_id: 'other',
+          is_friend: true,
+          peer_id: 'other',
+          peer_allows_online: true,
+          participants: [
+            { id: 'me', displayName: 'Me', avatarUrl: null },
+            { id: 'other', displayName: 'Other', avatarUrl: null },
+          ],
         },
       ]);
 

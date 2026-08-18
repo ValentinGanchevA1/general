@@ -79,7 +79,7 @@ export function ProfileScreen(): React.JSX.Element {
   if (!derived) {
     return (
       <ProfileErrorState
-        message={error}
+        message={error ?? 'Could not load profile'}
         onRetry={() => void dispatch(fetchProfile())}
         onLogout={handleLogout}
       />
@@ -98,136 +98,98 @@ export function ProfileScreen(): React.JSX.Element {
     isPaid,
     showIdCta,
     displayName,
-    tierLabel,
   } = derived;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            onRefresh();
-            void dispatch(fetchPendingCount());
-          }}
-          tintColor={colors.primary}
+    <View style={styles.root}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
+        }
+      >
+        <ProfileHeaderPhoto
+          photos={photos}
+          mainPhoto={mainPhoto}
+          activeIndex={activePhotoIndex}
+          onIndexChange={setActivePhotoIndex}
+          displayName={displayName}
+          verification={p.verification}
+          idVerified={p.idVerified}
+          online={p.online}
+          age={p.age}
+          hometownCity={p.hometownCity}
+          hometownCountry={p.hometownCountry}
+          showAge={p.showAge}
+          showHometown={p.showHometown}
         />
-      }
-    >
-      <ProfileHeaderPhoto
-        photoUrl={mainPhoto ?? null}
-        displayName={displayName}
-        verificationPercent={verificationScore}
-        isVisibleOnMap={mapVisible}
-        isPaid={isPaid}
-        tierLabel={tierLabel}
-        photoCount={photos.length}
-        activePhotoIndex={activePhotoIndex}
-        onSelectPhoto={setActivePhotoIndex}
-        onPressSettings={() => openRootScreen(navigation, 'Settings')}
-        onPressVerificationBadge={() => openRootScreen(navigation, 'Verification')}
-        onPressPhoto={() => openRootScreen(navigation, 'Photos')}
-      />
 
-      <View style={styles.trustSection}>
+        <MapPresenceCard visible={mapVisible} onToggle={handleMapToggle} saving={saving} />
+
         <TrustStrip
-          chips={trustChips}
-          onChipPress={(id) => {
-            if (id === 'id' || id === 'percent') {
-              openRootScreen(
-                navigation,
-                p.idVerificationStatus === 'pending' ? 'VerificationId' : 'Verification',
-              );
-            }
-          }}
+          verificationScore={verificationScore}
+          badges={badges}
+          isPaid={isPaid}
+          trustChips={trustChips}
         />
-      </View>
 
-      <View style={styles.mapPresenceSection}>
-        <MapPresenceCard
-          isVisible={mapVisible}
-          saving={saving}
-          onToggle={handleMapToggle}
-          onViewPin={() =>
-            navigation.navigate('Main', { screen: 'Map', params: { focusMyPin: true } })
-          }
+        <ProfileBio bio={p.bio} />
+
+        {showIdCta ? (
+          <ProfileIdCta onPress={() => navigation.navigate('Verification')} />
+        ) : null}
+
+        <ProfileQuickActions
+          onEdit={() => navigation.navigate('ProfileEdit')}
+          onViewPin={() => openRootScreen(navigation, 'Map', { focusMyPin: true })}
+          onSettings={() => navigation.navigate('Settings')}
         />
-      </View>
 
-      {showIdCta ? (
-        <ProfileIdCta
-          status={p.idVerificationStatus}
-          onPress={() => openRootScreen(navigation, 'VerificationId')}
+        <ProfileFriendsCard
+          pendingCount={pendingCount}
+          onFriends={() => navigation.navigate('FriendsList')}
+          onRequests={() => navigation.navigate('FriendsList', { initialTab: 'requests' })}
         />
-      ) : null}
 
-      {p.bio ? <ProfileBio bio={p.bio} /> : null}
+        <ProfileActivityLinks
+          spendableXp={spendableXp}
+          challenges={challenges}
+          gamification={gamification}
+          onGifts={() => navigation.navigate('MyGifts')}
+          onAchievements={() => navigation.navigate('Achievements')}
+        />
 
-      <ProfileQuickActions
-        onEdit={() => openRootScreen(navigation, 'ProfileEdit')}
-        onPhotos={() => openRootScreen(navigation, 'Photos')}
-        onTrust={() => openRootScreen(navigation, 'Verification')}
-      />
+        <ProfilePhotosSection photos={photos} isSelf />
 
-      <ProfileFriendsCard
-        pendingCount={pendingCount}
-        onPress={() => openRootScreen(navigation, 'FriendsList')}
-      />
-
-      <ProfileActivityLinks
-        gamification={gamification ?? null}
-        challenges={challenges}
-        spendableXp={spendableXp}
-        onChallenges={() => openRootScreen(navigation, 'Challenges')}
-        onLeaderboard={() => openRootScreen(navigation, 'Leaderboard')}
-        onAchievements={() => openRootScreen(navigation, 'Achievements')}
-        onGifts={() => openRootScreen(navigation, 'GiftsInbox')}
-      />
-
-      <ProfilePhotosSection
-        photos={photos}
-        isSelf
-        activeIndex={activePhotoIndex}
-        onSelect={setActivePhotoIndex}
-        onManage={() => openRootScreen(navigation, 'Photos')}
-      />
-
-      {p.id ? (
         <View style={styles.section}>
-          <ProfileStoryline userId={p.id} isSelf />
+          <ProfileStoryline userId={p.id} />
         </View>
-      ) : null}
 
-      <ProfileTagsSection interests={interests} goals={goals} />
+        <ProfileTagsSection interests={interests} goals={goals} />
 
-      <ProfileAccountSection
-        email={p.email}
-        phone={p.phone}
-        emailVerified={!!badges.email}
-        phoneVerified={!!badges.phone}
-        onAddPhone={() => openRootScreen(navigation, 'Verification')}
-      />
+        <ProfileAccountSection
+          email={p.email}
+          phone={p.phone}
+          onEdit={() => navigation.navigate('ProfileEdit')}
+        />
 
-      <ProfileSocialSection
-        links={socialLinks}
-        onManage={() => openRootScreen(navigation, 'SocialLinking')}
-      />
+        <ProfileSocialSection links={socialLinks} />
 
-      <ProfileMenuSection
-        isPaid={isPaid}
-        onNavigate={(route) => openRootScreen(navigation, route)}
-        onLogout={handleLogout}
-      />
-    </ScrollView>
+        <ProfileMenuSection
+          onSettings={() => navigation.navigate('Settings')}
+          onLogout={handleLogout}
+        />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: spacing.xxl },
-  trustSection: { marginTop: spacing.md },
-  mapPresenceSection: { marginTop: spacing.sm },
-  section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl },
+  root: { flex: 1, backgroundColor: colors.bg },
+  scroll: { paddingBottom: spacing.xxl },
+  section: { paddingHorizontal: spacing.lg, marginTop: spacing.md },
 });
