@@ -94,8 +94,7 @@ class ReorderPhotosDto implements ReorderPhotosRequest {
 }
 
 class DeleteAccountDto implements DeleteAccountRequest {
-  @IsString()
-  @IsIn(['DELETE'])
+  @IsIn(['DELETE'], { message: "confirm must be the literal string 'DELETE'" })
   confirm!: 'DELETE';
 
   @IsOptional()
@@ -111,13 +110,18 @@ export class UsersController {
     private readonly s3: S3Service,
   ) {}
 
+  @Get('me')
+  async getMe(@CurrentUser('id') userId: string): Promise<UserProfile> {
+    return this.users.getProfile(userId);
+  }
+
   @Get('me/profile')
-  async getMyProfile(@CurrentUser('id') userId: string): Promise<UserProfile> {
+  async getProfile(@CurrentUser('id') userId: string): Promise<UserProfile> {
     return this.users.getProfile(userId);
   }
 
   @Patch('me/profile')
-  async updateMyProfile(
+  async updateProfile(
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateProfileDto,
   ): Promise<UserProfile> {
@@ -126,7 +130,7 @@ export class UsersController {
 
   @Delete('me')
   @HttpCode(204)
-  async deleteMe(
+  async deleteAccount(
     @CurrentUser('id') userId: string,
     @Body() dto: DeleteAccountDto,
   ): Promise<void> {
