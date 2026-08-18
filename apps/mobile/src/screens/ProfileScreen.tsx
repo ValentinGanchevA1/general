@@ -1,5 +1,12 @@
-import React, { useEffect } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -37,6 +44,7 @@ export function ProfileScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const { on } = useSocket();
   const pendingCount = useAppSelector((s) => s.friends.pendingCount);
+  const [mapPresenceOpen, setMapPresenceOpen] = useState(false);
   const {
     loading,
     error,
@@ -101,6 +109,7 @@ export function ProfileScreen(): React.JSX.Element {
   } = derived;
 
   return (
+    <>
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
@@ -121,6 +130,7 @@ export function ProfileScreen(): React.JSX.Element {
         onPressSettings={() => openRootScreen(navigation, 'Settings')}
         onPressVerificationBadge={() => openRootScreen(navigation, 'Verification')}
         onPressPhoto={() => openRootScreen(navigation, 'Photos')}
+        onPressVisibility={() => setMapPresenceOpen(true)}
       />
 
       <View style={styles.trustSection}>
@@ -144,17 +154,6 @@ export function ProfileScreen(): React.JSX.Element {
               );
             }
           }}
-        />
-      </View>
-
-      <View style={styles.mapPresenceSection}>
-        <MapPresenceCard
-          isVisible={mapVisible}
-          saving={saving}
-          onToggle={handleMapToggle}
-          onViewPin={() =>
-            navigation.navigate('Main', { screen: 'Map', params: { focusMyPin: true } })
-          }
         />
       </View>
 
@@ -223,6 +222,28 @@ export function ProfileScreen(): React.JSX.Element {
         onLogout={handleLogout}
       />
     </ScrollView>
+
+    <Modal
+      visible={mapPresenceOpen}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setMapPresenceOpen(false)}
+    >
+      <Pressable style={styles.modalBackdrop} onPress={() => setMapPresenceOpen(false)}>
+        <View style={styles.modalCardWrap}>
+          <MapPresenceCard
+            isVisible={mapVisible}
+            saving={saving}
+            onToggle={handleMapToggle}
+            onViewPin={() => {
+              setMapPresenceOpen(false);
+              navigation.navigate('Main', { screen: 'Map', params: { focusMyPin: true } });
+            }}
+          />
+        </View>
+      </Pressable>
+    </Modal>
+    </>
   );
 }
 
@@ -230,6 +251,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { paddingBottom: spacing.xxl },
   trustSection: { marginTop: spacing.md },
-  mapPresenceSection: { marginTop: spacing.sm },
   section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  modalCardWrap: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
 });
