@@ -1,7 +1,3 @@
-// apps/mobile/src/screens/SuggestionsScreen.tsx
-// People you may know — FoF, recent wave, recent chat.
-// Entry: FriendsList header / empty-state CTA.
-
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -49,9 +45,13 @@ export function SuggestionsScreen(): React.JSX.Element {
     setError(null);
     try {
       const data = await getJson<SuggestionCard[]>('/friends/suggestions?limit=20');
-      setItems(data);
-    } catch {
-      setError('Could not load suggestions.');
+      setItems(Array.isArray(data) ? data : []);
+    } catch (e) {
+      const msg =
+        e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string'
+          ? (e as { message: string }).message
+          : 'Could not load suggestions.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -119,76 +119,80 @@ export function SuggestionsScreen(): React.JSX.Element {
     ({ item }: { item: SuggestionCard }) => {
       const busy = busyIds.includes(item.userId);
       return (
-        <View style={S.row}>
-          <TouchableOpacity onPress={() => openProfile(item.userId)} accessibilityRole="button">
-            <Avatar uri={item.avatarUrl} name={item.displayName} size={44} />
-          </TouchableOpacity>
+        <View style={S.card}>
           <TouchableOpacity
-            style={S.rowBody}
+            style={S.cardMain}
             onPress={() => openProfile(item.userId)}
             accessibilityRole="button"
           >
-            <Text style={S.name} numberOfLines={1}>
-              {item.displayName}
-            </Text>
-            <Text style={S.meta} numberOfLines={1}>
-              {reasonLabel(item.reason, item.mutualFriendsCount)}
-            </Text>
+            <Avatar uri={item.avatarUrl} name={item.displayName} size={48} />
+            <View style={S.cardMeta}>
+              <Text style={S.name} numberOfLines={1}>
+                {item.displayName}
+              </Text>
+              <Text style={S.reason}>
+                {reasonLabel(item.reason, item.mutualFriendsCount)}
+              </Text>
+            </View>
           </TouchableOpacity>
           <View style={S.actions}>
             {!item.isFollowing ? (
               <TouchableOpacity
-                style={[S.secondaryBtn, busy && S.btnDisabled]}
-                disabled={busy}
+                style={S.btnSecondary}
                 onPress={() => void onFollow(item.userId)}
+                disabled={busy}
               >
                 {busy ? (
                   <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
-                  <Text style={S.secondaryBtnText}>Follow</Text>
+                  <Text style={S.btnSecondaryText}>Follow</Text>
                 )}
               </TouchableOpacity>
             ) : (
-              <View style={S.secondaryBtn}>
-                <Text style={S.secondaryBtnText}>Following</Text>
+              <View style={S.btnGhost}>
+                <Text style={S.btnGhostText}>Following</Text>
               </View>
             )}
-            {item.hasPendingOutgoing ? (
-              <View style={S.pendingChip}>
-                <Text style={S.pendingChipText}>Pending</Text>
-              </View>
-            ) : (
+            {!item.hasPendingOutgoing ? (
               <TouchableOpacity
-                style={[S.primaryBtn, busy && S.btnDisabled]}
-                disabled={busy}
+                style={S.btnPrimary}
                 onPress={() => void onAddFriend(item.userId)}
+                disabled={busy}
               >
-                <Text style={S.primaryBtnText}>Add</Text>
+                {busy ? (
+                  <ActivityIndicator size="small" color={colors.onPrimary} />
+                ) : (
+                  <Text style={S.btnPrimaryText}>Add</Text>
+                )}
               </TouchableOpacity>
+            ) : (
+              <View style={S.btnGhost}>
+                <Text style={S.btnGhostText}>Requested</Text>
+              </View>
             )}
           </View>
         </View>
       );
     },
-    [busyIds, openProfile, onFollow, onAddFriend],
+    [busyIds, onAddFriend, onFollow, openProfile],
   );
 
   return (
     <View style={S.root}>
-      <View style={S.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
-          <Text style={S.back}>‹ Back</Text>
+      <View style={S.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={S.back}>
+          <Text style={S.backText}>‹ Back</Text>
         </TouchableOpacity>
-        <Text style={S.heading}>Suggestions</Text>
-        <View style={S.spacer} />
+        <Text style={S.title}>Suggestions</Text>
+        <View style={S.back} />
       </View>
 
       {loading && items.length === 0 ? (
-        <View style={S.center}>
-          <ActivityIndicator color={colors.primary} size="large" />
+        <View style={S.centered}>
+          <ActivityIndicator color={colors.primary} />
         </View>
       ) : error && items.length === 0 ? (
-        <View style={S.center}>
+        <View style={S.centered}>
           <Text style={S.errorText}>{error}</Text>
           <TouchableOpacity style={S.retry} onPress={() => void load()}>
             <Text style={S.retryText}>Retry</Text>
@@ -197,8 +201,9 @@ export function SuggestionsScreen(): React.JSX.Element {
       ) : (
         <FlatList
           data={items}
-          keyExtractor={(item) => item.userId}
-          contentContainerStyle={S.listContent}
+          keyExtractor={(i) => i.userId}
+          renderItem={renderItem}
+          contentContainerStyle={S.list}
           refreshControl={
             <RefreshControl
               refreshing={loading && items.length > 0}
@@ -209,13 +214,12 @@ export function SuggestionsScreen(): React.JSX.Element {
           ListEmptyComponent={
             <View style={S.empty}>
               <Text style={S.emptyTitle}>No suggestions yet</Text>
-              <Text style={S.emptyHint}>
+              <Text style={S.emptyBody}>
                 Wave at people on the map, chat, or grow your friend graph — suggestions show up
                 here.
               </Text>
             </View>
           }
-          renderItem={renderItem}
         />
       )}
     </View>
@@ -224,84 +228,65 @@ export function SuggestionsScreen(): React.JSX.Element {
 
 const S = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  topBar: {
-    paddingTop: 52,
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.sm,
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingTop: 52,
+    paddingBottom: 12,
   },
-  back: { color: colors.primary, fontSize: 17, fontWeight: '600', width: 64 },
-  heading: { color: colors.textPrimary, fontSize: 17, fontWeight: '700' },
-  spacer: { width: 64 },
-
-  listContent: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: 40,
-    gap: 10,
+  back: { width: 72 },
+  backText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
+  title: { color: colors.textPrimary, fontSize: 17, fontWeight: '700' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  errorText: { color: colors.danger, marginBottom: 12, textAlign: 'center' },
+  retry: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: radius.md,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.surfaceRaised,
+  retryText: { color: colors.onPrimary, fontWeight: '700' },
+  list: { padding: spacing.xl, gap: 12, paddingBottom: 40 },
+  card: {
+    backgroundColor: colors.surface,
     borderRadius: radius.md,
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
+    gap: 12,
   },
-  rowBody: { flex: 1, minWidth: 0 },
-  name: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
-  meta: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
-
-  actions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  primaryBtn: {
+  cardMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  cardMeta: { flex: 1 },
+  name: { color: colors.textPrimary, fontWeight: '700', fontSize: fontSize.md },
+  reason: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  actions: { flexDirection: 'row', gap: 8 },
+  btnPrimary: {
+    flex: 1,
     backgroundColor: colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.sm,
-    minWidth: 56,
+    borderRadius: radius.md,
+    paddingVertical: 10,
     alignItems: 'center',
   },
-  primaryBtnText: { color: colors.onPrimary, fontWeight: '700', fontSize: 13 },
-  secondaryBtn: {
+  btnPrimaryText: { color: colors.onPrimary, fontWeight: '700' },
+  btnSecondary: {
+    flex: 1,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.borderStrong,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.sm,
-    minWidth: 72,
+  },
+  btnSecondaryText: { color: colors.primary, fontWeight: '700' },
+  btnGhost: {
+    flex: 1,
+    paddingVertical: 10,
     alignItems: 'center',
   },
-  secondaryBtnText: { color: colors.textSecondary, fontWeight: '600', fontSize: 13 },
-  pendingChip: {
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: radius.sm,
-  },
-  pendingChipText: { color: colors.textMuted, fontWeight: '600', fontSize: 13 },
-  btnDisabled: { opacity: 0.5 },
-
-  empty: { alignItems: 'center', paddingTop: 48, paddingHorizontal: 24 },
-  emptyTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '600' },
-  emptyHint: {
-    color: colors.textMuted,
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  errorText: { color: colors.danger, marginBottom: 12, textAlign: 'center' },
-  retry: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: radius.sm,
-  },
-  retryText: { color: colors.onPrimary, fontWeight: '700' },
+  btnGhostText: { color: colors.textMuted, fontWeight: '600' },
+  empty: { paddingTop: 48, alignItems: 'center', gap: 8 },
+  emptyTitle: { color: colors.textPrimary, fontWeight: '700', fontSize: 16 },
+  emptyBody: { color: colors.textMuted, textAlign: 'center', lineHeight: 20, paddingHorizontal: 12 },
 });

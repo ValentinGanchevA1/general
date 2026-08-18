@@ -39,6 +39,9 @@ function applyOptimistic(profile: UserProfile, req: UpdateProfileRequest): UserP
     ...(req.goals !== undefined ? { goals: req.goals } : {}),
     ...(req.interests !== undefined ? { interests: req.interests } : {}),
     ...(req.dateOfBirth !== undefined ? { dateOfBirth: req.dateOfBirth } as Partial<UserProfile> : {}),
+    ...(req.friendsSeeOnlineStatus !== undefined
+      ? { friendsSeeOnlineStatus: req.friendsSeeOnlineStatus }
+      : {}),
   };
 }
 

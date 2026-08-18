@@ -183,10 +183,11 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     setSocialBusy(true);
     try {
       await fn();
-      await loadRelationship();
     } catch (e) {
       Alert.alert('Could not update', errMessage(e, 'Try again in a moment.'));
     } finally {
+      // Always re-sync from server so optimistic UI cannot stick after a failed write.
+      await loadRelationship();
       setSocialBusy(false);
     }
   };
@@ -196,11 +197,39 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     const following = rel?.isFollowing === true;
     if (following) {
       void runSocial(async () => {
+        setRel((prev) =>
+          prev
+            ? {
+                ...prev,
+                isFollowing: false,
+                state:
+                  prev.state === 'following'
+                    ? 'none'
+                    : prev.state === 'mutual_follow'
+                      ? 'followed_by'
+                      : prev.state,
+              }
+            : prev,
+        );
         await deleteJson<{ following: false }>(`/friends/follow/${userId}`);
       });
       return;
     }
     void runSocial(async () => {
+      setRel((prev) =>
+        prev
+          ? {
+              ...prev,
+              isFollowing: true,
+              state:
+                prev.state === 'none' || prev.state === 'followed_by'
+                  ? prev.state === 'followed_by'
+                    ? 'mutual_follow'
+                    : 'following'
+                  : prev.state,
+            }
+          : prev,
+      );
       await postJson<{ userId: string }, { following: true }>('/friends/follow', { userId });
     });
   };
@@ -229,9 +258,20 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         return;
       default:
         void runSocial(async () => {
-          await postJson<{ userId: string }, { requestId: string }>('/friends/requests', {
-            userId,
-          });
+          setRel((prev) =>
+            prev
+              ? { ...prev, state: 'request_outgoing' as const, requestId: prev.requestId }
+              : prev,
+          );
+          const res = await postJson<{ userId: string }, { requestId: string }>(
+            '/friends/requests',
+            { userId },
+          );
+          setRel((prev) =>
+            prev
+              ? { ...prev, state: 'request_outgoing', requestId: res.requestId }
+              : prev,
+          );
         });
     }
   };

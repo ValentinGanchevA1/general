@@ -56,6 +56,8 @@ class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(40) hometownCountry?: string | null;
   @IsOptional() @IsBoolean() showAge?: boolean;
   @IsOptional() @IsBoolean() showHometown?: boolean;
+  /** When false, close friends cannot see online status. */
+  @IsOptional() @IsBoolean() friendsSeeOnlineStatus?: boolean;
 }
 
 class PresignedUrlDto {
