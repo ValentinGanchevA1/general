@@ -5,6 +5,8 @@
 // - Unfriend keeps mutual follows (friendship row only is deleted).
 // - Follow is independent of friendship: you can unfollow while still friends.
 
+import type { VerificationLevel } from './api';
+
 export type FriendRequestStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
 
 /** Close friend or follow edge as shown in list UIs. */
@@ -113,7 +115,8 @@ export interface InboxItem {
     id: string;
     displayName: string;
     avatarUrl: string | null;
-    verification?: { level?: string; status?: string } | null;
+    /** Present for waves; optional for friend_request / follow cards. */
+    verification?: VerificationLevel | null;
   };
   isMutual?: boolean;
   requestId?: string;
