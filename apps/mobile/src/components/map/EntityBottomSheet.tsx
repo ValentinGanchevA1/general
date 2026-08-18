@@ -21,7 +21,7 @@ import { deleteJson, getJson, postJson } from '@/api/client';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { Avatar } from '@/components/Avatar';
-import { colors } from '@/theme';
+import { colors, spacing } from '@/theme';
 
 function labelFor(value: string): string {
   return GOAL_OPTIONS.find((o) => o.value === value)?.label ?? value;
@@ -130,7 +130,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 
   return (
     <View style={styles.sheet}>
-      <View style={styles.handle} />
       <View style={styles.userHeader}>
         <TouchableOpacity
           style={styles.userHeaderTap}
@@ -155,7 +154,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
             {profile?.age != null ? (
               <Text style={styles.originLine}>{profile.age} years</Text>
             ) : null}
-            {(profile?.hometownCity || profile?.hometownCountry) ? (
+            {profile?.hometownCity || profile?.hometownCountry ? (
               <Text style={styles.originLine} numberOfLines={1}>
                 {[profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ')}
               </Text>
@@ -166,9 +165,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
               <Text style={[styles.onlineLabel, styles.offlineLabel]}>Offline</Text>
             )}
           </View>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={12}>
-          <Text style={styles.closeText}>✕</Text>
         </TouchableOpacity>
       </View>
 
@@ -251,6 +247,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   );
 }
 
+/** Content only — host mounts inside BottomSheetModal. */
 export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): React.JSX.Element {
   if (point.kind === 'user') {
     return (
@@ -272,15 +269,11 @@ export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): Re
 
   return (
     <View style={styles.sheet}>
-      <View style={styles.handle} />
       <View style={styles.header}>
         <View style={styles.titleGroup}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>{point.kind}</Text>
         </View>
-        <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={12}>
-          <Text style={styles.closeText}>✕</Text>
-        </TouchableOpacity>
       </View>
       <TouchableOpacity style={styles.viewBtn} onPress={onClose}>
         <Text style={styles.viewBtnText}>Close</Text>
@@ -291,24 +284,9 @@ export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): Re
 
 const styles = StyleSheet.create({
   sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.surfaceAlt,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 36,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
     gap: 14,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: colors.textFaint,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 4,
   },
   userHeaderTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   userHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -330,7 +308,6 @@ const styles = StyleSheet.create({
   },
   goalIcon: { fontSize: 13 },
   goalLabel: { color: colors.textSecondary, fontSize: 12 },
-  sharedHint: { color: colors.info, fontSize: 13 },
   statusBlock: {
     backgroundColor: colors.bg,
     borderRadius: 12,
@@ -384,10 +361,8 @@ const styles = StyleSheet.create({
   titleGroup: { flex: 1 },
   title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
   subtitle: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
-  closeBtn: { padding: 4 },
-  closeText: { color: colors.textSecondary, fontSize: 16 },
   viewBtn: {
-    marginTop: 14,
+    marginTop: 8,
     backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 12,

@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Dimensions,
   Image,
@@ -9,12 +10,21 @@ import {
   Text,
   View,
 } from 'react-native';
+import {
+  BottomSheetModal,
+  BottomSheetView,
+} from '@gorhom/bottom-sheet';
 import Video from 'react-native-video';
 
 import type { StoryCard, StoryReactionKind } from '@g88/shared';
 
 import { colors } from '@/theme';
 import { useAppDispatch } from '@/hooks/redux';
+import {
+  ActionSheetList,
+  sheetChrome,
+  useSheetBackdrop,
+} from '@/components/sheets';
 import { reactToStory, recordStoryView } from '../storiesSlice';
 import { useStoryProgress } from './useStoryProgress';
 
@@ -35,6 +45,9 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   const [muted, setMuted] = useState(false);
   const [chromeDimmed, setChromeDimmed] = useState(false);
   const chromeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const optionsRef = useRef<BottomSheetModal>(null);
+  const optionsSnap = useMemo(() => ['22%'], []);
+  const renderBackdrop = useSheetBackdrop(0.45);
 
   const current = stories[index];
   const storyId = current?.id;
@@ -43,7 +56,6 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   const goNext = useCallback(() => {
     setIndex((i) => {
       if (i < stories.length - 1) return i + 1;
-      // Side-effect outside the updater body
       void Promise.resolve().then(() => onClose());
       return i;
     });
@@ -62,7 +74,6 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
       onComplete: goNext,
     });
 
-  // Sync index when sheet opens on a different story
   useEffect(() => {
     if (!visible) return;
     void Promise.resolve().then(() => {
@@ -72,7 +83,6 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
     });
   }, [visible, initialIndex]);
 
-  // Record view + reset chrome dim on story change
   useEffect(() => {
     if (!visible || !storyId) return;
     void dispatch(recordStoryView(storyId));
@@ -108,6 +118,11 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
     else goNext();
   };
 
+  const openOptions = () => {
+    setHeld(true);
+    optionsRef.current?.present();
+  };
+
   if (!current) return null;
 
   const onReact = (kind: StoryReactionKind) => {
@@ -136,6 +151,9 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
                 <Text style={styles.mute}>{muted ? '🔇' : '🔊'}</Text>
               </Pressable>
             ) : null}
+            <Pressable onPress={openOptions} hitSlop={12} accessibilityLabel="Story options">
+              <Text style={styles.more}>···</Text>
+            </Pressable>
             <Pressable onPress={onClose} hitSlop={12}>
               <Text style={styles.close}>✕</Text>
             </Pressable>
@@ -203,6 +221,41 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
             {current.viewCount} views · {current.reactionCount} reacts
           </Text>
         </View>
+
+        <BottomSheetModal
+          ref={optionsRef}
+          snapPoints={optionsSnap}
+          enablePanDownToClose
+          enableDynamicSizing={false}
+          backdropComponent={renderBackdrop}
+          backgroundStyle={sheetChrome.background}
+          handleIndicatorStyle={sheetChrome.handle}
+          onDismiss={() => {
+            setHeld(false);
+            scheduleChromeDim();
+          }}
+        >
+          <BottomSheetView style={sheetChrome.content}>
+            <ActionSheetList
+              title="Story"
+              items={[
+                {
+                  key: 'report',
+                  label: 'Report story',
+                  icon: 'flag-outline',
+                  destructive: true,
+                  onPress: () => {
+                    optionsRef.current?.dismiss();
+                    Alert.alert(
+                      'Report submitted',
+                      'Thanks — we will review this story.',
+                    );
+                  },
+                },
+              ]}
+            />
+          </BottomSheetView>
+        </BottomSheetModal>
       </View>
     </Modal>
   );
@@ -268,6 +321,7 @@ const styles = StyleSheet.create({
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   author: { color: colors.textPrimary, fontWeight: '600', fontSize: 15 },
   mute: { fontSize: 18 },
+  more: { color: colors.textPrimary, fontSize: 18, letterSpacing: 1 },
   close: { color: colors.textPrimary, fontSize: 18 },
   chromeDim: { opacity: 0.35 },
   mediaWrap: { flex: 1, justifyContent: 'center' },
