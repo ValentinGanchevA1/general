@@ -87,3 +87,36 @@ export interface SuggestionCard {
 export interface FriendPendingCount {
   count: number;
 }
+
+/** Lightweight recent follower for the Interactions inbox. */
+export interface RecentFollowerCard {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  createdAt: string;
+  /** Viewer already follows this user back. */
+  isFollowingBack: boolean;
+}
+
+export interface RecentFollowersResponse {
+  items: RecentFollowerCard[];
+}
+
+/** Unified Interactions inbox item (client merge today; backend union later). */
+export type InboxItemType = 'wave' | 'friend_request' | 'follow' | 'story_reaction';
+
+export interface InboxItem {
+  id: string;
+  type: InboxItemType;
+  createdAt: string;
+  fromUser: {
+    id: string;
+    displayName: string;
+    avatarUrl: string | null;
+    verification?: { level?: string; status?: string } | null;
+  };
+  isMutual?: boolean;
+  requestId?: string;
+  isFollowingBack?: boolean;
+  reactionKind?: string;
+}

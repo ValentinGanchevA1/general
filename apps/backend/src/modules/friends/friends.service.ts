@@ -15,6 +15,8 @@ import type {
   FriendRequestCard,
   FriendRequestsPage,
   FriendsPage,
+  RecentFollowerCard,
+  RecentFollowersResponse,
   RelationshipSummary,
   RelationshipState,
 } from '@g88/shared';
@@ -433,6 +435,60 @@ export class FriendsService {
     limit = DEFAULT_LIMIT,
   ): Promise<FriendsPage> {
     return this.listFollowEdge(actorId, 'followers', cursor, limit);
+  }
+
+  /**
+   * Recent inbound follows for the Interactions inbox.
+   * Window defaults to 14 days; blocks filtered; includes isFollowingBack.
+   */
+  async listRecentFollowers(
+    actorId: string,
+    sinceDays = 14,
+    limit = DEFAULT_LIMIT,
+  ): Promise<RecentFollowersResponse> {
+    const take = Math.min(Math.max(limit, 1), 50);
+    const days = Math.min(Math.max(sinceDays, 1), 90);
+
+    const rows = await this.db.query<
+      Array<{
+        user_id: string;
+        display_name: string;
+        avatar_url: string | null;
+        created_at: Date;
+        is_following_back: boolean;
+      }>
+    >(
+      `SELECT u.id AS user_id,
+              u.display_name,
+              u.avatar_url,
+              f.created_at,
+              EXISTS (
+                SELECT 1 FROM follows fl
+                 WHERE fl.follower_id = $1 AND fl.followee_id = u.id
+              ) AS is_following_back
+         FROM follows f
+         JOIN users u ON u.id = f.follower_id AND u.deleted_at IS NULL
+        WHERE f.followee_id = $1
+          AND f.created_at > NOW() - ($2::int * INTERVAL '1 day')
+          AND NOT EXISTS (
+            SELECT 1 FROM blocks b
+             WHERE (b.blocker_id = $1 AND b.blocked_id = u.id)
+                OR (b.blocker_id = u.id AND b.blocked_id = $1)
+          )
+        ORDER BY f.created_at DESC
+        LIMIT $3`,
+      [actorId, days, take],
+    );
+
+    const items: RecentFollowerCard[] = rows.map((r) => ({
+      userId: r.user_id,
+      displayName: r.display_name,
+      avatarUrl: r.avatar_url,
+      createdAt: r.created_at.toISOString(),
+      isFollowingBack: r.is_following_back,
+    }));
+
+    return { items };
   }
 
   async listPendingIncoming(
