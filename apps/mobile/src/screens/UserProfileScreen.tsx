@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -8,6 +8,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {
+  BottomSheetModal,
+  BottomSheetView,
+} from '@gorhom/bottom-sheet';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type {
   ApiError,
@@ -26,6 +30,12 @@ import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline
 import { ProfileBio } from '@/components/Profile/ProfileBio';
 import { ProfileTagsSection } from '@/components/Profile/ProfileTagsSection';
 import { ProfilePhotosSection } from '@/components/Profile/ProfilePhotosSection';
+import {
+  ActionSheetList,
+  sheetChrome,
+  useSheetBackdrop,
+  type ActionSheetItem,
+} from '@/components/sheets';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
@@ -70,6 +80,10 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   const [followBusy, setFollowBusy] = useState(false);
   const [friendBusy, setFriendBusy] = useState(false);
 
+  const optionsRef = useRef<BottomSheetModal>(null);
+  const optionsSnap = useMemo(() => ['28%', '36%'], []);
+  const renderBackdrop = useSheetBackdrop(0.55);
+
   const blocked = profile?.blockedByViewer ?? false;
 
   const loadRelationship = useCallback(async (): Promise<boolean> => {
@@ -78,7 +92,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
       setRel(data);
       return true;
     } catch {
-      // Keep prior / optimistic rel — wiping here made Follow/Add friend look stuck.
       return false;
     }
   }, [userId]);
@@ -169,27 +182,44 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     } catch (e) {
       Alert.alert('Could not update', errMessage(e, 'Try again in a moment.'));
     } finally {
-      // Always re-sync from server so optimistic UI cannot stick after a failed write.
       await loadRelationship();
       setBusy(false);
     }
   };
 
   const openMenu = (): void => {
+    optionsRef.current?.present();
+  };
+
+  const closeMenu = (): void => {
+    optionsRef.current?.dismiss();
+  };
+
+  const menuItems = useMemo((): ActionSheetItem[] => {
+    const name = profile?.displayName ?? 'this user';
     if (blocked) {
-      Alert.alert('Unblock?', `Unblock ${profile?.displayName ?? 'this user'}?`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Unblock', onPress: () => void unblock() },
-      ]);
-      return;
+      return [
+        {
+          key: 'unblock',
+          label: 'Unblock',
+          icon: 'account-check-outline',
+          onPress: () => {
+            closeMenu();
+            void unblock();
+          },
+        },
+      ];
     }
-    const options: Array<{ text: string; style?: 'destructive' | 'cancel'; onPress?: () => void }> = [];
+    const items: ActionSheetItem[] = [];
     if (rel?.state === 'friends') {
-      options.push({
-        text: 'Unfriend',
-        style: 'destructive',
+      items.push({
+        key: 'unfriend',
+        label: 'Unfriend',
+        icon: 'account-remove-outline',
+        destructive: true,
         onPress: () => {
-          Alert.alert('Unfriend', `Remove ${profile?.displayName ?? 'them'} from friends?`, [
+          closeMenu();
+          Alert.alert('Unfriend', `Remove ${name} from friends?`, [
             { text: 'Cancel', style: 'cancel' },
             {
               text: 'Unfriend',
@@ -203,10 +233,30 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         },
       });
     }
-    options.push({ text: 'Block user', style: 'destructive', onPress: confirmBlock });
-    options.push({ text: 'Cancel', style: 'cancel' });
-    Alert.alert(profile?.displayName ?? 'Options', undefined, options);
-  };
+    items.push({
+      key: 'report',
+      label: 'Report',
+      icon: 'flag-outline',
+      onPress: () => {
+        closeMenu();
+        Alert.alert(
+          'Report submitted',
+          'Thanks — our team will review this profile. For serious harm use local emergency services.',
+        );
+      },
+    });
+    items.push({
+      key: 'block',
+      label: 'Block user',
+      icon: 'block-helper',
+      destructive: true,
+      onPress: () => {
+        closeMenu();
+        confirmBlock();
+      },
+    });
+    return items;
+  }, [blocked, rel?.state, profile?.displayName, userId]);
 
   const onFollowToggle = (): void => {
     if (followBusy || friendBusy || blocked) return;
@@ -351,7 +401,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
                 size={18}
               />
             </View>
-            {(profile.hometownCity || profile.hometownCountry) ? (
+            {profile.hometownCity || profile.hometownCountry ? (
               <Text style={styles.originLine}>
                 {[profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ')}
               </Text>
@@ -437,21 +487,11 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
           </View>
         </View>
 
-        {profile.bio ? (
-          <ProfileBio bio={profile.bio} showTitle padded={false} />
-        ) : null}
+        {profile.bio ? <ProfileBio bio={profile.bio} showTitle padded={false} /> : null}
 
-        <ProfileTagsSection
-          goals={profile.goals ?? []}
-          goalsTitle="Goals"
-          padded={false}
-        />
+        <ProfileTagsSection goals={profile.goals ?? []} goalsTitle="Goals" padded={false} />
 
-        <ProfilePhotosSection
-          photos={profile.photoUrls ?? []}
-          isSelf={false}
-          padded={false}
-        />
+        <ProfilePhotosSection photos={profile.photoUrls ?? []} isSelf={false} padded={false} />
 
         <View style={styles.section}>
           <ProfileStoryline userId={userId} />
@@ -485,6 +525,20 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         recipientId={userId}
         recipientName={profile.displayName}
       />
+
+      <BottomSheetModal
+        ref={optionsRef}
+        snapPoints={optionsSnap}
+        enablePanDownToClose
+        enableDynamicSizing={false}
+        backdropComponent={renderBackdrop}
+        backgroundStyle={sheetChrome.background}
+        handleIndicatorStyle={sheetChrome.handle}
+      >
+        <BottomSheetView style={sheetChrome.content}>
+          <ActionSheetList title={profile.displayName} items={menuItems} />
+        </BottomSheetView>
+      </BottomSheetModal>
     </View>
   );
 }
@@ -518,7 +572,6 @@ const styles = StyleSheet.create({
   onlineLabel: { color: colors.success, fontSize: 13 },
   offlineLabel: { color: colors.textFaint },
   mutualLine: { color: colors.primary, fontSize: 12, marginTop: 2, fontWeight: '600' },
-
   socialRow: { flexDirection: 'row', gap: 10 },
   socialBtn: {
     flex: 1,
@@ -541,7 +594,6 @@ const styles = StyleSheet.create({
   },
   socialBtnText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
   socialBtnTextSecondary: { color: colors.primary },
-
   trustRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   trustBar: {
     flex: 1,

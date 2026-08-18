@@ -11,6 +11,10 @@ import MapView, {
   PROVIDER_GOOGLE,
   type Region,
 } from 'react-native-maps';
+import {
+  BottomSheetModal,
+  BottomSheetView,
+} from '@gorhom/bottom-sheet';
 
 import type {
   ApiError,
@@ -50,6 +54,7 @@ import { colors } from '@/theme';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
 import { MapCoachMarks } from '@/components/map/MapCoachMarks';
 import { MapChrome } from '@/components/map/MapChrome';
+import { sheetChrome, useSheetBackdrop } from '@/components/sheets';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
@@ -62,6 +67,9 @@ export function MapScreen(): React.JSX.Element {
   const [selected, setSelected] = useState<EntityPoint | null>(null);
   const [waving, setWaving] = useState<string | null>(null);
   const mapRef = useRef<MapView>(null);
+  const entitySheetRef = useRef<BottomSheetModal>(null);
+  const entitySnapPoints = useMemo(() => ['42%', '58%'], []);
+  const renderBackdrop = useSheetBackdrop(0.5);
   const { unreadCount: interactionUnread } = useReceivedInteractions();
   const focusMyPin = route.params?.focusMyPin === true;
 
@@ -73,14 +81,23 @@ export function MapScreen(): React.JSX.Element {
   const points = data?.points ?? EMPTY_POINTS;
 
   const onCloseSheet = useCallback(() => {
+    entitySheetRef.current?.dismiss();
     setSelected(null);
   }, []);
+
+  // Present / dismiss when selection changes.
+  useEffect(() => {
+    if (selected) {
+      entitySheetRef.current?.present();
+    } else {
+      entitySheetRef.current?.dismiss();
+    }
+  }, [selected]);
 
   useEffect(() => {
     dispatch(setPoints(points));
   }, [points, dispatch]);
 
-  // Warm disk cache for faces currently on the map (offline-friendly re-open).
   useEffect(() => {
     const uris: Array<string | null> = [];
     for (const p of points) {
@@ -91,7 +108,6 @@ export function MapScreen(): React.JSX.Element {
     prefetchAvatars(uris);
   }, [points]);
 
-  // Initial centre when we first get GPS and the user has not panned yet.
   useEffect(() => {
     if (!myCoords || region || focusMyPin) return;
     mapRef.current?.animateToRegion(
@@ -105,7 +121,6 @@ export function MapScreen(): React.JSX.Element {
     );
   }, [myCoords, region, focusMyPin]);
 
-  // Profile → "View my pin on map": force-centre on the user once GPS is ready, then clear the flag.
   useFocusEffect(
     useCallback(() => {
       if (!focusMyPin || !myCoords) return;
@@ -118,7 +133,6 @@ export function MapScreen(): React.JSX.Element {
         },
         450,
       );
-      // Clear so a later tab switch does not re-fire.
       navigation.setParams({ focusMyPin: undefined });
     }, [focusMyPin, myCoords, navigation]),
   );
@@ -137,8 +151,6 @@ export function MapScreen(): React.JSX.Element {
     }, 30_000);
     return () => clearInterval(t);
   }, [myCoords, sendPresence]);
-
-  // wave:received + gift:received → AchievementToastHost (non-blocking global queue)
 
   useEffect(() => {
     if (!viewport) return;
@@ -233,6 +245,8 @@ export function MapScreen(): React.JSX.Element {
     return false;
   }, [nearestUserId, onWave, navigation]);
 
+  const sheetOpen = selected != null;
+
   return (
     <View style={styles.root}>
       <ErrorBoundary fallback={<MapUnavailableFallback />}>
@@ -275,26 +289,16 @@ export function MapScreen(): React.JSX.Element {
       )}
 
       <MapChrome
-        sheetOpen={selected != null}
+        sheetOpen={sheetOpen}
         interactionUnread={interactionUnread}
         onPressInteractions={() => openRootScreen(navigation, 'Interactions')}
       />
 
-      {!selected && (
+      {!sheetOpen && (
         <EventsRail location={region ? { lat: region.latitude, lng: region.longitude } : myCoords} />
       )}
 
-      {selected && (
-        <EntityBottomSheet
-          point={selected}
-          waving={selected.kind === 'user' && waving === selected.id}
-          onClose={onCloseSheet}
-          {...(selected.kind === 'user' && { onWave: onSheetWavePress })}
-        />
-      )}
-
-      {/* FAB maximum bottom — no EventsRail lift. Hide while entity sheet open. */}
-      {!selected && (
+      {!sheetOpen && (
         <ContextualFab
           zoom={zoom}
           points={points}
@@ -304,8 +308,29 @@ export function MapScreen(): React.JSX.Element {
         />
       )}
 
-      {/* First-session coach: people → wave → create. Once dismissed, never again. */}
-      {!selected && <MapCoachMarks mapReady={region != null} />}
+      {!sheetOpen && <MapCoachMarks mapReady={region != null} />}
+
+      <BottomSheetModal
+        ref={entitySheetRef}
+        snapPoints={entitySnapPoints}
+        enablePanDownToClose
+        enableDynamicSizing={false}
+        backdropComponent={renderBackdrop}
+        backgroundStyle={sheetChrome.background}
+        handleIndicatorStyle={sheetChrome.handle}
+        onDismiss={() => setSelected(null)}
+      >
+        <BottomSheetView style={sheetChrome.content}>
+          {selected ? (
+            <EntityBottomSheet
+              point={selected}
+              waving={selected.kind === 'user' && waving === selected.id}
+              onClose={onCloseSheet}
+              {...(selected.kind === 'user' && { onWave: onSheetWavePress })}
+            />
+          ) : null}
+        </BottomSheetView>
+      </BottomSheetModal>
     </View>
   );
 }
