@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,14 +11,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { deleteAccount, logout } from '@/features/auth/authSlice';
-import { updateProfile } from '@/features/profile/profileSlice';
+import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
 
 export function SettingsScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
@@ -34,6 +34,14 @@ export function SettingsScreen(): React.JSX.Element {
   const [deletePassword, setDeletePassword] = useState('');
   const isVisible = profile?.visibility !== 'private';
   const friendsSeeOnline = profile?.friendsSeeOnlineStatus !== false;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!profile) {
+        void dispatch(fetchProfile());
+      }
+    }, [dispatch, profile]),
+  );
 
   const emailVerified = profile != null && profile.verification !== 'none';
 
