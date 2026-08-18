@@ -23,7 +23,6 @@ export function SettingsScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NativeStackNavigationProp<AccountStackParamList>>();
   const profile = useAppSelector((s) => s.profile.profile);
-  const { loading } = useAppSelector((s) => s.profile);
 
   const authError = useAppSelector((s) => s.auth.error);
   const authLoading = useAppSelector((s) => s.auth.loading);
@@ -76,14 +75,6 @@ export function SettingsScreen(): React.JSX.Element {
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Icon name="chevron-left" size={28} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
-        <View style={styles.back} />
-      </View>
-
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Discovery</Text>
@@ -96,7 +87,7 @@ export function SettingsScreen(): React.JSX.Element {
                   : 'Hidden from discovery — you can still browse'}
               </Text>
             </View>
-            {toggling || loading ? (
+            {toggling ? (
               <ActivityIndicator color="#00d4ff" />
             ) : (
               <Switch
@@ -109,14 +100,14 @@ export function SettingsScreen(): React.JSX.Element {
           </View>
           <View style={[styles.row, styles.rowSpaced]}>
             <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Friends can see when I\'m online</Text>
+              <Text style={styles.rowLabel}>Friends can see when I am online</Text>
               <Text style={styles.rowSub}>
                 {friendsSeeOnline
                   ? 'Close friends see you as online in chat and friends list'
                   : 'Hidden from friends — you still appear in lists without a green dot'}
               </Text>
             </View>
-            {togglingOnline || loading ? (
+            {togglingOnline ? (
               <ActivityIndicator color="#00d4ff" />
             ) : (
               <Switch
