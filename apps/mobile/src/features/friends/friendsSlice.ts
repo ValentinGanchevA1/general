@@ -167,7 +167,7 @@ const friendsSlice = createSlice({
         if (tab === 'requests') {
           const items = (page as FriendRequestsPage).items;
           state.requests.items = append ? [...state.requests.items, ...items] : items;
-          if (!append) state.pendingCount = items.length;
+          // Badge must stay on total pending (GET /count or WS), not page length.
         } else {
           const items = (page as FriendsPage).items;
           const target = state[tab];
