@@ -28,8 +28,8 @@ export function useInboxInteractions(): {
       ]);
 
       const mapped: InboxItem[] = [
-        ...waves.items.map(
-          (w): InboxItem => ({
+        ...waves.items.map((w): InboxItem => {
+          const base: InboxItem = {
             id: `wave:${w.id}`,
             type: w.type === 'wave' ? 'wave' : 'story_reaction',
             createdAt: w.createdAt,
@@ -40,9 +40,13 @@ export function useInboxInteractions(): {
               verification: w.fromUser.verification ?? null,
             },
             isMutual: w.isMutual,
-            reactionKind: w.reactionKind,
-          }),
-        ),
+          };
+          // exactOptionalPropertyTypes: only set when defined (never undefined)
+          if (w.reactionKind != null) {
+            base.reactionKind = w.reactionKind;
+          }
+          return base;
+        }),
         ...requests.items.map(
           (r): InboxItem => ({
             id: `fr:${r.id}`,
