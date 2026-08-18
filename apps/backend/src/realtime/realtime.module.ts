@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { RealtimeGateway } from './realtime.gateway';
 import { WsJwtGuard } from './ws-jwt.guard';
 import { LocationShareSweepService } from './location-share.sweep';
@@ -16,7 +16,8 @@ import { FriendsModule } from '../modules/friends/friends.module';
     ChatModule,
     NotificationsModule,
     ChallengesModule,
-    FriendsModule,
+    // Bidirectional: FriendsNotifyService → RealtimeGateway; gateway → FriendsService (presence).
+    forwardRef(() => FriendsModule),
   ],
   providers: [RealtimeGateway, WsJwtGuard, LocationShareSweepService],
   exports: [RealtimeGateway],
