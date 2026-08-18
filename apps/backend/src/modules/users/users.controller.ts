@@ -56,6 +56,8 @@ class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(40) hometownCountry?: string | null;
   @IsOptional() @IsBoolean() showAge?: boolean;
   @IsOptional() @IsBoolean() showHometown?: boolean;
+  /** When false, close friends cannot see online status. */
+  @IsOptional() @IsBoolean() friendsSeeOnlineStatus?: boolean;
 }
 
 class PresignedUrlDto {
@@ -92,7 +94,8 @@ class ReorderPhotosDto implements ReorderPhotosRequest {
 }
 
 class DeleteAccountDto implements DeleteAccountRequest {
-  @IsIn(['DELETE'], { message: "confirm must be the literal string 'DELETE'" })
+  @IsString()
+  @IsIn(['DELETE'])
   confirm!: 'DELETE';
 
   @IsOptional()
@@ -108,18 +111,13 @@ export class UsersController {
     private readonly s3: S3Service,
   ) {}
 
-  @Get('me')
-  async getMe(@CurrentUser('id') userId: string): Promise<UserProfile> {
-    return this.users.getProfile(userId);
-  }
-
   @Get('me/profile')
-  async getProfile(@CurrentUser('id') userId: string): Promise<UserProfile> {
+  async getMyProfile(@CurrentUser('id') userId: string): Promise<UserProfile> {
     return this.users.getProfile(userId);
   }
 
   @Patch('me/profile')
-  async updateProfile(
+  async updateMyProfile(
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateProfileDto,
   ): Promise<UserProfile> {
@@ -128,7 +126,7 @@ export class UsersController {
 
   @Delete('me')
   @HttpCode(204)
-  async deleteAccount(
+  async deleteMe(
     @CurrentUser('id') userId: string,
     @Body() dto: DeleteAccountDto,
   ): Promise<void> {
