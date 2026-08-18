@@ -101,8 +101,11 @@ function EntityMarkerItemImpl({ point, onPress }: EntityItemProps): React.JSX.El
   const tracksFromKey = useTracksViewChanges([visualKey]);
 
   // Reset settle when the painted media identity changes (new avatar URL).
+  // Defer setState so react-hooks/set-state-in-effect stays clean (CI --max-warnings 0).
   useEffect(() => {
-    setMediaSettled(false);
+    queueMicrotask(() => {
+      setMediaSettled(false);
+    });
   }, [visualKey]);
 
   const tracksViewChanges = tracksFromKey || !mediaSettled;

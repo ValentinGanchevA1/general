@@ -79,6 +79,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   const [blocking, setBlocking] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
   const [friendBusy, setFriendBusy] = useState(false);
+  const [menuItems, setMenuItems] = useState<ActionSheetItem[]>([]);
 
   const optionsRef = useRef<BottomSheetModal>(null);
   const optionsSnap = useMemo(() => ['28%', '36%'], []);
@@ -187,76 +188,77 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     }
   };
 
+  /** Build sheet actions in the press handler so refs are not read during render. */
   const openMenu = (): void => {
-    optionsRef.current?.present();
-  };
-
-  const closeMenu = (): void => {
-    optionsRef.current?.dismiss();
-  };
-
-  const menuItems = useMemo((): ActionSheetItem[] => {
     const name = profile?.displayName ?? 'this user';
+    const dismiss = (): void => {
+      optionsRef.current?.dismiss();
+    };
+
+    let items: ActionSheetItem[];
     if (blocked) {
-      return [
+      items = [
         {
           key: 'unblock',
           label: 'Unblock',
           icon: 'account-check-outline',
           onPress: () => {
-            closeMenu();
+            dismiss();
             void unblock();
           },
         },
       ];
-    }
-    const items: ActionSheetItem[] = [];
-    if (rel?.state === 'friends') {
+    } else {
+      items = [];
+      if (rel?.state === 'friends') {
+        items.push({
+          key: 'unfriend',
+          label: 'Unfriend',
+          icon: 'account-remove-outline',
+          destructive: true,
+          onPress: () => {
+            dismiss();
+            Alert.alert('Unfriend', `Remove ${name} from friends?`, [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Unfriend',
+                style: 'destructive',
+                onPress: () =>
+                  void runSocial(async () => {
+                    await deleteJson<{ friends: false }>(`/friends/${userId}`);
+                  }, setFriendBusy),
+              },
+            ]);
+          },
+        });
+      }
       items.push({
-        key: 'unfriend',
-        label: 'Unfriend',
-        icon: 'account-remove-outline',
+        key: 'report',
+        label: 'Report',
+        icon: 'flag-outline',
+        onPress: () => {
+          dismiss();
+          Alert.alert(
+            'Report submitted',
+            'Thanks — our team will review this profile. For serious harm use local emergency services.',
+          );
+        },
+      });
+      items.push({
+        key: 'block',
+        label: 'Block user',
+        icon: 'block-helper',
         destructive: true,
         onPress: () => {
-          closeMenu();
-          Alert.alert('Unfriend', `Remove ${name} from friends?`, [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Unfriend',
-              style: 'destructive',
-              onPress: () =>
-                void runSocial(async () => {
-                  await deleteJson<{ friends: false }>(`/friends/${userId}`);
-                }, setFriendBusy),
-            },
-          ]);
+          dismiss();
+          confirmBlock();
         },
       });
     }
-    items.push({
-      key: 'report',
-      label: 'Report',
-      icon: 'flag-outline',
-      onPress: () => {
-        closeMenu();
-        Alert.alert(
-          'Report submitted',
-          'Thanks — our team will review this profile. For serious harm use local emergency services.',
-        );
-      },
-    });
-    items.push({
-      key: 'block',
-      label: 'Block user',
-      icon: 'block-helper',
-      destructive: true,
-      onPress: () => {
-        closeMenu();
-        confirmBlock();
-      },
-    });
-    return items;
-  }, [blocked, rel?.state, profile?.displayName, userId]);
+
+    setMenuItems(items);
+    optionsRef.current?.present();
+  };
 
   const onFollowToggle = (): void => {
     if (followBusy || friendBusy || blocked) return;
