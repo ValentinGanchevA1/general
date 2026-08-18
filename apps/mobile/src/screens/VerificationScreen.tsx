@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -32,16 +32,12 @@ export function VerificationScreen(): React.JSX.Element {
   const route = useRoute<RouteProp<AccountStackParamList, 'Verification'>>();
   const dispatch = useAppDispatch();
   const [step, setStep] = useState<Step>('phone');
+  // Initialized from route params — no effect needed (avoids set-state-in-effect).
   const [phone, setPhone] = useState(route.params?.initialPhone ?? '');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [devHint, setDevHint] = useState(false);
-
-  useEffect(() => {
-    const initial = route.params?.initialPhone?.trim();
-    if (initial) setPhone(initial);
-  }, [route.params?.initialPhone]);
 
   const start = async (): Promise<void> => {
     setBusy(true);
