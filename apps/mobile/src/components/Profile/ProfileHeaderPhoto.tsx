@@ -27,6 +27,8 @@ interface ProfileHeaderPhotoProps {
   onPressVerificationBadge?: () => void;
   onPressSettings?: () => void;
   onSelectPhoto?: (index: number) => void;
+  /** Opens map visibility sheet (How others see you). */
+  onPressVisibility?: () => void;
 }
 
 export function ProfileHeaderPhoto({
@@ -43,6 +45,7 @@ export function ProfileHeaderPhoto({
   onPressVerificationBadge,
   onPressSettings,
   onSelectPhoto,
+  onPressVisibility,
 }: ProfileHeaderPhotoProps): React.JSX.Element {
   return (
     <Pressable onPress={onPressPhoto} style={styles.container}>
@@ -105,7 +108,18 @@ export function ProfileHeaderPhoto({
               {displayName}
             </Text>
             {handle ? <Text style={styles.handle}>@{handle}</Text> : null}
-            <View style={styles.visibilityRow}>
+            <Pressable
+              onPress={onPressVisibility}
+              disabled={!onPressVisibility}
+              style={styles.visibilityRow}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isVisibleOnMap
+                  ? 'Visible on map. Tap to change how others see you.'
+                  : 'Hidden from map. Tap to change how others see you.'
+              }
+            >
               <View
                 style={[
                   styles.visibilityDot,
@@ -115,7 +129,10 @@ export function ProfileHeaderPhoto({
               <Text style={styles.visibilityText}>
                 {isVisibleOnMap ? 'Visible on map' : 'Hidden from map'}
               </Text>
-            </View>
+              {onPressVisibility ? (
+                <Icon name="chevron-down" size={14} color={colors.textMuted} />
+              ) : null}
+            </Pressable>
           </View>
 
           <Pressable
