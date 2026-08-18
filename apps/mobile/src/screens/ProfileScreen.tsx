@@ -127,6 +127,16 @@ export function ProfileScreen(): React.JSX.Element {
         <TrustStrip
           chips={trustChips}
           onChipPress={(id) => {
+            if (id === 'email') {
+              openRootScreen(navigation, 'EmailVerification');
+              return;
+            }
+            if (id === 'phone') {
+              openRootScreen(navigation, 'Verification', {
+                initialPhone: p.phone ?? undefined,
+              });
+              return;
+            }
             if (id === 'id' || id === 'percent') {
               openRootScreen(
                 navigation,

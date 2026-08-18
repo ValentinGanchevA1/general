@@ -56,6 +56,7 @@ import { pingGamification } from '@/features/gamification/useGamification';
 import { AchievementToastHost } from '@/components/AchievementToast';
 import { navigationRef } from './navigationRef';
 import { openViaRef } from './openRootScreen';
+import { takePendingPhoneVerify } from '@/services/pendingPhone';
 import type {
   AccountStackParamList,
   CommerceStackParamList,
@@ -242,6 +243,23 @@ export function AppNavigator(): React.JSX.Element {
     }
     if (!user) prevUserRef.current = null;
   }, [user]);
+
+  // After register: optional phone from AuthScreen → open Verify phone once.
+  useEffect(() => {
+    if (!user || restoring) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      void (async () => {
+        const phone = await takePendingPhoneVerify();
+        if (cancelled || !phone) return;
+        openViaRef('Verification', { initialPhone: phone });
+      })();
+    }, 700);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [user, restoring]);
 
   // Loading screen while we check for a stored session. Gated on `restoring`
   // (not the shared auth `loading`) so an in-progress login/register never

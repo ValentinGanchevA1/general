@@ -12,6 +12,7 @@ import {
 
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { login, register, clearError, loginWithGoogle } from '@/features/auth/authSlice';
+import { setPendingPhoneVerify } from '@/services/pendingPhone';
 
 export function AuthScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
@@ -21,14 +22,22 @@ export function AuthScreen(): React.JSX.Element {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [phone, setPhone] = useState('');
 
   const submit = () => {
-    dispatch(clearError());
-    if (mode === 'login') {
-      void dispatch(login({ email: email.trim(), password }));
-    } else {
-      void dispatch(register({ email: email.trim(), password, displayName: displayName.trim() }));
-    }
+    void (async () => {
+      dispatch(clearError());
+      if (mode === 'login') {
+        void dispatch(login({ email: email.trim(), password }));
+        return;
+      }
+      const action = await dispatch(
+        register({ email: email.trim(), password, displayName: displayName.trim() }),
+      );
+      if (register.fulfilled.match(action) && phone.trim().length >= 8) {
+        await setPendingPhoneVerify(phone.trim());
+      }
+    })();
   };
 
   const toggleMode = () => {
@@ -68,6 +77,18 @@ export function AuthScreen(): React.JSX.Element {
           autoCapitalize="none"
           autoComplete="email"
         />
+
+        {mode === 'register' ? (
+          <TextInput
+            style={styles.input}
+            placeholder="Phone (optional) e.g. +359888123456"
+            placeholderTextColor="#666"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            autoComplete="tel"
+          />
+        ) : null}
 
         <TextInput
           style={styles.input}

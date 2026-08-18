@@ -38,11 +38,18 @@ export function ProfileAccountSection({
             {phone ?? 'No phone added'}
           </Text>
           {phone ? (
-            <Icon
-              name={phoneVerified ? 'check-circle' : 'circle-outline'}
-              size={18}
-              color={phoneVerified ? colors.success : colors.borderStrong}
-            />
+            <>
+              <Icon
+                name={phoneVerified ? 'check-circle' : 'circle-outline'}
+                size={18}
+                color={phoneVerified ? colors.success : colors.borderStrong}
+              />
+              <TouchableOpacity onPress={onAddPhone}>
+                <Text style={styles.sectionAction}>
+                  {phoneVerified ? 'Change' : 'Verify'}
+                </Text>
+              </TouchableOpacity>
+            </>
           ) : (
             <TouchableOpacity onPress={onAddPhone}>
               <Text style={styles.sectionAction}>Add</Text>
