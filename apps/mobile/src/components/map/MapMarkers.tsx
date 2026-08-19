@@ -66,13 +66,10 @@ function ClusterMarkerItemImpl({ point, onPress }: ClusterItemProps): React.JSX.
     () => ({ latitude: point.lat, longitude: point.lng }),
     [point.lat, point.lng],
   );
-  const handlePress = useCallback(
-    (e: { stopPropagation?: () => void }) => {
-      e.stopPropagation?.();
-      onPress(point);
-    },
-    [onPress, point],
-  );
+  // Do NOT call e.stopPropagation() — on Android Google Maps that can native-crash.
+  const handlePress = useCallback(() => {
+    onPress(point);
+  }, [onPress, point]);
 
   return (
     <Marker
@@ -108,28 +105,21 @@ function EntityMarkerItemImpl({ point, onPress }: EntityItemProps): React.JSX.El
   const tracksFromKey = useTracksViewChanges([visualKey]);
 
   // Reset settle when the painted media identity changes (new avatar URL).
-  // Defer setState so react-hooks/set-state-in-effect stays clean (CI --max-warnings 0).
   useEffect(() => {
     void Promise.resolve().then(() => {
       setMediaSettled(false);
     });
   }, [visualKey]);
 
-  // Keep tracking until the avatar bitmap is painted — frozen markers can miss taps
-  // on Android when the snapshot is captured before layout finishes.
   const tracksViewChanges = tracksFromKey || !mediaSettled;
   const coordinate = useMemo(
     () => ({ latitude: point.lat, longitude: point.lng }),
     [point.lat, point.lng],
   );
-  const handlePress = useCallback(
-    (e: { stopPropagation?: () => void }) => {
-      // Prevent the map from treating this as a map-body press and swallowing it.
-      e.stopPropagation?.();
-      onPress(point);
-    },
-    [onPress, point],
-  );
+  // Do NOT call e.stopPropagation() — Android Google Maps MarkerPress can native-crash.
+  const handlePress = useCallback(() => {
+    onPress(point);
+  }, [onPress, point]);
   const onVisualSettled = useCallback(() => setMediaSettled(true), []);
 
   return (
