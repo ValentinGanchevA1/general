@@ -7,6 +7,7 @@ import {
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { colors } from '@/theme';
@@ -282,64 +283,67 @@ export function AppNavigator(): React.JSX.Element {
 
   return (
     <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {user ? (
-          <>
-            {!profileSetupComplete && (
+      {/* Provider inside NavigationContainer so BottomSheetModal portals keep nav context */}
+      <BottomSheetModalProvider>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {user ? (
+            <>
+              {!profileSetupComplete && (
+                <Stack.Screen
+                  name="ProfileCreation"
+                  component={ProfileCreationScreen}
+                />
+              )}
+              <Stack.Screen name="Main" component={MainTabs} />
+              <Stack.Screen name="Chat" component={ChatScreen} />
               <Stack.Screen
-                name="ProfileCreation"
-                component={ProfileCreationScreen}
+                name="AlertComposer"
+                component={AlertComposerScreen}
               />
-            )}
-            <Stack.Screen name="Main" component={MainTabs} />
-            <Stack.Screen name="Chat" component={ChatScreen} />
-            <Stack.Screen
-              name="AlertComposer"
-              component={AlertComposerScreen}
-            />
-            <Stack.Screen name="UserProfile" component={UserProfileScreen} />
-            <Stack.Screen
-              name="MutualFriends"
-              component={MutualFriendsScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />
-            <Stack.Screen
-              name="Interactions"
-              component={InteractionsScreen}
-              options={{
-                headerShown: true,
-                title: 'Interactions',
-                headerStyle: { backgroundColor: colors.bg },
-                headerTintColor: colors.textPrimary,
-              }}
-            />
-            <Stack.Screen
-              name="Gamification"
-              component={GamificationNavigator}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="Commerce"
-              component={CommerceNavigator}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="Account"
-              component={AccountNavigator}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="Events"
-              component={EventsNavigator}
-              options={{ headerShown: false }}
-            />
-          </>
-        ) : (
-          <Stack.Screen name="Auth" component={AuthScreen} />
-        )}
-      </Stack.Navigator>
-      {user ? <AchievementToastHost /> : null}
+              <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+              <Stack.Screen
+                name="MutualFriends"
+                component={MutualFriendsScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />
+              <Stack.Screen
+                name="Interactions"
+                component={InteractionsScreen}
+                options={{
+                  headerShown: true,
+                  title: 'Interactions',
+                  headerStyle: { backgroundColor: colors.bg },
+                  headerTintColor: colors.textPrimary,
+                }}
+              />
+              <Stack.Screen
+                name="Gamification"
+                component={GamificationNavigator}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Commerce"
+                component={CommerceNavigator}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Account"
+                component={AccountNavigator}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Events"
+                component={EventsNavigator}
+                options={{ headerShown: false }}
+              />
+            </>
+          ) : (
+            <Stack.Screen name="Auth" component={AuthScreen} />
+          )}
+        </Stack.Navigator>
+        {user ? <AchievementToastHost /> : null}
+      </BottomSheetModalProvider>
     </NavigationContainer>
   );
 }

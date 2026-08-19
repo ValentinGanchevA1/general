@@ -3,7 +3,6 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { Provider } from 'react-redux';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
@@ -27,13 +26,13 @@ Sentry.init({
 GoogleSignin.configure({ webClientId: Config.GOOGLE_WEB_CLIENT_ID });
 
 function App(): React.JSX.Element {
+  // BottomSheetModalProvider lives inside NavigationContainer (AppNavigator)
+  // so portal content keeps navigation context (EntityBottomSheet useNavigation).
   return (
     <GestureHandlerRootView style={styles.root}>
       <Provider store={store}>
         <SafeAreaProvider>
-          <BottomSheetModalProvider>
-            <AppNavigator />
-          </BottomSheetModalProvider>
+          <AppNavigator />
         </SafeAreaProvider>
       </Provider>
     </GestureHandlerRootView>
