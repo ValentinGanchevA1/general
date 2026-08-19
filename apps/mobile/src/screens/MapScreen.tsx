@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import MapView, {
   PROVIDER_GOOGLE,
+  type MapPressEvent,
   type Region,
 } from 'react-native-maps';
 import {
@@ -37,8 +38,6 @@ import { MapMarkers } from '@/components/map/MapMarkers';
 import { prefetchAvatars } from '@/services/avatarCache';
 import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { ContextualFab } from '@/components/ContextualFab';
-import type { FabActionId } from '@/components/ContextualFab/useFabContext';
 import { challengeEvents } from '@/features/gamification/challengeEvents';
 import { EventsRail } from '@/features/events/EventsRail';
 import {
@@ -237,32 +236,39 @@ export function MapScreen(): React.JSX.Element {
     }
   }, [selected, onSheetWave]);
 
-  const nearestUserId = useMemo(() => {
-    if (!myCoords) return null;
-    const users = points.filter((p): p is EntityPoint => p.kind === 'user');
-    if (!users.length) return null;
-    return users.reduce((best, p) =>
-      squaredDist(myCoords, p) < squaredDist(myCoords, best) ? p : best,
-    ).id;
-  }, [myCoords, points]);
-
-  const onFabAction = useCallback(async (id: FabActionId, contextKey: string): Promise<boolean> => {
-    if (id === 'wave_nearest' && nearestUserId) {
-      const t0 = Date.now();
-      try {
-        await onWave(nearestUserId);
-        track('fab.conversion', { contextKey, actionId: id, latencyMs: Date.now() - t0, success: true });
-      } catch {
-        track('fab.conversion', { contextKey, actionId: id, latencyMs: Date.now() - t0, success: false });
-      }
-      return true;
-    }
-    if (id === 'create_listing') {
-      openRootScreen(navigation, 'Marketplace');
-      return true;
-    }
-    return false;
-  }, [nearestUserId, onWave, navigation]);
+  /** Long-press empty map → create menu (replaces FAB). */
+  const onMapLongPress = useCallback(
+    (e: MapPressEvent) => {
+      if (selected) return; // entity sheet owns the surface
+      const { latitude, longitude } = e.nativeEvent.coordinate;
+      track('map.longpress_create', { lat: latitude, lng: longitude });
+      Alert.alert('Create nearby', 'What do you want to post at this spot?', [
+        {
+          text: 'List item',
+          onPress: () => {
+            track('map.create_choice', { kind: 'listing' });
+            openRootScreen(navigation, 'ListingCreate');
+          },
+        },
+        {
+          text: 'Create event',
+          onPress: () => {
+            track('map.create_choice', { kind: 'event' });
+            openRootScreen(navigation, 'EventCreate');
+          },
+        },
+        {
+          text: 'Post alert',
+          onPress: () => {
+            track('map.create_choice', { kind: 'alert' });
+            openRootScreen(navigation, 'AlertComposer');
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    },
+    [navigation, selected],
+  );
 
   const sheetOpen = selected != null;
 
@@ -278,6 +284,7 @@ export function MapScreen(): React.JSX.Element {
           showsCompass={false}
           toolbarEnabled={false}
           onRegionChangeComplete={setRegion}
+          onLongPress={onMapLongPress}
           initialRegion={{
             latitude: 43.21,
             longitude: 27.92,
@@ -315,16 +322,6 @@ export function MapScreen(): React.JSX.Element {
 
       {!sheetOpen && (
         <EventsRail location={region ? { lat: region.latitude, lng: region.longitude } : myCoords} />
-      )}
-
-      {!sheetOpen && (
-        <ContextualFab
-          zoom={zoom}
-          points={points}
-          nearestUserId={nearestUserId}
-          onAction={onFabAction}
-          bottomOffset={0}
-        />
       )}
 
       {!sheetOpen && <MapCoachMarks mapReady={region != null} />}
@@ -368,12 +365,6 @@ function MapUnavailableFallback(): React.JSX.Element {
       </Text>
     </View>
   );
-}
-
-function squaredDist(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
-  const dlat = a.lat - b.lat;
-  const dlng = a.lng - b.lng;
-  return dlat * dlat + dlng * dlng;
 }
 
 function regionToViewport(r: Region | null): Viewport | null {

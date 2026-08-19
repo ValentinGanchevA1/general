@@ -1,5 +1,5 @@
 // First-session map coach — three steps, then permanent dismiss.
-// Goal: teach people-nearby → wave → create without blocking power users (Skip).
+// Goal: teach people-nearby → wave → long-press create without blocking power users (Skip).
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -41,7 +41,7 @@ const STEPS: Step[] = [
     id: 'create',
     emoji: '＋',
     title: 'Post nearby',
-    body: 'Use the button at the bottom to create a listing, alert, or event around you.',
+    body: 'Long-press the map to list an item, create an event, or post an alert at that spot.',
   },
 ];
 
