@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,10 +9,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import type { SuggestionCard, SuggestionReason } from '@g88/shared';
+import type { ApiError, SuggestionCard, SuggestionReason } from '@g88/shared';
 
 import type { AccountStackParamList } from '@/navigation/stacks';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
@@ -31,6 +31,15 @@ function reasonLabel(reason: SuggestionReason, mutual: number): string {
     case 'recent_chat':
       return 'Recent chat';
   }
+}
+
+function isApiError(e: unknown): e is ApiError {
+  return (
+    typeof e === 'object' &&
+    e !== null &&
+    'code' in e &&
+    typeof (e as { code: unknown }).code === 'string'
+  );
 }
 
 export function SuggestionsScreen(): React.JSX.Element {
@@ -57,12 +66,12 @@ export function SuggestionsScreen(): React.JSX.Element {
     }
   }, []);
 
-  useEffect(() => {
-    const t = setTimeout(() => {
+  // Reload when returning from Profile so Follow/Requested match server graph.
+  useFocusEffect(
+    useCallback(() => {
       void load();
-    }, 0);
-    return () => clearTimeout(t);
-  }, [load]);
+    }, [load]),
+  );
 
   const openProfile = useCallback(
     (userId: string) => {
@@ -77,21 +86,39 @@ export function SuggestionsScreen(): React.JSX.Element {
     );
   }, []);
 
+  const markFollowing = useCallback((userId: string) => {
+    setItems((prev) =>
+      prev.map((c) => (c.userId === userId ? { ...c, isFollowing: true } : c)),
+    );
+  }, []);
+
+  const markRequested = useCallback((userId: string) => {
+    setItems((prev) =>
+      prev.map((c) =>
+        c.userId === userId ? { ...c, hasPendingOutgoing: true } : c,
+      ),
+    );
+  }, []);
+
+  /** Pending either way or already friends → drop from suggestions (matches backend exclude). */
+  const removeCard = useCallback((userId: string) => {
+    setItems((prev) => prev.filter((c) => c.userId !== userId));
+  }, []);
+
   const onFollow = useCallback(
     async (userId: string) => {
       setBusy(userId, true);
       try {
         await postJson<{ userId: string }, { following: true }>('/friends/follow', { userId });
-        setItems((prev) =>
-          prev.map((c) => (c.userId === userId ? { ...c, isFollowing: true } : c)),
-        );
-      } catch {
-        Alert.alert('Could not follow', 'Try again.');
+        markFollowing(userId);
+      } catch (e) {
+        const msg = isApiError(e) ? e.message : 'Try again.';
+        Alert.alert('Could not follow', msg);
       } finally {
         setBusy(userId, false);
       }
     },
-    [setBusy],
+    [markFollowing, setBusy],
   );
 
   const onAddFriend = useCallback(
@@ -101,18 +128,27 @@ export function SuggestionsScreen(): React.JSX.Element {
         await postJson<{ userId: string }, { requestId: string }>('/friends/requests', {
           userId,
         });
-        setItems((prev) =>
-          prev.map((c) =>
-            c.userId === userId ? { ...c, hasPendingOutgoing: true } : c,
-          ),
-        );
-      } catch {
+        markRequested(userId);
+      } catch (e) {
+        // Idempotent conflicts: request already lives on server (e.g. sent from Profile).
+        if (isApiError(e)) {
+          if (e.code === 'friends.request_pending') {
+            markRequested(userId);
+            return;
+          }
+          if (e.code === 'friends.already_friends') {
+            removeCard(userId);
+            return;
+          }
+          Alert.alert('Could not send request', e.message || 'Try again.');
+          return;
+        }
         Alert.alert('Could not send request', 'Try again.');
       } finally {
         setBusy(userId, false);
       }
     },
-    [setBusy],
+    [markRequested, removeCard, setBusy],
   );
 
   const renderItem = useCallback(
