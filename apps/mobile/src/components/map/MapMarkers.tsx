@@ -66,13 +66,20 @@ function ClusterMarkerItemImpl({ point, onPress }: ClusterItemProps): React.JSX.
     () => ({ latitude: point.lat, longitude: point.lng }),
     [point.lat, point.lng],
   );
-  const handlePress = useCallback(() => onPress(point), [onPress, point]);
+  const handlePress = useCallback(
+    (e: { stopPropagation?: () => void }) => {
+      e.stopPropagation?.();
+      onPress(point);
+    },
+    [onPress, point],
+  );
 
   return (
     <Marker
       coordinate={coordinate}
       onPress={handlePress}
       tracksViewChanges={tracksViewChanges}
+      anchor={{ x: 0.5, y: 0.5 }}
     >
       <ClusterMarker point={point} />
     </Marker>
@@ -102,19 +109,27 @@ function EntityMarkerItemImpl({ point, onPress }: EntityItemProps): React.JSX.El
 
   // Reset settle when the painted media identity changes (new avatar URL).
   // Defer setState so react-hooks/set-state-in-effect stays clean (CI --max-warnings 0).
-  // Prefer Promise microtask over queueMicrotask — RN tsc libs omit the latter.
   useEffect(() => {
     void Promise.resolve().then(() => {
       setMediaSettled(false);
     });
   }, [visualKey]);
 
+  // Keep tracking until the avatar bitmap is painted — frozen markers can miss taps
+  // on Android when the snapshot is captured before layout finishes.
   const tracksViewChanges = tracksFromKey || !mediaSettled;
   const coordinate = useMemo(
     () => ({ latitude: point.lat, longitude: point.lng }),
     [point.lat, point.lng],
   );
-  const handlePress = useCallback(() => onPress(point), [onPress, point]);
+  const handlePress = useCallback(
+    (e: { stopPropagation?: () => void }) => {
+      // Prevent the map from treating this as a map-body press and swallowing it.
+      e.stopPropagation?.();
+      onPress(point);
+    },
+    [onPress, point],
+  );
   const onVisualSettled = useCallback(() => setMediaSettled(true), []);
 
   return (
@@ -122,6 +137,7 @@ function EntityMarkerItemImpl({ point, onPress }: EntityItemProps): React.JSX.El
       coordinate={coordinate}
       onPress={handlePress}
       tracksViewChanges={tracksViewChanges}
+      anchor={{ x: 0.5, y: 0.5 }}
     >
       <EntityMarker point={point} onVisualSettled={onVisualSettled} />
     </Marker>
