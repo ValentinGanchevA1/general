@@ -471,9 +471,9 @@ export class FriendsService {
         WHERE f.followee_id = $1
           AND f.created_at > NOW() - ($2::int * INTERVAL '1 day')
           AND NOT EXISTS (
-            SELECT 1 FROM blocks b
-             WHERE (b.blocker_id = $1 AND b.blocked_id = u.id)
-                OR (b.blocker_id = u.id AND b.blocked_id = $1)
+            SELECT 1 FROM user_blocks ub
+             WHERE (ub.blocker_id = $1 AND ub.blocked_id = u.id)
+                OR (ub.blocker_id = u.id AND ub.blocked_id = $1)
           )
         ORDER BY f.created_at DESC
         LIMIT $3`,
