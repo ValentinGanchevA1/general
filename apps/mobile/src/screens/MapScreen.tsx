@@ -85,13 +85,19 @@ export function MapScreen(): React.JSX.Element {
     setSelected(null);
   }, []);
 
-  // Present / dismiss when selection changes.
+  /** Select entity + present sheet after the modal body has the new point. */
+  const onEntityPress = useCallback((point: EntityPoint) => {
+    setSelected(point);
+  }, []);
+
+  // Present when selection is set; dismiss only when cleared from outside (onDismiss).
   useEffect(() => {
-    if (selected) {
+    if (!selected) return;
+    // rAF: BottomSheetModal needs the content tree for this selection mounted first.
+    const raf = requestAnimationFrame(() => {
       entitySheetRef.current?.present();
-    } else {
-      entitySheetRef.current?.dismiss();
-    }
+    });
+    return () => cancelAnimationFrame(raf);
   }, [selected]);
 
   useEffect(() => {
@@ -269,7 +275,7 @@ export function MapScreen(): React.JSX.Element {
           <MapMarkers
             points={points}
             onClusterPress={onClusterPress}
-            onEntityPress={setSelected}
+            onEntityPress={onEntityPress}
           />
         </MapView>
       </ErrorBoundary>
