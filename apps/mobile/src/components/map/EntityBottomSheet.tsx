@@ -68,6 +68,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   }, [point.id]);
 
   const meta = point.meta;
+  const displayName = meta.displayName?.trim() || 'User';
   const canMessage = profile?.relationship?.canMessage ?? 'none';
   const sharedInterests = profile?.relationship?.sharedInterests ?? [];
   const blocked = profile?.blockedByViewer ?? false;
@@ -117,7 +118,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
       onClose();
       navigation.navigate('Chat', {
         conversationId: res.conversationId,
-        otherUserName: meta.displayName,
+        otherUserName: displayName,
         otherUserId: point.id,
         requestPending: res.status === 'pending',
       });
@@ -139,14 +140,14 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
           }}
           activeOpacity={0.85}
         >
-          <Avatar uri={meta.avatarUrl ?? null} name={meta.displayName} size={56} />
+          <Avatar uri={meta.avatarUrl ?? null} name={displayName} size={56} />
           <View style={styles.userHeaderText}>
             <View style={styles.nameRow}>
               <Text style={styles.title} numberOfLines={1}>
-                {meta.displayName}
+                {displayName}
               </Text>
               <VerificationBadge
-                verification={meta.verification}
+                verification={meta.verification ?? 'none'}
                 idVerified={profile?.idVerified}
                 size={16}
               />
