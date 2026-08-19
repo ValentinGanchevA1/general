@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  InteractionManager,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -68,6 +69,7 @@ export function MapScreen(): React.JSX.Element {
   const [waving, setWaving] = useState<string | null>(null);
   const mapRef = useRef<MapView>(null);
   const entitySheetRef = useRef<BottomSheetModal>(null);
+  const presentedIdRef = useRef<string | null>(null);
   const entitySnapPoints = useMemo(() => ['42%', '58%'], []);
   const renderBackdrop = useSheetBackdrop(0.5);
   const { unreadCount: interactionUnread } = useReceivedInteractions();
@@ -81,23 +83,34 @@ export function MapScreen(): React.JSX.Element {
   const points = data?.points ?? EMPTY_POINTS;
 
   const onCloseSheet = useCallback(() => {
+    presentedIdRef.current = null;
     entitySheetRef.current?.dismiss();
     setSelected(null);
   }, []);
 
-  /** Select entity + present sheet after the modal body has the new point. */
   const onEntityPress = useCallback((point: EntityPoint) => {
     setSelected(point);
   }, []);
 
-  // Present when selection is set; dismiss only when cleared from outside (onDismiss).
+  // Present once per selection id. InteractionManager avoids presenting mid-gesture.
   useEffect(() => {
-    if (!selected) return;
-    // rAF: BottomSheetModal needs the content tree for this selection mounted first.
-    const raf = requestAnimationFrame(() => {
-      entitySheetRef.current?.present();
+    if (!selected) {
+      presentedIdRef.current = null;
+      return;
+    }
+    const id = `${selected.kind}:${selected.id}`;
+    if (presentedIdRef.current === id) return;
+
+    const task = InteractionManager.runAfterInteractions(() => {
+      presentedIdRef.current = id;
+      try {
+        entitySheetRef.current?.present();
+      } catch (e) {
+        if (__DEV__) console.warn('entity sheet present failed', e);
+        presentedIdRef.current = null;
+      }
     });
-    return () => cancelAnimationFrame(raf);
+    return () => task.cancel();
   }, [selected]);
 
   useEffect(() => {
@@ -324,16 +337,21 @@ export function MapScreen(): React.JSX.Element {
         backdropComponent={renderBackdrop}
         backgroundStyle={sheetChrome.background}
         handleIndicatorStyle={sheetChrome.handle}
-        onDismiss={() => setSelected(null)}
+        onDismiss={() => {
+          presentedIdRef.current = null;
+          setSelected(null);
+        }}
       >
         <BottomSheetView style={sheetChrome.content}>
           {selected ? (
-            <EntityBottomSheet
-              point={selected}
-              waving={selected.kind === 'user' && waving === selected.id}
-              onClose={onCloseSheet}
-              {...(selected.kind === 'user' && { onWave: onSheetWavePress })}
-            />
+            <ErrorBoundary fallback={<Text style={styles.sheetError}>Could not load card</Text>}>
+              <EntityBottomSheet
+                point={selected}
+                waving={selected.kind === 'user' && waving === selected.id}
+                onClose={onCloseSheet}
+                {...(selected.kind === 'user' && { onWave: onSheetWavePress })}
+              />
+            </ErrorBoundary>
           ) : null}
         </BottomSheetView>
       </BottomSheetModal>
@@ -405,4 +423,5 @@ const styles = StyleSheet.create({
   },
   errorText: { color: colors.textPrimary, flex: 1 },
   retry: { color: colors.textPrimary, fontWeight: '600' },
+  sheetError: { color: colors.textMuted, padding: 16, textAlign: 'center' },
 });
