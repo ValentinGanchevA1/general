@@ -18,6 +18,8 @@ import { Config } from '@/config';
 
 type G88Socket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
+type ServerHandler<E extends keyof ServerToClientEvents> = ServerToClientEvents[E];
+
 interface UseSocketOptions {
   autoConnect?: boolean;
 }
@@ -37,6 +39,126 @@ interface UseSocketResult {
 }
 
 let sharedSocket: G88Socket | null = null;
+/** Lifecycle listeners (connect/disconnect) bound once per socket instance. */
+let lifecycleBound = false;
+
+/**
+ * Handlers registered before the socket exists — or kept as source of truth.
+ * Attached to the live socket on create; cleaned up via returned unsub.
+ */
+const eventHandlers = new Map<
+  keyof ServerToClientEvents,
+  Set<ServerToClientEvents[keyof ServerToClientEvents]>
+>();
+
+/** Runs on every successful socket connect (incl. reconnect). */
+const connectListeners = new Set<() => void>();
+
+/**
+ * Subscribe to socket connect/reconnect. Safe to call before the socket exists.
+ * Used by inbox hooks to refetch after background disconnect.
+ */
+export function onSocketConnected(fn: () => void): () => void {
+  connectListeners.add(fn);
+  // If already connected, fire once so callers do not wait for the next reconnect.
+  if (sharedSocket?.connected) {
+    try {
+      fn();
+    } catch {
+      /* ignore */
+    }
+  }
+  return () => {
+    connectListeners.delete(fn);
+  };
+}
+
+function attachHandlerToSocket<
+  E extends keyof ServerToClientEvents,
+>(s: G88Socket, event: E, handler: ServerHandler<E>): void {
+  s.on(event, handler as never);
+}
+
+function detachHandlerFromSocket<
+  E extends keyof ServerToClientEvents,
+>(s: G88Socket, event: E, handler: ServerHandler<E>): void {
+  s.off(event, handler as never);
+}
+
+function attachAllRegisteredHandlers(s: G88Socket): void {
+  for (const [event, set] of eventHandlers) {
+    for (const handler of set) {
+      attachHandlerToSocket(s, event, handler as ServerHandler<typeof event>);
+    }
+  }
+}
+
+function notifyConnectListeners(): void {
+  for (const fn of connectListeners) {
+    try {
+      fn();
+    } catch (e) {
+      if (__DEV__) console.warn('[socket] connect listener failed', e);
+    }
+  }
+}
+
+async function onConnectedSideEffects(): Promise<void> {
+  notifyConnectListeners();
+  // Heal friends badge after any gap offline.
+  try {
+    const { store } = await import('@/store');
+    const { fetchPendingCount } = await import('@/features/friends/friendsSlice');
+    void store.dispatch(fetchPendingCount());
+  } catch (e) {
+    if (__DEV__) console.warn('[socket] fetchPendingCount on connect failed', e);
+  }
+  // Drain chat outbox (dynamic import avoids circular dep).
+  try {
+    const { store } = await import('@/store');
+    const { outbox } = store.getState().chat;
+    if (outbox.length === 0) return;
+    const { messageConfirmed, outboxRetryIncremented } = await import(
+      '@/features/chat/chatSlice'
+    );
+    for (const entry of outbox) {
+      const result = await socketSendMessage(
+        entry.conversationId,
+        entry.body,
+        entry.optimisticId,
+      );
+      if (result) {
+        store.dispatch(
+          messageConfirmed({
+            optimisticId: entry.optimisticId,
+            confirmed: toChatMessage(result),
+          }),
+        );
+      } else {
+        store.dispatch(outboxRetryIncremented(entry.optimisticId));
+      }
+    }
+  } catch (e) {
+    if (__DEV__) console.warn('[socket] outbox drain failed', e);
+  }
+}
+
+function bindLifecycle(s: G88Socket): void {
+  if (lifecycleBound) return;
+  lifecycleBound = true;
+
+  s.on('connect', () => {
+    void onConnectedSideEffects();
+  });
+  s.on('disconnect', () => {
+    /* connected state updated per-hook via shared flag listeners if needed */
+  });
+  s.on('error:event', (e) => {
+    if (__DEV__) {
+      console.warn(`[socket] server error: ${e.code} ${e.message}`);
+    }
+  });
+}
 
 /** Normalize socket payload to ChatMessage (type required under exactOptionalPropertyTypes). */
 function toChatMessage(e: ChatMessageEvent): ChatMessage {
@@ -134,53 +256,43 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
       const token = await tokenStore.getAccessToken();
       if (!token || cancelled) return;
 
-      sharedSocket ??= io(`${Config.API_BASE_URL}/realtime`, {
-        transports: ['websocket'],
-        auth: async (cb) => {
-          const fresh = await tokenStore.getAccessToken();
-          cb({ token: fresh });
-        },
-        reconnection: true,
-        reconnectionDelay: 500,
-        reconnectionDelayMax: 5_000,
-      }) as G88Socket;
+      if (!sharedSocket) {
+        sharedSocket = io(`${Config.API_BASE_URL}/realtime`, {
+          // Polling fallback when pure WS is blocked (strict mobile networks).
+          transports: ['websocket', 'polling'],
+          auth: async (cb) => {
+            const fresh = await tokenStore.getAccessToken();
+            cb({ token: fresh });
+          },
+          reconnection: true,
+          reconnectionDelay: 500,
+          reconnectionDelayMax: 5_000,
+        }) as G88Socket;
 
-      sharedSocket.on('connect', () => {
+        bindLifecycle(sharedSocket);
+        attachAllRegisteredHandlers(sharedSocket);
+      } else {
+        // Existing instance, not connected — ensure lifecycle once, then connect.
+        bindLifecycle(sharedSocket);
+        sharedSocket.connect();
+      }
+
+      // Per-hook connected flag (lifecycle connect already runs side effects).
+      const onConnect = (): void => {
         if (!cancelled) setConnected(true);
-        // Drain the outbox on every reconnect. Dynamic import avoids a
-        // circular dep: useSocket ← store ← chatSlice ← useSocket.
-        void (async () => {
-          const { store } = await import('@/store');
-          const { outbox } = store.getState().chat;
-          if (outbox.length === 0) return;
-          const {
-            messageConfirmed,
-            outboxRetryIncremented,
-          } = await import('@/features/chat/chatSlice');
-          for (const entry of outbox) {
-            const result = await socketSendMessage(
-              entry.conversationId,
-              entry.body,
-              entry.optimisticId,
-            );
-            if (result) {
-              store.dispatch(
-                messageConfirmed({
-                  optimisticId: entry.optimisticId,
-                  confirmed: toChatMessage(result),
-                }),
-              );
-            } else {
-              store.dispatch(outboxRetryIncremented(entry.optimisticId));
-            }
-          }
-        })();
-      });
-      sharedSocket.on('disconnect', () => !cancelled && setConnected(false));
-      sharedSocket.on('error:event', (e) => {
-        if (__DEV__) {
-          console.warn(`[socket] server error: ${e.code} ${e.message}`);
-        }
+      };
+      const onDisconnect = (): void => {
+        if (!cancelled) setConnected(false);
+      };
+      sharedSocket.on('connect', onConnect);
+      sharedSocket.on('disconnect', onDisconnect);
+      // If we raced into an already-open socket, sync state.
+      if (sharedSocket.connected && !cancelled) setConnected(true);
+
+      // Cleanup only this hook's connect/disconnect flags — not the shared socket.
+      handlersRef.current.add(() => {
+        sharedSocket?.off('connect', onConnect);
+        sharedSocket?.off('disconnect', onDisconnect);
       });
     };
 
@@ -206,10 +318,23 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
       event: E,
       handler: ServerToClientEvents[E],
     ): (() => void) => {
-      const s = sharedSocket;
-      if (!s) return () => undefined;
-      s.on(event, handler as never);
-      const unsub = () => s.off(event, handler as never);
+      let set = eventHandlers.get(event);
+      if (!set) {
+        set = new Set();
+        eventHandlers.set(event, set);
+      }
+      set.add(handler as ServerToClientEvents[keyof ServerToClientEvents]);
+
+      if (sharedSocket) {
+        attachHandlerToSocket(sharedSocket, event, handler);
+      }
+
+      const unsub = (): void => {
+        eventHandlers.get(event)?.delete(handler as ServerToClientEvents[keyof ServerToClientEvents]);
+        if (sharedSocket) {
+          detachHandlerFromSocket(sharedSocket, event, handler);
+        }
+      };
       handlersRef.current.add(unsub);
       return unsub;
     },
@@ -296,4 +421,6 @@ export function disconnectSocket(): void {
     sharedSocket.disconnect();
     sharedSocket = null;
   }
+  lifecycleBound = false;
+  // Keep eventHandlers + connectListeners so the next login re-attaches the same UI subs.
 }

@@ -8,7 +8,7 @@ import type {
 } from '@g88/shared';
 
 import { getJson } from '@/api/client';
-import { useSocket } from '@/realtime/useSocket';
+import { onSocketConnected, useSocket } from '@/realtime/useSocket';
 
 export function useInboxInteractions(): {
   items: InboxItem[];
@@ -27,10 +27,8 @@ export function useInboxInteractions(): {
       getJson<RecentFollowersResponse>('/friends/followers/recent?sinceDays=14&limit=30'),
     ]);
 
-    const waves =
-      wavesRes.status === 'fulfilled' ? wavesRes.value.items : [];
-    const requests =
-      requestsRes.status === 'fulfilled' ? requestsRes.value.items : [];
+    const waves = wavesRes.status === 'fulfilled' ? wavesRes.value.items : [];
+    const requests = requestsRes.status === 'fulfilled' ? requestsRes.value.items : [];
     const followers =
       followersRes.status === 'fulfilled' ? followersRes.value.items : [];
 
@@ -103,6 +101,11 @@ export function useInboxInteractions(): {
       void refresh();
     });
   }, [refresh]);
+
+  // Heal list after reconnect (events may have been missed while offline).
+  useEffect(() => onSocketConnected(() => {
+    void refresh();
+  }), [refresh]);
 
   useEffect(() => {
     const unsubWave = on('wave:received', () => {

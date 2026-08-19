@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ReceivedInteraction, ReceivedInteractionsResponse } from '@g88/shared';
 
 import { getJson } from '@/api/client';
-import { useSocket } from '@/realtime/useSocket';
+import { onSocketConnected, useSocket } from '@/realtime/useSocket';
 
 export function useReceivedInteractions(): {
   items: ReceivedInteraction[];
@@ -35,7 +35,11 @@ export function useReceivedInteractions(): {
     });
   }, [refresh]);
 
-  // Real-time: new wave bumps the list
+  // Refetch waves after reconnect so map 👋 badge stays honest.
+  useEffect(() => onSocketConnected(() => {
+    void refresh();
+  }), [refresh]);
+
   useEffect(() => {
     const unsub = on('wave:received', () => {
       void refresh();
