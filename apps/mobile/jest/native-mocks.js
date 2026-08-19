@@ -149,3 +149,31 @@ jest.mock('@gorhom/bottom-sheet', () => {
     useBottomSheet: () => ({ close: jest.fn(), expand: jest.fn(), collapse: jest.fn() }),
   };
 });
+
+// PulseScreen → Avatar → useCachedImageUri → avatarCache → blob-util native fs.
+// Without stub: TypeError Cannot read properties of null (reading 'getConstants').
+jest.mock('react-native-blob-util', () => {
+  const dirs = { CacheDir: '/tmp/g88-jest-cache', DocumentDir: '/tmp/g88-jest-docs' };
+  const fs = {
+    dirs,
+    isDir: jest.fn(() => Promise.resolve(true)),
+    mkdir: jest.fn(() => Promise.resolve()),
+    exists: jest.fn(() => Promise.resolve(false)),
+    unlink: jest.fn(() => Promise.resolve()),
+  };
+  const fetchResult = {
+    info: () => ({ status: 404 }),
+    path: () => '',
+  };
+  const api = {
+    fs,
+    config: jest.fn(() => ({
+      fetch: jest.fn(() => Promise.resolve(fetchResult)),
+    })),
+  };
+  return {
+    __esModule: true,
+    default: api,
+    ...api,
+  };
+});
