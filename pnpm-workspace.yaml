@@ -23,7 +23,14 @@ overrides:
   'form-data@4': '>=4.0.6 <5' # CRLF injection via multipart field names (transitive; base64 upload path, not outbound multipart)
   'multer@2': '>=2.2.0 <3' # GHSA-72gw-mp4g-v24j + GHSA-3p4h-7m6x-2hcm (DoS; transitive via @nestjs/platform-express; no multipart route in use)
   'protobufjs@7': '>=7.6.3 <8' # GHSA-wcpc-wj8m-hjx6 + GHSA-f38q-mgvj-vph7 (DoS; transitive via firebase-admin + firebase)
-  'js-yaml@4': '>=4.2.0 <5' # quadratic-complexity DoS in merge-key handling (build/config YAML, not untrusted runtime input)
+  'js-yaml@4': '>=4.3.1 <5' # GHSA-5p4m-2wfm-xmqj — quadratic CPU in !!omap resolution, CVE-2026-59870 fix not backported to 4.2.0 (build/config YAML, not untrusted runtime input)
+  'js-yaml@3': '>=3.15.1 <4' # GHSA-5p4m-2wfm-xmqj (same CVE, 3.x line; transitive via jest/babel-plugin-istanbul test tooling)
+  'brace-expansion@1': '>=1.1.18 <2' # GHSA-mh99-v99m-4gvg + GHSA-rgw5-rvv9-x895 (DoS; transitive via eslint/minimatch dev tooling)
+  'brace-expansion@2': '>=2.1.4 <3' # same, 2.x line (transitive via @typescript-eslint/typescript-estree)
+  'brace-expansion@5': '>=5.0.9 <6' # same, 5.x line (transitive via ts-morph, pulled by the shadcn CLI)
+  'fast-uri@3': '>=3.1.5 <4' # GHSA-7p8r-x3mc-p8w7 — host confusion via backslash authority introducer (transitive via ajv, dev/build tooling only)
+  'hono@4': '>=4.12.34 <5' # GHSA-8j4g-w8fx-2239 + GHSA-f23p-vx2j-j53r + GHSA-54fx-42gc-7vw4 (transitive via @modelcontextprotocol/sdk pulled by the shadcn CLI; not part of the admin app's shipped runtime)
+  'nanoid@3': '>=3.3.18 <4' # GHSA-2v37-7h3g-55p8 — indefinite loop on size:0 (transitive via postcss/vite build tooling)
   '@babel/core': '>=7.29.6 <8' # arbitrary file read via sourceMappingURL (build-time transform only)
   '@opentelemetry/core@2': '>=2.8.0 <3' # unbounded memory in W3C baggage propagation (Sentry tracing; needs untrusted baggage header)
   'webpack@5': '5.104.1'
@@ -40,3 +47,13 @@ overrides:
 # Explicitly NOT in the workspace:
 #   legacy/**   — frozen pre-monorepo layout (read-only reference)
 #                 See legacy/README.md and STATUS.md.
+#
+# Known advisory NOT overridden:
+#   image-size <2.0.3 (GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq) — DoS via
+#   infinite loop parsing malformed ICNS/JXL/HEIF. Transitive via Metro
+#   (react-native's bundler; dev/build-time only, not shipped in the app).
+#   The fix is a 1.x -> 2.x major bump inside Metro's own dependency tree;
+#   forcing it here risks breaking the RN build toolchain for a bug that
+#   needs a malicious local asset file to trigger. Revisit when
+#   @react-native/community-cli-plugin ships on a metro version that pulls
+#   image-size >=2.0.3 upstream.
