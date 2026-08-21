@@ -11,6 +11,7 @@ import { ListPendingVerificationsDto } from './dto/list-pending-verifications.dt
 import { ListPendingResponseDto } from './dto/list-pending-response.dto';
 import { AdminVerificationDetailDto } from './dto/admin-verification-detail.dto';
 import { RekognitionService } from './rekognition.service';
+import { IdVerificationGateway } from './gateways/id-verification.gateway';
 
 interface UserRow {
   id: string;
@@ -48,6 +49,7 @@ export class IdVerificationService {
     private readonly s3Service: S3Service,
     private readonly notificationsService: NotificationsService,
     private readonly rekognitionService: RekognitionService,
+    private readonly verificationGateway: IdVerificationGateway,
   ) {}
 
   async startVerification(userId: string) {
@@ -68,7 +70,7 @@ export class IdVerificationService {
     // Assist-only: never blocks submit; scores inform admin review.
     const analysis = await this.rekognitionService.analyzeVerification(selfieKey, idFrontKey);
 
-    await this.db.query(
+    const inserted = await this.db.query<{ id: string }[]>(
       `INSERT INTO user_id_verifications (
          user_id, selfie_url, id_front_url, id_back_url, status,
          face_similarity, selfie_face_count, id_front_face_count,
@@ -77,7 +79,8 @@ export class IdVerificationService {
        ) VALUES (
          $1, $2, $3, $4, 'pending',
          $5, $6, $7, $8, $9, $10, $11, now()
-       )`,
+       )
+       RETURNING id`,
       [
         userId,
         selfieKey,
@@ -98,7 +101,16 @@ export class IdVerificationService {
       [userId],
     );
 
-    return { status: 'pending' as const };
+    const verificationId = inserted[0]?.id;
+    if (verificationId) {
+      this.verificationGateway.emitVerificationUpdate({
+        id: verificationId,
+        userId,
+        status: 'pending',
+      });
+    }
+
+    return { status: 'pending' as const, verificationId };
   }
 
   async getStatus(userId: string) {
@@ -168,6 +180,12 @@ export class IdVerificationService {
       newStatus as 'verified' | 'rejected',
       dto.decision === 'rejected' ? dto.reason : undefined,
     );
+
+    this.verificationGateway.emitVerificationUpdate({
+      id: result,
+      userId: targetUserId,
+      status: newStatus as 'verified' | 'rejected',
+    });
 
     return { status: newStatus, verificationId: result };
   }
