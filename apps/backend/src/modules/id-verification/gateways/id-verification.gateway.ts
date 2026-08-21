@@ -7,23 +7,17 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import type { VerificationUpdatedEvent } from '@g88/shared';
-
-function getWsOrigins(): string[] {
-  return (process.env.CORS_ORIGINS ?? 'http://127.0.0.1:5173,http://localhost:5173')
-    .split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
-}
+import { corsOrigins } from '../../../common/cors-origins';
 
 /**
  * Admin-only realtime for the ID verification queue.
  * Namespace `/admin` — clients (apps/admin useVerificationSocket) listen for
- * `verification:updated`. No room join required; emit is namespace-wide.
+ * `verification:updated`.
  */
 @WebSocketGateway({
   namespace: '/admin',
   cors: {
-    origin: getWsOrigins(),
+    origin: corsOrigins(),
     credentials: true,
   },
 })
@@ -34,11 +28,10 @@ export class IdVerificationGateway implements OnGatewayInit, OnGatewayConnection
   private readonly logger = new Logger(IdVerificationGateway.name);
 
   afterInit() {
-    this.logger.log(`Admin WS ready. Origins: ${getWsOrigins().join(', ')}`);
+    this.logger.log(`Admin WS ready. CORS: ${corsOrigins().join(', ')}`);
   }
 
   handleConnection(client: Socket) {
-    // Optional room for future targeting; emit also goes namespace-wide below.
     void client.join('admins');
   }
 
@@ -48,7 +41,6 @@ export class IdVerificationGateway implements OnGatewayInit, OnGatewayConnection
       return;
     }
     this.server.to('admins').emit('verification:updated', update);
-    // Fallback for clients that never joined the room (first paint / reconnect).
     this.server.emit('verification:updated', update);
   }
 }
