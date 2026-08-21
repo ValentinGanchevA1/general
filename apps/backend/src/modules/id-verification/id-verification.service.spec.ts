@@ -8,6 +8,7 @@ import { IdVerificationService } from './id-verification.service';
 import { S3Service } from '../../common/s3.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RekognitionService } from './rekognition.service';
+import { IdVerificationGateway } from './gateways/id-verification.gateway';
 
 const B64 = Buffer.from('fake-image-bytes').toString('base64');
 
@@ -31,6 +32,7 @@ describe('IdVerificationService', () => {
   let uploadVerificationBuffer: jest.Mock;
   let notifyIdVerificationDecided: jest.Mock;
   let analyzeVerification: jest.Mock;
+  let emitVerificationUpdate: jest.Mock;
 
   beforeEach(async () => {
     query = jest.fn().mockResolvedValue([]);
@@ -41,6 +43,7 @@ describe('IdVerificationService', () => {
       );
     notifyIdVerificationDecided = jest.fn().mockResolvedValue(undefined);
     analyzeVerification = jest.fn().mockResolvedValue(analysisOk);
+    emitVerificationUpdate = jest.fn();
 
     const transaction = jest.fn(async (fn: (m: { query: jest.Mock }) => Promise<unknown>) => {
       return fn({ query });
@@ -56,6 +59,7 @@ describe('IdVerificationService', () => {
         { provide: S3Service, useValue: { uploadVerificationBuffer, verificationReadUrl: jest.fn() } },
         { provide: NotificationsService, useValue: { notifyIdVerificationDecided } },
         { provide: RekognitionService, useValue: { analyzeVerification } },
+        { provide: IdVerificationGateway, useValue: { emitVerificationUpdate } },
       ],
     }).compile();
     service = mod.get(IdVerificationService);
@@ -71,10 +75,12 @@ describe('IdVerificationService', () => {
 
     it('uploads server-side, runs assist Rekognition, inserts pending with scores', async () => {
       query.mockResolvedValueOnce([userRow('none')]); // requireEligible
+      query.mockResolvedValueOnce([{ id: 'v-new' }]); // INSERT RETURNING
+      query.mockResolvedValueOnce([]); // users UPDATE
 
       const res = await service.submitVerification('u1', payload);
 
-      expect(res).toEqual({ status: 'pending' });
+      expect(res).toEqual({ status: 'pending', verificationId: 'v-new' });
 
       expect(uploadVerificationBuffer).toHaveBeenCalledTimes(2);
       expect(analyzeVerification).toHaveBeenCalledWith(
@@ -96,10 +102,18 @@ describe('IdVerificationService', () => {
         'ok',
         null,
       ]);
+
+      expect(emitVerificationUpdate).toHaveBeenCalledWith({
+        id: 'v-new',
+        userId: 'u1',
+        status: 'pending',
+      });
     });
 
     it('uploads the optional ID back when provided', async () => {
       query.mockResolvedValueOnce([userRow('rejected')]);
+      query.mockResolvedValueOnce([{ id: 'v-back' }]);
+      query.mockResolvedValueOnce([]);
 
       await service.submitVerification('u1', {
         ...payload,
@@ -114,6 +128,8 @@ describe('IdVerificationService', () => {
 
     it('still submits pending when Rekognition returns error (fail-open)', async () => {
       query.mockResolvedValueOnce([userRow('none')]);
+      query.mockResolvedValueOnce([{ id: 'v-err' }]);
+      query.mockResolvedValueOnce([]);
       analyzeVerification.mockResolvedValueOnce({
         status: 'error',
         faceSimilarity: null,
@@ -125,7 +141,7 @@ describe('IdVerificationService', () => {
       });
 
       const res = await service.submitVerification('u1', payload);
-      expect(res).toEqual({ status: 'pending' });
+      expect(res).toEqual({ status: 'pending', verificationId: 'v-err' });
       const insertParams = query.mock.calls[1]![1] as unknown[];
       expect(insertParams[9]).toBe('error');
       expect(insertParams[10]).toBe('AccessDenied');
@@ -233,6 +249,11 @@ describe('IdVerificationService', () => {
       expect(userParams).toEqual(['verified', 'u1']);
 
       expect(notifyIdVerificationDecided).toHaveBeenCalledWith('u1', 'verified', undefined);
+      expect(emitVerificationUpdate).toHaveBeenCalledWith({
+        id: 'v1',
+        userId: 'u1',
+        status: 'verified',
+      });
     });
 
     it('rejects: stores the reason and notifies with it', async () => {
@@ -250,6 +271,11 @@ describe('IdVerificationService', () => {
       expect(reviewParams).toEqual(['rejected', 'admin1', 'Blurry ID photo', 'u1']);
 
       expect(notifyIdVerificationDecided).toHaveBeenCalledWith('u1', 'rejected', 'Blurry ID photo');
+      expect(emitVerificationUpdate).toHaveBeenCalledWith({
+        id: 'v1',
+        userId: 'u1',
+        status: 'rejected',
+      });
     });
 
     it('throws BadRequest when concurrent decide already consumed the pending row', async () => {
@@ -262,6 +288,7 @@ describe('IdVerificationService', () => {
         service.decideVerification('admin1', 'u1', { decision: 'approved' }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(notifyIdVerificationDecided).not.toHaveBeenCalled();
+      expect(emitVerificationUpdate).not.toHaveBeenCalled();
     });
   });
 });
