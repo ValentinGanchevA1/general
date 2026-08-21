@@ -56,13 +56,10 @@ import { NotificationsService } from '../modules/notifications/notifications.ser
 import { ChallengesService } from '../modules/challenges/challenges.service';
 import { FriendsService } from '../modules/friends/friends.service';
 import type { JwtPayload } from '../modules/auth/jwt.strategy';
+import { corsOrigins } from '../common/cors-origins';
 
 type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 type G88Socket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
-
-const wsAllowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
-  .split(',')
-  .filter(Boolean);
 
 function extractApiError(err: unknown): { code: string; message: string } {
   if (
@@ -96,7 +93,7 @@ function extractApiError(err: unknown): { code: string; message: string } {
 
 @WebSocketGateway({
   namespace: '/realtime',
-  cors: { origin: wsAllowedOrigins, credentials: true },
+  cors: { origin: corsOrigins(), credentials: true },
   connectionStateRecovery: {
     maxDisconnectionDuration: 2 * 60 * 1000,
     skipMiddlewares: true,
