@@ -10,6 +10,7 @@ import helmet from 'helmet';
 import { scrubSentryPayload } from '@g88/shared';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
+import { corsOrigins } from './common/cors-origins';
 
 
 loadEnv({ path: join(process.cwd(), '../../.env') });
@@ -72,10 +73,12 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
+  const origins = corsOrigins();
   app.enableCors({
-    origin: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(',').filter(Boolean),
+    origin: origins,
     credentials: true,
   });
+  logger.log(`CORS origins: ${origins.join(', ')}`);
 
   const port = Number(process.env.PORT ?? 3001);
   await app.listen(port);
