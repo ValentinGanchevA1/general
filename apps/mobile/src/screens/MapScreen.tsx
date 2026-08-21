@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import MapView, {
   PROVIDER_GOOGLE,
-  type MapPressEvent,
+  type LongPressEvent,
   type Region,
 } from 'react-native-maps';
 import {
@@ -238,7 +238,7 @@ export function MapScreen(): React.JSX.Element {
 
   /** Long-press empty map → create menu (replaces FAB). */
   const onMapLongPress = useCallback(
-    (e: MapPressEvent) => {
+    (e: LongPressEvent) => {
       if (selected) return; // entity sheet owns the surface
       const { latitude, longitude } = e.nativeEvent.coordinate;
       track('map.longpress_create', { lat: latitude, lng: longitude });
