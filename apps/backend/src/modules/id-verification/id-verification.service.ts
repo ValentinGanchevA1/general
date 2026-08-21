@@ -119,31 +119,49 @@ export class IdVerificationService {
     targetUserId: string,
     dto: DecideIdVerificationDto,
   ) {
-    const rows = await this.db.query<{ id: string; status: string }[]>(
-      `SELECT id, status FROM user_id_verifications
-       WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
-      [targetUserId],
-    );
-    if (!rows[0]) throw new NotFoundException('No verification submission found');
-    if (rows[0].status !== 'pending') {
-      throw new BadRequestException(`Submission already ${rows[0].status}`);
-    }
-
     const newStatus = dto.decision === 'approved' ? 'verified' : 'rejected';
+    const rejectionReason = dto.decision === 'rejected' ? dto.reason ?? null : null;
 
-    await this.db.query(
-      `UPDATE user_id_verifications
-       SET status = $1, reviewed_by = $2, reviewed_at = now(), rejection_reason = $3
-       WHERE id = $4`,
-      [newStatus, adminId, dto.decision === 'rejected' ? dto.reason ?? null : null, rows[0].id],
-    );
+    // Atomic conditional update: prevents double-process race between two admins.
+    // Notification stays outside the transaction (side-effect convention).
+    const result = await this.db.transaction(async (manager) => {
+      const updated = await manager.query<{ id: string }[]>(
+        `UPDATE user_id_verifications
+         SET status = $1, reviewed_by = $2, reviewed_at = now(), rejection_reason = $3
+         WHERE user_id = $4
+           AND status = 'pending'
+           AND id = (
+             SELECT id FROM user_id_verifications
+             WHERE user_id = $4 AND status = 'pending'
+             ORDER BY created_at DESC
+             LIMIT 1
+           )
+         RETURNING id`,
+        [newStatus, adminId, rejectionReason, targetUserId],
+      );
 
-    await this.db.query(
-      `UPDATE users
-       SET id_verification_status = $1, id_verified_at = CASE WHEN $1 = 'verified' THEN now() ELSE id_verified_at END
-       WHERE id = $2`,
-      [newStatus, targetUserId],
-    );
+      if (!updated[0]) {
+        const existing = await manager.query<{ id: string; status: string }[]>(
+          `SELECT id, status FROM user_id_verifications
+           WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+          [targetUserId],
+        );
+        if (!existing[0]) {
+          throw new NotFoundException('No verification submission found');
+        }
+        throw new BadRequestException(`Submission already ${existing[0].status}`);
+      }
+
+      await manager.query(
+        `UPDATE users
+         SET id_verification_status = $1,
+             id_verified_at = CASE WHEN $1 = 'verified' THEN now() ELSE id_verified_at END
+         WHERE id = $2`,
+        [newStatus, targetUserId],
+      );
+
+      return updated[0].id;
+    });
 
     await this.notificationsService.notifyIdVerificationDecided(
       targetUserId,
@@ -151,7 +169,7 @@ export class IdVerificationService {
       dto.decision === 'rejected' ? dto.reason : undefined,
     );
 
-    return { status: newStatus };
+    return { status: newStatus, verificationId: result };
   }
 
   async listPendingVerifications(query: ListPendingVerificationsDto): Promise<ListPendingResponseDto> {
@@ -234,10 +252,15 @@ export class IdVerificationService {
       [userId],
     );
     if (!rows[0]) throw new NotFoundException('User not found');
-    if (rows[0].id_verification_status === 'verified') {
+    const status = rows[0].id_verification_status;
+    if (status === 'verified') {
       throw new BadRequestException('Already verified');
     }
-    return rows[0].id_verification_status;
+    // One pending submission at a time — blocks stack-up and admin queue noise.
+    if (status === 'pending') {
+      throw new BadRequestException('Verification already pending review');
+    }
+    return status;
   }
 
   private async uploadImage(

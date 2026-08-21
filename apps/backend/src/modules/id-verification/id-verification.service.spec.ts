@@ -42,10 +42,17 @@ describe('IdVerificationService', () => {
     notifyIdVerificationDecided = jest.fn().mockResolvedValue(undefined);
     analyzeVerification = jest.fn().mockResolvedValue(analysisOk);
 
+    const transaction = jest.fn(async (fn: (m: { query: jest.Mock }) => Promise<unknown>) => {
+      return fn({ query });
+    });
+
     const mod = await Test.createTestingModule({
       providers: [
         IdVerificationService,
-        { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
+        {
+          provide: getDataSourceToken(),
+          useValue: { query, transaction } as unknown as DataSource,
+        },
         { provide: S3Service, useValue: { uploadVerificationBuffer, verificationReadUrl: jest.fn() } },
         { provide: NotificationsService, useValue: { notifyIdVerificationDecided } },
         { provide: RekognitionService, useValue: { analyzeVerification } },
@@ -134,6 +141,16 @@ describe('IdVerificationService', () => {
       expect(analyzeVerification).not.toHaveBeenCalled();
     });
 
+    it('rejects submit while a review is already pending', async () => {
+      query.mockResolvedValueOnce([userRow('pending')]);
+
+      await expect(service.submitVerification('u1', payload)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(uploadVerificationBuffer).not.toHaveBeenCalled();
+      expect(analyzeVerification).not.toHaveBeenCalled();
+    });
+
     it('throws NotFound when the user does not exist', async () => {
       query.mockResolvedValueOnce([]);
 
@@ -182,7 +199,8 @@ describe('IdVerificationService', () => {
 
   describe('decideVerification', () => {
     it('throws NotFound when no submission exists for the user', async () => {
-      query.mockResolvedValueOnce([]);
+      query.mockResolvedValueOnce([]); // UPDATE RETURNING empty
+      query.mockResolvedValueOnce([]); // fallback SELECT empty
       await expect(
         service.decideVerification('admin1', 'u1', { decision: 'approved' }),
       ).rejects.toBeInstanceOf(NotFoundException);
@@ -190,6 +208,7 @@ describe('IdVerificationService', () => {
     });
 
     it('throws BadRequest when the submission is not pending', async () => {
+      query.mockResolvedValueOnce([]); // UPDATE RETURNING empty
       query.mockResolvedValueOnce([{ id: 'v1', status: 'verified' }]);
       await expect(
         service.decideVerification('admin1', 'u1', { decision: 'approved' }),
@@ -197,27 +216,27 @@ describe('IdVerificationService', () => {
       expect(notifyIdVerificationDecided).not.toHaveBeenCalled();
     });
 
-    it('approves: updates both tables and notifies with no reason', async () => {
-      query.mockResolvedValueOnce([{ id: 'v1', status: 'pending' }]);
-      query.mockResolvedValueOnce([]);
+    it('approves: atomic update both tables and notifies with no reason', async () => {
+      // UPDATE ... RETURNING id
+      query.mockResolvedValueOnce([{ id: 'v1' }]);
+      // users UPDATE
       query.mockResolvedValueOnce([]);
 
       const res = await service.decideVerification('admin1', 'u1', { decision: 'approved' });
 
-      expect(res).toEqual({ status: 'verified' });
+      expect(res).toEqual({ status: 'verified', verificationId: 'v1' });
 
-      const reviewParams = query.mock.calls[1]![1] as unknown[];
-      expect(reviewParams).toEqual(['verified', 'admin1', null, 'v1']);
+      const reviewParams = query.mock.calls[0]![1] as unknown[];
+      expect(reviewParams).toEqual(['verified', 'admin1', null, 'u1']);
 
-      const userParams = query.mock.calls[2]![1] as unknown[];
+      const userParams = query.mock.calls[1]![1] as unknown[];
       expect(userParams).toEqual(['verified', 'u1']);
 
       expect(notifyIdVerificationDecided).toHaveBeenCalledWith('u1', 'verified', undefined);
     });
 
     it('rejects: stores the reason and notifies with it', async () => {
-      query.mockResolvedValueOnce([{ id: 'v1', status: 'pending' }]);
-      query.mockResolvedValueOnce([]);
+      query.mockResolvedValueOnce([{ id: 'v1' }]);
       query.mockResolvedValueOnce([]);
 
       const res = await service.decideVerification('admin1', 'u1', {
@@ -225,12 +244,24 @@ describe('IdVerificationService', () => {
         reason: 'Blurry ID photo',
       });
 
-      expect(res).toEqual({ status: 'rejected' });
+      expect(res).toEqual({ status: 'rejected', verificationId: 'v1' });
 
-      const reviewParams = query.mock.calls[1]![1] as unknown[];
-      expect(reviewParams).toEqual(['rejected', 'admin1', 'Blurry ID photo', 'v1']);
+      const reviewParams = query.mock.calls[0]![1] as unknown[];
+      expect(reviewParams).toEqual(['rejected', 'admin1', 'Blurry ID photo', 'u1']);
 
       expect(notifyIdVerificationDecided).toHaveBeenCalledWith('u1', 'rejected', 'Blurry ID photo');
+    });
+
+    it('throws BadRequest when concurrent decide already consumed the pending row', async () => {
+      // UPDATE returns empty (race lost)
+      query.mockResolvedValueOnce([]);
+      // fallback SELECT shows already verified
+      query.mockResolvedValueOnce([{ id: 'v1', status: 'verified' }]);
+
+      await expect(
+        service.decideVerification('admin1', 'u1', { decision: 'approved' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(notifyIdVerificationDecided).not.toHaveBeenCalled();
     });
   });
 });
