@@ -4,6 +4,7 @@ import {
   Injectable,
   Inject,
   Logger,
+  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -12,9 +13,12 @@ import type Redis from 'ioredis';
 import { randomInt } from 'crypto';
 
 import type {
+  IdVerificationStatus,
   StartEmailVerificationResponse,
   StartPhoneVerificationResponse,
   UserProfile,
+  VerificationLadderStatus,
+  VerificationLevel,
 } from '@g88/shared';
 
 import { REDIS_CLIENT } from '../../config/redis.provider';
@@ -46,6 +50,14 @@ function maskEmail(email: string): string {
   return `${head}***@${domain}`;
 }
 
+const LEVEL_RANK: Record<string, number> = {
+  none: 0,
+  email: 1,
+  phone: 2,
+  selfie: 3, // legacy intermediate; product treats as toward id
+  id: 4,
+};
+
 @Injectable()
 export class VerificationService {
   private readonly logger = new Logger(VerificationService.name);
@@ -55,6 +67,80 @@ export class VerificationService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly users: UsersService,
   ) {}
+
+  /**
+   * Single ladder status for mobile / gates.
+   * Product steps: email → phone → id (selfie is media inside ID submit, not a step).
+   */
+  async getLadderStatus(userId: string): Promise<VerificationLadderStatus> {
+    const [row] = (await this.db.query(
+      `SELECT verification_level, id_verification_status, email, phone
+         FROM users
+        WHERE id = $1 AND deleted_at IS NULL
+        LIMIT 1`,
+      [userId],
+    )) as Array<{
+      verification_level: string;
+      id_verification_status: IdVerificationStatus;
+      email: string | null;
+      phone: string | null;
+    }>;
+
+    if (!row) {
+      throw new NotFoundException({ code: 'verification.user_missing', message: 'User not found' });
+    }
+
+    const level = (row.verification_level ?? 'none') as VerificationLevel;
+    const idStatus = row.id_verification_status ?? 'none';
+    const rank = LEVEL_RANK[level] ?? 0;
+
+    // ID fully done → no next step.
+    if (idStatus === 'verified' || level === 'id') {
+      return {
+        level: level === 'id' ? 'id' : level,
+        idStatus,
+        nextStep: null,
+        canStartEmail: false,
+        canStartPhone: false,
+        canStartId: false,
+        message: 'Identity verified',
+      };
+    }
+
+    const canStartEmail = rank < LEVEL_RANK.email && !!row.email;
+    const canStartPhone = rank < LEVEL_RANK.phone;
+    const canStartId = idStatus !== 'pending' && idStatus !== 'verified';
+
+    let nextStep: VerificationLadderStatus['nextStep'] = null;
+    let message = 'Complete verification to unlock more features';
+
+    if (rank < LEVEL_RANK.email) {
+      nextStep = 'email';
+      message = 'Verify your email to post stories and raise trust';
+    } else if (rank < LEVEL_RANK.phone) {
+      nextStep = 'phone';
+      message = 'Add a verified phone for higher-stakes actions';
+    } else if (canStartId) {
+      nextStep = 'id';
+      message =
+        idStatus === 'rejected'
+          ? 'ID was rejected — you can resubmit'
+          : 'Submit photo ID and selfie for full verification';
+    } else if (idStatus === 'pending') {
+      nextStep = null;
+      message = 'ID under review';
+    }
+
+    return {
+      level,
+      idStatus,
+      nextStep,
+      canStartEmail,
+      canStartPhone,
+      canStartId,
+      message,
+    };
+  }
 
   async startPhone(
     userId: string,

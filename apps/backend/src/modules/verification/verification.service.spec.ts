@@ -4,6 +4,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import {
   BadRequestException,
   ConflictException,
+  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 
@@ -48,6 +49,87 @@ describe('VerificationService', () => {
 
   afterEach(() => {
     process.env = ORIGINAL_ENV;
+  });
+
+  describe('getLadderStatus', () => {
+    it('throws when user is missing', async () => {
+      query.mockResolvedValueOnce([]);
+      await expect(service.getLadderStatus('ghost')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('points to email when level is none', async () => {
+      query.mockResolvedValueOnce([
+        {
+          verification_level: 'none',
+          id_verification_status: 'none',
+          email: 'a@b.co',
+          phone: null,
+        },
+      ]);
+      const s = await service.getLadderStatus('u1');
+      expect(s.nextStep).toBe('email');
+      expect(s.canStartEmail).toBe(true);
+      expect(s.canStartPhone).toBe(true);
+      expect(s.canStartId).toBe(true);
+    });
+
+    it('points to phone after email', async () => {
+      query.mockResolvedValueOnce([
+        {
+          verification_level: 'email',
+          id_verification_status: 'none',
+          email: 'a@b.co',
+          phone: null,
+        },
+      ]);
+      const s = await service.getLadderStatus('u1');
+      expect(s.nextStep).toBe('phone');
+      expect(s.canStartEmail).toBe(false);
+    });
+
+    it('points to id after phone; selfie is not a step', async () => {
+      query.mockResolvedValueOnce([
+        {
+          verification_level: 'phone',
+          id_verification_status: 'none',
+          email: 'a@b.co',
+          phone: '+1555',
+        },
+      ]);
+      const s = await service.getLadderStatus('u1');
+      expect(s.nextStep).toBe('id');
+      expect(s.canStartId).toBe(true);
+    });
+
+    it('blocks id start while pending', async () => {
+      query.mockResolvedValueOnce([
+        {
+          verification_level: 'phone',
+          id_verification_status: 'pending',
+          email: 'a@b.co',
+          phone: '+1555',
+        },
+      ]);
+      const s = await service.getLadderStatus('u1');
+      expect(s.nextStep).toBeNull();
+      expect(s.canStartId).toBe(false);
+      expect(s.message).toMatch(/review/i);
+    });
+
+    it('is complete when id verified', async () => {
+      query.mockResolvedValueOnce([
+        {
+          verification_level: 'id',
+          id_verification_status: 'verified',
+          email: 'a@b.co',
+          phone: '+1555',
+        },
+      ]);
+      const s = await service.getLadderStatus('u1');
+      expect(s.nextStep).toBeNull();
+      expect(s.canStartId).toBe(false);
+      expect(s.message).toMatch(/verified/i);
+    });
   });
 
   describe('startPhone', () => {
