@@ -104,7 +104,11 @@ export interface RecentFollowersResponse {
   items: RecentFollowerCard[];
 }
 
-/** Unified Interactions inbox item (client merge today; backend union later). */
+/**
+ * Unified Interactions inbox item.
+ * Backend: GET /interactions/inbox (domain projection).
+ * Friends Requests tab still uses /friends/requests/pending.
+ */
 export type InboxItemType = 'wave' | 'friend_request' | 'follow' | 'story_reaction';
 
 export interface InboxItem {
@@ -115,7 +119,7 @@ export interface InboxItem {
     id: string;
     displayName: string;
     avatarUrl: string | null;
-    /** Present for waves; optional for friend_request / follow cards. */
+    /** Present for waves/reactions; optional for friend_request / follow cards. */
     verification?: VerificationLevel | null;
   };
   isMutual?: boolean;
@@ -123,4 +127,8 @@ export interface InboxItem {
   isFollowingBack?: boolean;
   /** Story reaction only; omit (do not set undefined) under exactOptionalPropertyTypes. */
   reactionKind?: 'heart' | 'wave';
+}
+
+export interface InboxResponse {
+  items: InboxItem[];
 }

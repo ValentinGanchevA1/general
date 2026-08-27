@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 import type {
+  InboxResponse,
   ReceivedInteractionsResponse,
   WaveRequest,
   WaveResponse,
@@ -47,6 +48,21 @@ export class InteractionsController {
   ): Promise<ReceivedInteractionsResponse> {
     const limit = Math.min(Math.max(Number(limitRaw) || 50, 1), 100);
     const items = await this.interactions.listReceived(userId, limit);
+    return { items };
+  }
+
+  /**
+   * Domain inbox: waves + story reactions + pending friend requests + recent followers.
+   * Friends Requests tab continues to use /friends/requests/pending.
+   */
+  @Get('inbox')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async inbox(
+    @CurrentUser('id') userId: string,
+    @Query('limit') limitRaw?: string,
+  ): Promise<InboxResponse> {
+    const limit = Math.min(Math.max(Number(limitRaw) || 50, 1), 100);
+    const items = await this.interactions.listInbox(userId, limit);
     return { items };
   }
 }

@@ -10,6 +10,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
 import type {
+  InboxItem,
   ReceivedInteraction,
   WaveRequest,
   WaveResponse,
@@ -27,6 +28,7 @@ import { BlocksService } from '../blocks/blocks.service';
 export class InteractionsService {
   private readonly logger = new Logger(InteractionsService.name);
   private static readonly REWAVE_COOLDOWN_HOURS = 24;
+  private static readonly INBOX_FOLLOWER_WINDOW_DAYS = 14;
 
   constructor(
     @InjectDataSource() private readonly db: DataSource,
@@ -310,5 +312,174 @@ export class InteractionsService {
       createdAt: r.created_at.toISOString(),
       isMutual: r.is_mutual,
     }));
+  }
+
+  /**
+   * Domain inbox projection: waves + story reactions + pending friend requests +
+   * recent followers (14d). Friends REST endpoints remain the source of truth
+   * for the Requests tab; this is a read-only merge for the unified inbox UI
+   * and future consistent badge/unread counts.
+   */
+  async listInbox(userId: string, limit = 50): Promise<InboxItem[]> {
+    const take = Math.min(Math.max(limit, 1), 100);
+    const rows = await this.db.query<
+      Array<{
+        id: string;
+        kind: 'wave' | 'story_reaction' | 'friend_request' | 'follow';
+        from_id: string;
+        display_name: string;
+        avatar_url: string | null;
+        verification_level: string | null;
+        created_at: Date;
+        is_mutual: boolean | null;
+        request_id: string | null;
+        is_following_back: boolean | null;
+        reaction_kind: string | null;
+      }>
+    >(
+      `
+      WITH blocked AS (
+        SELECT blocked_id AS uid FROM user_blocks WHERE blocker_id = $1
+        UNION
+        SELECT blocker_id AS uid FROM user_blocks WHERE blocked_id = $1
+      ),
+      waves_in AS (
+        SELECT
+          ('wave:' || w.id::text) AS id,
+          'wave'::text AS kind,
+          w.from_user_id AS from_id,
+          u.display_name,
+          u.avatar_url,
+          u.verification_level,
+          w.created_at,
+          (
+            EXISTS (
+              SELECT 1 FROM waves w2
+               WHERE w2.from_user_id = $1 AND w2.to_user_id = w.from_user_id
+            ) OR EXISTS (
+              SELECT 1 FROM conversations c
+               WHERE c.status = 'accepted'
+                 AND c.participant_ids @> ARRAY[$1::uuid, w.from_user_id]::uuid[]
+            )
+          ) AS is_mutual,
+          NULL::text AS request_id,
+          NULL::boolean AS is_following_back,
+          NULL::text AS reaction_kind
+        FROM waves w
+        JOIN users u ON u.id = w.from_user_id AND u.deleted_at IS NULL
+        WHERE w.to_user_id = $1
+          AND w.from_user_id NOT IN (SELECT uid FROM blocked)
+      ),
+      reactions_in AS (
+        SELECT
+          ('story_reaction:' || sr.story_id::text || ':' || sr.user_id::text) AS id,
+          'story_reaction'::text AS kind,
+          sr.user_id AS from_id,
+          u.display_name,
+          u.avatar_url,
+          u.verification_level,
+          sr.created_at,
+          (
+            EXISTS (
+              SELECT 1 FROM waves w2
+               WHERE w2.from_user_id = $1 AND w2.to_user_id = sr.user_id
+            ) OR EXISTS (
+              SELECT 1 FROM conversations c
+               WHERE c.status = 'accepted'
+                 AND c.participant_ids @> ARRAY[$1::uuid, sr.user_id]::uuid[]
+            )
+          ) AS is_mutual,
+          NULL::text AS request_id,
+          NULL::boolean AS is_following_back,
+          sr.kind AS reaction_kind
+        FROM story_reactions sr
+        JOIN stories s ON s.id = sr.story_id AND s.deleted_at IS NULL AND s.expires_at > NOW()
+        JOIN users u ON u.id = sr.user_id AND u.deleted_at IS NULL
+        WHERE s.author_id = $1
+          AND sr.user_id NOT IN (SELECT uid FROM blocked)
+      ),
+      friend_requests_in AS (
+        SELECT
+          ('fr:' || fr.id::text) AS id,
+          'friend_request'::text AS kind,
+          fr.requester_id AS from_id,
+          u.display_name,
+          u.avatar_url,
+          u.verification_level,
+          fr.created_at,
+          NULL::boolean AS is_mutual,
+          fr.id::text AS request_id,
+          NULL::boolean AS is_following_back,
+          NULL::text AS reaction_kind
+        FROM friend_requests fr
+        JOIN users u ON u.id = fr.requester_id AND u.deleted_at IS NULL
+        WHERE fr.addressee_id = $1
+          AND fr.status = 'pending'
+          AND fr.requester_id NOT IN (SELECT uid FROM blocked)
+      ),
+      followers_in AS (
+        SELECT
+          ('follow:' || u.id::text || ':' || f.created_at::text) AS id,
+          'follow'::text AS kind,
+          u.id AS from_id,
+          u.display_name,
+          u.avatar_url,
+          u.verification_level,
+          f.created_at,
+          NULL::boolean AS is_mutual,
+          NULL::text AS request_id,
+          EXISTS (
+            SELECT 1 FROM follows fl
+             WHERE fl.follower_id = $1 AND fl.followee_id = u.id
+          ) AS is_following_back,
+          NULL::text AS reaction_kind
+        FROM follows f
+        JOIN users u ON u.id = f.follower_id AND u.deleted_at IS NULL
+        WHERE f.followee_id = $1
+          AND f.created_at > NOW() - ($3::int * INTERVAL '1 day')
+          AND u.id NOT IN (SELECT uid FROM blocked)
+      )
+      SELECT * FROM (
+        SELECT * FROM waves_in
+        UNION ALL
+        SELECT * FROM reactions_in
+        UNION ALL
+        SELECT * FROM friend_requests_in
+        UNION ALL
+        SELECT * FROM followers_in
+      ) combined
+      ORDER BY created_at DESC
+      LIMIT $2
+      `,
+      [userId, take, InteractionsService.INBOX_FOLLOWER_WINDOW_DAYS],
+    );
+
+    return rows.map((r): InboxItem => {
+      const base: InboxItem = {
+        id: r.id,
+        type:
+          r.kind === 'friend_request'
+            ? 'friend_request'
+            : r.kind === 'follow'
+              ? 'follow'
+              : r.kind === 'story_reaction'
+                ? 'story_reaction'
+                : 'wave',
+        createdAt: r.created_at.toISOString(),
+        fromUser: {
+          id: r.from_id,
+          displayName: r.display_name,
+          avatarUrl: r.avatar_url,
+          verification: (r.verification_level ?? null) as InboxItem['fromUser']['verification'],
+        },
+      };
+      if (r.is_mutual != null) base.isMutual = r.is_mutual;
+      if (r.request_id != null) base.requestId = r.request_id;
+      if (r.is_following_back != null) base.isFollowingBack = r.is_following_back;
+      if (r.reaction_kind === 'heart' || r.reaction_kind === 'wave') {
+        base.reactionKind = r.reaction_kind;
+      }
+      return base;
+    });
   }
 }
