@@ -196,4 +196,82 @@ describe('InteractionsService', () => {
       expect(insertedConvo).toBe(false);
     });
   });
+
+  describe('listInbox', () => {
+    it('maps mixed kinds into InboxItem shape with stable ids', async () => {
+      const created = new Date('2026-08-20T12:00:00Z');
+      query.mockResolvedValueOnce([
+        {
+          id: 'wave:w1',
+          kind: 'wave',
+          from_id: 'u2',
+          display_name: 'Alice',
+          avatar_url: null,
+          verification_level: 'email',
+          created_at: created,
+          is_mutual: false,
+          request_id: null,
+          is_following_back: null,
+          reaction_kind: null,
+        },
+        {
+          id: 'fr:r1',
+          kind: 'friend_request',
+          from_id: 'u3',
+          display_name: 'Bob',
+          avatar_url: 'https://x/b.png',
+          verification_level: 'phone',
+          created_at: created,
+          is_mutual: null,
+          request_id: 'r1',
+          is_following_back: null,
+          reaction_kind: null,
+        },
+        {
+          id: 'follow:u4:2026-08-20',
+          kind: 'follow',
+          from_id: 'u4',
+          display_name: 'Cara',
+          avatar_url: null,
+          verification_level: null,
+          created_at: created,
+          is_mutual: null,
+          request_id: null,
+          is_following_back: true,
+          reaction_kind: null,
+        },
+      ]);
+
+      const items = await service.listInbox('me', 50);
+
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('friend_requests_in'),
+        ['me', 50, 14],
+      );
+      expect(items).toHaveLength(3);
+      expect(items[0]).toMatchObject({
+        id: 'wave:w1',
+        type: 'wave',
+        isMutual: false,
+        fromUser: { id: 'u2', displayName: 'Alice' },
+      });
+      expect(items[1]).toMatchObject({
+        id: 'fr:r1',
+        type: 'friend_request',
+        requestId: 'r1',
+        fromUser: { id: 'u3', displayName: 'Bob' },
+      });
+      expect(items[2]).toMatchObject({
+        type: 'follow',
+        isFollowingBack: true,
+        fromUser: { id: 'u4', displayName: 'Cara' },
+      });
+    });
+
+    it('clamps limit to 1..100', async () => {
+      query.mockResolvedValueOnce([]);
+      await service.listInbox('me', 999);
+      expect(query.mock.calls[0]![1]).toEqual(['me', 100, 14]);
+    });
+  });
 });
