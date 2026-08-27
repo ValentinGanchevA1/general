@@ -104,7 +104,7 @@ export interface RecentFollowersResponse {
   items: RecentFollowerCard[];
 }
 
-/** Unified Interactions inbox item (client merge today; backend union later). */
+/** Unified Interactions inbox item (backend aggregator; mobile single fetch). */
 export type InboxItemType = 'wave' | 'friend_request' | 'follow' | 'story_reaction';
 
 export interface InboxItem {
@@ -123,4 +123,9 @@ export interface InboxItem {
   isFollowingBack?: boolean;
   /** Story reaction only; omit (do not set undefined) under exactOptionalPropertyTypes. */
   reactionKind?: 'heart' | 'wave';
+}
+
+/** GET /interactions/inbox — thin aggregator over waves, reactions, friend requests, recent followers. */
+export interface InboxResponse {
+  items: InboxItem[];
 }
