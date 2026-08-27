@@ -2,7 +2,7 @@ packages:
   - "apps/*"
   - "packages/*"
 
-enable-pre-post-scripts: true
+enablePrePostScripts: true
 allowBuilds:
   '@nestjs/core': true
   '@sentry/cli': true
