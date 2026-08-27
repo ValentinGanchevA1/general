@@ -50,13 +50,21 @@ function maskEmail(email: string): string {
   return `${head}***@${domain}`;
 }
 
-const LEVEL_RANK: Record<string, number> = {
+/** Ladder rank — numeric so comparisons are never possibly-undefined under strictNullChecks. */
+const LEVEL_RANK = {
   none: 0,
   email: 1,
   phone: 2,
   selfie: 3, // legacy intermediate; product treats as toward id
   id: 4,
-};
+} as const;
+
+function levelRank(level: string): number {
+  if (level in LEVEL_RANK) {
+    return LEVEL_RANK[level as keyof typeof LEVEL_RANK];
+  }
+  return 0;
+}
 
 @Injectable()
 export class VerificationService {
@@ -92,7 +100,7 @@ export class VerificationService {
 
     const level = (row.verification_level ?? 'none') as VerificationLevel;
     const idStatus = row.id_verification_status ?? 'none';
-    const rank = LEVEL_RANK[level] ?? 0;
+    const rank = levelRank(level);
 
     // ID fully done → no next step.
     if (idStatus === 'verified' || level === 'id') {
@@ -107,9 +115,10 @@ export class VerificationService {
       };
     }
 
+    // After the early return, idStatus is narrowed away from 'verified'.
     const canStartEmail = rank < LEVEL_RANK.email && !!row.email;
     const canStartPhone = rank < LEVEL_RANK.phone;
-    const canStartId = idStatus !== 'pending' && idStatus !== 'verified';
+    const canStartId = idStatus !== 'pending';
 
     let nextStep: VerificationLadderStatus['nextStep'] = null;
     let message = 'Complete verification to unlock more features';
@@ -126,7 +135,8 @@ export class VerificationService {
         idStatus === 'rejected'
           ? 'ID was rejected — you can resubmit'
           : 'Submit photo ID and selfie for full verification';
-    } else if (idStatus === 'pending') {
+    } else {
+      // idStatus === 'pending'
       nextStep = null;
       message = 'ID under review';
     }
