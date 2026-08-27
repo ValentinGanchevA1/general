@@ -29,6 +29,7 @@ import { useAppDispatch } from '@/hooks/redux';
 import { setPendingFilter } from '@/features/pulse/pulseSlice';
 import { track } from '@/lib/analytics';
 import { colors, radius, spacing, fontSize, shadow } from '@/theme';
+import { mapFabBottom } from '@/components/map/mapChromeLayout';
 
 import { useFabContext, type FabActionId } from './useFabContext';
 import { FAB_ACTIONS } from './fabActions';
@@ -50,8 +51,6 @@ interface Props {
 const FAB_SIZE = 56;
 const ITEM_SIZE = 48;
 const ITEM_GAP = 14;
-/** Minimum clearance above tab bar — maximum bottom placement. */
-const FAB_BOTTOM = spacing.md; // 12 — was spacing.xxl (24)
 
 export function ContextualFab(props: Props): React.JSX.Element {
   const { zoom, points, nearestUserId, onAction, bottomOffset = 0 } = props;
@@ -61,7 +60,7 @@ export function ContextualFab(props: Props): React.JSX.Element {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
-  const fabBottom = FAB_BOTTOM + insets.bottom + bottomOffset;
+  const fabBottom = mapFabBottom(insets.bottom, bottomOffset);
 
   // useState (not useRef) so identity is stable without a render-time ref read.
   const [anim] = useState(() => new Animated.Value(0));
