@@ -7,6 +7,7 @@ import { GamificationModule } from '../gamification/gamification.module';
 import { ChallengesModule } from '../challenges/challenges.module';
 import { AchievementsModule } from '../achievements/achievements.module';
 import { BlocksModule } from '../blocks/blocks.module';
+import { FriendsModule } from '../friends/friends.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { BlocksModule } from '../blocks/blocks.module';
     ChallengesModule,
     AchievementsModule,
     BlocksModule,
+    FriendsModule,
   ],
   providers: [InteractionsService],
   controllers: [InteractionsController],
