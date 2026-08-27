@@ -1,10 +1,11 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
 import type {
   StartEmailVerificationResponse,
   StartPhoneVerificationResponse,
   UserProfile,
+  VerificationLadderStatus,
 } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -16,6 +17,13 @@ import { CheckEmailDto, CheckPhoneDto, StartPhoneDto } from './dto';
 @UseGuards(JwtAuthGuard)
 export class VerificationController {
   constructor(private readonly verification: VerificationService) {}
+
+  /** GET /api/v1/verification/status — unified ladder (email → phone → id). */
+  @Get('status')
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  status(@CurrentUser('id') userId: string): Promise<VerificationLadderStatus> {
+    return this.verification.getLadderStatus(userId);
+  }
 
   /** POST /api/v1/verification/phone/start — send an SMS OTP. */
   @Post('phone/start')

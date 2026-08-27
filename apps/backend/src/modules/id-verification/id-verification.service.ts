@@ -164,10 +164,16 @@ export class IdVerificationService {
         throw new BadRequestException(`Submission already ${existing[0].status}`);
       }
 
+      // Keep ladder + ID status aligned: approve promotes verification_level to 'id'.
       await manager.query(
         `UPDATE users
          SET id_verification_status = $1,
-             id_verified_at = CASE WHEN $1 = 'verified' THEN now() ELSE id_verified_at END
+             id_verified_at = CASE WHEN $1 = 'verified' THEN now() ELSE id_verified_at END,
+             verification_level = CASE
+               WHEN $1 = 'verified' THEN 'id'
+               ELSE verification_level
+             END,
+             updated_at = NOW()
          WHERE id = $2`,
         [newStatus, targetUserId],
       );
