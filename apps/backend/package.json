@@ -15,7 +15,9 @@
     "migration:run": "node --env-file-if-exists=../../.env scripts/migrate.js",
     "migration:check-prefixes": "node scripts/check-migration-prefixes.mjs",
     "migration:check-schema": "node scripts/check-schema-migrations.mjs",
-    "seed": "node --env-file-if-exists=../../.env scripts/seed.js"
+    "seed": "node --env-file-if-exists=../../.env scripts/seed.js",
+    "id:approve": "node --env-file-if-exists=../../.env scripts/approve-id-verification.mjs",
+    "id:review": "node --env-file-if-exists=../../.env scripts/review-id-verifications.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-rekognition": "^3.1075.0",

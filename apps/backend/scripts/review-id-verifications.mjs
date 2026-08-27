@@ -36,8 +36,9 @@ for (const /** @type {Row} */ row of rows) {
 	console.log('Selfie:  ', await presign(row.selfie_url));
 	console.log('ID front:', await presign(row.id_front_url));
 	console.log('ID back: ', await presign(row.id_back_url));
-	console.log(`Decide:  curl -X POST $API/id-verification/admin/${row.user_id}/decide \\`);
-	console.log(`  -H "Authorization: Bearer $ADMIN_JWT" -H "Content-Type: application/json" \\`);
+	console.log(`Decide:  node scripts/approve-id-verification.mjs --user ${row.user_id}`);
+	console.log(`Or curl: POST $API/admin/verifications/pending/${row.user_id}/decide`);
+	console.log(`  -H "Authorization: Bearer $ADMIN_JWT" -H "Content-Type: application/json"`);
 	console.log(`  -d '{"decision":"approved"}'`);
 }
 
