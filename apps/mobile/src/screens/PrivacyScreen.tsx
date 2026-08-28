@@ -6,6 +6,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { PRIVACY_POLICY_URL } from '@/constants/app';
+import { colors, spacing, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
@@ -20,7 +21,7 @@ function Point({
 }): React.JSX.Element {
   return (
     <View style={styles.point}>
-      <Icon name={icon} size={22} color="#00d4ff" style={styles.pointIcon} />
+      <Icon name={icon} size={22} color={colors.primary} style={styles.pointIcon} />
       <View style={styles.pointText}>
         <Text style={styles.pointTitle}>{title}</Text>
         <Text style={styles.pointBody}>{body}</Text>
@@ -30,8 +31,8 @@ function Point({
 }
 
 /**
- * Native summary of G88's privacy posture aligned with current product:
- * map discovery, Pulse, stories, soft post gates, offline trade.
+ * Native summary of G88 privacy posture. Legal text of record remains the
+ * hosted policy (PRIVACY_POLICY_URL) — this screen is product-aligned explainer only.
  */
 export function PrivacyScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
@@ -44,7 +45,7 @@ export function PrivacyScreen(): React.JSX.Element {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Icon name="chevron-left" size={28} color="#fff" />
+          <Icon name="chevron-left" size={28} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Privacy</Text>
         <View style={styles.back} />
@@ -69,17 +70,22 @@ export function PrivacyScreen(): React.JSX.Element {
         <Point
           icon="eye-off"
           title="You control who sees you"
-          body="Hide from discovery any time in Settings → Appear on map. You can also revoke OS location permission in device settings."
+          body="Hide from discovery any time in Settings → Appear on map. Close friends’ online status is a separate toggle. You can also revoke OS location permission in device settings."
+        />
+        <Point
+          icon="account-group"
+          title="Friends stay intentional"
+          body="Friend requests are explicit. Your friends list and online status for friends are not sold or used for ads. Unfriending does not automatically tear down public follows."
         />
         <Point
           icon="circle-outline"
           title="Stories stay local and temporary"
-          body="Stories are visible to people nearby and expire after 24 hours. Posting requires a verified email and a minimum account age (or phone+). Media is not kept as a permanent public archive."
+          body="Stories are visible to people nearby and expire after 24 hours. Posting requires a verified email and a minimum account age (phone-verified accounts can post sooner). Media is not kept as a permanent public archive."
         />
         <Point
           icon="hand-wave"
           title="Interactions are intentional"
-          body="Waves and story reactions are first-class signals. Chat unlocks only after mutual interest — not cold outreach from strangers."
+          body="Waves, story reactions, and friend requests are first-class signals. Chat prioritizes people you already know; cold outreach stays lightweight until interest is mutual."
         />
         <Point
           icon="account-eye"
@@ -109,28 +115,28 @@ export function PrivacyScreen(): React.JSX.Element {
           style={styles.actionRow}
           onPress={() => navigation.navigate('Settings')}
         >
-          <Icon name="cog" size={22} color="#888" />
+          <Icon name="cog" size={22} color={colors.textMuted} />
           <View style={styles.actionText}>
             <Text style={styles.actionLabel}>Visibility & account</Text>
             <Text style={styles.actionSub}>
-              Appear on map, blocked users, delete account
+              Map presence, friends online, blocked users, delete account
             </Text>
           </View>
-          <Icon name="chevron-right" size={24} color="#444" />
+          <Icon name="chevron-right" size={24} color={colors.borderStrong} />
         </TouchableOpacity>
 
         <TouchableOpacity style={[styles.actionRow, styles.actionRowSpaced]} onPress={openFullPolicy}>
-          <Icon name="file-document-outline" size={22} color="#888" />
+          <Icon name="file-document-outline" size={22} color={colors.textMuted} />
           <View style={styles.actionText}>
             <Text style={styles.actionLabel}>Read the full policy</Text>
             <Text style={styles.actionSub}>Opens our complete privacy policy</Text>
           </View>
-          <Icon name="open-in-new" size={20} color="#444" />
+          <Icon name="open-in-new" size={20} color={colors.borderStrong} />
         </TouchableOpacity>
 
         <Text style={styles.footnote}>
           Deleting your account (Settings → Delete account) is immediate and
-          permanently removes your profile, photos, stories, messages, and activity.
+          permanently removes your profile, photos, stories, messages, friends, and activity.
         </Text>
       </ScrollView>
     </View>
@@ -138,45 +144,45 @@ export function PrivacyScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
+  container: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
+    padding: spacing.md,
     paddingTop: 56,
   },
   back: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  body: { padding: 24, paddingBottom: 48 },
-  intro: { color: '#aaa', fontSize: 14, lineHeight: 21, marginBottom: 24 },
+  headerTitle: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '700' },
+  body: { padding: spacing.xxl, paddingBottom: 48 },
+  intro: { color: colors.textSecondary, fontSize: 14, lineHeight: 21, marginBottom: spacing.xxl },
   point: { flexDirection: 'row', marginBottom: 22 },
   pointIcon: { marginTop: 2, width: 30 },
   pointText: { flex: 1 },
-  pointTitle: { color: '#fff', fontSize: 15, fontWeight: '600', marginBottom: 4 },
-  pointBody: { color: '#888', fontSize: 13, lineHeight: 19 },
-  divider: { height: 1, backgroundColor: '#1a1a2e', marginVertical: 12 },
+  pointTitle: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600', marginBottom: 4 },
+  pointBody: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 19 },
+  divider: { height: 1, backgroundColor: colors.surfaceAlt, marginVertical: spacing.md },
   sectionTitle: {
-    color: '#555',
+    color: colors.textFaint,
     fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: 12,
-    marginTop: 8,
+    marginBottom: spacing.md,
+    marginTop: spacing.sm,
   },
   actionRow: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
     borderRadius: 10,
-    padding: 16,
+    padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
   },
-  actionRowSpaced: { marginTop: 12 },
-  actionText: { flex: 1, marginLeft: 12 },
-  actionLabel: { color: '#fff', fontSize: 15, fontWeight: '500' },
-  actionSub: { color: '#666', fontSize: 12, marginTop: 2 },
-  footnote: { color: '#555', fontSize: 12, lineHeight: 18, marginTop: 20 },
+  actionRowSpaced: { marginTop: spacing.md },
+  actionText: { flex: 1, marginLeft: spacing.md },
+  actionLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '500' },
+  actionSub: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
+  footnote: { color: colors.textFaint, fontSize: fontSize.xs, lineHeight: 18, marginTop: 20 },
 });

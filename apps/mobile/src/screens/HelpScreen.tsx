@@ -15,6 +15,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { SUPPORT_EMAIL, APP_VERSION } from '@/constants/app';
 import { track } from '@/lib/analytics';
+import { colors, spacing, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
@@ -35,15 +36,23 @@ const FAQS: Faq[] = [
   },
   {
     q: 'How do stories work?',
-    a: 'Stories are visible to people nearby and disappear after 24 hours. Posting needs a verified email and an account at least 24 hours old (phone-verified accounts can post sooner). Reactions on stories count like waves.',
+    a: 'Stories are visible to people nearby and disappear after 24 hours. Posting needs a verified email and an account at least 24 hours old (phone-verified accounts can post sooner). Reactions on stories count like waves toward mutual interest.',
+  },
+  {
+    q: 'What is the Interactions screen?',
+    a: 'Interactions is one inbox for waves, pending friend requests, and recent followers. Accept or decline friend requests there, match a wave, or follow someone back. Your Friends → Requests tab stays available for requests only.',
+  },
+  {
+    q: 'How do friends work?',
+    a: 'Send or accept a friend request from a profile or from Interactions. Friends can see when you are online if you allow it in Settings. Unfriending removes the close-friend link but keeps mutual follows unless you unfollow separately.',
   },
   {
     q: 'Why can’t I message someone?',
-    a: 'Chat unlocks after mutual interest — a mutual wave, or a wave matched with a story reaction. Send a wave or react first; when they reciprocate, the chat opens.',
+    a: 'Chat unlocks after mutual interest — a mutual wave, a wave matched with a story reaction, or an existing relationship path. Friends and recent activity sort first in your chat list. Send a wave or react first when you are still strangers.',
   },
   {
     q: 'What do verification badges mean?',
-    a: 'They show confirmed email, phone, or ID review. Optional, but they raise trust. Start from Profile → Verification. Email verification also unlocks story posting.',
+    a: 'They show progress on the trust ladder: email → phone → ID review. Optional, but they raise trust. Email verification also unlocks story posting. Start from Profile → Verification.',
   },
   {
     q: 'How does local trade work?',
@@ -51,7 +60,7 @@ const FAQS: Faq[] = [
   },
   {
     q: 'How do I delete my account?',
-    a: 'Settings → Delete account. Immediate and permanent: profile, photos, stories, messages, and activity are removed.',
+    a: 'Settings → Delete account. Immediate and permanent: profile, photos, stories, messages, friends, and activity are removed.',
   },
   {
     q: 'I found a bug or something feels wrong.',
@@ -69,7 +78,7 @@ function FaqItem({ q, a }: Faq): React.JSX.Element {
     >
       <View style={styles.faqHead}>
         <Text style={styles.faqQ}>{q}</Text>
-        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={22} color="#666" />
+        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={22} color={colors.textFaint} />
       </View>
       {open ? <Text style={styles.faqA}>{a}</Text> : null}
     </TouchableOpacity>
@@ -98,7 +107,7 @@ export function HelpScreen(): React.JSX.Element {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Icon name="chevron-left" size={28} color="#fff" />
+          <Icon name="chevron-left" size={28} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Help & Support</Text>
         <View style={styles.back} />
@@ -112,24 +121,24 @@ export function HelpScreen(): React.JSX.Element {
 
         <Text style={[styles.sectionTitle, styles.sectionGap]}>Still need help?</Text>
         <TouchableOpacity style={styles.contactRow} onPress={emailSupport}>
-          <Icon name="email-outline" size={22} color="#00d4ff" />
+          <Icon name="email-outline" size={22} color={colors.primary} />
           <View style={styles.contactText}>
             <Text style={styles.contactLabel}>Email support</Text>
             <Text style={styles.contactSub}>{SUPPORT_EMAIL}</Text>
           </View>
-          <Icon name="chevron-right" size={24} color="#444" />
+          <Icon name="chevron-right" size={24} color={colors.borderStrong} />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.contactRow}
           onPress={() => navigation.navigate('Privacy')}
         >
-          <Icon name="shield-lock" size={22} color="#888" />
+          <Icon name="shield-lock" size={22} color={colors.textMuted} />
           <View style={styles.contactText}>
             <Text style={styles.contactLabel}>Privacy</Text>
-            <Text style={styles.contactSub}>How your data and location are handled</Text>
+            <Text style={styles.contactSub}>How your data, friends, and location are handled</Text>
           </View>
-          <Icon name="chevron-right" size={24} color="#444" />
+          <Icon name="chevron-right" size={24} color={colors.borderStrong} />
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -137,48 +146,48 @@ export function HelpScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
+  container: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
+    padding: spacing.md,
     paddingTop: 56,
   },
   back: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  body: { padding: 24, paddingBottom: 48 },
+  headerTitle: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '700' },
+  body: { padding: spacing.xxl, paddingBottom: 48 },
   sectionTitle: {
-    color: '#555',
+    color: colors.textFaint,
     fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   sectionGap: { marginTop: 28 },
   faq: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
     borderRadius: 10,
-    padding: 16,
+    padding: spacing.lg,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
   },
   faqHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  faqQ: { color: '#fff', fontSize: 14, fontWeight: '500', flex: 1, marginRight: 12 },
-  faqA: { color: '#888', fontSize: 13, lineHeight: 19, marginTop: 10 },
+  faqQ: { color: colors.textPrimary, fontSize: 14, fontWeight: '500', flex: 1, marginRight: spacing.md },
+  faqA: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 19, marginTop: 10 },
   contactRow: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
     borderRadius: 10,
-    padding: 16,
+    padding: spacing.lg,
     marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
   },
-  contactText: { flex: 1, marginLeft: 12 },
-  contactLabel: { color: '#fff', fontSize: 15, fontWeight: '500' },
-  contactSub: { color: '#666', fontSize: 12, marginTop: 2 },
+  contactText: { flex: 1, marginLeft: spacing.md },
+  contactLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '500' },
+  contactSub: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
 });
