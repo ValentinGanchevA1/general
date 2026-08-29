@@ -61,6 +61,13 @@ const FILTERS: FilterDef[] = [
   { key: 'alerts',   label: 'Alerts',  type: 'alert' },
 ];
 
+const ALLOWED_FILTER_KEYS = new Set(FILTERS.map((f) => f.key));
+
+function resolveFilter(raw: PulseFilter | undefined): PulseFilter {
+  if (raw && ALLOWED_FILTER_KEYS.has(raw)) return raw;
+  return 'all';
+}
+
 /** ~2km box around the user for nearby story query when map viewport is unavailable. */
 function viewportAround(
   lat: number,
@@ -86,26 +93,25 @@ export function PulseScreen(): React.JSX.Element {
   const { coords: myCoords, requestPermission } = useUserLocation();
   const { on } = useSocket();
 
-  const [filter, setFilter] = useState<PulseFilter>(route.params?.filter ?? 'all');
+  const [filter, setFilter] = useState<PulseFilter>(() => resolveFilter(route.params?.filter));
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
 
+  // Sync filter from navigation params (deep link / tab param change).
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (route.params?.filter) {
-      const allowed = FILTERS.some((f) => f.key === route.params?.filter);
-      setFilter(allowed ? (route.params.filter as PulseFilter) : 'all');
-    }
+    if (route.params?.filter == null) return;
+    const next = resolveFilter(route.params.filter);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional sync from route
+    setFilter(next);
   }, [route.params?.filter]);
 
   useEffect(() => {
-    if (pendingFilter) {
-      const allowed = FILTERS.some((f) => f.key === pendingFilter);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFilter(allowed ? (pendingFilter as PulseFilter) : 'all');
-      dispatch(clearPendingFilter());
-    }
+    if (!pendingFilter) return;
+    const next = resolveFilter(pendingFilter as PulseFilter);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional sync from redux pending
+    setFilter(next);
+    dispatch(clearPendingFilter());
   }, [pendingFilter, dispatch]);
 
   const load = useCallback(() => {
