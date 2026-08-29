@@ -153,6 +153,8 @@ export class ChatService {
   /**
    * Order: close friends first, then online friends, then last activity.
    * peerOnline respects friends_see_online_status.
+   * unreadCount: messages from peer after viewer's last open is not stored yet;
+   * MVP = 1 when the latest message is from the peer, else 0.
    */
   async findConversations(userId: string): Promise<ConversationSummary[]> {
     const rows = await this.db.query<
@@ -239,6 +241,8 @@ export class ChatService {
       if (isFriend && r.peer_id && r.peer_allows_online) {
         peerOnline = onlineSet.has(r.peer_id);
       }
+      const unreadCount =
+        r.last_sender_id != null && r.last_sender_id !== userId ? 1 : 0;
       return {
         id: r.id,
         participantIds: r.participant_ids,
@@ -252,6 +256,7 @@ export class ChatService {
         initiatedBy: r.initiated_by,
         isFriend,
         peerOnline,
+        unreadCount,
       };
     });
 

@@ -69,20 +69,33 @@ const chatSlice = createSlice({
   initialState,
   reducers: {
     /** Called when a chat:message socket event arrives. */
-    messageReceived(state, action: PayloadAction<ChatMessage>) {
-      const { conversationId } = action.payload;
+    messageReceived(
+      state,
+      action: PayloadAction<ChatMessage & { viewerId?: string }>,
+    ) {
+      const { conversationId, senderId, body, createdAt, viewerId } = action.payload;
       const existing = state.messages[conversationId] ?? [];
       if (!existing.some((m) => m.id === action.payload.id)) {
         state.messages[conversationId] = [action.payload, ...existing];
       }
       const convo = state.conversations.find((c) => c.id === conversationId);
       if (convo) {
-        convo.lastMessage = { senderId: action.payload.senderId, body: action.payload.body };
-        convo.lastMessageAt = action.payload.createdAt;
+        convo.lastMessage = { senderId, body };
+        convo.lastMessageAt = createdAt;
+        if (viewerId && senderId !== viewerId) {
+          convo.unreadCount = (convo.unreadCount ?? 0) + 1;
+        }
       }
     },
 
-    /** Prepend an optimistically-sent message before the ack arrives. */
+    /** Clear unread badge after opening a conversation. */
+    conversationMarkedRead(state, action: PayloadAction<string>) {
+      const convo = state.conversations.find((c) => c.id === action.payload);
+      if (convo) {
+        convo.unreadCount = 0;
+      }
+    },
+
     messageSentOptimistic(state, action: PayloadAction<ChatMessage>) {
       const { conversationId } = action.payload;
       const existing = state.messages[conversationId] ?? [];
@@ -91,7 +104,6 @@ const chatSlice = createSlice({
       }
     },
 
-    /** Replace the optimistic message with the server-confirmed version. */
     messageConfirmed(
       state,
       action: PayloadAction<{ optimisticId: string; confirmed: ChatMessage }>,
@@ -101,11 +113,6 @@ const chatSlice = createSlice({
       if (!list) return;
       const idx = list.findIndex((m) => m.id === action.payload.optimisticId);
       if (idx !== -1) {
-        // The server fans `chat:message` to the whole convo room — including the
-        // sender — so the broadcast can beat the ack and `messageReceived` may have
-        // already inserted the confirmed message. Overwriting the optimistic slot
-        // would then duplicate that id (React "two children with the same key").
-        // If the confirmed id is already present, drop the optimistic entry instead.
         const alreadyPresent = list.some(
           (m, i) => i !== idx && m.id === action.payload.confirmed.id,
         );
@@ -115,12 +122,10 @@ const chatSlice = createSlice({
           list[idx] = action.payload.confirmed;
         }
       }
-      // Remove from outbox and failedIds if present.
       state.outbox = state.outbox.filter((e) => e.optimisticId !== action.payload.optimisticId);
       state.failedIds = state.failedIds.filter((id) => id !== action.payload.optimisticId);
     },
 
-    /** Queue a message for retry when the socket is not connected. */
     messageQueued(state, action: PayloadAction<OutboxEntry>) {
       const existing = state.outbox.find((e) => e.optimisticId === action.payload.optimisticId);
       if (!existing) {
@@ -128,7 +133,6 @@ const chatSlice = createSlice({
       }
     },
 
-    /** Increment retry count on an outbox entry after a failed drain attempt. */
     outboxRetryIncremented(state, action: PayloadAction<string>) {
       const entry = state.outbox.find((e) => e.optimisticId === action.payload);
       if (!entry) return;
@@ -141,20 +145,29 @@ const chatSlice = createSlice({
       }
     },
 
-    /** Remove a message from failedIds so the user can retry it manually. */
     failedMessageCleared(state, action: PayloadAction<string>) {
       state.failedIds = state.failedIds.filter((id) => id !== action.payload);
-      // Re-queue with reset retries so the next send attempt works.
     },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchConversations.pending, (state) => { state.conversationsLoading = true; })
+      .addCase(fetchConversations.pending, (state) => {
+        state.conversationsLoading = true;
+      })
       .addCase(fetchConversations.fulfilled, (state, action) => {
         state.conversationsLoading = false;
-        state.conversations = action.payload;
+        // Preserve higher local unread if we already counted via socket before refetch.
+        const prev = new Map(
+          state.conversations.map((c) => [c.id, c.unreadCount ?? 0] as const),
+        );
+        state.conversations = action.payload.map((c) => ({
+          ...c,
+          unreadCount: Math.max(c.unreadCount ?? 0, prev.get(c.id) ?? 0),
+        }));
       })
-      .addCase(fetchConversations.rejected, (state) => { state.conversationsLoading = false; })
+      .addCase(fetchConversations.rejected, (state) => {
+        state.conversationsLoading = false;
+      })
 
       .addCase(fetchMessages.pending, (state, action) => {
         state.messagesLoading[action.meta.arg.conversationId] = true;
@@ -169,6 +182,10 @@ const chatSlice = createSlice({
           ...page.messages.filter((m) => !seen.has(m.id)),
         ];
         state.nextCursor[conversationId] = page.nextCursor;
+        if (!action.meta.arg.cursor) {
+          const convo = state.conversations.find((c) => c.id === conversationId);
+          if (convo) convo.unreadCount = 0;
+        }
       })
       .addCase(fetchMessages.rejected, (state, action) => {
         state.messagesLoading[action.meta.arg.conversationId] = false;
@@ -185,6 +202,7 @@ export const {
   messageQueued,
   outboxRetryIncremented,
   failedMessageCleared,
+  conversationMarkedRead,
 } = chatSlice.actions;
 
 export { MAX_RETRIES };

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -8,10 +8,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import type { FollowRequest, InboxItem, WaveRequest, WaveResponse } from '@g88/shared';
+import type {
+  ConversationSummary,
+  FollowRequest,
+  InboxItem,
+  WaveRequest,
+  WaveResponse,
+} from '@g88/shared';
 
 import { postJson } from '@/api/client';
 import { Avatar } from '@/components/Avatar';
@@ -20,12 +26,18 @@ import {
   acceptFriendRequest,
   declineFriendRequest,
 } from '@/features/friends/friendsSlice';
+import { fetchConversations } from '@/features/chat/chatSlice';
 import { useInboxInteractions } from '@/features/interactions/useInboxInteractions';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
-import { useAppDispatch } from '@/hooks/redux';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { useSocket } from '@/realtime/useSocket';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+type HubRow =
+  | { kind: 'chat'; sortAt: number; conversation: ConversationSummary }
+  | { kind: 'inbox'; sortAt: number; item: InboxItem };
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -46,7 +58,15 @@ function signalLabel(item: InboxItem): string {
   return 'reacted to your story';
 }
 
-function Row({
+function peerOf(convo: ConversationSummary, myUserId: string) {
+  return (
+    convo.participants.find((p) => p.id !== myUserId) ??
+    convo.participants[0] ??
+    null
+  );
+}
+
+function InboxRow({
   item,
   busy,
   onMatch,
@@ -145,12 +165,87 @@ function Row({
   );
 }
 
+function ChatRow({
+  conversation,
+  myUserId,
+  onOpen,
+}: {
+  conversation: ConversationSummary;
+  myUserId: string;
+  onOpen: (c: ConversationSummary) => void;
+}): React.JSX.Element {
+  const peer = peerOf(conversation, myUserId);
+  const name = peer?.displayName ?? 'Chat';
+  const last = conversation.lastMessage;
+  const isFromMe = last?.senderId === myUserId;
+  const unread = (conversation.unreadCount ?? 0) > 0;
+  const preview = last
+    ? `${isFromMe ? 'You: ' : ''}${last.body}`
+    : conversation.status === 'pending'
+      ? 'Message request'
+      : 'No messages yet';
+  const when = conversation.lastMessageAt
+    ? timeAgo(conversation.lastMessageAt)
+    : '';
+  const online = conversation.peerOnline === true;
+  const badge =
+    (conversation.unreadCount ?? 0) > 99
+      ? '99+'
+      : String(conversation.unreadCount ?? 0);
+
+  return (
+    <TouchableOpacity
+      style={styles.row}
+      onPress={() => onOpen(conversation)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.avatarWrap}>
+        <Avatar uri={peer?.avatarUrl ?? null} name={name} size={48} />
+        {online ? <View style={styles.onlineDot} /> : null}
+      </View>
+      <View style={styles.info}>
+        <View style={styles.nameRow}>
+          <Text style={[styles.name, unread && styles.nameUnread]} numberOfLines={1}>
+            {name}
+          </Text>
+          {conversation.isFriend ? (
+            <Text style={styles.friendHint}>Friend</Text>
+          ) : null}
+        </View>
+        <Text style={[styles.preview, unread && styles.previewUnread]} numberOfLines={1}>
+          {preview}
+        </Text>
+        {when ? <Text style={styles.time}>{when}</Text> : null}
+      </View>
+      <View style={styles.chatRight}>
+        {unread ? (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadBadgeText}>{badge}</Text>
+          </View>
+        ) : conversation.status === 'pending' ? (
+          <View style={styles.pendingBadge}>
+            <Text style={styles.pendingText}>Pending</Text>
+          </View>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 export function InteractionsScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const dispatch = useAppDispatch();
-  const { items, loading, refresh } = useInboxInteractions();
+  const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
+  const conversations = useAppSelector((s) => s.chat.conversations);
+  const conversationsLoading = useAppSelector((s) => s.chat.conversationsLoading);
+  const { items, loading: inboxLoading, refresh } = useInboxInteractions();
   const { markSeen } = useReceivedInteractions();
+  const { on } = useSocket();
   const [busyIds, setBusyIds] = React.useState<string[]>([]);
+
+  const loadChats = useCallback(() => {
+    void dispatch(fetchConversations());
+  }, [dispatch]);
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -158,8 +253,42 @@ export function InteractionsScreen(): React.JSX.Element {
     });
   }, [markSeen]);
 
-  const setBusy = useCallback((id: string, on: boolean) => {
-    setBusyIds((prev) => (on ? [...prev, id] : prev.filter((x) => x !== id)));
+  useFocusEffect(
+    useCallback(() => {
+      loadChats();
+    }, [loadChats]),
+  );
+
+  useEffect(() => {
+    const unsub = on('chat:message', () => {
+      loadChats();
+    });
+    return unsub;
+  }, [on, loadChats]);
+
+  const rows: HubRow[] = useMemo(() => {
+    const chatRows: HubRow[] = conversations.map((c) => ({
+      kind: 'chat',
+      sortAt: c.lastMessageAt ? new Date(c.lastMessageAt).getTime() : 0,
+      conversation: c,
+    }));
+    const inboxRows: HubRow[] = items.map((item) => ({
+      kind: 'inbox',
+      sortAt: new Date(item.createdAt).getTime(),
+      item,
+    }));
+    return [...chatRows, ...inboxRows].sort((a, b) => b.sortAt - a.sortAt);
+  }, [conversations, items]);
+
+  const loading = (inboxLoading || conversationsLoading) && rows.length === 0;
+
+  const onRefresh = useCallback(async () => {
+    loadChats();
+    await refresh();
+  }, [loadChats, refresh]);
+
+  const setBusy = useCallback((id: string, onFlag: boolean) => {
+    setBusyIds((prev) => (onFlag ? [...prev, id] : prev.filter((x) => x !== id)));
   }, []);
 
   const onMatch = useCallback(
@@ -234,7 +363,20 @@ export function InteractionsScreen(): React.JSX.Element {
     [navigation],
   );
 
-  if (loading && items.length === 0) {
+  const onOpenChat = useCallback(
+    (c: ConversationSummary): void => {
+      const peer = peerOf(c, myUserId);
+      navigation.navigate('Chat', {
+        conversationId: c.id,
+        otherUserName: peer?.displayName ?? 'Chat',
+        otherUserId: peer?.id,
+        requestPending: c.status === 'pending',
+      });
+    },
+    [navigation, myUserId],
+  );
+
+  if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color="#00d4ff" />
@@ -245,31 +387,45 @@ export function InteractionsScreen(): React.JSX.Element {
   return (
     <View style={styles.root}>
       <FlatList
-        data={items}
-        keyExtractor={(i) => i.id}
-        refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={() => void refresh()} tintColor="#00d4ff" />
+        data={rows}
+        keyExtractor={(r) =>
+          r.kind === 'chat' ? `chat-${r.conversation.id}` : `inbox-${r.item.id}`
         }
-        contentContainerStyle={items.length === 0 ? styles.emptyContainer : styles.list}
+        refreshControl={
+          <RefreshControl
+            refreshing={inboxLoading || conversationsLoading}
+            onRefresh={() => void onRefresh()}
+            tintColor="#00d4ff"
+          />
+        }
+        contentContainerStyle={rows.length === 0 ? styles.emptyContainer : styles.list}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>No interactions yet</Text>
             <Text style={styles.emptyBody}>
-              Waves, friend requests, and new followers show up here.
+              Chats, waves, friend requests, and new followers show up here.
             </Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <Row
-            item={item}
-            busy={busyIds.includes(item.requestId ?? item.fromUser.id)}
-            onMatch={(id) => void onMatch(id)}
-            onAccept={(id) => void onAccept(id)}
-            onDecline={(id) => void onDecline(id)}
-            onFollowBack={(id) => void onFollowBack(id)}
-            onOpenProfile={onOpenProfile}
-          />
-        )}
+        renderItem={({ item: row }) =>
+          row.kind === 'chat' ? (
+            <ChatRow
+              conversation={row.conversation}
+              myUserId={myUserId}
+              onOpen={onOpenChat}
+            />
+          ) : (
+            <InboxRow
+              item={row.item}
+              busy={busyIds.includes(row.item.requestId ?? row.item.fromUser.id)}
+              onMatch={(id) => void onMatch(id)}
+              onAccept={(id) => void onAccept(id)}
+              onDecline={(id) => void onDecline(id)}
+              onFollowBack={(id) => void onFollowBack(id)}
+              onOpenProfile={onOpenProfile}
+            />
+          )
+        }
       />
     </View>
   );
@@ -292,11 +448,38 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#1a1a2e',
   },
+  avatarWrap: { position: 'relative' },
+  onlineDot: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#1dbf73',
+    borderWidth: 2,
+    borderColor: '#0a0a1a',
+  },
   info: { flex: 1, gap: 2 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { color: '#fff', fontWeight: '600', fontSize: 15, maxWidth: 160 },
+  nameUnread: { fontWeight: '800' },
+  friendHint: { color: '#34e0a1', fontSize: 11, fontWeight: '600' },
   signal: { color: '#aaa', fontSize: 13 },
+  preview: { color: '#aaa', fontSize: 13 },
+  previewUnread: { color: '#fff', fontWeight: '600' },
   time: { color: '#666', fontSize: 12 },
+  chatRight: { alignItems: 'flex-end', justifyContent: 'center', minWidth: 28 },
+  unreadBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#1dbf73',
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadBadgeText: { color: '#0a0a1a', fontSize: 11, fontWeight: '800' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   primaryBtn: {
     paddingHorizontal: 14,
@@ -321,4 +504,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a3a2a',
   },
   mutualText: { color: '#34e0a1', fontWeight: '700', fontSize: 12 },
+  pendingBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#2a2a1a',
+  },
+  pendingText: { color: '#e0c34a', fontWeight: '700', fontSize: 12 },
 });
