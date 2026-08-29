@@ -32,7 +32,7 @@ const FAQS: Faq[] = [
   },
   {
     q: 'What is Pulse?',
-    a: 'Pulse is your activity hub: chats, waves, trades, alerts, matches, and nearby story rings. Post a story from the strip at the top of Pulse.',
+    a: 'Pulse is your local activity feed: trades, alerts, and nearby story rings. Post a story from the strip at the top. Chats, waves, and matches live in Interactions.',
   },
   {
     q: 'How do stories work?',
@@ -40,7 +40,7 @@ const FAQS: Faq[] = [
   },
   {
     q: 'What is the Interactions screen?',
-    a: 'Interactions is one inbox for waves, pending friend requests, and recent followers. Accept or decline friend requests there, match a wave, or follow someone back. Your Friends → Requests tab stays available for requests only.',
+    a: 'Interactions is one inbox for chats, waves, pending friend requests, and recent followers. Open a chat from a conversation row, accept or decline friend requests, match a wave, or follow someone back. Your Friends → Requests tab stays available for requests only.',
   },
   {
     q: 'How do friends work?',
@@ -48,7 +48,7 @@ const FAQS: Faq[] = [
   },
   {
     q: 'Why can’t I message someone?',
-    a: 'Chat unlocks after mutual interest — a mutual wave, a wave matched with a story reaction, or an existing relationship path. Friends and recent activity sort first in your chat list. Send a wave or react first when you are still strangers.',
+    a: 'Chat unlocks after mutual interest — a mutual wave, a wave matched with a story reaction, or an existing relationship path. Friends and recent activity sort first. Send a wave or react first when you are still strangers.',
   },
   {
     q: 'What do verification badges mean?',
@@ -56,7 +56,7 @@ const FAQS: Faq[] = [
   },
   {
     q: 'How does local trade work?',
-    a: 'Create listings and negotiate in the app. Settlement is offline between you and the other person — G88 does not charge fees or process payments for local trade.',
+    a: 'Create listings and negotiate in the app. Settlement is offline between you and the other person — G88 does not charge fees or process payments for local trade. Open a trade from Pulse to view details.',
   },
   {
     q: 'How do I delete my account?',

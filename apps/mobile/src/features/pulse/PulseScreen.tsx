@@ -3,6 +3,9 @@
 // Pulse — activity hub + stories.
 //   Layout: header + story strip + filter chips + nearby strip + cards + trending
 //   Data:   `/feed` for cards; stories.nearby for PulseStrip; discovery for nearby.
+//
+// 2026-08-29: Chat / Waves / Matches removed from Pulse filters.
+//             Those live in Interactions. Pulse keeps Alerts + Trades (+ stories).
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -51,13 +54,11 @@ type R = RouteProp<TabParamList, 'Pulse'>;
 
 interface FilterDef { key: PulseFilter; label: string; type: ActivityType | null }
 
+/** Pulse filters after Interactions hub split: no chats / waves / matches. */
 const FILTERS: FilterDef[] = [
   { key: 'all',      label: 'All',     type: null },
-  { key: 'chats',    label: 'Chats',   type: 'chat' },
-  { key: 'waves',    label: 'Waves',   type: 'wave' },
   { key: 'listings', label: 'Trades',  type: 'listing' },
   { key: 'alerts',   label: 'Alerts',  type: 'alert' },
-  { key: 'matches',  label: 'Matches', type: 'match' },
 ];
 
 /** ~2km box around the user for nearby story query when map viewport is unavailable. */
@@ -92,13 +93,17 @@ export function PulseScreen(): React.JSX.Element {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (route.params?.filter) setFilter(route.params.filter);
+    if (route.params?.filter) {
+      const allowed = FILTERS.some((f) => f.key === route.params?.filter);
+      setFilter(allowed ? (route.params.filter as PulseFilter) : 'all');
+    }
   }, [route.params?.filter]);
 
   useEffect(() => {
     if (pendingFilter) {
+      const allowed = FILTERS.some((f) => f.key === pendingFilter);
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFilter(pendingFilter as PulseFilter);
+      setFilter(allowed ? (pendingFilter as PulseFilter) : 'all');
       dispatch(clearPendingFilter());
     }
   }, [pendingFilter, dispatch]);
@@ -134,8 +139,12 @@ export function PulseScreen(): React.JSX.Element {
   }, [on, dispatch]);
 
   const filtered = useMemo(() => {
+    // Never show chat / wave / match cards in Pulse (moved to Interactions).
+    const withoutPeople = items.filter(
+      (i) => i.type !== 'chat' && i.type !== 'wave' && i.type !== 'match',
+    );
     const f = FILTERS.find((x) => x.key === filter);
-    return f?.type ? items.filter((i) => i.type === f.type) : items;
+    return f?.type ? withoutPeople.filter((i) => i.type === f.type) : withoutPeople;
   }, [items, filter]);
 
   const onTap = useCallback((it: ActivityItem): void => {
@@ -183,16 +192,6 @@ export function PulseScreen(): React.JSX.Element {
 
   const emptyCopy = useMemo(() => {
     switch (filter) {
-      case 'chats':
-        return {
-          title: 'No chats yet',
-          hint: 'Wave someone on the map — when they wave back, your chat shows up here.',
-        };
-      case 'waves':
-        return {
-          title: 'No waves yet',
-          hint: 'Send a wave from the map or a profile. Incoming and outgoing waves land here.',
-        };
       case 'listings':
         return {
           title: 'No trades nearby',
@@ -203,15 +202,10 @@ export function PulseScreen(): React.JSX.Element {
           title: 'No local alerts',
           hint: 'Post an alert from the map Create button when something is happening nearby.',
         };
-      case 'matches':
-        return {
-          title: 'No matches yet',
-          hint: 'A match appears when someone waves you back. Keep waving on the map.',
-        };
       default:
         return {
           title: 'Quiet around here',
-          hint: 'Pull to refresh, or post a story above.',
+          hint: 'Pull to refresh, or post a story above. Chats and waves live in Interactions.',
         };
     }
   }, [filter]);
