@@ -42,6 +42,7 @@ interface ListingRow {
   currency: string;
   category: string;
   status: ListingStatus;
+  mode: 'sell' | 'buy';
   lat: number;
   lng: number;
   created_at: Date;
@@ -104,16 +105,18 @@ export class ListingsService {
     // tracked personal position — stored precisely with app-computed H3 cells.
     const cells = computeH3Cells(dto.location.lat, dto.location.lng);
 
+    const mode = dto.mode === 'buy' ? 'buy' : 'sell';
+
     const rows = (await this.db.query(
       `INSERT INTO listings
-         (seller_id, title, description, thumbnail_url, price_cents, currency, category, visibility,
+         (seller_id, title, description, thumbnail_url, price_cents, currency, category, visibility, mode,
           location, location_h3_r4, location_h3_r5, location_h3_r6,
           location_h3_r7, location_h3_r8, location_h3_r9, location_h3_r10)
        VALUES
-         ($1, $2, $3, $4, $5, $6, $7, $8,
-          ST_SetSRID(ST_MakePoint($9, $10), 4326)::geography,
-          $11, $12, $13, $14, $15, $16, $17)
-       RETURNING id, seller_id, title, thumbnail_url, price_cents, currency, category, status,
+         ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+          ST_SetSRID(ST_MakePoint($10, $11), 4326)::geography,
+          $12, $13, $14, $15, $16, $17, $18)
+       RETURNING id, seller_id, title, thumbnail_url, price_cents, currency, category, status, mode,
                  created_at, ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng`,
       [
         sellerId,
@@ -124,6 +127,7 @@ export class ListingsService {
         dto.currency ?? 'USD',
         dto.category,
         dto.visibility ?? 'public',
+        mode,
         dto.location.lng,
         dto.location.lat,
         cells.r4, cells.r5, cells.r6, cells.r7, cells.r8, cells.r9, cells.r10,
@@ -149,7 +153,7 @@ export class ListingsService {
 
     const rows = (await this.db.query(
       `SELECT l.id, l.seller_id, l.title, l.thumbnail_url, l.price_cents, l.currency,
-              l.category, l.status, l.created_at,
+              l.category, l.status, l.mode, l.created_at,
               ST_Y(l.location::geometry) AS lat, ST_X(l.location::geometry) AS lng,
               (f.user_id IS NOT NULL) AS favorited_by_me
          FROM listings l
@@ -158,13 +162,14 @@ export class ListingsService {
           AND l.status = 'active'
           AND (l.visibility = 'public' OR l.seller_id = $1)
           AND ($5::text IS NULL OR l.category = $5)
+          AND ($7::text IS NULL OR l.mode = $7)
           AND ST_DWithin(
                 l.location,
                 ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
                 $4)
         ORDER BY l.created_at DESC
         LIMIT $6`,
-      [userId, dto.location.lng, dto.location.lat, radiusM, dto.category ?? null, limit],
+      [userId, dto.location.lng, dto.location.lat, radiusM, dto.category ?? null, limit, dto.mode ?? null],
     )) as ListingRow[];
 
     return rows.map((r) => this.toSummary(r));
@@ -173,7 +178,7 @@ export class ListingsService {
   async detail(userId: string, listingId: string): Promise<ListingDetail> {
     const [row] = (await this.db.query(
       `SELECT l.id, l.seller_id, l.title, l.description, l.thumbnail_url, l.price_cents,
-              l.currency, l.category, l.status, l.visibility, l.created_at,
+              l.currency, l.category, l.status, l.mode, l.visibility, l.created_at,
               ST_Y(l.location::geometry) AS lat, ST_X(l.location::geometry) AS lng,
               s.display_name AS seller_display_name, s.avatar_url AS seller_avatar_url,
               (f.user_id IS NOT NULL) AS favorited_by_me,
@@ -416,7 +421,7 @@ export class ListingsService {
   async listFavorites(userId: string): Promise<ListingSummary[]> {
     const rows = (await this.db.query(
       `SELECT l.id, l.seller_id, l.title, l.thumbnail_url, l.price_cents, l.currency,
-              l.category, l.status, l.created_at,
+              l.category, l.status, l.mode, l.created_at,
               ST_Y(l.location::geometry) AS lat, ST_X(l.location::geometry) AS lng,
               true AS favorited_by_me
          FROM trade_favorites f
@@ -483,6 +488,7 @@ export class ListingsService {
       currency: row.currency,
       category: row.category,
       status: row.status,
+      mode: row.mode === 'buy' ? 'buy' : 'sell',
       location: { lat: row.lat, lng: row.lng },
       createdAt: new Date(row.created_at).toISOString(),
       favoritedByMe: row.favorited_by_me,
