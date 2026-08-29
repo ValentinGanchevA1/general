@@ -19,7 +19,7 @@ import type { AccountStackParamList } from '@/navigation/stacks';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { deleteAccount, logout } from '@/features/auth/authSlice';
 import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { colors, spacing, fontSize } from '@/theme';
 
 export function SettingsScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
