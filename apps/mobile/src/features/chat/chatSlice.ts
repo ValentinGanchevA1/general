@@ -69,22 +69,26 @@ const chatSlice = createSlice({
   initialState,
   reducers: {
     /** Called when a chat:message socket event arrives. */
-    messageReceived(state, action: PayloadAction<ChatMessage>) {
-      const { conversationId } = action.payload;
+    messageReceived(
+      state,
+      action: PayloadAction<ChatMessage & { viewerId?: string }>,
+    ) {
+      const { conversationId, senderId, body, createdAt, viewerId } = action.payload;
       const existing = state.messages[conversationId] ?? [];
       if (!existing.some((m) => m.id === action.payload.id)) {
         state.messages[conversationId] = [action.payload, ...existing];
       }
       const convo = state.conversations.find((c) => c.id === conversationId);
       if (convo) {
-        convo.lastMessage = { senderId: action.payload.senderId, body: action.payload.body };
-        convo.lastMessageAt = action.payload.createdAt;
-        // Increment unread only for inbound messages (caller may also refetch list).
-        // We do not know viewer id here reliably in all contexts — prefer refetch.
+        convo.lastMessage = { senderId, body };
+        convo.lastMessageAt = createdAt;
+        if (viewerId && senderId !== viewerId) {
+          convo.unreadCount = (convo.unreadCount ?? 0) + 1;
+        }
       }
     },
 
-    /** Clear unread badge after opening a conversation (server also marks read). */
+    /** Clear unread badge after opening a conversation. */
     conversationMarkedRead(state, action: PayloadAction<string>) {
       const convo = state.conversations.find((c) => c.id === action.payload);
       if (convo) {
@@ -92,7 +96,6 @@ const chatSlice = createSlice({
       }
     },
 
-    /** Prepend an optimistically-sent message before the ack arrives. */
     messageSentOptimistic(state, action: PayloadAction<ChatMessage>) {
       const { conversationId } = action.payload;
       const existing = state.messages[conversationId] ?? [];
@@ -101,7 +104,6 @@ const chatSlice = createSlice({
       }
     },
 
-    /** Replace the optimistic message with the server-confirmed version. */
     messageConfirmed(
       state,
       action: PayloadAction<{ optimisticId: string; confirmed: ChatMessage }>,
@@ -149,12 +151,23 @@ const chatSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchConversations.pending, (state) => { state.conversationsLoading = true; })
+      .addCase(fetchConversations.pending, (state) => {
+        state.conversationsLoading = true;
+      })
       .addCase(fetchConversations.fulfilled, (state, action) => {
         state.conversationsLoading = false;
-        state.conversations = action.payload;
+        // Preserve higher local unread if we already counted via socket before refetch.
+        const prev = new Map(
+          state.conversations.map((c) => [c.id, c.unreadCount ?? 0] as const),
+        );
+        state.conversations = action.payload.map((c) => ({
+          ...c,
+          unreadCount: Math.max(c.unreadCount ?? 0, prev.get(c.id) ?? 0),
+        }));
       })
-      .addCase(fetchConversations.rejected, (state) => { state.conversationsLoading = false; })
+      .addCase(fetchConversations.rejected, (state) => {
+        state.conversationsLoading = false;
+      })
 
       .addCase(fetchMessages.pending, (state, action) => {
         state.messagesLoading[action.meta.arg.conversationId] = true;
@@ -169,7 +182,6 @@ const chatSlice = createSlice({
           ...page.messages.filter((m) => !seen.has(m.id)),
         ];
         state.nextCursor[conversationId] = page.nextCursor;
-        // First page fetch marks read on the server — clear badge locally.
         if (!action.meta.arg.cursor) {
           const convo = state.conversations.find((c) => c.id === conversationId);
           if (convo) convo.unreadCount = 0;
