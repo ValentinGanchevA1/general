@@ -18,7 +18,9 @@ import { Type } from 'class-transformer';
 
 import {
   LISTING_LIMITS,
+  LISTING_MODES,
   LISTING_VISIBILITIES,
+  type ListingMode,
   type ListingVisibility,
   type UploadListingImageRequest,
 } from '@g88/shared';
@@ -69,6 +71,10 @@ export class CreateListingDto {
   @IsOptional()
   @IsEnum(LISTING_VISIBILITIES)
   visibility?: ListingVisibility;
+
+  @IsOptional()
+  @IsEnum(LISTING_MODES)
+  mode?: ListingMode;
 }
 
 export class BrowseListingsDto {
@@ -86,6 +92,10 @@ export class BrowseListingsDto {
   @IsString()
   @MaxLength(LISTING_LIMITS.categoryMax)
   category?: string;
+
+  @IsOptional()
+  @IsEnum(LISTING_MODES)
+  mode?: ListingMode;
 
   @IsOptional()
   @IsInt()
