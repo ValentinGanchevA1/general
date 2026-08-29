@@ -35,7 +35,6 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-/** Unified row for the Interactions list. */
 type HubRow =
   | { kind: 'chat'; sortAt: number; conversation: ConversationSummary }
   | { kind: 'inbox'; sortAt: number; item: InboxItem };
@@ -179,6 +178,7 @@ function ChatRow({
   const name = peer?.displayName ?? 'Chat';
   const last = conversation.lastMessage;
   const isFromMe = last?.senderId === myUserId;
+  const unread = (conversation.unreadCount ?? 0) > 0;
   const preview = last
     ? `${isFromMe ? 'You: ' : ''}${last.body}`
     : conversation.status === 'pending'
@@ -188,6 +188,10 @@ function ChatRow({
     ? timeAgo(conversation.lastMessageAt)
     : '';
   const online = conversation.peerOnline === true;
+  const badge =
+    (conversation.unreadCount ?? 0) > 99
+      ? '99+'
+      : String(conversation.unreadCount ?? 0);
 
   return (
     <TouchableOpacity
@@ -201,23 +205,29 @@ function ChatRow({
       </View>
       <View style={styles.info}>
         <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>
+          <Text style={[styles.name, unread && styles.nameUnread]} numberOfLines={1}>
             {name}
           </Text>
           {conversation.isFriend ? (
             <Text style={styles.friendHint}>Friend</Text>
           ) : null}
         </View>
-        <Text style={styles.preview} numberOfLines={1}>
+        <Text style={[styles.preview, unread && styles.previewUnread]} numberOfLines={1}>
           {preview}
         </Text>
         {when ? <Text style={styles.time}>{when}</Text> : null}
       </View>
-      {conversation.status === 'pending' ? (
-        <View style={styles.pendingBadge}>
-          <Text style={styles.pendingText}>Pending</Text>
-        </View>
-      ) : null}
+      <View style={styles.chatRight}>
+        {unread ? (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadBadgeText}>{badge}</Text>
+          </View>
+        ) : conversation.status === 'pending' ? (
+          <View style={styles.pendingBadge}>
+            <Text style={styles.pendingText}>Pending</Text>
+          </View>
+        ) : null}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -249,7 +259,6 @@ export function InteractionsScreen(): React.JSX.Element {
     }, [loadChats]),
   );
 
-  // Keep conversation list fresh when a message lands while this screen is open.
   useEffect(() => {
     const unsub = on('chat:message', () => {
       loadChats();
@@ -454,10 +463,23 @@ const styles = StyleSheet.create({
   info: { flex: 1, gap: 2 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { color: '#fff', fontWeight: '600', fontSize: 15, maxWidth: 160 },
+  nameUnread: { fontWeight: '800' },
   friendHint: { color: '#34e0a1', fontSize: 11, fontWeight: '600' },
   signal: { color: '#aaa', fontSize: 13 },
   preview: { color: '#aaa', fontSize: 13 },
+  previewUnread: { color: '#fff', fontWeight: '600' },
   time: { color: '#666', fontSize: 12 },
+  chatRight: { alignItems: 'flex-end', justifyContent: 'center', minWidth: 28 },
+  unreadBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#1dbf73',
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadBadgeText: { color: '#0a0a1a', fontSize: 11, fontWeight: '800' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   primaryBtn: {
     paddingHorizontal: 14,
