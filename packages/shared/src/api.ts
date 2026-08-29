@@ -412,6 +412,8 @@ export interface ConversationSummary {
    * null/undefined for non-friends or when privacy hides status.
    */
   peerOnline?: boolean | null;
+  /** Messages from the peer after the viewer's last_read_at (0 when fully read). */
+  unreadCount?: number;
 }
 
 export interface MessagePage {
