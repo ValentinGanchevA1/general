@@ -17,6 +17,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Image,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, type LatLng as RNLatLng } from 'react-native-maps';
 import { useNavigation } from '@react-navigation/native';
@@ -27,48 +28,30 @@ import { EVENT_LIMITS, type CreateEventRequest, type LatLng } from '@g88/shared'
 import type { EventsStackParamList } from '@/navigation/stacks';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { createEvent } from '@/features/events/useEvents';
+import { pickAndUploadListingImage } from '@/features/trading/listingImage';
 
 type Nav = NativeStackNavigationProp<EventsStackParamList>;
 
-// Varna center — fallback pin before a location fix lands.
 const FALLBACK: LatLng = { lat: 43.21, lng: 27.92 };
 
 const DURATIONS = [
   { label: '1h', hours: 1 },
   { label: '2h', hours: 2 },
   { label: '3h', hours: 3 },
-  { label: 'All day', hours: 24 },
+  { label: '4h', hours: 4 },
+  { label: 'All day', hours: 8 },
 ] as const;
 
-function nextDays(count: number): Date[] {
-  const out: Date[] = [];
-  const base = new Date();
-  base.setHours(0, 0, 0, 0);
-  for (let i = 0; i < count; i++) {
-    out.push(new Date(base.getTime() + i * 86_400_000));
-  }
-  return out;
-}
-
-function dayLabel(d: Date, i: number): string {
-  if (i === 0) return 'Today';
-  if (i === 1) return 'Tomorrow';
-  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-}
-
-// 30-min slots, 06:00 → 23:30.
-function timeSlots(): number[] {
-  const out: number[] = [];
-  for (let m = 6 * 60; m <= 23 * 60 + 30; m += 30) out.push(m);
-  return out;
+function dayLabel(d: Date, idx: number): string {
+  if (idx === 0) return 'Today';
+  if (idx === 1) return 'Tomorrow';
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function timeLabel(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  const ampm = h < 12 ? 'AM' : 'PM';
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 export function EventCreateScreen(): React.JSX.Element {
@@ -77,21 +60,32 @@ export function EventCreateScreen(): React.JSX.Element {
   const mapRef = useRef<MapView>(null);
   const hasCentered = useRef(false);
 
-  const days = useMemo(() => nextDays(14), []);
-  const slots = useMemo(() => timeSlots(), []);
-
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [dayIdx, setDayIdx] = useState(0);
-  const [minutes, setMinutes] = useState(19 * 60); // default 7:00 PM
-  const [durationIdx, setDurationIdx] = useState(1);
   const [capacity, setCapacity] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
-  const [pin, setPin] = useState<LatLng | null>(null);
+  const [dayIdx, setDayIdx] = useState(0);
+  const [minutes, setMinutes] = useState(18 * 60);
+  const [durationIdx, setDurationIdx] = useState(1);
+  const [pin, setPin] = useState<LatLng>(coords ?? FALLBACK);
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const venue = pin ?? coords ?? FALLBACK;
+  const days = useMemo(() => {
+    const out: Date[] = [];
+    const now = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now);
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + i);
+      out.push(d);
+    }
+    return out;
+  }, []);
+
+  const venue = pin;
 
   const startsAt = useMemo(() => {
     const d = new Date(days[dayIdx] ?? days[0]!);
@@ -99,7 +93,20 @@ export function EventCreateScreen(): React.JSX.Element {
     return d;
   }, [days, dayIdx, minutes]);
 
-  const canSubmit = title.trim().length > 0 && !submitting;
+  const canSubmit = title.trim().length > 0 && !submitting && !uploading;
+
+  const onPickPhoto = useCallback(async () => {
+    setUploading(true);
+    setError(null);
+    try {
+      const url = await pickAndUploadListingImage();
+      if (url) setCoverUrl(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not upload that photo. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  }, []);
 
   const onSubmit = useCallback(async () => {
     if (!canSubmit) return;
@@ -121,6 +128,7 @@ export function EventCreateScreen(): React.JSX.Element {
         visibility,
         ...(description.trim() ? { description: description.trim() } : {}),
         ...(cap != null && !Number.isNaN(cap) ? { capacity: cap } : {}),
+        ...(coverUrl ? { coverUrl } : {}),
       };
       const created = await createEvent(req);
       nav.replace('EventDetail', { eventId: created.id });
@@ -129,14 +137,12 @@ export function EventCreateScreen(): React.JSX.Element {
     } finally {
       setSubmitting(false);
     }
-  }, [canSubmit, durationIdx, startsAt, capacity, title, venue, visibility, description, nav]);
+  }, [canSubmit, durationIdx, startsAt, capacity, title, venue, visibility, description, coverUrl, nav]);
 
   const onDragEnd = useCallback((c: RNLatLng) => {
     setPin({ lat: c.latitude, lng: c.longitude });
   }, []);
 
-  // Center on the user once when their location resolves; initialRegion (not a
-  // controlled region) keeps the map from snapping back to the pin on each drag.
   useEffect(() => {
     if (coords && !hasCentered.current) {
       hasCentered.current = true;
@@ -164,10 +170,43 @@ export function EventCreateScreen(): React.JSX.Element {
       </View>
 
       <ScrollView style={S.scroll} contentContainerStyle={S.content} keyboardShouldPersistTaps="handled">
+        <Text style={S.label}>Cover photo <Text style={S.optional}>(optional)</Text></Text>
+        <TouchableOpacity
+          style={S.photoWrap}
+          onPress={() => void onPickPhoto()}
+          disabled={uploading}
+          activeOpacity={0.8}
+        >
+          {coverUrl ? (
+            <>
+              <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              {!uploading ? (
+                <View style={S.photoEditBadge}>
+                  <Icon name="camera" size={14} color="#fff" />
+                  <Text style={S.photoEditText}>Change</Text>
+                </View>
+              ) : null}
+            </>
+          ) : (
+            !uploading && (
+              <View style={S.photoEmpty}>
+                <Icon name="camera-plus-outline" size={28} color="#00d4ff" />
+                <Text style={S.photoEmptyText}>Add a cover photo</Text>
+              </View>
+            )
+          )}
+          {uploading ? (
+            <View style={S.photoUploading}>
+              <ActivityIndicator color="#00d4ff" />
+              <Text style={S.photoEmptyText}>Uploading…</Text>
+            </View>
+          ) : null}
+        </TouchableOpacity>
+
         <Text style={S.label}>Title</Text>
         <TextInput
           style={S.input}
-          placeholder="What's the event?"
+          placeholder="What is happening?"
           placeholderTextColor="#555"
           value={title}
           onChangeText={setTitle}
@@ -178,7 +217,7 @@ export function EventCreateScreen(): React.JSX.Element {
         <Text style={S.label}>Description <Text style={S.optional}>(optional)</Text></Text>
         <TextInput
           style={[S.input, S.multiline]}
-          placeholder="Details, what to bring, who it's for…"
+          placeholder="Tell people what to expect"
           placeholderTextColor="#555"
           value={description}
           onChangeText={setDescription}
@@ -196,7 +235,7 @@ export function EventCreateScreen(): React.JSX.Element {
 
         <Text style={S.label}>Start time</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.chips}>
-          {slots.map((m) => (
+          {Array.from({ length: 24 * 2 }, (_, i) => i * 30).map((m) => (
             <Chip key={m} active={m === minutes} label={timeLabel(m)} onPress={() => setMinutes(m)} />
           ))}
         </ScrollView>
@@ -208,7 +247,7 @@ export function EventCreateScreen(): React.JSX.Element {
           ))}
         </View>
 
-        <Text style={S.label}>Location <Text style={S.optional}>(drag the pin)</Text></Text>
+        <Text style={S.label}>Venue</Text>
         <View style={S.mapWrap}>
           <MapView
             ref={mapRef}
@@ -222,8 +261,8 @@ export function EventCreateScreen(): React.JSX.Element {
             }}
           >
             <Marker
-              draggable
               coordinate={{ latitude: venue.lat, longitude: venue.lng }}
+              draggable
               onDragEnd={(e) => onDragEnd(e.nativeEvent.coordinate)}
             />
           </MapView>
@@ -232,12 +271,11 @@ export function EventCreateScreen(): React.JSX.Element {
         <Text style={S.label}>Capacity <Text style={S.optional}>(optional)</Text></Text>
         <TextInput
           style={S.input}
-          placeholder="Max attendees"
+          placeholder="e.g. 20"
           placeholderTextColor="#555"
           value={capacity}
-          onChangeText={(t) => setCapacity(t.replace(/[^0-9]/g, ''))}
+          onChangeText={setCapacity}
           keyboardType="number-pad"
-          maxLength={6}
         />
 
         <Text style={S.label}>Visibility</Text>
@@ -312,4 +350,19 @@ const S = StyleSheet.create({
     borderRadius: 10, padding: 12, marginTop: 16,
   },
   errorText: { color: '#ff6b6b', fontSize: 14, flex: 1 },
+
+  photoWrap: {
+    height: 160, borderRadius: 12, overflow: 'hidden',
+    backgroundColor: '#12121f', borderWidth: 1, borderColor: '#1f1f33',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  photoEmpty: { alignItems: 'center', gap: 8 },
+  photoEmptyText: { color: '#aaa', fontSize: 13, fontWeight: '600' },
+  photoUploading: { alignItems: 'center', gap: 8 },
+  photoEditBadge: {
+    position: 'absolute', right: 10, bottom: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14,
+  },
+  photoEditText: { color: '#fff', fontSize: 12, fontWeight: '600' },
 });

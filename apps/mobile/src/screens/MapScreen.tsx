@@ -56,7 +56,7 @@ import { MapCoachMarks } from '@/components/map/MapCoachMarks';
 import { MapChrome } from '@/components/map/MapChrome';
 import {
   CreateNearbySheet,
-  type CreateNearbyKind,
+  type CreateNearbyAction,
 } from '@/components/map/CreateNearbySheet';
 import { sheetChrome, useSheetBackdrop } from '@/components/sheets';
 
@@ -78,6 +78,9 @@ export function MapScreen(): React.JSX.Element {
   const { unreadCount: interactionUnread } = useReceivedInteractions();
   const focusMyPin = route.params?.focusMyPin === true;
 
+  const [createNearbyOpen, setCreateNearbyOpen] = useState(false);
+  const [createNearbyCoords, setCreateNearbyCoords] = useState<{ lat: number; lng: number } | null>(null);
+
   const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
   const zoom = useMemo(() => (region ? approxZoomFromRegion(region) : 12), [region]);
 
@@ -95,7 +98,6 @@ export function MapScreen(): React.JSX.Element {
     setSelected(point);
   }, []);
 
-  // Present once per selection id. InteractionManager avoids presenting mid-gesture.
   useEffect(() => {
     if (!selected) {
       presentedIdRef.current = null;
@@ -240,32 +242,38 @@ export function MapScreen(): React.JSX.Element {
     }
   }, [selected, onSheetWave]);
 
-  const [createNearbyOpen, setCreateNearbyOpen] = useState(false);
-
-  /** Long-press empty map → themed create sheet (replaces system Alert). */
   const onMapLongPress = useCallback(
     (e: LongPressEvent) => {
-      if (selected) return; // entity sheet owns the surface
+      if (selected) return;
       const { latitude, longitude } = e.nativeEvent.coordinate;
       track('map.longpress_create', { lat: latitude, lng: longitude });
+      setCreateNearbyCoords({ lat: latitude, lng: longitude });
       setCreateNearbyOpen(true);
     },
     [selected],
   );
 
   const onCreateNearbySelect = useCallback(
-    (kind: CreateNearbyKind): void => {
-      setCreateNearbyOpen(false);
-      track('map.create_choice', { kind });
-      if (kind === 'listing') {
-        openRootScreen(navigation, 'ListingCreate');
-      } else if (kind === 'event') {
-        openRootScreen(navigation, 'EventCreate');
-      } else {
-        openRootScreen(navigation, 'AlertComposer');
+    (action: CreateNearbyAction): void => {
+      const location = createNearbyCoords;
+      track('map.create_choice', { kind: action });
+      const locParams = location ? { initialLocation: location } : {};
+      switch (action) {
+        case 'listing_sell':
+          openRootScreen(navigation, 'ListingCreate', { mode: 'sell', ...locParams });
+          break;
+        case 'listing_buy':
+          openRootScreen(navigation, 'ListingCreate', { mode: 'buy', ...locParams });
+          break;
+        case 'event':
+          openRootScreen(navigation, 'EventCreate', locParams);
+          break;
+        case 'alert':
+          openRootScreen(navigation, 'AlertComposer', locParams);
+          break;
       }
     },
-    [navigation],
+    [createNearbyCoords, navigation],
   );
 
   const sheetOpen = selected != null;

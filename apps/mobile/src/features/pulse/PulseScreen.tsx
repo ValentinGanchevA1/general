@@ -155,11 +155,28 @@ export function PulseScreen(): React.JSX.Element {
 
   const onTap = useCallback((it: ActivityItem): void => {
     const { screen, params } = it.deepLink;
+    // Nested stack screens — always go through openRootScreen so the tab
+    // navigator does not swallow the push.
+    if (
+      screen === 'ListingDetail' ||
+      screen === 'EventDetail' ||
+      screen === 'OfferDetail' ||
+      screen === 'TradeDetail'
+    ) {
+      openRootScreen(navigation, screen as 'ListingDetail' | 'EventDetail', params);
+      return;
+    }
     if (screen === 'Main') {
       navigation.navigate('Main', params as never);
-    } else {
-      (navigation.navigate as (s: string, p?: object) => void)(screen, params);
+      return;
     }
+    // Fallback: listing/offer activity without a typed deepLink still opens
+    // the listing when the activity id is a listing id.
+    if (it.type === 'listing' && it.id) {
+      openRootScreen(navigation, 'ListingDetail', { listingId: it.id });
+      return;
+    }
+    (navigation.navigate as (s: string, p?: object) => void)(screen, params);
   }, [navigation]);
 
   const storyEligibility = useMemo(() => {

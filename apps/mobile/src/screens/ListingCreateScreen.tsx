@@ -3,6 +3,7 @@
 // P3.7 listing creation. Dependency-free inputs + a draggable map pin for the
 // item location (react-native-maps, already a dep). No payment fields — price is
 // just a number; settlement is offline (offer-based v1).
+// Supports mode: 'sell' | 'buy' from route params (Create nearby sheet).
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -18,8 +19,9 @@ import {
   View,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, type LatLng as RNLatLng } from 'react-native-maps';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { LISTING_LIMITS, type CreateListingRequest, type LatLng } from '@g88/shared';
@@ -29,6 +31,7 @@ import { createListing } from '@/features/trading/useTrading';
 import { pickAndUploadListingImage } from '@/features/trading/listingImage';
 
 type Nav = NativeStackNavigationProp<CommerceStackParamList>;
+type R = RouteProp<CommerceStackParamList, 'ListingCreate'>;
 
 const FALLBACK: LatLng = { lat: 43.21, lng: 27.92 };
 const CATEGORIES = ['Electronics', 'Furniture', 'Clothing', 'Sports', 'Home', 'Books', 'Other'] as const;
@@ -36,16 +39,20 @@ const CURRENCIES = ['USD', 'EUR', 'BGN', 'GBP'] as const;
 
 export function ListingCreateScreen(): React.JSX.Element {
   const nav = useNavigation<Nav>();
+  const route = useRoute<R>();
   const { coords } = useUserLocation();
   const mapRef = useRef<MapView>(null);
   const hasCentered = useRef(false);
+
+  const mode = route.params?.mode === 'buy' ? 'buy' : 'sell';
+  const initialLocation = route.params?.initialLocation;
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [currency, setCurrency] = useState<string>('USD');
-  const [category, setCategory] = useState<string>('Electronics');
-  const [pin, setPin] = useState<LatLng | null>(null);
+  const [category, setCategory] = useState<string>(mode === 'buy' ? 'Other' : 'Electronics');
+  const [pin, setPin] = useState<LatLng | null>(initialLocation ?? null);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -86,6 +93,7 @@ export function ListingCreateScreen(): React.JSX.Element {
         location: venue,
         ...(description.trim() ? { description: description.trim() } : {}),
         ...(thumbnailUrl ? { thumbnailUrl } : {}),
+        ...(mode === 'buy' ? { mode: 'buy' as const } : {}),
       };
       const created = await createListing(req);
       nav.replace('ListingDetail', { listingId: created.id });
@@ -94,22 +102,24 @@ export function ListingCreateScreen(): React.JSX.Element {
     } finally {
       setSubmitting(false);
     }
-  }, [canSubmit, title, priceCents, currency, category, venue, description, thumbnailUrl, nav]);
+  }, [canSubmit, title, priceCents, currency, category, venue, description, thumbnailUrl, nav, mode]);
 
   const onDragEnd = useCallback((c: RNLatLng) => setPin({ lat: c.latitude, lng: c.longitude }), []);
 
-  // Center on the user once when their location first resolves. Using
-  // initialRegion (not a controlled `region`) keeps the map from snapping back
-  // to the pin on every drag, so the user can pan freely to place it.
   useEffect(() => {
-    if (coords && !hasCentered.current) {
+    const target = initialLocation ?? coords;
+    if (target && !hasCentered.current) {
       hasCentered.current = true;
       mapRef.current?.animateToRegion(
-        { latitude: coords.lat, longitude: coords.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
+        { latitude: target.lat, longitude: target.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
         400,
       );
     }
-  }, [coords]);
+  }, [coords, initialLocation]);
+
+  const headerTitle = mode === 'buy' ? 'Looking to buy' : 'Sell an item';
+  const titlePlaceholder = mode === 'buy' ? 'What are you looking for?' : 'What are you selling?';
+  const submitLabel = mode === 'buy' ? 'Post' : 'List';
 
   return (
     <KeyboardAvoidingView style={S.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -117,12 +127,12 @@ export function ListingCreateScreen(): React.JSX.Element {
         <TouchableOpacity onPress={() => nav.goBack()} hitSlop={8}>
           <Icon name="close" size={26} color="#fff" />
         </TouchableOpacity>
-        <Text style={S.headerTitle}>Sell an item</Text>
+        <Text style={S.headerTitle}>{headerTitle}</Text>
         <TouchableOpacity onPress={() => void onSubmit()} disabled={!canSubmit} hitSlop={8}>
           {submitting ? (
             <ActivityIndicator size="small" color="#00d4ff" />
           ) : (
-            <Text style={[S.create, !canSubmit && S.createDisabled]}>List</Text>
+            <Text style={[S.create, !canSubmit && S.createDisabled]}>{submitLabel}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -164,7 +174,7 @@ export function ListingCreateScreen(): React.JSX.Element {
         <Text style={S.label}>Title</Text>
         <TextInput
           style={S.input}
-          placeholder="What are you selling?"
+          placeholder={titlePlaceholder}
           placeholderTextColor="#555"
           value={title}
           onChangeText={setTitle}
@@ -172,7 +182,7 @@ export function ListingCreateScreen(): React.JSX.Element {
           autoFocus
         />
 
-        <Text style={S.label}>Price</Text>
+        <Text style={S.label}>{mode === 'buy' ? 'Budget' : 'Price'}</Text>
         <View style={S.priceRow}>
           <TextInput
             style={[S.input, { flex: 1 }]}
@@ -199,7 +209,7 @@ export function ListingCreateScreen(): React.JSX.Element {
         <Text style={S.label}>Description <Text style={S.optional}>(optional)</Text></Text>
         <TextInput
           style={[S.input, S.multiline]}
-          placeholder="Condition, details, pickup notes…"
+          placeholder={mode === 'buy' ? 'Condition, preferred pickup, details…' : 'Condition, details, pickup notes…'}
           placeholderTextColor="#555"
           value={description}
           onChangeText={setDescription}

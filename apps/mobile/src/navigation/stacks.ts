@@ -2,6 +2,7 @@
 // Root mounts each as a single Stack.Screen; use openRootScreen() from outside.
 
 import type { NavigatorScreenParams } from '@react-navigation/native';
+import type { LatLng } from '@g88/shared';
 
 export type GamificationStackParamList = {
   Challenges: undefined;
@@ -12,7 +13,12 @@ export type GamificationStackParamList = {
 export type CommerceStackParamList = {
   Marketplace: undefined;
   ListingDetail: { listingId: string };
-  ListingCreate: undefined;
+  ListingCreate:
+    | {
+        mode?: 'sell' | 'buy';
+        initialLocation?: LatLng;
+      }
+    | undefined;
 };
 
 export type AccountStackParamList = {
@@ -35,7 +41,7 @@ export type AccountStackParamList = {
 
 export type EventsStackParamList = {
   EventDetail: { eventId: string };
-  EventCreate: undefined;
+  EventCreate: { initialLocation?: LatLng } | undefined;
 };
 
 export type NestedStackName =
