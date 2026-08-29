@@ -1,73 +1,91 @@
 // apps/mobile/src/components/map/CreateNearbySheet.tsx
 //
-// Map long-press create picker — same visual family as ActionSheetList /
-// StoryCreateSheet (dark surface, cyan accents, MCI icons).
+// Themed action sheet for map long-press "Create nearby".
+// Same visual family as StoryCreateSheet / ActionSheetList:
+// dark surface, handle, MCI icons, radius.md, subtle borders.
 
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   Modal,
   Pressable,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { colors, radius, spacing } from '@/theme';
 
-export type CreateNearbyKind = 'listing_sell' | 'listing_buy' | 'event' | 'alert';
+export type CreateNearbyAction =
+  | 'listing_sell'
+  | 'listing_buy'
+  | 'event'
+  | 'alert';
 
 interface Option {
-  kind: CreateNearbyKind;
-  label: string;
-  hint: string;
+  key: CreateNearbyAction;
   icon: string;
-  iconColor: string;
-  iconBg: string;
+  title: string;
+  hint: string;
+  accent?: string;
 }
 
 const OPTIONS: Option[] = [
   {
-    kind: 'listing_sell',
-    label: 'Sell an item',
-    hint: 'List something for sale nearby',
+    key: 'listing_sell',
     icon: 'tag-outline',
-    iconColor: colors.action,
-    iconBg: 'rgba(52, 224, 161, 0.14)',
+    title: 'Sell an item',
+    hint: 'List something for sale nearby',
   },
   {
-    kind: 'listing_buy',
-    label: 'Looking to buy',
-    hint: 'Post what you are searching for',
+    key: 'listing_buy',
     icon: 'cart-outline',
-    iconColor: colors.primary,
-    iconBg: 'rgba(0, 212, 255, 0.14)',
+    title: 'Looking to buy',
+    hint: 'Post what you’re searching for',
   },
   {
-    kind: 'event',
-    label: 'Create event',
-    hint: 'Plan a meetup at this spot',
+    key: 'event',
     icon: 'calendar-star',
-    iconColor: colors.accent,
-    iconBg: 'rgba(124, 92, 255, 0.16)',
+    title: 'Create event',
+    hint: 'Meetup, hangout, or gathering',
   },
   {
-    kind: 'alert',
-    label: 'Post alert',
-    hint: 'Share something happening now',
+    key: 'alert',
     icon: 'bullhorn-outline',
-    iconColor: colors.warning,
-    iconBg: 'rgba(255, 157, 60, 0.14)',
+    title: 'Post alert',
+    hint: 'Local notice or heads-up',
   },
 ];
 
-interface Props {
+export interface CreateNearbySheetProps {
   visible: boolean;
   onClose: () => void;
-  onSelect: (kind: CreateNearbyKind) => void;
+  onSelect: (action: CreateNearbyAction) => void;
 }
 
-export function CreateNearbySheet({ visible, onClose, onSelect }: Props): React.JSX.Element {
+export function CreateNearbySheet({
+  visible,
+  onClose,
+  onSelect,
+}: CreateNearbySheetProps): React.JSX.Element {
+  const insets = useSafeAreaInsets();
+
+  const handleSelect = useCallback(
+    (key: CreateNearbyAction) => {
+      onClose();
+      // Defer so modal close animation starts before navigation push.
+      requestAnimationFrame(() => onSelect(key));
+    },
+    [onClose, onSelect],
+  );
+
+  const bottomPad = useMemo(
+    () => Math.max(insets.bottom, spacing.md) + spacing.sm,
+    [insets.bottom],
+  );
+
   return (
     <Modal
       visible={visible}
@@ -76,134 +94,131 @@ export function CreateNearbySheet({ visible, onClose, onSelect }: Props): React.
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Dismiss">
-        <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.handle} />
-          <Text style={styles.title}>Create nearby</Text>
-          <Text style={styles.subtitle}>What do you want to post at this spot?</Text>
+      <Pressable style={S.backdrop} onPress={onClose}>
+        <Pressable
+          style={[S.sheet, { paddingBottom: bottomPad }]}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <View style={S.handle} />
+          <Text style={S.title}>Create nearby</Text>
+          <Text style={S.subtitle}>What do you want to post at this location?</Text>
 
-          <View style={styles.options}>
+          <View style={S.list}>
             {OPTIONS.map((opt) => (
-              <Pressable
-                key={opt.kind}
-                testID={`create-nearby-${opt.kind}`}
-                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-                onPress={() => onSelect(opt.kind)}
-                accessibilityRole="button"
-                accessibilityLabel={opt.label}
+              <TouchableOpacity
+                key={opt.key}
+                style={S.row}
+                onPress={() => handleSelect(opt.key)}
+                activeOpacity={0.85}
+                testID={`create-nearby-${opt.key}`}
               >
-                <View style={[styles.iconWrap, { backgroundColor: opt.iconBg }]}>
-                  <MCI name={opt.icon} size={22} color={opt.iconColor} />
+                <View style={S.iconWrap}>
+                  <MCI name={opt.icon} size={22} color={colors.primary ?? '#00d4ff'} />
                 </View>
-                <View style={styles.rowText}>
-                  <Text style={styles.rowLabel}>{opt.label}</Text>
-                  <Text style={styles.rowHint}>{opt.hint}</Text>
+                <View style={S.rowText}>
+                  <Text style={S.rowTitle}>{opt.title}</Text>
+                  <Text style={S.rowHint}>{opt.hint}</Text>
                 </View>
-                <MCI name="chevron-right" size={20} color={colors.textFaint} />
-              </Pressable>
+                <MCI name="chevron-right" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
             ))}
           </View>
 
-          <Pressable
-            style={({ pressed }) => [styles.cancelBtn, pressed && styles.rowPressed]}
+          <TouchableOpacity
+            style={S.cancel}
             onPress={onClose}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel"
+            activeOpacity={0.8}
+            testID="create-nearby-cancel"
           >
-            <Text style={styles.cancelText}>Cancel</Text>
-          </Pressable>
+            <Text style={S.cancelText}>Cancel</Text>
+          </TouchableOpacity>
         </Pressable>
       </Pressable>
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
+const S = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.62)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'flex-end',
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    borderTopWidth: 1,
-    borderColor: colors.borderStrong,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl + 8,
-    paddingTop: spacing.sm,
+  sheet: {
+    backgroundColor: colors.surface ?? '#12121f',
+    borderTopLeftRadius: radius?.lg ?? 20,
+    borderTopRightRadius: radius?.lg ?? 20,
+    paddingHorizontal: spacing?.md ?? 16,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong ?? '#2a2a4a',
   },
   handle: {
     alignSelf: 'center',
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.borderStrong,
-    marginBottom: spacing.md,
+    backgroundColor: colors.borderStrong ?? '#3a3a5a',
+    marginBottom: 14,
   },
   title: {
-    color: colors.textPrimary,
-    fontSize: fontSize.lg,
+    color: colors.textPrimary ?? '#fff',
+    fontSize: 18,
     fontWeight: '700',
     marginBottom: 4,
   },
   subtitle: {
-    color: colors.textMuted,
-    fontSize: fontSize.sm,
-    lineHeight: 18,
-    marginBottom: spacing.lg,
+    color: colors.textMuted ?? '#888',
+    fontSize: 13,
+    marginBottom: 16,
   },
-  options: {
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+  list: {
+    gap: 8,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  rowPressed: {
-    opacity: 0.88,
+    backgroundColor: colors.surfaceAlt ?? '#1a1a2e',
+    borderRadius: radius?.md ?? 14,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong ?? '#2a2a4a',
   },
   iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,212,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
   },
   rowText: {
     flex: 1,
-    gap: 2,
   },
-  rowLabel: {
-    color: colors.textPrimary,
-    fontSize: fontSize.md,
-    fontWeight: '700',
+  rowTitle: {
+    color: colors.textPrimary ?? '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   rowHint: {
-    color: colors.textMuted,
-    fontSize: fontSize.xs,
+    color: colors.textMuted ?? '#888',
+    fontSize: 12,
+    marginTop: 2,
   },
-  cancelBtn: {
-    marginTop: spacing.xs,
+  cancel: {
+    marginTop: 14,
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: colors.border,
+    paddingVertical: 14,
+    borderRadius: radius?.md ?? 14,
+    backgroundColor: colors.surfaceAlt ?? '#1a1a2e',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong ?? '#2a2a4a',
   },
   cancelText: {
-    color: colors.textSecondary,
-    fontSize: fontSize.md,
+    color: colors.textSecondary ?? '#aaa',
+    fontSize: 15,
     fontWeight: '600',
   },
 });
