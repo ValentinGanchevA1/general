@@ -15,7 +15,7 @@ import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { colors, spacing, radius, fontSize } from '@/theme';
 
-export type CreateNearbyKind = 'listing' | 'event' | 'alert';
+export type CreateNearbyKind = 'listing_sell' | 'listing_buy' | 'event' | 'alert';
 
 interface Option {
   kind: CreateNearbyKind;
@@ -28,12 +28,20 @@ interface Option {
 
 const OPTIONS: Option[] = [
   {
-    kind: 'listing',
-    label: 'List item',
-    hint: 'Sell or trade something nearby',
+    kind: 'listing_sell',
+    label: 'Sell an item',
+    hint: 'List something for sale nearby',
     icon: 'tag-outline',
     iconColor: colors.action,
     iconBg: 'rgba(52, 224, 161, 0.14)',
+  },
+  {
+    kind: 'listing_buy',
+    label: 'Looking to buy',
+    hint: 'Post what you are searching for',
+    icon: 'cart-outline',
+    iconColor: colors.primary,
+    iconBg: 'rgba(0, 212, 255, 0.14)',
   },
   {
     kind: 'event',
