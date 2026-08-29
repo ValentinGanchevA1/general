@@ -91,9 +91,9 @@ export function ListingCreateScreen(): React.JSX.Element {
         currency,
         category,
         location: venue,
+        mode,
         ...(description.trim() ? { description: description.trim() } : {}),
         ...(thumbnailUrl ? { thumbnailUrl } : {}),
-        ...(mode === 'buy' ? { mode: 'buy' as const } : {}),
       };
       const created = await createListing(req);
       nav.replace('ListingDetail', { listingId: created.id });
