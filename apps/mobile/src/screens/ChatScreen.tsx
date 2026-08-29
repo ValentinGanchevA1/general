@@ -27,6 +27,8 @@ import {
   messageConfirmed,
   messageQueued,
   failedMessageCleared,
+  setActiveConversation,
+  markConversationReadRemote,
 } from '@/features/chat/chatSlice';
 import { socketSendMessage, useSocket } from '@/realtime/useSocket';
 import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
@@ -159,11 +161,21 @@ export function ChatScreen(): React.JSX.Element {
   const canGift = !!otherUserId && peerBadge != null && !peerBadge.blockedByViewer;
   const canShareLocation = !requestLocked;
 
+  // Track active thread so inbound socket msgs do not bump unread; clear on leave.
+  useEffect(() => {
+    dispatch(setActiveConversation(conversationId));
+    void dispatch(markConversationReadRemote(conversationId));
+    return () => {
+      dispatch(setActiveConversation(null));
+    };
+  }, [conversationId, dispatch]);
+
   useEffect(() => {
     void dispatch(fetchMessages({ conversationId }));
     void joinConversation(conversationId);
   }, [conversationId, dispatch, joinConversation]);
 
+  // While focused, keep advancing last_read_at as messages arrive.
   useEffect(() => {
     return on('chat:message', (msg) => {
       dispatch(
@@ -172,10 +184,14 @@ export function ChatScreen(): React.JSX.Element {
           type: msg.type ?? 'text',
           location: msg.location ?? null,
           locationSessionId: msg.locationSessionId ?? null,
+          viewerId: myUserId,
         }),
       );
+      if (msg.conversationId === conversationId && msg.senderId !== myUserId) {
+        void dispatch(markConversationReadRemote(conversationId));
+      }
     });
-  }, [on, dispatch]);
+  }, [on, dispatch, conversationId, myUserId]);
 
   const send = useCallback(async (): Promise<void> => {
     const text = body.trim();
