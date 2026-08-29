@@ -54,6 +54,10 @@ import { colors } from '@/theme';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
 import { MapCoachMarks } from '@/components/map/MapCoachMarks';
 import { MapChrome } from '@/components/map/MapChrome';
+import {
+  CreateNearbySheet,
+  type CreateNearbyKind,
+} from '@/components/map/CreateNearbySheet';
 import { sheetChrome, useSheetBackdrop } from '@/components/sheets';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
@@ -236,38 +240,32 @@ export function MapScreen(): React.JSX.Element {
     }
   }, [selected, onSheetWave]);
 
-  /** Long-press empty map → create menu (replaces FAB). */
+  const [createNearbyOpen, setCreateNearbyOpen] = useState(false);
+
+  /** Long-press empty map → themed create sheet (replaces system Alert). */
   const onMapLongPress = useCallback(
     (e: LongPressEvent) => {
       if (selected) return; // entity sheet owns the surface
       const { latitude, longitude } = e.nativeEvent.coordinate;
       track('map.longpress_create', { lat: latitude, lng: longitude });
-      Alert.alert('Create nearby', 'What do you want to post at this spot?', [
-        {
-          text: 'List item',
-          onPress: () => {
-            track('map.create_choice', { kind: 'listing' });
-            openRootScreen(navigation, 'ListingCreate');
-          },
-        },
-        {
-          text: 'Create event',
-          onPress: () => {
-            track('map.create_choice', { kind: 'event' });
-            openRootScreen(navigation, 'EventCreate');
-          },
-        },
-        {
-          text: 'Post alert',
-          onPress: () => {
-            track('map.create_choice', { kind: 'alert' });
-            openRootScreen(navigation, 'AlertComposer');
-          },
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
+      setCreateNearbyOpen(true);
     },
-    [navigation, selected],
+    [selected],
+  );
+
+  const onCreateNearbySelect = useCallback(
+    (kind: CreateNearbyKind): void => {
+      setCreateNearbyOpen(false);
+      track('map.create_choice', { kind });
+      if (kind === 'listing') {
+        openRootScreen(navigation, 'ListingCreate');
+      } else if (kind === 'event') {
+        openRootScreen(navigation, 'EventCreate');
+      } else {
+        openRootScreen(navigation, 'AlertComposer');
+      }
+    },
+    [navigation],
   );
 
   const sheetOpen = selected != null;
@@ -352,6 +350,12 @@ export function MapScreen(): React.JSX.Element {
           ) : null}
         </BottomSheetView>
       </BottomSheetModal>
+
+      <CreateNearbySheet
+        visible={createNearbyOpen}
+        onClose={() => setCreateNearbyOpen(false)}
+        onSelect={onCreateNearbySelect}
+      />
     </View>
   );
 }
