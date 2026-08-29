@@ -111,15 +111,20 @@ describe('PulseScreen v2', () => {
     expect(queryByTestId('share-cta')).toBeNull();
     // No profile in the test store → soft gate locks create; strip still mounts.
     expect(getByLabelText(/Create your story|Story posting locked/)).toBeTruthy();
+    // Chats / Waves / Matches moved to Interactions — Pulse keeps All / Trades / Alerts.
     expect(getByTestId('pulse-filter-all')).toBeTruthy();
-    expect(getByTestId('pulse-filter-chats')).toBeTruthy();
-});
+    expect(getByTestId('pulse-filter-listings')).toBeTruthy();
+    expect(getByTestId('pulse-filter-alerts')).toBeTruthy();
+    expect(queryByTestId('pulse-filter-chats')).toBeNull();
+    expect(queryByTestId('pulse-filter-waves')).toBeNull();
+    expect(queryByTestId('pulse-filter-matches')).toBeNull();
+  });
 
   it('switches filter when a chip is tapped', () => {
     const { getByTestId } = render(wrap(<PulseScreen />));
-    fireEvent.press(getByTestId('pulse-filter-waves'));
+    fireEvent.press(getByTestId('pulse-filter-listings'));
     // The chip should remain rendered after press — no crash, basic interaction works.
-    expect(getByTestId('pulse-filter-waves')).toBeTruthy();
+    expect(getByTestId('pulse-filter-listings')).toBeTruthy();
   });
 
   it('renders the trending strip with mock topics', () => {
