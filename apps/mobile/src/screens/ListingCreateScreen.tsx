@@ -4,6 +4,8 @@
 // item location (react-native-maps, already a dep). No payment fields — price is
 // just a number; settlement is offline (offer-based v1).
 // Supports mode: 'sell' | 'buy' from route params (Create nearby sheet).
+// NOTE: backend CreateListingDto has no `mode` field and ValidationPipe uses
+// forbidNonWhitelisted — do NOT send mode in the request body.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -36,6 +38,14 @@ type R = RouteProp<CommerceStackParamList, 'ListingCreate'>;
 const FALLBACK: LatLng = { lat: 43.21, lng: 27.92 };
 const CATEGORIES = ['Electronics', 'Furniture', 'Clothing', 'Sports', 'Home', 'Books', 'Other'] as const;
 const CURRENCIES = ['USD', 'EUR', 'BGN', 'GBP'] as const;
+
+/** Surface buy-intent in the title until backend supports a real `mode` column. */
+function titleForMode(raw: string, mode: 'sell' | 'buy'): string {
+  const t = raw.trim();
+  if (mode !== 'buy') return t;
+  if (/^wanted\s*:/i.test(t)) return t;
+  return `Wanted: ${t}`;
+}
 
 export function ListingCreateScreen(): React.JSX.Element {
   const nav = useNavigation<Nav>();
@@ -85,20 +95,25 @@ export function ListingCreateScreen(): React.JSX.Element {
     setSubmitting(true);
     setError(null);
     try {
+      // Never send `mode` — CreateListingDto has no such field and the global
+      // ValidationPipe uses forbidNonWhitelisted (400 on unknown props).
       const req: CreateListingRequest = {
-        title: title.trim(),
+        title: titleForMode(title, mode),
         priceCents,
         currency,
         category,
         location: venue,
         ...(description.trim() ? { description: description.trim() } : {}),
         ...(thumbnailUrl ? { thumbnailUrl } : {}),
-        ...(mode === 'buy' ? { mode: 'buy' as const } : {}),
       };
       const created = await createListing(req);
       nav.replace('ListingDetail', { listingId: created.id });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create the listing. Please try again.');
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Could not create the listing. Please try again.';
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
