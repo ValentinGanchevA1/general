@@ -41,7 +41,12 @@ function initialsFromName(name: string): string {
 
 function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element {
   const isFriend = point.kind === 'user' && point.meta.isFriend === true;
-  const color = isFriend ? FRIEND_COLOR : KIND_COLOR[point.kind];
+  const isBuyListing = point.kind === 'listing' && point.meta.mode === 'buy';
+  const color = isFriend
+    ? FRIEND_COLOR
+    : isBuyListing
+      ? '#00d4ff'
+      : KIND_COLOR[point.kind];
 
   const label =
     point.kind === 'user'
@@ -102,7 +107,7 @@ function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element 
           />
         ) : (
           <Text style={styles.icon} onLayout={settle}>
-            {KIND_ICON[point.kind]}
+            {isBuyListing ? '🛒' : KIND_ICON[point.kind]}
           </Text>
         )}
         {isVerified ? (

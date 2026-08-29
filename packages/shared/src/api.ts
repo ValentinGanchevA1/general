@@ -62,6 +62,8 @@ export interface ListingMeta {
   priceCents: number;
   currency: string;
   category: string;
+  /** sell (default) | buy (wanted). Omitted on legacy rows → treat as sell. */
+  mode?: 'sell' | 'buy';
 }
 
 export type DiscoveryPoint = ClusterPoint | EntityPoint;
