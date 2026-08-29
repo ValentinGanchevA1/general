@@ -79,6 +79,16 @@ const chatSlice = createSlice({
       if (convo) {
         convo.lastMessage = { senderId: action.payload.senderId, body: action.payload.body };
         convo.lastMessageAt = action.payload.createdAt;
+        // Increment unread only for inbound messages (caller may also refetch list).
+        // We do not know viewer id here reliably in all contexts — prefer refetch.
+      }
+    },
+
+    /** Clear unread badge after opening a conversation (server also marks read). */
+    conversationMarkedRead(state, action: PayloadAction<string>) {
+      const convo = state.conversations.find((c) => c.id === action.payload);
+      if (convo) {
+        convo.unreadCount = 0;
       }
     },
 
@@ -101,11 +111,6 @@ const chatSlice = createSlice({
       if (!list) return;
       const idx = list.findIndex((m) => m.id === action.payload.optimisticId);
       if (idx !== -1) {
-        // The server fans `chat:message` to the whole convo room — including the
-        // sender — so the broadcast can beat the ack and `messageReceived` may have
-        // already inserted the confirmed message. Overwriting the optimistic slot
-        // would then duplicate that id (React "two children with the same key").
-        // If the confirmed id is already present, drop the optimistic entry instead.
         const alreadyPresent = list.some(
           (m, i) => i !== idx && m.id === action.payload.confirmed.id,
         );
@@ -115,12 +120,10 @@ const chatSlice = createSlice({
           list[idx] = action.payload.confirmed;
         }
       }
-      // Remove from outbox and failedIds if present.
       state.outbox = state.outbox.filter((e) => e.optimisticId !== action.payload.optimisticId);
       state.failedIds = state.failedIds.filter((id) => id !== action.payload.optimisticId);
     },
 
-    /** Queue a message for retry when the socket is not connected. */
     messageQueued(state, action: PayloadAction<OutboxEntry>) {
       const existing = state.outbox.find((e) => e.optimisticId === action.payload.optimisticId);
       if (!existing) {
@@ -128,7 +131,6 @@ const chatSlice = createSlice({
       }
     },
 
-    /** Increment retry count on an outbox entry after a failed drain attempt. */
     outboxRetryIncremented(state, action: PayloadAction<string>) {
       const entry = state.outbox.find((e) => e.optimisticId === action.payload);
       if (!entry) return;
@@ -141,10 +143,8 @@ const chatSlice = createSlice({
       }
     },
 
-    /** Remove a message from failedIds so the user can retry it manually. */
     failedMessageCleared(state, action: PayloadAction<string>) {
       state.failedIds = state.failedIds.filter((id) => id !== action.payload);
-      // Re-queue with reset retries so the next send attempt works.
     },
   },
   extraReducers: (builder) => {
@@ -169,6 +169,11 @@ const chatSlice = createSlice({
           ...page.messages.filter((m) => !seen.has(m.id)),
         ];
         state.nextCursor[conversationId] = page.nextCursor;
+        // First page fetch marks read on the server — clear badge locally.
+        if (!action.meta.arg.cursor) {
+          const convo = state.conversations.find((c) => c.id === conversationId);
+          if (convo) convo.unreadCount = 0;
+        }
       })
       .addCase(fetchMessages.rejected, (state, action) => {
         state.messagesLoading[action.meta.arg.conversationId] = false;
@@ -185,6 +190,7 @@ export const {
   messageQueued,
   outboxRetryIncremented,
   failedMessageCleared,
+  conversationMarkedRead,
 } = chatSlice.actions;
 
 export { MAX_RETRIES };
