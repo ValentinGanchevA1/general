@@ -46,6 +46,14 @@ export class ChatService {
         [conversationId],
       );
 
+      await tx.query(
+        `INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (conversation_id, user_id)
+         DO UPDATE SET last_read_at = EXCLUDED.last_read_at`,
+        [conversationId, senderId],
+      );
+
       return this.normalizeMessage(msg!);
     });
   }
@@ -78,6 +86,14 @@ export class ChatService {
       await tx.query(
         `UPDATE conversations SET last_message_at = NOW() WHERE id = $1`,
         [conversationId],
+      );
+
+      await tx.query(
+        `INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (conversation_id, user_id)
+         DO UPDATE SET last_read_at = EXCLUDED.last_read_at`,
+        [conversationId, senderId],
       );
 
       return this.normalizeMessage(msg!);
@@ -150,11 +166,22 @@ export class ChatService {
     return rows.length > 0;
   }
 
+  async markConversationRead(conversationId: string, userId: string): Promise<void> {
+    if (!(await this.isParticipant(conversationId, userId))) {
+      throw new ForbiddenException({ code: 'chat.forbidden', message: 'Not a participant' });
+    }
+    await this.db.query(
+      `INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (conversation_id, user_id)
+       DO UPDATE SET last_read_at = EXCLUDED.last_read_at`,
+      [conversationId, userId],
+    );
+  }
+
   /**
    * Order: close friends first, then online friends, then last activity.
-   * peerOnline respects friends_see_online_status.
-   * unreadCount: messages from peer after viewer's last open is not stored yet;
-   * MVP = 1 when the latest message is from the peer, else 0.
+   * unreadCount = peer messages after conversation_reads.last_read_at.
    */
   async findConversations(userId: string): Promise<ConversationSummary[]> {
     const rows = await this.db.query<
@@ -169,6 +196,7 @@ export class ChatService {
         is_friend: boolean;
         peer_id: string | null;
         peer_allows_online: boolean;
+        unread_count: number;
         participants: Array<{ id: string; displayName: string; avatarUrl: string | null }>;
       }>
     >(
@@ -203,6 +231,18 @@ export class ChatService {
            ),
            true
          ) AS peer_allows_online,
+         (
+           SELECT COUNT(*)::int
+             FROM messages um
+            WHERE um.conversation_id = c.id
+              AND um.sender_id <> $1
+              AND um.created_at > COALESCE(
+                (SELECT cr.last_read_at
+                   FROM conversation_reads cr
+                  WHERE cr.conversation_id = c.id AND cr.user_id = $1),
+                TIMESTAMPTZ 'epoch'
+              )
+         ) AS unread_count,
          COALESCE(
            json_agg(
              json_build_object('id', u.id, 'displayName', u.display_name, 'avatarUrl', u.avatar_url)
@@ -241,8 +281,6 @@ export class ChatService {
       if (isFriend && r.peer_id && r.peer_allows_online) {
         peerOnline = onlineSet.has(r.peer_id);
       }
-      const unreadCount =
-        r.last_sender_id != null && r.last_sender_id !== userId ? 1 : 0;
       return {
         id: r.id,
         participantIds: r.participant_ids,
@@ -256,7 +294,7 @@ export class ChatService {
         initiatedBy: r.initiated_by,
         isFriend,
         peerOnline,
-        unreadCount,
+        unreadCount: Number(r.unread_count) || 0,
       };
     });
 
@@ -285,6 +323,10 @@ export class ChatService {
   ): Promise<MessagePage> {
     if (!(await this.isParticipant(conversationId, userId))) {
       throw new ForbiddenException({ code: 'chat.forbidden', message: 'Not a participant' });
+    }
+
+    if (!cursor) {
+      await this.markConversationRead(conversationId, userId);
     }
 
     const cap = Math.min(limit, 100);

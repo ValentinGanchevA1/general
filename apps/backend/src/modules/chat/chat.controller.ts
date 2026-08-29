@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
 
 import type { ConversationSummary, LocationShareSession, MessagePage } from '@g88/shared';
 
@@ -28,6 +28,16 @@ export class ChatController {
     @Query('limit') limit?: string,
   ): Promise<MessagePage> {
     return this.chat.findMessages(conversationId, userId, cursor, limit ? Number(limit) : 50);
+  }
+
+  /** Explicit mark-read (also runs on first page of GET messages). */
+  @Post('conversations/:id/read')
+  @HttpCode(204)
+  async markRead(
+    @Param('id') conversationId: string,
+    @CurrentUser('id') userId: string,
+  ): Promise<void> {
+    await this.chat.markConversationRead(conversationId, userId);
   }
 
   /** Active live-location session for cold-open of ChatScreen. */
