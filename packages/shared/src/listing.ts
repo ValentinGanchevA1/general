@@ -13,6 +13,10 @@ export type ListingStatus = (typeof LISTING_STATUSES)[number];
 export const LISTING_VISIBILITIES = ['public', 'private'] as const;
 export type ListingVisibility = (typeof LISTING_VISIBILITIES)[number];
 
+/** Sell an item vs looking to buy (wanted). */
+export const LISTING_MODES = ['sell', 'buy'] as const;
+export type ListingMode = (typeof LISTING_MODES)[number];
+
 export const OFFER_STATUSES = ['pending', 'accepted', 'declined', 'withdrawn'] as const;
 export type OfferStatus = (typeof OFFER_STATUSES)[number];
 
@@ -36,6 +40,8 @@ export interface CreateListingRequest {
   /** Where the item is — a seller-published location (stored precisely). */
   location: LatLng;
   visibility?: ListingVisibility;
+  /** Default sell. Buy = "looking to buy" / wanted post. */
+  mode?: ListingMode;
 }
 
 /** Base64-over-JSON listing image upload (same RN-safe path as gallery photos). */
@@ -61,6 +67,7 @@ export interface ListingSummary {
   currency: string;
   category: string;
   status: ListingStatus;
+  mode: ListingMode;
   location: LatLng;
   createdAt: string;
   /** Whether the calling user has saved this listing. */
@@ -84,6 +91,7 @@ export interface BrowseListingsRequest {
   location: LatLng;
   radiusM?: number;
   category?: string;
+  mode?: ListingMode;
   limit?: number;
 }
 

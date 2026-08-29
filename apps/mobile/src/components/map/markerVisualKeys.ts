@@ -31,5 +31,5 @@ export function entityVisualKey(point: EntityPoint): string {
   if (point.kind === 'event') {
     return [point.id, point.kind, point.meta.title, point.meta.coverUrl ?? ''].join('|');
   }
-  return [point.id, point.kind, point.meta.title, point.meta.thumbnailUrl ?? ''].join('|');
+  return [point.id, point.kind, point.meta.title, point.meta.thumbnailUrl ?? '', point.meta.mode ?? 'sell'].join('|');
 }
