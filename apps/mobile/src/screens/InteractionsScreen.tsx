@@ -369,8 +369,8 @@ export function InteractionsScreen(): React.JSX.Element {
       navigation.navigate('Chat', {
         conversationId: c.id,
         otherUserName: peer?.displayName ?? 'Chat',
-        otherUserId: peer?.id,
         requestPending: c.status === 'pending',
+        ...(peer?.id ? { otherUserId: peer.id } : {}),
       });
     },
     [navigation, myUserId],
