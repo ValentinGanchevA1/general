@@ -155,6 +155,15 @@ export function PulseScreen(): React.JSX.Element {
 
   const onTap = useCallback((it: ActivityItem): void => {
     const { screen, params } = it.deepLink;
+    // ListingDetail / EventDetail live under nested stacks — use openRootScreen.
+    if (screen === 'ListingDetail') {
+      openRootScreen(navigation, 'ListingDetail', params);
+      return;
+    }
+    if (screen === 'EventDetail') {
+      openRootScreen(navigation, 'EventDetail', params);
+      return;
+    }
     if (screen === 'Main') {
       navigation.navigate('Main', params as never);
     } else {
