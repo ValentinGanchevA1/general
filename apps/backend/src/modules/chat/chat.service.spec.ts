@@ -79,7 +79,8 @@ describe('ChatService', () => {
         ])
         .mockResolvedValueOnce([{ count: 0 }]) // no prior message
         .mockResolvedValueOnce(MSG) // INSERT
-        .mockResolvedValueOnce([]); // UPDATE last_message_at
+        .mockResolvedValueOnce([]) // UPDATE last_message_at
+        .mockResolvedValueOnce([]); // conversation_reads upsert
 
       const res = await service.persist('c1', 'me', 'hi');
       expect(res.id).toBe('m1');
@@ -87,14 +88,14 @@ describe('ChatService', () => {
     });
 
     it('promotes the conversation to accepted when the recipient replies', async () => {
-      // Gate order for recipient on pending: SELECT → UPDATE status → INSERT → UPDATE last_message_at
       txQuery
         .mockResolvedValueOnce([
           { participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'other' },
         ])
         .mockResolvedValueOnce([]) // UPDATE status → accepted (before insert)
         .mockResolvedValueOnce(MSG) // INSERT
-        .mockResolvedValueOnce([]); // UPDATE last_message_at
+        .mockResolvedValueOnce([]) // UPDATE last_message_at
+        .mockResolvedValueOnce([]); // conversation_reads upsert
 
       await service.persist('c1', 'me', 'reply');
       const statusCall = txQuery.mock.calls.find((c) =>
@@ -109,7 +110,8 @@ describe('ChatService', () => {
           { participant_ids: ['me', 'other'], status: 'accepted', initiated_by: null },
         ])
         .mockResolvedValueOnce(MSG)
-        .mockResolvedValueOnce([]);
+        .mockResolvedValueOnce([]) // UPDATE last_message_at
+        .mockResolvedValueOnce([]); // conversation_reads upsert
 
       const res = await service.persist('c1', 'me', 'hi');
       expect(res.body).toBe('hi');
@@ -124,8 +126,11 @@ describe('ChatService', () => {
     });
 
     it('pages newest-first and exposes nextCursor when more rows exist', async () => {
+      // Without cursor: isParticipant → markRead(isParticipant + INSERT) → SELECT messages
       query
-        .mockResolvedValueOnce([{ exists: true }]) // any non-empty row set = participant
+        .mockResolvedValueOnce([{ exists: true }]) // isParticipant (findMessages)
+        .mockResolvedValueOnce([{ exists: true }]) // isParticipant (markConversationRead)
+        .mockResolvedValueOnce([]) // conversation_reads upsert
         .mockResolvedValueOnce([
           {
             id: 'm2',
@@ -166,7 +171,9 @@ describe('ChatService', () => {
 
     it('returns nextCursor=null on the last page', async () => {
       query
-        .mockResolvedValueOnce([{ exists: true }])
+        .mockResolvedValueOnce([{ exists: true }]) // isParticipant
+        .mockResolvedValueOnce([{ exists: true }]) // markRead isParticipant
+        .mockResolvedValueOnce([]) // conversation_reads upsert
         .mockResolvedValueOnce([
           {
             id: 'm1',
@@ -185,6 +192,7 @@ describe('ChatService', () => {
     });
 
     it('applies the cursor predicate and binds it', async () => {
+      // With cursor: mark-read is skipped — only isParticipant + SELECT
       query.mockResolvedValueOnce([{ exists: true }]).mockResolvedValueOnce([]);
       await service.findMessages('c1', 'me', '2026-06-01T00:00:00.000Z');
       const [, params] = query.mock.calls[1]!;
@@ -206,6 +214,7 @@ describe('ChatService', () => {
           is_friend: false,
           peer_id: 'other',
           peer_allows_online: true,
+          unread_count: 0,
           participants: [
             { id: 'me', displayName: 'Me', avatarUrl: null },
             { id: 'other', displayName: 'Other', avatarUrl: null },
@@ -216,6 +225,7 @@ describe('ChatService', () => {
       const list = await service.findConversations('me');
       expect(list[0]!.lastMessage).toBeNull();
       expect(list[0]!.participants.find((p) => p.id === 'other')?.displayName).toBe('Other');
+      expect(list[0]!.unreadCount).toBe(0);
     });
 
     it('builds lastMessage from the latest body/sender', async () => {
@@ -231,6 +241,7 @@ describe('ChatService', () => {
           is_friend: true,
           peer_id: 'other',
           peer_allows_online: true,
+          unread_count: 3,
           participants: [
             { id: 'me', displayName: 'Me', avatarUrl: null },
             { id: 'other', displayName: 'Other', avatarUrl: null },
@@ -241,6 +252,7 @@ describe('ChatService', () => {
       const list = await service.findConversations('me');
       expect(list[0]!.lastMessage?.body).toBe('yo');
       expect(list[0]!.isFriend).toBe(true);
+      expect(list[0]!.unreadCount).toBe(3);
     });
   });
 
