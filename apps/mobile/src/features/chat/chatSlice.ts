@@ -2,7 +2,7 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 
 import type { ConversationSummary, ChatMessage, MessagePage } from '@g88/shared';
 
-import { getJson } from '@/api/client';
+import { getJson, postJson } from '@/api/client';
 import { logout } from '@/features/auth/authSlice';
 
 export interface OutboxEntry {
@@ -15,14 +15,12 @@ export interface OutboxEntry {
 interface ChatState {
   conversations: ConversationSummary[];
   conversationsLoading: boolean;
-  /** Keyed by conversationId. Messages ordered newest-first. */
   messages: Record<string, ChatMessage[]>;
   messagesLoading: Record<string, boolean>;
   nextCursor: Record<string, string | null>;
-  /** Messages queued for send — drained when socket reconnects. */
   outbox: OutboxEntry[];
-  /** Optimistic IDs that exhausted retries and show a permanent error. */
   failedIds: string[];
+  activeConversationId: string | null;
 }
 
 const MAX_RETRIES = 3;
@@ -35,6 +33,7 @@ const initialState: ChatState = {
   nextCursor: {},
   outbox: [],
   failedIds: [],
+  activeConversationId: null,
 };
 
 export const fetchConversations = createAsyncThunk(
@@ -64,11 +63,30 @@ export const fetchMessages = createAsyncThunk(
   },
 );
 
+export const markConversationReadRemote = createAsyncThunk(
+  'chat/markConversationReadRemote',
+  async (conversationId: string, { rejectWithValue }) => {
+    try {
+      await postJson(`/conversations/${conversationId}/read`, {});
+      return conversationId;
+    } catch (e) {
+      return rejectWithValue(e instanceof Error ? e.message : 'Failed to mark read');
+    }
+  },
+);
+
 const chatSlice = createSlice({
   name: 'chat',
   initialState,
   reducers: {
-    /** Called when a chat:message socket event arrives. */
+    setActiveConversation(state, action: PayloadAction<string | null>) {
+      state.activeConversationId = action.payload;
+      if (action.payload) {
+        const convo = state.conversations.find((c) => c.id === action.payload);
+        if (convo) convo.unreadCount = 0;
+      }
+    },
+
     messageReceived(
       state,
       action: PayloadAction<ChatMessage & { viewerId?: string }>,
@@ -82,13 +100,13 @@ const chatSlice = createSlice({
       if (convo) {
         convo.lastMessage = { senderId, body };
         convo.lastMessageAt = createdAt;
-        if (viewerId && senderId !== viewerId) {
+        const isActive = state.activeConversationId === conversationId;
+        if (!isActive && viewerId && senderId !== viewerId) {
           convo.unreadCount = (convo.unreadCount ?? 0) + 1;
         }
       }
     },
 
-    /** Clear unread badge after opening a conversation. */
     conversationMarkedRead(state, action: PayloadAction<string>) {
       const convo = state.conversations.find((c) => c.id === action.payload);
       if (convo) {
@@ -156,19 +174,11 @@ const chatSlice = createSlice({
       })
       .addCase(fetchConversations.fulfilled, (state, action) => {
         state.conversationsLoading = false;
-        // Preserve higher local unread if we already counted via socket before refetch.
-        const prev = new Map(
-          state.conversations.map((c) => [c.id, c.unreadCount ?? 0] as const),
-        );
-        state.conversations = action.payload.map((c) => ({
-          ...c,
-          unreadCount: Math.max(c.unreadCount ?? 0, prev.get(c.id) ?? 0),
-        }));
+        state.conversations = action.payload;
       })
       .addCase(fetchConversations.rejected, (state) => {
         state.conversationsLoading = false;
       })
-
       .addCase(fetchMessages.pending, (state, action) => {
         state.messagesLoading[action.meta.arg.conversationId] = true;
       })
@@ -190,7 +200,10 @@ const chatSlice = createSlice({
       .addCase(fetchMessages.rejected, (state, action) => {
         state.messagesLoading[action.meta.arg.conversationId] = false;
       })
-
+      .addCase(markConversationReadRemote.fulfilled, (state, action) => {
+        const convo = state.conversations.find((c) => c.id === action.payload);
+        if (convo) convo.unreadCount = 0;
+      })
       .addCase(logout.fulfilled, () => initialState);
   },
 });
@@ -203,6 +216,7 @@ export const {
   outboxRetryIncremented,
   failedMessageCleared,
   conversationMarkedRead,
+  setActiveConversation,
 } = chatSlice.actions;
 
 export { MAX_RETRIES };
