@@ -57,14 +57,14 @@ describe('ListingsService', () => {
       query.mockResolvedValueOnce([
         {
           id: 'l1', seller_id: 's1', title: 'Bike', thumbnail_url: null,
-          price_cents: 5000, currency: 'USD', category: 'sports', status: 'active',
+          price_cents: 5000, currency: 'USD', category: 'sports', status: 'active', mode: 'sell',
           created_at: new Date('2026-06-12T00:00:00Z'), lat: 43.2, lng: 27.9,
         },
       ]);
       const res = await service.create('s1', {
         title: 'Bike', priceCents: 5000, category: 'sports', location: loc,
       } as never);
-      expect(res).toMatchObject({ id: 'l1', sellerId: 's1', priceCents: 5000, favoritedByMe: false });
+      expect(res).toMatchObject({ id: 'l1', sellerId: 's1', priceCents: 5000, mode: 'sell', favoritedByMe: false });
       expect(res.location).toEqual(loc);
     });
   });
