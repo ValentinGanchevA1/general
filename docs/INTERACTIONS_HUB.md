@@ -19,20 +19,30 @@
 - FAQ for Pulse and Interactions updated to match the split
 
 ### Interactions
-- Existing inbox (waves, friend requests, follows, story reactions) remains
-- **Next step on this branch / follow-up:** merge `chatSlice.conversations` into the Interactions list UI with last-message preview + online indicator + navigate to `Chat`
+- Unified list: `chatSlice.conversations` + inbox (waves, friend requests, follows, story reactions)
+- Sort by most recent activity (`lastMessageAt` / `createdAt`)
+- **ChatRow**: peer name, last-message preview, peer online dot, pending badge, **green unread badge**
+- Tap chat → `Chat` with `conversationId`, `otherUserId`, `otherUserName`, `requestPending`
+- `fetchConversations` on focus; refresh on `chat:message` socket
 
-### Scaffold (first commit — review / wire carefully)
-Earlier commit added parallel scaffolding under:
-- `packages/shared/types/interaction.ts` (prefer extending `@g88/shared` InboxItem instead)
-- `apps/mobile/src/store/interactionsSlice.ts` (prefer existing `useInboxInteractions` + chatSlice)
-- `apps/backend/src/interactions/*` (prefer existing `apps/backend/src/modules/interactions`)
+### Unread counts
+- Backend `findConversations`: MVP `unreadCount = 1` when latest message is from peer, else `0`
+- `chatSlice.messageReceived`: increments when `viewerId` known and sender ≠ viewer
+- `fetchConversations.fulfilled`: keeps `Math.max(server, local)` so socket increments are not clobbered
+- `fetchMessages` (first page) and `conversationMarkedRead` clear unread
+- ChatRow shows badge `1`…`99+` and bold name/preview when unread
 
-**Do not double-register reducers.** Prefer extending the current InteractionsScreen + `/interactions/inbox` rather than the scaffold paths above unless you intentionally migrate.
+### Scaffold cleanup (done)
+Removed unused first-commit files (not wired into production paths):
+- `packages/shared/types/interaction.ts`
+- `apps/mobile/src/store/interactionsSlice.ts`
+- `apps/mobile/src/hooks/useInteractionsRealtime.ts`
+- `apps/mobile/src/components/interactions/InteractionRow.tsx`
+- `apps/backend/src/interactions/*` (prefer existing modules)
 
-## Remaining work
-1. Extend `InteractionsScreen` row renderer for chat conversations (from `fetchConversations` / `chatSlice`).
-2. Socket: on `chat:message`, refresh inbox or update conversation row in place.
-3. Optional: backend include chats in `GET /interactions/inbox` for a single ordered list.
-4. Clean up scaffold files if not used, or migrate fully to them in one PR.
-5. Ensure `PulseFilter` type in navigator no longer requires removed keys (or map old deep links to `all`).
+Production path remains: `useInboxInteractions` + `chatSlice` + `InteractionsScreen` HubRow/ChatRow/InboxRow.
+
+## Optional follow-ups
+1. Server-side `conversation_reads` / `last_read_at` for accurate multi-message unread counts
+2. Optional: include chats in `GET /interactions/inbox` for a single ordered API list
+3. Tab-level badge summing conversation unreadCounts
