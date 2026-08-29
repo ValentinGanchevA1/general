@@ -12,7 +12,7 @@ export type GamificationStackParamList = {
 export type CommerceStackParamList = {
   Marketplace: undefined;
   ListingDetail: { listingId: string };
-  ListingCreate: undefined;
+  ListingCreate: { mode?: 'sell' | 'buy' } | undefined;
 };
 
 export type AccountStackParamList = {
