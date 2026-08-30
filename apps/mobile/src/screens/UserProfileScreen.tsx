@@ -21,7 +21,6 @@ import type {
   CreateConversationResponse,
   PublicUserProfile,
   RelationshipSummary,
-  VerificationLevel,
   WaveRequest,
   WaveResponse,
 } from '@g88/shared';
@@ -43,19 +42,6 @@ import {
 import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
-
-const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
-const LADDER_BADGES: Array<{ level: VerificationLevel; label: string }> = [
-  { level: 'email', label: 'Email' },
-  { level: 'phone', label: 'Phone' },
-  { level: 'selfie', label: 'Photo' },
-  { level: 'id', label: 'ID' },
-];
-
-function earnedBadges(level: VerificationLevel): string[] {
-  const rank = LADDER.indexOf(level);
-  return LADDER_BADGES.filter((b) => rank >= LADDER.indexOf(b.level)).map((b) => b.label);
-}
 
 function errMessage(e: unknown, fallback: string): string {
   if (typeof e === 'object' && e !== null && 'message' in e) {
@@ -196,8 +182,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
       mapParams.focusLat = profile.mapLat;
       mapParams.focusLng = profile.mapLng;
     }
-    // CommonActions + nested params so an already-mounted Main/Map receives focus*
-    // even when the stack is already under UserProfile.
     navigation.dispatch(
       CommonActions.navigate({
         name: 'Main',
@@ -437,7 +421,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 
   if (!profile) return <View style={styles.centered} />;
 
-  const badges = earnedBadges(profile.verification);
   const isFollowing = Boolean(rel?.isFollowing);
   const friendLabel =
     rel?.state === 'friends'
@@ -554,27 +537,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
           </View>
         ) : null}
 
-        {/* Reordered: Trust → About → Storyline → Photos → Goals */}
-        <View>
-          <Text style={styles.sectionLabel}>Trust</Text>
-          <View style={styles.trustCompact}>
-            <Text style={styles.trustText}>{profile.verificationScore}% verified</Text>
-            <View style={styles.trustBadges}>
-              {badges.length === 0 ? (
-                <Text style={styles.trustEmpty}>No verification yet</Text>
-              ) : (
-                badges.map((b) => (
-                  <View key={b} style={[styles.trustChip, b === 'ID' && styles.trustChipStrong]}>
-                    <Text style={b === 'ID' ? styles.trustChipStrongText : styles.trustChipText}>
-                      {b}
-                    </Text>
-                  </View>
-                ))
-              )}
-            </View>
-          </View>
-        </View>
-
+        {/* About → Storyline → Photos → Goals (Trust lives on map entity sheet) */}
         {profile.bio ? <ProfileBio bio={profile.bio} showTitle padded={false} /> : null}
 
         <View style={styles.section}>
@@ -726,31 +689,6 @@ const styles = StyleSheet.create({
   outlineBtnText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.md },
 
   section: { paddingHorizontal: spacing.xl, gap: 10 },
-  sectionLabel: {
-    color: colors.textFaint,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    paddingHorizontal: spacing.xl,
-    marginBottom: 8,
-  },
-  trustCompact: {
-    paddingHorizontal: spacing.xl,
-    gap: 10,
-  },
-  trustText: { color: colors.textMuted, fontSize: 12 },
-  trustBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  trustChip: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  trustChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
-  trustChipStrong: { backgroundColor: '#00d4ff20' },
-  trustChipStrongText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  trustEmpty: { color: colors.textFaint, fontSize: 12 },
 
   footer: {
     flexDirection: 'row',

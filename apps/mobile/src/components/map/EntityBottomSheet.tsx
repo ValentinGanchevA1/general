@@ -15,6 +15,7 @@ import type {
   EntityPoint,
   PublicUserProfile,
   UserMeta,
+  VerificationLevel,
 } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { deleteJson, getJson, postJson } from '@/api/client';
@@ -25,6 +26,19 @@ import { colors, spacing } from '@/theme';
 
 function labelFor(value: string): string {
   return GOAL_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
+const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
+const LADDER_BADGES: Array<{ level: VerificationLevel; label: string }> = [
+  { level: 'email', label: 'Email' },
+  { level: 'phone', label: 'Phone' },
+  { level: 'selfie', label: 'Photo' },
+  { level: 'id', label: 'ID' },
+];
+
+function earnedBadges(level: VerificationLevel): string[] {
+  const rank = LADDER.indexOf(level);
+  return LADDER_BADGES.filter((b) => rank >= LADDER.indexOf(b.level)).map((b) => b.label);
 }
 
 type UserEntityPoint = EntityPoint & { kind: 'user'; meta: UserMeta };
@@ -71,8 +85,12 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   const displayName = meta.displayName?.trim() || 'User';
   const canMessage = profile?.relationship?.canMessage ?? 'none';
   const sharedInterests = profile?.relationship?.sharedInterests ?? [];
+  const goalChips =
+    (profile?.goals?.length ? profile.goals : sharedInterests).slice(0, 6);
   const blocked = profile?.blockedByViewer ?? false;
   const status = profile?.status;
+  const trustScore = profile?.verificationScore;
+  const badges = profile ? earnedBadges(profile.verification) : [];
 
   const onBlockToggle = (): void => {
     if (blocking) return;
@@ -173,15 +191,38 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         <ActivityIndicator color={colors.primary} size="small" style={{ alignSelf: 'flex-start' }} />
       ) : null}
 
+      {/* Trust — under avatar, before bio */}
+      {!fetching && profile != null ? (
+        <View style={styles.trustBlock}>
+          <Text style={styles.trustLabel}>Trust</Text>
+          <Text style={styles.trustText}>
+            {trustScore != null ? `${trustScore}% verified` : '0% verified'}
+          </Text>
+          <View style={styles.trustBadges}>
+            {badges.length === 0 ? (
+              <Text style={styles.trustEmpty}>No verification yet</Text>
+            ) : (
+              badges.map((b) => (
+                <View key={b} style={[styles.trustChip, b === 'ID' && styles.trustChipStrong]}>
+                  <Text style={b === 'ID' ? styles.trustChipStrongText : styles.trustChipText}>
+                    {b}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+        </View>
+      ) : null}
+
       {profile?.bio ? (
         <Text style={styles.bio} numberOfLines={3}>
           {profile.bio}
         </Text>
       ) : null}
 
-      {sharedInterests.length > 0 ? (
+      {goalChips.length > 0 ? (
         <View style={styles.goalsRow}>
-          {sharedInterests.slice(0, 4).map((g) => (
+          {goalChips.map((g) => (
             <View key={g} style={styles.goalChip}>
               <Text style={styles.goalIcon}>✓</Text>
               <Text style={styles.goalLabel}>{labelFor(g)}</Text>
@@ -190,22 +231,40 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         </View>
       ) : null}
 
-      {status ? (
+      {/* Level (number + bar only) + badges under goals */}
+      {status || badges.length > 0 ? (
         <View style={styles.statusBlock}>
-          <Text style={styles.statusLevel}>Level {status.level}</Text>
-          <View style={styles.xpTrack}>
-            <View
-              style={[
-                styles.xpFill,
-                {
-                  width: `${Math.min(100, Math.round((status.xpIntoLevel / Math.max(1, status.xpForNextLevel)) * 100))}%`,
-                },
-              ]}
-            />
-          </View>
-          <Text style={styles.statusXp}>
-            {status.xpIntoLevel}/{status.xpForNextLevel} XP
-          </Text>
+          {status ? (
+            <>
+              <Text style={styles.statusLevel}>Level {status.level}</Text>
+              <View style={styles.xpTrack}>
+                <View
+                  style={[
+                    styles.xpFill,
+                    {
+                      width: `${Math.min(
+                        100,
+                        Math.round(
+                          (status.xpIntoLevel / Math.max(1, status.xpForNextLevel)) * 100,
+                        ),
+                      )}%`,
+                    },
+                  ]}
+                />
+              </View>
+            </>
+          ) : null}
+          {badges.length > 0 ? (
+            <View style={styles.badgesRow}>
+              {badges.map((b) => (
+                <View key={b} style={[styles.badgeChip, b === 'ID' && styles.trustChipStrong]}>
+                  <Text style={b === 'ID' ? styles.trustChipStrongText : styles.badgeChipText}>
+                    {b}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -296,6 +355,26 @@ const styles = StyleSheet.create({
   originLine: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   onlineLabel: { color: colors.success, fontSize: 12, marginTop: 2 },
   offlineLabel: { color: colors.textMuted },
+  trustBlock: { gap: 6 },
+  trustLabel: {
+    color: colors.textFaint,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  trustText: { color: colors.textMuted, fontSize: 12 },
+  trustBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  trustChip: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  trustChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
+  trustChipStrong: { backgroundColor: '#00d4ff20' },
+  trustChipStrongText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  trustEmpty: { color: colors.textFaint, fontSize: 12 },
   bio: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
   goalsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   goalChip: {
@@ -314,7 +393,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    gap: 6,
+    gap: 8,
   },
   statusLevel: { color: colors.textPrimary, fontWeight: '700', fontSize: 14 },
   xpTrack: {
@@ -328,7 +407,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: 3,
   },
-  statusXp: { color: colors.textMuted, fontSize: 12 },
+  badgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
+  badgeChip: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  badgeChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
   actions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   blockLink: { alignSelf: 'center', paddingVertical: 4 },
   blockLinkText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
