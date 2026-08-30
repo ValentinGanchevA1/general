@@ -536,16 +536,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
           </View>
         ) : null}
 
-        <ProfilePhotosSection photos={photoUrls} isSelf={false} padded={false} />
-
-        <View style={styles.section}>
-          <ProfileStoryline userId={userId} />
-        </View>
-
-        {profile.bio ? <ProfileBio bio={profile.bio} showTitle padded={false} /> : null}
-
-        <ProfileTagsSection goals={profile.goals ?? []} goalsTitle="Goals" padded={false} />
-
+        {/* Reordered: Trust → About → Storyline → Photos → Goals */}
         <View>
           <Text style={styles.sectionLabel}>Trust</Text>
           <View style={styles.trustCompact}>
@@ -565,6 +556,16 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
             </View>
           </View>
         </View>
+
+        {profile.bio ? <ProfileBio bio={profile.bio} showTitle padded={false} /> : null}
+
+        <View style={styles.section}>
+          <ProfileStoryline userId={userId} />
+        </View>
+
+        <ProfilePhotosSection photos={photoUrls} isSelf={false} padded={false} />
+
+        <ProfileTagsSection goals={profile.goals ?? []} goalsTitle="Goals" padded={false} />
       </ScrollView>
 
       <View style={styles.footer}>
