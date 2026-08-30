@@ -25,13 +25,16 @@ function isActive(s: StoryCard, now = Date.now()): boolean {
   return new Date(s.expiresAt).getTime() > now;
 }
 
+/** Stable empty ref — avoids "Selector unknown returned a different result" when byAuthor misses. */
+const EMPTY_STORIES: StoryCard[] = [];
+
 /**
  * Profile wall: active + recent expired stories (timeline).
  * Placed after Photos on Profile / UserProfile.
  */
 export function ProfileStoryline({ userId, isSelf = false }: Props): React.JSX.Element {
   const dispatch = useAppDispatch();
-  const stories = useAppSelector((s) => s.stories.byAuthor[userId] ?? []);
+  const stories = useAppSelector((s) => s.stories.byAuthor[userId] ?? EMPTY_STORIES);
   const [loading, setLoading] = useState(true);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
