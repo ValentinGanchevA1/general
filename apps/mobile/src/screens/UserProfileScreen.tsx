@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +16,8 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type {
   ApiError,
+  CreateConversationRequest,
+  CreateConversationResponse,
   PublicUserProfile,
   RelationshipSummary,
   VerificationLevel,
@@ -75,6 +78,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   const [rel, setRel] = useState<RelationshipSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [waving, setWaving] = useState(false);
+  const [messaging, setMessaging] = useState(false);
   const [giftSheetOpen, setGiftSheetOpen] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
@@ -86,6 +90,9 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   const renderBackdrop = useSheetBackdrop(0.55);
 
   const blocked = profile?.blockedByViewer ?? false;
+  const canMessage = profile?.relationship?.canMessage ?? 'none';
+  const photoUrls = profile?.photoUrls ?? [];
+  const coverUri = photoUrls[0] ?? profile?.avatarUrl ?? null;
 
   const loadRelationship = useCallback(async (): Promise<boolean> => {
     try {
@@ -130,6 +137,33 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     } finally {
       setWaving(false);
     }
+  };
+
+  const openMessage = async (): Promise<void> => {
+    if (messaging || canMessage === 'none') return;
+    setMessaging(true);
+    try {
+      const res = await postJson<CreateConversationRequest, CreateConversationResponse>(
+        '/conversations',
+        { targetUserId: userId },
+      );
+      navigation.navigate('Chat', {
+        conversationId: res.conversationId,
+        otherUserName: profile?.displayName ?? 'Chat',
+        requestPending: res.status === 'pending' && res.permission === 'request',
+        otherUserId: userId,
+        otherUserVerification: profile?.verification,
+        otherUserIdVerified: profile?.idVerified ?? false,
+      });
+    } catch (e) {
+      Alert.alert('Could not open chat', errMessage(e, 'Try again in a moment.'));
+    } finally {
+      setMessaging(false);
+    }
+  };
+
+  const viewOnMap = (): void => {
+    navigation.navigate('Main', { screen: 'Map' });
   };
 
   const block = async (): Promise<void> => {
@@ -188,7 +222,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     }
   };
 
-  /** Build sheet actions in the press handler so refs are not read during render. */
   const openMenu = (): void => {
     const name = profile?.displayName ?? 'this user';
     const dismiss = (): void => {
@@ -371,6 +404,8 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         : rel?.state === 'request_incoming'
           ? 'Accept'
           : 'Add friend';
+  const hometown = [profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ');
+  const showMessage = !blocked && (canMessage === 'chat' || canMessage === 'request');
 
   return (
     <View style={styles.root}>
@@ -389,11 +424,21 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.hero}>
-          <Avatar uri={profile.avatarUrl} name={profile.displayName} size={72} ring />
+        <View style={styles.heroBlock}>
+          <View style={styles.cover}>
+            {coverUri ? (
+              <Image source={{ uri: coverUri }} style={styles.coverImage} />
+            ) : (
+              <View style={styles.coverPlaceholder} />
+            )}
+            <View style={styles.coverScrim} />
+          </View>
+          <View style={styles.avatarWrap}>
+            <Avatar uri={profile.avatarUrl} name={profile.displayName} size={96} ring />
+          </View>
           <View style={styles.heroMeta}>
             <View style={styles.nameRow}>
-              <Text style={styles.displayName}>
+              <Text style={styles.displayName} numberOfLines={1}>
                 {profile.displayName}
                 {profile.age != null ? `, ${profile.age}` : ''}
               </Text>
@@ -403,14 +448,16 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
                 size={18}
               />
             </View>
-            {profile.hometownCity || profile.hometownCountry ? (
-              <Text style={styles.originLine}>
-                {[profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ')}
+            {hometown ? <Text style={styles.originLine}>{hometown}</Text> : null}
+            <View style={styles.placeRow}>
+              <Text style={[styles.onlineLabel, !profile.online && styles.offlineLabel]}>
+                {profile.online ? 'Online now' : 'Recently nearby'}
               </Text>
-            ) : null}
-            <Text style={[styles.onlineLabel, !profile.online && styles.offlineLabel]}>
-              {profile.online ? 'Online now' : 'Recently nearby'}
-            </Text>
+              <Text style={styles.placeDot}>·</Text>
+              <TouchableOpacity onPress={viewOnMap} hitSlop={8} accessibilityRole="button">
+                <Text style={styles.viewOnMap}>View on map</Text>
+              </TouchableOpacity>
+            </View>
             {rel && rel.mutualFriendsCount > 0 ? (
               <TouchableOpacity onPress={openMutualFriends} accessibilityRole="button">
                 <Text style={styles.mutualLine}>
@@ -425,26 +472,22 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         {!blocked ? (
           <View style={styles.socialRow}>
             <TouchableOpacity
-              style={[styles.socialBtn, isFollowing && styles.socialBtnSecondary]}
+              style={[styles.outlineBtn, isFollowing && styles.outlineBtnActive]}
               onPress={onFollowToggle}
               disabled={followBusy || friendBusy}
             >
               {followBusy ? (
-                <ActivityIndicator size="small" color={isFollowing ? colors.primary : colors.onPrimary} />
+                <ActivityIndicator size="small" color={colors.primary} />
               ) : (
-                <Text
-                  style={[styles.socialBtnText, isFollowing && styles.socialBtnTextSecondary]}
-                >
-                  {isFollowing ? 'Following' : 'Follow'}
-                </Text>
+                <Text style={styles.outlineBtnText}>{isFollowing ? 'Following' : 'Follow'}</Text>
               )}
             </TouchableOpacity>
             <TouchableOpacity
               style={[
-                styles.socialBtn,
+                styles.outlineBtn,
                 (rel?.state === 'friends' || rel?.state === 'request_outgoing') &&
-                  styles.socialBtnSecondary,
-                rel?.state === 'request_incoming' && styles.socialBtnAccent,
+                  styles.outlineBtnActive,
+                rel?.state === 'request_incoming' && styles.outlineBtnAccent,
               ]}
               onPress={onFriendAction}
               disabled={friendBusy || followBusy || rel?.state === 'friends'}
@@ -452,51 +495,40 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
               {friendBusy ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
-                <Text
-                  style={[
-                    styles.socialBtnText,
-                    (rel?.state === 'friends' ||
-                      rel?.state === 'request_outgoing' ||
-                      rel?.state === 'request_incoming') &&
-                      styles.socialBtnTextSecondary,
-                  ]}
-                >
-                  {friendLabel}
-                </Text>
+                <Text style={styles.outlineBtnText}>{friendLabel}</Text>
               )}
             </TouchableOpacity>
           </View>
         ) : null}
 
-        <View>
-          <Text style={styles.sectionLabel}>Trust</Text>
-          <View style={styles.trustRow}>
-            <View style={styles.trustBar}>
-              <View style={[styles.trustProgress, { width: `${profile.verificationScore}%` as unknown as number }]} />
-            </View>
-            <Text style={styles.trustText}>{profile.verificationScore}% verified</Text>
-          </View>
-          <View style={styles.trustBadges}>
-            {badges.length === 0 ? (
-              <Text style={styles.trustEmpty}>No verification yet</Text>
-            ) : (
-              badges.map((b) => (
-                <View key={b} style={[styles.trustChip, b === 'ID' && styles.trustChipStrong]}>
-                  <Text style={b === 'ID' ? styles.trustChipStrongText : styles.trustChipText}>{b}</Text>
-                </View>
-              ))
-            )}
-          </View>
+        <ProfilePhotosSection photos={photoUrls} isSelf={false} padded={false} />
+
+        <View style={styles.section}>
+          <ProfileStoryline userId={userId} />
         </View>
 
         {profile.bio ? <ProfileBio bio={profile.bio} showTitle padded={false} /> : null}
 
         <ProfileTagsSection goals={profile.goals ?? []} goalsTitle="Goals" padded={false} />
 
-        <ProfilePhotosSection photos={profile.photoUrls ?? []} isSelf={false} padded={false} />
-
-        <View style={styles.section}>
-          <ProfileStoryline userId={userId} />
+        <View>
+          <Text style={styles.sectionLabel}>Trust</Text>
+          <View style={styles.trustCompact}>
+            <Text style={styles.trustText}>{profile.verificationScore}% verified</Text>
+            <View style={styles.trustBadges}>
+              {badges.length === 0 ? (
+                <Text style={styles.trustEmpty}>No verification yet</Text>
+              ) : (
+                badges.map((b) => (
+                  <View key={b} style={[styles.trustChip, b === 'ID' && styles.trustChipStrong]}>
+                    <Text style={b === 'ID' ? styles.trustChipStrongText : styles.trustChipText}>
+                      {b}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
+          </View>
         </View>
       </ScrollView>
 
@@ -507,15 +539,28 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
           </TouchableOpacity>
         ) : (
           <>
-            <TouchableOpacity style={styles.giftBtn} onPress={() => setGiftSheetOpen(true)}>
-              <Text style={styles.giftBtnText}>🎁 Gift</Text>
-            </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.waveBtn, waving && styles.waveBtnDisabled]}
+              style={[styles.footerBtn, styles.waveBtn, waving && styles.btnDisabled]}
               onPress={() => void sendWave()}
               disabled={waving}
             >
-              <Text style={styles.waveBtnText}>{waving ? 'Sending…' : '👋 Send Wave'}</Text>
+              <Text style={styles.footerBtnTextOnPrimary}>
+                {waving ? '…' : '👋 Wave'}
+              </Text>
+            </TouchableOpacity>
+            {showMessage ? (
+              <TouchableOpacity
+                style={[styles.footerBtn, styles.messageBtn, messaging && styles.btnDisabled]}
+                onPress={() => void openMessage()}
+                disabled={messaging}
+              >
+                <Text style={styles.footerBtnTextOnPrimary}>
+                  {messaging ? '…' : canMessage === 'request' ? '✉️ Message' : '💬 Chat'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity style={[styles.footerBtn, styles.giftBtn]} onPress={() => setGiftSheetOpen(true)}>
+              <Text style={styles.giftBtnText}>🎁</Text>
             </TouchableOpacity>
           </>
         )}
@@ -559,54 +604,88 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 52,
     paddingHorizontal: 12,
-    paddingBottom: 8,
+    paddingBottom: 4,
+    zIndex: 2,
   },
   backBtn: { padding: 8 },
   backBtnText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
   menuBtn: { padding: 8 },
   menuBtnText: { color: colors.textMuted, fontSize: 22, letterSpacing: 2 },
-  scroll: { padding: spacing.xl, gap: 28, paddingBottom: 24 },
-  hero: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingTop: 8 },
-  heroMeta: { flex: 1, gap: 4 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  scroll: { paddingBottom: 24, gap: 22 },
+
+  heroBlock: { marginBottom: 4 },
+  cover: {
+    height: 140,
+    backgroundColor: colors.surfaceRaised,
+    overflow: 'hidden',
+  },
+  coverImage: { width: '100%', height: '100%', opacity: 0.55 },
+  coverPlaceholder: { flex: 1, backgroundColor: colors.surfaceAlt },
+  coverScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10,10,15,0.35)',
+  },
+  avatarWrap: {
+    alignItems: 'center',
+    marginTop: -48,
+  },
+  heroMeta: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    marginTop: 10,
+    gap: 4,
+  },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '100%' },
   displayName: { color: colors.textPrimary, fontSize: 24, fontWeight: '700' },
-  originLine: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
+  originLine: { color: colors.textMuted, fontSize: 13 },
+  placeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   onlineLabel: { color: colors.success, fontSize: 13 },
   offlineLabel: { color: colors.textFaint },
+  placeDot: { color: colors.textFaint, fontSize: 13 },
+  viewOnMap: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   mutualLine: { color: colors.primary, fontSize: 12, marginTop: 2, fontWeight: '600' },
-  socialRow: { flexDirection: 'row', gap: 10 },
-  socialBtn: {
+
+  socialRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: spacing.xl,
+  },
+  outlineBtn: {
     flex: 1,
-    backgroundColor: colors.primary,
     borderRadius: radius.md,
-    paddingVertical: 12,
+    paddingVertical: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 44,
-  },
-  socialBtnSecondary: {
+    minHeight: 42,
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.borderStrong,
   },
-  socialBtnAccent: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
+  outlineBtnActive: {
     borderColor: colors.primary,
   },
-  socialBtnText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
-  socialBtnTextSecondary: { color: colors.primary },
-  trustRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  trustBar: {
-    flex: 1,
-    height: 6,
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: 3,
-    overflow: 'hidden',
+  outlineBtnAccent: {
+    borderColor: colors.primary,
+    backgroundColor: '#00d4ff12',
   },
-  trustProgress: { height: '100%', backgroundColor: colors.primary, borderRadius: 3 },
+  outlineBtnText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.md },
+
+  section: { paddingHorizontal: spacing.xl, gap: 10 },
+  sectionLabel: {
+    color: colors.textFaint,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    paddingHorizontal: spacing.xl,
+    marginBottom: 8,
+  },
+  trustCompact: {
+    paddingHorizontal: spacing.xl,
+    gap: 10,
+  },
   trustText: { color: colors.textMuted, fontSize: 12 },
-  trustBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  trustBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   trustChip: {
     backgroundColor: colors.surface,
     borderRadius: 12,
@@ -617,34 +696,41 @@ const styles = StyleSheet.create({
   trustChipStrong: { backgroundColor: '#00d4ff20' },
   trustChipStrongText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   trustEmpty: { color: colors.textFaint, fontSize: 12 },
-  section: { gap: 10 },
-  sectionLabel: {
-    color: colors.textFaint,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+
+  footer: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: spacing.xl,
+    paddingTop: 12,
+    paddingBottom: 36,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
+    backgroundColor: colors.bg,
   },
-  footer: { flexDirection: 'row', gap: 12, padding: spacing.xl, paddingBottom: 36 },
+  footerBtn: {
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
+  },
   waveBtn: {
     flex: 1,
     backgroundColor: colors.primary,
-    borderRadius: 14,
-    padding: 16,
-    alignItems: 'center',
   },
-  waveBtnDisabled: { opacity: 0.6 },
-  waveBtnText: { color: colors.onPrimary, fontWeight: '700', fontSize: 16 },
+  messageBtn: {
+    flex: 1,
+    backgroundColor: colors.primary,
+  },
   giftBtn: {
-    paddingHorizontal: 22,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 56,
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: '#00d4ff66',
   },
-  giftBtnText: { color: colors.primary, fontWeight: '700', fontSize: 16 },
+  footerBtnTextOnPrimary: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
+  giftBtnText: { fontSize: 20 },
+  btnDisabled: { opacity: 0.55 },
   unblockBtn: {
     flex: 1,
     borderRadius: 14,
