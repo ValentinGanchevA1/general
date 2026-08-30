@@ -21,6 +21,7 @@ import {
   fetchIdVerificationStatus,
 } from '@/features/verification/idVerificationSlice';
 import { fetchProfile } from '@/features/profile/profileSlice';
+import { extractMessage } from '@/utils/extractMessage';
 
 type StepKey = 'selfie' | 'idFront' | 'idBack';
 
@@ -65,9 +66,10 @@ export default function VerificationIdScreen(): React.ReactElement {
   async function pickForStep(step: StepKey) {
     // Bound the dimensions so the base64 payload stays well under the API's body
     // limit even with selfie + ID front + back in one submission.
+    // PhotoQuality is a discrete union (0 | 0.1 | … | 1) — 0.65 is not assignable.
     const options: ImageLibraryOptions = {
       mediaType: 'photo',
-      quality: 0.65,
+      quality: 0.6,
       maxWidth: 1280,
       maxHeight: 1280,
       includeBase64: true,
@@ -124,10 +126,11 @@ export default function VerificationIdScreen(): React.ReactElement {
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e: unknown) {
-      const msg =
-        e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string'
-          ? (e as { message: string }).message
-          : 'There was an error uploading your documents. Please try again.';
+      const msg = extractMessage(
+        e,
+        'There was an error uploading your documents. Please try again.',
+      );
+      // eslint-disable-next-line no-console -- debug path for emulator submit failures
       console.warn('[id-verify] submit failed', e);
       Alert.alert('Upload Failed', msg);
     } finally {
