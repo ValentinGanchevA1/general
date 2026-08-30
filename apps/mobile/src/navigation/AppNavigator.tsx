@@ -74,7 +74,14 @@ export type PulseFilter =
   | 'matches';
 
 export type TabParamList = {
-  Map: { focusMyPin?: boolean } | undefined;
+  Map: {
+    focusMyPin?: boolean;
+    /** Peer user id — animate camera to their pin and open the entity sheet when found. */
+    focusUserId?: string;
+    /** Optional fuzzed lat/lng when the pin is outside the current discovery viewport. */
+    focusLat?: number;
+    focusLng?: number;
+  } | undefined;
   Pulse: { filter?: PulseFilter } | undefined;
   Profile: undefined;
 };

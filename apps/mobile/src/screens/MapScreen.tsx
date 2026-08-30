@@ -77,6 +77,9 @@ export function MapScreen(): React.JSX.Element {
   const renderBackdrop = useSheetBackdrop(0.5);
   const { unreadCount: interactionUnread } = useReceivedInteractions();
   const focusMyPin = route.params?.focusMyPin === true;
+  const focusUserId = route.params?.focusUserId;
+  const focusLat = route.params?.focusLat;
+  const focusLng = route.params?.focusLng;
 
   const [createNearbyOpen, setCreateNearbyOpen] = useState(false);
   const [createNearbyCoords, setCreateNearbyCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -133,7 +136,7 @@ export function MapScreen(): React.JSX.Element {
   }, [points]);
 
   useEffect(() => {
-    if (!myCoords || region || focusMyPin) return;
+    if (!myCoords || region || focusMyPin || focusUserId) return;
     mapRef.current?.animateToRegion(
       {
         latitude: myCoords.lat,
@@ -143,23 +146,89 @@ export function MapScreen(): React.JSX.Element {
       },
       400,
     );
-  }, [myCoords, region, focusMyPin]);
+  }, [myCoords, region, focusMyPin, focusUserId]);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!focusMyPin || !myCoords) return;
+  const clearFocusParams = useCallback(() => {
+    navigation.setParams({
+      focusMyPin: undefined,
+      focusUserId: undefined,
+      focusLat: undefined,
+      focusLng: undefined,
+    });
+  }, [navigation]);
+
+  const focusPeerOnMap = useCallback(
+    (lat: number, lng: number, point?: EntityPoint) => {
       mapRef.current?.animateToRegion(
         {
-          latitude: myCoords.lat,
-          longitude: myCoords.lng,
+          latitude: lat,
+          longitude: lng,
           latitudeDelta: 0.015,
           longitudeDelta: 0.015,
         },
         450,
       );
-      navigation.setParams({ focusMyPin: undefined });
-    }, [focusMyPin, myCoords, navigation]),
+      // Defer setState so callers from useEffect / useFocusEffect stay lint-clean.
+      if (point) {
+        setTimeout(() => setSelected(point), 0);
+      }
+      clearFocusParams();
+    },
+    [clearFocusParams],
   );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (focusMyPin && myCoords) {
+        mapRef.current?.animateToRegion(
+          {
+            latitude: myCoords.lat,
+            longitude: myCoords.lng,
+            latitudeDelta: 0.015,
+            longitudeDelta: 0.015,
+          },
+          450,
+        );
+        clearFocusParams();
+        return;
+      }
+
+      if (!focusUserId && focusLat == null && focusLng == null) return;
+
+      const fromPoints =
+        focusUserId != null
+          ? points.find(
+              (p): p is EntityPoint & { kind: 'user' } =>
+                p.kind === 'user' && p.id === focusUserId,
+            )
+          : undefined;
+      const lat = fromPoints?.lat ?? focusLat;
+      const lng = fromPoints?.lng ?? focusLng;
+      if (lat == null || lng == null) return;
+      focusPeerOnMap(lat, lng, fromPoints);
+    }, [
+      focusMyPin,
+      myCoords,
+      focusUserId,
+      focusLat,
+      focusLng,
+      points,
+      clearFocusParams,
+      focusPeerOnMap,
+    ]),
+  );
+
+  // Peer pin may arrive after discovery loads — keep watching until found or coords used.
+  useEffect(() => {
+    if (!focusUserId) return;
+    if (focusLat != null && focusLng != null) return; // handled by focus effect with coords
+    const fromPoints = points.find(
+      (p): p is EntityPoint & { kind: 'user' } =>
+        p.kind === 'user' && p.id === focusUserId,
+    );
+    if (!fromPoints) return;
+    focusPeerOnMap(fromPoints.lat, fromPoints.lng, fromPoints);
+  }, [points, focusUserId, focusLat, focusLng, focusPeerOnMap]);
 
   useEffect(() => {
     void requestPermission();

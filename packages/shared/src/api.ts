@@ -236,6 +236,13 @@ export interface PublicUserProfile {
    * side has no location, or when viewing your own profile.
    */
   distanceMeters?: number;
+  /**
+   * Subject's last fuzzed map pin (r10). Present for authenticated viewers of a
+   * public profile when the subject has a location. Used to focus the map camera.
+   * Never exact GPS — same privacy as discovery markers.
+   */
+  mapLat?: number;
+  mapLng?: number;
 }
 
 export interface BlockedUser {

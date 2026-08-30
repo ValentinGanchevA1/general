@@ -180,7 +180,15 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   };
 
   const viewOnMap = (): void => {
-    navigation.navigate('Main', { screen: 'Map' });
+    navigation.navigate('Main', {
+      screen: 'Map',
+      params: {
+        focusUserId: userId,
+        ...(profile?.mapLat != null && profile?.mapLng != null
+          ? { focusLat: profile.mapLat, focusLng: profile.mapLng }
+          : {}),
+      },
+    });
   };
 
   const block = async (): Promise<void> => {

@@ -207,11 +207,14 @@ export class UsersService {
     let relationship: PublicUserProfile['relationship'];
     let blockedByViewer: boolean | undefined;
     let distanceMeters: number | undefined;
+    let mapLat: number | undefined;
+    let mapLng: number | undefined;
     if (viewerId && viewerId !== r.id) {
-      const [perm, blocked, meters] = await Promise.all([
+      const [perm, blocked, meters, pin] = await Promise.all([
         this.messaging.permissionFor(viewerId, r.id),
         this.blocks.hasBlocked(viewerId, r.id),
         this.distanceBetween(viewerId, r.id),
+        this.subjectMapPin(r.id),
       ]);
       relationship = {
         matched: perm.matched,
@@ -220,6 +223,10 @@ export class UsersService {
       };
       blockedByViewer = blocked;
       if (meters != null) distanceMeters = meters;
+      if (pin) {
+        mapLat = pin.lat;
+        mapLng = pin.lng;
+      }
     }
 
     const [status, photos] = await Promise.all([
@@ -250,7 +257,31 @@ export class UsersService {
       ...(relationship ? { relationship } : {}),
       ...(blockedByViewer !== undefined ? { blockedByViewer } : {}),
       ...(distanceMeters != null ? { distanceMeters } : {}),
+      ...(mapLat != null && mapLng != null ? { mapLat, mapLng } : {}),
     };
+  }
+
+  /**
+   * Subject's last fuzzed map pin. Same coordinates discovery would show.
+   */
+  private async subjectMapPin(
+    targetId: string,
+  ): Promise<{ lat: number; lng: number } | null> {
+    const rows = await this.db.query<Array<{ lat: number | string; lng: number | string }>>(
+      `SELECT ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng
+         FROM users
+        WHERE id = $1
+          AND deleted_at IS NULL
+          AND location IS NOT NULL
+        LIMIT 1`,
+      [targetId],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    const lat = typeof row.lat === 'number' ? row.lat : Number(row.lat);
+    const lng = typeof row.lng === 'number' ? row.lng : Number(row.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
   }
 
   /**
