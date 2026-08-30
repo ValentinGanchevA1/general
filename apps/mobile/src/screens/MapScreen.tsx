@@ -168,7 +168,10 @@ export function MapScreen(): React.JSX.Element {
         },
         450,
       );
-      if (point) setSelected(point);
+      // Defer setState so callers from useEffect / useFocusEffect stay lint-clean.
+      if (point) {
+        queueMicrotask(() => setSelected(point));
+      }
       clearFocusParams();
     },
     [clearFocusParams],
