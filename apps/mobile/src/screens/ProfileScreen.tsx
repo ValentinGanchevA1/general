@@ -27,9 +27,8 @@ import { ProfileFriendsCard } from '@/components/Profile/ProfileFriendsCard';
 import { ProfileActivityLinks } from '@/components/Profile/ProfileActivityLinks';
 import { ProfilePhotosSection } from '@/components/Profile/ProfilePhotosSection';
 import { ProfileTagsSection } from '@/components/Profile/ProfileTagsSection';
-import { ProfileAccountSection } from '@/components/Profile/ProfileAccountSection';
-import { ProfileSocialSection } from '@/components/Profile/ProfileSocialSection';
-import { ProfileMenuSection } from '@/components/Profile/ProfileMenuSection';
+import { ProfileContactLine } from '@/components/Profile/ProfileContactLine';
+import { ProfilePremiumCard } from '@/components/Profile/ProfilePremiumCard';
 import { ProfileLoadingState, ProfileErrorState } from '@/components/Profile/ProfileScreenStates';
 import { useProfileScreenData } from '@/features/profile/useProfileScreenData';
 import { useAppSelector } from '@/hooks/redux';
@@ -38,7 +37,10 @@ import { colors, spacing } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-/** Self profile — pure composition over Profile/* sections. */
+/**
+ * Self profile — public-facing identity + activity.
+ * Account controls (settings, social, legal, logout) live in Settings.
+ */
 export function ProfileScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const { on } = useSocket();
@@ -60,7 +62,6 @@ export function ProfileScreen(): React.JSX.Element {
     mapVisible,
     derived,
     onRefresh,
-    handleLogout,
     handleMapToggle,
     dispatch,
   } = useProfileScreenData();
@@ -74,7 +75,7 @@ export function ProfileScreen(): React.JSX.Element {
       dispatch(pendingCountSet(e.pendingCount));
     });
     const unsubAcc = on('friend:accepted', () => {
-      // no badge change for acceptor; requester gets toast later
+      // no badge change for acceptor
     });
     return () => {
       unsubReq();
@@ -121,7 +122,6 @@ export function ProfileScreen(): React.JSX.Element {
     mainPhoto,
     interests,
     goals,
-    socialLinks,
     badges,
     verificationScore,
     isPaid,
@@ -153,6 +153,13 @@ export function ProfileScreen(): React.JSX.Element {
           onPressVerificationBadge={() => openRootScreen(navigation, 'Verification')}
           onPressPhoto={() => openRootScreen(navigation, 'Photos')}
           onPressVisibility={openMapPresence}
+        />
+
+        <ProfileContactLine
+          email={p.email}
+          phone={p.phone}
+          emailVerified={!!badges.email}
+          phoneVerified={!!badges.phone}
         />
 
         <View style={styles.trustSection}>
@@ -188,11 +195,7 @@ export function ProfileScreen(): React.JSX.Element {
 
         {p.bio ? <ProfileBio bio={p.bio} /> : null}
 
-        <ProfileQuickActions
-          onEdit={() => openRootScreen(navigation, 'ProfileEdit')}
-          onPhotos={() => openRootScreen(navigation, 'Photos')}
-          onTrust={() => openRootScreen(navigation, 'Verification')}
-        />
+        <ProfileQuickActions onEdit={() => openRootScreen(navigation, 'ProfileEdit')} />
 
         <ProfileFriendsCard
           pendingCount={pendingCount}
@@ -225,24 +228,9 @@ export function ProfileScreen(): React.JSX.Element {
 
         <ProfileTagsSection interests={interests} goals={goals} />
 
-        <ProfileAccountSection
-          email={p.email}
-          phone={p.phone}
-          emailVerified={!!badges.email}
-          phoneVerified={!!badges.phone}
-          onAddPhone={() => openRootScreen(navigation, 'Verification')}
-        />
-
-        <ProfileSocialSection
-          links={socialLinks}
-          onManage={() => openRootScreen(navigation, 'SocialLinking')}
-        />
-
-        <ProfileMenuSection
-          isPaid={isPaid}
-          onNavigate={(route) => openRootScreen(navigation, route)}
-          onLogout={handleLogout}
-        />
+        {!isPaid ? (
+          <ProfilePremiumCard onPress={() => openRootScreen(navigation, 'Subscription')} />
+        ) : null}
       </ScrollView>
 
       <BottomSheetModal
