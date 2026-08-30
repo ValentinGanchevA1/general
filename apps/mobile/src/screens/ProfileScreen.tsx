@@ -21,13 +21,10 @@ import { ProfileHeaderPhoto } from '@/components/Profile/ProfileHeaderPhoto';
 import { MapPresenceCard } from '@/components/Profile/MapPresenceCard';
 import { TrustStrip } from '@/components/Profile/TrustStrip';
 import { ProfileBio } from '@/components/Profile/ProfileBio';
-import { ProfileIdCta } from '@/components/Profile/ProfileIdCta';
-import { ProfileQuickActions } from '@/components/Profile/ProfileQuickActions';
 import { ProfileFriendsCard } from '@/components/Profile/ProfileFriendsCard';
 import { ProfileActivityLinks } from '@/components/Profile/ProfileActivityLinks';
 import { ProfilePhotosSection } from '@/components/Profile/ProfilePhotosSection';
 import { ProfileTagsSection } from '@/components/Profile/ProfileTagsSection';
-import { ProfileContactLine } from '@/components/Profile/ProfileContactLine';
 import { ProfilePremiumCard } from '@/components/Profile/ProfilePremiumCard';
 import { ProfileLoadingState, ProfileErrorState } from '@/components/Profile/ProfileScreenStates';
 import { useProfileScreenData } from '@/features/profile/useProfileScreenData';
@@ -39,7 +36,8 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 /**
  * Self profile — public-facing identity + activity.
- * Account controls (settings, social, legal, logout) live in Settings.
+ * Order: Hero → Bio → Trust → Tags → Activity → Friends → Storyline → Photos → Premium.
+ * Account controls live in Settings (header cog).
  */
 export function ProfileScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
@@ -122,10 +120,8 @@ export function ProfileScreen(): React.JSX.Element {
     mainPhoto,
     interests,
     goals,
-    badges,
     verificationScore,
     isPaid,
-    showIdCta,
     displayName,
     tierLabel,
   } = derived;
@@ -155,12 +151,7 @@ export function ProfileScreen(): React.JSX.Element {
           onPressVisibility={openMapPresence}
         />
 
-        <ProfileContactLine
-          email={p.email}
-          phone={p.phone}
-          emailVerified={!!badges.email}
-          phoneVerified={!!badges.phone}
-        />
+        {p.bio ? <ProfileBio bio={p.bio} /> : null}
 
         <View style={styles.trustSection}>
           <TrustStrip
@@ -186,21 +177,7 @@ export function ProfileScreen(): React.JSX.Element {
           />
         </View>
 
-        {showIdCta ? (
-          <ProfileIdCta
-            status={p.idVerificationStatus}
-            onPress={() => openRootScreen(navigation, 'VerificationId')}
-          />
-        ) : null}
-
-        {p.bio ? <ProfileBio bio={p.bio} /> : null}
-
-        <ProfileQuickActions onEdit={() => openRootScreen(navigation, 'ProfileEdit')} />
-
-        <ProfileFriendsCard
-          pendingCount={pendingCount}
-          onPress={() => openRootScreen(navigation, 'FriendsList')}
-        />
+        <ProfileTagsSection interests={interests} goals={goals} />
 
         <ProfileActivityLinks
           gamification={gamification ?? null}
@@ -212,12 +189,9 @@ export function ProfileScreen(): React.JSX.Element {
           onGifts={() => openRootScreen(navigation, 'GiftsInbox')}
         />
 
-        <ProfilePhotosSection
-          photos={photos}
-          isSelf
-          activeIndex={activePhotoIndex}
-          onSelect={setActivePhotoIndex}
-          onManage={() => openRootScreen(navigation, 'Photos')}
+        <ProfileFriendsCard
+          pendingCount={pendingCount}
+          onPress={() => openRootScreen(navigation, 'FriendsList')}
         />
 
         {p.id ? (
@@ -226,7 +200,13 @@ export function ProfileScreen(): React.JSX.Element {
           </View>
         ) : null}
 
-        <ProfileTagsSection interests={interests} goals={goals} />
+        <ProfilePhotosSection
+          photos={photos}
+          isSelf
+          activeIndex={activePhotoIndex}
+          onSelect={setActivePhotoIndex}
+          onManage={() => openRootScreen(navigation, 'Photos')}
+        />
 
         {!isPaid ? (
           <ProfilePremiumCard onPress={() => openRootScreen(navigation, 'Subscription')} />
