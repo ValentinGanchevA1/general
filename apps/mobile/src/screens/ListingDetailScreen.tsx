@@ -33,6 +33,7 @@ import {
   withdrawOffer,
 } from '@/features/trading/useTrading';
 import { formatPrice } from '@/features/trading/formatPrice';
+import { openRootScreen, openViaRef } from '@/navigation/openRootScreen';
 
 type R = RouteProp<CommerceStackParamList, 'ListingDetail'>;
 
@@ -114,14 +115,20 @@ export function ListingDetailScreen(): React.JSX.Element {
         </View>
 
         <View style={S.sellerRow}>
-          {listing.sellerAvatarUrl ? (
-            <Image source={{ uri: listing.sellerAvatarUrl }} style={S.sellerAvatar} />
-          ) : (
-            <View style={[S.sellerAvatar, S.sellerAvatarPlaceholder]}>
-              <Text style={S.sellerInitial}>{listing.sellerDisplayName[0]?.toUpperCase() ?? '?'}</Text>
-            </View>
-          )}
-          <Text style={S.sellerName}>{listing.sellerDisplayName}</Text>
+          <TouchableOpacity
+            style={S.sellerIdentity}
+            activeOpacity={0.7}
+            onPress={() => openRootScreen(navigation, 'UserProfile', { userId: listing.sellerId })}
+          >
+            {listing.sellerAvatarUrl ? (
+              <Image source={{ uri: listing.sellerAvatarUrl }} style={S.sellerAvatar} />
+            ) : (
+              <View style={[S.sellerAvatar, S.sellerAvatarPlaceholder]}>
+                <Text style={S.sellerInitial}>{listing.sellerDisplayName[0]?.toUpperCase() ?? '?'}</Text>
+              </View>
+            )}
+            <Text style={S.sellerName}>{listing.sellerDisplayName}</Text>
+          </TouchableOpacity>
           {!isSeller ? <SellerWaveButton sellerId={listing.sellerId} /> : null}
         </View>
 
@@ -346,7 +353,12 @@ function SellerControls({
         offers.map((o) => (
           <View key={o.id} style={S.offerRow}>
             <View style={{ flex: 1 }}>
-              <Text style={S.offerBuyer}>{o.buyerDisplayName}</Text>
+              <TouchableOpacity
+                onPress={() => openViaRef('UserProfile', { userId: o.buyerId })}
+                hitSlop={4}
+              >
+                <Text style={S.offerBuyer}>{o.buyerDisplayName}</Text>
+              </TouchableOpacity>
               <Text style={S.offerAmount}>
                 {o.offerCents != null ? formatPrice(o.offerCents, currency) : 'At asking price'}
                 {'  ·  '}<Text style={S.offerStatus}>{o.status}</Text>
@@ -396,6 +408,7 @@ const S = StyleSheet.create({
   favCount: { color: '#888', fontSize: 12, marginLeft: 'auto' },
 
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20 },
+  sellerIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   sellerAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#12121f' },
   sellerAvatarPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   sellerInitial: { color: '#00d4ff', fontSize: 16, fontWeight: '700' },

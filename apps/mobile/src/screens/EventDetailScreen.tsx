@@ -32,6 +32,7 @@ import {
   votePoll,
 } from '@/features/events/useEvents';
 import { formatEventWhen } from '@/features/events/eventFormat';
+import { openRootScreen, openViaRef } from '@/navigation/openRootScreen';
 
 type R = RouteProp<EventsStackParamList, 'EventDetail'>;
 
@@ -119,10 +120,15 @@ export function EventDetailScreen(): React.JSX.Element {
           {event.attendeeCount} going{event.capacity != null ? ` · ${event.capacity} cap` : ''}
         </Text>
       </View>
-      <View style={styles.metaRow}>
+      <TouchableOpacity
+        style={styles.metaRow}
+        onPress={() => openRootScreen(navigation, 'UserProfile', { userId: event.hostId })}
+        activeOpacity={0.7}
+      >
         <Icon name="account" size={16} color="#888" />
         <Text style={styles.metaSubtle}>Hosted by {event.hostDisplayName}</Text>
-      </View>
+        <Icon name="chevron-right" size={18} color="#555" />
+      </TouchableOpacity>
 
       {event.description ? <Text style={styles.description}>{event.description}</Text> : null}
 
@@ -155,7 +161,12 @@ export function EventDetailScreen(): React.JSX.Element {
         <>
           <Text style={styles.sectionTitle}>Going ({event.attendeeCount})</Text>
           {event.attendees.map((a) => (
-            <View key={a.userId} style={styles.attendeeRow}>
+            <TouchableOpacity
+              key={a.userId}
+              style={styles.attendeeRow}
+              activeOpacity={0.7}
+              onPress={() => openRootScreen(navigation, 'UserProfile', { userId: a.userId })}
+            >
               {a.avatarUrl ? (
                 <Image source={{ uri: a.avatarUrl }} style={styles.attendeeAvatar} />
               ) : (
@@ -164,7 +175,8 @@ export function EventDetailScreen(): React.JSX.Element {
                 </View>
               )}
               <Text style={styles.attendeeName}>{a.displayName}</Text>
-            </View>
+              <Icon name="chevron-right" size={20} color="#555" style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
           ))}
         </>
       ) : null}
@@ -378,7 +390,7 @@ function QuestionsSection({
 
   return (
     <View>
-      <Text style={styles.sectionTitle}>Q&amp;A</Text>
+      <Text style={styles.sectionTitle}>Q&A</Text>
       <View style={styles.askRow}>
         <TextInput
           style={styles.askInput}
@@ -416,9 +428,14 @@ function QuestionsSection({
             </TouchableOpacity>
             <View style={styles.questionBody}>
               <Text style={styles.questionText}>{q.body}</Text>
-              <Text style={styles.questionMeta}>
-                {q.displayName}{q.answered ? ' · answered' : ''}
-              </Text>
+              <TouchableOpacity
+                onPress={() => openViaRef('UserProfile', { userId: q.userId })}
+                hitSlop={6}
+              >
+                <Text style={styles.questionMeta}>
+                  {q.displayName}{q.answered ? ' · answered' : ''}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         ))
