@@ -14,6 +14,7 @@ import {
   BottomSheetView,
 } from '@gorhom/bottom-sheet';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { CommonActions } from '@react-navigation/native';
 import type {
   ApiError,
   CreateConversationRequest,
@@ -179,16 +180,33 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     }
   };
 
+  /** Jump to Map tab and focus this user's fuzzed pin (coords preferred). */
   const viewOnMap = (): void => {
-    navigation.navigate('Main', {
-      screen: 'Map',
-      params: {
-        focusUserId: userId,
-        ...(profile?.mapLat != null && profile?.mapLng != null
-          ? { focusLat: profile.mapLat, focusLng: profile.mapLng }
-          : {}),
-      },
-    });
+    const mapParams: {
+      focusUserId: string;
+      focusLat?: number;
+      focusLng?: number;
+    } = { focusUserId: userId };
+    if (
+      profile?.mapLat != null &&
+      profile?.mapLng != null &&
+      Number.isFinite(profile.mapLat) &&
+      Number.isFinite(profile.mapLng)
+    ) {
+      mapParams.focusLat = profile.mapLat;
+      mapParams.focusLng = profile.mapLng;
+    }
+    // CommonActions + nested params so an already-mounted Main/Map receives focus*
+    // even when the stack is already under UserProfile.
+    navigation.dispatch(
+      CommonActions.navigate({
+        name: 'Main',
+        params: {
+          screen: 'Map',
+          params: mapParams,
+        },
+      }),
+    );
   };
 
   const block = async (): Promise<void> => {
