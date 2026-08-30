@@ -121,6 +121,13 @@ describe('UsersService — public profile trust fields', () => {
   beforeEach(async () => {
     query = jest.fn().mockResolvedValue([]);
     hasBlocked.mockClear().mockResolvedValue(false);
+    whichAreOnline.mockClear().mockResolvedValue(new Set<string>());
+    permissionFor.mockClear().mockResolvedValue({
+      matched: false,
+      sharedInterests: [],
+      canMessage: 'none',
+      conversation: null,
+    });
     const mod = await Test.createTestingModule({
       providers: [
         UsersService,
@@ -204,6 +211,58 @@ describe('UsersService — public profile trust fields', () => {
     const profile = await service.getPublicProfile(USER);
     expect(profile.blockedByViewer).toBeUndefined();
     expect(hasBlocked).not.toHaveBeenCalled();
+  });
+
+  it('includes distanceMeters when ST_Distance returns a value for the viewer pair', async () => {
+    const VIEWER = '99999999-9999-4999-9999-999999999999';
+    query
+      .mockResolvedValueOnce([
+        {
+          id: USER,
+          display_name: 'Ada',
+          avatar_url: null,
+          bio: null,
+          verification_level: 'email',
+          id_verification_status: 'none',
+          goals: [],
+          show_age: false,
+          show_hometown: false,
+          age: null,
+          hometown_city: null,
+          hometown_country: null,
+        },
+      ]) // public user row
+      .mockResolvedValueOnce([{ meters: 342 }]) // distanceBetween
+      .mockResolvedValueOnce([]) // gamification / status
+      .mockResolvedValueOnce([]); // photos
+
+    const profile = await service.getPublicProfile(USER, VIEWER);
+    expect(profile.distanceMeters).toBe(342);
+    const distanceCall = query.mock.calls.find((c) => /ST_Distance/.test(String(c[0])));
+    expect(distanceCall).toBeDefined();
+    expect(distanceCall?.[1]).toEqual([VIEWER, USER]);
+  });
+
+  it('omits distanceMeters when either user has no location', async () => {
+    const VIEWER = '99999999-9999-4999-9999-999999999999';
+    query
+      .mockResolvedValueOnce([
+        {
+          id: USER,
+          display_name: 'Ada',
+          avatar_url: null,
+          bio: null,
+          verification_level: 'email',
+          id_verification_status: 'none',
+          goals: [],
+        },
+      ])
+      .mockResolvedValueOnce([]) // distanceBetween → no row
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const profile = await service.getPublicProfile(USER, VIEWER);
+    expect(profile.distanceMeters).toBeUndefined();
   });
 });
 

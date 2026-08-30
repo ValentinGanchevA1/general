@@ -230,6 +230,12 @@ export interface PublicUserProfile {
   status?: PublicUserStatus;
   relationship?: ProfileRelationship;
   blockedByViewer?: boolean;
+  /**
+   * Approximate distance (meters) from the viewer's last known map location
+   * to this user. Both locations are already fuzzed (r10). Omitted when either
+   * side has no location, or when viewing your own profile.
+   */
+  distanceMeters?: number;
 }
 
 export interface BlockedUser {

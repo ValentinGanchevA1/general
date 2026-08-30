@@ -72,6 +72,21 @@ function emptyRel(): RelationshipSummary {
   };
 }
 
+/** Map-native distance: ~300 m away / ~1.2 km away (fuzzed locations). */
+function formatDistanceAway(meters: number): string {
+  if (meters < 50) return '~50 m away';
+  if (meters < 1000) {
+    const rounded = Math.max(100, Math.round(meters / 100) * 100);
+    return `~${rounded} m away`;
+  }
+  const km = meters / 1000;
+  if (km < 10) {
+    const one = Math.round(km * 10) / 10;
+    return `~${one.toFixed(1)} km away`;
+  }
+  return `~${Math.round(km)} km away`;
+}
+
 export function UserProfileScreen({ route, navigation }: Props): React.JSX.Element {
   const { userId } = route.params;
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
@@ -452,9 +467,19 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
             </View>
             {hometown ? <Text style={styles.originLine}>{hometown}</Text> : null}
             <View style={styles.placeRow}>
-              <Text style={[styles.onlineLabel, !profile.online && styles.offlineLabel]}>
-                {profile.online ? 'Online now' : 'Recently nearby'}
-              </Text>
+              {profile.online ? (
+                <Text style={styles.onlineLabel}>Online now</Text>
+              ) : null}
+              {profile.distanceMeters != null ? (
+                <>
+                  {profile.online ? <Text style={styles.placeDot}>·</Text> : null}
+                  <Text style={styles.distanceLabel}>
+                    {formatDistanceAway(profile.distanceMeters)}
+                  </Text>
+                </>
+              ) : !profile.online ? (
+                <Text style={styles.offlineLabel}>Recently nearby</Text>
+              ) : null}
               <Text style={styles.placeDot}>·</Text>
               <TouchableOpacity onPress={viewOnMap} hitSlop={8} accessibilityRole="button">
                 <Text style={styles.viewOnMap}>View on map</Text>
@@ -643,6 +668,7 @@ const styles = StyleSheet.create({
   placeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   onlineLabel: { color: colors.success, fontSize: 13 },
   offlineLabel: { color: colors.textFaint },
+  distanceLabel: { color: colors.textMuted, fontSize: 13 },
   placeDot: { color: colors.textFaint, fontSize: 13 },
   viewOnMap: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   mutualLine: { color: colors.primary, fontSize: 12, marginTop: 2, fontWeight: '600' },

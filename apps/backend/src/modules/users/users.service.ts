@@ -206,10 +206,12 @@ export class UsersService {
 
     let relationship: PublicUserProfile['relationship'];
     let blockedByViewer: boolean | undefined;
+    let distanceMeters: number | undefined;
     if (viewerId && viewerId !== r.id) {
-      const [perm, blocked] = await Promise.all([
+      const [perm, blocked, meters] = await Promise.all([
         this.messaging.permissionFor(viewerId, r.id),
         this.blocks.hasBlocked(viewerId, r.id),
+        this.distanceBetween(viewerId, r.id),
       ]);
       relationship = {
         matched: perm.matched,
@@ -217,6 +219,7 @@ export class UsersService {
         canMessage: perm.canMessage,
       };
       blockedByViewer = blocked;
+      if (meters != null) distanceMeters = meters;
     }
 
     const [status, photos] = await Promise.all([
@@ -246,7 +249,33 @@ export class UsersService {
       ...(status ? { status } : {}),
       ...(relationship ? { relationship } : {}),
       ...(blockedByViewer !== undefined ? { blockedByViewer } : {}),
+      ...(distanceMeters != null ? { distanceMeters } : {}),
     };
+  }
+
+  /**
+   * Great-circle distance (meters) between two users' last fuzzed map locations.
+   * Returns null when either side has no location.
+   */
+  private async distanceBetween(viewerId: string, targetId: string): Promise<number | null> {
+    const rows = await this.db.query<Array<{ meters: number | string | null }>>(
+      `SELECT ROUND(ST_Distance(v.location, t.location)::numeric)::int AS meters
+         FROM users v
+         CROSS JOIN users t
+        WHERE v.id = $1
+          AND t.id = $2
+          AND v.deleted_at IS NULL
+          AND t.deleted_at IS NULL
+          AND v.location IS NOT NULL
+          AND t.location IS NOT NULL
+        LIMIT 1`,
+      [viewerId, targetId],
+    );
+    const raw = rows[0]?.meters;
+    if (raw == null) return null;
+    const n = typeof raw === 'number' ? raw : Number(raw);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return Math.round(n);
   }
 
   private async loadPublicStatus(userId: string): Promise<PublicUserStatus | undefined> {
