@@ -59,6 +59,10 @@ import {
   type CreateNearbyAction,
 } from '@/components/map/CreateNearbySheet';
 import { sheetChrome, useSheetBackdrop } from '@/components/sheets';
+import {
+  approxDistanceMeters,
+  buildPeerRegionFocus,
+} from '@/components/map/focusPeerOnMap';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
@@ -156,14 +160,23 @@ export function MapScreen(): React.JSX.Element {
   const applyPeerFocus = useCallback(
     (lat: number, lng: number, point?: EntityPoint) => {
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+      const distanceMeters =
+        myCoords != null
+          ? approxDistanceMeters(myCoords, { lat, lng })
+          : undefined;
+
+      const {
+        latitude,
+        longitude,
+        latitudeDelta,
+        longitudeDelta,
+        duration,
+      } = buildPeerRegionFocus({ lat, lng, distanceMeters });
+
       mapRef.current?.animateToRegion(
-        {
-          latitude: lat,
-          longitude: lng,
-          latitudeDelta: 0.015,
-          longitudeDelta: 0.015,
-        },
-        450,
+        { latitude, longitude, latitudeDelta, longitudeDelta },
+        duration,
       );
       if (point) {
         setTimeout(() => setSelected(point), 0);
@@ -171,7 +184,7 @@ export function MapScreen(): React.JSX.Element {
       pendingFocusRef.current = null;
       clearFocusParams();
     },
-    [clearFocusParams],
+    [clearFocusParams, myCoords],
   );
 
   /** Capture route focus intent into a ref so it is not lost on focus races. */
