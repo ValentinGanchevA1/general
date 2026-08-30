@@ -17,9 +17,13 @@ export const submitIdVerification = createAsyncThunk(
     idBack?: string;
     idBackContentType?: string;
   }) => {
-    const { data } = await api.post('/verification/id/submit', payload);
+    // Default client timeout is 15s — too low for selfie+ID base64 + server S3 PUTs
+    // (emulator/host saw BadRequestError: request aborted from raw-body).
+    const { data } = await api.post('/verification/id/submit', payload, {
+      timeout: 90_000,
+    });
     return data;
-  }
+  },
 );
 
 export const fetchIdVerificationStatus = createAsyncThunk('verification/status', async () => {
