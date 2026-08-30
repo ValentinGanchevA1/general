@@ -6,24 +6,15 @@ import { colors, spacing, radius } from '@/theme';
 
 interface Props {
   onEdit: () => void;
-  onPhotos: () => void;
-  onTrust: () => void;
 }
 
-export function ProfileQuickActions({ onEdit, onPhotos, onTrust }: Props): React.JSX.Element {
+/** Single primary CTA — photos managed from gallery section; trust via TrustStrip. */
+export function ProfileQuickActions({ onEdit }: Props): React.JSX.Element {
   return (
     <View style={styles.actionsRow}>
-      <TouchableOpacity style={styles.actionButton} onPress={onEdit}>
+      <TouchableOpacity style={styles.actionButton} onPress={onEdit} accessibilityRole="button">
         <Icon name="pencil" size={18} color={colors.textPrimary} />
-        <Text style={styles.actionButtonText}>Edit</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.actionButton} onPress={onPhotos}>
-        <Icon name="image-multiple" size={18} color={colors.textPrimary} />
-        <Text style={styles.actionButtonText}>Photos</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.actionButton} onPress={onTrust}>
-        <Icon name="shield-check" size={18} color={colors.textPrimary} />
-        <Text style={styles.actionButtonText}>Trust</Text>
+        <Text style={styles.actionButtonText}>Edit profile</Text>
       </TouchableOpacity>
     </View>
   );
