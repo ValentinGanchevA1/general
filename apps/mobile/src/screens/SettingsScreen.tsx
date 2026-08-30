@@ -19,6 +19,7 @@ import type { AccountStackParamList } from '@/navigation/stacks';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { deleteAccount, logout } from '@/features/auth/authSlice';
 import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
+import { APP_VERSION } from '@/constants/app';
 import { colors, spacing, fontSize } from '@/theme';
 
 export function SettingsScreen(): React.JSX.Element {
@@ -92,11 +93,6 @@ export function SettingsScreen(): React.JSX.Element {
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.body}>
-        <Text style={styles.lead}>
-          Controls for discovery, trust, and your account. Privacy policy, help, and
-          about live on your Profile menu.
-        </Text>
-
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Discovery</Text>
           <View style={styles.row}>
@@ -180,6 +176,44 @@ export function SettingsScreen(): React.JSX.Element {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Connected accounts</Text>
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => navigation.navigate('SocialLinking')}
+          >
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Social accounts</Text>
+              <Text style={styles.rowSub}>Link Instagram, X, TikTok and more — boosts trust</Text>
+            </View>
+            <Icon name="chevron-right" size={24} color={colors.textFaint} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Profile</Text>
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => navigation.navigate('ProfileEdit')}
+          >
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Edit profile</Text>
+              <Text style={styles.rowSub}>Name, bio, hometown, age visibility</Text>
+            </View>
+            <Icon name="chevron-right" size={24} color={colors.textFaint} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.row, styles.rowSpaced]}
+            onPress={() => navigation.navigate('Photos')}
+          >
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Manage photos</Text>
+              <Text style={styles.rowSub}>Gallery order and cover photo</Text>
+            </View>
+            <Icon name="chevron-right" size={24} color={colors.textFaint} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Notifications</Text>
           <TouchableOpacity
             style={styles.row}
@@ -197,6 +231,37 @@ export function SettingsScreen(): React.JSX.Element {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => navigation.navigate('Privacy')}
+          >
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Privacy</Text>
+              <Text style={styles.rowSub}>Policy and how we handle your data</Text>
+            </View>
+            <Icon name="chevron-right" size={24} color={colors.textFaint} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.row, styles.rowSpaced]}
+            onPress={() => navigation.navigate('Help')}
+          >
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Help & Support</Text>
+              <Text style={styles.rowSub}>FAQ and contact</Text>
+            </View>
+            <Icon name="chevron-right" size={24} color={colors.textFaint} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.row, styles.rowSpaced]}
+            onPress={() => navigation.navigate('About')}
+          >
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>About</Text>
+              <Text style={styles.rowSub}>Version and credits</Text>
+            </View>
+            <Icon name="chevron-right" size={24} color={colors.textFaint} />
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <Text style={styles.logoutText}>Log out</Text>
           </TouchableOpacity>
@@ -210,6 +275,8 @@ export function SettingsScreen(): React.JSX.Element {
             <Text style={styles.deleteText}>Delete account</Text>
           </TouchableOpacity>
         </View>
+
+        <Text style={styles.version}>Version {APP_VERSION}</Text>
       </ScrollView>
 
       <Modal
@@ -266,12 +333,6 @@ export function SettingsScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   body: { padding: spacing.xxl, paddingBottom: 48 },
-  lead: {
-    color: colors.textMuted,
-    fontSize: fontSize.sm,
-    lineHeight: 19,
-    marginBottom: spacing.xl,
-  },
   section: { marginBottom: 28 },
   sectionTitle: {
     color: colors.textFaint,
@@ -295,6 +356,7 @@ const styles = StyleSheet.create({
   rowLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '500' },
   rowSub: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
   logoutBtn: {
+    marginTop: spacing.lg,
     backgroundColor: colors.surfaceAlt,
     borderRadius: 10,
     padding: spacing.lg,
@@ -312,6 +374,12 @@ const styles = StyleSheet.create({
     borderColor: '#5a1a1a',
   },
   deleteText: { color: colors.danger, fontWeight: '700', fontSize: fontSize.md },
+  version: {
+    textAlign: 'center',
+    color: colors.textFaint,
+    fontSize: fontSize.xs,
+    marginTop: spacing.md,
+  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
