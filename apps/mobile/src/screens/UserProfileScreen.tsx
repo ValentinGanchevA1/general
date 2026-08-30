@@ -152,7 +152,9 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         otherUserName: profile?.displayName ?? 'Chat',
         requestPending: res.status === 'pending' && res.permission === 'request',
         otherUserId: userId,
-        otherUserVerification: profile?.verification,
+        ...(profile?.verification != null
+          ? { otherUserVerification: profile.verification }
+          : {}),
         otherUserIdVerified: profile?.idVerified ?? false,
       });
     } catch (e) {
