@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { getDataSourceToken } from '@nestjs/typeorm';
 
@@ -25,6 +26,7 @@ describe('ChallengesService', () => {
         ChallengesService,
         { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
         { provide: GamificationService, useValue: { awardRaw } },
+        { provide: ModuleRef, useValue: { get: () => ({ emitChallengeCompleted: jest.fn().mockResolvedValue(undefined) }) } },
       ],
     }).compile();
     service = mod.get(ChallengesService);
@@ -32,20 +34,20 @@ describe('ChallengesService', () => {
 
   describe('increment', () => {
     it('does nothing for a metric no active challenge tracks', async () => {
-      await service.increment('u1', 'match_made'); // CHALLENGE tracks wave_sent
+      await service.increment('u1', 'match_made');
       expect(query).not.toHaveBeenCalled();
     });
 
     it('advances progress but does not reward below target', async () => {
-      query.mockResolvedValueOnce([{ progress: 1, was_completed: false }]); // upsert
+      query.mockResolvedValueOnce([{ progress: 1, was_completed: false }]);
       await service.increment('u1', 'wave_sent');
       expect(awardRaw).not.toHaveBeenCalled();
     });
 
     it('stamps completion and rewards once when target is crossed', async () => {
       query
-        .mockResolvedValueOnce([{ progress: 2, was_completed: false }]) // upsert -> at target
-        .mockResolvedValueOnce([{ id: 'c1' }]); // UPDATE completed_at won the race
+        .mockResolvedValueOnce([{ progress: 2, was_completed: false }])
+        .mockResolvedValueOnce([{ id: 'c1' }]);
       await service.increment('u1', 'wave_sent');
       expect(awardRaw).toHaveBeenCalledWith('u1', 20, 'challenge.completed', expect.stringContaining('challenge:c1:'));
     });
