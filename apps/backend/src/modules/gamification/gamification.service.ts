@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
@@ -7,18 +8,25 @@ import {
   type LeaderboardEntry,
   type LeaderboardPage,
   type LeaderboardScope,
+  type LevelUpEvent,
   type XpReason,
   XP_AMOUNTS,
   XP_DAILY_CAP,
   levelForXp,
   summaryForXp,
+  xpForLevel,
 } from '@g88/shared';
+
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
 
 @Injectable()
 export class GamificationService {
   private readonly logger = new Logger(GamificationService.name);
 
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    private readonly moduleRef: ModuleRef,
+  ) {}
 
   /**
    * Award XP for an action. Idempotent when a dedupeKey is supplied (the same
@@ -70,20 +78,49 @@ export class GamificationService {
     );
     if (inserted.length === 0) return; // deduped — already awarded
 
-    // Bump the denormalized summary. Level recomputed in SQL from the new total
-    // so the DB stays authoritative even under concurrent awards. Earning also
-    // funds the spendable wallet 1:1 — total_xp is the lifetime score (drives
-    // level/leaderboard, never spent); spendable_xp is what gifts draw down.
-    await this.db.query(
+    const before = await this.db.query<Array<{ level: number; total_xp: number }>>(
+      `SELECT level, total_xp FROM user_gamification WHERE user_id = $1`,
+      [userId],
+    );
+    const previousLevel = before[0]?.level ?? 1;
+
+    const after = await this.db.query<Array<{ level: number; total_xp: number }>>(
       `INSERT INTO user_gamification (user_id, total_xp, spendable_xp, level)
             VALUES ($1, $2, $2, $3)
        ON CONFLICT (user_id) DO UPDATE
           SET total_xp     = user_gamification.total_xp + $2,
               spendable_xp = user_gamification.spendable_xp + $2,
               level        = FLOOR(SQRT((user_gamification.total_xp + $2) / 50.0)) + 1,
-              updated_at   = NOW()`,
+              updated_at   = NOW()
+       RETURNING level, total_xp`,
       [userId, amount, levelForXp(amount)],
     );
+    const row = after[0];
+    if (row && row.level > previousLevel) {
+      const level = row.level;
+      const totalXp = row.total_xp;
+      const base = xpForLevel(level);
+      const next = xpForLevel(level + 1);
+      const evt: LevelUpEvent = {
+        level,
+        previousLevel,
+        totalXp,
+        xpIntoLevel: totalXp - base,
+        xpForNextLevel: next - base,
+      };
+      this.emitLevelUpSafe(userId, evt);
+    }
+  }
+
+  private emitLevelUpSafe(userId: string, evt: LevelUpEvent): void {
+    try {
+      const gw = this.moduleRef.get(RealtimeGateway, { strict: false });
+      void gw
+        .emitLevelUp(userId, evt)
+        .catch((err: unknown) => this.logger.error(`level:up emit failed: ${err}`));
+    } catch (err) {
+      this.logger.warn(`level:up emit skipped (gateway unavailable): ${err}`);
+    }
   }
 
   /**
@@ -156,12 +193,6 @@ export class GamificationService {
     return { scope, entries, me };
   }
 
-  /**
-   * When the current weekly window rolls over — the next week boundary, matching
-   * `date_trunc('week', NOW())` used by the weekly SUM so the client countdown
-   * never drifts from the actual reset. Computed in SQL to honour the DB session
-   * time zone. Returns undefined only if the scalar query unexpectedly yields no row.
-   */
   private async weekResetsAt(): Promise<string | undefined> {
     const [row] = await this.db.query<Array<{ resets_at: Date }>>(
       `SELECT date_trunc('week', NOW()) + interval '7 days' AS resets_at`,
