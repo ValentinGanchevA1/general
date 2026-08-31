@@ -31,6 +31,11 @@ jobs:
   apk:
     name: Signed APK
     runs-on: ubuntu-latest
+    # Job-level permissions are required in addition to workflow-level:
+    # some GitHub runners / org policies only honor the job scope for
+    # contents:write when creating releases/tags.
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: apps/mobile
@@ -76,112 +81,101 @@ jobs:
 
           # Do NOT `find -name hermesc | head -1` — hermes-compiler ships a
           # same-named "hermesc" binary under every platform folder
-          # (linux64-bin, osx-bin, win64-bin), and find's traversal order is
-          # not guaranteed alphabetical, so that can chmod the wrong
-          # platform's binary while the real Linux one stays without +x.
-          #
-          # Also don't hard-code the "linux64-bin" folder name — it's an
-          # implementation detail of hermes-compiler's packaging that isn't
-          # guaranteed stable across versions. Instead, filter every
-          # same-named candidate down to the one(s) that are actually ELF
-          # binaries (i.e. runnable on this Linux runner) — that's
-          # version-proof.
-          CANDIDATES=$(find node_modules -type f -name "hermesc" 2>/dev/null)
-          if [ -z "$CANDIDATES" ]; then
-            echo "::error::No file named hermesc found under node_modules"
+          # (osx-arm64, win64-bin, etc.). On Linux runners that resolves to a
+          # non-Linux binary and the subsequent --version check fails with
+          # "cannot execute binary file". Pin the Linux path explicitly.
+          HERMESC="node_modules/hermes-compiler/hermesc/linux64-bin/hermesc"
+          test -x "$HERMESC" || {
+            echo "::error::hermesc not found at $HERMESC after clean install"
+            find node_modules -name hermesc -type f 2>/dev/null | head -20 || true
             exit 1
-          fi
-
-          # IMPORTANT: do NOT stop at the first ELF match. Multiple
-          # hermes-compiler versions can be installed side-by-side in the
-          # pnpm store simultaneously (e.g. one pinned transitively, another
-          # resolved directly by React Native) — which one Gradle actually
-          # invokes at build time depends on dependency resolution and isn't
-          # knowable here. Fixing permissions on only the first candidate
-          # found leaves other versions non-executable, causing "A problem
-          # occurred starting process" tens of minutes into the Gradle build
-          # if Gradle happens to resolve a different version than we picked.
-          # So: chmod +x every ELF candidate, and verify at least one runs.
-          ELF_COUNT=0
-          while IFS= read -r candidate; do
-            if file "$candidate" | grep -q "ELF"; then
-              echo "Found ELF hermesc: $candidate"
-              chmod +x "$candidate"
-              ELF_COUNT=$((ELF_COUNT + 1))
-            fi
-          done <<< "$CANDIDATES"
-
-          if [ "$ELF_COUNT" -eq 0 ]; then
-            echo "::error::Found hermesc candidate(s) but none are ELF binaries runnable on this Linux runner:"
-            echo "$CANDIDATES"
-            exit 1
-          fi
-          echo "chmod +x applied to $ELF_COUNT ELF hermesc candidate(s)"
-
-          # chmod +x alone doesn't catch a missing shared lib or an arch
-          # mismatch — actually execute each one and fail fast here
-          # (seconds), instead of discovering it 9+ minutes into the Gradle
-          # build.
-          while IFS= read -r candidate; do
-            if file "$candidate" | grep -q "ELF"; then
-              if ! "$candidate" -version; then
-                echo "::error::$candidate is +x but won't run — check libz3-4/glibc or an architecture mismatch"
-                exit 1
-              fi
-              echo "✓ $candidate is executable and runs"
-            fi
-          done <<< "$CANDIDATES"
+          }
+          "$HERMESC" --version
 
       - name: Inject Maps keys
+        env:
+          GOOGLE_MAPS_API_KEY_DEBUG: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG }}
+          GOOGLE_MAPS_API_KEY_RELEASE: ${{ secrets.GOOGLE_MAPS_API_KEY_RELEASE }}
         run: |
-          cat >> android/local.properties <<EOF
-          GOOGLE_MAPS_API_KEY_DEBUG=${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG }}
-          GOOGLE_MAPS_API_KEY_RELEASE=${{ secrets.GOOGLE_MAPS_API_KEY_RELEASE }}
-          EOF
+          # Prefer dedicated debug/release secrets; fall back to single key if only one is set.
+          DEBUG_KEY="${GOOGLE_MAPS_API_KEY_DEBUG:-${GOOGLE_MAPS_API_KEY_RELEASE:-}}"
+          RELEASE_KEY="${GOOGLE_MAPS_API_KEY_RELEASE:-${GOOGLE_MAPS_API_KEY_DEBUG:-}}"
+          if [ -z "$DEBUG_KEY" ] || [ -z "$RELEASE_KEY" ]; then
+            echo "::warning::Maps API keys missing — map tiles will be blank on device."
+          fi
+          # android/local.properties is gitignored; Gradle reads it for MAPS_*_KEY.
+          cat > android/local.properties <<EOF
+MAPS_DEBUG_KEY=$DEBUG_KEY
+MAPS_RELEASE_KEY=$RELEASE_KEY
+EOF
 
       - name: Inject google-services.json
-        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > android/app/google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::warning::GOOGLE_SERVICES_JSON secret missing — Firebase/FCM will not work in this APK."
+            exit 0
+          fi
+          echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
 
       - name: Decode upload keystore
-        run: echo "${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload.keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 secret is required for a signed release APK."
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
 
       - name: Inject release signing config
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          cat >> android/local.properties <<EOF
-          RELEASE_STORE_FILE=app/upload.keystore
-          RELEASE_STORE_PASSWORD=${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
-          RELEASE_KEY_ALIAS=${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD=${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
-          EOF
+          for v in ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            eval "val=\$$v"
+            if [ -z "$val" ]; then
+              echo "::error::$v secret is required for release signing."
+              exit 1
+            fi
+          done
+          # gradle.properties is already present; append signing props (not committed).
+          cat >> android/gradle.properties <<EOF
+
+MYAPP_UPLOAD_STORE_FILE=upload-keystore.jks
+MYAPP_UPLOAD_KEY_ALIAS=$ANDROID_KEY_ALIAS
+MYAPP_UPLOAD_STORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD
+MYAPP_UPLOAD_KEY_PASSWORD=$ANDROID_KEY_PASSWORD
+EOF
 
       - name: Print signing certificate fingerprints
         run: |
-          echo "Add the SHA1 below to GOOGLE_MAPS_API_KEY_RELEASE's Android app restriction"
-          echo "(Cloud Console → APIs & Services → Credentials → the release Maps key)."
-          echo "package: com.g88"
+          # Operators need the upload-key SHA-1 for Maps API key restrictions.
           keytool -list -v \
-            -keystore android/app/upload.keystore \
-            -storepass "${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}" \
-            -alias "${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}" \
-            | grep -E "SHA1:|SHA256:"
+            -keystore android/app/upload-keystore.jks \
+            -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            -alias "${{ secrets.ANDROID_KEY_ALIAS }}" 2>/dev/null \
+            | grep -E 'SHA1:|SHA256:|Owner:|Alias name:' || true
 
       - name: Cache Gradle
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: gradle-
+            apps/mobile/android/.gradle
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
       - name: Build signed release APK
-        # GOOGLE_WEB_CLIENT_ID / SENTRY_DSN are read via process.env at JS bundle
-        # time (babel inline-env transform) — they must be present in the gradle
-        # process env, otherwise they inline as '' and Google Sign-In + Sentry are
-        # silently disabled in the APK. The web client id is public (OAuth web
-        # client); SENTRY_DSN is a public DSN kept as a secret for hygiene.
         env:
-          GOOGLE_WEB_CLIENT_ID: 689098029576-r7hoijre01nvocb25elp2q0ufb5v0geu.apps.googleusercontent.com
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
           cd android
@@ -191,11 +185,12 @@ jobs:
           for i in $(seq 1 "$ATTEMPTS"); do
             if ./gradlew assembleRelease --no-daemon \
               --init-script ci-init.gradle \
-              -PversionCodeOverride=${{ github.run_number }}; then
+              -PreactNativeArchitectures=armeabi-v7a,arm64-v8a \
+              -PreactNativeDevServerPort=8081; then
               exit 0
             fi
             if [ "$i" -eq "$ATTEMPTS" ]; then
-              echo "::error::assembleRelease failed after $ATTEMPTS attempts"
+              echo "::error::Gradle assembleRelease failed after $ATTEMPTS attempts"
               exit 1
             fi
             sleep_s=$((i * 45))
@@ -231,13 +226,20 @@ jobs:
       # keeps releases/latest/download/g88-v1.0.apk pointing at the newest build,
       # so the share link never changes. Full release (not prerelease) is
       # required for the /latest/ redirect to resolve.
+      # Requires contents:write (workflow + job). If this still fails with
+      # "Resource not accessible by integration", set repo Settings → Actions
+      # → General → Workflow permissions → Read and write permissions.
+      # Optional override: create a classic PAT (repo scope) as secret
+      # RELEASE_GITHUB_TOKEN when the default GITHUB_TOKEN is restricted by org policy.
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.2.1
         with:
+          token: ${{ secrets.RELEASE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           tag_name: apk-v1.0.${{ github.run_number }}
           name: "G88 v1.0 (build ${{ github.run_number }}) — Android sideload APK"
           files: apps/mobile/android/app/build/outputs/apk/release/g88-v1.0.apk
           make_latest: "true"
+          fail_on_unmatched_files: true
           target_commitish: ${{ github.sha }}
           body: |
             Signed Android APK for direct install (sideload). Not the Play Store build.
