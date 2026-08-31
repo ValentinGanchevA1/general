@@ -163,8 +163,13 @@ export function MapScreen(): React.JSX.Element {
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
       const distanceMeters =
         myCoords != null ? approxDistanceMeters(myCoords, { lat, lng }) : undefined;
+      // exactOptionalPropertyTypes: omit key when undefined
       const { latitude, longitude, latitudeDelta, longitudeDelta, duration } =
-        buildPeerRegionFocus({ lat, lng, distanceMeters });
+        buildPeerRegionFocus({
+          lat,
+          lng,
+          ...(distanceMeters != null ? { distanceMeters } : {}),
+        });
       InteractionManager.runAfterInteractions(() => {
         mapRef.current?.animateToRegion(
           { latitude, longitude, latitudeDelta, longitudeDelta },
