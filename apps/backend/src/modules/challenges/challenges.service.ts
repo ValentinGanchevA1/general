@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
@@ -9,6 +10,7 @@ import {
 } from '@g88/shared';
 
 import { GamificationService } from '../gamification/gamification.service';
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -21,6 +23,7 @@ export class ChallengesService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly gamification: GamificationService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   /**
@@ -34,7 +37,6 @@ export class ChallengesService {
     if (active.length === 0) return;
 
     for (const c of active) {
-      // Upsert the counter, returning the new progress + whether it was already done.
       const rows = await this.db.query<Array<{ progress: number; was_completed: boolean }>>(
         `INSERT INTO challenge_progress (user_id, challenge_id, day, progress)
               VALUES ($1, $2, $3, $4)
@@ -48,7 +50,6 @@ export class ChallengesService {
       if (!row || row.was_completed) continue;
 
       if (row.progress >= c.target) {
-        // Stamp completion (guarded so only the first crossing wins) and reward.
         const done = await this.db.query<Array<{ id: string }>>(
           `UPDATE challenge_progress
               SET completed_at = NOW()
@@ -58,16 +59,37 @@ export class ChallengesService {
           [userId, c.id, day],
         );
         if (done.length > 0) {
-          // Reward XP via the ledger — dedupes on this key, so safe regardless.
           await this.gamification
             .awardRaw(userId, c.rewardXp, 'challenge.completed', `challenge:${c.id}:${day}`)
             .catch((err) => this.logger.error(`challenge reward failed: ${err}`));
+
+          this.emitChallengeCompletedSafe(userId, {
+            challengeId: c.id,
+            title: c.title,
+            rewardXp: c.rewardXp,
+            icon: '✅',
+          });
         }
       }
     }
   }
 
-  /** Today's 3 challenges merged with this user's progress. */
+  private emitChallengeCompletedSafe(
+    userId: string,
+    evt: { challengeId: string; title: string; rewardXp: number; icon?: string },
+  ): void {
+    try {
+      const gw = this.moduleRef.get(RealtimeGateway, { strict: false });
+      void gw
+        .emitChallengeCompleted(userId, evt)
+        .catch((err: unknown) =>
+          this.logger.error(`challenge:completed emit failed: ${err}`),
+        );
+    } catch (err) {
+      this.logger.warn(`challenge:completed emit skipped: ${err}`);
+    }
+  }
+
   async getToday(userId: string): Promise<ChallengeToday[]> {
     const day = todayISO();
     const defs = dailyChallenges(day);
