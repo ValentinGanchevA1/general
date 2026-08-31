@@ -51,8 +51,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        # TEMP: no --frozen-lockfile until pnpm-lock.yaml includes react-native-linear-gradient
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
         working-directory: .
 
       - name: Ensure Hermes compiler is available and runnable
@@ -66,8 +65,7 @@ jobs:
           # incorrectly add it to root package.json.
           pnpm store prune
           rm -rf node_modules
-          # TEMP: no --frozen-lockfile until lockfile is updated for linear-gradient
-          pnpm install
+          pnpm install --frozen-lockfile
 
           # Only libz3-4 is confirmed required (Hermes links against Z3 for
           # its SMT-based type checking). Don't add speculative packages here
