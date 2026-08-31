@@ -8,11 +8,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 
 import type { StoryCard } from '@g88/shared';
 
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { colors, spacing } from '@/theme';
+import { colors } from '@/theme';
 import { fetchAuthorStories } from '../storiesSlice';
 import { StoryViewer } from './StoryViewer';
 
@@ -31,7 +32,8 @@ const EMPTY_STORIES: StoryCard[] = [];
 
 /**
  * Profile wall: active + recent expired stories (timeline).
- * Placed after Photos on Profile / UserProfile.
+ * Captions overlay the thumbnail via bottom gradient so labels never get lost
+ * when images scale or layout shifts.
  */
 export function ProfileStoryline({ userId, isSelf = false }: Props): React.JSX.Element {
   const dispatch = useAppDispatch();
@@ -93,27 +95,37 @@ export function ProfileStoryline({ userId, isSelf = false }: Props): React.JSX.E
           contentContainerStyle={styles.list}
           renderItem={({ item, index }) => {
             const live = isActive(item);
+            const label = item.caption
+              ? item.caption
+              : live
+                ? 'Active'
+                : 'Earlier';
             return (
               <TouchableOpacity
                 style={styles.card}
                 onPress={() => openAt(index)}
                 activeOpacity={0.85}
               >
-                <Image source={{ uri: item.mediaUrl }} style={styles.thumb} />
-                {live ? (
-                  <View style={styles.liveBadge}>
-                    <Text style={styles.liveText}>Live</Text>
-                  </View>
-                ) : null}
-                {item.caption ? (
-                  <Text style={styles.caption} numberOfLines={2}>
-                    {item.caption}
-                  </Text>
-                ) : (
-                  <Text style={styles.captionMuted} numberOfLines={1}>
-                    {live ? 'Active' : 'Earlier'}
-                  </Text>
-                )}
+                <View style={styles.thumbWrap}>
+                  <Image source={{ uri: item.mediaUrl }} style={styles.thumb} />
+                  {live ? (
+                    <View style={styles.liveBadge}>
+                      <Text style={styles.liveText}>Live</Text>
+                    </View>
+                  ) : null}
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.75)']}
+                    style={styles.captionGradient}
+                    pointerEvents="none"
+                  >
+                    <Text
+                      style={item.caption ? styles.caption : styles.captionMuted}
+                      numberOfLines={2}
+                    >
+                      {label}
+                    </Text>
+                  </LinearGradient>
+                </View>
               </TouchableOpacity>
             );
           }}
@@ -151,11 +163,16 @@ const styles = StyleSheet.create({
   },
   list: { paddingHorizontal: 12, gap: 10 },
   card: { width: 112, marginHorizontal: 4 },
-  thumb: {
+  thumbWrap: {
     width: 112,
     height: 160,
     borderRadius: 12,
+    overflow: 'hidden',
     backgroundColor: colors.surfaceRaised,
+  },
+  thumb: {
+    width: 112,
+    height: 160,
   },
   liveBadge: {
     position: 'absolute',
@@ -165,9 +182,35 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
+    zIndex: 2,
   },
   liveText: { color: colors.onPrimary, fontSize: 10, fontWeight: '800' },
-  /** Detached from image border for clearer hierarchy (was marginTop: 6). */
-  caption: { color: colors.textSecondary, fontSize: 11, marginTop: 10, lineHeight: 14 },
-  captionMuted: { color: colors.textMuted, fontSize: 11, marginTop: 10 },
+  captionGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 8,
+    paddingTop: 28,
+    paddingBottom: 8,
+    justifyContent: 'flex-end',
+  },
+  caption: {
+    color: '#ffffff',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  captionMuted: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '500',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
 });
