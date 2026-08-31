@@ -36,8 +36,10 @@ export const colors = {
 
   textPrimary: '#ffffff',
   textSecondary: '#aaaaaa',
-  textMuted: '#888888',
-  textFaint: '#555555',
+  /** Secondary labels / hints — lightened for dark-mode readability (was #888). */
+  textMuted: '#A0A0A0',
+  /** Faintest supporting text (chevrons, placeholders). */
+  textFaint: '#777777',
 
   danger: '#ff4444',
   warning: '#ff9d3c',

@@ -52,10 +52,17 @@ export function ProfilePhotosSection({
         {photos.map((photo, index) => {
           const active = isSelf && index === activeIndex;
           const body = (
-            <Image
-              source={{ uri: photo }}
-              style={[styles.gridPhotoImage, { width: photoSize, height: photoSize }]}
-            />
+            <>
+              <Image
+                source={{ uri: photo }}
+                style={[styles.gridPhotoImage, { width: photoSize, height: photoSize }]}
+              />
+              {active ? (
+                <View style={styles.activeBadge} accessibilityLabel="Primary photo">
+                  <Icon name="check-circle" size={16} color={colors.primary} />
+                </View>
+              ) : null}
+            </>
           );
           if (isSelf && onSelect) {
             return (
@@ -67,6 +74,7 @@ export function ProfilePhotosSection({
                   { width: photoSize, height: photoSize },
                   active && styles.gridPhotoActive,
                 ]}
+                accessibilityState={{ selected: active }}
               >
                 {body}
               </TouchableOpacity>
@@ -85,8 +93,9 @@ export function ProfilePhotosSection({
           <TouchableOpacity
             style={[styles.addPhotoButton, { width: photoSize, height: photoSize }]}
             onPress={onManage}
+            accessibilityLabel="Add photo"
           >
-            <Icon name="plus" size={24} color={colors.textMuted} />
+            <Icon name="plus" size={28} color={colors.primary} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -114,6 +123,15 @@ const styles = StyleSheet.create({
   },
   gridPhotoActive: { borderColor: colors.primary },
   gridPhotoImage: { borderRadius: radius.sm - 2 },
+  /** Secondary visual cue for primary photo (beyond color border — a11y). */
+  activeBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 10,
+    padding: 2,
+  },
   addPhotoButton: {
     borderRadius: radius.sm,
     backgroundColor: colors.surfaceRaised,

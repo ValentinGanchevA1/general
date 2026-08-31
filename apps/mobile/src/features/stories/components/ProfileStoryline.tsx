@@ -12,6 +12,7 @@ import {
 import type { StoryCard } from '@g88/shared';
 
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { colors, spacing } from '@/theme';
 import { fetchAuthorStories } from '../storiesSlice';
 import { StoryViewer } from './StoryViewer';
 
@@ -76,7 +77,7 @@ export function ProfileStoryline({ userId, isSelf = false }: Props): React.JSX.E
       </View>
 
       {loading && sorted.length === 0 ? (
-        <ActivityIndicator color="#00d4ff" style={styles.loader} />
+        <ActivityIndicator color={colors.primary} style={styles.loader} />
       ) : sorted.length === 0 ? (
         <Text style={styles.empty}>
           {isSelf
@@ -138,11 +139,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 10,
   },
-  title: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  hint: { color: '#666', fontSize: 12 },
+  title: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
+  hint: { color: colors.textMuted, fontSize: 12 },
   loader: { marginVertical: 16 },
   empty: {
-    color: '#888',
+    color: colors.textMuted,
     fontSize: 13,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -154,18 +155,19 @@ const styles = StyleSheet.create({
     width: 112,
     height: 160,
     borderRadius: 12,
-    backgroundColor: '#1a1a24',
+    backgroundColor: colors.surfaceRaised,
   },
   liveBadge: {
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: '#00d4ff',
+    backgroundColor: colors.primary,
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  liveText: { color: '#000', fontSize: 10, fontWeight: '800' },
-  caption: { color: '#ccc', fontSize: 11, marginTop: 6, lineHeight: 14 },
-  captionMuted: { color: '#666', fontSize: 11, marginTop: 6 },
+  liveText: { color: colors.onPrimary, fontSize: 10, fontWeight: '800' },
+  /** Detached from image border for clearer hierarchy (was marginTop: 6). */
+  caption: { color: colors.textSecondary, fontSize: 11, marginTop: 10, lineHeight: 14 },
+  captionMuted: { color: colors.textMuted, fontSize: 11, marginTop: 10 },
 });
