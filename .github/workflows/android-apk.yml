@@ -31,6 +31,11 @@ jobs:
   apk:
     name: Signed APK
     runs-on: ubuntu-latest
+    # Job-level permissions are required in addition to workflow-level:
+    # some GitHub runners / org policies only honor the job scope for
+    # contents:write when creating releases/tags.
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: apps/mobile
@@ -231,13 +236,20 @@ jobs:
       # keeps releases/latest/download/g88-v1.0.apk pointing at the newest build,
       # so the share link never changes. Full release (not prerelease) is
       # required for the /latest/ redirect to resolve.
+      # Requires contents:write (workflow + job). If this still fails with
+      # "Resource not accessible by integration", set repo Settings → Actions
+      # → General → Workflow permissions → Read and write permissions.
+      # Optional override: create a classic PAT (repo scope) as secret
+      # RELEASE_GITHUB_TOKEN when the default GITHUB_TOKEN is restricted by org policy.
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.2.1
         with:
+          token: ${{ secrets.RELEASE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           tag_name: apk-v1.0.${{ github.run_number }}
           name: "G88 v1.0 (build ${{ github.run_number }}) — Android sideload APK"
           files: apps/mobile/android/app/build/outputs/apk/release/g88-v1.0.apk
           make_latest: "true"
+          fail_on_unmatched_files: true
           target_commitish: ${{ github.sha }}
           body: |
             Signed Android APK for direct install (sideload). Not the Play Store build.
