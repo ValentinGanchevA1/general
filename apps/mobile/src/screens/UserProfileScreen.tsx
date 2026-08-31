@@ -14,7 +14,6 @@ import {
   BottomSheetView,
 } from '@gorhom/bottom-sheet';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { CommonActions } from '@react-navigation/native';
 import type {
   ApiError,
   CreateConversationRequest,
@@ -25,6 +24,7 @@ import type {
   WaveResponse,
 } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { setPendingMapFocus } from '@/navigation/pendingMapFocus';
 import { deleteJson, getJson, postJson } from '@/api/client';
 import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
 import { VerificationBadge } from '@/components/VerificationBadge';
@@ -166,31 +166,50 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     }
   };
 
-  /** Jump to Map tab and focus this user's fuzzed pin (coords preferred). */
+  /**
+   * Jump to Map tab and focus this user's fuzzed pin.
+   * 1) Seed module handoff (survives nested-param races)
+   * 2) Navigate Main/Map with merge so tab params update when Main is already mounted
+   */
   const viewOnMap = (): void => {
+    const hasCoords =
+      profile?.mapLat != null &&
+      profile?.mapLng != null &&
+      Number.isFinite(profile.mapLat) &&
+      Number.isFinite(profile.mapLng);
+
+    if (!hasCoords && profile?.distanceMeters == null) {
+      Alert.alert(
+        'Location unavailable',
+        'This person has no map pin right now. Try again when they are nearby.',
+      );
+      return;
+    }
+
+    setPendingMapFocus({
+      userId,
+      ...(hasCoords ? { lat: profile!.mapLat!, lng: profile!.mapLng! } : {}),
+    });
+
     const mapParams: {
       focusUserId: string;
       focusLat?: number;
       focusLng?: number;
     } = { focusUserId: userId };
-    if (
-      profile?.mapLat != null &&
-      profile?.mapLng != null &&
-      Number.isFinite(profile.mapLat) &&
-      Number.isFinite(profile.mapLng)
-    ) {
-      mapParams.focusLat = profile.mapLat;
-      mapParams.focusLng = profile.mapLng;
+    if (hasCoords) {
+      mapParams.focusLat = profile!.mapLat!;
+      mapParams.focusLng = profile!.mapLng!;
     }
-    navigation.dispatch(
-      CommonActions.navigate({
-        name: 'Main',
-        params: {
-          screen: 'Map',
-          params: mapParams,
-        },
-      }),
-    );
+
+    navigation.navigate({
+      name: 'Main',
+      params: {
+        screen: 'Map',
+        params: mapParams,
+        merge: true,
+      },
+      merge: true,
+    });
   };
 
   const block = async (): Promise<void> => {
@@ -537,7 +556,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
           </View>
         ) : null}
 
-        {/* About → Storyline → Photos → Goals (Trust lives on map entity sheet) */}
         {profile.bio ? <ProfileBio bio={profile.bio} showTitle padded={false} /> : null}
 
         <View style={styles.section}>
