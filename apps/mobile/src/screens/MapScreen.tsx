@@ -49,6 +49,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
+import {
+  clearPendingMapFocus,
+  peekPendingMapFocus,
+} from '@/navigation/pendingMapFocus';
 import { track } from '@/lib/analytics';
 import { colors } from '@/theme';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
@@ -66,7 +70,6 @@ import {
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
-/** Intent from Profile "View on map" — survives param clear / focus races. */
 type PendingFocus = {
   userId?: string;
   lat?: number;
@@ -101,7 +104,6 @@ export function MapScreen(): React.JSX.Element {
   const zoom = useMemo(() => (region ? approxZoomFromRegion(region) : 12), [region]);
 
   const { data, loading, error, refresh } = useDiscovery({ viewport, zoom });
-
   const points = data?.points ?? EMPTY_POINTS;
 
   const onCloseSheet = useCallback(() => {
@@ -121,7 +123,6 @@ export function MapScreen(): React.JSX.Element {
     }
     const id = `${selected.kind}:${selected.id}`;
     if (presentedIdRef.current === id) return;
-
     const task = InteractionManager.runAfterInteractions(() => {
       presentedIdRef.current = id;
       try {
@@ -154,40 +155,56 @@ export function MapScreen(): React.JSX.Element {
       focusUserId: undefined,
       focusLat: undefined,
       focusLng: undefined,
-    });
+    } as never);
   }, [navigation]);
 
   const applyPeerFocus = useCallback(
-    (lat: number, lng: number, point?: EntityPoint) => {
+    (lat: number, lng: number, point?: EntityPoint, token?: number) => {
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
       const distanceMeters =
-        myCoords != null
-          ? approxDistanceMeters(myCoords, { lat, lng })
-          : undefined;
-
-      const {
-        latitude,
-        longitude,
-        latitudeDelta,
-        longitudeDelta,
-        duration,
-      } = buildPeerRegionFocus({ lat, lng, distanceMeters });
-
-      mapRef.current?.animateToRegion(
-        { latitude, longitude, latitudeDelta, longitudeDelta },
-        duration,
-      );
-      if (point) {
-        setTimeout(() => setSelected(point), 0);
-      }
+        myCoords != null ? approxDistanceMeters(myCoords, { lat, lng }) : undefined;
+      const { latitude, longitude, latitudeDelta, longitudeDelta, duration } =
+        buildPeerRegionFocus({ lat, lng, distanceMeters });
+      InteractionManager.runAfterInteractions(() => {
+        mapRef.current?.animateToRegion(
+          { latitude, longitude, latitudeDelta, longitudeDelta },
+          duration,
+        );
+        if (point) setTimeout(() => setSelected(point), 0);
+      });
       pendingFocusRef.current = null;
+      clearPendingMapFocus(token);
       clearFocusParams();
     },
     [clearFocusParams, myCoords],
   );
 
-  /** Capture route focus intent into a ref so it is not lost on focus races. */
+  const tryApplyPendingFocus = useCallback(() => {
+    const mod = peekPendingMapFocus();
+    if (mod != null) {
+      pendingFocusRef.current = {
+        userId: mod.userId,
+        ...(mod.lat != null && mod.lng != null ? { lat: mod.lat, lng: mod.lng } : {}),
+      };
+    }
+    const pending = pendingFocusRef.current;
+    if (!pending) return;
+    const fromPoints =
+      pending.userId != null
+        ? points.find(
+            (p): p is EntityPoint & { kind: 'user' } =>
+              p.kind === 'user' && p.id === pending.userId,
+          )
+        : undefined;
+    const lat = pending.lat ?? fromPoints?.lat;
+    const lng = pending.lng ?? fromPoints?.lng;
+    if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const key = `${pending.userId ?? ''}|${lat}|${lng}|${mod?.token ?? 0}`;
+    if (focusAppliedKeyRef.current === key) return;
+    focusAppliedKeyRef.current = key;
+    applyPeerFocus(lat, lng, fromPoints, mod?.token);
+  }, [points, applyPeerFocus]);
+
   useEffect(() => {
     if (focusMyPin) return;
     const hasUser = focusUserId != null && focusUserId !== '';
@@ -197,48 +214,15 @@ export function MapScreen(): React.JSX.Element {
       Number.isFinite(focusLat) &&
       Number.isFinite(focusLng);
     if (!hasUser && !hasCoords) return;
-
-    const key = `${focusUserId ?? ''}|${focusLat ?? ''}|${focusLng ?? ''}`;
-    if (focusAppliedKeyRef.current === key) return;
-
     pendingFocusRef.current = {
       ...(hasUser ? { userId: focusUserId } : {}),
       ...(hasCoords ? { lat: focusLat, lng: focusLng } : {}),
     };
   }, [focusUserId, focusLat, focusLng, focusMyPin]);
 
-  /** Resolve pending peer focus: prefer explicit coords, else discovery pin. */
-  const tryApplyPendingFocus = useCallback(() => {
-    const pending = pendingFocusRef.current;
-    if (!pending) return;
-
-    const fromPoints =
-      pending.userId != null
-        ? points.find(
-            (p): p is EntityPoint & { kind: 'user' } =>
-              p.kind === 'user' && p.id === pending.userId,
-          )
-        : undefined;
-
-    const lat = pending.lat ?? fromPoints?.lat;
-    const lng = pending.lng ?? fromPoints?.lng;
-    if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return;
-    }
-
-    const key = `${pending.userId ?? ''}|${lat}|${lng}`;
-    if (focusAppliedKeyRef.current === key) {
-      pendingFocusRef.current = null;
-      return;
-    }
-    focusAppliedKeyRef.current = key;
-    applyPeerFocus(lat, lng, fromPoints);
-  }, [points, applyPeerFocus]);
-
-  // Initial self-center only when there is no peer-focus intent.
   useEffect(() => {
     if (!myCoords || region) return;
-    if (focusMyPin || focusUserId || pendingFocusRef.current) return;
+    if (focusMyPin || focusUserId || pendingFocusRef.current || peekPendingMapFocus()) return;
     mapRef.current?.animateToRegion(
       {
         latitude: myCoords.lat,
@@ -265,23 +249,23 @@ export function MapScreen(): React.JSX.Element {
         clearFocusParams();
         return;
       }
-
-      // Re-seed pending from current route params on every focus (params may
-      // arrive after the screen was already focused).
-      const hasUser = focusUserId != null && focusUserId !== '';
+      const mod = peekPendingMapFocus();
+      const hasUser =
+        (focusUserId != null && focusUserId !== '') ||
+        (mod?.userId != null && mod.userId !== '');
+      const lat = focusLat ?? mod?.lat;
+      const lng = focusLng ?? mod?.lng;
       const hasCoords =
-        focusLat != null &&
-        focusLng != null &&
-        Number.isFinite(focusLat) &&
-        Number.isFinite(focusLng);
+        lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
       if (hasUser || hasCoords) {
+        const userId =
+          focusUserId != null && focusUserId !== '' ? focusUserId : mod?.userId;
         pendingFocusRef.current = {
-          ...(hasUser ? { userId: focusUserId } : {}),
-          ...(hasCoords ? { lat: focusLat as number, lng: focusLng as number } : {}),
+          ...(userId ? { userId } : {}),
+          ...(hasCoords ? { lat: lat as number, lng: lng as number } : {}),
         };
         focusAppliedKeyRef.current = null;
       }
-
       tryApplyPendingFocus();
     }, [
       focusMyPin,
@@ -294,12 +278,10 @@ export function MapScreen(): React.JSX.Element {
     ]),
   );
 
-  // Apply when coords/points become available after navigate.
   useEffect(() => {
     tryApplyPendingFocus();
   }, [points, focusUserId, focusLat, focusLng, tryApplyPendingFocus]);
 
-  // Retry once the map has a region (mapRef is layout-ready).
   useEffect(() => {
     if (!region) return;
     tryApplyPendingFocus();
@@ -335,55 +317,60 @@ export function MapScreen(): React.JSX.Element {
     return unsub;
   }, [on, dispatch]);
 
-  const onClusterPress = useCallback((c: ClusterPoint) => {
-    mapRef.current?.animateToRegion(
-      {
-        latitude: c.lat,
-        longitude: c.lng,
-        latitudeDelta: Math.max(0.005, (region?.latitudeDelta ?? 0.05) / 2.5),
-        longitudeDelta: Math.max(0.005, (region?.longitudeDelta ?? 0.05) / 2.5),
-      },
-      300,
-    );
-  }, [region?.latitudeDelta, region?.longitudeDelta]);
-
-  const onWave = useCallback(async (toUserId: string) => {
-    setWaving(toUserId);
-    try {
-      const res = await postJson<WaveRequest, WaveResponse>('/interactions/wave', {
-        toUserId,
-        context: 'map',
-      });
-      challengeEvents.emit('progress');
-      if (res.conversationId) {
-        navigation.navigate('Chat', {
-          conversationId: res.conversationId,
-          otherUserName: '',
-        });
-      }
-    } catch (e) {
-      if (__DEV__) {
-        console.warn('wave failed', e);
-      }
-      throw e;
-    } finally {
-      setWaving(null);
-    }
-  }, [navigation]);
-
-  const onSheetWave = useCallback((toUserId: string) => {
-    onWave(toUserId).catch((err: ApiError) => {
-      Alert.alert(
-        err.code === 'wave.cooldown' ? 'Already waved' : 'Could not send wave',
-        err.message || 'Try again in a moment.',
+  const onClusterPress = useCallback(
+    (c: ClusterPoint) => {
+      mapRef.current?.animateToRegion(
+        {
+          latitude: c.lat,
+          longitude: c.lng,
+          latitudeDelta: Math.max(0.005, (region?.latitudeDelta ?? 0.05) / 2.5),
+          longitudeDelta: Math.max(0.005, (region?.longitudeDelta ?? 0.05) / 2.5),
+        },
+        300,
       );
-    });
-  }, [onWave]);
+    },
+    [region?.latitudeDelta, region?.longitudeDelta],
+  );
+
+  const onWave = useCallback(
+    async (toUserId: string) => {
+      setWaving(toUserId);
+      try {
+        const res = await postJson<WaveRequest, WaveResponse>('/interactions/wave', {
+          toUserId,
+          context: 'map',
+        });
+        challengeEvents.emit('progress');
+        if (res.conversationId) {
+          navigation.navigate('Chat', {
+            conversationId: res.conversationId,
+            otherUserName: '',
+          });
+        }
+      } catch (e) {
+        if (__DEV__) console.warn('wave failed', e);
+        throw e;
+      } finally {
+        setWaving(null);
+      }
+    },
+    [navigation],
+  );
+
+  const onSheetWave = useCallback(
+    (toUserId: string) => {
+      onWave(toUserId).catch((err: ApiError) => {
+        Alert.alert(
+          err.code === 'wave.cooldown' ? 'Already waved' : 'Could not send wave',
+          err.message || 'Try again in a moment.',
+        );
+      });
+    },
+    [onWave],
+  );
 
   const onSheetWavePress = useCallback(() => {
-    if (selected?.kind === 'user') {
-      onSheetWave(selected.id);
-    }
+    if (selected?.kind === 'user') onSheetWave(selected.id);
   }, [selected, onSheetWave]);
 
   const onMapLongPress = useCallback(
