@@ -10,7 +10,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -19,6 +18,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -206,7 +207,7 @@ export function PulseScreen(): React.JSX.Element {
               },
             ]
           : [{ text: 'OK' }];
-      Alert.alert('Stories', storyGateMessage(reason), buttons);
+      appAlert('Stories', storyGateMessage(reason), buttons);
       return;
     }
     setCreateOpen(true);
