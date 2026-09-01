@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
@@ -22,6 +22,7 @@ export class ChallengesService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly gamification: GamificationService,
+    @Inject(forwardRef(() => RealtimeGateway))
     private readonly realtime: RealtimeGateway,
   ) {}
 
