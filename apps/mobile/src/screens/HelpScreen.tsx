@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   Linking,
   ScrollView,
   StyleSheet,
@@ -8,6 +7,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -44,27 +45,19 @@ const FAQS: Faq[] = [
   },
   {
     q: 'How do friends work?',
-    a: 'Send or accept a friend request from a profile or from Interactions. Friends can see when you are online if you allow it in Settings. Unfriending removes the close-friend link but keeps mutual follows unless you unfollow separately.',
+    a: 'Send or accept a friend request from a profile. Friends can see when you are online (if you allow it in Settings), and chat sorts friends first. Unfriending does not remove mutual follows.',
   },
   {
-    q: 'Why can’t I message someone?',
-    a: 'Chat unlocks after mutual interest — a mutual wave, a wave matched with a story reaction, or an existing relationship path. Friends and recent activity sort first. Send a wave or react first when you are still strangers.',
-  },
-  {
-    q: 'What do verification badges mean?',
+    q: 'What do the verification badges mean?',
     a: 'They show progress on the trust ladder: email → phone → ID review. Optional, but they raise trust. Email verification also unlocks story posting. Start from Profile → Verification.',
   },
   {
     q: 'How does local trade work?',
-    a: 'Create listings and negotiate in the app. Settlement is offline between you and the other person — G88 does not charge fees or process payments for local trade. Open a trade from Pulse to view details.',
-  },
-  {
-    q: 'How do I delete my account?',
-    a: 'Settings → Delete account. Immediate and permanent: profile, photos, stories, messages, friends, and activity are removed.',
+    a: 'Create a listing from the map or Marketplace. Nearby people can wave, chat, or make an offer. Meet in public places; G88 does not process payments yet.',
   },
   {
     q: 'I found a bug or something feels wrong.',
-    a: 'Tap “Email support” below. Include the screen you were on and what you expected — that helps us fix it faster.',
+    a: 'Use Email support below with what you were doing and a screenshot if you can. We read every report.',
   },
 ];
 
@@ -72,13 +65,17 @@ function FaqItem({ q, a }: Faq): React.JSX.Element {
   const [open, setOpen] = useState(false);
   return (
     <TouchableOpacity
-      activeOpacity={0.8}
-      style={styles.faq}
+      style={styles.faqCard}
       onPress={() => setOpen((v) => !v)}
+      activeOpacity={0.85}
     >
       <View style={styles.faqHead}>
         <Text style={styles.faqQ}>{q}</Text>
-        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={22} color={colors.textFaint} />
+        <Icon
+          name={open ? 'chevron-up' : 'chevron-down'}
+          size={22}
+          color={colors.textMuted}
+        />
       </View>
       {open ? <Text style={styles.faqA}>{a}</Text> : null}
     </TouchableOpacity>
@@ -88,18 +85,18 @@ function FaqItem({ q, a }: Faq): React.JSX.Element {
 export function HelpScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
 
-  const emailSupport = async (): Promise<void> => {
-    track('help_email_support');
-    const subject = encodeURIComponent('G88 support request');
+  const emailSupport = async () => {
+    track('help.email_support');
+    const subject = encodeURIComponent('G88 support');
     const body = encodeURIComponent(
-      `\n\n—\nApp version: ${APP_VERSION}\nPlease describe what happened above this line.`,
+      `App version: ${APP_VERSION}\n\nPlease describe what happened above this line.`,
     );
     const url = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
     const ok = await Linking.canOpenURL(url).catch(() => false);
     if (ok) {
       await Linking.openURL(url);
     } else {
-      Alert.alert('Email us', `Reach support at ${SUPPORT_EMAIL}`);
+      appAlert('Email us', `Reach support at ${SUPPORT_EMAIL}`);
     }
   };
 
@@ -119,26 +116,27 @@ export function HelpScreen(): React.JSX.Element {
           <FaqItem key={f.q} {...f} />
         ))}
 
-        <Text style={[styles.sectionTitle, styles.sectionGap]}>Still need help?</Text>
-        <TouchableOpacity style={styles.contactRow} onPress={emailSupport}>
+        <Text style={[styles.sectionTitle, { marginTop: spacing.xl }]}>Still need help?</Text>
+        <TouchableOpacity style={styles.row} onPress={() => void emailSupport()} activeOpacity={0.85}>
           <Icon name="email-outline" size={22} color={colors.primary} />
-          <View style={styles.contactText}>
-            <Text style={styles.contactLabel}>Email support</Text>
-            <Text style={styles.contactSub}>{SUPPORT_EMAIL}</Text>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Email support</Text>
+            <Text style={styles.rowSub}>{SUPPORT_EMAIL}</Text>
           </View>
-          <Icon name="chevron-right" size={24} color={colors.borderStrong} />
+          <Icon name="chevron-right" size={22} color={colors.textFaint} />
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.contactRow}
+          style={styles.row}
           onPress={() => navigation.navigate('Privacy')}
+          activeOpacity={0.85}
         >
-          <Icon name="shield-lock" size={22} color={colors.textMuted} />
-          <View style={styles.contactText}>
-            <Text style={styles.contactLabel}>Privacy</Text>
-            <Text style={styles.contactSub}>How your data, friends, and location are handled</Text>
+          <Icon name="shield-lock-outline" size={22} color={colors.primary} />
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Privacy</Text>
+            <Text style={styles.rowSub}>How your data, friends, and location are handled</Text>
           </View>
-          <Icon name="chevron-right" size={24} color={colors.borderStrong} />
+          <Icon name="chevron-right" size={22} color={colors.textFaint} />
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -151,43 +149,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.md,
-    paddingTop: 56,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
   },
-  back: { width: 40, alignItems: 'flex-start' },
+  back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '700' },
-  body: { padding: spacing.xxl, paddingBottom: 48 },
+  body: { padding: spacing.lg, paddingBottom: 48 },
   sectionTitle: {
-    color: colors.textFaint,
-    fontSize: 11,
-    fontWeight: '600',
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
     textTransform: 'uppercase',
-    letterSpacing: 1,
     marginBottom: spacing.md,
   },
-  sectionGap: { marginTop: 28 },
-  faq: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 10,
-    padding: spacing.lg,
-    marginBottom: 10,
+  faqCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  faqHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  faqQ: { color: colors.textPrimary, fontSize: 14, fontWeight: '500', flex: 1, marginRight: spacing.md },
-  faqA: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 19, marginTop: 10 },
-  contactRow: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 10,
+    borderColor: colors.border,
     padding: spacing.lg,
-    marginBottom: 10,
+    marginBottom: spacing.sm,
+  },
+  faqHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  faqQ: { flex: 1, color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
+  faqA: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 20, marginTop: spacing.md },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
   },
-  contactText: { flex: 1, marginLeft: spacing.md },
-  contactLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '500' },
-  contactSub: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
+  rowText: { flex: 1 },
+  rowTitle: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
+  rowSub: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: 2 },
 });

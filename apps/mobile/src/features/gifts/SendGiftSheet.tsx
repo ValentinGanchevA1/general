@@ -7,7 +7,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   StyleSheet,
@@ -16,6 +15,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { ApiError, GiftCatalogItem } from '@g88/shared';
@@ -43,7 +44,6 @@ export function SendGiftSheet({
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
 
-  // Re-check the balance each time the sheet opens.
   useEffect(() => { if (visible) refresh(); }, [visible, refresh]);
 
   const reset = (): void => { setSelected(null); setMessage(''); };
@@ -62,11 +62,11 @@ export function SendGiftSheet({
         ...(note ? { message: note } : {}),
       });
       onSent?.(res.spendableXp);
-      Alert.alert(`Gift sent ${selected.emoji}`, `You sent a ${selected.label} to ${recipientName}.`);
+      appAlert(`Gift sent ${selected.emoji}`, `You sent a ${selected.label} to ${recipientName}.`);
       close();
     } catch (err) {
       const e = err as ApiError;
-      Alert.alert(
+      appAlert(
         e.code === 'gift.insufficient_xp'
           ? 'Not enough XP'
           : e.code === 'gift.blocked'
@@ -83,7 +83,6 @@ export function SendGiftSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <Pressable style={styles.backdrop} onPress={close}>
-        {/* Inner press is swallowed so taps inside the sheet don't close it. */}
         <Pressable style={styles.sheet} onPress={() => {}}>
           <View style={styles.handle} />
 
@@ -104,17 +103,17 @@ export function SendGiftSheet({
                 <TouchableOpacity
                   key={item.id}
                   style={[
-                    styles.tile,
-                    isSelected && styles.tileSelected,
-                    !affordable && styles.tileDisabled,
+                    styles.giftCell,
+                    isSelected && styles.giftCellSelected,
+                    !affordable && styles.giftCellDisabled,
                   ]}
-                  disabled={!affordable}
+                  disabled={!affordable || sending}
                   onPress={() => setSelected(item)}
-                  testID={`gift-tile-${item.id}`}
+                  activeOpacity={0.85}
                 >
-                  <Text style={styles.tileEmoji}>{item.emoji}</Text>
-                  <Text style={styles.tileLabel}>{item.label}</Text>
-                  <Text style={[styles.tileCost, !affordable && styles.tileCostDisabled]}>
+                  <Text style={styles.giftEmoji}>{item.emoji}</Text>
+                  <Text style={styles.giftLabel}>{item.label}</Text>
+                  <Text style={[styles.giftCost, !affordable && styles.giftCostDisabled]}>
                     {item.costXp} XP
                   </Text>
                 </TouchableOpacity>
@@ -123,22 +122,22 @@ export function SendGiftSheet({
           </View>
 
           <TextInput
-            style={styles.messageInput}
+            style={styles.note}
             placeholder="Add a note (optional)"
             placeholderTextColor="#555"
             value={message}
             onChangeText={setMessage}
-            maxLength={200}
-            multiline
+            maxLength={120}
           />
 
           <TouchableOpacity
             style={[styles.sendBtn, (!selected || sending) && styles.sendBtnDisabled]}
-            onPress={handleSend}
             disabled={!selected || sending}
+            onPress={() => void handleSend()}
+            activeOpacity={0.9}
           >
             {sending ? (
-              <ActivityIndicator color="#000" size="small" />
+              <ActivityIndicator color="#0a0a0f" />
             ) : (
               <Text style={styles.sendBtnText}>
                 {selected ? `Send ${selected.label} · ${selected.costXp} XP` : 'Pick a gift'}
@@ -152,59 +151,93 @@ export function SendGiftSheet({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: '#000a', justifyContent: 'flex-end' },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
   sheet: {
     backgroundColor: '#12121f',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 36,
-    gap: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+    paddingTop: 10,
   },
-  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: '#333' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  handle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#333',
+    marginBottom: 14,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   title: { color: '#fff', fontSize: 18, fontWeight: '700' },
   balancePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FFD70018',
+    backgroundColor: '#1a1a2e',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
   balanceText: { color: '#FFD700', fontSize: 13, fontWeight: '700' },
-  subtitle: { color: '#888', fontSize: 13, marginTop: -6 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' },
-  tile: {
-    width: '31%',
-    alignItems: 'center',
-    paddingVertical: 14,
-    backgroundColor: '#1a1a2e',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#2a2a4a',
-    gap: 4,
+  subtitle: { color: '#888', fontSize: 13, marginTop: 4, marginBottom: 16 },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
-  tileSelected: { borderColor: '#00d4ff', backgroundColor: '#00d4ff12' },
-  tileDisabled: { opacity: 0.35 },
-  tileEmoji: { fontSize: 30 },
-  tileLabel: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  tileCost: { color: '#FFD700', fontSize: 12, fontWeight: '700' },
-  tileCostDisabled: { color: '#888' },
-  messageInput: {
+  giftCell: {
+    width: '30%',
+    flexGrow: 1,
     backgroundColor: '#1a1a2e',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#2a2a4a',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  giftCellSelected: {
+    borderColor: '#00d4ff',
+  },
+  giftCellDisabled: {
+    opacity: 0.4,
+  },
+  giftEmoji: { fontSize: 28 },
+  giftLabel: { color: '#fff', fontSize: 12, fontWeight: '600', marginTop: 4 },
+  giftCost: { color: '#FFD700', fontSize: 11, marginTop: 2 },
+  giftCostDisabled: { color: '#666' },
+  note: {
+    marginTop: 14,
+    backgroundColor: '#1a1a2e',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2a2a4a',
     color: '#fff',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    minHeight: 44,
-    maxHeight: 96,
   },
-  sendBtn: { backgroundColor: '#00d4ff', borderRadius: 14, padding: 16, alignItems: 'center' },
-  sendBtnDisabled: { opacity: 0.5 },
-  sendBtnText: { color: '#000', fontWeight: '700', fontSize: 16 },
+  sendBtn: {
+    marginTop: 14,
+    backgroundColor: '#00d4ff',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  sendBtnDisabled: {
+    opacity: 0.45,
+  },
+  sendBtnText: {
+    color: '#0a0a0f',
+    fontSize: 15,
+    fontWeight: '700',
+  },
 });
