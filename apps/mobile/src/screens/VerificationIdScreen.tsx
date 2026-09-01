@@ -5,9 +5,10 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import { useNavigation } from '@react-navigation/native';
 import {
   launchImageLibrary,
@@ -84,7 +85,7 @@ export default function VerificationIdScreen(): React.ReactElement {
 
     const asset = result.assets?.[0];
     if (!asset?.uri || !asset.base64) {
-      Alert.alert('Error', 'Could not access image');
+      appAlert('Error', 'Could not access image');
       return;
     }
 
@@ -97,7 +98,7 @@ export default function VerificationIdScreen(): React.ReactElement {
 
   async function uploadAll() {
     if (!images.selfie || !images.idFront) {
-      Alert.alert('Missing Photos', 'Please provide at least a selfie and the front of your ID.');
+      appAlert('Missing Photos', 'Please provide at least a selfie and the front of your ID.');
       return;
     }
 
@@ -122,7 +123,7 @@ export default function VerificationIdScreen(): React.ReactElement {
       // (the submit flips id_verification_status to 'pending' server-side).
       void dispatch(fetchProfile());
 
-      Alert.alert('Success', 'Verification submitted for review.', [
+      appAlert('Success', 'Verification submitted for review.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e: unknown) {
@@ -132,7 +133,7 @@ export default function VerificationIdScreen(): React.ReactElement {
       );
       // eslint-disable-next-line no-console -- debug path for emulator submit failures
       console.warn('[id-verify] submit failed', e);
-      Alert.alert('Upload Failed', msg);
+      appAlert('Upload Failed', msg);
     } finally {
       setUploading(false);
     }
@@ -140,11 +141,11 @@ export default function VerificationIdScreen(): React.ReactElement {
 
   function next() {
     if (currentStep.key === 'selfie' && !images.selfie) {
-      Alert.alert('Selfie required', 'Please take a selfie to continue.');
+      appAlert('Selfie required', 'Please take a selfie to continue.');
       return;
     }
     if (currentStep.key === 'idFront' && !images.idFront) {
-      Alert.alert('ID required', 'Please upload the front of your ID.');
+      appAlert('ID required', 'Please upload the front of your ID.');
       return;
     }
     if (currentStepIndex < STEPS.length - 1) setCurrentStepIndex((i) => i + 1);
