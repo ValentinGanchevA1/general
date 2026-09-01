@@ -157,8 +157,6 @@ export function ListingDetailScreen(): React.JSX.Element {
   );
 }
 
-// ─── Seller wave ────────────────────────────────────────────────────────────
-
 function SellerWaveButton({ sellerId }: { sellerId: string }): React.JSX.Element {
   const [waving, setWaving] = useState(false);
   const onWave = useCallback(async () => {
@@ -185,8 +183,6 @@ function SellerWaveButton({ sellerId }: { sellerId: string }): React.JSX.Element
   );
 }
 
-// ─── Buyer offer ────────────────────────────────────────────────────────────
-
 function BuyerOffer({
   listingId, disabled, myOffer, askingCents, currency, onChanged,
 }: {
@@ -202,8 +198,6 @@ function BuyerOffer({
   const [busy, setBusy] = useState(false);
 
   const submit = useCallback(async () => {
-    // A typed price must be valid — otherwise NaN would be dropped and silently
-    // submit an offer at the asking price. Empty = intentional "at asking price".
     let offerCents: number | undefined;
     if (amount.trim()) {
       const parsed = parseFloat(amount);
@@ -291,8 +285,6 @@ function BuyerOffer({
     </View>
   );
 }
-
-// ─── Seller controls ──────────────────────────────────────────────────────────
 
 function SellerControls({
   listingId, status, offers, currency, onChanged,
@@ -387,16 +379,13 @@ const S = StyleSheet.create({
   content: { paddingBottom: 48 },
   center: { alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: '#666', fontSize: 15, marginTop: 12 },
-
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 12, paddingTop: 56, paddingBottom: 8,
   },
   headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-
   image: { width: '100%', height: 260, backgroundColor: '#12121f' },
   imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-
   body: { padding: 20 },
   title: { color: '#fff', fontSize: 22, fontWeight: '800' },
   price: { color: '#00d4ff', fontSize: 24, fontWeight: '900', marginTop: 4 },
@@ -406,7 +395,6 @@ const S = StyleSheet.create({
   statusPill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, backgroundColor: 'rgba(255,159,67,0.15)' },
   statusText: { color: '#ff9f43', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
   favCount: { color: '#888', fontSize: 12, marginLeft: 'auto' },
-
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20 },
   sellerIdentity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   sellerAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#12121f' },
@@ -418,9 +406,7 @@ const S = StyleSheet.create({
     backgroundColor: '#00d4ff', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8,
   },
   waveText: { color: '#0a0a0f', fontSize: 13, fontWeight: '700' },
-
   description: { color: '#bbb', fontSize: 15, lineHeight: 22, marginTop: 16 },
-
   card: {
     marginTop: 20, padding: 16, borderRadius: 14,
     backgroundColor: '#12121f', borderWidth: 1, borderColor: '#1f1f33',
@@ -440,10 +426,8 @@ const S = StyleSheet.create({
     borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center',
   },
   secondaryBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-
   offerLine: { color: '#ddd', fontSize: 15 },
   offerStatus: { color: '#00d4ff', fontWeight: '700', textTransform: 'capitalize' },
-
   sellerActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
   offerRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

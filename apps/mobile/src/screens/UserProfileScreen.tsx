@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -9,6 +8,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import {
   BottomSheetModal,
   BottomSheetView,
@@ -59,7 +60,6 @@ function emptyRel(): RelationshipSummary {
   };
 }
 
-/** Map-native distance: ~300 m away / ~1.2 km away (fuzzed locations). */
 function formatDistanceAway(meters: number): string {
   if (meters < 50) return '~50 m away';
   if (meters < 1000) {
@@ -113,7 +113,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         setProfile(data);
         await loadRelationship();
       } catch {
-        Alert.alert('Error', 'Could not load this profile.', [
+        appAlert('Error', 'Could not load this profile.', [
           { text: 'Go back', onPress: () => navigation.goBack() },
         ]);
       } finally {
@@ -133,9 +133,9 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         toUserId: userId,
         context: 'profile',
       });
-      Alert.alert('Wave sent', `You waved at ${profile?.displayName ?? 'them'}.`);
+      appAlert('Wave sent', `You waved at ${profile?.displayName ?? 'them'}.`);
     } catch (e) {
-      Alert.alert('Wave failed', errMessage(e, 'Could not send wave'));
+      appAlert('Wave failed', errMessage(e, 'Could not send wave'));
     } finally {
       setWaving(false);
     }
@@ -160,17 +160,12 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         otherUserIdVerified: profile?.idVerified ?? false,
       });
     } catch (e) {
-      Alert.alert('Could not open chat', errMessage(e, 'Try again in a moment.'));
+      appAlert('Could not open chat', errMessage(e, 'Try again in a moment.'));
     } finally {
       setMessaging(false);
     }
   };
 
-  /**
-   * Jump to Map tab and focus this user's fuzzed pin.
-   * 1) Seed module handoff (survives nested-param races)
-   * 2) Navigate Main/Map with merge so tab params update when Main is already mounted
-   */
   const viewOnMap = (): void => {
     const hasCoords =
       profile?.mapLat != null &&
@@ -179,7 +174,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
       Number.isFinite(profile.mapLng);
 
     if (!hasCoords && profile?.distanceMeters == null) {
-      Alert.alert(
+      appAlert(
         'Location unavailable',
         'This person has no map pin right now. Try again when they are nearby.',
       );
@@ -216,14 +211,14 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     setBlocking(true);
     try {
       await postJson<undefined, { blocked: boolean }>(`/blocks/${userId}`, undefined);
-      Alert.alert(
+      appAlert(
         'Blocked',
         `You won't see ${profile?.displayName ?? 'this user'} or hear from them.`,
         [{ text: 'OK', onPress: () => navigation.goBack() }],
         { cancelable: false },
       );
     } catch {
-      Alert.alert('Could not block', 'Try again in a moment.');
+      appAlert('Could not block', 'Try again in a moment.');
     } finally {
       setBlocking(false);
     }
@@ -236,14 +231,14 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
       setProfile((p) => (p ? { ...p, blockedByViewer: false } : p));
       await loadRelationship();
     } catch {
-      Alert.alert('Could not unblock', 'Try again in a moment.');
+      appAlert('Could not unblock', 'Try again in a moment.');
     } finally {
       setBlocking(false);
     }
   };
 
   const confirmBlock = (): void => {
-    Alert.alert(
+    appAlert(
       `Block ${profile?.displayName ?? 'this user'}?`,
       "They won't appear on your map and neither of you can message the other. You can undo this in Settings → Blocked users.",
       [
@@ -261,7 +256,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     try {
       await fn();
     } catch (e) {
-      Alert.alert('Could not update', errMessage(e, 'Try again in a moment.'));
+      appAlert('Could not update', errMessage(e, 'Try again in a moment.'));
     } finally {
       await loadRelationship();
       setBusy(false);
@@ -297,7 +292,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
           destructive: true,
           onPress: () => {
             dismiss();
-            Alert.alert('Unfriend', `Remove ${name} from friends?`, [
+            appAlert('Unfriend', `Remove ${name} from friends?`, [
               { text: 'Cancel', style: 'cancel' },
               {
                 text: 'Unfriend',
@@ -317,7 +312,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         icon: 'flag-outline',
         onPress: () => {
           dismiss();
-          Alert.alert(
+          appAlert(
             'Report submitted',
             'Thanks — our team will review this profile. For serious harm use local emergency services.',
           );
@@ -647,7 +642,6 @@ const styles = StyleSheet.create({
   menuBtn: { padding: 8 },
   menuBtnText: { color: colors.textMuted, fontSize: 22, letterSpacing: 2 },
   scroll: { paddingBottom: 24, gap: 22 },
-
   heroBlock: { marginBottom: 4 },
   cover: {
     height: 140,
@@ -680,7 +674,6 @@ const styles = StyleSheet.create({
   placeDot: { color: colors.textFaint, fontSize: 13 },
   viewOnMap: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   mutualLine: { color: colors.primary, fontSize: 12, marginTop: 2, fontWeight: '600' },
-
   socialRow: {
     flexDirection: 'row',
     gap: 10,
@@ -705,9 +698,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#00d4ff12',
   },
   outlineBtnText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.md },
-
   section: { paddingHorizontal: spacing.xl, gap: 10 },
-
   footer: {
     flexDirection: 'row',
     gap: 10,
