@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -9,6 +8,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -113,7 +114,7 @@ export function SuggestionsScreen(): React.JSX.Element {
         markFollowing(userId);
       } catch (e) {
         const msg = isApiError(e) ? e.message : 'Try again.';
-        Alert.alert('Could not follow', msg);
+        appAlert('Could not follow', msg);
       } finally {
         setBusy(userId, false);
       }
@@ -140,10 +141,10 @@ export function SuggestionsScreen(): React.JSX.Element {
             removeCard(userId);
             return;
           }
-          Alert.alert('Could not send request', e.message || 'Try again.');
+          appAlert('Could not send request', e.message || 'Try again.');
           return;
         }
-        Alert.alert('Could not send request', 'Try again.');
+        appAlert('Could not send request', 'Try again.');
       } finally {
         setBusy(userId, false);
       }
