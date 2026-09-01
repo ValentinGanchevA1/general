@@ -6,7 +6,6 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   RefreshControl,
   ScrollView,
@@ -16,6 +15,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -166,10 +167,10 @@ function SellerWaveButton({ sellerId }: { sellerId: string }): React.JSX.Element
         toUserId: sellerId,
         context: 'profile',
       });
-      Alert.alert('Wave sent', 'The seller will see your wave.');
+      appAlert('Wave sent', 'The seller will see your wave.');
     } catch (e) {
       const err = e as ApiError;
-      Alert.alert(err.code === 'wave.cooldown' ? 'Already waved' : 'Could not wave', err.message || 'Try again.');
+      appAlert(err.code === 'wave.cooldown' ? 'Already waved' : 'Could not wave', err.message || 'Try again.');
     } finally {
       setWaving(false);
     }
@@ -202,7 +203,7 @@ function BuyerOffer({
     if (amount.trim()) {
       const parsed = parseFloat(amount);
       if (Number.isNaN(parsed) || parsed < 0) {
-        Alert.alert('Invalid price', 'Please enter a valid offer price, or leave it blank to offer at the asking price.');
+        appAlert('Invalid price', 'Please enter a valid offer price, or leave it blank to offer at the asking price.');
         return;
       }
       offerCents = Math.round(parsed * 100);
@@ -216,7 +217,7 @@ function BuyerOffer({
       setAmount(''); setMessage('');
       onChanged();
     } catch (e) {
-      Alert.alert('Could not send offer', (e as ApiError).message || 'Try again.');
+      appAlert('Could not send offer', (e as ApiError).message || 'Try again.');
     } finally {
       setBusy(false);
     }
@@ -301,7 +302,7 @@ function SellerControls({
         await respondToOffer(offerId, decision);
         onChanged();
       } catch (e) {
-        Alert.alert('Could not respond', (e as ApiError).message || 'Try again.');
+        appAlert('Could not respond', (e as ApiError).message || 'Try again.');
       }
     },
     [onChanged],
