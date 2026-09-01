@@ -9,7 +9,9 @@
 // Android: if CAMERA is declared in the app manifest, image-picker requires
 // the host to request the runtime permission before launchCamera.
 
-import { Alert, PermissionsAndroid, Platform } from 'react-native';
+import { PermissionsAndroid, Platform } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import {
   launchCamera,
   launchImageLibrary,
@@ -147,7 +149,7 @@ type Source = 'library' | 'camera_photo' | 'camera_video';
 
 function chooseSource(): Promise<Source | null> {
   return new Promise((resolve) => {
-    Alert.alert('Add to story', 'Photo or video · max 15s', [
+    appAlert('Add to story', 'Photo or video · max 15s', [
       { text: 'Library', onPress: () => resolve('library') },
       { text: 'Take photo', onPress: () => resolve('camera_photo') },
       { text: 'Record video', onPress: () => resolve('camera_video') },
