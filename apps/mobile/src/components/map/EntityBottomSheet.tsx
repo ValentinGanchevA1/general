@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type {
@@ -106,7 +107,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
           onClose();
         }
       } catch {
-        Alert.alert('Could not update block', 'Try again in a moment.');
+        appAlert('Could not update block', 'Try again in a moment.');
       } finally {
         setBlocking(false);
       }
@@ -115,7 +116,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
       void doBlock();
       return;
     }
-    Alert.alert(
+    appAlert(
       'Block this user?',
       'They will not be able to wave or message you. You can unblock later in Settings.',
       [
@@ -141,7 +142,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         requestPending: res.status === 'pending',
       });
     } catch {
-      Alert.alert('Could not open chat', 'Try again in a moment.');
+      appAlert('Could not open chat', 'Try again in a moment.');
     } finally {
       setOpening(false);
     }
