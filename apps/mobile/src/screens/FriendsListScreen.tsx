@@ -5,7 +5,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -13,6 +12,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -109,7 +110,7 @@ export function FriendsListScreen(): React.JSX.Element {
         if (acceptFriendRequest.fulfilled.match(r)) {
           void dispatch(fetchFriendsTab({ tab: 'friends' }));
         } else {
-          Alert.alert('Could not accept', (r.payload as string) ?? 'Try again.');
+          appAlert('Could not accept', (r.payload as string) ?? 'Try again.');
         }
       });
     },
@@ -120,7 +121,7 @@ export function FriendsListScreen(): React.JSX.Element {
     (id: string) => {
       void dispatch(declineFriendRequest(id)).then((r) => {
         if (!declineFriendRequest.fulfilled.match(r)) {
-          Alert.alert('Could not decline', (r.payload as string) ?? 'Try again.');
+          appAlert('Could not decline', (r.payload as string) ?? 'Try again.');
         }
       });
     },
@@ -129,7 +130,7 @@ export function FriendsListScreen(): React.JSX.Element {
 
   const onUnfriend = useCallback(
     (userId: string, name: string) => {
-      Alert.alert('Unfriend', `Remove ${name} from your friends?`, [
+      appAlert('Unfriend', `Remove ${name} from your friends?`, [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Unfriend',
@@ -137,7 +138,7 @@ export function FriendsListScreen(): React.JSX.Element {
           onPress: () => {
             void dispatch(unfriendUser(userId)).then((r) => {
               if (!unfriendUser.fulfilled.match(r)) {
-                Alert.alert('Could not unfriend', (r.payload as string) ?? 'Try again.');
+                appAlert('Could not unfriend', (r.payload as string) ?? 'Try again.');
               }
             });
           },
