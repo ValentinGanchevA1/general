@@ -55,6 +55,7 @@ import {
 } from '@/lib/pushNotifications';
 import { pingGamification } from '@/features/gamification/useGamification';
 import { AmbientToastHost } from '@/components/AmbientToastHost';
+import { AppAlertHost } from '@/components/AppAlertHost';
 import { navigationRef } from './navigationRef';
 import { openViaRef } from './openRootScreen';
 import { takePendingPhoneVerify } from '@/services/pendingPhone';
@@ -76,9 +77,7 @@ export type PulseFilter =
 export type TabParamList = {
   Map: {
     focusMyPin?: boolean;
-    /** Peer user id — animate camera to their pin and open the entity sheet when found. */
     focusUserId?: string;
-    /** Optional fuzzed lat/lng when the pin is outside the current discovery viewport. */
     focusLat?: number;
     focusLng?: number;
   } | undefined;
@@ -94,11 +93,8 @@ export type RootStackParamList = {
     conversationId: string;
     otherUserName: string;
     requestPending?: boolean;
-    /** Peer user id — enables header → profile without waiting for messages. */
     otherUserId?: string;
-    /** The other participant's verification ladder level (for the header badge). */
     otherUserVerification?: VerificationLevel;
-    /** True when the other participant passed ID review (strong decagram badge). */
     otherUserIdVerified?: boolean;
   };
   UserProfile: { userId: string };
@@ -239,12 +235,11 @@ export function AppNavigator(): React.JSX.Element {
     void dispatch(restoreSession());
   }, [dispatch]);
 
-  // Register FCM token whenever the user logs in (null → id transition).
   useEffect(() => {
     if (user && prevUserRef.current !== user.id) {
       prevUserRef.current = user.id;
       void registerPushToken();
-      void pingGamification(); // advance daily streak on login/session restore
+      void pingGamification();
       return setupNotificationHandlers((screen, params) => {
         openViaRef(screen as Parameters<typeof openViaRef>[0], params);
       });
@@ -252,7 +247,6 @@ export function AppNavigator(): React.JSX.Element {
     if (!user) prevUserRef.current = null;
   }, [user]);
 
-  // After register: optional phone from AuthScreen → open Verify phone once.
   useEffect(() => {
     if (!user || restoring) return;
     let cancelled = false;
@@ -345,6 +339,7 @@ export function AppNavigator(): React.JSX.Element {
           )}
         </Stack.Navigator>
         {user ? <AmbientToastHost /> : null}
+        <AppAlertHost />
       </BottomSheetModalProvider>
     </NavigationContainer>
   );
