@@ -1,0 +1,26 @@
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type {
+  CreateConversationRequest,
+  CreateConversationResponse,
+  EntityPoint,
+  PublicUserProfile,
+  UserMeta,
+  VerificationLevel,
+} from '@g88/shared';
+import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { deleteJson, getJson, postJson } from '@/api/client';
+import { VerificationBadge } from '@/components/VerificationBadge';
+import { Avatar } from '@/components/Avatar';
+import { colors, spacing } from '@/theme';
+
+const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
