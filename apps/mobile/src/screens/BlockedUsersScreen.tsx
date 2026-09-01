@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BlockedUser } from '@g88/shared';
@@ -42,7 +43,7 @@ export function BlockedUsersScreen(): React.JSX.Element {
       try {
         setUsers(await getJson<BlockedUser[]>('/blocks'));
       } catch {
-        Alert.alert('Error', 'Could not load blocked users. Try again in a moment.');
+        appAlert('Error', 'Could not load blocked users. Try again in a moment.');
       } finally {
         setLoading(false);
       }
@@ -57,7 +58,7 @@ export function BlockedUsersScreen(): React.JSX.Element {
       await deleteJson<{ blocked: boolean }>(`/blocks/${id}`);
       setUsers((list) => list.filter((u) => u.id !== id));
     } catch {
-      Alert.alert('Error', 'Could not unblock. Try again in a moment.');
+      appAlert('Error', 'Could not unblock. Try again in a moment.');
     } finally {
       setPendingIds((s) => {
         const next = new Set(s);

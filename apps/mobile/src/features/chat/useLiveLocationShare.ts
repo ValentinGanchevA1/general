@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Linking, Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import Geolocation from '@react-native-community/geolocation';
 
 import type {
@@ -189,7 +191,7 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
       try {
         const location = await getCurrentLocation();
         if (!location) {
-          Alert.alert(
+          appAlert(
             'Location unavailable',
             'Allow location access to share your live location.',
           );
@@ -198,7 +200,7 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
         latestCoordsRef.current = location;
         const result = await locationShareStart(conversationId, duration, location);
         if (!result) {
-          Alert.alert('Could not share location', 'Check your connection and try again.');
+          appAlert('Could not share location', 'Check your connection and try again.');
           return;
         }
         // Server assigns session id — apply as soon as ack arrives (socket may also fan-out).
@@ -222,11 +224,11 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
       const ok = await locationShareStop(snapshot.id);
       if (!ok) {
         setSession(snapshot);
-        Alert.alert('Could not stop sharing', 'Try again in a moment.');
+        appAlert('Could not stop sharing', 'Try again in a moment.');
       }
     } catch {
       setSession(snapshot);
-      Alert.alert('Could not stop sharing', 'Try again in a moment.');
+      appAlert('Could not stop sharing', 'Try again in a moment.');
     } finally {
       setStopping(false);
     }

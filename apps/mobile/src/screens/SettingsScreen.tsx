@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -11,6 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -55,7 +56,7 @@ export function SettingsScreen(): React.JSX.Element {
         updateProfile({ visibility: isVisible ? 'private' : 'public' }),
       );
       if (updateProfile.rejected.match(result)) {
-        Alert.alert('Could not update', (result.payload as string) || 'Try again.');
+        appAlert('Could not update', (result.payload as string) || 'Try again.');
       }
     } finally {
       setToggling(false);
@@ -70,7 +71,7 @@ export function SettingsScreen(): React.JSX.Element {
         updateProfile({ friendsSeeOnlineStatus: !friendsSeeOnline }),
       );
       if (updateProfile.rejected.match(result)) {
-        Alert.alert('Could not update', (result.payload as string) || 'Try again.');
+        appAlert('Could not update', (result.payload as string) || 'Try again.');
       }
     } finally {
       setTogglingOnline(false);
