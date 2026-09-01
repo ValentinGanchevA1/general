@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { getDataSourceToken } from '@nestjs/typeorm';
 
@@ -11,6 +12,7 @@ jest.mock('@g88/shared', () => {
     XP_DAILY_CAP: { 'alert.posted': 2 }, // only alert.posted is capped
     levelForXp: jest.fn(() => 1),
     summaryForXp: jest.fn((total: number) => ({ totalXp: total, level: 1 })),
+    xpForLevel: jest.fn((level: number) => 50 * (Math.max(1, level) - 1) ** 2),
   };
 });
 
@@ -19,13 +21,21 @@ import { GamificationService } from './gamification.service';
 describe('GamificationService', () => {
   let service: GamificationService;
   let query: jest.Mock;
+  let emitLevelUp: jest.Mock;
 
   beforeEach(async () => {
     query = jest.fn().mockResolvedValue([]);
+    emitLevelUp = jest.fn().mockResolvedValue(undefined);
     const mod = await Test.createTestingModule({
       providers: [
         GamificationService,
         { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
+        {
+          provide: ModuleRef,
+          useValue: {
+            get: () => ({ emitLevelUp }),
+          },
+        },
       ],
     }).compile();
     service = mod.get(GamificationService);
@@ -41,13 +51,34 @@ describe('GamificationService', () => {
       query.mockResolvedValueOnce([]); // ON CONFLICT DO NOTHING -> no row
       await service.awardRaw('u1', 10, 'gift.received', 'dk');
       expect(query).toHaveBeenCalledTimes(1); // only the insert, no summary update
+      expect(emitLevelUp).not.toHaveBeenCalled();
     });
 
     it('bumps the denormalized summary after a fresh insert', async () => {
-      query.mockResolvedValueOnce([{ id: 'x1' }]); // inserted
+      query
+        .mockResolvedValueOnce([{ id: 'x1' }]) // inserted
+        .mockResolvedValueOnce([{ level: 1, total_xp: 0 }]) // level before
+        .mockResolvedValueOnce([{ level: 1, total_xp: 10 }]); // upsert returning
       await service.awardRaw('u1', 10, 'gift.received', 'dk');
-      expect(query).toHaveBeenCalledTimes(2);
-      expect(query.mock.calls[1]![0]).toContain('user_gamification');
+      expect(query).toHaveBeenCalledTimes(3);
+      expect(query.mock.calls[2]![0]).toContain('user_gamification');
+      expect(emitLevelUp).not.toHaveBeenCalled();
+    });
+
+    it('emits level:up when the award crosses a level boundary', async () => {
+      query
+        .mockResolvedValueOnce([{ id: 'x1' }]) // inserted
+        .mockResolvedValueOnce([{ level: 1, total_xp: 40 }]) // level before
+        .mockResolvedValueOnce([{ level: 2, total_xp: 50 }]); // upsert returning
+      await service.awardRaw('u1', 10, 'gift.received', 'dk');
+      expect(emitLevelUp).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({
+          level: 2,
+          previousLevel: 1,
+          totalXp: 50,
+        }),
+      );
     });
   });
 
@@ -62,7 +93,8 @@ describe('GamificationService', () => {
       query
         .mockResolvedValueOnce([{ n: 0 }]) // count
         .mockResolvedValueOnce([{ id: 'x1' }]) // insert xp_events
-        .mockResolvedValueOnce([]); // summary bump
+        .mockResolvedValueOnce([{ level: 1, total_xp: 0 }]) // level before
+        .mockResolvedValueOnce([{ level: 1, total_xp: 3 }]); // upsert returning
       await service.award('u1', 'alert.posted', { dedupeKey: 'a:1' });
       expect(query.mock.calls[1]![0]).toContain('INSERT INTO xp_events');
     });
