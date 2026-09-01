@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   InteractionManager,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import MapView, {
   PROVIDER_GOOGLE,
   type LongPressEvent,
@@ -365,7 +366,7 @@ export function MapScreen(): React.JSX.Element {
   const onSheetWave = useCallback(
     (toUserId: string) => {
       onWave(toUserId).catch((err: ApiError) => {
-        Alert.alert(
+        appAlert(
           err.code === 'wave.cooldown' ? 'Already waved' : 'Could not send wave',
           err.message || 'Try again in a moment.',
         );
