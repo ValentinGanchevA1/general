@@ -15,7 +15,7 @@ import { FriendsModule } from '../modules/friends/friends.module';
     AuthModule,
     ChatModule,
     NotificationsModule,
-    ChallengesModule,
+    forwardRef(() => ChallengesModule),
     // Bidirectional: FriendsNotifyService → RealtimeGateway; gateway → FriendsService (presence).
     forwardRef(() => FriendsModule),
   ],

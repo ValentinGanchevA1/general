@@ -1,11 +1,13 @@
 import {
   ForbiddenException,
   GoneException,
+  Inject,
   Logger,
   NotFoundException,
+  UseGuards,
   UsePipes,
   ValidationPipe,
-  UseGuards,
+  forwardRef,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -114,6 +116,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly chat: ChatService,
     private readonly locationShare: LocationShareService,
     private readonly notifications: NotificationsService,
+    @Inject(forwardRef(() => ChallengesService))
     private readonly challenges: ChallengesService,
     private readonly friends: FriendsService,
     private readonly jwt: JwtService,
