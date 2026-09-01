@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Animated,
   Dimensions,
   Image,
@@ -10,6 +9,8 @@ import {
   Text,
   View,
 } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import {
   BottomSheetModal,
   BottomSheetView,
@@ -246,7 +247,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
                   destructive: true,
                   onPress: () => {
                     optionsRef.current?.dismiss();
-                    Alert.alert(
+                    appAlert(
                       'Report submitted',
                       'Thanks — we will review this story.',
                     );
