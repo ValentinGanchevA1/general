@@ -23,7 +23,7 @@ import type {
   UserProfile,
   VerificationLevel,
 } from '@g88/shared';
-import { summaryForXp } from '@g88/shared';
+import { ACHIEVEMENTS, summaryForXp } from '@g88/shared';
 
 import { PresenceService } from '../presence/presence.service';
 import { MessagingService } from '../messaging/messaging.service';
@@ -310,25 +310,47 @@ export class UsersService {
   }
 
   private async loadPublicStatus(userId: string): Promise<PublicUserStatus | undefined> {
-    const rows = await this.db.query<
-      Array<{ total_xp: number; current_streak: number; longest_streak: number }>
-    >(
-      `SELECT total_xp, current_streak, longest_streak
-         FROM user_gamification
-        WHERE user_id = $1
-        LIMIT 1`,
-      [userId],
-    );
+    const [rows, rankRows, unlockRows] = await Promise.all([
+      this.db.query<
+        Array<{ total_xp: number; current_streak: number; longest_streak: number }>
+      >(
+        `SELECT total_xp, current_streak, longest_streak
+           FROM user_gamification
+          WHERE user_id = $1
+          LIMIT 1`,
+        [userId],
+      ),
+      this.db.query<Array<{ rank: number }>>(
+        `WITH ranked AS (
+            SELECT user_id,
+                   RANK() OVER (ORDER BY total_xp DESC)::int AS rank
+              FROM user_gamification
+             WHERE total_xp > 0)
+          SELECT rank FROM ranked WHERE user_id = $1`,
+        [userId],
+      ),
+      this.db.query<Array<{ achievement_id: string }>>(
+        `SELECT achievement_id FROM user_achievements WHERE user_id = $1`,
+        [userId],
+      ),
+    ]);
+
     const row = rows[0];
-    if (!row) {
-      return { level: 1, xpIntoLevel: 0, xpForNextLevel: 50, currentStreak: 0 };
-    }
-    const summary = summaryForXp(row.total_xp, row.current_streak, row.longest_streak);
+    const summary = row
+      ? summaryForXp(row.total_xp, row.current_streak, row.longest_streak)
+      : { level: 1, xpIntoLevel: 0, xpForNextLevel: 50, currentStreak: 0 };
+
+    const allTimeRank = rankRows[0]?.rank ?? null;
+    const unlocked = new Set(unlockRows.map((r) => r.achievement_id));
+    const achievementIcons = ACHIEVEMENTS.filter((a) => unlocked.has(a.id)).map((a) => a.icon);
+
     return {
       level: summary.level,
       xpIntoLevel: summary.xpIntoLevel,
       xpForNextLevel: summary.xpForNextLevel,
       currentStreak: summary.currentStreak,
+      allTimeRank,
+      achievementIcons,
     };
   }
 
