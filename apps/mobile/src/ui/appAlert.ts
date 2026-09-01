@@ -50,11 +50,12 @@ export function appAlert(
       ? buttons
       : [{ text: 'OK', style: 'default' }];
 
+  // exactOptionalPropertyTypes: omit keys when undefined (do not assign undefined).
   const req: AppAlertRequest = {
     title,
-    message,
     buttons: resolved,
-    options,
+    ...(message !== undefined ? { message } : {}),
+    ...(options !== undefined ? { options } : {}),
   };
 
   if (listener) {

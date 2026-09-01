@@ -31,9 +31,10 @@ export function AppAlertHost(): React.JSX.Element | null {
 
   const onButton = useCallback((btn: AppAlertButton) => {
     setReq(null);
-    queueMicrotask(() => {
+    // Defer past modal unmount (RN has no reliable queueMicrotask in all targets).
+    setTimeout(() => {
       btn.onPress?.();
-    });
+    }, 0);
   }, []);
 
   const cancelable = req?.options?.cancelable !== false;
