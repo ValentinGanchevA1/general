@@ -20,14 +20,9 @@ import type {
 } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { deleteJson, getJson, postJson } from '@/api/client';
-import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { Avatar } from '@/components/Avatar';
 import { colors, spacing } from '@/theme';
-
-function labelFor(value: string): string {
-  return GOAL_OPTIONS.find((o) => o.value === value)?.label ?? value;
-}
 
 const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
 const LADDER_BADGES: Array<{ level: VerificationLevel; label: string }> = [
@@ -85,13 +80,14 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   const meta = point.meta;
   const displayName = meta.displayName?.trim() || 'User';
   const canMessage = profile?.relationship?.canMessage ?? 'none';
-  const sharedInterests = profile?.relationship?.sharedInterests ?? [];
-  const goalChips =
-    (profile?.goals?.length ? profile.goals : sharedInterests).slice(0, 6);
   const blocked = profile?.blockedByViewer ?? false;
   const status = profile?.status;
   const trustScore = profile?.verificationScore;
   const badges = profile ? earnedBadges(profile.verification) : [];
+  const achievementIcons = status?.achievementIcons ?? [];
+  const allTimeRank = status?.allTimeRank ?? null;
+  const hasStats =
+    status != null || allTimeRank != null || achievementIcons.length > 0;
 
   const onBlockToggle = (): void => {
     if (blocking) return;
@@ -215,58 +211,38 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         </View>
       ) : null}
 
+      {/* Stats: level + all-time rank + achievement icons — under Trust, above Bio */}
+      {!fetching && profile != null && hasStats ? (
+        <View style={styles.statsBlock}>
+          <Text style={styles.statsLabel}>Stats</Text>
+          <View style={styles.statsRow}>
+            {status ? (
+              <View style={styles.statPill}>
+                <Text style={styles.statPillValue}>Lv {status.level}</Text>
+              </View>
+            ) : null}
+            {allTimeRank != null ? (
+              <View style={styles.statPill}>
+                <Text style={styles.statPillValue}>#{allTimeRank}</Text>
+              </View>
+            ) : null}
+            {achievementIcons.length > 0 ? (
+              <View style={styles.achievementIcons}>
+                {achievementIcons.slice(0, 6).map((icon, i) => (
+                  <Text key={`${icon}-${i}`} style={styles.achievementIcon}>
+                    {icon}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+
       {profile?.bio ? (
         <Text style={styles.bio} numberOfLines={3}>
           {profile.bio}
         </Text>
-      ) : null}
-
-      {goalChips.length > 0 ? (
-        <View style={styles.goalsRow}>
-          {goalChips.map((g) => (
-            <View key={g} style={styles.goalChip}>
-              <Text style={styles.goalIcon}>✓</Text>
-              <Text style={styles.goalLabel}>{labelFor(g)}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-
-      {/* Level (number + bar only) + badges under goals */}
-      {status || badges.length > 0 ? (
-        <View style={styles.statusBlock}>
-          {status ? (
-            <>
-              <Text style={styles.statusLevel}>Level {status.level}</Text>
-              <View style={styles.xpTrack}>
-                <View
-                  style={[
-                    styles.xpFill,
-                    {
-                      width: `${Math.min(
-                        100,
-                        Math.round(
-                          (status.xpIntoLevel / Math.max(1, status.xpForNextLevel)) * 100,
-                        ),
-                      )}%`,
-                    },
-                  ]}
-                />
-              </View>
-            </>
-          ) : null}
-          {badges.length > 0 ? (
-            <View style={styles.badgesRow}>
-              {badges.map((b) => (
-                <View key={b} style={[styles.badgeChip, b === 'ID' && styles.trustChipStrong]}>
-                  <Text style={b === 'ID' ? styles.trustChipStrongText : styles.badgeChipText}>
-                    {b}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </View>
       ) : null}
 
       <View style={styles.actions}>
@@ -377,45 +353,29 @@ const styles = StyleSheet.create({
   trustChipStrongText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   trustEmpty: { color: colors.textFaint, fontSize: 12 },
   bio: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
-  goalsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  goalChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: colors.bg,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
+  statsBlock: { gap: 6 },
+  statsLabel: {
+    color: colors.textFaint,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
-  goalIcon: { fontSize: 13 },
-  goalLabel: { color: colors.textSecondary, fontSize: 12 },
-  statusBlock: {
-    backgroundColor: colors.bg,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  statsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 8,
   },
-  statusLevel: { color: colors.textPrimary, fontWeight: '700', fontSize: 14 },
-  xpTrack: {
-    height: 6,
-    backgroundColor: colors.borderStrong,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  xpFill: {
-    height: '100%',
-    backgroundColor: colors.primary,
-    borderRadius: 3,
-  },
-  badgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
-  badgeChip: {
-    backgroundColor: colors.surface,
+  statPill: {
+    backgroundColor: colors.bg,
     borderRadius: 12,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
   },
-  badgeChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
+  statPillValue: { color: colors.textPrimary, fontSize: 13, fontWeight: '700' },
+  achievementIcons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  achievementIcon: { fontSize: 16 },
   actions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   blockLink: { alignSelf: 'center', paddingVertical: 4 },
   blockLinkText: { color: colors.danger, fontSize: 13, fontWeight: '600' },

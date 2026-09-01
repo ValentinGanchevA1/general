@@ -204,6 +204,16 @@ export interface PublicUserStatus {
   xpIntoLevel: number;
   xpForNextLevel: number;
   currentStreak: number;
+  /**
+   * All-time leaderboard rank (1-based) when the user has total XP > 0.
+   * null when unranked.
+   */
+  allTimeRank?: number | null;
+  /**
+   * Unlocked achievement icons (emoji from the catalog) for compact public display.
+   * Ordered by catalog definition order; empty when none unlocked.
+   */
+  achievementIcons?: string[];
 }
 
 /** Public-facing profile returned by GET /users/:id */
