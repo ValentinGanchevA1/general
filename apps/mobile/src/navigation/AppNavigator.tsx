@@ -54,7 +54,7 @@ import {
   setupNotificationHandlers,
 } from '@/lib/pushNotifications';
 import { pingGamification } from '@/features/gamification/useGamification';
-import { AchievementToastHost } from '@/components/AchievementToast';
+import { AmbientToastHost } from '@/components/AmbientToastHost';
 import { navigationRef } from './navigationRef';
 import { openViaRef } from './openRootScreen';
 import { takePendingPhoneVerify } from '@/services/pendingPhone';
@@ -269,10 +269,6 @@ export function AppNavigator(): React.JSX.Element {
     };
   }, [user, restoring]);
 
-  // Loading screen while we check for a stored session. Gated on `restoring`
-  // (not the shared auth `loading`) so an in-progress login/register never
-  // unmounts the AuthScreen. Spinner so a slow/offline /auth/me reads as
-  // "loading" rather than a frozen black screen.
   if (restoring && user === null) {
     return (
       <View
@@ -290,7 +286,6 @@ export function AppNavigator(): React.JSX.Element {
 
   return (
     <NavigationContainer ref={navigationRef}>
-      {/* Provider inside NavigationContainer so BottomSheetModal portals keep nav context */}
       <BottomSheetModalProvider>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {user ? (
@@ -349,7 +344,7 @@ export function AppNavigator(): React.JSX.Element {
             <Stack.Screen name="Auth" component={AuthScreen} />
           )}
         </Stack.Navigator>
-        {user ? <AchievementToastHost /> : null}
+        {user ? <AmbientToastHost /> : null}
       </BottomSheetModalProvider>
     </NavigationContainer>
   );

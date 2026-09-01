@@ -1,5 +1,4 @@
 import { Test } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
 import { getDataSourceToken } from '@nestjs/typeorm';
 
 const CHALLENGE = { id: 'c1', metric: 'wave_sent', target: 2, rewardXp: 20, title: 'Wave twice' };
@@ -11,49 +10,63 @@ jest.mock('@g88/shared', () => {
 
 import { ChallengesService } from './challenges.service';
 import { GamificationService } from '../gamification/gamification.service';
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
 
 describe('ChallengesService', () => {
   let service: ChallengesService;
   let query: jest.Mock;
   let awardRaw: jest.Mock;
+  let emitChallengeCompleted: jest.Mock;
 
   beforeEach(async () => {
-    query = jest.fn().mockResolvedValue([]);
+    query = jest.fn();
     awardRaw = jest.fn().mockResolvedValue(undefined);
-    const mod = await Test.createTestingModule({
+    emitChallengeCompleted = jest.fn().mockResolvedValue(undefined);
+    const module = await Test.createTestingModule({
       providers: [
         ChallengesService,
-        { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
+        { provide: getDataSourceToken(), useValue: { query } },
         { provide: GamificationService, useValue: { awardRaw } },
+        { provide: RealtimeGateway, useValue: { emitChallengeCompleted } },
       ],
     }).compile();
-    service = mod.get(ChallengesService);
+    service = module.get(ChallengesService);
   });
 
   describe('increment', () => {
-    it('does nothing for a metric no active challenge tracks', async () => {
-      await service.increment('u1', 'match_made'); // CHALLENGE tracks wave_sent
-      expect(query).not.toHaveBeenCalled();
-    });
-
-    it('advances progress but does not reward below target', async () => {
-      query.mockResolvedValueOnce([{ progress: 1, was_completed: false }]); // upsert
+    it('no-ops when the metric has no active challenges today', async () => {
+      const { dailyChallenges } = jest.requireMock('@g88/shared') as {
+        dailyChallenges: jest.Mock;
+      };
+      dailyChallenges.mockReturnValueOnce([]);
       await service.increment('u1', 'wave_sent');
+      expect(query).not.toHaveBeenCalled();
       expect(awardRaw).not.toHaveBeenCalled();
     });
 
-    it('stamps completion and rewards once when target is crossed', async () => {
+    it('awards XP and emits challenge:completed on first crossing', async () => {
       query
-        .mockResolvedValueOnce([{ progress: 2, was_completed: false }]) // upsert -> at target
-        .mockResolvedValueOnce([{ id: 'c1' }]); // UPDATE completed_at won the race
+        .mockResolvedValueOnce([{ progress: 2, was_completed: false }])
+        .mockResolvedValueOnce([{ id: 'c1' }]);
       await service.increment('u1', 'wave_sent');
-      expect(awardRaw).toHaveBeenCalledWith('u1', 20, 'challenge.completed', expect.stringContaining('challenge:c1:'));
+      expect(awardRaw).toHaveBeenCalledWith(
+        'u1',
+        20,
+        'challenge.completed',
+        expect.stringContaining('challenge:c1:'),
+      );
+      expect(emitChallengeCompleted).toHaveBeenCalledWith('u1', {
+        challengeId: 'c1',
+        title: 'Wave twice',
+        rewardXp: 20,
+      });
     });
 
     it('does not reward a challenge already completed', async () => {
       query.mockResolvedValueOnce([{ progress: 5, was_completed: true }]);
       await service.increment('u1', 'wave_sent');
       expect(awardRaw).not.toHaveBeenCalled();
+      expect(emitChallengeCompleted).not.toHaveBeenCalled();
     });
   });
 

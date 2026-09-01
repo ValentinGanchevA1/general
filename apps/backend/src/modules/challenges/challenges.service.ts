@@ -9,6 +9,7 @@ import {
 } from '@g88/shared';
 
 import { GamificationService } from '../gamification/gamification.service';
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -21,6 +22,7 @@ export class ChallengesService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly gamification: GamificationService,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   /**
@@ -62,6 +64,17 @@ export class ChallengesService {
           await this.gamification
             .awardRaw(userId, c.rewardXp, 'challenge.completed', `challenge:${c.id}:${day}`)
             .catch((err) => this.logger.error(`challenge reward failed: ${err}`));
+
+          // Live toast for the completing client (fire-and-forget).
+          void this.realtime
+            .emitChallengeCompleted(userId, {
+              challengeId: c.id,
+              title: c.title,
+              rewardXp: c.rewardXp,
+            })
+            .catch((err: unknown) =>
+              this.logger.error(`challenge:completed emit failed: ${err}`),
+            );
         }
       }
     }

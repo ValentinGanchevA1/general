@@ -30,6 +30,9 @@ import type {
   ChatMessageEvent,
   GiftReceivedEvent,
   AchievementUnlockedEvent,
+  LevelUpEvent,
+  ChallengeCompletedEvent,
+  LeaderboardRankUpEvent,
   EventPollDelta,
   EventQuestionDelta,
   EventQuestionUpvoteDelta,
@@ -443,6 +446,18 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   async emitAchievementUnlocked(toUserId: string, evt: AchievementUnlockedEvent): Promise<void> {
     this.server.to(this.userRoom(toUserId)).emit('achievement:unlocked', evt);
+  }
+
+  async emitLevelUp(toUserId: string, evt: LevelUpEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('level:up', evt);
+  }
+
+  async emitChallengeCompleted(toUserId: string, evt: ChallengeCompletedEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('challenge:completed', evt);
+  }
+
+  async emitLeaderboardRankUp(toUserId: string, evt: LeaderboardRankUpEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('leaderboard:rank_up', evt);
   }
 
   emitEventPoll(delta: EventPollDelta): void {

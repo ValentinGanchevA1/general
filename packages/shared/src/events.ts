@@ -103,6 +103,35 @@ export interface AchievementUnlockedEvent {
   unlockedAt: string;
 }
 
+/** User crossed an XP level threshold. */
+export interface LevelUpEvent {
+  level: number;
+  previousLevel: number;
+  totalXp: number;
+  xpIntoLevel: number;
+  xpForNextLevel: number;
+}
+
+/** Daily challenge crossed its target for the first time today. */
+export interface ChallengeCompletedEvent {
+  challengeId: string;
+  title: string;
+  rewardXp: number;
+  /** Optional emoji; client falls back to ✅. */
+  icon?: string;
+}
+
+/**
+ * Caller improved rank on a leaderboard scope.
+ * Emitted client-side today (compare previous fetch); server emit reserved.
+ */
+export interface LeaderboardRankUpEvent {
+  scope: 'weekly' | 'all_time';
+  previousRank: number;
+  rank: number;
+  xp: number;
+}
+
 // ─── Live location share ───────────────────────────────────────────────────
 
 export interface LocationShareStartedEvent {
@@ -152,6 +181,10 @@ export interface ServerToClientEvents {
   'conversation:opened': (e: ConversationOpenedEvent) => void;
   'gift:received': (e: GiftReceivedEvent) => void;
   'achievement:unlocked': (e: AchievementUnlockedEvent) => void;
+  'level:up': (e: LevelUpEvent) => void;
+  'challenge:completed': (e: ChallengeCompletedEvent) => void;
+  /** Reserved for server-side rank emit; mobile also synthesizes locally. */
+  'leaderboard:rank_up': (e: LeaderboardRankUpEvent) => void;
   'location:share:started': (e: LocationShareStartedEvent) => void;
   'location:share:update': (e: LocationShareUpdateEvent) => void;
   'location:share:ended': (e: LocationShareEndedEvent) => void;
