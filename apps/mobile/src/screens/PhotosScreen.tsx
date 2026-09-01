@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Image,
   ScrollView,
@@ -10,6 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -88,7 +89,7 @@ export function PhotosScreen(): React.JSX.Element {
         },
         { text: 'Cancel', style: 'cancel' as const },
       ];
-      Alert.alert('Photo', isPrimary ? 'This is your main photo' : undefined, options);
+      appAlert('Photo', isPrimary ? 'This is your main photo' : undefined, options);
     },
     [photos],
   );
