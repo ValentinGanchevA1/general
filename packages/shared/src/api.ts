@@ -167,6 +167,8 @@ export interface UpdateProfileRequest {
   showHometown?: boolean;
   /** When false, close friends cannot see you as online. Default true. */
   friendsSeeOnlineStatus?: boolean;
+  /** Full-bleed cover/background URL; null clears. Independent of avatar. */
+  coverUrl?: string | null;
 }
 
 export type IdVerificationStatus = 'none' | 'pending' | 'verified' | 'rejected';
@@ -189,6 +191,8 @@ export interface UserProfile extends AuthenticatedUser {
   /** Close friends may see online status when true. */
   friendsSeeOnlineStatus: boolean;
   photoUrls: string[];
+  /** Full-bleed cover/background; independent of avatarUrl / gallery primary. */
+  coverUrl: string | null;
   subscriptionTier: SubscriptionTier;
   socialLinks: SocialLink[];
   verificationScore: number;
@@ -222,6 +226,8 @@ export interface PublicUserProfile {
   displayName: string;
   bio: string | null;
   avatarUrl: string | null;
+  /** Full-bleed cover/background when set. Independent of avatar. */
+  coverUrl: string | null;
   verification: VerificationLevel;
   verificationScore: number;
   idVerified: boolean;
@@ -295,6 +301,14 @@ export interface UploadPhotoBase64Request {
 
 export interface ReorderPhotosRequest {
   photoIds: string[];
+}
+
+/** Set or clear the profile cover (background) photo. */
+export interface SetCoverRequest {
+  /** Gallery photo id to use as cover. */
+  photoId?: string;
+  /** When true, clears cover_url. */
+  clear?: boolean;
 }
 
 export interface DeleteAccountRequest {

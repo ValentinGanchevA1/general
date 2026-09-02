@@ -29,24 +29,14 @@ export async function setPrimary(photoId: string, all: UserPhoto[]): Promise<Use
 }
 
 /**
- * Full add flow: pick from the library → POST the image as base64 JSON → backend
- * decodes and writes to S3.
- *
- * Why base64-over-JSON and not multipart: React Native's multipart file upload
- * sends the file as a one-shot stream body. Dev-mode network inspectors (and some
- * OkHttp interceptors) read that stream to log it, which closes it before OkHttp
- * can transmit — the request then fails instantly with "Stream Closed" / status 0.
- * A JSON body is a re-readable buffer, so it sends reliably in both debug and
- * release builds. The previous presigned-PUT and multipart-proxy flows both hit
- * this same wall.
- *
+ * Pick from library and upload via base64 (same RN-safe path as listings).
  * Returns the updated gallery, or null if the user cancelled the picker.
  */
 export async function pickAndUploadPhoto(): Promise<UserPhoto[] | null> {
   const result = await launchImageLibrary({
     mediaType: 'photo',
     selectionLimit: 1,
-    quality: 0.8,
+    quality: 0.85,
     includeBase64: true,
   });
   if (result.didCancel) return null;
@@ -75,4 +65,14 @@ function normalizeContentType(asset: Asset): string {
   if (name.endsWith('.webp')) return 'image/webp';
   if (name.endsWith('.heic')) return 'image/heic';
   return 'image/jpeg';
+}
+
+/** Set gallery photo as profile cover (background). Does not change main/avatar order. */
+export async function setCover(photoId: string): Promise<void> {
+  await patchJson<{ photoId: string }, unknown>('/users/me/cover', { photoId });
+}
+
+/** Clear profile cover background. */
+export async function clearCover(): Promise<void> {
+  await patchJson<{ clear: true }, unknown>('/users/me/cover', { clear: true });
 }

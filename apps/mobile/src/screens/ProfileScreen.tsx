@@ -118,6 +118,7 @@ export function ProfileScreen(): React.JSX.Element {
     p,
     photos,
     mainPhoto,
+    coverUrl,
     interests,
     goals,
     verificationScore,
@@ -137,6 +138,7 @@ export function ProfileScreen(): React.JSX.Element {
       >
         <ProfileHeaderPhoto
           photoUrl={mainPhoto ?? null}
+          coverUrl={coverUrl}
           displayName={displayName}
           verificationPercent={verificationScore}
           isVisibleOnMap={mapVisible}

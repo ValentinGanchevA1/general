@@ -94,7 +94,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
   const blocked = profile?.blockedByViewer ?? false;
   const canMessage = profile?.relationship?.canMessage ?? 'none';
   const photoUrls = profile?.photoUrls ?? [];
-  const coverUri = photoUrls[0] ?? profile?.avatarUrl ?? null;
+  const coverUri = profile?.coverUrl ?? photoUrls[0] ?? profile?.avatarUrl ?? null;
 
   const loadRelationship = useCallback(async (): Promise<boolean> => {
     try {

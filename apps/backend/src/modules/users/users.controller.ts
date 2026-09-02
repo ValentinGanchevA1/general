@@ -33,6 +33,7 @@ import type {
   DeleteAccountRequest,
   ReorderPhotosRequest,
   UpdateProfileRequest,
+  SetCoverRequest,
   UploadPhotoBase64Request,
   UserPhoto,
   UserProfile,
@@ -47,6 +48,7 @@ class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @IsString() displayName?: string;
   @IsOptional() @IsString() bio?: string;
   @IsOptional() @IsString() avatarUrl?: string;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() coverUrl?: string | null;
   @IsOptional() @IsIn(['public', 'private']) visibility?: 'public' | 'private';
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) goals?: string[];
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) interests?: string[];
@@ -91,6 +93,11 @@ class ReorderPhotosDto implements ReorderPhotosRequest {
   @ArrayMinSize(1)
   @IsUUID('4', { each: true })
   photoIds!: string[];
+}
+
+class SetCoverDto implements SetCoverRequest {
+  @IsOptional() @IsUUID() photoId?: string | null;
+  @IsOptional() @IsBoolean() clear?: boolean;
 }
 
 class DeleteAccountDto implements DeleteAccountRequest {
@@ -188,6 +195,17 @@ export class UsersController {
     @Body() dto: AddPhotoDto,
   ): Promise<UserPhoto[]> {
     return this.users.addPhoto(userId, dto.url);
+  }
+
+  @Patch('me/cover')
+  async setCover(
+    @CurrentUser('id') userId: string,
+    @Body() dto: SetCoverDto,
+  ): Promise<UserProfile> {
+    return this.users.setCover(userId, {
+      photoId: dto.photoId,
+      clear: dto.clear,
+    });
   }
 
   @Patch('me/photos/order')
