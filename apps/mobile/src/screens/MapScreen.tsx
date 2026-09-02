@@ -79,7 +79,7 @@ type PendingFocus = {
   avatarUrl?: string | null;
   verification?: import('@g88/shared').VerificationLevel;
   online?: boolean;
-  lastSeenAt?: string;
+  lastSeenAt?: string | null;
 };
 
 export function MapScreen(): React.JSX.Element {
@@ -212,7 +212,7 @@ export function MapScreen(): React.JSX.Element {
           avatarUrl: seed?.avatarUrl ?? null,
           verification: seed?.verification ?? 'none',
           online: seed?.online ?? false,
-          lastSeenAt: seed?.lastSeenAt ?? new Date().toISOString(),
+          lastSeenAt: seed?.lastSeenAt ?? null,
         },
       };
     },
