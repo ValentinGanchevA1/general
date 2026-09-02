@@ -63,6 +63,7 @@ export function useProfileScreenData() {
       p: profile,
       photos,
       mainPhoto: photos[activePhotoIndex] ?? profile.avatarUrl,
+      coverUrl: profile.coverUrl ?? null,
       interests: profile.interests ?? [],
       goals: profile.goals ?? [],
       socialLinks: profile.socialLinks ?? [],
