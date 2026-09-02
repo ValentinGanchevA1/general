@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { appAlert } from '@/ui/appAlert';
 import {
@@ -76,6 +77,7 @@ function formatDistanceAway(meters: number): string {
 
 export function UserProfileScreen({ route, navigation }: Props): React.JSX.Element {
   const { userId } = route.params;
+  const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [rel, setRel] = useState<RelationshipSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -449,23 +451,10 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 
   return (
     <View style={styles.root}>
-      <View style={styles.topBar}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>‹ Back</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuBtn}
-          onPress={openMenu}
-          disabled={blocking}
-          accessibilityLabel="Profile options"
-        >
-          <Text style={styles.menuBtnText}>···</Text>
-        </TouchableOpacity>
-      </View>
-
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.heroBlock}>
-          <View style={styles.cover}>
+          {/* Cover extends under status bar — no empty strip above chrome */}
+          <View style={[styles.cover, { height: COVER_BODY + insets.top }]}>
             {coverUri ? (
               <Image source={{ uri: coverUri }} style={styles.coverImage} />
             ) : (
@@ -616,9 +605,30 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
           <ActionSheetList title={profile.displayName} items={menuItems} />
         </BottomSheetView>
       </BottomSheetModal>
+
+      {/* Floating chrome over edge-to-edge cover (no opaque status-bar strip) */}
+      <View
+        style={[styles.topBar, { paddingTop: insets.top + 4 }]}
+        pointerEvents="box-none"
+      >
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backBtnText}>‹ Back</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.menuBtn}
+          onPress={openMenu}
+          disabled={blocking}
+          accessibilityLabel="Profile options"
+        >
+          <Text style={styles.menuBtnText}>···</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
+
+/** Visible cover body below status bar (total cover = COVER_BODY + insets.top). */
+const COVER_BODY = 148;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
@@ -629,22 +639,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   topBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 52,
     paddingHorizontal: 12,
-    paddingBottom: 4,
-    zIndex: 2,
+    paddingBottom: 8,
+    zIndex: 10,
   },
   backBtn: { padding: 8 },
-  backBtnText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
+  backBtnText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
   menuBtn: { padding: 8 },
-  menuBtnText: { color: colors.textMuted, fontSize: 22, letterSpacing: 2 },
+  menuBtnText: {
+    color: colors.textPrimary,
+    fontSize: 22,
+    letterSpacing: 2,
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
   scroll: { paddingBottom: 24, gap: 22 },
   heroBlock: { marginBottom: 4 },
   cover: {
-    height: 140,
+    // height set inline: COVER_BODY + insets.top (edge-to-edge under status bar)
     backgroundColor: colors.surfaceRaised,
     overflow: 'hidden',
   },
@@ -652,7 +679,7 @@ const styles = StyleSheet.create({
   coverPlaceholder: { flex: 1, backgroundColor: colors.surfaceAlt },
   coverScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10,10,15,0.35)',
+    backgroundColor: 'rgba(10,10,15,0.28)',
   },
   avatarWrap: {
     alignItems: 'center',
