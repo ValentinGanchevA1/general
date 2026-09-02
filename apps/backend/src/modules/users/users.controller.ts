@@ -96,7 +96,7 @@ class ReorderPhotosDto implements ReorderPhotosRequest {
 }
 
 class SetCoverDto implements SetCoverRequest {
-  @IsOptional() @IsUUID() photoId?: string | null;
+  @IsOptional() @IsUUID() photoId?: string;
   @IsOptional() @IsBoolean() clear?: boolean;
 }
 
