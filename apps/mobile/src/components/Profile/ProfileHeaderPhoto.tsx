@@ -29,6 +29,8 @@ interface ProfileHeaderPhotoProps {
   onPressPhoto?: () => void;
   onPressVerificationBadge?: () => void;
   onPressSettings?: () => void;
+  /** Shown when the screen was pushed onto a stack (not tab root). */
+  onPressBack?: () => void;
   onSelectPhoto?: (index: number) => void;
   /** Opens map visibility sheet (How others see you). */
   onPressVisibility?: () => void;
@@ -48,6 +50,7 @@ export function ProfileHeaderPhoto({
   onPressPhoto,
   onPressVerificationBadge,
   onPressSettings,
+  onPressBack,
   onSelectPhoto,
   onPressVisibility,
 }: ProfileHeaderPhotoProps): React.JSX.Element {
@@ -71,20 +74,31 @@ export function ProfileHeaderPhoto({
         </View>
       )}
 
-      {/* Top chrome */}
+      {/* Top chrome — back (stack) or tier; settings always when provided */}
       <View style={[styles.topChrome, { top: insets.top + 6 }]} pointerEvents="box-none">
-        {isPaid && tierLabel ? (
-          <View style={styles.tierBadge}>
-            <Icon name="crown" size={13} color="#000" />
-            <Text style={styles.tierBadgeText}>{tierLabel}</Text>
-          </View>
-        ) : (
-          <View />
-        )}
+        <View style={styles.topLeft} pointerEvents="box-none">
+          {onPressBack ? (
+            <Pressable
+              onPress={onPressBack}
+              style={styles.chromeBtn}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+            >
+              <Icon name="arrow-left" size={22} color={colors.textPrimary} />
+            </Pressable>
+          ) : null}
+          {isPaid && tierLabel ? (
+            <View style={styles.tierBadge}>
+              <Icon name="crown" size={13} color="#000" />
+              <Text style={styles.tierBadgeText}>{tierLabel}</Text>
+            </View>
+          ) : null}
+        </View>
         {onPressSettings ? (
           <Pressable
             onPress={onPressSettings}
-            style={styles.settingsBtn}
+            style={styles.chromeBtn}
             hitSlop={10}
             accessibilityRole="button"
             accessibilityLabel="Settings"
@@ -182,7 +196,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  settingsBtn: {
+  topLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  chromeBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,

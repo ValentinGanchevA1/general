@@ -19,7 +19,11 @@ import {
 import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline';
 import { ProfileHeaderPhoto } from '@/components/Profile/ProfileHeaderPhoto';
 import { MapPresenceCard } from '@/components/Profile/MapPresenceCard';
-import { TrustStrip } from '@/components/Profile/TrustStrip';
+import {
+  VerificationStatusSheet,
+  buildVerificationItems,
+  type VerificationItemId,
+} from '@/components/Profile/VerificationStatusSheet';
 import { ProfileBio } from '@/components/Profile/ProfileBio';
 import { ProfileFriendsCard } from '@/components/Profile/ProfileFriendsCard';
 import { ProfileActivityLinks } from '@/components/Profile/ProfileActivityLinks';
@@ -36,15 +40,17 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 /**
  * Self profile — public-facing identity + activity.
- * Order: Hero → Bio → Trust → Tags → Activity → Friends → Storyline → Photos → Premium.
- * Account controls live in Settings (header cog).
+ * Order: Hero → Bio → Tags → Activity → Friends → Storyline → Photos → Premium.
+ * Trust details open from the % badge (bottom sheet). Account controls in Settings.
  */
 export function ProfileScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const { on } = useSocket();
   const pendingCount = useAppSelector((s) => s.friends.pendingCount);
   const mapPresenceRef = useRef<BottomSheetModal>(null);
-  const snapPoints = useMemo(() => ['34%'], []);
+  const verificationRef = useRef<BottomSheetModal>(null);
+  const mapSnapPoints = useMemo(() => ['34%'], []);
+  const verificationSnapPoints = useMemo(() => ['42%'], []);
 
   const {
     loading,
@@ -56,7 +62,6 @@ export function ProfileScreen(): React.JSX.Element {
     gamification,
     challenges,
     spendableXp,
-    trustChips,
     mapVisible,
     derived,
     onRefresh,
@@ -89,6 +94,14 @@ export function ProfileScreen(): React.JSX.Element {
     mapPresenceRef.current?.dismiss();
   }, []);
 
+  const openVerification = useCallback(() => {
+    verificationRef.current?.present();
+  }, []);
+
+  const closeVerification = useCallback(() => {
+    verificationRef.current?.dismiss();
+  }, []);
+
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
       <BottomSheetBackdrop
@@ -101,6 +114,37 @@ export function ProfileScreen(): React.JSX.Element {
     ),
     [],
   );
+
+  const handleVerificationItem = useCallback(
+    (id: VerificationItemId) => {
+      closeVerification();
+      if (id === 'email') {
+        openRootScreen(navigation, 'EmailVerification');
+        return;
+      }
+      if (id === 'phone') {
+        openRootScreen(navigation, 'Verification', {
+          initialPhone: derived?.p.phone ?? undefined,
+        });
+        return;
+      }
+      // id
+      openRootScreen(
+        navigation,
+        derived?.p.idVerificationStatus === 'pending' ? 'VerificationId' : 'Verification',
+      );
+    },
+    [closeVerification, navigation, derived?.p.phone, derived?.p.idVerificationStatus],
+  );
+
+  const handleBack = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    // Tab root — send user to Map (primary home surface).
+    navigation.navigate('Main', { screen: 'Map' });
+  }, [navigation]);
 
   if (loading && !derived) {
     return <ProfileLoadingState />;
@@ -127,6 +171,8 @@ export function ProfileScreen(): React.JSX.Element {
     tierLabel,
   } = derived;
 
+  const verificationItems = buildVerificationItems(p);
+
   return (
     <>
       <ScrollView
@@ -148,36 +194,13 @@ export function ProfileScreen(): React.JSX.Element {
           activePhotoIndex={activePhotoIndex}
           onSelectPhoto={setActivePhotoIndex}
           onPressSettings={() => openRootScreen(navigation, 'Settings')}
-          onPressVerificationBadge={() => openRootScreen(navigation, 'Verification')}
+          onPressBack={handleBack}
+          onPressVerificationBadge={openVerification}
           onPressPhoto={() => openRootScreen(navigation, 'Photos')}
           onPressVisibility={openMapPresence}
         />
 
         {p.bio ? <ProfileBio bio={p.bio} /> : null}
-
-        <View style={styles.trustSection}>
-          <TrustStrip
-            chips={trustChips}
-            onChipPress={(id) => {
-              if (id === 'email') {
-                openRootScreen(navigation, 'EmailVerification');
-                return;
-              }
-              if (id === 'phone') {
-                openRootScreen(navigation, 'Verification', {
-                  initialPhone: p.phone ?? undefined,
-                });
-                return;
-              }
-              if (id === 'id' || id === 'percent') {
-                openRootScreen(
-                  navigation,
-                  p.idVerificationStatus === 'pending' ? 'VerificationId' : 'Verification',
-                );
-              }
-            }}
-          />
-        </View>
 
         <ProfileTagsSection interests={interests} goals={goals} />
 
@@ -217,7 +240,7 @@ export function ProfileScreen(): React.JSX.Element {
 
       <BottomSheetModal
         ref={mapPresenceRef}
-        snapPoints={snapPoints}
+        snapPoints={mapSnapPoints}
         enablePanDownToClose
         enableDynamicSizing={false}
         backdropComponent={renderBackdrop}
@@ -236,6 +259,24 @@ export function ProfileScreen(): React.JSX.Element {
           />
         </BottomSheetView>
       </BottomSheetModal>
+
+      <BottomSheetModal
+        ref={verificationRef}
+        snapPoints={verificationSnapPoints}
+        enablePanDownToClose
+        enableDynamicSizing={false}
+        backdropComponent={renderBackdrop}
+        backgroundStyle={styles.sheetBackground}
+        handleIndicatorStyle={styles.sheetHandle}
+      >
+        <BottomSheetView style={styles.sheetContent}>
+          <VerificationStatusSheet
+            score={verificationScore}
+            items={verificationItems}
+            onItemPress={handleVerificationItem}
+          />
+        </BottomSheetView>
+      </BottomSheetModal>
     </>
   );
 }
@@ -243,7 +284,6 @@ export function ProfileScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { paddingBottom: spacing.xxl },
-  trustSection: { marginTop: spacing.md },
   section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl },
   sheetBackground: {
     backgroundColor: colors.surfaceRaised,
