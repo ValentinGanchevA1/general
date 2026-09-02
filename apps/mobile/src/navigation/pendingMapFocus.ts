@@ -2,7 +2,12 @@
  * Cross-navigator handoff for "View on map".
  * Nested tab params are flaky when UserProfile (root stack) navigates to Main/Map
  * while Main is already mounted — this module carries the intent reliably.
+ *
+ * Also seeds enough UserMeta so Map can open the entity sheet without waiting
+ * for the peer to appear in the current discovery viewport.
  */
+
+import type { VerificationLevel } from '@g88/shared';
 
 export type PendingMapFocus = {
   userId: string;
@@ -10,6 +15,11 @@ export type PendingMapFocus = {
   lng?: number;
   /** Monotonic token so the same peer can be focused again. */
   token: number;
+  /** Sheet seed — used when peer is outside current discovery viewport. */
+  displayName?: string;
+  avatarUrl?: string | null;
+  verification?: VerificationLevel;
+  online?: boolean;
 };
 
 let pending: PendingMapFocus | null = null;
@@ -19,6 +29,10 @@ export function setPendingMapFocus(input: {
   userId: string;
   lat?: number;
   lng?: number;
+  displayName?: string;
+  avatarUrl?: string | null;
+  verification?: VerificationLevel;
+  online?: boolean;
 }): number {
   tokenSeq += 1;
   const hasCoords =
@@ -30,6 +44,10 @@ export function setPendingMapFocus(input: {
     userId: input.userId,
     ...(hasCoords ? { lat: input.lat as number, lng: input.lng as number } : {}),
     token: tokenSeq,
+    ...(input.displayName != null ? { displayName: input.displayName } : {}),
+    ...(input.avatarUrl !== undefined ? { avatarUrl: input.avatarUrl } : {}),
+    ...(input.verification != null ? { verification: input.verification } : {}),
+    ...(input.online != null ? { online: input.online } : {}),
   };
   return tokenSeq;
 }
