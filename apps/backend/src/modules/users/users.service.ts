@@ -34,6 +34,7 @@ interface UserRow {
   email: string;
   display_name: string;
   avatar_url: string | null;
+  cover_url: string | null;
   bio: string | null;
   verification_level: string;
   visibility: 'public' | 'private';
@@ -56,6 +57,7 @@ interface PublicUserRow {
   id: string;
   display_name: string;
   avatar_url: string | null;
+  cover_url: string | null;
   bio: string | null;
   verification_level: string;
   id_verification_status: IdVerificationStatus;
@@ -75,7 +77,7 @@ interface SocialLinkRow {
 }
 
 const USER_COLUMNS = `
-  id, email, display_name, avatar_url, bio, verification_level, visibility,
+  id, email, display_name, avatar_url, cover_url, bio, verification_level, visibility,
   goals, interests, phone, subscription_tier, id_verification_status, created_at,
   date_of_birth::text AS date_of_birth,
   hometown_city, hometown_country, show_age, show_hometown,
@@ -191,6 +193,7 @@ export class UsersService {
                 avatar_url,
                 (SELECT url FROM user_photos WHERE user_id = users.id ORDER BY position ASC LIMIT 1)
               ) AS avatar_url,
+              cover_url,
               bio, verification_level,
               id_verification_status, goals,
               date_part('year', age(date_of_birth))::int AS age,
@@ -239,6 +242,7 @@ export class UsersService {
       id: r.id,
       displayName: r.display_name,
       avatarUrl: r.avatar_url,
+      coverUrl: r.cover_url,
       bio: r.bio,
       verification: r.verification_level as PublicUserProfile['verification'],
       verificationScore: SCORE[r.verification_level as VerificationLevel] ?? 0,
@@ -370,6 +374,10 @@ export class UsersService {
       params.push(req.avatarUrl);
       setClauses.push(`avatar_url = $${params.length}`);
     }
+    if (req.coverUrl !== undefined) {
+      params.push(req.coverUrl);
+      setClauses.push(`cover_url = $${params.length}`);
+    }
     if (req.visibility !== undefined) {
       params.push(req.visibility);
       setClauses.push(`visibility = $${params.length}`);
@@ -479,13 +487,22 @@ export class UsersService {
   }
 
   async deletePhoto(userId: string, photoId: string): Promise<UserPhoto[]> {
-    const [deleted] = await this.db.query<[{ id: string }[], number]>(
-      `DELETE FROM user_photos WHERE id = $1 AND user_id = $2 RETURNING id`,
+    const existing = await this.db.query<Array<{ id: string; url: string }>>(
+      `SELECT id, url FROM user_photos WHERE id = $1 AND user_id = $2 LIMIT 1`,
       [photoId, userId],
     );
-    if (!deleted[0]) {
+    if (!existing[0]) {
       throw new NotFoundException({ code: 'photos.not_found', message: 'Photo not found' });
     }
+    await this.db.query(`DELETE FROM user_photos WHERE id = $1 AND user_id = $2`, [
+      photoId,
+      userId,
+    ]);
+    await this.db.query(
+      `UPDATE users SET cover_url = NULL, updated_at = NOW()
+         WHERE id = $1 AND cover_url IS NOT DISTINCT FROM $2`,
+      [userId, existing[0].url],
+    );
     await this.syncAvatar(userId);
     return this.listPhotos(userId);
   }
@@ -514,6 +531,38 @@ export class UsersService {
     );
     await this.syncAvatar(userId);
     return this.listPhotos(userId);
+  }
+
+  async setCover(
+    userId: string,
+    opts: { photoId?: string | null; clear?: boolean },
+  ): Promise<UserProfile> {
+    if (opts.clear) {
+      await this.db.query(
+        `UPDATE users SET cover_url = NULL, updated_at = NOW() WHERE id = $1`,
+        [userId],
+      );
+      return this.getProfile(userId);
+    }
+    const photoId = opts.photoId;
+    if (!photoId) {
+      throw new BadRequestException({
+        code: 'photos.cover_required',
+        message: 'photoId is required unless clear is true',
+      });
+    }
+    const rows = await this.db.query<Array<{ url: string }>>(
+      `SELECT url FROM user_photos WHERE id = $1 AND user_id = $2 LIMIT 1`,
+      [photoId, userId],
+    );
+    if (!rows[0]) {
+      throw new NotFoundException({ code: 'photos.not_found', message: 'Photo not found' });
+    }
+    await this.db.query(
+      `UPDATE users SET cover_url = $2, updated_at = NOW() WHERE id = $1`,
+      [userId, rows[0].url],
+    );
+    return this.getProfile(userId);
   }
 
   private async syncAvatar(userId: string): Promise<void> {
@@ -593,6 +642,7 @@ export class UsersService {
       showAge: r.show_age ?? true,
       showHometown: r.show_hometown ?? true,
       friendsSeeOnlineStatus: r.friends_see_online_status ?? true,
+      coverUrl: r.cover_url ?? null,
       photoUrls,
       subscriptionTier: r.subscription_tier ?? 'free',
       socialLinks,

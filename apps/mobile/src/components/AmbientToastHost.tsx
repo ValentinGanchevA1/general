@@ -80,7 +80,6 @@ function visualFor(item: ToastItem): ToastVisual {
       return {
         eyebrow: 'Level up',
         title: `You reached level ${item.data.level}`,
-        xpLabel: undefined,
         icon: '⭐',
         gradient: ['#2a1a08', '#12121f', '#0a0a0f'],
         accent: colors.warning,
@@ -92,7 +91,7 @@ function visualFor(item: ToastItem): ToastVisual {
       return {
         eyebrow: 'Challenge complete',
         title: item.data.title,
-        xpLabel: xp,
+        ...(xp ? { xpLabel: xp } : {}),
         icon: item.data.icon || '✅',
         gradient: ['#0d2818', '#12121f', '#0a0a0f'],
         accent: colors.action,
@@ -105,7 +104,7 @@ function visualFor(item: ToastItem): ToastVisual {
       return {
         eyebrow: 'Achievement unlocked',
         title: item.data.title,
-        xpLabel: xp,
+        ...(xp ? { xpLabel: xp } : {}),
         icon: item.data.icon || '🏆',
         gradient: ['#1a1030', '#12121f', '#0a0a0f'],
         accent: colors.accent,
@@ -449,6 +448,7 @@ const styles = StyleSheet.create({
     left: -30,
   },
   badge: {
+    position: 'relative' as const,
     width: 44,
     height: 44,
     borderRadius: 22,

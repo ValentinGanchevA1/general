@@ -36,7 +36,7 @@ export async function pickAndUploadPhoto(): Promise<UserPhoto[] | null> {
   const result = await launchImageLibrary({
     mediaType: 'photo',
     selectionLimit: 1,
-    quality: 0.85,
+    quality: 0.8,
     includeBase64: true,
   });
   if (result.didCancel) return null;
