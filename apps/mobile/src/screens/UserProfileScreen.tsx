@@ -175,7 +175,8 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
       Number.isFinite(profile.mapLat) &&
       Number.isFinite(profile.mapLng);
 
-    if (!hasCoords && profile?.distanceMeters == null) {
+    // Must have pin coordinates — distance alone cannot fly the camera.
+    if (!hasCoords) {
       appAlert(
         'Location unavailable',
         'This person has no map pin right now. Try again when they are nearby.',
@@ -183,26 +184,29 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
       return;
     }
 
+    const lat = profile!.mapLat!;
+    const lng = profile!.mapLng!;
+
+    // Module handoff (reliable) + route params (belt-and-suspenders).
     setPendingMapFocus({
       userId,
-      ...(hasCoords ? { lat: profile!.mapLat!, lng: profile!.mapLng! } : {}),
+      lat,
+      lng,
+      displayName: profile!.displayName,
+      avatarUrl: profile!.avatarUrl,
+      verification: profile!.verification,
+      online: profile!.online,
     });
-
-    const mapParams: {
-      focusUserId: string;
-      focusLat?: number;
-      focusLng?: number;
-    } = { focusUserId: userId };
-    if (hasCoords) {
-      mapParams.focusLat = profile!.mapLat!;
-      mapParams.focusLng = profile!.mapLng!;
-    }
 
     navigation.navigate({
       name: 'Main',
       params: {
         screen: 'Map',
-        params: mapParams,
+        params: {
+          focusUserId: userId,
+          focusLat: lat,
+          focusLng: lng,
+        },
         merge: true,
       },
       merge: true,
