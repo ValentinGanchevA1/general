@@ -7,6 +7,7 @@ import {
   Dimensions,
   Pressable,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, spacing, fontSize } from '@/theme';
 
@@ -50,6 +51,7 @@ export function ProfileHeaderPhoto({
   onSelectPhoto,
   onPressVisibility,
 }: ProfileHeaderPhotoProps): React.JSX.Element {
+  const insets = useSafeAreaInsets();
   const backgroundUri = coverUrl || photoUrl;
 
   return (
@@ -70,7 +72,7 @@ export function ProfileHeaderPhoto({
       )}
 
       {/* Top chrome */}
-      <View style={styles.topChrome} pointerEvents="box-none">
+      <View style={[styles.topChrome, { top: insets.top + 6 }]} pointerEvents="box-none">
         {isPaid && tierLabel ? (
           <View style={styles.tierBadge}>
             <Icon name="crown" size={13} color="#000" />
@@ -118,23 +120,31 @@ export function ProfileHeaderPhoto({
               </Text>
             ) : null}
             <Pressable
-              style={styles.visibilityRow}
               onPress={onPressVisibility}
-              disabled={!onPressVisibility}
-              hitSlop={6}
+              style={styles.visibilityRow}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={isVisibleOnMap ? 'Visible on map' : 'Hidden from map'}
             >
               <View
                 style={[
                   styles.visibilityDot,
-                  { backgroundColor: isVisibleOnMap ? colors.success : colors.textFaint },
+                  { backgroundColor: isVisibleOnMap ? colors.success : colors.textMuted },
                 ]}
               />
               <Text style={styles.visibilityText}>
-                {isVisibleOnMap ? 'Visible on map' : 'Hidden on map'}
+                {isVisibleOnMap ? 'Visible on map' : 'Hidden from map'}
               </Text>
             </Pressable>
           </View>
-          <Pressable onPress={onPressVerificationBadge} style={styles.percentBadge} hitSlop={8}>
+
+          <Pressable
+            onPress={onPressVerificationBadge}
+            style={styles.percentBadge}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Verification ${verificationPercent} percent`}
+          >
             <Text style={styles.percentText}>{verificationPercent}%</Text>
           </Pressable>
         </View>
@@ -165,7 +175,7 @@ const styles = StyleSheet.create({
   },
   topChrome: {
     position: 'absolute',
-    top: 52,
+    // top set inline from safe-area insets
     left: spacing.lg,
     right: spacing.lg,
     flexDirection: 'row',
