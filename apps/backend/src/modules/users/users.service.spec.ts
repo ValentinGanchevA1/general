@@ -67,18 +67,21 @@ describe('UsersService — gallery photos', () => {
   });
 
   it('deletePhoto throws when the photo is not the user’s', async () => {
-    query.mockResolvedValueOnce([[], 0]); // DELETE ... RETURNING → nothing
+    query.mockResolvedValueOnce([]); // SELECT id, url → not found
     await expect(service.deletePhoto(USER, PHOTO_A)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('deletePhoto resyncs the avatar after a successful delete', async () => {
     query
-      .mockResolvedValueOnce([[{ id: PHOTO_A }], 1]) // DELETE RETURNING
+      .mockResolvedValueOnce([{ id: PHOTO_A, url: 'https://cdn/a.jpg' }]) // SELECT id, url
+      .mockResolvedValueOnce([]) // DELETE
+      .mockResolvedValueOnce([]) // clear cover_url if it matched
       .mockResolvedValueOnce([]) // syncAvatar UPDATE
       .mockResolvedValueOnce([{ id: PHOTO_B, url: 'https://cdn/b.jpg', position: 0 }]); // listPhotos
     const res = await service.deletePhoto(USER, PHOTO_A);
     expect(res).toEqual([{ id: PHOTO_B, url: 'https://cdn/b.jpg', position: 0 }]);
     expect(query.mock.calls.some((c) => /SET avatar_url = \(/.test(c[0]))).toBe(true);
+    expect(query.mock.calls.some((c) => /SET cover_url = NULL/.test(c[0]))).toBe(true);
   });
 
   it('reorderPhotos rejects an id set that does not match the gallery', async () => {
@@ -106,6 +109,110 @@ describe('UsersService — gallery photos', () => {
     expect(query.mock.calls.some((c) => /UPDATE user_photos AS up SET position/.test(c[0]))).toBe(
       true,
     );
+  });
+});
+
+describe('UsersService — setCover', () => {
+  let service: UsersService;
+  let query: jest.Mock;
+
+  beforeEach(async () => {
+    query = jest.fn().mockResolvedValue([]);
+    const mod = await Test.createTestingModule({
+      providers: [
+        UsersService,
+        { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
+        { provide: PresenceService, useValue: {} },
+        { provide: MessagingService, useValue: {} },
+        { provide: S3Service, useValue: {} },
+        { provide: BlocksService, useValue: {} },
+      ],
+    }).compile();
+    service = mod.get(UsersService);
+  });
+
+  it('setCover clear nulls cover_url', async () => {
+    query
+      .mockResolvedValueOnce([]) // UPDATE cover_url = NULL
+      .mockResolvedValueOnce([
+        {
+          id: USER,
+          email: 'a@b.c',
+          display_name: 'Ada',
+          avatar_url: null,
+          cover_url: null,
+          bio: null,
+          verification_level: 'none',
+          visibility: 'public',
+          goals: [],
+          interests: [],
+          phone: null,
+          age: null,
+          date_of_birth: null,
+          hometown_city: null,
+          hometown_country: null,
+          show_age: true,
+          show_hometown: true,
+          friends_see_online_status: true,
+          subscription_tier: 'free',
+          id_verification_status: 'none',
+          created_at: new Date().toISOString(),
+        },
+      ]) // getProfile SELECT
+      .mockResolvedValueOnce([]) // getPhotoUrls
+      .mockResolvedValueOnce([]); // getSocialLinks
+    const profile = await service.setCover(USER, { clear: true });
+    expect(profile.coverUrl).toBeNull();
+    expect(query.mock.calls.some((c) => /SET cover_url = NULL/.test(c[0]))).toBe(true);
+  });
+
+  it('setCover requires photoId when not clearing', async () => {
+    await expect(service.setCover(USER, {})).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('setCover rejects unknown photoId', async () => {
+    query.mockResolvedValueOnce([]); // SELECT url → not found
+    await expect(service.setCover(USER, { photoId: PHOTO_A })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('setCover writes gallery url onto users.cover_url', async () => {
+    query
+      .mockResolvedValueOnce([{ url: 'https://cdn/a.jpg' }]) // SELECT url
+      .mockResolvedValueOnce([]) // UPDATE cover_url
+      .mockResolvedValueOnce([
+        {
+          id: USER,
+          email: 'a@b.c',
+          display_name: 'Ada',
+          avatar_url: null,
+          cover_url: 'https://cdn/a.jpg',
+          bio: null,
+          verification_level: 'none',
+          visibility: 'public',
+          goals: [],
+          interests: [],
+          phone: null,
+          age: null,
+          date_of_birth: null,
+          hometown_city: null,
+          hometown_country: null,
+          show_age: true,
+          show_hometown: true,
+          friends_see_online_status: true,
+          subscription_tier: 'free',
+          id_verification_status: 'none',
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    const profile = await service.setCover(USER, { photoId: PHOTO_A });
+    expect(profile.coverUrl).toBe('https://cdn/a.jpg');
+    const update = query.mock.calls.find((c) => /SET cover_url = \$2/.test(c[0]));
+    expect(update).toBeDefined();
+    expect(update?.[1]).toEqual([USER, 'https://cdn/a.jpg']);
   });
 });
 
