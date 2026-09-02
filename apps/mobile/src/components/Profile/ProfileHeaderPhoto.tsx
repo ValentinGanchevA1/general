@@ -15,6 +15,8 @@ const PHOTO_HEIGHT = SCREEN_WIDTH * 1.05;
 
 interface ProfileHeaderPhotoProps {
   photoUrl: string | null;
+  /** Independent cover/background; falls back to photoUrl when unset. */
+  coverUrl?: string | null;
   displayName: string;
   handle?: string | null;
   verificationPercent: number;
@@ -33,6 +35,7 @@ interface ProfileHeaderPhotoProps {
 
 export function ProfileHeaderPhoto({
   photoUrl,
+  coverUrl,
   displayName,
   handle,
   verificationPercent,
@@ -47,10 +50,12 @@ export function ProfileHeaderPhoto({
   onSelectPhoto,
   onPressVisibility,
 }: ProfileHeaderPhotoProps): React.JSX.Element {
+  const backgroundUri = coverUrl || photoUrl;
+
   return (
     <Pressable onPress={onPressPhoto} style={styles.container}>
-      {photoUrl ? (
-        <Image source={{ uri: photoUrl }} style={styles.photo} resizeMode="cover" />
+      {backgroundUri ? (
+        <Image source={{ uri: backgroundUri }} style={styles.photo} resizeMode="cover" />
       ) : (
         <View style={[styles.photo, styles.placeholder]}>
           <Text style={styles.placeholderInitials}>
@@ -88,15 +93,15 @@ export function ProfileHeaderPhoto({
       </View>
 
       {/* Bottom readability + identity */}
-      <View style={styles.overlayContent}>
+      <View style={styles.overlayContent} pointerEvents="box-none">
         {photoCount > 1 ? (
           <View style={styles.dots}>
-            {Array.from({ length: photoCount }).map((_, index) => (
+            {Array.from({ length: photoCount }).map((_, i) => (
               <Pressable
-                key={index}
-                onPress={() => onSelectPhoto?.(index)}
-                style={[styles.dot, index === activePhotoIndex && styles.dotActive]}
+                key={i}
+                onPress={() => onSelectPhoto?.(i)}
                 hitSlop={6}
+                style={[styles.dot, i === activePhotoIndex && styles.dotActive]}
               />
             ))}
           </View>
@@ -107,18 +112,16 @@ export function ProfileHeaderPhoto({
             <Text style={styles.name} numberOfLines={1}>
               {displayName}
             </Text>
-            {handle ? <Text style={styles.handle}>@{handle}</Text> : null}
+            {handle ? (
+              <Text style={styles.handle} numberOfLines={1}>
+                @{handle}
+              </Text>
+            ) : null}
             <Pressable
+              style={styles.visibilityRow}
               onPress={onPressVisibility}
               disabled={!onPressVisibility}
-              style={styles.visibilityRow}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={
-                isVisibleOnMap
-                  ? 'Visible on map. Tap to change how others see you.'
-                  : 'Hidden from map. Tap to change how others see you.'
-              }
+              hitSlop={6}
             >
               <View
                 style={[
@@ -127,21 +130,11 @@ export function ProfileHeaderPhoto({
                 ]}
               />
               <Text style={styles.visibilityText}>
-                {isVisibleOnMap ? 'Visible on map' : 'Hidden from map'}
+                {isVisibleOnMap ? 'Visible on map' : 'Hidden on map'}
               </Text>
-              {onPressVisibility ? (
-                <Icon name="chevron-down" size={14} color={colors.textMuted} />
-              ) : null}
             </Pressable>
           </View>
-
-          <Pressable
-            onPress={onPressVerificationBadge}
-            style={styles.percentBadge}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={`${verificationPercent} percent verified`}
-          >
+          <Pressable onPress={onPressVerificationBadge} style={styles.percentBadge} hitSlop={8}>
             <Text style={styles.percentText}>{verificationPercent}%</Text>
           </Pressable>
         </View>
@@ -154,7 +147,6 @@ const styles = StyleSheet.create({
   container: {
     width: SCREEN_WIDTH,
     height: PHOTO_HEIGHT,
-    position: 'relative',
     backgroundColor: colors.surfaceRaised,
   },
   photo: {
