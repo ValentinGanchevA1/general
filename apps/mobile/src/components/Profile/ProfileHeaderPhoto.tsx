@@ -7,6 +7,7 @@ import {
   Dimensions,
   Pressable,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, spacing, fontSize } from '@/theme';
 
@@ -50,6 +51,7 @@ export function ProfileHeaderPhoto({
   onSelectPhoto,
   onPressVisibility,
 }: ProfileHeaderPhotoProps): React.JSX.Element {
+  const insets = useSafeAreaInsets();
   const backgroundUri = coverUrl || photoUrl;
 
   return (
@@ -70,7 +72,7 @@ export function ProfileHeaderPhoto({
       )}
 
       {/* Top chrome */}
-      <View style={styles.topChrome} pointerEvents="box-none">
+      <View style={[styles.topChrome, { top: Math.max(insets.top, 8) + 2 }]} pointerEvents="box-none">
         {isPaid && tierLabel ? (
           <View style={styles.tierBadge}>
             <Icon name="crown" size={13} color="#000" />
@@ -87,21 +89,20 @@ export function ProfileHeaderPhoto({
             accessibilityRole="button"
             accessibilityLabel="Settings"
           >
-            <Icon name="cog" size={20} color={colors.textPrimary} />
+            <Icon name="cog-outline" size={20} color={colors.textPrimary} />
           </Pressable>
         ) : null}
       </View>
 
-      {/* Bottom readability + identity */}
       <View style={styles.overlayContent} pointerEvents="box-none">
         {photoCount > 1 ? (
           <View style={styles.dots}>
-            {Array.from({ length: photoCount }).map((_, i) => (
+            {Array.from({ length: photoCount }, (_, i) => (
               <Pressable
                 key={i}
                 onPress={() => onSelectPhoto?.(i)}
-                hitSlop={6}
                 style={[styles.dot, i === activePhotoIndex && styles.dotActive]}
+                hitSlop={6}
               />
             ))}
           </View>
@@ -112,29 +113,30 @@ export function ProfileHeaderPhoto({
             <Text style={styles.name} numberOfLines={1}>
               {displayName}
             </Text>
-            {handle ? (
-              <Text style={styles.handle} numberOfLines={1}>
-                @{handle}
-              </Text>
-            ) : null}
+            {handle ? <Text style={styles.handle}>@{handle}</Text> : null}
             <Pressable
               style={styles.visibilityRow}
               onPress={onPressVisibility}
-              disabled={!onPressVisibility}
-              hitSlop={6}
+              hitSlop={8}
+              accessibilityRole="button"
             >
               <View
                 style={[
                   styles.visibilityDot,
-                  { backgroundColor: isVisibleOnMap ? colors.success : colors.textFaint },
+                  { backgroundColor: isVisibleOnMap ? colors.success : colors.textMuted },
                 ]}
               />
               <Text style={styles.visibilityText}>
-                {isVisibleOnMap ? 'Visible on map' : 'Hidden on map'}
+                {isVisibleOnMap ? 'Visible on map' : 'Hidden from map'}
               </Text>
             </Pressable>
           </View>
-          <Pressable onPress={onPressVerificationBadge} style={styles.percentBadge} hitSlop={8}>
+          <Pressable
+            onPress={onPressVerificationBadge}
+            style={styles.percentBadge}
+            hitSlop={8}
+            accessibilityRole="button"
+          >
             <Text style={styles.percentText}>{verificationPercent}%</Text>
           </Pressable>
         </View>
@@ -165,7 +167,7 @@ const styles = StyleSheet.create({
   },
   topChrome: {
     position: 'absolute',
-    top: 52,
+    top: 0,
     left: spacing.lg,
     right: spacing.lg,
     flexDirection: 'row',
