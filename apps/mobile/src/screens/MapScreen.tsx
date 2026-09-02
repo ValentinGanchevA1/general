@@ -79,6 +79,7 @@ type PendingFocus = {
   avatarUrl?: string | null;
   verification?: import('@g88/shared').VerificationLevel;
   online?: boolean;
+  lastSeenAt?: string;
 };
 
 export function MapScreen(): React.JSX.Element {
@@ -211,6 +212,7 @@ export function MapScreen(): React.JSX.Element {
           avatarUrl: seed?.avatarUrl ?? null,
           verification: seed?.verification ?? 'none',
           online: seed?.online ?? false,
+          lastSeenAt: seed?.lastSeenAt ?? new Date().toISOString(),
         },
       };
     },
@@ -227,6 +229,7 @@ export function MapScreen(): React.JSX.Element {
         ...(mod.avatarUrl !== undefined ? { avatarUrl: mod.avatarUrl } : {}),
         ...(mod.verification != null ? { verification: mod.verification } : {}),
         ...(mod.online != null ? { online: mod.online } : {}),
+        ...(mod.lastSeenAt != null ? { lastSeenAt: mod.lastSeenAt } : {}),
       };
     }
     const pending = pendingFocusRef.current;
@@ -283,6 +286,7 @@ export function MapScreen(): React.JSX.Element {
       ...(mod?.avatarUrl !== undefined ? { avatarUrl: mod.avatarUrl } : {}),
       ...(mod?.verification != null ? { verification: mod.verification } : {}),
       ...(mod?.online != null ? { online: mod.online } : {}),
+      ...(mod?.lastSeenAt != null ? { lastSeenAt: mod.lastSeenAt } : {}),
     };
     focusAppliedKeyRef.current = null;
   }, [focusUserId, focusLat, focusLng, focusMyPin]);
@@ -337,6 +341,7 @@ export function MapScreen(): React.JSX.Element {
           ...(mod?.avatarUrl !== undefined ? { avatarUrl: mod.avatarUrl } : {}),
           ...(mod?.verification != null ? { verification: mod.verification } : {}),
           ...(mod?.online != null ? { online: mod.online } : {}),
+          ...(mod?.lastSeenAt != null ? { lastSeenAt: mod.lastSeenAt } : {}),
         };
         // Allow re-apply on every View-on-map entry (new token or same peer).
         focusAppliedKeyRef.current = null;
