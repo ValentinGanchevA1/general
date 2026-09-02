@@ -20,8 +20,11 @@ import {
   deletePhoto,
   listPhotos,
   pickAndUploadPhoto,
+  setCover,
   setPrimary,
 } from '@/features/profile/photos';
+import { useAppDispatch } from '@/hooks/redux';
+import { fetchProfile } from '@/features/profile/profileSlice';
 import { extractMessage } from '@/utils/extractMessage';
 
 const MAX_PHOTOS = 6;
@@ -30,6 +33,7 @@ const TILE = (width - 24 * 2 - 12) / 2;
 
 export function PhotosScreen(): React.JSX.Element {
   const navigation = useNavigation();
+  const dispatch = useAppDispatch();
   const [photos, setPhotos] = useState<UserPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -66,32 +70,54 @@ export function PhotosScreen(): React.JSX.Element {
           ? []
           : [
               {
-                text: 'Set as main',
+                text: 'Set as main photo',
                 onPress: () => {
                   setBusy(true);
                   setPrimary(photo.id, photos)
-                    .then(setPhotos)
+                    .then((list) => {
+                      setPhotos(list);
+                      void dispatch(fetchProfile());
+                    })
                     .catch((e) => setError(extractMessage(e, 'Could not update')))
                     .finally(() => setBusy(false));
                 },
               },
             ]),
         {
+          text: 'Set as cover (background)',
+          onPress: () => {
+            setBusy(true);
+            setCover(photo.id)
+              .then(() => void dispatch(fetchProfile()))
+              .catch((e) => setError(extractMessage(e, 'Could not set cover')))
+              .finally(() => setBusy(false));
+          },
+        },
+        {
           text: 'Delete',
           style: 'destructive' as const,
           onPress: () => {
             setBusy(true);
             deletePhoto(photo.id)
-              .then(setPhotos)
+              .then((list) => {
+                setPhotos(list);
+                void dispatch(fetchProfile());
+              })
               .catch((e) => setError(extractMessage(e, 'Could not delete')))
               .finally(() => setBusy(false));
           },
         },
         { text: 'Cancel', style: 'cancel' as const },
       ];
-      appAlert('Photo', isPrimary ? 'This is your main photo' : undefined, options);
+      appAlert(
+        'Photo',
+        isPrimary
+          ? 'Main profile photo. You can also use any photo as the cover background.'
+          : 'Main is your avatar. Cover is the wide background on profiles.',
+        options,
+      );
     },
-    [photos],
+    [photos, dispatch],
   );
 
   return (
@@ -109,7 +135,7 @@ export function PhotosScreen(): React.JSX.Element {
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
           <Text style={styles.hint}>
-            Your first photo is your main profile picture. Tap a photo to set it as main or delete it.
+            Main = avatar. Cover = profile background. Tap a photo to set main, set cover, or delete.
           </Text>
 
           <View style={styles.grid}>
