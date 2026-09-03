@@ -24,6 +24,7 @@ type Leaf =
   | 'ProfileEdit'
   | 'Photos'
   | 'FriendsList'
+  | 'Suggestions'
   | 'EventDetail'
   | 'EventCreate'
   | 'GiftsInbox'
@@ -55,6 +56,7 @@ const NEST: Partial<
   ProfileEdit: { stack: 'Account', screen: 'ProfileEdit' },
   Photos: { stack: 'Account', screen: 'Photos' },
   FriendsList: { stack: 'Account', screen: 'FriendsList' },
+  Suggestions: { stack: 'Account', screen: 'Suggestions' },
   EventDetail: { stack: 'Events', screen: 'EventDetail' },
   EventCreate: { stack: 'Events', screen: 'EventCreate' },
 };
