@@ -1,18 +1,17 @@
 // apps/mobile/src/components/VerificationBadge.tsx
 //
-// P3.4 — one consistent verification glyph across the app's *other-user*
-// surfaces (chat header, profile card, map sheet). Two tiers:
-//   • ID-verified  → blue "check-decagram" (the strong trust signal)
-//   • partial      → small ✓ chip (email/phone/selfie on the ladder)
+// Compact verification glyph for other-user surfaces (chat header, profile
+// card, map sheet, IdentityBlock).
+//   • ID-verified  → primary "check-decagram"
+//   • partial      → small ✓ chip (email/phone/selfie)
 //   • none         → nothing rendered
-// Self-profile keeps its richer badge row in ProfileScreen; this is the
-// compact read-only badge for everyone else.
 
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { VerificationLevel } from '@g88/shared';
+import { colors } from '@/theme';
 
 interface Props {
   verification: VerificationLevel;
@@ -28,13 +27,28 @@ export function VerificationBadge({
   size = 16,
 }: Props): React.JSX.Element | null {
   if (idVerified) {
-    return <Icon name="check-decagram" size={size} color="#00d4ff" />;
+    return (
+      <Icon
+        name="check-decagram"
+        size={size}
+        color={colors.primary}
+        accessibilityLabel="ID verified"
+      />
+    );
   }
   if (verification !== 'none') {
     const dim = Math.max(0, size - 2);
     return (
       <View
-        style={[styles.partial, { width: dim, height: dim, borderRadius: dim / 2 }]}
+        style={[
+          styles.partial,
+          {
+            width: dim,
+            height: dim,
+            borderRadius: dim / 2,
+            backgroundColor: colors.primary,
+          },
+        ]}
         accessibilityLabel="Verified"
       >
         <Text style={[styles.partialText, { fontSize: dim * 0.62 }]}>✓</Text>
@@ -45,6 +59,6 @@ export function VerificationBadge({
 }
 
 const styles = StyleSheet.create({
-  partial: { backgroundColor: '#00d4ff', alignItems: 'center', justifyContent: 'center' },
-  partialText: { color: '#000', fontWeight: '700' },
+  partial: { alignItems: 'center', justifyContent: 'center' },
+  partialText: { color: colors.onPrimary, fontWeight: '700' },
 });
