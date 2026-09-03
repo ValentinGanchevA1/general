@@ -34,7 +34,7 @@ type Leaf =
   | 'AlertComposer';
 
 const NEST: Partial<
-  Record<Leaf, { stack: 'Gamification' | 'Commerce' | 'Account' | 'Events'; screen: string }>
+  Record<Leaf, { stack: 'Gamification' | 'Commerce' | 'Account' | 'Social' | 'Events'; screen: string }>
 > = {
   Challenges: { stack: 'Gamification', screen: 'Challenges' },
   Leaderboard: { stack: 'Gamification', screen: 'Leaderboard' },
@@ -55,8 +55,8 @@ const NEST: Partial<
   SocialLinking: { stack: 'Account', screen: 'SocialLinking' },
   ProfileEdit: { stack: 'Account', screen: 'ProfileEdit' },
   Photos: { stack: 'Account', screen: 'Photos' },
-  FriendsList: { stack: 'Account', screen: 'FriendsList' },
-  Suggestions: { stack: 'Account', screen: 'Suggestions' },
+  FriendsList: { stack: 'Social', screen: 'FriendsList' },
+  Suggestions: { stack: 'Social', screen: 'Suggestions' },
   EventDetail: { stack: 'Events', screen: 'EventDetail' },
   EventCreate: { stack: 'Events', screen: 'EventCreate' },
 };

@@ -1,4 +1,6 @@
-// Top-of-map chrome: challenge, streak nudge, interactions entry.
+// apps/mobile/src/components/map/MapChrome.tsx
+// Top-of-map chrome: daily challenge, streak nudge, interactions entry,
+// marketplace entry (IA-2).
 // Owns stack visibility + absolute tops so cards never self-compute offsets.
 
 import React from 'react';
@@ -21,12 +23,15 @@ interface Props {
   sheetOpen: boolean;
   interactionUnread: number;
   onPressInteractions: () => void;
+  /** Browse local marketplace (IA-2). */
+  onPressMarketplace?: () => void;
 }
 
 export function MapChrome({
   sheetOpen,
   interactionUnread,
   onPressInteractions,
+  onPressMarketplace,
 }: Props): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const challengeTop = mapChallengeTop(insets.top);
@@ -37,6 +42,18 @@ export function MapChrome({
     <>
       {!sheetOpen ? <DailyChallengeCard top={challengeTop} /> : null}
       {!sheetOpen ? <NudgeBanner top={nudgeTop} /> : null}
+
+      {onPressMarketplace ? (
+        <TouchableOpacity
+          style={[styles.marketBadge, { top: badgeTop }]}
+          onPress={onPressMarketplace}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Marketplace"
+        >
+          <Text style={styles.marketBadgeIcon}>🏪</Text>
+        </TouchableOpacity>
+      ) : null}
 
       <TouchableOpacity
         style={[styles.interactionBadge, { top: badgeTop }]}
@@ -63,6 +80,20 @@ export function MapChrome({
 }
 
 const styles = StyleSheet.create({
+  marketBadge: {
+    position: 'absolute',
+    right: 16 + INTERACTION_BADGE_SIZE + 10,
+    width: INTERACTION_BADGE_SIZE,
+    height: INTERACTION_BADGE_SIZE,
+    borderRadius: INTERACTION_BADGE_SIZE / 2,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 20,
+  },
+  marketBadgeIcon: { fontSize: 18 },
   interactionBadge: {
     position: 'absolute',
     right: 16,
@@ -90,7 +121,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   interactionBadgeCount: {
-    color: colors.textPrimary,
+    color: colors.onPrimary,
     fontSize: 10,
     fontWeight: '700',
   },
