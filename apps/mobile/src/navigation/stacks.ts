@@ -35,6 +35,9 @@ export type AccountStackParamList = {
   SocialLinking: undefined;
   ProfileEdit: undefined;
   Photos: undefined;
+};
+
+export type SocialStackParamList = {
   FriendsList: undefined;
   Suggestions: undefined;
 };
@@ -48,11 +51,13 @@ export type NestedStackName =
   | 'Gamification'
   | 'Commerce'
   | 'Account'
+  | 'Social'
   | 'Events';
 
 export type NestedStackParams = {
   Gamification: NavigatorScreenParams<GamificationStackParamList>;
   Commerce: NavigatorScreenParams<CommerceStackParamList>;
   Account: NavigatorScreenParams<AccountStackParamList>;
+  Social: NavigatorScreenParams<SocialStackParamList>;
   Events: NavigatorScreenParams<EventsStackParamList>;
 };
