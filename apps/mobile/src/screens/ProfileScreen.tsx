@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -40,7 +47,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 /**
  * Self profile — public-facing identity + activity.
- * Order: Hero → Bio → Tags → Activity → Friends → Storyline → Photos → Premium.
+ * Order: Hero → Bio → Tags → Activity → Friends → Market → Storyline → Photos → Premium.
  * Trust details open from the % badge (bottom sheet). Account controls in Settings.
  */
 export function ProfileScreen(): React.JSX.Element {
@@ -128,7 +135,6 @@ export function ProfileScreen(): React.JSX.Element {
         });
         return;
       }
-      // id
       openRootScreen(
         navigation,
         derived?.p.idVerificationStatus === 'pending' ? 'VerificationId' : 'Verification',
@@ -142,7 +148,6 @@ export function ProfileScreen(): React.JSX.Element {
       navigation.goBack();
       return;
     }
-    // Tab root — send user to Map (primary home surface).
     navigation.navigate('Main', { screen: 'Map' });
   }, [navigation]);
 
@@ -219,6 +224,16 @@ export function ProfileScreen(): React.JSX.Element {
           onPress={() => openRootScreen(navigation, 'FriendsList')}
         />
 
+        <TouchableOpacity
+          style={styles.marketRow}
+          onPress={() => openRootScreen(navigation, 'Marketplace')}
+          accessibilityRole="button"
+          accessibilityLabel="Local marketplace"
+        >
+          <Text style={styles.marketRowTitle}>Local market</Text>
+          <Text style={styles.marketRowSub}>Browse nearby listings</Text>
+        </TouchableOpacity>
+
         {p.id ? (
           <View style={styles.section}>
             <ProfileStoryline userId={p.id} isSelf />
@@ -294,5 +309,25 @@ const styles = StyleSheet.create({
   },
   sheetContent: {
     paddingBottom: spacing.xl,
+  },
+  marketRow: {
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  marketRowTitle: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  marketRowSub: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
   },
 });
