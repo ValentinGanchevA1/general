@@ -2,14 +2,46 @@ import React, { useState } from 'react';
 import { useCachedImageUri } from '@/hooks/useCachedImageUri';
 import { Image, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { colors } from '@/theme';
+
+export type AvatarRingVariant = 'none' | 'brand' | 'friend' | 'story' | 'verified';
+
 export interface AvatarProps {
   uri?: string | null;
   name: string;
   size?: number;
-  /** Cyan ring used on profile cards / map sheet. */
+  /** @deprecated Prefer ringVariant="brand". Kept for existing call sites. */
   ring?: boolean;
+  /** Visual ring: brand (cyan), friend (green), story (accent), verified (primary strong). */
+  ringVariant?: AvatarRingVariant;
   online?: boolean;
+  /** Friend marker — short green arc-style ring if ringVariant not set. */
+  isFriend?: boolean;
   style?: StyleProp<ViewStyle>;
+}
+
+function resolveRingColor(
+  ringVariant: AvatarRingVariant | undefined,
+  ring: boolean | undefined,
+  isFriend: boolean | undefined,
+): string | null {
+  if (ringVariant && ringVariant !== 'none') {
+    switch (ringVariant) {
+      case 'brand':
+        return colors.primary;
+      case 'friend':
+        return colors.success;
+      case 'story':
+        return colors.accent;
+      case 'verified':
+        return colors.primary;
+      default:
+        return null;
+    }
+  }
+  if (isFriend) return colors.success;
+  if (ring) return colors.primary;
+  return null;
 }
 
 /**
@@ -22,7 +54,9 @@ export function Avatar({
   name,
   size = 72,
   ring = false,
+  ringVariant,
   online = false,
+  isFriend = false,
   style,
 }: AvatarProps): React.JSX.Element {
   const cachedUri = useCachedImageUri(uri);
@@ -38,7 +72,8 @@ export function Avatar({
     .slice(0, 2);
 
   const radius = size / 2;
-  const ringWidth = ring ? Math.max(2, Math.round(size * 0.04)) : 0;
+  const ringColor = resolveRingColor(ringVariant, ring, isFriend);
+  const ringWidth = ringColor ? Math.max(2, Math.round(size * 0.04)) : 0;
 
   return (
     <View style={[{ width: size, height: size }, style]}>
@@ -50,8 +85,8 @@ export function Avatar({
             height: size,
             borderRadius: radius,
             borderWidth: ringWidth,
-            borderColor: ring ? '#00d4ff' : 'transparent',
-            backgroundColor: showImage ? '#0a0a1a' : '#0a0a1a',
+            borderColor: ringColor ?? 'transparent',
+            backgroundColor: colors.bg,
           },
         ]}
       >
@@ -97,14 +132,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   initials: {
-    color: '#00d4ff',
+    color: colors.primary,
     fontWeight: '700',
   },
   onlineDot: {
     position: 'absolute',
     bottom: 1,
     right: 1,
-    backgroundColor: '#4caf50',
-    borderColor: '#0a0a0f',
+    backgroundColor: colors.success,
+    borderColor: colors.bg,
   },
 });

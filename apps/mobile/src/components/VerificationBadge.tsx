@@ -13,6 +13,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { VerificationLevel } from '@g88/shared';
+import { colors } from '@/theme';
 
 interface Props {
   verification: VerificationLevel;
@@ -28,7 +29,7 @@ export function VerificationBadge({
   size = 16,
 }: Props): React.JSX.Element | null {
   if (idVerified) {
-    return <Icon name="check-decagram" size={size} color="#00d4ff" />;
+    return <Icon name="check-decagram" size={size} color={colors.primary} />;
   }
   if (verification !== 'none') {
     const dim = Math.max(0, size - 2);
@@ -45,6 +46,6 @@ export function VerificationBadge({
 }
 
 const styles = StyleSheet.create({
-  partial: { backgroundColor: '#00d4ff', alignItems: 'center', justifyContent: 'center' },
-  partialText: { color: '#000', fontWeight: '700' },
+  partial: { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  partialText: { color: colors.onPrimary, fontWeight: '700' },
 });
