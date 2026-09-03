@@ -1,0 +1,51 @@
+--- a/apps/mobile/src/screens/MapScreen.tsx
++++ b/apps/mobile/src/screens/MapScreen.tsx
+@@ -58,6 +58,7 @@
+ import { colors } from '@/theme';
+ import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
+ import { MapCoachMarks } from '@/components/map/MapCoachMarks';
++import { EmptyState } from '@/components/EmptyState';
+ import { MapChrome } from '@/components/map/MapChrome';
+ import {
+   CreateNearbySheet,
+@@ -95,7 +96,7 @@
+   const presentedIdRef = useRef<string | null>(null);
+   const pendingFocusRef = useRef<PendingFocus | null>(null);
+   const focusAppliedKeyRef = useRef<string | null>(null);
+-  const entitySnapPoints = useMemo(() => ['42%', '58%'], []);
++  const entitySnapPoints = useMemo(() => ['36%', '62%'], []);
+   const renderBackdrop = useSheetBackdrop(0.5);
+   const { unreadCount: interactionUnread } = useReceivedInteractions();
+   const focusMyPin = route.params?.focusMyPin === true;
+@@ -527,6 +528,16 @@
+           <ActivityIndicator />
+         </View>
+       )}
++      {!loading && !error && !sheetOpen && points.length === 0 && region != null ? (
++        <View style={styles.emptyOverlay} pointerEvents="box-none">
++          <EmptyState
++            title="No one nearby yet"
++            body="Pan the map or wait a moment — presence updates live. Share your pin so others can find you."
++            actionLabel="Refresh area"
++            onAction={refresh}
++          />
++        </View>
++      ) : null}
+       {error && (
+         <View style={styles.errorBanner}>
+           <Text style={styles.errorText}>{error}</Text>
+@@ -620,6 +631,14 @@
+   },
+   unavailableTitle: { color: colors.danger, fontSize: 16, fontWeight: '700', marginBottom: 8 },
+   unavailableBody: { color: colors.textMuted, fontSize: 13, textAlign: 'center', lineHeight: 20 },
++  emptyOverlay: {
++    position: 'absolute',
++    left: 0,
++    right: 0,
++    top: '38%',
++    alignItems: 'center',
++    paddingHorizontal: 24,
++  },
+   loading: {
+     position: 'absolute',
+     top: 120,

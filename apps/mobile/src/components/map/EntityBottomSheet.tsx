@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -20,9 +20,8 @@ import type {
 } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { deleteJson, getJson, postJson } from '@/api/client';
-import { VerificationBadge } from '@/components/VerificationBadge';
-import { Avatar } from '@/components/Avatar';
-import { colors, spacing } from '@/theme';
+import { IdentityBlock } from '@/components/IdentityBlock';
+import { colors, radius, spacing } from '@/theme';
 
 const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
 const LADDER_BADGES: Array<{ level: VerificationLevel; label: string }> = [
@@ -89,6 +88,23 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   const hasStats =
     status != null || allTimeRank != null || achievementIcons.length > 0;
 
+  const isFriend = profile?.relationship?.isFriend === true;
+  const idVerified = profile?.idVerified === true;
+  const ringVariant = idVerified ? 'verified' : isFriend ? 'friend' : 'brand';
+
+  const subtitle = useMemo(() => {
+    const parts: string[] = [];
+    if (profile?.age != null) parts.push(`${profile.age}`);
+    const home = [profile?.hometownCity, profile?.hometownCountry].filter(Boolean).join(', ');
+    if (home) parts.push(home);
+    return parts.length > 0 ? parts.join(' \u00b7 ') : null;
+  }, [profile?.age, profile?.hometownCity, profile?.hometownCountry]);
+
+  const openProfile = (): void => {
+    onClose();
+    navigation.navigate('UserProfile', { userId: point.id });
+  };
+
   const onBlockToggle = (): void => {
     if (blocking) return;
     const doBlock = async (): Promise<void> => {
@@ -146,55 +162,63 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 
   return (
     <View style={styles.sheet}>
-      <View style={styles.userHeader}>
-        <TouchableOpacity
-          style={styles.userHeaderTap}
-          onPress={() => {
-            onClose();
-            navigation.navigate('UserProfile', { userId: point.id });
-          }}
-          activeOpacity={0.85}
-        >
-          <Avatar uri={meta.avatarUrl ?? null} name={displayName} size={56} />
-          <View style={styles.userHeaderText}>
-            <View style={styles.nameRow}>
-              <Text style={styles.title} numberOfLines={1}>
-                {displayName}
-              </Text>
-              <VerificationBadge
-                verification={meta.verification ?? 'none'}
-                idVerified={profile?.idVerified}
-                size={16}
-              />
-            </View>
-            {profile?.age != null ? (
-              <Text style={styles.originLine}>{profile.age} years</Text>
-            ) : null}
-            {profile?.hometownCity || profile?.hometownCountry ? (
-              <Text style={styles.originLine} numberOfLines={1}>
-                {[profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ')}
-              </Text>
-            ) : null}
-            {meta.online ? (
-              <Text style={styles.onlineLabel}>Online</Text>
-            ) : (
-              <Text style={[styles.onlineLabel, styles.offlineLabel]}>Offline</Text>
-            )}
-          </View>
-        </TouchableOpacity>
-      </View>
+      <IdentityBlock
+        name={displayName}
+        avatarUrl={meta.avatarUrl ?? null}
+        verification={meta.verification ?? profile?.verification ?? 'none'}
+        idVerified={idVerified}
+        online={meta.online}
+        subtitle={subtitle}
+        ringVariant={ringVariant}
+        size={56}
+        onPress={openProfile}
+      />
 
       {fetching ? (
         <ActivityIndicator color={colors.primary} size="small" style={{ alignSelf: 'flex-start' }} />
       ) : null}
 
-      {/* Trust — under avatar, before bio */}
+      <View style={styles.actions}>
+        {onWave && !blocked ? (
+          <TouchableOpacity
+            style={[styles.primaryBtn, styles.waveBtn, waving && styles.btnDisabled]}
+            onPress={onWave}
+            disabled={waving}
+            accessibilityRole="button"
+            accessibilityLabel="Wave"
+          >
+            <Text style={styles.primaryBtnText}>{waving ? '\u2026' : 'Wave'}</Text>
+          </TouchableOpacity>
+        ) : null}
+        {canMessage !== 'none' && !blocked ? (
+          <TouchableOpacity
+            style={[styles.primaryBtn, styles.messageBtn, opening && styles.btnDisabled]}
+            onPress={() => void onMessage()}
+            disabled={opening}
+            accessibilityRole="button"
+            accessibilityLabel="Message"
+          >
+            <Text style={styles.primaryBtnText}>{opening ? '\u2026' : 'Message'}</Text>
+          </TouchableOpacity>
+        ) : null}
+        <TouchableOpacity
+          style={styles.profileBtn}
+          onPress={openProfile}
+          accessibilityRole="button"
+          accessibilityLabel="Open profile"
+        >
+          <Text style={styles.profileBtnText}>Profile</Text>
+        </TouchableOpacity>
+      </View>
+
       {!fetching && profile != null ? (
         <View style={styles.trustBlock}>
-          <Text style={styles.trustLabel}>Trust</Text>
-          <Text style={styles.trustText}>
-            {trustScore != null ? `${trustScore}% verified` : '0% verified'}
-          </Text>
+          <View style={styles.trustHeader}>
+            <Text style={styles.sectionLabel}>Trust</Text>
+            <Text style={styles.trustText}>
+              {trustScore != null ? `${trustScore}%` : '0%'}
+            </Text>
+          </View>
           <View style={styles.trustBadges}>
             {badges.length === 0 ? (
               <Text style={styles.trustEmpty}>No verification yet</Text>
@@ -211,12 +235,11 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         </View>
       ) : null}
 
-      {/* Stats: level + all-time rank + achievement icons — under Trust, above Bio */}
-      {!fetching && profile != null && hasStats ? (
+      {!fetching && hasStats ? (
         <View style={styles.statsBlock}>
-          <Text style={styles.statsLabel}>Stats</Text>
+          <Text style={styles.sectionLabel}>Stats</Text>
           <View style={styles.statsRow}>
-            {status ? (
+            {status?.level != null ? (
               <View style={styles.statPill}>
                 <Text style={styles.statPillValue}>Lv {status.level}</Text>
               </View>
@@ -228,7 +251,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
             ) : null}
             {achievementIcons.length > 0 ? (
               <View style={styles.achievementIcons}>
-                {achievementIcons.slice(0, 6).map((icon, i) => (
+                {achievementIcons.slice(0, 3).map((icon, i) => (
                   <Text key={`${icon}-${i}`} style={styles.achievementIcon}>
                     {icon}
                   </Text>
@@ -245,36 +268,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         </Text>
       ) : null}
 
-      <View style={styles.actions}>
-        {onWave && !blocked ? (
-          <TouchableOpacity
-            style={[styles.primaryBtn, styles.waveBtn, waving && styles.btnDisabled]}
-            onPress={onWave}
-            disabled={waving}
-          >
-            <Text style={styles.primaryBtnText}>{waving ? '…' : 'Wave'}</Text>
-          </TouchableOpacity>
-        ) : null}
-        {canMessage !== 'none' && !blocked ? (
-          <TouchableOpacity
-            style={[styles.primaryBtn, styles.messageBtn, opening && styles.btnDisabled]}
-            onPress={() => void onMessage()}
-            disabled={opening}
-          >
-            <Text style={styles.primaryBtnText}>{opening ? '…' : 'Message'}</Text>
-          </TouchableOpacity>
-        ) : null}
-        <TouchableOpacity
-          style={styles.profileBtn}
-          onPress={() => {
-            onClose();
-            navigation.navigate('UserProfile', { userId: point.id });
-          }}
-        >
-          <Text style={styles.profileBtnText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
-
       <TouchableOpacity style={styles.blockLink} onPress={onBlockToggle} disabled={blocking}>
         <Text style={[styles.blockLinkText, blocked && styles.unblockLinkText]}>
           {blocked ? 'Unblock' : 'Block'}
@@ -284,7 +277,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   );
 }
 
-/** Content only — host mounts inside BottomSheetModal. */
+/** Content only \u2014 host mounts inside BottomSheetModal. */
 export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): React.JSX.Element {
   if (point.kind === 'user') {
     return (
@@ -325,42 +318,33 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     gap: 14,
   },
-  userHeaderTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  userHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  userHeaderText: { flex: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  originLine: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-  onlineLabel: { color: colors.success, fontSize: 12, marginTop: 2 },
-  offlineLabel: { color: colors.textMuted },
-  trustBlock: { gap: 6 },
-  trustLabel: {
+  sectionLabel: {
     color: colors.textFaint,
     fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  trustText: { color: colors.textMuted, fontSize: 12 },
+  trustBlock: { gap: 6 },
+  trustHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  trustText: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
   trustBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   trustChip: {
     backgroundColor: colors.surface,
-    borderRadius: 12,
+    borderRadius: radius.md,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   trustChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
-  trustChipStrong: { backgroundColor: '#00d4ff20' },
+  trustChipStrong: { backgroundColor: 'rgba(0,212,255,0.12)' },
   trustChipStrongText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   trustEmpty: { color: colors.textFaint, fontSize: 12 },
   bio: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
   statsBlock: { gap: 6 },
-  statsLabel: {
-    color: colors.textFaint,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
   statsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -369,7 +353,7 @@ const styles = StyleSheet.create({
   },
   statPill: {
     backgroundColor: colors.bg,
-    borderRadius: 12,
+    borderRadius: radius.md,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
@@ -382,7 +366,7 @@ const styles = StyleSheet.create({
   unblockLinkText: { color: colors.info },
   primaryBtn: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: radius.md,
     paddingVertical: 14,
     paddingHorizontal: 16,
     alignItems: 'center',
@@ -393,7 +377,7 @@ const styles = StyleSheet.create({
   messageBtn: { backgroundColor: colors.action },
   primaryBtnText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
   profileBtn: {
-    borderRadius: 12,
+    borderRadius: radius.md,
     paddingVertical: 14,
     paddingHorizontal: 16,
     alignItems: 'center',
@@ -412,7 +396,7 @@ const styles = StyleSheet.create({
   viewBtn: {
     marginTop: 8,
     backgroundColor: colors.primary,
-    borderRadius: 12,
+    borderRadius: radius.md,
     paddingVertical: 12,
     alignItems: 'center',
   },
