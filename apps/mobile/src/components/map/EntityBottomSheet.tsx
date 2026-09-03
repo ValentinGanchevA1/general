@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -92,13 +92,14 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   const idVerified = profile?.idVerified === true;
   const ringVariant = idVerified ? 'verified' : isFriend ? 'friend' : 'brand';
 
-  const subtitle = useMemo(() => {
+  const subtitle = (() => {
+    if (profile == null) return null;
     const parts: string[] = [];
-    if (profile?.age != null) parts.push(`${profile.age}`);
-    const home = [profile?.hometownCity, profile?.hometownCountry].filter(Boolean).join(', ');
+    if (profile.age != null) parts.push(`${profile.age}`);
+    const home = [profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ');
     if (home) parts.push(home);
     return parts.length > 0 ? parts.join(' \u00b7 ') : null;
-  }, [profile?.age, profile?.hometownCity, profile?.hometownCountry]);
+  })();
 
   const openProfile = (): void => {
     onClose();
@@ -277,7 +278,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   );
 }
 
-/** Content only \u2014 host mounts inside BottomSheetModal. */
+/** Content only — host mounts inside BottomSheetModal. */
 export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): React.JSX.Element {
   if (point.kind === 'user') {
     return (
