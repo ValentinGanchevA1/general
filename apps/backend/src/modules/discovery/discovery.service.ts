@@ -172,18 +172,39 @@ export class DiscoveryService {
       return null;
     }
 
-    const currentKeys = new Set(currentPoints.map((p) => this.pointKey(p)));
-    const prevKeys = new Set(prevPoints.map((p) => this.pointKey(p)));
+    // Content-aware diff: a surviving key whose payload changed (cluster count,
+    // presence/meta on an entity, etc.) is emitted as remove-old + add-new so
+    // the client's remove-then-merge-added logic swaps in the fresh copy
+    // instead of keeping a stale cached point for the rest of the snapshot TTL.
+    // Uses a canonical (sorted-key) comparison so key-insertion-order
+    // differences between the cached snapshot and a freshly computed point
+    // never register as a false "changed" positive.
+    const currentByKey = new Map(currentPoints.map((p) => [this.pointKey(p), p]));
+    const prevByKey = new Map(prevPoints.map((p) => [this.pointKey(p), p]));
 
-    const removed = [...prevKeys].filter((k) => !currentKeys.has(k));
+    const removed: string[] = [];
+    const added: DiscoveryPoint[] = [];
+
+    for (const [key, prevPoint] of prevByKey) {
+      const curPoint = currentByKey.get(key);
+      if (!curPoint) {
+        removed.push(key);
+      } else if (this.canonicalJson(prevPoint) !== this.canonicalJson(curPoint)) {
+        removed.push(key);
+        added.push(curPoint);
+      }
+    }
+    for (const [key, curPoint] of currentByKey) {
+      if (!prevByKey.has(key)) added.push(curPoint);
+    }
 
     // If more than threshold of prev points were removed, the user jumped far —
-    // sending a diff would be larger than the full payload.
+    // sending a diff would be larger than the full payload. A content-changed
+    // key counts toward "removed" here too, which only makes this heuristic
+    // more conservative (more full-response fallbacks, never an incorrect diff).
     if (prevPoints.length > 0 && removed.length / prevPoints.length > DIFF_FALLBACK_THRESHOLD) {
       return null;
     }
-
-    const added = currentPoints.filter((p) => !prevKeys.has(this.pointKey(p)));
 
     // Skip diff if nothing changed.
     if (added.length === 0 && removed.length === 0) {
@@ -191,6 +212,20 @@ export class DiscoveryService {
     }
 
     return { added, removed };
+  }
+
+  /** Order-insensitive structural equality via canonical (sorted-key) JSON. */
+  private canonicalJson(value: unknown): string {
+    return JSON.stringify(value, (_key, val) =>
+      val && typeof val === 'object' && !Array.isArray(val)
+        ? Object.keys(val as Record<string, unknown>)
+            .sort()
+            .reduce<Record<string, unknown>>((acc, k) => {
+              acc[k] = (val as Record<string, unknown>)[k];
+              return acc;
+            }, {})
+        : val,
+    );
   }
 
   // ─── Cluster aggregate (low/mid zoom) ────────────────────────────────────
@@ -239,8 +274,13 @@ export class DiscoveryService {
       byCell.set(row.cell, slot);
     }
 
+    // Sort largest-first before capping so an overflow silently drops the
+    // smallest, least-visually-significant clusters — not an arbitrary subset
+    // in SQL-row/Map-insertion order.
+    const sortedCells = [...byCell].sort((a, b) => b[1].count - a[1].count);
+
     const points: DiscoveryPoint[] = [];
-    for (const [cellId, slot] of byCell) {
+    for (const [cellId, slot] of sortedCells) {
       const [lat, lng] = h3.cellToLatLng(cellId);
       points.push({
         kind: 'cluster',

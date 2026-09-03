@@ -14,6 +14,7 @@ import MapView, {
 	type LongPressEvent,
 	type Region,
 } from 'react-native-maps';
+import { MAP_STYLE } from '@/components/map/mapStyle';
 import {
 	BottomSheetModal,
 	BottomSheetView,
@@ -503,6 +504,7 @@ export function MapScreen(): React.JSX.Element {
 				<MapView
 					ref={mapRef}
 					provider={PROVIDER_GOOGLE}
+					customMapStyle={MAP_STYLE}
 					style={StyleSheet.absoluteFill}
 					showsUserLocation
 					showsMyLocationButton={false}

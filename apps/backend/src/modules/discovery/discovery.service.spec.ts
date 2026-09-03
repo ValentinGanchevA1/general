@@ -243,5 +243,32 @@ describe('DiscoveryService', () => {
       expect(res.points).toEqual([]);
       expect(res.diff).toEqual({ added: [], removed: [] });
     });
+
+    it('treats a same-key content change as remove+add, not silently stale', async () => {
+      // Same id, different meta — a naive presence-only diff would drop this
+      // update entirely since the key ('e1') exists in both snapshots.
+      const fresh = { id: 'e1', kind: 'event', lat: 1, lng: 2, meta: { attendeeCount: 9 } };
+      query.mockResolvedValueOnce([fresh]);
+      redisGet.mockResolvedValue(
+        JSON.stringify([{ id: 'e1', kind: 'event', lat: 1, lng: 2, meta: { attendeeCount: 3 } }]),
+      );
+
+      const res = await call({ prevViewportHash: 'prev' });
+
+      expect(res.diff).toBeTruthy();
+      expect(res.diff!.removed).toEqual(['e1']);
+      expect(asPoints(res.diff!.added)).toEqual([fresh]);
+    });
+
+    it('does not flag a real overlap as changed due to key-insertion-order alone', async () => {
+      // Regression guard for the canonical-JSON comparator: a hand-rolled
+      // fixture (id-first key order) vs. the service's own construction order
+      // must compare equal when content is identical.
+      query.mockResolvedValueOnce([p('e1')]);
+      redisGet.mockResolvedValue(JSON.stringify([p('e1')]));
+
+      const res = await call({ prevViewportHash: 'prev' });
+      expect(res.diff).toEqual({ added: [], removed: [] });
+    });
   });
 });
