@@ -15,6 +15,8 @@ interface Props {
   onLeaderboard: () => void;
   onAchievements: () => void;
   onGifts: () => void;
+  /** Browse marketplace (IA-2). Always available. */
+  onMarketplace: () => void;
 }
 
 export function ProfileActivityLinks({
@@ -25,6 +27,7 @@ export function ProfileActivityLinks({
   onLeaderboard,
   onAchievements,
   onGifts,
+  onMarketplace,
 }: Props): React.JSX.Element | null {
   // Progressive disclosure: hide gamification chrome until the user has real signal.
   const challengeStarted = challenges.some((c) => (c.progress ?? 0) > 0);
@@ -35,7 +38,9 @@ export function ProfileActivityLinks({
   // Gifts inbox is useful once wallet/activity exists; hide pure-empty new accounts.
   const showGifts = spendableXp > 0 || showGamificationRow;
 
-  if (!showProgress && !showGamificationRow && !showGifts) {
+  // Marketplace is a permanent commerce entry (IA-2) — never fully empty.
+  const showMarketplace = true;
+  if (!showProgress && !showGamificationRow && !showGifts && !showMarketplace) {
     return null;
   }
 
@@ -76,6 +81,20 @@ export function ProfileActivityLinks({
           <Icon name="chevron-right" size={22} color={colors.textFaint} />
         </TouchableOpacity>
       ) : null}
+
+      <TouchableOpacity
+        style={styles.giftsCard}
+        onPress={onMarketplace}
+        accessibilityRole="button"
+        accessibilityLabel="Marketplace"
+      >
+        <Icon name="storefront-outline" size={22} color={colors.primary} />
+        <View style={styles.giftsCardBody}>
+          <Text style={styles.giftsCardTitle}>Marketplace</Text>
+          <Text style={styles.giftsCardSubtitle}>Nearby listings</Text>
+        </View>
+        <Icon name="chevron-right" size={22} color={colors.textFaint} />
+      </TouchableOpacity>
     </>
   );
 }
