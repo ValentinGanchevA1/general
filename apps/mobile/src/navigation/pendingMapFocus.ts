@@ -20,6 +20,7 @@ export type PendingMapFocus = {
   avatarUrl?: string | null;
   verification?: VerificationLevel;
   online?: boolean;
+  lastSeenAt?: string | null;
 };
 
 let pending: PendingMapFocus | null = null;
@@ -33,6 +34,7 @@ export function setPendingMapFocus(input: {
   avatarUrl?: string | null;
   verification?: VerificationLevel;
   online?: boolean;
+  lastSeenAt?: string | null;
 }): number {
   tokenSeq += 1;
   const hasCoords =
@@ -48,6 +50,7 @@ export function setPendingMapFocus(input: {
     ...(input.avatarUrl !== undefined ? { avatarUrl: input.avatarUrl } : {}),
     ...(input.verification != null ? { verification: input.verification } : {}),
     ...(input.online != null ? { online: input.online } : {}),
+    ...(input.lastSeenAt != null ? { lastSeenAt: input.lastSeenAt } : {}),
   };
   return tokenSeq;
 }
