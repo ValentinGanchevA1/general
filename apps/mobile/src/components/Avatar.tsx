@@ -4,7 +4,18 @@ import { Image, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'r
 
 import { colors } from '@/theme';
 
-export type AvatarRing = 'none' | 'brand' | 'friend' | 'verified';
+/**
+ * Ring styles for map sheet, profile, stories, and markers.
+ * - brand: primary cyan
+ * - friend: action green
+ * - story: accent (stories strip / ring)
+ * - verified: accent for ID trust
+ * - none: no ring
+ */
+export type AvatarRing = 'none' | 'brand' | 'friend' | 'story' | 'verified';
+
+/** @deprecated Use AvatarRing — kept for branches that imported AvatarRingVariant. */
+export type AvatarRingVariant = AvatarRing;
 
 export interface AvatarProps {
   uri?: string | null;
@@ -16,13 +27,11 @@ export interface AvatarProps {
    */
   ring?: boolean;
   /**
-   * Visual ring style:
-   * - brand: primary cyan (default when ring=true)
-   * - friend: action green
-   * - verified: accent purple (ID / high trust)
-   * - none: no ring
+   * Visual ring style. See AvatarRing.
    */
   ringVariant?: AvatarRing;
+  /** Friend marker — green ring when ringVariant is unset. */
+  isFriend?: boolean;
   online?: boolean;
   style?: StyleProp<ViewStyle>;
 }
@@ -30,8 +39,22 @@ export interface AvatarProps {
 const RING_COLOR: Record<Exclude<AvatarRing, 'none'>, string> = {
   brand: colors.primary,
   friend: colors.action,
+  story: colors.accent,
   verified: colors.accent,
 };
+
+function resolveRingColor(
+  ringVariant: AvatarRing | undefined,
+  ring: boolean | undefined,
+  isFriend: boolean | undefined,
+): string | null {
+  if (ringVariant && ringVariant !== 'none') {
+    return RING_COLOR[ringVariant];
+  }
+  if (isFriend) return colors.action;
+  if (ring) return colors.primary;
+  return null;
+}
 
 /**
  * Circular avatar: primary photo when available, initials fallback.
@@ -44,6 +67,7 @@ export function Avatar({
   size = 72,
   ring = false,
   ringVariant,
+  isFriend = false,
   online = false,
   style,
 }: AvatarProps): React.JSX.Element {
@@ -51,10 +75,9 @@ export function Avatar({
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(cachedUri) && !failed;
 
-  const resolvedRing: AvatarRing =
-    ringVariant ?? (ring ? 'brand' : 'none');
-  const hasRing = resolvedRing !== 'none';
-  const ringColor = hasRing ? RING_COLOR[resolvedRing] : 'transparent';
+  const ringColor = resolveRingColor(ringVariant, ring, isFriend);
+  const hasRing = ringColor != null;
+  const ringWidth = hasRing ? Math.max(2, Math.round(size * 0.04)) : 0;
 
   const initials = name
     .trim()
@@ -65,7 +88,6 @@ export function Avatar({
     .slice(0, 2);
 
   const radius = size / 2;
-  const ringWidth = hasRing ? Math.max(2, Math.round(size * 0.04)) : 0;
 
   return (
     <View style={[{ width: size, height: size }, style]}>
@@ -77,7 +99,7 @@ export function Avatar({
             height: size,
             borderRadius: radius,
             borderWidth: ringWidth,
-            borderColor: ringColor,
+            borderColor: ringColor ?? 'transparent',
             backgroundColor: colors.bg,
           },
         ]}
