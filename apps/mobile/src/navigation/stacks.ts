@@ -21,6 +21,7 @@ export type CommerceStackParamList = {
     | undefined;
 };
 
+/** Settings / verification / legal — not the social graph. */
 export type AccountStackParamList = {
   Settings: undefined;
   Privacy: undefined;
@@ -35,6 +36,10 @@ export type AccountStackParamList = {
   SocialLinking: undefined;
   ProfileEdit: undefined;
   Photos: undefined;
+};
+
+/** Friends graph — Profile / map CTAs, not Settings. */
+export type SocialStackParamList = {
   FriendsList: undefined;
   Suggestions: undefined;
 };
@@ -48,11 +53,13 @@ export type NestedStackName =
   | 'Gamification'
   | 'Commerce'
   | 'Account'
+  | 'Social'
   | 'Events';
 
 export type NestedStackParams = {
   Gamification: NavigatorScreenParams<GamificationStackParamList>;
   Commerce: NavigatorScreenParams<CommerceStackParamList>;
   Account: NavigatorScreenParams<AccountStackParamList>;
+  Social: NavigatorScreenParams<SocialStackParamList>;
   Events: NavigatorScreenParams<EventsStackParamList>;
 };

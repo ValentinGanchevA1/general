@@ -15,13 +15,13 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { ApiError, SuggestionCard, SuggestionReason } from '@g88/shared';
 
-import type { AccountStackParamList } from '@/navigation/stacks';
+import type { SocialStackParamList } from '@/navigation/stacks';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson, postJson } from '@/api/client';
 import { Avatar } from '@/components/Avatar';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
-type Nav = NativeStackNavigationProp<AccountStackParamList & RootStackParamList>;
+type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
 
 function reasonLabel(reason: SuggestionReason, mutual: number): string {
   switch (reason) {

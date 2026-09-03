@@ -1,6 +1,6 @@
 // apps/mobile/src/screens/FriendsListScreen.tsx
 // Tabs: Friends · Following · Followers · Requests
-// Entry: Profile → Friends card / openRootScreen('FriendsList')
+// Entry: Profile → Friends card / openRootScreen('FriendsList') → Social stack
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -19,7 +19,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { FriendCard, FriendRequestCard } from '@g88/shared';
 
-import type { AccountStackParamList } from '@/navigation/stacks';
+import type { SocialStackParamList } from '@/navigation/stacks';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {
@@ -36,7 +36,7 @@ import { useSocket } from '@/realtime/useSocket';
 import { Avatar } from '@/components/Avatar';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
-type Nav = NativeStackNavigationProp<AccountStackParamList & RootStackParamList>;
+type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
 
 const TABS: { key: FriendsTab; label: string }[] = [
   { key: 'friends', label: 'Friends' },
@@ -153,7 +153,7 @@ export function FriendsListScreen(): React.JSX.Element {
       case 'friends':
         return {
           title: 'No close friends yet',
-          hint: 'Send a friend request from someone’s profile. Accepted friends show here.',
+          hint: 'Send a friend request from someone\u2019s profile. Accepted friends show here.',
           showSuggestions: true,
         };
       case 'following':
@@ -165,7 +165,7 @@ export function FriendsListScreen(): React.JSX.Element {
       case 'followers':
         return {
           title: 'No followers yet',
-          hint: 'When others follow you, they’ll appear here.',
+          hint: 'When others follow you, they\u2019ll appear here.',
           showSuggestions: false,
         };
       case 'requests':

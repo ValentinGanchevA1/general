@@ -212,6 +212,7 @@ export function ProfileScreen(): React.JSX.Element {
           onLeaderboard={() => openRootScreen(navigation, 'Leaderboard')}
           onAchievements={() => openRootScreen(navigation, 'Achievements')}
           onGifts={() => openRootScreen(navigation, 'GiftsInbox')}
+          onMarketplace={() => openRootScreen(navigation, 'Marketplace')}
         />
 
         <ProfileFriendsCard
