@@ -47,7 +47,7 @@ export function IdentityBlock({
   const content = (
     <View style={[styles.row, style]}>
       <Avatar
-        uri={avatarUrl}
+        uri={avatarUrl ?? null}
         name={name}
         size={size}
         ringVariant={ringVariant}
