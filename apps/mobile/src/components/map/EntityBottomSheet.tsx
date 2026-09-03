@@ -20,8 +20,8 @@ import type {
 } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { deleteJson, getJson, postJson } from '@/api/client';
-import { VerificationBadge } from '@/components/VerificationBadge';
-import { Avatar } from '@/components/Avatar';
+import { IdentityBlock } from '@/components/IdentityBlock';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { colors, spacing } from '@/theme';
 
 const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
@@ -55,6 +55,11 @@ interface UserCardProps {
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
+/**
+ * Map entity sheet — conversion surface.
+ * Hierarchy: Identity → Trust chips → Bio → Primary CTAs (Wave → Message → Profile) → Block.
+ * Stats live inside IdentityBlock (level / rank / 3 icons max).
+ */
 function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
@@ -84,10 +89,12 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   const status = profile?.status;
   const trustScore = profile?.verificationScore;
   const badges = profile ? earnedBadges(profile.verification) : [];
-  const achievementIcons = status?.achievementIcons ?? [];
-  const allTimeRank = status?.allTimeRank ?? null;
-  const hasStats =
-    status != null || allTimeRank != null || achievementIcons.length > 0;
+  const isFriend = profile?.relationship?.state === 'friends';
+
+  const openProfile = (): void => {
+    onClose();
+    navigation.navigate('UserProfile', { userId: point.id });
+  };
 
   const onBlockToggle = (): void => {
     if (blocking) return;
@@ -126,10 +133,10 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
     if (opening || canMessage === 'none' || blocked) return;
     setOpening(true);
     try {
-      const res = await postJson<
-        CreateConversationRequest,
-        CreateConversationResponse
-      >('/chat/conversations', { targetUserId: point.id });
+      const res = await postJson<CreateConversationRequest, CreateConversationResponse>(
+        '/chat/conversations',
+        { targetUserId: point.id },
+      );
       onClose();
       navigation.navigate('Chat', {
         conversationId: res.conversationId,
@@ -146,49 +153,30 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 
   return (
     <View style={styles.sheet}>
-      <View style={styles.userHeader}>
-        <TouchableOpacity
-          style={styles.userHeaderTap}
-          onPress={() => {
-            onClose();
-            navigation.navigate('UserProfile', { userId: point.id });
-          }}
-          activeOpacity={0.85}
-        >
-          <Avatar uri={meta.avatarUrl ?? null} name={displayName} size={56} />
-          <View style={styles.userHeaderText}>
-            <View style={styles.nameRow}>
-              <Text style={styles.title} numberOfLines={1}>
-                {displayName}
-              </Text>
-              <VerificationBadge
-                verification={meta.verification ?? 'none'}
-                idVerified={profile?.idVerified}
-                size={16}
-              />
-            </View>
-            {profile?.age != null ? (
-              <Text style={styles.originLine}>{profile.age} years</Text>
-            ) : null}
-            {profile?.hometownCity || profile?.hometownCountry ? (
-              <Text style={styles.originLine} numberOfLines={1}>
-                {[profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ')}
-              </Text>
-            ) : null}
-            {meta.online ? (
-              <Text style={styles.onlineLabel}>Online</Text>
-            ) : (
-              <Text style={[styles.onlineLabel, styles.offlineLabel]}>Offline</Text>
-            )}
-          </View>
-        </TouchableOpacity>
-      </View>
+      <IdentityBlock
+        name={displayName}
+        avatarUrl={meta.avatarUrl ?? null}
+        verification={profile?.verification ?? meta.verification ?? 'none'}
+        idVerified={profile?.idVerified}
+        age={profile?.age}
+        hometownCity={profile?.hometownCity}
+        hometownCountry={profile?.hometownCountry}
+        online={Boolean(meta.online)}
+        isFriend={isFriend}
+        level={status?.level ?? null}
+        allTimeRank={status?.allTimeRank ?? null}
+        achievementIcons={status?.achievementIcons ?? []}
+        onPress={openProfile}
+      />
 
       {fetching ? (
-        <ActivityIndicator color={colors.primary} size="small" style={{ alignSelf: 'flex-start' }} />
+        <ActivityIndicator
+          color={colors.primary}
+          size="small"
+          style={{ alignSelf: 'flex-start' }}
+        />
       ) : null}
 
-      {/* Trust — under avatar, before bio */}
       {!fetching && profile != null ? (
         <View style={styles.trustBlock}>
           <Text style={styles.trustLabel}>Trust</Text>
@@ -211,34 +199,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         </View>
       ) : null}
 
-      {/* Stats: level + all-time rank + achievement icons — under Trust, above Bio */}
-      {!fetching && profile != null && hasStats ? (
-        <View style={styles.statsBlock}>
-          <Text style={styles.statsLabel}>Stats</Text>
-          <View style={styles.statsRow}>
-            {status ? (
-              <View style={styles.statPill}>
-                <Text style={styles.statPillValue}>Lv {status.level}</Text>
-              </View>
-            ) : null}
-            {allTimeRank != null ? (
-              <View style={styles.statPill}>
-                <Text style={styles.statPillValue}>#{allTimeRank}</Text>
-              </View>
-            ) : null}
-            {achievementIcons.length > 0 ? (
-              <View style={styles.achievementIcons}>
-                {achievementIcons.slice(0, 6).map((icon, i) => (
-                  <Text key={`${icon}-${i}`} style={styles.achievementIcon}>
-                    {icon}
-                  </Text>
-                ))}
-              </View>
-            ) : null}
-          </View>
-        </View>
-      ) : null}
-
       {profile?.bio ? (
         <Text style={styles.bio} numberOfLines={3}>
           {profile.bio}
@@ -247,35 +207,33 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 
       <View style={styles.actions}>
         {onWave && !blocked ? (
-          <TouchableOpacity
-            style={[styles.primaryBtn, styles.waveBtn, waving && styles.btnDisabled]}
+          <PrimaryButton
+            label={waving ? '…' : 'Wave'}
             onPress={onWave}
+            variant="primary"
             disabled={waving}
-          >
-            <Text style={styles.primaryBtnText}>{waving ? '…' : 'Wave'}</Text>
-          </TouchableOpacity>
+            flex
+          />
         ) : null}
         {canMessage !== 'none' && !blocked ? (
-          <TouchableOpacity
-            style={[styles.primaryBtn, styles.messageBtn, opening && styles.btnDisabled]}
+          <PrimaryButton
+            label={opening ? '…' : 'Message'}
             onPress={() => void onMessage()}
+            variant="action"
             disabled={opening}
-          >
-            <Text style={styles.primaryBtnText}>{opening ? '…' : 'Message'}</Text>
-          </TouchableOpacity>
+            loading={opening}
+            flex
+          />
         ) : null}
-        <TouchableOpacity
-          style={styles.profileBtn}
-          onPress={() => {
-            onClose();
-            navigation.navigate('UserProfile', { userId: point.id });
-          }}
-        >
-          <Text style={styles.profileBtnText}>Profile</Text>
-        </TouchableOpacity>
+        <PrimaryButton label="Profile" onPress={openProfile} variant="secondary" />
       </View>
 
-      <TouchableOpacity style={styles.blockLink} onPress={onBlockToggle} disabled={blocking}>
+      <TouchableOpacity
+        style={styles.blockLink}
+        onPress={onBlockToggle}
+        disabled={blocking}
+        accessibilityRole="button"
+      >
         <Text style={[styles.blockLinkText, blocked && styles.unblockLinkText]}>
           {blocked ? 'Unblock' : 'Block'}
         </Text>
@@ -299,9 +257,9 @@ export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): Re
 
   const title =
     point.kind === 'event'
-      ? (point.meta as { title?: string }).title ?? 'Event'
+      ? ((point.meta as { title?: string }).title ?? 'Event')
       : point.kind === 'listing'
-        ? (point.meta as { title?: string }).title ?? 'Listing'
+        ? ((point.meta as { title?: string }).title ?? 'Listing')
         : 'Place';
 
   return (
@@ -312,9 +270,7 @@ export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): Re
           <Text style={styles.subtitle}>{point.kind}</Text>
         </View>
       </View>
-      <TouchableOpacity style={styles.viewBtn} onPress={onClose}>
-        <Text style={styles.viewBtnText}>Close</Text>
-      </TouchableOpacity>
+      <PrimaryButton label="Close" onPress={onClose} variant="primary" />
     </View>
   );
 }
@@ -325,13 +281,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     gap: 14,
   },
-  userHeaderTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  userHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  userHeaderText: { flex: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  originLine: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-  onlineLabel: { color: colors.success, fontSize: 12, marginTop: 2 },
-  offlineLabel: { color: colors.textMuted },
   trustBlock: { gap: 6 },
   trustLabel: {
     color: colors.textFaint,
@@ -340,7 +289,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  trustText: { color: colors.textMuted, fontSize: 12 },
+  trustText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   trustBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   trustChip: {
     backgroundColor: colors.surface,
@@ -349,72 +298,16 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   trustChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
-  trustChipStrong: { backgroundColor: '#00d4ff20' },
+  trustChipStrong: { backgroundColor: `${colors.primary}33` },
   trustChipStrongText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   trustEmpty: { color: colors.textFaint, fontSize: 12 },
   bio: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
-  statsBlock: { gap: 6 },
-  statsLabel: {
-    color: colors.textFaint,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 8,
-  },
-  statPill: {
-    backgroundColor: colors.bg,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  statPillValue: { color: colors.textPrimary, fontSize: 13, fontWeight: '700' },
-  achievementIcons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  achievementIcon: { fontSize: 16 },
   actions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   blockLink: { alignSelf: 'center', paddingVertical: 4 },
   blockLinkText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
   unblockLinkText: { color: colors.info },
-  primaryBtn: {
-    flex: 1,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  waveBtn: { backgroundColor: colors.primary },
-  messageBtn: { backgroundColor: colors.action },
-  primaryBtnText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
-  profileBtn: {
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    minHeight: 48,
-  },
-  profileBtnText: { color: colors.textSecondary, fontWeight: '600', fontSize: 14 },
-  btnDisabled: { opacity: 0.55 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   titleGroup: { flex: 1 },
   title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
   subtitle: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
-  viewBtn: {
-    marginTop: 8,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  viewBtnText: { color: colors.onPrimary, fontSize: 14, fontWeight: '700' },
 });
