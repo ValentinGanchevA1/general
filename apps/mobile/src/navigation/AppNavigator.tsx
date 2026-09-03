@@ -64,6 +64,7 @@ import type {
   CommerceStackParamList,
   EventsStackParamList,
   GamificationStackParamList,
+  SocialStackParamList,
 } from './stacks';
 
 export type PulseFilter =
@@ -105,6 +106,7 @@ export type RootStackParamList = {
   Gamification: NavigatorScreenParams<GamificationStackParamList>;
   Commerce: NavigatorScreenParams<CommerceStackParamList>;
   Account: NavigatorScreenParams<AccountStackParamList>;
+  Social: NavigatorScreenParams<SocialStackParamList>;
   Events: NavigatorScreenParams<EventsStackParamList>;
 };
 
@@ -113,6 +115,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 const GamificationStack = createNativeStackNavigator<GamificationStackParamList>();
 const CommerceStack = createNativeStackNavigator<CommerceStackParamList>();
 const AccountStack = createNativeStackNavigator<AccountStackParamList>();
+const SocialStack = createNativeStackNavigator<SocialStackParamList>();
 const EventsStack = createNativeStackNavigator<EventsStackParamList>();
 export { navigationRef };
 
@@ -167,17 +170,24 @@ function AccountNavigator(): React.JSX.Element {
       <AccountStack.Screen name="SocialLinking" component={SocialLinkingScreen} />
       <AccountStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
       <AccountStack.Screen name="Photos" component={PhotosScreen} />
-      <AccountStack.Screen
+    </AccountStack.Navigator>
+  );
+}
+
+function SocialNavigator(): React.JSX.Element {
+  return (
+    <SocialStack.Navigator screenOptions={stackScreenOpts}>
+      <SocialStack.Screen
         name="FriendsList"
         component={FriendsListScreen}
         options={{ headerShown: false, title: 'Friends' }}
       />
-      <AccountStack.Screen
+      <SocialStack.Screen
         name="Suggestions"
         component={SuggestionsScreen}
         options={{ headerShown: false, title: 'Suggestions' }}
       />
-    </AccountStack.Navigator>
+    </SocialStack.Navigator>
   );
 }
 
@@ -326,6 +336,11 @@ export function AppNavigator(): React.JSX.Element {
               <Stack.Screen
                 name="Account"
                 component={AccountNavigator}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Social"
+                component={SocialNavigator}
                 options={{ headerShown: false }}
               />
               <Stack.Screen
