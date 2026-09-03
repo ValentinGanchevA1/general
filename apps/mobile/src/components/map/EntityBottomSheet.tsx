@@ -88,7 +88,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   const hasStats =
     status != null || allTimeRank != null || achievementIcons.length > 0;
 
-  const isFriend = profile?.relationship?.isFriend === true;
+  const isFriend = meta.isFriend === true;
   const idVerified = profile?.idVerified === true;
   const ringVariant = idVerified ? 'verified' : isFriend ? 'friend' : 'brand';
 
