@@ -14,11 +14,14 @@ import type {
   CreateConversationRequest,
   CreateConversationResponse,
   EntityPoint,
+  EventMeta,
+  ListingMeta,
   PublicUserProfile,
   UserMeta,
   VerificationLevel,
 } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { openRootScreen } from '@/navigation/openRootScreen';
 import { deleteJson, getJson, postJson } from '@/api/client';
 import { IdentityBlock } from '@/components/IdentityBlock';
 import { colors, radius, spacing } from '@/theme';
@@ -36,7 +39,38 @@ function earnedBadges(level: VerificationLevel): string[] {
   return LADDER_BADGES.filter((b) => rank >= LADDER.indexOf(b.level)).map((b) => b.label);
 }
 
+function formatStartsAt(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  try {
+    return d.toLocaleString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return d.toISOString();
+  }
+}
+
+function formatPrice(cents: number, currency: string): string {
+  const amount = cents / 100;
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: currency || 'USD',
+      maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    }).format(amount);
+  } catch {
+    return `${(currency || 'USD').toUpperCase()} ${amount.toFixed(2)}`;
+  }
+}
+
 type UserEntityPoint = EntityPoint & { kind: 'user'; meta: UserMeta };
+type EventEntityPoint = EntityPoint & { kind: 'event'; meta: EventMeta };
+type ListingEntityPoint = EntityPoint & { kind: 'listing'; meta: ListingMeta };
 
 interface Props {
   point: EntityPoint;
@@ -98,7 +132,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
     if (profile.age != null) parts.push(`${profile.age}`);
     const home = [profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ');
     if (home) parts.push(home);
-    return parts.length > 0 ? parts.join(' \u00b7 ') : null;
+    return parts.length > 0 ? parts.join(' · ') : null;
   })();
 
   const openProfile = (): void => {
@@ -106,37 +140,51 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
     navigation.navigate('UserProfile', { userId: point.id });
   };
 
-  const onBlockToggle = (): void => {
+  const runBlockToggle = async (): Promise<void> => {
     if (blocking) return;
-    const doBlock = async (): Promise<void> => {
-      setBlocking(true);
-      try {
-        if (blocked) {
-          await deleteJson<{ blocked: boolean }>(`/blocks/${point.id}`);
-          setProfile((p) => (p ? { ...p, blockedByViewer: false } : p));
-        } else {
-          await postJson<undefined, { blocked: boolean }>(`/blocks/${point.id}`, undefined);
-          setProfile((p) => (p ? { ...p, blockedByViewer: true } : p));
-          onClose();
-        }
-      } catch {
-        appAlert('Could not update block', 'Try again in a moment.');
-      } finally {
-        setBlocking(false);
+    setBlocking(true);
+    try {
+      if (blocked) {
+        await deleteJson<{ blocked: boolean }>(`/blocks/${point.id}`);
+        setProfile((p) => (p ? { ...p, blockedByViewer: false } : p));
+      } else {
+        await postJson<undefined, { blocked: boolean }>(`/blocks/${point.id}`, undefined);
+        setProfile((p) => (p ? { ...p, blockedByViewer: true } : p));
+        onClose();
       }
-    };
+    } catch {
+      appAlert('Could not update block', 'Try again in a moment.');
+    } finally {
+      setBlocking(false);
+    }
+  };
+
+  const onOverflow = (): void => {
+    if (blocking) return;
     if (blocked) {
-      void doBlock();
+      appAlert(displayName, undefined, [
+        { text: 'Unblock', onPress: () => void runBlockToggle() },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
       return;
     }
-    appAlert(
-      'Block this user?',
-      'They will not be able to wave or message you. You can unblock later in Settings.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Block', style: 'destructive', onPress: () => void doBlock() },
-      ],
-    );
+    appAlert(displayName, undefined, [
+      {
+        text: 'Block',
+        style: 'destructive',
+        onPress: () => {
+          appAlert(
+            'Block this user?',
+            'They will not be able to wave or message you. You can unblock later in Settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Block', style: 'destructive', onPress: () => void runBlockToggle() },
+            ],
+          );
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const onMessage = async (): Promise<void> => {
@@ -163,17 +211,31 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 
   return (
     <View style={styles.sheet}>
-      <IdentityBlock
-        name={displayName}
-        avatarUrl={meta.avatarUrl ?? null}
-        verification={meta.verification ?? profile?.verification ?? 'none'}
-        idVerified={idVerified}
-        online={meta.online}
-        subtitle={subtitle}
-        ringVariant={ringVariant}
-        size={56}
-        onPress={openProfile}
-      />
+      <View style={styles.userHeader}>
+        <View style={styles.userHeaderMain}>
+          <IdentityBlock
+            name={displayName}
+            avatarUrl={meta.avatarUrl ?? null}
+            verification={meta.verification ?? profile?.verification ?? 'none'}
+            idVerified={idVerified}
+            online={meta.online}
+            subtitle={subtitle}
+            ringVariant={ringVariant}
+            size={56}
+            onPress={openProfile}
+          />
+        </View>
+        <TouchableOpacity
+          style={styles.overflowBtn}
+          onPress={onOverflow}
+          disabled={blocking || fetching}
+          accessibilityRole="button"
+          accessibilityLabel="More actions"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.overflowBtnText}>···</Text>
+        </TouchableOpacity>
+      </View>
 
       {fetching ? (
         <ActivityIndicator color={colors.primary} size="small" style={{ alignSelf: 'flex-start' }} />
@@ -188,7 +250,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
             accessibilityRole="button"
             accessibilityLabel="Wave"
           >
-            <Text style={styles.primaryBtnText}>{waving ? '\u2026' : 'Wave'}</Text>
+            <Text style={styles.primaryBtnText}>{waving ? '…' : 'Wave'}</Text>
           </TouchableOpacity>
         ) : null}
         {canMessage !== 'none' && !blocked ? (
@@ -199,7 +261,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
             accessibilityRole="button"
             accessibilityLabel="Message"
           >
-            <Text style={styles.primaryBtnText}>{opening ? '\u2026' : 'Message'}</Text>
+            <Text style={styles.primaryBtnText}>{opening ? '…' : 'Message'}</Text>
           </TouchableOpacity>
         ) : null}
         <TouchableOpacity
@@ -268,11 +330,100 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
           {profile.bio}
         </Text>
       ) : null}
+    </View>
+  );
+}
 
-      <TouchableOpacity style={styles.blockLink} onPress={onBlockToggle} disabled={blocking}>
-        <Text style={[styles.blockLinkText, blocked && styles.unblockLinkText]}>
-          {blocked ? 'Unblock' : 'Block'}
-        </Text>
+function EventCard({
+  point,
+  onClose,
+}: {
+  point: EventEntityPoint;
+  onClose: () => void;
+}): React.JSX.Element {
+  const navigation = useNavigation<Nav>();
+  const meta = point.meta;
+  const title = meta.title?.trim() || 'Event';
+  const capacity =
+    meta.capacity != null && meta.capacity > 0
+      ? `${meta.attendeeCount}/${meta.capacity} going`
+      : `${meta.attendeeCount} going`;
+
+  const openDetail = (): void => {
+    onClose();
+    openRootScreen(navigation, 'EventDetail', { eventId: point.id });
+  };
+
+  return (
+    <View style={styles.sheet}>
+      <View style={styles.kindHeader}>
+        <View style={[styles.kindDot, styles.kindDotEvent]} />
+        <Text style={styles.kindLabel}>Event</Text>
+      </View>
+      <Text style={styles.entityTitle} numberOfLines={2}>
+        {title}
+      </Text>
+      <View style={styles.metaRow}>
+        <Text style={styles.metaText}>{formatStartsAt(meta.startsAt)}</Text>
+        <Text style={styles.metaDot}>·</Text>
+        <Text style={styles.metaText}>{capacity}</Text>
+      </View>
+      <TouchableOpacity
+        style={[styles.primaryBtn, styles.entityPrimaryBtn]}
+        onPress={openDetail}
+        accessibilityRole="button"
+        accessibilityLabel="View event"
+      >
+        <Text style={styles.primaryBtnText}>View event</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function ListingCard({
+  point,
+  onClose,
+}: {
+  point: ListingEntityPoint;
+  onClose: () => void;
+}): React.JSX.Element {
+  const navigation = useNavigation<Nav>();
+  const meta = point.meta;
+  const title = meta.title?.trim() || 'Listing';
+  const mode = meta.mode === 'buy' ? 'Wanted' : 'For sale';
+  const price = formatPrice(meta.priceCents, meta.currency);
+  const category = meta.category?.trim() || null;
+
+  const openDetail = (): void => {
+    onClose();
+    openRootScreen(navigation, 'ListingDetail', { listingId: point.id });
+  };
+
+  return (
+    <View style={styles.sheet}>
+      <View style={styles.kindHeader}>
+        <View style={[styles.kindDot, styles.kindDotListing]} />
+        <Text style={styles.kindLabel}>{mode}</Text>
+      </View>
+      <Text style={styles.entityTitle} numberOfLines={2}>
+        {title}
+      </Text>
+      <View style={styles.metaRow}>
+        <Text style={styles.priceText}>{price}</Text>
+        {category ? (
+          <>
+            <Text style={styles.metaDot}>·</Text>
+            <Text style={styles.metaText}>{category}</Text>
+          </>
+        ) : null}
+      </View>
+      <TouchableOpacity
+        style={[styles.primaryBtn, styles.entityPrimaryBtn, styles.listingPrimaryBtn]}
+        onPress={openDetail}
+        accessibilityRole="button"
+        accessibilityLabel="View listing"
+      >
+        <Text style={styles.primaryBtnText}>View listing</Text>
       </TouchableOpacity>
     </View>
   );
@@ -291,23 +442,19 @@ export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): Re
     );
   }
 
-  const title =
-    point.kind === 'event'
-      ? (point.meta as { title?: string }).title ?? 'Event'
-      : point.kind === 'listing'
-        ? (point.meta as { title?: string }).title ?? 'Listing'
-        : 'Place';
+  if (point.kind === 'event') {
+    return <EventCard point={point as EventEntityPoint} onClose={onClose} />;
+  }
+
+  if (point.kind === 'listing') {
+    return <ListingCard point={point as ListingEntityPoint} onClose={onClose} />;
+  }
 
   return (
     <View style={styles.sheet}>
-      <View style={styles.header}>
-        <View style={styles.titleGroup}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{point.kind}</Text>
-        </View>
-      </View>
-      <TouchableOpacity style={styles.viewBtn} onPress={onClose}>
-        <Text style={styles.viewBtnText}>Close</Text>
+      <Text style={styles.entityTitle}>Unknown</Text>
+      <TouchableOpacity style={[styles.primaryBtn, styles.entityPrimaryBtn]} onPress={onClose}>
+        <Text style={styles.primaryBtnText}>Close</Text>
       </TouchableOpacity>
     </View>
   );
@@ -318,6 +465,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
     gap: 14,
+  },
+  userHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  userHeaderMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  overflowBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overflowBtnText: {
+    color: colors.textSecondary,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   sectionLabel: {
     color: colors.textFaint,
@@ -362,9 +534,6 @@ const styles = StyleSheet.create({
   achievementIcons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   achievementIcon: { fontSize: 16 },
   actions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  blockLink: { alignSelf: 'center', paddingVertical: 4 },
-  blockLinkText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
-  unblockLinkText: { color: colors.info },
   primaryBtn: {
     flex: 1,
     borderRadius: radius.md,
@@ -390,16 +559,57 @@ const styles = StyleSheet.create({
   },
   profileBtnText: { color: colors.textSecondary, fontWeight: '600', fontSize: 14 },
   btnDisabled: { opacity: 0.55 },
-  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  titleGroup: { flex: 1 },
-  title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
-  subtitle: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
-  viewBtn: {
-    marginTop: 8,
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: 12,
+  kindHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
-  viewBtnText: { color: colors.onPrimary, fontSize: 14, fontWeight: '700' },
+  kindDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  kindDotEvent: { backgroundColor: colors.warning },
+  kindDotListing: { backgroundColor: colors.success },
+  kindLabel: {
+    color: colors.textFaint,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  entityTitle: {
+    color: colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+  },
+  metaText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  metaDot: {
+    color: colors.textFaint,
+    fontSize: 13,
+  },
+  priceText: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  entityPrimaryBtn: {
+    flex: 0,
+    alignSelf: 'stretch',
+    backgroundColor: colors.primary,
+    marginTop: 4,
+  },
+  listingPrimaryBtn: {
+    backgroundColor: colors.action,
+  },
 });
