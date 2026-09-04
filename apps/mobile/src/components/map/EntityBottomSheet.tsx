@@ -569,8 +569,8 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
   },
-  kindDotEvent: { backgroundColor: colors.warning },
-  kindDotListing: { backgroundColor: colors.success },
+  kindDotEvent: { backgroundColor: colors.entityEvent },
+  kindDotListing: { backgroundColor: colors.entityListing },
   kindLabel: {
     color: colors.textFaint,
     fontSize: 11,

@@ -44,6 +44,15 @@ export const colors = {
   danger: '#ff4444',
   warning: '#ff9d3c',
   success: '#4caf50',
+
+  /** Map / discovery: people pins (non-friend). */
+  entityUser: '#FF69B4',
+  /** Map / discovery: events. */
+  entityEvent: '#FF9800',
+  /** Map / discovery: listings (sell). */
+  entityListing: '#4CAF50',
+  /** Map / discovery: close-friend pins + wanted listings. */
+  entityFriend: '#00d4ff',
 } as const;
 
 export const spacing = {

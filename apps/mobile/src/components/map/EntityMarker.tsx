@@ -4,16 +4,15 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import type { EntityPoint } from '@g88/shared';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import { colors } from '@/theme';
+
 import { entityVisualKey } from './markerVisualKeys';
 
 const KIND_COLOR: Record<EntityPoint['kind'], string> = {
-  user: '#FF69B4',
-  event: '#FF9800',
-  listing: '#4CAF50',
+  user: colors.entityUser,
+  event: colors.entityEvent,
+  listing: colors.entityListing,
 };
-
-/** Close-friend pin — brand cyan so trusted people read above strangers. */
-const FRIEND_COLOR = '#00d4ff';
 
 const KIND_ICON: Record<EntityPoint['kind'], string> = {
   user: '👤',
@@ -43,9 +42,9 @@ function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element 
   const isFriend = point.kind === 'user' && point.meta.isFriend === true;
   const isBuyListing = point.kind === 'listing' && point.meta.mode === 'buy';
   const color = isFriend
-    ? FRIEND_COLOR
+    ? colors.entityFriend
     : isBuyListing
-      ? '#00d4ff'
+      ? colors.entityFriend
       : KIND_COLOR[point.kind];
 
   const label =
@@ -112,7 +111,7 @@ function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element 
         )}
         {isVerified ? (
           <View style={styles.verifiedBadge}>
-            <Icon name="check-decagram" size={12} color="#00d4ff" />
+            <Icon name="check-decagram" size={12} color={colors.entityFriend} />
           </View>
         ) : null}
       </View>
