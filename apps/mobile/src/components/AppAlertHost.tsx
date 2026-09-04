@@ -102,7 +102,6 @@ export function AppAlertHost(): React.JSX.Element | null {
                       isCancel && styles.btnTextCancel,
                     ]}
                     numberOfLines={2}
-                    textAlign="center"
                   >
                     {btn.text}
                   </Text>
@@ -190,6 +189,7 @@ const styles = StyleSheet.create({
   btnText: {
     fontSize: fontSize.md,
     fontWeight: '700',
+    textAlign: 'center',
   },
   btnTextPrimary: {
     color: colors.onPrimary,
