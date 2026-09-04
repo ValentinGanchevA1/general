@@ -23,7 +23,7 @@ import {
   setCover,
   setPrimary,
 } from '@/features/profile/photos';
-import { useAppDispatch } from '@/hooks/redux';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { extractMessage } from '@/utils/extractMessage';
 
@@ -31,10 +31,19 @@ const MAX_PHOTOS = 6;
 const { width } = Dimensions.get('window');
 const TILE = (width - 24 * 2 - 12) / 2;
 
+function urlsMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  // Strip query/signature so CDN-signed coverUrl still matches gallery url.
+  const strip = (u: string) => u.split('?')[0] ?? u;
+  return strip(a) === strip(b);
+}
+
 export function PhotosScreen(): React.JSX.Element {
   const navigation = useNavigation();
   const dispatch = useAppDispatch();
+  const profileCoverUrl = useAppSelector((s) => s.profile.profile?.coverUrl ?? null);
   const [photos, setPhotos] = useState<UserPhoto[]>([]);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +58,11 @@ export function PhotosScreen(): React.JSX.Element {
       active = false;
     };
   }, []);
+
+  // Seed / sync cover badge from profile store.
+  useEffect(() => {
+    if (profileCoverUrl != null) setCoverUrl(profileCoverUrl);
+  }, [profileCoverUrl]);
 
   const onAdd = useCallback(async () => {
     setError(null);
@@ -65,12 +79,13 @@ export function PhotosScreen(): React.JSX.Element {
 
   const onTapPhoto = useCallback(
     (photo: UserPhoto, isPrimary: boolean) => {
+      const isCover = urlsMatch(photo.url, coverUrl);
       const options = [
         ...(isPrimary
           ? []
           : [
               {
-                text: 'Set as main photo',
+                text: 'Set as main',
                 onPress: () => {
                   setBusy(true);
                   setPrimary(photo.id, photos)
@@ -83,16 +98,23 @@ export function PhotosScreen(): React.JSX.Element {
                 },
               },
             ]),
-        {
-          text: 'Set as cover (background)',
-          onPress: () => {
-            setBusy(true);
-            setCover(photo.id)
-              .then(() => void dispatch(fetchProfile()))
-              .catch((e) => setError(extractMessage(e, 'Could not set cover')))
-              .finally(() => setBusy(false));
-          },
-        },
+        ...(isCover
+          ? []
+          : [
+              {
+                text: 'Set as cover',
+                onPress: () => {
+                  setBusy(true);
+                  setCover(photo.id)
+                    .then(() => {
+                      setCoverUrl(photo.url);
+                      void dispatch(fetchProfile());
+                    })
+                    .catch((e) => setError(extractMessage(e, 'Could not set cover')))
+                    .finally(() => setBusy(false));
+                },
+              },
+            ]),
         {
           text: 'Delete',
           style: 'destructive' as const,
@@ -101,6 +123,7 @@ export function PhotosScreen(): React.JSX.Element {
             deletePhoto(photo.id)
               .then((list) => {
                 setPhotos(list);
+                if (urlsMatch(photo.url, coverUrl)) setCoverUrl(null);
                 void dispatch(fetchProfile());
               })
               .catch((e) => setError(extractMessage(e, 'Could not delete')))
@@ -112,12 +135,12 @@ export function PhotosScreen(): React.JSX.Element {
       appAlert(
         'Photo',
         isPrimary
-          ? 'Main profile photo. You can also use any photo as the cover background.'
+          ? 'Main is your avatar. You can also use any photo as the cover background.'
           : 'Main is your avatar. Cover is the wide background on profiles.',
         options,
       );
     },
-    [photos, dispatch],
+    [photos, dispatch, coverUrl],
   );
 
   return (
@@ -139,21 +162,34 @@ export function PhotosScreen(): React.JSX.Element {
           </Text>
 
           <View style={styles.grid}>
-            {photos.map((photo, index) => (
-              <TouchableOpacity
-                key={photo.id}
-                style={styles.tile}
-                onPress={() => onTapPhoto(photo, index === 0)}
-                disabled={busy}
-              >
-                <Image source={{ uri: photo.url }} style={styles.tileImage} />
-                {index === 0 ? (
-                  <View style={styles.mainTag}>
-                    <Text style={styles.mainTagText}>MAIN</Text>
-                  </View>
-                ) : null}
-              </TouchableOpacity>
-            ))}
+            {photos.map((photo, index) => {
+              const isMain = index === 0;
+              const isCover = urlsMatch(photo.url, coverUrl);
+              return (
+                <TouchableOpacity
+                  key={photo.id}
+                  style={styles.tile}
+                  onPress={() => onTapPhoto(photo, isMain)}
+                  disabled={busy}
+                >
+                  <Image source={{ uri: photo.url }} style={styles.tileImage} />
+                  {(isMain || isCover) && (
+                    <View style={styles.badgeRow}>
+                      {isMain ? (
+                        <View style={[styles.tag, styles.mainTag]}>
+                          <Text style={styles.mainTagText}>MAIN</Text>
+                        </View>
+                      ) : null}
+                      {isCover ? (
+                        <View style={[styles.tag, styles.coverTag]}>
+                          <Text style={styles.coverTagText}>COVER</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
 
             {photos.length < MAX_PHOTOS ? (
               <TouchableOpacity style={[styles.tile, styles.addTile]} onPress={onAdd} disabled={busy}>
@@ -202,16 +238,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a24',
   },
   tileImage: { width: '100%', height: '100%' },
-  mainTag: {
+  badgeRow: {
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: '#00d4ff',
+    right: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tag: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
   },
+  mainTag: {
+    backgroundColor: '#00d4ff',
+  },
   mainTagText: { color: '#000', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  coverTag: {
+    backgroundColor: 'rgba(168, 85, 247, 0.95)',
+  },
+  coverTagText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
   addTile: {
     justifyContent: 'center',
     alignItems: 'center',

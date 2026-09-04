@@ -42,6 +42,7 @@ export function AppAlertHost(): React.JSX.Element | null {
   const orderedButtons = useMemo(() => {
     if (!req) return [];
     const btns = [...req.buttons];
+    // Cancel first, then defaults, destructive last — readable on stacked layouts.
     btns.sort((a, b) => {
       const rank = (s?: string) =>
         s === 'cancel' ? 0 : s === 'destructive' ? 2 : 1;
@@ -52,7 +53,8 @@ export function AppAlertHost(): React.JSX.Element | null {
 
   if (!req) return null;
 
-  const multi = orderedButtons.length > 1;
+  // 1–2 actions: optional side-by-side. 3+: always stack so labels never wrap mid-word.
+  const useRow = orderedButtons.length === 2;
 
   return (
     <Modal
@@ -74,7 +76,7 @@ export function AppAlertHost(): React.JSX.Element | null {
           <Text style={styles.title}>{req.title}</Text>
           {req.message ? <Text style={styles.message}>{req.message}</Text> : null}
 
-          <View style={[styles.actions, multi && styles.actionsRow]}>
+          <View style={[styles.actions, useRow && styles.actionsRow]}>
             {orderedButtons.map((btn, i) => {
               const isCancel = btn.style === 'cancel';
               const isDestructive = btn.style === 'destructive';
@@ -83,8 +85,8 @@ export function AppAlertHost(): React.JSX.Element | null {
                   key={`${btn.text}-${i}`}
                   style={[
                     styles.btn,
-                    multi && styles.btnFlex,
-                    !multi && styles.btnFull,
+                    useRow && styles.btnFlex,
+                    !useRow && styles.btnFull,
                     isDestructive && styles.btnDestructive,
                     !isCancel && !isDestructive && styles.btnPrimary,
                     isCancel && styles.btnCancel,
@@ -99,6 +101,7 @@ export function AppAlertHost(): React.JSX.Element | null {
                       !isCancel && !isDestructive && styles.btnTextPrimary,
                       isCancel && styles.btnTextCancel,
                     ]}
+                    numberOfLines={2}
                   >
                     {btn.text}
                   </Text>
@@ -157,11 +160,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   btn: {
-    minHeight: 44,
+    minHeight: 48,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
   btnFlex: {
     flex: 1,
@@ -185,6 +189,7 @@ const styles = StyleSheet.create({
   btnText: {
     fontSize: fontSize.md,
     fontWeight: '700',
+    textAlign: 'center',
   },
   btnTextPrimary: {
     color: colors.onPrimary,
