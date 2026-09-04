@@ -1,5 +1,6 @@
-// First-session map coach — three steps, then permanent dismiss.
-// Goal: teach people-nearby → wave → long-press create without blocking power users (Skip).
+// First map session after sign-in / profile setup.
+// Three steps for the core loop, then permanent dismiss (AsyncStorage).
+// Skip always available — never block power users.
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -15,10 +16,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fontSize, radius, spacing } from '@/theme';
 import { track } from '@/lib/analytics';
 
+/** Persist key — do not rename (users who finished v1 stay done). */
 const STORAGE_KEY = 'g88:map_coach_v1';
 
 interface Step {
-  id: 'people' | 'wave' | 'create';
+  id: 'pin' | 'wave' | 'pulse';
   emoji: string;
   title: string;
   body: string;
@@ -26,22 +28,22 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    id: 'people',
+    id: 'pin',
     emoji: '📍',
-    title: 'People near you',
-    body: 'Pins on the map are people, events, and listings nearby. Tap a pin to open their card.',
+    title: 'You are on the map',
+    body: 'Your pin is your presence. Other pins are people, events, and listings nearby. Pan and zoom to explore the area.',
   },
   {
     id: 'wave',
     emoji: '👋',
     title: 'Wave to say hi',
-    body: 'Open a person and send a wave. If they wave back, you can chat — no cold DMs.',
+    body: 'Tap a person to open their card, then Wave. If they wave back, you can chat — no cold DMs.',
   },
   {
-    id: 'create',
-    emoji: '＋',
-    title: 'Post nearby',
-    body: 'Long-press the map to list an item, create an event, or post an alert at that spot.',
+    id: 'pulse',
+    emoji: '⚡',
+    title: 'Pulse is nearby life',
+    body: 'Open the Pulse tab for stories and activity around you. Come back to the map anytime to meet people in place.',
   },
 ];
 
@@ -74,23 +76,30 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
 
   useEffect(() => {
     if (shouldShow !== true || !mapReady || visible) return;
+    // Short delay so markers / chrome paint before the overlay.
     const t = setTimeout(() => {
       setVisible(true);
       track('map.coach_shown', { step: STEPS[0]!.id });
-    }, 600);
+    }, 700);
     return () => clearTimeout(t);
   }, [shouldShow, mapReady, visible]);
 
-  const persistDone = useCallback(async (reason: 'completed' | 'skipped') => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, 'done');
-    } catch {
-      // still hide UI
-    }
-    track('map.coach_dismissed', { reason, step: STEPS[step]?.id ?? 'unknown' });
-    setShouldShow(false);
-    setVisible(false);
-  }, [step]);
+  const persistDone = useCallback(
+    async (reason: 'completed' | 'skipped') => {
+      try {
+        await AsyncStorage.setItem(STORAGE_KEY, 'done');
+      } catch {
+        // still hide UI
+      }
+      track('map.coach_dismissed', {
+        reason,
+        step: STEPS[step]?.id ?? 'unknown',
+      });
+      setShouldShow(false);
+      setVisible(false);
+    },
+    [step],
+  );
 
   const onNext = useCallback(() => {
     if (step >= STEPS.length - 1) {
@@ -113,13 +122,21 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
 
   return (
     <Modal visible transparent animationType="fade" statusBarTranslucent>
-      <View style={styles.backdrop}>
-        <View style={[styles.card, { marginBottom: Math.max(insets.bottom, spacing.lg) + 72 }]}>
+      <View style={styles.backdrop} accessibilityViewIsModal>
+        <View
+          style={[
+            styles.card,
+            { marginBottom: Math.max(insets.bottom, spacing.lg) + 72 },
+          ]}
+        >
+          <Text style={styles.progress}>
+            {step + 1} of {STEPS.length}
+          </Text>
           <Text style={styles.emoji}>{current.emoji}</Text>
           <Text style={styles.title}>{current.title}</Text>
           <Text style={styles.body}>{current.body}</Text>
 
-          <View style={styles.dots}>
+          <View style={styles.dots} accessibilityElementsHidden>
             {STEPS.map((s, i) => (
               <View
                 key={s.id}
@@ -129,13 +146,19 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
           </View>
 
           <View style={styles.actions}>
-            <Pressable onPress={onSkip} hitSlop={8} accessibilityRole="button">
+            <Pressable
+              onPress={onSkip}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Skip introduction"
+            >
               <Text style={styles.skip}>Skip</Text>
             </Pressable>
             <Pressable
               style={styles.nextBtn}
               onPress={onNext}
               accessibilityRole="button"
+              accessibilityLabel={isLast ? 'Finish introduction' : 'Next step'}
             >
               <Text style={styles.nextLabel}>{isLast ? 'Got it' : 'Next'}</Text>
             </Pressable>
@@ -159,6 +182,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderStrong,
     padding: spacing.xl,
+  },
+  progress: {
+    color: colors.textFaint,
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
   },
   emoji: {
     fontSize: 28,
@@ -208,6 +239,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xxl,
     borderRadius: radius.pill,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   nextLabel: {
     color: colors.onPrimary,
