@@ -43,10 +43,13 @@ export function PhotosScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const profileCoverUrl = useAppSelector((s) => s.profile.profile?.coverUrl ?? null);
   const [photos, setPhotos] = useState<UserPhoto[]>([]);
-  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  /** Optimistic override after Set as cover / delete; otherwise fall through to store. */
+  const [coverOverride, setCoverOverride] = useState<string | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const coverUrl = coverOverride !== undefined ? coverOverride : profileCoverUrl;
 
   useEffect(() => {
     let active = true;
@@ -58,11 +61,6 @@ export function PhotosScreen(): React.JSX.Element {
       active = false;
     };
   }, []);
-
-  // Seed / sync cover badge from profile store.
-  useEffect(() => {
-    if (profileCoverUrl != null) setCoverUrl(profileCoverUrl);
-  }, [profileCoverUrl]);
 
   const onAdd = useCallback(async () => {
     setError(null);
@@ -107,7 +105,7 @@ export function PhotosScreen(): React.JSX.Element {
                   setBusy(true);
                   setCover(photo.id)
                     .then(() => {
-                      setCoverUrl(photo.url);
+                      setCoverOverride(photo.url);
                       void dispatch(fetchProfile());
                     })
                     .catch((e) => setError(extractMessage(e, 'Could not set cover')))
@@ -123,7 +121,7 @@ export function PhotosScreen(): React.JSX.Element {
             deletePhoto(photo.id)
               .then((list) => {
                 setPhotos(list);
-                if (urlsMatch(photo.url, coverUrl)) setCoverUrl(null);
+                if (urlsMatch(photo.url, coverUrl)) setCoverOverride(null);
                 void dispatch(fetchProfile());
               })
               .catch((e) => setError(extractMessage(e, 'Could not delete')))
