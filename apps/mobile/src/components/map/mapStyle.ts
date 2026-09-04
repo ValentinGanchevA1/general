@@ -1,5 +1,3 @@
-import type { MapStyleElement } from 'react-native-maps';
-
 /**
  * Suppresses Google's native POI layer (business/landmark icons + labels —
  * museums, galleries, transit stops, etc.) so only G88's own entity and
@@ -8,10 +6,13 @@ import type { MapStyleElement } from 'react-native-maps';
  * theme.
  *
  * Audited 2026-09-04 (discovery cluster investigation).
+ *
+ * Typed as a plain style array (no MapStyleElement import) so project-aware
+ * ESLint does not depend on react-native-maps type re-exports.
  */
-export const MAP_STYLE: MapStyleElement[] = [
+export const MAP_STYLE = [
 	{
 		featureType: 'poi',
-		stylers: [{ visibility: 'off' }],
+		stylers: [{ visibility: 'off' as const }],
 	},
 ];

@@ -48,7 +48,7 @@ const H3_CELL_AREA_KM2: Record<number, number> = {
 /** Snapshot TTL — after 30s the diff baseline expires and clients get a full response. */
 const SNAPSHOT_TTL_SECONDS = 30;
 
-/** Fall back to full response if more than 60% of prev points were removed (big jump). */
+/** Fall back to full response if more than 60% of prev keys left the viewport (big jump). */
 const DIFF_FALLBACK_THRESHOLD = 0.6;
 
 @Injectable()
@@ -156,7 +156,11 @@ export class DiscoveryService {
   /**
    * Returns a diff against the previous snapshot, or null if:
    * - the previous snapshot has expired
-   * - the overlap is too small (big viewport jump → full response is smaller)
+   * - pure key overlap is too small (big viewport jump → full response is smaller)
+   *
+   * Content changes on a surviving key (cluster count, presence/meta) are emitted
+   * as remove+add. They do NOT count toward the jump threshold — otherwise a
+   * presence refresh on a static viewport would force full payloads.
    */
   private async computeDiff(
     prevHash: string,
@@ -184,11 +188,14 @@ export class DiscoveryService {
 
     const removed: string[] = [];
     const added: DiscoveryPoint[] = [];
+    // Keys that left the viewport entirely — only these feed the jump threshold.
+    let pureRemovedCount = 0;
 
     for (const [key, prevPoint] of prevByKey) {
       const curPoint = currentByKey.get(key);
       if (!curPoint) {
         removed.push(key);
+        pureRemovedCount += 1;
       } else if (this.canonicalJson(prevPoint) !== this.canonicalJson(curPoint)) {
         removed.push(key);
         added.push(curPoint);
@@ -198,11 +205,9 @@ export class DiscoveryService {
       if (!prevByKey.has(key)) added.push(curPoint);
     }
 
-    // If more than threshold of prev points were removed, the user jumped far —
-    // sending a diff would be larger than the full payload. A content-changed
-    // key counts toward "removed" here too, which only makes this heuristic
-    // more conservative (more full-response fallbacks, never an incorrect diff).
-    if (prevPoints.length > 0 && removed.length / prevPoints.length > DIFF_FALLBACK_THRESHOLD) {
+    // Viewport jump heuristic: only pure removals. Content swaps on surviving
+    // keys are routine (presence, cluster counts) and must stay as diffs.
+    if (prevPoints.length > 0 && pureRemovedCount / prevPoints.length > DIFF_FALLBACK_THRESHOLD) {
       return null;
     }
 
