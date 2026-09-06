@@ -159,15 +159,8 @@ export function EventCreateScreen(): React.JSX.Element {
     <KeyboardAvoidingView style={S.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScreenHeader
         title="New event"
-        bordered
         right={
-          <TouchableOpacity
-            onPress={() => void onSubmit()}
-            disabled={!canSubmit}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Create event"
-          >
+          <TouchableOpacity onPress={() => void onSubmit()} disabled={!canSubmit} hitSlop={8} accessibilityRole="button" accessibilityLabel="Create event">
             {submitting ? (
               <ActivityIndicator size="small" color={colors.primary} />
             ) : (
@@ -175,6 +168,7 @@ export function EventCreateScreen(): React.JSX.Element {
             )}
           </TouchableOpacity>
         }
+        bordered
       />
 
       <ScrollView style={S.scroll} contentContainerStyle={S.content} keyboardShouldPersistTaps="handled">
