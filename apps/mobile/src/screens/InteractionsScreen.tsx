@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/EmptyState';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   ActivityIndicator,
@@ -32,6 +33,7 @@ import { useReceivedInteractions } from '@/features/interactions/useReceivedInte
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { useSocket } from '@/realtime/useSocket';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -379,7 +381,7 @@ export function InteractionsScreen(): React.JSX.Element {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color="#00d4ff" />
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }
@@ -395,17 +397,17 @@ export function InteractionsScreen(): React.JSX.Element {
           <RefreshControl
             refreshing={inboxLoading || conversationsLoading}
             onRefresh={() => void onRefresh()}
-            tintColor="#00d4ff"
+            tintColor={colors.primary}
           />
         }
         contentContainerStyle={rows.length === 0 ? styles.emptyContainer : styles.list}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No interactions yet</Text>
-            <Text style={styles.emptyBody}>
-              Chats, waves, friend requests, and new followers show up here.
-            </Text>
-          </View>
+          <EmptyState
+            variant="plain"
+            icon="message-text-outline"
+            title="No interactions yet"
+            body="Chats, waves, friend requests, and new followers show up here."
+          />
         }
         renderItem={({ item: row }) =>
           row.kind === 'chat' ? (
@@ -432,21 +434,18 @@ export function InteractionsScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a0a1a' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a1a' },
-  list: { paddingVertical: 8 },
+  root: { flex: 1, backgroundColor: colors.bg },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
+  list: { paddingVertical: spacing.sm },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  empty: { paddingHorizontal: 32, alignItems: 'center' },
-  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  emptyBody: { color: '#888', fontSize: 14, textAlign: 'center', lineHeight: 20 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#1a1a2e',
+    borderBottomColor: colors.surfaceAlt,
   },
   avatarWrap: { position: 'relative' },
   onlineDot: {
@@ -456,59 +455,59 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#1dbf73',
+    backgroundColor: colors.action,
     borderWidth: 2,
-    borderColor: '#0a0a1a',
+    borderColor: colors.bg,
   },
   info: { flex: 1, gap: 2 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: { color: '#fff', fontWeight: '600', fontSize: 15, maxWidth: 160 },
+  name: { color: colors.textPrimary, fontWeight: '600', fontSize: fontSize.md, maxWidth: 160 },
   nameUnread: { fontWeight: '800' },
-  friendHint: { color: '#34e0a1', fontSize: 11, fontWeight: '600' },
-  signal: { color: '#aaa', fontSize: 13 },
-  preview: { color: '#aaa', fontSize: 13 },
-  previewUnread: { color: '#fff', fontWeight: '600' },
-  time: { color: '#666', fontSize: 12 },
+  friendHint: { color: colors.action, fontSize: 11, fontWeight: '600' },
+  signal: { color: colors.textSecondary, fontSize: fontSize.sm },
+  preview: { color: colors.textSecondary, fontSize: fontSize.sm },
+  previewUnread: { color: colors.textPrimary, fontWeight: '600' },
+  time: { color: colors.textFaint, fontSize: fontSize.xs },
   chatRight: { alignItems: 'flex-end', justifyContent: 'center', minWidth: 28 },
   unreadBadge: {
     minWidth: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#1dbf73',
+    backgroundColor: colors.action,
     paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  unreadBadgeText: { color: '#0a0a1a', fontSize: 11, fontWeight: '800' },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  unreadBadgeText: { color: colors.onPrimary, fontSize: 11, fontWeight: '800' },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   primaryBtn: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
     borderRadius: 16,
-    backgroundColor: '#1dbf73',
+    backgroundColor: colors.action,
   },
-  primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  primaryBtnText: { color: colors.textPrimary, fontWeight: '700', fontSize: fontSize.sm },
   declineBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: 16,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#333',
+    borderColor: colors.borderStrong,
   },
-  declineBtnText: { color: '#aaa', fontWeight: '600', fontSize: 13 },
+  declineBtnText: { color: colors.textSecondary, fontWeight: '600', fontSize: fontSize.sm },
   mutualBadge: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: radius.md,
     backgroundColor: '#1a3a2a',
   },
-  mutualText: { color: '#34e0a1', fontWeight: '700', fontSize: 12 },
+  mutualText: { color: colors.action, fontWeight: '700', fontSize: fontSize.xs },
   pendingBadge: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: radius.md,
     backgroundColor: '#2a2a1a',
   },
-  pendingText: { color: '#e0c34a', fontWeight: '700', fontSize: 12 },
+  pendingText: { color: colors.warning, fontWeight: '700', fontSize: fontSize.xs },
 });
