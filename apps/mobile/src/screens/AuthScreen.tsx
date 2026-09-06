@@ -16,7 +16,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { login, register, clearError, loginWithGoogle } from '@/features/auth/authSlice';
 import { setPendingPhoneVerify } from '@/services/pendingPhone';
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@/constants/app';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { colors, spacing, fontSize } from '@/theme';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LEN = 8;
