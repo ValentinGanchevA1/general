@@ -34,6 +34,8 @@ import {
 } from '@/features/friends/friendsSlice';
 import { useSocket } from '@/realtime/useSocket';
 import { Avatar } from '@/components/Avatar';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/EmptyState';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
@@ -153,26 +155,30 @@ export function FriendsListScreen(): React.JSX.Element {
       case 'friends':
         return {
           title: 'No close friends yet',
-          hint: 'Send a friend request from someone\u2019s profile. Accepted friends show here.',
+          hint: "Send a friend request from someone's profile. Accepted friends show here.",
           showSuggestions: true,
+          icon: 'account-heart-outline',
         };
       case 'following':
         return {
           title: 'Not following anyone',
           hint: 'Follow people from their profile to build your public graph.',
           showSuggestions: true,
+          icon: 'account-plus-outline',
         };
       case 'followers':
         return {
           title: 'No followers yet',
-          hint: 'When others follow you, they\u2019ll appear here.',
+          hint: "When others follow you, they'll appear here.",
           showSuggestions: false,
+          icon: 'account-group-outline',
         };
       case 'requests':
         return {
           title: 'No pending requests',
           hint: 'Incoming friend requests land here for you to accept or decline.',
           showSuggestions: false,
+          icon: 'email-outline',
         };
     }
   }, [tab]);
@@ -265,15 +271,19 @@ export function FriendsListScreen(): React.JSX.Element {
 
   return (
     <View style={S.root}>
-      <View style={S.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
-          <Text style={S.back}>‹ Back</Text>
-        </TouchableOpacity>
-        <Text style={S.heading}>Friends</Text>
-        <TouchableOpacity onPress={openSuggestions} hitSlop={8} accessibilityRole="button">
-          <Text style={S.suggestLink}>Suggest</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Friends"
+        right={
+          <TouchableOpacity
+            onPress={openSuggestions}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="See suggestions"
+          >
+            <Text style={S.suggestLink}>Suggest</Text>
+          </TouchableOpacity>
+        }
+      />
 
       <View style={S.tabs}>
         {TABS.map((t) => {
@@ -329,15 +339,14 @@ export function FriendsListScreen(): React.JSX.Element {
           onEndReached={onEndReached}
           onEndReachedThreshold={0.4}
           ListEmptyComponent={
-            <View style={S.empty}>
-              <Text style={S.emptyTitle}>{emptyCopy.title}</Text>
-              <Text style={S.emptyHint}>{emptyCopy.hint}</Text>
-              {emptyCopy.showSuggestions ? (
-                <TouchableOpacity style={S.suggestCta} onPress={openSuggestions}>
-                  <Text style={S.suggestCtaText}>See suggestions</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
+            <EmptyState
+              variant="plain"
+              icon={emptyCopy.icon}
+              title={emptyCopy.title}
+              body={emptyCopy.hint}
+              actionLabel={emptyCopy.showSuggestions ? 'See suggestions' : undefined}
+              onAction={emptyCopy.showSuggestions ? openSuggestions : undefined}
+            />
           }
           ListFooterComponent={
             list.loadingMore ? (
@@ -358,22 +367,10 @@ export function FriendsListScreen(): React.JSX.Element {
 const S = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  topBar: {
-    paddingTop: 52,
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  back: { color: colors.primary, fontSize: 17, fontWeight: '600', width: 64 },
-  heading: { color: colors.textPrimary, fontSize: 17, fontWeight: '700' },
   suggestLink: {
     color: colors.primary,
     fontSize: 15,
     fontWeight: '600',
-    width: 64,
-    textAlign: 'right',
   },
 
   tabs: {
@@ -444,23 +441,6 @@ const S = StyleSheet.create({
   secondaryBtnText: { color: colors.textSecondary, fontWeight: '600', fontSize: 13 },
   btnDisabled: { opacity: 0.5 },
 
-  empty: { alignItems: 'center', paddingTop: 48, paddingHorizontal: 24 },
-  emptyTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '600' },
-  emptyHint: {
-    color: colors.textMuted,
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  suggestCta: {
-    marginTop: 16,
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: radius.sm,
-  },
-  suggestCtaText: { color: colors.onPrimary, fontWeight: '700', fontSize: 14 },
   errorText: { color: colors.danger, marginBottom: 12, textAlign: 'center' },
   retry: {
     backgroundColor: colors.primary,

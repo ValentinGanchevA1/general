@@ -30,6 +30,8 @@ import { setPendingMapFocus } from '@/navigation/pendingMapFocus';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { createListing } from '@/features/trading/useTrading';
 import { pickAndUploadListingImage } from '@/features/trading/listingImage';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { colors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<CommerceStackParamList>;
 type R = RouteProp<CommerceStackParamList, 'ListingCreate'>;
@@ -97,7 +99,6 @@ export function ListingCreateScreen(): React.JSX.Element {
         ...(thumbnailUrl ? { thumbnailUrl } : {}),
       };
       const created = await createListing(req);
-      // Hand off pin focus (module + route) then open Map so the author sees the pin.
       setPendingMapFocus({
         listingId: created.id,
         lat: created.location.lat,
@@ -153,28 +154,23 @@ export function ListingCreateScreen(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView style={S.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={S.header}>
-        <TouchableOpacity onPress={() => nav.goBack()} hitSlop={8}>
-          <Icon name="close" size={26} color="#fff" />
-        </TouchableOpacity>
-        <Text style={S.headerTitle}>{headerTitle}</Text>
-        <TouchableOpacity onPress={() => void onSubmit()} disabled={!canSubmit} hitSlop={8}>
-          {submitting ? (
-            <ActivityIndicator size="small" color="#00d4ff" />
-          ) : (
-            <Text style={[S.create, !canSubmit && S.createDisabled]}>{submitLabel}</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title={headerTitle}
+        right={
+          <TouchableOpacity onPress={() => void onSubmit()} disabled={!canSubmit} hitSlop={8} accessibilityRole="button" accessibilityLabel={submitLabel}>
+            {submitting ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text style={[S.create, !canSubmit && S.createDisabled]}>{submitLabel}</Text>
+            )}
+          </TouchableOpacity>
+        }
+        bordered
+      />
 
       <ScrollView style={S.scroll} contentContainerStyle={S.content} keyboardShouldPersistTaps="handled">
         <Text style={S.label}>Photo <Text style={S.optional}>(optional)</Text></Text>
-        <TouchableOpacity
-          style={S.photoWrap}
-          onPress={() => void onPickPhoto()}
-          disabled={uploading}
-          activeOpacity={0.8}
-        >
+        <TouchableOpacity style={S.photoWrap} onPress={() => void onPickPhoto()} disabled={uploading} activeOpacity={0.8}>
           {thumbnailUrl ? (
             <>
               <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -202,26 +198,11 @@ export function ListingCreateScreen(): React.JSX.Element {
         </TouchableOpacity>
 
         <Text style={S.label}>Title</Text>
-        <TextInput
-          style={S.input}
-          placeholder={titlePlaceholder}
-          placeholderTextColor="#555"
-          value={title}
-          onChangeText={setTitle}
-          maxLength={LISTING_LIMITS.titleMax}
-          autoFocus
-        />
+        <TextInput style={S.input} placeholder={titlePlaceholder} placeholderTextColor="#555" value={title} onChangeText={setTitle} maxLength={LISTING_LIMITS.titleMax} autoFocus />
 
         <Text style={S.label}>{mode === 'buy' ? 'Budget' : 'Price'}</Text>
         <View style={S.priceRow}>
-          <TextInput
-            style={[S.input, { flex: 1 }]}
-            placeholder="0.00"
-            placeholderTextColor="#555"
-            value={price}
-            onChangeText={(t) => setPrice(t.replace(/[^0-9.]/g, ''))}
-            keyboardType="decimal-pad"
-          />
+          <TextInput style={[S.input, { flex: 1 }]} placeholder="0.00" placeholderTextColor="#555" value={price} onChangeText={(t) => setPrice(t.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.chips}>
             {CURRENCIES.map((c) => (
               <Chip key={c} active={c === currency} label={c} onPress={() => setCurrency(c)} />
@@ -237,30 +218,12 @@ export function ListingCreateScreen(): React.JSX.Element {
         </ScrollView>
 
         <Text style={S.label}>Description <Text style={S.optional}>(optional)</Text></Text>
-        <TextInput
-          style={[S.input, S.multiline]}
-          placeholder={mode === 'buy' ? 'Condition, preferred pickup, details…' : 'Condition, details, pickup notes…'}
-          placeholderTextColor="#555"
-          value={description}
-          onChangeText={setDescription}
-          maxLength={LISTING_LIMITS.descriptionMax}
-          multiline
-          textAlignVertical="top"
-        />
+        <TextInput style={[S.input, S.multiline]} placeholder={mode === 'buy' ? 'Condition, preferred pickup, details…' : 'Condition, details, pickup notes…'} placeholderTextColor="#555" value={description} onChangeText={setDescription} maxLength={LISTING_LIMITS.descriptionMax} multiline textAlignVertical="top" />
 
         <Text style={S.label}>Location <Text style={S.optional}>(drag the pin)</Text></Text>
         <View style={S.mapWrap}>
-          <MapView
-            ref={mapRef}
-            provider={PROVIDER_GOOGLE}
-            style={StyleSheet.absoluteFill}
-            initialRegion={{ latitude: venue.lat, longitude: venue.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 }}
-          >
-            <Marker
-              draggable
-              coordinate={{ latitude: venue.lat, longitude: venue.lng }}
-              onDragEnd={(e) => onDragEnd(e.nativeEvent.coordinate)}
-            />
+          <MapView ref={mapRef} provider={PROVIDER_GOOGLE} style={StyleSheet.absoluteFill} initialRegion={{ latitude: venue.lat, longitude: venue.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 }}>
+            <Marker draggable coordinate={{ latitude: venue.lat, longitude: venue.lng }} onDragEnd={(e) => onDragEnd(e.nativeEvent.coordinate)} />
           </MapView>
         </View>
 
@@ -275,13 +238,7 @@ export function ListingCreateScreen(): React.JSX.Element {
   );
 }
 
-function Chip({
-  active, label, onPress,
-}: {
-  active: boolean;
-  label: string;
-  onPress: () => void;
-}): React.JSX.Element {
+function Chip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }): React.JSX.Element {
   return (
     <TouchableOpacity style={[S.chip, active && S.chipActive]} onPress={onPress}>
       <Text style={[S.chipText, active && S.chipTextActive]}>{label}</Text>
@@ -291,13 +248,7 @@ function Chip({
 
 const S = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0a0a0f' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 56, paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#1a1a2e',
-  },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  create: { color: '#00d4ff', fontSize: 16, fontWeight: '700' },
+  create: { color: colors.primary, fontSize: 16, fontWeight: '700' },
   createDisabled: { color: '#333' },
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 48 },

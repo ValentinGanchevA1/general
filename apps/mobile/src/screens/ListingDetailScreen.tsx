@@ -21,6 +21,9 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { colors } from '@/theme';
+
 import type { ApiError, ListingOffer, WaveRequest, WaveResponse } from '@g88/shared';
 import type { CommerceStackParamList } from '@/navigation/stacks';
 import { useAppSelector } from '@/hooks/redux';
@@ -61,15 +64,18 @@ export function ListingDetailScreen(): React.JSX.Element {
 
   if (!listing) {
     return (
-      <View style={[S.container, S.center]}>
-        {loading ? (
-          <ActivityIndicator color="#00d4ff" />
-        ) : (
-          <>
-            <Icon name="tag-off-outline" size={48} color="#555" />
-            <Text style={S.emptyText}>Listing not found.</Text>
-          </>
-        )}
+      <View style={S.container}>
+        <ScreenHeader title="Listing" />
+        <View style={[S.container, S.center]}>
+          {loading ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <>
+              <Icon name="tag-off-outline" size={48} color={colors.borderStrong} />
+              <Text style={S.emptyText}>Listing not found.</Text>
+            </>
+          )}
+        </View>
       </View>
     );
   }
@@ -82,19 +88,24 @@ export function ListingDetailScreen(): React.JSX.Element {
       contentContainerStyle={S.content}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#00d4ff" />}
     >
-      <View style={S.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
-          <Icon name="chevron-left" size={28} color="#fff" />
-        </TouchableOpacity>
-        <Text style={S.headerTitle}>Listing</Text>
-        <TouchableOpacity onPress={() => void onToggleFav()} disabled={favBusy} hitSlop={8}>
-          <Icon
-            name={listing.favoritedByMe ? 'heart' : 'heart-outline'}
-            size={24}
-            color={listing.favoritedByMe ? '#ff6b6b' : '#fff'}
-          />
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Listing"
+        right={
+          <TouchableOpacity
+            onPress={() => void onToggleFav()}
+            disabled={favBusy}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={listing.favoritedByMe ? 'Remove from saved' : 'Save listing'}
+          >
+            <Icon
+              name={listing.favoritedByMe ? 'heart' : 'heart-outline'}
+              size={24}
+              color={listing.favoritedByMe ? colors.danger : colors.textPrimary}
+            />
+          </TouchableOpacity>
+        }
+      />
 
       {listing.thumbnailUrl ? (
         <Image source={{ uri: listing.thumbnailUrl }} style={S.image} />
@@ -380,11 +391,6 @@ const S = StyleSheet.create({
   content: { paddingBottom: 48 },
   center: { alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: '#666', fontSize: 15, marginTop: 12 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 12, paddingTop: 56, paddingBottom: 8,
-  },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   image: { width: '100%', height: 260, backgroundColor: '#12121f' },
   imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
   body: { padding: 20 },

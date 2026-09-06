@@ -20,6 +20,9 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { colors } from '@/theme';
+
 import { EVENT_LIMITS, RSVP_STATUSES, type PollResult, type RsvpStatus } from '@g88/shared';
 import type { EventsStackParamList } from '@/navigation/stacks';
 import { useAppSelector } from '@/hooks/redux';
@@ -70,15 +73,18 @@ export function EventDetailScreen(): React.JSX.Element {
 
   if (!event) {
     return (
-      <View style={[styles.container, styles.center]}>
-        {loading ? (
-          <ActivityIndicator color="#00d4ff" />
-        ) : (
-          <>
-            <Icon name="calendar-remove" size={48} color="#555" />
-            <Text style={styles.emptyText}>Event not found.</Text>
-          </>
-        )}
+      <View style={styles.container}>
+        <ScreenHeader title="Event" />
+        <View style={[styles.container, styles.center]}>
+          {loading ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <>
+              <Icon name="calendar-remove" size={48} color={colors.borderStrong} />
+              <Text style={styles.emptyText}>Event not found.</Text>
+            </>
+          )}
+        </View>
       </View>
     );
   }
@@ -92,13 +98,7 @@ export function EventDetailScreen(): React.JSX.Element {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#00d4ff" />}
     >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
-          <Icon name="chevron-left" size={28} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>Event</Text>
-        <View style={{ width: 28 }} />
-      </View>
+      <ScreenHeader title="Event" />
 
       {event.coverUrl ? (
         <Image source={{ uri: event.coverUrl }} style={styles.cover} />
@@ -132,7 +132,6 @@ export function EventDetailScreen(): React.JSX.Element {
 
       {event.description ? <Text style={styles.description}>{event.description}</Text> : null}
 
-      {/* ─── RSVP ─────────────────────────────────────────────────────── */}
       <Text style={styles.sectionTitle}>Your RSVP</Text>
       <View style={styles.rsvpRow}>
         {RSVP_STATUSES.map((status) => {
@@ -156,7 +155,6 @@ export function EventDetailScreen(): React.JSX.Element {
         <Text style={styles.fullNote}>This event is at capacity.</Text>
       ) : null}
 
-      {/* ─── Attendees ────────────────────────────────────────────────── */}
       {event.attendees.length > 0 ? (
         <>
           <Text style={styles.sectionTitle}>Going ({event.attendeeCount})</Text>
@@ -181,16 +179,11 @@ export function EventDetailScreen(): React.JSX.Element {
         </>
       ) : null}
 
-      {/* ─── Polls ────────────────────────────────────────────────────── */}
       <PollsSection polls={polls} isHost={isHost} eventId={eventId} onChanged={refreshPolls} />
-
-      {/* ─── Q&A ──────────────────────────────────────────────────────── */}
       <QuestionsSection eventId={eventId} questions={questions} onChanged={refreshQuestions} />
     </ScrollView>
   );
 }
-
-// ─── Polls ────────────────────────────────────────────────────────────────────
 
 function PollsSection({
   polls, isHost, eventId, onChanged,
@@ -349,8 +342,6 @@ function PollComposer({
   );
 }
 
-// ─── Q&A ──────────────────────────────────────────────────────────────────────
-
 function QuestionsSection({
   eventId, questions, onChanged,
 }: {
@@ -450,12 +441,6 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: '#666', fontSize: 15, marginTop: 12 },
 
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 12, paddingTop: 56, paddingBottom: 8,
-  },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-
   cover: { width: '100%', height: 180, backgroundColor: '#12121f' },
   coverPlaceholder: { alignItems: 'center', justifyContent: 'center' },
 
@@ -505,46 +490,45 @@ const styles = StyleSheet.create({
   pollOptionFill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: '#00d4ff22' },
   pollOptionFillMine: { backgroundColor: '#00d4ff44' },
   pollOptionContent: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 12, zIndex: 1,
   },
-  pollOptionLabel: { color: '#fff', fontSize: 14, fontWeight: '500' },
-  pollOptionPct: { color: '#aaa', fontSize: 13, fontWeight: '600' },
+  pollOptionLabel: { color: '#ddd', fontSize: 14 },
+  pollOptionPct: { color: '#888', fontSize: 12, fontWeight: '600' },
   pollTotal: { color: '#666', fontSize: 12, marginTop: 4 },
 
   composerInput: {
     backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#2a2a4a',
-    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 14,
-    marginBottom: 8,
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 15, marginBottom: 10,
   },
-  composerOptionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  composerAdd: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, marginBottom: 8 },
+  composerOptionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 0 },
+  composerAdd: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
   composerAddText: { color: '#00d4ff', fontSize: 13, fontWeight: '600' },
   composerSubmit: {
-    backgroundColor: '#00d4ff', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 4,
+    backgroundColor: '#00d4ff', borderRadius: 10, paddingVertical: 12, alignItems: 'center',
   },
   composerSubmitText: { color: '#0a0a0f', fontSize: 14, fontWeight: '700' },
 
-  askRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, paddingHorizontal: 20, marginBottom: 14 },
+  askRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 12 },
   askInput: {
     flex: 1, backgroundColor: '#12121f', borderWidth: 1, borderColor: '#1f1f33',
-    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, color: '#fff', fontSize: 15,
-    maxHeight: 100,
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 14, minHeight: 44,
   },
   askBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#00d4ff',
+    width: 44, height: 44, borderRadius: 12, backgroundColor: '#00d4ff',
     alignItems: 'center', justifyContent: 'center',
   },
   askBtnDisabled: { opacity: 0.4 },
 
   questionRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, marginBottom: 14 },
   upvoteBtn: {
-    alignItems: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 10,
-    backgroundColor: '#00d4ff18', minWidth: 44,
+    width: 40, alignItems: 'center', paddingVertical: 6, borderRadius: 10,
+    backgroundColor: '#12121f', borderWidth: 1, borderColor: '#1f1f33',
   },
-  upvoteBtnActive: { backgroundColor: '#00d4ff' },
-  upvoteCount: { color: '#00d4ff', fontSize: 13, fontWeight: '700', marginTop: 2 },
+  upvoteBtnActive: { backgroundColor: '#00d4ff', borderColor: '#00d4ff' },
+  upvoteCount: { color: '#00d4ff', fontSize: 12, fontWeight: '700', marginTop: 2 },
   upvoteCountActive: { color: '#0a0a0f' },
   questionBody: { flex: 1 },
-  questionText: { color: '#eee', fontSize: 15, lineHeight: 21 },
+  questionText: { color: '#ddd', fontSize: 14, lineHeight: 21 },
   questionMeta: { color: '#777', fontSize: 12, marginTop: 4 },
 });
