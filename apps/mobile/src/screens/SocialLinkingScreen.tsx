@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 
 import { appAlert } from '@/ui/appAlert';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { SocialAuthorizeResponse, SocialLink, SocialProvider, UserProfile } from '@g88/shared';
@@ -20,17 +20,16 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { SOCIAL_PROVIDER_CONFIG } from '@/features/profile/socialConfig';
 import { extractMessage } from '@/utils/extractMessage';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 const PROVIDERS = Object.keys(SOCIAL_PROVIDER_CONFIG) as SocialProvider[];
 
 export function SocialLinkingScreen(): React.JSX.Element {
-  const navigation = useNavigation();
   const dispatch = useAppDispatch();
   const links = useAppSelector((s) => s.profile.profile?.socialLinks ?? []);
   const [busy, setBusy] = useState<SocialProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // The OAuth callback happens in the browser; refetch on focus to pick up the link.
   useFocusEffect(
     useCallback(() => {
       void dispatch(fetchProfile());
@@ -77,65 +76,53 @@ export function SocialLinkingScreen(): React.JSX.Element {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Icon name="chevron-left" size={28} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Connected Accounts</Text>
-        <View style={styles.back} />
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Connected Accounts" />
 
-      <Text style={styles.intro}>Link your accounts to boost your trust score.</Text>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
+        <Text style={styles.intro}>Link your accounts to boost your trust score.</Text>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      {PROVIDERS.map((provider) => {
-        const cfg = SOCIAL_PROVIDER_CONFIG[provider];
-        const link = linkFor(provider);
-        const connected = !!link;
-        return (
-          <View key={provider} style={styles.row}>
-            <View style={[styles.icon, { backgroundColor: cfg.color }]}>
-              <Icon name={cfg.icon} size={22} color="#fff" />
-            </View>
-            <View style={styles.info}>
-              <Text style={styles.name}>{cfg.label}</Text>
-              {connected && link?.username ? (
-                <Text style={styles.username}>@{link.username}</Text>
+        {PROVIDERS.map((provider) => {
+          const cfg = SOCIAL_PROVIDER_CONFIG[provider];
+          const link = linkFor(provider);
+          const connected = !!link;
+          return (
+            <View key={provider} style={styles.row}>
+              <View style={[styles.icon, { backgroundColor: cfg.color }]}>
+                <Icon name={cfg.icon} size={22} color="#fff" />
+              </View>
+              <View style={styles.info}>
+                <Text style={styles.name}>{cfg.label}</Text>
+                {connected && link?.username ? (
+                  <Text style={styles.username}>@{link.username}</Text>
+                ) : (
+                  <Text style={styles.notLinked}>Not connected</Text>
+                )}
+              </View>
+              {busy === provider ? (
+                <ActivityIndicator color="#00d4ff" />
+              ) : connected ? (
+                <TouchableOpacity onPress={() => disconnect(provider)}>
+                  <Text style={styles.disconnect}>Disconnect</Text>
+                </TouchableOpacity>
               ) : (
-                <Text style={styles.notLinked}>Not connected</Text>
+                <TouchableOpacity style={styles.connectBtn} onPress={() => void connect(provider)}>
+                  <Text style={styles.connectText}>Connect</Text>
+                </TouchableOpacity>
               )}
             </View>
-            {busy === provider ? (
-              <ActivityIndicator color="#00d4ff" />
-            ) : connected ? (
-              <TouchableOpacity onPress={() => disconnect(provider)}>
-                <Text style={styles.disconnect}>Disconnect</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.connectBtn} onPress={() => connect(provider)}>
-                <Text style={styles.connectText}>Connect</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        );
-      })}
-    </ScrollView>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0f' },
+  flex: { flex: 1 },
   content: { paddingBottom: 40 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    paddingTop: 56,
-  },
-  back: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   intro: { color: '#888', fontSize: 14, textAlign: 'center', paddingHorizontal: 24, marginBottom: 16 },
   error: { color: '#ff4444', fontSize: 13, textAlign: 'center', marginBottom: 12, paddingHorizontal: 24 },
   row: {

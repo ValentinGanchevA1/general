@@ -24,6 +24,7 @@ import { postJson } from '@/api/client';
 import { useAppDispatch } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { extractMessage } from '@/utils/extractMessage';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 type Step = 'phone' | 'code';
 
@@ -32,7 +33,6 @@ export function VerificationScreen(): React.JSX.Element {
   const route = useRoute<RouteProp<AccountStackParamList, 'Verification'>>();
   const dispatch = useAppDispatch();
   const [step, setStep] = useState<Step>('phone');
-  // Initialized from route params — no effect needed (avoids set-state-in-effect).
   const [phone, setPhone] = useState(route.params?.initialPhone ?? '');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -78,13 +78,7 @@ export function VerificationScreen(): React.JSX.Element {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Icon name="chevron-left" size={28} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Verify phone</Text>
-        <View style={styles.back} />
-      </View>
+      <ScreenHeader title="Verify phone" />
 
       <View style={styles.body}>
         <Icon name="cellphone-check" size={48} color="#00d4ff" />
@@ -109,7 +103,7 @@ export function VerificationScreen(): React.JSX.Element {
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <TouchableOpacity
               style={[styles.button, (busy || phone.trim().length < 8) && styles.buttonDisabled]}
-              onPress={start}
+              onPress={() => void start()}
               disabled={busy || phone.trim().length < 8}
             >
               {busy ? <ActivityIndicator color="#000" /> : <Text style={styles.buttonText}>Send code</Text>}
@@ -139,12 +133,12 @@ export function VerificationScreen(): React.JSX.Element {
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <TouchableOpacity
               style={[styles.button, (busy || code.trim().length < 4) && styles.buttonDisabled]}
-              onPress={check}
+              onPress={() => void check()}
               disabled={busy || code.trim().length < 4}
             >
               {busy ? <ActivityIndicator color="#000" /> : <Text style={styles.buttonText}>Verify</Text>}
             </TouchableOpacity>
-            <TouchableOpacity onPress={start} disabled={busy} style={styles.resend}>
+            <TouchableOpacity onPress={() => void start()} disabled={busy} style={styles.resend}>
               <Text style={styles.link}>Resend code</Text>
             </TouchableOpacity>
           </>
@@ -156,15 +150,6 @@ export function VerificationScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0f' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    paddingTop: 56,
-  },
-  back: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   body: { flex: 1, alignItems: 'center', paddingHorizontal: 32, paddingTop: 32, gap: 12 },
   title: { color: '#fff', fontSize: 22, fontWeight: '700', marginTop: 8 },
   blurb: { color: '#888', fontSize: 14, textAlign: 'center', lineHeight: 20, maxWidth: 300 },

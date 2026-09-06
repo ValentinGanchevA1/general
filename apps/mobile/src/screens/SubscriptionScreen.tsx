@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type {
@@ -24,19 +24,17 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { TIER_COLOR } from '@/features/profile/socialConfig';
 import { extractMessage } from '@/utils/extractMessage';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 const TIER_RANK: Record<string, number> = { free: 0, basic: 1, premium: 2 };
 
 export function SubscriptionScreen(): React.JSX.Element {
-  const navigation = useNavigation();
   const dispatch = useAppDispatch();
   const profile = useAppSelector((s) => s.profile.profile);
   const currentTier = profile?.subscriptionTier ?? 'free';
   const [busyTier, setBusyTier] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Tier may have changed via the Stripe webhook while the user was in the
-  // browser — refetch whenever the screen regains focus.
   useFocusEffect(
     useCallback(() => {
       void dispatch(fetchProfile());
@@ -79,87 +77,75 @@ export function SubscriptionScreen(): React.JSX.Element {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Icon name="chevron-left" size={28} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Premium</Text>
-        <View style={styles.back} />
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Premium" />
 
-      <Text style={styles.intro}>Upgrade to unlock more reach and visibility.</Text>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
+        <Text style={styles.intro}>Upgrade to unlock more reach and visibility.</Text>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      {SUBSCRIPTION_PLANS.map((plan) => {
-        const isCurrent = plan.tier === currentTier;
-        const isUpgrade = TIER_RANK[plan.tier]! > TIER_RANK[currentTier]!;
-        const color = TIER_COLOR[plan.tier];
-        return (
-          <View key={plan.tier} style={[styles.card, isCurrent && { borderColor: color }]}>
-            <View style={styles.cardHead}>
-              <View style={styles.cardTitleRow}>
-                {plan.tier !== 'free' ? <Icon name="crown" size={18} color={color} /> : null}
-                <Text style={styles.planName}>{plan.name}</Text>
+        {SUBSCRIPTION_PLANS.map((plan) => {
+          const isCurrent = plan.tier === currentTier;
+          const isUpgrade = TIER_RANK[plan.tier]! > TIER_RANK[currentTier]!;
+          const color = TIER_COLOR[plan.tier];
+          return (
+            <View key={plan.tier} style={[styles.card, isCurrent && { borderColor: color }]}>
+              <View style={styles.cardHead}>
+                <View style={styles.cardTitleRow}>
+                  {plan.tier !== 'free' ? <Icon name="crown" size={18} color={color} /> : null}
+                  <Text style={styles.planName}>{plan.name}</Text>
+                </View>
+                <Text style={[styles.price, { color }]}>{plan.priceLabel}</Text>
               </View>
-              <Text style={[styles.price, { color }]}>{plan.priceLabel}</Text>
+
+              {plan.features.map((f) => (
+                <View key={f} style={styles.featureRow}>
+                  <Icon name="check" size={16} color={color} />
+                  <Text style={styles.featureText}>{f}</Text>
+                </View>
+              ))}
+
+              {isCurrent ? (
+                <View style={styles.currentPill}>
+                  <Text style={styles.currentText}>Current plan</Text>
+                </View>
+              ) : isUpgrade ? (
+                <TouchableOpacity
+                  style={[styles.cta, { backgroundColor: color }]}
+                  onPress={() => void upgrade(plan.tier as PaidTier)}
+                  disabled={busyTier !== null}
+                >
+                  {busyTier === plan.tier ? (
+                    <ActivityIndicator color="#000" />
+                  ) : (
+                    <Text style={styles.ctaText}>Upgrade to {plan.name}</Text>
+                  )}
+                </TouchableOpacity>
+              ) : null}
             </View>
+          );
+        })}
 
-            {plan.features.map((f) => (
-              <View key={f} style={styles.featureRow}>
-                <Icon name="check" size={16} color={color} />
-                <Text style={styles.featureText}>{f}</Text>
-              </View>
-            ))}
+        {currentTier !== 'free' ? (
+          <TouchableOpacity style={styles.manageBtn} onPress={() => void manage()} disabled={busyTier !== null}>
+            {busyTier === 'manage' ? (
+              <ActivityIndicator color="#00d4ff" />
+            ) : (
+              <Text style={styles.manageText}>Manage subscription</Text>
+            )}
+          </TouchableOpacity>
+        ) : null}
 
-            {isCurrent ? (
-              <View style={styles.currentPill}>
-                <Text style={styles.currentText}>Current plan</Text>
-              </View>
-            ) : isUpgrade ? (
-              <TouchableOpacity
-                style={[styles.cta, { backgroundColor: color }]}
-                onPress={() => upgrade(plan.tier as PaidTier)}
-                disabled={busyTier !== null}
-              >
-                {busyTier === plan.tier ? (
-                  <ActivityIndicator color="#000" />
-                ) : (
-                  <Text style={styles.ctaText}>Upgrade to {plan.name}</Text>
-                )}
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        );
-      })}
-
-      {currentTier !== 'free' ? (
-        <TouchableOpacity style={styles.manageBtn} onPress={manage} disabled={busyTier !== null}>
-          {busyTier === 'manage' ? (
-            <ActivityIndicator color="#00d4ff" />
-          ) : (
-            <Text style={styles.manageText}>Manage subscription</Text>
-          )}
-        </TouchableOpacity>
-      ) : null}
-
-      <Text style={styles.fine}>Billing is handled securely by Stripe. Cancel anytime.</Text>
-    </ScrollView>
+        <Text style={styles.fine}>Billing is handled securely by Stripe. Cancel anytime.</Text>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0f' },
+  flex: { flex: 1 },
   content: { paddingBottom: 40 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    paddingTop: 56,
-  },
-  back: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   intro: { color: '#888', fontSize: 14, textAlign: 'center', paddingHorizontal: 24, marginBottom: 16 },
   error: { color: '#ff4444', fontSize: 13, textAlign: 'center', marginBottom: 12, paddingHorizontal: 24 },
   card: {
