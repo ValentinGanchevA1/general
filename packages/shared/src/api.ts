@@ -7,6 +7,9 @@ export type EntityKind = 'user' | 'event' | 'listing';
 
 export type VerificationLevel = 'none' | 'email' | 'phone' | 'selfie' | 'id';
 
+/** Map / browse filter for marketplace listings. */
+export type ListingMode = 'sell' | 'buy';
+
 // ─── Discovery ─────────────────────────────────────────────────────────────
 
 export interface DiscoveryQuery {
@@ -15,6 +18,11 @@ export interface DiscoveryQuery {
   kinds?: EntityKind[];
   prevViewportHash?: string;
   topic?: string;
+  /**
+   * When set, only listings matching this mode are returned.
+   * Users and events are unaffected. Omit for all listings.
+   */
+  listingMode?: ListingMode;
 }
 
 export interface ClusterPoint {
@@ -63,7 +71,7 @@ export interface ListingMeta {
   currency: string;
   category: string;
   /** sell (default) | buy (wanted). Omitted on legacy rows → treat as sell. */
-  mode?: 'sell' | 'buy';
+  mode?: ListingMode;
 }
 
 export type DiscoveryPoint = ClusterPoint | EntityPoint;
