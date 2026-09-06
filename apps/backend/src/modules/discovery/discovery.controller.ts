@@ -41,6 +41,7 @@ export class DiscoveryController {
       requesterId: userId,
       prevViewportHash: dto.prevViewportHash,
       topic: dto.topic,
+      listingMode: dto.listingMode,
     });
   }
 }

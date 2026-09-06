@@ -49,10 +49,12 @@ export const colors = {
   entityUser: '#FF69B4',
   /** Map / discovery: events. */
   entityEvent: '#FF9800',
-  /** Map / discovery: listings (sell). */
+  /** Map / discovery: listings for sale. */
   entityListing: '#4CAF50',
-  /** Map / discovery: close-friend pins + wanted listings. */
+  /** Map / discovery: close-friend pins. */
   entityFriend: '#00d4ff',
+  /** Map / discovery: wanted / looking-to-buy listings (distinct from friends). */
+  entityWanted: '#C084FC',
 } as const;
 
 export const spacing = {

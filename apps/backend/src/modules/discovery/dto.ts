@@ -12,7 +12,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import type { EntityKind } from '@g88/shared';
+import type { EntityKind, ListingMode } from '@g88/shared';
 
 class LatLngDto {
   @IsLatitude()
@@ -56,4 +56,9 @@ export class DiscoveryQueryDto {
   @IsString()
   @MaxLength(40)
   topic?: string;
+
+  /** When set, only listings of this mode (sell | buy). Users/events unchanged. */
+  @IsOptional()
+  @IsIn(['sell', 'buy'])
+  listingMode?: ListingMode;
 }
