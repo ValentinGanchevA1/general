@@ -17,7 +17,8 @@ interface UseDiscoveryArgs {
   viewport: Viewport | null;
   kinds?: EntityKind[];
   topic?: string | null;
-  listingMode?: ListingMode;
+  /** Omit or undefined = all listing modes. */
+  listingMode?: ListingMode | undefined;
   debounceMs?: number;
   enabled?: boolean;
 }
