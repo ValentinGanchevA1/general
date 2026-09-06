@@ -11,3 +11,8 @@ export const SUPPORT_EMAIL = 'vganchev6@gmail.com';
 /** Canonical hosted privacy policy (Render static site `g88-legal`). Same URL
  *  used by the Play store listing + Data Safety form. */
 export const PRIVACY_POLICY_URL = 'https://g88-legal.onrender.com/privacy';
+
+/** Terms of Service. Dedicated /terms page not published yet — reuse privacy
+ *  host until a real ToS document is live. AuthScreen still labels the link
+ *  "Terms of Service" for store-compliance wording. */
+export const TERMS_OF_SERVICE_URL = 'https://g88-legal.onrender.com/privacy';
