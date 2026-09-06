@@ -2,12 +2,14 @@
 //
 // P3.7 trading hub: a nearby browse grid + a "Sell an item" entry + a saved
 // (favorites) toggle. Tapping a card opens ListingDetail.
+// Browse supports mode filter (All / For sale / Wanted) — same labels as map.
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Image,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -18,7 +20,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { ListingSummary } from '@g88/shared';
+import type { ListingMode, ListingSummary } from '@g88/shared';
 import type { CommerceStackParamList } from '@/navigation/stacks';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { useBrowseListings, useFavorites } from '@/features/trading/useTrading';
@@ -26,10 +28,19 @@ import { formatPrice } from '@/features/trading/formatPrice';
 
 type Nav = NativeStackNavigationProp<CommerceStackParamList>;
 
+type ModeFilter = 'all' | ListingMode;
+
+const MODE_OPTIONS: Array<{ id: ModeFilter; label: string }> = [
+  { id: 'all', label: 'All' },
+  { id: 'sell', label: 'For sale' },
+  { id: 'buy', label: 'Wanted' },
+];
+
 export function MarketplaceScreen(): React.JSX.Element {
   const nav = useNavigation<Nav>();
   const { coords, requestPermission } = useUserLocation();
   const [tab, setTab] = useState<'browse' | 'saved'>('browse');
+  const [modeFilter, setModeFilter] = useState<ModeFilter>('all');
 
   // useUserLocation only starts acquiring a fix once requestPermission() runs,
   // and `coords` is local state that defaults to null. Without this, the nearby
@@ -39,7 +50,10 @@ export function MarketplaceScreen(): React.JSX.Element {
     void requestPermission();
   }, [requestPermission]);
 
-  const browse = useBrowseListings(tab === 'browse' ? coords : null);
+  const browseMode = modeFilter === 'all' ? undefined : modeFilter;
+  const browse = useBrowseListings(tab === 'browse' ? coords : null, {
+    mode: browseMode,
+  });
   const saved = useFavorites(tab === 'saved');
 
   const data = tab === 'browse' ? browse.listings : saved.favorites;
@@ -75,6 +89,26 @@ export function MarketplaceScreen(): React.JSX.Element {
         ))}
       </View>
 
+      {tab === 'browse' ? (
+        <View style={S.modeRow}>
+          {MODE_OPTIONS.map((opt) => {
+            const active = modeFilter === opt.id;
+            return (
+              <Pressable
+                key={opt.id}
+                onPress={() => setModeFilter(opt.id)}
+                style={[S.modeChip, active && S.modeChipActive]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`Show ${opt.label} listings`}
+              >
+                <Text style={[S.modeChipText, active && S.modeChipTextActive]}>{opt.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+
       <FlatList
         data={data}
         keyExtractor={(l) => l.id}
@@ -90,11 +124,24 @@ export function MarketplaceScreen(): React.JSX.Element {
             <View style={S.empty}>
               <Icon name={tab === 'browse' ? 'storefront-outline' : 'heart-outline'} size={44} color="#555" />
               <Text style={S.emptyText}>
-                {tab === 'browse' ? 'No listings nearby yet.' : "You haven't saved any listings."}
+                {tab === 'browse'
+                  ? modeFilter === 'buy'
+                    ? 'No wanted posts nearby yet.'
+                    : modeFilter === 'sell'
+                      ? 'No items for sale nearby yet.'
+                      : 'No listings nearby yet.'
+                  : "You haven't saved any listings."}
               </Text>
               {tab === 'browse' ? (
-                <TouchableOpacity style={S.sellBtn} onPress={() => nav.navigate('ListingCreate')}>
-                  <Text style={S.sellBtnText}>Sell an item</Text>
+                <TouchableOpacity
+                  style={S.sellBtn}
+                  onPress={() =>
+                    nav.navigate('ListingCreate', {
+                      mode: modeFilter === 'buy' ? 'buy' : 'sell',
+                    })
+                  }
+                >
+                  <Text style={S.sellBtnText}>{modeFilter === 'buy' ? 'Post a wanted' : 'Sell an item'}</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -106,11 +153,13 @@ export function MarketplaceScreen(): React.JSX.Element {
 }
 
 function ListingCard({
-  item, onPress,
+  item,
+  onPress,
 }: {
   item: ListingSummary;
   onPress: () => void;
 }): React.JSX.Element {
+  const isWanted = item.mode === 'buy';
   return (
     <TouchableOpacity style={S.card} activeOpacity={0.85} onPress={onPress}>
       {item.thumbnailUrl ? (
@@ -121,14 +170,22 @@ function ListingCard({
         </View>
       )}
       {item.status !== 'active' ? (
-        <View style={S.statusPill}><Text style={S.statusText}>{item.status}</Text></View>
+        <View style={S.statusPill}>
+          <Text style={S.statusText}>{item.status}</Text>
+        </View>
+      ) : isWanted ? (
+        <View style={S.wantedPill}>
+          <Text style={S.wantedText}>Wanted</Text>
+        </View>
       ) : null}
-      {item.favoritedByMe ? (
-        <Icon name="heart" size={18} color="#ff6b6b" style={S.heart} />
-      ) : null}
-      <Text style={S.cardTitle} numberOfLines={1}>{item.title}</Text>
+      {item.favoritedByMe ? <Icon name="heart" size={18} color="#ff6b6b" style={S.heart} /> : null}
+      <Text style={S.cardTitle} numberOfLines={1}>
+        {item.title}
+      </Text>
       <Text style={S.cardPrice}>{formatPrice(item.priceCents, item.currency)}</Text>
-      <Text style={S.cardCategory} numberOfLines={1}>{item.category}</Text>
+      <Text style={S.cardCategory} numberOfLines={1}>
+        {item.category}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -136,28 +193,83 @@ function ListingCard({
 const S = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0f' },
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 12, paddingTop: 56, paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingTop: 56,
+    paddingBottom: 8,
   },
   headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
-  tab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 16, backgroundColor: '#12121f', borderWidth: 1, borderColor: '#1f1f33' },
+  tab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: '#12121f',
+    borderWidth: 1,
+    borderColor: '#1f1f33',
+  },
   tabActive: { backgroundColor: '#00d4ff', borderColor: '#00d4ff' },
   tabText: { color: '#aaa', fontSize: 13, fontWeight: '700' },
   tabTextActive: { color: '#0a0a0f' },
+  modeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  modeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#12121f',
+    borderWidth: 1,
+    borderColor: '#2a2a4a',
+  },
+  modeChipActive: { backgroundColor: '#00d4ff', borderColor: '#00d4ff' },
+  modeChipText: { color: '#aaa', fontSize: 12, fontWeight: '700' },
+  modeChipTextActive: { color: '#0a0a0f' },
   grid: { padding: 12, paddingBottom: 40 },
   row: { gap: 12 },
   card: {
-    flex: 1, marginBottom: 12, padding: 8, borderRadius: 14,
-    backgroundColor: '#12121f', borderWidth: 1, borderColor: '#1f1f33',
+    flex: 1,
+    marginBottom: 12,
+    padding: 8,
+    borderRadius: 14,
+    backgroundColor: '#12121f',
+    borderWidth: 1,
+    borderColor: '#1f1f33',
   },
-  thumb: { width: '100%', aspectRatio: 1, borderRadius: 10, backgroundColor: '#1a1a2e', marginBottom: 8 },
+  thumb: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 10,
+    backgroundColor: '#1a1a2e',
+    marginBottom: 8,
+  },
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   statusPill: {
-    position: 'absolute', top: 14, left: 14, paddingHorizontal: 8, paddingVertical: 2,
-    borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.7)',
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
   },
   statusText: { color: '#ff9f43', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  wantedPill: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: 'rgba(139,92,246,0.9)',
+  },
+  wantedText: { color: '#fff', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
   heart: { position: 'absolute', top: 14, right: 14 },
   cardTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
   cardPrice: { color: '#00d4ff', fontSize: 15, fontWeight: '800', marginTop: 2 },
