@@ -11,6 +11,7 @@ import type {
   CreateListingRequest,
   LatLng,
   ListingDetail,
+  ListingMode,
   ListingOffer,
   ListingStatus,
   ListingSummary,
@@ -29,8 +30,14 @@ interface UseBrowseResult {
 
 export function useBrowseListings(
   location: LatLng | null,
-  category?: string | null,
+  options?: {
+    category?: string | null;
+    /** Omit / undefined = all modes (sell + buy). */
+    mode?: ListingMode | undefined;
+  },
 ): UseBrowseResult {
+  const category = options?.category;
+  const mode = options?.mode;
   const [listings, setListings] = useState<ListingSummary[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -42,6 +49,7 @@ export function useBrowseListings(
         const body: BrowseListingsRequest = {
           location,
           ...(category ? { category } : {}),
+          ...(mode ? { mode } : {}),
         };
         setListings(await postJson<BrowseListingsRequest, ListingSummary[]>('/listings/browse', body));
       } catch {
@@ -50,9 +58,11 @@ export function useBrowseListings(
         setLoading(false);
       }
     })();
-  }, [location?.lat, location?.lng, category]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [location?.lat, location?.lng, category, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   return { listings, loading, refresh };
 }
@@ -96,7 +106,9 @@ export function useListing(listingId: string): UseListingResult {
     refreshOffers();
   }, [listingId, refreshOffers]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   return { listing, offers, loading, refresh, refreshOffers };
 }
@@ -123,7 +135,9 @@ export function useFavorites(
     })();
   }, [enabled]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   return { favorites, loading, refresh };
 }
