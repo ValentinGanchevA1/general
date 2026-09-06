@@ -24,7 +24,6 @@ const MARKER_SIZE = 40;
 
 interface Props {
   point: EntityPoint;
-  /** Fired once avatar image finishes loading or fails — parent can stop tracksViewChanges. */
   onVisualSettled?: () => void;
 }
 
@@ -44,7 +43,7 @@ function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element 
   const color = isFriend
     ? colors.entityFriend
     : isBuyListing
-      ? colors.entityFriend
+      ? colors.entityWanted
       : KIND_COLOR[point.kind];
 
   const label =
@@ -106,7 +105,7 @@ function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element 
           />
         ) : (
           <Text style={styles.icon} onLayout={settle}>
-            {isBuyListing ? '🛒' : KIND_ICON[point.kind]}
+            {isBuyListing ? '🔍' : KIND_ICON[point.kind]}
           </Text>
         )}
         {isVerified ? (
