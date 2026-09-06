@@ -8,11 +8,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { ReceivedGift, SentGift } from '@g88/shared';
 import { useGiftBalance, useReceivedGifts, useSentGifts } from '@/features/gifts/useGifts';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/EmptyState';
 
 type Tab = 'received' | 'sent';
 
@@ -59,7 +60,6 @@ function SentRow({ g }: { g: SentGift }): React.JSX.Element {
 }
 
 export function GiftsInboxScreen(): React.JSX.Element {
-  const navigation = useNavigation();
   const [tab, setTab] = useState<Tab>('received');
   const { gifts: received, loading: loadingReceived, refresh: refreshReceived } = useReceivedGifts();
   const { gifts: sent, loading: loadingSent, refresh: refreshSent } = useSentGifts();
@@ -73,76 +73,68 @@ export function GiftsInboxScreen(): React.JSX.Element {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor="#00d4ff" />}
-    >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Icon name="chevron-left" size={28} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Gifts</Text>
-        <View style={styles.back} />
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Gifts" />
 
-      <View style={styles.balanceCard}>
-        <Icon name="star-four-points" size={20} color="#FFD700" />
-        <Text style={styles.balanceValue}>{spendableXp.toLocaleString()} XP</Text>
-        <Text style={styles.balanceLabel}>to spend on gifts</Text>
-      </View>
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor="#00d4ff" />}
+      >
+        <View style={styles.balanceCard}>
+          <Icon name="star-four-points" size={20} color="#FFD700" />
+          <Text style={styles.balanceValue}>{spendableXp.toLocaleString()} XP</Text>
+          <Text style={styles.balanceLabel}>to spend on gifts</Text>
+        </View>
 
-      <View style={styles.tabs}>
-        {(['received', 'sent'] as Tab[]).map((t) => (
-          <TouchableOpacity
-            key={t}
-            style={[styles.tab, tab === t && styles.tabActive]}
-            onPress={() => setTab(t)}
-          >
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t === 'received' ? 'Received' : 'Sent'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+        <View style={styles.tabs}>
+          {(['received', 'sent'] as Tab[]).map((t) => (
+            <TouchableOpacity
+              key={t}
+              style={[styles.tab, tab === t && styles.tabActive]}
+              onPress={() => setTab(t)}
+            >
+              <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
+                {t === 'received' ? 'Received' : 'Sent'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      {tab === 'received' ? (
-        received.length > 0 ? (
-          received.map((g) => <ReceivedRow key={g.id} g={g} />)
-        ) : loadingReceived ? (
+        {tab === 'received' ? (
+          received.length > 0 ? (
+            received.map((g) => <ReceivedRow key={g.id} g={g} />)
+          ) : loadingReceived ? (
+            <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
+          ) : (
+            <EmptyState
+              variant="plain"
+              icon="gift-outline"
+              title="No gifts yet"
+              body="Earn XP and send one to a friend nearby."
+            />
+          )
+        ) : sent.length > 0 ? (
+          sent.map((g) => <SentRow key={g.id} g={g} />)
+        ) : loadingSent ? (
           <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
         ) : (
-          <View style={styles.empty}>
-            <Icon name="gift-outline" size={48} color="#333" />
-            <Text style={styles.emptyText}>No gifts yet. Earn XP and send one!</Text>
-          </View>
-        )
-      ) : sent.length > 0 ? (
-        sent.map((g) => <SentRow key={g.id} g={g} />)
-      ) : loadingSent ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
-      ) : (
-        <View style={styles.empty}>
-          <Icon name="gift-outline" size={48} color="#333" />
-          <Text style={styles.emptyText}>You haven't sent any gifts yet.</Text>
-        </View>
-      )}
-    </ScrollView>
+          <EmptyState
+            variant="plain"
+            icon="gift-outline"
+            title="No gifts sent"
+            body="You haven't sent any gifts yet."
+          />
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0f' },
+  flex: { flex: 1 },
   content: { paddingBottom: 40 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    paddingTop: 56,
-  },
-  back: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   balanceCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -188,6 +180,4 @@ const styles = StyleSheet.create({
   peer: { color: '#fff', fontWeight: '700' },
   message: { color: '#aaa', fontSize: 13, fontStyle: 'italic' },
   time: { color: '#666', fontSize: 11, marginTop: 2 },
-  empty: { alignItems: 'center', marginTop: 60, gap: 12 },
-  emptyText: { color: '#666', fontSize: 14, textAlign: 'center', paddingHorizontal: 40 },
 });

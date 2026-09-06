@@ -17,6 +17,7 @@ import type { AccountStackParamList } from '@/navigation/stacks';
 import { SUPPORT_EMAIL, APP_VERSION } from '@/constants/app';
 import { track } from '@/lib/analytics';
 import { colors, spacing, fontSize } from '@/theme';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
@@ -102,13 +103,7 @@ export function HelpScreen(): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Icon name="chevron-left" size={28} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Help & Support</Text>
-        <View style={styles.back} />
-      </View>
+      <ScreenHeader title="Help & Support" />
 
       <ScrollView contentContainerStyle={styles.body}>
         <Text style={styles.sectionTitle}>Frequently asked</Text>
@@ -145,16 +140,6 @@ export function HelpScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.sm,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '700' },
   body: { padding: spacing.lg, paddingBottom: 48 },
   sectionTitle: {
     color: colors.textMuted,

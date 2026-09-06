@@ -7,6 +7,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { PRIVACY_POLICY_URL } from '@/constants/app';
 import { colors, spacing, fontSize } from '@/theme';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
@@ -43,13 +44,7 @@ export function PrivacyScreen(): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Icon name="chevron-left" size={28} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Privacy</Text>
-        <View style={styles.back} />
-      </View>
+      <ScreenHeader title="Privacy" />
 
       <ScrollView contentContainerStyle={styles.body}>
         <Text style={styles.intro}>
@@ -145,15 +140,6 @@ export function PrivacyScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.md,
-    paddingTop: 56,
-  },
-  back: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '700' },
   body: { padding: spacing.xxl, paddingBottom: 48 },
   intro: { color: colors.textSecondary, fontSize: 14, lineHeight: 21, marginBottom: spacing.xxl },
   point: { flexDirection: 'row', marginBottom: 22 },

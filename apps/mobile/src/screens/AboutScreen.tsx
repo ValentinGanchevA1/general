@@ -6,6 +6,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { APP_VERSION } from '@/constants/app';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
@@ -44,13 +45,7 @@ export function AboutScreen(): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Icon name="chevron-left" size={28} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>About</Text>
-        <View style={styles.back} />
-      </View>
+      <ScreenHeader title="About" />
 
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.brand}>
@@ -128,15 +123,6 @@ export function AboutScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0f' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    paddingTop: 56,
-  },
-  back: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   body: { padding: 24, paddingBottom: 48 },
   brand: { alignItems: 'center', marginTop: 12, marginBottom: 28 },
   logo: {

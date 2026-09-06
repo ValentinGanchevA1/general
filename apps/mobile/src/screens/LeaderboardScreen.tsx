@@ -9,12 +9,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { LeaderboardEntry, LeaderboardScope } from '@g88/shared';
 import { useLeaderboard } from '@/features/gamification/useLeaderboard';
 import { WeeklyRibbon } from '@/features/gamification/WeeklyRibbon';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/EmptyState';
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
@@ -51,7 +51,6 @@ function Row({ entry }: { entry: LeaderboardEntry }): React.JSX.Element {
 }
 
 export function LeaderboardScreen(): React.JSX.Element {
-  const navigation = useNavigation();
   const [scope, setScope] = useState<LeaderboardScope>('weekly');
   const { page, loading, refresh } = useLeaderboard(scope);
 
@@ -60,13 +59,7 @@ export function LeaderboardScreen(): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Icon name="chevron-left" size={28} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Leaderboard</Text>
-        <View style={styles.back} />
-      </View>
+      <ScreenHeader title="Leaderboard" />
 
       <View style={styles.tabs}>
         {(['weekly', 'all_time'] as LeaderboardScope[]).map((s) => (
@@ -93,7 +86,12 @@ export function LeaderboardScreen(): React.JSX.Element {
         {page == null && loading ? (
           <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
         ) : page && page.entries.length === 0 ? (
-          <Text style={styles.empty}>No ranked players yet. Earn XP to climb!</Text>
+          <EmptyState
+            variant="plain"
+            icon="trophy-outline"
+            title="No ranked players yet"
+            body="Earn XP to climb the leaderboard."
+          />
         ) : (
           page?.entries.map((e) => <Row key={e.userId} entry={e} />)
         )}
@@ -111,15 +109,6 @@ export function LeaderboardScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0f' },
   content: { paddingBottom: 24 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    paddingTop: 56,
-  },
-  back: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   tabs: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 12, gap: 8 },
   tab: {
     flex: 1,
@@ -133,7 +122,6 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: '#00d4ff18', borderColor: '#00d4ff' },
   tabText: { color: '#888', fontWeight: '600' },
   tabTextActive: { color: '#00d4ff' },
-  empty: { color: '#666', textAlign: 'center', marginTop: 40, paddingHorizontal: 32 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
