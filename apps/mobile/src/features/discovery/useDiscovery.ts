@@ -6,6 +6,7 @@ import {
   type DiscoveryQuery,
   type DiscoveryPoint,
   type EntityKind,
+  type ListingMode,
   type Viewport,
 } from '@g88/shared';
 
@@ -15,8 +16,8 @@ interface UseDiscoveryArgs {
   zoom: number;
   viewport: Viewport | null;
   kinds?: EntityKind[];
-  /** Trending topic filter (hashtag). Changing it forces a fresh full fetch. */
   topic?: string | null;
+  listingMode?: ListingMode;
   debounceMs?: number;
   enabled?: boolean;
 }
@@ -32,20 +33,12 @@ function pointKey(p: DiscoveryPoint): string {
   return p.kind === 'cluster' ? p.cellId : p.id;
 }
 
-/**
- * Viewport-driven discovery with viewport-diff (M1).
- *
- * First request: sends viewport + zoom, receives full point set.
- * Subsequent requests: sends prevViewportHash from last response.
- * Server returns a diff ({added, removed}) when the viewport overlaps
- * the previous one; the hook merges it into the cached point set.
- * Falls back to full replace when diff is absent or null.
- */
 export function useDiscovery({
   zoom,
   viewport,
   kinds,
   topic,
+  listingMode,
   debounceMs = 250,
   enabled = true,
 }: UseDiscoveryArgs): UseDiscoveryResult {
@@ -56,25 +49,29 @@ export function useDiscovery({
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const lastFetchKey = useRef<string>('');
-  // Hash from the last successful response — sent as prevViewportHash next time.
   const prevHashRef = useRef<string | null>(null);
-  // Cached point set updated incrementally by diffs.
   const cachedPointsRef = useRef<DiscoveryPoint[]>([]);
-  // Last topic filter applied — used to detect a filter change and reset diffs.
   const lastTopicRef = useRef<string | null>(null);
+  const lastListingModeRef = useRef<string | null>(null);
 
   const fetchNow = useCallback(
-    async (vp: Viewport, z: number, k?: EntityKind[], t?: string | null) => {
-      const key = JSON.stringify({ vp, z, k, t });
+    async (
+      vp: Viewport,
+      z: number,
+      k?: EntityKind[],
+      t?: string | null,
+      lm?: ListingMode,
+    ) => {
+      const key = JSON.stringify({ vp, z, k, t, lm: lm ?? null });
       if (key === lastFetchKey.current) return;
 
-      // A topic change swaps the entire result set, so the diff baseline from the
-      // previous (differently-filtered) snapshot is invalid — force a full fetch.
       const topicChanged = lastTopicRef.current !== (t ?? null);
-      if (topicChanged) {
+      const modeChanged = lastListingModeRef.current !== (lm ?? null);
+      if (topicChanged || modeChanged) {
         prevHashRef.current = null;
         cachedPointsRef.current = [];
         lastTopicRef.current = t ?? null;
+        lastListingModeRef.current = lm ?? null;
       }
 
       lastFetchKey.current = key;
@@ -92,6 +89,7 @@ export function useDiscovery({
           zoom: z,
           ...(k ? { kinds: k } : {}),
           ...(t ? { topic: t } : {}),
+          ...(lm ? { listingMode: lm } : {}),
           ...(prevHashRef.current ? { prevViewportHash: prevHashRef.current } : {}),
         };
 
@@ -106,15 +104,12 @@ export function useDiscovery({
         prevHashRef.current = res.viewportHash;
 
         if (res.diff) {
-          // Incremental update — apply diff to cached point set.
           const removedSet = new Set(res.diff.removed);
           const kept = cachedPointsRef.current.filter((p) => !removedSet.has(pointKey(p)));
           const merged = [...res.diff.added, ...kept];
           cachedPointsRef.current = merged;
-          // Expose a synthetic full response so consumers are diff-unaware.
           setData({ ...res, points: merged, diff: null });
         } else {
-          // Full response — replace.
           cachedPointsRef.current = res.points;
           setData(res);
         }
@@ -132,12 +127,12 @@ export function useDiscovery({
     if (!enabled || !viewport) return;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
-      void fetchNow(viewport, zoom, kinds, topic);
+      void fetchNow(viewport, zoom, kinds, topic, listingMode);
     }, debounceMs);
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [enabled, viewport, zoom, kinds, topic, debounceMs, fetchNow]);
+  }, [enabled, viewport, zoom, kinds, topic, listingMode, debounceMs, fetchNow]);
 
   useEffect(() => {
     return () => abortRef.current?.abort();
@@ -146,10 +141,10 @@ export function useDiscovery({
   const refresh = useCallback(() => {
     if (!viewport) return;
     lastFetchKey.current = '';
-    prevHashRef.current = null;   // force full response on explicit refresh
+    prevHashRef.current = null;
     cachedPointsRef.current = [];
-    void fetchNow(viewport, zoom, kinds, topic);
-  }, [viewport, zoom, kinds, topic, fetchNow]);
+    void fetchNow(viewport, zoom, kinds, topic, listingMode);
+  }, [viewport, zoom, kinds, topic, listingMode, fetchNow]);
 
   return { data, loading, error, refresh };
 }
