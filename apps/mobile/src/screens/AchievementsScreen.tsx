@@ -5,14 +5,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { AchievementStatus } from '@g88/shared';
 import { useAchievements } from '@/features/gamification/useAchievements';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 function AchievementRow({ a }: { a: AchievementStatus }): React.JSX.Element {
   const pct = a.threshold > 0 ? Math.min(100, Math.round((a.progress / a.threshold) * 100)) : 0;
@@ -41,51 +40,38 @@ function AchievementRow({ a }: { a: AchievementStatus }): React.JSX.Element {
 }
 
 export function AchievementsScreen(): React.JSX.Element {
-  const navigation = useNavigation();
   const { achievements, loading, refresh } = useAchievements();
   const unlockedCount = achievements.filter((a) => a.unlocked).length;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#00d4ff" />}
-    >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Icon name="chevron-left" size={28} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Achievements</Text>
-        <View style={styles.back} />
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Achievements" />
 
-      {achievements.length > 0 ? (
-        <Text style={styles.summary}>
-          {unlockedCount} of {achievements.length} unlocked
-        </Text>
-      ) : loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
-      ) : null}
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#00d4ff" />}
+      >
+        {achievements.length > 0 ? (
+          <Text style={styles.summary}>
+            {unlockedCount} of {achievements.length} unlocked
+          </Text>
+        ) : loading ? (
+          <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
+        ) : null}
 
-      {achievements.map((a) => (
-        <AchievementRow key={a.id} a={a} />
-      ))}
-    </ScrollView>
+        {achievements.map((a) => (
+          <AchievementRow key={a.id} a={a} />
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0f' },
+  flex: { flex: 1 },
   content: { paddingBottom: 40 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    paddingTop: 56,
-  },
-  back: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   summary: { color: '#888', fontSize: 14, textAlign: 'center', marginBottom: 16 },
   row: {
     flexDirection: 'row',

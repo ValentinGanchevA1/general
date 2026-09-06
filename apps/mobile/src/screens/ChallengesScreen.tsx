@@ -5,18 +5,15 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { ChallengeToday } from '@g88/shared';
 import { useChallenges } from '@/features/gamification/useChallenges';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/EmptyState';
 
-// ChallengeToday carries no icon (the catalog keys on `metric`, which the
-// today-endpoint strips), so derive one from the id prefix. Falls back to a
-// generic target icon for ids we don't recognise.
 function iconForChallenge(id: string): string {
   if (id.startsWith('wave')) return 'hand-wave';
   if (id.startsWith('match')) return 'heart';
@@ -61,55 +58,46 @@ function ChallengeRow({ c }: { c: ChallengeToday }): React.JSX.Element {
 }
 
 export function ChallengesScreen(): React.JSX.Element {
-  const navigation = useNavigation();
   const { challenges, loading, refresh } = useChallenges();
   const completedCount = challenges.filter((c) => c.completed).length;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#00d4ff" />}
-    >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Icon name="chevron-left" size={28} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Challenges</Text>
-        <View style={styles.back} />
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Challenges" />
 
-      {challenges.length > 0 ? (
-        <Text style={styles.summary}>
-          {completedCount} of {challenges.length} completed today · resets at midnight
-        </Text>
-      ) : loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
-      ) : (
-        <Text style={styles.empty}>No challenges right now. Check back tomorrow!</Text>
-      )}
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#00d4ff" />}
+      >
+        {challenges.length > 0 ? (
+          <Text style={styles.summary}>
+            {completedCount} of {challenges.length} completed today · resets at midnight
+          </Text>
+        ) : loading ? (
+          <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
+        ) : (
+          <EmptyState
+            variant="plain"
+            icon="flag-outline"
+            title="No challenges right now"
+            body="Check back tomorrow for new daily goals."
+          />
+        )}
 
-      {challenges.map((c) => (
-        <ChallengeRow key={c.id} c={c} />
-      ))}
-    </ScrollView>
+        {challenges.map((c) => (
+          <ChallengeRow key={c.id} c={c} />
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0f' },
+  flex: { flex: 1 },
   content: { paddingBottom: 40 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    paddingTop: 56,
-  },
-  back: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   summary: { color: '#888', fontSize: 14, textAlign: 'center', marginBottom: 16 },
-  empty: { color: '#666', fontSize: 14, textAlign: 'center', marginTop: 40, paddingHorizontal: 32 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
