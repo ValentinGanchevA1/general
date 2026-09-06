@@ -184,7 +184,7 @@ export function EventCreateScreen(): React.JSX.Element {
               <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
               {!uploading ? (
                 <View style={S.photoEditBadge}>
-                  <Icon name="camera" size={14} color="#fff" />
+                  <Icon name="camera" size={14} color={colors.textPrimary} />
                   <Text style={S.photoEditText}>Change</Text>
                 </View>
               ) : null}
@@ -192,14 +192,14 @@ export function EventCreateScreen(): React.JSX.Element {
           ) : (
             !uploading && (
               <View style={S.photoEmpty}>
-                <Icon name="camera-plus-outline" size={28} color="#00d4ff" />
+                <Icon name="camera-plus-outline" size={28} color={colors.primary} />
                 <Text style={S.photoEmptyText}>Add a cover photo</Text>
               </View>
             )
           )}
           {uploading ? (
             <View style={S.photoUploading}>
-              <ActivityIndicator color="#00d4ff" />
+              <ActivityIndicator color={colors.primary} />
               <Text style={S.photoEmptyText}>Uploading…</Text>
             </View>
           ) : null}
@@ -209,7 +209,7 @@ export function EventCreateScreen(): React.JSX.Element {
         <TextInput
           style={S.input}
           placeholder="What is happening?"
-          placeholderTextColor="#555"
+          placeholderTextColor={colors.textFaint}
           value={title}
           onChangeText={setTitle}
           maxLength={EVENT_LIMITS.titleMax}
@@ -220,7 +220,7 @@ export function EventCreateScreen(): React.JSX.Element {
         <TextInput
           style={[S.input, S.multiline]}
           placeholder="Tell people what to expect"
-          placeholderTextColor="#555"
+          placeholderTextColor={colors.textFaint}
           value={description}
           onChangeText={setDescription}
           maxLength={EVENT_LIMITS.descriptionMax}
@@ -274,7 +274,7 @@ export function EventCreateScreen(): React.JSX.Element {
         <TextInput
           style={S.input}
           placeholder="e.g. 20"
-          placeholderTextColor="#555"
+          placeholderTextColor={colors.textFaint}
           value={capacity}
           onChangeText={setCapacity}
           keyboardType="number-pad"
@@ -288,7 +288,7 @@ export function EventCreateScreen(): React.JSX.Element {
 
         {error ? (
           <View style={S.errorBox}>
-            <Icon name="alert-circle-outline" size={16} color="#ff6b6b" style={{ marginRight: 8 }} />
+            <Icon name="alert-circle-outline" size={16} color={colors.danger} style={{ marginRight: 8 }} />
             <Text style={S.errorText}>{error}</Text>
           </View>
         ) : null}
@@ -312,19 +312,19 @@ function Chip({
 }
 
 const S = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a0a0f' },
+  root: { flex: 1, backgroundColor: colors.bg },
   create: { color: colors.primary, fontSize: 16, fontWeight: '700' },
-  createDisabled: { color: '#333' },
+  createDisabled: { color: colors.borderStrong },
 
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 48 },
 
-  label: { color: '#aaa', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 18, marginBottom: 8 },
-  optional: { color: '#555', textTransform: 'none', fontWeight: '400' },
+  label: { color: colors.textSecondary, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 18, marginBottom: 8 },
+  optional: { color: colors.textFaint, textTransform: 'none', fontWeight: '400' },
 
   input: {
-    backgroundColor: '#12121f', borderWidth: 1, borderColor: '#1f1f33',
-    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#fff', fontSize: 16,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: colors.textPrimary, fontSize: 16,
   },
   multiline: { minHeight: 90 },
 
@@ -332,33 +332,33 @@ const S = StyleSheet.create({
   chips: { gap: 8, paddingRight: 8 },
   chip: {
     paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20,
-    backgroundColor: '#12121f', borderWidth: 1, borderColor: '#2a2a4a',
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderStrong,
   },
-  chipActive: { backgroundColor: '#00d4ff', borderColor: '#00d4ff' },
-  chipText: { color: '#aaa', fontSize: 13, fontWeight: '600' },
-  chipTextActive: { color: '#0a0a0f' },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  chipTextActive: { color: colors.onPrimary },
 
-  mapWrap: { height: 180, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#1f1f33' },
+  mapWrap: { height: 180, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
 
   errorBox: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,107,107,0.1)', borderWidth: 1, borderColor: 'rgba(255,107,107,0.3)',
     borderRadius: 10, padding: 12, marginTop: 16,
   },
-  errorText: { color: '#ff6b6b', fontSize: 14, flex: 1 },
+  errorText: { color: colors.danger, fontSize: 14, flex: 1 },
 
   photoWrap: {
     height: 160, borderRadius: 12, overflow: 'hidden',
-    backgroundColor: '#12121f', borderWidth: 1, borderColor: '#1f1f33',
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
     justifyContent: 'center', alignItems: 'center',
   },
   photoEmpty: { alignItems: 'center', gap: 8 },
-  photoEmptyText: { color: '#aaa', fontSize: 13, fontWeight: '600' },
+  photoEmptyText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   photoUploading: { alignItems: 'center', gap: 8 },
   photoEditBadge: {
     position: 'absolute', right: 10, bottom: 10,
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14,
   },
-  photoEditText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  photoEditText: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
 });

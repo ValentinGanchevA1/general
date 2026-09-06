@@ -9,12 +9,12 @@ import {
 } from 'react-native';
 
 import { appAlert } from '@/ui/appAlert';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BlockedUser } from '@g88/shared';
 
-import type { AccountStackParamList } from '@/navigation/stacks';
 import { deleteJson, getJson } from '@/api/client';
+import { EmptyState } from '@/components/EmptyState';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { colors, spacing, radius, fontSize } from '@/theme';
 
 function InitialsAvatar({ name }: { name: string }): React.JSX.Element {
   const initials = name
@@ -31,7 +31,6 @@ function InitialsAvatar({ name }: { name: string }): React.JSX.Element {
 }
 
 export function BlockedUsersScreen(): React.JSX.Element {
-  const navigation = useNavigation<NativeStackNavigationProp<AccountStackParamList>>();
   const [users, setUsers] = useState<BlockedUser[]>([]);
   const [loading, setLoading] = useState(true);
   // Track every in-flight unblock by id so rapid taps on different rows don't
@@ -70,17 +69,11 @@ export function BlockedUsersScreen(): React.JSX.Element {
 
   return (
     <View style={styles.root}>
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>‹ Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.heading}>Blocked users</Text>
-        <View style={styles.spacer} />
-      </View>
+      <ScreenHeader title="Blocked users" bordered />
 
       {loading ? (
         <View style={styles.centered}>
-          <ActivityIndicator color="#00d4ff" size="large" />
+          <ActivityIndicator color={colors.primary} size="large" />
         </View>
       ) : (
         <FlatList
@@ -88,9 +81,12 @@ export function BlockedUsersScreen(): React.JSX.Element {
           keyExtractor={(u) => u.id}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
-            <Text style={styles.empty}>
-              You haven't blocked anyone. Blocked users don't appear on your map and can't message you.
-            </Text>
+            <EmptyState
+              variant="plain"
+              icon="account-cancel-outline"
+              title="No blocked users"
+              body="Blocked users don't appear on your map and can't message you."
+            />
           }
           renderItem={({ item }) => (
             <View style={styles.row}>
@@ -100,9 +96,11 @@ export function BlockedUsersScreen(): React.JSX.Element {
                 style={[styles.unblockBtn, pendingIds.has(item.id) && styles.unblockBtnDisabled]}
                 onPress={() => void unblock(item.id)}
                 disabled={pendingIds.has(item.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`Unblock ${item.displayName}`}
               >
                 {pendingIds.has(item.id) ? (
-                  <ActivityIndicator color="#00d4ff" size="small" />
+                  <ActivityIndicator color={colors.primary} size="small" />
                 ) : (
                   <Text style={styles.unblockText}>Unblock</Text>
                 )}
@@ -116,52 +114,40 @@ export function BlockedUsersScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a0a0f' },
+  root: { flex: 1, backgroundColor: colors.bg },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  topBar: {
-    paddingTop: 52,
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backBtnText: { color: '#00d4ff', fontSize: 17, fontWeight: '600', width: 60 },
-  heading: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  spacer: { width: 60 },
-  listContent: { paddingHorizontal: 20, paddingTop: 8, gap: 10 },
-  empty: { color: '#666', fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 48 },
+  listContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: 10 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#1a1a2e',
-    borderRadius: 12,
-    padding: 12,
+    gap: spacing.md,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    padding: spacing.md,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
   },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#0a0a0f',
+    backgroundColor: colors.bg,
     borderWidth: 1,
-    borderColor: '#00d4ff66',
+    borderColor: colors.primary + '66',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarText: { color: '#00d4ff', fontSize: 15, fontWeight: '700' },
-  name: { flex: 1, color: '#fff', fontSize: 15, fontWeight: '500' },
+  avatarText: { color: colors.primary, fontSize: fontSize.md, fontWeight: '700' },
+  name: { flex: 1, color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '500' },
   unblockBtn: {
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 9,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#00d4ff66',
+    borderColor: colors.primary + '66',
     minWidth: 92,
     alignItems: 'center',
   },
   unblockBtnDisabled: { opacity: 0.6 },
-  unblockText: { color: '#00d4ff', fontWeight: '700', fontSize: 14 },
+  unblockText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.sm + 1 },
 });
