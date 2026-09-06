@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type { LocationShareSession } from '@g88/shared';
+import { colors } from '@/theme';
 
 interface Props {
   session: LocationShareSession;
@@ -81,31 +82,31 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#0d1f2a',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a3a4a',
+    borderBottomColor: colors.border,
   },
   left: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   pin: { fontSize: 16 },
   copy: { flex: 1 },
-  title: { color: '#e6f7ff', fontSize: 13, fontWeight: '600' },
-  time: { color: '#7ec8e3', fontSize: 12, marginTop: 1 },
+  title: { color: colors.info, fontSize: 13, fontWeight: '600' },
+  time: { color: colors.primary, fontSize: 12, marginTop: 1 },
   stopBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: '#ff3b5c22',
+    backgroundColor: colors.danger + '22',
     borderWidth: 1,
-    borderColor: '#ff3b5c55',
+    borderColor: colors.danger + '55',
   },
-  stopText: { color: '#ff6b8a', fontSize: 13, fontWeight: '700' },
+  stopText: { color: colors.danger, fontSize: 13, fontWeight: '700' },
   mapBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: '#00d4ff22',
+    backgroundColor: colors.primary + '22',
     borderWidth: 1,
-    borderColor: '#00d4ff55',
+    borderColor: colors.primary + '55',
   },
-  mapText: { color: '#00d4ff', fontSize: 13, fontWeight: '700' },
+  mapText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
 });

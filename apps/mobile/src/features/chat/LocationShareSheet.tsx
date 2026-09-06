@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import type { LocationShareDuration } from '@g88/shared';
+import { colors } from '@/theme';
 
 interface Props {
   visible: boolean;
@@ -79,7 +80,7 @@ export function LocationShareSheet({
               disabled={starting}
             >
               {starting ? (
-                <ActivityIndicator color="#000" size="small" />
+                <ActivityIndicator color={colors.onPrimary} size="small" />
               ) : (
                 <Text style={styles.shareText}>Share</Text>
               )}
@@ -92,9 +93,9 @@ export function LocationShareSheet({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: '#000a', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.67)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: '#12121f',
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -106,10 +107,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#333',
+    backgroundColor: colors.borderStrong,
   },
-  title: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  subtitle: { color: '#888', fontSize: 13, lineHeight: 18, marginTop: -6 },
+  title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
+  subtitle: { color: colors.textMuted, fontSize: 13, lineHeight: 18, marginTop: -6 },
   options: { gap: 8 },
   option: {
     flexDirection: 'row',
@@ -118,48 +119,48 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 14,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
   },
-  optionSelected: { borderColor: '#00d4ff', backgroundColor: '#00d4ff12' },
+  optionSelected: { borderColor: colors.primary, backgroundColor: colors.primary + '12' },
   radio: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#555',
+    borderColor: colors.textFaint,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  radioOn: { borderColor: '#00d4ff' },
+  radioOn: { borderColor: colors.primary },
   radioDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#00d4ff',
+    backgroundColor: colors.primary,
   },
   optionText: { flex: 1 },
-  optionLabel: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  optionHint: { color: '#888', fontSize: 12, marginTop: 2 },
+  optionLabel: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
+  optionHint: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   cancelBtn: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 14,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
   },
-  cancelText: { color: '#ccc', fontWeight: '600', fontSize: 15 },
+  cancelText: { color: colors.textSecondary, fontWeight: '600', fontSize: 15 },
   shareBtn: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 14,
-    backgroundColor: '#00d4ff',
+    backgroundColor: colors.primary,
     alignItems: 'center',
   },
   shareBtnDisabled: { opacity: 0.5 },
-  shareText: { color: '#000', fontWeight: '700', fontSize: 15 },
+  shareText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
 });
