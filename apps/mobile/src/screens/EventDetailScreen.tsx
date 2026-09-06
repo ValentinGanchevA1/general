@@ -21,6 +21,7 @@ import type { RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/EmptyState';
 import { colors } from '@/theme';
 
 import { EVENT_LIMITS, RSVP_STATUSES, type PollResult, type RsvpStatus } from '@g88/shared';
@@ -79,10 +80,12 @@ export function EventDetailScreen(): React.JSX.Element {
           {loading ? (
             <ActivityIndicator color={colors.primary} />
           ) : (
-            <>
-              <Icon name="calendar-remove" size={48} color={colors.borderStrong} />
-              <Text style={styles.emptyText}>Event not found.</Text>
-            </>
+            <EmptyState
+              variant="plain"
+              icon="calendar-remove"
+              title="Event not found"
+              body="This event may have been removed or the link is invalid."
+            />
           )}
         </View>
       </View>
@@ -96,7 +99,7 @@ export function EventDetailScreen(): React.JSX.Element {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#00d4ff" />}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />}
     >
       <ScreenHeader title="Event" />
 
@@ -104,18 +107,18 @@ export function EventDetailScreen(): React.JSX.Element {
         <Image source={{ uri: event.coverUrl }} style={styles.cover} />
       ) : (
         <View style={[styles.cover, styles.coverPlaceholder]}>
-          <Icon name="calendar-star" size={40} color="#00d4ff" />
+          <Icon name="calendar-star" size={40} color={colors.primary} />
         </View>
       )}
 
       <Text style={styles.title}>{event.title}</Text>
 
       <View style={styles.metaRow}>
-        <Icon name="clock-outline" size={16} color="#00d4ff" />
+        <Icon name="clock-outline" size={16} color={colors.primary} />
         <Text style={styles.metaText}>{formatEventWhen(event.startsAt, event.endsAt)}</Text>
       </View>
       <View style={styles.metaRow}>
-        <Icon name="account-group" size={16} color="#00d4ff" />
+        <Icon name="account-group" size={16} color={colors.primary} />
         <Text style={styles.metaText}>
           {event.attendeeCount} going{event.capacity != null ? ` · ${event.capacity} cap` : ''}
         </Text>
@@ -125,9 +128,9 @@ export function EventDetailScreen(): React.JSX.Element {
         onPress={() => openRootScreen(navigation, 'UserProfile', { userId: event.hostId })}
         activeOpacity={0.7}
       >
-        <Icon name="account" size={16} color="#888" />
+        <Icon name="account" size={16} color={colors.textMuted} />
         <Text style={styles.metaSubtle}>Hosted by {event.hostDisplayName}</Text>
-        <Icon name="chevron-right" size={18} color="#555" />
+        <Icon name="chevron-right" size={18} color={colors.textFaint} />
       </TouchableOpacity>
 
       {event.description ? <Text style={styles.description}>{event.description}</Text> : null}
@@ -145,7 +148,7 @@ export function EventDetailScreen(): React.JSX.Element {
               disabled={disabled}
               onPress={() => void onRsvp(status)}
             >
-              <Icon name={meta.icon} size={18} color={active ? '#0a0a0f' : '#aaa'} />
+              <Icon name={meta.icon} size={18} color={active ? colors.bg : colors.textSecondary} />
               <Text style={[styles.rsvpText, active && styles.rsvpTextActive]}>{meta.label}</Text>
             </TouchableOpacity>
           );
@@ -173,7 +176,7 @@ export function EventDetailScreen(): React.JSX.Element {
                 </View>
               )}
               <Text style={styles.attendeeName}>{a.displayName}</Text>
-              <Icon name="chevron-right" size={20} color="#555" style={{ marginLeft: 'auto' }} />
+              <Icon name="chevron-right" size={20} color={colors.textFaint} style={{ marginLeft: 'auto' }} />
             </TouchableOpacity>
           ))}
         </>
@@ -213,7 +216,7 @@ function PollsSection({
         <Text style={styles.sectionTitle}>Polls</Text>
         {isHost ? (
           <TouchableOpacity onPress={() => setComposing((v) => !v)} hitSlop={8}>
-            <Icon name={composing ? 'close-circle' : 'plus-circle'} size={22} color="#00d4ff" />
+            <Icon name={composing ? 'close-circle' : 'plus-circle'} size={22} color={colors.primary} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -299,7 +302,7 @@ function PollComposer({
       <TextInput
         style={styles.composerInput}
         placeholder="Poll question"
-        placeholderTextColor="#555"
+        placeholderTextColor={colors.textFaint}
         value={question}
         onChangeText={setQuestion}
         maxLength={EVENT_LIMITS.pollQuestionMax}
@@ -309,21 +312,21 @@ function PollComposer({
           <TextInput
             style={[styles.composerInput, { flex: 1 }]}
             placeholder={`Option ${i + 1}`}
-            placeholderTextColor="#555"
+            placeholderTextColor={colors.textFaint}
             value={opt}
             onChangeText={(v) => setOption(i, v)}
             maxLength={EVENT_LIMITS.pollOptionMax}
           />
           {options.length > EVENT_LIMITS.pollOptionsMin ? (
             <TouchableOpacity onPress={() => removeOption(i)} hitSlop={8}>
-              <Icon name="minus-circle-outline" size={22} color="#888" />
+              <Icon name="minus-circle-outline" size={22} color={colors.textMuted} />
             </TouchableOpacity>
           ) : null}
         </View>
       ))}
       {options.length < EVENT_LIMITS.pollOptionsMax ? (
         <TouchableOpacity style={styles.composerAdd} onPress={addOption}>
-          <Icon name="plus" size={16} color="#00d4ff" />
+          <Icon name="plus" size={16} color={colors.primary} />
           <Text style={styles.composerAddText}>Add option</Text>
         </TouchableOpacity>
       ) : null}
@@ -333,7 +336,7 @@ function PollComposer({
         onPress={() => void onSubmit()}
       >
         {submitting ? (
-          <ActivityIndicator size="small" color="#0a0a0f" />
+          <ActivityIndicator size="small" color={colors.onPrimary} />
         ) : (
           <Text style={styles.composerSubmitText}>Create poll</Text>
         )}
@@ -386,7 +389,7 @@ function QuestionsSection({
         <TextInput
           style={styles.askInput}
           placeholder="Ask the host a question…"
-          placeholderTextColor="#555"
+          placeholderTextColor={colors.textFaint}
           value={body}
           onChangeText={setBody}
           multiline
@@ -397,9 +400,9 @@ function QuestionsSection({
           onPress={() => void onAsk()}
         >
           {submitting ? (
-            <ActivityIndicator size="small" color="#0a0a0f" />
+            <ActivityIndicator size="small" color={colors.onPrimary} />
           ) : (
-            <Icon name="send" size={18} color="#0a0a0f" />
+            <Icon name="send" size={18} color={colors.onPrimary} />
           )}
         </TouchableOpacity>
       </View>
@@ -412,7 +415,7 @@ function QuestionsSection({
               style={[styles.upvoteBtn, q.upvotedByMe && styles.upvoteBtnActive]}
               onPress={() => void onUpvote(q.id)}
             >
-              <Icon name="arrow-up-bold" size={16} color={q.upvotedByMe ? '#0a0a0f' : '#00d4ff'} />
+              <Icon name="arrow-up-bold" size={16} color={q.upvotedByMe ? colors.bg : colors.primary} />
               <Text style={[styles.upvoteCount, q.upvotedByMe && styles.upvoteCountActive]}>
                 {q.upvotes}
               </Text>
@@ -436,86 +439,86 @@ function QuestionsSection({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
+  container: { flex: 1, backgroundColor: colors.bg },
   content: { paddingBottom: 48 },
   center: { alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: '#666', fontSize: 15, marginTop: 12 },
+  emptyText: { color: colors.textFaint, fontSize: 15, marginTop: 12 },
 
-  cover: { width: '100%', height: 180, backgroundColor: '#12121f' },
+  cover: { width: '100%', height: 180, backgroundColor: colors.surface },
   coverPlaceholder: { alignItems: 'center', justifyContent: 'center' },
 
-  title: { color: '#fff', fontSize: 22, fontWeight: '800', paddingHorizontal: 20, marginTop: 16 },
+  title: { color: colors.textPrimary, fontSize: 22, fontWeight: '800', paddingHorizontal: 20, marginTop: 16 },
 
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, marginTop: 8 },
-  metaText: { color: '#ddd', fontSize: 14 },
-  metaSubtle: { color: '#888', fontSize: 13 },
-  description: { color: '#bbb', fontSize: 15, lineHeight: 22, paddingHorizontal: 20, marginTop: 16 },
+  metaText: { color: colors.textSecondary, fontSize: 14 },
+  metaSubtle: { color: colors.textMuted, fontSize: 13 },
+  description: { color: colors.textSecondary, fontSize: 15, lineHeight: 22, paddingHorizontal: 20, marginTop: 16 },
 
   sectionTitle: {
-    color: '#fff', fontSize: 16, fontWeight: '700',
+    color: colors.textPrimary, fontSize: 16, fontWeight: '700',
     paddingHorizontal: 20, marginTop: 28, marginBottom: 10,
   },
   sectionHeaderRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 18,
   },
-  emptyHint: { color: '#666', fontSize: 14, paddingHorizontal: 20 },
+  emptyHint: { color: colors.textFaint, fontSize: 14, paddingHorizontal: 20 },
 
   rsvpRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20 },
   rsvpBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     paddingVertical: 12, borderRadius: 12,
-    backgroundColor: '#12121f', borderWidth: 1, borderColor: '#1f1f33',
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
   },
-  rsvpBtnActive: { backgroundColor: '#00d4ff', borderColor: '#00d4ff' },
+  rsvpBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   rsvpBtnDisabled: { opacity: 0.4 },
-  rsvpText: { color: '#aaa', fontSize: 13, fontWeight: '600' },
-  rsvpTextActive: { color: '#0a0a0f' },
-  fullNote: { color: '#ff9f43', fontSize: 13, paddingHorizontal: 20, marginTop: 8 },
+  rsvpText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  rsvpTextActive: { color: colors.onPrimary },
+  fullNote: { color: colors.warning, fontSize: 13, paddingHorizontal: 20, marginTop: 8 },
 
   attendeeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, marginBottom: 10 },
-  attendeeAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#12121f' },
+  attendeeAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface },
   attendeeAvatarPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  attendeeInitial: { color: '#00d4ff', fontSize: 15, fontWeight: '700' },
-  attendeeName: { color: '#ddd', fontSize: 15 },
+  attendeeInitial: { color: colors.primary, fontSize: 15, fontWeight: '700' },
+  attendeeName: { color: colors.textSecondary, fontSize: 15 },
 
   card: {
     marginHorizontal: 20, marginBottom: 12, padding: 16,
-    backgroundColor: '#12121f', borderRadius: 14, borderWidth: 1, borderColor: '#1f1f33',
+    backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border,
   },
-  pollQuestion: { color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 12 },
+  pollQuestion: { color: colors.textPrimary, fontSize: 15, fontWeight: '700', marginBottom: 12 },
   pollOption: {
-    height: 40, borderRadius: 10, backgroundColor: '#1a1a2e',
+    height: 40, borderRadius: 10, backgroundColor: colors.surfaceAlt,
     marginBottom: 8, overflow: 'hidden', justifyContent: 'center',
   },
-  pollOptionFill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: '#00d4ff22' },
-  pollOptionFillMine: { backgroundColor: '#00d4ff44' },
+  pollOptionFill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,212,255,0.13)' },
+  pollOptionFillMine: { backgroundColor: 'rgba(0,212,255,0.27)' },
   pollOptionContent: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 12, zIndex: 1,
   },
-  pollOptionLabel: { color: '#ddd', fontSize: 14 },
-  pollOptionPct: { color: '#888', fontSize: 12, fontWeight: '600' },
-  pollTotal: { color: '#666', fontSize: 12, marginTop: 4 },
+  pollOptionLabel: { color: colors.textSecondary, fontSize: 14 },
+  pollOptionPct: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
+  pollTotal: { color: colors.textFaint, fontSize: 12, marginTop: 4 },
 
   composerInput: {
-    backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#2a2a4a',
-    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 15, marginBottom: 10,
+    backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong,
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.textPrimary, fontSize: 15, marginBottom: 10,
   },
   composerOptionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 0 },
   composerAdd: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  composerAddText: { color: '#00d4ff', fontSize: 13, fontWeight: '600' },
+  composerAddText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   composerSubmit: {
-    backgroundColor: '#00d4ff', borderRadius: 10, paddingVertical: 12, alignItems: 'center',
+    backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center',
   },
-  composerSubmitText: { color: '#0a0a0f', fontSize: 14, fontWeight: '700' },
+  composerSubmitText: { color: colors.onPrimary, fontSize: 14, fontWeight: '700' },
 
   askRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 12 },
   askInput: {
-    flex: 1, backgroundColor: '#12121f', borderWidth: 1, borderColor: '#1f1f33',
-    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 14, minHeight: 44,
+    flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: colors.textPrimary, fontSize: 14, minHeight: 44,
   },
   askBtn: {
-    width: 44, height: 44, borderRadius: 12, backgroundColor: '#00d4ff',
+    width: 44, height: 44, borderRadius: 12, backgroundColor: colors.primary,
     alignItems: 'center', justifyContent: 'center',
   },
   askBtnDisabled: { opacity: 0.4 },
@@ -523,12 +526,12 @@ const styles = StyleSheet.create({
   questionRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, marginBottom: 14 },
   upvoteBtn: {
     width: 40, alignItems: 'center', paddingVertical: 6, borderRadius: 10,
-    backgroundColor: '#12121f', borderWidth: 1, borderColor: '#1f1f33',
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
   },
-  upvoteBtnActive: { backgroundColor: '#00d4ff', borderColor: '#00d4ff' },
-  upvoteCount: { color: '#00d4ff', fontSize: 12, fontWeight: '700', marginTop: 2 },
-  upvoteCountActive: { color: '#0a0a0f' },
+  upvoteBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  upvoteCount: { color: colors.primary, fontSize: 12, fontWeight: '700', marginTop: 2 },
+  upvoteCountActive: { color: colors.onPrimary },
   questionBody: { flex: 1 },
-  questionText: { color: '#ddd', fontSize: 14, lineHeight: 21 },
-  questionMeta: { color: '#777', fontSize: 12, marginTop: 4 },
+  questionText: { color: colors.textSecondary, fontSize: 14, lineHeight: 21 },
+  questionMeta: { color: colors.textFaint, fontSize: 12, marginTop: 4 },
 });
