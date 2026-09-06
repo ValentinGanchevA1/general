@@ -4,7 +4,8 @@
 // hooks for reads, plain async helpers for writes (screens refresh after).
 // Wraps the /listings REST API (offer-based v1, no payment processing).
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import axios from 'axios';
 
 import type {
   BrowseListingsRequest,
@@ -40,9 +41,15 @@ export function useBrowseListings(
   const mode = options?.mode;
   const [listings, setListings] = useState<ListingSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const refresh = useCallback(() => {
     if (!location) return;
+
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
     void (async () => {
       setLoading(true);
       try {
@@ -51,11 +58,18 @@ export function useBrowseListings(
           ...(category ? { category } : {}),
           ...(mode ? { mode } : {}),
         };
-        setListings(await postJson<BrowseListingsRequest, ListingSummary[]>('/listings/browse', body));
-      } catch {
+        const next = await postJson<BrowseListingsRequest, ListingSummary[]>(
+          '/listings/browse',
+          body,
+          { signal: ctrl.signal },
+        );
+        if (ctrl.signal.aborted) return;
+        setListings(next);
+      } catch (err) {
+        if (axios.isCancel(err) || ctrl.signal.aborted) return;
         // keep stale data on error
       } finally {
-        setLoading(false);
+        if (!ctrl.signal.aborted) setLoading(false);
       }
     })();
   }, [location?.lat, location?.lng, category, mode]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -63,6 +77,10 @@ export function useBrowseListings(
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
 
   return { listings, loading, refresh };
 }
