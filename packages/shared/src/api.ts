@@ -1,14 +1,12 @@
 import type { LatLng, Viewport } from './geo';
 import type { AreaCategory } from './activity';
+import type { ListingMode } from './listing';
 
 // ─── Domain enums ──────────────────────────────────────────────────────────
 
 export type EntityKind = 'user' | 'event' | 'listing';
 
 export type VerificationLevel = 'none' | 'email' | 'phone' | 'selfie' | 'id';
-
-/** Map / browse filter for marketplace listings. */
-export type ListingMode = 'sell' | 'buy';
 
 // ─── Discovery ─────────────────────────────────────────────────────────────
 
