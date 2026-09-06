@@ -19,6 +19,8 @@ import type { SocialStackParamList } from '@/navigation/stacks';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson, postJson } from '@/api/client';
 import { Avatar } from '@/components/Avatar';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/EmptyState';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
@@ -67,7 +69,6 @@ export function SuggestionsScreen(): React.JSX.Element {
     }
   }, []);
 
-  // Reload when returning from Profile so Follow/Requested match server graph.
   useFocusEffect(
     useCallback(() => {
       void load();
@@ -101,7 +102,6 @@ export function SuggestionsScreen(): React.JSX.Element {
     );
   }, []);
 
-  /** Pending either way or already friends → drop from suggestions (matches backend exclude). */
   const removeCard = useCallback((userId: string) => {
     setItems((prev) => prev.filter((c) => c.userId !== userId));
   }, []);
@@ -131,7 +131,6 @@ export function SuggestionsScreen(): React.JSX.Element {
         });
         markRequested(userId);
       } catch (e) {
-        // Idempotent conflicts: request already lives on server (e.g. sent from Profile).
         if (isApiError(e)) {
           if (e.code === 'friends.request_pending') {
             markRequested(userId);
@@ -216,13 +215,7 @@ export function SuggestionsScreen(): React.JSX.Element {
 
   return (
     <View style={S.root}>
-      <View style={S.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={S.back}>
-          <Text style={S.backText}>‹ Back</Text>
-        </TouchableOpacity>
-        <Text style={S.title}>Suggestions</Text>
-        <View style={S.back} />
-      </View>
+      <ScreenHeader title="Suggestions" />
 
       {loading && items.length === 0 ? (
         <View style={S.centered}>
@@ -249,13 +242,12 @@ export function SuggestionsScreen(): React.JSX.Element {
             />
           }
           ListEmptyComponent={
-            <View style={S.empty}>
-              <Text style={S.emptyTitle}>No suggestions yet</Text>
-              <Text style={S.emptyBody}>
-                Wave at people on the map, chat, or grow your friend graph — suggestions show up
-                here.
-              </Text>
-            </View>
+            <EmptyState
+              variant="plain"
+              icon="account-plus-outline"
+              title="No suggestions yet"
+              body="Wave at people on the map, chat, or grow your friend graph — suggestions show up here."
+            />
           }
         />
       )}
@@ -265,17 +257,6 @@ export function SuggestionsScreen(): React.JSX.Element {
 
 const S = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingTop: 52,
-    paddingBottom: 12,
-  },
-  back: { width: 72 },
-  backText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
-  title: { color: colors.textPrimary, fontSize: 17, fontWeight: '700' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   errorText: { color: colors.danger, marginBottom: 12, textAlign: 'center' },
   retry: {
@@ -323,7 +304,4 @@ const S = StyleSheet.create({
     alignItems: 'center',
   },
   btnGhostText: { color: colors.textMuted, fontWeight: '600' },
-  empty: { paddingTop: 48, alignItems: 'center', gap: 8 },
-  emptyTitle: { color: colors.textPrimary, fontWeight: '700', fontSize: 16 },
-  emptyBody: { color: colors.textMuted, textAlign: 'center', lineHeight: 20, paddingHorizontal: 12 },
 });

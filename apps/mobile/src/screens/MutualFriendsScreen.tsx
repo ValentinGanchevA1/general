@@ -20,6 +20,8 @@ import type { FriendCard, FriendsPage } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson } from '@/api/client';
 import { Avatar } from '@/components/Avatar';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/EmptyState';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MutualFriends'>;
@@ -103,15 +105,7 @@ export function MutualFriendsScreen({ route, navigation }: Props): React.JSX.Ele
 
   return (
     <View style={S.root}>
-      <View style={S.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
-          <Text style={S.back}>‹ Back</Text>
-        </TouchableOpacity>
-        <Text style={S.heading} numberOfLines={1}>
-          {title}
-        </Text>
-        <View style={S.spacer} />
-      </View>
+      <ScreenHeader title={title} />
 
       {loading && items.length === 0 ? (
         <View style={S.center}>
@@ -143,12 +137,12 @@ export function MutualFriendsScreen({ route, navigation }: Props): React.JSX.Ele
           }}
           onEndReachedThreshold={0.4}
           ListEmptyComponent={
-            <View style={S.empty}>
-              <Text style={S.emptyTitle}>No mutual friends yet</Text>
-              <Text style={S.emptyHint}>
-                When you and {peerName ?? 'this person'} share close friends, they show up here.
-              </Text>
-            </View>
+            <EmptyState
+              variant="plain"
+              icon="account-group-outline"
+              title="No mutual friends yet"
+              body={`When you and ${peerName ?? 'this person'} share close friends, they show up here.`}
+            />
           }
           ListFooterComponent={
             loadingMore ? (
@@ -165,24 +159,6 @@ export function MutualFriendsScreen({ route, navigation }: Props): React.JSX.Ele
 const S = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  topBar: {
-    paddingTop: 52,
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  back: { color: colors.primary, fontSize: 17, fontWeight: '600', width: 64 },
-  heading: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 17,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  spacer: { width: 64 },
-
   listContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: 40, gap: 10 },
   row: {
     flexDirection: 'row',
@@ -198,16 +174,6 @@ const S = StyleSheet.create({
   name: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
   meta: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
   metaOnline: { color: colors.success, fontSize: fontSize.xs, marginTop: 2, fontWeight: '600' },
-
-  empty: { alignItems: 'center', paddingTop: 48, paddingHorizontal: 24 },
-  emptyTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '600' },
-  emptyHint: {
-    color: colors.textMuted,
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 20,
-  },
   errorText: { color: colors.danger, marginBottom: 12, textAlign: 'center' },
   retry: {
     backgroundColor: colors.primary,

@@ -16,6 +16,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { login, register, clearError, loginWithGoogle } from '@/features/auth/authSlice';
 import { setPendingPhoneVerify } from '@/services/pendingPhone';
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@/constants/app';
+import { colors, spacing, radius, fontSize } from '@/theme';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LEN = 8;
@@ -130,7 +131,7 @@ export function AuthScreen(): React.JSX.Element {
               <TextInput
                 style={[styles.input, fieldErrors.displayName ? styles.inputError : null]}
                 placeholder="Display name"
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.textFaint}
                 value={displayName}
                 onChangeText={(t) => {
                   setDisplayName(t);
@@ -149,7 +150,7 @@ export function AuthScreen(): React.JSX.Element {
             <TextInput
               style={[styles.input, fieldErrors.email ? styles.inputError : null]}
               placeholder="Email"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textFaint}
               value={email}
               onChangeText={(t) => {
                 setEmail(t);
@@ -169,7 +170,7 @@ export function AuthScreen(): React.JSX.Element {
             <TextInput
               style={styles.input}
               placeholder="Phone (optional) e.g. +359888123456"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textFaint}
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
@@ -182,7 +183,7 @@ export function AuthScreen(): React.JSX.Element {
             <TextInput
               style={[styles.input, fieldErrors.password ? styles.inputError : null]}
               placeholder="Password"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textFaint}
               value={password}
               onChangeText={(t) => {
                 setPassword(t);
@@ -208,7 +209,7 @@ export function AuthScreen(): React.JSX.Element {
             accessibilityLabel={mode === 'login' ? 'Sign in' : 'Create account'}
           >
             {loading ? (
-              <ActivityIndicator color="#000" />
+              <ActivityIndicator color={colors.onPrimary} />
             ) : (
               <Text style={styles.btnText}>
                 {mode === 'login' ? 'Sign in' : 'Create account'}
@@ -262,80 +263,80 @@ export function AuthScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a0a0f' },
+  root: { flex: 1, backgroundColor: colors.bg },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing.xxl,
     paddingVertical: 40,
   },
-  card: { gap: 12 },
+  card: { gap: spacing.md },
   logo: {
-    color: '#00d4ff',
+    color: colors.primary,
     fontSize: 40,
     fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   subtitle: {
-    color: '#aaa',
-    fontSize: 14,
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   input: {
-    backgroundColor: '#1a1a2e',
-    color: '#fff',
+    backgroundColor: colors.surfaceAlt,
+    color: colors.textPrimary,
     borderRadius: 10,
     padding: 14,
-    fontSize: 15,
+    fontSize: fontSize.md,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
   },
   inputError: {
-    borderColor: '#ff6b6b',
+    borderColor: colors.danger,
   },
   fieldError: {
-    color: '#ff6b6b',
-    fontSize: 12,
-    marginTop: 4,
+    color: colors.danger,
+    fontSize: fontSize.xs,
+    marginTop: spacing.xs,
     marginLeft: 2,
   },
-  error: { color: '#ff6b6b', fontSize: 13, textAlign: 'center' },
+  error: { color: colors.danger, fontSize: fontSize.sm, textAlign: 'center' },
   btn: {
-    backgroundColor: '#00d4ff',
+    backgroundColor: colors.primary,
     borderRadius: 10,
     padding: 14,
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
-  btnText: { color: '#000', fontWeight: '700', fontSize: 15 },
-  toggle: { alignItems: 'center', marginTop: 8 },
-  toggleText: { color: '#00d4ff', fontSize: 13 },
+  btnText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
+  toggle: { alignItems: 'center', marginTop: spacing.sm },
+  toggleText: { color: colors.primary, fontSize: fontSize.sm },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 16,
-    gap: 8,
+    marginVertical: spacing.lg,
+    gap: spacing.sm,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#2a2a4a' },
-  dividerText: { color: '#666', fontSize: 12 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.borderStrong },
+  dividerText: { color: colors.textFaint, fontSize: fontSize.xs },
   googleBtn: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.textPrimary,
     borderRadius: 10,
     padding: 14,
     alignItems: 'center',
   },
-  googleBtnText: { color: '#000', fontWeight: '600', fontSize: 15 },
+  googleBtnText: { color: colors.onPrimary, fontWeight: '600', fontSize: fontSize.md },
   legal: {
-    color: '#888',
-    fontSize: 12,
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
     textAlign: 'center',
     lineHeight: 18,
-    marginTop: 16,
+    marginTop: spacing.lg,
   },
   legalLink: {
-    color: '#00d4ff',
+    color: colors.primary,
     textDecorationLine: 'underline',
   },
 });

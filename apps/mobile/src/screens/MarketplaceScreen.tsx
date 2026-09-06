@@ -1,8 +1,7 @@
 // apps/mobile/src/screens/MarketplaceScreen.tsx
 //
-// P3.7 trading hub: a nearby browse grid + a "Sell an item" entry + a saved
-// (favorites) toggle. Tapping a card opens ListingDetail.
-// Browse supports mode filter (All / For sale / Wanted) — same labels as map.
+// P3.7 trading hub: nearby browse grid + Sell entry + saved toggle.
+// Mode filter (All / For sale / Wanted) — same labels as map.
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -25,6 +24,9 @@ import type { CommerceStackParamList } from '@/navigation/stacks';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { useBrowseListings, useFavorites } from '@/features/trading/useTrading';
 import { formatPrice } from '@/features/trading/formatPrice';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/EmptyState';
+import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<CommerceStackParamList>;
 
@@ -42,10 +44,6 @@ export function MarketplaceScreen(): React.JSX.Element {
   const [tab, setTab] = useState<'browse' | 'saved'>('browse');
   const [modeFilter, setModeFilter] = useState<ModeFilter>('all');
 
-  // useUserLocation only starts acquiring a fix once requestPermission() runs,
-  // and `coords` is local state that defaults to null. Without this, the nearby
-  // browse never gets a location and the grid is permanently empty. Mirrors
-  // MapScreen's mount effect.
   useEffect(() => {
     void requestPermission();
   }, [requestPermission]);
@@ -67,17 +65,35 @@ export function MarketplaceScreen(): React.JSX.Element {
     [nav],
   );
 
+  const emptyTitle =
+    tab === 'saved'
+      ? 'No saved listings'
+      : modeFilter === 'buy'
+        ? 'No wanted posts nearby'
+        : modeFilter === 'sell'
+          ? 'No items for sale nearby'
+          : 'No listings nearby';
+
+  const emptyBody =
+    tab === 'saved'
+      ? "You haven't saved any listings yet."
+      : 'Be the first to post something near you.';
+
   return (
     <View style={S.container}>
-      <View style={S.header}>
-        <TouchableOpacity onPress={() => nav.goBack()} hitSlop={8}>
-          <Icon name="chevron-left" size={28} color="#fff" />
-        </TouchableOpacity>
-        <Text style={S.headerTitle}>Marketplace</Text>
-        <TouchableOpacity onPress={() => nav.navigate('ListingCreate')} hitSlop={8}>
-          <Icon name="plus-circle" size={24} color="#00d4ff" />
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Marketplace"
+        right={
+          <TouchableOpacity
+            onPress={() => nav.navigate('ListingCreate')}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Create listing"
+          >
+            <Icon name="plus-circle" size={24} color={colors.primary} />
+          </TouchableOpacity>
+        }
+      />
 
       <View style={S.tabs}>
         {(['browse', 'saved'] as const).map((t) => (
@@ -116,35 +132,26 @@ export function MarketplaceScreen(): React.JSX.Element {
         numColumns={2}
         columnWrapperStyle={S.row}
         contentContainerStyle={S.grid}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#00d4ff" />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />}
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator style={{ marginTop: 48 }} color="#00d4ff" />
+            <ActivityIndicator style={{ marginTop: 48 }} color={colors.primary} />
           ) : (
-            <View style={S.empty}>
-              <Icon name={tab === 'browse' ? 'storefront-outline' : 'heart-outline'} size={44} color="#555" />
-              <Text style={S.emptyText}>
-                {tab === 'browse'
-                  ? modeFilter === 'buy'
-                    ? 'No wanted posts nearby yet.'
-                    : modeFilter === 'sell'
-                      ? 'No items for sale nearby yet.'
-                      : 'No listings nearby yet.'
-                  : "You haven't saved any listings."}
-              </Text>
-              {tab === 'browse' ? (
-                <TouchableOpacity
-                  style={S.sellBtn}
-                  onPress={() =>
-                    nav.navigate('ListingCreate', {
-                      mode: modeFilter === 'buy' ? 'buy' : 'sell',
-                    })
-                  }
-                >
-                  <Text style={S.sellBtnText}>{modeFilter === 'buy' ? 'Post a wanted' : 'Sell an item'}</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
+            <EmptyState
+              variant="plain"
+              icon={tab === 'browse' ? 'storefront-outline' : 'heart-outline'}
+              title={emptyTitle}
+              body={emptyBody}
+              actionLabel={tab === 'browse' ? (modeFilter === 'buy' ? 'Post a wanted' : 'Sell an item') : undefined}
+              onAction={
+                tab === 'browse'
+                  ? () =>
+                      nav.navigate('ListingCreate', {
+                        mode: modeFilter === 'buy' ? 'buy' : 'sell',
+                      })
+                  : undefined
+              }
+            />
           )
         }
       />
@@ -166,7 +173,7 @@ function ListingCard({
         <Image source={{ uri: item.thumbnailUrl }} style={S.thumb} />
       ) : (
         <View style={[S.thumb, S.thumbPlaceholder]}>
-          <Icon name="image-off-outline" size={28} color="#444" />
+          <Icon name="image-off-outline" size={28} color={colors.borderStrong} />
         </View>
       )}
       {item.status !== 'active' ? (
@@ -178,7 +185,7 @@ function ListingCard({
           <Text style={S.wantedText}>Wanted</Text>
         </View>
       ) : null}
-      {item.favoritedByMe ? <Icon name="heart" size={18} color="#ff6b6b" style={S.heart} /> : null}
+      {item.favoritedByMe ? <Icon name="heart" size={18} color={colors.danger} style={S.heart} /> : null}
       <Text style={S.cardTitle} numberOfLines={1}>
         {item.title}
       </Text>
@@ -191,63 +198,54 @@ function ListingCard({
 }
 
 const S = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingTop: 56,
-    paddingBottom: 8,
-  },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
+  container: { flex: 1, backgroundColor: colors.bg },
+  tabs: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: '#12121f',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#1f1f33',
+    borderColor: colors.border,
   },
-  tabActive: { backgroundColor: '#00d4ff', borderColor: '#00d4ff' },
-  tabText: { color: '#aaa', fontSize: 13, fontWeight: '700' },
-  tabTextActive: { color: '#0a0a0f' },
+  tabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  tabText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '700' },
+  tabTextActive: { color: colors.onPrimary },
   modeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    paddingHorizontal: 16,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
     marginBottom: 10,
   },
   modeChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: 20,
-    backgroundColor: '#12121f',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
   },
-  modeChipActive: { backgroundColor: '#00d4ff', borderColor: '#00d4ff' },
-  modeChipText: { color: '#aaa', fontSize: 12, fontWeight: '700' },
-  modeChipTextActive: { color: '#0a0a0f' },
-  grid: { padding: 12, paddingBottom: 40 },
-  row: { gap: 12 },
+  modeChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  modeChipText: { color: colors.textSecondary, fontSize: fontSize.xs, fontWeight: '700' },
+  modeChipTextActive: { color: colors.onPrimary },
+  grid: { padding: spacing.md, paddingBottom: 40 },
+  row: { gap: spacing.md },
   card: {
     flex: 1,
-    marginBottom: 12,
-    padding: 8,
+    marginBottom: spacing.md,
+    padding: spacing.sm,
     borderRadius: 14,
-    backgroundColor: '#12121f',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#1f1f33',
+    borderColor: colors.border,
   },
   thumb: {
     width: '100%',
     aspectRatio: 1,
     borderRadius: 10,
-    backgroundColor: '#1a1a2e',
-    marginBottom: 8,
+    backgroundColor: colors.surfaceAlt,
+    marginBottom: spacing.sm,
   },
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   statusPill: {
@@ -259,7 +257,7 @@ const S = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'rgba(0,0,0,0.7)',
   },
-  statusText: { color: '#ff9f43', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  statusText: { color: colors.warning, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
   wantedPill: {
     position: 'absolute',
     top: 14,
@@ -267,15 +265,11 @@ const S = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
-    backgroundColor: 'rgba(139,92,246,0.9)',
+    backgroundColor: colors.entityWanted,
   },
-  wantedText: { color: '#fff', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  wantedText: { color: colors.textPrimary, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
   heart: { position: 'absolute', top: 14, right: 14 },
-  cardTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  cardPrice: { color: '#00d4ff', fontSize: 15, fontWeight: '800', marginTop: 2 },
-  cardCategory: { color: '#888', fontSize: 12, marginTop: 2 },
-  empty: { alignItems: 'center', marginTop: 64, paddingHorizontal: 32, gap: 12 },
-  emptyText: { color: '#666', fontSize: 14, textAlign: 'center' },
-  sellBtn: { backgroundColor: '#00d4ff', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 },
-  sellBtnText: { color: '#0a0a0f', fontSize: 14, fontWeight: '700' },
+  cardTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
+  cardPrice: { color: colors.primary, fontSize: 15, fontWeight: '800', marginTop: 2 },
+  cardCategory: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
 });
