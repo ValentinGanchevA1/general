@@ -390,7 +390,8 @@ function ListingCard({
   const navigation = useNavigation<Nav>();
   const meta = point.meta;
   const title = meta.title?.trim() || 'Listing';
-  const mode = meta.mode === 'buy' ? 'Wanted' : 'For sale';
+  const isBuy = meta.mode === 'buy';
+  const mode = isBuy ? 'Wanted' : 'For sale';
   const price = formatPrice(meta.priceCents, meta.currency);
   const category = meta.category?.trim() || null;
 
@@ -402,8 +403,13 @@ function ListingCard({
   return (
     <View style={styles.sheet}>
       <View style={styles.kindHeader}>
-        <View style={[styles.kindDot, styles.kindDotListing]} />
-        <Text style={styles.kindLabel}>{mode}</Text>
+        <View
+          style={[
+            styles.kindDot,
+            isBuy ? styles.kindDotWanted : styles.kindDotListing,
+          ]}
+        />
+        <Text style={[styles.kindLabel, isBuy && styles.kindLabelWanted]}>{mode}</Text>
       </View>
       <Text style={styles.entityTitle} numberOfLines={2}>
         {title}
@@ -571,6 +577,8 @@ const styles = StyleSheet.create({
   },
   kindDotEvent: { backgroundColor: colors.entityEvent },
   kindDotListing: { backgroundColor: colors.entityListing },
+  kindDotWanted: { backgroundColor: colors.entityWanted },
+  kindLabelWanted: { color: colors.entityWanted },
   kindLabel: {
     color: colors.textFaint,
     fontSize: 11,
