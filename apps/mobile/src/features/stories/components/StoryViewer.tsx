@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Image,
@@ -45,6 +46,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   const [held, setHeld] = useState(false);
   const [muted, setMuted] = useState(false);
   const [chromeDimmed, setChromeDimmed] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
   const chromeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optionsRef = useRef<BottomSheetModal>(null);
   const optionsSnap = useMemo(() => ['22%'], []);
@@ -81,6 +83,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
       setIndex(initialIndex);
       setHeld(false);
       setChromeDimmed(false);
+      setVideoReady(false);
     });
   }, [visible, initialIndex]);
 
@@ -90,13 +93,14 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
     void Promise.resolve().then(() => {
       setHeld(false);
       setChromeDimmed(false);
+      setVideoReady(mediaType !== 'video');
     });
     if (chromeTimer.current) clearTimeout(chromeTimer.current);
     chromeTimer.current = setTimeout(() => setChromeDimmed(true), 1_200);
     return () => {
       if (chromeTimer.current) clearTimeout(chromeTimer.current);
     };
-  }, [visible, storyId, index, dispatch]);
+  }, [visible, storyId, index, dispatch, mediaType]);
 
   const scheduleChromeDim = () => {
     if (chromeTimer.current) clearTimeout(chromeTimer.current);
@@ -128,6 +132,11 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
 
   const onReact = (kind: StoryReactionKind) => {
     void dispatch(reactToStory({ storyId: current.id, kind }));
+  };
+
+  const handleVideoLoad = (data: Parameters<typeof onVideoLoad>[0]) => {
+    setVideoReady(true);
+    onVideoLoad(data);
   };
 
   return (
@@ -179,23 +188,30 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
           {current.mediaType === 'image' ? (
             <Image source={{ uri: current.mediaUrl }} style={styles.media} resizeMode="cover" />
           ) : (
-            <Video
-              key={current.id}
-              source={{ uri: current.mediaUrl }}
-              style={styles.media}
-              resizeMode="cover"
-              controls={false}
-              muted={muted}
-              repeat={false}
-              paused={!visible || held}
-              playInBackground={false}
-              playWhenInactive={false}
-              ignoreSilentSwitch="ignore"
-              onEnd={onVideoEnd}
-              onLoad={onVideoLoad}
-              onProgress={onVideoProgress}
-              onError={onVideoError}
-            />
+            <>
+              <Video
+                key={current.id}
+                source={{ uri: current.mediaUrl }}
+                style={styles.media}
+                resizeMode="cover"
+                controls={false}
+                muted={muted}
+                repeat={false}
+                paused={!visible || held}
+                playInBackground={false}
+                playWhenInactive={false}
+                ignoreSilentSwitch="ignore"
+                onEnd={onVideoEnd}
+                onLoad={handleVideoLoad}
+                onProgress={onVideoProgress}
+                onError={onVideoError}
+              />
+              {!videoReady ? (
+                <View style={styles.videoLoading} pointerEvents="none">
+                  <ActivityIndicator color={colors.textPrimary} size="large" />
+                </View>
+              ) : null}
+            </>
           )}
         </View>
 
@@ -301,7 +317,7 @@ function ProgressRow({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000', paddingTop: 48 },
+  root: { flex: 1, backgroundColor: colors.bg, paddingTop: 48 },
   progressRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 12 },
   progressTrack: {
     flex: 1,
@@ -310,7 +326,7 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     overflow: 'hidden',
   },
-  progressFill: { height: 2, width: 0, backgroundColor: '#fff' },
+  progressFill: { height: 2, width: 0, backgroundColor: colors.textPrimary },
   progressDone: { width: '100%' },
   header: {
     flexDirection: 'row',
@@ -327,6 +343,12 @@ const styles = StyleSheet.create({
   chromeDim: { opacity: 0.35 },
   mediaWrap: { flex: 1, justifyContent: 'center' },
   media: { width: SCREEN_W, height: SCREEN_H * 0.65 },
+  videoLoading: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.bg,
+  },
   tapLeft: {
     position: 'absolute',
     left: 0,
@@ -364,7 +386,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  reactActive: { backgroundColor: 'rgba(124,92,255,0.4)' },
+  reactActive: { backgroundColor: colors.accent + '66' },
   reactEmoji: { fontSize: 22 },
   counts: { color: colors.textSecondary, fontSize: 12, marginLeft: 8 },
 });
