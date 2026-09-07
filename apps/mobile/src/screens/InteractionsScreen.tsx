@@ -98,7 +98,7 @@ export function InteractionsScreen(): React.JSX.Element {
   const rows: HubRow[] = useMemo(() => {
     const chatRows: HubRow[] = conversations.map((c) => ({
       kind: 'chat' as const,
-      sortAt: new Date(c.lastMessage?.createdAt ?? c.updatedAt ?? 0).getTime(),
+      sortAt: new Date(c.lastMessageAt ?? 0).getTime(),
       conversation: c,
     }));
     const inboxRows: HubRow[] = inbox.items.map((item) => ({
@@ -157,7 +157,7 @@ export function InteractionsScreen(): React.JSX.Element {
                     navigation.navigate('Chat', {
                       conversationId: item.conversation.id,
                       otherUserName: name,
-                      otherUserId: peer?.id,
+                      ...(peer?.id ? { otherUserId: peer.id } : {}),
                     })
                   }
                 >

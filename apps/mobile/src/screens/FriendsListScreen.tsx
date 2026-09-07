@@ -188,7 +188,7 @@ export function FriendsListScreen(): React.JSX.Element {
             <Text style={S.name} numberOfLines={1}>
               {item.displayName}
             </Text>
-            {item.isOnline ? (
+            {item.online ? (
               <Text style={S.online}>Online</Text>
             ) : null}
           </View>
@@ -213,48 +213,42 @@ export function FriendsListScreen(): React.JSX.Element {
   const renderRequest = useCallback(
     ({ item }: { item: FriendRequestCard }) => {
       const busy = isBusy(item.id);
-      const incoming = item.direction === 'incoming';
+      // Pending list is incoming-only (GET /friends/requests/pending).
       return (
         <TouchableOpacity
           style={S.row}
-          onPress={() => openProfile(item.fromUser.id)}
+          onPress={() => openProfile(item.fromUserId)}
           activeOpacity={0.7}
         >
-          <Avatar uri={item.fromUser.avatarUrl} name={item.fromUser.displayName} size={48} />
+          <Avatar uri={item.avatarUrl} name={item.displayName} size={48} />
           <View style={S.info}>
             <Text style={S.name} numberOfLines={1}>
-              {item.fromUser.displayName}
+              {item.displayName}
             </Text>
-            <Text style={S.meta}>{incoming ? 'Wants to be friends' : 'Request sent'}</Text>
+            <Text style={S.meta}>Wants to be friends</Text>
           </View>
-          {incoming ? (
-            <View style={S.actions}>
-              <TouchableOpacity
-                style={S.declineBtn}
-                disabled={busy}
-                onPress={(e) => {
-                  e.stopPropagation?.();
-                  void onDecline(item.id);
-                }}
-              >
-                <Text style={S.declineBtnText}>Decline</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={S.primaryBtn}
-                disabled={busy}
-                onPress={(e) => {
-                  e.stopPropagation?.();
-                  void onAccept(item.id);
-                }}
-              >
-                <Text style={S.primaryBtnText}>Accept</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={S.pendingBadge}>
-              <Text style={S.pendingText}>Pending</Text>
-            </View>
-          )}
+          <View style={S.actions}>
+            <TouchableOpacity
+              style={S.declineBtn}
+              disabled={busy}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                void onDecline(item.id);
+              }}
+            >
+              <Text style={S.declineBtnText}>Decline</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={S.primaryBtn}
+              disabled={busy}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                void onAccept(item.id);
+              }}
+            >
+              <Text style={S.primaryBtnText}>Accept</Text>
+            </TouchableOpacity>
+          </View>
         </TouchableOpacity>
       );
     },

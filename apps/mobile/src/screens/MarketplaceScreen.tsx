@@ -19,7 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { ListingCard, ListingMode } from '@g88/shared';
+import type { ListingMode, ListingSummary } from '@g88/shared';
 import type { CommerceStackParamList } from '@/navigation/stacks';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { useBrowseListings, useFavorites } from '@/features/trading/useTrading';
@@ -45,10 +45,13 @@ export function MarketplaceScreen(): React.JSX.Element {
   const [modeFilter, setModeFilter] = useState<ModeFilter>('all');
 
   const listingMode = modeFilter === 'all' ? undefined : modeFilter;
-  const browse = useBrowseListings(coords ?? null, listingMode);
+  const browse = useBrowseListings(
+    coords ?? null,
+    listingMode ? { mode: listingMode } : undefined,
+  );
   const saved = useFavorites();
 
-  const data = tab === 'browse' ? browse.listings : saved.listings;
+  const data = tab === 'browse' ? browse.listings : saved.favorites;
   const loading = tab === 'browse' ? browse.loading : saved.loading;
   const refresh = tab === 'browse' ? browse.refresh : saved.refresh;
 
@@ -68,7 +71,7 @@ export function MarketplaceScreen(): React.JSX.Element {
       : 'Heart listings to keep them here.';
 
   const renderItem = useCallback(
-    ({ item }: { item: ListingCard }) => (
+    ({ item }: { item: ListingSummary }) => (
       <TouchableOpacity
         style={S.card}
         activeOpacity={0.85}
