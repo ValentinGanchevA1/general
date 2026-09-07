@@ -113,6 +113,7 @@ export function SettingsScreen(): React.JSX.Element {
                 onValueChange={toggleVisibility}
                 trackColor={{ false: colors.borderStrong, true: '#0095b3' }}
                 thumbColor={isVisible ? colors.primary : colors.textFaint}
+                accessibilityLabel="Appear on map"
               />
             )}
           </View>
@@ -133,12 +134,15 @@ export function SettingsScreen(): React.JSX.Element {
                 onValueChange={toggleFriendsOnline}
                 trackColor={{ false: colors.borderStrong, true: '#0095b3' }}
                 thumbColor={friendsSeeOnline ? colors.primary : colors.textFaint}
+                accessibilityLabel="Friends can see when I am online"
               />
             )}
           </View>
           <TouchableOpacity
             style={[styles.row, styles.rowSpaced]}
             onPress={() => navigation.navigate('BlockedUsers')}
+            accessibilityRole="button"
+            accessibilityLabel="Blocked users"
           >
             <View style={styles.rowContent}>
               <Text style={styles.rowLabel}>Blocked users</Text>
@@ -153,6 +157,8 @@ export function SettingsScreen(): React.JSX.Element {
           <TouchableOpacity
             style={styles.row}
             onPress={() => navigation.navigate('Verification')}
+            accessibilityRole="button"
+            accessibilityLabel="Verification"
           >
             <View style={styles.rowContent}>
               <Text style={styles.rowLabel}>Verification</Text>
@@ -166,6 +172,8 @@ export function SettingsScreen(): React.JSX.Element {
             <TouchableOpacity
               style={[styles.row, styles.rowSpaced]}
               onPress={() => navigation.navigate('EmailVerification')}
+              accessibilityRole="button"
+              accessibilityLabel="Verify email"
             >
               <View style={styles.rowContent}>
                 <Text style={styles.rowLabel}>Verify email</Text>
@@ -181,6 +189,8 @@ export function SettingsScreen(): React.JSX.Element {
           <TouchableOpacity
             style={styles.row}
             onPress={() => navigation.navigate('SocialLinking')}
+            accessibilityRole="button"
+            accessibilityLabel="Social accounts"
           >
             <View style={styles.rowContent}>
               <Text style={styles.rowLabel}>Social accounts</Text>
@@ -195,6 +205,8 @@ export function SettingsScreen(): React.JSX.Element {
           <TouchableOpacity
             style={styles.row}
             onPress={() => navigation.navigate('ProfileEdit')}
+            accessibilityRole="button"
+            accessibilityLabel="Edit profile"
           >
             <View style={styles.rowContent}>
               <Text style={styles.rowLabel}>Edit profile</Text>
@@ -205,6 +217,8 @@ export function SettingsScreen(): React.JSX.Element {
           <TouchableOpacity
             style={[styles.row, styles.rowSpaced]}
             onPress={() => navigation.navigate('Photos')}
+            accessibilityRole="button"
+            accessibilityLabel="Manage photos"
           >
             <View style={styles.rowContent}>
               <Text style={styles.rowLabel}>Manage photos</Text>
@@ -219,6 +233,8 @@ export function SettingsScreen(): React.JSX.Element {
           <TouchableOpacity
             style={styles.row}
             onPress={() => navigation.navigate('NotificationSettings')}
+            accessibilityRole="button"
+            accessibilityLabel="Push notifications"
           >
             <View style={styles.rowContent}>
               <Text style={styles.rowLabel}>Push notifications</Text>
@@ -235,6 +251,8 @@ export function SettingsScreen(): React.JSX.Element {
           <TouchableOpacity
             style={styles.row}
             onPress={() => navigation.navigate('Privacy')}
+            accessibilityRole="button"
+            accessibilityLabel="Privacy"
           >
             <View style={styles.rowContent}>
               <Text style={styles.rowLabel}>Privacy</Text>
@@ -245,6 +263,8 @@ export function SettingsScreen(): React.JSX.Element {
           <TouchableOpacity
             style={[styles.row, styles.rowSpaced]}
             onPress={() => navigation.navigate('Help')}
+            accessibilityRole="button"
+            accessibilityLabel="Help and Support"
           >
             <View style={styles.rowContent}>
               <Text style={styles.rowLabel}>Help & Support</Text>
@@ -255,6 +275,8 @@ export function SettingsScreen(): React.JSX.Element {
           <TouchableOpacity
             style={[styles.row, styles.rowSpaced]}
             onPress={() => navigation.navigate('About')}
+            accessibilityRole="button"
+            accessibilityLabel="About"
           >
             <View style={styles.rowContent}>
               <Text style={styles.rowLabel}>About</Text>
@@ -263,7 +285,12 @@ export function SettingsScreen(): React.JSX.Element {
             <Icon name="chevron-right" size={24} color={colors.textFaint} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+          <TouchableOpacity
+            style={styles.logoutBtn}
+            onPress={handleLogout}
+            accessibilityRole="button"
+            accessibilityLabel="Log out"
+          >
             <Text style={styles.logoutText}>Log out</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -272,6 +299,8 @@ export function SettingsScreen(): React.JSX.Element {
               setDeletePassword('');
               setDeleteOpen(true);
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Delete account"
           >
             <Text style={styles.deleteText}>Delete account</Text>
           </TouchableOpacity>
