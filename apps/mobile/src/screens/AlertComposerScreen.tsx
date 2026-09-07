@@ -26,12 +26,23 @@ import { setPendingFilter } from '@/features/pulse/pulseSlice';
 import { challengeEvents } from '@/features/gamification/challengeEvents';
 import { postJson } from '@/api/client';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, fontSize, spacing, radius } from '@/theme';
+import { colors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type R = RouteProp<RootStackParamList, 'AlertComposer'>;
 
-const BODY_MAX = 280;
+const CATEGORY_META: Record<
+  AreaCategory,
+  { label: string; icon: string }
+> = {
+  general:  { label: 'General',  icon: 'bullhorn-outline' },
+  safety:   { label: 'Safety',   icon: 'shield-alert-outline' },
+  traffic:  { label: 'Traffic',  icon: 'car-outline' },
+  weather:  { label: 'Weather',  icon: 'weather-partly-cloudy' },
+  event:    { label: 'Event',    icon: 'calendar-outline' },
+  business: { label: 'Business', icon: 'storefront-outline' },
+  news:     { label: 'News',     icon: 'newspaper-variant-outline' },
+};
 
 export function AlertComposerScreen(): React.JSX.Element {
   const nav = useNavigation<Nav>();
@@ -39,7 +50,7 @@ export function AlertComposerScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
 
   const [category, setCategory] = useState<AreaCategory>(
-    route.params?.presetCategory ?? 'safety',
+    route.params?.presetCategory ?? 'general',
   );
   const [body, setBody] = useState('');
   const [tag, setTag] = useState(route.params?.presetTag ?? '');
@@ -47,28 +58,29 @@ export function AlertComposerScreen(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const bodyRef = useRef<TextInput>(null);
 
-  const canSubmit = body.trim().length >= 3 && !submitting;
+  const canSubmit = body.trim().length > 0 && !submitting;
 
   const onSubmit = useCallback(async () => {
     if (!canSubmit) return;
     setSubmitting(true);
     setError(null);
     try {
-      const payload: CreateAlertRequest = {
+      const req: CreateAlertRequest = {
         category,
         body: body.trim(),
         ...(tag.trim() ? { tag: tag.trim() } : {}),
       };
-      await postJson<CreateAlertRequest, AlertResponse>('/alerts', payload);
-      challengeEvents.emit('alert_posted');
+      await postJson<CreateAlertRequest, AlertResponse>('/alerts', req);
+      // Nudge the daily-challenge banner ("Post an area alert" / "Post 2 area alerts").
+      challengeEvents.emit('progress');
       dispatch(setPendingFilter('alerts'));
-      nav.goBack();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not post alert');
+      nav.navigate('Main', { screen: 'Pulse' });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
       setSubmitting(false);
     }
-  }, [body, canSubmit, category, dispatch, nav, tag]);
+  }, [canSubmit, category, body, tag, dispatch, nav]);
 
   return (
     <KeyboardAvoidingView
@@ -102,54 +114,67 @@ export function AlertComposerScreen(): React.JSX.Element {
         contentContainerStyle={S.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={S.label}>Category</Text>
-        <View style={S.chips}>
-          {AREA_CATEGORIES.map((c) => {
-            const active = category === c;
+        {/* ─── Category chips ────────────────────────────────────────── */}
+        <Text style={S.sectionLabel}>Category</Text>
+        <View style={S.chipRow}>
+          {AREA_CATEGORIES.map((cat) => {
+            const meta = CATEGORY_META[cat];
+            const active = cat === category;
             return (
               <Pressable
-                key={c}
-                onPress={() => setCategory(c)}
+                key={cat}
+                onPress={() => setCategory(cat)}
+                testID={`alert-category-${cat}`}
                 style={[S.chip, active && S.chipActive]}
               >
-                <Text style={[S.chipText, active && S.chipTextActive]}>{c}</Text>
+                <MCI
+                  name={meta.icon}
+                  size={16}
+                  color={active ? '#0a0a0f' : '#aaa'}
+                  style={{ marginRight: 5 }}
+                />
+                <Text style={[S.chipLabel, active && S.chipLabelActive]}>
+                  {meta.label}
+                </Text>
               </Pressable>
             );
           })}
         </View>
 
-        <Text style={S.label}>What's happening?</Text>
+        {/* ─── Body ──────────────────────────────────────────────────── */}
+        <Text style={S.sectionLabel}>What\'s happening?</Text>
         <TextInput
           ref={bodyRef}
           style={S.bodyInput}
           value={body}
           onChangeText={setBody}
-          placeholder="Describe the situation nearby…"
-          placeholderTextColor={colors.textFaint}
+          placeholder="Describe the situation near you…"
+          placeholderTextColor="#555"
           multiline
-          maxLength={BODY_MAX}
+          maxLength={500}
           textAlignVertical="top"
+          testID="alert-body-input"
         />
-        <Text style={[S.charCount, body.length > BODY_MAX - 40 && S.charCountWarn]}>
-          {body.length}/{BODY_MAX}
-        </Text>
+        <Text style={S.charCount}>{body.length}/500</Text>
 
-        <Text style={S.label}>
+        {/* ─── Optional tag ──────────────────────────────────────────── */}
+        <Text style={S.sectionLabel}>
           Tag <Text style={S.optional}>(optional)</Text>
         </Text>
         <TextInput
           style={S.tagInput}
           value={tag}
           onChangeText={setTag}
-          placeholder="e.g. traffic, weather"
-          placeholderTextColor={colors.textFaint}
+          placeholder="e.g. road-closed"
+          placeholderTextColor="#555"
           maxLength={40}
           autoCapitalize="none"
+          testID="alert-tag-input"
         />
 
         {error ? (
           <View style={S.errorRow}>
-            <MCI name="alert-circle-outline" size={16} color={colors.danger} style={{ marginRight: 6 }} />
+            <MCI name="alert-circle-outline" size={16} color="#ff6b6b" style={{ marginRight: 6 }} />
             <Text style={S.errorText}>{error}</Text>
           </View>
         ) : null}
@@ -159,53 +184,56 @@ export function AlertComposerScreen(): React.JSX.Element {
 }
 
 const S = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1, backgroundColor: '#0a0a0f' },
   postBtn: { color: colors.primary, fontSize: 16, fontWeight: '700' },
   postBtnDisabled: { color: colors.textFaint },
   scroll: { flex: 1 },
-  scrollContent: { padding: spacing.lg, paddingBottom: 40 },
-  label: {
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
+  scrollContent: { padding: 16, paddingBottom: 40 },
+  sectionLabel: {
+    color: '#888',
+    fontSize: 13,
     fontWeight: '600',
     marginBottom: 8,
-    marginTop: spacing.md,
+    marginTop: 16,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  optional: { color: colors.textFaint, textTransform: 'none', fontWeight: '400' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  optional: { color: '#555', textTransform: 'none', fontWeight: '400' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: radius.pill ?? 16,
-    backgroundColor: colors.surfaceAlt,
+    borderRadius: 20,
+    backgroundColor: '#1a1a2e',
     borderWidth: 1,
-    borderColor: colors.borderStrong,
+    borderColor: '#2a2a4a',
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '600' },
-  chipTextActive: { color: colors.onPrimary },
+  chipActive: { backgroundColor: '#00d4ff', borderColor: '#00d4ff' },
+  chipLabel: { color: '#ccc', fontSize: 13, fontWeight: '600' },
+  chipLabelActive: { color: '#0a0a0f' },
   bodyInput: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
+    backgroundColor: '#1a1a2e',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
-    color: colors.textPrimary,
+    borderColor: '#2a2a4a',
+    color: '#fff',
     padding: 14,
-    fontSize: fontSize.md,
+    fontSize: 15,
     minHeight: 120,
   },
-  charCount: { color: colors.textFaint, fontSize: 12, textAlign: 'right', marginTop: 4 },
-  charCountWarn: { color: colors.warning },
+  charCount: { color: '#555', fontSize: 12, textAlign: 'right', marginTop: 4 },
   tagInput: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
+    backgroundColor: '#1a1a2e',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
-    color: colors.textPrimary,
+    borderColor: '#2a2a4a',
+    color: '#fff',
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: fontSize.md,
+    fontSize: 15,
   },
-  errorRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
-  errorText: { color: colors.danger, fontSize: 14, flex: 1 },
+  errorRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16 },
+  errorText: { color: '#ff6b6b', fontSize: 14, flex: 1 },
 });
