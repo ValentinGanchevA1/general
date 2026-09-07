@@ -1,4 +1,4 @@
-// Top-of-map chrome: challenge, streak nudge, interactions entry.
+// Top-of-map chrome: challenge, streak nudge, interactions entry + location recovery.
 // Owns stack visibility + absolute tops so cards never self-compute offsets.
 
 import React from 'react';
@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DailyChallengeCard } from '@/features/gamification/DailyChallengeCard';
 import { NudgeBanner } from '@/features/nudges/NudgeBanner';
+import { useUserLocation } from '@/features/location/useUserLocation';
+import { LocationPermissionBanner } from '@/features/location/LocationPermissionBanner';
 import { colors } from '@/theme';
 
 import {
@@ -29,14 +31,21 @@ export function MapChrome({
   onPressInteractions,
 }: Props): React.JSX.Element {
   const insets = useSafeAreaInsets();
+  const { permissionDenied, requestPermission } = useUserLocation();
   const challengeTop = mapChallengeTop(insets.top);
   const nudgeTop = mapNudgeTop(insets.top);
   const badgeTop = mapBadgeTop(insets.top, sheetOpen);
 
   return (
     <>
-      {!sheetOpen ? <DailyChallengeCard top={challengeTop} /> : null}
-      {!sheetOpen ? <NudgeBanner top={nudgeTop} /> : null}
+      {permissionDenied ? (
+        <View style={[styles.locationWrap, { top: insets.top + 8 }]} pointerEvents="box-none">
+          <LocationPermissionBanner onRetry={() => void requestPermission()} />
+        </View>
+      ) : null}
+
+      {!sheetOpen && !permissionDenied ? <DailyChallengeCard top={challengeTop} /> : null}
+      {!sheetOpen && !permissionDenied ? <NudgeBanner top={nudgeTop} /> : null}
 
       <TouchableOpacity
         style={[styles.interactionBadge, { top: badgeTop }]}
@@ -63,6 +72,12 @@ export function MapChrome({
 }
 
 const styles = StyleSheet.create({
+  locationWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 25,
+  },
   interactionBadge: {
     position: 'absolute',
     right: 16,
@@ -81,17 +96,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -2,
     right: -2,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: colors.danger,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
   },
   interactionBadgeCount: {
     color: colors.textPrimary,
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 9,
+    fontWeight: '800',
   },
 });
