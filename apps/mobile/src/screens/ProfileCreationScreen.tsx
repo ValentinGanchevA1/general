@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -8,6 +8,7 @@ import {
   Switch,
   Text,
   TouchableOpacity,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -109,6 +110,8 @@ function StepOrigin({
   onChange: (patch: Partial<OnboardingState>) => void;
   error: string;
 }): React.JSX.Element {
+  const cityRef = useRef<TextInput>(null);
+  const countryRef = useRef<TextInput>(null);
   return (
     <View style={styles.stepBody}>
       <Text style={styles.stepHeading}>Age & origin</Text>
@@ -123,25 +126,32 @@ function StepOrigin({
         keyboardType="numbers-and-punctuation"
         maxLength={10}
         autoCapitalize="none"
+        returnKeyType="next"
+        onSubmitEditing={() => cityRef.current?.focus()}
         error={error || undefined}
         testID="onboarding-dob"
       />
       <FormField
+        ref={cityRef}
         label="City of origin"
         value={hometownCity}
         onChangeText={(v) => onChange({ hometownCity: v })}
         placeholder="e.g. Sofia"
         autoCapitalize="words"
         maxLength={80}
+        returnKeyType="next"
+        onSubmitEditing={() => countryRef.current?.focus()}
         testID="onboarding-city"
       />
       <FormField
+        ref={countryRef}
         label="Country"
         value={hometownCountry}
         onChangeText={(v) => onChange({ hometownCountry: v })}
         placeholder="e.g. BG"
         autoCapitalize="characters"
         maxLength={40}
+        returnKeyType="done"
         testID="onboarding-country"
       />
       <View style={styles.toggleRow}>

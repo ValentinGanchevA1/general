@@ -26,7 +26,8 @@ import { setPendingFilter } from '@/features/pulse/pulseSlice';
 import { challengeEvents } from '@/features/gamification/challengeEvents';
 import { postJson } from '@/api/client';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors } from '@/theme';
+import { FormField } from '@/components/FormField';
+import { colors, fontSize, spacing, radius } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type R = RouteProp<RootStackParamList, 'AlertComposer'>;
@@ -56,6 +57,7 @@ export function AlertComposerScreen(): React.JSX.Element {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bodyRef = useRef<TextInput>(null);
+  const tagRef = useRef<TextInput>(null);
 
   const canSubmit = body.trim().length > 0 && !submitting;
 
@@ -70,7 +72,6 @@ export function AlertComposerScreen(): React.JSX.Element {
         ...(tag.trim() ? { tag: tag.trim() } : {}),
       };
       await postJson<CreateAlertRequest, AlertResponse>('/alerts', req);
-      // Nudge the daily-challenge banner ("Post an area alert" / "Post 2 area alerts").
       challengeEvents.emit('progress');
       dispatch(setPendingFilter('alerts'));
       nav.navigate('Main', { screen: 'Pulse' });
@@ -113,7 +114,6 @@ export function AlertComposerScreen(): React.JSX.Element {
         contentContainerStyle={S.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* ─── Category picker ────────────────────────────────────── */}
         <Text style={S.sectionLabel}>Category</Text>
         <ScrollView
           horizontal
@@ -133,7 +133,7 @@ export function AlertComposerScreen(): React.JSX.Element {
                 <MCI
                   name={meta.icon}
                   size={16}
-                  color={active ? '#0a0a0f' : '#aaa'}
+                  color={active ? colors.onPrimary : colors.textSecondary}
                   style={{ marginRight: 6 }}
                 />
                 <Text style={[S.chipText, active && S.chipTextActive]}>{meta.label}</Text>
@@ -142,95 +142,103 @@ export function AlertComposerScreen(): React.JSX.Element {
           })}
         </ScrollView>
 
-        {/* ─── Body input ─────────────────────────────────────────── */}
         <Text style={S.sectionLabel}>What's happening?</Text>
-        <Pressable onPress={() => bodyRef.current?.focus()}>
-          <TextInput
-            ref={bodyRef}
-            style={S.bodyInput}
-            placeholder="Share a local alert, tip, or update…"
-            placeholderTextColor="#555"
-            multiline
-            maxLength={BODY_MAX}
-            value={body}
-            onChangeText={setBody}
-            textAlignVertical="top"
-            testID="alert-body-input"
-            autoFocus
-          />
-        </Pressable>
-        {body.length > 0 && (
+        <FormField
+          ref={bodyRef}
+          value={body}
+          onChangeText={setBody}
+          placeholder="Share a local alert, tip, or update…"
+          multiline
+          maxLength={BODY_MAX}
+          textAlignVertical="top"
+          style={S.bodyInput}
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => tagRef.current?.focus()}
+          autoFocus
+          testID="alert-body-input"
+        />
+        {body.length > 0 ? (
           <Text style={[S.charCount, body.length >= BODY_MAX - 20 && S.charCountWarn]}>
             {body.length}/{BODY_MAX}
           </Text>
-        )}
+        ) : null}
 
-        {/* ─── Tag input ──────────────────────────────────────────── */}
-        <Text style={S.sectionLabel}>Topic tag <Text style={S.optional}>(optional)</Text></Text>
-        <TextInput
-          style={S.tagInput}
-          placeholder="#open-mic, #garage-sale…"
-          placeholderTextColor="#555"
-          maxLength={TAG_MAX}
+        <Text style={S.sectionLabel}>
+          Topic tag <Text style={S.optional}>(optional)</Text>
+        </Text>
+        <FormField
+          ref={tagRef}
           value={tag}
           onChangeText={setTag}
+          placeholder="#open-mic, #garage-sale…"
+          maxLength={TAG_MAX}
           autoCapitalize="none"
           autoCorrect={false}
+          returnKeyType="done"
+          onSubmitEditing={() => { void onSubmit(); }}
           testID="alert-tag-input"
         />
 
-        {/* ─── Error ──────────────────────────────────────────────── */}
-        {error && (
+        {error ? (
           <View style={S.errorBox}>
-            <MCI name="alert-circle-outline" size={16} color="#ff6b6b" style={{ marginRight: 8 }} />
+            <MCI name="alert-circle-outline" size={16} color={colors.danger} style={{ marginRight: 8 }} />
             <Text style={S.errorText}>{error}</Text>
           </View>
-        )}
+        ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const S = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a0a0f' },
+  root: { flex: 1, backgroundColor: colors.bg },
 
-  postBtn: { color: colors.primary, fontSize: 16, fontWeight: '700' },
+  postBtn: { color: colors.primary, fontSize: fontSize.md + 1, fontWeight: '700' },
   postBtnDisabled: { color: colors.textFaint },
 
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, gap: 8 },
+  scrollContent: { padding: spacing.lg, gap: spacing.sm },
 
-  sectionLabel: { color: '#aaa', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 12, marginBottom: 4 },
-  optional: { color: '#555', textTransform: 'none', fontWeight: '400' },
+  sectionLabel: {
+    color: colors.textSecondary,
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginTop: spacing.md,
+    marginBottom: 4,
+  },
+  optional: { color: colors.textFaint, textTransform: 'none', fontWeight: '400' },
 
-  chips: { paddingBottom: 4, gap: 8 },
+  chips: { paddingBottom: 4, gap: spacing.sm },
   chip: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#2a2a4a',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
   },
-  chipActive: { backgroundColor: '#00d4ff', borderColor: '#00d4ff' },
-  chipText: { color: '#aaa', fontSize: 13, fontWeight: '600' },
-  chipTextActive: { color: '#0a0a0f' },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '600' },
+  chipTextActive: { color: colors.onPrimary },
 
-  bodyInput: {
-    backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#2a2a4a',
-    borderRadius: 12, padding: 14, color: '#fff', fontSize: 16, lineHeight: 22,
-    minHeight: 120,
-  },
-  charCount: { color: '#555', fontSize: 12, textAlign: 'right', marginTop: 4 },
-  charCountWarn: { color: '#ff9f43' },
-
-  tagInput: {
-    backgroundColor: '#1a1a2e', borderWidth: 1, borderColor: '#2a2a4a',
-    borderRadius: 12, padding: 14, color: '#fff', fontSize: 15,
-  },
+  bodyInput: { minHeight: 120, lineHeight: 22 },
+  charCount: { color: colors.textFaint, fontSize: fontSize.xs, textAlign: 'right', marginTop: 4 },
+  charCountWarn: { color: colors.warning },
 
   errorBox: {
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(255,107,107,0.1)',
-    borderWidth: 1, borderColor: 'rgba(255,107,107,0.3)',
-    borderRadius: 10, padding: 12, marginTop: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,107,0.3)',
+    borderRadius: radius.sm + 2,
+    padding: spacing.md,
+    marginTop: spacing.sm,
   },
-  errorText: { color: '#ff6b6b', fontSize: 14, flex: 1 },
+  errorText: { color: colors.danger, fontSize: fontSize.md - 1, flex: 1 },
 });
