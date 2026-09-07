@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -15,6 +14,8 @@ import {
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { updateProfile } from '@/features/profile/profileSlice';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
+import { FormField } from '@/components/FormField';
+import { colors, fontSize, spacing, radius } from '@/theme';
 
 const TOTAL_STEPS = 5;
 
@@ -51,15 +52,14 @@ function StepName({
     <View style={styles.stepBody}>
       <Text style={styles.stepHeading}>What should{'\n'}we call you?</Text>
       <Text style={styles.stepSub}>This is the name other users see on the map.</Text>
-      <TextInput
-        style={styles.input}
+      <FormField
         value={value}
         onChangeText={onChange}
         placeholder="Your name"
-        placeholderTextColor="#555"
         autoCapitalize="words"
         autoFocus
         maxLength={40}
+        testID="onboarding-display-name"
       />
     </View>
   );
@@ -76,16 +76,16 @@ function StepBio({
     <View style={styles.stepBody}>
       <Text style={styles.stepHeading}>Tell people{'\n'}about yourself</Text>
       <Text style={styles.stepSub}>A short bio helps others connect with you.</Text>
-      <TextInput
-        style={[styles.input, styles.bioInput]}
+      <FormField
         value={value}
         onChangeText={onChange}
         placeholder="A short bio — what are you here for?"
-        placeholderTextColor="#555"
         multiline
         autoFocus
         maxLength={160}
         textAlignVertical="top"
+        style={styles.bioInput}
+        testID="onboarding-bio"
       />
       <Text style={styles.charCount}>{value.length}/160</Text>
     </View>
@@ -115,44 +115,42 @@ function StepOrigin({
       <Text style={styles.stepSub}>
         You must be 18+. Others only see your age and place if you allow it.
       </Text>
-      <Text style={styles.fieldLabel}>Date of birth</Text>
-      <TextInput
-        style={styles.input}
+      <FormField
+        label="Date of birth"
         value={dateOfBirth}
         onChangeText={(v) => onChange({ dateOfBirth: v })}
         placeholder="YYYY-MM-DD"
-        placeholderTextColor="#555"
         keyboardType="numbers-and-punctuation"
         maxLength={10}
         autoCapitalize="none"
+        error={error || undefined}
+        testID="onboarding-dob"
       />
-      <Text style={styles.fieldLabel}>City of origin</Text>
-      <TextInput
-        style={styles.input}
+      <FormField
+        label="City of origin"
         value={hometownCity}
         onChangeText={(v) => onChange({ hometownCity: v })}
         placeholder="e.g. Sofia"
-        placeholderTextColor="#555"
         autoCapitalize="words"
         maxLength={80}
+        testID="onboarding-city"
       />
-      <Text style={styles.fieldLabel}>Country</Text>
-      <TextInput
-        style={styles.input}
+      <FormField
+        label="Country"
         value={hometownCountry}
         onChangeText={(v) => onChange({ hometownCountry: v })}
         placeholder="e.g. BG"
-        placeholderTextColor="#555"
         autoCapitalize="characters"
         maxLength={40}
+        testID="onboarding-country"
       />
       <View style={styles.toggleRow}>
         <Text style={styles.toggleLabel}>Show age on profile</Text>
         <Switch
           value={showAge}
           onValueChange={(v) => onChange({ showAge: v })}
-          trackColor={{ false: '#2a2a4a', true: '#0095b3' }}
-          thumbColor={showAge ? '#00d4ff' : '#555'}
+          trackColor={{ false: colors.borderStrong, true: 'rgba(0,212,255,0.35)' }}
+          thumbColor={showAge ? colors.primary : colors.textFaint}
         />
       </View>
       <View style={styles.toggleRow}>
@@ -160,11 +158,10 @@ function StepOrigin({
         <Switch
           value={showHometown}
           onValueChange={(v) => onChange({ showHometown: v })}
-          trackColor={{ false: '#2a2a4a', true: '#0095b3' }}
-          thumbColor={showHometown ? '#00d4ff' : '#555'}
+          trackColor={{ false: colors.borderStrong, true: 'rgba(0,212,255,0.35)' }}
+          thumbColor={showHometown ? colors.primary : colors.textFaint}
         />
       </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
 }
@@ -223,7 +220,7 @@ function StepVisibility({
           </Text>
           <Text style={styles.visibilitySub}>Others nearby can discover you</Text>
         </View>
-        {value === 'public' && <Text style={styles.visibilityCheck}>✓</Text>}
+        {value === 'public' ? <Text style={styles.visibilityCheck}>✓</Text> : null}
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.visibilityCard, value === 'private' && styles.visibilityCardActive]}
@@ -237,7 +234,7 @@ function StepVisibility({
           </Text>
           <Text style={styles.visibilitySub}>You browse; no one sees you</Text>
         </View>
-        {value === 'private' && <Text style={styles.visibilityCheck}>✓</Text>}
+        {value === 'private' ? <Text style={styles.visibilityCheck}>✓</Text> : null}
       </TouchableOpacity>
     </View>
   );
@@ -358,13 +355,13 @@ export function ProfileCreationScreen(): React.JSX.Element {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {step === 1 && (
+        {step === 1 ? (
           <StepName
             value={form.displayName}
             onChange={(v) => setForm((f) => ({ ...f, displayName: v }))}
           />
-        )}
-        {step === 2 && (
+        ) : null}
+        {step === 2 ? (
           <StepBio
             value={form.bio}
             onChange={(v) => {
@@ -372,27 +369,30 @@ export function ProfileCreationScreen(): React.JSX.Element {
               setForm((f) => ({ ...f, bio: v }));
             }}
           />
-        )}
-        {step === 3 && (
+        ) : null}
+        {step === 3 ? (
           <StepOrigin
             dateOfBirth={form.dateOfBirth}
             hometownCity={form.hometownCity}
             hometownCountry={form.hometownCountry}
             showAge={form.showAge}
             showHometown={form.showHometown}
-            onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+            onChange={(patch) => {
+              setOriginError('');
+              setForm((f) => ({ ...f, ...patch }));
+            }}
             error={originError}
           />
-        )}
-        {step === 4 && (
+        ) : null}
+        {step === 4 ? (
           <StepGoals selected={form.goals} onToggle={toggleGoal} />
-        )}
-        {step === 5 && (
+        ) : null}
+        {step === 5 ? (
           <StepVisibility
             value={form.visibility}
             onChange={(v) => setForm((f) => ({ ...f, visibility: v }))}
           />
-        )}
+        ) : null}
 
         {bioError ? <Text style={styles.error}>{bioError}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -408,7 +408,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
           disabled={loading || !canAdvance()}
         >
           {loading && isLastStep ? (
-            <ActivityIndicator color="#000" />
+            <ActivityIndicator color={colors.onPrimary} />
           ) : (
             <Text style={styles.btnText}>{isLastStep ? 'Finish' : 'Continue'}</Text>
           )}
@@ -419,107 +419,164 @@ export function ProfileCreationScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a0a0f' },
-  welcomeBody: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, gap: 16 },
-  logo: { color: '#00d4ff', fontSize: 48, fontWeight: '800', letterSpacing: 4 },
-  welcomeHeading: { color: '#fff', fontSize: 26, fontWeight: '700', textAlign: 'center' },
-  welcomeSub: { color: '#aaa', fontSize: 15, textAlign: 'center', lineHeight: 22 },
-  welcomeFooter: { padding: 24 },
+  root: { flex: 1, backgroundColor: colors.bg },
+  welcomeBody: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xxl,
+    gap: spacing.md,
+  },
+  logo: {
+    color: colors.primary,
+    fontSize: 48,
+    fontWeight: '800',
+    letterSpacing: 4,
+  },
+  welcomeHeading: {
+    color: colors.textPrimary,
+    fontSize: 26,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  welcomeSub: {
+    color: colors.textSecondary,
+    fontSize: fontSize.md,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  welcomeFooter: { padding: spacing.xxl },
   progressRow: {
     flexDirection: 'row',
     gap: 6,
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.xxl,
     paddingTop: 56,
-    paddingBottom: 8,
+    paddingBottom: spacing.sm,
   },
-  progressSegment: { flex: 1, height: 3, borderRadius: 2, backgroundColor: '#1a1a2e' },
-  progressSegmentFilled: { backgroundColor: '#00d4ff' },
-  scroll: { padding: 24, paddingBottom: 8, flexGrow: 1 },
-  stepBody: { gap: 12 },
-  stepHeading: { color: '#fff', fontSize: 28, fontWeight: '700', lineHeight: 36, marginBottom: 4 },
-  stepSub: { color: '#888', fontSize: 14, lineHeight: 20, marginBottom: 8 },
-  fieldLabel: {
-    color: '#aaa',
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginTop: 4,
+  progressSegment: {
+    flex: 1,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.surfaceAlt,
+  },
+  progressSegmentFilled: { backgroundColor: colors.primary },
+  scroll: { padding: spacing.xxl, paddingBottom: spacing.sm, flexGrow: 1 },
+  stepBody: { gap: spacing.md },
+  stepHeading: {
+    color: colors.textPrimary,
+    fontSize: 28,
+    fontWeight: '700',
+    lineHeight: 36,
+    marginBottom: 4,
+  },
+  stepSub: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    marginBottom: spacing.sm,
   },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1a1a2e',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
     marginTop: 4,
   },
-  toggleLabel: { color: '#fff', fontSize: 15, fontWeight: '500', flex: 1, marginRight: 12 },
-  input: {
-    backgroundColor: '#1a1a2e',
-    color: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#2a2a4a',
+  toggleLabel: {
+    color: colors.textPrimary,
+    fontSize: fontSize.md,
+    fontWeight: '500',
+    flex: 1,
+    marginRight: spacing.md,
   },
   bioInput: { minHeight: 120 },
-  charCount: { color: '#555', fontSize: 12, textAlign: 'right' },
-  error: { color: '#ff6b6b', fontSize: 13, marginTop: 4 },
+  charCount: {
+    color: colors.textFaint,
+    fontSize: fontSize.xs,
+    textAlign: 'right',
+  },
+  error: { color: colors.danger, fontSize: fontSize.sm, marginTop: 4 },
   goalsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   goalChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#1a1a2e',
-    borderRadius: 24,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
   },
-  goalChipActive: { borderColor: '#00d4ff', backgroundColor: '#00d4ff18' },
+  goalChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(0,212,255,0.1)',
+  },
   goalIcon: { fontSize: 18 },
-  goalLabel: { color: '#aaa', fontSize: 14, fontWeight: '500' },
-  goalLabelActive: { color: '#00d4ff' },
+  goalLabel: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    fontWeight: '500',
+  },
+  goalLabelActive: { color: colors.primary },
   visibilityCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
     padding: 18,
-    backgroundColor: '#1a1a2e',
-    borderRadius: 14,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
-    marginBottom: 12,
+    borderColor: colors.borderStrong,
+    marginBottom: spacing.md,
   },
-  visibilityCardActive: { borderColor: '#00d4ff', backgroundColor: '#00d4ff10' },
+  visibilityCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(0,212,255,0.06)',
+  },
   visibilityIcon: { fontSize: 28 },
   visibilityText: { flex: 1, gap: 2 },
-  visibilityTitle: { color: '#aaa', fontSize: 16, fontWeight: '600' },
-  visibilityTitleActive: { color: '#fff' },
-  visibilitySub: { color: '#555', fontSize: 13 },
-  visibilityCheck: { color: '#00d4ff', fontSize: 18, fontWeight: '700' },
-  footer: { flexDirection: 'row', gap: 12, padding: 24, paddingTop: 12 },
+  visibilityTitle: {
+    color: colors.textSecondary,
+    fontSize: fontSize.md + 1,
+    fontWeight: '600',
+  },
+  visibilityTitleActive: { color: colors.textPrimary },
+  visibilitySub: { color: colors.textFaint, fontSize: fontSize.sm },
+  visibilityCheck: { color: colors.primary, fontSize: 18, fontWeight: '700' },
+  footer: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.xxl,
+    paddingTop: spacing.md,
+  },
   backBtn: {
     paddingHorizontal: 20,
     paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#1a1a2e',
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
     justifyContent: 'center',
   },
-  backBtnText: { color: '#aaa', fontWeight: '600', fontSize: 15 },
+  backBtnText: {
+    color: colors.textSecondary,
+    fontWeight: '600',
+    fontSize: fontSize.md,
+  },
   btn: {
-    backgroundColor: '#00d4ff',
-    borderRadius: 12,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
     padding: 14,
     alignItems: 'center',
   },
   btnFlex: { flex: 1 },
   btnDisabled: { opacity: 0.4 },
-  btnText: { color: '#000', fontWeight: '700', fontSize: 15 },
+  btnText: {
+    color: colors.onPrimary,
+    fontWeight: '700',
+    fontSize: fontSize.md,
+  },
 });
