@@ -15,7 +15,7 @@ import { WeeklyRibbon } from '@/features/gamification/WeeklyRibbon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonListRow } from '@/components/Skeleton';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { colors } from '@/theme';
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 

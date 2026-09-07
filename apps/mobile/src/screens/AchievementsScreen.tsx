@@ -12,7 +12,7 @@ import type { AchievementStatus } from '@g88/shared';
 import { useAchievements } from '@/features/gamification/useAchievements';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SkeletonListRow } from '@/components/Skeleton';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { colors } from '@/theme';
 
 function AchievementRow({ a }: { a: AchievementStatus }): React.JSX.Element {
   const pct = a.threshold > 0 ? Math.min(100, Math.round((a.progress / a.threshold) * 100)) : 0;
