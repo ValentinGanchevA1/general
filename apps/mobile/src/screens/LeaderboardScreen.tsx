@@ -15,6 +15,7 @@ import { WeeklyRibbon } from '@/features/gamification/WeeklyRibbon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonListRow } from '@/components/Skeleton';
+import { colors } from '@/theme';
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
@@ -77,7 +78,7 @@ export function LeaderboardScreen(): React.JSX.Element {
 
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#00d4ff" />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />}
       >
         {scope === 'weekly' && page?.resetsAt ? (
           <WeeklyRibbon resetsAt={page.resetsAt} me={page.me} />
@@ -114,46 +115,46 @@ export function LeaderboardScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
+  container: { flex: 1, backgroundColor: colors.bg },
   content: { paddingBottom: 24 },
   tabs: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 12, gap: 8 },
   tab: {
     flex: 1,
     paddingVertical: 10,
     alignItems: 'center',
-    backgroundColor: '#12121f',
+    backgroundColor: colors.surface,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#1f1f33',
+    borderColor: colors.border,
   },
-  tabActive: { backgroundColor: '#00d4ff18', borderColor: '#00d4ff' },
-  tabText: { color: '#888', fontWeight: '600' },
-  tabTextActive: { color: '#00d4ff' },
+  tabActive: { backgroundColor: '#00d4ff18', borderColor: colors.primary },
+  tabText: { color: colors.textMuted, fontWeight: '600' },
+  tabTextActive: { color: colors.primary },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 20,
     marginBottom: 8,
     padding: 12,
-    backgroundColor: '#12121f',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#1f1f33',
+    borderColor: colors.border,
     gap: 12,
   },
-  rowMe: { borderColor: '#00d4ff', backgroundColor: '#00d4ff12' },
-  rank: { color: '#fff', fontSize: 16, fontWeight: '700', width: 28, textAlign: 'center' },
+  rowMe: { borderColor: colors.primary, backgroundColor: '#00d4ff12' },
+  rank: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', width: 28, textAlign: 'center' },
   avatar: { width: 40, height: 40, borderRadius: 20 },
-  avatarPlaceholder: { backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
-  avatarInitials: { color: '#00d4ff', fontWeight: '700' },
+  avatarPlaceholder: { backgroundColor: colors.surfaceAlt, justifyContent: 'center', alignItems: 'center' },
+  avatarInitials: { color: colors.primary, fontWeight: '700' },
   info: { flex: 1 },
-  name: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  level: { color: '#888', fontSize: 12, marginTop: 2 },
-  xp: { color: '#00d4ff', fontSize: 14, fontWeight: '700' },
+  name: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
+  level: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  xp: { color: colors.primary, fontSize: 14, fontWeight: '700' },
   meFooter: {
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#1a1a2e',
-    backgroundColor: '#0a0a0f',
+    borderTopColor: colors.surfaceAlt,
+    backgroundColor: colors.bg,
   },
 });

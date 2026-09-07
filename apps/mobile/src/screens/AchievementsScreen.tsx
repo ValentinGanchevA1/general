@@ -12,6 +12,7 @@ import type { AchievementStatus } from '@g88/shared';
 import { useAchievements } from '@/features/gamification/useAchievements';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SkeletonListRow } from '@/components/Skeleton';
+import { colors } from '@/theme';
 
 function AchievementRow({ a }: { a: AchievementStatus }): React.JSX.Element {
   const pct = a.threshold > 0 ? Math.min(100, Math.round((a.progress / a.threshold) * 100)) : 0;
@@ -50,7 +51,7 @@ export function AchievementsScreen(): React.JSX.Element {
       <ScrollView
         style={styles.flex}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#00d4ff" />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />}
       >
         {achievements.length > 0 ? (
           <Text style={styles.summary}>
@@ -75,19 +76,19 @@ export function AchievementsScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
+  container: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   content: { paddingBottom: 40 },
-  summary: { color: '#888', fontSize: 14, textAlign: 'center', marginBottom: 16 },
+  summary: { color: colors.textMuted, fontSize: 14, textAlign: 'center', marginBottom: 16 },
   row: {
     flexDirection: 'row',
     marginHorizontal: 20,
     marginBottom: 12,
     padding: 16,
-    backgroundColor: '#12121f',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#1f1f33',
+    borderColor: colors.border,
     gap: 14,
     opacity: 0.7,
   },
@@ -96,9 +97,9 @@ const styles = StyleSheet.create({
   emojiLocked: { opacity: 0.4 },
   info: { flex: 1, gap: 4 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  title: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  desc: { color: '#888', fontSize: 13 },
-  barTrack: { height: 6, backgroundColor: '#1f1f33', borderRadius: 3, overflow: 'hidden', marginTop: 6 },
-  barFill: { height: 6, backgroundColor: '#00d4ff', borderRadius: 3 },
-  progressText: { color: '#666', fontSize: 11, marginTop: 4 },
+  title: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
+  desc: { color: colors.textMuted, fontSize: 13 },
+  barTrack: { height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden', marginTop: 6 },
+  barFill: { height: 6, backgroundColor: colors.primary, borderRadius: 3 },
+  progressText: { color: colors.textFaint, fontSize: 11, marginTop: 4 },
 });

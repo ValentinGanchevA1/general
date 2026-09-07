@@ -14,6 +14,7 @@ import { useGiftBalance, useReceivedGifts, useSentGifts } from '@/features/gifts
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonListRow } from '@/components/Skeleton';
+import { colors } from '@/theme';
 
 type Tab = 'received' | 'sent';
 
@@ -79,7 +80,7 @@ export function GiftsInboxScreen(): React.JSX.Element {
       <ScrollView
         style={styles.flex}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor="#00d4ff" />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         <View style={styles.balanceCard}>
           <Icon name="star-four-points" size={20} color="#FFD700" />
@@ -140,7 +141,7 @@ export function GiftsInboxScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
+  container: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   content: { paddingBottom: 40 },
   balanceCard: {
@@ -150,42 +151,42 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 12,
     padding: 16,
-    backgroundColor: '#12121f',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#FFD70033',
   },
   balanceValue: { color: '#FFD700', fontSize: 20, fontWeight: '800' },
-  balanceLabel: { color: '#888', fontSize: 13 },
+  balanceLabel: { color: colors.textMuted, fontSize: 13 },
   tabs: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 14, gap: 8 },
   tab: {
     flex: 1,
     paddingVertical: 10,
     alignItems: 'center',
-    backgroundColor: '#12121f',
+    backgroundColor: colors.surface,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#1f1f33',
+    borderColor: colors.border,
   },
-  tabActive: { backgroundColor: '#00d4ff18', borderColor: '#00d4ff' },
-  tabText: { color: '#888', fontWeight: '600' },
-  tabTextActive: { color: '#00d4ff' },
+  tabActive: { backgroundColor: '#00d4ff18', borderColor: colors.primary },
+  tabText: { color: colors.textMuted, fontWeight: '600' },
+  tabTextActive: { color: colors.primary },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 20,
     marginBottom: 10,
     padding: 14,
-    backgroundColor: '#12121f',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#1f1f33',
+    borderColor: colors.border,
     gap: 14,
   },
   emoji: { fontSize: 34 },
   info: { flex: 1, gap: 3 },
-  rowTitle: { color: '#ddd', fontSize: 15 },
-  peer: { color: '#fff', fontWeight: '700' },
-  message: { color: '#aaa', fontSize: 13, fontStyle: 'italic' },
-  time: { color: '#666', fontSize: 11, marginTop: 2 },
+  rowTitle: { color: colors.textSecondary, fontSize: 15 },
+  peer: { color: colors.textPrimary, fontWeight: '700' },
+  message: { color: colors.textSecondary, fontSize: 13, fontStyle: 'italic' },
+  time: { color: colors.textFaint, fontSize: 11, marginTop: 2 },
 });
