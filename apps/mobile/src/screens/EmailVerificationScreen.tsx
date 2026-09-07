@@ -9,8 +9,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type {
   CheckEmailVerificationRequest,
@@ -22,30 +23,30 @@ import { postJson } from '@/api/client';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { extractMessage } from '@/utils/extractMessage';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { colors, fontSize, spacing, radius } from '@/theme';
 
 /**
  * Email ownership OTP — required by the soft story-post gate (and badge ladder).
- * Dev: code is logged server-side; use DEV_OTP_CODE / 000000 when Twilio is off.
  */
-export function EmailVerificationScreen(): React.JSX.Element {
-  const navigation = useNavigation();
+export default function EmailVerificationScreen(): React.JSX.Element {
+  const navigation = useNavigation<NativeStackNavigationProp<Record<string, object | undefined>>>();
   const dispatch = useAppDispatch();
-  const profile = useAppSelector((s) => s.profile.profile);
   const [code, setCode] = useState('');
-  const [busy, setBusy] = useState(false);
   const [sending, setSending] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [masked, setMasked] = useState<string | null>(null);
   const [devHint, setDevHint] = useState(false);
-  const [masked, setMasked] = useState(profile?.email ?? '');
 
   const send = async (): Promise<void> => {
     setSending(true);
     setError(null);
     try {
-      const res = await postJson<Record<string, never>, StartEmailVerificationResponse>(
-        '/verification/email/start',
-        {},
-      );
+      const res = await postJson<
+        Record<string, never>,
+        StartEmailVerificationResponse
+      >('/verification/email/start', {});
       setDevHint(res.channel === 'dev');
       setMasked(res.maskedEmail);
     } catch (e) {
@@ -84,16 +85,10 @@ export function EmailVerificationScreen(): React.JSX.Element {
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Icon name="chevron-left" size={28} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Verify email</Text>
-        <View style={styles.back} />
-      </View>
+      <ScreenHeader title="Verify email" bordered />
 
       <View style={styles.body}>
-        <Icon name="email-check" size={48} color="#00d4ff" />
+        <Icon name="email-check" size={48} color={colors.primary} />
         <Text style={styles.title}>Confirm your email</Text>
         <Text style={styles.blurb}>
           {devHint
@@ -110,7 +105,7 @@ export function EmailVerificationScreen(): React.JSX.Element {
           value={code}
           onChangeText={setCode}
           placeholder="000000"
-          placeholderTextColor="#555"
+          placeholderTextColor={colors.textFaint}
           keyboardType="number-pad"
           maxLength={10}
           autoFocus
@@ -123,71 +118,55 @@ export function EmailVerificationScreen(): React.JSX.Element {
           disabled={busy || code.trim().length < 4}
         >
           {busy ? (
-            <ActivityIndicator color="#000" />
+            <ActivityIndicator color={colors.onPrimary} />
           ) : (
-            <Text style={styles.buttonText}>Confirm</Text>
+            <Text style={styles.buttonText}>Verify</Text>
           )}
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => void send()} disabled={sending} style={styles.resend}>
-          {sending ? (
-            <ActivityIndicator color="#00d4ff" />
-          ) : (
-            <Text style={styles.resendText}>Resend code</Text>
-          )}
+        <TouchableOpacity style={styles.resend} onPress={() => void send()} disabled={sending}>
+          <Text style={styles.resendText}>{sending ? 'Sending…' : 'Resend code'}</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-export default EmailVerificationScreen;
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a0a0f' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 52,
-    paddingHorizontal: 8,
-    paddingBottom: 8,
-  },
-  back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
-  body: { padding: 24, alignItems: 'center', gap: 12 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700', marginTop: 8 },
-  blurb: { color: '#888', fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  root: { flex: 1, backgroundColor: colors.bg },
+  body: { padding: spacing.xl, alignItems: 'center', gap: spacing.sm },
+  title: { color: colors.textPrimary, fontSize: 22, fontWeight: '700', marginTop: spacing.sm },
+  blurb: { color: colors.textMuted, fontSize: fontSize.sm, textAlign: 'center', lineHeight: 20 },
   devHint: {
-    color: '#f0c040',
-    fontSize: 12,
+    color: colors.warning,
+    fontSize: fontSize.xs,
     textAlign: 'center',
     marginTop: 4,
   },
   input: {
     width: '100%',
-    marginTop: 12,
-    backgroundColor: '#14141c',
-    borderRadius: 12,
+    marginTop: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#2a2a3a',
-    color: '#fff',
-    fontSize: 22,
-    letterSpacing: 6,
-    textAlign: 'center',
+    borderColor: colors.borderStrong,
+    color: colors.textPrimary,
+    paddingHorizontal: spacing.md,
     paddingVertical: 14,
-    paddingHorizontal: 16,
+    fontSize: 22,
+    letterSpacing: 8,
+    textAlign: 'center',
   },
-  error: { color: '#ff6b6b', fontSize: 13, alignSelf: 'flex-start' },
+  error: { color: colors.danger, fontSize: fontSize.sm, textAlign: 'center' },
   button: {
+    marginTop: spacing.md,
     width: '100%',
-    backgroundColor: '#00d4ff',
-    borderRadius: 12,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 8,
   },
-  buttonDisabled: { opacity: 0.5 },
-  buttonText: { color: '#000', fontWeight: '700', fontSize: 16 },
-  resend: { marginTop: 16, padding: 8 },
-  resendText: { color: '#00d4ff', fontSize: 14 },
+  buttonDisabled: { opacity: 0.45 },
+  buttonText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
+  resend: { marginTop: spacing.sm, padding: spacing.sm },
+  resendText: { color: colors.primary, fontSize: fontSize.sm, fontWeight: '600' },
 });
