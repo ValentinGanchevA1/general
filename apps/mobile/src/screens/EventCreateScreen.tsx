@@ -30,6 +30,7 @@ import { useUserLocation } from '@/features/location/useUserLocation';
 import { createEvent } from '@/features/events/useEvents';
 import { pickAndUploadListingImage } from '@/features/trading/listingImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { FormField } from '@/components/FormField';
 import { colors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<EventsStackParamList>;
@@ -61,6 +62,8 @@ export function EventCreateScreen(): React.JSX.Element {
   const { coords } = useUserLocation();
   const mapRef = useRef<MapView>(null);
   const hasCentered = useRef(false);
+  const descriptionRef = useRef<TextInput>(null);
+  const capacityRef = useRef<TextInput>(null);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -205,27 +208,29 @@ export function EventCreateScreen(): React.JSX.Element {
           ) : null}
         </TouchableOpacity>
 
-        <Text style={S.label}>Title</Text>
-        <TextInput
-          style={S.input}
+        <FormField
+          label="Title"
           placeholder="What is happening?"
-          placeholderTextColor={colors.textFaint}
           value={title}
           onChangeText={setTitle}
           maxLength={EVENT_LIMITS.titleMax}
           autoFocus
+          returnKeyType="next"
+          onSubmitEditing={() => descriptionRef.current?.focus()}
+          testID="event-create-title"
         />
 
-        <Text style={S.label}>Description <Text style={S.optional}>(optional)</Text></Text>
-        <TextInput
-          style={[S.input, S.multiline]}
+        <FormField
+          ref={descriptionRef}
+          label="Description (optional)"
           placeholder="Tell people what to expect"
-          placeholderTextColor={colors.textFaint}
           value={description}
           onChangeText={setDescription}
           maxLength={EVENT_LIMITS.descriptionMax}
           multiline
           textAlignVertical="top"
+          style={S.multiline}
+          testID="event-create-description"
         />
 
         <Text style={S.label}>Day</Text>
@@ -270,14 +275,14 @@ export function EventCreateScreen(): React.JSX.Element {
           </MapView>
         </View>
 
-        <Text style={S.label}>Capacity <Text style={S.optional}>(optional)</Text></Text>
-        <TextInput
-          style={S.input}
+        <FormField
+          ref={capacityRef}
+          label="Capacity (optional)"
           placeholder="e.g. 20"
-          placeholderTextColor={colors.textFaint}
           value={capacity}
           onChangeText={setCapacity}
           keyboardType="number-pad"
+          testID="event-create-capacity"
         />
 
         <Text style={S.label}>Visibility</Text>
