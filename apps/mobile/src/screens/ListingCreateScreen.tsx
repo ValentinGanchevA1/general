@@ -31,6 +31,7 @@ import { useUserLocation } from '@/features/location/useUserLocation';
 import { createListing } from '@/features/trading/useTrading';
 import { pickAndUploadListingImage } from '@/features/trading/listingImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { FormField } from '@/components/FormField';
 import { colors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<CommerceStackParamList>;
@@ -46,6 +47,8 @@ export function ListingCreateScreen(): React.JSX.Element {
   const { coords } = useUserLocation();
   const mapRef = useRef<MapView>(null);
   const hasCentered = useRef(false);
+  const priceRef = useRef<TextInput>(null);
+  const descriptionRef = useRef<TextInput>(null);
 
   const mode = route.params?.mode === 'buy' ? 'buy' : 'sell';
   const initialLocation = route.params?.initialLocation;
@@ -197,12 +200,32 @@ export function ListingCreateScreen(): React.JSX.Element {
           ) : null}
         </TouchableOpacity>
 
-        <Text style={S.label}>Title</Text>
-        <TextInput style={S.input} placeholder={titlePlaceholder} placeholderTextColor={colors.textFaint} value={title} onChangeText={setTitle} maxLength={LISTING_LIMITS.titleMax} autoFocus />
+        <FormField
+          label="Title"
+          placeholder={titlePlaceholder}
+          value={title}
+          onChangeText={setTitle}
+          maxLength={LISTING_LIMITS.titleMax}
+          autoFocus
+          returnKeyType="next"
+          onSubmitEditing={() => priceRef.current?.focus()}
+          testID="listing-create-title"
+        />
 
         <Text style={S.label}>{mode === 'buy' ? 'Budget' : 'Price'}</Text>
         <View style={S.priceRow}>
-          <TextInput style={[S.input, { flex: 1 }]} placeholder="0.00" placeholderTextColor={colors.textFaint} value={price} onChangeText={(t) => setPrice(t.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" />
+          <TextInput
+            ref={priceRef}
+            style={[S.input, { flex: 1 }]}
+            placeholder="0.00"
+            placeholderTextColor={colors.textFaint}
+            value={price}
+            onChangeText={(t) => setPrice(t.replace(/[^0-9.]/g, ''))}
+            keyboardType="decimal-pad"
+            returnKeyType="next"
+            onSubmitEditing={() => descriptionRef.current?.focus()}
+            testID="listing-create-price"
+          />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.chips}>
             {CURRENCIES.map((c) => (
               <Chip key={c} active={c === currency} label={c} onPress={() => setCurrency(c)} />
@@ -217,8 +240,18 @@ export function ListingCreateScreen(): React.JSX.Element {
           ))}
         </ScrollView>
 
-        <Text style={S.label}>Description <Text style={S.optional}>(optional)</Text></Text>
-        <TextInput style={[S.input, S.multiline]} placeholder={mode === 'buy' ? 'Condition, preferred pickup, details…' : 'Condition, details, pickup notes…'} placeholderTextColor={colors.textFaint} value={description} onChangeText={setDescription} maxLength={LISTING_LIMITS.descriptionMax} multiline textAlignVertical="top" />
+        <FormField
+          ref={descriptionRef}
+          label="Description (optional)"
+          placeholder={mode === 'buy' ? 'Condition, preferred pickup, details…' : 'Condition, details, pickup notes…'}
+          value={description}
+          onChangeText={setDescription}
+          maxLength={LISTING_LIMITS.descriptionMax}
+          multiline
+          textAlignVertical="top"
+          style={S.multiline}
+          testID="listing-create-description"
+        />
 
         <Text style={S.label}>Location <Text style={S.optional}>(drag the pin)</Text></Text>
         <View style={S.mapWrap}>
