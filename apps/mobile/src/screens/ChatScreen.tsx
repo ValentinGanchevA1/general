@@ -19,6 +19,7 @@ import { getJson } from '@/api/client';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { Avatar } from '@/components/Avatar';
 import { colors } from '@/theme';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {
   fetchMessages,
@@ -254,40 +255,36 @@ export function ChatScreen(): React.JSX.Element {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.headerBack}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={styles.headerBackText}>‹</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.headerTitleTap}
-          onPress={() => {
-            if (!otherUserId) return;
-            navigation.navigate('UserProfile', { userId: otherUserId });
-          }}
-          disabled={!otherUserId}
-          accessibilityRole="button"
-          accessibilityLabel={`Open profile for ${otherUserName || 'user'}`}
-          activeOpacity={0.7}
-        >
-          <Avatar
-            uri={peerBadge?.avatarUrl ?? null}
-            name={otherUserName || 'Chat'}
-            size={32}
-          />
-          <Text style={styles.headerName} numberOfLines={1}>
-            {otherUserName || 'Chat'}
-          </Text>
-          <VerificationBadge
-            verification={badgeVerification}
-            idVerified={badgeIdVerified}
-            size={18}
-          />
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        bordered
+        center={
+          <TouchableOpacity
+            style={styles.headerTitleTap}
+            onPress={() => {
+              if (!otherUserId) return;
+              navigation.navigate('UserProfile', { userId: otherUserId });
+            }}
+            disabled={!otherUserId}
+            accessibilityRole="button"
+            accessibilityLabel={`Open profile for ${otherUserName || 'user'}`}
+            activeOpacity={0.7}
+          >
+            <Avatar
+              uri={peerBadge?.avatarUrl ?? null}
+              name={otherUserName || 'Chat'}
+              size={32}
+            />
+            <Text style={styles.headerName} numberOfLines={1}>
+              {otherUserName || 'Chat'}
+            </Text>
+            <VerificationBadge
+              verification={badgeVerification}
+              idVerified={badgeIdVerified}
+              size={18}
+            />
+          </TouchableOpacity>
+        }
+      />
 
       {showRequestBanner && (
         <View style={styles.requestBanner}>
@@ -396,24 +393,12 @@ export function ChatScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  headerBack: { paddingHorizontal: 6 },
-  headerBackText: { color: colors.primary, fontSize: 28, lineHeight: 28, marginTop: -2 },
   headerTitleTap: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     minHeight: 44,
+    maxWidth: '100%',
   },
   headerName: { flexShrink: 1, color: colors.textPrimary, fontSize: 17, fontWeight: '600' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },

@@ -16,7 +16,10 @@ import { colors, fontSize, spacing } from '@/theme';
 const BACK_SIZE = 48;
 
 export interface ScreenHeaderProps {
-  title: string;
+  /** Plain title string. Ignored when `center` is provided. */
+  title?: string;
+  /** Custom center content (e.g. chat peer avatar + name). Takes priority over `title`. */
+  center?: React.ReactNode;
   /** Override back handler (defaults to navigation.goBack). */
   onBack?: () => void;
   /** Hide the back button (e.g. root tab screens). Default false. */
@@ -26,6 +29,8 @@ export interface ScreenHeaderProps {
   style?: StyleProp<ViewStyle>;
   /** Extra bottom border. Default false. */
   bordered?: boolean;
+  /** Transparent header over media (no solid bg). */
+  transparent?: boolean;
 }
 
 /**
@@ -35,11 +40,13 @@ export interface ScreenHeaderProps {
  */
 export function ScreenHeader({
   title,
+  center,
   onBack,
   hideBack = false,
   right,
   style,
   bordered = false,
+  transparent = false,
 }: ScreenHeaderProps): React.JSX.Element {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -59,6 +66,7 @@ export function ScreenHeader({
       style={[
         styles.header,
         { paddingTop: insets.top + spacing.sm },
+        transparent ? styles.transparent : null,
         bordered && styles.bordered,
         style,
       ]}
@@ -77,9 +85,13 @@ export function ScreenHeader({
         </TouchableOpacity>
       )}
 
-      <Text style={styles.title} numberOfLines={1}>
-        {title}
-      </Text>
+      {center != null ? (
+        <View style={styles.center}>{center}</View>
+      ) : (
+        <Text style={styles.title} numberOfLines={1}>
+          {title ?? ''}
+        </Text>
+      )}
 
       <View style={styles.side}>{right ?? null}</View>
     </View>
@@ -94,6 +106,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.md,
     backgroundColor: colors.bg,
+  },
+  transparent: {
+    backgroundColor: 'transparent',
   },
   bordered: {
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -110,6 +125,12 @@ const styles = StyleSheet.create({
     minHeight: BACK_SIZE,
     alignItems: 'flex-end',
     justifyContent: 'center',
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: BACK_SIZE,
   },
   title: {
     flex: 1,
