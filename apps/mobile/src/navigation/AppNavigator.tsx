@@ -107,7 +107,7 @@ export type RootStackParamList = {
   Gamification: NavigatorScreenParams<GamificationStackParamList>;
   Commerce: NavigatorScreenParams<CommerceStackParamList>;
   Account: NavigatorScreenParams<AccountStackParamList>;
-  Social: NavigatorScreenParams<SocialStackParamList>;
+  Social: NavigatorStackParamList extends never ? never : NavigatorScreenParams<SocialStackParamList>;
   Events: NavigatorScreenParams<EventsStackParamList>;
 };
 
@@ -202,6 +202,10 @@ function EventsNavigator(): React.JSX.Element {
 }
 
 function MainTabs(): React.JSX.Element {
+  const chatUnread = useAppSelector((s) =>
+    s.chat.conversations.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0),
+  );
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -229,7 +233,23 @@ function MainTabs(): React.JSX.Element {
       })}
     >
       <Tab.Screen name="Map" component={MapScreen} />
-      <Tab.Screen name="Pulse" component={PulseScreen} />
+      <Tab.Screen
+        name="Pulse"
+        component={PulseScreen}
+        options={
+          chatUnread > 0
+            ? {
+                tabBarBadge: chatUnread > 99 ? '99+' : chatUnread,
+                tabBarBadgeStyle: {
+                  backgroundColor: colors.danger,
+                  color: colors.textPrimary,
+                  fontSize: 11,
+                  fontWeight: '700' as const,
+                },
+              }
+            : {}
+        }
+      />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -317,12 +337,7 @@ export function AppNavigator(): React.JSX.Element {
               <Stack.Screen
                 name="Interactions"
                 component={InteractionsScreen}
-                options={{
-                  headerShown: true,
-                  title: 'Interactions',
-                  headerStyle: { backgroundColor: colors.bg },
-                  headerTintColor: colors.textPrimary,
-                }}
+                options={{ headerShown: false }}
               />
               <Stack.Screen
                 name="Gamification"
