@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   RefreshControl,
   ScrollView,
@@ -15,6 +14,7 @@ import { useLeaderboard } from '@/features/gamification/useLeaderboard';
 import { WeeklyRibbon } from '@/features/gamification/WeeklyRibbon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
+import { SkeletonListRow } from '@/components/Skeleton';
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
@@ -84,7 +84,14 @@ export function LeaderboardScreen(): React.JSX.Element {
         ) : null}
 
         {page == null && loading ? (
-          <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
+          <>
+            <SkeletonListRow />
+            <SkeletonListRow />
+            <SkeletonListRow />
+            <SkeletonListRow />
+            <SkeletonListRow />
+            <SkeletonListRow />
+          </>
         ) : page && page.entries.length === 0 ? (
           <EmptyState
             variant="plain"

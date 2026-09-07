@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -14,6 +13,7 @@ import type { ReceivedGift, SentGift } from '@g88/shared';
 import { useGiftBalance, useReceivedGifts, useSentGifts } from '@/features/gifts/useGifts';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
+import { SkeletonListRow } from '@/components/Skeleton';
 
 type Tab = 'received' | 'sent';
 
@@ -105,7 +105,11 @@ export function GiftsInboxScreen(): React.JSX.Element {
           received.length > 0 ? (
             received.map((g) => <ReceivedRow key={g.id} g={g} />)
           ) : loadingReceived ? (
-            <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
+            <>
+              <SkeletonListRow />
+              <SkeletonListRow />
+              <SkeletonListRow />
+            </>
           ) : (
             <EmptyState
               variant="plain"
@@ -117,7 +121,11 @@ export function GiftsInboxScreen(): React.JSX.Element {
         ) : sent.length > 0 ? (
           sent.map((g) => <SentRow key={g.id} g={g} />)
         ) : loadingSent ? (
-          <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
+          <>
+            <SkeletonListRow />
+            <SkeletonListRow />
+            <SkeletonListRow />
+          </>
         ) : (
           <EmptyState
             variant="plain"

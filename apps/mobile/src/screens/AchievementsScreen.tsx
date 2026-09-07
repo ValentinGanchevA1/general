@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -12,6 +11,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { AchievementStatus } from '@g88/shared';
 import { useAchievements } from '@/features/gamification/useAchievements';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { SkeletonListRow } from '@/components/Skeleton';
 
 function AchievementRow({ a }: { a: AchievementStatus }): React.JSX.Element {
   const pct = a.threshold > 0 ? Math.min(100, Math.round((a.progress / a.threshold) * 100)) : 0;
@@ -57,7 +57,13 @@ export function AchievementsScreen(): React.JSX.Element {
             {unlockedCount} of {achievements.length} unlocked
           </Text>
         ) : loading ? (
-          <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
+          <>
+            <SkeletonListRow />
+            <SkeletonListRow />
+            <SkeletonListRow />
+            <SkeletonListRow />
+            <SkeletonListRow />
+          </>
         ) : null}
 
         {achievements.map((a) => (
