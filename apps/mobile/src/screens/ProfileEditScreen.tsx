@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -18,8 +18,13 @@ import type { AccountStackParamList } from '@/navigation/stacks';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { updateProfile } from '@/features/profile/profileSlice';
 import { openRootScreen } from '@/navigation/openRootScreen';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { FormField } from '@/components/FormField';
+import { useFieldErrors } from '@/hooks/useFieldErrors';
+import { colors, fontSize, spacing, radius } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
+type FieldKey = 'displayName' | 'dateOfBirth' | 'hometownCity' | 'hometownCountry';
 
 function isAdult(isoDate: string): boolean {
   const dob = new Date(isoDate);
@@ -45,15 +50,28 @@ export function ProfileEditScreen(): React.JSX.Element {
   const [hometownCountry, setHometownCountry] = useState(profile?.hometownCountry ?? '');
   const [showAge, setShowAge] = useState(profile?.showAge ?? true);
   const [showHometown, setShowHometown] = useState(profile?.showHometown ?? true);
-  const [localError, setLocalError] = useState<string | null>(null);
+
+  const { errors, setErrors, clear } = useFieldErrors<FieldKey>();
+
+  const bioRef = useRef<TextInput>(null);
+  const dobRef = useRef<TextInput>(null);
+  const cityRef = useRef<TextInput>(null);
+  const countryRef = useRef<TextInput>(null);
 
   const save = async (): Promise<void> => {
-    setLocalError(null);
+    const next: Partial<Record<FieldKey, string>> = {};
+    if (!displayName.trim()) {
+      next.displayName = 'Display name is required.';
+    }
     const dob = dateOfBirth.trim();
     if (dob && !isAdult(dob)) {
-      setLocalError('You must be at least 18 years old.');
+      next.dateOfBirth = 'You must be at least 18 years old.';
+    }
+    if (Object.keys(next).length > 0) {
+      setErrors(next);
       return;
     }
+    setErrors({});
     const result = await dispatch(
       updateProfile({
         displayName: displayName.trim(),
@@ -75,61 +93,96 @@ export function ProfileEditScreen(): React.JSX.Element {
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <ScreenHeader
+        title="Edit profile"
+        bordered
+        onBack={() => navigation.goBack()}
+        right={
+          <TouchableOpacity
+            onPress={() => { void save(); }}
+            disabled={loading}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Save profile"
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text style={styles.saveLink}>Save</Text>
+            )}
+          </TouchableOpacity>
+        }
+      />
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={styles.heading}>Edit profile</Text>
-
-        <Text style={styles.label}>Display name</Text>
-        <TextInput
-          style={styles.input}
+        <FormField
+          label="Display name"
           value={displayName}
-          onChangeText={setDisplayName}
+          onChangeText={(t) => {
+            setDisplayName(t);
+            clear('displayName');
+          }}
           placeholder="Your name"
-          placeholderTextColor="#555"
           maxLength={50}
+          returnKeyType="next"
+          onSubmitEditing={() => bioRef.current?.focus()}
+          error={errors.displayName}
+          testID="profile-edit-display-name"
         />
 
-        <Text style={styles.label}>Bio</Text>
-        <TextInput
-          style={[styles.input, styles.bioInput]}
+        <FormField
+          ref={bioRef}
+          label="Bio"
           value={bio}
           onChangeText={setBio}
           placeholder="A short intro"
-          placeholderTextColor="#555"
           multiline
           maxLength={160}
+          style={styles.bioInput}
+          returnKeyType="next"
+          onSubmitEditing={() => dobRef.current?.focus()}
+          testID="profile-edit-bio"
         />
         <Text style={styles.charCount}>{bio.length}/160</Text>
 
         <Text style={styles.section}>ORIGIN</Text>
-        <Text style={styles.label}>Date of birth (YYYY-MM-DD)</Text>
-        <TextInput
-          style={styles.input}
+        <FormField
+          ref={dobRef}
+          label="Date of birth (YYYY-MM-DD)"
           value={dateOfBirth}
-          onChangeText={setDateOfBirth}
+          onChangeText={(t) => {
+            setDateOfBirth(t);
+            clear('dateOfBirth');
+          }}
           placeholder="1990-01-15"
-          placeholderTextColor="#555"
           autoCapitalize="none"
+          returnKeyType="next"
+          onSubmitEditing={() => cityRef.current?.focus()}
+          error={errors.dateOfBirth}
+          testID="profile-edit-dob"
         />
         <Text style={styles.hint}>Used for age only. Must be 18+.</Text>
 
-        <Text style={styles.label}>City</Text>
-        <TextInput
-          style={styles.input}
+        <FormField
+          ref={cityRef}
+          label="City"
           value={hometownCity}
           onChangeText={setHometownCity}
           placeholder="Varna"
-          placeholderTextColor="#555"
+          returnKeyType="next"
+          onSubmitEditing={() => countryRef.current?.focus()}
+          testID="profile-edit-city"
         />
 
-        <Text style={styles.label}>Country</Text>
-        <TextInput
-          style={styles.input}
+        <FormField
+          ref={countryRef}
+          label="Country"
           value={hometownCountry}
           onChangeText={setHometownCountry}
           placeholder="BG"
-          placeholderTextColor="#555"
           autoCapitalize="characters"
           maxLength={40}
+          returnKeyType="done"
+          testID="profile-edit-country"
         />
 
         <View style={styles.toggleRow}>
@@ -140,8 +193,8 @@ export function ProfileEditScreen(): React.JSX.Element {
           <Switch
             value={showAge}
             onValueChange={setShowAge}
-            trackColor={{ false: '#2a2a4a', true: '#0095b3' }}
-            thumbColor={showAge ? '#00d4ff' : '#555'}
+            trackColor={{ false: colors.borderStrong, true: 'rgba(0,212,255,0.35)' }}
+            thumbColor={showAge ? colors.primary : colors.textFaint}
           />
         </View>
 
@@ -153,8 +206,8 @@ export function ProfileEditScreen(): React.JSX.Element {
           <Switch
             value={showHometown}
             onValueChange={setShowHometown}
-            trackColor={{ false: '#2a2a4a', true: '#0095b3' }}
-            thumbColor={showHometown ? '#00d4ff' : '#555'}
+            trackColor={{ false: colors.borderStrong, true: 'rgba(0,212,255,0.35)' }}
+            thumbColor={showHometown ? colors.primary : colors.textFaint}
           />
         </View>
 
@@ -184,12 +237,11 @@ export function ProfileEditScreen(): React.JSX.Element {
           </TouchableOpacity>
         </View>
 
-        {localError ? <Text style={styles.error}>{localError}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <TouchableOpacity style={styles.btn} onPress={save} disabled={loading}>
+        <TouchableOpacity style={styles.btn} onPress={() => { void save(); }} disabled={loading}>
           {loading ? (
-            <ActivityIndicator color="#000" />
+            <ActivityIndicator color={colors.onPrimary} />
           ) : (
             <Text style={styles.btnText}>Save</Text>
           )}
@@ -204,70 +256,60 @@ export function ProfileEditScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a0a0f' },
-  scroll: { padding: 24, gap: 8, paddingBottom: 48 },
-  heading: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 16 },
+  root: { flex: 1, backgroundColor: colors.bg },
+  saveLink: { color: colors.primary, fontSize: fontSize.md, fontWeight: '700' },
+  scroll: { padding: spacing.lg, gap: spacing.sm, paddingBottom: 48 },
   section: {
-    color: '#00d4ff',
-    fontSize: 13,
+    color: colors.primary,
+    fontSize: fontSize.sm,
     fontWeight: '700',
     letterSpacing: 0.6,
-    marginTop: 16,
+    marginTop: spacing.md,
     marginBottom: 4,
   },
-  label: { color: '#aaa', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8 },
-  input: {
-    backgroundColor: '#1a1a2e',
-    color: '#fff',
-    borderRadius: 10,
-    padding: 14,
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: '#2a2a4a',
-  },
-  bioInput: { minHeight: 100 },
-  charCount: { color: '#555', fontSize: 12, textAlign: 'right' },
-  hint: { color: '#555', fontSize: 12, marginBottom: 4 },
+  bioInput: { minHeight: 100, textAlignVertical: 'top' as const },
+  charCount: { color: colors.textFaint, fontSize: fontSize.xs, textAlign: 'right' },
+  hint: { color: colors.textFaint, fontSize: fontSize.xs, marginBottom: 4 },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
-    borderRadius: 10,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
     padding: 14,
-    marginTop: 8,
+    marginTop: spacing.sm,
     gap: 12,
   },
   toggleText: { flex: 1 },
-  toggleLabel: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  toggleSub: { color: '#888', fontSize: 12, marginTop: 2 },
+  toggleLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
+  toggleSub: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
   phoneRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
-    borderRadius: 10,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
     gap: 12,
   },
-  phoneText: { flex: 1, color: '#fff', fontSize: 15 },
-  phoneMuted: { color: '#666' },
+  phoneText: { flex: 1, color: colors.textPrimary, fontSize: fontSize.md },
+  phoneMuted: { color: colors.textFaint },
   phoneBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     backgroundColor: 'rgba(0,212,255,0.15)',
   },
-  phoneBtnText: { color: '#00d4ff', fontWeight: '700', fontSize: 13 },
-  error: { color: '#ff6b6b', fontSize: 13, marginTop: 8 },
+  phoneBtnText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.sm },
+  error: { color: colors.danger, fontSize: fontSize.sm, marginTop: spacing.sm },
   btn: {
-    backgroundColor: '#00d4ff',
-    borderRadius: 10,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
     padding: 14,
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: spacing.md,
   },
-  btnText: { color: '#000', fontWeight: '700', fontSize: 15 },
+  btnText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
   cancelBtn: { alignItems: 'center', padding: 12 },
-  cancelText: { color: '#888', fontSize: 14 },
+  cancelText: { color: colors.textMuted, fontSize: fontSize.sm },
 });
