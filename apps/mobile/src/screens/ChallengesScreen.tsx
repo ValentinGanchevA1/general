@@ -13,6 +13,7 @@ import { useChallenges } from '@/features/gamification/useChallenges';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonListRow } from '@/components/Skeleton';
+import { colors, spacing, radius, fontSize } from '@/theme';
 
 function iconForChallenge(id: string): string {
   if (id.startsWith('wave')) return 'hand-wave';
@@ -30,7 +31,7 @@ function ChallengeRow({ c }: { c: ChallengeToday }): React.JSX.Element {
         <Icon
           name={c.completed ? 'check-bold' : iconForChallenge(c.id)}
           size={22}
-          color={c.completed ? '#0a0a0f' : '#00d4ff'}
+          color={c.completed ? colors.bg : colors.primary}
         />
       </View>
       <View style={styles.info}>
@@ -68,7 +69,7 @@ export function ChallengesScreen(): React.JSX.Element {
       <ScrollView
         style={styles.flex}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#00d4ff" />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />}
       >
         {challenges.length > 0 ? (
           <Text style={styles.summary}>
@@ -99,20 +100,20 @@ export function ChallengesScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
+  container: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   content: { paddingBottom: 40 },
-  summary: { color: '#888', fontSize: 14, textAlign: 'center', marginBottom: 16 },
+  summary: { color: colors.textMuted, fontSize: 14, textAlign: 'center', marginBottom: 16 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 20,
     marginBottom: 12,
     padding: 16,
-    backgroundColor: '#12121f',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#1f1f33',
+    borderColor: colors.border,
     gap: 14,
   },
   rowDone: { borderColor: '#00d4ff40', backgroundColor: '#00d4ff12' },
@@ -124,10 +125,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  iconWrapDone: { backgroundColor: '#00d4ff' },
+  iconWrapDone: { backgroundColor: colors.primary },
   info: { flex: 1, gap: 4 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  title: { color: '#fff', fontSize: 16, fontWeight: '700', flexShrink: 1 },
+  title: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', flexShrink: 1 },
   rewardPill: {
     paddingHorizontal: 10,
     paddingVertical: 3,
@@ -135,8 +136,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   rewardText: { color: '#FFD700', fontSize: 12, fontWeight: '700' },
-  doneText: { color: '#00d4ff', fontSize: 13, fontWeight: '600', marginTop: 2 },
-  barTrack: { height: 6, backgroundColor: '#1f1f33', borderRadius: 3, overflow: 'hidden', marginTop: 6 },
-  barFill: { height: 6, backgroundColor: '#00d4ff', borderRadius: 3 },
-  progressText: { color: '#666', fontSize: 11, marginTop: 4 },
+  doneText: { color: colors.primary, fontSize: 13, fontWeight: '600', marginTop: 2 },
+  barTrack: { height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden', marginTop: 6 },
+  barFill: { height: 6, backgroundColor: colors.primary, borderRadius: 3 },
+  progressText: { color: colors.textFaint, fontSize: 11, marginTop: 4 },
 });
