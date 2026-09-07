@@ -42,6 +42,7 @@ import {
   type ActionSheetItem,
 } from '@/components/sheets';
 import { colors, spacing, radius, fontSize } from '@/theme';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
@@ -615,16 +616,24 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         style={[styles.topBar, { paddingTop: insets.top + 4 }]}
         pointerEvents="box-none"
       >
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>‹ Back</Text>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Icon name="chevron-left" size={28} color={colors.textPrimary} />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.menuBtn}
           onPress={openMenu}
           disabled={blocking}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
           accessibilityLabel="Profile options"
         >
-          <Text style={styles.menuBtnText}>···</Text>
+          <Icon name="dots-horizontal" size={26} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
     </View>
@@ -654,23 +663,21 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     zIndex: 10,
   },
-  backBtn: { padding: 8 },
-  backBtnText: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0,0,0,0.55)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+  backBtn: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 24,
+    backgroundColor: 'rgba(10,10,15,0.45)',
   },
-  menuBtn: { padding: 8 },
-  menuBtnText: {
-    color: colors.textPrimary,
-    fontSize: 22,
-    letterSpacing: 2,
-    textShadowColor: 'rgba(0,0,0,0.55)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+  menuBtn: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 24,
+    backgroundColor: 'rgba(10,10,15,0.45)',
   },
   scroll: { paddingBottom: 24, gap: 22 },
   heroBlock: { marginBottom: 4 },
