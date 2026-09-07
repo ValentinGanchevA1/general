@@ -21,6 +21,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { deleteAccount, logout } from '@/features/auth/authSlice';
 import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
 import { APP_VERSION } from '@/constants/app';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { colors, spacing, fontSize } from '@/theme';
 
 export function SettingsScreen(): React.JSX.Element {
@@ -78,21 +79,40 @@ export function SettingsScreen(): React.JSX.Element {
     }
   };
 
-  const handleLogout = (): void => {
-    void dispatch(logout());
+  const onLogout = (): void => {
+    appAlert('Log out?', 'You can sign back in any time.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log out',
+        style: 'destructive',
+        onPress: () => {
+          void dispatch(logout());
+        },
+      },
+    ]);
+  };
+
+  const openDelete = (): void => {
+    setDeletePassword('');
+    setDeleteOpen(true);
   };
 
   const confirmDelete = async (): Promise<void> => {
-    const pw = deletePassword.trim();
-    const result = await dispatch(deleteAccount(pw ? { password: pw } : {}));
-    if (deleteAccount.fulfilled.match(result)) {
-      setDeleteOpen(false);
-      setDeletePassword('');
+    if (!deletePassword.trim()) {
+      appAlert('Password required', 'Enter your password to confirm account deletion.');
+      return;
     }
+    const result = await dispatch(deleteAccount({ password: deletePassword }));
+    if (deleteAccount.rejected.match(result)) {
+      appAlert('Could not delete account', (result.payload as string) || 'Try again.');
+      return;
+    }
+    setDeleteOpen(false);
   };
 
   return (
     <View style={styles.root}>
+      <ScreenHeader title="Settings" bordered />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Discovery</Text>
@@ -111,7 +131,7 @@ export function SettingsScreen(): React.JSX.Element {
               <Switch
                 value={isVisible}
                 onValueChange={toggleVisibility}
-                trackColor={{ false: colors.borderStrong, true: '#0095b3' }}
+                trackColor={{ false: colors.borderStrong, true: 'rgba(0,212,255,0.35)' }}
                 thumbColor={isVisible ? colors.primary : colors.textFaint}
               />
             )}
@@ -131,194 +151,132 @@ export function SettingsScreen(): React.JSX.Element {
               <Switch
                 value={friendsSeeOnline}
                 onValueChange={toggleFriendsOnline}
-                trackColor={{ false: colors.borderStrong, true: '#0095b3' }}
+                trackColor={{ false: colors.borderStrong, true: 'rgba(0,212,255,0.35)' }}
                 thumbColor={friendsSeeOnline ? colors.primary : colors.textFaint}
               />
             )}
           </View>
-          <TouchableOpacity
-            style={[styles.row, styles.rowSpaced]}
-            onPress={() => navigation.navigate('BlockedUsers')}
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Blocked users</Text>
-              <Text style={styles.rowSub}>Hidden from map, chat, waves, and friend requests</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Trust & posting</Text>
-          <TouchableOpacity
-            style={styles.row}
-            onPress={() => navigation.navigate('Verification')}
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Verification</Text>
-              <Text style={styles.rowSub}>
-                Email → phone → ID review. Raises trust and unlocks higher-stakes actions
-              </Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
-          {!emailVerified ? (
-            <TouchableOpacity
-              style={[styles.row, styles.rowSpaced]}
-              onPress={() => navigation.navigate('EmailVerification')}
-            >
-              <View style={styles.rowContent}>
-                <Text style={styles.rowLabel}>Verify email</Text>
-                <Text style={styles.rowSub}>Required to post stories on Pulse</Text>
-              </View>
-              <Icon name="chevron-right" size={24} color={colors.textFaint} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Connected accounts</Text>
-          <TouchableOpacity
-            style={styles.row}
-            onPress={() => navigation.navigate('SocialLinking')}
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Social accounts</Text>
-              <Text style={styles.rowSub}>Link Instagram, X, TikTok and more — boosts trust</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Profile</Text>
-          <TouchableOpacity
-            style={styles.row}
-            onPress={() => navigation.navigate('ProfileEdit')}
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Edit profile</Text>
-              <Text style={styles.rowSub}>Name, bio, hometown, age visibility</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.row, styles.rowSpaced]}
-            onPress={() => navigation.navigate('Photos')}
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Manage photos</Text>
-              <Text style={styles.rowSub}>Gallery order and cover photo</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
-          <TouchableOpacity
-            style={styles.row}
-            onPress={() => navigation.navigate('NotificationSettings')}
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Push notifications</Text>
-              <Text style={styles.rowSub}>
-                Waves, friend requests, chats, stories, trades, and more
-              </Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           <TouchableOpacity
-            style={styles.row}
-            onPress={() => navigation.navigate('Privacy')}
+            style={styles.linkRow}
+            onPress={() => navigation.navigate('ProfileEdit')}
           >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Privacy</Text>
-              <Text style={styles.rowSub}>Policy and how we handle your data</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
+            <Icon name="account-edit-outline" size={22} color={colors.textPrimary} />
+            <Text style={styles.linkLabel}>Edit profile</Text>
+            <Icon name="chevron-right" size={22} color={colors.textMuted} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.row, styles.rowSpaced]}
-            onPress={() => navigation.navigate('Help')}
+            style={styles.linkRow}
+            onPress={() => navigation.navigate('Verification')}
           >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Help & Support</Text>
-              <Text style={styles.rowSub}>FAQ and contact</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
+            <Icon name="shield-check-outline" size={22} color={colors.textPrimary} />
+            <Text style={styles.linkLabel}>Verification</Text>
+            <Text style={styles.linkMeta}>{emailVerified ? 'Email ✓' : 'Start'}</Text>
+            <Icon name="chevron-right" size={22} color={colors.textMuted} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.row, styles.rowSpaced]}
-            onPress={() => navigation.navigate('About')}
+            style={styles.linkRow}
+            onPress={() => navigation.navigate('SocialLinking')}
           >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>About</Text>
-              <Text style={styles.rowSub}>Version and credits</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <Text style={styles.logoutText}>Log out</Text>
+            <Icon name="link-variant" size={22} color={colors.textPrimary} />
+            <Text style={styles.linkLabel}>Connected accounts</Text>
+            <Icon name="chevron-right" size={22} color={colors.textMuted} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={() => {
-              setDeletePassword('');
-              setDeleteOpen(true);
-            }}
+            style={styles.linkRow}
+            onPress={() => navigation.navigate('Subscription')}
           >
-            <Text style={styles.deleteText}>Delete account</Text>
+            <Icon name="star-outline" size={22} color={colors.textPrimary} />
+            <Text style={styles.linkLabel}>Premium</Text>
+            <Icon name="chevron-right" size={22} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.version}>Version {APP_VERSION}</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Privacy & safety</Text>
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={() => navigation.navigate('Privacy')}
+          >
+            <Icon name="lock-outline" size={22} color={colors.textPrimary} />
+            <Text style={styles.linkLabel}>Privacy</Text>
+            <Icon name="chevron-right" size={22} color={colors.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={() => navigation.navigate('BlockedUsers')}
+          >
+            <Icon name="block-helper" size={22} color={colors.textPrimary} />
+            <Text style={styles.linkLabel}>Blocked users</Text>
+            <Icon name="chevron-right" size={22} color={colors.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={() => navigation.navigate('NotificationSettings')}
+          >
+            <Icon name="bell-outline" size={22} color={colors.textPrimary} />
+            <Text style={styles.linkLabel}>Notifications</Text>
+            <Icon name="chevron-right" size={22} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Support</Text>
+          <TouchableOpacity style={styles.linkRow} onPress={() => navigation.navigate('Help')}>
+            <Icon name="help-circle-outline" size={22} color={colors.textPrimary} />
+            <Text style={styles.linkLabel}>Help</Text>
+            <Icon name="chevron-right" size={22} color={colors.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.linkRow} onPress={() => navigation.navigate('About')}>
+            <Icon name="information-outline" size={22} color={colors.textPrimary} />
+            <Text style={styles.linkLabel}>About</Text>
+            <Text style={styles.linkMeta}>v{APP_VERSION}</Text>
+            <Icon name="chevron-right" size={22} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
+          <Text style={styles.logoutText}>Log out</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.deleteBtn} onPress={openDelete}>
+          <Text style={styles.deleteText}>Delete account</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.footerNote}>G88 · local discovery</Text>
       </ScrollView>
 
-      <Modal
-        visible={deleteOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDeleteOpen(false)}
-      >
+      <Modal visible={deleteOpen} transparent animationType="fade" onRequestClose={() => setDeleteOpen(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Delete account?</Text>
+            <Text style={styles.modalTitle}>Delete account</Text>
             <Text style={styles.modalBody}>
-              This permanently deletes your profile, photos, stories, messages, friends,
-              and activity. It cannot be undone.
+              This permanently removes your profile, listings, and messages. Enter your password to confirm.
             </Text>
             <TextInput
-              style={styles.input}
+              style={styles.modalInput}
               value={deletePassword}
               onChangeText={setDeletePassword}
-              placeholder="Password (if you signed up with email)"
+              placeholder="Password"
               placeholderTextColor={colors.textFaint}
               secureTextEntry
               autoCapitalize="none"
-              editable={!authLoading}
             />
             {authError ? <Text style={styles.modalError}>{authError}</Text> : null}
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalCancel]}
-                onPress={() => setDeleteOpen(false)}
-                disabled={authLoading}
-              >
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setDeleteOpen(false)}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalBtn, styles.modalConfirm]}
-                onPress={confirmDelete}
+                style={[styles.modalConfirm, authLoading && styles.modalDisabled]}
+                onPress={() => void confirmDelete()}
                 disabled={authLoading}
               >
                 {authLoading ? (
-                  <ActivityIndicator color={colors.textPrimary} />
+                  <ActivityIndicator color={colors.onPrimary} />
                 ) : (
                   <Text style={styles.modalConfirmText}>Delete</Text>
                 )}
@@ -333,84 +291,109 @@ export function SettingsScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  body: { padding: spacing.xxl, paddingBottom: 48 },
-  section: { marginBottom: 28 },
+  body: { paddingBottom: spacing.xxl },
+  section: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
   sectionTitle: {
-    color: colors.textFaint,
-    fontSize: 11,
-    fontWeight: '600',
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: spacing.md,
+    letterSpacing: 0.8,
+    marginBottom: spacing.sm,
   },
   row: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 10,
-    padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.md,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
+    borderColor: colors.border,
   },
-  rowSpaced: { marginTop: spacing.md },
-  rowContent: { flex: 1 },
-  rowLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '500' },
-  rowSub: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
+  rowSpaced: { marginTop: spacing.sm },
+  rowContent: { flex: 1, gap: 2 },
+  rowLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
+  rowSub: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 18 },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  linkLabel: { flex: 1, color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '500' },
+  linkMeta: { color: colors.textMuted, fontSize: fontSize.sm, marginRight: 4 },
   logoutBtn: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 10,
-    padding: spacing.lg,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xl,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#3a1a1a',
+    borderColor: 'rgba(255,68,68,0.25)',
   },
-  logoutText: { color: '#ff6b6b', fontWeight: '600', fontSize: fontSize.md },
+  logoutText: { color: colors.danger, fontWeight: '600', fontSize: fontSize.md },
   deleteBtn: {
-    marginTop: spacing.md,
-    borderRadius: 10,
-    padding: spacing.lg,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#5a1a1a',
+    borderColor: 'rgba(255,68,68,0.35)',
   },
   deleteText: { color: colors.danger, fontWeight: '700', fontSize: fontSize.md },
-  version: {
+  footerNote: {
     textAlign: 'center',
     color: colors.textFaint,
     fontSize: fontSize.xs,
-    marginTop: spacing.md,
+    marginTop: spacing.xl,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
-    padding: spacing.xxl,
+    padding: spacing.lg,
   },
   modalCard: {
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 22,
     borderWidth: 1,
-    borderColor: '#3a1a1a',
+    borderColor: 'rgba(255,68,68,0.25)',
   },
-  modalTitle: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '700', marginBottom: 10 },
-  modalBody: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginBottom: spacing.lg },
-  input: {
-    backgroundColor: colors.bg,
+  modalTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
+  modalBody: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: 8, lineHeight: 20 },
+  modalInput: {
+    marginTop: 14,
+    backgroundColor: colors.surfaceAlt,
     borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: spacing.md,
-    color: colors.textPrimary,
-    fontSize: fontSize.md,
     borderWidth: 1,
     borderColor: colors.borderStrong,
+    color: colors.textPrimary,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: fontSize.md,
   },
-  modalError: { color: '#ff6b6b', fontSize: fontSize.sm, marginTop: 10 },
-  modalActions: { flexDirection: 'row', marginTop: 20, gap: spacing.md },
-  modalBtn: { flex: 1, borderRadius: 10, padding: 14, alignItems: 'center' },
-  modalCancel: { backgroundColor: colors.borderStrong },
-  modalCancelText: { color: colors.textPrimary, fontWeight: '600', fontSize: fontSize.md },
-  modalConfirm: { backgroundColor: '#c0392b' },
-  modalConfirmText: { color: colors.textPrimary, fontWeight: '700', fontSize: fontSize.md },
+  modalError: { color: colors.danger, fontSize: fontSize.sm, marginTop: 10 },
+  modalActions: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  modalCancel: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+  },
+  modalCancelText: { color: colors.textSecondary, fontWeight: '600', fontSize: fontSize.md },
+  modalConfirm: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.danger, alignItems: 'center' },
+  modalConfirmText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
+  modalDisabled: { opacity: 0.5 },
 });
