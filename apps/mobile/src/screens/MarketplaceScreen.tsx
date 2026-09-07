@@ -3,7 +3,7 @@
 // P3.7 trading hub: nearby browse grid + Sell entry + saved toggle.
 // Mode filter (All / For sale / Wanted) — same labels as map.
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
