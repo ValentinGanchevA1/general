@@ -13,17 +13,17 @@ import { colors, radius, spacing } from '@/theme';
 
 export interface EmptyStateProps {
   title: string;
-  body?: string;
-  actionLabel?: string;
-  onAction?: () => void;
+  body?: string | undefined;
+  actionLabel?: string | undefined;
+  onAction?: (() => void) | undefined;
   /** Optional MCI icon name shown above the title. */
-  icon?: string;
+  icon?: string | undefined;
   /**
    * `card` (default) — bordered panel for map overlays.
    * `plain` — no card chrome; for full-screen list empties.
    */
-  variant?: 'card' | 'plain';
-  style?: StyleProp<ViewStyle>;
+  variant?: 'card' | 'plain' | undefined;
+  style?: StyleProp<ViewStyle> | undefined;
 }
 
 /**
@@ -59,7 +59,6 @@ export function EmptyState({
         <TouchableOpacity
           style={styles.btn}
           onPress={onAction}
-          activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
         >
@@ -72,26 +71,21 @@ export function EmptyState({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: 'rgba(10,10,15,0.88)',
+    backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    borderColor: colors.border,
+    padding: spacing.xl,
     alignItems: 'center',
     gap: spacing.sm,
-    maxWidth: 320,
   },
   plain: {
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.xxl * 2,
     alignItems: 'center',
     gap: spacing.sm,
-    paddingHorizontal: spacing.xxl,
-    paddingVertical: spacing.xxl,
-    marginTop: spacing.xl,
   },
-  icon: {
-    marginBottom: spacing.xs,
-  },
+  icon: { marginBottom: spacing.xs },
   title: {
     color: colors.textPrimary,
     fontSize: 16,
@@ -100,22 +94,20 @@ const styles = StyleSheet.create({
   },
   body: {
     color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
   },
   btn: {
-    marginTop: spacing.sm,
-    backgroundColor: colors.primary,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    minHeight: 44,
-    justifyContent: 'center',
+    backgroundColor: colors.primary,
   },
   btnText: {
     color: colors.onPrimary,
-    fontWeight: '700',
     fontSize: 14,
+    fontWeight: '700',
   },
 });

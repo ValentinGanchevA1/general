@@ -106,168 +106,160 @@ export function FriendsListScreen(): React.JSX.Element {
     navigation.navigate('Suggestions');
   }, [navigation]);
 
+  const data = list.items;
+  const emptyCopy = useMemo(() => {
+    switch (tab) {
+      case 'requests':
+        return {
+          icon: 'account-clock-outline',
+          title: 'No pending requests',
+          hint: 'When someone sends you a friend request, it shows up here.',
+          showSuggestions: false,
+        };
+      case 'following':
+        return {
+          icon: 'account-arrow-right-outline',
+          title: 'Not following anyone',
+          hint: 'Follow people to see them here.',
+          showSuggestions: true,
+        };
+      case 'followers':
+        return {
+          icon: 'account-arrow-left-outline',
+          title: 'No followers yet',
+          hint: 'People who follow you appear here.',
+          showSuggestions: false,
+        };
+      default:
+        return {
+          icon: 'account-group-outline',
+          title: 'No friends yet',
+          hint: 'Find people nearby or from suggestions.',
+          showSuggestions: true,
+        };
+    }
+  }, [tab]);
+
+  const isBusy = useCallback(
+    (id: string) => pendingActionIds.includes(id),
+    [pendingActionIds],
+  );
+
   const onAccept = useCallback(
-    (id: string) => {
-      void dispatch(acceptFriendRequest(id)).then((r) => {
-        if (acceptFriendRequest.fulfilled.match(r)) {
-          void dispatch(fetchFriendsTab({ tab: 'friends' }));
-        } else {
-          appAlert('Could not accept', (r.payload as string) ?? 'Try again.');
-        }
-      });
+    async (requestId: string) => {
+      try {
+        await dispatch(acceptFriendRequest(requestId)).unwrap();
+      } catch {
+        appAlert('Error', 'Could not accept request.');
+      }
     },
     [dispatch],
   );
 
   const onDecline = useCallback(
-    (id: string) => {
-      void dispatch(declineFriendRequest(id)).then((r) => {
-        if (!declineFriendRequest.fulfilled.match(r)) {
-          appAlert('Could not decline', (r.payload as string) ?? 'Try again.');
-        }
-      });
+    async (requestId: string) => {
+      try {
+        await dispatch(declineFriendRequest(requestId)).unwrap();
+      } catch {
+        appAlert('Error', 'Could not decline request.');
+      }
     },
     [dispatch],
   );
 
   const onUnfriend = useCallback(
-    (userId: string, name: string) => {
-      appAlert('Unfriend', `Remove ${name} from your friends?`, [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Unfriend',
-          style: 'destructive',
-          onPress: () => {
-            void dispatch(unfriendUser(userId)).then((r) => {
-              if (!unfriendUser.fulfilled.match(r)) {
-                appAlert('Could not unfriend', (r.payload as string) ?? 'Try again.');
-              }
-            });
-          },
-        },
-      ]);
+    async (userId: string) => {
+      try {
+        await dispatch(unfriendUser(userId)).unwrap();
+      } catch {
+        appAlert('Error', 'Could not unfriend.');
+      }
     },
     [dispatch],
   );
 
-  const emptyCopy = useMemo(() => {
-    switch (tab) {
-      case 'friends':
-        return {
-          title: 'No close friends yet',
-          hint: "Send a friend request from someone's profile. Accepted friends show here.",
-          showSuggestions: true,
-          icon: 'account-heart-outline',
-        };
-      case 'following':
-        return {
-          title: 'Not following anyone',
-          hint: 'Follow people from their profile to build your public graph.',
-          showSuggestions: true,
-          icon: 'account-plus-outline',
-        };
-      case 'followers':
-        return {
-          title: 'No followers yet',
-          hint: "When others follow you, they'll appear here.",
-          showSuggestions: false,
-          icon: 'account-group-outline',
-        };
-      case 'requests':
-        return {
-          title: 'No pending requests',
-          hint: 'Incoming friend requests land here for you to accept or decline.',
-          showSuggestions: false,
-          icon: 'email-outline',
-        };
-    }
-  }, [tab]);
-
   const renderFriend = useCallback(
     ({ item }: { item: FriendCard }) => {
-      const busy = pendingActionIds.includes(item.userId);
+      const busy = isBusy(item.userId);
       return (
-        <TouchableOpacity
-          style={S.row}
-          onPress={() => openProfile(item.userId)}
-          accessibilityRole="button"
-        >
-          <Avatar
-            uri={item.avatarUrl}
-            name={item.displayName}
-            size={44}
-            online={item.online === true}
-          />
-          <View style={S.rowBody}>
+        <TouchableOpacity style={S.row} onPress={() => openProfile(item.userId)} activeOpacity={0.7}>
+          <Avatar uri={item.avatarUrl} name={item.displayName} size={48} />
+          <View style={S.info}>
             <Text style={S.name} numberOfLines={1}>
               {item.displayName}
             </Text>
-            {item.online === true ? (
-              <Text style={S.metaOnline}>Online</Text>
-            ) : item.online === false ? (
-              <Text style={S.meta}>Offline</Text>
+            {item.isOnline ? (
+              <Text style={S.online}>Online</Text>
             ) : null}
           </View>
           {tab === 'friends' ? (
             <TouchableOpacity
-              style={[S.secondaryBtn, busy && S.btnDisabled]}
+              style={S.secondaryBtn}
               disabled={busy}
-              onPress={() => onUnfriend(item.userId, item.displayName)}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                void onUnfriend(item.userId);
+              }}
             >
-              {busy ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <Text style={S.secondaryBtnText}>Unfriend</Text>
-              )}
+              <Text style={S.secondaryBtnText}>Unfriend</Text>
             </TouchableOpacity>
           ) : null}
         </TouchableOpacity>
       );
     },
-    [openProfile, onUnfriend, pendingActionIds, tab],
+    [isBusy, openProfile, onUnfriend, tab],
   );
 
   const renderRequest = useCallback(
     ({ item }: { item: FriendRequestCard }) => {
-      const busy = pendingActionIds.includes(item.id);
+      const busy = isBusy(item.id);
+      const incoming = item.direction === 'incoming';
       return (
-        <View style={S.row}>
-          <TouchableOpacity onPress={() => openProfile(item.fromUserId)}>
-            <Avatar uri={item.avatarUrl} name={item.displayName} size={44} />
-          </TouchableOpacity>
-          <TouchableOpacity style={S.rowBody} onPress={() => openProfile(item.fromUserId)}>
+        <TouchableOpacity
+          style={S.row}
+          onPress={() => openProfile(item.fromUser.id)}
+          activeOpacity={0.7}
+        >
+          <Avatar uri={item.fromUser.avatarUrl} name={item.fromUser.displayName} size={48} />
+          <View style={S.info}>
             <Text style={S.name} numberOfLines={1}>
-              {item.displayName}
+              {item.fromUser.displayName}
             </Text>
-            <Text style={S.meta}>Wants to be friends</Text>
-          </TouchableOpacity>
-          <View style={S.requestActions}>
-            <TouchableOpacity
-              style={[S.acceptBtn, busy && S.btnDisabled]}
-              disabled={busy}
-              onPress={() => onAccept(item.id)}
-            >
-              {busy ? (
-                <ActivityIndicator size="small" color={colors.onPrimary} />
-              ) : (
-                <Text style={S.acceptBtnText}>Accept</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[S.secondaryBtn, busy && S.btnDisabled]}
-              disabled={busy}
-              onPress={() => onDecline(item.id)}
-            >
-              <Text style={S.secondaryBtnText}>Decline</Text>
-            </TouchableOpacity>
+            <Text style={S.meta}>{incoming ? 'Wants to be friends' : 'Request sent'}</Text>
           </View>
-        </View>
+          {incoming ? (
+            <View style={S.actions}>
+              <TouchableOpacity
+                style={S.declineBtn}
+                disabled={busy}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  void onDecline(item.id);
+                }}
+              >
+                <Text style={S.declineBtnText}>Decline</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={S.primaryBtn}
+                disabled={busy}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  void onAccept(item.id);
+                }}
+              >
+                <Text style={S.primaryBtnText}>Accept</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={S.pendingBadge}>
+              <Text style={S.pendingText}>Pending</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       );
     },
-    [openProfile, onAccept, onDecline, pendingActionIds],
+    [isBusy, openProfile, onAccept, onDecline],
   );
-
-  const data = list.items;
 
   return (
     <View style={S.root}>
@@ -278,44 +270,38 @@ export function FriendsListScreen(): React.JSX.Element {
             onPress={openSuggestions}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="See suggestions"
+            accessibilityLabel="Suggestions"
           >
-            <Text style={S.suggestLink}>Suggest</Text>
+            <Text style={S.headerAction}>Suggest</Text>
           </TouchableOpacity>
         }
+        bordered
       />
 
       <View style={S.tabs}>
-        {TABS.map((t) => {
-          const active = tab === t.key;
-          return (
-            <TouchableOpacity
-              key={t.key}
-              style={[S.tab, active && S.tabActive]}
-              onPress={() => setTab(t.key)}
-            >
-              <View style={S.tabInner}>
-                <Text style={[S.tabText, active && S.tabTextActive]}>{t.label}</Text>
-                {t.key === 'requests' && pendingCount > 0 ? (
-                  <View style={S.tabBadge}>
-                    <Text style={S.tabBadgeText}>
-                      {pendingCount > 99 ? '99+' : String(pendingCount)}
-                    </Text>
-                  </View>
-                ) : null}
+        {TABS.map((t) => (
+          <TouchableOpacity
+            key={t.key}
+            style={[S.tab, tab === t.key && S.tabActive]}
+            onPress={() => setTab(t.key)}
+          >
+            <Text style={[S.tabText, tab === t.key && S.tabTextActive]}>{t.label}</Text>
+            {t.key === 'requests' && pendingCount > 0 ? (
+              <View style={S.badge}>
+                <Text style={S.badgeText}>{pendingCount > 99 ? '99+' : String(pendingCount)}</Text>
               </View>
-            </TouchableOpacity>
-          );
-        })}
+            ) : null}
+          </TouchableOpacity>
+        ))}
       </View>
 
       {list.loading && data.length === 0 ? (
         <View style={S.center}>
-          <ActivityIndicator color={colors.primary} size="large" />
+          <ActivityIndicator color={colors.primary} />
         </View>
       ) : list.error && data.length === 0 ? (
         <View style={S.center}>
-          <Text style={S.errorText}>{list.error}</Text>
+          <Text style={S.error}>{list.error}</Text>
           <TouchableOpacity style={S.retry} onPress={onRefresh}>
             <Text style={S.retryText}>Retry</Text>
           </TouchableOpacity>
@@ -366,87 +352,90 @@ export function FriendsListScreen(): React.JSX.Element {
 
 const S = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  suggestLink: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-
+  headerAction: { color: colors.primary, fontSize: fontSize.md, fontWeight: '700' },
   tabs: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    gap: 6,
-    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    gap: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
   tab: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  tabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabInner: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  tabText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
-  tabTextActive: { color: colors.onPrimary, fontWeight: '700' },
-  tabBadge: {
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+  tabActive: { borderBottomColor: colors.primary },
+  tabText: { color: colors.textMuted, fontSize: fontSize.sm, fontWeight: '600' },
+  tabTextActive: { color: colors.primary },
+  badge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: colors.danger,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 5,
   },
-  tabBadgeText: { color: colors.onPrimary, fontSize: 10, fontWeight: '800' },
-
-  listContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: 40, gap: 10 },
+  badgeText: { color: colors.textPrimary, fontSize: 10, fontWeight: '800' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+  error: { color: colors.danger, fontSize: fontSize.sm },
+  retry: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+  },
+  retryText: { color: colors.primary, fontWeight: '700' },
+  listContent: { paddingVertical: spacing.sm, flexGrow: 1 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
-  rowBody: { flex: 1, minWidth: 0 },
-  name: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
-  meta: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
-  metaOnline: { color: colors.success, fontSize: fontSize.xs, marginTop: 2, fontWeight: '600' },
-
-  requestActions: { flexDirection: 'row', gap: 8 },
-  acceptBtn: {
-    backgroundColor: colors.primary,
+  info: { flex: 1, gap: 2 },
+  name: { color: colors.textPrimary, fontWeight: '600', fontSize: fontSize.md, maxWidth: 180 },
+  online: { color: colors.action, fontSize: fontSize.xs, fontWeight: '600' },
+  meta: { color: colors.textMuted, fontSize: fontSize.sm },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  primaryBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: colors.action,
+  },
+  primaryBtnText: { color: colors.textPrimary, fontWeight: '700', fontSize: 13 },
+  declineBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: radius.sm,
-    minWidth: 72,
-    alignItems: 'center',
-  },
-  acceptBtnText: { color: colors.onPrimary, fontWeight: '700', fontSize: 13 },
-  secondaryBtn: {
-    borderWidth: 1,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
+  },
+  declineBtnText: { color: colors.textSecondary, fontWeight: '600', fontSize: 13 },
+  secondaryBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: radius.sm,
-    minWidth: 72,
-    alignItems: 'center',
+    borderRadius: 16,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
   },
   secondaryBtnText: { color: colors.textSecondary, fontWeight: '600', fontSize: 13 },
-  btnDisabled: { opacity: 0.5 },
-
-  errorText: { color: colors.danger, marginBottom: 12, textAlign: 'center' },
-  retry: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: radius.sm,
+  pendingBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#2a2a1a',
   },
-  retryText: { color: colors.onPrimary, fontWeight: '700' },
+  pendingText: { color: colors.warning, fontWeight: '700', fontSize: 12 },
 });
