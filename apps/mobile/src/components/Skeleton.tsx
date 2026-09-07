@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   Animated,
   StyleSheet,
@@ -27,7 +27,8 @@ export function Skeleton({
   borderRadius = radius.md,
   style,
 }: SkeletonProps): React.JSX.Element {
-  const opacity = useRef(new Animated.Value(0.35)).current;
+  // useMemo (not useRef().current) — satisfies react-hooks/refs under --max-warnings 0
+  const opacity = useMemo(() => new Animated.Value(0.35), []);
 
   useEffect(() => {
     const loop = Animated.loop(
