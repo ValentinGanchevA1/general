@@ -107,7 +107,7 @@ export type RootStackParamList = {
   Gamification: NavigatorScreenParams<GamificationStackParamList>;
   Commerce: NavigatorScreenParams<CommerceStackParamList>;
   Account: NavigatorScreenParams<AccountStackParamList>;
-  Social: NavigatorStackParamList extends never ? never : NavigatorScreenParams<SocialStackParamList>;
+  Social: NavigatorScreenParams<SocialStackParamList>;
   Events: NavigatorScreenParams<EventsStackParamList>;
 };
 
