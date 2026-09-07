@@ -36,6 +36,7 @@ import { useSocket } from '@/realtime/useSocket';
 import { Avatar } from '@/components/Avatar';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
+import { SkeletonListRow } from '@/components/Skeleton';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
@@ -290,8 +291,13 @@ export function FriendsListScreen(): React.JSX.Element {
       </View>
 
       {list.loading && data.length === 0 ? (
-        <View style={S.center}>
-          <ActivityIndicator color={colors.primary} />
+        <View style={S.listContent}>
+          <SkeletonListRow />
+          <SkeletonListRow />
+          <SkeletonListRow />
+          <SkeletonListRow />
+          <SkeletonListRow />
+          <SkeletonListRow />
         </View>
       ) : list.error && data.length === 0 ? (
         <View style={S.center}>
