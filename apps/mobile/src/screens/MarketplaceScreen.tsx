@@ -5,7 +5,6 @@
 
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   Pressable,
@@ -26,6 +25,7 @@ import { useBrowseListings, useFavorites } from '@/features/trading/useTrading';
 import { formatPrice } from '@/features/trading/formatPrice';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
+import { SkeletonMarketGrid } from '@/components/Skeleton';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<CommerceStackParamList>;
@@ -156,7 +156,7 @@ export function MarketplaceScreen(): React.JSX.Element {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />}
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator style={{ marginTop: 48 }} color={colors.primary} />
+            <SkeletonMarketGrid count={4} />
           ) : (
             <EmptyState
               variant="plain"
