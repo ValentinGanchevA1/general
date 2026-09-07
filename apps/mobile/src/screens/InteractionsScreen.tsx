@@ -1,8 +1,8 @@
 import { EmptyState } from '@/components/EmptyState';
+import { SkeletonListRow } from '@/components/Skeleton';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -120,8 +120,12 @@ export function InteractionsScreen(): React.JSX.Element {
     <View style={styles.root}>
       <ScreenHeader title="Interactions" bordered />
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.primary} />
+        <View style={styles.listContent}>
+          <SkeletonListRow />
+          <SkeletonListRow />
+          <SkeletonListRow />
+          <SkeletonListRow />
+          <SkeletonListRow />
         </View>
       ) : (
         <FlatList
