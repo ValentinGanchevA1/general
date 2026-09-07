@@ -3,7 +3,7 @@
 // P3.7 trading hub: nearby browse grid + Sell entry + saved toggle.
 // Mode filter (All / For sale / Wanted) — same labels as map.
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -19,7 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { ListingMode, ListingSummary } from '@g88/shared';
+import type { ListingCard, ListingMode } from '@g88/shared';
 import type { CommerceStackParamList } from '@/navigation/stacks';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { useBrowseListings, useFavorites } from '@/features/trading/useTrading';
@@ -29,94 +29,112 @@ import { EmptyState } from '@/components/EmptyState';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<CommerceStackParamList>;
-
+type Tab = 'browse' | 'saved';
 type ModeFilter = 'all' | ListingMode;
 
-const MODE_OPTIONS: Array<{ id: ModeFilter; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'sell', label: 'For sale' },
-  { id: 'buy', label: 'Wanted' },
+const MODE_OPTIONS: Array<{ value: ModeFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'sell', label: 'For sale' },
+  { value: 'buy', label: 'Wanted' },
 ];
 
 export function MarketplaceScreen(): React.JSX.Element {
   const nav = useNavigation<Nav>();
-  const { coords, requestPermission } = useUserLocation();
-  const [tab, setTab] = useState<'browse' | 'saved'>('browse');
+  const { coords } = useUserLocation();
+  const [tab, setTab] = useState<Tab>('browse');
   const [modeFilter, setModeFilter] = useState<ModeFilter>('all');
 
-  useEffect(() => {
-    void requestPermission();
-  }, [requestPermission]);
+  const listingMode = modeFilter === 'all' ? undefined : modeFilter;
+  const browse = useBrowseListings(coords ?? null, listingMode);
+  const saved = useFavorites();
 
-  const browseMode = modeFilter === 'all' ? undefined : modeFilter;
-  const browse = useBrowseListings(tab === 'browse' ? coords : null, {
-    mode: browseMode,
-  });
-  const saved = useFavorites(tab === 'saved');
-
-  const data = tab === 'browse' ? browse.listings : saved.favorites;
+  const data = tab === 'browse' ? browse.listings : saved.listings;
   const loading = tab === 'browse' ? browse.loading : saved.loading;
   const refresh = tab === 'browse' ? browse.refresh : saved.refresh;
 
+  const emptyTitle =
+    tab === 'browse'
+      ? modeFilter === 'buy'
+        ? 'No wanted posts nearby'
+        : modeFilter === 'sell'
+          ? 'Nothing for sale nearby'
+          : 'Nothing nearby yet'
+      : 'No saved listings';
+  const emptyBody =
+    tab === 'browse'
+      ? modeFilter === 'buy'
+        ? 'Be the first to post what you are looking for.'
+        : 'List something or widen your map region.'
+      : 'Heart listings to keep them here.';
+
   const renderItem = useCallback(
-    ({ item }: { item: ListingSummary }) => (
-      <ListingCard item={item} onPress={() => nav.navigate('ListingDetail', { listingId: item.id })} />
+    ({ item }: { item: ListingCard }) => (
+      <TouchableOpacity
+        style={S.card}
+        activeOpacity={0.85}
+        onPress={() => nav.navigate('ListingDetail', { listingId: item.id })}
+      >
+        {item.thumbnailUrl ? (
+          <Image source={{ uri: item.thumbnailUrl }} style={S.thumb} />
+        ) : (
+          <View style={[S.thumb, S.thumbPlaceholder]}>
+            <Icon name="image-off-outline" size={28} color={colors.borderStrong} />
+          </View>
+        )}
+        <View style={S.cardBody}>
+          <Text style={S.cardTitle} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={S.cardPrice}>{formatPrice(item.priceCents, item.currency)}</Text>
+          <Text style={S.cardMeta} numberOfLines={1}>
+            {item.mode === 'buy' ? 'Wanted · ' : ''}{item.category}
+          </Text>
+        </View>
+      </TouchableOpacity>
     ),
     [nav],
   );
 
-  const emptyTitle =
-    tab === 'saved'
-      ? 'No saved listings'
-      : modeFilter === 'buy'
-        ? 'No wanted posts nearby'
-        : modeFilter === 'sell'
-          ? 'No items for sale nearby'
-          : 'No listings nearby';
-
-  const emptyBody =
-    tab === 'saved'
-      ? "You haven't saved any listings yet."
-      : 'Be the first to post something near you.';
-
   return (
-    <View style={S.container}>
+    <View style={S.root}>
       <ScreenHeader
         title="Marketplace"
         right={
           <TouchableOpacity
-            onPress={() => nav.navigate('ListingCreate')}
+            onPress={() => nav.navigate('ListingCreate', { mode: 'sell' })}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="Create listing"
+            accessibilityLabel="Sell an item"
           >
-            <Icon name="plus-circle" size={24} color={colors.primary} />
+            <Text style={S.headerAction}>Sell</Text>
           </TouchableOpacity>
         }
+        bordered
       />
 
       <View style={S.tabs}>
         {(['browse', 'saved'] as const).map((t) => (
-          <TouchableOpacity key={t} style={[S.tab, tab === t && S.tabActive]} onPress={() => setTab(t)}>
+          <Pressable
+            key={t}
+            style={[S.tab, tab === t && S.tabActive]}
+            onPress={() => setTab(t)}
+          >
             <Text style={[S.tabText, tab === t && S.tabTextActive]}>
               {t === 'browse' ? 'Nearby' : 'Saved'}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         ))}
       </View>
 
       {tab === 'browse' ? (
         <View style={S.modeRow}>
           {MODE_OPTIONS.map((opt) => {
-            const active = modeFilter === opt.id;
+            const active = modeFilter === opt.value;
             return (
               <Pressable
-                key={opt.id}
-                onPress={() => setModeFilter(opt.id)}
+                key={opt.value}
                 style={[S.modeChip, active && S.modeChipActive]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`Show ${opt.label} listings`}
+                onPress={() => setModeFilter(opt.value)}
               >
                 <Text style={[S.modeChipText, active && S.modeChipTextActive]}>{opt.label}</Text>
               </Pressable>
@@ -142,15 +160,15 @@ export function MarketplaceScreen(): React.JSX.Element {
               icon={tab === 'browse' ? 'storefront-outline' : 'heart-outline'}
               title={emptyTitle}
               body={emptyBody}
-              actionLabel={tab === 'browse' ? (modeFilter === 'buy' ? 'Post a wanted' : 'Sell an item') : undefined}
-              onAction={
-                tab === 'browse'
-                  ? () =>
+              {...(tab === 'browse'
+                ? {
+                    actionLabel: modeFilter === 'buy' ? 'Post a wanted' : 'Sell an item',
+                    onAction: () =>
                       nav.navigate('ListingCreate', {
                         mode: modeFilter === 'buy' ? 'buy' : 'sell',
-                      })
-                  : undefined
-              }
+                      }),
+                  }
+                : {})}
             />
           )
         }
@@ -159,117 +177,57 @@ export function MarketplaceScreen(): React.JSX.Element {
   );
 }
 
-function ListingCard({
-  item,
-  onPress,
-}: {
-  item: ListingSummary;
-  onPress: () => void;
-}): React.JSX.Element {
-  const isWanted = item.mode === 'buy';
-  return (
-    <TouchableOpacity style={S.card} activeOpacity={0.85} onPress={onPress}>
-      {item.thumbnailUrl ? (
-        <Image source={{ uri: item.thumbnailUrl }} style={S.thumb} />
-      ) : (
-        <View style={[S.thumb, S.thumbPlaceholder]}>
-          <Icon name="image-off-outline" size={28} color={colors.borderStrong} />
-        </View>
-      )}
-      {item.status !== 'active' ? (
-        <View style={S.statusPill}>
-          <Text style={S.statusText}>{item.status}</Text>
-        </View>
-      ) : isWanted ? (
-        <View style={S.wantedPill}>
-          <Text style={S.wantedText}>Wanted</Text>
-        </View>
-      ) : null}
-      {item.favoritedByMe ? <Icon name="heart" size={18} color={colors.danger} style={S.heart} /> : null}
-      <Text style={S.cardTitle} numberOfLines={1}>
-        {item.title}
-      </Text>
-      <Text style={S.cardPrice}>{formatPrice(item.priceCents, item.currency)}</Text>
-      <Text style={S.cardCategory} numberOfLines={1}>
-        {item.category}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
 const S = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  tabs: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
-  tab: {
+  root: { flex: 1, backgroundColor: colors.bg },
+  headerAction: { color: colors.primary, fontSize: fontSize.md, fontWeight: '700' },
+  tabs: {
+    flexDirection: 'row',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    gap: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
-  tabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '700' },
-  tabTextActive: { color: colors.onPrimary },
+  tab: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: { borderBottomColor: colors.primary },
+  tabText: { color: colors.textMuted, fontSize: fontSize.md, fontWeight: '600' },
+  tabTextActive: { color: colors.primary },
   modeRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    marginBottom: 10,
+    paddingVertical: spacing.sm,
   },
   modeChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.borderStrong,
   },
   modeChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  modeChipText: { color: colors.textSecondary, fontSize: fontSize.xs, fontWeight: '700' },
+  modeChipText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '600' },
   modeChipTextActive: { color: colors.onPrimary },
-  grid: { padding: spacing.md, paddingBottom: 40 },
+  grid: { padding: spacing.md, gap: spacing.md, flexGrow: 1 },
   row: { gap: spacing.md },
   card: {
     flex: 1,
-    marginBottom: spacing.md,
-    padding: spacing.sm,
-    borderRadius: 14,
     backgroundColor: colors.surface,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: 'hidden',
+    marginBottom: spacing.md,
   },
-  thumb: {
-    width: '100%',
-    aspectRatio: 1,
-    borderRadius: 10,
-    backgroundColor: colors.surfaceAlt,
-    marginBottom: spacing.sm,
-  },
+  thumb: { width: '100%', height: 120, backgroundColor: colors.surfaceAlt },
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  statusPill: {
-    position: 'absolute',
-    top: 14,
-    left: 14,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-  },
-  statusText: { color: colors.warning, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
-  wantedPill: {
-    position: 'absolute',
-    top: 14,
-    left: 14,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    backgroundColor: colors.entityWanted,
-  },
-  wantedText: { color: colors.textPrimary, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
-  heart: { position: 'absolute', top: 14, right: 14 },
-  cardTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
-  cardPrice: { color: colors.primary, fontSize: 15, fontWeight: '800', marginTop: 2 },
-  cardCategory: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  cardBody: { padding: spacing.sm, gap: 2 },
+  cardTitle: { color: colors.textPrimary, fontSize: fontSize.sm, fontWeight: '600' },
+  cardPrice: { color: colors.primary, fontSize: fontSize.md, fontWeight: '700' },
+  cardMeta: { color: colors.textMuted, fontSize: fontSize.xs },
 });
