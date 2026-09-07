@@ -1,5 +1,5 @@
 // First map session after sign-in / profile setup.
-// Three steps for the core loop, then permanent dismiss (AsyncStorage).
+// Four steps for the core loop (incl. long-press create), then permanent dismiss (AsyncStorage).
 // Skip always available — never block power users.
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -20,7 +20,7 @@ import { track } from '@/lib/analytics';
 const STORAGE_KEY = 'g88:map_coach_v1';
 
 interface Step {
-  id: 'pin' | 'wave' | 'pulse';
+  id: 'pin' | 'wave' | 'create' | 'pulse';
   emoji: string;
   title: string;
   body: string;
@@ -38,6 +38,12 @@ const STEPS: Step[] = [
     emoji: '👋',
     title: 'Wave to say hi',
     body: 'Tap a person to open their card, then Wave. If they wave back, you can chat — no cold DMs.',
+  },
+  {
+    id: 'create',
+    emoji: '📌',
+    title: 'Long-press to post',
+    body: 'Press and hold anywhere on the map to sell an item, post a wanted, create an event, or drop a local alert at that spot.',
   },
   {
     id: 'pulse',
