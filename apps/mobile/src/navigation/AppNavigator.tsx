@@ -163,7 +163,7 @@ function AccountNavigator(): React.JSX.Element {
       />
       <AccountStack.Screen
         name="VerificationId"
-        options={{ title: 'ID Verification', presentation: 'modal' }}
+        options={{ headerShown: false, title: 'ID Verification', presentation: 'modal' }}
       >
         {() => <VerificationIdScreen />}
       </AccountStack.Screen>
