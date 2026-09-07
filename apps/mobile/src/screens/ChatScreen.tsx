@@ -64,7 +64,11 @@ function MessageBubble({
         <Text style={styles.statusPending}>⏱</Text>
       )}
       {isFailed && (
-        <TouchableOpacity onPress={onRetry}>
+        <TouchableOpacity
+          onPress={onRetry}
+          accessibilityRole="button"
+          accessibilityLabel="Retry sending message"
+        >
           <Text style={styles.statusFailed}>! Tap to retry</Text>
         </TouchableOpacity>
       )}
@@ -337,12 +341,21 @@ export function ChatScreen(): React.JSX.Element {
             style={styles.locBtn}
             onPress={() => setShareOpen(true)}
             disabled={shareStarting}
+            accessibilityRole="button"
+            accessibilityLabel="Share live location"
+            hitSlop={8}
           >
             <Text style={styles.locBtnText}>📍</Text>
           </TouchableOpacity>
         ) : null}
         {canGift ? (
-          <TouchableOpacity style={styles.giftBtn} onPress={() => setGiftOpen(true)}>
+          <TouchableOpacity
+            style={styles.giftBtn}
+            onPress={() => setGiftOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Send a gift"
+            hitSlop={8}
+          >
             <Text style={styles.giftBtnText}>🎁</Text>
           </TouchableOpacity>
         ) : null}
@@ -358,11 +371,14 @@ export function ChatScreen(): React.JSX.Element {
           returnKeyType="send"
           onSubmitEditing={send}
           blurOnSubmit={false}
+          accessibilityLabel="Message"
         />
         <TouchableOpacity
           style={[styles.sendBtn, (!body.trim() || sending || requestLocked) && styles.sendBtnDisabled]}
           onPress={send}
           disabled={!body.trim() || sending || requestLocked}
+          accessibilityRole="button"
+          accessibilityLabel="Send message"
         >
           {sending ? (
             <ActivityIndicator color={colors.onPrimary} size="small" />
