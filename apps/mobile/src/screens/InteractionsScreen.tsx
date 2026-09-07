@@ -15,26 +15,17 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type {
   ConversationSummary,
-  FollowRequest,
   InboxItem,
-  WaveRequest,
-  WaveResponse,
 } from '@g88/shared';
 
-import { postJson } from '@/api/client';
 import { Avatar } from '@/components/Avatar';
-import { VerificationBadge } from '@/components/VerificationBadge';
-import {
-  acceptFriendRequest,
-  declineFriendRequest,
-} from '@/features/friends/friendsSlice';
 import { fetchConversations } from '@/features/chat/chatSlice';
 import { useInboxInteractions } from '@/features/interactions/useInboxInteractions';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { useSocket } from '@/realtime/useSocket';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { colors, spacing, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
