@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 
 /** Generic field-error bag, extracted from AuthScreen's inline pattern. */
 export function useFieldErrors<K extends string>() {
-  const [errors, setErrors] = useState<Partial<Record<K, string>>>({{}});
+  const [errors, setErrors] = useState<Partial<Record<K, string>>>({});
 
   const clear = useCallback((key: K) => {
     setErrors((prev) => {
