@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -13,6 +12,7 @@ import type { ChallengeToday } from '@g88/shared';
 import { useChallenges } from '@/features/gamification/useChallenges';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
+import { SkeletonListRow } from '@/components/Skeleton';
 
 function iconForChallenge(id: string): string {
   if (id.startsWith('wave')) return 'hand-wave';
@@ -75,7 +75,12 @@ export function ChallengesScreen(): React.JSX.Element {
             {completedCount} of {challenges.length} completed today · resets at midnight
           </Text>
         ) : loading ? (
-          <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
+          <>
+            <SkeletonListRow />
+            <SkeletonListRow />
+            <SkeletonListRow />
+            <SkeletonListRow />
+          </>
         ) : (
           <EmptyState
             variant="plain"
