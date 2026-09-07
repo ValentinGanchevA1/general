@@ -25,6 +25,8 @@ import { useAppDispatch } from '@/hooks/redux';
 import { setPendingFilter } from '@/features/pulse/pulseSlice';
 import { challengeEvents } from '@/features/gamification/challengeEvents';
 import { postJson } from '@/api/client';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { colors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type R = RouteProp<RootStackParamList, 'AlertComposer'>;
@@ -84,31 +86,27 @@ export function AlertComposerScreen(): React.JSX.Element {
       style={S.root}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* ─── Header ─────────────────────────────────────────────────── */}
-      <View style={S.header}>
-        <TouchableOpacity
-          onPress={() => nav.goBack()}
-          testID="alert-composer-back"
-          hitSlop={8}
-        >
-          <MCI name="close" size={26} color="#fff" />
-        </TouchableOpacity>
-
-        <Text style={S.headerTitle}>Post an alert</Text>
-
-        <TouchableOpacity
-          onPress={() => { void onSubmit(); }}
-          disabled={!canSubmit}
-          testID="alert-composer-submit"
-          hitSlop={8}
-        >
-          {submitting ? (
-            <ActivityIndicator size="small" color="#00d4ff" />
-          ) : (
-            <Text style={[S.postBtn, !canSubmit && S.postBtnDisabled]}>Post</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Post an alert"
+        bordered
+        onBack={() => nav.goBack()}
+        right={
+          <TouchableOpacity
+            onPress={() => { void onSubmit(); }}
+            disabled={!canSubmit}
+            testID="alert-composer-submit"
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Post alert"
+          >
+            {submitting ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text style={[S.postBtn, !canSubmit && S.postBtnDisabled]}>Post</Text>
+            )}
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView
         style={S.scroll}
@@ -196,14 +194,8 @@ export function AlertComposerScreen(): React.JSX.Element {
 const S = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0a0a0f' },
 
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#1a1a2e',
-  },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '600' },
-  postBtn: { color: '#00d4ff', fontSize: 16, fontWeight: '700' },
-  postBtnDisabled: { color: '#333' },
+  postBtn: { color: colors.primary, fontSize: 16, fontWeight: '700' },
+  postBtnDisabled: { color: colors.textFaint },
 
   scroll: { flex: 1 },
   scrollContent: { padding: 16, gap: 8 },
