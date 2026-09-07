@@ -21,6 +21,7 @@ import { fetchProfile } from '@/features/profile/profileSlice';
 import { SOCIAL_PROVIDER_CONFIG } from '@/features/profile/socialConfig';
 import { extractMessage } from '@/utils/extractMessage';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { colors, fontSize, spacing, radius } from '@/theme';
 
 const PROVIDERS = Object.keys(SOCIAL_PROVIDER_CONFIG) as SocialProvider[];
 
@@ -90,7 +91,7 @@ export function SocialLinkingScreen(): React.JSX.Element {
           return (
             <View key={provider} style={styles.row}>
               <View style={[styles.icon, { backgroundColor: cfg.color }]}>
-                <Icon name={cfg.icon} size={22} color="#fff" />
+                <Icon name={cfg.icon} size={22} color={colors.textPrimary} />
               </View>
               <View style={styles.info}>
                 <Text style={styles.name}>{cfg.label}</Text>
@@ -101,7 +102,7 @@ export function SocialLinkingScreen(): React.JSX.Element {
                 )}
               </View>
               {busy === provider ? (
-                <ActivityIndicator color="#00d4ff" />
+                <ActivityIndicator color={colors.primary} />
               ) : connected ? (
                 <TouchableOpacity onPress={() => disconnect(provider)}>
                   <Text style={styles.disconnect}>Disconnect</Text>
@@ -120,33 +121,45 @@ export function SocialLinkingScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
+  container: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   content: { paddingBottom: 40 },
-  intro: { color: '#888', fontSize: 14, textAlign: 'center', paddingHorizontal: 24, marginBottom: 16 },
-  error: { color: '#ff4444', fontSize: 13, textAlign: 'center', marginBottom: 12, paddingHorizontal: 24 },
+  intro: {
+    color: colors.textMuted,
+    fontSize: fontSize.md - 1,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    marginBottom: spacing.lg,
+  },
+  error: {
+    color: colors.danger,
+    fontSize: fontSize.sm,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    paddingHorizontal: 24,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 20,
-    marginBottom: 12,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
     padding: 14,
-    backgroundColor: '#12121f',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#1f1f33',
+    borderColor: colors.border,
   },
   icon: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
   info: { flex: 1, marginLeft: 14 },
-  name: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  username: { color: '#888', fontSize: 13, marginTop: 2 },
-  notLinked: { color: '#555', fontSize: 13, marginTop: 2 },
+  name: { color: colors.textPrimary, fontSize: fontSize.md + 1, fontWeight: '600' },
+  username: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: 2 },
+  notLinked: { color: colors.textFaint, fontSize: fontSize.sm, marginTop: 2 },
   connectBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#00d4ff',
-    borderRadius: 20,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill - 4,
   },
-  connectText: { color: '#000', fontWeight: '700', fontSize: 13 },
-  disconnect: { color: '#ff4444', fontWeight: '600', fontSize: 13 },
+  connectText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.sm },
+  disconnect: { color: colors.danger, fontWeight: '600', fontSize: fontSize.sm },
 });

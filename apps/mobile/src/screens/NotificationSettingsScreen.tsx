@@ -16,6 +16,7 @@ import {
 import { NOTIFICATION_CHANNELS, NOTIFICATION_CHANNEL_META } from '@g88/shared';
 import { useNotificationPreferences } from '@/features/notifications/useNotificationPreferences';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { colors, fontSize, spacing, radius } from '@/theme';
 
 export function NotificationSettingsScreen(): React.JSX.Element {
   const { prefs, loading, saving, setChannel } = useNotificationPreferences();
@@ -28,7 +29,7 @@ export function NotificationSettingsScreen(): React.JSX.Element {
         <Text style={S.intro}>Choose which push notifications you want to receive.</Text>
 
         {loading && !prefs ? (
-          <ActivityIndicator style={{ marginTop: 40 }} color="#00d4ff" />
+          <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
         ) : !prefs ? (
           <Text style={S.error}>Couldn't load your notification settings.</Text>
         ) : (
@@ -42,13 +43,13 @@ export function NotificationSettingsScreen(): React.JSX.Element {
                     <Text style={S.rowSub}>{meta.description}</Text>
                   </View>
                   {saving === channel ? (
-                    <ActivityIndicator color="#00d4ff" />
+                    <ActivityIndicator color={colors.primary} />
                   ) : (
                     <Switch
                       value={prefs[channel]}
                       onValueChange={(v) => void setChannel(channel, v)}
-                      trackColor={{ false: '#2a2a4a', true: '#0095b3' }}
-                      thumbColor={prefs[channel] ? '#00d4ff' : '#555'}
+                      trackColor={{ false: colors.borderStrong, true: '#0095b3' }}
+                      thumbColor={prefs[channel] ? colors.primary : colors.textFaint}
                     />
                   )}
                 </View>
@@ -62,18 +63,32 @@ export function NotificationSettingsScreen(): React.JSX.Element {
 }
 
 const S = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
+  container: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   content: { paddingBottom: 40 },
-  intro: { color: '#888', fontSize: 14, paddingHorizontal: 20, marginBottom: 16 },
-  error: { color: '#ff6b6b', fontSize: 14, textAlign: 'center', marginTop: 40 },
-  list: { paddingHorizontal: 16, gap: 10 },
-  row: {
-    backgroundColor: '#12121f', borderRadius: 12, padding: 16,
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1, borderColor: '#1f1f33',
+  intro: {
+    color: colors.textMuted,
+    fontSize: fontSize.md - 1,
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.lg,
   },
-  rowContent: { flex: 1, paddingRight: 12 },
-  rowLabel: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  rowSub: { color: '#666', fontSize: 12, marginTop: 2 },
+  error: {
+    color: colors.danger,
+    fontSize: fontSize.md - 1,
+    textAlign: 'center',
+    marginTop: 40,
+  },
+  list: { paddingHorizontal: spacing.lg, gap: 10 },
+  row: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  rowContent: { flex: 1, paddingRight: spacing.md },
+  rowLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
+  rowSub: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
 });

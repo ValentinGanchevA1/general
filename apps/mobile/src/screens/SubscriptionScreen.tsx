@@ -25,6 +25,7 @@ import { fetchProfile } from '@/features/profile/profileSlice';
 import { TIER_COLOR } from '@/features/profile/socialConfig';
 import { extractMessage } from '@/utils/extractMessage';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { colors, fontSize, spacing, radius } from '@/theme';
 
 const TIER_RANK: Record<string, number> = { free: 0, basic: 1, premium: 2 };
 
@@ -116,7 +117,7 @@ export function SubscriptionScreen(): React.JSX.Element {
                   disabled={busyTier !== null}
                 >
                   {busyTier === plan.tier ? (
-                    <ActivityIndicator color="#000" />
+                    <ActivityIndicator color={colors.onPrimary} />
                   ) : (
                     <Text style={styles.ctaText}>Upgrade to {plan.name}</Text>
                   )}
@@ -129,7 +130,7 @@ export function SubscriptionScreen(): React.JSX.Element {
         {currentTier !== 'free' ? (
           <TouchableOpacity style={styles.manageBtn} onPress={() => void manage()} disabled={busyTier !== null}>
             {busyTier === 'manage' ? (
-              <ActivityIndicator color="#00d4ff" />
+              <ActivityIndicator color={colors.primary} />
             ) : (
               <Text style={styles.manageText}>Manage subscription</Text>
             )}
@@ -143,39 +144,57 @@ export function SubscriptionScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
+  container: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   content: { paddingBottom: 40 },
-  intro: { color: '#888', fontSize: 14, textAlign: 'center', paddingHorizontal: 24, marginBottom: 16 },
-  error: { color: '#ff4444', fontSize: 13, textAlign: 'center', marginBottom: 12, paddingHorizontal: 24 },
+  intro: {
+    color: colors.textMuted,
+    fontSize: fontSize.md - 1,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    marginBottom: spacing.lg,
+  },
+  error: {
+    color: colors.danger,
+    fontSize: fontSize.sm,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    paddingHorizontal: 24,
+  },
   card: {
-    marginHorizontal: 20,
-    marginBottom: 16,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.lg,
     padding: 18,
-    backgroundColor: '#12121f',
-    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#1f1f33',
+    borderColor: colors.border,
     gap: 10,
   },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  planName: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  price: { fontSize: 16, fontWeight: '700' },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  featureText: { color: '#ccc', fontSize: 14 },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  planName: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '700' },
+  price: { fontSize: fontSize.md + 1, fontWeight: '700' },
+  featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  featureText: { color: colors.textSecondary, fontSize: fontSize.md - 1 },
   currentPill: {
     alignSelf: 'flex-start',
     marginTop: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: spacing.md,
     paddingVertical: 6,
-    backgroundColor: '#1a1a24',
-    borderRadius: 16,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.lg,
   },
-  currentText: { color: '#888', fontSize: 12, fontWeight: '600' },
-  cta: { marginTop: 8, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  ctaText: { color: '#000', fontWeight: '700', fontSize: 15 },
-  manageBtn: { marginHorizontal: 20, marginTop: 4, padding: 14, alignItems: 'center' },
-  manageText: { color: '#00d4ff', fontWeight: '600', fontSize: 15 },
-  fine: { color: '#555', fontSize: 12, textAlign: 'center', marginTop: 12, paddingHorizontal: 32 },
+  currentText: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: '600' },
+  cta: { marginTop: spacing.sm, paddingVertical: 14, borderRadius: radius.md, alignItems: 'center' },
+  ctaText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
+  manageBtn: { marginHorizontal: spacing.xl, marginTop: 4, padding: 14, alignItems: 'center' },
+  manageText: { color: colors.primary, fontWeight: '600', fontSize: fontSize.md },
+  fine: {
+    color: colors.textFaint,
+    fontSize: fontSize.xs,
+    textAlign: 'center',
+    marginTop: spacing.md,
+    paddingHorizontal: 32,
+  },
 });
