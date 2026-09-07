@@ -169,7 +169,11 @@ function AccountNavigator(): React.JSX.Element {
       </AccountStack.Screen>
       <AccountStack.Screen name="Subscription" component={SubscriptionScreen} />
       <AccountStack.Screen name="SocialLinking" component={SocialLinkingScreen} />
-      <AccountStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
+      <AccountStack.Screen
+        name="ProfileEdit"
+        component={ProfileEditScreen}
+        options={{ headerShown: false, title: 'Edit profile' }}
+      />
       <AccountStack.Screen name="Photos" component={PhotosScreen} />
     </AccountStack.Navigator>
   );
