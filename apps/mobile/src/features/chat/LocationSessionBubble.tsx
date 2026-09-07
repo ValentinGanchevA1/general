@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { ChatMessage } from '@g88/shared';
+import { colors } from '@/theme';
 
 interface Props {
   msg: ChatMessage;
@@ -38,17 +39,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   cardMine: {
-    backgroundColor: '#00d4ff',
-    borderColor: '#00b8e0',
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   cardTheirs: {
-    backgroundColor: '#1a1a2e',
-    borderColor: '#2a2a4a',
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.borderStrong,
   },
   icon: { fontSize: 22 },
   copy: { flexShrink: 1 },
-  title: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  titleMine: { color: '#000' },
-  body: { color: '#bbb', fontSize: 13, marginTop: 2, lineHeight: 18 },
-  bodyMine: { color: '#000000aa' },
+  title: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
+  titleMine: { color: colors.onPrimary },
+  body: { color: colors.textSecondary, fontSize: 13, marginTop: 2, lineHeight: 18 },
+  bodyMine: { color: 'rgba(10,10,15,0.67)' },
 });

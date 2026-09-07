@@ -20,7 +20,11 @@ import { appAlert } from '@/ui/appAlert';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { ApiError, GiftCatalogItem } from '@g88/shared';
+import { colors } from '@/theme';
 import { sendGift, useGiftBalance, useGiftCatalog } from './useGifts';
+
+/** XP gold — product accent, not in core theme palette. */
+const XP_GOLD = '#FFD700';
 
 interface Props {
   visible: boolean;
@@ -89,7 +93,7 @@ export function SendGiftSheet({
           <View style={styles.header}>
             <Text style={styles.title}>Send a gift</Text>
             <View style={styles.balancePill}>
-              <Icon name="star-four-points" size={13} color="#FFD700" />
+              <Icon name="star-four-points" size={13} color={XP_GOLD} />
               <Text style={styles.balanceText}>{spendableXp} XP</Text>
             </View>
           </View>
@@ -124,7 +128,7 @@ export function SendGiftSheet({
           <TextInput
             style={styles.note}
             placeholder="Add a note (optional)"
-            placeholderTextColor="#555"
+            placeholderTextColor={colors.textFaint}
             value={message}
             onChangeText={setMessage}
             maxLength={120}
@@ -137,7 +141,7 @@ export function SendGiftSheet({
             activeOpacity={0.9}
           >
             {sending ? (
-              <ActivityIndicator color="#0a0a0f" />
+              <ActivityIndicator color={colors.onPrimary} />
             ) : (
               <Text style={styles.sendBtnText}>
                 {selected ? `Send ${selected.label} · ${selected.costXp} XP` : 'Pick a gift'}
@@ -157,7 +161,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#12121f',
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 20,
@@ -169,7 +173,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#333',
+    backgroundColor: colors.borderStrong,
     marginBottom: 14,
   },
   header: {
@@ -177,18 +181,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  title: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
   balancePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  balanceText: { color: '#FFD700', fontSize: 13, fontWeight: '700' },
-  subtitle: { color: '#888', fontSize: 13, marginTop: 4, marginBottom: 16 },
+  balanceText: { color: XP_GOLD, fontSize: 13, fontWeight: '700' },
+  subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 4, marginBottom: 16 },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -197,37 +201,37 @@ const styles = StyleSheet.create({
   giftCell: {
     width: '30%',
     flexGrow: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
     paddingVertical: 12,
     alignItems: 'center',
   },
   giftCellSelected: {
-    borderColor: '#00d4ff',
+    borderColor: colors.primary,
   },
   giftCellDisabled: {
     opacity: 0.4,
   },
   giftEmoji: { fontSize: 28 },
-  giftLabel: { color: '#fff', fontSize: 12, fontWeight: '600', marginTop: 4 },
-  giftCost: { color: '#FFD700', fontSize: 11, marginTop: 2 },
-  giftCostDisabled: { color: '#666' },
+  giftLabel: { color: colors.textPrimary, fontSize: 12, fontWeight: '600', marginTop: 4 },
+  giftCost: { color: XP_GOLD, fontSize: 11, marginTop: 2 },
+  giftCostDisabled: { color: colors.textFaint },
   note: {
     marginTop: 14,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
-    color: '#fff',
+    borderColor: colors.borderStrong,
+    color: colors.textPrimary,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
   },
   sendBtn: {
     marginTop: 14,
-    backgroundColor: '#00d4ff',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
@@ -236,7 +240,7 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   sendBtnText: {
-    color: '#0a0a0f',
+    color: colors.onPrimary,
     fontSize: 15,
     fontWeight: '700',
   },
