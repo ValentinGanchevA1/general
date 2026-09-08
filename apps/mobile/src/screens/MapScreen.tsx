@@ -11,7 +11,6 @@ import {
 import { appAlert } from '@/ui/appAlert';
 import MapView, {
 	PROVIDER_GOOGLE,
-	type LongPressEvent,
 	type Region,
 } from 'react-native-maps';
 import { MAP_STYLE } from '@/components/map/mapStyle';
@@ -46,16 +45,12 @@ import {
 	fetchNearbyStories,
 	storyReceived,
 } from '@/features/stories/storiesSlice';
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
-import {
-	clearPendingMapFocus,
-	peekPendingMapFocus,
-} from '@/navigation/pendingMapFocus';
 import { track } from '@/lib/analytics';
 import { colors } from '@/theme';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
@@ -66,36 +61,13 @@ import {
 } from '@/components/map/ListingModeFilter';
 import { EmptyState } from '@/components/EmptyState';
 import { MapChrome } from '@/components/map/MapChrome';
-import {
-	CreateNearbySheet,
-	type CreateNearbyAction,
-} from '@/components/map/CreateNearbySheet';
+import { CreateNearbySheet } from '@/components/map/CreateNearbySheet';
+import { useCreateNearby } from '@/features/map/useCreateNearby';
+import { useMapFocus } from '@/features/map/useMapFocus';
 import { sheetChrome, useSheetBackdrop } from '@/components/sheets';
-import {
-	approxDistanceMeters,
-	buildPeerRegionFocus,
-} from '@/components/map/focusPeerOnMap';
 import { mapListingModeFilterTop } from '@/components/map/mapChromeLayout';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
-
-type PendingFocus = {
-	userId?: string;
-	listingId?: string;
-	lat?: number;
-	lng?: number;
-	displayName?: string;
-	avatarUrl?: string | null;
-	verification?: import('@g88/shared').VerificationLevel;
-	online?: boolean;
-	lastSeenAt?: string | null;
-	title?: string;
-	mode?: import('@g88/shared').ListingMode;
-	priceCents?: number;
-	currency?: string;
-	category?: string;
-	thumbnailUrl?: string | null;
-};
 
 export function MapScreen(): React.JSX.Element {
 	const dispatch = useAppDispatch();
@@ -108,22 +80,10 @@ export function MapScreen(): React.JSX.Element {
 	const mapRef = useRef<MapView>(null);
 	const entitySheetRef = useRef<BottomSheetModal>(null);
 	const presentedIdRef = useRef<string | null>(null);
-	const pendingFocusRef = useRef<PendingFocus | null>(null);
-	const pendingFocusReaderRef = useRef<() => ReturnType<typeof peekPendingMapFocus>>(
-		() => peekPendingMapFocus(),
-	);
-	const focusAppliedKeyRef = useRef<string | null>(null);
 	const entitySnapPoints = useMemo(() => ['36%', '62%'], []);
 	const renderBackdrop = useSheetBackdrop(0.5);
 	const { unreadCount: interactionUnread } = useReceivedInteractions();
-	const focusMyPin = route.params?.focusMyPin === true;
-	const focusUserId = route.params?.focusUserId;
-	const focusListingId = route.params?.focusListingId;
-	const focusLat = route.params?.focusLat;
-	const focusLng = route.params?.focusLng;
 
-	const [createNearbyOpen, setCreateNearbyOpen] = useState(false);
-	const [createNearbyCoords, setCreateNearbyCoords] = useState<{ lat: number; lng: number } | null>(null);
 	const [listingModeFilter, setListingModeFilter] =
 		useState<ListingModeFilterValue>('all');
 	const insets = useSafeAreaInsets();
@@ -139,6 +99,34 @@ export function MapScreen(): React.JSX.Element {
 		listingMode,
 	});
 	const points = data?.points ?? EMPTY_POINTS;
+
+	const {
+		createNearbyOpen,
+		setCreateNearbyOpen,
+		onMapLongPress,
+		onCreateNearbySelect,
+	} = useCreateNearby(navigation, selected != null);
+
+	useMapFocus({
+		mapRef,
+		myCoords,
+		points: points.filter(
+			(p): p is EntityPoint => p.kind === 'user' || p.kind === 'event' || p.kind === 'listing',
+		),
+		region,
+		setSelected,
+		setListingModeFilter,
+		navigation,
+		params: {
+			focusMyPin: route.params?.focusMyPin === true,
+			...(route.params?.focusUserId != null ? { focusUserId: route.params.focusUserId } : {}),
+			...(route.params?.focusListingId != null
+				? { focusListingId: route.params.focusListingId }
+				: {}),
+			...(route.params?.focusLat != null ? { focusLat: route.params.focusLat } : {}),
+			...(route.params?.focusLng != null ? { focusLng: route.params.focusLng } : {}),
+		},
+	});
 
 	const onCloseSheet = useCallback(() => {
 		presentedIdRef.current = null;
@@ -182,292 +170,6 @@ export function MapScreen(): React.JSX.Element {
 		}
 		prefetchAvatars(uris);
 	}, [points]);
-
-	const clearFocusParams = useCallback(() => {
-		navigation.setParams({
-			focusMyPin: undefined,
-			focusUserId: undefined,
-			focusListingId: undefined,
-			focusLat: undefined,
-			focusLng: undefined,
-		} as never);
-	}, [navigation]);
-
-	const applyPeerFocus = useCallback(
-		(lat: number, lng: number, point?: EntityPoint, token?: number) => {
-			if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-			const distanceMeters =
-				myCoords != null ? approxDistanceMeters(myCoords, { lat, lng }) : undefined;
-			const { latitude, longitude, latitudeDelta, longitudeDelta, duration } =
-				buildPeerRegionFocus({
-					lat,
-					lng,
-					...(distanceMeters != null ? { distanceMeters } : {}),
-				});
-			InteractionManager.runAfterInteractions(() => {
-				mapRef.current?.animateToRegion(
-					{ latitude, longitude, latitudeDelta, longitudeDelta },
-					duration,
-				);
-				if (point) {
-					setTimeout(() => setSelected(point), Math.min(duration, 350));
-				}
-			});
-			pendingFocusRef.current = null;
-			clearPendingMapFocus(token);
-			clearFocusParams();
-		},
-		[clearFocusParams, myCoords],
-	);
-
-	const buildSeedUserPoint = useCallback(
-		(
-			userId: string,
-			lat: number,
-			lng: number,
-			seed: PendingFocus | null,
-			fromPoints?: EntityPoint & { kind: 'user' },
-		): EntityPoint => {
-			if (fromPoints) return fromPoints;
-			return {
-				kind: 'user',
-				id: userId,
-				lat,
-				lng,
-				meta: {
-					displayName: seed?.displayName ?? 'User',
-					avatarUrl: seed?.avatarUrl ?? null,
-					verification: seed?.verification ?? 'none',
-					online: seed?.online ?? false,
-					lastSeenAt: seed?.lastSeenAt ?? null,
-				},
-			};
-		},
-		[],
-	);
-
-	const buildSeedListingPoint = useCallback(
-		(
-			listingId: string,
-			lat: number,
-			lng: number,
-			seed: PendingFocus | null,
-			fromPoints?: EntityPoint & { kind: 'listing' },
-		): EntityPoint => {
-			if (fromPoints) return fromPoints;
-			return {
-				kind: 'listing',
-				id: listingId,
-				lat,
-				lng,
-				meta: {
-					title: seed?.title ?? 'Listing',
-					thumbnailUrl: seed?.thumbnailUrl ?? null,
-					priceCents: seed?.priceCents ?? 0,
-					currency: seed?.currency ?? 'USD',
-					category: seed?.category ?? '',
-					...(seed?.mode != null ? { mode: seed.mode } : {}),
-				},
-			};
-		},
-		[],
-	);
-
-	const tryApplyPendingFocus = useCallback(() => {
-		const mod = pendingFocusReaderRef.current();
-		if (mod != null) {
-			pendingFocusRef.current = {
-				...(mod.userId ? { userId: mod.userId } : {}),
-				...(mod.listingId ? { listingId: mod.listingId } : {}),
-				...(mod.lat != null && mod.lng != null ? { lat: mod.lat, lng: mod.lng } : {}),
-				...(mod.displayName != null ? { displayName: mod.displayName } : {}),
-				...(mod.avatarUrl !== undefined ? { avatarUrl: mod.avatarUrl } : {}),
-				...(mod.verification != null ? { verification: mod.verification } : {}),
-				...(mod.online != null ? { online: mod.online } : {}),
-				...(mod.lastSeenAt != null ? { lastSeenAt: mod.lastSeenAt } : {}),
-				...(mod.title != null ? { title: mod.title } : {}),
-				...(mod.mode != null ? { mode: mod.mode } : {}),
-				...(mod.priceCents != null ? { priceCents: mod.priceCents } : {}),
-				...(mod.currency != null ? { currency: mod.currency } : {}),
-				...(mod.category != null ? { category: mod.category } : {}),
-				...(mod.thumbnailUrl !== undefined ? { thumbnailUrl: mod.thumbnailUrl } : {}),
-			};
-		}
-		const pending = pendingFocusRef.current;
-		if (!pending) return;
-
-		const fromUser =
-			pending.userId != null
-				? points.find(
-						(p): p is EntityPoint & { kind: 'user' } =>
-							p.kind === 'user' && p.id === pending.userId,
-				  )
-				: undefined;
-		const fromListing =
-			pending.listingId != null
-				? points.find(
-						(p): p is EntityPoint & { kind: 'listing' } =>
-							p.kind === 'listing' && p.id === pending.listingId,
-				  )
-				: undefined;
-
-		const lat = pending.lat ?? fromUser?.lat ?? fromListing?.lat;
-		const lng = pending.lng ?? fromUser?.lng ?? fromListing?.lng;
-		if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-			return;
-		}
-
-		const key = `${pending.userId ?? ''}|${pending.listingId ?? ''}|${lat}|${lng}|${mod?.token ?? 0}`;
-		if (focusAppliedKeyRef.current === key) return;
-		focusAppliedKeyRef.current = key;
-
-		let point: EntityPoint | undefined;
-		if (pending.listingId != null) {
-			point = buildSeedListingPoint(pending.listingId, lat, lng, pending, fromListing);
-			// Post-create / View-on-map for a listing: match discovery filter to mode
-			// so a Wanted pin is not hidden behind an active "For sale" filter.
-			if (pending.mode === 'buy' || pending.mode === 'sell') {
-				setListingModeFilter(pending.mode);
-			}
-		} else if (pending.userId != null) {
-			point = buildSeedUserPoint(pending.userId, lat, lng, pending, fromUser);
-		} else {
-			point = fromUser ?? fromListing;
-		}
-
-		applyPeerFocus(lat, lng, point, mod?.token);
-	}, [points, applyPeerFocus, buildSeedUserPoint, buildSeedListingPoint]);
-
-	useEffect(() => {
-		if (focusMyPin) return;
-		const hasUser = focusUserId != null && focusUserId !== '';
-		const hasListing = focusListingId != null && focusListingId !== '';
-		const hasCoords =
-			focusLat != null &&
-			focusLng != null &&
-			Number.isFinite(focusLat) &&
-			Number.isFinite(focusLng);
-		if (!hasUser && !hasListing && !hasCoords) return;
-		const mod = pendingFocusReaderRef.current();
-		pendingFocusRef.current = {
-			...(mod?.userId || hasUser
-				? { userId: (hasUser ? focusUserId : mod?.userId) as string }
-				: {}),
-			...(mod?.listingId || hasListing
-				? { listingId: (hasListing ? focusListingId : mod?.listingId) as string }
-				: {}),
-			...(hasCoords
-				? { lat: focusLat as number, lng: focusLng as number }
-				: mod?.lat != null && mod?.lng != null
-					? { lat: mod.lat, lng: mod.lng }
-					: {}),
-			...(mod?.displayName != null ? { displayName: mod.displayName } : {}),
-			...(mod?.avatarUrl !== undefined ? { avatarUrl: mod.avatarUrl } : {}),
-			...(mod?.verification != null ? { verification: mod.verification } : {}),
-			...(mod?.online != null ? { online: mod.online } : {}),
-			...(mod?.lastSeenAt != null ? { lastSeenAt: mod.lastSeenAt } : {}),
-			...(mod?.title != null ? { title: mod.title } : {}),
-			...(mod?.mode != null ? { mode: mod.mode } : {}),
-			...(mod?.priceCents != null ? { priceCents: mod.priceCents } : {}),
-			...(mod?.currency != null ? { currency: mod.currency } : {}),
-			...(mod?.category != null ? { category: mod.category } : {}),
-			...(mod?.thumbnailUrl !== undefined ? { thumbnailUrl: mod.thumbnailUrl } : {}),
-		};
-		focusAppliedKeyRef.current = null;
-	}, [focusUserId, focusListingId, focusLat, focusLng, focusMyPin]);
-
-	useEffect(() => {
-		if (!myCoords || region) return;
-		if (focusMyPin || focusUserId || focusListingId || pendingFocusRef.current || pendingFocusReaderRef.current()) return;
-		mapRef.current?.animateToRegion(
-			{
-				latitude: myCoords.lat,
-				longitude: myCoords.lng,
-				latitudeDelta: 0.02,
-				longitudeDelta: 0.02,
-			},
-			400,
-		);
-	}, [myCoords, region, focusMyPin, focusUserId, focusListingId]);
-
-	useFocusEffect(
-		useCallback(() => {
-			if (focusMyPin && myCoords) {
-				mapRef.current?.animateToRegion(
-					{
-						latitude: myCoords.lat,
-						longitude: myCoords.lng,
-						latitudeDelta: 0.015,
-						longitudeDelta: 0.015,
-					},
-					450,
-				);
-				clearFocusParams();
-				return;
-			}
-
-			const mod = pendingFocusReaderRef.current();
-			const hasUser =
-				(focusUserId != null && focusUserId !== '') ||
-				(mod?.userId != null && mod.userId !== '');
-			const hasListing =
-				(focusListingId != null && focusListingId !== '') ||
-				(mod?.listingId != null && mod.listingId !== '');
-			const lat = focusLat ?? mod?.lat;
-			const lng = focusLng ?? mod?.lng;
-			const hasCoords =
-				lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
-
-			if (hasUser || hasListing || hasCoords) {
-				const userId =
-					focusUserId != null && focusUserId !== '' ? focusUserId : mod?.userId;
-				const listingId =
-					focusListingId != null && focusListingId !== ''
-						? focusListingId
-						: mod?.listingId;
-				pendingFocusRef.current = {
-					...(userId ? { userId } : {}),
-					...(listingId ? { listingId } : {}),
-					...(hasCoords ? { lat: lat as number, lng: lng as number } : {}),
-					...(mod?.displayName != null ? { displayName: mod.displayName } : {}),
-					...(mod?.avatarUrl !== undefined ? { avatarUrl: mod.avatarUrl } : {}),
-					...(mod?.verification != null ? { verification: mod.verification } : {}),
-					...(mod?.online != null ? { online: mod.online } : {}),
-					...(mod?.lastSeenAt != null ? { lastSeenAt: mod.lastSeenAt } : {}),
-					...(mod?.title != null ? { title: mod.title } : {}),
-					...(mod?.mode != null ? { mode: mod.mode } : {}),
-					...(mod?.priceCents != null ? { priceCents: mod.priceCents } : {}),
-					...(mod?.currency != null ? { currency: mod.currency } : {}),
-					...(mod?.category != null ? { category: mod.category } : {}),
-					...(mod?.thumbnailUrl !== undefined ? { thumbnailUrl: mod.thumbnailUrl } : {}),
-				};
-				focusAppliedKeyRef.current = null;
-			}
-
-			const task = InteractionManager.runAfterInteractions(() => {
-				tryApplyPendingFocus();
-			});
-			return () => task.cancel();
-		}, [
-			focusMyPin,
-			myCoords,
-			focusUserId,
-			focusListingId,
-			focusLat,
-			focusLng,
-			clearFocusParams,
-			tryApplyPendingFocus,
-		]),
-	);
-
-	useEffect(() => {
-		tryApplyPendingFocus();
-	}, [points, focusUserId, focusListingId, focusLat, focusLng, tryApplyPendingFocus]);
-
-	useEffect(() => {
-		if (!region) return;
-		tryApplyPendingFocus();
-	}, [region, tryApplyPendingFocus]);
 
 	useEffect(() => {
 		void requestPermission();
@@ -521,71 +223,28 @@ export function MapScreen(): React.JSX.Element {
 					toUserId,
 					context: 'map',
 				});
-				challengeEvents.emit('progress');
-				if (res.conversationId) {
-					navigation.navigate('Chat', {
-						conversationId: res.conversationId,
-						otherUserName: '',
-					});
+				challengeEvents.emit({ type: 'wave_sent' });
+				if (res.matched) {
+					appAlert('Match!', 'You both waved — say hi.');
 				}
 			} catch (e) {
-				if (__DEV__) console.warn('wave failed', e);
-				throw e;
+				const msg =
+					e && typeof e === 'object' && 'message' in e
+						? String((e as ApiError).message)
+						: 'Could not send wave.';
+				appAlert('Wave failed', msg);
 			} finally {
 				setWaving(null);
 			}
 		},
-		[navigation],
+		[],
 	);
 
-	const onSheetWave = useCallback(
-		(toUserId: string) => {
-			onWave(toUserId).catch((err: ApiError) => {
-				appAlert(
-					err.code === 'wave.cooldown' ? 'Already waved' : 'Could not send wave',
-					err.message || 'Try again in a moment.',
-				);
-			});
+	const onSheetWavePress = useCallback(
+		(userId: string) => {
+			void onWave(userId);
 		},
 		[onWave],
-	);
-
-	const onSheetWavePress = (): void => {
-		if (selected?.kind === 'user') onSheetWave(selected.id);
-	};
-
-	const onMapLongPress = useCallback(
-		(e: LongPressEvent) => {
-			if (selected) return;
-			const { latitude, longitude } = e.nativeEvent.coordinate;
-			track('map.longpress_create', { lat: latitude, lng: longitude });
-			setCreateNearbyCoords({ lat: latitude, lng: longitude });
-			setCreateNearbyOpen(true);
-		},
-		[selected],
-	);
-
-	const onCreateNearbySelect = useCallback(
-		(action: CreateNearbyAction): void => {
-			const location = createNearbyCoords;
-			track('map.create_choice', { kind: action });
-			const locParams = location ? { initialLocation: location } : {};
-			switch (action) {
-				case 'listing_sell':
-					openRootScreen(navigation, 'ListingCreate', { mode: 'sell', ...locParams });
-					break;
-				case 'listing_buy':
-					openRootScreen(navigation, 'ListingCreate', { mode: 'buy', ...locParams });
-					break;
-				case 'event':
-					openRootScreen(navigation, 'EventCreate', locParams);
-					break;
-				case 'alert':
-					openRootScreen(navigation, 'AlertComposer', locParams);
-					break;
-			}
-		},
-		[createNearbyCoords, navigation],
 	);
 
 	const sheetOpen = selected != null;
@@ -598,83 +257,65 @@ export function MapScreen(): React.JSX.Element {
 					provider={PROVIDER_GOOGLE}
 					customMapStyle={MAP_STYLE}
 					style={StyleSheet.absoluteFill}
+					onRegionChangeComplete={setRegion}
+					onLongPress={onMapLongPress}
 					showsUserLocation
 					showsMyLocationButton={false}
 					showsCompass={false}
 					toolbarEnabled={false}
-					onRegionChangeComplete={setRegion}
-					onLongPress={onMapLongPress}
-					initialRegion={{
-						latitude: 43.21,
-						longitude: 27.92,
-						latitudeDelta: 0.05,
-						longitudeDelta: 0.05,
-					}}
 				>
 					<MapMarkers
 						points={points}
-						onClusterPress={onClusterPress}
 						onEntityPress={onEntityPress}
+						onClusterPress={onClusterPress}
+						selectedId={selected ? `${selected.kind}:${selected.id}` : null}
 					/>
 				</MapView>
 			</ErrorBoundary>
 
-			{loading && (
-				<View style={styles.loading} pointerEvents="none">
-					<ActivityIndicator />
+			<MapChrome
+				loading={loading}
+				error={error}
+				onRetry={() => void refresh()}
+				interactionUnread={interactionUnread}
+				onPressInteractions={() => openRootScreen(navigation, 'Interactions')}
+				sheetOpen={sheetOpen}
+			/>
+
+			{region ? (
+				<View style={[styles.listingFilter, { top: mapListingModeFilterTop(insets.top) }]}>
+					<ListingModeFilter value={listingModeFilter} onChange={setListingModeFilter} />
 				</View>
-			)}
-			{!loading && !error && !sheetOpen && points.length === 0 && region != null ? (
-				<View style={styles.emptyOverlay} pointerEvents="box-none">
+			) : null}
+
+			{!loading && points.length === 0 && region ? (
+				<View style={styles.emptyWrap} pointerEvents="none">
 					<EmptyState
-						title="No one nearby yet"
-						body="Pan the map or wait a moment — presence updates live. Share your pin so others can find you."
-						actionLabel="Refresh area"
-						onAction={refresh}
+						variant="plain"
+						icon="map-marker-radius-outline"
+						title="Nothing nearby"
+						body="Pan the map or long-press to create something here."
 					/>
 				</View>
 			) : null}
-			{error && (
-				<View style={styles.errorBanner}>
-					<Text style={styles.errorText}>{error}</Text>
-					<TouchableOpacity onPress={refresh}>
-						<Text style={styles.retry}>Retry</Text>
-					</TouchableOpacity>
+
+			{loading && points.length === 0 ? (
+				<View style={styles.loadingWrap} pointerEvents="none">
+					<ActivityIndicator color={colors.primary} />
 				</View>
-			)}
-
-			<MapChrome
-				sheetOpen={sheetOpen}
-				interactionUnread={interactionUnread}
-				onPressInteractions={() => openRootScreen(navigation, 'Interactions')}
-			/>
-
-			{!sheetOpen ? (
-				<ListingModeFilter
-					value={listingModeFilter}
-					onChange={setListingModeFilter}
-					top={mapListingModeFilterTop(insets.top)}
-				/>
 			) : null}
 
-			{!sheetOpen && (
-				<EventsRail location={region ? { lat: region.latitude, lng: region.longitude } : myCoords} />
-			)}
-
-			{!sheetOpen && <MapCoachMarks mapReady={region != null} />}
+			<EventsRail />
+			<MapCoachMarks />
 
 			<BottomSheetModal
 				ref={entitySheetRef}
 				snapPoints={entitySnapPoints}
 				enablePanDownToClose
-				enableDynamicSizing={false}
+				onDismiss={onCloseSheet}
 				backdropComponent={renderBackdrop}
 				backgroundStyle={sheetChrome.background}
-				handleIndicatorStyle={sheetChrome.handle}
-				onDismiss={() => {
-					presentedIdRef.current = null;
-					setSelected(null);
-				}}
+				handleIndicatorStyle={sheetChrome.handleIndicator}
 			>
 				<BottomSheetView style={sheetChrome.content}>
 					{selected ? (
@@ -721,49 +362,32 @@ function regionToViewport(r: Region | null): Viewport | null {
 }
 
 function approxZoomFromRegion(r: Region): number {
-	const z = Math.log2(360 / Math.max(r.latitudeDelta, 0.0001));
-	return Math.max(0, Math.min(22, Math.round(z)));
+	const latDelta = Math.max(r.latitudeDelta, 0.0001);
+	return Math.round(Math.log(360 / latDelta) / Math.LN2);
 }
 
 const styles = StyleSheet.create({
 	root: { flex: 1, backgroundColor: colors.bg },
-	unavailable: {
-		justifyContent: 'center',
+	listingFilter: { position: 'absolute', left: 12, right: 12, zIndex: 4 },
+	emptyWrap: {
+		position: 'absolute',
+		left: 24,
+		right: 24,
+		bottom: 120,
 		alignItems: 'center',
+	},
+	loadingWrap: {
+		...StyleSheet.absoluteFillObject,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	sheetError: { color: colors.danger, padding: 16 },
+	unavailable: {
+		alignItems: 'center',
+		justifyContent: 'center',
 		backgroundColor: colors.bg,
 		padding: 24,
 	},
-	unavailableTitle: { color: colors.danger, fontSize: 16, fontWeight: '700', marginBottom: 8 },
-	unavailableBody: { color: colors.textMuted, fontSize: 13, textAlign: 'center', lineHeight: 20 },
-	emptyOverlay: {
-		position: 'absolute',
-		left: 0,
-		right: 0,
-		top: '38%',
-		alignItems: 'center',
-		paddingHorizontal: 24,
-	},
-	loading: {
-		position: 'absolute',
-		top: 120,
-		alignSelf: 'center',
-		padding: 8,
-		borderRadius: 16,
-		backgroundColor: 'rgba(0,0,0,0.5)',
-	},
-	errorBanner: {
-		position: 'absolute',
-		bottom: 32,
-		left: 16,
-		right: 16,
-		padding: 12,
-		borderRadius: 12,
-		backgroundColor: colors.danger,
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-	},
-	errorText: { color: colors.textPrimary, flex: 1 },
-	retry: { color: colors.textPrimary, fontWeight: '600' },
-	sheetError: { color: colors.textMuted, padding: 16, textAlign: 'center' },
+	unavailableTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
+	unavailableBody: { color: colors.textMuted, marginTop: 8, textAlign: 'center' },
 });

@@ -42,6 +42,8 @@ type HubRow =
   | { kind: 'chat'; sortAt: number; conversation: ConversationSummary }
   | { kind: 'inbox'; sortAt: number; item: InboxItem };
 
+type HubTab = 'activity' | 'chats';
+
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
@@ -260,6 +262,7 @@ export function InteractionsScreen(): React.JSX.Element {
   const { markSeen } = useReceivedInteractions();
   const { on } = useSocket();
   const [busyIds, setBusyIds] = React.useState<string[]>([]);
+  const [tab, setTab] = React.useState<HubTab>('activity');
 
   const loadChats = useCallback(() => {
     void dispatch(fetchConversations());
@@ -297,22 +300,33 @@ export function InteractionsScreen(): React.JSX.Element {
     };
   }, [on, loadChats, refresh]);
 
-  const rows: HubRow[] = useMemo(() => {
-    const chatRows: HubRow[] = conversations.map((c) => ({
-      kind: 'chat' as const,
-      sortAt: c.lastMessageAt ? new Date(c.lastMessageAt).getTime() : 0,
-      conversation: c,
-    }));
-    const inboxRows: HubRow[] = items.map((item) => ({
-      kind: 'inbox' as const,
-      sortAt: new Date(item.createdAt).getTime(),
-      item,
-    }));
-    return [...chatRows, ...inboxRows].sort((a, b) => b.sortAt - a.sortAt);
-  }, [conversations, items]);
+  const chatRows: HubRow[] = useMemo(
+    () =>
+      conversations.map((c) => ({
+        kind: 'chat' as const,
+        sortAt: c.lastMessageAt ? new Date(c.lastMessageAt).getTime() : 0,
+        conversation: c,
+      })),
+    [conversations],
+  );
+
+  const activityRows: HubRow[] = useMemo(
+    () =>
+      items
+        .map((item) => ({
+          kind: 'inbox' as const,
+          sortAt: new Date(item.createdAt).getTime(),
+          item,
+        }))
+        .sort((a, b) => b.sortAt - a.sortAt),
+    [items],
+  );
+
+  const rows: HubRow[] = tab === 'chats' ? chatRows : activityRows;
 
   const coldLoading =
-    rows.length === 0 && (inboxLoading || conversationsLoading);
+    rows.length === 0 &&
+    (tab === 'chats' ? conversationsLoading : inboxLoading || conversationsLoading);
 
   const onRefresh = useCallback(() => {
     loadChats();
@@ -412,6 +426,31 @@ export function InteractionsScreen(): React.JSX.Element {
     <View style={styles.root}>
       <ScreenHeader title="Interactions" bordered />
 
+      <View style={styles.tabs}>
+        <TouchableOpacity
+          style={[styles.tab, tab === 'activity' && styles.tabActive]}
+          onPress={() => setTab('activity')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: tab === 'activity' }}
+          accessibilityLabel="Activity"
+        >
+          <Text style={[styles.tabText, tab === 'activity' && styles.tabTextActive]}>
+            Activity
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, tab === 'chats' && styles.tabActive]}
+          onPress={() => setTab('chats')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: tab === 'chats' }}
+          accessibilityLabel="Chats"
+        >
+          <Text style={[styles.tabText, tab === 'chats' && styles.tabTextActive]}>
+            Chats
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {coldLoading ? (
         <View style={styles.list}>
           <SkeletonListRow />
@@ -440,9 +479,13 @@ export function InteractionsScreen(): React.JSX.Element {
           ListEmptyComponent={
             <EmptyState
               variant="plain"
-              icon="message-text-outline"
-              title="No interactions yet"
-              body="Chats, waves, friend requests, and new followers show up here."
+              icon={tab === 'chats' ? 'message-text-outline' : 'bell-outline'}
+              title={tab === 'chats' ? 'No chats yet' : 'No activity yet'}
+              body={
+                tab === 'chats'
+                  ? 'Start a conversation from a profile or after a match.'
+                  : 'Waves, friend requests, and new followers show up here.'
+              }
             />
           }
           renderItem={({ item: row }) =>
@@ -472,6 +515,22 @@ export function InteractionsScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  tabs: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: { borderBottomColor: colors.primary },
+  tabText: { color: colors.textMuted, fontSize: fontSize.sm, fontWeight: '600' },
+  tabTextActive: { color: colors.primary },
   list: { paddingVertical: spacing.sm, flexGrow: 1 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
   row: {

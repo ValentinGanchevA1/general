@@ -111,7 +111,7 @@ export function SettingsScreen(): React.JSX.Element {
               <Switch
                 value={isVisible}
                 onValueChange={toggleVisibility}
-                trackColor={{ false: colors.borderStrong, true: '#0095b3' }}
+                trackColor={{ false: colors.borderStrong, true: colors.primaryTrack }}
                 thumbColor={isVisible ? colors.primary : colors.textFaint}
                 accessibilityLabel="Appear on map"
               />
@@ -132,7 +132,7 @@ export function SettingsScreen(): React.JSX.Element {
               <Switch
                 value={friendsSeeOnline}
                 onValueChange={toggleFriendsOnline}
-                trackColor={{ false: colors.borderStrong, true: '#0095b3' }}
+                trackColor={{ false: colors.borderStrong, true: colors.primaryTrack }}
                 thumbColor={friendsSeeOnline ? colors.primary : colors.textFaint}
                 accessibilityLabel="Friends can see when I am online"
               />
@@ -392,16 +392,16 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#3a1a1a',
+    borderColor: colors.dangerSurface,
   },
-  logoutText: { color: '#ff6b6b', fontWeight: '600', fontSize: fontSize.md },
+  logoutText: { color: colors.dangerMuted, fontWeight: '600', fontSize: fontSize.md },
   deleteBtn: {
     marginTop: spacing.md,
     borderRadius: 10,
     padding: spacing.lg,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#5a1a1a',
+    borderColor: colors.dangerBorder,
   },
   deleteText: { color: colors.danger, fontWeight: '700', fontSize: fontSize.md },
   version: {
@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 22,
     borderWidth: 1,
-    borderColor: '#3a1a1a',
+    borderColor: colors.dangerSurface,
   },
   modalTitle: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '700', marginBottom: 10 },
   modalBody: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginBottom: spacing.lg },
@@ -435,11 +435,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderStrong,
   },
-  modalError: { color: '#ff6b6b', fontSize: fontSize.sm, marginTop: 10 },
+  modalError: { color: colors.dangerMuted, fontSize: fontSize.sm, marginTop: 10 },
   modalActions: { flexDirection: 'row', marginTop: 20, gap: spacing.md },
   modalBtn: { flex: 1, borderRadius: 10, padding: 14, alignItems: 'center' },
   modalCancel: { backgroundColor: colors.borderStrong },
   modalCancelText: { color: colors.textPrimary, fontWeight: '600', fontSize: fontSize.md },
-  modalConfirm: { backgroundColor: '#c0392b' },
+  modalConfirm: { backgroundColor: colors.dangerSolid },
   modalConfirmText: { color: colors.textPrimary, fontWeight: '700', fontSize: fontSize.md },
 });

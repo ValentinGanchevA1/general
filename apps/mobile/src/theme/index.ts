@@ -42,6 +42,15 @@ export const colors = {
   textFaint: '#777777',
 
   danger: '#ff4444',
+  /** Softer danger for text (logout, form errors). */
+  dangerMuted: '#ff6b6b',
+  /** Danger surface / border for logout & destructive rows. */
+  dangerSurface: '#3a1a1a',
+  dangerBorder: '#5a1a1a',
+  /** Solid destructive button (confirm delete). */
+  dangerSolid: '#c0392b',
+  /** Switch track when on (slightly dimmed primary). */
+  primaryTrack: '#0095b3',
   warning: '#ff9d3c',
   success: '#4caf50',
 
