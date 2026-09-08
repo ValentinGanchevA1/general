@@ -107,6 +107,12 @@ export interface MakeOfferRequest {
   message?: string;
 }
 
+/** Seller counter-offer while keeping status=pending. */
+export interface CounterOfferRequest {
+  offerCents: number;
+  message?: string;
+}
+
 export interface ListingOffer {
   id: string;
   listingId: string;
@@ -116,15 +122,9 @@ export interface ListingOffer {
   offerCents: number | null;
   message: string | null;
   status: OfferStatus;
+  /** Who last moved the price: buyer offer or seller counter. */
+  lastActor: 'buyer' | 'seller' | null;
   createdAt: string;
-  /** Who last set offerCents: seller counter keeps status pending. */
-  lastActor?: 'buyer' | 'seller' | null;
-}
-
-/** Seller proposes a different price; offer stays pending for buyer response. */
-export interface CounterOfferRequest {
-  offerCents: number;
-  message?: string;
 }
 
 export interface RespondToOfferRequest {
