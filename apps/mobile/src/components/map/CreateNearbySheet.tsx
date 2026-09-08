@@ -43,7 +43,7 @@ const OPTIONS: Option[] = [
     key: 'listing_buy',
     icon: 'cart-outline',
     title: 'Looking to buy',
-    hint: 'Post what you’re searching for',
+    hint: "Post what you're searching for",
   },
   {
     key: 'event',
@@ -75,7 +75,6 @@ export function CreateNearbySheet({
   const handleSelect = useCallback(
     (key: CreateNearbyAction) => {
       onClose();
-      // Defer so modal close animation starts before navigation push.
       requestAnimationFrame(() => onSelect(key));
     },
     [onClose, onSelect],
@@ -113,9 +112,10 @@ export function CreateNearbySheet({
                 testID={`create-nearby-${opt.key}`}
                 accessibilityRole="button"
                 accessibilityLabel={opt.title}
+                accessibilityHint={opt.hint}
               >
                 <View style={S.iconWrap}>
-                  <MCI name={opt.icon} size={22} color={colors.primary ?? '#00d4ff'} />
+                  <MCI name={opt.icon} size={22} color={colors.primary} />
                 </View>
                 <View style={S.rowText}>
                   <Text style={S.rowTitle}>{opt.title}</Text>
@@ -149,30 +149,30 @@ const S = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: colors.surface ?? '#12121f',
-    borderTopLeftRadius: radius?.lg ?? 20,
-    borderTopRightRadius: radius?.lg ?? 20,
-    paddingHorizontal: spacing?.md ?? 16,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    paddingHorizontal: spacing.md,
     paddingTop: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong ?? '#2a2a4a',
+    borderColor: colors.borderStrong,
   },
   handle: {
     alignSelf: 'center',
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.borderStrong ?? '#3a3a5a',
+    backgroundColor: colors.borderStrong,
     marginBottom: 14,
   },
   title: {
-    color: colors.textPrimary ?? '#fff',
+    color: colors.textPrimary,
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 4,
   },
   subtitle: {
-    color: colors.textMuted ?? '#888',
+    color: colors.textMuted,
     fontSize: 13,
     marginBottom: 16,
   },
@@ -182,12 +182,12 @@ const S = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceAlt ?? '#1a1a2e',
-    borderRadius: radius?.md ?? 14,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
     paddingVertical: 14,
     paddingHorizontal: 14,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong ?? '#2a2a4a',
+    borderColor: colors.borderStrong,
   },
   iconWrap: {
     width: 40,
@@ -202,12 +202,12 @@ const S = StyleSheet.create({
     flex: 1,
   },
   rowTitle: {
-    color: colors.textPrimary ?? '#fff',
+    color: colors.textPrimary,
     fontSize: 15,
     fontWeight: '600',
   },
   rowHint: {
-    color: colors.textMuted ?? '#888',
+    color: colors.textMuted,
     fontSize: 12,
     marginTop: 2,
   },
@@ -215,13 +215,13 @@ const S = StyleSheet.create({
     marginTop: 14,
     alignItems: 'center',
     paddingVertical: 14,
-    borderRadius: radius?.md ?? 14,
-    backgroundColor: colors.surfaceAlt ?? '#1a1a2e',
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong ?? '#2a2a4a',
+    borderColor: colors.borderStrong,
   },
   cancelText: {
-    color: colors.textSecondary ?? '#aaa',
+    color: colors.textSecondary,
     fontSize: 15,
     fontWeight: '600',
   },

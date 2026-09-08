@@ -180,7 +180,7 @@ export function SuggestionsScreen(): React.JSX.Element {
                   accessibilityLabel={reasonLabel(item.reason, item.mutualFriendsCount)}
                   hitSlop={6}
                 >
-                  <Text style={S.reason}>
+                  <Text style={[S.reason, S.reasonLink]}>
                     {reasonLabel(item.reason, item.mutualFriendsCount)}
                   </Text>
                 </TouchableOpacity>
@@ -307,6 +307,7 @@ const S = StyleSheet.create({
   cardMeta: { flex: 1 },
   name: { color: colors.textPrimary, fontWeight: '700', fontSize: fontSize.md },
   reason: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  reasonLink: { color: colors.primary, fontWeight: '600' },
   actions: { flexDirection: 'row', gap: 8 },
   btnPrimary: {
     flex: 1,
