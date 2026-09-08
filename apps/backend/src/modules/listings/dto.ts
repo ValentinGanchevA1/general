@@ -127,6 +127,18 @@ export class RespondOfferDto {
   status!: 'accepted' | 'declined';
 }
 
+export class CounterOfferDto {
+  @IsInt()
+  @Min(0)
+  @Max(LISTING_LIMITS.priceCentsMax)
+  offerCents!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(LISTING_LIMITS.offerMessageMax)
+  message?: string;
+}
+
 export class UploadListingImageDto implements UploadListingImageRequest {
   @IsString()
   @IsNotEmpty()
