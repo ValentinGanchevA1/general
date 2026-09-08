@@ -15,6 +15,7 @@ import { DataSource } from 'typeorm';
 import {
   STORY_LIMITS,
   canPostStory,
+  STRIKE_THRESHOLDS,
   cellsForViewport,
   computeH3Cells,
   fuzzLocation,
@@ -78,10 +79,6 @@ export class StoriesService {
     return result;
   }
 
-  /**
-   * Mobile-safe media upload: base64 JSON → S3 (stories/{userId}/…).
-   * Photos only — image-picker never returns base64 for video.
-   */
   async uploadMediaBase64(
     userId: string,
     dto: UploadStoryBase64Dto,
@@ -114,10 +111,6 @@ export class StoriesService {
     return this.bindAndReturnUploaded(userId, buf, dto.contentType);
   }
 
-  /**
-   * Multipart / raw buffer upload (video path — image-picker never returns
-   * base64 for video). Same Redis bind as presign/base64 so create() accepts it.
-   */
   async uploadMediaBuffer(
     userId: string,
     buffer: Buffer,
@@ -498,17 +491,29 @@ export class StoriesService {
 
   private async assertCanPost(userId: string): Promise<void> {
     const [u] = (await this.db.query(
-      `SELECT verification_level, created_at FROM users
+      `SELECT verification_level, created_at, story_suspended_until FROM users
         WHERE id = $1 AND deleted_at IS NULL`,
       [userId],
-    )) as Array<{ verification_level: VerificationLevel; created_at: Date | string }>;
+    )) as Array<{
+      verification_level: VerificationLevel;
+      created_at: Date | string;
+      story_suspended_until: Date | string | null;
+    }>;
     if (!u) {
       throw new ForbiddenException({ code: 'auth.forbidden', message: 'User not found.' });
     }
 
+    const [strikeRow] = (await this.db.query(
+      `SELECT COALESCE(SUM(weight), 0)::int AS pts FROM user_strikes
+        WHERE user_id = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+      [userId],
+    )) as Array<{ pts: number }>;
+
     const gate = canPostStory({
       verification: u.verification_level,
       createdAt: u.created_at,
+      strikePoints: strikeRow?.pts ?? 0,
+      storySuspendedUntil: u.story_suspended_until,
     });
     if (!gate.allowed) {
       const code =
@@ -516,7 +521,9 @@ export class StoriesService {
           ? 'story.email_unverified'
           : gate.reason === 'account_too_new'
             ? 'story.account_too_new'
-            : 'story.phone_required';
+            : gate.reason === 'suspended'
+              ? 'story.suspended'
+              : 'story.phone_required';
       throw new ForbiddenException({
         code,
         message: storyGateMessage(gate.reason),
@@ -538,12 +545,38 @@ export class StoriesService {
       [userId],
     )) as Array<{ n: number }>;
     if ((cnt?.n ?? 0) >= maxPer24h) {
+      await this.recordStrike(userId, 'story_rate_limit', 1);
       throw new HttpException(
         {
           code: 'story.rate_limited',
           message: `Story limit reached (${maxPer24h} per 24h). Try again later.`,
         },
         HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  private async recordStrike(
+    userId: string,
+    reason: 'story_rate_limit' | 'story_gate' | 'wave_spam' | 'friend_request_spam',
+    weight: number,
+  ): Promise<void> {
+    await this.db.query(
+      `INSERT INTO user_strikes (user_id, reason, weight) VALUES ($1, $2, $3)`,
+      [userId, reason, weight],
+    );
+    const [row] = (await this.db.query(
+      `SELECT COALESCE(SUM(weight), 0)::int AS pts FROM user_strikes
+        WHERE user_id = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+      [userId],
+    )) as Array<{ pts: number }>;
+    const pts = row?.pts ?? 0;
+    if (pts >= STRIKE_THRESHOLDS.suspend) {
+      await this.db.query(
+        `UPDATE users SET story_suspended_until = NOW() + INTERVAL '7 days'
+          WHERE id = $1
+            AND (story_suspended_until IS NULL OR story_suspended_until < NOW())`,
+        [userId],
       );
     }
   }

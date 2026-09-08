@@ -36,7 +36,18 @@ export type StoryGateReason =
   | 'ok'
   | 'email_unverified'
   | 'account_too_new'
-  | 'phone_required'; // reserved for future strike escalation
+  | 'phone_required'
+  | 'suspended';
+
+/** Rolling strike weight that escalates the soft gate (shared client/server). */
+export const STRIKE_THRESHOLDS = {
+  /** At/above → require phone to post stories. */
+  phoneRequired: 3,
+  /** At/above → set story_suspended_until (server applies duration). */
+  suspend: 5,
+  /** Suspension length after hitting suspend threshold. */
+  suspendDays: 7,
+} as const;
 
 /**
  * Client/server shared eligibility for posting stories.
@@ -47,11 +58,33 @@ export function canPostStory(input: {
   verification: VerificationLevel;
   createdAt: string | Date;
   now?: number;
+  /** Sum of strike weights in the relevant window (server-supplied). */
+  strikePoints?: number;
+  /** ISO timestamp; when in the future, posting is blocked. */
+  storySuspendedUntil?: string | Date | null;
 }): { allowed: true } | { allowed: false; reason: Exclude<StoryGateReason, 'ok'> } {
+  const now = input.now ?? Date.now();
+  if (input.storySuspendedUntil) {
+    const until =
+      typeof input.storySuspendedUntil === 'string'
+        ? new Date(input.storySuspendedUntil).getTime()
+        : input.storySuspendedUntil.getTime();
+    if (Number.isFinite(until) && until > now) {
+      return { allowed: false, reason: 'suspended' };
+    }
+  }
+
   const rank = LEVEL_RANK[input.verification] ?? 0;
   if (rank < LEVEL_RANK.email) {
     return { allowed: false, reason: 'email_unverified' };
   }
+
+  const strikes = input.strikePoints ?? 0;
+  // Escalation: enough strikes → phone required (email-only soft-gate users).
+  if (strikes >= STRIKE_THRESHOLDS.phoneRequired && rank < LEVEL_RANK.phone) {
+    return { allowed: false, reason: 'phone_required' };
+  }
+
   // Phone+ may post regardless of age (already passed stronger trust).
   if (rank >= LEVEL_RANK.phone) {
     return { allowed: true };
@@ -60,7 +93,6 @@ export function canPostStory(input: {
     typeof input.createdAt === 'string'
       ? new Date(input.createdAt).getTime()
       : input.createdAt.getTime();
-  const now = input.now ?? Date.now();
   if (!Number.isFinite(created) || now - created < STORY_LIMITS.minAccountAgeMs) {
     return { allowed: false, reason: 'account_too_new' };
   }
@@ -77,6 +109,8 @@ export function storyGateMessage(
       return 'Your account needs to be at least 24 hours old to post stories.';
     case 'phone_required':
       return 'Phone verification required to post stories.';
+    case 'suspended':
+      return 'Story posting is temporarily suspended. Try again later.';
   }
 }
 
