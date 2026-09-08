@@ -4,7 +4,6 @@ import {
 	InteractionManager,
 	StyleSheet,
 	Text,
-	TouchableOpacity,
 	View,
 } from 'react-native';
 
@@ -51,7 +50,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
-import { track } from '@/lib/analytics';
 import { colors } from '@/theme';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
 import { MapCoachMarks } from '@/components/map/MapCoachMarks';
