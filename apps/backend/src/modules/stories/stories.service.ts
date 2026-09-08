@@ -1,1 +1,623 @@
-SEE_FILE
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { createHash } from 'crypto';
+import type Redis from 'ioredis';
+import { DataSource } from 'typeorm';
+
+import {
+  STORY_LIMITS,
+  canPostStory,
+  STRIKE_THRESHOLDS,
+  cellsForViewport,
+  computeH3Cells,
+  fuzzLocation,
+  h3ResolutionForZoom,
+  storyGateMessage,
+  type StoryCard,
+  type StoryMediaType,
+  type StoryReactionKind,
+  type VerificationLevel,
+} from '@g88/shared';
+
+import { S3Service } from '../../common/s3.service';
+import { REDIS_CLIENT } from '../../config/redis.provider';
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
+import { CreateStoryDto, NearbyStoriesDto, PresignStoryDto, UploadStoryBase64Dto } from './dto';
+
+/** Matches S3 presigned URL lifetime in S3Service.presignStory (300s). */
+const PRESIGN_TTL_SECONDS = 300;
+
+interface StoryRow {
+  id: string;
+  author_id: string;
+  media_url: string;
+  media_type: StoryMediaType;
+  caption: string | null;
+  approx_lat: number;
+  approx_lng: number;
+  expires_at: Date;
+  created_at: Date;
+  view_count: number;
+  reaction_count: number;
+  display_name: string;
+  avatar_url: string | null;
+  verification_level: VerificationLevel;
+  viewed_by_me: boolean;
+  my_reaction: StoryReactionKind | null;
+  location_h3_r7?: string;
+}
+
+@Injectable()
+export class StoriesService {
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    private readonly s3: S3Service,
+    private readonly realtime: RealtimeGateway,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+  ) {}
+
+  async presign(
+    userId: string,
+    dto: PresignStoryDto,
+  ): Promise<{ uploadUrl: string; publicUrl: string }> {
+    await this.assertCanPost(userId);
+    const result = await this.s3.storyPresignedUrl(userId, dto.contentType);
+    await this.redis.set(
+      this.presignRedisKey(userId, result.publicUrl),
+      result.publicUrl,
+      'EX',
+      PRESIGN_TTL_SECONDS,
+    );
+    return result;
+  }
+
+  async uploadMediaBase64(
+    userId: string,
+    dto: UploadStoryBase64Dto,
+  ): Promise<{ publicUrl: string; mediaType: 'image' | 'video' }> {
+    await this.assertCanPost(userId);
+
+    let buf: Buffer;
+    try {
+      buf = Buffer.from(dto.data, 'base64');
+    } catch {
+      throw new BadRequestException({
+        code: 'story.media_invalid',
+        message: 'Media data is not valid base64.',
+      });
+    }
+    if (buf.length === 0) {
+      throw new BadRequestException({
+        code: 'story.media_invalid',
+        message: 'Media data is empty.',
+      });
+    }
+    const maxBytes = 18 * 1024 * 1024;
+    if (buf.length > maxBytes) {
+      throw new BadRequestException({
+        code: 'story.media_too_large',
+        message: 'Media is too large. Use a shorter clip or lower quality.',
+      });
+    }
+
+    return this.bindAndReturnUploaded(userId, buf, dto.contentType);
+  }
+
+  async uploadMediaBuffer(
+    userId: string,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<{ publicUrl: string; mediaType: 'image' | 'video' }> {
+    await this.assertCanPost(userId);
+    if (buffer.length === 0) {
+      throw new BadRequestException({
+        code: 'story.media_invalid',
+        message: 'Media data is empty.',
+      });
+    }
+    const maxBytes = 18 * 1024 * 1024;
+    if (buffer.length > maxBytes) {
+      throw new BadRequestException({
+        code: 'story.media_too_large',
+        message: 'Media is too large. Use a shorter clip or lower quality.',
+      });
+    }
+    const allowed = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'video/mp4',
+      'video/quicktime',
+    ]);
+    if (!allowed.has(contentType)) {
+      throw new BadRequestException({
+        code: 'story.media_type_unsupported',
+        message: `Unsupported content type: ${contentType}`,
+      });
+    }
+    return this.bindAndReturnUploaded(userId, buffer, contentType);
+  }
+
+  private async bindAndReturnUploaded(
+    userId: string,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<{ publicUrl: string; mediaType: 'image' | 'video' }> {
+    const publicUrl = await this.s3.uploadStoryBuffer(userId, buffer, contentType);
+    await this.redis.set(
+      this.presignRedisKey(userId, publicUrl),
+      publicUrl,
+      'EX',
+      PRESIGN_TTL_SECONDS,
+    );
+
+    const mediaType: 'image' | 'video' = contentType.startsWith('video/')
+      ? 'video'
+      : 'image';
+    return { publicUrl, mediaType };
+  }
+
+  async create(userId: string, dto: CreateStoryDto): Promise<StoryCard> {
+    await this.assertCanPost(userId);
+    await this.assertMediaUrlFromPresign(userId, dto.mediaUrl);
+
+    const active = (await this.db.query(
+      `SELECT COUNT(*)::int AS n FROM stories
+        WHERE author_id = $1 AND deleted_at IS NULL AND expires_at > NOW()`,
+      [userId],
+    )) as Array<{ n: number }>;
+    if ((active[0]?.n ?? 0) >= STORY_LIMITS.maxActivePerUser) {
+      throw new BadRequestException({
+        code: 'story.limit_reached',
+        message: `Max ${STORY_LIMITS.maxActivePerUser} active stories.`,
+      });
+    }
+
+    const cells = computeH3Cells(dto.location.lat, dto.location.lng);
+    const approx = fuzzLocation({ lat: dto.location.lat, lng: dto.location.lng }, 10);
+    const expiresAt = new Date(Date.now() + STORY_LIMITS.ttlHours * 3_600_000);
+
+    const rows = (await this.db.query(
+      `INSERT INTO stories (
+          author_id, media_url, media_type, caption,
+          location, location_h3_r4, location_h3_r5, location_h3_r6,
+          location_h3_r7, location_h3_r8, location_h3_r9, location_h3_r10,
+          approx_lat, approx_lng, expires_at
+        ) VALUES (
+          $1, $2, $3, $4,
+          ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography,
+          $7, $8, $9, $10, $11, $12, $13,
+          $14, $15, $16
+        )
+        RETURNING id, author_id, media_url, media_type, caption,
+                  approx_lat, approx_lng, expires_at, created_at,
+                  view_count, reaction_count, location_h3_r7`,
+      [
+        userId,
+        dto.mediaUrl,
+        dto.mediaType,
+        dto.caption ?? null,
+        dto.location.lng,
+        dto.location.lat,
+        cells.r4,
+        cells.r5,
+        cells.r6,
+        cells.r7,
+        cells.r8,
+        cells.r9,
+        cells.r10,
+        approx.lat,
+        approx.lng,
+        expiresAt,
+      ],
+    )) as StoryRow[];
+
+    const row = rows[0]!;
+    const card = await this.enrichOne(row);
+
+    this.realtime.emitStoryNew({
+      story: card,
+      cellId: row.location_h3_r7 ?? cells.r7,
+    });
+
+    return card;
+  }
+
+  async nearby(userId: string, dto: NearbyStoriesDto): Promise<StoryCard[]> {
+    const resolution = h3ResolutionForZoom(dto.zoom);
+    const h3Res = Math.min(10, Math.max(7, resolution));
+    const h3Col = `location_h3_r${h3Res}`;
+    const cells = cellsForViewport({ ne: dto.ne, sw: dto.sw }, h3Res);
+    if (cells.length === 0 || cells.length > 5_000) {
+      return [];
+    }
+
+    const limit = dto.limit ?? STORY_LIMITS.nearbyLimit;
+
+    const rows = (await this.db.query(
+      `SELECT s.id, s.author_id, s.media_url, s.media_type, s.caption,
+              s.approx_lat, s.approx_lng, s.expires_at, s.created_at,
+              s.view_count, s.reaction_count,
+              u.display_name, u.avatar_url, u.verification_level,
+              EXISTS (
+                SELECT 1 FROM story_views sv
+                 WHERE sv.story_id = s.id AND sv.viewer_id = $1
+              ) AS viewed_by_me,
+              (
+                SELECT sr.kind FROM story_reactions sr
+                 WHERE sr.story_id = s.id AND sr.user_id = $1
+              ) AS my_reaction
+         FROM stories s
+         JOIN users u ON u.id = s.author_id AND u.deleted_at IS NULL
+        WHERE s.deleted_at IS NULL
+          AND s.expires_at > NOW()
+          AND s.${h3Col} = ANY($2::text[])
+          AND NOT EXISTS (
+            SELECT 1 FROM user_blocks ub
+             WHERE (ub.blocker_id = $1 AND ub.blocked_id = s.author_id)
+                OR (ub.blocker_id = s.author_id AND ub.blocked_id = $1)
+          )
+        ORDER BY s.created_at DESC
+        LIMIT $3`,
+      [userId, cells, limit],
+    )) as StoryRow[];
+
+    return rows.map((r) => this.toCard(r));
+  }
+
+  async getOne(userId: string, storyId: string): Promise<StoryCard> {
+    const rows = (await this.db.query(
+      `SELECT s.id, s.author_id, s.media_url, s.media_type, s.caption,
+              s.approx_lat, s.approx_lng, s.expires_at, s.created_at,
+              s.view_count, s.reaction_count,
+              u.display_name, u.avatar_url, u.verification_level,
+              EXISTS (
+                SELECT 1 FROM story_views sv
+                 WHERE sv.story_id = s.id AND sv.viewer_id = $1
+              ) AS viewed_by_me,
+              (
+                SELECT sr.kind FROM story_reactions sr
+                 WHERE sr.story_id = s.id AND sr.user_id = $1
+              ) AS my_reaction
+         FROM stories s
+         JOIN users u ON u.id = s.author_id AND u.deleted_at IS NULL
+        WHERE s.id = $2
+          AND s.deleted_at IS NULL
+          AND s.expires_at > NOW()
+          AND NOT EXISTS (
+            SELECT 1 FROM user_blocks ub
+             WHERE (ub.blocker_id = $1 AND ub.blocked_id = s.author_id)
+                OR (ub.blocker_id = s.author_id AND ub.blocked_id = $1)
+          )`,
+      [userId, storyId],
+    )) as StoryRow[];
+
+    if (!rows[0]) {
+      throw new NotFoundException({ code: 'story.not_found', message: 'Story not found.' });
+    }
+    return this.toCard(rows[0]);
+  }
+
+  async recordView(
+    userId: string,
+    storyId: string,
+  ): Promise<{ viewed: true; viewCount: number }> {
+    const [story] = (await this.db.query(
+      `SELECT author_id FROM stories
+        WHERE id = $1 AND deleted_at IS NULL AND expires_at > NOW()`,
+      [storyId],
+    )) as Array<{ author_id: string }>;
+    if (!story) {
+      throw new NotFoundException({ code: 'story.not_found', message: 'Story not found.' });
+    }
+    if (story.author_id === userId) {
+      const [c] = (await this.db.query(
+        `SELECT view_count FROM stories WHERE id = $1`,
+        [storyId],
+      )) as Array<{ view_count: number }>;
+      return { viewed: true, viewCount: c?.view_count ?? 0 };
+    }
+
+    const inserted = (await this.db.query(
+      `INSERT INTO story_views (story_id, viewer_id)
+       VALUES ($1, $2)
+       ON CONFLICT DO NOTHING
+       RETURNING story_id`,
+      [storyId, userId],
+    )) as Array<{ story_id: string }>;
+
+    if (inserted.length > 0) {
+      await this.db.query(
+        `UPDATE stories SET view_count = view_count + 1 WHERE id = $1`,
+        [storyId],
+      );
+    }
+
+    const [c] = (await this.db.query(
+      `SELECT view_count FROM stories WHERE id = $1`,
+      [storyId],
+    )) as Array<{ view_count: number }>;
+    return { viewed: true, viewCount: c?.view_count ?? 0 };
+  }
+
+  async react(
+    userId: string,
+    storyId: string,
+    kind: StoryReactionKind,
+  ): Promise<{ reaction: StoryReactionKind; reactionCount: number }> {
+    const [story] = (await this.db.query(
+      `SELECT author_id FROM stories
+        WHERE id = $1 AND deleted_at IS NULL AND expires_at > NOW()`,
+      [storyId],
+    )) as Array<{ author_id: string }>;
+    if (!story) {
+      throw new NotFoundException({ code: 'story.not_found', message: 'Story not found.' });
+    }
+    if (story.author_id === userId) {
+      throw new BadRequestException({
+        code: 'story.self_react',
+        message: 'Cannot react to your own story.',
+      });
+    }
+
+    const existing = (await this.db.query(
+      `SELECT kind FROM story_reactions WHERE story_id = $1 AND user_id = $2`,
+      [storyId, userId],
+    )) as Array<{ kind: StoryReactionKind }>;
+
+    if (existing.length === 0) {
+      await this.db.query(
+        `INSERT INTO story_reactions (story_id, user_id, kind) VALUES ($1, $2, $3)`,
+        [storyId, userId, kind],
+      );
+      await this.db.query(
+        `UPDATE stories SET reaction_count = reaction_count + 1 WHERE id = $1`,
+        [storyId],
+      );
+    } else if (existing[0]!.kind !== kind) {
+      await this.db.query(
+        `UPDATE story_reactions SET kind = $3, created_at = NOW()
+          WHERE story_id = $1 AND user_id = $2`,
+        [storyId, userId, kind],
+      );
+    }
+
+    const [c] = (await this.db.query(
+      `SELECT reaction_count FROM stories WHERE id = $1`,
+      [storyId],
+    )) as Array<{ reaction_count: number }>;
+    return { reaction: kind, reactionCount: c?.reaction_count ?? 0 };
+  }
+
+  async remove(userId: string, storyId: string): Promise<void> {
+    const result = (await this.db.query(
+      `UPDATE stories SET deleted_at = NOW()
+        WHERE id = $1 AND author_id = $2 AND deleted_at IS NULL
+        RETURNING id`,
+      [storyId, userId],
+    )) as Array<{ id: string }>;
+    if (result.length === 0) {
+      throw new NotFoundException({ code: 'story.not_found', message: 'Story not found.' });
+    }
+  }
+
+  async listByAuthor(
+    viewerId: string,
+    authorId: string,
+    opts: { includeExpired?: boolean; limit?: number } = {},
+  ): Promise<StoryCard[]> {
+    const blocked = (await this.db.query(
+      `SELECT 1 FROM user_blocks
+        WHERE (blocker_id = $1 AND blocked_id = $2)
+           OR (blocker_id = $2 AND blocked_id = $1)
+        LIMIT 1`,
+      [viewerId, authorId],
+    )) as unknown[];
+    if (blocked.length > 0) return [];
+
+    const includeExpired = opts.includeExpired === true;
+    const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100);
+    const expireClause = includeExpired ? '' : 'AND s.expires_at > NOW()';
+
+    const rows = (await this.db.query(
+      `SELECT s.id, s.author_id, s.media_url, s.media_type, s.caption,
+              s.approx_lat, s.approx_lng, s.expires_at, s.created_at,
+              s.view_count, s.reaction_count,
+              u.display_name, u.avatar_url, u.verification_level,
+              EXISTS (
+                SELECT 1 FROM story_views sv
+                 WHERE sv.story_id = s.id AND sv.viewer_id = $1
+              ) AS viewed_by_me,
+              (
+                SELECT sr.kind FROM story_reactions sr
+                 WHERE sr.story_id = s.id AND sr.user_id = $1
+              ) AS my_reaction
+         FROM stories s
+         JOIN users u ON u.id = s.author_id
+        WHERE s.author_id = $2
+          AND s.deleted_at IS NULL
+          ` + expireClause + `
+        ORDER BY s.created_at DESC
+        LIMIT $3`,
+      [viewerId, authorId, limit],
+    )) as StoryRow[];
+
+    return rows.map((r) => this.toCard(r));
+  }
+
+  private async assertMediaUrlFromPresign(userId: string, mediaUrl: string): Promise<void> {
+    let path: string;
+    try {
+      path = new URL(mediaUrl).pathname.replace(/^\//, '');
+    } catch {
+      throw new BadRequestException({
+        code: 'story.media_url_invalid',
+        message: 'Invalid media URL.',
+      });
+    }
+
+    const expectedPrefix = `stories/${userId}/`;
+    if (!path.startsWith(expectedPrefix)) {
+      throw new BadRequestException({
+        code: 'story.media_url_untrusted',
+        message: 'Media URL must come from the story upload flow.',
+      });
+    }
+
+    const tokenKey = this.presignRedisKey(userId, mediaUrl);
+    const bound = await this.redis.get(tokenKey);
+    if (!bound) {
+      throw new BadRequestException({
+        code: 'story.media_url_untrusted',
+        message: 'Media URL is expired or was not issued by presign. Request a new upload URL.',
+      });
+    }
+
+    await this.redis.del(tokenKey);
+  }
+
+  private presignRedisKey(userId: string, publicUrl: string): string {
+    const hash = createHash('sha256').update(publicUrl).digest('hex').slice(0, 32);
+    return `story:presign:${userId}:${hash}`;
+  }
+
+  private async assertCanPost(userId: string): Promise<void> {
+    const [u] = (await this.db.query(
+      `SELECT verification_level, created_at, story_suspended_until FROM users
+        WHERE id = $1 AND deleted_at IS NULL`,
+      [userId],
+    )) as Array<{
+      verification_level: VerificationLevel;
+      created_at: Date | string;
+      story_suspended_until: Date | string | null;
+    }>;
+    if (!u) {
+      throw new ForbiddenException({ code: 'auth.forbidden', message: 'User not found.' });
+    }
+
+    const [strikeRow] = (await this.db.query(
+      `SELECT COALESCE(SUM(weight), 0)::int AS pts FROM user_strikes
+        WHERE user_id = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+      [userId],
+    )) as Array<{ pts: number }>;
+
+    const gate = canPostStory({
+      verification: u.verification_level,
+      createdAt: u.created_at,
+      strikePoints: strikeRow?.pts ?? 0,
+      storySuspendedUntil: u.story_suspended_until,
+    });
+    if (!gate.allowed) {
+      const code =
+        gate.reason === 'email_unverified'
+          ? 'story.email_unverified'
+          : gate.reason === 'account_too_new'
+            ? 'story.account_too_new'
+            : gate.reason === 'suspended'
+              ? 'story.suspended'
+              : 'story.phone_required';
+      throw new ForbiddenException({
+        code,
+        message: storyGateMessage(gate.reason),
+      });
+    }
+
+    const rankPhone =
+      u.verification_level === 'phone' ||
+      u.verification_level === 'selfie' ||
+      u.verification_level === 'id';
+    const maxPer24h = rankPhone
+      ? STORY_LIMITS.phoneVerifiedMaxPer24h
+      : STORY_LIMITS.softerGateMaxPer24h;
+
+    const [cnt] = (await this.db.query(
+      `SELECT COUNT(*)::int AS n FROM stories
+        WHERE author_id = $1
+          AND created_at > NOW() - INTERVAL '24 hours'`,
+      [userId],
+    )) as Array<{ n: number }>;
+    if ((cnt?.n ?? 0) >= maxPer24h) {
+      await this.recordStrike(userId, 'story_rate_limit', 1);
+      throw new HttpException(
+        {
+          code: 'story.rate_limited',
+          message: `Story limit reached (${maxPer24h} per 24h). Try again later.`,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  private async recordStrike(
+    userId: string,
+    reason: 'story_rate_limit' | 'story_gate' | 'wave_spam' | 'friend_request_spam',
+    weight: number,
+  ): Promise<void> {
+    await this.db.query(
+      `INSERT INTO user_strikes (user_id, reason, weight) VALUES ($1, $2, $3)`,
+      [userId, reason, weight],
+    );
+    const [row] = (await this.db.query(
+      `SELECT COALESCE(SUM(weight), 0)::int AS pts FROM user_strikes
+        WHERE user_id = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+      [userId],
+    )) as Array<{ pts: number }>;
+    const pts = row?.pts ?? 0;
+    if (pts >= STRIKE_THRESHOLDS.suspend) {
+      await this.db.query(
+        `UPDATE users SET story_suspended_until = NOW() + INTERVAL '7 days'
+          WHERE id = $1
+            AND (story_suspended_until IS NULL OR story_suspended_until < NOW())`,
+        [userId],
+      );
+    }
+  }
+
+  private async enrichOne(row: StoryRow): Promise<StoryCard> {
+    const [u] = (await this.db.query(
+      `SELECT display_name, avatar_url, verification_level
+         FROM users WHERE id = $1`,
+      [row.author_id],
+    )) as Array<{
+      display_name: string;
+      avatar_url: string | null;
+      verification_level: VerificationLevel;
+    }>;
+    return this.toCard({
+      ...row,
+      display_name: u?.display_name ?? '',
+      avatar_url: u?.avatar_url ?? null,
+      verification_level: u?.verification_level ?? 'none',
+      viewed_by_me: false,
+      my_reaction: null,
+    });
+  }
+
+  private toCard(r: StoryRow): StoryCard {
+    return {
+      id: r.id,
+      authorId: r.author_id,
+      authorDisplayName: r.display_name,
+      authorAvatarUrl: r.avatar_url,
+      authorVerification: r.verification_level,
+      mediaUrl: r.media_url,
+      mediaType: r.media_type,
+      caption: r.caption,
+      approxLocation: { lat: Number(r.approx_lat), lng: Number(r.approx_lng) },
+      expiresAt: new Date(r.expires_at).toISOString(),
+      createdAt: new Date(r.created_at).toISOString(),
+      viewCount: Number(r.view_count),
+      reactionCount: Number(r.reaction_count),
+      viewedByMe: Boolean(r.viewed_by_me),
+      myReaction: r.my_reaction,
+    };
+  }
+}
