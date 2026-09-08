@@ -183,7 +183,13 @@ export function FriendsListScreen(): React.JSX.Element {
     ({ item }: { item: FriendCard }) => {
       const busy = isBusy(item.userId);
       return (
-        <TouchableOpacity style={S.row} onPress={() => openProfile(item.userId)} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={S.row}
+          onPress={() => openProfile(item.userId)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`Open profile for ${item.displayName}`}
+        >
           <Avatar uri={item.avatarUrl} name={item.displayName} size={48} />
           <View style={S.info}>
             <Text style={S.name} numberOfLines={1}>
@@ -201,6 +207,8 @@ export function FriendsListScreen(): React.JSX.Element {
                 e.stopPropagation?.();
                 void onUnfriend(item.userId);
               }}
+              accessibilityRole="button"
+              accessibilityLabel={`Unfriend ${item.displayName}`}
             >
               <Text style={S.secondaryBtnText}>Unfriend</Text>
             </TouchableOpacity>
@@ -220,6 +228,8 @@ export function FriendsListScreen(): React.JSX.Element {
           style={S.row}
           onPress={() => openProfile(item.fromUserId)}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`Open profile for ${item.displayName}`}
         >
           <Avatar uri={item.avatarUrl} name={item.displayName} size={48} />
           <View style={S.info}>
@@ -236,6 +246,8 @@ export function FriendsListScreen(): React.JSX.Element {
                 e.stopPropagation?.();
                 void onDecline(item.id);
               }}
+              accessibilityRole="button"
+              accessibilityLabel={`Decline friend request from ${item.displayName}`}
             >
               <Text style={S.declineBtnText}>Decline</Text>
             </TouchableOpacity>
@@ -246,6 +258,8 @@ export function FriendsListScreen(): React.JSX.Element {
                 e.stopPropagation?.();
                 void onAccept(item.id);
               }}
+              accessibilityRole="button"
+              accessibilityLabel={`Accept friend request from ${item.displayName}`}
             >
               <Text style={S.primaryBtnText}>Accept</Text>
             </TouchableOpacity>
@@ -279,6 +293,13 @@ export function FriendsListScreen(): React.JSX.Element {
             key={t.key}
             style={[S.tab, tab === t.key && S.tabActive]}
             onPress={() => setTab(t.key)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === t.key }}
+            accessibilityLabel={
+              t.key === 'requests' && pendingCount > 0
+                ? `${t.label}, ${pendingCount} pending`
+                : t.label
+            }
           >
             <Text style={[S.tabText, tab === t.key && S.tabTextActive]}>{t.label}</Text>
             {t.key === 'requests' && pendingCount > 0 ? (
@@ -302,7 +323,12 @@ export function FriendsListScreen(): React.JSX.Element {
       ) : list.error && data.length === 0 ? (
         <View style={S.center}>
           <Text style={S.error}>{list.error}</Text>
-          <TouchableOpacity style={S.retry} onPress={onRefresh}>
+          <TouchableOpacity
+            style={S.retry}
+            onPress={onRefresh}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading friends"
+          >
             <Text style={S.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
