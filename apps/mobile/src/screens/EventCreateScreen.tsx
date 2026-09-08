@@ -152,14 +152,13 @@ export function EventCreateScreen(): React.JSX.Element {
     setPin({ lat: c.latitude, lng: c.longitude });
   }, []);
 
+  // Pin is seeded from initialLocation (long-press) or coords at mount.
+  // Effect only animates the map camera — no setState (react-hooks/set-state-in-effect).
   useEffect(() => {
     if (hasCentered.current) return;
     const target = initialLocation ?? coords;
     if (!target) return;
     hasCentered.current = true;
-    if (!initialLocation && coords) {
-      setPin(coords);
-    }
     mapRef.current?.animateToRegion(
       { latitude: target.lat, longitude: target.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
       400,
