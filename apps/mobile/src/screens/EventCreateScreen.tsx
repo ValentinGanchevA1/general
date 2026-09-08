@@ -4,7 +4,7 @@
 // day/time/duration chips instead of a native @react-native-community
 // datetimepicker (a native module = an Android rebuild on the RN 0.83 surface,
 // per CLAUDE.md). The venue pin uses react-native-maps (already a dep) with a
-// draggable marker, defaulting to the user's current location.
+// draggable marker, defaulting to long-press location or GPS.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -186,3 +186,204 @@ export function EventCreateScreen(): React.JSX.Element {
           </TouchableOpacity>
         }
       />
+
+      <ScrollView contentContainerStyle={S.scroll} keyboardShouldPersistTaps="handled">
+        <FormField
+          label="Title"
+          value={title}
+          onChangeText={setTitle}
+          placeholder="What's happening?"
+          maxLength={EVENT_LIMITS.titleMax}
+          returnKeyType="next"
+          onSubmitEditing={() => descriptionRef.current?.focus()}
+          testID="event-create-title"
+        />
+
+        <FormField
+          ref={descriptionRef}
+          label="Description"
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Optional details"
+          multiline
+          maxLength={EVENT_LIMITS.descriptionMax}
+          style={S.bio}
+          returnKeyType="next"
+          onSubmitEditing={() => capacityRef.current?.focus()}
+          testID="event-create-description"
+        />
+
+        <Text style={S.label}>When</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.chips}>
+          {days.map((d, i) => (
+            <TouchableOpacity
+              key={i}
+              style={[S.chip, dayIdx === i && S.chipActive]}
+              onPress={() => setDayIdx(i)}
+            >
+              <Text style={[S.chipText, dayIdx === i && S.chipTextActive]}>{dayLabel(d, i)}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.chips}>
+          {[9 * 60, 12 * 60, 15 * 60, 18 * 60, 20 * 60, 21 * 60].map((m) => (
+            <TouchableOpacity
+              key={m}
+              style={[S.chip, minutes === m && S.chipActive]}
+              onPress={() => setMinutes(m)}
+            >
+              <Text style={[S.chipText, minutes === m && S.chipTextActive]}>{timeLabel(m)}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <Text style={S.label}>Duration</Text>
+        <View style={S.chips}>
+          {DURATIONS.map((d, i) => (
+            <TouchableOpacity
+              key={d.label}
+              style={[S.chip, durationIdx === i && S.chipActive]}
+              onPress={() => setDurationIdx(i)}
+            >
+              <Text style={[S.chipText, durationIdx === i && S.chipTextActive]}>{d.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <FormField
+          ref={capacityRef}
+          label="Capacity (optional)"
+          value={capacity}
+          onChangeText={setCapacity}
+          placeholder="Unlimited"
+          keyboardType="number-pad"
+          testID="event-create-capacity"
+        />
+
+        <Text style={S.label}>Visibility</Text>
+        <View style={S.chips}>
+          {(['public', 'private'] as const).map((v) => (
+            <TouchableOpacity
+              key={v}
+              style={[S.chip, visibility === v && S.chipActive]}
+              onPress={() => setVisibility(v)}
+            >
+              <Text style={[S.chipText, visibility === v && S.chipTextActive]}>
+                {v === 'public' ? 'Public on map' : 'Private'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={S.label}>Venue pin</Text>
+        <Text style={S.hint}>
+          {initialLocation
+            ? 'Pinned from the map long-press. Drag to adjust.'
+            : 'Drag the pin to set the venue. Defaults to your location.'}
+        </Text>
+        <View style={S.mapWrap}>
+          <MapView
+            ref={mapRef}
+            provider={PROVIDER_GOOGLE}
+            style={S.map}
+            initialRegion={{
+              latitude: pin.lat,
+              longitude: pin.lng,
+              latitudeDelta: 0.02,
+              longitudeDelta: 0.02,
+            }}
+          >
+            <Marker
+              coordinate={{ latitude: pin.lat, longitude: pin.lng }}
+              draggable
+              onDragEnd={(e) => onDragEnd(e.nativeEvent.coordinate)}
+            />
+          </MapView>
+        </View>
+
+        <Text style={S.label}>Cover photo</Text>
+        <TouchableOpacity style={S.photoBtn} onPress={() => { void onPickPhoto(); }} disabled={uploading}>
+          {coverUrl ? (
+            <Image source={{ uri: coverUrl }} style={S.photo} />
+          ) : (
+            <View style={S.photoPlaceholder}>
+              <Icon name="camera-plus-outline" size={28} color={colors.primary} />
+              <Text style={S.photoPlaceholderText}>{uploading ? 'Uploading…' : 'Add cover'}</Text>
+            </View>
+          )}
+          {coverUrl ? (
+            <View style={S.photoEdit}>
+              <Icon name="pencil" size={14} color={colors.textPrimary} />
+              <Text style={S.photoEditText}>Change</Text>
+            </View>
+          ) : null}
+        </TouchableOpacity>
+
+        {error ? <Text style={S.error}>{error}</Text> : null}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const S = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  saveLink: { color: colors.primary, fontSize: 16, fontWeight: '700' },
+  saveDisabled: { color: colors.textFaint },
+  scroll: { padding: 16, gap: 10, paddingBottom: 48 },
+  label: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: 8,
+  },
+  hint: { color: colors.textFaint, fontSize: 12, marginBottom: 6 },
+  bio: { minHeight: 88, textAlignVertical: 'top' as const },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 4 },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  chipActive: { backgroundColor: 'rgba(0,212,255,0.15)', borderColor: colors.primary },
+  chipText: { color: colors.textSecondary, fontWeight: '600', fontSize: 13 },
+  chipTextActive: { color: colors.primary },
+  mapWrap: {
+    height: 180,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  map: { flex: 1 },
+  photoBtn: {
+    height: 140,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  photo: { width: '100%', height: '100%' },
+  photoPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  photoPlaceholderText: { color: colors.textMuted, fontWeight: '600' },
+  photoEdit: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  photoEditText: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
+  error: { color: colors.danger, marginTop: 8 },
+});
