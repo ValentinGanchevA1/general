@@ -111,6 +111,8 @@ export function CreateNearbySheet({
                 onPress={() => handleSelect(opt.key)}
                 activeOpacity={0.85}
                 testID={`create-nearby-${opt.key}`}
+                accessibilityRole="button"
+                accessibilityLabel={opt.title}
               >
                 <View style={S.iconWrap}>
                   <MCI name={opt.icon} size={22} color={colors.primary ?? '#00d4ff'} />
@@ -129,6 +131,8 @@ export function CreateNearbySheet({
             onPress={onClose}
             activeOpacity={0.8}
             testID="create-nearby-cancel"
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
           >
             <Text style={S.cancelText}>Cancel</Text>
           </TouchableOpacity>

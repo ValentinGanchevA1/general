@@ -21,6 +21,7 @@ import { getJson, postJson } from '@/api/client';
 import { Avatar } from '@/components/Avatar';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
+import { SkeletonListRow } from '@/components/Skeleton';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
@@ -160,15 +161,34 @@ export function SuggestionsScreen(): React.JSX.Element {
             style={S.cardMain}
             onPress={() => openProfile(item.userId)}
             accessibilityRole="button"
+            accessibilityLabel={`Open profile for ${item.displayName}`}
           >
             <Avatar uri={item.avatarUrl} name={item.displayName} size={48} />
             <View style={S.cardMeta}>
               <Text style={S.name} numberOfLines={1}>
                 {item.displayName}
               </Text>
-              <Text style={S.reason}>
-                {reasonLabel(item.reason, item.mutualFriendsCount)}
-              </Text>
+              {item.reason === 'mutual_friends' && item.mutualFriendsCount > 0 ? (
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('MutualFriends', {
+                      peerUserId: item.userId,
+                      peerName: item.displayName,
+                    })
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={reasonLabel(item.reason, item.mutualFriendsCount)}
+                  hitSlop={6}
+                >
+                  <Text style={S.reason}>
+                    {reasonLabel(item.reason, item.mutualFriendsCount)}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={S.reason}>
+                  {reasonLabel(item.reason, item.mutualFriendsCount)}
+                </Text>
+              )}
             </View>
           </TouchableOpacity>
           <View style={S.actions}>
@@ -177,6 +197,8 @@ export function SuggestionsScreen(): React.JSX.Element {
                 style={S.btnSecondary}
                 onPress={() => void onFollow(item.userId)}
                 disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel={`Follow ${item.displayName}`}
               >
                 {busy ? (
                   <ActivityIndicator size="small" color={colors.primary} />
@@ -194,6 +216,8 @@ export function SuggestionsScreen(): React.JSX.Element {
                 style={S.btnPrimary}
                 onPress={() => void onAddFriend(item.userId)}
                 disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel={`Add ${item.displayName} as friend`}
               >
                 {busy ? (
                   <ActivityIndicator size="small" color={colors.onPrimary} />
@@ -210,7 +234,7 @@ export function SuggestionsScreen(): React.JSX.Element {
         </View>
       );
     },
-    [busyIds, onAddFriend, onFollow, openProfile],
+    [busyIds, navigation, onAddFriend, onFollow, openProfile],
   );
 
   return (
@@ -218,8 +242,12 @@ export function SuggestionsScreen(): React.JSX.Element {
       <ScreenHeader title="Suggestions" />
 
       {loading && items.length === 0 ? (
-        <View style={S.centered}>
-          <ActivityIndicator color={colors.primary} />
+        <View style={S.list}>
+          <SkeletonListRow />
+          <SkeletonListRow />
+          <SkeletonListRow />
+          <SkeletonListRow />
+          <SkeletonListRow />
         </View>
       ) : error && items.length === 0 ? (
         <View style={S.centered}>

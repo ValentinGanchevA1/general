@@ -22,6 +22,7 @@ import { getJson } from '@/api/client';
 import { Avatar } from '@/components/Avatar';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
+import { SkeletonListRow } from '@/components/Skeleton';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MutualFriends'>;
@@ -81,6 +82,7 @@ export function MutualFriendsScreen({ route, navigation }: Props): React.JSX.Ele
         style={S.row}
         onPress={() => openProfile(item.userId)}
         accessibilityRole="button"
+        accessibilityLabel={`Open profile for ${item.displayName}`}
       >
         <Avatar
           uri={item.avatarUrl}
@@ -108,8 +110,11 @@ export function MutualFriendsScreen({ route, navigation }: Props): React.JSX.Ele
       <ScreenHeader title={title} />
 
       {loading && items.length === 0 ? (
-        <View style={S.center}>
-          <ActivityIndicator color={colors.primary} size="large" />
+        <View style={S.listContent}>
+          <SkeletonListRow />
+          <SkeletonListRow />
+          <SkeletonListRow />
+          <SkeletonListRow />
         </View>
       ) : error && items.length === 0 ? (
         <View style={S.center}>
