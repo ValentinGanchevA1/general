@@ -37,6 +37,7 @@ import { Avatar } from '@/components/Avatar';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonListRow } from '@/components/Skeleton';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
@@ -222,7 +223,6 @@ export function FriendsListScreen(): React.JSX.Element {
   const renderRequest = useCallback(
     ({ item }: { item: FriendRequestCard }) => {
       const busy = isBusy(item.id);
-      // Pending list is incoming-only (GET /friends/requests/pending).
       return (
         <TouchableOpacity
           style={S.row}
@@ -281,7 +281,7 @@ export function FriendsListScreen(): React.JSX.Element {
             accessibilityRole="button"
             accessibilityLabel="Suggestions"
           >
-            <Text style={S.headerAction}>Suggest</Text>
+            <Icon name="account-plus-outline" size={24} color={colors.primary} />
           </TouchableOpacity>
         }
         bordered

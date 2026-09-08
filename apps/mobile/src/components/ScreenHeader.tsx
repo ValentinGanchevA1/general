@@ -16,28 +16,16 @@ import { colors, fontSize, spacing } from '@/theme';
 const BACK_SIZE = 48;
 
 export interface ScreenHeaderProps {
-  /** Plain title string. Ignored when `center` is provided. */
   title?: string;
-  /** Custom center content (e.g. chat peer avatar + name). Takes priority over `title`. */
   center?: React.ReactNode;
-  /** Override back handler (defaults to navigation.goBack). */
   onBack?: () => void;
-  /** Hide the back button (e.g. root tab screens). Default false. */
   hideBack?: boolean;
-  /** Optional right-side action slot (e.g. overflow menu). */
   right?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
-  /** Extra bottom border. Default false. */
   bordered?: boolean;
-  /** Transparent header over media (no solid bg). */
   transparent?: boolean;
 }
 
-/**
- * Shared screen header: safe-area top inset, 48dp back target + hitSlop,
- * accessibilityLabel="Go back", theme tokens. Replaces hand-rolled
- * paddingTop: 56 + chevron-left blocks across account/list screens.
- */
 export function ScreenHeader({
   title,
   center,
@@ -121,7 +109,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   side: {
-    width: BACK_SIZE,
+    minWidth: BACK_SIZE,
     minHeight: BACK_SIZE,
     alignItems: 'flex-end',
     justifyContent: 'center',
