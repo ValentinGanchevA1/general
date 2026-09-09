@@ -91,7 +91,7 @@ export function MapScreen(): React.JSX.Element {
 	const listingMode =
 		listingModeFilter === 'all' ? undefined : listingModeFilter;
 
-	const { data, loading, error, refresh } = useDiscovery({
+	const { data, loading } = useDiscovery({
 		viewport,
 		zoom,
 		listingMode,
@@ -221,8 +221,8 @@ export function MapScreen(): React.JSX.Element {
 					toUserId,
 					context: 'map',
 				});
-				challengeEvents.emit({ type: 'wave_sent' });
-				if (res.matched) {
+				challengeEvents.emit('progress');
+				if (res.conversationId) {
 					appAlert('Match!', 'You both waved — say hi.');
 				}
 			} catch (e) {
@@ -266,24 +266,22 @@ export function MapScreen(): React.JSX.Element {
 						points={points}
 						onEntityPress={onEntityPress}
 						onClusterPress={onClusterPress}
-						selectedId={selected ? `${selected.kind}:${selected.id}` : null}
 					/>
 				</MapView>
 			</ErrorBoundary>
 
 			<MapChrome
-				loading={loading}
-				error={error}
-				onRetry={() => void refresh()}
 				interactionUnread={interactionUnread}
 				onPressInteractions={() => openRootScreen(navigation, 'Interactions')}
 				sheetOpen={sheetOpen}
 			/>
 
 			{region ? (
-				<View style={[styles.listingFilter, { top: mapListingModeFilterTop(insets.top) }]}>
-					<ListingModeFilter value={listingModeFilter} onChange={setListingModeFilter} />
-				</View>
+				<ListingModeFilter
+					value={listingModeFilter}
+					onChange={setListingModeFilter}
+					top={mapListingModeFilterTop(insets.top)}
+				/>
 			) : null}
 
 			{!loading && points.length === 0 && region ? (
@@ -303,8 +301,8 @@ export function MapScreen(): React.JSX.Element {
 				</View>
 			) : null}
 
-			<EventsRail />
-			<MapCoachMarks />
+			<EventsRail location={myCoords} />
+			<MapCoachMarks mapReady={region != null} />
 
 			<BottomSheetModal
 				ref={entitySheetRef}
@@ -313,7 +311,7 @@ export function MapScreen(): React.JSX.Element {
 				onDismiss={onCloseSheet}
 				backdropComponent={renderBackdrop}
 				backgroundStyle={sheetChrome.background}
-				handleIndicatorStyle={sheetChrome.handleIndicator}
+				handleIndicatorStyle={sheetChrome.handle}
 			>
 				<BottomSheetView style={sheetChrome.content}>
 					{selected ? (
@@ -322,7 +320,9 @@ export function MapScreen(): React.JSX.Element {
 								point={selected}
 								waving={selected.kind === 'user' && waving === selected.id}
 								onClose={onCloseSheet}
-								{...(selected.kind === 'user' && { onWave: onSheetWavePress })}
+								{...(selected.kind === 'user'
+									? { onWave: () => onSheetWavePress(selected.id) }
+									: {})}
 							/>
 						</ErrorBoundary>
 					) : null}
@@ -366,7 +366,6 @@ function approxZoomFromRegion(r: Region): number {
 
 const styles = StyleSheet.create({
 	root: { flex: 1, backgroundColor: colors.bg },
-	listingFilter: { position: 'absolute', left: 12, right: 12, zIndex: 4 },
 	emptyWrap: {
 		position: 'absolute',
 		left: 24,
