@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -28,7 +27,8 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { deleteJson, getJson, postJson } from '@/api/client';
 import { IdentityBlock } from '@/components/IdentityBlock';
-import { colors, radius, spacing } from '@/theme';
+import { colors } from '@/theme';
+import { styles } from './EntityBottomSheet.styles';
 
 const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
 const LADDER_BADGES: Array<{ level: VerificationLevel; label: string }> = [
