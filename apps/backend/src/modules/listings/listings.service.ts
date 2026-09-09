@@ -28,10 +28,7 @@ import {
 import { NotificationsService } from '../notifications/notifications.service';
 import { S3Service } from '../../common/s3.service';
 
-/** Decoded listing image cap — matches the gallery-photo limit. */
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-
-/** Max offers inlined into a seller's listing detail. */
 const OFFER_PREVIEW = 50;
 
 interface ListingRow {
@@ -71,13 +68,6 @@ export class ListingsService {
     private readonly s3: S3Service,
   ) {}
 
-  // ─── Image upload ───────────────────────────────────────────────────────────
-
-  /**
-   * Decode a base64 listing image, validate size, push to S3, return its public
-   * URL — the seller then passes it as `thumbnailUrl` on create. Base64-over-JSON
-   * (not multipart) for the same RN "Stream Closed" reason as gallery photos.
-   */
   async uploadImage(
     userId: string,
     data: string,
@@ -100,15 +90,9 @@ export class ListingsService {
     return { url };
   }
 
-  // ─── Create / read ─────────────────────────────────────────────────────────
-
   async create(sellerId: string, dto: CreateListingDto): Promise<ListingSummary> {
-    // A listing's location is the seller-published whereabouts of the item, not
-    // tracked personal position — stored precisely with app-computed H3 cells.
     const cells = computeH3Cells(dto.location.lat, dto.location.lng);
-
     const mode = dto.mode === 'buy' ? 'buy' : 'sell';
-
     const rows = (await this.db.query(
       `INSERT INTO listings
          (seller_id, title, description, thumbnail_url, price_cents, currency, category, visibility, mode,
@@ -121,38 +105,24 @@ export class ListingsService {
        RETURNING id, seller_id, title, thumbnail_url, price_cents, currency, category, status, mode,
                  created_at, ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng`,
       [
-        sellerId,
-        dto.title,
-        dto.description ?? null,
-        dto.thumbnailUrl ?? null,
-        dto.priceCents,
-        dto.currency ?? 'USD',
-        dto.category,
-        dto.visibility ?? 'public',
-        mode,
-        dto.location.lng,
-        dto.location.lat,
+        sellerId, dto.title, dto.description ?? null, dto.thumbnailUrl ?? null, dto.priceCents,
+        dto.currency ?? 'USD', dto.category, dto.visibility ?? 'public', mode,
+        dto.location.lng, dto.location.lat,
         cells.r4, cells.r5, cells.r6, cells.r7, cells.r8, cells.r9, cells.r10,
       ],
     )) as ListingRow[];
-
     const summary = this.toSummary({ ...rows[0]!, favorited_by_me: false });
-
-    // Fan a push to geofence-watchers in this area (channel `listings`).
-    // Fire-and-forget — public listings only; never block create on FCM.
     if ((dto.visibility ?? 'public') === 'public') {
       void this.notifications
         .notifyListingNearby(cells.r7, sellerId, summary.title, summary.id)
         .catch(() => undefined);
     }
-
     return summary;
   }
 
   async browse(userId: string, dto: BrowseListingsDto): Promise<ListingSummary[]> {
     const radiusM = dto.radiusM ?? 5_000;
     const limit = dto.limit ?? 50;
-
     const rows = (await this.db.query(
       `SELECT l.id, l.seller_id, l.title, l.thumbnail_url, l.price_cents, l.currency,
               l.category, l.status, l.mode, l.created_at,
@@ -173,7 +143,6 @@ export class ListingsService {
         LIMIT $6`,
       [userId, dto.location.lng, dto.location.lat, radiusM, dto.category ?? null, limit, dto.mode ?? null],
     )) as ListingRow[];
-
     return rows.map((r) => this.toSummary(r));
   }
 
@@ -197,14 +166,11 @@ export class ListingsService {
       seller_avatar_url: string | null;
       favorite_count: number;
     }>;
-
     if (!row) throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
     if (row.visibility === 'private' && row.seller_id !== userId) {
       throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
     }
-
     const isSeller = row.seller_id === userId;
-
     const [mine] = (await this.db.query(
       `SELECT o.id, o.listing_id, o.buyer_id, o.offer_cents, o.message, o.status, o.last_actor, o.created_at,
               u.display_name AS buyer_display_name, u.avatar_url AS buyer_avatar_url
@@ -213,14 +179,12 @@ export class ListingsService {
         WHERE o.listing_id = $1 AND o.buyer_id = $2`,
       [listingId, userId],
     )) as OfferRow[];
-
     const openRows = (await this.db.query(
       `SELECT COUNT(*)::int AS open_offers FROM trade_offers
         WHERE listing_id = $1 AND status = 'pending'`,
       [listingId],
     )) as Array<{ open_offers: number }>;
     const openOffers = openRows[0]?.open_offers ?? 0;
-
     return {
       ...this.toSummary(row),
       description: row.description,
@@ -242,8 +206,6 @@ export class ListingsService {
     return this.detail(userId, listingId);
   }
 
-  // ─── Offers ──────────────────────────────────────────────────────────────────
-
   async makeOffer(buyerId: string, listingId: string, dto: MakeOfferDto): Promise<ListingOffer> {
     const [listing] = (await this.db.query(
       `SELECT seller_id, status FROM listings WHERE id = $1 AND deleted_at IS NULL`,
@@ -264,8 +226,6 @@ export class ListingsService {
         message: 'This listing is no longer accepting offers.',
       });
     }
-
-    // One offer per buyer per listing; re-offering re-opens it as pending (buyer moved last).
     await this.db.query(
       `INSERT INTO trade_offers (listing_id, buyer_id, offer_cents, message, status, last_actor)
             VALUES ($1, $2, $3, $4, 'pending', 'buyer')
@@ -277,14 +237,9 @@ export class ListingsService {
                      updated_at  = NOW()`,
       [listingId, buyerId, dto.offerCents ?? null, dto.message ?? null],
     );
-
     return this.getOffer(listingId, buyerId);
   }
 
-  /**
-   * Seller counter: update amount + message, keep status=pending, last_actor=seller.
-   * Buyer can then accept (via respond accepted), re-offer, or withdraw.
-   */
   async counterOffer(
     sellerId: string,
     offerId: string,
@@ -304,7 +259,6 @@ export class ListingsService {
       seller_id: string;
       listing_status: ListingStatus;
     }>;
-
     if (!row) {
       throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
     }
@@ -326,7 +280,6 @@ export class ListingsService {
         message: 'Only pending offers can be countered.',
       });
     }
-
     await this.db.query(
       `UPDATE trade_offers
           SET offer_cents = $2,
@@ -337,7 +290,6 @@ export class ListingsService {
         WHERE id = $1`,
       [offerId, dto.offerCents, dto.message ?? null],
     );
-
     return this.getOfferById(offerId);
   }
 
@@ -349,10 +301,6 @@ export class ListingsService {
     if (!listing) {
       throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
     }
-
-    // Seller sees every offer; a buyer sees only their own. Bind $2 only when
-    // the buyer scope actually references it — passing an unused parameter makes
-    // Postgres reject the bind ("supplies 2 parameters, statement requires 1").
     const isSeller = listing.seller_id === userId;
     const rows = (await this.db.query(
       `SELECT o.id, o.listing_id, o.buyer_id, o.offer_cents, o.message, o.status, o.last_actor, o.created_at,
@@ -364,12 +312,17 @@ export class ListingsService {
         LIMIT ${OFFER_PREVIEW}`,
       isSeller ? [listingId] : [listingId, userId],
     )) as OfferRow[];
-
     return rows.map((o) => this.toOffer(o));
   }
 
+  /**
+   * Accept or decline a pending offer.
+   * - Seller: always (buyer moved last, or cancel own counter).
+   * - Buyer: only when last_actor=seller (accept/decline the counter).
+   * Accept sells the listing and declines other pending offers.
+   */
   async respondToOffer(
-    sellerId: string,
+    userId: string,
     offerId: string,
     status: 'accepted' | 'declined',
   ): Promise<ListingOffer> {
@@ -378,29 +331,51 @@ export class ListingsService {
     await qr.startTransaction();
     try {
       const [offer] = await qr.query(
-        `SELECT o.listing_id, o.buyer_id, l.seller_id
+        `SELECT o.listing_id, o.buyer_id, o.status AS offer_status, o.last_actor,
+                l.seller_id, l.status AS listing_status
            FROM trade_offers o
            JOIN listings l ON l.id = o.listing_id
-          WHERE o.id = $1
+          WHERE o.id = $1 AND l.deleted_at IS NULL
           FOR UPDATE OF o`,
         [offerId],
       );
       if (!offer) {
         throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
       }
-      if (offer.seller_id !== sellerId) {
-        throw new ForbiddenException({
-          code: 'offer.not_seller',
-          message: 'Only the seller can respond to this offer.',
+      if (offer.offer_status !== 'pending') {
+        throw new ConflictException({
+          code: 'offer.not_pending',
+          message: 'Only pending offers can be accepted or declined.',
         });
       }
-
+      if (offer.listing_status !== 'active') {
+        throw new ConflictException({
+          code: 'listing.not_active',
+          message: 'This listing is no longer accepting negotiation.',
+        });
+      }
+      const isSeller = offer.seller_id === userId;
+      const isBuyer = offer.buyer_id === userId;
+      const waitingOnBuyer = offer.last_actor === 'seller';
+      if (isSeller) {
+        // ok
+      } else if (isBuyer && waitingOnBuyer) {
+        // ok
+      } else if (isBuyer) {
+        throw new ForbiddenException({
+          code: 'offer.not_your_turn',
+          message: 'Wait for the seller to respond, or withdraw and re-offer.',
+        });
+      } else {
+        throw new ForbiddenException({
+          code: 'offer.forbidden',
+          message: 'You cannot respond to this offer.',
+        });
+      }
       await qr.query(
         `UPDATE trade_offers SET status = $2, updated_at = NOW() WHERE id = $1`,
         [offerId, status],
       );
-
-      // Accepting an offer sells the listing and declines the rest.
       if (status === 'accepted') {
         await qr.query(
           `UPDATE listings SET status = 'sold', updated_at = NOW() WHERE id = $1`,
@@ -412,7 +387,6 @@ export class ListingsService {
           [offer.listing_id, offerId],
         );
       }
-
       await qr.commitTransaction();
       return this.getOfferById(offerId);
     } catch (err) {
@@ -439,8 +413,6 @@ export class ListingsService {
     return this.getOffer(listingId, buyerId);
   }
 
-  // ─── Favorites ────────────────────────────────────────────────────────────
-
   async toggleFavorite(userId: string, listingId: string): Promise<ToggleFavoriteResponse> {
     const [listing] = (await this.db.query(
       `SELECT id FROM listings WHERE id = $1 AND deleted_at IS NULL`,
@@ -449,14 +421,10 @@ export class ListingsService {
     if (!listing) {
       throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
     }
-
-    // Check-then-act rather than DELETE ... RETURNING (TypeORM's query() returns
-    // an ambiguous [rows, affected] tuple for UPDATE/DELETE — see events fix).
     const [existing] = (await this.db.query(
       `SELECT 1 AS x FROM trade_favorites WHERE listing_id = $1 AND user_id = $2`,
       [listingId, userId],
     )) as Array<{ x: number }>;
-
     let favorited: boolean;
     if (existing) {
       await this.db.query(
@@ -472,12 +440,10 @@ export class ListingsService {
       );
       favorited = true;
     }
-
     const countRows = (await this.db.query(
       `SELECT COUNT(*)::int AS count FROM trade_favorites WHERE listing_id = $1`,
       [listingId],
     )) as Array<{ count: number }>;
-
     return { listingId, favorited, favoriteCount: countRows[0]?.count ?? 0 };
   }
 
@@ -496,8 +462,6 @@ export class ListingsService {
     )) as ListingRow[];
     return rows.map((r) => this.toSummary(r));
   }
-
-  // ─── Helpers ────────────────────────────────────────────────────────────────
 
   private async assertSeller(userId: string, listingId: string): Promise<void> {
     const [listing] = (await this.db.query(

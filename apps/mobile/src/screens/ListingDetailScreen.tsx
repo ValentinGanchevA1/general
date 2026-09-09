@@ -212,6 +212,7 @@ function BuyerOffer({
   const [amount, setAmount] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [reofferOpen, setReofferOpen] = useState(false);
 
   const submit = useCallback(async () => {
     let offerCents: number | undefined;
@@ -252,11 +253,71 @@ function BuyerOffer({
 
   if (myOffer && myOffer.status !== 'withdrawn') {
     const isSellerCounter = myOffer.status === 'pending' && myOffer.lastActor === 'seller';
+
+    const onAcceptCounter = async () => {
+      setBusy(true);
+      try {
+        await respondToOffer(myOffer.id, 'accepted');
+        onChanged();
+      } catch (e) {
+        appAlert('Could not accept', (e as ApiError).message || 'Try again.');
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    const onDeclineCounter = async () => {
+      setBusy(true);
+      try {
+        await respondToOffer(myOffer.id, 'declined');
+        onChanged();
+      } catch (e) {
+        appAlert('Could not decline', (e as ApiError).message || 'Try again.');
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    if (isSellerCounter && reofferOpen) {
+      return (
+        <View style={S.card}>
+          <Text style={S.cardTitle}>Counter back</Text>
+          <Text style={S.counterHint}>
+            Seller offered{' '}
+            {myOffer.offerCents != null ? formatPrice(myOffer.offerCents, currency) : 'asking'}.
+            Send a new amount.
+          </Text>
+          <TextInput
+            style={S.input}
+            placeholder={`Your price (asking ${formatPrice(askingCents, currency)})`}
+            placeholderTextColor={colors.textFaint}
+            value={amount}
+            onChangeText={(t) => setAmount(t.replace(/[^0-9.]/g, ''))}
+            keyboardType="decimal-pad"
+          />
+          <TextInput
+            style={[S.input, S.multiline]}
+            placeholder="Add a message (optional)"
+            placeholderTextColor={colors.textFaint}
+            value={message}
+            onChangeText={setMessage}
+            multiline
+          />
+          <TouchableOpacity style={[S.primaryBtn, busy && S.btnDisabled]} disabled={busy} onPress={() => void submit()}>
+            {busy ? <ActivityIndicator size="small" color={colors.onPrimary} /> : <Text style={S.primaryBtnText}>Send counter</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity style={[S.secondaryBtn, { marginTop: 10 }]} disabled={busy} onPress={() => setReofferOpen(false)}>
+            <Text style={S.secondaryBtnText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
     return (
       <View style={S.card}>
         <Text style={S.cardTitle}>Your offer</Text>
         {isSellerCounter ? (
-          <Text style={S.counterHint}>Seller countered — accept via chat or send a new offer below.</Text>
+          <Text style={S.counterHint}>Seller countered — accept their price, decline, or counter back.</Text>
         ) : null}
         <Text style={S.offerLine}>
           {myOffer.offerCents != null ? formatPrice(myOffer.offerCents, currency) : 'At asking price'}
@@ -269,20 +330,43 @@ function BuyerOffer({
         {myOffer.status === 'pending' ? (
           <>
             {isSellerCounter ? (
-              <TouchableOpacity
-                style={[S.primaryBtn, { marginTop: 12 }, busy && S.btnDisabled]}
-                disabled={busy}
-                onPress={() => {
-                  setAmount(myOffer.offerCents != null ? String(myOffer.offerCents / 100) : '');
-                  setMessage('');
-                }}
-              >
-                <Text style={S.primaryBtnText}>Send updated offer</Text>
+              <View style={{ marginTop: 12, gap: 10 }}>
+                <TouchableOpacity
+                  style={[S.primaryBtn, busy && S.btnDisabled]}
+                  disabled={busy}
+                  onPress={() => void onAcceptCounter()}
+                  accessibilityLabel="Accept counter offer"
+                >
+                  {busy ? (
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
+                  ) : (
+                    <Text style={S.primaryBtnText}>Accept counter</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[S.secondaryBtn, busy && S.btnDisabled]}
+                  disabled={busy}
+                  onPress={() => {
+                    setAmount(myOffer.offerCents != null ? String(myOffer.offerCents / 100) : '');
+                    setMessage('');
+                    setReofferOpen(true);
+                  }}
+                >
+                  <Text style={S.secondaryBtnText}>Counter back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[S.secondaryBtn, busy && S.btnDisabled]}
+                  disabled={busy}
+                  onPress={() => void onDeclineCounter()}
+                >
+                  <Text style={S.secondaryBtnText}>Decline</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={[S.secondaryBtn, { marginTop: 10 }]} disabled={busy} onPress={() => void onWithdraw()}>
+                <Text style={S.secondaryBtnText}>Withdraw offer</Text>
               </TouchableOpacity>
-            ) : null}
-            <TouchableOpacity style={[S.secondaryBtn, { marginTop: 10 }]} disabled={busy} onPress={() => void onWithdraw()}>
-              <Text style={S.secondaryBtnText}>Withdraw offer</Text>
-            </TouchableOpacity>
+            )}
           </>
         ) : null}
       </View>
@@ -468,6 +552,14 @@ function SellerControls({
               ) : null}
             </View>
             {o.status === 'pending' && status === 'active' && counterFor !== o.id ? (
+              o.lastActor === 'seller' ? (
+                <View style={S.offerActions}>
+                  <Text style={S.waitingHint}>Waiting on buyer</Text>
+                  <TouchableOpacity style={S.declineBtn} onPress={() => void respond(o.id, 'declined')}>
+                    <Icon name="close" size={18} color={colors.textPrimary} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
               <View style={S.offerActions}>
                 <TouchableOpacity style={S.acceptBtn} onPress={() => void respond(o.id, 'accepted')}>
                   <Icon name="check" size={18} color={colors.onPrimary} />
@@ -487,6 +579,7 @@ function SellerControls({
                   <Icon name="close" size={18} color={colors.textPrimary} />
                 </TouchableOpacity>
               </View>
+              )
             ) : null}
           </View>
         ))
@@ -528,6 +621,7 @@ const S = StyleSheet.create({
   },
   cardTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginTop: 20, marginBottom: 10 },
   emptyHint: { color: colors.textFaint, fontSize: 14 },
+  waitingHint: { color: colors.textMuted, fontSize: 12, fontWeight: '600', marginRight: 8 },
   counterHint: { color: colors.warning, fontSize: 13, fontWeight: '600', marginBottom: 8 },
   counterTag: { color: colors.warning, fontWeight: '600' },
   counterBox: { marginTop: 10 },
