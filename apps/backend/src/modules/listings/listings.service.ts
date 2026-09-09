@@ -21,6 +21,7 @@ import {
 
 import {
   BrowseListingsDto,
+  CounterOfferDto,
   CreateListingDto,
   MakeOfferDto,
 } from './dto';
@@ -58,6 +59,7 @@ interface OfferRow {
   offer_cents: number | null;
   message: string | null;
   status: OfferStatus;
+  last_actor: 'buyer' | 'seller' | null;
   created_at: Date;
 }
 
@@ -204,7 +206,7 @@ export class ListingsService {
     const isSeller = row.seller_id === userId;
 
     const [mine] = (await this.db.query(
-      `SELECT o.id, o.listing_id, o.buyer_id, o.offer_cents, o.message, o.status, o.created_at,
+      `SELECT o.id, o.listing_id, o.buyer_id, o.offer_cents, o.message, o.status, o.last_actor, o.created_at,
               u.display_name AS buyer_display_name, u.avatar_url AS buyer_avatar_url
          FROM trade_offers o
          JOIN users u ON u.id = o.buyer_id
@@ -263,19 +265,80 @@ export class ListingsService {
       });
     }
 
-    // One offer per buyer per listing; re-offering re-opens it as pending.
+    // One offer per buyer per listing; re-offering re-opens it as pending (buyer moved last).
     await this.db.query(
-      `INSERT INTO trade_offers (listing_id, buyer_id, offer_cents, message, status)
-            VALUES ($1, $2, $3, $4, 'pending')
+      `INSERT INTO trade_offers (listing_id, buyer_id, offer_cents, message, status, last_actor)
+            VALUES ($1, $2, $3, $4, 'pending', 'buyer')
        ON CONFLICT (listing_id, buyer_id)
        DO UPDATE SET offer_cents = EXCLUDED.offer_cents,
                      message     = EXCLUDED.message,
                      status      = 'pending',
+                     last_actor  = 'buyer',
                      updated_at  = NOW()`,
       [listingId, buyerId, dto.offerCents ?? null, dto.message ?? null],
     );
 
     return this.getOffer(listingId, buyerId);
+  }
+
+  /**
+   * Seller counter: update amount + message, keep status=pending, last_actor=seller.
+   * Buyer can then accept (via respond accepted), re-offer, or withdraw.
+   */
+  async counterOffer(
+    sellerId: string,
+    offerId: string,
+    dto: CounterOfferDto,
+  ): Promise<ListingOffer> {
+    const [row] = (await this.db.query(
+      `SELECT o.id, o.listing_id, o.buyer_id, o.status, l.seller_id, l.status AS listing_status
+         FROM trade_offers o
+         JOIN listings l ON l.id = o.listing_id
+        WHERE o.id = $1 AND l.deleted_at IS NULL`,
+      [offerId],
+    )) as Array<{
+      id: string;
+      listing_id: string;
+      buyer_id: string;
+      status: OfferStatus;
+      seller_id: string;
+      listing_status: ListingStatus;
+    }>;
+
+    if (!row) {
+      throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
+    }
+    if (row.seller_id !== sellerId) {
+      throw new ForbiddenException({
+        code: 'offer.not_seller',
+        message: 'Only the seller can counter this offer.',
+      });
+    }
+    if (row.listing_status !== 'active') {
+      throw new ConflictException({
+        code: 'listing.not_active',
+        message: 'This listing is no longer accepting negotiation.',
+      });
+    }
+    if (row.status !== 'pending') {
+      throw new ConflictException({
+        code: 'offer.not_pending',
+        message: 'Only pending offers can be countered.',
+      });
+    }
+
+    await this.db.query(
+      `UPDATE trade_offers
+          SET offer_cents = $2,
+              message     = $3,
+              status      = 'pending',
+              last_actor  = 'seller',
+              updated_at  = NOW()
+        WHERE id = $1`,
+      [offerId, dto.offerCents, dto.message ?? null],
+    );
+
+    return this.getOfferById(offerId);
   }
 
   async listOffers(userId: string, listingId: string): Promise<ListingOffer[]> {
@@ -292,7 +355,7 @@ export class ListingsService {
     // Postgres reject the bind ("supplies 2 parameters, statement requires 1").
     const isSeller = listing.seller_id === userId;
     const rows = (await this.db.query(
-      `SELECT o.id, o.listing_id, o.buyer_id, o.offer_cents, o.message, o.status, o.created_at,
+      `SELECT o.id, o.listing_id, o.buyer_id, o.offer_cents, o.message, o.status, o.last_actor, o.created_at,
               u.display_name AS buyer_display_name, u.avatar_url AS buyer_avatar_url
          FROM trade_offers o
          JOIN users u ON u.id = o.buyer_id
@@ -454,7 +517,7 @@ export class ListingsService {
 
   private async getOffer(listingId: string, buyerId: string): Promise<ListingOffer> {
     const [row] = (await this.db.query(
-      `SELECT o.id, o.listing_id, o.buyer_id, o.offer_cents, o.message, o.status, o.created_at,
+      `SELECT o.id, o.listing_id, o.buyer_id, o.offer_cents, o.message, o.status, o.last_actor, o.created_at,
               u.display_name AS buyer_display_name, u.avatar_url AS buyer_avatar_url
          FROM trade_offers o
          JOIN users u ON u.id = o.buyer_id
@@ -467,7 +530,7 @@ export class ListingsService {
 
   private async getOfferById(offerId: string): Promise<ListingOffer> {
     const [row] = (await this.db.query(
-      `SELECT o.id, o.listing_id, o.buyer_id, o.offer_cents, o.message, o.status, o.created_at,
+      `SELECT o.id, o.listing_id, o.buyer_id, o.offer_cents, o.message, o.status, o.last_actor, o.created_at,
               u.display_name AS buyer_display_name, u.avatar_url AS buyer_avatar_url
          FROM trade_offers o
          JOIN users u ON u.id = o.buyer_id
@@ -496,6 +559,7 @@ export class ListingsService {
   }
 
   private toOffer(row: OfferRow): ListingOffer {
+    const actor = row.last_actor;
     return {
       id: row.id,
       listingId: row.listing_id,
@@ -505,6 +569,7 @@ export class ListingsService {
       offerCents: row.offer_cents,
       message: row.message,
       status: row.status,
+      lastActor: actor === 'buyer' || actor === 'seller' ? actor : null,
       createdAt: new Date(row.created_at).toISOString(),
     };
   }

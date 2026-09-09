@@ -25,6 +25,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { ListingsService } from './listings.service';
 import {
   BrowseListingsDto,
+  CounterOfferDto,
   CreateListingDto,
   MakeOfferDto,
   RespondOfferDto,
@@ -148,5 +149,19 @@ export class ListingsController {
     @Body() dto: RespondOfferDto,
   ): Promise<ListingOffer> {
     return this.listings.respondToOffer(userId, offerId, dto.status);
+  }
+
+  /**
+   * PUT /api/v1/listings/offers/:offerId/counter — seller counter-offer.
+   * Keeps status=pending; sets last_actor=seller so buyer can accept / re-offer.
+   */
+  @Put('offers/:offerId/counter')
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  counterOffer(
+    @CurrentUser('id') userId: string,
+    @Param('offerId', ParseUUIDPipe) offerId: string,
+    @Body() dto: CounterOfferDto,
+  ): Promise<ListingOffer> {
+    return this.listings.counterOffer(userId, offerId, dto);
   }
 }

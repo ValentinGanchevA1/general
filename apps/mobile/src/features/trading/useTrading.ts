@@ -9,6 +9,7 @@ import axios from 'axios';
 
 import type {
   BrowseListingsRequest,
+  CounterOfferRequest,
   CreateListingRequest,
   LatLng,
   ListingDetail,
@@ -180,6 +181,11 @@ export function withdrawOffer(listingId: string): Promise<ListingOffer> {
 
 export function respondToOffer(offerId: string, status: 'accepted' | 'declined'): Promise<ListingOffer> {
   return putJson<{ status: 'accepted' | 'declined' }, ListingOffer>(`/listings/offers/${offerId}`, { status });
+}
+
+/** Seller counter while keeping status=pending (last_actor=seller). */
+export function counterOffer(offerId: string, req: CounterOfferRequest): Promise<ListingOffer> {
+  return putJson<CounterOfferRequest, ListingOffer>(`/listings/offers/${offerId}/counter`, req);
 }
 
 export function updateListingStatus(listingId: string, status: ListingStatus): Promise<ListingDetail> {

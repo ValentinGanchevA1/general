@@ -1,7 +1,7 @@
 // apps/mobile/src/screens/ListingDetailScreen.tsx
 //
 // P3.7 listing detail. Buyer: favorite, make/withdraw an offer, wave the seller.
-// Seller: review offers (accept/decline) and mark the listing sold/withdrawn.
+// Seller: review offers (accept / counter / decline) and mark sold/withdrawn.
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -30,6 +30,7 @@ import type { CommerceStackParamList } from '@/navigation/stacks';
 import { useAppSelector } from '@/hooks/redux';
 import { postJson } from '@/api/client';
 import {
+  counterOffer,
   makeOffer,
   respondToOffer,
   toggleFavorite,
@@ -250,18 +251,39 @@ function BuyerOffer({
   }, [listingId, onChanged]);
 
   if (myOffer && myOffer.status !== 'withdrawn') {
+    const isSellerCounter = myOffer.status === 'pending' && myOffer.lastActor === 'seller';
     return (
       <View style={S.card}>
         <Text style={S.cardTitle}>Your offer</Text>
+        {isSellerCounter ? (
+          <Text style={S.counterHint}>Seller countered — accept via chat or send a new offer below.</Text>
+        ) : null}
         <Text style={S.offerLine}>
           {myOffer.offerCents != null ? formatPrice(myOffer.offerCents, currency) : 'At asking price'}
           {'  ·  '}
-          <Text style={S.offerStatus}>{myOffer.status}</Text>
+          <Text style={S.offerStatus}>
+            {isSellerCounter ? 'seller countered' : myOffer.status}
+          </Text>
         </Text>
+        {myOffer.message ? <Text style={S.offerMsg}>{myOffer.message}</Text> : null}
         {myOffer.status === 'pending' ? (
-          <TouchableOpacity style={S.secondaryBtn} disabled={busy} onPress={() => void onWithdraw()}>
-            <Text style={S.secondaryBtnText}>Withdraw offer</Text>
-          </TouchableOpacity>
+          <>
+            {isSellerCounter ? (
+              <TouchableOpacity
+                style={[S.primaryBtn, { marginTop: 12 }, busy && S.btnDisabled]}
+                disabled={busy}
+                onPress={() => {
+                  setAmount(myOffer.offerCents != null ? String(myOffer.offerCents / 100) : '');
+                  setMessage('');
+                }}
+              >
+                <Text style={S.primaryBtnText}>Send updated offer</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity style={[S.secondaryBtn, { marginTop: 10 }]} disabled={busy} onPress={() => void onWithdraw()}>
+              <Text style={S.secondaryBtnText}>Withdraw offer</Text>
+            </TouchableOpacity>
+          </>
         ) : null}
       </View>
     );
@@ -310,6 +332,11 @@ function SellerControls({
   currency: string;
   onChanged: () => void;
 }): React.JSX.Element {
+  const [counterFor, setCounterFor] = useState<string | null>(null);
+  const [counterAmount, setCounterAmount] = useState('');
+  const [counterMsg, setCounterMsg] = useState('');
+  const [counterBusy, setCounterBusy] = useState(false);
+
   const respond = useCallback(
     async (offerId: string, decision: 'accepted' | 'declined') => {
       try {
@@ -320,6 +347,32 @@ function SellerControls({
       }
     },
     [onChanged],
+  );
+
+  const submitCounter = useCallback(
+    async (offerId: string) => {
+      const parsed = parseFloat(counterAmount);
+      if (Number.isNaN(parsed) || parsed < 0) {
+        appAlert('Invalid price', 'Enter a valid counter amount.');
+        return;
+      }
+      setCounterBusy(true);
+      try {
+        await counterOffer(offerId, {
+          offerCents: Math.round(parsed * 100),
+          ...(counterMsg.trim() ? { message: counterMsg.trim() } : {}),
+        });
+        setCounterFor(null);
+        setCounterAmount('');
+        setCounterMsg('');
+        onChanged();
+      } catch (e) {
+        appAlert('Could not counter', (e as ApiError).message || 'Try again.');
+      } finally {
+        setCounterBusy(false);
+      }
+    },
+    [counterAmount, counterMsg, onChanged],
   );
 
   const setStatus = useCallback(
@@ -369,13 +422,66 @@ function SellerControls({
               <Text style={S.offerAmount}>
                 {o.offerCents != null ? formatPrice(o.offerCents, currency) : 'At asking price'}
                 {'  ·  '}<Text style={S.offerStatus}>{o.status}</Text>
+                {o.lastActor === 'seller' && o.status === 'pending' ? (
+                  <Text style={S.counterTag}> · your counter</Text>
+                ) : null}
               </Text>
               {o.message ? <Text style={S.offerMsg}>{o.message}</Text> : null}
+              {counterFor === o.id ? (
+                <View style={S.counterBox}>
+                  <TextInput
+                    style={S.input}
+                    placeholder="Counter price"
+                    placeholderTextColor={colors.textFaint}
+                    value={counterAmount}
+                    onChangeText={(t) => setCounterAmount(t.replace(/[^0-9.]/g, ''))}
+                    keyboardType="decimal-pad"
+                  />
+                  <TextInput
+                    style={[S.input, S.multiline]}
+                    placeholder="Message (optional)"
+                    placeholderTextColor={colors.textFaint}
+                    value={counterMsg}
+                    onChangeText={setCounterMsg}
+                    multiline
+                  />
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                      style={[S.primaryBtn, { flex: 1 }, counterBusy && S.btnDisabled]}
+                      disabled={counterBusy}
+                      onPress={() => void submitCounter(o.id)}
+                    >
+                      {counterBusy ? (
+                        <ActivityIndicator size="small" color={colors.onPrimary} />
+                      ) : (
+                        <Text style={S.primaryBtnText}>Send counter</Text>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={S.secondaryBtn}
+                      onPress={() => { setCounterFor(null); setCounterAmount(''); setCounterMsg(''); }}
+                    >
+                      <Text style={S.secondaryBtnText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : null}
             </View>
-            {o.status === 'pending' && status === 'active' ? (
+            {o.status === 'pending' && status === 'active' && counterFor !== o.id ? (
               <View style={S.offerActions}>
                 <TouchableOpacity style={S.acceptBtn} onPress={() => void respond(o.id, 'accepted')}>
                   <Icon name="check" size={18} color={colors.onPrimary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={S.counterBtn}
+                  onPress={() => {
+                    setCounterFor(o.id);
+                    setCounterAmount(o.offerCents != null ? String(o.offerCents / 100) : '');
+                    setCounterMsg('');
+                  }}
+                  accessibilityLabel="Counter offer"
+                >
+                  <Icon name="swap-horizontal" size={18} color={colors.textPrimary} />
                 </TouchableOpacity>
                 <TouchableOpacity style={S.declineBtn} onPress={() => void respond(o.id, 'declined')}>
                   <Icon name="close" size={18} color={colors.textPrimary} />
@@ -422,6 +528,9 @@ const S = StyleSheet.create({
   },
   cardTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginTop: 20, marginBottom: 10 },
   emptyHint: { color: colors.textFaint, fontSize: 14 },
+  counterHint: { color: colors.warning, fontSize: 13, fontWeight: '600', marginBottom: 8 },
+  counterTag: { color: colors.warning, fontWeight: '600' },
+  counterBox: { marginTop: 10 },
   input: {
     backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong,
     borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.textPrimary, fontSize: 15, marginBottom: 10,
@@ -447,5 +556,6 @@ const S = StyleSheet.create({
   offerMsg: { color: colors.textMuted, fontSize: 13, marginTop: 4, fontStyle: 'italic' },
   offerActions: { flexDirection: 'row', gap: 8 },
   acceptBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  counterBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' },
   declineBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' },
 });
