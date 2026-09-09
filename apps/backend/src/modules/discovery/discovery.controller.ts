@@ -42,6 +42,7 @@ export class DiscoveryController {
       prevViewportHash: dto.prevViewportHash,
       topic: dto.topic,
       listingMode: dto.listingMode,
+      friendsOnly: dto.friendsOnly === true,
     });
   }
 }

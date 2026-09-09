@@ -19,6 +19,8 @@ interface UseDiscoveryArgs {
   topic?: string | null;
   /** Omit or undefined = all listing modes. */
   listingMode?: ListingMode | undefined;
+  /** Close-friend user pins only. */
+  friendsOnly?: boolean;
   debounceMs?: number;
   enabled?: boolean;
 }
@@ -40,6 +42,7 @@ export function useDiscovery({
   kinds,
   topic,
   listingMode,
+  friendsOnly = false,
   debounceMs = 250,
   enabled = true,
 }: UseDiscoveryArgs): UseDiscoveryResult {
@@ -54,6 +57,7 @@ export function useDiscovery({
   const cachedPointsRef = useRef<DiscoveryPoint[]>([]);
   const lastTopicRef = useRef<string | null>(null);
   const lastListingModeRef = useRef<string | null>(null);
+  const lastFriendsOnlyRef = useRef(false);
 
   const fetchNow = useCallback(
     async (
@@ -62,17 +66,20 @@ export function useDiscovery({
       k?: EntityKind[],
       t?: string | null,
       lm?: ListingMode,
+      fo?: boolean,
     ) => {
-      const key = JSON.stringify({ vp, z, k, t, lm: lm ?? null });
+      const key = JSON.stringify({ vp, z, k, t, lm: lm ?? null, fo: fo === true });
       if (key === lastFetchKey.current) return;
 
       const topicChanged = lastTopicRef.current !== (t ?? null);
       const modeChanged = lastListingModeRef.current !== (lm ?? null);
-      if (topicChanged || modeChanged) {
+      const friendsChanged = lastFriendsOnlyRef.current !== (fo === true);
+      if (topicChanged || modeChanged || friendsChanged) {
         prevHashRef.current = null;
         cachedPointsRef.current = [];
         lastTopicRef.current = t ?? null;
         lastListingModeRef.current = lm ?? null;
+        lastFriendsOnlyRef.current = fo === true;
       }
 
       lastFetchKey.current = key;
@@ -91,6 +98,7 @@ export function useDiscovery({
           ...(k ? { kinds: k } : {}),
           ...(t ? { topic: t } : {}),
           ...(lm ? { listingMode: lm } : {}),
+          ...(fo ? { friendsOnly: true } : {}),
           ...(prevHashRef.current ? { prevViewportHash: prevHashRef.current } : {}),
         };
 
@@ -128,12 +136,12 @@ export function useDiscovery({
     if (!enabled || !viewport) return;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
-      void fetchNow(viewport, zoom, kinds, topic, listingMode);
+      void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly);
     }, debounceMs);
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [enabled, viewport, zoom, kinds, topic, listingMode, debounceMs, fetchNow]);
+  }, [enabled, viewport, zoom, kinds, topic, listingMode, friendsOnly, debounceMs, fetchNow]);
 
   useEffect(() => {
     return () => abortRef.current?.abort();
@@ -144,8 +152,8 @@ export function useDiscovery({
     lastFetchKey.current = '';
     prevHashRef.current = null;
     cachedPointsRef.current = [];
-    void fetchNow(viewport, zoom, kinds, topic, listingMode);
-  }, [viewport, zoom, kinds, topic, listingMode, fetchNow]);
+    void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly);
+  }, [viewport, zoom, kinds, topic, listingMode, friendsOnly, fetchNow]);
 
   return { data, loading, error, refresh };
 }
