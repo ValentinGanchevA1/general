@@ -1,7 +1,7 @@
 // apps/mobile/src/screens/ListingDetailScreen.tsx
 //
 // P3.7 listing detail. Buyer: favorite, make/withdraw an offer, wave the seller.
-// Seller: review offers (accept/decline) and mark the listing sold/withdrawn.
+// Seller: review offers (accept/decline/counter) and mark the listing sold/withdrawn.
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -30,6 +30,7 @@ import type { CommerceStackParamList } from '@/navigation/stacks';
 import { useAppSelector } from '@/hooks/redux';
 import { postJson } from '@/api/client';
 import {
+  counterOffer,
   makeOffer,
   respondToOffer,
   toggleFavorite,
@@ -250,14 +251,20 @@ function BuyerOffer({
   }, [listingId, onChanged]);
 
   if (myOffer && myOffer.status !== 'withdrawn') {
+    const sellerCountered = myOffer.lastActor === 'seller' && myOffer.status === 'pending';
     return (
       <View style={S.card}>
-        <Text style={S.cardTitle}>Your offer</Text>
+        <Text style={S.cardTitle}>{sellerCountered ? 'Seller counter-offer' : 'Your offer'}</Text>
         <Text style={S.offerLine}>
           {myOffer.offerCents != null ? formatPrice(myOffer.offerCents, currency) : 'At asking price'}
           {'  ·  '}
           <Text style={S.offerStatus}>{myOffer.status}</Text>
         </Text>
+        {sellerCountered ? (
+          <Text style={S.counterHint}>
+            The seller proposed a new price. Accept by offering that amount, re-counter, or withdraw.
+          </Text>
+        ) : null}
         {myOffer.status === 'pending' ? (
           <TouchableOpacity style={S.secondaryBtn} disabled={busy} onPress={() => void onWithdraw()}>
             <Text style={S.secondaryBtnText}>Withdraw offer</Text>
@@ -310,6 +317,10 @@ function SellerControls({
   currency: string;
   onChanged: () => void;
 }): React.JSX.Element {
+  const [counterFor, setCounterFor] = useState<string | null>(null);
+  const [counterAmount, setCounterAmount] = useState('');
+  const [counterBusy, setCounterBusy] = useState(false);
+
   const respond = useCallback(
     async (offerId: string, decision: 'accepted' | 'declined') => {
       try {
@@ -320,6 +331,28 @@ function SellerControls({
       }
     },
     [onChanged],
+  );
+
+  const onCounter = useCallback(
+    async (offerId: string) => {
+      const parsed = parseFloat(counterAmount);
+      if (Number.isNaN(parsed) || parsed < 0) {
+        appAlert('Invalid price', 'Enter a valid counter-offer amount.');
+        return;
+      }
+      setCounterBusy(true);
+      try {
+        await counterOffer(offerId, { offerCents: Math.round(parsed * 100) });
+        setCounterFor(null);
+        setCounterAmount('');
+        onChanged();
+      } catch (e) {
+        appAlert('Could not counter', (e as ApiError).message || 'Try again.');
+      } finally {
+        setCounterBusy(false);
+      }
+    },
+    [counterAmount, onChanged],
   );
 
   const setStatus = useCallback(
@@ -369,11 +402,57 @@ function SellerControls({
               <Text style={S.offerAmount}>
                 {o.offerCents != null ? formatPrice(o.offerCents, currency) : 'At asking price'}
                 {'  ·  '}<Text style={S.offerStatus}>{o.status}</Text>
+                {o.lastActor === 'seller' && o.status === 'pending' ? (
+                  <Text style={S.counterBadge}> · your counter</Text>
+                ) : null}
               </Text>
               {o.message ? <Text style={S.offerMsg}>{o.message}</Text> : null}
+              {counterFor === o.id ? (
+                <View style={S.counterBox}>
+                  <TextInput
+                    style={S.input}
+                    placeholder="Counter price"
+                    placeholderTextColor={colors.textFaint}
+                    value={counterAmount}
+                    onChangeText={(t) => setCounterAmount(t.replace(/[^0-9.]/g, ''))}
+                    keyboardType="decimal-pad"
+                    autoFocus
+                  />
+                  <View style={S.counterActions}>
+                    <TouchableOpacity
+                      style={[S.primaryBtn, { flex: 1 }, counterBusy && S.btnDisabled]}
+                      disabled={counterBusy}
+                      onPress={() => void onCounter(o.id)}
+                    >
+                      {counterBusy ? (
+                        <ActivityIndicator size="small" color={colors.onPrimary} />
+                      ) : (
+                        <Text style={S.primaryBtnText}>Send counter</Text>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={S.secondaryBtn}
+                      onPress={() => { setCounterFor(null); setCounterAmount(''); }}
+                    >
+                      <Text style={S.secondaryBtnText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : null}
             </View>
-            {o.status === 'pending' && status === 'active' ? (
+            {o.status === 'pending' && status === 'active' && counterFor !== o.id ? (
               <View style={S.offerActions}>
+                <TouchableOpacity
+                  style={S.counterBtn}
+                  onPress={() => {
+                    setCounterFor(o.id);
+                    setCounterAmount(o.offerCents != null ? String(o.offerCents / 100) : '');
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Counter offer"
+                >
+                  <Icon name="swap-horizontal" size={18} color={colors.textPrimary} />
+                </TouchableOpacity>
                 <TouchableOpacity style={S.acceptBtn} onPress={() => void respond(o.id, 'accepted')}>
                   <Icon name="check" size={18} color={colors.onPrimary} />
                 </TouchableOpacity>
@@ -422,6 +501,7 @@ const S = StyleSheet.create({
   },
   cardTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginTop: 20, marginBottom: 10 },
   emptyHint: { color: colors.textFaint, fontSize: 14 },
+  counterHint: { color: colors.textMuted, fontSize: 13, marginTop: 8, marginBottom: 8, lineHeight: 18 },
   input: {
     backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong,
     borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.textPrimary, fontSize: 15, marginBottom: 10,
@@ -437,9 +517,10 @@ const S = StyleSheet.create({
   secondaryBtnText: { color: colors.textPrimary, fontSize: 13, fontWeight: '600' },
   offerLine: { color: colors.textSecondary, fontSize: 15 },
   offerStatus: { color: colors.primary, fontWeight: '700', textTransform: 'capitalize' },
+  counterBadge: { color: colors.warning, fontWeight: '600' },
   sellerActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
   offerRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
     paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
   },
   offerBuyer: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
@@ -448,4 +529,7 @@ const S = StyleSheet.create({
   offerActions: { flexDirection: 'row', gap: 8 },
   acceptBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   declineBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' },
+  counterBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' },
+  counterBox: { marginTop: 10 },
+  counterActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
 });
