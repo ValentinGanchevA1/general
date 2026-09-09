@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -28,7 +27,8 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { deleteJson, getJson, postJson } from '@/api/client';
 import { IdentityBlock } from '@/components/IdentityBlock';
-import { colors, radius, spacing } from '@/theme';
+import { colors } from '@/theme';
+import { styles } from './EntityBottomSheet.styles';
 
 const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
 const LADDER_BADGES: Array<{ level: VerificationLevel; label: string }> = [
@@ -104,9 +104,12 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 
   useEffect(() => {
     let cancelled = false;
-    setMutualCount(0);
-    setMutualPreview([]);
-    setFetching(true);
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setMutualCount(0);
+      setMutualPreview([]);
+      setFetching(true);
+    });
 
     void getJson<PublicUserProfile>(`/users/${point.id}`)
       .then((p) => {
@@ -531,198 +534,3 @@ export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): Re
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  sheet: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    gap: 14,
-  },
-  userHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-  },
-  userHeaderMain: {
-    flex: 1,
-    minWidth: 0,
-  },
-  mutualRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-    alignSelf: 'flex-start',
-  },
-  mutualAvatars: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  mutualAvatarWrap: {
-    borderWidth: 2,
-    borderColor: colors.surface,
-    borderRadius: 12,
-  },
-  mutualAvatarOverlap: {
-    marginLeft: -8,
-  },
-  mutualAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.surfaceAlt,
-  },
-  mutualAvatarPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mutualInitial: {
-    color: colors.primary,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  mutualText: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  overflowBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  overflowBtnText: {
-    color: colors.textSecondary,
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  sectionLabel: {
-    color: colors.textFaint,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  trustBlock: { gap: 6 },
-  trustHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  trustText: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
-  trustBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  trustChip: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  trustChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
-  trustChipStrong: { backgroundColor: 'rgba(0,212,255,0.12)' },
-  trustChipStrongText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  trustEmpty: { color: colors.textFaint, fontSize: 12 },
-  bio: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
-  statsBlock: { gap: 6 },
-  statsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 8,
-  },
-  statPill: {
-    backgroundColor: colors.bg,
-    borderRadius: radius.md,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  statPillValue: { color: colors.textPrimary, fontSize: 13, fontWeight: '700' },
-  achievementIcons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  achievementIcon: { fontSize: 16 },
-  actions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  primaryBtn: {
-    flex: 1,
-    borderRadius: radius.md,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  waveBtn: { backgroundColor: colors.primary },
-  messageBtn: { backgroundColor: colors.action },
-  primaryBtnText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
-  profileBtn: {
-    borderRadius: radius.md,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    minHeight: 48,
-  },
-  profileBtnText: { color: colors.textSecondary, fontWeight: '600', fontSize: 14 },
-  btnDisabled: { opacity: 0.55 },
-  kindHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  kindDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  kindDotEvent: { backgroundColor: colors.entityEvent },
-  kindDotListing: { backgroundColor: colors.entityListing },
-  kindDotWanted: { backgroundColor: colors.entityWanted },
-  kindLabelWanted: { color: colors.entityWanted },
-  kindLabel: {
-    color: colors.textFaint,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  entityTitle: {
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 6,
-  },
-  metaText: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  metaDot: {
-    color: colors.textFaint,
-    fontSize: 13,
-  },
-  priceText: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  entityPrimaryBtn: {
-    flex: 0,
-    alignSelf: 'stretch',
-    backgroundColor: colors.primary,
-    marginTop: 4,
-  },
-  listingPrimaryBtn: {
-    backgroundColor: colors.action,
-  },
-});
