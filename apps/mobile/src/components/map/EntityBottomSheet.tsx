@@ -104,7 +104,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 
   useEffect(() => {
     let cancelled = false;
-    // Defer reset so setState is not synchronous in the effect body (react-hooks/set-state-in-effect).
     queueMicrotask(() => {
       if (cancelled) return;
       setMutualCount(0);
@@ -400,6 +399,138 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
           {profile.bio}
         </Text>
       ) : null}
+    </View>
+  );
+}
+
+function EventCard({
+  point,
+  onClose,
+}: {
+  point: EventEntityPoint;
+  onClose: () => void;
+}): React.JSX.Element {
+  const navigation = useNavigation<Nav>();
+  const meta = point.meta;
+  const title = meta.title?.trim() || 'Event';
+  const capacity =
+    meta.capacity != null && meta.capacity > 0
+      ? `${meta.attendeeCount}/${meta.capacity} going`
+      : `${meta.attendeeCount} going`;
+
+  const openDetail = (): void => {
+    onClose();
+    openRootScreen(navigation, 'EventDetail', { eventId: point.id });
+  };
+
+  return (
+    <View style={styles.sheet}>
+      <View style={styles.kindHeader}>
+        <View style={[styles.kindDot, styles.kindDotEvent]} />
+        <Text style={styles.kindLabel}>Event</Text>
+      </View>
+      <Text style={styles.entityTitle} numberOfLines={2}>
+        {title}
+      </Text>
+      <View style={styles.metaRow}>
+        <Text style={styles.metaText}>{formatStartsAt(meta.startsAt)}</Text>
+        <Text style={styles.metaDot}>·</Text>
+        <Text style={styles.metaText}>{capacity}</Text>
+      </View>
+      <TouchableOpacity
+        style={[styles.primaryBtn, styles.entityPrimaryBtn]}
+        onPress={openDetail}
+        accessibilityRole="button"
+        accessibilityLabel="View event"
+      >
+        <Text style={styles.primaryBtnText}>View event</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function ListingCard({
+  point,
+  onClose,
+}: {
+  point: ListingEntityPoint;
+  onClose: () => void;
+}): React.JSX.Element {
+  const navigation = useNavigation<Nav>();
+  const meta = point.meta;
+  const title = meta.title?.trim() || 'Listing';
+  const isBuy = meta.mode === 'buy';
+  const mode = isBuy ? 'Wanted' : 'For sale';
+  const price = formatPrice(meta.priceCents, meta.currency);
+  const category = meta.category?.trim() || null;
+
+  const openDetail = (): void => {
+    onClose();
+    openRootScreen(navigation, 'ListingDetail', { listingId: point.id });
+  };
+
+  return (
+    <View style={styles.sheet}>
+      <View style={styles.kindHeader}>
+        <View
+          style={[
+            styles.kindDot,
+            isBuy ? styles.kindDotWanted : styles.kindDotListing,
+          ]}
+        />
+        <Text style={[styles.kindLabel, isBuy ? styles.kindLabelWanted : undefined]}>{mode}</Text>
+      </View>
+      <Text style={styles.entityTitle} numberOfLines={2}>
+        {title}
+      </Text>
+      <View style={styles.metaRow}>
+        <Text style={styles.priceText}>{price}</Text>
+        {category ? (
+          <>
+            <Text style={styles.metaDot}>·</Text>
+            <Text style={styles.metaText}>{category}</Text>
+          </>
+        ) : null}
+      </View>
+      <TouchableOpacity
+        style={[styles.primaryBtn, styles.entityPrimaryBtn, styles.listingPrimaryBtn]}
+        onPress={openDetail}
+        accessibilityRole="button"
+        accessibilityLabel="View listing"
+      >
+        <Text style={styles.primaryBtnText}>View listing</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+/** Content only — host mounts inside BottomSheetModal. */
+export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): React.JSX.Element {
+  if (point.kind === 'user') {
+    return (
+      <UserCard
+        point={point as UserEntityPoint}
+        waving={waving}
+        onClose={onClose}
+        onWave={onWave}
+      />
+    );
+  }
+
+  if (point.kind === 'event') {
+    return <EventCard point={point as EventEntityPoint} onClose={onClose} />;
+  }
+
+  if (point.kind === 'listing') {
+    return <ListingCard point={point as ListingEntityPoint} onClose={onClose} />;
+  }
+
+  return (
+    <View style={styles.sheet}>
+      <Text style={styles.entityTitle}>Unknown</Text>
+      <TouchableOpacity style={[styles.primaryBtn, styles.entityPrimaryBtn]} onPress={onClose}>
+        <Text style={styles.primaryBtnText}>Close</Text>
+      </TouchableOpacity>
     </View>
   );
 }
