@@ -1,1 +1,1 @@
-PLACEHOLDER_EB
+SEE_ARTIFACT_EntityBottomSheet.fix.tsx
