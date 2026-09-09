@@ -24,6 +24,7 @@ import {
   buildVerificationItems,
   type VerificationItemId,
 } from '@/components/Profile/VerificationStatusSheet';
+import { TrustNextCard } from '@/components/Profile/TrustNextCard';
 import { ProfileBio } from '@/components/Profile/ProfileBio';
 import { ProfileFriendsCard } from '@/components/Profile/ProfileFriendsCard';
 import { ProfileActivityLinks } from '@/components/Profile/ProfileActivityLinks';
@@ -40,7 +41,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 /**
  * Self profile — public-facing identity + activity.
- * Order: Hero → Bio → Tags → Activity → Friends → Storyline → Photos → Premium.
+ * Order: Hero → Bio → Tags → Trust → Activity → Friends → Storyline → Photos → Premium.
  * Trust details open from the % badge (bottom sheet). Account controls in Settings.
  */
 export function ProfileScreen(): React.JSX.Element {
@@ -203,6 +204,12 @@ export function ProfileScreen(): React.JSX.Element {
         {p.bio ? <ProfileBio bio={p.bio} /> : null}
 
         <ProfileTagsSection interests={interests} goals={goals} />
+
+        <TrustNextCard
+          profile={p}
+          onContinue={handleVerificationItem}
+          onOpenDetails={openVerification}
+        />
 
         <ProfileActivityLinks
           gamification={gamification ?? null}
