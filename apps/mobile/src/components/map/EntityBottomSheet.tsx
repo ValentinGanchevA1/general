@@ -104,12 +104,12 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 
   useEffect(() => {
     let cancelled = false;
-    queueMicrotask(() => {
+    setTimeout(() => {
       if (cancelled) return;
       setMutualCount(0);
       setMutualPreview([]);
       setFetching(true);
-    });
+    }, 0);
 
     void getJson<PublicUserProfile>(`/users/${point.id}`)
       .then((p) => {
