@@ -35,29 +35,35 @@ describe('StoriesService', () => {
 
   // assertCanPost selects verification_level, created_at, story_suspended_until
   // then SUM(user_strikes) then 24h story count — mocks must follow that order.
-  const phoneUser = {
-    verification_level: 'phone' as const,
-    created_at: new Date('2026-01-01T00:00:00Z'),
-    story_suspended_until: null as Date | null,
+  type GateUser = {
+    verification_level: 'none' | 'email' | 'phone' | 'selfie' | 'id';
+    created_at: Date;
+    story_suspended_until: Date | null;
   };
-  const emailOldUser = {
-    verification_level: 'email' as const,
+
+  const phoneUser: GateUser = {
+    verification_level: 'phone',
+    created_at: new Date('2026-01-01T00:00:00Z'),
+    story_suspended_until: null,
+  };
+  const emailOldUser: GateUser = {
+    verification_level: 'email',
     created_at: new Date(Date.now() - 48 * 3600_000),
-    story_suspended_until: null as Date | null,
+    story_suspended_until: null,
   };
-  const emailNewUser = {
-    verification_level: 'email' as const,
+  const emailNewUser: GateUser = {
+    verification_level: 'email',
     created_at: new Date(Date.now() - 60 * 60_000),
-    story_suspended_until: null as Date | null,
+    story_suspended_until: null,
   };
-  const noneUser = {
-    verification_level: 'none' as const,
+  const noneUser: GateUser = {
+    verification_level: 'none',
     created_at: new Date('2026-01-01T00:00:00Z'),
-    story_suspended_until: null as Date | null,
+    story_suspended_until: null,
   };
 
   /** User row + zero strikes (gate passes age/level). Count is mocked by the caller. */
-  function mockUserAndStrikes(user: typeof phoneUser) {
+  function mockUserAndStrikes(user: GateUser) {
     query.mockResolvedValueOnce([user]).mockResolvedValueOnce([{ pts: 0 }]);
   }
 
