@@ -71,9 +71,8 @@ describe('ListingsService', () => {
         title: 'Bike',
         priceCents: 10000,
         category: 'goods',
-        lat: 42.7,
-        lng: 23.3,
-      } as never);
+        location: { lat: 42.7, lng: 23.3 },
+      });
       expect(res).toMatchObject({ id: 'l1', title: 'Bike', favoritedByMe: false });
     });
   });
