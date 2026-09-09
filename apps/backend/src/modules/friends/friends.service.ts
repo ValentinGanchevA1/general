@@ -421,6 +421,23 @@ export class FriendsService {
     return rows[0]?.allowed !== false;
   }
 
+  /**
+   * Batch: which of the given userIds allow close friends to see online status.
+   * Default true when column is null. Used by discovery map presence overlay.
+   */
+  async listWhoAllowFriendsOnline(userIds: string[]): Promise<Set<string>> {
+    if (userIds.length === 0) return new Set();
+    const rows = await this.db.query<Array<{ id: string }>>(
+      `SELECT id
+         FROM users
+        WHERE id = ANY($1::uuid[])
+          AND deleted_at IS NULL
+          AND COALESCE(friends_see_online_status, true) = true`,
+      [userIds],
+    );
+    return new Set(rows.map((r) => r.id));
+  }
+
   async listFollowing(
     actorId: string,
     cursor?: string,

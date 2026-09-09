@@ -38,6 +38,7 @@ describe('DiscoveryService', () => {
   let query: jest.Mock;
   let whichAreOnline: jest.Mock;
   let listFriendIds: jest.Mock;
+  let listWhoAllowFriendsOnline: jest.Mock;
   let redisGet: jest.Mock;
   let redisSet: jest.Mock;
 
@@ -49,6 +50,7 @@ describe('DiscoveryService', () => {
     query = jest.fn().mockResolvedValue([]);
     whichAreOnline = jest.fn().mockResolvedValue(new Set<string>());
     listFriendIds = jest.fn().mockResolvedValue([]);
+    listWhoAllowFriendsOnline = jest.fn().mockResolvedValue(new Set<string>());
     redisGet = jest.fn().mockResolvedValue(null);
     redisSet = jest.fn().mockResolvedValue('OK');
 
@@ -57,7 +59,10 @@ describe('DiscoveryService', () => {
         DiscoveryService,
         { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
         { provide: PresenceService, useValue: { whichAreOnline } },
-        { provide: FriendsService, useValue: { listFriendIds } },
+        {
+          provide: FriendsService,
+          useValue: { listFriendIds, listWhoAllowFriendsOnline },
+        },
         { provide: REDIS_CLIENT, useValue: { get: redisGet, set: redisSet } },
       ],
     }).compile();
@@ -116,24 +121,56 @@ describe('DiscoveryService', () => {
 
     const userMeta = { displayName: 'A', avatarUrl: null, verification: 'email', online: false, lastSeenAt: null };
 
-    it('overlays live Redis presence onto user points and passes other kinds through', async () => {
+    it('overlays live Redis presence onto friend pins only when peer allows friends online', async () => {
       query.mockResolvedValueOnce([
         { id: 'u1', kind: 'user', lat: 10, lng: 20, meta: { ...userMeta } },
         { id: 'e1', kind: 'event', lat: 11, lng: 21, meta: { title: 'Party' } },
       ]);
       whichAreOnline.mockResolvedValue(new Set(['u1']));
       listFriendIds.mockResolvedValue(['u1']);
+      listWhoAllowFriendsOnline.mockResolvedValue(new Set(['u1']));
 
       const res = await call();
 
-      expect(whichAreOnline).toHaveBeenCalledWith(['u1']);
       expect(listFriendIds).toHaveBeenCalledWith('me');
+      expect(listWhoAllowFriendsOnline).toHaveBeenCalledWith(['u1']);
+      expect(whichAreOnline).toHaveBeenCalledWith(['u1']);
       const points = asPoints(res.points);
       const user = points.find((p) => p.kind === 'user');
       const event = points.find((p) => p.kind === 'event');
-      expect(user?.meta?.online).toBe(true); // view hardcodes false; Redis overrides
+      expect(user?.meta?.online).toBe(true);
       expect(user?.meta?.isFriend).toBe(true);
       expect(event?.meta).toEqual({ title: 'Party' });
+    });
+
+    it('hides online for non-friends even if presence is hot', async () => {
+      query.mockResolvedValueOnce([
+        { id: 'u1', kind: 'user', lat: 10, lng: 20, meta: { ...userMeta } },
+      ]);
+      whichAreOnline.mockResolvedValue(new Set(['u1']));
+      listFriendIds.mockResolvedValue([]); // not a friend
+      listWhoAllowFriendsOnline.mockResolvedValue(new Set());
+
+      const res = await call();
+      const user = asPoints(res.points).find((p) => p.kind === 'user');
+      expect(user?.meta?.online).toBe(false);
+      expect(user?.meta?.isFriend).toBe(false);
+      expect(whichAreOnline).not.toHaveBeenCalled();
+    });
+
+    it('hides online when friend disallows friends_see_online_status', async () => {
+      query.mockResolvedValueOnce([
+        { id: 'u1', kind: 'user', lat: 10, lng: 20, meta: { ...userMeta } },
+      ]);
+      whichAreOnline.mockResolvedValue(new Set(['u1']));
+      listFriendIds.mockResolvedValue(['u1']);
+      listWhoAllowFriendsOnline.mockResolvedValue(new Set()); // disallowed
+
+      const res = await call();
+      const user = asPoints(res.points).find((p) => p.kind === 'user');
+      expect(user?.meta?.online).toBe(false);
+      expect(user?.meta?.isFriend).toBe(true);
+      expect(whichAreOnline).not.toHaveBeenCalled();
     });
 
     it('does not call presence when there are no user rows', async () => {

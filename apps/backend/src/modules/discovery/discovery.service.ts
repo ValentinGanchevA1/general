@@ -314,17 +314,26 @@ export class DiscoveryService {
     );
 
     const userIds = rows.filter((r) => r.kind === 'user').map((r) => r.id);
-    const onlineSet = userIds.length
-      ? await this.presence.whichAreOnline(userIds)
-      : new Set<string>();
     const friendIdSet =
       userIds.length > 0
         ? new Set(await this.friends.listFriendIds(requesterId))
         : new Set<string>();
+    // Presence is only visible to close friends, and only when the peer allows it
+    // (friends_see_online_status). Non-friends never see online on the map.
+    const friendUserIds = userIds.filter((id) => friendIdSet.has(id));
+    const allowOnlineSet =
+      friendUserIds.length > 0
+        ? await this.friends.listWhoAllowFriendsOnline(friendUserIds)
+        : new Set<string>();
+    const presenceIds = friendUserIds.filter((id) => allowOnlineSet.has(id));
+    const onlineSet = presenceIds.length
+      ? await this.presence.whichAreOnline(presenceIds)
+      : new Set<string>();
 
     return rows.map((r) => {
       if (r.kind === 'user') {
         const viewMeta = r.meta as unknown as UserMeta;
+        const isFriend = friendIdSet.has(r.id);
         return {
           kind: 'user' as const,
           id: r.id,
@@ -332,8 +341,8 @@ export class DiscoveryService {
           lng: r.lng,
           meta: {
             ...viewMeta,
-            online: onlineSet.has(r.id),
-            isFriend: friendIdSet.has(r.id),
+            online: isFriend && allowOnlineSet.has(r.id) && onlineSet.has(r.id),
+            isFriend,
           },
         };
       }

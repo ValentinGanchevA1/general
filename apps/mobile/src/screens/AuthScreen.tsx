@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -16,6 +16,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { login, register, clearError, loginWithGoogle } from '@/features/auth/authSlice';
 import { setPendingPhoneVerify } from '@/services/pendingPhone';
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@/constants/app';
+import { FormField } from '@/components/FormField';
 import { colors, spacing, fontSize } from '@/theme';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -66,6 +67,10 @@ export function AuthScreen(): React.JSX.Element {
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
 
   const clearFieldError = useCallback((key: keyof FieldErrors) => {
     setFieldErrors((prev) => {
@@ -126,78 +131,69 @@ export function AuthScreen(): React.JSX.Element {
             {mode === 'login' ? 'Sign in to continue' : 'Create your account'}
           </Text>
 
-          {mode === 'register' && (
-            <View>
-              <TextInput
-                style={[styles.input, fieldErrors.displayName ? styles.inputError : null]}
-                placeholder="Display name"
-                placeholderTextColor={colors.textFaint}
-                value={displayName}
-                onChangeText={(t) => {
-                  setDisplayName(t);
-                  clearFieldError('displayName');
-                }}
-                autoCapitalize="words"
-                accessibilityLabel="Display name"
-              />
-              {fieldErrors.displayName ? (
-                <Text style={styles.fieldError}>{fieldErrors.displayName}</Text>
-              ) : null}
-            </View>
-          )}
-
-          <View>
-            <TextInput
-              style={[styles.input, fieldErrors.email ? styles.inputError : null]}
-              placeholder="Email"
-              placeholderTextColor={colors.textFaint}
-              value={email}
+          {mode === 'register' ? (
+            <FormField
+              placeholder="Display name"
+              value={displayName}
               onChangeText={(t) => {
-                setEmail(t);
-                clearFieldError('email');
+                setDisplayName(t);
+                clearFieldError('displayName');
               }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              accessibilityLabel="Email"
+              autoCapitalize="words"
+              returnKeyType="next"
+              onSubmitEditing={() => emailRef.current?.focus()}
+              error={fieldErrors.displayName}
+              accessibilityLabel="Display name"
             />
-            {fieldErrors.email ? (
-              <Text style={styles.fieldError}>{fieldErrors.email}</Text>
-            ) : null}
-          </View>
+          ) : null}
+
+          <FormField
+            ref={emailRef}
+            placeholder="Email"
+            value={email}
+            onChangeText={(t) => {
+              setEmail(t);
+              clearFieldError('email');
+            }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            returnKeyType="next"
+            onSubmitEditing={() =>
+              mode === 'register' ? phoneRef.current?.focus() : passwordRef.current?.focus()
+            }
+            error={fieldErrors.email}
+            accessibilityLabel="Email"
+          />
 
           {mode === 'register' ? (
-            <TextInput
-              style={styles.input}
+            <FormField
+              ref={phoneRef}
               placeholder="Phone (optional) e.g. +359888123456"
-              placeholderTextColor={colors.textFaint}
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
               autoComplete="tel"
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
               accessibilityLabel="Phone number optional"
             />
           ) : null}
 
-          <View>
-            <TextInput
-              style={[styles.input, fieldErrors.password ? styles.inputError : null]}
-              placeholder="Password"
-              placeholderTextColor={colors.textFaint}
-              value={password}
-              onChangeText={(t) => {
-                setPassword(t);
-                clearFieldError('password');
-              }}
-              secureTextEntry
-              returnKeyType="done"
-              onSubmitEditing={submit}
-              accessibilityLabel="Password"
-            />
-            {fieldErrors.password ? (
-              <Text style={styles.fieldError}>{fieldErrors.password}</Text>
-            ) : null}
-          </View>
+          <FormField
+            ref={passwordRef}
+            placeholder="Password"
+            value={password}
+            onChangeText={(t) => {
+              setPassword(t);
+              clearFieldError('password');
+            }}
+            secureTextEntry
+            returnKeyType="done"
+            onSubmitEditing={submit}
+            error={fieldErrors.password}
+            accessibilityLabel="Password"
+          />
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -283,24 +279,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     textAlign: 'center',
     marginBottom: spacing.md,
-  },
-  input: {
-    backgroundColor: colors.surfaceAlt,
-    color: colors.textPrimary,
-    borderRadius: 10,
-    padding: 14,
-    fontSize: fontSize.md,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  inputError: {
-    borderColor: colors.danger,
-  },
-  fieldError: {
-    color: colors.danger,
-    fontSize: fontSize.xs,
-    marginTop: spacing.xs,
-    marginLeft: 2,
   },
   error: { color: colors.danger, fontSize: fontSize.sm, textAlign: 'center' },
   btn: {
