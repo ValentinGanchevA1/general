@@ -197,22 +197,25 @@ export function PulseScreen(): React.JSX.Element {
   const onCreatePress = useCallback(() => {
     if (!storyEligibility.allowed) {
       const reason = storyEligibility.reason;
-      const buttons =
-        reason === 'email_unverified'
-          ? [
-              { text: 'Cancel', style: 'cancel' as const },
-              {
-                text: 'Verify email',
-                onPress: () => openRootScreen(navigation, 'EmailVerification'),
-              },
-            ]
-          : [{ text: 'OK' }];
-      appAlert('Stories', storyGateMessage(reason), buttons);
+      track('story.gate_tap', { reason, surface: 'pulse' });
+
+      if (reason === 'email_unverified') {
+        openRootScreen(navigation, 'EmailVerification');
+        return;
+      }
+      if (reason === 'phone_required') {
+        openRootScreen(navigation, 'Verification', {
+          initialPhone: profile?.phone ?? undefined,
+        });
+        return;
+      }
+      // account_too_new | suspended — no actionable destination
+      appAlert('Stories', storyGateMessage(reason), [{ text: 'OK' }]);
       return;
     }
     setCreateOpen(true);
     track('story.create_open', { surface: 'pulse' });
-  }, [storyEligibility, navigation]);
+  }, [storyEligibility, navigation, profile?.phone]);
 
   const emptyCopy = useMemo(() => {
     switch (filter) {
@@ -244,6 +247,7 @@ export function PulseScreen(): React.JSX.Element {
         onOpenStory={onOpenStory}
         onCreatePress={onCreatePress}
         canCreate={storyEligibility.allowed}
+        {...(!storyEligibility.allowed ? { gateReason: storyEligibility.reason } : {})}
       />
 
       <ScrollView
