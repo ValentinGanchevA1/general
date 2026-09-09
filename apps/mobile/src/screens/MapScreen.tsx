@@ -62,6 +62,8 @@ import { MapChrome } from '@/components/map/MapChrome';
 import { CreateNearbySheet } from '@/components/map/CreateNearbySheet';
 import { useCreateNearby } from '@/features/map/useCreateNearby';
 import { useMapFocus } from '@/features/map/useMapFocus';
+import { useMapCreateNudge } from '@/features/map/useMapCreateNudge';
+import { MapCreateNudgeBanner } from '@/features/map/MapCreateNudgeBanner';
 import { sheetChrome, useSheetBackdrop } from '@/components/sheets';
 import { mapListingModeFilterTop } from '@/components/map/mapChromeLayout';
 
@@ -246,6 +248,22 @@ export function MapScreen(): React.JSX.Element {
 	);
 
 	const sheetOpen = selected != null;
+	const isEmpty = !loading && points.length === 0 && region != null;
+
+	const openCreateNearby = useCallback(() => {
+		setCreateNearbyOpen(true);
+	}, [setCreateNearbyOpen]);
+
+	const { visible: createNudgeVisible, dismiss: dismissCreateNudge } = useMapCreateNudge({
+		mapReady: region != null,
+		isEmpty,
+		blocked: sheetOpen || createNearbyOpen,
+	});
+
+	const onCreateNudgeCreate = useCallback(() => {
+		dismissCreateNudge('create');
+		openCreateNearby();
+	}, [dismissCreateNudge, openCreateNearby]);
 
 	return (
 		<View style={styles.root}>
@@ -284,13 +302,15 @@ export function MapScreen(): React.JSX.Element {
 				/>
 			) : null}
 
-			{!loading && points.length === 0 && region ? (
-				<View style={styles.emptyWrap} pointerEvents="none">
+			{isEmpty ? (
+				<View style={styles.emptyWrap} pointerEvents="box-none">
 					<EmptyState
 						variant="plain"
 						icon="map-marker-radius-outline"
-						title="Nothing nearby"
-						body="Pan the map or long-press to create something here."
+						title="Nothing nearby yet"
+						body="Be the first — post a listing, event, or alert. Or long-press the map anytime."
+						actionLabel="Create here"
+						onAction={openCreateNearby}
 					/>
 				</View>
 			) : null}
@@ -299,6 +319,13 @@ export function MapScreen(): React.JSX.Element {
 				<View style={styles.loadingWrap} pointerEvents="none">
 					<ActivityIndicator color={colors.primary} />
 				</View>
+			) : null}
+
+			{createNudgeVisible ? (
+				<MapCreateNudgeBanner
+					onCreate={onCreateNudgeCreate}
+					onDismiss={() => dismissCreateNudge('dismiss')}
+				/>
 			) : null}
 
 			<EventsRail location={myCoords} />
