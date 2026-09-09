@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsLatitude,
   IsLongitude,
@@ -61,4 +62,9 @@ export class DiscoveryQueryDto {
   @IsOptional()
   @IsIn(['sell', 'buy'])
   listingMode?: ListingMode;
+
+  /** Close-friend user pins only (events/listings omitted). */
+  @IsOptional()
+  @IsBoolean()
+  friendsOnly?: boolean;
 }

@@ -57,6 +57,7 @@ import {
 	ListingModeFilter,
 	type ListingModeFilterValue,
 } from '@/components/map/ListingModeFilter';
+import { FriendsOnlyFilter } from '@/components/map/FriendsOnlyFilter';
 import { EmptyState } from '@/components/EmptyState';
 import { MapChrome } from '@/components/map/MapChrome';
 import { CreateNearbySheet } from '@/components/map/CreateNearbySheet';
@@ -87,6 +88,7 @@ export function MapScreen(): React.JSX.Element {
 
 	const [listingModeFilter, setListingModeFilter] =
 		useState<ListingModeFilterValue>('all');
+	const [friendsOnly, setFriendsOnly] = useState(false);
 	const insets = useSafeAreaInsets();
 
 	const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
@@ -97,7 +99,8 @@ export function MapScreen(): React.JSX.Element {
 	const { data, loading } = useDiscovery({
 		viewport,
 		zoom,
-		listingMode,
+		listingMode: friendsOnly ? undefined : listingMode,
+		friendsOnly,
 	});
 	const points = data?.points ?? EMPTY_POINTS;
 
@@ -303,10 +306,18 @@ export function MapScreen(): React.JSX.Element {
 				sheetOpen={sheetOpen}
 			/>
 
-			{region ? (
+			{region && !friendsOnly ? (
 				<ListingModeFilter
 					value={listingModeFilter}
 					onChange={setListingModeFilter}
+					top={mapListingModeFilterTop(insets.top)}
+				/>
+			) : null}
+
+			{region ? (
+				<FriendsOnlyFilter
+					active={friendsOnly}
+					onChange={setFriendsOnly}
 					top={mapListingModeFilterTop(insets.top)}
 				/>
 			) : null}
@@ -315,11 +326,22 @@ export function MapScreen(): React.JSX.Element {
 				<View style={styles.emptyWrap} pointerEvents="box-none">
 					<EmptyState
 						variant="plain"
-						icon="map-marker-radius-outline"
-						title="Nothing nearby yet"
-						body="Be the first — post a listing, event, or alert. Or long-press the map anytime."
-						actionLabel="Create here"
-						onAction={openCreateNearby}
+						icon={friendsOnly ? 'account-group-outline' : 'map-marker-radius-outline'}
+						title={friendsOnly ? 'No friends nearby' : 'Nothing nearby yet'}
+						body={
+							friendsOnly
+								? 'None of your friends are in this area right now. Pan the map or turn Friends off.'
+								: 'Be the first — post a listing, event, or alert. Or long-press the map anytime.'
+						}
+						{...(friendsOnly
+							? {
+									actionLabel: 'Show everyone',
+									onAction: () => setFriendsOnly(false),
+								}
+							: {
+									actionLabel: 'Create here',
+									onAction: openCreateNearby,
+								})}
 					/>
 				</View>
 			) : null}

@@ -21,6 +21,11 @@ export interface DiscoveryQuery {
    * Users and events are unaffected. Omit for all listings.
    */
   listingMode?: ListingMode;
+  /**
+   * When true, only close-friend user pins are returned (events/listings omitted).
+   * Offline friends remain visible; online is still presence-based.
+   */
+  friendsOnly?: boolean;
 }
 
 export interface ClusterPoint {

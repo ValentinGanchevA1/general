@@ -60,37 +60,59 @@ export class DiscoveryService {
     prevViewportHash?: string;
     topic?: string;
     listingMode?: ListingMode;
+    /** Close-friend user pins only (events/listings omitted). */
+    friendsOnly?: boolean;
   }): Promise<DiscoveryResponse> {
-    const topicSlug = params.topic ? params.topic.replace(/^#/, '').trim().toLowerCase() : '';
+    const friendsOnly = params.friendsOnly === true;
+    const topicSlug = friendsOnly
+      ? ''
+      : params.topic
+        ? params.topic.replace(/^#/, '').trim().toLowerCase()
+        : '';
     const requested = params.kinds?.length ? params.kinds : DEFAULT_KINDS;
-    const kinds = topicSlug
+    let kinds = topicSlug
       ? requested.filter((k) => k === 'event' || k === 'listing')
       : requested;
-    const listingMode: ListingMode | undefined =
-      params.listingMode === 'buy' || params.listingMode === 'sell'
+    if (friendsOnly) kinds = ['user'];
+    const listingMode: ListingMode | undefined = friendsOnly
+      ? undefined
+      : params.listingMode === 'buy' || params.listingMode === 'sell'
         ? params.listingMode
         : undefined;
+    const friendIds = friendsOnly
+      ? await this.friends.listFriendIds(params.requesterId)
+      : null;
     const resolution = h3ResolutionForZoom(params.zoom);
+
+    if (friendsOnly && (friendIds == null || friendIds.length === 0)) {
+      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, true);
+    }
 
     if (this.estimateCellCount(params.viewport, resolution) > MAX_CELLS_PER_VIEWPORT) {
       this.logger.warn(`Viewport too large at r${resolution} — refusing`);
-      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode);
+      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly);
     }
 
     const cells = cellsForViewport(params.viewport, resolution);
     if (cells.length === 0 || (topicSlug && kinds.length === 0)) {
-      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode);
+      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly);
     }
     if (cells.length > 5_000) {
       this.logger.warn(`Viewport produced ${cells.length} cells at r${resolution} — refusing`);
-      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode);
+      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly);
     }
 
     const points = isEntityZoom(params.zoom)
-      ? await this.entitiesInCells(cells, resolution, kinds, params.requesterId, topicSlug, listingMode)
-      : await this.clusterByCell(cells, resolution, kinds, params.requesterId, topicSlug, listingMode);
+      ? await this.entitiesInCells(
+          cells, resolution, kinds, params.requesterId, topicSlug, listingMode, friendIds,
+        )
+      : await this.clusterByCell(
+          cells, resolution, kinds, params.requesterId, topicSlug, listingMode, friendIds,
+        );
 
-    const viewportHash = this.hashViewport(params.viewport, params.zoom, kinds, topicSlug, listingMode);
+    const viewportHash = this.hashViewport(
+      params.viewport, params.zoom, kinds, topicSlug, listingMode, friendsOnly,
+    );
     await this.storeSnapshot(viewportHash, points);
 
     if (params.prevViewportHash) {
@@ -189,9 +211,21 @@ export class DiscoveryService {
     requesterId: string,
     topicSlug: string,
     listingMode?: ListingMode,
+    friendIds: string[] | null = null,
   ): Promise<DiscoveryPoint[]> {
     const cellCol = this.cellColumn(resolution);
     const listingClause = listingModeSql(listingMode);
+    const queryParams: unknown[] = [cells, kinds, requesterId];
+    let friendsClause = '';
+    if (friendIds != null) {
+      queryParams.push(friendIds);
+      friendsClause = `AND id = ANY($${queryParams.length}::uuid[])`;
+    }
+    let topicClause = '';
+    if (topicSlug) {
+      queryParams.push(topicSlug);
+      topicClause = `AND ${TOPIC_MATCH_SQL('$' + String(queryParams.length))}`;
+    }
     const rows: Array<{ cell: string; kind: EntityKind; n: string }> = await this.db.query(
       `
       SELECT ${cellCol} AS cell, kind, COUNT(*)::text AS n
@@ -205,11 +239,12 @@ export class DiscoveryService {
             WHERE (ub.blocker_id = $3 AND ub.blocked_id = id)
                OR (ub.blocker_id = id AND ub.blocked_id = $3)
          ))
-         ${topicSlug ? `AND ${TOPIC_MATCH_SQL('$4')}` : ''}
+         ${topicClause}
          ${listingClause}
+         ${friendsClause}
        GROUP BY ${cellCol}, kind
       `,
-      topicSlug ? [cells, kinds, requesterId, topicSlug] : [cells, kinds, requesterId],
+      queryParams,
     );
 
     const byCell = new Map<string, { count: number; by: Partial<Record<EntityKind, number>> }>();
@@ -238,9 +273,21 @@ export class DiscoveryService {
     requesterId: string,
     topicSlug: string,
     listingMode?: ListingMode,
+    friendIds: string[] | null = null,
   ): Promise<DiscoveryPoint[]> {
     const cellCol = this.cellColumn(resolution);
     const listingClause = listingModeSql(listingMode);
+    const queryParams: unknown[] = [cells, kinds, requesterId, MAX_POINTS_PER_RESPONSE];
+    let friendsClause = '';
+    if (friendIds != null) {
+      queryParams.push(friendIds);
+      friendsClause = `AND id = ANY($${queryParams.length}::uuid[])`;
+    }
+    let topicClause = '';
+    if (topicSlug) {
+      queryParams.push(topicSlug);
+      topicClause = `AND ${TOPIC_MATCH_SQL('$' + String(queryParams.length))}`;
+    }
     const rows: EntityRow[] = await this.db.query(
       `
       SELECT id, kind,
@@ -257,21 +304,20 @@ export class DiscoveryService {
             WHERE (ub.blocker_id = $3 AND ub.blocked_id = id)
                OR (ub.blocker_id = id AND ub.blocked_id = $3)
          ))
-         ${topicSlug ? `AND ${TOPIC_MATCH_SQL('$5')}` : ''}
+         ${topicClause}
          ${listingClause}
+         ${friendsClause}
        ORDER BY v_discoverable_entity.id
        LIMIT $4
       `,
-      topicSlug
-        ? [cells, kinds, requesterId, MAX_POINTS_PER_RESPONSE, topicSlug]
-        : [cells, kinds, requesterId, MAX_POINTS_PER_RESPONSE],
+      queryParams,
     );
 
     const userIds = rows.filter((r) => r.kind === 'user').map((r) => r.id);
     const onlineSet = userIds.length
       ? await this.presence.whichAreOnline(userIds)
       : new Set<string>();
-    const friendIds =
+    const friendIdSet =
       userIds.length > 0
         ? new Set(await this.friends.listFriendIds(requesterId))
         : new Set<string>();
@@ -287,7 +333,7 @@ export class DiscoveryService {
           meta: {
             ...viewMeta,
             online: onlineSet.has(r.id),
-            isFriend: friendIds.has(r.id),
+            isFriend: friendIdSet.has(r.id),
           },
         };
       }
@@ -327,6 +373,7 @@ export class DiscoveryService {
     kinds: EntityKind[],
     topicSlug: string,
     listingMode?: ListingMode,
+    friendsOnly = false,
   ): string {
     return createHash('sha1')
       .update(
@@ -336,6 +383,7 @@ export class DiscoveryService {
           kinds: [...kinds].sort(),
           topicSlug,
           listingMode: listingMode ?? null,
+          friendsOnly,
         }),
       )
       .digest('hex')
@@ -348,12 +396,14 @@ export class DiscoveryService {
     kinds: EntityKind[],
     topicSlug: string,
     listingMode?: ListingMode,
+    friendsOnly = false,
   ): DiscoveryResponse {
     return {
       points: [],
       resolution,
       generatedAt: new Date().toISOString(),
-      viewportHash: this.hashViewport(viewport, 0, kinds, topicSlug, listingMode),
+      viewportHash: this.hashViewport(viewport, 0, kinds, topicSlug, listingMode, friendsOnly),
+      diff: null,
     };
   }
 }
