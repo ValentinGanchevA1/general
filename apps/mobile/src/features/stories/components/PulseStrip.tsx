@@ -9,15 +9,20 @@ import {
 } from 'react-native';
 import { colors } from '@/theme';
 
-import type { StoryCard } from '@g88/shared';
+import type { StoryCard, StoryGateReason } from '@g88/shared';
+import { storyGateMessage } from '@g88/shared';
 
 import { useAppSelector } from '@/hooks/redux';
+
+export type StoryGateLockReason = Exclude<StoryGateReason, 'ok'>;
 
 interface Props {
   onOpenStory: (story: StoryCard, index: number) => void;
   onCreatePress: () => void;
-  /** When false, create ring is muted; host still receives onCreatePress for nudge. */
+  /** When false, create ring is muted; host still receives onCreatePress for CTA. */
   canCreate?: boolean;
+  /** Why create is locked — drives ring label + a11y. */
+  gateReason?: StoryGateLockReason;
 }
 
 /**
@@ -26,10 +31,38 @@ interface Props {
  */
 export const PULSE_STRIP_HEIGHT = 8 /* wrap py */ + 64 /* ring */ + 4 + 14 /* name */ + 8;
 
+function createRingLabel(canCreate: boolean, reason?: StoryGateLockReason): string {
+  if (canCreate) return 'Your story';
+  switch (reason) {
+    case 'email_unverified':
+      return 'Verify';
+    case 'account_too_new':
+      return 'Soon';
+    case 'phone_required':
+      return 'Phone';
+    case 'suspended':
+      return 'Paused';
+    default:
+      return 'Locked';
+  }
+}
+
 /** Horizontal stories strip — primary surface is the Pulse tab. */
-export function PulseStrip({ onOpenStory, onCreatePress, canCreate = true }: Props) {
+export function PulseStrip({
+  onOpenStory,
+  onCreatePress,
+  canCreate = true,
+  gateReason,
+}: Props) {
   const stories = useAppSelector((s) => s.stories.nearby);
   const loading = useAppSelector((s) => s.stories.loading);
+
+  const ringLabel = createRingLabel(canCreate, gateReason);
+  const createA11y = canCreate
+    ? 'Create your story'
+    : gateReason
+      ? `Story posting locked: ${storyGateMessage(gateReason)}`
+      : 'Story posting locked';
 
   const renderItem = useCallback(
     ({ item, index }: { item: StoryCard; index: number }) => {
@@ -80,7 +113,8 @@ export function PulseStrip({ onOpenStory, onCreatePress, canCreate = true }: Pro
           <Pressable
             style={styles.item}
             onPress={onCreatePress}
-            accessibilityLabel={canCreate ? 'Create your story' : 'Story posting locked'}
+            accessibilityRole="button"
+            accessibilityLabel={createA11y}
           >
             <View
               style={[
@@ -93,7 +127,9 @@ export function PulseStrip({ onOpenStory, onCreatePress, canCreate = true }: Pro
                 {canCreate ? '+' : '🔒'}
               </Text>
             </View>
-            <Text style={styles.name}>{canCreate ? 'Your story' : 'Locked'}</Text>
+            <Text style={styles.name} numberOfLines={1}>
+              {ringLabel}
+            </Text>
           </Pressable>
         }
         ListEmptyComponent={
