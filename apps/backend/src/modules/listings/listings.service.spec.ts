@@ -1,19 +1,20 @@
+import { Test } from '@nestjs/testing';
+import { DataSource } from 'typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import {
-  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+
 import { ListingsService } from './listings.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { S3Service } from '../../common/s3.service';
+import { BadRequestException } from '@nestjs/common';
 
-/** Minimal double of TypeORM DataSource used by ListingsService. */
-function makeDb(query: jest.Mock, createQueryRunner: jest.Mock) {
-  return { query, createQueryRunner } as never;
-}
-
-function makeQueryRunner(results: unknown[][]) {
-  const query = jest.fn();
-  for (const r of results) query.mockResolvedValueOnce(r);
+/** queryRunner whose query() drains a pre-seeded FIFO result queue. */
+function makeQueryRunner(results: unknown[]) {
+  const query = jest.fn((..._args: unknown[]) => Promise.resolve(results.shift() ?? []));
   const runner = {
     connect: jest.fn().mockResolvedValue(undefined),
     startTransaction: jest.fn().mockResolvedValue(undefined),
@@ -25,21 +26,28 @@ function makeQueryRunner(results: unknown[][]) {
   return { runner, query };
 }
 
-/** Tiny valid JPEG (1x1) as base64 for uploadImage tests. */
-const oneByteJpegB64 = Buffer.from([
-  0xff, 0xd8, 0xff, 0xd9,
-]).toString('base64');
-
 describe('ListingsService', () => {
   let service: ListingsService;
   let query: jest.Mock;
   let createQueryRunner: jest.Mock;
+  let uploadListingImageBuffer: jest.Mock;
 
-  beforeEach(() => {
-    query = jest.fn();
+  beforeEach(async () => {
+    query = jest.fn().mockResolvedValue([]);
     createQueryRunner = jest.fn();
-    // S3 client is optional in unit tests — service tolerates missing client for non-upload paths.
-    service = new ListingsService(makeDb(query, createQueryRunner));
+    uploadListingImageBuffer = jest.fn().mockResolvedValue('https://cdn.example/listings/s1/x.jpg');
+    const mod = await Test.createTestingModule({
+      providers: [
+        ListingsService,
+        {
+          provide: getDataSourceToken(),
+          useValue: { query, createQueryRunner } as unknown as DataSource,
+        },
+        { provide: NotificationsService, useValue: { notifyListingNearby: jest.fn().mockResolvedValue(undefined) } },
+        { provide: S3Service, useValue: { uploadListingImageBuffer } as unknown as S3Service },
+      ],
+    }).compile();
+    service = mod.get(ListingsService);
   });
 
   describe('create', () => {
@@ -72,9 +80,9 @@ describe('ListingsService', () => {
 
   describe('uploadImage', () => {
     it('decodes, uploads, and returns the public URL', async () => {
-      // Without real S3, this path is skipped in pure unit tests when client absent.
-      // Keep as smoke that invalid input is rejected — service may throw if S3 unset.
-      await expect(service.uploadImage('s1', oneByteJpegB64, 'image/jpeg')).rejects.toBeDefined();
+      const res = await service.uploadImage('s1', Buffer.from([0xff, 0xd8, 0xff, 0xd9]).toString('base64'), 'image/jpeg');
+      expect(res).toEqual({ url: 'https://cdn.example/listings/s1/x.jpg' });
+      expect(uploadListingImageBuffer).toHaveBeenCalled();
     });
 
     it('rejects empty/invalid base64 without hitting S3', async () => {
@@ -146,12 +154,13 @@ describe('ListingsService', () => {
         [{
           listing_id: 'l1', buyer_id: 'b1', seller_id: 's1',
           offer_status: 'pending', listing_status: 'active', last_actor: 'buyer',
-        }],
-        [],
-        [],
-        [],
+        }], // SELECT FOR UPDATE
+        [], // UPDATE this offer -> accepted
+        [], // UPDATE listings -> sold
+        [], // UPDATE other pending offers -> declined
       ]);
       createQueryRunner.mockReturnValue(runner);
+      // getOfferById runs on the pooled connection (this.db.query), not the runner.
       query.mockResolvedValueOnce([
         {
           id: 'o1', listing_id: 'l1', buyer_id: 'b1', offer_cents: 4500, message: null,
@@ -162,6 +171,7 @@ describe('ListingsService', () => {
 
       const res = await service.respondToOffer('s1', 'o1', 'accepted');
       expect(res.status).toBe('accepted');
+      // 4 statements: lock + accept + sell + decline-others
       expect(qrq).toHaveBeenCalledTimes(4);
       const sql = qrq.mock.calls.map((c) => String(c[0])).join(' | ');
       expect(sql).toContain("status = 'sold'");
