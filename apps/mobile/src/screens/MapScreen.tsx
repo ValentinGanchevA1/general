@@ -76,6 +76,7 @@ export function MapScreen(): React.JSX.Element {
 	const { coords: myCoords, requestPermission } = useUserLocation();
 	const [region, setRegion] = useState<Region | null>(null);
 	const [selected, setSelected] = useState<EntityPoint | null>(null);
+	const [waveToast, setWaveToast] = useState<string | null>(null);
 	const [waving, setWaving] = useState<string | null>(null);
 	const mapRef = useRef<MapView>(null);
 	const entitySheetRef = useRef<BottomSheetModal>(null);
@@ -226,6 +227,8 @@ export function MapScreen(): React.JSX.Element {
 				challengeEvents.emit('progress');
 				if (res.conversationId) {
 					appAlert('Match!', 'You both waved — say hi.');
+				} else {
+					setWaveToast('Wave sent');
 				}
 			} catch (e) {
 				const msg =
@@ -246,6 +249,12 @@ export function MapScreen(): React.JSX.Element {
 		},
 		[onWave],
 	);
+
+	useEffect(() => {
+		if (!waveToast) return;
+		const t = setTimeout(() => setWaveToast(null), 2200);
+		return () => clearTimeout(t);
+	}, [waveToast]);
 
 	const sheetOpen = selected != null;
 	const isEmpty = !loading && points.length === 0 && region != null;
@@ -361,6 +370,16 @@ export function MapScreen(): React.JSX.Element {
 				onClose={() => setCreateNearbyOpen(false)}
 				onSelect={onCreateNearbySelect}
 			/>
+
+			{waveToast ? (
+				<View
+					style={[styles.waveToast, { top: insets.top + 12 }]}
+					pointerEvents="none"
+					accessibilityLiveRegion="polite"
+				>
+					<Text style={styles.waveToastText}>{waveToast}</Text>
+				</View>
+			) : null}
 		</View>
 	);
 }
@@ -392,6 +411,27 @@ function approxZoomFromRegion(r: Region): number {
 }
 
 const styles = StyleSheet.create({
+	waveToast: {
+		position: 'absolute',
+		alignSelf: 'center',
+		backgroundColor: colors.surface,
+		borderWidth: 1,
+		borderColor: colors.border,
+		borderRadius: 20,
+		paddingHorizontal: 16,
+		paddingVertical: 10,
+		zIndex: 50,
+		elevation: 6,
+		shadowColor: '#000',
+		shadowOpacity: 0.25,
+		shadowRadius: 8,
+		shadowOffset: { width: 0, height: 2 },
+	},
+	waveToastText: {
+		color: colors.textPrimary,
+		fontSize: 14,
+		fontWeight: '600',
+	},
 	root: { flex: 1, backgroundColor: colors.bg },
 	emptyWrap: {
 		position: 'absolute',
