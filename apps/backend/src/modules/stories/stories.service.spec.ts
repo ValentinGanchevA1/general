@@ -33,22 +33,33 @@ describe('StoriesService', () => {
   const OTHER_USER_URL =
     'https://g88-uploads-dev.s3.eu-north-1.amazonaws.com/stories/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/x.jpg';
 
+  // assertCanPost selects verification_level, created_at, story_suspended_until
+  // then SUM(user_strikes) then 24h story count — mocks must follow that order.
   const phoneUser = {
     verification_level: 'phone' as const,
     created_at: new Date('2026-01-01T00:00:00Z'),
+    story_suspended_until: null as Date | null,
   };
   const emailOldUser = {
     verification_level: 'email' as const,
     created_at: new Date(Date.now() - 48 * 3600_000),
+    story_suspended_until: null as Date | null,
   };
   const emailNewUser = {
     verification_level: 'email' as const,
     created_at: new Date(Date.now() - 60 * 60_000),
+    story_suspended_until: null as Date | null,
   };
   const noneUser = {
     verification_level: 'none' as const,
     created_at: new Date('2026-01-01T00:00:00Z'),
+    story_suspended_until: null as Date | null,
   };
+
+  /** User row + zero strikes (gate passes age/level). Count is mocked by the caller. */
+  function mockUserAndStrikes(user: typeof phoneUser) {
+    query.mockResolvedValueOnce([user]).mockResolvedValueOnce([{ pts: 0 }]);
+  }
 
   beforeEach(async () => {
     query = jest.fn().mockResolvedValue([]);
@@ -81,6 +92,7 @@ describe('StoriesService', () => {
 
   describe('assertCanPost / presign gate', () => {
     it('rejects email_unverified before S3', async () => {
+      // Gate fails on verification before strike/count queries run.
       query.mockResolvedValueOnce([noneUser]);
       await expect(
         service.presign(USER, { contentType: 'image/jpeg' }),
@@ -90,7 +102,7 @@ describe('StoriesService', () => {
     });
 
     it('rejects account_too_new for email-only under 24h', async () => {
-      query.mockResolvedValueOnce([emailNewUser]);
+      mockUserAndStrikes(emailNewUser);
       await expect(
         service.presign(USER, { contentType: 'image/jpeg' }),
       ).rejects.toMatchObject({
@@ -100,9 +112,14 @@ describe('StoriesService', () => {
     });
 
     it('rejects rate limit for email-only at softerGateMaxPer24h', async () => {
+      mockUserAndStrikes(emailOldUser);
       query
-        .mockResolvedValueOnce([emailOldUser])
-        .mockResolvedValueOnce([{ n: STORY_LIMITS.softerGateMaxPer24h }]);
+        // 24h create count at the softer-gate cap
+        .mockResolvedValueOnce([{ n: STORY_LIMITS.softerGateMaxPer24h }])
+        // recordStrike: INSERT
+        .mockResolvedValueOnce([])
+        // recordStrike: re-sum weights (below suspend threshold)
+        .mockResolvedValueOnce([{ pts: 1 }]);
       await expect(
         service.presign(USER, { contentType: 'image/jpeg' }),
       ).rejects.toBeInstanceOf(HttpException);
@@ -110,9 +127,8 @@ describe('StoriesService', () => {
     });
 
     it('phone+ skips age and stores Redis presign token', async () => {
-      query
-        .mockResolvedValueOnce([phoneUser])
-        .mockResolvedValueOnce([{ n: 0 }]);
+      mockUserAndStrikes(phoneUser);
+      query.mockResolvedValueOnce([{ n: 0 }]); // under 24h cap
       const res = await service.presign(USER, { contentType: 'image/jpeg' });
       expect(res.publicUrl).toBe(PUBLIC_URL);
       expect(storyPresignedUrl).toHaveBeenCalledWith(USER, 'image/jpeg');
@@ -132,10 +148,10 @@ describe('StoriesService', () => {
       location: { lat: 42.7, lng: 23.3 },
     };
 
+    /** assertCanPost succeeds (phone, no strikes, under rate limit). */
     function mockGateOk() {
-      query
-        .mockResolvedValueOnce([phoneUser])
-        .mockResolvedValueOnce([{ n: 0 }]);
+      mockUserAndStrikes(phoneUser);
+      query.mockResolvedValueOnce([{ n: 0 }]);
     }
 
     it('rejects external mediaUrl (wrong host/path)', async () => {
@@ -178,7 +194,9 @@ describe('StoriesService', () => {
       mockGateOk();
       redisGet.mockResolvedValueOnce(PUBLIC_URL);
       query
+        // active stories count
         .mockResolvedValueOnce([{ n: 0 }])
+        // INSERT RETURNING
         .mockResolvedValueOnce([
           {
             id: 'story-1',
@@ -195,6 +213,7 @@ describe('StoriesService', () => {
             location_h3_r7: 'cell7',
           },
         ])
+        // enrichOne user
         .mockResolvedValueOnce([
           {
             display_name: 'Me',
