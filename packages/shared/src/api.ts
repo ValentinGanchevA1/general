@@ -91,3 +91,48 @@ export interface DiscoveryResponse {
   viewportHash: string;
   diff?: DiscoveryDiff | null;
 }
+
+// ─── Interactions ──────────────────────────────────────────────────────────
+
+export interface WaveRequest {
+  toUserId: string;
+  context?: 'map' | 'profile' | 'event';
+}
+
+export interface WaveResponse {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  createdAt: string;
+  conversationId: string | null;
+}
+
+// ─── Auth ──────────────────────────────────────────────────────────────────
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+}
+
+export interface AuthenticatedUser {
+  id: string;
+  displayName: string;
+  email: string;
+  verification: VerificationLevel;
+  avatarUrl: string | null;
+}
+
+export interface LoginResponse {
+  user: AuthenticatedUser;
+  tokens: AuthTokens;
+}
+
+// ─── Profile ───────────────────────────────────────────────────────────────
+
+export type SubscriptionTier = 'free' | 'basic' | 'premium';
