@@ -102,14 +102,14 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   const [mutualCount, setMutualCount] = useState(0);
   const [mutualPreview, setMutualPreview] = useState<FriendCard[]>([]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setTimeout(() => {
-      if (cancelled) return;
-      setMutualCount(0);
-      setMutualPreview([]);
-      setFetching(true);
-    }, 0);
+	useEffect(() => {
+		let cancelled = false;
+		setTimeout(() => {
+			if (cancelled) return;
+			setMutualCount(0);
+			setMutualPreview([]);
+			setFetching(true);
+		}, 0);
 
     void getJson<PublicUserProfile>(`/users/${point.id}`)
       .then((p) => {
