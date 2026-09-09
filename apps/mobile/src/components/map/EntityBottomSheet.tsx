@@ -171,7 +171,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
     onClose();
     navigation.navigate('MutualFriends', {
       peerUserId: point.id,
-      peerName: displayName,
+      ...(displayName ? { peerName: displayName } : {}),
     });
   };
 
@@ -287,7 +287,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
             {mutualPreview.map((f, i) => (
               <View
                 key={f.userId}
-                style={[styles.mutualAvatarWrap, i > 0 ? styles.mutualAvatarOverlap : null]}
+                style={[styles.mutualAvatarWrap, i > 0 ? styles.mutualAvatarOverlap : undefined]}
               >
                 {f.avatarUrl ? (
                   <Image source={{ uri: f.avatarUrl }} style={styles.mutualAvatar} />
@@ -310,7 +310,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
       <View style={styles.actions}>
         {onWave && !blocked ? (
           <TouchableOpacity
-            style={[styles.primaryBtn, styles.waveBtn, waving && styles.btnDisabled]}
+            style={[styles.primaryBtn, styles.waveBtn, waving ? styles.btnDisabled : undefined]}
             onPress={onWave}
             disabled={waving}
             accessibilityRole="button"
@@ -321,7 +321,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         ) : null}
         {canMessage !== 'none' && !blocked ? (
           <TouchableOpacity
-            style={[styles.primaryBtn, styles.messageBtn, opening && styles.btnDisabled]}
+            style={[styles.primaryBtn, styles.messageBtn, opening ? styles.btnDisabled : undefined]}
             onPress={() => void onMessage()}
             disabled={opening}
             accessibilityRole="button"
@@ -353,7 +353,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
               <Text style={styles.trustEmpty}>No verification yet</Text>
             ) : (
               badges.map((b) => (
-                <View key={b} style={[styles.trustChip, b === 'ID' && styles.trustChipStrong]}>
+                <View key={b} style={[styles.trustChip, b === 'ID' ? styles.trustChipStrong : undefined]}>
                   <Text style={b === 'ID' ? styles.trustChipStrongText : styles.trustChipText}>
                     {b}
                   </Text>
@@ -475,7 +475,7 @@ function ListingCard({
             isBuy ? styles.kindDotWanted : styles.kindDotListing,
           ]}
         />
-        <Text style={[styles.kindLabel, isBuy && styles.kindLabelWanted]}>{mode}</Text>
+        <Text style={[styles.kindLabel, isBuy ? styles.kindLabelWanted : undefined]}>{mode}</Text>
       </View>
       <Text style={styles.entityTitle} numberOfLines={2}>
         {title}
