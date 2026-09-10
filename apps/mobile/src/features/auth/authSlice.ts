@@ -10,7 +10,7 @@ import type {
   UserProfile,
 } from '@g88/shared';
 
-import { api, postJson } from '@/api/client';
+import { api, getJson, postJson } from '@/api/client';
 import { tokenStore } from '@/api/tokenStore';
 import { resetRankBaseline } from '@/features/gamification/rankBaseline';
 import { resetInboxSeen } from '@/features/interactions/inboxSeen';
@@ -149,7 +149,6 @@ export const restoreSession = createAsyncThunk('auth/restore', async () => {
   const token = await tokenStore.getAccessToken();
   if (!token) return null;
   try {
-    const { getJson } = await import('@/api/client');
     // Bound the boot-blocking check: if the network is slow/offline, fall through
     // to the Auth screen quickly instead of holding the splash gate for the full 15s.
     const user = await getJson<AuthenticatedUser>('/auth/me', { timeout: 8_000 });
