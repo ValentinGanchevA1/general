@@ -1,14 +1,14 @@
 // apps/mobile/src/features/gamification/WeeklyRibbon.tsx
 //
-// Weekly-leaderboard reset countdown + the caller's current standing. The
-// "climb before reset" urgency hook for the weekly board. Reads resetsAt
-// (server-computed, matches the SUM window) and ticks the countdown each minute.
+// Compact "this week" standing strip under the daily challenge card.
+// Shows rank (when the user is ranked, matches the SUM window) and ticks the countdown each minute.
 
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { LeaderboardEntry } from '@g88/shared';
+import { colors } from '@/theme';
 
 const MINUTE_MS = 60_000;
 
@@ -53,7 +53,7 @@ export function WeeklyRibbon({ resetsAt, me }: WeeklyRibbonProps): React.JSX.Ele
       <Icon
         name={isLeader ? 'crown' : 'flag-checkered'}
         size={18}
-        color={isLeader ? '#FFD700' : '#00d4ff'}
+        color={isLeader ? colors.premium : colors.primary}
       />
       <View style={styles.body}>
         <Text style={styles.title}>{title}</Text>
@@ -75,12 +75,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
-    backgroundColor: '#00d4ff12',
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: '#00d4ff55',
+    borderColor: 'rgba(0, 212, 255, 0.33)',
   },
-  ribbonLeader: { backgroundColor: '#FFD70012', borderColor: '#FFD70066' },
+  ribbonLeader: { backgroundColor: colors.premiumSoft, borderColor: colors.premiumBorderMid },
   body: { flex: 1 },
-  title: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  sub: { color: '#9ad', fontSize: 12, marginTop: 2 },
+  title: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
+  sub: { color: colors.info, fontSize: 12, marginTop: 2 },
 });

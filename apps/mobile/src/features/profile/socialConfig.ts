@@ -1,3 +1,4 @@
+import { colors } from '@/theme';
 import type { SocialProvider, SubscriptionTier } from '@g88/shared';
 
 /** MaterialCommunityIcons name + brand colour per social provider. */
@@ -20,7 +21,7 @@ export const TIER_LABEL: Record<SubscriptionTier, string> = {
 };
 
 export const TIER_COLOR: Record<SubscriptionTier, string> = {
-  free: '#666',
-  basic: '#00d4ff',
-  premium: '#9C27B0',
+  free: colors.textFaint,
+  basic: colors.primary,
+  premium: colors.premiumTier,
 };
