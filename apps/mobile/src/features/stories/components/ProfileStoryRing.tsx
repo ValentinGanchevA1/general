@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchAuthorStories } from '../storiesSlice';
+import { colors } from '@/theme';
 
 interface Props {
   userId: string;
@@ -48,7 +49,7 @@ export function ProfileStoryRing({
             width: ring,
             height: ring,
             borderRadius: ring / 2,
-            borderColor: hasStories ? (hasUnseen ? '#7C5CFF' : '#555') : 'transparent',
+            borderColor: hasStories ? (hasUnseen ? colors.accent : colors.textFaint) : 'transparent',
           },
         ]}
       >
@@ -75,9 +76,9 @@ export function ProfileStoryRing({
 const styles = StyleSheet.create({
   ring: { borderWidth: 2.5, justifyContent: 'center', alignItems: 'center' },
   fallback: {
-    backgroundColor: '#333',
+    backgroundColor: colors.surfaceRaised,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  initial: { color: '#fff', fontSize: 22, fontWeight: '600' },
+  initial: { color: colors.textPrimary, fontSize: 22, fontWeight: '600' },
 });
