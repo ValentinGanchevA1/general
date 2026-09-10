@@ -52,7 +52,9 @@ export function SettingsScreen(): React.JSX.Element {
     }, [dispatch, profile]),
   );
 
-  const emailVerified = profile != null && profile.verification !== 'none';
+  // Trust ladder level is not the same as email badge. Phone-verified users
+  // still need the email row until badges.email is true.
+  const emailVerified = profile?.badges?.email === true;
 
   const toggleVisibility = async (): Promise<void> => {
     if (toggling || !profile) return;
