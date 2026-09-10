@@ -181,16 +181,38 @@ export function MapScreen(): React.JSX.Element {
 		},
 	});
 
-	const onCloseSheet = useCallback(() => {
+	/** onDismiss only — sheet is already closing; do NOT call dismiss() again (sticks modal). */
+	const onSheetDismiss = useCallback(() => {
 		presentedIdRef.current = null;
-		entitySheetRef.current?.dismiss();
 		setSelected(null);
 	}, []);
 
-	const onEntityPress = useCallback((point: EntityPoint) => {
-		setSelected(point);
+	/** Programmatic close (X / Wave navigate): animate dismiss; onSheetDismiss clears state. */
+	const closeSheet = useCallback(() => {
+		entitySheetRef.current?.dismiss();
 	}, []);
 
+	const onEntityPress = useCallback((point: EntityPoint) => {
+		const id = `${point.kind}:${point.id}`;
+		// Clear the "already presented" gate so a re-tap after dismiss always presents.
+		// (onSheetDismiss also clears this; this covers the race where present was a no-op.)
+		if (presentedIdRef.current !== id) {
+			presentedIdRef.current = null;
+		}
+		setSelected(point);
+		// Present on every marker press. Same-id while already open → present() no-op, content updates.
+		InteractionManager.runAfterInteractions(() => {
+			try {
+				entitySheetRef.current?.present();
+				presentedIdRef.current = id;
+			} catch (e) {
+				if (__DEV__) console.warn('entity sheet present failed', e);
+				presentedIdRef.current = null;
+			}
+		});
+	}, []);
+
+	// When selection is set from focus (useMapFocus) rather than a marker press, still present.
 	useEffect(() => {
 		if (!selected) {
 			presentedIdRef.current = null;
@@ -199,9 +221,9 @@ export function MapScreen(): React.JSX.Element {
 		const id = `${selected.kind}:${selected.id}`;
 		if (presentedIdRef.current === id) return;
 		const task = InteractionManager.runAfterInteractions(() => {
-			presentedIdRef.current = id;
 			try {
 				entitySheetRef.current?.present();
+				presentedIdRef.current = id;
 			} catch (e) {
 				if (__DEV__) console.warn('entity sheet present failed', e);
 				presentedIdRef.current = null;
@@ -420,7 +442,7 @@ export function MapScreen(): React.JSX.Element {
 				ref={entitySheetRef}
 				snapPoints={entitySnapPoints}
 				enablePanDownToClose
-				onDismiss={onCloseSheet}
+				onDismiss={onSheetDismiss}
 				backdropComponent={renderBackdrop}
 				backgroundStyle={sheetChrome.background}
 				handleIndicatorStyle={sheetChrome.handle}
@@ -431,7 +453,7 @@ export function MapScreen(): React.JSX.Element {
 							<EntityBottomSheet
 								point={selected}
 								waving={selected.kind === 'user' && waving === selected.id}
-								onClose={onCloseSheet}
+								onClose={closeSheet}
 								{...(selected.kind === 'user'
 									? { onWave: () => onSheetWavePress(selected.id) }
 									: {})}
