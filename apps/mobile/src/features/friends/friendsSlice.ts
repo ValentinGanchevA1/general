@@ -9,6 +9,7 @@ import type {
 } from '@g88/shared';
 
 import { deleteJson, getJson, postJson } from '@/api/client';
+import { logout } from '@/features/auth/authSlice';
 import { extractMessage } from '@/utils/extractMessage';
 
 export type FriendsTab = 'friends' | 'following' | 'followers' | 'requests';
@@ -215,7 +216,9 @@ const friendsSlice = createSlice({
       })
       .addCase(unfriendUser.rejected, (state, action) => {
         state.pendingActionIds = state.pendingActionIds.filter((id) => id !== action.meta.arg);
-      });
+      })
+      .addCase(logout.fulfilled, () => initialState)
+      .addCase(logout.rejected, () => initialState);
   },
 });
 

@@ -4,6 +4,7 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import type { ActivityItem, ActivityType, FeedResponse } from '@g88/shared';
 
 import { getJson } from '@/api/client';
+import { logout } from '@/features/auth/authSlice';
 
 export interface PulseState {
   items: ActivityItem[];
@@ -58,6 +59,8 @@ const slice = createSlice({
       s.loading = false;
       s.error = (a.payload as string | undefined) ?? a.error.message ?? 'Failed';
     });
+    b.addCase(logout.fulfilled, () => initialState);
+    b.addCase(logout.rejected, () => initialState);
   },
 });
 
