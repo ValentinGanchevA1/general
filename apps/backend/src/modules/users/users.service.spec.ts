@@ -66,7 +66,7 @@ describe('UsersService — gallery photos', () => {
     expect(query.mock.calls.some((c) => /INSERT INTO user_photos/.test(c[0]))).toBe(false);
   });
 
-  it('deletePhoto throws when the photo is not the user’s', async () => {
+  it('deletePhoto throws when the photo is not the user's', async () => {
     query.mockResolvedValueOnce([]); // SELECT id, url → not found
     await expect(service.deletePhoto(USER, PHOTO_A)).rejects.toBeInstanceOf(NotFoundException);
   });
@@ -414,12 +414,13 @@ describe('UsersService — profile createdAt', () => {
     service = mod.get(UsersService);
   });
 
-  // getProfile: user row → getPhotoUrls → getSocialLinks
+  // getProfile: user row → getPhotoUrls → getSocialLinks → strikeRows
   const mockProfileReads = (createdAt: unknown): void => {
     query
       .mockResolvedValueOnce([buildRow(createdAt)]) // SELECT user
       .mockResolvedValueOnce([]) // photos
-      .mockResolvedValueOnce([]); // social links
+      .mockResolvedValueOnce([]) // social links
+      .mockResolvedValueOnce([{ pts: 0 }]); // strikes query
   };
 
   it('passes through a valid created_at as ISO', async () => {
