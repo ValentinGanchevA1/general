@@ -25,10 +25,10 @@ module.exports = {
     // `useRef(new Animated.Value()).current` + interpolate-in-render, and
     // set-state-in-effect trips on standard load-on-mount / store→local sync.
     // Kept as warnings (visible) rather than errors (build-breaking).
-    'react-hooks/refs': 'warn',
-    'react-hooks/set-state-in-effect': 'warn',
-    '@typescript-eslint/no-explicit-any': 'warn',
-    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+    'react-hooks/refs': 'error',
+    'react-hooks/set-state-in-effect': 'error',
+    '@typescript-eslint/no-explicit-any': 'error',
+    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     'no-restricted-imports': [
       'error',
       {
