@@ -24,7 +24,8 @@ module.exports = {
     // react-hooks v7 rules that over-flag idiomatic RN patterns: refs trips on
     // `useRef(new Animated.Value()).current` + interpolate-in-render, and
     // set-state-in-effect trips on standard load-on-mount / store→local sync.
-    // Kept as warnings (visible) rather than errors (build-breaking).
+    // Enforced as errors so CI --max-warnings 0 stays honest; fix call sites
+    // with queueMicrotask / InteractionManager rather than downgrading severity.
     'react-hooks/refs': 'error',
     'react-hooks/set-state-in-effect': 'error',
     '@typescript-eslint/no-explicit-any': 'error',

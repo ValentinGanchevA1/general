@@ -65,7 +65,8 @@ api.interceptors.response.use(
       }
       if (outcome.authFailed) {
         // Refresh token is genuinely invalid → end the session.
-        tokenStore.clear();
+        // Await clear so any listener reading tokens after the event sees null.
+        await tokenStore.clear();
         authEvents.emit('logout', 'refresh_failed');
         return Promise.reject(normalizeError(err));
       }

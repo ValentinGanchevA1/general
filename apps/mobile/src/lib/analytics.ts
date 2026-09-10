@@ -9,6 +9,7 @@ export type AnalyticsProps = Record<string, string | number | boolean | null>;
 
 const REDACTED_KEYS = new Set([
   'userId', 'user_id',
+  'toUserId', 'fromUserId', 'peerUserId', 'senderId', 'recipientId',
   'email',
   'phone',
   'token', 'accessToken', 'refreshToken', 'access_token', 'refresh_token',
@@ -16,10 +17,20 @@ const REDACTED_KEYS = new Set([
   'password',
 ]);
 
+/** True when the key is an exact match or a *Id / *Token / *Email suffix that looks PII-ish. */
+function shouldRedactKey(key: string): boolean {
+  if (REDACTED_KEYS.has(key)) return true;
+  // camelCase role prefixes that commonly carry user identifiers
+  if (/(?:^|[A-Z])(?:userId|UserId)$/.test(key)) return true;
+  if (key.endsWith('Token') || key.endsWith('_token')) return true;
+  if (key.toLowerCase().includes('password')) return true;
+  return false;
+}
+
 function redact(props: AnalyticsProps): AnalyticsProps {
   const out: AnalyticsProps = {};
   for (const [k, v] of Object.entries(props)) {
-    out[k] = REDACTED_KEYS.has(k) ? '[redacted]' : v;
+    out[k] = shouldRedactKey(k) ? '[redacted]' : v;
   }
   return out;
 }
