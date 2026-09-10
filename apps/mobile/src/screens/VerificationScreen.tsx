@@ -25,6 +25,7 @@ import { useAppDispatch } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { extractMessage } from '@/utils/extractMessage';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { colors, fontSize, spacing, radius } from '@/theme';
 
 type Step = 'phone' | 'code';
 
@@ -81,7 +82,7 @@ export function VerificationScreen(): React.JSX.Element {
       <ScreenHeader title="Verify phone" />
 
       <View style={styles.body}>
-        <Icon name="cellphone-check" size={48} color="#00d4ff" />
+        <Icon name="cellphone-check" size={48} color={colors.primary} />
 
         {step === 'phone' ? (
           <>
@@ -95,7 +96,7 @@ export function VerificationScreen(): React.JSX.Element {
               value={phone}
               onChangeText={setPhone}
               placeholder="+359888123456"
-              placeholderTextColor="#555"
+              placeholderTextColor={colors.textFaint}
               keyboardType="phone-pad"
               autoFocus
               editable={!busy}
@@ -106,7 +107,11 @@ export function VerificationScreen(): React.JSX.Element {
               onPress={() => void start()}
               disabled={busy || phone.trim().length < 8}
             >
-              {busy ? <ActivityIndicator color="#000" /> : <Text style={styles.buttonText}>Send code</Text>}
+              {busy ? (
+                <ActivityIndicator color={colors.onPrimary} />
+              ) : (
+                <Text style={styles.buttonText}>Send code</Text>
+              )}
             </TouchableOpacity>
           </>
         ) : (
@@ -124,7 +129,7 @@ export function VerificationScreen(): React.JSX.Element {
               value={code}
               onChangeText={setCode}
               placeholder="000000"
-              placeholderTextColor="#555"
+              placeholderTextColor={colors.textFaint}
               keyboardType="number-pad"
               maxLength={10}
               autoFocus
@@ -136,7 +141,11 @@ export function VerificationScreen(): React.JSX.Element {
               onPress={() => void check()}
               disabled={busy || code.trim().length < 4}
             >
-              {busy ? <ActivityIndicator color="#000" /> : <Text style={styles.buttonText}>Verify</Text>}
+              {busy ? (
+                <ActivityIndicator color={colors.onPrimary} />
+              ) : (
+                <Text style={styles.buttonText}>Verify</Text>
+              )}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => void start()} disabled={busy} style={styles.resend}>
               <Text style={styles.link}>Resend code</Text>
@@ -149,35 +158,52 @@ export function VerificationScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
-  body: { flex: 1, alignItems: 'center', paddingHorizontal: 32, paddingTop: 32, gap: 12 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700', marginTop: 8 },
-  blurb: { color: '#888', fontSize: 14, textAlign: 'center', lineHeight: 20, maxWidth: 300 },
-  link: { color: '#00d4ff', fontWeight: '600' },
-  devHint: { color: '#ff9d3c', fontSize: 12, fontWeight: '600' },
+  container: { flex: 1, backgroundColor: colors.bg },
+  body: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.xxl,
+    gap: spacing.md,
+  },
+  title: {
+    color: colors.textPrimary,
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    marginTop: spacing.sm,
+  },
+  blurb: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 300,
+  },
+  link: { color: colors.primary, fontWeight: '600' },
+  devHint: { color: colors.warning, fontSize: fontSize.xs, fontWeight: '600' },
   input: {
     width: '100%',
-    backgroundColor: '#1a1a24',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#2a2a34',
-    color: '#fff',
-    fontSize: 18,
-    paddingHorizontal: 16,
+    borderColor: colors.borderStrong,
+    color: colors.textPrimary,
+    fontSize: fontSize.lg,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 14,
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   codeInput: { textAlign: 'center', letterSpacing: 8, fontSize: 24 },
-  error: { color: '#ff4444', fontSize: 13, textAlign: 'center' },
+  error: { color: colors.danger, fontSize: fontSize.sm, textAlign: 'center' },
   button: {
     width: '100%',
-    backgroundColor: '#00d4ff',
-    borderRadius: 12,
-    paddingVertical: 16,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   buttonDisabled: { opacity: 0.4 },
-  buttonText: { color: '#000', fontWeight: '700', fontSize: 16 },
-  resend: { marginTop: 8 },
+  buttonText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
+  resend: { marginTop: spacing.sm },
 });
