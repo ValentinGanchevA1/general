@@ -14,6 +14,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { track } from '@/lib/analytics';
 import { useNudges } from './useNudges';
+import { colors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -56,7 +57,7 @@ export function NudgeBanner({ top }: Props): React.JSX.Element | null {
             dismiss(nudge.id);
           }}
         >
-          <Icon name="close" size={16} color="#888" />
+          <Icon name="close" size={16} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
     </View>
@@ -81,12 +82,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: 'rgba(18,18,31,0.95)',
     borderWidth: 1,
-    borderColor: '#1f1f33',
+    borderColor: colors.border,
   },
   main: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   body: { flex: 1 },
   label: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4 },
-  title: { color: '#fff', fontSize: 14, fontWeight: '600', marginTop: 2 },
+  title: { color: colors.textPrimary, fontSize: 14, fontWeight: '600', marginTop: 2 },
   ctaPill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
