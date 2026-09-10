@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import { ListRow } from '@/components/ListRow';
 import { APP_VERSION } from '@/constants/app';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
@@ -39,15 +40,15 @@ export function ProfileMenuSection({ isPaid, onNavigate, onLogout }: Props): Rea
 
       <View style={styles.menuSection}>
         {MENU.map((item, index) => (
-          <TouchableOpacity
+          <ListRow
             key={item.route}
-            style={[styles.menuItem, index === MENU.length - 1 && styles.infoRowLast]}
+            variant="inset"
+            last={index === MENU.length - 1}
+            icon={item.icon}
+            title={item.label}
             onPress={() => onNavigate(item.route)}
-          >
-            <Icon name={item.icon} size={20} color={colors.textMuted} />
-            <Text style={styles.menuItemText}>{item.label}</Text>
-            <Icon name="chevron-right" size={20} color={colors.borderStrong} />
-          </TouchableOpacity>
+            accessibilityLabel={item.label}
+          />
         ))}
       </View>
 
@@ -84,15 +85,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     overflow: 'hidden',
   },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderStrong,
-  },
-  infoRowLast: { borderBottomWidth: 0 },
-  menuItemText: { flex: 1, marginLeft: 12, color: colors.textPrimary, fontSize: 15 },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
