@@ -14,12 +14,12 @@ import {
 import { appAlert } from '@/ui/appAlert';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { deleteAccount, logout } from '@/features/auth/authSlice';
 import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
+import { ListRow } from '@/components/ListRow';
 import { APP_VERSION } from '@/constants/app';
 import { colors, spacing, fontSize } from '@/theme';
 
@@ -96,194 +96,128 @@ export function SettingsScreen(): React.JSX.Element {
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Discovery</Text>
-          <View style={styles.row}>
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Appear on map</Text>
-              <Text style={styles.rowSub}>
-                {isVisible
-                  ? 'Others can see you nearby on the map'
-                  : 'Hidden from discovery — you can still browse'}
-              </Text>
-            </View>
-            {toggling ? (
-              <ActivityIndicator color={colors.primary} />
-            ) : (
-              <Switch
-                value={isVisible}
-                onValueChange={toggleVisibility}
-                trackColor={{ false: colors.borderStrong, true: colors.primaryTrack }}
-                thumbColor={isVisible ? colors.primary : colors.textFaint}
-                accessibilityLabel="Appear on map"
-              />
-            )}
-          </View>
-          <View style={[styles.row, styles.rowSpaced]}>
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Friends can see when I am online</Text>
-              <Text style={styles.rowSub}>
-                {friendsSeeOnline
-                  ? 'Close friends see you online in chat and the friends list'
-                  : 'Hidden from friends — you still appear in lists without a green dot'}
-              </Text>
-            </View>
-            {togglingOnline ? (
-              <ActivityIndicator color={colors.primary} />
-            ) : (
-              <Switch
-                value={friendsSeeOnline}
-                onValueChange={toggleFriendsOnline}
-                trackColor={{ false: colors.borderStrong, true: colors.primaryTrack }}
-                thumbColor={friendsSeeOnline ? colors.primary : colors.textFaint}
-                accessibilityLabel="Friends can see when I am online"
-              />
-            )}
-          </View>
-          <TouchableOpacity
-            style={[styles.row, styles.rowSpaced]}
+          <ListRow
+            title="Appear on map"
+            subtitle={
+              isVisible
+                ? 'Others can see you nearby on the map'
+                : 'Hidden from discovery — you can still browse'
+            }
+            trailing={
+              toggling ? (
+                <ActivityIndicator color={colors.primary} />
+              ) : (
+                <Switch
+                  value={isVisible}
+                  onValueChange={toggleVisibility}
+                  trackColor={{ false: colors.borderStrong, true: colors.primaryTrack }}
+                  thumbColor={isVisible ? colors.primary : colors.textFaint}
+                  accessibilityLabel="Appear on map"
+                />
+              )
+            }
+            accessibilityLabel="Appear on map"
+          />
+          <ListRow
+            style={styles.rowSpaced}
+            title="Friends can see when I am online"
+            subtitle={
+              friendsSeeOnline
+                ? 'Close friends see you online in chat and the friends list'
+                : 'Hidden from friends — you still appear in lists without a green dot'
+            }
+            trailing={
+              togglingOnline ? (
+                <ActivityIndicator color={colors.primary} />
+              ) : (
+                <Switch
+                  value={friendsSeeOnline}
+                  onValueChange={toggleFriendsOnline}
+                  trackColor={{ false: colors.borderStrong, true: colors.primaryTrack }}
+                  thumbColor={friendsSeeOnline ? colors.primary : colors.textFaint}
+                  accessibilityLabel="Friends can see when I am online"
+                />
+              )
+            }
+            accessibilityLabel="Friends can see when I am online"
+          />
+          <ListRow
+            style={styles.rowSpaced}
+            title="Blocked users"
+            subtitle="Hidden from map, chat, waves, and friend requests"
             onPress={() => navigation.navigate('BlockedUsers')}
-            accessibilityRole="button"
-            accessibilityLabel="Blocked users"
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Blocked users</Text>
-              <Text style={styles.rowSub}>Hidden from map, chat, waves, and friend requests</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
+          />
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Trust & posting</Text>
-          <TouchableOpacity
-            style={styles.row}
+          <ListRow
+            title="Verification"
+            subtitle="Email → phone → ID review. Raises trust and unlocks higher-stakes actions"
             onPress={() => navigation.navigate('Verification')}
-            accessibilityRole="button"
-            accessibilityLabel="Verification"
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Verification</Text>
-              <Text style={styles.rowSub}>
-                Email → phone → ID review. Raises trust and unlocks higher-stakes actions
-              </Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
+          />
           {!emailVerified ? (
-            <TouchableOpacity
-              style={[styles.row, styles.rowSpaced]}
+            <ListRow
+              style={styles.rowSpaced}
+              title="Verify email"
+              subtitle="Required to post stories on Pulse"
               onPress={() => navigation.navigate('EmailVerification')}
-              accessibilityRole="button"
-              accessibilityLabel="Verify email"
-            >
-              <View style={styles.rowContent}>
-                <Text style={styles.rowLabel}>Verify email</Text>
-                <Text style={styles.rowSub}>Required to post stories on Pulse</Text>
-              </View>
-              <Icon name="chevron-right" size={24} color={colors.textFaint} />
-            </TouchableOpacity>
+            />
           ) : null}
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Connected accounts</Text>
-          <TouchableOpacity
-            style={styles.row}
+          <ListRow
+            title="Social accounts"
+            subtitle="Link Instagram, X, TikTok and more — boosts trust"
             onPress={() => navigation.navigate('SocialLinking')}
-            accessibilityRole="button"
-            accessibilityLabel="Social accounts"
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Social accounts</Text>
-              <Text style={styles.rowSub}>Link Instagram, X, TikTok and more — boosts trust</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
+          />
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Profile</Text>
-          <TouchableOpacity
-            style={styles.row}
+          <ListRow
+            title="Edit profile"
+            subtitle="Name, bio, hometown, age visibility"
             onPress={() => navigation.navigate('ProfileEdit')}
-            accessibilityRole="button"
-            accessibilityLabel="Edit profile"
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Edit profile</Text>
-              <Text style={styles.rowSub}>Name, bio, hometown, age visibility</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.row, styles.rowSpaced]}
+          />
+          <ListRow
+            style={styles.rowSpaced}
+            title="Manage photos"
+            subtitle="Gallery order and cover photo"
             onPress={() => navigation.navigate('Photos')}
-            accessibilityRole="button"
-            accessibilityLabel="Manage photos"
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Manage photos</Text>
-              <Text style={styles.rowSub}>Gallery order and cover photo</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
+          />
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Notifications</Text>
-          <TouchableOpacity
-            style={styles.row}
+          <ListRow
+            title="Push notifications"
+            subtitle="Waves, friend requests, chats, stories, trades, and more"
             onPress={() => navigation.navigate('NotificationSettings')}
-            accessibilityRole="button"
-            accessibilityLabel="Push notifications"
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Push notifications</Text>
-              <Text style={styles.rowSub}>
-                Waves, friend requests, chats, stories, trades, and more
-              </Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
+          />
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
-          <TouchableOpacity
-            style={styles.row}
+          <ListRow
+            title="Privacy"
+            subtitle="Policy and how we handle your data"
             onPress={() => navigation.navigate('Privacy')}
-            accessibilityRole="button"
-            accessibilityLabel="Privacy"
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Privacy</Text>
-              <Text style={styles.rowSub}>Policy and how we handle your data</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.row, styles.rowSpaced]}
+          />
+          <ListRow
+            style={styles.rowSpaced}
+            title="Help & Support"
+            subtitle="FAQ and contact"
             onPress={() => navigation.navigate('Help')}
-            accessibilityRole="button"
-            accessibilityLabel="Help and Support"
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Help & Support</Text>
-              <Text style={styles.rowSub}>FAQ and contact</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.row, styles.rowSpaced]}
+          />
+          <ListRow
+            style={styles.rowSpaced}
+            title="About"
+            subtitle="Version and credits"
             onPress={() => navigation.navigate('About')}
-            accessibilityRole="button"
-            accessibilityLabel="About"
-          >
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>About</Text>
-              <Text style={styles.rowSub}>Version and credits</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={colors.textFaint} />
-          </TouchableOpacity>
+          />
 
           <TouchableOpacity
             style={styles.logoutBtn}
@@ -372,19 +306,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: spacing.md,
   },
-  row: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 10,
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
   rowSpaced: { marginTop: spacing.md },
-  rowContent: { flex: 1 },
-  rowLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '500' },
-  rowSub: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
   logoutBtn: {
     marginTop: spacing.lg,
     backgroundColor: colors.surfaceAlt,
