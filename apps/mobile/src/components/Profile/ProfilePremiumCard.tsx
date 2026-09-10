@@ -13,7 +13,7 @@ export function ProfilePremiumCard({ onPress }: Props): React.JSX.Element {
   return (
     <TouchableOpacity style={styles.upgradeCard} onPress={onPress} accessibilityRole="button">
       <View style={styles.upgradeContent}>
-        <Icon name="crown" size={26} color="#FFD700" />
+        <Icon name="crown" size={26} color={colors.premium} />
         <View style={styles.upgradeText}>
           <Text style={styles.upgradeTitle}>Upgrade to Premium</Text>
           <Text style={styles.upgradeSubtitle}>More reach · who viewed you</Text>
@@ -34,10 +34,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceRaised,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#FFD70040',
+    borderColor: colors.premiumBorder,
   },
   upgradeContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   upgradeText: { flex: 1 },
-  upgradeTitle: { color: '#FFD700', fontWeight: '700', fontSize: 15 },
+  upgradeTitle: { color: colors.premium, fontWeight: '700', fontSize: 15 },
   upgradeSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
 });

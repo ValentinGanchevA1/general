@@ -38,7 +38,7 @@ export function MapPresenceCard({
           onValueChange={onToggle}
           disabled={saving}
           trackColor={{ false: colors.textFaint, true: colors.primary }}
-          thumbColor="#FFFFFF"
+          thumbColor={colors.textPrimary}
           ios_backgroundColor={colors.textFaint}
         />
       </View>

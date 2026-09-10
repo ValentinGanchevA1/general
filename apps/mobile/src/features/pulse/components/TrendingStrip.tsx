@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { colors } from '@/theme';
 
 interface Props {
   topics: string[];
@@ -15,7 +16,7 @@ export function TrendingStrip(props: Props): React.JSX.Element | null {
   return (
     <View style={S.section}>
       <View style={S.sectionHeader}>
-        <Text style={S.sectionTitle}>{'\u{1F525}'} Trending nearby</Text>
+        <Text style={S.sectionTitle}>{'🔥'} Trending nearby</Text>
       </View>
       <ScrollView
         horizontal
@@ -40,12 +41,12 @@ export function TrendingStrip(props: Props): React.JSX.Element | null {
 const S = StyleSheet.create({
   section: { paddingTop: 8 },
   sectionHeader: { paddingHorizontal: 16, marginBottom: 8 },
-  sectionTitle: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  sectionTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
   scroll: { paddingHorizontal: 12, paddingVertical: 4, gap: 8 },
   topic: {
-    backgroundColor: '#1a1a2e',
-    borderWidth: 1, borderColor: '#2a2a4a',
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1, borderColor: colors.borderStrong,
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14,
   },
-  topicText: { color: '#00d4ff', fontSize: 13, fontWeight: '600' },
+  topicText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
 });
