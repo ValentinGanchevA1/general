@@ -4,10 +4,9 @@
 // inline across screens (no visual change intended) so a UX pass can converge
 // on one source of truth instead of re-declaring hexes per StyleSheet.
 //
-// Adoption is incremental: new/edited components should import from here;
-// existing screens get migrated as they're touched. Do NOT mass-rewrite every
-// StyleSheet in one commit — that collides with parallel work and buries real
-// diffs.
+// Adoption: most UI StyleSheets now import tokens from here. Remaining
+// intentional hex: Google Maps style JSON (mapStyle.ts), third-party brand
+// colours (socialConfig providers), ambient toast gradient tints, shadowColor #000.
 
 export const colors = {
   /** App background (near-black). */
@@ -67,6 +66,27 @@ export const colors = {
   entityFriend: '#2EE6C5',
   /** Map / discovery: wanted / looking-to-buy listings (distinct from friends). */
   entityWanted: '#C084FC',
+
+  /** Premium / subscription gold. */
+  premium: '#FFD700',
+  /** Premium border with alpha. */
+  premiumBorder: '#FFD70040',
+  /** Premium tier purple (subscription badge). */
+  premiumTier: '#9C27B0',
+
+  /** Translucent primary tints (chips, selected rows). */
+  primarySoft: 'rgba(0, 212, 255, 0.07)',
+  primaryMutedBg: 'rgba(0, 212, 255, 0.09)',
+  primaryGhost: 'rgba(0, 212, 255, 0.125)',
+  primaryBorderSoft: 'rgba(0, 212, 255, 0.25)',
+  primaryBorder: 'rgba(0, 212, 255, 0.4)',
+  /** Translucent premium tints. */
+  premiumSoft: 'rgba(255, 215, 0, 0.07)',
+  premiumMutedBg: 'rgba(255, 215, 0, 0.09)',
+  premiumBorderSoft: 'rgba(255, 215, 0, 0.2)',
+  premiumBorderMid: 'rgba(255, 215, 0, 0.4)',
+  /** Translucent danger. */
+  dangerBorderSoft: 'rgba(255, 107, 107, 0.4)',
 } as const;
 
 export const spacing = {
