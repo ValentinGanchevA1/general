@@ -70,6 +70,55 @@ import { mapListingModeFilterTop } from '@/components/map/mapChromeLayout';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
+
+type MapEmptyActionKind = 'show_everyone' | 'create';
+
+function mapEmptyCopy(opts: {
+	friendsOnly: boolean;
+	listingMode: ListingModeFilterValue;
+}): {
+	icon: string;
+	title: string;
+	body: string;
+	actionLabel: string;
+	actionKind: MapEmptyActionKind;
+} {
+	if (opts.friendsOnly) {
+		return {
+			icon: 'account-group-outline',
+			title: 'No friends nearby',
+			body: 'None of your friends are in this area right now. Pan the map or turn Friends off.',
+			actionLabel: 'Show everyone',
+			actionKind: 'show_everyone',
+		};
+	}
+	if (opts.listingMode === 'sell') {
+		return {
+			icon: 'tag-outline',
+			title: 'No for-sale listings here',
+			body: 'Nothing for sale in this area. Post one, or switch the filter to All.',
+			actionLabel: 'Create here',
+			actionKind: 'create',
+		};
+	}
+	if (opts.listingMode === 'buy') {
+		return {
+			icon: 'cart-outline',
+			title: 'No wanted posts here',
+			body: 'Nobody is looking to buy in this area yet. Post a wanted, or switch the filter to All.',
+			actionLabel: 'Create here',
+			actionKind: 'create',
+		};
+	}
+	return {
+		icon: 'map-marker-radius-outline',
+		title: 'Nothing nearby yet',
+		body: 'Be the first — sell something, post a wanted, create an event, or drop a local alert. Long-press the map anytime.',
+		actionLabel: 'Create here',
+		actionKind: 'create',
+	};
+}
+
 export function MapScreen(): React.JSX.Element {
 	const dispatch = useAppDispatch();
 	const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -281,6 +330,11 @@ export function MapScreen(): React.JSX.Element {
 		openCreateNearby();
 	}, [dismissCreateNudge, openCreateNearby]);
 
+	const emptyCopy = mapEmptyCopy({
+		friendsOnly,
+		listingMode: listingModeFilter,
+	});
+
 	return (
 		<View style={styles.root}>
 			<ErrorBoundary fallback={<MapUnavailableFallback />}>
@@ -329,23 +383,19 @@ export function MapScreen(): React.JSX.Element {
 			{isEmpty ? (
 				<View style={styles.emptyWrap} pointerEvents="box-none">
 					<EmptyState
-						variant="plain"
-						icon={friendsOnly ? 'account-group-outline' : 'map-marker-radius-outline'}
-						title={friendsOnly ? 'No friends nearby' : 'Nothing nearby yet'}
-						body={
-							friendsOnly
-								? 'None of your friends are in this area right now. Pan the map or turn Friends off.'
-								: 'Be the first — post a listing, event, or alert. Or long-press the map anytime.'
-						}
-						{...(friendsOnly
+						variant="card"
+						icon={emptyCopy.icon}
+						title={emptyCopy.title}
+						body={emptyCopy.body}
+						{...(!createNudgeVisible
 							? {
-									actionLabel: 'Show everyone',
-									onAction: () => setFriendsOnly(false),
+									actionLabel: emptyCopy.actionLabel,
+									onAction:
+										emptyCopy.actionKind === 'show_everyone'
+											? () => setFriendsOnly(false)
+											: openCreateNearby,
 								}
-							: {
-									actionLabel: 'Create here',
-									onAction: openCreateNearby,
-								})}
+							: {})}
 					/>
 				</View>
 			) : null}
