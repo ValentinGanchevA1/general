@@ -18,7 +18,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson } from '@/api/client';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { Avatar } from '@/components/Avatar';
-import { colors } from '@/theme';
+import { colors, spacing } from '@/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {
@@ -44,26 +44,30 @@ function MessageBubble({
   isPending,
   isFailed,
   onRetry,
+  peerName,
+  peerAvatarUrl,
+  onOpenPeerProfile,
 }: {
   msg: ChatMessage;
   isMine: boolean;
   isPending: boolean;
   isFailed: boolean;
   onRetry: () => void;
+  peerName: string;
+  peerAvatarUrl: string | null;
+  onOpenPeerProfile: (() => void) | null;
 }): React.JSX.Element {
   if (msg.type === 'location_session') {
     return <LocationSessionBubble msg={msg} isMine={isMine} />;
   }
 
-  return (
+  const bubble = (
     <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
       <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
         {msg.body}
       </Text>
-      {isPending && (
-        <Text style={styles.statusPending}>⏱</Text>
-      )}
-      {isFailed && (
+      {isPending ? <Text style={styles.statusPending}>⏱</Text> : null}
+      {isFailed ? (
         <TouchableOpacity
           onPress={onRetry}
           accessibilityRole="button"
@@ -71,7 +75,29 @@ function MessageBubble({
         >
           <Text style={styles.statusFailed}>! Tap to retry</Text>
         </TouchableOpacity>
-      )}
+      ) : null}
+    </View>
+  );
+
+  if (isMine) {
+    return bubble;
+  }
+
+  // Peer row: avatar left of bubble — tap opens UserProfile.
+  return (
+    <View style={styles.peerRow}>
+      <TouchableOpacity
+        onPress={onOpenPeerProfile ?? undefined}
+        disabled={!onOpenPeerProfile}
+        accessibilityRole="button"
+        accessibilityLabel={`Open profile for ${peerName}`}
+        hitSlop={6}
+        activeOpacity={0.7}
+        style={styles.peerAvatarTap}
+      >
+        <Avatar uri={peerAvatarUrl} name={peerName} size={28} />
+      </TouchableOpacity>
+      {bubble}
     </View>
   );
 }
@@ -154,8 +180,12 @@ export function ChatScreen(): React.JSX.Element {
           });
         }
       })
-      .catch(() => { /* non-blocking */ });
-    return () => { cancelled = true; };
+      .catch(() => {
+        /* non-blocking */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [otherUserId]);
 
   const peerBadge = fetchedPeer?.userId === otherUserId ? fetchedPeer : null;
@@ -163,6 +193,13 @@ export function ChatScreen(): React.JSX.Element {
   const badgeIdVerified = otherUserIdVerified ?? peerBadge?.idVerified;
   const canGift = !!otherUserId && peerBadge != null && !peerBadge.blockedByViewer;
   const canShareLocation = !requestLocked;
+  const peerDisplayName = otherUserName || 'User';
+  const peerAvatarUrl = peerBadge?.avatarUrl ?? null;
+
+  const openPeerProfile = useCallback(() => {
+    if (!otherUserId) return;
+    navigation.navigate('UserProfile', { userId: otherUserId });
+  }, [navigation, otherUserId]);
 
   useEffect(() => {
     void dispatch(fetchMessages({ conversationId }));
@@ -218,26 +255,29 @@ export function ChatScreen(): React.JSX.Element {
     setSending(false);
   }, [body, sending, conversationId, myUserId, dispatch, sendMessage]);
 
-  const retry = useCallback(async (optimisticId: string, text: string): Promise<void> => {
-    dispatch(failedMessageCleared(optimisticId));
-    dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
-    const confirmed = await socketSendMessage(conversationId, text, optimisticId);
-    if (confirmed) {
-      dispatch(
-        messageConfirmed({
-          optimisticId,
-          confirmed: {
-            ...confirmed,
-            type: confirmed.type ?? 'text',
-            location: confirmed.location ?? null,
-            locationSessionId: confirmed.locationSessionId ?? null,
-          },
-        }),
-      );
-    } else {
+  const retry = useCallback(
+    async (optimisticId: string, text: string): Promise<void> => {
+      dispatch(failedMessageCleared(optimisticId));
       dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
-    }
-  }, [conversationId, dispatch]);
+      const confirmed = await socketSendMessage(conversationId, text, optimisticId);
+      if (confirmed) {
+        dispatch(
+          messageConfirmed({
+            optimisticId,
+            confirmed: {
+              ...confirmed,
+              type: confirmed.type ?? 'text',
+              location: confirmed.location ?? null,
+              locationSessionId: confirmed.locationSessionId ?? null,
+            },
+          }),
+        );
+      } else {
+        dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
+      }
+    },
+    [conversationId, dispatch],
+  );
 
   const loadMore = (): void => {
     if (nextCursor && !loading) {
@@ -264,10 +304,7 @@ export function ChatScreen(): React.JSX.Element {
         center={
           <TouchableOpacity
             style={styles.headerTitleTap}
-            onPress={() => {
-              if (!otherUserId) return;
-              navigation.navigate('UserProfile', { userId: otherUserId });
-            }}
+            onPress={openPeerProfile}
             disabled={!otherUserId}
             accessibilityRole="button"
             accessibilityLabel={`Open profile for ${otherUserName || 'user'}`}
@@ -290,7 +327,7 @@ export function ChatScreen(): React.JSX.Element {
         }
       />
 
-      {showRequestBanner && (
+      {showRequestBanner ? (
         <View style={styles.requestBanner}>
           <Text style={styles.requestBannerText}>
             {requestLocked
@@ -298,7 +335,7 @@ export function ChatScreen(): React.JSX.Element {
               : "Message request — they'll see one message until they reply."}
           </Text>
         </View>
-      )}
+      ) : null}
 
       {liveSession ? (
         <LocationSessionBanner
@@ -326,6 +363,9 @@ export function ChatScreen(): React.JSX.Element {
               isPending={pendingIds.has(item.id)}
               isFailed={failedIds.includes(item.id)}
               onRetry={() => void retry(item.id, item.body)}
+              peerName={peerDisplayName}
+              peerAvatarUrl={peerAvatarUrl}
+              onOpenPeerProfile={otherUserId ? openPeerProfile : null}
             />
           )}
           inverted
@@ -374,7 +414,10 @@ export function ChatScreen(): React.JSX.Element {
           accessibilityLabel="Message"
         />
         <TouchableOpacity
-          style={[styles.sendBtn, (!body.trim() || sending || requestLocked) && styles.sendBtnDisabled]}
+          style={[
+            styles.sendBtn,
+            (!body.trim() || sending || requestLocked) && styles.sendBtnDisabled,
+          ]}
           onPress={send}
           disabled={!body.trim() || sending || requestLocked}
           accessibilityRole="button"
@@ -427,18 +470,47 @@ const styles = StyleSheet.create({
   },
   requestBannerText: { color: colors.action, fontSize: 12, textAlign: 'center' },
   messageList: { paddingHorizontal: 12, paddingVertical: 8 },
+  peerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+    marginVertical: 3,
+    maxWidth: '90%',
+    alignSelf: 'flex-start',
+  },
+  peerAvatarTap: {
+    marginBottom: 2,
+  },
   locBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
   locBtnText: { fontSize: 20 },
   giftBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6 },
   giftBtnText: { fontSize: 22 },
   bubble: { maxWidth: '78%', borderRadius: 16, padding: 10, marginVertical: 3 },
   bubbleMine: { alignSelf: 'flex-end', backgroundColor: colors.primary },
-  bubbleTheirs: { alignSelf: 'flex-start', backgroundColor: colors.surfaceAlt },
+  // Peer bubble sits inside peerRow — no outer alignSelf/margin (row owns layout).
+  bubbleTheirs: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.surfaceAlt,
+    maxWidth: '100%',
+    flexShrink: 1,
+    marginVertical: 0,
+  },
   bubbleText: { fontSize: 15, lineHeight: 20 },
   bubbleTextMine: { color: colors.onPrimary },
   bubbleTextTheirs: { color: colors.textPrimary },
-  statusPending: { fontSize: 11, color: 'rgba(10,10,15,0.4)', marginTop: 2, textAlign: 'right' },
-  statusFailed: { fontSize: 11, color: colors.danger, marginTop: 2, textAlign: 'right', fontWeight: '600' },
+  statusPending: {
+    fontSize: 11,
+    color: 'rgba(10,10,15,0.4)',
+    marginTop: 2,
+    textAlign: 'right',
+  },
+  statusFailed: {
+    fontSize: 11,
+    color: colors.danger,
+    marginTop: 2,
+    textAlign: 'right',
+    fontWeight: '600',
+  },
   inputRow: {
     flexDirection: 'row',
     padding: 10,
