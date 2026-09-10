@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  videoBadgeText: { color: '#fff', fontSize: 9, marginLeft: 1 },
+  videoBadgeText: { color: colors.textPrimary, fontSize: 9, marginLeft: 1 },
   plus: { color: colors.textPrimary, fontSize: 28, fontWeight: '300' },
   plusLocked: { fontSize: 20 },
   name: {
