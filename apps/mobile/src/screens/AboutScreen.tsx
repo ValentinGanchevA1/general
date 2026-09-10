@@ -8,7 +8,7 @@ import type { AccountStackParamList } from '@/navigation/stacks';
 import { APP_VERSION } from '@/constants/app';
 import { ListRow } from '@/components/ListRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { colors, radius, spacing } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
