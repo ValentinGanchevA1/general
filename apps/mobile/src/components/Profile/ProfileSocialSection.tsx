@@ -49,7 +49,7 @@ export function ProfileSocialSection({ links, onManage }: Props): React.JSX.Elem
           <TouchableOpacity style={styles.connectSocialButton} onPress={onManage}>
             <Icon name="link-plus" size={22} color={colors.primary} />
             <Text style={styles.connectSocialText}>Connect social accounts</Text>
-            <Text style={styles.connectSocialSubtext}>Boost trust score</Text>
+            <Text style={styles.connectSocialSubtext}>Boost your trust score</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -58,18 +58,16 @@ export function ProfileSocialSection({ links, onManage }: Props): React.JSX.Elem
 }
 
 const styles = StyleSheet.create({
-  section: { marginTop: spacing.lg },
+  section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.xl,
     marginBottom: spacing.sm,
   },
   sectionTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
   sectionAction: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   infoCard: {
-    marginHorizontal: spacing.xl,
     backgroundColor: colors.surfaceRaised,
     borderRadius: radius.md,
     overflow: 'hidden',
@@ -77,28 +75,16 @@ const styles = StyleSheet.create({
   socialLinkItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
+    padding: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.borderStrong,
   },
   infoRowLast: { borderBottomWidth: 0 },
-  socialIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  socialLinkInfo: { flex: 1 },
-  socialLinkName: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
-  socialLinkUsername: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-  connectSocialButton: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    gap: 4,
-  },
-  connectSocialText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  socialIcon: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
+  socialLinkInfo: { flex: 1, marginLeft: 12 },
+  socialLinkName: { color: colors.textPrimary, fontWeight: '600' },
+  socialLinkUsername: { color: colors.textMuted, fontSize: 12 },
+  connectSocialButton: { alignItems: 'center', padding: 20, gap: 6 },
+  connectSocialText: { color: colors.primary, fontWeight: '600', fontSize: 15 },
   connectSocialSubtext: { color: colors.textMuted, fontSize: 12 },
 });
