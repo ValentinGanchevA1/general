@@ -181,14 +181,18 @@ export function MapScreen(): React.JSX.Element {
 
 	const { sendPresence, on } = useSocket();
 
+	// Depend on primitive lat/lng so GPS object identity churn does not reset the 30s interval.
+	const myLat = myCoords?.lat;
+	const myLng = myCoords?.lng;
 	useEffect(() => {
-		if (!myCoords) return;
-		void sendPresence({ location: myCoords });
+		if (myLat == null || myLng == null) return;
+		const location = { lat: myLat, lng: myLng };
+		void sendPresence({ location });
 		const t = setInterval(() => {
-			if (myCoords) void sendPresence({ location: myCoords });
+			void sendPresence({ location });
 		}, 30_000);
 		return () => clearInterval(t);
-	}, [myCoords, sendPresence]);
+	}, [myLat, myLng, sendPresence]);
 
 	useEffect(() => {
 		if (!viewport) return;
