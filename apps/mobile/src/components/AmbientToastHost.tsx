@@ -42,6 +42,12 @@ import type {
 } from '@g88/shared';
 
 import { getJson } from '@/api/client';
+import {
+  getLastRank,
+  isRankBaselineReady,
+  markRankBaselineReady,
+  setLastRank,
+} from '@/features/gamification/rankBaseline';
 import { openViaRef } from '@/navigation/openRootScreen';
 import { useSocket } from '@/realtime/useSocket';
 import { colors, radius } from '@/theme';
@@ -163,9 +169,6 @@ function hapticFor(item: ToastItem): number[] {
   }
 }
 
-const lastRankByScope: Partial<Record<LeaderboardScope, number>> = {};
-let rankBaselineReady = false;
-
 export function AmbientToastHost(): React.JSX.Element | null {
   const { on } = useSocket();
   const insets = useSafeAreaInsets();
@@ -262,8 +265,8 @@ export function AmbientToastHost(): React.JSX.Element | null {
         );
         const rank = page.me?.rank;
         if (rank == null || rank <= 0) continue;
-        const prev = lastRankByScope[scope];
-        if (rankBaselineReady && prev != null && rank < prev) {
+        const prev = getLastRank(scope);
+        if (isRankBaselineReady() && prev != null && rank < prev) {
           enqueue({
             kind: 'rank',
             data: {
@@ -274,12 +277,12 @@ export function AmbientToastHost(): React.JSX.Element | null {
             },
           });
         }
-        lastRankByScope[scope] = rank;
+        setLastRank(scope, rank);
       } catch {
         // keep last known
       }
     }
-    rankBaselineReady = true;
+    markRankBaselineReady();
   }, [enqueue]);
 
   useEffect(() => {
