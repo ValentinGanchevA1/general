@@ -12,6 +12,7 @@ import type {
 
 import { api, postJson } from '@/api/client';
 import { tokenStore } from '@/api/tokenStore';
+import { resetInboxSeen } from '@/features/interactions/inboxSeen';
 import { disconnectSocket } from '@/realtime/useSocket';
 import { extractMessage } from '@/utils/extractMessage';
 
@@ -105,6 +106,7 @@ export const logout = createAsyncThunk('auth/logout', async () => {
   }
   disconnectSocket();
   await tokenStore.clear();
+  resetInboxSeen();
   Sentry.setUser(null);
 });
 
@@ -127,6 +129,7 @@ export const deleteAccount = createAsyncThunk(
     }
     disconnectSocket();
     await tokenStore.clear();
+    resetInboxSeen();
     Sentry.setUser(null);
   },
 );
@@ -214,14 +217,10 @@ const authSlice = createSlice({
       .addCase(restoreSession.fulfilled, (state, action) => {
         state.restoring = false;
         state.user = action.payload;
-        // Do not force true: wait for profile/fetch matcher when a user is present.
-        // Keep previous value when null (logged out); when user restored, leave gate
-        // open until profile confirms profileComplete (matcher below).
+        // Do not force true when a user is present — wait for profile/fetch matcher.
         if (action.payload == null) {
           state.profileSetupComplete = true;
         }
-        // When user is present, leave profileSetupComplete as-is until profile fetch
-        // lands (AppNavigator / Profile gate should still fetch profile on restore).
       })
       .addCase(restoreSession.rejected, (state) => {
         state.restoring = false;
