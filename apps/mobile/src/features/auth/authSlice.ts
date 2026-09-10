@@ -12,6 +12,7 @@ import type {
 
 import { api, postJson } from '@/api/client';
 import { tokenStore } from '@/api/tokenStore';
+import { resetRankBaseline } from '@/features/gamification/rankBaseline';
 import { resetInboxSeen } from '@/features/interactions/inboxSeen';
 import { unregisterPushToken } from '@/lib/pushNotifications';
 import { disconnectSocket } from '@/realtime/useSocket';
@@ -94,7 +95,7 @@ export const loginWithGoogle = createAsyncThunk(
   },
 );
 
-export const logout = createAsyncThunk('auth/logout', async () => {
+export const logout = createAsyncThunk('auth/logout', async (_, { dispatch }) => {
   // Fire-and-forget: revoke the refresh token server-side.
   // If the network is down or the token is already expired, we still clear locally.
   const refreshToken = await tokenStore.getRefreshToken();
@@ -110,7 +111,11 @@ export const logout = createAsyncThunk('auth/logout', async () => {
   disconnectSocket();
   await tokenStore.clear();
   resetInboxSeen();
+  resetRankBaseline();
   Sentry.setUser(null);
+  // Broadcast after local teardown so module singletons + future listeners stay in sync
+  // even when the network POST fails (logout.rejected still clears locally).
+  dispatch({ type: 'auth/sessionEnded' });
 });
 
 /**
@@ -121,7 +126,7 @@ export const logout = createAsyncThunk('auth/logout', async () => {
  */
 export const deleteAccount = createAsyncThunk(
   'auth/deleteAccount',
-  async (args: { password?: string }, { rejectWithValue }) => {
+  async (args: { password?: string }, { rejectWithValue, dispatch }) => {
     try {
       const body: DeleteAccountRequest = args.password
         ? { confirm: 'DELETE', password: args.password }
@@ -134,7 +139,9 @@ export const deleteAccount = createAsyncThunk(
     disconnectSocket();
     await tokenStore.clear();
     resetInboxSeen();
+    resetRankBaseline();
     Sentry.setUser(null);
+    dispatch({ type: 'auth/sessionEnded' });
   },
 );
 
