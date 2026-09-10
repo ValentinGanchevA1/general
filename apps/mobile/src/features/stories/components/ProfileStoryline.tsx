@@ -83,34 +83,32 @@ export function ProfileStoryline({ userId, isSelf = false }: Props): React.JSX.E
       ) : sorted.length === 0 ? (
         <Text style={styles.empty}>
           {isSelf
-            ? 'Your storyline is empty — share a moment from the map.'
-            : 'No stories yet.'}
+            ? 'Your stories will show up here. Post from the Pulse tab.'
+            : 'No stories on this profile yet.'}
         </Text>
       ) : (
         <FlatList
           horizontal
           data={sorted}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(s) => s.id}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.list}
           renderItem={({ item, index }) => {
-            const live = isActive(item);
-            const label = item.caption
-              ? item.caption
-              : live
-                ? 'Active'
-                : 'Earlier';
+            const active = isActive(item);
+            const label = item.caption?.trim() || (active ? 'Live' : 'Expired');
             return (
               <TouchableOpacity
                 style={styles.card}
                 onPress={() => openAt(index)}
                 activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={`Story: ${label}`}
               >
                 <View style={styles.thumbWrap}>
                   <Image source={{ uri: item.mediaUrl }} style={styles.thumb} />
-                  {live ? (
+                  {active ? (
                     <View style={styles.liveBadge}>
-                      <Text style={styles.liveText}>Live</Text>
+                      <Text style={styles.liveText}>LIVE</Text>
                     </View>
                   ) : null}
                   <LinearGradient
@@ -196,7 +194,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   caption: {
-    color: '#ffffff',
+    color: colors.textPrimary,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '600',
