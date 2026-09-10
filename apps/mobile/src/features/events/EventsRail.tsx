@@ -15,6 +15,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { useNearbyEvents } from './useEvents';
 import { formatEventDayShort } from './eventFormat';
+import { colors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -59,7 +60,7 @@ function EventCard({
         <Image source={{ uri: event.coverUrl }} style={styles.cover} />
       ) : (
         <View style={[styles.cover, styles.coverPlaceholder]}>
-          <Icon name="calendar-star" size={18} color="#00d4ff" />
+          <Icon name="calendar-star" size={18} color={colors.primary} />
         </View>
       )}
       <View style={styles.body}>
@@ -90,16 +91,16 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: 'rgba(18,18,31,0.95)',
     borderWidth: 1,
-    borderColor: '#1f1f33',
+    borderColor: colors.border,
   },
   cover: {
     width: 48,
     height: 48,
     borderRadius: 10,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
   },
   coverPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, minWidth: 0 },
-  title: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  meta: { color: '#999', fontSize: 11, marginTop: 3 },
+  title: { color: colors.textPrimary, fontSize: 13, fontWeight: '700' },
+  meta: { color: colors.textFaint, fontSize: 11, marginTop: 3 },
 });
