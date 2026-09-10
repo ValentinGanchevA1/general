@@ -41,7 +41,7 @@ export function SettingsScreen(): React.JSX.Element {
   const standing = strikeStanding({
     strikePoints: profile?.strikePoints ?? 0,
     storySuspendedUntil: profile?.storySuspendedUntil ?? null,
-    verification: profile?.verification,
+    verification: profile?.verification ?? 'none',
   });
 
   useFocusEffect(
