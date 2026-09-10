@@ -24,7 +24,12 @@ import { FriendsService } from '../friends/friends.service';
 
 const DEFAULT_KINDS: EntityKind[] = ['user', 'event', 'listing'];
 const MAX_POINTS_PER_RESPONSE = 500;
-const MAX_CELLS_PER_VIEWPORT = 200_000;
+/** Hard cap — refuse before h3.polygonToCells when estimate exceeds this.
+ *  Must match the post-enumeration guard below so free-tier (512MB) never
+ *  materializes tens of thousands of cell ids (OOM root cause 2026-09-11). */
+const MAX_CELLS_PER_VIEWPORT = 5_000;
+/** Area estimate can undercount vs polygonToCells; refuse a bit early. */
+const ESTIMATE_CELL_MARGIN = 0.8;
 const H3_CELL_AREA_KM2: Record<number, number> = {
   4: 1770.3, 5: 252.9, 6: 36.13, 7: 5.161, 8: 0.7373, 9: 0.1053, 10: 0.01504,
 };
@@ -88,8 +93,11 @@ export class DiscoveryService {
       return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, true);
     }
 
-    if (this.estimateCellCount(params.viewport, resolution) > MAX_CELLS_PER_VIEWPORT) {
-      this.logger.warn(`Viewport too large at r${resolution} — refusing`);
+    const estimate = this.estimateCellCount(params.viewport, resolution);
+    if (estimate > MAX_CELLS_PER_VIEWPORT * ESTIMATE_CELL_MARGIN) {
+      this.logger.warn(
+        `Viewport estimate ${estimate} cells at r${resolution} — refusing before polygonToCells`,
+      );
       return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly);
     }
 
@@ -97,7 +105,7 @@ export class DiscoveryService {
     if (cells.length === 0 || (topicSlug && kinds.length === 0)) {
       return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly);
     }
-    if (cells.length > 5_000) {
+    if (cells.length > MAX_CELLS_PER_VIEWPORT) {
       this.logger.warn(`Viewport produced ${cells.length} cells at r${resolution} — refusing`);
       return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly);
     }

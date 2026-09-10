@@ -32,6 +32,15 @@ interface UseDiscoveryResult {
   refresh: () => void;
 }
 
+/** ~15° lat/lng ≈ multi-country; beyond that discovery is useless and expensive. */
+function isViewportTooLarge(vp: Viewport): boolean {
+  const latSpan = Math.abs(vp.ne.lat - vp.sw.lat);
+  const rawLng = vp.ne.lng - vp.sw.lng;
+  const lngSpan = ((rawLng % 360) + 360) % 360;
+  const lngNorm = lngSpan > 180 ? 360 - lngSpan : lngSpan;
+  return latSpan > 15 || lngNorm > 15;
+}
+
 function pointKey(p: DiscoveryPoint): string {
   return p.kind === 'cluster' ? p.cellId : p.id;
 }
@@ -68,6 +77,21 @@ export function useDiscovery({
       lm?: ListingMode,
       fo?: boolean,
     ) => {
+      // Continent-scale pans at low zoom explode H3 cell counts on the API
+      // (r4 × huge viewport → OOM on free tier). Skip the network call.
+      if (isViewportTooLarge(vp)) {
+        setData({
+          points: [],
+          resolution: 0,
+          generatedAt: new Date().toISOString(),
+          viewportHash: 'too-large',
+          diff: null,
+        });
+        setLoading(false);
+        setError(null);
+        return;
+      }
+
       const key = JSON.stringify({ vp, z, k, t, lm: lm ?? null, fo: fo === true });
       if (key === lastFetchKey.current) return;
 
