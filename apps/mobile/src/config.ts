@@ -14,12 +14,25 @@ const DEV_HOST: string =
   (Platform.OS === 'android' ? '10.0.2.2' : 'localhost');
 
 // Allow API_HOST to be a full https hostname (e.g. prod on Render) or a bare
-// IP/hostname for local dev. Port 3001 and http:// only apply to local IPs.
-const isRemoteHost = DEV_HOST.includes('.');
+// IP/hostname for local dev. Port 3001 and http:// only apply to local hosts.
+// Do NOT treat dotted private/loopback addresses as remote (127.0.0.1, 10.x, 192.168.x, 172.16–31.x).
+function isLocalDevHost(host: string): boolean {
+  if (host === 'localhost' || host === '10.0.2.2') return true;
+  if (host === '127.0.0.1' || host.startsWith('127.')) return true;
+  if (host.startsWith('192.168.')) return true;
+  if (host.startsWith('10.')) return true;
+  // RFC1918 172.16.0.0/12
+  const m = /^172\.(\d+)\./.exec(host);
+  if (m) {
+    const second = Number(m[1]);
+    if (second >= 16 && second <= 31) return true;
+  }
+  return false;
+}
 
-const DEV_API_URL = isRemoteHost && !DEV_HOST.startsWith('192.') && !DEV_HOST.startsWith('10.')
-  ? `https://${DEV_HOST}`
-  : `http://${DEV_HOST}:3001`;
+const DEV_API_URL = isLocalDevHost(DEV_HOST)
+  ? `http://${DEV_HOST}:3001`
+  : `https://${DEV_HOST}`;
 
 export const Config = {
   API_BASE_URL: __DEV__
