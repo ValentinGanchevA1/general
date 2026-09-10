@@ -160,6 +160,14 @@ const authSlice = createSlice({
     clearError(state) {
       state.error = null;
     },
+    /**
+     * Broadcast when the local session is fully torn down (logout success/failure,
+     * or successful account deletion). Other slices match this so they reset even
+     * when logout.rejected (network down) still clears tokens locally.
+     */
+    sessionEnded() {
+      // no local state change beyond what the logout cases already do
+    },
   },
   extraReducers: (builder) => {
     const pending = (state: AuthState) => {
@@ -206,7 +214,14 @@ const authSlice = createSlice({
       .addCase(restoreSession.fulfilled, (state, action) => {
         state.restoring = false;
         state.user = action.payload;
-        state.profileSetupComplete = true;
+        // Do not force true: wait for profile/fetch matcher when a user is present.
+        // Keep previous value when null (logged out); when user restored, leave gate
+        // open until profile confirms profileComplete (matcher below).
+        if (action.payload == null) {
+          state.profileSetupComplete = true;
+        }
+        // When user is present, leave profileSetupComplete as-is until profile fetch
+        // lands (AppNavigator / Profile gate should still fetch profile on restore).
       })
       .addCase(restoreSession.rejected, (state) => {
         state.restoring = false;
@@ -253,5 +268,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError } = authSlice.actions;
+export const { clearError, sessionEnded } = authSlice.actions;
 export default authSlice.reducer;
