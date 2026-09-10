@@ -7,21 +7,22 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { ActivityItem, ActivityType } from '@g88/shared';
+import { colors } from '@/theme';
 
 const BORDER_BY_TYPE: Record<ActivityType, string> = {
-  chat:    '#00d4ff',
-  wave:    '#FF69B4',
-  listing: '#4CAF50',
-  alert:   '#FF9800',
-  match:   '#FF69B4',
+  chat: colors.primary,
+  wave: colors.entityUser,
+  listing: colors.entityListing,
+  alert: colors.entityEvent,
+  match: colors.entityUser,
 };
 
 const ICON_BY_TYPE: Record<ActivityType, string> = {
-  chat:    'message-text',
-  wave:    'hand-wave',
+  chat: 'message-text',
+  wave: 'hand-wave',
   listing: 'tag',
-  alert:   'bullhorn',
-  match:   'heart',
+  alert: 'bullhorn',
+  match: 'heart',
 };
 
 interface Props {
@@ -31,7 +32,11 @@ interface Props {
 
 export function ActivityCard({ item, onPress }: Props): React.JSX.Element {
   const initials = (item.actorName ?? '?')
-    .split(' ').map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
+    .split(' ')
+    .map((w) => w[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
   const distance = item.distanceM != null ? formatDistance(item.distanceM) : null;
 
   return (
@@ -50,10 +55,7 @@ export function ActivityCard({ item, onPress }: Props): React.JSX.Element {
           <Text style={S.avatarText}>{initials}</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text
-            style={[S.author, item.unread && S.authorUnread]}
-            numberOfLines={1}
-          >
+          <Text style={[S.author, item.unread && S.authorUnread]} numberOfLines={1}>
             {item.actorName ?? 'Someone'}
           </Text>
           <View style={S.meta}>
@@ -65,12 +67,16 @@ export function ActivityCard({ item, onPress }: Props): React.JSX.Element {
             )}
           </View>
         </View>
-        <MCI name={ICON_BY_TYPE[item.type]} size={18} color="#666" />
+        <MCI name={ICON_BY_TYPE[item.type]} size={18} color={colors.textFaint} />
       </View>
 
-      <Text style={S.title} numberOfLines={1}>{item.title}</Text>
+      <Text style={S.title} numberOfLines={1}>
+        {item.title}
+      </Text>
       {!!item.preview && (
-        <Text style={S.preview} numberOfLines={2}>{item.preview}</Text>
+        <Text style={S.preview} numberOfLines={2}>
+          {item.preview}
+        </Text>
       )}
     </Pressable>
   );
@@ -93,28 +99,41 @@ function relTime(iso: string): string {
 
 const S = StyleSheet.create({
   card: {
-    backgroundColor: '#1a1a2e', borderRadius: 14, padding: 14,
-    marginHorizontal: 12, marginBottom: 10,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: 14,
+    padding: 14,
+    marginHorizontal: 12,
+    marginBottom: 10,
     borderLeftWidth: 3,
   },
   cardPressed: { opacity: 0.7 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-  unreadDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#00d4ff' },
+  unreadDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+  },
   avatar: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: '#0a0a0f',
-    justifyContent: 'center', alignItems: 'center',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.bg,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  avatarText: { color: '#00d4ff', fontWeight: '700', fontSize: 13 },
-  author: { color: '#aaa', fontSize: 14, fontWeight: '500' },
-  authorUnread: { color: '#fff', fontWeight: '700' },
+  avatarText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  author: { color: colors.textSecondary, fontSize: 14, fontWeight: '500' },
+  authorUnread: { color: colors.textPrimary, fontWeight: '700' },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  metaText: { color: '#666', fontSize: 11 },
+  metaText: { color: colors.textFaint, fontSize: 11 },
   distancePill: {
-    backgroundColor: '#0a0a0f',
-    paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8,
+    backgroundColor: colors.bg,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
   },
-  distanceText: { color: '#00d4ff', fontSize: 10, fontWeight: '600' },
-  title: { color: '#fff', fontSize: 15, fontWeight: '600', marginBottom: 2 },
-  preview: { color: '#aaa', fontSize: 13, lineHeight: 18 },
+  distanceText: { color: colors.primary, fontSize: 10, fontWeight: '600' },
+  title: { color: colors.textPrimary, fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  preview: { color: colors.textSecondary, fontSize: 13, lineHeight: 18 },
 });
