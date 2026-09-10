@@ -38,11 +38,7 @@ export function ProfileActivityLinks({
   // Gifts inbox is useful once wallet/activity exists; hide pure-empty new accounts.
   const showGifts = spendableXp > 0 || showGamificationRow;
 
-  // Marketplace is a permanent commerce entry (IA-2) — never fully empty.
-  const showMarketplace = true;
-  if (!showProgress && !showGamificationRow && !showGifts && !showMarketplace) {
-    return null;
-  }
+  // Marketplace is a permanent commerce entry (IA-2) — component always renders at least that row.
 
   return (
     <>

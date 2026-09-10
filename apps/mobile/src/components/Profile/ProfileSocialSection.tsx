@@ -28,7 +28,10 @@ export function ProfileSocialSection({ links, onManage }: Props): React.JSX.Elem
             const cfg = SOCIAL_PROVIDER_CONFIG[link.provider];
             const last = index === links.length - 1;
             return (
-              <View key={index} style={[styles.socialLinkItem, last && styles.infoRowLast]}>
+              <View
+                key={`${link.provider}:${link.username ?? index}`}
+                style={[styles.socialLinkItem, last && styles.infoRowLast]}
+              >
                 <View style={[styles.socialIcon, { backgroundColor: cfg.color }]}>
                   <Icon name={cfg.icon} size={18} color="#fff" />
                 </View>
