@@ -3,7 +3,7 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { UserProfile, UpdateProfileRequest } from '@g88/shared';
 
 import { getJson, patchJson } from '@/api/client';
-import { logout } from '@/features/auth/authSlice';
+import { logout, sessionEnded } from '@/features/auth/authSlice';
 import { extractMessage } from '@/utils/extractMessage';
 
 interface ProfileState {
@@ -108,7 +108,8 @@ const profileSlice = createSlice({
         state.error = action.payload as string;
       })
 
-      .addCase(logout.fulfilled, () => initialState);
+      .addCase(logout.fulfilled, () => initialState)
+      .addCase(sessionEnded, () => initialState);
   },
 });
 
