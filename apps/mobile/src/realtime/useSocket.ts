@@ -42,6 +42,14 @@ let sharedSocket: G88Socket | null = null;
 /** Lifecycle listeners (connect/disconnect) bound once per socket instance. */
 let lifecycleBound = false;
 
+/** Monotonic suffix so two sends in the same ms never share an optimistic id. */
+let clientMessageSeq = 0;
+
+function nextClientMessageId(): string {
+  clientMessageSeq += 1;
+  return `c-${Date.now()}-${clientMessageSeq}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 /**
  * Handlers registered before the socket exists — or kept as source of truth.
  * Attached to the live socket on create; cleaned up via returned unsub.
@@ -371,7 +379,7 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
 
   const sendMessage = useCallback(
     (conversationId: string, body: string, clientMessageId?: string): Promise<ChatMessageEvent | null> =>
-      socketSendMessage(conversationId, body, clientMessageId ?? `${Date.now()}`),
+      socketSendMessage(conversationId, body, clientMessageId ?? nextClientMessageId()),
     [],
   );
 

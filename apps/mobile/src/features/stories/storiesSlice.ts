@@ -13,6 +13,7 @@ import type {
 } from '@g88/shared';
 
 import { getJson, postJson } from '@/api/client';
+import { logout } from '@/features/auth/authSlice';
 
 function errorMessage(e: unknown, fallback: string): string {
   if (typeof e === 'string' && e.trim()) return e;
@@ -232,6 +233,9 @@ const slice = createSlice({
         s.byAuthor[key] = apply(s.byAuthor[key]!);
       }
     });
+
+    b.addCase(logout.fulfilled, () => initialState);
+    b.addCase(logout.rejected, () => initialState);
   },
 });
 

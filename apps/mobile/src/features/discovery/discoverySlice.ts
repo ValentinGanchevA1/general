@@ -1,6 +1,8 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { DiscoveryPoint } from '@g88/shared';
 
+import { logout } from '@/features/auth/authSlice';
+
 interface DiscoveryState {
   points: DiscoveryPoint[];
 }
@@ -14,6 +16,11 @@ const discoverySlice = createSlice({
     setPoints(state, action: PayloadAction<DiscoveryPoint[]>) {
       state.points = action.payload;
     },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(logout.fulfilled, () => initialState)
+      .addCase(logout.rejected, () => initialState);
   },
 });
 

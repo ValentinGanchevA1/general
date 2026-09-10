@@ -5,6 +5,8 @@ import type { ReceivedInteraction, ReceivedInteractionsResponse } from '@g88/sha
 import { getJson } from '@/api/client';
 import { onSocketConnected, useSocket } from '@/realtime/useSocket';
 
+import { getInboxSeenAt, markInboxSeen, subscribeInboxSeen } from './inboxSeen';
+
 export function useReceivedInteractions(): {
   items: ReceivedInteraction[];
   unreadCount: number;
@@ -14,8 +16,10 @@ export function useReceivedInteractions(): {
 } {
   const [items, setItems] = useState<ReceivedInteraction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [seenAt, setSeenAt] = useState<number>(() => Date.now());
+  const [seenAt, setSeenAt] = useState<number>(() => getInboxSeenAt());
   const { on } = useSocket();
+
+  useEffect(() => subscribeInboxSeen(() => setSeenAt(getInboxSeenAt())), []);
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -50,7 +54,7 @@ export function useReceivedInteractions(): {
   const unreadCount = items.filter((i) => new Date(i.createdAt).getTime() > seenAt).length;
 
   const markSeen = useCallback((): void => {
-    setSeenAt(Date.now());
+    markInboxSeen(Date.now());
   }, []);
 
   return { items, unreadCount, loading, refresh, markSeen };

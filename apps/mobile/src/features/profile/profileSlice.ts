@@ -108,7 +108,8 @@ const profileSlice = createSlice({
         state.error = action.payload as string;
       })
 
-      .addCase(logout.fulfilled, () => initialState);
+      .addCase(logout.fulfilled, () => initialState)
+      .addCase(logout.rejected, () => initialState);
   },
 });
 

@@ -204,7 +204,9 @@ const chatSlice = createSlice({
         const convo = state.conversations.find((c) => c.id === action.payload);
         if (convo) convo.unreadCount = 0;
       })
-      .addCase(logout.fulfilled, () => initialState);
+      // Both paths: logout is best-effort and clears locally even when the network POST fails.
+      .addCase(logout.fulfilled, () => initialState)
+      .addCase(logout.rejected, () => initialState);
   },
 });
 

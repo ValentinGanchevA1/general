@@ -12,6 +12,7 @@ import type {
 
 import { api, postJson } from '@/api/client';
 import { tokenStore } from '@/api/tokenStore';
+import { resetInboxSeen } from '@/features/interactions/inboxSeen';
 import { disconnectSocket } from '@/realtime/useSocket';
 import { extractMessage } from '@/utils/extractMessage';
 
@@ -105,6 +106,7 @@ export const logout = createAsyncThunk('auth/logout', async () => {
   }
   disconnectSocket();
   await tokenStore.clear();
+  resetInboxSeen();
   Sentry.setUser(null);
 });
 
@@ -127,6 +129,7 @@ export const deleteAccount = createAsyncThunk(
     }
     disconnectSocket();
     await tokenStore.clear();
+    resetInboxSeen();
     Sentry.setUser(null);
   },
 );
@@ -159,6 +162,14 @@ const authSlice = createSlice({
   reducers: {
     clearError(state) {
       state.error = null;
+    },
+    /**
+     * Broadcast when the local session is fully torn down (logout success/failure,
+     * or successful account deletion). Other slices match this so they reset even
+     * when logout.rejected (network down) still clears tokens locally.
+     */
+    sessionEnded() {
+      // no local state change beyond what the logout cases already do
     },
   },
   extraReducers: (builder) => {
@@ -206,7 +217,10 @@ const authSlice = createSlice({
       .addCase(restoreSession.fulfilled, (state, action) => {
         state.restoring = false;
         state.user = action.payload;
-        state.profileSetupComplete = true;
+        // Do not force true when a user is present — wait for profile/fetch matcher.
+        if (action.payload == null) {
+          state.profileSetupComplete = true;
+        }
       })
       .addCase(restoreSession.rejected, (state) => {
         state.restoring = false;
@@ -253,5 +267,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError } = authSlice.actions;
+export const { clearError, sessionEnded } = authSlice.actions;
 export default authSlice.reducer;
