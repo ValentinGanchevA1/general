@@ -9,6 +9,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import type { DiscoveryPoint, EntityPoint, UserMeta } from '@g88/shared';
 
 import { Avatar } from '@/components/Avatar';
+import { colors } from '@/theme';
 
 interface Props {
   points: DiscoveryPoint[];
@@ -109,30 +110,30 @@ const S = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 6,
   },
-  sectionTitle: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  sectionTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
   sectionCount: {
-    color: '#00d4ff',
+    color: colors.primary,
     fontSize: 12,
     fontWeight: '700',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
     paddingHorizontal: 8,
     paddingVertical: 1,
     borderRadius: 8,
   },
-  expandHint: { color: '#666', fontSize: 12, marginLeft: 'auto' },
+  expandHint: { color: colors.textFaint, fontSize: 12, marginLeft: 'auto' },
   scroll: { paddingHorizontal: 12, paddingVertical: 4, gap: 12 },
   userItem: { alignItems: 'center', width: 56 },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 2,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  overflowAvatar: { backgroundColor: '#0a0a0f' },
-  overflowText: { color: '#aaa', fontWeight: '700', fontSize: 13 },
-  name: { color: '#aaa', fontSize: 11, marginTop: 4, maxWidth: 56, textAlign: 'center' },
+  overflowAvatar: { backgroundColor: colors.bg },
+  overflowText: { color: colors.textSecondary, fontWeight: '700', fontSize: 13 },
+  name: { color: colors.textSecondary, fontSize: 11, marginTop: 4, maxWidth: 56, textAlign: 'center' },
 });
