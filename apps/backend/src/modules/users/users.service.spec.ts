@@ -66,7 +66,7 @@ describe('UsersService — gallery photos', () => {
     expect(query.mock.calls.some((c) => /INSERT INTO user_photos/.test(c[0]))).toBe(false);
   });
 
-  it('deletePhoto throws when the photo is not the user's', async () => {
+  it("deletePhoto throws when the photo is not the user's", async () => {
     query.mockResolvedValueOnce([]); // SELECT id, url → not found
     await expect(service.deletePhoto(USER, PHOTO_A)).rejects.toBeInstanceOf(NotFoundException);
   });
