@@ -3,7 +3,7 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import type { ConversationSummary, ChatMessage, MessagePage } from '@g88/shared';
 
 import { getJson, postJson } from '@/api/client';
-import { logout, sessionEnded } from '@/features/auth/authSlice';
+import { logout } from '@/features/auth/authSlice';
 
 export interface OutboxEntry {
   optimisticId: string;
@@ -204,10 +204,9 @@ const chatSlice = createSlice({
         const convo = state.conversations.find((c) => c.id === action.payload);
         if (convo) convo.unreadCount = 0;
       })
-      // Prefer sessionEnded (covers logout.rejected + deleteAccount) but keep
-      // logout.fulfilled for older dispatch paths during rollout.
+      // Both paths: logout is best-effort and clears locally even when the network POST fails.
       .addCase(logout.fulfilled, () => initialState)
-      .addCase(sessionEnded, () => initialState);
+      .addCase(logout.rejected, () => initialState);
   },
 });
 

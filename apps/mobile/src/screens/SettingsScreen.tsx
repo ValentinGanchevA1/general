@@ -52,7 +52,8 @@ export function SettingsScreen(): React.JSX.Element {
     }, [dispatch, profile]),
   );
 
-  const emailVerified = profile != null && profile.verification !== 'none';
+  // Trust ladder (verification) is not the same as email badge — phone-only users still need the Verify email row.
+  const emailVerified = profile?.badges?.email === true;
 
   const toggleVisibility = async (): Promise<void> => {
     if (toggling || !profile) return;
