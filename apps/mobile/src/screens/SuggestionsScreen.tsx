@@ -26,14 +26,17 @@ import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
 
-function reasonLabel(reason: SuggestionReason, mutual: number): string {
+function reasonLabel(reason: SuggestionReason, mutual: number | null | undefined): string {
+  const n = mutual ?? 0;
   switch (reason) {
     case 'mutual_friends':
-      return mutual === 1 ? '1 mutual friend' : `${mutual} mutual friends`;
+      return n === 1 ? '1 mutual friend' : `${n} mutual friends`;
     case 'recent_wave':
       return 'Recent wave';
     case 'recent_chat':
       return 'Recent chat';
+    default:
+      return 'Suggested for you';
   }
 }
 

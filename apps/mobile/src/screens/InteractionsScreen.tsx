@@ -58,9 +58,11 @@ function signalLabel(item: InboxItem): string {
   if (item.type === 'wave') return 'waved at you';
   if (item.type === 'friend_request') return 'sent you a friend request';
   if (item.type === 'follow') return 'started following you';
+  // Story reactions (and any future reaction-bearing types)
   if (item.reactionKind === 'heart') return '❤️ reacted to your story';
   if (item.reactionKind === 'wave') return '👋 reacted to your story';
-  return 'reacted to your story';
+  if (item.reactionKind != null) return 'reacted to your story';
+  return 'interacted with you';
 }
 
 function peerOf(convo: ConversationSummary, myUserId: string) {

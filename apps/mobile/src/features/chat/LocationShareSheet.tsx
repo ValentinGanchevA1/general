@@ -8,9 +8,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { LocationShareDuration } from '@g88/shared';
-import { colors } from '@/theme';
+import { colors, spacing } from '@/theme';
 
 interface Props {
   visible: boolean;
@@ -31,6 +32,7 @@ export function LocationShareSheet({
   onClose,
   onShare,
 }: Props): React.JSX.Element {
+  const insets = useSafeAreaInsets();
   const [duration, setDuration] = useState<LocationShareDuration>('15m');
 
   const handleShare = (): void => {
@@ -38,10 +40,12 @@ export function LocationShareSheet({
     onShare(duration);
   };
 
+  const bottomPad = Math.max(insets.bottom, spacing.md);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={() => {}}>
+        <Pressable style={[styles.sheet, { paddingBottom: bottomPad + 16 }]} onPress={() => {}}>
           <View style={styles.handle} />
           <Text style={styles.title}>Share live location</Text>
           <Text style={styles.subtitle}>
@@ -99,7 +103,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
-    paddingBottom: 36,
+    // paddingBottom set inline from safe-area insets
     gap: 14,
   },
   handle: {
