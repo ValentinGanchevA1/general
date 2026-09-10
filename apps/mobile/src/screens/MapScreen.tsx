@@ -92,7 +92,7 @@ function mapEmptyCopy(opts: {
 			actionKind: 'show_everyone',
 		};
 	}
-	if (opts.listingMode === 'for_sale') {
+	if (opts.listingMode === 'sell') {
 		return {
 			icon: 'tag-outline',
 			title: 'No for-sale listings here',
@@ -101,7 +101,7 @@ function mapEmptyCopy(opts: {
 			actionKind: 'create',
 		};
 	}
-	if (opts.listingMode === 'wanted') {
+	if (opts.listingMode === 'buy') {
 		return {
 			icon: 'cart-outline',
 			title: 'No wanted posts here',
