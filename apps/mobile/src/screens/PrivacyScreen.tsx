@@ -1,11 +1,12 @@
 import React from 'react';
-import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { PRIVACY_POLICY_URL } from '@/constants/app';
+import { ListRow } from '@/components/ListRow';
 import { colors, spacing, fontSize } from '@/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
@@ -106,28 +107,20 @@ export function PrivacyScreen(): React.JSX.Element {
         <View style={styles.divider} />
 
         <Text style={styles.sectionTitle}>Manage your data</Text>
-        <TouchableOpacity
-          style={styles.actionRow}
+        <ListRow
+          icon="cog"
+          title="Visibility & account"
+          subtitle="Map presence, friends online, blocked users, delete account"
           onPress={() => navigation.navigate('Settings')}
-        >
-          <Icon name="cog" size={22} color={colors.textMuted} />
-          <View style={styles.actionText}>
-            <Text style={styles.actionLabel}>Visibility & account</Text>
-            <Text style={styles.actionSub}>
-              Map presence, friends online, blocked users, delete account
-            </Text>
-          </View>
-          <Icon name="chevron-right" size={24} color={colors.borderStrong} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.actionRow, styles.actionRowSpaced]} onPress={openFullPolicy}>
-          <Icon name="file-document-outline" size={22} color={colors.textMuted} />
-          <View style={styles.actionText}>
-            <Text style={styles.actionLabel}>Read the full policy</Text>
-            <Text style={styles.actionSub}>Opens our complete privacy policy</Text>
-          </View>
-          <Icon name="open-in-new" size={20} color={colors.borderStrong} />
-        </TouchableOpacity>
+        />
+        <ListRow
+          style={styles.rowSpaced}
+          icon="file-document-outline"
+          title="Read the full policy"
+          subtitle="Opens our complete privacy policy"
+          onPress={openFullPolicy}
+          trailing={<Icon name="open-in-new" size={20} color={colors.textFaint} />}
+        />
 
         <Text style={styles.footnote}>
           Deleting your account (Settings → Delete account) is immediate and
@@ -157,18 +150,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     marginTop: spacing.sm,
   },
-  actionRow: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 10,
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  actionRowSpaced: { marginTop: spacing.md },
-  actionText: { flex: 1, marginLeft: spacing.md },
-  actionLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '500' },
-  actionSub: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
+  rowSpaced: { marginTop: spacing.md },
   footnote: { color: colors.textFaint, fontSize: fontSize.xs, lineHeight: 18, marginTop: 20 },
 });

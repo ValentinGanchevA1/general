@@ -16,6 +16,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { SUPPORT_EMAIL, APP_VERSION } from '@/constants/app';
 import { track } from '@/lib/analytics';
+import { ListRow } from '@/components/ListRow';
 import { colors, spacing, fontSize } from '@/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
@@ -112,27 +113,19 @@ export function HelpScreen(): React.JSX.Element {
         ))}
 
         <Text style={[styles.sectionTitle, { marginTop: spacing.xl }]}>Still need help?</Text>
-        <TouchableOpacity style={styles.row} onPress={() => void emailSupport()} activeOpacity={0.85}>
-          <Icon name="email-outline" size={22} color={colors.primary} />
-          <View style={styles.rowText}>
-            <Text style={styles.rowTitle}>Email support</Text>
-            <Text style={styles.rowSub}>{SUPPORT_EMAIL}</Text>
-          </View>
-          <Icon name="chevron-right" size={22} color={colors.textFaint} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.row}
+        <ListRow
+          icon="email-outline"
+          title="Email support"
+          subtitle={SUPPORT_EMAIL}
+          onPress={() => void emailSupport()}
+        />
+        <ListRow
+          style={styles.rowSpaced}
+          icon="shield-lock-outline"
+          title="Privacy"
+          subtitle="How your data, friends, and location are handled"
           onPress={() => navigation.navigate('Privacy')}
-          activeOpacity={0.85}
-        >
-          <Icon name="shield-lock-outline" size={22} color={colors.primary} />
-          <View style={styles.rowText}>
-            <Text style={styles.rowTitle}>Privacy</Text>
-            <Text style={styles.rowSub}>How your data, friends, and location are handled</Text>
-          </View>
-          <Icon name="chevron-right" size={22} color={colors.textFaint} />
-        </TouchableOpacity>
+        />
       </ScrollView>
     </View>
   );
@@ -157,21 +150,13 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: spacing.sm,
   },
-  faqHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  faqQ: { flex: 1, color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
-  faqA: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 20, marginTop: spacing.md },
-  row: {
+  faqHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
-  rowText: { flex: 1 },
-  rowTitle: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
-  rowSub: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: 2 },
+  faqQ: { flex: 1, color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
+  faqA: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 20, marginTop: spacing.md },
+  rowSpaced: { marginTop: spacing.sm },
 });

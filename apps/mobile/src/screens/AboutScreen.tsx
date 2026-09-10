@@ -1,37 +1,21 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { APP_VERSION } from '@/constants/app';
+import { ListRow } from '@/components/ListRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { colors, fontSize, radius, spacing } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
-
-function LinkRow({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: string;
-  label: string;
-  onPress: () => void;
-}): React.JSX.Element {
-  return (
-    <TouchableOpacity style={styles.linkRow} onPress={onPress}>
-      <Icon name={icon} size={22} color="#888" />
-      <Text style={styles.linkLabel}>{label}</Text>
-      <Icon name="chevron-right" size={24} color="#444" />
-    </TouchableOpacity>
-  );
-}
 
 function Feature({ icon, title, body }: { icon: string; title: string; body: string }): React.JSX.Element {
   return (
     <View style={styles.feature}>
-      <Icon name={icon} size={20} color="#00d4ff" style={styles.featureIcon} />
+      <Icon name={icon} size={20} color={colors.primary} style={styles.featureIcon} />
       <View style={styles.featureText}>
         <Text style={styles.featureTitle}>{title}</Text>
         <Text style={styles.featureBody}>{body}</Text>
@@ -50,7 +34,7 @@ export function AboutScreen(): React.JSX.Element {
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.brand}>
           <View style={styles.logo}>
-            <Icon name="map-marker-radius" size={44} color="#00d4ff" />
+            <Icon name="map-marker-radius" size={44} color={colors.primary} />
           </View>
           <Text style={styles.appName}>G88</Text>
           <Text style={styles.tagline}>
@@ -101,14 +85,17 @@ export function AboutScreen(): React.JSX.Element {
 
         <Text style={styles.sectionTitle}>Legal</Text>
         <View style={styles.group}>
-          <LinkRow
+          <ListRow
+            variant="inset"
             icon="shield-lock"
-            label="Privacy"
+            title="Privacy"
             onPress={() => navigation.navigate('Privacy')}
           />
-          <LinkRow
+          <ListRow
+            variant="inset"
+            last
             icon="help-circle"
-            label="Help & Support"
+            title="Help & Support"
             onPress={() => navigation.navigate('Help')}
           />
         </View>
@@ -122,51 +109,71 @@ export function AboutScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0f' },
-  body: { padding: 24, paddingBottom: 48 },
-  brand: { alignItems: 'center', marginTop: 12, marginBottom: 28 },
+  container: { flex: 1, backgroundColor: colors.bg },
+  body: { padding: spacing.xxl, paddingBottom: 48 },
+  brand: { alignItems: 'center', marginTop: spacing.md, marginBottom: 28 },
   logo: {
     width: 84,
     height: 84,
     borderRadius: 22,
-    backgroundColor: '#00d4ff15',
+    backgroundColor: 'rgba(0,212,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#00d4ff33',
+    borderColor: 'rgba(0,212,255,0.2)',
   },
-  appName: { color: '#fff', fontSize: 28, fontWeight: '800', marginTop: 16, letterSpacing: 1 },
-  tagline: { color: '#888', fontSize: 14, textAlign: 'center', marginTop: 6, maxWidth: 280, lineHeight: 20 },
-  version: { color: '#555', fontSize: 12, marginTop: 10 },
-  about: { color: '#aaa', fontSize: 14, lineHeight: 21, marginBottom: 24 },
+  appName: {
+    color: colors.textPrimary,
+    fontSize: 28,
+    fontWeight: '800',
+    marginTop: spacing.lg,
+    letterSpacing: 1,
+  },
+  tagline: {
+    color: colors.textMuted,
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 6,
+    maxWidth: 280,
+    lineHeight: 20,
+  },
+  version: { color: colors.textFaint, fontSize: 12, marginTop: 10 },
+  about: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: spacing.xxl,
+  },
   sectionTitle: {
-    color: '#555',
+    color: colors.textFaint,
     fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   featureGroup: { marginBottom: 28 },
-  feature: { flexDirection: 'row', marginBottom: 16 },
+  feature: { flexDirection: 'row', marginBottom: spacing.lg },
   featureIcon: { marginTop: 2, width: 28 },
   featureText: { flex: 1 },
-  featureTitle: { color: '#fff', fontSize: 14, fontWeight: '600', marginBottom: 2 },
-  featureBody: { color: '#888', fontSize: 13, lineHeight: 18 },
+  featureTitle: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  featureBody: { color: colors.textMuted, fontSize: 13, lineHeight: 18 },
   group: {
-    backgroundColor: '#1a1a2e',
-    borderRadius: 10,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#2a2a4a',
+    borderColor: colors.borderStrong,
     overflow: 'hidden',
   },
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#2a2a4a',
+  copyright: {
+    color: colors.textFaint,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: spacing.xxl,
   },
-  linkLabel: { color: '#fff', fontSize: 15, fontWeight: '500', flex: 1, marginLeft: 12 },
-  copyright: { color: '#444', fontSize: 12, textAlign: 'center', marginTop: 32 },
 });

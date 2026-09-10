@@ -15,8 +15,9 @@ import {
 
 import { NOTIFICATION_CHANNELS, NOTIFICATION_CHANNEL_META } from '@g88/shared';
 import { useNotificationPreferences } from '@/features/notifications/useNotificationPreferences';
+import { ListRow } from '@/components/ListRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, fontSize, spacing, radius } from '@/theme';
+import { colors, fontSize, spacing } from '@/theme';
 
 export function NotificationSettingsScreen(): React.JSX.Element {
   const { prefs, loading, saving, setChannel } = useNotificationPreferences();
@@ -37,22 +38,25 @@ export function NotificationSettingsScreen(): React.JSX.Element {
             {NOTIFICATION_CHANNELS.map((channel) => {
               const meta = NOTIFICATION_CHANNEL_META[channel];
               return (
-                <View key={channel} style={S.row}>
-                  <View style={S.rowContent}>
-                    <Text style={S.rowLabel}>{meta.label}</Text>
-                    <Text style={S.rowSub}>{meta.description}</Text>
-                  </View>
-                  {saving === channel ? (
-                    <ActivityIndicator color={colors.primary} />
-                  ) : (
-                    <Switch
-                      value={prefs[channel]}
-                      onValueChange={(v) => void setChannel(channel, v)}
-                      trackColor={{ false: colors.borderStrong, true: '#0095b3' }}
-                      thumbColor={prefs[channel] ? colors.primary : colors.textFaint}
-                    />
-                  )}
-                </View>
+                <ListRow
+                  key={channel}
+                  title={meta.label}
+                  subtitle={meta.description}
+                  trailing={
+                    saving === channel ? (
+                      <ActivityIndicator color={colors.primary} />
+                    ) : (
+                      <Switch
+                        value={prefs[channel]}
+                        onValueChange={(v) => void setChannel(channel, v)}
+                        trackColor={{ false: colors.borderStrong, true: colors.primaryTrack }}
+                        thumbColor={prefs[channel] ? colors.primary : colors.textFaint}
+                        accessibilityLabel={meta.label}
+                      />
+                    )
+                  }
+                  accessibilityLabel={meta.label}
+                />
               );
             })}
           </View>
@@ -79,16 +83,4 @@ const S = StyleSheet.create({
     marginTop: 40,
   },
   list: { paddingHorizontal: spacing.lg, gap: 10 },
-  row: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  rowContent: { flex: 1, paddingRight: spacing.md },
-  rowLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
-  rowSub: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
 });
