@@ -33,7 +33,7 @@ export function ProfileSocialSection({ links, onManage }: Props): React.JSX.Elem
                 style={[styles.socialLinkItem, last && styles.infoRowLast]}
               >
                 <View style={[styles.socialIcon, { backgroundColor: cfg.color }]}>
-                  <Icon name={cfg.icon} size={18} color="#fff" />
+                  <Icon name={cfg.icon} size={18} color={colors.textPrimary} />
                 </View>
                 <View style={styles.socialLinkInfo}>
                   <Text style={styles.socialLinkName}>{cfg.label}</Text>
