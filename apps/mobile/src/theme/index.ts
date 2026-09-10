@@ -60,8 +60,11 @@ export const colors = {
   entityEvent: '#FF9800',
   /** Map / discovery: listings for sale. */
   entityListing: '#4CAF50',
-  /** Map / discovery: close-friend pins. */
-  entityFriend: '#00d4ff',
+  /**
+   * Map / discovery + avatar rings: close-friend identity.
+   * Dedicated teal — distinct from brand primary cyan and action green.
+   */
+  entityFriend: '#2EE6C5',
   /** Map / discovery: wanted / looking-to-buy listings (distinct from friends). */
   entityWanted: '#C084FC',
 } as const;

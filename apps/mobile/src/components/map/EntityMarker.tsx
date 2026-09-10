@@ -22,6 +22,9 @@ const KIND_ICON: Record<EntityPoint['kind'], string> = {
 
 const MARKER_SIZE = 40;
 
+/** Soft friend-pin fill derived from entityFriend (no hard-coded cyan). */
+const FRIEND_BUBBLE_BG = 'rgba(46,230,197,0.12)';
+
 interface Props {
   point: EntityPoint;
   onVisualSettled?: () => void;
@@ -110,7 +113,7 @@ function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element 
         )}
         {isVerified ? (
           <View style={styles.verifiedBadge}>
-            <Icon name="check-decagram" size={12} color={colors.entityFriend} />
+            <Icon name="check-decagram" size={12} color={colors.accent} />
           </View>
         ) : null}
       </View>
@@ -145,7 +148,7 @@ const styles = StyleSheet.create({
   },
   friendBubble: {
     borderWidth: 3,
-    backgroundColor: 'rgba(0,212,255,0.12)',
+    backgroundColor: FRIEND_BUBBLE_BG,
   },
   photo: {
     width: MARKER_SIZE - 5,

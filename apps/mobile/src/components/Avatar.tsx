@@ -7,7 +7,7 @@ import { colors } from '@/theme';
 /**
  * Ring styles for map sheet, profile, stories, and markers.
  * - brand: primary cyan
- * - friend: action green
+ * - friend: entityFriend teal (shared with map pins)
  * - story: accent (stories strip / ring)
  * - verified: accent for ID trust
  * - none: no ring
@@ -30,7 +30,7 @@ export interface AvatarProps {
    * Visual ring style. See AvatarRing.
    */
   ringVariant?: AvatarRing;
-  /** Friend marker — green ring when ringVariant is unset. */
+  /** Friend marker — entityFriend ring when ringVariant is unset. */
   isFriend?: boolean;
   online?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -38,7 +38,7 @@ export interface AvatarProps {
 
 const RING_COLOR: Record<Exclude<AvatarRing, 'none'>, string> = {
   brand: colors.primary,
-  friend: colors.action,
+  friend: colors.entityFriend,
   story: colors.accent,
   verified: colors.accent,
 };
@@ -51,7 +51,7 @@ function resolveRingColor(
   if (ringVariant && ringVariant !== 'none') {
     return RING_COLOR[ringVariant];
   }
-  if (isFriend) return colors.action;
+  if (isFriend) return colors.entityFriend;
   if (ring) return colors.primary;
   return null;
 }
