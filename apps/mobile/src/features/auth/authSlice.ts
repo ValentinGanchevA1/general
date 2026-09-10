@@ -13,6 +13,7 @@ import type {
 import { api, postJson } from '@/api/client';
 import { tokenStore } from '@/api/tokenStore';
 import { resetInboxSeen } from '@/features/interactions/inboxSeen';
+import { unregisterPushToken } from '@/lib/pushNotifications';
 import { disconnectSocket } from '@/realtime/useSocket';
 import { extractMessage } from '@/utils/extractMessage';
 
@@ -104,6 +105,8 @@ export const logout = createAsyncThunk('auth/logout', async () => {
       // best-effort
     }
   }
+  // Unregister while JWT is still valid so this device stops receiving prior-account pushes.
+  await unregisterPushToken();
   disconnectSocket();
   await tokenStore.clear();
   resetInboxSeen();
@@ -127,6 +130,7 @@ export const deleteAccount = createAsyncThunk(
     } catch (e: unknown) {
       return rejectWithValue(extractMessage(e, 'Could not delete your account'));
     }
+    await unregisterPushToken();
     disconnectSocket();
     await tokenStore.clear();
     resetInboxSeen();
