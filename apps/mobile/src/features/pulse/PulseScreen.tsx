@@ -185,6 +185,8 @@ export function PulseScreen(): React.JSX.Element {
     return canPostStory({
       verification: profile.verification,
       createdAt: profile.createdAt,
+      strikePoints: profile.strikePoints ?? 0,
+      storySuspendedUntil: profile.storySuspendedUntil ?? null,
     });
   }, [profile]);
 

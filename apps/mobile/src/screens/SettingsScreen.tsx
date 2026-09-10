@@ -21,7 +21,8 @@ import { deleteAccount, logout } from '@/features/auth/authSlice';
 import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
 import { ListRow } from '@/components/ListRow';
 import { APP_VERSION } from '@/constants/app';
-import { colors, spacing, fontSize } from '@/theme';
+import { colors, spacing, fontSize, radius } from '@/theme';
+import { strikeStanding } from '@g88/shared';
 
 export function SettingsScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
@@ -37,6 +38,11 @@ export function SettingsScreen(): React.JSX.Element {
   const [deletePassword, setDeletePassword] = useState('');
   const isVisible = profile?.visibility !== 'private';
   const friendsSeeOnline = profile?.friendsSeeOnlineStatus !== false;
+  const standing = strikeStanding({
+    strikePoints: profile?.strikePoints ?? 0,
+    storySuspendedUntil: profile?.storySuspendedUntil ?? null,
+    verification: profile?.verification,
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -148,6 +154,31 @@ export function SettingsScreen(): React.JSX.Element {
             onPress={() => navigation.navigate('BlockedUsers')}
           />
         </View>
+
+        {standing.level !== 'clear' ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Standing</Text>
+            <View
+              style={[
+                styles.standingCard,
+                standing.level === 'suspended' ? styles.standingDanger : undefined,
+                standing.level === 'phone_required' ? styles.standingWarn : undefined,
+              ]}
+              accessibilityRole="summary"
+            >
+              <Text style={styles.standingTitle}>{standing.title}</Text>
+              <Text style={styles.standingBody}>{standing.body}</Text>
+              {standing.level === 'phone_required' ? (
+                <ListRow
+                  style={styles.rowSpaced}
+                  title="Verify phone"
+                  subtitle="Unlocks story posting after elevated strikes"
+                  onPress={() => navigation.navigate('Verification')}
+                />
+              ) : null}
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Trust & posting</Text>
@@ -307,6 +338,30 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   rowSpaced: { marginTop: spacing.md },
+  standingCard: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  standingWarn: {
+    borderColor: colors.warning,
+  },
+  standingDanger: {
+    borderColor: colors.danger,
+  },
+  standingTitle: {
+    color: colors.textPrimary,
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+  standingBody: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    marginTop: 4,
+    lineHeight: 18,
+  },
   logoutBtn: {
     marginTop: spacing.lg,
     backgroundColor: colors.surfaceAlt,

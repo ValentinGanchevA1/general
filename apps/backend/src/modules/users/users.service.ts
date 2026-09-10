@@ -51,6 +51,7 @@ interface UserRow {
   subscription_tier: SubscriptionTier;
   id_verification_status: IdVerificationStatus;
   created_at: string | Date;
+  story_suspended_until: string | Date | null;
 }
 
 interface PublicUserRow {
@@ -82,7 +83,8 @@ const USER_COLUMNS = `
   date_of_birth::text AS date_of_birth,
   hometown_city, hometown_country, show_age, show_hometown,
   COALESCE(friends_see_online_status, true) AS friends_see_online_status,
-  date_part('year', age(date_of_birth))::int AS age`;
+  date_part('year', age(date_of_birth))::int AS age,
+  story_suspended_until`;
 
 const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
 const SCORE: Record<VerificationLevel, number> = {
@@ -179,11 +181,16 @@ export class UsersService {
     );
     if (!rows[0]) throw new UnauthorizedException();
 
-    const [photoUrls, socialLinks] = await Promise.all([
+    const [photoUrls, socialLinks, strikeRows] = await Promise.all([
       this.getPhotoUrls(userId),
       this.getSocialLinks(userId),
+      this.db.query<{ pts: number }[]>(
+        `SELECT COALESCE(SUM(weight), 0)::int AS pts FROM user_strikes
+          WHERE user_id = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+        [userId],
+      ),
     ]);
-    return this.toProfile(rows[0], photoUrls, socialLinks);
+    return this.toProfile(rows[0], photoUrls, socialLinks, strikeRows[0]?.pts ?? 0);
   }
 
   async getPublicProfile(userId: string, viewerId?: string): Promise<PublicUserProfile> {
@@ -625,8 +632,21 @@ export class UsersService {
     };
   }
 
-  private toProfile(r: UserRow, photoUrls: string[], socialLinks: SocialLink[]): UserProfile {
+  private toProfile(
+    r: UserRow,
+    photoUrls: string[],
+    socialLinks: SocialLink[],
+    strikePoints = 0,
+  ): UserProfile {
     const level = r.verification_level as VerificationLevel;
+    const suspendedRaw = r.story_suspended_until;
+    let storySuspendedUntil: string | null = null;
+    if (suspendedRaw) {
+      const t = new Date(suspendedRaw as string | Date).getTime();
+      if (Number.isFinite(t) && t > Date.now()) {
+        storySuspendedUntil = new Date(t).toISOString();
+      }
+    }
     return {
       ...this.toPublic(r),
       bio: r.bio,
@@ -651,6 +671,8 @@ export class UsersService {
       idVerificationStatus: r.id_verification_status,
       verifiedBadge: r.id_verification_status === 'verified',
       createdAt: toIsoOrNow(r.created_at),
+      strikePoints,
+      storySuspendedUntil,
     };
   }
 }

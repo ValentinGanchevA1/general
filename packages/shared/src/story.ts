@@ -108,10 +108,72 @@ export function storyGateMessage(
     case 'account_too_new':
       return 'Your account needs to be at least 24 hours old to post stories.';
     case 'phone_required':
-      return 'Phone verification required to post stories.';
+      return 'Too many recent limit hits — verify your phone to keep posting stories.';
     case 'suspended':
-      return 'Story posting is temporarily suspended. Try again later.';
+      return 'Story posting is temporarily suspended after repeated limit hits. Try again later.';
   }
+}
+
+/** Owner-facing standing for Settings / Profile (not public). */
+export type StrikeStandingLevel = 'clear' | 'elevated' | 'phone_required' | 'suspended';
+
+export function strikeStanding(input: {
+  strikePoints: number;
+  storySuspendedUntil?: string | Date | null;
+  verification?: VerificationLevel;
+  now?: number;
+}): {
+  level: StrikeStandingLevel;
+  title: string;
+  body: string;
+  strikePoints: number;
+  suspendedUntil: string | null;
+} {
+  const now = input.now ?? Date.now();
+  const pts = Math.max(0, input.strikePoints ?? 0);
+  let suspendedUntil: string | null = null;
+  if (input.storySuspendedUntil) {
+    const until =
+      typeof input.storySuspendedUntil === 'string'
+        ? new Date(input.storySuspendedUntil).getTime()
+        : input.storySuspendedUntil.getTime();
+    if (Number.isFinite(until) && until > now) {
+      suspendedUntil = new Date(until).toISOString();
+      return {
+        level: 'suspended',
+        title: 'Story posting suspended',
+        body: `Suspended until ${new Date(until).toLocaleDateString()} after repeated limit hits (${pts} strike pts in 30 days).`,
+        strikePoints: pts,
+        suspendedUntil,
+      };
+    }
+  }
+  const rank = LEVEL_RANK[input.verification ?? 'none'] ?? 0;
+  if (pts >= STRIKE_THRESHOLDS.phoneRequired && rank < LEVEL_RANK.phone) {
+    return {
+      level: 'phone_required',
+      title: 'Phone verification required',
+      body: `${pts} strike pts in 30 days — verify your phone to post stories again.`,
+      strikePoints: pts,
+      suspendedUntil: null,
+    };
+  }
+  if (pts > 0) {
+    return {
+      level: 'elevated',
+      title: 'Elevated activity limits',
+      body: `${pts} strike pts in 30 days. At ${STRIKE_THRESHOLDS.phoneRequired}+ email-only accounts need phone; at ${STRIKE_THRESHOLDS.suspend}+ story posting can pause for ${STRIKE_THRESHOLDS.suspendDays} days.`,
+      strikePoints: pts,
+      suspendedUntil: null,
+    };
+  }
+  return {
+    level: 'clear',
+    title: 'Good standing',
+    body: 'No recent story or spam strikes.',
+    strikePoints: 0,
+    suspendedUntil: null,
+  };
 }
 
 export type StoryMediaType = 'image' | 'video';

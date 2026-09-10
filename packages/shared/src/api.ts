@@ -211,6 +211,15 @@ export interface UserProfile extends AuthenticatedUser {
   idVerificationStatus: IdVerificationStatus;
   verifiedBadge: boolean;
   createdAt: string;
+  /**
+   * Owner-only: sum of strike weights in the last 30 days (stories / spam ladder).
+   * Omitted or 0 when clear.
+   */
+  strikePoints?: number;
+  /**
+   * Owner-only: when set and in the future, story create is blocked.
+   */
+  storySuspendedUntil?: string | null;
 }
 
 /** Public status shown only inside EntityBottomSheet / profile (not on map markers). */
