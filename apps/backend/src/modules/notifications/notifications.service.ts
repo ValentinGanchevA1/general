@@ -60,6 +60,13 @@ export class NotificationsService {
     );
   }
 
+  async unregisterToken(userId: string, token: string): Promise<void> {
+    await this.db.query(
+      `DELETE FROM device_tokens WHERE user_id = $1 AND token = $2`,
+      [userId, token],
+    );
+  }
+
   async getPreferences(userId: string): Promise<NotificationPreferences> {
     const rows = await this.db.query<Array<{ channel: string; enabled: boolean }>>(
       `SELECT channel, enabled FROM notification_preferences WHERE user_id = $1`,
