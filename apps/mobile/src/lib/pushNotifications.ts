@@ -7,6 +7,7 @@
  *            + add Push Notifications capability in Xcode
  *
  * Call registerPushToken() after every successful login/session restore.
+ * Call unregisterPushToken() on logout / deleteAccount (best-effort).
  * Call setupNotificationHandlers(navigate) once at app boot after login.
  */
 import { Platform, PermissionsAndroid } from 'react-native';
@@ -60,6 +61,22 @@ export async function registerPushToken(): Promise<void> {
     if (__DEV__) console.log('[push] token registered with backend');
   } catch (err) {
     if (__DEV__) console.warn('[push] registerPushToken failed:', err);
+  }
+}
+
+/**
+ * Best-effort: remove this device token from the current user's rows so the next
+ * account on the same device does not receive the previous user's pushes.
+ * Must run while the access token is still valid (before tokenStore.clear).
+ */
+export async function unregisterPushToken(): Promise<void> {
+  try {
+    const token = await getToken(messaging());
+    if (!token) return;
+    await api.delete('/notifications/device-token', { data: { token } });
+    if (__DEV__) console.log('[push] token unregistered with backend');
+  } catch (err) {
+    if (__DEV__) console.warn('[push] unregisterPushToken failed:', err);
   }
 }
 

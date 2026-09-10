@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Headers,
@@ -27,6 +28,10 @@ class RegisterTokenDto implements RegisterDeviceTokenRequest {
   @IsIn(['ios', 'android']) platform!: 'ios' | 'android';
 }
 
+class UnregisterTokenDto {
+  @IsString() token!: string;
+}
+
 class UpdatePreferencesDto implements UpdateNotificationPreferencesRequest {
   // Dynamic channel→boolean map; channels + boolean values are validated in the
   // service (setPreferences ignores unknown channels / non-boolean values).
@@ -47,6 +52,17 @@ export class NotificationsController {
     @CurrentUser('id') userId: string,
   ): Promise<void> {
     await this.notifications.registerToken(userId, dto.token, dto.platform);
+  }
+
+  /** DELETE /api/v1/notifications/device-token — drop this device for the current user. */
+  @Delete('device-token')
+  @HttpCode(204)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async unregisterToken(
+    @Body() dto: UnregisterTokenDto,
+    @CurrentUser('id') userId: string,
+  ): Promise<void> {
+    await this.notifications.unregisterToken(userId, dto.token);
   }
 
   /** GET /api/v1/notifications/preferences — all channels with on/off state. */
