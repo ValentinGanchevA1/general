@@ -24,7 +24,7 @@ import { colors } from '@/theme';
 import { sendGift, useGiftBalance, useGiftCatalog } from './useGifts';
 
 /** XP gold — product accent, not in core theme palette. */
-const XP_GOLD = '#FFD700';
+const XP_GOLD = colors.premium;
 
 interface Props {
   visible: boolean;
@@ -87,17 +87,16 @@ export function SendGiftSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
       <Pressable style={styles.backdrop} onPress={close}>
-        <Pressable style={styles.sheet} onPress={() => {}}>
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.handle} />
-
           <View style={styles.header}>
             <Text style={styles.title}>Send a gift</Text>
             <View style={styles.balancePill}>
               <Icon name="star-four-points" size={13} color={XP_GOLD} />
-              <Text style={styles.balanceText}>{spendableXp} XP</Text>
+              <Text style={styles.balanceText}>{spendableXp.toLocaleString()} XP</Text>
             </View>
           </View>
-          <Text style={styles.subtitle}>to {recipientName}</Text>
+          <Text style={styles.subtitle}>To {recipientName}</Text>
 
           <View style={styles.grid}>
             {catalog.map((item) => {
@@ -132,13 +131,14 @@ export function SendGiftSheet({
             value={message}
             onChangeText={setMessage}
             maxLength={120}
+            editable={!sending}
           />
 
           <TouchableOpacity
             style={[styles.sendBtn, (!selected || sending) && styles.sendBtnDisabled]}
             disabled={!selected || sending}
-            onPress={() => void handleSend()}
-            activeOpacity={0.9}
+            onPress={() => { void handleSend(); }}
+            activeOpacity={0.85}
           >
             {sending ? (
               <ActivityIndicator color={colors.onPrimary} />
