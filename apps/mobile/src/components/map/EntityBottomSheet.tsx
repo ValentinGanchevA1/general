@@ -229,19 +229,28 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
     if (opening || canMessage === 'none' || blocked) return;
     setOpening(true);
     try {
+      // Same path as UserProfileScreen — controller is @Controller('conversations').
       const res = await postJson<
         CreateConversationRequest,
         CreateConversationResponse
-      >('/chat/conversations', { targetUserId: point.id });
+      >('/conversations', { targetUserId: point.id });
       onClose();
-      navigation.navigate('Chat', {
+      openRootScreen(navigation, 'Chat', {
         conversationId: res.conversationId,
         otherUserName: displayName,
         otherUserId: point.id,
-        requestPending: res.status === 'pending',
+        requestPending: res.status === 'pending' && res.permission === 'request',
+        ...(profile?.verification != null
+          ? { otherUserVerification: profile.verification }
+          : {}),
+        otherUserIdVerified: profile?.idVerified ?? false,
       });
-    } catch {
-      appAlert('Could not open chat', 'Try again in a moment.');
+    } catch (e) {
+      const msg =
+        e && typeof e === 'object' && 'message' in e
+          ? String((e as { message: unknown }).message)
+          : 'Try again in a moment.';
+      appAlert('Could not open chat', msg);
     } finally {
       setOpening(false);
     }
