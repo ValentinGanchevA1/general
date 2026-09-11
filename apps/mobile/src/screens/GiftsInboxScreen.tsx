@@ -83,7 +83,7 @@ export function GiftsInboxScreen(): React.JSX.Element {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         <View style={styles.balanceCard}>
-          <Icon name="star-four-points" size={20} color="#FFD700" />
+          <Icon name="star-four-points" size={20} color={colors.premium} />
           <Text style={styles.balanceValue}>{spendableXp.toLocaleString()} XP</Text>
           <Text style={styles.balanceLabel}>to spend on gifts</Text>
         </View>
@@ -154,9 +154,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#FFD70033',
+    borderColor: colors.premiumBorderSoft,
   },
-  balanceValue: { color: '#FFD700', fontSize: 20, fontWeight: '800' },
+  balanceValue: { color: colors.premium, fontSize: 20, fontWeight: '800' },
   balanceLabel: { color: colors.textMuted, fontSize: 13 },
   tabs: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 14, gap: 8 },
   tab: {
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  tabActive: { backgroundColor: '#00d4ff18', borderColor: colors.primary },
+  tabActive: { backgroundColor: colors.primaryMutedBg, borderColor: colors.primary },
   tabText: { color: colors.textMuted, fontWeight: '600' },
   tabTextActive: { color: colors.primary },
   row: {

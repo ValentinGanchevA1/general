@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { useGamification } from '@/features/gamification/useGamification';
+import { colors } from '@/theme';
 
 /** Logical screens a nudge can deep-link to (resolved via openRootScreen). */
 type NudgeTarget = 'VerificationId' | 'Challenges';
@@ -98,7 +99,7 @@ export function selectNudge({
     candidates.push({
       id: 'verify-id',
       icon: 'shield-alert',
-      accent: '#FF9800',
+      accent: colors.entityEvent,
       label: 'Verification',
       title:
         idStatus === 'rejected'
@@ -114,7 +115,7 @@ export function selectNudge({
     candidates.push({
       id: 'streak-milestone',
       icon: 'fire',
-      accent: '#ff9d3c',
+      accent: colors.warning,
       label: 'Streak',
       title: streakTitle(currentStreak),
       cta: 'View',

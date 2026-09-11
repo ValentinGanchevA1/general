@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  tabActive: { backgroundColor: '#00d4ff18', borderColor: colors.primary },
+  tabActive: { backgroundColor: colors.primaryMutedBg, borderColor: colors.primary },
   tabText: { color: colors.textMuted, fontWeight: '600' },
   tabTextActive: { color: colors.primary },
   row: {
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     gap: 12,
   },
-  rowMe: { borderColor: colors.primary, backgroundColor: '#00d4ff12' },
+  rowMe: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   rank: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', width: 28, textAlign: 'center' },
   avatar: { width: 40, height: 40, borderRadius: 20 },
   avatarPlaceholder: { backgroundColor: colors.surfaceAlt, justifyContent: 'center', alignItems: 'center' },
