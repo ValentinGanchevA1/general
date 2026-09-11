@@ -176,7 +176,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
       Number.isFinite(profile.mapLat) &&
       Number.isFinite(profile.mapLng);
 
-    // Must have pin coordinates — distance alone cannot fly the camera.
     if (!hasCoords) {
       appAlert(
         'Location unavailable',
@@ -188,7 +187,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     const lat = profile!.mapLat!;
     const lng = profile!.mapLng!;
 
-    // Module handoff (reliable) + route params (belt-and-suspenders).
     setPendingMapFocus({
       userId,
       lat,
@@ -458,7 +456,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.heroBlock}>
-          {/* Cover extends under status bar — no empty strip above chrome */}
           <View style={[styles.cover, { height: COVER_BODY + insets.top }]}>
             {coverUri ? (
               <Image source={{ uri: coverUri }} style={styles.coverImage} />
@@ -579,12 +576,23 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
                 disabled={messaging}
               >
                 <Text style={styles.footerBtnTextOnPrimary}>
-                  {messaging ? '…' : canMessage === 'request' ? '✉️ Message' : '💬 Chat'}
+                  {messaging ? '…' : canMessage === 'request' ? 'Request chat' : 'Message'}
                 </Text>
               </TouchableOpacity>
             ) : null}
-            <TouchableOpacity style={[styles.footerBtn, styles.giftBtn]} onPress={() => setGiftSheetOpen(true)}>
+            <TouchableOpacity
+              style={[styles.footerBtn, styles.giftBtn]}
+              onPress={() => setGiftSheetOpen(true)}
+              accessibilityLabel="Send gift"
+            >
               <Text style={styles.giftBtnText}>🎁</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.footerBtn, styles.menuBtn]}
+              onPress={openMenu}
+              accessibilityLabel="More options"
+            >
+              <Icon name="dots-horizontal" size={22} color={colors.textPrimary} />
             </TouchableOpacity>
           </>
         )}
@@ -601,100 +609,35 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         ref={optionsRef}
         snapPoints={optionsSnap}
         enablePanDownToClose
-        enableDynamicSizing={false}
         backdropComponent={renderBackdrop}
         backgroundStyle={sheetChrome.background}
-        handleIndicatorStyle={sheetChrome.handle}
+        handleIndicatorStyle={sheetChrome.handleIndicator}
       >
-        <BottomSheetView style={sheetChrome.content}>
-          <ActionSheetList title={profile.displayName} items={menuItems} />
+        <BottomSheetView style={styles.sheetBody}>
+          <ActionSheetList items={menuItems} />
         </BottomSheetView>
       </BottomSheetModal>
-
-      {/* Floating chrome over edge-to-edge cover (no opaque status-bar strip) */}
-      <View
-        style={[styles.topBar, { paddingTop: insets.top + 4 }]}
-        pointerEvents="box-none"
-      >
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Icon name="chevron-left" size={28} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuBtn}
-          onPress={openMenu}
-          disabled={blocking}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Profile options"
-        >
-          <Icon name="dots-horizontal" size={26} color={colors.textPrimary} />
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
 
-/** Visible cover body below status bar (total cover = COVER_BODY + insets.top). */
-const COVER_BODY = 148;
+const COVER_BODY = 160;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  centered: {
-    flex: 1,
-    backgroundColor: colors.bg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  topBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-    zIndex: 10,
-  },
-  backBtn: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 24,
-    backgroundColor: 'rgba(10,10,15,0.45)',
-  },
-  menuBtn: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 24,
-    backgroundColor: 'rgba(10,10,15,0.45)',
-  },
-  scroll: { paddingBottom: 24, gap: 22 },
-  heroBlock: { marginBottom: 4 },
-  cover: {
-    // height set inline: COVER_BODY + insets.top (edge-to-edge under status bar)
-    backgroundColor: colors.surfaceRaised,
-    overflow: 'hidden',
-  },
-  coverImage: { width: '100%', height: '100%', opacity: 0.55 },
-  coverPlaceholder: { flex: 1, backgroundColor: colors.surfaceAlt },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
+  scroll: { paddingBottom: 24 },
+  heroBlock: { marginBottom: 16 },
+  cover: { width: '100%', backgroundColor: colors.surfaceRaised, overflow: 'hidden' },
+  coverImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  coverPlaceholder: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.surfaceRaised },
   coverScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10,10,15,0.28)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   avatarWrap: {
-    alignItems: 'center',
     marginTop: -48,
+    alignItems: 'center',
   },
   heroMeta: {
     alignItems: 'center',
@@ -702,20 +645,21 @@ const styles = StyleSheet.create({
     marginTop: 10,
     gap: 4,
   },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '100%' },
-  displayName: { color: colors.textPrimary, fontSize: 24, fontWeight: '700' },
-  originLine: { color: colors.textMuted, fontSize: 13 },
-  placeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-  onlineLabel: { color: colors.success, fontSize: 13 },
-  offlineLabel: { color: colors.textFaint },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  displayName: { color: colors.textPrimary, fontSize: fontSize.xl, fontWeight: '700' },
+  originLine: { color: colors.textMuted, fontSize: 14 },
+  placeRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: 2 },
+  onlineLabel: { color: colors.success, fontWeight: '600', fontSize: 13 },
   distanceLabel: { color: colors.textMuted, fontSize: 13 },
+  offlineLabel: { color: colors.textMuted, fontSize: 13 },
   placeDot: { color: colors.textFaint, fontSize: 13 },
-  viewOnMap: { color: colors.primary, fontSize: 13, fontWeight: '600' },
-  mutualLine: { color: colors.primary, fontSize: 12, marginTop: 2, fontWeight: '600' },
+  viewOnMap: { color: colors.primary, fontWeight: '600', fontSize: 13 },
+  mutualLine: { color: colors.primary, fontSize: 13, fontWeight: '600', marginTop: 4 },
   socialRow: {
     flexDirection: 'row',
     gap: 10,
     paddingHorizontal: spacing.xl,
+    marginBottom: 16,
   },
   outlineBtn: {
     flex: 1,
@@ -733,7 +677,7 @@ const styles = StyleSheet.create({
   },
   outlineBtnAccent: {
     borderColor: colors.primary,
-    backgroundColor: '#00d4ff12',
+    backgroundColor: colors.primarySoft,
   },
   outlineBtnText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.md },
   section: { paddingHorizontal: spacing.xl, gap: 10 },
@@ -766,7 +710,13 @@ const styles = StyleSheet.create({
     width: 56,
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
-    borderColor: '#00d4ff66',
+    borderColor: colors.primaryBorder,
+  },
+  menuBtn: {
+    width: 56,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
   },
   footerBtnTextOnPrimary: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
   giftBtnText: { fontSize: 20 },
@@ -778,7 +728,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
-    borderColor: '#ff6b6b66',
+    borderColor: colors.dangerBorderSoft,
   },
-  unblockBtnText: { color: '#ff6b6b', fontWeight: '700', fontSize: 16 },
+  unblockBtnText: { color: colors.dangerMuted, fontWeight: '700', fontSize: 16 },
+  sheetBody: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 });
