@@ -90,7 +90,7 @@ export function ProfileHeaderPhoto({
           ) : null}
           {isPaid && tierLabel ? (
             <View style={styles.tierBadge}>
-              <Icon name="crown" size={13} color="#000" />
+              <Icon name="crown" size={13} color={colors.onPrimary} />
               <Text style={styles.tierBadgeText}>{tierLabel}</Text>
             </View>
           ) : null}
@@ -217,11 +217,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 16,
-    backgroundColor: '#FFD700',
+    backgroundColor: colors.premium,
     gap: 4,
   },
   tierBadgeText: {
-    color: '#000',
+    color: colors.onPrimary,
     fontWeight: '700',
     fontSize: 12,
   },
