@@ -22,7 +22,7 @@ function AchievementRow({ a }: { a: AchievementStatus }): React.JSX.Element {
       <View style={styles.info}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>{a.title}</Text>
-          {a.unlocked ? <Icon name="check-decagram" size={16} color="#FFD700" /> : null}
+          {a.unlocked ? <Icon name="check-decagram" size={16} color={colors.premium} /> : null}
         </View>
         <Text style={styles.desc}>{a.description}</Text>
         {!a.unlocked ? (
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     gap: 14,
     opacity: 0.7,
   },
-  rowUnlocked: { opacity: 1, borderColor: '#FFD70040' },
+  rowUnlocked: { opacity: 1, borderColor: colors.premiumBorder },
   emoji: { fontSize: 32 },
   emojiLocked: { opacity: 0.4 },
   info: { flex: 1, gap: 4 },
