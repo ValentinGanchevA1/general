@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Secret / env scanning (hard gate)
+        run: bash scripts/ci/check-no-secrets.sh
       - name: Check for forbidden legacy/ imports
         run: bash scripts/ci/check-no-legacy-imports.sh
       - name: Check for do-not-commit / dev-preview markers

@@ -18,7 +18,7 @@ Living doc. Decisions in here are explicit so they can be argued with. If you ch
 | Client      | Admin dashboard (`apps/admin`) | Vite + React + shadcn/ui — ID-verification queue, live socket feed; origin `http://127.0.0.1:5173` |
 | Edge        | API + realtime (`apps/backend`)| NestJS single process today; planned REST/realtime split |
 | Shared      | `@g88/shared`                  | DTOs, socket events, geo helpers — mobile + backend + admin |
-| Data        | Postgres + PostGIS + H3-PG     | Supabase managed; migrations `0001`–`0031` |
+| Data        | Postgres + PostGIS + H3-PG     | Supabase managed; migrations `0001`–`0040`; next free `0041` |
 | Cache       | Redis 7                        | Presence ZSETs, rate limits, OTP, viewport snapshots |
 | Object store| AWS S3                         | Avatars, gallery, ID docs, stories, listing photos |
 | Push        | FCM                            | Offline waves/chat/gifts; geofence alerts |
@@ -118,6 +118,7 @@ Stripe Connect / paid gifts · Elasticsearch · Kafka · gRPC · K8s/Terraform �
 
 ## Change log
 
+- **2026-09-11** — Migration range reconciled: on-disk + prod order is `0001`–`0040` (conversation kind, strikes, trade counter). Next free `0041`. Dual-0030 long resolved via #126. Secret/env scanning retained as CI hard gate.
 - **2026-08-14** — Doc sync: `CLAUDE.md` gains full `apps/admin` coverage (repo layout, conventions, codebase-reference section, admin API rows, Rekognition assist status). Tier map + §3.14 wording tightened (CORS origin, token keys, AdminGuard). ARCHITECTURE restored to monorepo root if absent.
 - **2026-08-13** — Backfilled six weeks of undocumented architectural changes (168 commits, 2026-06-26 → 2026-08-12): added §3.10–§3.14 (Stories, chat live-location exception to fuzzing, Rekognition assist-only, OAuth PKCE, admin dashboard topology); added `apps/admin` to the tier map; documented the Sentry PII scrubber. Full narrative detail lives in `STATUS.md`'s "Build-out since 2026-06-26" section — this doc only captures the *how/why*, per the doc-hierarchy split.
 - **2026-06-14** — Auth tokens encrypted at rest on mobile (Keystore/Keychain).

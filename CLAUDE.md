@@ -46,7 +46,7 @@ Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md`.
 | Admin dashboard            | Vite + React 19 + shadcn/ui + TanStack Query + Socket.IO (`apps/admin`). Origin **`http://127.0.0.1:5173`** (must be in `CORS_ORIGINS`). ID-verification queue. |
 | Backend (REST)             | NestJS 11, TypeORM 0.3 (DataSource only, raw SQL), Node ≥22.13 |
 | Realtime gateway           | Socket.IO 4 (Redis adapter), **in-process** with REST (`ARCHITECTURE.md §3.5`) |
-| Database                   | PostgreSQL 16 + PostGIS + H3-PG. Migrations through **0031**; next free **0032** |
+| Database                   | PostgreSQL 16 + PostGIS + H3-PG. Migrations through **0040**; next free **0041** |
 | Cache / Presence / Pub-Sub | Redis 7 |
 | Storage                    | AWS S3 (presigned + buffer uploads) |
 | Auth                       | JWT access 15m + opaque rotating refresh 30d. Google OAuth live; Apple removed (`0019`) |
@@ -67,7 +67,7 @@ g88/
 │   │   │                     verification, id-verification, subscriptions, gamification,
 │   │   │                     challenges, achievements, gifts, trending, feed, blocks, stories, ...)
 │   │   ├── src/realtime/   Socket.IO gateway (top-level, not under modules/)
-│   │   └── migrations/     0001–0031 raw SQL (next free 0032)
+│   │   └── migrations/     0001–0040 raw SQL (next free 0041)
 │   ├── mobile/             React Native + TypeScript client (src/features/{domain}/)
 │   └── admin/              Vite + React admin dashboard (ID-verification queue)
 │       ├── src/features/   auth (LoginPage, useAuth) · verification (QueuePage, table, modal, socket)
@@ -231,7 +231,7 @@ All class-guarded: `JwtAuthGuard` + `AdminGuard`. Rekognition scores are **assis
 
 ### Database
 
-Migrations **0001–0031** (next **0032**), tracked in `schema_migrations`. Runner is idempotent; `RENAMES` handle renumbered files. Locations fuzzed to H3 r10 at write time.
+Migrations **0001–0040** (next **0041**), tracked in `schema_migrations`. Runner is idempotent; `RENAMES` handle renumbered files. Locations fuzzed to H3 r10 at write time.
 
 ### Auth chain
 
