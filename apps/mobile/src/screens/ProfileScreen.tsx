@@ -1,99 +1,51 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useMemo, useRef } from 'react';
 import {
-  BottomSheetBackdrop,
-  BottomSheetModal,
-  BottomSheetView,
-  type BottomSheetBackdropProps,
-} from '@gorhom/bottom-sheet';
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  Pressable,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
+import BottomSheet, { BottomSheetModal, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+import type { BottomSheetBackdropProps } from '@gorhom/bottom-sheet';
 
-import type { RootStackParamList } from '@/navigation/AppNavigator';
-import { openRootScreen } from '@/navigation/openRootScreen';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
-import {
-  fetchPendingCount,
-  pendingCountSet,
-} from '@/features/friends/friendsSlice';
-import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline';
+import { openRootScreen } from '@/navigation/openRootScreen';
+import { colors, fontSize, spacing, radius } from '@/theme';
 import { ProfileHeaderPhoto } from '@/components/Profile/ProfileHeaderPhoto';
-import { MapPresenceCard } from '@/components/Profile/MapPresenceCard';
+import { ProfileContactLine } from '@/components/Profile/ProfileContactLine';
+import { ProfileStoryline } from '@/components/Profile/ProfileStoryline';
+import { TrustNextCard } from '@/components/Profile/TrustNextCard';
 import {
   VerificationStatusSheet,
   buildVerificationItems,
   type VerificationItemId,
 } from '@/components/Profile/VerificationStatusSheet';
-import { TrustNextCard } from '@/components/Profile/TrustNextCard';
-import { ProfileBio } from '@/components/Profile/ProfileBio';
-import { ProfileFriendsCard } from '@/components/Profile/ProfileFriendsCard';
-import { ProfileActivityLinks } from '@/components/Profile/ProfileActivityLinks';
-import { ProfilePhotosSection } from '@/components/Profile/ProfilePhotosSection';
-import { ProfileTagsSection } from '@/components/Profile/ProfileTagsSection';
-import { ProfilePremiumCard } from '@/components/Profile/ProfilePremiumCard';
-import { ProfileLoadingState, ProfileErrorState } from '@/components/Profile/ProfileScreenStates';
-import { useProfileScreenData } from '@/features/profile/useProfileScreenData';
-import { useAppSelector } from '@/hooks/redux';
-import { useSocket } from '@/realtime/useSocket';
-import { colors, spacing } from '@/theme';
+import { ProfileMenuSection } from '@/components/Profile/ProfileMenuSection';
+import { IdentityBlock } from '@/components/IdentityBlock';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
-
-/**
- * Self profile — public-facing identity + activity.
- * Order: Hero → Bio → Tags → Trust → Activity → Friends → Storyline → Photos → Premium.
- * Trust details open from the % badge (bottom sheet). Account controls in Settings.
- */
 export function ProfileScreen(): React.JSX.Element {
-  const navigation = useNavigation<Nav>();
-  const { on } = useSocket();
-  const pendingCount = useAppSelector((s) => s.friends.pendingCount);
-  const mapPresenceRef = useRef<BottomSheetModal>(null);
+  const navigation = useNavigation();
+  const dispatch = useAppDispatch();
+  const profile = useAppSelector((s) => s.profile.data);
+  const loading = useAppSelector((s) => s.profile.loading);
+
   const verificationRef = useRef<BottomSheetModal>(null);
-  const mapSnapPoints = useMemo(() => ['34%'], []);
   const verificationSnapPoints = useMemo(() => ['42%'], []);
 
-  const {
-    loading,
-    error,
-    saving,
-    refreshing,
-    activePhotoIndex,
-    setActivePhotoIndex,
-    gamification,
-    challenges,
-    spendableXp,
-    mapVisible,
-    derived,
-    onRefresh,
-    handleMapToggle,
-    dispatch,
-  } = useProfileScreenData();
+  const derived = useMemo(() => {
+    if (!profile) return null;
+    const p = profile;
+    const verificationScore = p.verificationScore ?? 0;
+    return { p, verificationScore };
+  }, [profile]);
 
-  useEffect(() => {
-    void dispatch(fetchPendingCount());
+  const onRefresh = useCallback(() => {
+    void dispatch(fetchProfile());
   }, [dispatch]);
-
-  useEffect(() => {
-    const unsubReq = on('friend:request', (e) => {
-      dispatch(pendingCountSet(e.pendingCount));
-    });
-    const unsubAcc = on('friend:accepted', () => {
-      // no badge change for acceptor
-    });
-    return () => {
-      unsubReq();
-      unsubAcc();
-    };
-  }, [on, dispatch]);
-
-  const openMapPresence = useCallback(() => {
-    mapPresenceRef.current?.present();
-  }, []);
-
-  const closeMapPresence = useCallback(() => {
-    mapPresenceRef.current?.dismiss();
-  }, []);
 
   const openVerification = useCallback(() => {
     verificationRef.current?.present();
@@ -105,13 +57,7 @@ export function ProfileScreen(): React.JSX.Element {
 
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-        opacity={0.55}
-        pressBehavior="close"
-      />
+      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
     ),
     [],
   );
@@ -129,13 +75,10 @@ export function ProfileScreen(): React.JSX.Element {
         });
         return;
       }
-      // id
-      openRootScreen(
-        navigation,
-        derived?.p.idVerificationStatus === 'pending' ? 'VerificationId' : 'Verification',
-      );
+      // id — always the ID flow (pending/rejected/not-started handled inside VerificationIdScreen)
+      openRootScreen(navigation, 'VerificationId');
     },
-    [closeVerification, navigation, derived?.p.phone, derived?.p.idVerificationStatus],
+    [closeVerification, navigation, derived?.p.phone],
   );
 
   const handleBack = useCallback(() => {
@@ -143,164 +86,72 @@ export function ProfileScreen(): React.JSX.Element {
       navigation.goBack();
       return;
     }
-    // Tab root — send user to Map (primary home surface).
-    navigation.navigate('Main', { screen: 'Map' });
   }, [navigation]);
 
-  if (loading && !derived) {
-    return <ProfileLoadingState />;
-  }
   if (!derived) {
     return (
-      <ProfileErrorState
-        message={error ?? 'Could not load profile'}
-        onRetry={() => void dispatch(fetchProfile())}
-      />
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.muted}>Loading profile…</Text>
+      </View>
     );
   }
 
-  const {
-    p,
-    photos,
-    mainPhoto,
-    coverUrl,
-    interests,
-    goals,
-    verificationScore,
-    isPaid,
-    displayName,
-    tierLabel,
-  } = derived;
-
+  const { p, verificationScore } = derived;
   const verificationItems = buildVerificationItems(p);
 
   return (
-    <>
+    <View style={styles.container}>
       <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={styles.scroll}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          <RefreshControl refreshing={!!loading} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
         <ProfileHeaderPhoto
-          photoUrl={mainPhoto ?? null}
-          coverUrl={coverUrl}
-          displayName={displayName}
-          verificationPercent={verificationScore}
-          isVisibleOnMap={mapVisible}
-          isPaid={isPaid}
-          tierLabel={tierLabel}
-          photoCount={photos.length}
-          activePhotoIndex={activePhotoIndex}
-          onSelectPhoto={setActivePhotoIndex}
-          onPressSettings={() => openRootScreen(navigation, 'Settings')}
-          onPressBack={handleBack}
-          onPressVerificationBadge={openVerification}
-          onPressPhoto={() => openRootScreen(navigation, 'Photos')}
-          onPressVisibility={openMapPresence}
-        />
-
-        {p.bio ? <ProfileBio bio={p.bio} /> : null}
-
-        <ProfileTagsSection interests={interests} goals={goals} />
-
-        <TrustNextCard
           profile={p}
-          onContinue={handleVerificationItem}
-          onOpenDetails={openVerification}
+          verificationPercent={verificationScore}
+          onPressBack={handleBack}
+          onPressSettings={() => openRootScreen(navigation, 'Settings')}
+          onPressEdit={() => openRootScreen(navigation, 'ProfileEdit')}
+          onPressVerificationBadge={openVerification}
         />
 
-        <ProfileActivityLinks
-          gamification={gamification ?? null}
-          challenges={challenges}
-          spendableXp={spendableXp}
-          onChallenges={() => openRootScreen(navigation, 'Challenges')}
-          onLeaderboard={() => openRootScreen(navigation, 'Leaderboard')}
-          onAchievements={() => openRootScreen(navigation, 'Achievements')}
-          onGifts={() => openRootScreen(navigation, 'GiftsInbox')}
-          onMarketplace={() => openRootScreen(navigation, 'Marketplace')}
-        />
-
-        <ProfileFriendsCard
-          pendingCount={pendingCount}
-          onPress={() => openRootScreen(navigation, 'FriendsList')}
-        />
-
-        {p.id ? (
-          <View style={styles.section}>
-            <ProfileStoryline userId={p.id} isSelf />
-          </View>
-        ) : null}
-
-        <ProfilePhotosSection
-          photos={photos}
-          isSelf
-          activeIndex={activePhotoIndex}
-          onSelect={setActivePhotoIndex}
-          onManage={() => openRootScreen(navigation, 'Photos')}
-        />
-
-        {!isPaid ? (
-          <ProfilePremiumCard onPress={() => openRootScreen(navigation, 'Subscription')} />
-        ) : null}
-      </ScrollView>
-
-      <BottomSheetModal
-        ref={mapPresenceRef}
-        snapPoints={mapSnapPoints}
-        enablePanDownToClose
-        enableDynamicSizing={false}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={styles.sheetBackground}
-        handleIndicatorStyle={styles.sheetHandle}
-      >
-        <BottomSheetView style={styles.sheetContent}>
-          <MapPresenceCard
-            isVisible={mapVisible}
-            saving={saving}
-            onToggle={handleMapToggle}
-            onViewPin={() => {
-              closeMapPresence();
-              navigation.navigate('Main', { screen: 'Map', params: { focusMyPin: true } });
-            }}
+        <View style={styles.body}>
+          <IdentityBlock profile={p} />
+          <ProfileContactLine profile={p} />
+          <TrustNextCard
+            profile={p}
+            onContinue={handleVerificationItem}
+            onOpenDetails={openVerification}
           />
-        </BottomSheetView>
-      </BottomSheetModal>
+          <ProfileStoryline userId={p.id} isOwner />
+          <ProfileMenuSection />
+        </View>
+      </ScrollView>
 
       <BottomSheetModal
         ref={verificationRef}
         snapPoints={verificationSnapPoints}
-        enablePanDownToClose
-        enableDynamicSizing={false}
         backdropComponent={renderBackdrop}
-        backgroundStyle={styles.sheetBackground}
+        backgroundStyle={styles.sheetBg}
         handleIndicatorStyle={styles.sheetHandle}
       >
-        <BottomSheetView style={styles.sheetContent}>
-          <VerificationStatusSheet
-            score={verificationScore}
-            items={verificationItems}
-            onItemPress={handleVerificationItem}
-          />
-        </BottomSheetView>
+        <VerificationStatusSheet
+          score={verificationScore}
+          items={verificationItems}
+          onItemPress={handleVerificationItem}
+        />
       </BottomSheetModal>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: spacing.xxl },
-  section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl },
-  sheetBackground: {
-    backgroundColor: colors.surfaceRaised,
-  },
-  sheetHandle: {
-    backgroundColor: colors.textMuted,
-    width: 40,
-  },
-  sheetContent: {
-    paddingBottom: spacing.xl,
-  },
+  centered: { alignItems: 'center', justifyContent: 'center' },
+  muted: { color: colors.textMuted },
+  scroll: { paddingBottom: spacing.xxl },
+  body: { paddingHorizontal: spacing.lg, gap: spacing.md, marginTop: spacing.md },
+  sheetBg: { backgroundColor: colors.surface },
+  sheetHandle: { backgroundColor: colors.borderStrong },
 });
