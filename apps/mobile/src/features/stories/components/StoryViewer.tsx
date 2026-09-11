@@ -47,6 +47,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   const [muted, setMuted] = useState(false);
   const [chromeDimmed, setChromeDimmed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
   const chromeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optionsRef = useRef<BottomSheetModal>(null);
   const optionsSnap = useMemo(() => ['22%'], []);
@@ -84,6 +85,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
       setHeld(false);
       setChromeDimmed(false);
       setVideoReady(false);
+      setVideoFailed(false);
     });
   }, [visible, initialIndex]);
 
@@ -94,6 +96,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
       setHeld(false);
       setChromeDimmed(false);
       setVideoReady(mediaType !== 'video');
+      setVideoFailed(false);
     });
     if (chromeTimer.current) clearTimeout(chromeTimer.current);
     chromeTimer.current = setTimeout(() => setChromeDimmed(true), 1_200);
@@ -135,8 +138,15 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   };
 
   const handleVideoLoad = (data: Parameters<typeof onVideoLoad>[0]) => {
+    setVideoFailed(false);
     setVideoReady(true);
     onVideoLoad(data);
+  };
+
+  const handleVideoError = () => {
+    setVideoFailed(true);
+    setVideoReady(true);
+    onVideoError();
   };
 
   return (
@@ -204,11 +214,17 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
                 onEnd={onVideoEnd}
                 onLoad={handleVideoLoad}
                 onProgress={onVideoProgress}
-                onError={onVideoError}
+                onError={handleVideoError}
               />
               {!videoReady ? (
                 <View style={styles.videoLoading} pointerEvents="none">
                   <ActivityIndicator color={colors.textPrimary} size="large" />
+                </View>
+              ) : null}
+              {videoFailed ? (
+                <View style={styles.videoFailed} pointerEvents="none">
+                  <Text style={styles.videoFailedTitle}>{"Couldn't play this video"}</Text>
+                  <Text style={styles.videoFailedBody}>Skipping in a moment…</Text>
                 </View>
               ) : null}
             </>
@@ -348,6 +364,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.bg,
+  },
+  videoFailed: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    paddingHorizontal: 24,
+  },
+  videoFailedTitle: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  videoFailedBody: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: 8,
+    textAlign: 'center',
   },
   tapLeft: {
     position: 'absolute',
