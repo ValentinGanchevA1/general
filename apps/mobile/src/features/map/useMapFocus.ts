@@ -81,6 +81,10 @@ export function useMapFocus({
   const pendingFocusRef = useRef<PendingFocus | null>(null);
   const pendingFocusReaderRef = useRef(() => peekPendingMapFocus());
   const focusAppliedKeyRef = useRef<string | null>(null);
+  /** True after we have animated to the user's GPS at city scale (or peer focus).
+   *  Must NOT key off `region` — MapView fires onRegionChangeComplete with a
+   *  continent-scale default before GPS arrives, which used to block centering. */
+  const hasCenteredOnUserRef = useRef(false);
 
   const clearFocusParams = useCallback(() => {
     navigation.setParams({
@@ -112,6 +116,7 @@ export function useMapFocus({
           setTimeout(() => setSelected(point), Math.min(duration, 350));
         }
       });
+      hasCenteredOnUserRef.current = true;
       pendingFocusRef.current = null;
       clearPendingMapFocus(token);
       clearFocusParams();
@@ -279,8 +284,10 @@ export function useMapFocus({
     focusAppliedKeyRef.current = null;
   }, [focusUserId, focusListingId, focusLat, focusLng, focusMyPin]);
 
+  // City-scale center on first GPS fix. Do not gate on `region` — the map's
+  // default onRegionChangeComplete is often continent-scale and would skip this.
   useEffect(() => {
-    if (!myCoords || region) return;
+    if (!myCoords || hasCenteredOnUserRef.current) return;
     if (
       focusMyPin ||
       focusUserId ||
@@ -290,6 +297,7 @@ export function useMapFocus({
     ) {
       return;
     }
+    hasCenteredOnUserRef.current = true;
     mapRef.current?.animateToRegion(
       {
         latitude: myCoords.lat,
@@ -299,11 +307,12 @@ export function useMapFocus({
       },
       400,
     );
-  }, [myCoords, region, focusMyPin, focusUserId, focusListingId, mapRef]);
+  }, [myCoords, focusMyPin, focusUserId, focusListingId, mapRef]);
 
   useFocusEffect(
     useCallback(() => {
       if (focusMyPin && myCoords) {
+        hasCenteredOnUserRef.current = true;
         mapRef.current?.animateToRegion(
           {
             latitude: myCoords.lat,
