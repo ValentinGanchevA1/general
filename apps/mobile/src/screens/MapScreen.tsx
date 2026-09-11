@@ -335,7 +335,15 @@ export function MapScreen(): React.JSX.Element {
 	}, [waveToast]);
 
 	const sheetOpen = selected != null;
-	const isEmpty = !loading && points.length === 0 && region != null;
+	// Continent-scale default region is not a real "empty nearby" — only city-ish
+	// deltas count so we don't stack empty + nudge over Europe/Africa.
+	const isCityScale =
+		region != null &&
+		region.latitudeDelta > 0 &&
+		region.latitudeDelta <= 0.25 &&
+		region.longitudeDelta > 0 &&
+		region.longitudeDelta <= 0.25;
+	const isEmpty = !loading && points.length === 0 && isCityScale;
 
 	const openCreateNearby = useCallback(() => {
 		setCreateNearbyOpen(true);
@@ -402,22 +410,19 @@ export function MapScreen(): React.JSX.Element {
 				/>
 			) : null}
 
-			{isEmpty ? (
+			{isEmpty && !createNudgeVisible ? (
 				<View style={styles.emptyWrap} pointerEvents="box-none">
 					<EmptyState
 						variant="card"
 						icon={emptyCopy.icon}
 						title={emptyCopy.title}
 						body={emptyCopy.body}
-						{...(!createNudgeVisible
-							? {
-									actionLabel: emptyCopy.actionLabel,
-									onAction:
-										emptyCopy.actionKind === 'show_everyone'
-											? () => setFriendsOnly(false)
-											: openCreateNearby,
-								}
-							: {})}
+						actionLabel={emptyCopy.actionLabel}
+						onAction={
+							emptyCopy.actionKind === 'show_everyone'
+								? () => setFriendsOnly(false)
+								: openCreateNearby
+						}
 					/>
 				</View>
 			) : null}
