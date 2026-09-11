@@ -611,7 +611,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
         enablePanDownToClose
         backdropComponent={renderBackdrop}
         backgroundStyle={sheetChrome.background}
-        handleIndicatorStyle={sheetChrome.handleIndicator}
+        handleIndicatorStyle={sheetChrome.handle}
       >
         <BottomSheetView style={styles.sheetBody}>
           <ActionSheetList items={menuItems} />
