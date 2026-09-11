@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Video from 'react-native-video';
 
 import { STORY_LIMITS } from '@g88/shared';
 
@@ -133,9 +134,21 @@ export function StoryCreateSheet({
                   resizeMode="cover"
                 />
               ) : (
-                <View style={[styles.preview, styles.previewVideo]}>
-                  <Text style={styles.previewVideoIcon}>▶</Text>
-                  <Text style={styles.previewVideoLabel}>Video ready</Text>
+                <View style={styles.preview}>
+                  <Video
+                    source={{ uri: pending.mediaUrl }}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode="cover"
+                    muted
+                    repeat
+                    paused={false}
+                    controls={false}
+                    playInBackground={false}
+                    playWhenInactive={false}
+                  />
+                  <View style={styles.previewVideoBadge} pointerEvents="none">
+                    <Text style={styles.previewVideoLabel}>Video · max {STORY_LIMITS.videoMaxSeconds}s</Text>
+                  </View>
                 </View>
               )}
               <Pressable
@@ -250,13 +263,18 @@ const styles = StyleSheet.create({
     height: 160,
     borderRadius: 12,
     backgroundColor: colors.surfaceAlt,
+    overflow: 'hidden',
   },
-  previewVideo: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  previewVideoBadge: {
+    position: 'absolute',
+    left: 10,
+    bottom: 10,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  previewVideoIcon: { color: colors.textPrimary, fontSize: 28, marginBottom: 4 },
-  previewVideoLabel: { color: colors.textSecondary, fontSize: 13 },
+  previewVideoLabel: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
   changeMedia: { alignSelf: 'flex-start', marginTop: 8, paddingVertical: 4 },
   changeMediaText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   caption: {
