@@ -110,7 +110,12 @@ describe('DiscoveryService', () => {
       // sw.lng=179, ne.lng=-179 is a ~2° span across the dateline. A naive
       // ne.lng - sw.lng = -358° would inflate the area estimate past the cell
       // cap and wrongly refuse; the normalized delta keeps it queryable.
-      const antimeridian: Viewport = { ne: { lat: 2, lng: -179 }, sw: { lat: 1, lng: 179 } };
+      // Lat span stays city-scale (~0.05°) so estimate at r8 stays under the
+      // soft cap (~1676 cells); a 1° lat strip was ~33k and refused for size.
+      const antimeridian: Viewport = {
+        ne: { lat: 1.05, lng: -179 },
+        sw: { lat: 1.0, lng: 179 },
+      };
       await call({ viewport: antimeridian });
       expect(query).toHaveBeenCalled();
     });
