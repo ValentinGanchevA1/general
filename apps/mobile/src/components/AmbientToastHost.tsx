@@ -87,7 +87,7 @@ function visualFor(item: ToastItem): ToastVisual {
         eyebrow: 'Level up',
         title: `You reached level ${item.data.level}`,
         icon: '⭐',
-        gradient: ['#2a1a08', '#12121f', '#0a0a0f'],
+        gradient: ['#2a1a08', colors.surface, colors.bg],
         accent: colors.warning,
         border: colors.warning + '99',
       };
@@ -99,7 +99,7 @@ function visualFor(item: ToastItem): ToastVisual {
         title: item.data.title,
         ...(xp ? { xpLabel: xp } : {}),
         icon: item.data.icon || '✅',
-        gradient: ['#0d2818', '#12121f', '#0a0a0f'],
+        gradient: ['#0d2818', colors.surface, colors.bg],
         accent: colors.action,
         border: colors.action + '88',
       };
@@ -112,7 +112,7 @@ function visualFor(item: ToastItem): ToastVisual {
         title: item.data.title,
         ...(xp ? { xpLabel: xp } : {}),
         icon: item.data.icon || '🏆',
-        gradient: ['#1a1030', '#12121f', '#0a0a0f'],
+        gradient: ['#1a1030', colors.surface, colors.bg],
         accent: colors.accent,
         border: colors.accent + '88',
       };
@@ -123,7 +123,7 @@ function visualFor(item: ToastItem): ToastVisual {
           item.data.scope === 'weekly' ? 'Weekly climb' : 'All-time climb',
         title: `#${item.data.previousRank} → #${item.data.rank}`,
         icon: '📈',
-        gradient: ['#0a2030', '#12121f', '#0a0a0f'],
+        gradient: ['#0a2030', colors.surface, colors.bg],
         accent: colors.info,
         border: colors.info + '88',
       };
@@ -133,7 +133,7 @@ function visualFor(item: ToastItem): ToastVisual {
         title: `${item.data.fromUser.displayName} waved at you`,
         icon: '👋',
         avatarUrl: item.data.fromUser.avatarUrl,
-        gradient: ['#0a2430', '#12121f', '#0a0a0f'],
+        gradient: ['#0a2430', colors.surface, colors.bg],
         accent: colors.primary,
         border: colors.primary + '66',
       };
@@ -144,7 +144,7 @@ function visualFor(item: ToastItem): ToastVisual {
         title: `${item.data.sender.displayName} sent ${item.data.label}${msg}`,
         icon: item.data.emoji || '🎁',
         avatarUrl: item.data.sender.avatarUrl,
-        gradient: ['#2a1030', '#12121f', '#0a0a0f'],
+        gradient: ['#2a1030', colors.surface, colors.bg],
         accent: colors.accent,
         border: colors.accent + '66',
       };
