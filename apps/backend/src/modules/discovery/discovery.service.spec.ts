@@ -20,7 +20,13 @@ import { PresenceService } from '../presence/presence.service';
 import { FriendsService } from '../friends/friends.service';
 import { REDIS_CLIENT } from '../../config/redis.provider';
 
-const VIEWPORT: Viewport = { ne: { lat: 2, lng: 2 }, sw: { lat: 1, lng: 1 } };
+// City-scale (~5.5 km): estimateCellCount at r8 stays well under
+// MAX_CELLS_PER_VIEWPORT * ESTIMATE_CELL_MARGIN (4000). A 1°×1° box
+// estimates ~16k cells and is refused before cellsForViewport / DB.
+const VIEWPORT: Viewport = {
+  ne: { lat: 1.05, lng: 1.05 },
+  sw: { lat: 1.0, lng: 1.0 },
+};
 
 // Structural view over the DiscoveryPoint union for assertions (cluster vs entity).
 type LoosePoint = {
@@ -82,10 +88,20 @@ describe('DiscoveryService', () => {
     });
 
     it('refuses a runaway viewport (>5000 cells) without querying', async () => {
+      // City-scale VIEWPORT passes the area estimate; post-enumeration guard fires.
       (cellsForViewport as jest.Mock).mockReturnValue(new Array(5001).fill('c'));
       const res = await call();
       expect(res.points).toEqual([]);
       expect(query).not.toHaveBeenCalled();
+    });
+
+    it('refuses before polygonToCells when area estimate exceeds soft cap', async () => {
+      // Continent-scale box → estimate >> 4000 at r8; must not call cellsForViewport.
+      const huge: Viewport = { ne: { lat: 50, lng: 30 }, sw: { lat: 0, lng: 0 } };
+      const res = await call({ viewport: huge });
+      expect(res.points).toEqual([]);
+      expect(query).not.toHaveBeenCalled();
+      expect(cellsForViewport).not.toHaveBeenCalled();
     });
 
     it('does not refuse a narrow antimeridian-crossing viewport (normalized lng delta)', async () => {
