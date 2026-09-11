@@ -461,7 +461,7 @@ const S = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: '#2a2a1a',
+    backgroundColor: colors.surfaceAlt,
   },
   pendingText: { color: colors.warning, fontWeight: '700', fontSize: 12 },
 });
