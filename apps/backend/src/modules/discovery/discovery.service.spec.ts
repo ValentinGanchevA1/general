@@ -97,6 +97,8 @@ describe('DiscoveryService', () => {
 
     it('refuses before polygonToCells when area estimate exceeds soft cap', async () => {
       // Continent-scale box → estimate >> 4000 at r8; must not call cellsForViewport.
+      // Module mock accumulates calls across tests — clear before asserting zero.
+      (cellsForViewport as jest.Mock).mockClear();
       const huge: Viewport = { ne: { lat: 50, lng: 30 }, sw: { lat: 0, lng: 0 } };
       const res = await call({ viewport: huge });
       expect(res.points).toEqual([]);
