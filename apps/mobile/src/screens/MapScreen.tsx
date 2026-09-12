@@ -54,10 +54,9 @@ import { colors } from '@/theme';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
 import { MapCoachMarks } from '@/components/map/MapCoachMarks';
 import {
-	ListingModeFilter,
+	CategoryFilterBar,
 	type ListingModeFilterValue,
-} from '@/components/map/ListingModeFilter';
-import { FriendsOnlyFilter } from '@/components/map/FriendsOnlyFilter';
+} from '@/components/map/CategoryFilterBar';
 import { EmptyState } from '@/components/EmptyState';
 import { MapChrome } from '@/components/map/MapChrome';
 import { MapSearchBar } from '@/components/map/MapSearchBar';
@@ -422,19 +421,14 @@ export function MapScreen(): React.JSX.Element {
 				/>
 			) : null}
 
-			{region && !friendsOnly ? (
-				<ListingModeFilter
-					value={listingModeFilter}
-					onChange={setListingModeFilter}
-					top={mapListingModeFilterTop(insets.top)}
-				/>
-			) : null}
-
 			{region ? (
-				<FriendsOnlyFilter
-					active={friendsOnly}
-					onChange={setFriendsOnly}
+				<CategoryFilterBar
+					listingMode={listingModeFilter}
+					onListingModeChange={setListingModeFilter}
+					friendsOnly={friendsOnly}
+					onFriendsOnlyChange={setFriendsOnly}
 					top={mapListingModeFilterTop(insets.top)}
+					showListingMode={!friendsOnly}
 				/>
 			) : null}
 
