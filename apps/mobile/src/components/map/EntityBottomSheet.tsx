@@ -142,7 +142,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
       setFetchError(false);
     } catch {
       setFetchError(true);
-      // Keep any previous profile so Wave/Profile still work from discovery meta.
     } finally {
       setFetching(false);
     }
@@ -150,13 +149,10 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 
   useEffect(() => {
     let cancelled = false;
-
-    // Sync reset — no setTimeout(0).
     setMutualCount(0);
     setMutualPreview([]);
     setOpening(false);
     setBlocking(false);
-
     const hit = getCachedProfile(point.id);
     if (hit) {
       setProfile(hit);
@@ -167,12 +163,10 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
       setFetching(true);
       setFetchError(false);
     }
-
     void (async () => {
       if (cancelled) return;
       await loadProfile(point.id);
     })();
-
     void (async () => {
       try {
         const rel = await getJson<RelationshipSummary>(`/friends/relationship/${point.id}`);
@@ -183,10 +177,9 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         const page = await getJson<FriendsPage>(`/friends/mutual/${point.id}?limit=3`);
         if (!cancelled) setMutualPreview(page.items.slice(0, 3));
       } catch {
-        /* mutual is additive — ignore failures */
+        /* mutual is additive */
       }
     })();
-
     return () => {
       cancelled = true;
     };
@@ -208,11 +201,9 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   const allTimeRank = status?.allTimeRank ?? null;
   const hasStats =
     status != null || allTimeRank != null || achievementIcons.length > 0;
-
   const isFriend = meta.isFriend === true;
   const idVerified = profile?.idVerified === true;
   const ringVariant = idVerified ? 'verified' : isFriend ? 'friend' : 'brand';
-
   const subtitle = (() => {
     if (profile == null) return null;
     const parts: string[] = [];
@@ -350,11 +341,9 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
           <Text style={styles.overflowBtnText}>···</Text>
         </TouchableOpacity>
       </View>
-
       {fetching && profile == null ? (
         <ActivityIndicator color={colors.primary} size="small" style={{ alignSelf: 'flex-start' }} />
       ) : null}
-
       {fetchError && profile == null ? (
         <View style={styles.fetchErrorRow}>
           <Text style={styles.fetchErrorText}>Could not load profile</Text>
@@ -368,7 +357,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
           </TouchableOpacity>
         </View>
       ) : null}
-
       {!fetching && mutualCount > 0 ? (
         <TouchableOpacity
           style={styles.mutualRow}
@@ -399,7 +387,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
           </Text>
         </TouchableOpacity>
       ) : null}
-
       <View style={styles.actions}>
         {onWave && !blocked ? (
           <TouchableOpacity
@@ -432,7 +419,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
           <Text style={styles.profileBtnText}>Profile</Text>
         </TouchableOpacity>
       </View>
-
       {!fetching && profile != null ? (
         <View style={styles.trustBlock}>
           <View style={styles.trustHeader}>
@@ -456,7 +442,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
           </View>
         </View>
       ) : null}
-
       {!fetching && hasStats ? (
         <View style={styles.statsBlock}>
           <Text style={styles.sectionLabel}>Stats</Text>
@@ -483,7 +468,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
           </View>
         </View>
       ) : null}
-
       {profile?.bio ? (
         <Text style={styles.bio} numberOfLines={3}>
           {profile.bio}
@@ -503,6 +487,7 @@ function EventCard({
   const navigation = useNavigation<Nav>();
   const meta = point.meta;
   const title = meta.title?.trim() || 'Event';
+  const coverUrl = meta.coverUrl?.trim() || null;
   const capacity =
     meta.capacity != null && meta.capacity > 0
       ? `${meta.attendeeCount}/${meta.capacity} going`
@@ -515,6 +500,13 @@ function EventCard({
 
   return (
     <View style={styles.sheet}>
+      {coverUrl ? (
+        <Image
+          source={{ uri: coverUrl }}
+          style={styles.entityCover}
+          accessibilityLabel={`${title} cover`}
+        />
+      ) : null}
       <View style={styles.kindHeader}>
         <View style={[styles.kindDot, styles.kindDotEvent]} />
         <Text style={styles.kindLabel}>Event</Text>
@@ -527,14 +519,24 @@ function EventCard({
         <Text style={styles.metaDot}>·</Text>
         <Text style={styles.metaText}>{capacity}</Text>
       </View>
-      <TouchableOpacity
-        style={[styles.primaryBtn, styles.entityPrimaryBtn]}
-        onPress={openDetail}
-        accessibilityRole="button"
-        accessibilityLabel="View event"
-      >
-        <Text style={styles.primaryBtnText}>View event</Text>
-      </TouchableOpacity>
+      <View style={styles.entityActions}>
+        <TouchableOpacity
+          style={[styles.primaryBtn, styles.entityPrimaryBtn, styles.entityActionPrimary]}
+          onPress={openDetail}
+          accessibilityRole="button"
+          accessibilityLabel="View event"
+        >
+          <Text style={styles.primaryBtnText}>View event</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.profileBtn, styles.entityActionSecondary]}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
+          <Text style={styles.profileBtnText}>Close</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -553,6 +555,7 @@ function ListingCard({
   const mode = isBuy ? 'Wanted' : 'For sale';
   const price = formatPrice(meta.priceCents, meta.currency);
   const category = meta.category?.trim() || null;
+  const thumbUrl = meta.thumbnailUrl?.trim() || null;
 
   const openDetail = (): void => {
     onClose();
@@ -561,35 +564,67 @@ function ListingCard({
 
   return (
     <View style={styles.sheet}>
-      <View style={styles.kindHeader}>
-        <View
+      <View style={styles.listingTop}>
+        {thumbUrl ? (
+          <Image
+            source={{ uri: thumbUrl }}
+            style={styles.listingThumb}
+            accessibilityLabel={`${title} photo`}
+          />
+        ) : (
+          <View style={[styles.listingThumb, styles.listingThumbPlaceholder]}>
+            <Text style={styles.listingThumbPlaceholderText}>{isBuy ? '🔍' : '🛍'}</Text>
+          </View>
+        )}
+        <View style={styles.listingTopText}>
+          <View style={styles.kindHeader}>
+            <View
+              style={[
+                styles.kindDot,
+                isBuy ? styles.kindDotWanted : styles.kindDotListing,
+              ]}
+            />
+            <Text style={[styles.kindLabel, isBuy ? styles.kindLabelWanted : undefined]}>
+              {mode}
+            </Text>
+          </View>
+          <Text style={styles.entityTitle} numberOfLines={2}>
+            {title}
+          </Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.priceText}>{price}</Text>
+            {category ? (
+              <>
+                <Text style={styles.metaDot}>·</Text>
+                <Text style={styles.metaText}>{category}</Text>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </View>
+      <View style={styles.entityActions}>
+        <TouchableOpacity
           style={[
-            styles.kindDot,
-            isBuy ? styles.kindDotWanted : styles.kindDotListing,
+            styles.primaryBtn,
+            styles.entityPrimaryBtn,
+            styles.listingPrimaryBtn,
+            styles.entityActionPrimary,
           ]}
-        />
-        <Text style={[styles.kindLabel, isBuy ? styles.kindLabelWanted : undefined]}>{mode}</Text>
+          onPress={openDetail}
+          accessibilityRole="button"
+          accessibilityLabel="View listing"
+        >
+          <Text style={styles.primaryBtnText}>View listing</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.profileBtn, styles.entityActionSecondary]}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
+          <Text style={styles.profileBtnText}>Close</Text>
+        </TouchableOpacity>
       </View>
-      <Text style={styles.entityTitle} numberOfLines={2}>
-        {title}
-      </Text>
-      <View style={styles.metaRow}>
-        <Text style={styles.priceText}>{price}</Text>
-        {category ? (
-          <>
-            <Text style={styles.metaDot}>·</Text>
-            <Text style={styles.metaText}>{category}</Text>
-          </>
-        ) : null}
-      </View>
-      <TouchableOpacity
-        style={[styles.primaryBtn, styles.entityPrimaryBtn, styles.listingPrimaryBtn]}
-        onPress={openDetail}
-        accessibilityRole="button"
-        accessibilityLabel="View listing"
-      >
-        <Text style={styles.primaryBtnText}>View listing</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -606,15 +641,12 @@ export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): Re
       />
     );
   }
-
   if (point.kind === 'event') {
     return <EventCard point={point as EventEntityPoint} onClose={onClose} />;
   }
-
   if (point.kind === 'listing') {
     return <ListingCard point={point as ListingEntityPoint} onClose={onClose} />;
   }
-
   return (
     <View style={styles.sheet}>
       <Text style={styles.entityTitle}>Unknown</Text>

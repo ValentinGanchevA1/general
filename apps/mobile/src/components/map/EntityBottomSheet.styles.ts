@@ -172,4 +172,46 @@ export const styles = StyleSheet.create({
   listingPrimaryBtn: {
     backgroundColor: colors.action,
   },
+  entityCover: {
+    width: '100%',
+    height: 140,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+  },
+  listingTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+  },
+  listingThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+  },
+  listingThumbPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listingThumbPlaceholderText: {
+    fontSize: 28,
+  },
+  listingTopText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 6,
+  },
+  entityActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  entityActionPrimary: {
+    flexGrow: 1,
+    alignSelf: 'auto',
+  },
+  entityActionSecondary: {
+    flexGrow: 0,
+  },
 });
