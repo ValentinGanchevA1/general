@@ -60,13 +60,17 @@ import {
 import { FriendsOnlyFilter } from '@/components/map/FriendsOnlyFilter';
 import { EmptyState } from '@/components/EmptyState';
 import { MapChrome } from '@/components/map/MapChrome';
+import { MapSearchBar } from '@/components/map/MapSearchBar';
 import { CreateNearbySheet } from '@/components/map/CreateNearbySheet';
 import { useCreateNearby } from '@/features/map/useCreateNearby';
 import { useMapFocus } from '@/features/map/useMapFocus';
 import { useMapCreateNudge } from '@/features/map/useMapCreateNudge';
 import { MapCreateNudgeBanner } from '@/features/map/MapCreateNudgeBanner';
 import { sheetChrome, useSheetBackdrop } from '@/components/sheets';
-import { mapListingModeFilterTop } from '@/components/map/mapChromeLayout';
+import {
+	mapListingModeFilterTop,
+	mapSearchBarTop,
+} from '@/components/map/mapChromeLayout';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
@@ -138,6 +142,7 @@ export function MapScreen(): React.JSX.Element {
 	const [listingModeFilter, setListingModeFilter] =
 		useState<ListingModeFilterValue>('all');
 	const [friendsOnly, setFriendsOnly] = useState(false);
+	const [searchQuery, setSearchQuery] = useState('');
 	const insets = useSafeAreaInsets();
 
 	const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
@@ -152,6 +157,21 @@ export function MapScreen(): React.JSX.Element {
 		friendsOnly,
 	});
 	const points = data?.points ?? EMPTY_POINTS;
+
+	const filteredPoints = useMemo(() => {
+		const q = searchQuery.trim().toLowerCase();
+		if (!q) return points;
+		return points.filter((p) => {
+			if (p.kind === 'cluster') return true;
+			if (p.kind === 'user') {
+				return p.meta.displayName.toLowerCase().includes(q);
+			}
+			if (p.kind === 'event' || p.kind === 'listing') {
+				return p.meta.title.toLowerCase().includes(q);
+			}
+			return false;
+		});
+	}, [points, searchQuery]);
 
 	const {
 		createNearbyOpen,
@@ -381,7 +401,7 @@ export function MapScreen(): React.JSX.Element {
 					toolbarEnabled={false}
 				>
 					<MapMarkers
-						points={points}
+						points={filteredPoints}
 						onEntityPress={onEntityPress}
 						onClusterPress={onClusterPress}
 					/>
@@ -393,6 +413,14 @@ export function MapScreen(): React.JSX.Element {
 				onPressInteractions={() => openRootScreen(navigation, 'Interactions')}
 				sheetOpen={sheetOpen}
 			/>
+
+			{region ? (
+				<MapSearchBar
+					value={searchQuery}
+					onChangeText={setSearchQuery}
+					top={mapSearchBarTop(insets.top)}
+				/>
+			) : null}
 
 			{region && !friendsOnly ? (
 				<ListingModeFilter
