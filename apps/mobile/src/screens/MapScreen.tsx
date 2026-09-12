@@ -60,6 +60,11 @@ import {
 import { EmptyState } from '@/components/EmptyState';
 import { MapChrome } from '@/components/map/MapChrome';
 import { MapSearchBar } from '@/components/map/MapSearchBar';
+import { TrendingCard } from '@/components/map/TrendingCard';
+import {
+	buildTrending,
+	type TrendingItem,
+} from '@/components/map/buildTrending';
 import { CreateNearbySheet } from '@/components/map/CreateNearbySheet';
 import { useCreateNearby } from '@/features/map/useCreateNearby';
 import { useMapFocus } from '@/features/map/useMapFocus';
@@ -67,6 +72,8 @@ import { useMapCreateNudge } from '@/features/map/useMapCreateNudge';
 import { MapCreateNudgeBanner } from '@/features/map/MapCreateNudgeBanner';
 import { sheetChrome, useSheetBackdrop } from '@/components/sheets';
 import {
+	LISTING_MODE_FILTER_HEIGHT,
+	MAP_CHROME_GAP,
 	mapListingModeFilterTop,
 	mapSearchBarTop,
 } from '@/components/map/mapChromeLayout';
@@ -364,6 +371,23 @@ export function MapScreen(): React.JSX.Element {
 		region.longitudeDelta <= 0.25;
 	const isEmpty = !loading && points.length === 0 && isCityScale;
 
+	const trendingItems = useMemo(
+		() => buildTrending(points, myLat, myLng, 3),
+		[points, myLat, myLng],
+	);
+
+	const onTrendingPress = useCallback(
+		(item: TrendingItem) => {
+			onEntityPress(item.point);
+		},
+		[onEntityPress],
+	);
+
+	const trendingTop =
+		mapListingModeFilterTop(insets.top) +
+		LISTING_MODE_FILTER_HEIGHT +
+		MAP_CHROME_GAP;
+
 	const openCreateNearby = useCallback(() => {
 		setCreateNearbyOpen(true);
 	}, [setCreateNearbyOpen]);
@@ -431,6 +455,13 @@ export function MapScreen(): React.JSX.Element {
 					showListingMode={!friendsOnly}
 				/>
 			) : null}
+
+			<TrendingCard
+				items={trendingItems}
+				onPressItem={onTrendingPress}
+				top={trendingTop}
+				visible={isCityScale && !sheetOpen && !isEmpty}
+			/>
 
 			{isEmpty && !createNudgeVisible ? (
 				<View style={styles.emptyWrap} pointerEvents="box-none">
