@@ -172,7 +172,8 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 
     void (async () => {
       if (cancelled) return;
-      await loadProfile(point.id, reloadToken > 0 && hit != null);
+      // force only when retrying after an explicit cache clear
+      await loadProfile(point.id, reloadToken > 0);
     })();
 
     void (async () => {
@@ -299,7 +300,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
     if (opening || canMessage === 'none' || blocked) return;
     setOpening(true);
     try {
-      // Same path as UserProfileScreen — controller is @Controller('conversations').
       const res = await postJson<
         CreateConversationRequest,
         CreateConversationResponse
@@ -360,7 +360,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 
       {fetchError && profile == null ? (
         <View style={styles.fetchErrorRow}>
-          <Text style={styles.fetchErrorText}>Couldn&apos;t load profile</Text>
+          <Text style={styles.fetchErrorText}>Could not load profile</Text>
           <TouchableOpacity
             onPress={onRetryProfile}
             accessibilityRole="button"
