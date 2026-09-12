@@ -65,7 +65,7 @@ g88/
 │   │   ├── src/modules/    Feature modules (auth, users, discovery, chat, messaging,
 │   │   │                     interactions, presence, notifications, alerts, geofences, social,
 │   │   │                     verification, id-verification, subscriptions, gamification,
-│   │   │                     challenges, achievements, gifts, trending, feed, blocks, stories, ...)
+│   │   │                     challenges, achievements, gifts, trending, feed, blocks, friends, stories, ...)
 │   │   ├── src/realtime/   Socket.IO gateway (top-level, not under modules/)
 │   │   └── migrations/     0001–0040 raw SQL (next free 0041)
 │   ├── mobile/             React Native + TypeScript client (src/features/{domain}/)
@@ -253,3 +253,15 @@ API DTOs, socket contracts, geo helpers — **mobile + backend + admin** import 
 ## Explicitly deferred
 
 Stripe Connect / paid gifts · Elasticsearch · Kafka · gRPC · Kubernetes · GraphQL · live streaming · group chat · web/desktop client. (Most are on the `ROADMAP.md` cuts list.)
+
+## Known gaps (docs / residual engineering)
+
+Tracked so agents do not re-discover them every session:
+
+| Gap | Notes |
+|-----|--------|
+| `admin.guard.spec.ts` | Still missing — AdminGuard has no dedicated unit spec |
+| ScreenHeader migration | Residual screens may still use ad-hoc headers (majority migrated 2026-09) |
+| Hardcoded hex colors | Theme convention not lint-enforced; prefer tokens over new hex |
+| Events/listings block by author | Needs `authorId` in discovery view meta (optional after B1 core) |
+| Migration collisions | Dual-0030 resolved; filesystem `check-migration-prefixes.mjs` keeps 0001–0040 unique |
