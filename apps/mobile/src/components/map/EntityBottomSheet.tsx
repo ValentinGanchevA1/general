@@ -125,15 +125,13 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   const [mutualPreview, setMutualPreview] = useState<FriendCard[]>([]);
   const [reloadToken, setReloadToken] = useState(0);
 
-  const loadProfile = useCallback(async (userId: string, force: boolean): Promise<void> => {
-    if (!force) {
-      const hit = getCachedProfile(userId);
-      if (hit) {
-        setProfile(hit);
-        setFetching(false);
-        setFetchError(false);
-        return;
-      }
+  const loadProfile = useCallback(async (userId: string): Promise<void> => {
+    const hit = getCachedProfile(userId);
+    if (hit) {
+      setProfile(hit);
+      setFetching(false);
+      setFetchError(false);
+      return;
     }
     setFetching(true);
     setFetchError(false);
@@ -172,8 +170,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 
     void (async () => {
       if (cancelled) return;
-      // force only when retrying after an explicit cache clear
-      await loadProfile(point.id, reloadToken > 0);
+      await loadProfile(point.id);
     })();
 
     void (async () => {
