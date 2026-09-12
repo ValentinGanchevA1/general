@@ -149,20 +149,8 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 
   useEffect(() => {
     let cancelled = false;
-    setMutualCount(0);
-    setMutualPreview([]);
-    setOpening(false);
-    setBlocking(false);
-    const hit = getCachedProfile(point.id);
-    if (hit) {
-      setProfile(hit);
-      setFetching(false);
-      setFetchError(false);
-    } else {
-      setProfile(null);
-      setFetching(true);
-      setFetchError(false);
-    }
+    // No sync setState in effect (react-hooks/set-state-in-effect).
+    // UserCard is keyed by point.id so mutual/opening/blocking reset on pin change.
     void (async () => {
       if (cancelled) return;
       await loadProfile(point.id);
@@ -173,7 +161,10 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         if (cancelled) return;
         const count = rel.mutualFriendsCount ?? 0;
         setMutualCount(count);
-        if (count < 1) return;
+        if (count < 1) {
+          setMutualPreview([]);
+          return;
+        }
         const page = await getJson<FriendsPage>(`/friends/mutual/${point.id}?limit=3`);
         if (!cancelled) setMutualPreview(page.items.slice(0, 3));
       } catch {
@@ -634,6 +625,7 @@ export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): Re
   if (point.kind === 'user') {
     return (
       <UserCard
+        key={point.id}
         point={point as UserEntityPoint}
         waving={waving}
         onClose={onClose}
@@ -641,12 +633,15 @@ export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): Re
       />
     );
   }
+
   if (point.kind === 'event') {
     return <EventCard point={point as EventEntityPoint} onClose={onClose} />;
   }
+
   if (point.kind === 'listing') {
     return <ListingCard point={point as ListingEntityPoint} onClose={onClose} />;
   }
+
   return (
     <View style={styles.sheet}>
       <Text style={styles.entityTitle}>Unknown</Text>
