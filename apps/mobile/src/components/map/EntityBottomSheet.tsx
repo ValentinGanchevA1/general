@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -37,6 +37,27 @@ const LADDER_BADGES: Array<{ level: VerificationLevel; label: string }> = [
   { level: 'selfie', label: 'Photo' },
   { level: 'id', label: 'ID' },
 ];
+
+/** Short TTL cache so re-opening the same pin does not triple-fetch. */
+const PROFILE_CACHE_TTL_MS = 45_000;
+const profileCache = new Map<
+  string,
+  { profile: PublicUserProfile; fetchedAt: number }
+>();
+
+function getCachedProfile(userId: string): PublicUserProfile | null {
+  const hit = profileCache.get(userId);
+  if (!hit) return null;
+  if (Date.now() - hit.fetchedAt > PROFILE_CACHE_TTL_MS) {
+    profileCache.delete(userId);
+    return null;
+  }
+  return hit.profile;
+}
+
+function setCachedProfile(userId: string, profile: PublicUserProfile): void {
+  profileCache.set(userId, { profile, fetchedAt: Date.now() });
+}
 
 function earnedBadges(level: VerificationLevel): string[] {
   const rank = LADDER.indexOf(level);
@@ -94,31 +115,63 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.Element {
   const navigation = useNavigation<Nav>();
-  const [profile, setProfile] = useState<PublicUserProfile | null>(null);
-  const [fetching, setFetching] = useState(true);
+  const cached = getCachedProfile(point.id);
+  const [profile, setProfile] = useState<PublicUserProfile | null>(cached);
+  const [fetching, setFetching] = useState(cached == null);
+  const [fetchError, setFetchError] = useState(false);
   const [opening, setOpening] = useState(false);
   const [blocking, setBlocking] = useState(false);
-
   const [mutualCount, setMutualCount] = useState(0);
   const [mutualPreview, setMutualPreview] = useState<FriendCard[]>([]);
+  const [reloadToken, setReloadToken] = useState(0);
 
-	useEffect(() => {
-		let cancelled = false;
-		setTimeout(() => {
-			if (cancelled) return;
-			setMutualCount(0);
-			setMutualPreview([]);
-			setFetching(true);
-		}, 0);
+  const loadProfile = useCallback(async (userId: string): Promise<void> => {
+    const hit = getCachedProfile(userId);
+    if (hit) {
+      setProfile(hit);
+      setFetching(false);
+      setFetchError(false);
+      return;
+    }
+    setFetching(true);
+    setFetchError(false);
+    try {
+      const p = await getJson<PublicUserProfile>(`/users/${userId}`);
+      setCachedProfile(userId, p);
+      setProfile(p);
+      setFetchError(false);
+    } catch {
+      setFetchError(true);
+      // Keep any previous profile so Wave/Profile still work from discovery meta.
+    } finally {
+      setFetching(false);
+    }
+  }, []);
 
-    void getJson<PublicUserProfile>(`/users/${point.id}`)
-      .then((p) => {
-        if (!cancelled) setProfile(p);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setFetching(false);
-      });
+  useEffect(() => {
+    let cancelled = false;
+
+    // Sync reset — no setTimeout(0).
+    setMutualCount(0);
+    setMutualPreview([]);
+    setOpening(false);
+    setBlocking(false);
+
+    const hit = getCachedProfile(point.id);
+    if (hit) {
+      setProfile(hit);
+      setFetching(false);
+      setFetchError(false);
+    } else {
+      setProfile(null);
+      setFetching(true);
+      setFetchError(false);
+    }
+
+    void (async () => {
+      if (cancelled) return;
+      await loadProfile(point.id);
+    })();
 
     void (async () => {
       try {
@@ -137,7 +190,12 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
     return () => {
       cancelled = true;
     };
-  }, [point.id]);
+  }, [point.id, reloadToken, loadProfile]);
+
+  const onRetryProfile = (): void => {
+    profileCache.delete(point.id);
+    setReloadToken((t) => t + 1);
+  };
 
   const meta = point.meta;
   const displayName = meta.displayName?.trim() || 'User';
@@ -184,10 +242,20 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
     try {
       if (blocked) {
         await deleteJson<{ blocked: boolean }>(`/blocks/${point.id}`);
-        setProfile((p) => (p ? { ...p, blockedByViewer: false } : p));
+        setProfile((p) => {
+          if (!p) return p;
+          const next = { ...p, blockedByViewer: false };
+          setCachedProfile(point.id, next);
+          return next;
+        });
       } else {
         await postJson<undefined, { blocked: boolean }>(`/blocks/${point.id}`, undefined);
-        setProfile((p) => (p ? { ...p, blockedByViewer: true } : p));
+        setProfile((p) => {
+          if (!p) return p;
+          const next = { ...p, blockedByViewer: true };
+          setCachedProfile(point.id, next);
+          return next;
+        });
         onClose();
       }
     } catch {
@@ -229,7 +297,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
     if (opening || canMessage === 'none' || blocked) return;
     setOpening(true);
     try {
-      // Same path as UserProfileScreen — controller is @Controller('conversations').
       const res = await postJson<
         CreateConversationRequest,
         CreateConversationResponse
@@ -275,7 +342,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         <TouchableOpacity
           style={styles.overflowBtn}
           onPress={onOverflow}
-          disabled={blocking || fetching}
+          disabled={blocking || (fetching && profile == null)}
           accessibilityRole="button"
           accessibilityLabel="More actions"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -284,8 +351,22 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         </TouchableOpacity>
       </View>
 
-      {fetching ? (
+      {fetching && profile == null ? (
         <ActivityIndicator color={colors.primary} size="small" style={{ alignSelf: 'flex-start' }} />
+      ) : null}
+
+      {fetchError && profile == null ? (
+        <View style={styles.fetchErrorRow}>
+          <Text style={styles.fetchErrorText}>Could not load profile</Text>
+          <TouchableOpacity
+            onPress={onRetryProfile}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading profile"
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Text style={styles.fetchErrorRetry}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : null}
 
       {!fetching && mutualCount > 0 ? (
