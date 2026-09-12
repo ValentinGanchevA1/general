@@ -71,6 +71,21 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1,
   },
+  fetchErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    alignSelf: 'flex-start',
+  },
+  fetchErrorText: {
+    color: colors.textMuted,
+    fontSize: 13,
+  },
+  fetchErrorRetry: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   sectionLabel: {
     color: colors.textFaint,
     fontSize: 11,
