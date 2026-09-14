@@ -75,6 +75,11 @@ export interface ListingMeta {
   category: string;
   /** sell (default) | buy (wanted). Omitted on legacy rows → treat as sell. */
   mode?: ListingMode;
+  /**
+   * Listing owner (seller). Present from migration 0041 discovery view.
+   * Used by EntityBottomSheet to open Message without a second listing fetch.
+   */
+  sellerId?: string;
 }
 
 export type DiscoveryPoint = ClusterPoint | EntityPoint;
