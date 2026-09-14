@@ -98,6 +98,11 @@ function formatDistanceMeters(meters: number): string {
 	return `${(meters / 1000).toFixed(meters < 10_000 ? 1 : 0)} km`;
 }
 
+function formatDistanceMeters(meters: number): string {
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${(meters / 1000).toFixed(meters < 10_000 ? 1 : 0)} km`;
+}
+
 type UserEntityPoint = EntityPoint & { kind: 'user'; meta: UserMeta };
 type EventEntityPoint = EntityPoint & { kind: 'event'; meta: EventMeta };
 type ListingEntityPoint = EntityPoint & { kind: 'listing'; meta: ListingMeta };
