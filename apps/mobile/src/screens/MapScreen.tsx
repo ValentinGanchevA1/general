@@ -54,12 +54,11 @@ import { colors } from '@/theme';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
 import { MapCoachMarks } from '@/components/map/MapCoachMarks';
 import {
-	CategoryFilterBar,
+	MapFilterRow,
 	type ListingModeFilterValue,
-} from '@/components/map/CategoryFilterBar';
+} from '@/components/map/MapFilterRow';
 import { EmptyState } from '@/components/EmptyState';
 import { MapChrome } from '@/components/map/MapChrome';
-import { MapSearchBar } from '@/components/map/MapSearchBar';
 import { TrendingCard } from '@/components/map/TrendingCard';
 import {
 	buildTrending,
@@ -72,10 +71,8 @@ import { useMapCreateNudge } from '@/features/map/useMapCreateNudge';
 import { MapCreateNudgeBanner } from '@/features/map/MapCreateNudgeBanner';
 import { sheetChrome, useSheetBackdrop } from '@/components/sheets';
 import {
-	LISTING_MODE_FILTER_HEIGHT,
-	MAP_CHROME_GAP,
-	mapListingModeFilterTop,
-	mapSearchBarTop,
+	mapFilterRowTop,
+	mapTrendingTop,
 } from '@/components/map/mapChromeLayout';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
@@ -149,6 +146,7 @@ export function MapScreen(): React.JSX.Element {
 		useState<ListingModeFilterValue>('all');
 	const [friendsOnly, setFriendsOnly] = useState(false);
 	const [searchQuery, setSearchQuery] = useState('');
+	const [trendingCollapsed, setTrendingCollapsed] = useState(true);
 	const insets = useSafeAreaInsets();
 
 	const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
@@ -383,10 +381,8 @@ export function MapScreen(): React.JSX.Element {
 		[onEntityPress],
 	);
 
-	const trendingTop =
-		mapListingModeFilterTop(insets.top) +
-		LISTING_MODE_FILTER_HEIGHT +
-		MAP_CHROME_GAP;
+	const filterRowTop = mapFilterRowTop(insets.top, sheetOpen);
+	const trendingTop = mapTrendingTop(insets.top, sheetOpen);
 
 	const openCreateNearby = useCallback(() => {
 		setCreateNearbyOpen(true);
@@ -438,20 +434,14 @@ export function MapScreen(): React.JSX.Element {
 			/>
 
 			{region ? (
-				<MapSearchBar
+				<MapFilterRow
 					value={searchQuery}
 					onChangeText={setSearchQuery}
-					top={mapSearchBarTop(insets.top)}
-				/>
-			) : null}
-
-			{region ? (
-				<CategoryFilterBar
 					listingMode={listingModeFilter}
 					onListingModeChange={setListingModeFilter}
 					friendsOnly={friendsOnly}
 					onFriendsOnlyChange={setFriendsOnly}
-					top={mapListingModeFilterTop(insets.top)}
+					top={filterRowTop}
 					showListingMode={!friendsOnly}
 				/>
 			) : null}
@@ -460,7 +450,14 @@ export function MapScreen(): React.JSX.Element {
 				items={trendingItems}
 				onPressItem={onTrendingPress}
 				top={trendingTop}
-				visible={isCityScale && !sheetOpen && !isEmpty}
+				visible={
+					isCityScale &&
+					!sheetOpen &&
+					!isEmpty &&
+					searchQuery.trim() === ''
+				}
+				collapsed={trendingCollapsed}
+				onToggleCollapse={() => setTrendingCollapsed((c) => !c)}
 			/>
 
 			{isEmpty && !createNudgeVisible ? (
