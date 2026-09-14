@@ -99,7 +99,11 @@ export type RootStackParamList = {
     otherUserVerification?: VerificationLevel;
     otherUserIdVerified?: boolean;
   };
-  UserProfile: { userId: string };
+  UserProfile: {
+    userId: string;
+    /** Scroll target after load — mirrors EntityBottomSheet deep sections. */
+    focus?: 'trust' | 'stats' | 'storyline' | 'photos' | 'bio' | 'mutual';
+  };
   MutualFriends: { peerUserId: string; peerName?: string };
   AlertComposer: { presetCategory?: AreaCategory; presetTag?: string };
   GiftsInbox: undefined;
