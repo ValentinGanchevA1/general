@@ -44,6 +44,32 @@ interface DiscoveryQuery {
 
 ✅ Presence Redis; wave → `403 wave.blocked` when blocked; 1:1 chat + outbox + live location share sessions.
 
+**Conversations REST**
+
+| Method | Path | Controller | Notes |
+|--------|------|------------|--------|
+| POST | `/conversations` | Messaging | Open/fetch 1:1; body `{ targetUserId }` → `CreateConversationResponse` |
+| GET | `/conversations` | Chat | List `ConversationSummary[]` (friends-first sort, `peerOnline` gated) |
+| GET | `/conversations/:id/messages` | Chat | Cursor page → `MessagePage` |
+| POST | `/conversations/:id/read` | Chat | 204 mark-read |
+| GET | `/conversations/:id/location-session` | Chat | Active live-location session or null |
+
+**Open gate** (`MessagingService.openForMessaging`): block → `canMessage: 'none'` → **403 `chat.locked`**. Match → accepted chat; shared interest may mint pending request. Do **not** use `/chat/conversations` (404).
+
+**Realtime (send path)** — no REST send; use Socket.IO:
+
+| Event | Direction | Notes |
+|-------|-----------|--------|
+| `conversation:join` | C→S | Ack before send |
+| `chat:send` | C→S | `{ conversationId, body, clientMessageId }` → ack message |
+| `chat:typing` | C→S | |
+| `chat:message` | S→C | Fanout |
+| `conversation:opened` | S→C | After wave reciprocation etc. |
+| `location:share:start` / `update` / `stop` | C→S | Live location |
+| `location:share:started` / `update` / `ended` | S→C | |
+
+Outbox: mobile persists pending with `clientMessageId`; server idempotent on `(senderId, clientMessageId)`.
+
 ### §2.7 — Blocks
 
 ✅ Discovery, messaging, gifts, waves. Residual: events/listings author hide needs `authorId` in view meta.
@@ -95,7 +121,24 @@ interface ListingOffer {
 }
 ```
 
-Seller counter keeps pending + sets `lastActor=seller`. Buyer can accept/decline that counter. No payment v1. Post-create map focus via `focusListingId` / pendingMapFocus.
+**REST** (`ListingsController`, JWT) — paths match controller (not nested under `:id` for respond/counter):
+
+| Method | Path | Notes |
+|--------|------|--------|
+| POST | `/listings` | Create (`mode` default `sell`) |
+| POST | `/listings/photo/base64` | Thumbnail upload → public URL |
+| POST | `/listings/browse` | Body: location + optional `mode` / category |
+| GET | `/listings/favorites` | Saved listings |
+| GET | `/listings/:id` | Detail (+ `myOffer`, `offerCount`) |
+| PUT | `/listings/:id/status` | Seller: active / sold / withdrawn |
+| PUT | `/listings/:id/favorite` | Toggle favorite |
+| POST | `/listings/:id/offers` | Buyer make / re-open offer |
+| GET | `/listings/:id/offers` | Seller all; buyer own |
+| PUT | `/listings/:id/offer/withdraw` | Buyer withdraw |
+| PUT | `/listings/offers/:offerId` | Accept / decline (`RespondOfferDto`) |
+| PUT | `/listings/offers/:offerId/counter` | Seller counter → `lastActor=seller`, status stays pending |
+
+Seller counter keeps `pending` + sets `lastActor=seller`. Buyer then accepts/declines via `PUT /listings/offers/:offerId`. No payment v1. Post-create map focus via `focusListingId` / pendingMapFocus.
 
 ## §3 — Deferred / horizon
 
@@ -106,5 +149,6 @@ Apple Sign-In rebuild · group chat · Stripe Connect · live streaming · web c
 | Date | Decision |
 |------|----------|
 | 2026-09-14 | Deepened §2.3; §2.12 types; added §2.13 sheet + §2.14 offers/counter; aligned to `@g88/shared` |
+| 2026-09-14 | §2.14 paths corrected to ListingsController (PUT offers/:id, POST browse); §2.4–§2.6 chat/messaging routes documented |
 | 2026-09-12 | §2.12 Friends; §2.7 waves blocked verified |
 | 2026-08-13 | Stories, email OTP, ID admin, live location documented |
