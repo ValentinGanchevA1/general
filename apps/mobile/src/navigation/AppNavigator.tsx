@@ -1,9 +1,8 @@
-// apps/mobile/src/navigation/AppNavigator.tsx
 import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import {
-  NavigationContainer,
-  type NavigatorScreenParams,
+	NavigationContainer,
+	type NavigatorScreenParams,
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -50,8 +49,8 @@ import { AuthScreen } from '@/screens/AuthScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { restoreSession } from '@/features/auth/authSlice';
 import {
-  registerPushToken,
-  setupNotificationHandlers,
+	registerPushToken,
+	setupNotificationHandlers,
 } from '@/lib/pushNotifications';
 import { pingGamification } from '@/features/gamification/useGamification';
 import { AmbientToastHost } from '@/components/AmbientToastHost';
@@ -60,55 +59,59 @@ import { navigationRef } from './navigationRef';
 import { openViaRef } from './openRootScreen';
 import { takePendingPhoneVerify } from '@/services/pendingPhone';
 import type {
-  AccountStackParamList,
-  CommerceStackParamList,
-  EventsStackParamList,
-  GamificationStackParamList,
-  SocialStackParamList,
+	AccountStackParamList,
+	CommerceStackParamList,
+	EventsStackParamList,
+	GamificationStackParamList,
+	SocialStackParamList,
 } from './stacks';
 
 export type PulseFilter =
-  | 'all'
-  | 'chats'
-  | 'waves'
-  | 'listings'
-  | 'alerts'
-  | 'matches';
+	| 'all'
+	| 'chats'
+	| 'waves'
+	| 'listings'
+	| 'alerts'
+	| 'matches';
 
 export type TabParamList = {
-  Map: {
-    focusMyPin?: boolean;
-    focusUserId?: string;
-    focusListingId?: string;
-    focusLat?: number;
-    focusLng?: number;
-  } | undefined;
-  Pulse: { filter?: PulseFilter } | undefined;
-  Profile: undefined;
+	Map: {
+		focusMyPin?: boolean;
+		focusUserId?: string;
+		focusListingId?: string;
+		focusLat?: number;
+		focusLng?: number;
+	} | undefined;
+	Pulse: { filter?: PulseFilter } | undefined;
+	Profile: undefined;
 };
 
 export type RootStackParamList = {
-  Auth: undefined;
-  ProfileCreation: undefined;
-  Main: NavigatorScreenParams<TabParamList> | undefined;
-  Chat: {
-    conversationId: string;
-    otherUserName: string;
-    requestPending?: boolean;
-    otherUserId?: string;
-    otherUserVerification?: VerificationLevel;
-    otherUserIdVerified?: boolean;
-  };
-  UserProfile: { userId: string };
-  MutualFriends: { peerUserId: string; peerName?: string };
-  AlertComposer: { presetCategory?: AreaCategory; presetTag?: string };
-  GiftsInbox: undefined;
-  Interactions: undefined;
-  Gamification: NavigatorScreenParams<GamificationStackParamList>;
-  Commerce: NavigatorScreenParams<CommerceStackParamList>;
-  Account: NavigatorScreenParams<AccountStackParamList>;
-  Social: NavigatorScreenParams<SocialStackParamList>;
-  Events: NavigatorScreenParams<EventsStackParamList>;
+	Auth: undefined;
+	ProfileCreation: undefined;
+	Main: NavigatorScreenParams<TabParamList> | undefined;
+	Chat: {
+		conversationId: string;
+		otherUserName: string;
+		requestPending?: boolean;
+		otherUserId?: string;
+		otherUserVerification?: VerificationLevel;
+		otherUserIdVerified?: boolean;
+	};
+	UserProfile: {
+		userId: string;
+		/** Scroll target after load — mirrors EntityBottomSheet deep sections. */
+		focus?: 'trust' | 'stats' | 'storyline' | 'photos' | 'bio' | 'mutual';
+	};
+	MutualFriends: { peerUserId: string; peerName?: string };
+	AlertComposer: { presetCategory?: AreaCategory; presetTag?: string };
+	GiftsInbox: undefined;
+	Interactions: undefined;
+	Gamification: NavigatorScreenParams<GamificationStackParamList>;
+	Commerce: NavigatorScreenParams<CommerceStackParamList>;
+	Account: NavigatorScreenParams<AccountStackParamList>;
+	Social: NavigatorScreenParams<SocialStackParamList>;
+	Events: NavigatorScreenParams<EventsStackParamList>;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -121,261 +124,261 @@ const EventsStack = createNativeStackNavigator<EventsStackParamList>();
 export { navigationRef };
 
 const stackScreenOpts = {
-  headerStyle: { backgroundColor: colors.bg },
-  headerTintColor: colors.textPrimary,
-  contentStyle: { backgroundColor: colors.bg },
+	headerStyle: { backgroundColor: colors.bg },
+	headerTintColor: colors.textPrimary,
+	contentStyle: { backgroundColor: colors.bg },
 } as const;
 
 function GamificationNavigator(): React.JSX.Element {
-  return (
-    <GamificationStack.Navigator screenOptions={stackScreenOpts}>
-      <GamificationStack.Screen name="Challenges" component={ChallengesScreen} />
-      <GamificationStack.Screen name="Leaderboard" component={LeaderboardScreen} />
-      <GamificationStack.Screen name="Achievements" component={AchievementsScreen} />
-    </GamificationStack.Navigator>
-  );
+	return (
+		<GamificationStack.Navigator screenOptions={stackScreenOpts}>
+			<GamificationStack.Screen name="Challenges" component={ChallengesScreen} />
+			<GamificationStack.Screen name="Leaderboard" component={LeaderboardScreen} />
+			<GamificationStack.Screen name="Achievements" component={AchievementsScreen} />
+		</GamificationStack.Navigator>
+	);
 }
 
 function CommerceNavigator(): React.JSX.Element {
-  return (
-    <CommerceStack.Navigator screenOptions={stackScreenOpts}>
-      <CommerceStack.Screen name="Marketplace" component={MarketplaceScreen} />
-      <CommerceStack.Screen name="ListingDetail" component={ListingDetailScreen} />
-      <CommerceStack.Screen name="ListingCreate" component={ListingCreateScreen} />
-    </CommerceStack.Navigator>
-  );
+	return (
+		<CommerceStack.Navigator screenOptions={stackScreenOpts}>
+			<CommerceStack.Screen name="Marketplace" component={MarketplaceScreen} />
+			<CommerceStack.Screen name="ListingDetail" component={ListingDetailScreen} />
+			<CommerceStack.Screen name="ListingCreate" component={ListingCreateScreen} />
+		</CommerceStack.Navigator>
+	);
 }
 
 function AccountNavigator(): React.JSX.Element {
-  return (
-    <AccountStack.Navigator screenOptions={stackScreenOpts}>
-      <AccountStack.Screen name="Settings" component={SettingsScreen} />
-      <AccountStack.Screen name="Privacy" component={PrivacyScreen} />
-      <AccountStack.Screen name="Help" component={HelpScreen} />
-      <AccountStack.Screen name="About" component={AboutScreen} />
-      <AccountStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
-      <AccountStack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
-      <AccountStack.Screen name="Verification" component={VerificationScreen} />
-      <AccountStack.Screen
-        name="EmailVerification"
-        component={EmailVerificationScreen}
-        options={{ title: 'Verify email', presentation: 'modal' }}
-      />
-      <AccountStack.Screen
-        name="VerificationId"
-        options={{ headerShown: false, title: 'ID Verification', presentation: 'modal' }}
-      >
-        {() => <VerificationIdScreen />}
-      </AccountStack.Screen>
-      <AccountStack.Screen name="Subscription" component={SubscriptionScreen} />
-      <AccountStack.Screen name="SocialLinking" component={SocialLinkingScreen} />
-      <AccountStack.Screen
-        name="ProfileEdit"
-        component={ProfileEditScreen}
-        options={{ headerShown: false, title: 'Edit profile' }}
-      />
-      <AccountStack.Screen name="Photos" component={PhotosScreen} />
-    </AccountStack.Navigator>
-  );
+	return (
+		<AccountStack.Navigator screenOptions={stackScreenOpts}>
+			<AccountStack.Screen name="Settings" component={SettingsScreen} />
+			<AccountStack.Screen name="Privacy" component={PrivacyScreen} />
+			<AccountStack.Screen name="Help" component={HelpScreen} />
+			<AccountStack.Screen name="About" component={AboutScreen} />
+			<AccountStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+			<AccountStack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
+			<AccountStack.Screen name="Verification" component={VerificationScreen} />
+			<AccountStack.Screen
+				name="EmailVerification"
+				component={EmailVerificationScreen}
+				options={{ title: 'Verify email', presentation: 'modal' }}
+			/>
+			<AccountStack.Screen
+				name="VerificationId"
+				options={{ headerShown: false, title: 'ID Verification', presentation: 'modal' }}
+			>
+				{() => <VerificationIdScreen />}
+			</AccountStack.Screen>
+			<AccountStack.Screen name="Subscription" component={SubscriptionScreen} />
+			<AccountStack.Screen name="SocialLinking" component={SocialLinkingScreen} />
+			<AccountStack.Screen
+				name="ProfileEdit"
+				component={ProfileEditScreen}
+				options={{ headerShown: false, title: 'Edit profile' }}
+			/>
+			<AccountStack.Screen name="Photos" component={PhotosScreen} />
+		</AccountStack.Navigator>
+	);
 }
 
 function SocialNavigator(): React.JSX.Element {
-  return (
-    <SocialStack.Navigator screenOptions={stackScreenOpts}>
-      <SocialStack.Screen
-        name="FriendsList"
-        component={FriendsListScreen}
-        options={{ headerShown: false, title: 'Friends' }}
-      />
-      <SocialStack.Screen
-        name="Suggestions"
-        component={SuggestionsScreen}
-        options={{ headerShown: false, title: 'Suggestions' }}
-      />
-    </SocialStack.Navigator>
-  );
+	return (
+		<SocialStack.Navigator screenOptions={stackScreenOpts}>
+			<SocialStack.Screen
+				name="FriendsList"
+				component={FriendsListScreen}
+				options={{ headerShown: false, title: 'Friends' }}
+			/>
+			<SocialStack.Screen
+				name="Suggestions"
+				component={SuggestionsScreen}
+				options={{ headerShown: false, title: 'Suggestions' }}
+			/>
+		</SocialStack.Navigator>
+	);
 }
 
 function EventsNavigator(): React.JSX.Element {
-  return (
-    <EventsStack.Navigator screenOptions={stackScreenOpts}>
-      <EventsStack.Screen name="EventDetail" component={EventDetailScreen} />
-      <EventsStack.Screen name="EventCreate" component={EventCreateScreen} />
-    </EventsStack.Navigator>
-  );
+	return (
+		<EventsStack.Navigator screenOptions={stackScreenOpts}>
+			<EventsStack.Screen name="EventDetail" component={EventDetailScreen} />
+			<EventsStack.Screen name="EventCreate" component={EventCreateScreen} />
+		</EventsStack.Navigator>
+	);
 }
 
 function MainTabs(): React.JSX.Element {
-  const chatUnread = useAppSelector((s) =>
-    s.chat.conversations.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0),
-  );
+	const chatUnread = useAppSelector((s) =>
+		s.chat.conversations.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0),
+	);
 
-  return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colors.bg,
-          borderTopColor: colors.surfaceAlt,
-          height: 64,
-          paddingTop: 6,
-        },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textFaint,
-        tabBarIcon: ({ color }) => {
-          const icons = {
-            Map: 'map-marker-radius',
-            Pulse: 'pulse',
-            Profile: 'account-circle-outline',
-          } as const;
+	return (
+		<Tab.Navigator
+			screenOptions={({ route }) => ({
+				headerShown: false,
+				tabBarStyle: {
+					backgroundColor: colors.bg,
+					borderTopColor: colors.surfaceAlt,
+					height: 64,
+					paddingTop: 6,
+				},
+				tabBarActiveTintColor: colors.primary,
+				tabBarInactiveTintColor: colors.textFaint,
+				tabBarIcon: ({ color }) => {
+					const icons = {
+						Map: 'map-marker-radius',
+						Pulse: 'pulse',
+						Profile: 'account-circle-outline',
+					} as const;
 
-          const iconName = icons[route.name as keyof typeof icons] ?? 'circle';
-          return (
-            <MaterialCommunityIcons name={iconName} size={24} color={color} />
-          );
-        },
-      })}
-    >
-      <Tab.Screen name="Map" component={MapScreen} />
-      <Tab.Screen
-        name="Pulse"
-        component={PulseScreen}
-        options={
-          chatUnread > 0
-            ? {
-                tabBarBadge: chatUnread > 99 ? '99+' : chatUnread,
-                tabBarBadgeStyle: {
-                  backgroundColor: colors.danger,
-                  color: colors.textPrimary,
-                  fontSize: 11,
-                  fontWeight: '700' as const,
-                },
-              }
-            : {}
-        }
-      />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-    </Tab.Navigator>
-  );
+					const iconName = icons[route.name as keyof typeof icons] ?? 'circle';
+					return (
+						<MaterialCommunityIcons name={iconName} size={24} color={color} />
+					);
+				},
+			})}
+		>
+			<Tab.Screen name="Map" component={MapScreen} />
+			<Tab.Screen
+				name="Pulse"
+				component={PulseScreen}
+				options={
+					chatUnread > 0
+						? {
+							tabBarBadge: chatUnread > 99 ? '99+' : chatUnread,
+							tabBarBadgeStyle: {
+								backgroundColor: colors.danger,
+								color: colors.textPrimary,
+								fontSize: 11,
+								fontWeight: '700' as const,
+							},
+						}
+						: {}
+				}
+			/>
+			<Tab.Screen name="Profile" component={ProfileScreen} />
+		</Tab.Navigator>
+	);
 }
 
 export function AppNavigator(): React.JSX.Element {
-  const dispatch = useAppDispatch();
-  const user = useAppSelector(s => s.auth.user);
-  const restoring = useAppSelector(s => s.auth.restoring);
-  const profileSetupComplete = useAppSelector(s => s.auth.profileSetupComplete);
-  const prevUserRef = useRef<string | null>(null);
+	const dispatch = useAppDispatch();
+	const user = useAppSelector(s => s.auth.user);
+	const restoring = useAppSelector(s => s.auth.restoring);
+	const profileSetupComplete = useAppSelector(s => s.auth.profileSetupComplete);
+	const prevUserRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    void dispatch(restoreSession());
-  }, [dispatch]);
+	useEffect(() => {
+		void dispatch(restoreSession());
+	}, [dispatch]);
 
-  useEffect(() => {
-    if (user && prevUserRef.current !== user.id) {
-      prevUserRef.current = user.id;
-      void registerPushToken();
-      void pingGamification();
-      return setupNotificationHandlers((screen, params) => {
-        openViaRef(screen as Parameters<typeof openViaRef>[0], params);
-      });
-    }
-    if (!user) prevUserRef.current = null;
-  }, [user]);
+	useEffect(() => {
+		if (user && prevUserRef.current !== user.id) {
+			prevUserRef.current = user.id;
+			void registerPushToken();
+			void pingGamification();
+			return setupNotificationHandlers((screen, params) => {
+				openViaRef(screen as Parameters<typeof openViaRef>[0], params);
+			});
+		}
+		if (!user) prevUserRef.current = null;
+	}, [user]);
 
-  useEffect(() => {
-    if (!user || restoring) return;
-    let cancelled = false;
-    const t = setTimeout(() => {
-      void (async () => {
-        const phone = await takePendingPhoneVerify();
-        if (cancelled || !phone) return;
-        openViaRef('Verification', { initialPhone: phone });
-      })();
-    }, 700);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [user, restoring]);
+	useEffect(() => {
+		if (!user || restoring) return;
+		let cancelled = false;
+		const t = setTimeout(() => {
+			void (async () => {
+				const phone = await takePendingPhoneVerify();
+				if (cancelled || !phone) return;
+				openViaRef('Verification', { initialPhone: phone });
+			})();
+		}, 700);
+		return () => {
+			cancelled = true;
+			clearTimeout(t);
+		};
+	}, [user, restoring]);
 
-  if (restoring && user === null) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+	if (restoring && user === null) {
+		return (
+			<View
+				style={{
+					flex: 1,
+					backgroundColor: colors.bg,
+					alignItems: 'center',
+					justifyContent: 'center',
+				}}
+			>
+				<ActivityIndicator size="large" color={colors.primary} />
+			</View>
+		);
+	}
 
-  return (
-    <NavigationContainer ref={navigationRef}>
-      <BottomSheetModalProvider>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {user ? (
-            <>
-              {!profileSetupComplete && (
-                <Stack.Screen
-                  name="ProfileCreation"
-                  component={ProfileCreationScreen}
-                />
-              )}
-              <Stack.Screen name="Main" component={MainTabs} />
-              <Stack.Screen name="Chat" component={ChatScreen} />
-              <Stack.Screen
-                name="AlertComposer"
-                component={AlertComposerScreen}
-              />
-              <Stack.Screen name="UserProfile" component={UserProfileScreen} />
-              <Stack.Screen
-                name="MutualFriends"
-                component={MutualFriendsScreen}
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />
-              <Stack.Screen
-                name="Interactions"
-                component={InteractionsScreen}
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="Gamification"
-                component={GamificationNavigator}
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="Commerce"
-                component={CommerceNavigator}
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="Account"
-                component={AccountNavigator}
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="Social"
-                component={SocialNavigator}
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="Events"
-                component={EventsNavigator}
-                options={{ headerShown: false }}
-              />
-            </>
-          ) : (
-            <Stack.Screen name="Auth" component={AuthScreen} />
-          )}
-        </Stack.Navigator>
-        {user ? <AmbientToastHost /> : null}
-        <AppAlertHost />
-      </BottomSheetModalProvider>
-    </NavigationContainer>
-  );
+	return (
+		<NavigationContainer ref={navigationRef}>
+			<BottomSheetModalProvider>
+				<Stack.Navigator screenOptions={{ headerShown: false }}>
+					{user ? (
+						<>
+							{!profileSetupComplete && (
+								<Stack.Screen
+									name="ProfileCreation"
+									component={ProfileCreationScreen}
+								/>
+							)}
+							<Stack.Screen name="Main" component={MainTabs} />
+							<Stack.Screen name="Chat" component={ChatScreen} />
+							<Stack.Screen
+								name="AlertComposer"
+								component={AlertComposerScreen}
+							/>
+							<Stack.Screen name="UserProfile" component={UserProfileScreen} />
+							<Stack.Screen
+								name="MutualFriends"
+								component={MutualFriendsScreen}
+								options={{ headerShown: false }}
+							/>
+							<Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />
+							<Stack.Screen
+								name="Interactions"
+								component={InteractionsScreen}
+								options={{ headerShown: false }}
+							/>
+							<Stack.Screen
+								name="Gamification"
+								component={GamificationNavigator}
+								options={{ headerShown: false }}
+							/>
+							<Stack.Screen
+								name="Commerce"
+								component={CommerceNavigator}
+								options={{ headerShown: false }}
+							/>
+							<Stack.Screen
+								name="Account"
+								component={AccountNavigator}
+								options={{ headerShown: false }}
+							/>
+							<Stack.Screen
+								name="Social"
+								component={SocialNavigator}
+								options={{ headerShown: false }}
+							/>
+							<Stack.Screen
+								name="Events"
+								component={EventsNavigator}
+								options={{ headerShown: false }}
+							/>
+						</>
+					) : (
+						<Stack.Screen name="Auth" component={AuthScreen} />
+					)}
+				</Stack.Navigator>
+				{user ? <AmbientToastHost /> : null}
+				<AppAlertHost />
+			</BottomSheetModalProvider>
+		</NavigationContainer>
+	);
 }
