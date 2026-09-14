@@ -98,11 +98,6 @@ function formatDistanceMeters(meters: number): string {
 	return `${(meters / 1000).toFixed(meters < 10_000 ? 1 : 0)} km`;
 }
 
-function formatDistanceMeters(meters: number): string {
-  if (meters < 1000) return `${Math.round(meters)} m`;
-  return `${(meters / 1000).toFixed(meters < 10_000 ? 1 : 0)} km`;
-}
-
 type UserEntityPoint = EntityPoint & { kind: 'user'; meta: UserMeta };
 type EventEntityPoint = EntityPoint & { kind: 'event'; meta: EventMeta };
 type ListingEntityPoint = EntityPoint & { kind: 'listing'; meta: ListingMeta };
@@ -538,9 +533,9 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 }
 
 function EventCard({
-					   point,
-					   onClose,
-				   }: {
+	point,
+	onClose,
+}: {
 	point: EventEntityPoint;
 	onClose: () => void;
 }): React.JSX.Element {
@@ -574,32 +569,24 @@ function EventCard({
 			<Text style={styles.entityTitle} numberOfLines={2}>
 				{title}
 			</Text>
-			<View style={styles.metaRow}>
-				<Text style={styles.metaText}>{formatStartsAt(meta.startsAt)}</Text>
-				<Text style={styles.metaDot}>·</Text>
-				<Text style={styles.metaText}>{capacity}</Text>
-			</View>
+			<Text style={styles.entityMeta}>{formatStartsAt(meta.startsAt)}</Text>
+			<Text style={styles.entityMeta}>{capacity}</Text>
 			<View style={styles.entityActions}>
 				<TouchableOpacity
-					style={[
-						styles.primaryBtn,
-						styles.entityPrimaryBtn,
-						styles.eventPrimaryBtn,
-						styles.entityActionPrimary,
-					]}
+					style={[styles.primaryBtn, styles.entityPrimaryBtn, { backgroundColor: colors.entityEvent }]}
 					onPress={openDetail}
 					accessibilityRole="button"
 					accessibilityLabel="View event"
 				>
-					<Text style={styles.primaryBtnText}>View event</Text>
+					<Text style={styles.primaryBtnText}>View</Text>
 				</TouchableOpacity>
 				<TouchableOpacity
-					style={[styles.profileBtn, styles.entityActionSecondary]}
+					style={styles.secondaryBtn}
 					onPress={onClose}
 					accessibilityRole="button"
 					accessibilityLabel="Close"
 				>
-					<Text style={styles.profileBtnText}>Close</Text>
+					<Text style={styles.secondaryBtnText}>Close</Text>
 				</TouchableOpacity>
 			</View>
 		</View>
@@ -607,20 +594,23 @@ function EventCard({
 }
 
 function ListingCard({
-						 point,
-						 onClose,
-					 }: {
+	point,
+	onClose,
+}: {
 	point: ListingEntityPoint;
 	onClose: () => void;
 }): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
 	const meta = point.meta;
 	const title = meta.title?.trim() || 'Listing';
-	const isBuy = meta.mode === 'buy';
-	const mode = isBuy ? 'Wanted' : 'For sale';
-	const price = formatPrice(meta.priceCents, meta.currency);
-	const category = meta.category?.trim() || null;
-	const thumbUrl = meta.thumbnailUrl?.trim() || null;
+	const thumbUrl = meta.thumbUrl?.trim() || null;
+	const isWanted = meta.listingMode === 'wanted';
+	const priceLabel =
+		meta.priceCents != null
+			? formatPrice(meta.priceCents, meta.currency ?? 'USD')
+			: isWanted
+				? 'Wanted'
+				: 'Price on request';
 
 	const openDetail = (): void => {
 		onClose();
@@ -629,72 +619,54 @@ function ListingCard({
 
 	return (
 		<View style={styles.sheet}>
-			<View style={styles.listingTop}>
-				{thumbUrl ? (
-					<Image
-						source={{ uri: thumbUrl }}
-						style={styles.listingThumb}
-						accessibilityLabel={`${title} photo`}
-					/>
-				) : (
-					<View style={[styles.listingThumb, styles.listingThumbPlaceholder]}>
-						<Text style={styles.listingThumbPlaceholderText}>{isBuy ? '🔍' : '🛍'}</Text>
-					</View>
-				)}
-				<View style={styles.listingTopText}>
-					<View style={styles.kindHeader}>
-						<View
-							style={[
-								styles.kindDot,
-								isBuy ? styles.kindDotWanted : styles.kindDotListing,
-							]}
-						/>
-						<Text style={[styles.kindLabel, isBuy ? styles.kindLabelWanted : undefined]}>
-							{mode}
-						</Text>
-					</View>
-					<Text style={styles.entityTitle} numberOfLines={2}>
-						{title}
-					</Text>
-					<View style={styles.metaRow}>
-						<Text style={styles.priceText}>{price}</Text>
-						{category ? (
-							<>
-								<Text style={styles.metaDot}>·</Text>
-								<Text style={styles.metaText}>{category}</Text>
-							</>
-						) : null}
-					</View>
-				</View>
+			{thumbUrl ? (
+				<Image
+					source={{ uri: thumbUrl }}
+					style={styles.entityCover}
+					accessibilityLabel={`${title} photo`}
+				/>
+			) : null}
+			<View style={styles.kindHeader}>
+				<View
+					style={[
+						styles.kindDot,
+						isWanted ? styles.kindDotWanted : styles.kindDotListing,
+					]}
+				/>
+				<Text style={styles.kindLabel}>{isWanted ? 'Wanted' : 'For sale'}</Text>
 			</View>
+			<Text style={styles.entityTitle} numberOfLines={2}>
+				{title}
+			</Text>
+			<Text style={styles.entityMeta}>{priceLabel}</Text>
 			<View style={styles.entityActions}>
 				<TouchableOpacity
 					style={[
 						styles.primaryBtn,
 						styles.entityPrimaryBtn,
-						styles.listingPrimaryBtn,
-						styles.entityActionPrimary,
+						{
+							backgroundColor: isWanted ? colors.entityWanted : colors.action,
+						},
 					]}
 					onPress={openDetail}
 					accessibilityRole="button"
 					accessibilityLabel="View listing"
 				>
-					<Text style={styles.primaryBtnText}>View listing</Text>
+					<Text style={styles.primaryBtnText}>View</Text>
 				</TouchableOpacity>
 				<TouchableOpacity
-					style={[styles.profileBtn, styles.entityActionSecondary]}
+					style={styles.secondaryBtn}
 					onPress={onClose}
 					accessibilityRole="button"
 					accessibilityLabel="Close"
 				>
-					<Text style={styles.profileBtnText}>Close</Text>
+					<Text style={styles.secondaryBtnText}>Close</Text>
 				</TouchableOpacity>
 			</View>
 		</View>
 	);
 }
 
-/** Content only — host mounts inside BottomSheetModal. */
 export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): React.JSX.Element {
 	if (point.kind === 'user') {
 		return (
