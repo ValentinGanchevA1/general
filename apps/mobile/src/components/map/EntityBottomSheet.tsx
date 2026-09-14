@@ -93,6 +93,11 @@ function formatPrice(cents: number, currency: string): string {
   }
 }
 
+function formatDistanceMeters(meters: number): string {
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${(meters / 1000).toFixed(meters < 10_000 ? 1 : 0)} km`;
+}
+
 type UserEntityPoint = EntityPoint & { kind: 'user'; meta: UserMeta };
 type EventEntityPoint = EntityPoint & { kind: 'event'; meta: EventMeta };
 type ListingEntityPoint = EntityPoint & { kind: 'listing'; meta: ListingMeta };
@@ -195,14 +200,23 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
   const isFriend = meta.isFriend === true;
   const idVerified = profile?.idVerified === true;
   const ringVariant = idVerified ? 'verified' : isFriend ? 'friend' : 'brand';
+  const distanceMeters = profile?.distanceMeters;
   const subtitle = (() => {
     if (profile == null) return null;
     const parts: string[] = [];
     if (profile.age != null) parts.push(`${profile.age}`);
     const home = [profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ');
     if (home) parts.push(home);
+    if (distanceMeters != null && distanceMeters >= 0) {
+      parts.push(formatDistanceMeters(distanceMeters));
+    }
     return parts.length > 0 ? parts.join(' · ') : null;
   })();
+
+  /** Kind-aware primary: Message when an open chat exists; Wave for cold contacts. */
+  const messageAllowed = canMessage !== 'none' && !blocked;
+  const waveAllowed = Boolean(onWave) && !blocked;
+  const preferMessagePrimary = canMessage === 'chat' && messageAllowed;
 
   const openProfile = (): void => {
     onClose();
@@ -305,6 +319,62 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
     }
   };
 
+  const waveButton = waveAllowed ? (
+    <TouchableOpacity
+      key="wave"
+      style={[
+        styles.primaryBtn,
+        preferMessagePrimary ? styles.secondarySolidBtn : styles.waveBtn,
+        waving ? styles.btnDisabled : undefined,
+        styles.ctaFlex,
+      ]}
+      onPress={onWave}
+      disabled={waving}
+      accessibilityRole="button"
+      accessibilityLabel="Wave"
+    >
+      <Text
+        style={preferMessagePrimary ? styles.secondarySolidBtnText : styles.primaryBtnText}
+      >
+        {waving ? '…' : 'Wave'}
+      </Text>
+    </TouchableOpacity>
+  ) : null;
+
+  const messageButton = messageAllowed ? (
+    <TouchableOpacity
+      key="message"
+      style={[
+        styles.primaryBtn,
+        preferMessagePrimary ? styles.waveBtn : styles.messageBtn,
+        opening ? styles.btnDisabled : undefined,
+        styles.ctaFlex,
+      ]}
+      onPress={() => void onMessage()}
+      disabled={opening}
+      accessibilityRole="button"
+      accessibilityLabel="Message"
+    >
+      <Text style={styles.primaryBtnText}>{opening ? '…' : 'Message'}</Text>
+    </TouchableOpacity>
+  ) : null;
+
+  const profileButton = (
+    <TouchableOpacity
+      key="profile"
+      style={[styles.profileBtn, styles.ctaFlexShrink]}
+      onPress={openProfile}
+      accessibilityRole="button"
+      accessibilityLabel="Open profile"
+    >
+      <Text style={styles.profileBtnText}>Profile</Text>
+    </TouchableOpacity>
+  );
+
+  const actionOrder = preferMessagePrimary
+    ? [messageButton, waveButton, profileButton]
+    : [waveButton, messageButton, profileButton];
+
   return (
     <View style={styles.sheet}>
       <View style={styles.userHeader}>
@@ -378,38 +448,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
           </Text>
         </TouchableOpacity>
       ) : null}
-      <View style={styles.actions}>
-        {onWave && !blocked ? (
-          <TouchableOpacity
-            style={[styles.primaryBtn, styles.waveBtn, waving ? styles.btnDisabled : undefined]}
-            onPress={onWave}
-            disabled={waving}
-            accessibilityRole="button"
-            accessibilityLabel="Wave"
-          >
-            <Text style={styles.primaryBtnText}>{waving ? '…' : 'Wave'}</Text>
-          </TouchableOpacity>
-        ) : null}
-        {canMessage !== 'none' && !blocked ? (
-          <TouchableOpacity
-            style={[styles.primaryBtn, styles.messageBtn, opening ? styles.btnDisabled : undefined]}
-            onPress={() => void onMessage()}
-            disabled={opening}
-            accessibilityRole="button"
-            accessibilityLabel="Message"
-          >
-            <Text style={styles.primaryBtnText}>{opening ? '…' : 'Message'}</Text>
-          </TouchableOpacity>
-        ) : null}
-        <TouchableOpacity
-          style={styles.profileBtn}
-          onPress={openProfile}
-          accessibilityRole="button"
-          accessibilityLabel="Open profile"
-        >
-          <Text style={styles.profileBtnText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
+      <View style={styles.actions}>{actionOrder}</View>
       {!fetching && profile != null ? (
         <View style={styles.trustBlock}>
           <View style={styles.trustHeader}>
@@ -512,7 +551,12 @@ function EventCard({
       </View>
       <View style={styles.entityActions}>
         <TouchableOpacity
-          style={[styles.primaryBtn, styles.entityPrimaryBtn, styles.entityActionPrimary]}
+          style={[
+            styles.primaryBtn,
+            styles.entityPrimaryBtn,
+            styles.eventPrimaryBtn,
+            styles.entityActionPrimary,
+          ]}
           onPress={openDetail}
           accessibilityRole="button"
           accessibilityLabel="View event"

@@ -126,6 +126,8 @@ export const styles = StyleSheet.create({
   achievementIcon: { fontSize: 16 },
   bio: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  ctaFlex: { flexGrow: 1 },
+  ctaFlexShrink: { flexGrow: 0 },
   primaryBtn: {
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -135,6 +137,17 @@ export const styles = StyleSheet.create({
   },
   waveBtn: { backgroundColor: colors.primary },
   messageBtn: { backgroundColor: colors.action },
+  /** Secondary solid when Message is primary (open chat) — Wave stays available. */
+  secondarySolidBtn: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  secondarySolidBtnText: {
+    color: colors.textPrimary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
   btnDisabled: { opacity: 0.5 },
   primaryBtnText: { color: colors.onPrimary, fontWeight: '700', fontSize: 14 },
   profileBtn: {
@@ -171,6 +184,9 @@ export const styles = StyleSheet.create({
   entityPrimaryBtn: { alignSelf: 'stretch', marginTop: 4 },
   listingPrimaryBtn: {
     backgroundColor: colors.action,
+  },
+  eventPrimaryBtn: {
+    backgroundColor: colors.entityEvent,
   },
   entityCover: {
     width: '100%',
