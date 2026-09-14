@@ -1,6 +1,7 @@
 import { CHALLENGE_CARD_HEIGHT } from '@/features/gamification/DailyChallengeCard';
 
 import {
+  COMBINED_FILTER_ROW_HEIGHT,
   FAB_BOTTOM,
   INTERACTION_BADGE_SIZE,
   MAP_CHROME,
@@ -10,7 +11,9 @@ import {
   mapChallengeTop,
   mapChromeTops,
   mapFabBottom,
+  mapFilterRowTop,
   mapNudgeTop,
+  mapTrendingTop,
 } from '../mapChromeLayout';
 
 describe('mapChromeLayout', () => {
@@ -22,6 +25,7 @@ describe('mapChromeLayout', () => {
     expect(MAP_CHROME.nudgeHeight).toBe(NUDGE_CARD_HEIGHT);
     expect(MAP_CHROME.badgeSize).toBe(INTERACTION_BADGE_SIZE);
     expect(MAP_CHROME.fabBottom).toBe(FAB_BOTTOM);
+    expect(MAP_CHROME.combinedFilterRowHeight).toBe(COMBINED_FILTER_ROW_HEIGHT);
   });
 
   it('stacks challenge under safe area with gap', () => {
@@ -61,6 +65,36 @@ describe('mapChromeLayout', () => {
     expect(tops.badge).toBe(tops.challenge);
   });
 
+  it('mapFilterRowTop sits under badge (closed sheet)', () => {
+    const badge = mapBadgeTop(insetsTop, false);
+    const filter = mapFilterRowTop(insetsTop, false);
+    expect(filter).toBe(badge + INTERACTION_BADGE_SIZE + MAP_CHROME_GAP);
+    expect(filter).toBeGreaterThan(badge);
+  });
+
+  it('mapFilterRowTop lifts with badge when sheet open (no challenge/nudge gap)', () => {
+    const closed = mapFilterRowTop(insetsTop, false);
+    const open = mapFilterRowTop(insetsTop, true);
+    expect(open).toBe(
+      mapBadgeTop(insetsTop, true) + INTERACTION_BADGE_SIZE + MAP_CHROME_GAP,
+    );
+    expect(open).toBeLessThan(closed);
+  });
+
+  it('mapTrendingTop sits under combined filter row and is sheet-aware', () => {
+    const closedFilter = mapFilterRowTop(insetsTop, false);
+    const closedTrending = mapTrendingTop(insetsTop, false);
+    expect(closedTrending).toBe(
+      closedFilter + COMBINED_FILTER_ROW_HEIGHT + MAP_CHROME_GAP,
+    );
+
+    const openTrending = mapTrendingTop(insetsTop, true);
+    expect(openTrending).toBeLessThan(closedTrending);
+    expect(openTrending).toBe(
+      mapFilterRowTop(insetsTop, true) + COMBINED_FILTER_ROW_HEIGHT + MAP_CHROME_GAP,
+    );
+  });
+
   it('mapFabBottom adds safe area and optional offset', () => {
     expect(mapFabBottom(34)).toBe(FAB_BOTTOM + 34);
     expect(mapFabBottom(34, 88)).toBe(FAB_BOTTOM + 34 + 88);
@@ -70,5 +104,6 @@ describe('mapChromeLayout', () => {
     // Regression lock: if DailyChallengeCard height drifts, update export + this.
     expect(CHALLENGE_CARD_HEIGHT).toBe(56);
     expect(NUDGE_CARD_HEIGHT).toBe(56);
+    expect(COMBINED_FILTER_ROW_HEIGHT).toBe(44);
   });
 });
