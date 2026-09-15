@@ -27,6 +27,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { deleteJson, getJson, postJson } from '@/api/client';
 import { IdentityBlock } from '@/components/IdentityBlock';
+import { useAppSelector } from '@/hooks/redux';
 import { colors } from '@/theme';
 import { styles } from './EntityBottomSheet.styles';
 
@@ -154,8 +155,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 
   useEffect(() => {
     let cancelled = false;
-    // No sync setState in effect (react-hooks/set-state-in-effect).
-    // UserCard is keyed by point.id so mutual/opening/blocking reset on pin change.
     void (async () => {
       if (cancelled) return;
       await loadProfile(point.id);
@@ -213,7 +212,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
     return parts.length > 0 ? parts.join(' · ') : null;
   })();
 
-  /** Kind-aware primary: Message when an open chat exists; Wave for cold contacts. */
   const messageAllowed = canMessage !== 'none' && !blocked;
   const waveAllowed = Boolean(onWave) && !blocked;
   const preferMessagePrimary = canMessage === 'chat' && messageAllowed;
@@ -609,6 +607,8 @@ function ListingCard({
   onClose: () => void;
 }): React.JSX.Element {
   const navigation = useNavigation<Nav>();
+  const viewerId = useAppSelector((s) => s.auth.user?.id ?? null);
+  const [opening, setOpening] = useState(false);
   const meta = point.meta;
   const title = meta.title?.trim() || 'Listing';
   const isBuy = meta.mode === 'buy';
@@ -616,10 +616,40 @@ function ListingCard({
   const price = formatPrice(meta.priceCents, meta.currency);
   const category = meta.category?.trim() || null;
   const thumbUrl = meta.thumbnailUrl?.trim() || null;
+  const sellerId = meta.sellerId?.trim() || null;
+  const sellerName = meta.sellerDisplayName?.trim() || 'Seller';
+  const canMessageSeller =
+    sellerId != null && sellerId.length > 0 && viewerId != null && sellerId !== viewerId;
 
   const openDetail = (): void => {
     onClose();
     openRootScreen(navigation, 'ListingDetail', { listingId: point.id });
+  };
+
+  const onMessageSeller = async (): Promise<void> => {
+    if (!canMessageSeller || opening || sellerId == null) return;
+    setOpening(true);
+    try {
+      const res = await postJson<CreateConversationRequest, CreateConversationResponse>(
+        '/conversations',
+        { targetUserId: sellerId },
+      );
+      onClose();
+      openRootScreen(navigation, 'Chat', {
+        conversationId: res.conversationId,
+        otherUserName: sellerName,
+        otherUserId: sellerId,
+        requestPending: res.status === 'pending' && res.permission === 'request',
+      });
+    } catch (e) {
+      const msg =
+        e && typeof e === 'object' && 'message' in e
+          ? String((e as { message: unknown }).message)
+          : 'Try again in a moment.';
+      appAlert('Could not open chat', msg);
+    } finally {
+      setOpening(false);
+    }
   };
 
   return (
@@ -663,12 +693,29 @@ function ListingCard({
         </View>
       </View>
       <View style={styles.entityActions}>
+        {canMessageSeller ? (
+          <TouchableOpacity
+            style={[
+              styles.primaryBtn,
+              styles.entityPrimaryBtn,
+              styles.messageBtn,
+              styles.entityActionPrimary,
+              opening ? styles.btnDisabled : undefined,
+            ]}
+            onPress={() => void onMessageSeller()}
+            disabled={opening}
+            accessibilityRole="button"
+            accessibilityLabel="Message seller"
+          >
+            <Text style={styles.primaryBtnText}>{opening ? '…' : 'Message'}</Text>
+          </TouchableOpacity>
+        ) : null}
         <TouchableOpacity
           style={[
             styles.primaryBtn,
             styles.entityPrimaryBtn,
             styles.listingPrimaryBtn,
-            styles.entityActionPrimary,
+            canMessageSeller ? styles.entityActionSecondary : styles.entityActionPrimary,
           ]}
           onPress={openDetail}
           accessibilityRole="button"

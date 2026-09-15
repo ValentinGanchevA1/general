@@ -75,6 +75,13 @@ export interface ListingMeta {
   category: string;
   /** sell (default) | buy (wanted). Omitted on legacy rows → treat as sell. */
   mode?: ListingMode;
+  /**
+   * Listing owner. Present after migration 0041 on discovery points.
+   * Used by EntityBottomSheet Message seller (same chat path as user pins).
+   */
+  sellerId?: string;
+  /** Seller display name for chat header; paired with sellerId. */
+  sellerDisplayName?: string;
 }
 
 export type DiscoveryPoint = ClusterPoint | EntityPoint;
