@@ -8,7 +8,12 @@ export const NUDGE_CARD_HEIGHT = 56;
 export const INTERACTION_BADGE_SIZE = 44;
 export const MAP_CHROME_H_INSET = spacing.lg;
 export const FAB_BOTTOM = spacing.md;
+/** Gap between home-indicator / tab edge and the events rail bottom. */
 export const EVENTS_RAIL_BOTTOM = spacing.lg;
+/** Compact card row height (matches EventsRail card padding + 48 cover). */
+export const EVENTS_RAIL_CARD_HEIGHT = 64;
+/** Full vertical footprint of the rail when visible (card + bottom gap). */
+export const EVENTS_RAIL_HEIGHT = EVENTS_RAIL_BOTTOM + EVENTS_RAIL_CARD_HEIGHT;
 /** @deprecated Prefer COMBINED_FILTER_ROW_HEIGHT — kept for any residual callers. */
 export const LISTING_MODE_FILTER_HEIGHT = 40;
 export const MAP_SEARCH_BAR_HEIGHT = 44;
@@ -23,6 +28,8 @@ export const MAP_CHROME = {
 	hInset: MAP_CHROME_H_INSET,
 	fabBottom: FAB_BOTTOM,
 	eventsRailBottom: EVENTS_RAIL_BOTTOM,
+	eventsRailCardHeight: EVENTS_RAIL_CARD_HEIGHT,
+	eventsRailHeight: EVENTS_RAIL_HEIGHT,
 	searchBarHeight: MAP_SEARCH_BAR_HEIGHT,
 	combinedFilterRowHeight: COMBINED_FILTER_ROW_HEIGHT,
 } as const;
@@ -68,6 +75,26 @@ export function mapListingModeFilterTop(insetsTop: number): number {
 
 export function mapFabBottom(insetsBottom: number, bottomOffset = 0): number {
 	return FAB_BOTTOM + insetsBottom + bottomOffset;
+}
+
+/**
+ * Absolute bottom offset for the nearby EventsRail.
+ * Safe-area aware so cards clear the home indicator / gesture bar.
+ */
+export function mapEventsRailBottom(insetsBottom: number): number {
+	return EVENTS_RAIL_BOTTOM + insetsBottom;
+}
+
+/**
+ * Clearance above the rail for empty state / create nudge.
+ * When the rail is hidden, pass railVisible=false to sit closer to the edge.
+ */
+export function mapBottomOverlayClearance(
+	insetsBottom: number,
+	railVisible: boolean,
+): number {
+	const base = Math.max(insetsBottom, EVENTS_RAIL_BOTTOM);
+	return railVisible ? base + EVENTS_RAIL_CARD_HEIGHT + MAP_CHROME_GAP : base + 72;
 }
 
 export function mapChromeTops(
