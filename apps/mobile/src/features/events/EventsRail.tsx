@@ -1,35 +1,50 @@
 // apps/mobile/src/features/events/EventsRail.tsx
 //
 // Compact horizontal rail of nearby events on the map bottom edge.
-// No section label — cards speak for themselves. Create lives on the FAB.
-// Hidden when empty or while a map entity sheet is open (caller-gated).
+// No section label — cards speak for themselves.
+// Hidden when empty or while a map entity sheet is open.
+// Bottom offset is owned by mapChromeLayout (safe-area aware).
 
 import React from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { EventSummary, LatLng } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
+import {
+  EVENTS_RAIL_CARD_HEIGHT,
+  EVENTS_RAIL_HEIGHT as LAYOUT_RAIL_HEIGHT,
+  mapEventsRailBottom,
+} from '@/components/map/mapChromeLayout';
 import { useNearbyEvents } from './useEvents';
 import { formatEventDayShort } from './eventFormat';
-import { colors } from '@/theme';
+import { colors, spacing } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-/** Card row height + bottom inset — MapScreen lifts the FAB by this amount. */
-export const EVENTS_RAIL_HEIGHT = 16 /* bottom */ + 72; /* compact horizontal card */
+/** @deprecated Prefer EVENTS_RAIL_HEIGHT from mapChromeLayout. */
+export const EVENTS_RAIL_HEIGHT = LAYOUT_RAIL_HEIGHT;
 
-export function EventsRail({ location }: { location: LatLng | null }): React.JSX.Element | null {
+interface Props {
+  location: LatLng | null;
+  /** When true (entity sheet open), hide so cards do not fight the sheet. */
+  sheetOpen?: boolean;
+}
+
+export function EventsRail({ location, sheetOpen = false }: Props): React.JSX.Element | null {
   const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
   const { events } = useNearbyEvents(location);
+  const bottom = mapEventsRailBottom(insets.bottom);
 
-  if (!location || events.length === 0) return null;
+  if (sheetOpen || !location || events.length === 0) return null;
 
   return (
-    <View style={styles.wrap} pointerEvents="box-none">
+    <View style={[styles.wrap, { bottom }]} pointerEvents="box-none">
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -55,7 +70,13 @@ function EventCard({
   onPress: () => void;
 }): React.JSX.Element {
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={onPress}>
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.85}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${event.title}, ${formatEventDayShort(event.startsAt)}`}
+    >
       {event.coverUrl ? (
         <Image source={{ uri: event.coverUrl }} style={styles.cover} />
       ) : (
@@ -80,16 +101,25 @@ function EventCard({
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', left: 0, right: 0, bottom: 16 },
-  scroll: { paddingLeft: 12, paddingRight: 12 + 56 + 16, gap: 10 },
+  wrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 18,
+  },
+  scroll: {
+    paddingHorizontal: spacing.lg,
+    gap: 10,
+  },
   card: {
     width: 168,
+    height: EVENTS_RAIL_CARD_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    padding: 8,
+    paddingHorizontal: 8,
     borderRadius: 14,
-    backgroundColor: 'rgba(18,18,31,0.95)',
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
