@@ -538,6 +538,8 @@ function EventCard({
   onClose: () => void;
 }): React.JSX.Element {
   const navigation = useNavigation<Nav>();
+  const viewerId = useAppSelector((s) => s.auth.user?.id ?? null);
+  const [opening, setOpening] = useState(false);
   const meta = point.meta;
   const title = meta.title?.trim() || 'Event';
   const coverUrl = meta.coverUrl?.trim() || null;
@@ -545,10 +547,40 @@ function EventCard({
     meta.capacity != null && meta.capacity > 0
       ? `${meta.attendeeCount}/${meta.capacity} going`
       : `${meta.attendeeCount} going`;
+  const hostId = meta.hostId?.trim() || null;
+  const hostName = meta.hostDisplayName?.trim() || 'Host';
+  const canMessageHost =
+    hostId != null && hostId.length > 0 && viewerId != null && hostId !== viewerId;
 
   const openDetail = (): void => {
     onClose();
     openRootScreen(navigation, 'EventDetail', { eventId: point.id });
+  };
+
+  const onMessageHost = async (): Promise<void> => {
+    if (!canMessageHost || opening || hostId == null) return;
+    setOpening(true);
+    try {
+      const res = await postJson<CreateConversationRequest, CreateConversationResponse>(
+        '/conversations',
+        { targetUserId: hostId },
+      );
+      onClose();
+      openRootScreen(navigation, 'Chat', {
+        conversationId: res.conversationId,
+        otherUserName: hostName,
+        otherUserId: hostId,
+        requestPending: res.status === 'pending' && res.permission === 'request',
+      });
+    } catch (e) {
+      const msg =
+        e && typeof e === 'object' && 'message' in e
+          ? String((e as { message: unknown }).message)
+          : 'Try again in a moment.';
+      appAlert('Could not open chat', msg);
+    } finally {
+      setOpening(false);
+    }
   };
 
   return (
@@ -573,12 +605,29 @@ function EventCard({
         <Text style={styles.metaText}>{capacity}</Text>
       </View>
       <View style={styles.entityActions}>
+        {canMessageHost ? (
+          <TouchableOpacity
+            style={[
+              styles.primaryBtn,
+              styles.entityPrimaryBtn,
+              styles.messageBtn,
+              styles.entityActionPrimary,
+              opening ? styles.btnDisabled : undefined,
+            ]}
+            onPress={() => void onMessageHost()}
+            disabled={opening}
+            accessibilityRole="button"
+            accessibilityLabel="Message host"
+          >
+            <Text style={styles.primaryBtnText}>{opening ? '…' : 'Message'}</Text>
+          </TouchableOpacity>
+        ) : null}
         <TouchableOpacity
           style={[
             styles.primaryBtn,
             styles.entityPrimaryBtn,
             styles.eventPrimaryBtn,
-            styles.entityActionPrimary,
+            canMessageHost ? styles.entityActionSecondary : styles.entityActionPrimary,
           ]}
           onPress={openDetail}
           accessibilityRole="button"
