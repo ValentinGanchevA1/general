@@ -1,27 +1,25 @@
 // apps/mobile/src/features/nudges/useNudges.ts
 //
-// P3.1 leftover "nudges" — the last surfacing item on the gamification epic
-// (ROADMAP P3.1: optional "complete your verification" / streak nudges, no
-// net-new backend). Derives 0–1 contextual nudges purely from state the app
-// already loads (profile badges + gamification streak) and returns the highest
-// priority one for a banner to render. Dismissals are persisted with a per-nudge
-// cooldown so a dismissed nudge stays gone for a few days instead of nagging.
-//
-// The streak nudge celebrates *milestone* days (3/7/14/30/…) rather than
-// reminding "keep it going today" — the foreground `ping` already secures the
-// streak before the Map renders, so a daily reminder would be redundant nagging.
-// Eligibility lives in the pure, unit-tested `selectNudge` below.
+// Map activation + trust ladder nudges (ROADMAP P3.1 / activation).
+// Derives 0–1 contextual nudge from profile badges + gamification streak.
+// Priority: email → phone → ID → streak milestone.
+// Dismissals persist with per-nudge cooldown (no net-new backend).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import type { IdVerificationStatus } from '@g88/shared';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { useGamification } from '@/features/gamification/useGamification';
 import { colors } from '@/theme';
 
 /** Logical screens a nudge can deep-link to (resolved via openRootScreen). */
-type NudgeTarget = 'VerificationId' | 'Challenges';
+export type NudgeTarget =
+  | 'EmailVerification'
+  | 'Verification'
+  | 'VerificationId'
+  | 'Challenges';
 
 export interface Nudge {
   id: string;
@@ -43,17 +41,13 @@ export interface Nudge {
 
 const DISMISS_KEY = 'g88:nudges:dismissed';
 const DAY_MS = 24 * 60 * 60 * 1000;
-// Hold the verification nudge until the account is ~2 days old (post-D2). New
-// users get to explore before we ask them to verify (ROADMAP §P3.4).
-const VERIFY_NUDGE_MIN_AGE_MS = 2 * DAY_MS;
-// Streak days worth celebrating. The streak is *secured* by the foreground
-// `ping` (sets last_active_date = today) before the Map renders, so a
-// "keep it going today" reminder is both redundant and a daily nag. Instead we
-// celebrate on the day a milestone is reached — and since `currentStreak` only
-// equals each value on a single day, each milestone surfaces ~once naturally.
+// Soft hold before phone/ID nudges (explore first). Email is earlier — stories/chat soft gates.
+const VERIFY_EMAIL_MIN_AGE_MS = 1 * DAY_MS;
+const VERIFY_PHONE_MIN_AGE_MS = 2 * DAY_MS;
+const VERIFY_ID_MIN_AGE_MS = 2 * DAY_MS;
+// Streak days worth celebrating (secured by foreground ping — no daily nag).
 const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100, 180, 365];
 
-/** Celebratory one-liner that scales with the milestone. */
 function streakTitle(streak: number): string {
   if (streak >= 100) return `🔥 ${streak}-day streak — legendary!`;
   if (streak >= 30) return `🔥 ${streak}-day streak — incredible!`;
@@ -63,10 +57,14 @@ function streakTitle(streak: number): string {
 
 type DismissMap = Record<string, number>; // nudge id → epoch ms of last dismiss
 
-/** Inputs for {@link selectNudge} — everything it needs, no hooks/clock reads. */
+/** Inputs for pure selectNudge (unit-tested). */
 export interface NudgeInputs {
-  idVerificationStatus: string | undefined;
-  /** ISO account-creation timestamp, for the verification age gate. */
+  /** badges.email — true when email verified. */
+  emailVerified: boolean;
+  /** badges.phone — true when phone verified. */
+  phoneVerified: boolean;
+  idVerificationStatus: IdVerificationStatus | string | undefined;
+  /** ISO account-creation timestamp, for age gates. */
   createdAt: string | undefined;
   currentStreak: number;
   /** nudge id → epoch ms of last dismissal. */
@@ -75,13 +73,20 @@ export interface NudgeInputs {
   now: number;
 }
 
+function accountAgeMs(createdAt: string | undefined, now: number): number {
+  if (!createdAt) return 0;
+  const t = Date.parse(createdAt);
+  if (Number.isNaN(t)) return 0;
+  return Math.max(0, now - t);
+}
+
 /**
- * Pure nudge selection: build the candidate list in priority order (verification
- * outranks the streak celebration) and return the first that applies and isn't
- * on cooldown. Extracted from the hook so the eligibility rules are unit-testable
- * without rendering.
+ * Pure nudge selection: candidate list in priority order (activation ladder
+ * outranks streak) and return the first that applies and isn't on cooldown.
  */
 export function selectNudge({
+  emailVerified,
+  phoneVerified,
   idVerificationStatus: idStatus,
   createdAt,
   currentStreak,
@@ -89,28 +94,59 @@ export function selectNudge({
   now,
 }: NudgeInputs): Nudge | null {
   const candidates: Nudge[] = [];
+  const age = accountAgeMs(createdAt, now);
 
-  // Account age gate: only nudge once the user has had ~2 days to settle in.
-  // A rejected ID is time-sensitive, so it bypasses the age hold.
-  const oldEnoughToNudge = createdAt
-    ? now - Date.parse(createdAt) >= VERIFY_NUDGE_MIN_AGE_MS
-    : false;
-  if ((idStatus === 'none' && oldEnoughToNudge) || idStatus === 'rejected') {
+  // 1) Email — earliest activation step (story soft gate + trust baseline).
+  if (!emailVerified && age >= VERIFY_EMAIL_MIN_AGE_MS) {
+    candidates.push({
+      id: 'verify-email',
+      icon: 'email-check-outline',
+      accent: colors.primary,
+      label: 'Trust',
+      title: 'Verify your email to unlock stories and more reach',
+      cta: 'Verify',
+      target: 'EmailVerification',
+      cooldownDays: 2,
+    });
+  }
+
+  // 2) Phone — after email is done (or never had email path blocked).
+  if (emailVerified && !phoneVerified && age >= VERIFY_PHONE_MIN_AGE_MS) {
+    candidates.push({
+      id: 'verify-phone',
+      icon: 'cellphone-check',
+      accent: colors.primary,
+      label: 'Trust',
+      title: 'Add a verified phone for stronger identity on the map',
+      cta: 'Add phone',
+      target: 'Verification',
+      cooldownDays: 3,
+    });
+  }
+
+  // 3) ID — after phone when possible; rejected always bypasses age.
+  const idNone = idStatus === 'none' || idStatus == null || idStatus === undefined;
+  const idRejected = idStatus === 'rejected';
+  if (
+    emailVerified &&
+    phoneVerified &&
+    ((idNone && age >= VERIFY_ID_MIN_AGE_MS) || idRejected)
+  ) {
     candidates.push({
       id: 'verify-id',
       icon: 'shield-alert',
       accent: colors.entityEvent,
       label: 'Verification',
-      title:
-        idStatus === 'rejected'
-          ? 'Your ID was rejected — resubmit to get verified'
-          : 'Get ID-verified to build trust on the map',
-      cta: idStatus === 'rejected' ? 'Resubmit' : 'Verify',
+      title: idRejected
+        ? 'Your ID was rejected — resubmit to get verified'
+        : 'Get ID-verified to build trust on the map',
+      cta: idRejected ? 'Resubmit' : 'Verify',
       target: 'VerificationId',
       cooldownDays: 3,
     });
   }
 
+  // 4) Streak milestone celebration (lowest priority).
   if (STREAK_MILESTONES.includes(currentStreak)) {
     candidates.push({
       id: 'streak-milestone',
@@ -145,13 +181,8 @@ export function useNudges(): UseNudgesResult {
   const initialized = useAppSelector((s) => s.profile.initialized);
   const { summary } = useGamification();
   const [dismissed, setDismissed] = useState<DismissMap>({});
-  // Wall-clock is impure in render, so capture it in state and refresh it only
-  // in the async/event callbacks that change eligibility (initial load + each
-  // dismiss). Keeps cooldown math out of the render body.
   const [now, setNow] = useState(0);
 
-  // The Map surface doesn't otherwise load the profile; pull it once so the
-  // verification nudge has data without forcing the user onto the Profile tab.
   useEffect(() => {
     if (!initialized) void dispatch(fetchProfile());
   }, [initialized, dispatch]);
@@ -162,42 +193,50 @@ export function useNudges(): UseNudgesResult {
         const raw = await AsyncStorage.getItem(DISMISS_KEY);
         if (raw) setDismissed(JSON.parse(raw) as DismissMap);
       } catch {
-        // ignore corrupt/missing storage — nudges just aren't suppressed
+        // ignore corrupt/missing storage
       } finally {
         setNow(Date.now());
       }
     })();
   }, []);
 
-  const dismiss = useCallback(
-    (id: string) => {
-      const ts = Date.now();
-      setNow(ts);
-      setDismissed((prev) => {
-        const next = { ...prev, [id]: ts };
-        void AsyncStorage.setItem(DISMISS_KEY, JSON.stringify(next)).catch(() => {});
-        return next;
-      });
-    },
-    [],
-  );
+  const dismiss = useCallback((id: string) => {
+    const ts = Date.now();
+    setNow(ts);
+    setDismissed((prev) => {
+      const next = { ...prev, [id]: ts };
+      void AsyncStorage.setItem(DISMISS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
 
-  // Verification (trust) outranks the streak celebration; see selectNudge.
-  // Hold until `now` is initialized (>0) — on first render the dismissal map is
-  // still loading from AsyncStorage, so evaluating with `now=0`/empty dismissals
-  // could briefly flash a nudge the user already dismissed.
+  const emailVerified = profile?.badges?.email === true;
+  const phoneVerified = profile?.badges?.phone === true;
+  const idStatus = profile?.idVerificationStatus;
+  const createdAt = profile?.createdAt;
+
   const nudge = useMemo<Nudge | null>(
     () =>
       now === 0
         ? null
         : selectNudge({
-            idVerificationStatus: profile?.idVerificationStatus,
-            createdAt: profile?.createdAt,
+            emailVerified,
+            phoneVerified,
+            idVerificationStatus: idStatus,
+            createdAt,
             currentStreak: summary?.currentStreak ?? 0,
             dismissed,
             now,
           }),
-    [profile?.idVerificationStatus, profile?.createdAt, summary?.currentStreak, dismissed, now],
+    [
+      emailVerified,
+      phoneVerified,
+      idStatus,
+      createdAt,
+      summary?.currentStreak,
+      dismissed,
+      now,
+    ],
   );
 
   return { nudge, dismiss };
