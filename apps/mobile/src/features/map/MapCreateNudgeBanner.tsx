@@ -3,28 +3,30 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { mapBottomOverlayClearance } from '@/components/map/mapChromeLayout';
 import { colors, radius, spacing } from '@/theme';
 
 interface Props {
   onCreate: () => void;
   onDismiss: () => void;
+  /** When nearby events rail is visible, lift above it. */
+  railVisible?: boolean;
 }
 
 /**
  * One-shot bottom banner encouraging first create on an empty map.
- * Positioned above the events rail / home indicator.
+ * Positioned above the events rail / home indicator via mapChromeLayout.
  */
 export function MapCreateNudgeBanner({
   onCreate,
   onDismiss,
+  railVisible = false,
 }: Props): React.JSX.Element {
   const insets = useSafeAreaInsets();
+  const bottom = mapBottomOverlayClearance(insets.bottom, railVisible);
 
   return (
-    <View
-      style={[styles.wrap, { bottom: Math.max(insets.bottom, spacing.md) + 72 }]}
-      pointerEvents="box-none"
-    >
+    <View style={[styles.wrap, { bottom }]} pointerEvents="box-none">
       <View style={styles.card} accessibilityRole="summary">
         <Icon name="map-marker-plus-outline" size={22} color={colors.primary} />
         <View style={styles.body}>
