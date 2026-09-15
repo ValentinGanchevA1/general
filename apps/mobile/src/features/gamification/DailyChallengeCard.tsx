@@ -23,13 +23,19 @@ export const CHALLENGE_CARD_HEIGHT = 56;
 interface Props {
   /** Absolute top offset — owned by MapChrome layout. */
   top: number;
+  /**
+   * When provided, parent owns session dismiss (map chrome density stack).
+   * When omitted, card keeps local session dismiss.
+   */
+  onDismiss?: () => void;
 }
 
-export function DailyChallengeCard({ top }: Props): React.JSX.Element | null {
+export function DailyChallengeCard({ top, onDismiss }: Props): React.JSX.Element | null {
   const navigation = useNavigation<Nav>();
   const { challenges } = useChallenges();
-  const [dismissed, setDismissed] = useState(false);
+  const [localDismissed, setLocalDismissed] = useState(false);
 
+  const dismissed = onDismiss != null ? false : localDismissed;
   if (dismissed) return null;
   const next = challenges.find((c) => !c.completed);
   if (!next) return null;
@@ -54,7 +60,14 @@ export function DailyChallengeCard({ top }: Props): React.JSX.Element | null {
             <Text style={styles.progressText}>{next.progress}/{next.target}</Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity hitSlop={10} style={styles.close} onPress={() => setDismissed(true)}>
+        <TouchableOpacity
+          hitSlop={10}
+          style={styles.close}
+          onPress={() => {
+            if (onDismiss) onDismiss();
+            else setLocalDismissed(true);
+          }}
+        >
           <Icon name="close" size={16} color={colors.textMuted} />
         </TouchableOpacity>
       </View>

@@ -73,7 +73,10 @@ import { sheetChrome, useSheetBackdrop } from '@/components/sheets';
 import {
 	mapFilterRowTop,
 	mapTrendingTop,
+	type MapTopStackVisibility,
 } from '@/components/map/mapChromeLayout';
+import { useNudges } from '@/features/nudges/useNudges';
+import { useChallenges } from '@/features/gamification/useChallenges';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
@@ -218,13 +221,10 @@ export function MapScreen(): React.JSX.Element {
 
 	const onEntityPress = useCallback((point: EntityPoint) => {
 		const id = `${point.kind}:${point.id}`;
-		// Clear the "already presented" gate so a re-tap after dismiss always presents.
-		// (onSheetDismiss also clears this; this covers the race where present was a no-op.)
 		if (presentedIdRef.current !== id) {
 			presentedIdRef.current = null;
 		}
 		setSelected(point);
-		// Present on every marker press. Same-id while already open → present() no-op, content updates.
 		InteractionManager.runAfterInteractions(() => {
 			try {
 				entitySheetRef.current?.present();
@@ -236,7 +236,6 @@ export function MapScreen(): React.JSX.Element {
 		});
 	}, []);
 
-	// When selection is set from focus (useMapFocus) rather than a marker press, still present.
 	useEffect(() => {
 		if (!selected) {
 			presentedIdRef.current = null;
@@ -276,7 +275,6 @@ export function MapScreen(): React.JSX.Element {
 
 	const { sendPresence, on } = useSocket();
 
-	// Depend on primitive lat/lng so GPS object identity churn does not reset the 30s interval.
 	const myLat = myCoords?.lat;
 	const myLng = myCoords?.lng;
 	useEffect(() => {
@@ -359,8 +357,6 @@ export function MapScreen(): React.JSX.Element {
 	}, [waveToast]);
 
 	const sheetOpen = selected != null;
-	// Continent-scale default region is not a real "empty nearby" — only city-ish
-	// deltas count so we don't stack empty + nudge over Europe/Africa.
 	const isCityScale =
 		region != null &&
 		region.latitudeDelta > 0 &&
@@ -381,8 +377,19 @@ export function MapScreen(): React.JSX.Element {
 		[onEntityPress],
 	);
 
-	const filterRowTop = mapFilterRowTop(insets.top, sheetOpen);
-	const trendingTop = mapTrendingTop(insets.top, sheetOpen);
+	const { nudge } = useNudges();
+	const { challenges } = useChallenges();
+	const [challengeDismissed, setChallengeDismissed] = useState(false);
+	const topStack = useMemo<MapTopStackVisibility>(
+		() => ({
+			challengeVisible:
+				!challengeDismissed && challenges.some((c) => !c.completed),
+			nudgeVisible: nudge != null,
+		}),
+		[challengeDismissed, challenges, nudge],
+	);
+	const filterRowTop = mapFilterRowTop(insets.top, sheetOpen, topStack);
+	const trendingTop = mapTrendingTop(insets.top, sheetOpen, topStack);
 
 	const openCreateNearby = useCallback(() => {
 		setCreateNearbyOpen(true);
@@ -431,6 +438,8 @@ export function MapScreen(): React.JSX.Element {
 				interactionUnread={interactionUnread}
 				onPressInteractions={() => openRootScreen(navigation, 'Interactions')}
 				sheetOpen={sheetOpen}
+				topStack={topStack}
+				onDismissChallenge={() => setChallengeDismissed(true)}
 			/>
 
 			{region ? (
