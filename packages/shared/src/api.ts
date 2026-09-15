@@ -65,6 +65,13 @@ export interface EventMeta {
   startsAt: string;
   attendeeCount: number;
   capacity: number | null;
+  /**
+   * Event host. Present after migration 0042 on discovery points.
+   * Used by EntityBottomSheet Message host (same chat path as user / seller).
+   */
+  hostId?: string;
+  /** Host display name for chat header; paired with hostId. */
+  hostDisplayName?: string;
 }
 
 export interface ListingMeta {
