@@ -6,6 +6,8 @@ import { STORY_LIMITS } from '@g88/shared';
 
 const IMAGE_PROGRESS_MS = 5_000;
 const VIDEO_SAFETY_MS = (STORY_LIMITS.videoMaxSeconds + 3) * 1_000;
+/** Auto-advance after a hard video error so the feed does not stall. */
+const VIDEO_ERROR_SKIP_MS = 3_000;
 
 export type StoryMediaKind = 'image' | 'video';
 
@@ -13,6 +15,11 @@ interface Args {
   visible: boolean;
   storyId: string | undefined;
   mediaType: StoryMediaKind | undefined;
+  /**
+   * Bump on Retry so timers/progress reset without changing storyId.
+   * Images ignore this (epoch only matters for video remount).
+   */
+  mediaEpoch?: number;
   /** When true, image timing freezes; video uses external `paused` prop. */
   held: boolean;
   onComplete: () => void;
@@ -26,6 +33,7 @@ export function useStoryProgress({
   visible,
   storyId,
   mediaType,
+  mediaEpoch = 0,
   held,
   onComplete,
 }: Args) {
@@ -37,7 +45,6 @@ export function useStoryProgress({
   const onCompleteRef = useRef(onComplete);
   const heldRef = useRef(held);
 
-  // Keep latest callbacks/flags in refs — update only in effects (react-hooks/refs).
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
@@ -86,7 +93,7 @@ export function useStoryProgress({
     [progressAnim, stopAnim],
   );
 
-  // Reset + start when the active story changes (held via heldRef — avoid restart-on-hold).
+  // Reset + start when the active story (or video retry epoch) changes.
   useEffect(() => {
     if (!visible || !storyId || !mediaType) return;
 
@@ -109,7 +116,16 @@ export function useStoryProgress({
       stopAnim();
       clearSafety();
     };
-  }, [visible, storyId, mediaType, progressAnim, stopAnim, clearSafety, startImageProgress]);
+  }, [
+    visible,
+    storyId,
+    mediaType,
+    mediaEpoch,
+    progressAnim,
+    stopAnim,
+    clearSafety,
+    startImageProgress,
+  ]);
 
   // Pause / resume image progress when hold changes
   useEffect(() => {
@@ -151,7 +167,7 @@ export function useStoryProgress({
 
   const onVideoError = useCallback(() => {
     clearSafety();
-    safetyTimer.current = setTimeout(() => onCompleteRef.current(), 1_500);
+    safetyTimer.current = setTimeout(() => onCompleteRef.current(), VIDEO_ERROR_SKIP_MS);
   }, [clearSafety]);
 
   const hardStop = useCallback(() => {
