@@ -20,6 +20,8 @@ import Video from 'react-native-video';
 
 import type { StoryCard, StoryReactionKind } from '@g88/shared';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { colors } from '@/theme';
 import { useAppDispatch } from '@/hooks/redux';
 import {
@@ -44,10 +46,15 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   const dispatch = useAppDispatch();
   const [index, setIndex] = useState(initialIndex);
   const [held, setHeld] = useState(false);
-  const [muted, setMuted] = useState(false);
+  const insets = useSafeAreaInsets();
+  /** Stories start muted (tap 🔊 to enable audio). */
+  const [muted, setMuted] = useState(true);
   const [chromeDimmed, setChromeDimmed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
+  const [videoBuffering, setVideoBuffering] = useState(false);
+  /** Bump to remount <Video> after Retry. */
+  const [videoEpoch, setVideoEpoch] = useState(0);
   const chromeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optionsRef = useRef<BottomSheetModal>(null);
   const optionsSnap = useMemo(() => ['22%'], []);
@@ -74,6 +81,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
       visible,
       storyId,
       mediaType,
+      mediaEpoch: videoEpoch,
       held,
       onComplete: goNext,
     });
@@ -97,6 +105,8 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
       setChromeDimmed(false);
       setVideoReady(mediaType !== 'video');
       setVideoFailed(false);
+      setVideoBuffering(false);
+      setVideoEpoch(0);
     });
     if (chromeTimer.current) clearTimeout(chromeTimer.current);
     chromeTimer.current = setTimeout(() => setChromeDimmed(true), 1_200);
@@ -140,18 +150,38 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   const handleVideoLoad = (data: Parameters<typeof onVideoLoad>[0]) => {
     setVideoFailed(false);
     setVideoReady(true);
+    setVideoBuffering(false);
     onVideoLoad(data);
   };
 
   const handleVideoError = () => {
     setVideoFailed(true);
     setVideoReady(true);
+    setVideoBuffering(false);
     onVideoError();
+  };
+
+  const handleVideoBuffer = (meta: { isBuffering: boolean }) => {
+    if (videoFailed) return;
+    setVideoBuffering(meta.isBuffering);
+  };
+
+  const onRetryVideo = () => {
+    hardStop();
+    setVideoFailed(false);
+    setVideoReady(false);
+    setVideoBuffering(false);
+    setVideoEpoch((e) => e + 1);
+  };
+
+  const onSkipFailedVideo = () => {
+    hardStop();
+    goNext();
   };
 
   return (
     <Modal visible={visible} animationType="fade" statusBarTranslucent>
-      <View style={styles.root}>
+      <View style={[styles.root, { paddingTop: Math.max(insets.top, 12) + 8 }]}>
         <ProgressRow
           stories={stories}
           index={index}
@@ -200,14 +230,14 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
           ) : (
             <>
               <Video
-                key={current.id}
+                key={`${current.id}:${videoEpoch}`}
                 source={{ uri: current.mediaUrl }}
                 style={styles.media}
                 resizeMode="cover"
                 controls={false}
                 muted={muted}
                 repeat={false}
-                paused={!visible || held}
+                paused={!visible || held || videoFailed}
                 playInBackground={false}
                 playWhenInactive={false}
                 ignoreSilentSwitch="ignore"
@@ -215,16 +245,37 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
                 onLoad={handleVideoLoad}
                 onProgress={onVideoProgress}
                 onError={handleVideoError}
+                onBuffer={handleVideoBuffer}
               />
-              {!videoReady ? (
+              {(!videoReady || videoBuffering) && !videoFailed ? (
                 <View style={styles.videoLoading} pointerEvents="none">
                   <ActivityIndicator color={colors.textPrimary} size="large" />
                 </View>
               ) : null}
               {videoFailed ? (
-                <View style={styles.videoFailed} pointerEvents="none">
+                <View style={styles.videoFailed} pointerEvents="box-none">
                   <Text style={styles.videoFailedTitle}>{"Couldn't play this video"}</Text>
-                  <Text style={styles.videoFailedBody}>Skipping in a moment…</Text>
+                  <Text style={styles.videoFailedBody}>
+                    Check your connection, or skip to the next story.
+                  </Text>
+                  <View style={styles.videoFailedActions}>
+                    <Pressable
+                      style={styles.videoFailedBtn}
+                      onPress={onRetryVideo}
+                      accessibilityRole="button"
+                      accessibilityLabel="Retry video"
+                    >
+                      <Text style={styles.videoFailedBtnText}>Retry</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.videoFailedBtn, styles.videoFailedBtnSecondary]}
+                      onPress={onSkipFailedVideo}
+                      accessibilityRole="button"
+                      accessibilityLabel="Skip story"
+                    >
+                      <Text style={styles.videoFailedBtnText}>Skip</Text>
+                    </Pressable>
+                  </View>
                 </View>
               ) : null}
             </>
@@ -333,7 +384,7 @@ function ProgressRow({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg, paddingTop: 48 },
+  root: { flex: 1, backgroundColor: colors.bg },
   progressRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 12 },
   progressTrack: {
     flex: 1,
@@ -383,6 +434,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 8,
     textAlign: 'center',
+  },
+  videoFailedActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  videoFailedBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: colors.primary,
+  },
+  videoFailedBtnSecondary: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  videoFailedBtnText: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
   },
   tapLeft: {
     position: 'absolute',
