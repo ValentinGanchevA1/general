@@ -176,3 +176,81 @@ describe('selectNudge — dismissal cooldown', () => {
     expect(n?.id).toBe('streak-milestone');
   });
 });
+
+describe('selectNudge — post-social activation boost', () => {
+  const postSocial = { at: NOW, source: 'wave' as const };
+
+  it('surfaces email immediately when post-social and account is young', () => {
+    const n = selectNudge(
+      inputs({
+        emailVerified: false,
+        phoneVerified: false,
+        idVerificationStatus: 'none',
+        createdAt: new Date(NOW - 1 * 60 * 60 * 1000).toISOString(),
+        postSocial,
+      }),
+    );
+    expect(n?.id).toBe('verify-email');
+    expect(n?.title).toMatch(/connected nearby/i);
+  });
+
+  it('uses message copy when source is message', () => {
+    const n = selectNudge(
+      inputs({
+        emailVerified: false,
+        createdAt: new Date(NOW - 1 * 60 * 60 * 1000).toISOString(),
+        postSocial: { at: NOW, source: 'message' },
+      }),
+    );
+    expect(n?.title).toMatch(/messaged someone/i);
+  });
+
+  it('boosts phone after email when post-social', () => {
+    const n = selectNudge(
+      inputs({
+        emailVerified: true,
+        phoneVerified: false,
+        createdAt: new Date(NOW).toISOString(),
+        postSocial,
+      }),
+    );
+    expect(n?.id).toBe('verify-phone');
+  });
+
+  it('boosts ID when email+phone done and post-social', () => {
+    const n = selectNudge(
+      inputs({
+        emailVerified: true,
+        phoneVerified: true,
+        idVerificationStatus: 'none',
+        createdAt: new Date(NOW).toISOString(),
+        postSocial,
+      }),
+    );
+    expect(n?.id).toBe('verify-id');
+  });
+
+  it('does not boost when fully verified', () => {
+    const n = selectNudge(
+      inputs({
+        emailVerified: true,
+        phoneVerified: true,
+        idVerificationStatus: 'verified',
+        postSocial,
+        currentStreak: 1,
+      }),
+    );
+    expect(n).toBeNull();
+  });
+
+  it('ignores expired post-social payload', () => {
+    const n = selectNudge(
+      inputs({
+        emailVerified: false,
+        createdAt: new Date(NOW - 1 * 60 * 60 * 1000).toISOString(),
+        postSocial: { at: NOW - 31 * 60 * 1000, source: 'wave' },
+      }),
+    );
+    expect(n).toBeNull();
+  });
+});
