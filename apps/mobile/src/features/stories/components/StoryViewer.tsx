@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -20,7 +20,7 @@ import Video from 'react-native-video';
 
 import type { StoryCard, StoryReactionKind } from '@g88/shared';
 
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 
 import { colors } from '@/theme';
 import { useAppDispatch } from '@/hooks/redux';
@@ -46,7 +46,13 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   const dispatch = useAppDispatch();
   const [index, setIndex] = useState(initialIndex);
   const [held, setHeld] = useState(false);
-  const insets = useSafeAreaInsets();
+  // Context fallback so unit tests (no SafeAreaProvider) do not throw.
+  const insets = useContext(SafeAreaInsetsContext) ?? {
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  };
   /** Stories start muted (tap 🔊 to enable audio). */
   const [muted, setMuted] = useState(true);
   const [chromeDimmed, setChromeDimmed] = useState(false);
