@@ -2,7 +2,8 @@
 //
 // Map activation + trust ladder nudges (ROADMAP P3.1 / activation).
 // Derives 0–1 contextual nudge from profile badges + gamification streak.
-// Priority: email → phone → ID → streak milestone.
+// Priority: post-social boost → email → phone → ID → streak milestone.
+// Post-social (after Wave/Message) bypasses age gates for the next trust step.
 // Dismissals persist with per-nudge cooldown (no net-new backend).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -13,6 +14,14 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { useGamification } from '@/features/gamification/useGamification';
 import { colors } from '@/theme';
+
+import {
+  clearPostSocialActivation,
+  getPostSocialActivation,
+  isPostSocialActive,
+  subscribePostSocialActivation,
+  type PostSocialPayload,
+} from './postSocialActivation';
 
 /** Logical screens a nudge can deep-link to (resolved via openRootScreen). */
 export type NudgeTarget =
@@ -71,6 +80,11 @@ export interface NudgeInputs {
   dismissed: DismissMap;
   /** Captured wall-clock (epoch ms). */
   now: number;
+  /**
+   * When set and within TTL, trust steps bypass age gates and use post-social copy.
+   * Armed after a successful Wave or Message.
+   */
+  postSocial?: PostSocialPayload | null;
 }
 
 function accountAgeMs(createdAt: string | undefined, now: number): number {
@@ -92,9 +106,56 @@ export function selectNudge({
   currentStreak,
   dismissed,
   now,
+  postSocial = null,
 }: NudgeInputs): Nudge | null {
   const candidates: Nudge[] = [];
   const age = accountAgeMs(createdAt, now);
+  const socialBoost = isPostSocialActive(postSocial, now);
+  const verb = postSocial?.source === 'message' ? 'messaged someone' : 'connected nearby';
+
+  // 0) Post-social boost — same ladder steps, no age gate, contextual copy.
+  if (socialBoost) {
+    if (!emailVerified) {
+      candidates.push({
+        id: 'verify-email',
+        icon: 'email-check-outline',
+        accent: colors.primary,
+        label: 'Trust',
+        title: `You just ${verb} — verify email so people can trust you`,
+        cta: 'Verify',
+        target: 'EmailVerification',
+        cooldownDays: 2,
+      });
+    } else if (!phoneVerified) {
+      candidates.push({
+        id: 'verify-phone',
+        icon: 'cellphone-check',
+        accent: colors.primary,
+        label: 'Trust',
+        title: `You just ${verb} — add a phone for stronger identity`,
+        cta: 'Add phone',
+        target: 'Verification',
+        cooldownDays: 3,
+      });
+    } else {
+      const idNone = idStatus === 'none' || idStatus == null || idStatus === undefined;
+      const idRejected = idStatus === 'rejected';
+      if (idNone || idRejected) {
+        candidates.push({
+          id: 'verify-id',
+          icon: 'shield-alert',
+          accent: colors.entityEvent,
+          label: 'Verification',
+          title: idRejected
+            ? 'Your ID was rejected — resubmit to get verified'
+            : `You're active nearby — get ID-verified for the trust badge`,
+          cta: idRejected ? 'Resubmit' : 'Verify',
+          target: 'VerificationId',
+          cooldownDays: 3,
+        });
+      }
+    }
+  }
 
   // 1) Email — earliest activation step (story soft gate + trust baseline).
   if (!emailVerified && age >= VERIFY_EMAIL_MIN_AGE_MS) {
@@ -160,8 +221,17 @@ export function selectNudge({
     });
   }
 
+  // Deduplicate by id (post-social copy wins over passive when both present).
+  const seen = new Set<string>();
+  const ordered: Nudge[] = [];
+  for (const c of candidates) {
+    if (seen.has(c.id)) continue;
+    seen.add(c.id);
+    ordered.push(c);
+  }
+
   return (
-    candidates.find((c) => {
+    ordered.find((c) => {
       const last = dismissed[c.id];
       return !last || now - last >= c.cooldownDays * DAY_MS;
     }) ?? null
@@ -182,10 +252,19 @@ export function useNudges(): UseNudgesResult {
   const { summary } = useGamification();
   const [dismissed, setDismissed] = useState<DismissMap>({});
   const [now, setNow] = useState(0);
+  const [postSocial, setPostSocial] = useState<PostSocialPayload | null>(null);
 
   useEffect(() => {
     if (!initialized) void dispatch(fetchProfile());
   }, [initialized, dispatch]);
+
+  const refreshPostSocial = useCallback(() => {
+    void (async () => {
+      const p = await getPostSocialActivation();
+      setPostSocial(p);
+      setNow(Date.now());
+    })();
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -198,7 +277,9 @@ export function useNudges(): UseNudgesResult {
         setNow(Date.now());
       }
     })();
-  }, []);
+    refreshPostSocial();
+    return subscribePostSocialActivation(refreshPostSocial);
+  }, [refreshPostSocial]);
 
   const dismiss = useCallback((id: string) => {
     const ts = Date.now();
@@ -208,6 +289,12 @@ export function useNudges(): UseNudgesResult {
       void AsyncStorage.setItem(DISMISS_KEY, JSON.stringify(next)).catch(() => {});
       return next;
     });
+    // Trust dismiss after a social action clears the boost so it does not reappear
+    // until the next Wave/Message.
+    if (id === 'verify-email' || id === 'verify-phone' || id === 'verify-id') {
+      void clearPostSocialActivation();
+      setPostSocial(null);
+    }
   }, []);
 
   const emailVerified = profile?.badges?.email === true;
@@ -227,6 +314,7 @@ export function useNudges(): UseNudgesResult {
             currentStreak: summary?.currentStreak ?? 0,
             dismissed,
             now,
+            postSocial,
           }),
     [
       emailVerified,
@@ -236,6 +324,7 @@ export function useNudges(): UseNudgesResult {
       summary?.currentStreak,
       dismissed,
       now,
+      postSocial,
     ],
   );
 

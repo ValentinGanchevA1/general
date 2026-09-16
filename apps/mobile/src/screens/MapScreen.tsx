@@ -39,6 +39,7 @@ import { prefetchAvatars } from '@/services/avatarCache';
 import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { challengeEvents } from '@/features/gamification/challengeEvents';
+import { signalPostSocialActivation } from '@/features/nudges/postSocialActivation';
 import { EventsRail } from '@/features/events/EventsRail';
 import {
 	fetchNearbyStories,
@@ -208,13 +209,11 @@ export function MapScreen(): React.JSX.Element {
 		},
 	});
 
-	/** onDismiss only — sheet is already closing; do NOT call dismiss() again (sticks modal). */
 	const onSheetDismiss = useCallback(() => {
 		presentedIdRef.current = null;
 		setSelected(null);
 	}, []);
 
-	/** Programmatic close (X / Wave navigate): animate dismiss; onSheetDismiss clears state. */
 	const closeSheet = useCallback(() => {
 		entitySheetRef.current?.dismiss();
 	}, []);
@@ -325,6 +324,7 @@ export function MapScreen(): React.JSX.Element {
 					context: 'map',
 				});
 				challengeEvents.emit('progress');
+				void signalPostSocialActivation('wave');
 				if (res.conversationId) {
 					appAlert('Match!', 'You both waved — say hi.');
 				} else {

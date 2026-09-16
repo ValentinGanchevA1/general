@@ -26,6 +26,7 @@ import type {
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { deleteJson, getJson, postJson } from '@/api/client';
+import { signalPostSocialActivation } from '@/features/nudges/postSocialActivation';
 import { IdentityBlock } from '@/components/IdentityBlock';
 import { useAppSelector } from '@/hooks/redux';
 import { colors } from '@/theme';
@@ -301,6 +302,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
         CreateConversationRequest,
         CreateConversationResponse
       >('/conversations', { targetUserId: point.id });
+      void signalPostSocialActivation('message');
       onClose();
       openRootScreen(navigation, 'Chat', {
         conversationId: res.conversationId,
@@ -565,6 +567,7 @@ function EventCard({
         '/conversations',
         { targetUserId: hostId },
       );
+      void signalPostSocialActivation('message');
       onClose();
       openRootScreen(navigation, 'Chat', {
         conversationId: res.conversationId,
@@ -683,6 +686,7 @@ function ListingCard({
         '/conversations',
         { targetUserId: sellerId },
       );
+      void signalPostSocialActivation('message');
       onClose();
       openRootScreen(navigation, 'Chat', {
         conversationId: res.conversationId,
