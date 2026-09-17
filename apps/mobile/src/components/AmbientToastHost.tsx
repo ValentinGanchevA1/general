@@ -1,18 +1,5 @@
 // apps/mobile/src/components/AmbientToastHost.tsx
-//
-// Global toast host for ambient realtime + local celebration events:
-//   • level:up              (server)
-//   • challenge:completed   (server)
-//   • achievement:unlocked  (server)
-//   • leaderboard:rank_up   (server reserved + client-synthesized)
-//   • wave:received / gift:received
-//
-// Visual system (two layers):
-//   • Background — kind-specific gradient wash (never another plain challenge card)
-//   • Main — icon badge or peer avatar
-//
-// Mounted once in the authenticated area (AppNavigator). Queues concurrent
-// events, animates a top toast + haptic, deep-links on tap.
+// Tokenized gradients (colors.toast*) + shadowInk — see theme/index.ts ownership.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -52,7 +39,6 @@ import { openViaRef } from '@/navigation/openRootScreen';
 import { useSocket } from '@/realtime/useSocket';
 import { colors, radius } from '@/theme';
 
-/** Clears DailyChallengeCard (~56) + gap when card is visible on map. */
 const BELOW_CHALLENGE_EXTRA = 64;
 const DEFAULT_VISIBLE_MS = 4_000;
 const LEVEL_VISIBLE_MS = 5_800;
@@ -68,13 +54,9 @@ type ToastItem =
 type ToastVisual = {
   eyebrow: string;
   title: string;
-  /** XP chip text, e.g. "+50 XP". */
   xpLabel?: string;
-  /** Emoji when no avatar. */
   icon: string;
-  /** Optional peer avatar (wave / gift) — the "main" face. */
   avatarUrl?: string | null;
-  /** Gradient wash (background layer). */
   gradient: [string, string, ...string[]];
   accent: string;
   border: string;
@@ -87,7 +69,7 @@ function visualFor(item: ToastItem): ToastVisual {
         eyebrow: 'Level up',
         title: `You reached level ${item.data.level}`,
         icon: '⭐',
-        gradient: ['#2a1a08', colors.surface, colors.bg],
+        gradient: [colors.toastXp, colors.surface, colors.bg],
         accent: colors.warning,
         border: colors.warning + '99',
       };
@@ -99,7 +81,7 @@ function visualFor(item: ToastItem): ToastVisual {
         title: item.data.title,
         ...(xp ? { xpLabel: xp } : {}),
         icon: item.data.icon || '✅',
-        gradient: ['#0d2818', colors.surface, colors.bg],
+        gradient: [colors.toastSuccess, colors.surface, colors.bg],
         accent: colors.action,
         border: colors.action + '88',
       };
@@ -112,7 +94,7 @@ function visualFor(item: ToastItem): ToastVisual {
         title: item.data.title,
         ...(xp ? { xpLabel: xp } : {}),
         icon: item.data.icon || '🏆',
-        gradient: ['#1a1030', colors.surface, colors.bg],
+        gradient: [colors.toastAchievement, colors.surface, colors.bg],
         accent: colors.accent,
         border: colors.accent + '88',
       };
@@ -123,7 +105,7 @@ function visualFor(item: ToastItem): ToastVisual {
           item.data.scope === 'weekly' ? 'Weekly climb' : 'All-time climb',
         title: `#${item.data.previousRank} → #${item.data.rank}`,
         icon: '📈',
-        gradient: ['#0a2030', colors.surface, colors.bg],
+        gradient: [colors.toastRank, colors.surface, colors.bg],
         accent: colors.info,
         border: colors.info + '88',
       };
@@ -133,7 +115,7 @@ function visualFor(item: ToastItem): ToastVisual {
         title: `${item.data.fromUser.displayName} waved at you`,
         icon: '👋',
         avatarUrl: item.data.fromUser.avatarUrl,
-        gradient: ['#0a2430', colors.surface, colors.bg],
+        gradient: [colors.toastWave, colors.surface, colors.bg],
         accent: colors.primary,
         border: colors.primary + '66',
       };
@@ -144,7 +126,7 @@ function visualFor(item: ToastItem): ToastVisual {
         title: `${item.data.sender.displayName} sent ${item.data.label}${msg}`,
         icon: item.data.emoji || '🎁',
         avatarUrl: item.data.sender.avatarUrl,
-        gradient: ['#2a1030', colors.surface, colors.bg],
+        gradient: [colors.toastGift, colors.surface, colors.bg],
         accent: colors.accent,
         border: colors.accent + '66',
       };
@@ -341,7 +323,6 @@ export function AmbientToastHost(): React.JSX.Element | null {
     inputRange: [0, 1],
     outputRange: [-28, 0],
   });
-  // Sit under safe area + daily challenge card so the two don't stack as twins.
   const top = insets.top + 8 + BELOW_CHALLENGE_EXTRA;
   const isCelebration =
     current.kind === 'level' ||
@@ -362,20 +343,17 @@ export function AmbientToastHost(): React.JSX.Element | null {
     >
       <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={styles.touch}>
         <View style={[styles.card, { borderColor: v.border }]}>
-          {/* Background layer — kind wash */}
           <LinearGradient
             colors={v.gradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
-          {/* Soft accent glow top-left */}
           <View
             style={[styles.glow, { backgroundColor: v.accent + '22' }]}
             pointerEvents="none"
           />
 
-          {/* Main layer — avatar or icon badge */}
           <View style={[styles.badge, { borderColor: v.accent + '66' }]}>
             {v.avatarUrl ? (
               <Image source={{ uri: v.avatarUrl }} style={styles.avatar} />
@@ -435,8 +413,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     overflow: 'hidden',
-    // Elevation / shadow for separation from map chrome
-    shadowColor: '#000',
+    shadowColor: colors.shadowInk,
     shadowOpacity: 0.45,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
