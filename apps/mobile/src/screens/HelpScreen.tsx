@@ -35,27 +35,31 @@ const FAQS: Faq[] = [
   },
   {
     q: 'What is Pulse?',
-    a: 'Pulse is your local activity feed: trades, alerts, and nearby story rings. Post a story from the strip at the top. Chats, waves, and matches live in Interactions.',
+    a: 'Pulse is your local activity feed: trades, alerts, and nearby story rings. Post a story from the strip at the top. Chats, waves, and friend activity live in Interactions — not in Pulse.',
   },
   {
     q: 'How do stories work?',
-    a: 'Stories are visible to people nearby and disappear after 24 hours. Posting needs a verified email and an account at least 24 hours old (phone-verified accounts can post sooner). Reactions on stories count like waves toward mutual interest.',
+    a: 'Stories are visible to people nearby and disappear after 24 hours. You can post a photo or a short video. Posting needs a verified email and an account at least 24 hours old (phone-verified accounts can post sooner). Reactions on stories count like waves toward mutual interest.',
   },
   {
     q: 'What is the Interactions screen?',
-    a: 'Interactions is one inbox for chats, waves, pending friend requests, and recent followers. Open a chat from a conversation row, accept or decline friend requests, match a wave, or follow someone back. Your Friends → Requests tab stays available for requests only.',
+    a: 'Interactions is one inbox for chats, inbound waves, pending friend requests, and recent followers. On a wave you can Match or open Map to see their pin when they have one. Your Friends → Requests tab stays available for requests only.',
   },
   {
-    q: 'How do friends work?',
-    a: 'Send or accept a friend request from a profile. Friends can see when you are online (if you allow it in Settings), and chat sorts friends first. Unfriending does not remove mutual follows.',
+    q: 'How do friends and online status work?',
+    a: 'Send or accept a friend request from a profile. Friends can appear with a distinct map style. Online status is shown only to friends, and only if you allow it in Settings → Friends can see when I’m online. Unfriending does not remove mutual follows.',
+  },
+  {
+    q: 'How do I find someone on the map?',
+    a: 'From a profile use View on map when they have a public pin. From Interactions, use Map on an inbound wave. The map centers on their coarsened pin and opens their card when available.',
   },
   {
     q: 'What do the verification badges mean?',
-    a: 'They show progress on the trust ladder: email → phone → ID review. Optional, but they raise trust. Email verification also unlocks story posting. Start from Profile → Verification.',
+    a: 'They show progress on the trust ladder: email → phone → ID review. Optional, but they raise trust. Email verification unlocks story posting. Start from Settings → Verification. ID review is assisted by automated face checks and always finished by a human.',
   },
   {
     q: 'How does local trade work?',
-    a: 'Create a listing from the map or Marketplace. Nearby people can wave, chat, or make an offer. Meet in public places; G88 does not process payments yet.',
+    a: 'Create a listing (for sale or wanted) from the map or Marketplace. Nearby people can message the seller, wave, or make an offer and counter. Meet in public places; G88 does not process payments.',
   },
   {
     q: 'I found a bug or something feels wrong.',
