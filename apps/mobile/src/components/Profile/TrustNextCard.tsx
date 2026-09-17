@@ -11,14 +11,9 @@ import type { VerificationItemId } from './VerificationStatusSheet';
 export interface TrustNextCardProps {
   profile: UserProfile;
   onContinue: (id: VerificationItemId) => void;
-  /** Optional: open full verification sheet (badge / list). */
   onOpenDetails?: () => void;
 }
 
-/**
- * Self-profile surface: one next trust step from resolveTrustNextStep
- * (same source as map nudge + Settings).
- */
 export function TrustNextCard({
   profile,
   onContinue,
@@ -29,7 +24,9 @@ export function TrustNextCard({
       resolveTrustNextStep({
         emailVerified: profile.badges?.email === true,
         phoneVerified: profile.badges?.phone === true,
-        idStatus: profile.idVerificationStatus,
+        ...(profile.idVerificationStatus != null
+          ? { idStatus: profile.idVerificationStatus }
+          : {}),
       }),
     [profile.badges?.email, profile.badges?.phone, profile.idVerificationStatus],
   );
