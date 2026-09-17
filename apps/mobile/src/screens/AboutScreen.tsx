@@ -38,15 +38,15 @@ export function AboutScreen(): React.JSX.Element {
           </View>
           <Text style={styles.appName}>G88</Text>
           <Text style={styles.tagline}>
-            Map-first local social — meet people nearby, build status through real interactions.
+            Map-first local social — meet people nearby, build trust through real interactions.
           </Text>
           <Text style={styles.version}>Version {APP_VERSION}</Text>
         </View>
 
         <Text style={styles.about}>
-          G88 puts nearby people and activity on a live map. Wave, react to stories,
-          chat after mutual interest, trade locally, and join events — all around you.
-          Your exact GPS is never stored: positions are coarsened before anything is saved.
+          G88 puts people, events, and listings on a live map around you. Wave or message,
+          post stories, trade locally, and join events — without a global feed. Your exact
+          GPS is never stored: positions are coarsened before anything is saved.
         </Text>
 
         <Text style={styles.sectionTitle}>What you can do</Text>
@@ -54,27 +54,37 @@ export function AboutScreen(): React.JSX.Element {
           <Feature
             icon="map"
             title="Map & discovery"
-            body="Live map of people and places nearby. Filters, clusters, and presence while the app is open."
+            body="Live map of people, events, and listings. Filters (for sale / wanted / friends), clusters, search, and presence while the app is open."
           />
           <Feature
             icon="pulse"
             title="Pulse"
-            body="Activity feed of chats, waves, trades, alerts, and matches — plus nearby story rings."
+            body="Local activity: trades, alerts, and nearby story rings. Chats, waves, and matches live in Interactions — not in Pulse."
           />
           <Feature
             icon="circle-outline"
             title="Stories"
-            body="24-hour posts visible to people nearby. Reactions count like waves for mutual unlock."
+            body="24-hour posts for people nearby. Photo or short video. Reactions count toward mutual interest."
           />
           <Feature
             icon="hand-wave"
-            title="Waves & chat"
-            body="Lightweight signals first. Chat unlocks when interest is mutual (wave or story reaction)."
+            title="Waves, chat & Interactions"
+            body="Lightweight signals first. Chat unlocks when interest is mutual. Interactions is one inbox for waves, chats, friend requests, and followers — with Map on inbound waves."
+          />
+          <Feature
+            icon="account-group"
+            title="Friends"
+            body="Requests, suggestions, mutual friends, and optional online status for friends only. Unfriending keeps mutual follows unless you unfollow."
+          />
+          <Feature
+            icon="calendar-star"
+            title="Events"
+            body="Create and discover local events from the map. Message the host when listed."
           />
           <Feature
             icon="storefront-outline"
             title="Local trade"
-            body="Listings and offers stay free and settle offline — no in-app payments required."
+            body="Listings, wanted posts, offers and counters. Settlement stays offline — no in-app payments required."
           />
           <Feature
             icon="shield-check"
