@@ -21,6 +21,7 @@ import {
 import type {
 	ApiError,
 	DiscoveryPoint,
+	DiscoveryRankBy,
 	EntityPoint,
 	ClusterPoint,
 	Viewport,
@@ -148,6 +149,7 @@ export function MapScreen(): React.JSX.Element {
 	const [listingModeFilter, setListingModeFilter] =
 		useState<ListingModeFilterValue>('all');
 	const [friendsOnly, setFriendsOnly] = useState(false);
+	const [rankBy, setRankBy] = useState<DiscoveryRankBy>('relevance');
 	const [searchQuery, setSearchQuery] = useState('');
 	const [trendingCollapsed, setTrendingCollapsed] = useState(true);
 	const insets = useSafeAreaInsets();
@@ -162,6 +164,7 @@ export function MapScreen(): React.JSX.Element {
 		zoom,
 		listingMode: friendsOnly ? undefined : listingMode,
 		friendsOnly,
+		rankBy,
 	});
 	const points = data?.points ?? EMPTY_POINTS;
 
@@ -447,6 +450,8 @@ export function MapScreen(): React.JSX.Element {
 					onListingModeChange={setListingModeFilter}
 					friendsOnly={friendsOnly}
 					onFriendsOnlyChange={setFriendsOnly}
+					rankBy={rankBy}
+					onRankByChange={setRankBy}
 					top={filterRowTop}
 					showListingMode={!friendsOnly}
 				/>

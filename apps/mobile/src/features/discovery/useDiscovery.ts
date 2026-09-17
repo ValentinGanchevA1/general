@@ -5,6 +5,7 @@ import {
   type DiscoveryResponse,
   type DiscoveryQuery,
   type DiscoveryPoint,
+  type DiscoveryRankBy,
   type EntityKind,
   type ListingMode,
   type Viewport,
@@ -17,10 +18,9 @@ interface UseDiscoveryArgs {
   viewport: Viewport | null;
   kinds?: EntityKind[];
   topic?: string | null;
-  /** Omit or undefined = all listing modes. */
   listingMode?: ListingMode | undefined;
-  /** Close-friend user pins only. */
   friendsOnly?: boolean;
+  rankBy?: DiscoveryRankBy;
   debounceMs?: number;
   enabled?: boolean;
 }
@@ -32,7 +32,6 @@ interface UseDiscoveryResult {
   refresh: () => void;
 }
 
-/** ~15° lat/lng ≈ multi-country; beyond that discovery is useless and expensive. */
 function isViewportTooLarge(vp: Viewport): boolean {
   const latSpan = Math.abs(vp.ne.lat - vp.sw.lat);
   const rawLng = vp.ne.lng - vp.sw.lng;
@@ -52,6 +51,7 @@ export function useDiscovery({
   topic,
   listingMode,
   friendsOnly = false,
+  rankBy = 'relevance',
   debounceMs = 250,
   enabled = true,
 }: UseDiscoveryArgs): UseDiscoveryResult {
@@ -67,6 +67,7 @@ export function useDiscovery({
   const lastTopicRef = useRef<string | null>(null);
   const lastListingModeRef = useRef<string | null>(null);
   const lastFriendsOnlyRef = useRef(false);
+  const lastRankByRef = useRef<DiscoveryRankBy>('relevance');
 
   const fetchNow = useCallback(
     async (
@@ -76,9 +77,8 @@ export function useDiscovery({
       t?: string | null,
       lm?: ListingMode,
       fo?: boolean,
+      rb?: DiscoveryRankBy,
     ) => {
-      // Continent-scale pans at low zoom explode H3 cell counts on the API
-      // (r4 × huge viewport → OOM on free tier). Skip the network call.
       if (isViewportTooLarge(vp)) {
         setData({
           points: [],
@@ -92,18 +92,29 @@ export function useDiscovery({
         return;
       }
 
-      const key = JSON.stringify({ vp, z, k, t, lm: lm ?? null, fo: fo === true });
+      const effectiveRank = rb ?? 'relevance';
+      const key = JSON.stringify({
+        vp,
+        z,
+        k,
+        t,
+        lm: lm ?? null,
+        fo: fo === true,
+        rb: effectiveRank,
+      });
       if (key === lastFetchKey.current) return;
 
       const topicChanged = lastTopicRef.current !== (t ?? null);
       const modeChanged = lastListingModeRef.current !== (lm ?? null);
       const friendsChanged = lastFriendsOnlyRef.current !== (fo === true);
-      if (topicChanged || modeChanged || friendsChanged) {
+      const rankChanged = lastRankByRef.current !== effectiveRank;
+      if (topicChanged || modeChanged || friendsChanged || rankChanged) {
         prevHashRef.current = null;
         cachedPointsRef.current = [];
         lastTopicRef.current = t ?? null;
         lastListingModeRef.current = lm ?? null;
         lastFriendsOnlyRef.current = fo === true;
+        lastRankByRef.current = effectiveRank;
       }
 
       lastFetchKey.current = key;
@@ -123,6 +134,7 @@ export function useDiscovery({
           ...(t ? { topic: t } : {}),
           ...(lm ? { listingMode: lm } : {}),
           ...(fo ? { friendsOnly: true } : {}),
+          ...(effectiveRank !== 'relevance' ? { rankBy: effectiveRank } : {}),
           ...(prevHashRef.current ? { prevViewportHash: prevHashRef.current } : {}),
         };
 
@@ -160,12 +172,12 @@ export function useDiscovery({
     if (!enabled || !viewport) return;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
-      void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly);
+      void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly, rankBy);
     }, debounceMs);
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [enabled, viewport, zoom, kinds, topic, listingMode, friendsOnly, debounceMs, fetchNow]);
+  }, [enabled, viewport, zoom, kinds, topic, listingMode, friendsOnly, rankBy, debounceMs, fetchNow]);
 
   useEffect(() => {
     return () => abortRef.current?.abort();
@@ -176,8 +188,8 @@ export function useDiscovery({
     lastFetchKey.current = '';
     prevHashRef.current = null;
     cachedPointsRef.current = [];
-    void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly);
-  }, [viewport, zoom, kinds, topic, listingMode, friendsOnly, fetchNow]);
+    void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly, rankBy);
+  }, [viewport, zoom, kinds, topic, listingMode, friendsOnly, rankBy, fetchNow]);
 
   return { data, loading, error, refresh };
 }
