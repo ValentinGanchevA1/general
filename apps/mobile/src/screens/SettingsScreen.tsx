@@ -46,7 +46,9 @@ export function SettingsScreen(): React.JSX.Element {
   const trustNext = resolveTrustNextStep({
     emailVerified: profile?.badges?.email === true,
     phoneVerified: profile?.badges?.phone === true,
-    idStatus: profile?.idVerificationStatus,
+    ...(profile?.idVerificationStatus != null
+      ? { idStatus: profile.idVerificationStatus }
+      : {}),
   });
 
   useFocusEffect(
