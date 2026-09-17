@@ -3,13 +3,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { UserProfile } from '@g88/shared';
+import { resolveTrustNextStep } from '@g88/shared';
 import { colors, fontSize, radius, spacing } from '@/theme';
 
-import {
-  buildVerificationItems,
-  type VerificationItem,
-  type VerificationItemId,
-} from './VerificationStatusSheet';
+import type { VerificationItemId } from './VerificationStatusSheet';
 
 export interface TrustNextCardProps {
   profile: UserProfile;
@@ -18,48 +15,36 @@ export interface TrustNextCardProps {
   onOpenDetails?: () => void;
 }
 
-function nextActionable(items: VerificationItem[]): VerificationItem | null {
-  // Prefer first incomplete that is not pending-only id review without resubmit path.
-  for (const item of items) {
-    if (item.status === 'success') continue;
-    return item;
-  }
-  return null;
-}
-
-const CTA_LABEL: Record<VerificationItemId, string> = {
-  email: 'Verify email',
-  phone: 'Add phone',
-  id: 'Verify ID',
-};
-
 /**
- * Self-profile surface: one next trust step, or “Fully verified”.
- * Full checklist remains on VerificationStatusSheet (badge).
+ * Self-profile surface: one next trust step from resolveTrustNextStep
+ * (same source as map nudge + Settings).
  */
 export function TrustNextCard({
   profile,
   onContinue,
   onOpenDetails,
 }: TrustNextCardProps): React.JSX.Element {
-  const items = useMemo(() => buildVerificationItems(profile), [profile]);
-  const next = useMemo(() => nextActionable(items), [items]);
+  const next = useMemo(
+    () =>
+      resolveTrustNextStep({
+        emailVerified: profile.badges?.email === true,
+        phoneVerified: profile.badges?.phone === true,
+        idStatus: profile.idVerificationStatus,
+      }),
+    [profile.badges?.email, profile.badges?.phone, profile.idVerificationStatus],
+  );
   const score = profile.verificationScore ?? 0;
 
-  const doneChips = items
-    .filter((i) => i.status === 'success')
-    .map((i) => (i.id === 'email' ? 'Email ✓' : i.id === 'phone' ? 'Phone ✓' : 'ID ✓'));
-
-  if (!next) {
+  if (next.kind === 'done') {
     return (
       <View style={styles.wrap} accessibilityRole="summary">
         <View style={[styles.card, styles.cardDone]}>
           <Icon name="shield-check" size={22} color={colors.success} />
           <View style={styles.body}>
             <Text style={styles.kicker}>Trust</Text>
-            <Text style={styles.title}>Fully verified</Text>
+            <Text style={styles.title}>{next.title}</Text>
             <Text style={styles.subtitle}>
-              {score}% · {doneChips.join(' · ') || 'All steps complete'}
+              {score}% · {next.detail}
             </Text>
           </View>
           {onOpenDetails ? (
@@ -77,22 +62,21 @@ export function TrustNextCard({
     );
   }
 
-  const isPendingId = next.id === 'id' && next.status === 'pending';
-  const accent =
-    next.status === 'pending'
-      ? colors.warning
-      : next.status === 'error'
-        ? colors.danger
-        : colors.primary;
+  const isPending = next.kind === 'pending';
+  const accent = isPending
+    ? colors.warning
+    : next.step === 'id' && next.ctaLabel === 'Resubmit'
+      ? colors.danger
+      : colors.primary;
 
   return (
     <View style={styles.wrap} accessibilityRole="summary">
       <View style={styles.card}>
         <Icon
           name={
-            next.status === 'pending'
+            isPending
               ? 'clock-outline'
-              : next.status === 'error'
+              : next.ctaLabel === 'Resubmit'
                 ? 'alert-circle'
                 : 'shield-outline'
           }
@@ -102,14 +86,14 @@ export function TrustNextCard({
         <View style={styles.body}>
           <Text style={styles.kicker}>Trust</Text>
           <Text style={styles.title}>
-            {isPendingId ? 'ID under review' : `Next: ${next.title}`}
+            {isPending ? next.title : `Next: ${next.title}`}
           </Text>
           <Text style={styles.subtitle} numberOfLines={2}>
-            {doneChips.length > 0 ? `${doneChips.join(' · ')} · ` : ''}
+            {score > 0 ? `${score}% · ` : ''}
             {next.detail}
           </Text>
         </View>
-        {isPendingId ? (
+        {isPending ? (
           onOpenDetails ? (
             <Pressable
               onPress={onOpenDetails}
@@ -120,18 +104,16 @@ export function TrustNextCard({
               <Icon name="chevron-right" size={20} color={colors.textMuted} />
             </Pressable>
           ) : null
-        ) : (
+        ) : next.step ? (
           <Pressable
             style={[styles.cta, { backgroundColor: accent }]}
-            onPress={() => onContinue(next.id)}
+            onPress={() => onContinue(next.step!)}
             accessibilityRole="button"
-            accessibilityLabel={CTA_LABEL[next.id]}
+            accessibilityLabel={next.ctaLabel ?? 'Continue'}
           >
-            <Text style={styles.ctaText}>
-              {next.status === 'error' && next.id === 'id' ? 'Resubmit' : 'Continue'}
-            </Text>
+            <Text style={styles.ctaText}>{next.ctaLabel ?? 'Continue'}</Text>
           </Pressable>
-        )}
+        ) : null}
       </View>
     </View>
   );
