@@ -6,12 +6,15 @@ import * as h3 from 'h3-js';
 import type Redis from 'ioredis';
 
 import {
+  type DiscoveryRankBy,
   type DiscoveryResponse,
   type DiscoveryDiff,
   type DiscoveryPoint,
   type EntityKind,
   type ListingMode,
   type UserMeta,
+  type EventMeta,
+  type ListingMeta,
   type Viewport,
   h3ResolutionForZoom,
   isEntityZoom,
@@ -21,6 +24,11 @@ import {
 import { REDIS_CLIENT } from '../../config/redis.provider';
 import { PresenceService } from '../presence/presence.service';
 import { FriendsService } from '../friends/friends.service';
+import {
+  computeRankScore,
+  type RankableEntity,
+  type RankContext,
+} from './ranking/scoring';
 
 const DEFAULT_KINDS: EntityKind[] = ['user', 'event', 'listing'];
 const MAX_POINTS_PER_RESPONSE = 500;
@@ -67,8 +75,10 @@ export class DiscoveryService {
     listingMode?: ListingMode;
     /** Close-friend user pins only (events/listings omitted). */
     friendsOnly?: boolean;
+    rankBy?: DiscoveryRankBy;
   }): Promise<DiscoveryResponse> {
     const friendsOnly = params.friendsOnly === true;
+    const rankBy: DiscoveryRankBy = params.rankBy ?? 'relevance';
     const topicSlug = friendsOnly
       ? ''
       : params.topic
@@ -90,7 +100,7 @@ export class DiscoveryService {
     const resolution = h3ResolutionForZoom(params.zoom);
 
     if (friendsOnly && (friendIds == null || friendIds.length === 0)) {
-      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, true);
+      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, true, rankBy);
     }
 
     const estimate = this.estimateCellCount(params.viewport, resolution);
@@ -98,28 +108,36 @@ export class DiscoveryService {
       this.logger.warn(
         `Viewport estimate ${estimate} cells at r${resolution} — refusing before polygonToCells`,
       );
-      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly);
+      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly, rankBy);
     }
 
     const cells = cellsForViewport(params.viewport, resolution);
     if (cells.length === 0 || (topicSlug && kinds.length === 0)) {
-      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly);
+      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly, rankBy);
     }
     if (cells.length > MAX_CELLS_PER_VIEWPORT) {
       this.logger.warn(`Viewport produced ${cells.length} cells at r${resolution} — refusing`);
-      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly);
+      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly, rankBy);
     }
 
     const points = isEntityZoom(params.zoom)
       ? await this.entitiesInCells(
-          cells, resolution, kinds, params.requesterId, topicSlug, listingMode, friendIds,
+          cells,
+          resolution,
+          kinds,
+          params.requesterId,
+          topicSlug,
+          listingMode,
+          friendIds,
+          params.viewport,
+          rankBy,
         )
       : await this.clusterByCell(
           cells, resolution, kinds, params.requesterId, topicSlug, listingMode, friendIds,
         );
 
     const viewportHash = this.hashViewport(
-      params.viewport, params.zoom, kinds, topicSlug, listingMode, friendsOnly,
+      params.viewport, params.zoom, kinds, topicSlug, listingMode, friendsOnly, rankBy,
     );
     await this.storeSnapshot(viewportHash, points);
 
@@ -280,8 +298,10 @@ export class DiscoveryService {
     kinds: EntityKind[],
     requesterId: string,
     topicSlug: string,
-    listingMode?: ListingMode,
-    friendIds: string[] | null = null,
+    listingMode: ListingMode | undefined,
+    friendIds: string[] | null,
+    viewport: Viewport,
+    rankBy: DiscoveryRankBy,
   ): Promise<DiscoveryPoint[]> {
     const cellCol = this.cellColumn(resolution);
     const listingClause = listingModeSql(listingMode);
@@ -338,7 +358,7 @@ export class DiscoveryService {
       ? await this.presence.whichAreOnline(presenceIds)
       : new Set<string>();
 
-    return rows.map((r) => {
+    let points: DiscoveryPoint[] = rows.map((r) => {
       if (r.kind === 'user') {
         const viewMeta = r.meta as unknown as UserMeta;
         const isFriend = friendIdSet.has(r.id);
@@ -362,6 +382,87 @@ export class DiscoveryService {
         meta: r.meta,
       } as unknown as DiscoveryPoint;
     });
+
+    if (rankBy === 'relevance') {
+      const centreLat = (viewport.ne.lat + viewport.sw.lat) / 2;
+      const centreLng = (viewport.ne.lng + viewport.sw.lng) / 2;
+      const ctx: RankContext = {
+        viewerLat: centreLat,
+        viewerLng: centreLng,
+        viewerId: requesterId,
+      };
+      points = points
+        .map((p) => {
+          if (p.kind === 'cluster') return p;
+          const rankable = this.toRankable(p);
+          const score = computeRankScore(rankable, ctx);
+          return { ...p, rankScore: score };
+        })
+        .sort((a, b) => {
+          if (a.kind === 'cluster' || b.kind === 'cluster') return 0;
+          return (b.rankScore ?? 0) - (a.rankScore ?? 0);
+        });
+    } else if (rankBy === 'newest') {
+      points = [...points].sort((a, b) => {
+        if (a.kind === 'cluster' || b.kind === 'cluster') return 0;
+        const ta = this.timeKey(a);
+        const tb = this.timeKey(b);
+        return tb - ta;
+      });
+    }
+    // rankBy === 'distance' keeps SQL / id order (geographic enough for v1)
+
+    return points.slice(0, MAX_POINTS_PER_RESPONSE);
+  }
+
+  private toRankable(p: DiscoveryPoint): RankableEntity {
+    if (p.kind === 'cluster') {
+      return { id: p.cellId, kind: 'user', lat: p.lat, lng: p.lng };
+    }
+    if (p.kind === 'user') {
+      const m = p.meta as UserMeta;
+      return {
+        id: p.id,
+        kind: 'user',
+        lat: p.lat,
+        lng: p.lng,
+        verification: m.verification,
+        isFriend: m.isFriend,
+        online: m.online,
+        lastSeenAt: m.lastSeenAt,
+      };
+    }
+    if (p.kind === 'event') {
+      const m = p.meta as EventMeta;
+      return {
+        id: p.id,
+        kind: 'event',
+        lat: p.lat,
+        lng: p.lng,
+        startsAt: m.startsAt,
+      };
+    }
+    const m = p.meta as ListingMeta;
+    return {
+      id: p.id,
+      kind: 'listing',
+      lat: p.lat,
+      lng: p.lng,
+      mode: m.mode,
+      createdAt: m.createdAt ?? null,
+    };
+  }
+
+  private timeKey(p: DiscoveryPoint): number {
+    if (p.kind === 'event') {
+      const s = (p.meta as EventMeta).startsAt;
+      return s ? new Date(s).getTime() : 0;
+    }
+    if (p.kind === 'listing') {
+      const c = (p.meta as ListingMeta).createdAt;
+      return c ? new Date(c).getTime() : 0;
+    }
+    return 0;
   }
 
   private estimateCellCount(viewport: Viewport, resolution: number): number {
@@ -391,6 +492,7 @@ export class DiscoveryService {
     topicSlug: string,
     listingMode?: ListingMode,
     friendsOnly = false,
+    rankBy: DiscoveryRankBy = 'relevance',
   ): string {
     return createHash('sha1')
       .update(
@@ -401,6 +503,7 @@ export class DiscoveryService {
           topicSlug,
           listingMode: listingMode ?? null,
           friendsOnly,
+          rankBy,
         }),
       )
       .digest('hex')
@@ -414,12 +517,13 @@ export class DiscoveryService {
     topicSlug: string,
     listingMode?: ListingMode,
     friendsOnly = false,
+    rankBy: DiscoveryRankBy = 'relevance',
   ): DiscoveryResponse {
     return {
       points: [],
       resolution,
       generatedAt: new Date().toISOString(),
-      viewportHash: this.hashViewport(viewport, 0, kinds, topicSlug, listingMode, friendsOnly),
+      viewportHash: this.hashViewport(viewport, 0, kinds, topicSlug, listingMode, friendsOnly, rankBy),
       diff: null,
     };
   }
