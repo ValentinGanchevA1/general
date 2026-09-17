@@ -50,6 +50,8 @@ type Args = {
   myCoords: LatLng | null;
   points: EntityPoint[];
   region: Region | null;
+  /** Sync React region state so discovery + chrome match the camera. */
+  setRegion: (r: Region) => void;
   setSelected: (p: EntityPoint | null) => void;
   setListingModeFilter: (v: ListingModeFilterValue) => void;
   navigation: NavigationProp<ParamListBase>;
@@ -58,13 +60,14 @@ type Args = {
 
 /**
  * Orchestrates "View on map" / post-create pin focus:
- * route params + pendingMapFocus module → animate + optional entity select.
+ * route params + pendingMapFocus module → city-scale camera + entity sheet.
  */
 export function useMapFocus({
   mapRef,
   myCoords,
   points,
   region,
+  setRegion,
   setSelected,
   setListingModeFilter,
   navigation,
@@ -81,9 +84,6 @@ export function useMapFocus({
   const pendingFocusRef = useRef<PendingFocus | null>(null);
   const pendingFocusReaderRef = useRef(() => peekPendingMapFocus());
   const focusAppliedKeyRef = useRef<string | null>(null);
-  /** True after we have animated to the user's GPS at city scale (or peer focus).
-   *  Must NOT key off `region` — MapView fires onRegionChangeComplete with a
-   *  continent-scale default before GPS arrives, which used to block centering. */
   const hasCenteredOnUserRef = useRef(false);
 
   const clearFocusParams = useCallback(() => {
@@ -107,21 +107,36 @@ export function useMapFocus({
           lng,
           ...(distanceMeters != null ? { distanceMeters } : {}),
         });
-      InteractionManager.runAfterInteractions(() => {
-        mapRef.current?.animateToRegion(
-          { latitude, longitude, latitudeDelta, longitudeDelta },
-          duration,
-        );
-        if (point) {
-          setTimeout(() => setSelected(point), Math.min(duration, 350));
-        }
-      });
+      const nextRegion: Region = {
+        latitude,
+        longitude,
+        latitudeDelta,
+        longitudeDelta,
+      };
+
+      // Keep discovery/chrome in sync even if animateToRegion is ignored
+      // (MapView not ready → continent default stays on screen).
+      setRegion(nextRegion);
       hasCenteredOnUserRef.current = true;
       pendingFocusRef.current = null;
       clearPendingMapFocus(token);
       clearFocusParams();
+
+      const runCamera = (): void => {
+        mapRef.current?.animateToRegion(nextRegion, duration);
+      };
+
+      InteractionManager.runAfterInteractions(() => {
+        runCamera();
+        // Retries: tab switch / first paint often drops the first animate.
+        setTimeout(runCamera, 120);
+        setTimeout(runCamera, 400);
+        if (point) {
+          setTimeout(() => setSelected(point), Math.min(duration, 280));
+        }
+      });
     },
-    [clearFocusParams, mapRef, myCoords, setSelected],
+    [clearFocusParams, mapRef, myCoords, setRegion, setSelected],
   );
 
   const buildSeedUserPoint = useCallback(
@@ -284,8 +299,6 @@ export function useMapFocus({
     focusAppliedKeyRef.current = null;
   }, [focusUserId, focusListingId, focusLat, focusLng, focusMyPin]);
 
-  // City-scale center on first GPS fix. Do not gate on `region` — the map's
-  // default onRegionChangeComplete is often continent-scale and would skip this.
   useEffect(() => {
     if (!myCoords || hasCenteredOnUserRef.current) return;
     if (

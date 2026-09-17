@@ -81,7 +81,6 @@ import { useChallenges } from '@/features/gamification/useChallenges';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
-
 type MapEmptyActionKind = 'show_everyone' | 'create';
 
 function mapEmptyCopy(opts: {
@@ -195,6 +194,7 @@ export function MapScreen(): React.JSX.Element {
 			(p): p is EntityPoint => p.kind === 'user' || p.kind === 'event' || p.kind === 'listing',
 		),
 		region,
+		setRegion,
 		setSelected,
 		setListingModeFilter,
 		navigation,
@@ -315,33 +315,30 @@ export function MapScreen(): React.JSX.Element {
 		[region?.latitudeDelta, region?.longitudeDelta],
 	);
 
-	const onWave = useCallback(
-		async (toUserId: string) => {
-			setWaving(toUserId);
-			try {
-				const res = await postJson<WaveRequest, WaveResponse>('/interactions/wave', {
-					toUserId,
-					context: 'map',
-				});
-				challengeEvents.emit('progress');
-				void signalPostSocialActivation('wave');
-				if (res.conversationId) {
-					appAlert('Match!', 'You both waved — say hi.');
-				} else {
-					setWaveToast('Wave sent');
-				}
-			} catch (e) {
-				const msg =
-					e && typeof e === 'object' && 'message' in e
-						? String((e as ApiError).message)
-						: 'Could not send wave.';
-				appAlert('Wave failed', msg);
-			} finally {
-				setWaving(null);
+	const onWave = useCallback(async (toUserId: string) => {
+		setWaving(toUserId);
+		try {
+			const res = await postJson<WaveRequest, WaveResponse>('/interactions/wave', {
+				toUserId,
+				context: 'map',
+			});
+			challengeEvents.emit('progress');
+			void signalPostSocialActivation('wave');
+			if (res.conversationId) {
+				appAlert('Match!', 'You both waved — say hi.');
+			} else {
+				setWaveToast('Wave sent');
 			}
-		},
-		[],
-	);
+		} catch (e) {
+			const msg =
+				e && typeof e === 'object' && 'message' in e
+					? String((e as ApiError).message)
+					: 'Could not send wave.';
+			appAlert('Wave failed', msg);
+		} finally {
+			setWaving(null);
+		}
+	}, []);
 
 	const onSheetWavePress = useCallback(
 		(userId: string) => {

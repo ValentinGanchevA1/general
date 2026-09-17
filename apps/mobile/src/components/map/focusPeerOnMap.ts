@@ -31,7 +31,7 @@ export function buildPeerRegionFocus({
   distanceMeters,
 }: FocusPeerArgs): PeerRegionFocus {
   const far = distanceMeters != null && distanceMeters > FAR_METERS;
-  const delta = far ? 0.04 : 0.015;
+  const delta = far ? 0.04 : 0.012; // city-scale (~1.3 km) for local peers
   return {
     latitude: lat,
     longitude: lng,
