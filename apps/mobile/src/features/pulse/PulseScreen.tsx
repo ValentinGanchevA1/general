@@ -7,7 +7,7 @@
 // 2026-08-29: Chat / Waves / Matches removed from Pulse filters.
 //             Those live in Interactions. Pulse keeps Alerts + Trades (+ stories).
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 
 import { appAlert } from '@/ui/appAlert';
-import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
@@ -38,7 +38,8 @@ import {
   storyReceived,
 } from '@/features/stories/storiesSlice';
 import { PulseStrip } from '@/features/stories/components/PulseStrip';
-import { colors } from '@/theme';
+import { colors, spacing } from '@/theme';
+import { EmptyState } from '@/components/EmptyState';
 import { StoryViewer } from '@/features/stories/components/StoryViewer';
 import { StoryCreateSheet } from '@/features/stories/components/StoryCreateSheet';
 import { pickAndUploadStoryMedia } from '@/features/stories/storyMedia';
@@ -98,6 +99,14 @@ export function PulseScreen(): React.JSX.Element {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
+  /** Density: collapse trending when the feed has cards (Map parity). */
+  const [trendingCollapsed, setTrendingCollapsed] = useState(true);
+  const insets = useContext(SafeAreaInsetsContext) ?? {
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  };
 
   // Sync filter from navigation params (deep link / tab param change).
   useEffect(() => {
@@ -223,25 +232,34 @@ export function PulseScreen(): React.JSX.Element {
     switch (filter) {
       case 'listings':
         return {
+          icon: 'tag-outline',
           title: 'No trades nearby',
-          hint: 'Post a listing from Create, or wait for neighbours to list something.',
+          body: 'Post a listing from the map, or wait for neighbours to list something.',
+          actionLabel: 'Open map',
+          actionKind: 'map' as const,
         };
       case 'alerts':
         return {
+          icon: 'bell-outline',
           title: 'No local alerts',
-          hint: 'Post an alert from the map Create button when something is happening nearby.',
+          body: 'Drop an alert from the map when something is happening nearby.',
+          actionLabel: 'Open map',
+          actionKind: 'map' as const,
         };
       default:
         return {
+          icon: 'pulse',
           title: 'Quiet around here',
-          hint: 'Pull to refresh, or post a story above. Chats and waves live in Interactions.',
+          body: 'Post a story above, or open the map. Chats and waves live in Interactions.',
+          actionLabel: storyEligibility.allowed ? 'Add story' : 'Open map',
+          actionKind: storyEligibility.allowed ? ('story' as const) : ('map' as const),
         };
     }
-  }, [filter]);
+  }, [filter, storyEligibility.allowed]);
 
   const Header = (
     <View>
-      <View style={S.headerBar}>
+      <View style={[S.headerBar, { paddingTop: Math.max(insets.top, 8) + 8 }]}>
         <Text style={S.headerTitle}>Pulse</Text>
       </View>
 
@@ -282,6 +300,8 @@ export function PulseScreen(): React.JSX.Element {
     <View style={S.footer}>
       <TrendingStrip
         topics={trendingTopics}
+        collapsed={trendingCollapsed && filtered.length > 0}
+        onToggleCollapse={() => setTrendingCollapsed((c) => !c)}
         onTapTopic={(t) =>
           navigation.navigate('AlertComposer', { presetCategory: 'general', presetTag: t })
         }
@@ -344,10 +364,21 @@ export function PulseScreen(): React.JSX.Element {
         ListHeaderComponent={Header}
         ListFooterComponent={Footer}
         ListEmptyComponent={
-          <View style={S.empty}>
-            <MCI name="pulse" size={40} color={colors.borderStrong} />
-            <Text style={S.emptyTitle}>{emptyCopy.title}</Text>
-            <Text style={S.emptyBody}>{emptyCopy.hint}</Text>
+          <View style={S.emptyWrap}>
+            <EmptyState
+              variant="plain"
+              icon={emptyCopy.icon}
+              title={emptyCopy.title}
+              body={emptyCopy.body}
+              actionLabel={emptyCopy.actionLabel}
+              onAction={() => {
+                if (emptyCopy.actionKind === 'story') {
+                  onCreatePress();
+                } else {
+                  navigation.navigate('Main', { screen: 'Map' } as never);
+                }
+              }}
+            />
           </View>
         }
         refreshControl={
@@ -360,7 +391,7 @@ export function PulseScreen(): React.JSX.Element {
             tintColor={colors.primary}
           />
         }
-        contentContainerStyle={{ paddingBottom: 140 }}
+        contentContainerStyle={{ paddingBottom: 100 + Math.max(insets.bottom, 8) }}
       />
 
       <StoryViewer
@@ -384,12 +415,12 @@ const S = StyleSheet.create({
 
   headerBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4,
+    paddingHorizontal: 16, paddingBottom: 2,
   },
-  headerTitle: { color: colors.textPrimary, fontSize: 28, fontWeight: '700' },
+  headerTitle: { color: colors.textPrimary, fontSize: 26, fontWeight: '700' },
 
-  chips: { maxHeight: 50 },
-  chipsContent: { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  chips: { maxHeight: 44 },
+  chipsContent: { paddingHorizontal: 12, paddingVertical: 6, gap: 8 },
   chip: {
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16,
     backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong,
@@ -406,9 +437,7 @@ const S = StyleSheet.create({
   },
   retryText: { color: colors.onPrimary, fontWeight: '700' },
 
-  empty: { alignItems: 'center', paddingVertical: 60 },
-  emptyTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginTop: 12 },
-  emptyBody: { color: colors.textMuted, fontSize: 13, marginTop: 4, textAlign: 'center', paddingHorizontal: 32 },
+  emptyWrap: { paddingVertical: spacing.lg, paddingHorizontal: spacing.sm },
 
-  footer: { paddingTop: 20, paddingBottom: 30 },
+  footer: { paddingTop: 8, paddingBottom: 16 },
 });
