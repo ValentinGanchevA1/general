@@ -22,7 +22,7 @@ import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
 import { ListRow } from '@/components/ListRow';
 import { APP_VERSION } from '@/constants/app';
 import { colors, spacing, fontSize, radius } from '@/theme';
-import { strikeStanding } from '@g88/shared';
+import { resolveTrustNextStep, strikeStanding } from '@g88/shared';
 
 export function SettingsScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
@@ -43,6 +43,11 @@ export function SettingsScreen(): React.JSX.Element {
     storySuspendedUntil: profile?.storySuspendedUntil ?? null,
     verification: profile?.verification ?? 'none',
   });
+  const trustNext = resolveTrustNextStep({
+    emailVerified: profile?.badges?.email === true,
+    phoneVerified: profile?.badges?.phone === true,
+    idStatus: profile?.idVerificationStatus,
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -51,9 +56,6 @@ export function SettingsScreen(): React.JSX.Element {
       }
     }, [dispatch, profile]),
   );
-
-  // Trust ladder (verification) is not the same as email badge — phone-only users still need the Verify email row.
-  const emailVerified = profile?.badges?.email === true;
 
   const toggleVisibility = async (): Promise<void> => {
     if (toggling || !profile) return;
@@ -185,15 +187,29 @@ export function SettingsScreen(): React.JSX.Element {
           <Text style={styles.sectionTitle}>Trust & posting</Text>
           <ListRow
             title="Verification"
-            subtitle="Email → phone → ID review. Raises trust and unlocks higher-stakes actions"
+            subtitle={
+              trustNext.kind === 'done'
+                ? 'Fully verified · Email → phone · ID'
+                : trustNext.kind === 'pending'
+                  ? trustNext.detail
+                  : `Next: ${trustNext.title} · ${trustNext.detail}`
+            }
             onPress={() => navigation.navigate('Verification')}
           />
-          {!emailVerified ? (
+          {trustNext.kind === 'actionable' && trustNext.nav ? (
             <ListRow
               style={styles.rowSpaced}
-              title="Verify email"
-              subtitle="Required to post stories on Pulse"
-              onPress={() => navigation.navigate('EmailVerification')}
+              title={trustNext.ctaLabel ?? trustNext.title}
+              subtitle={trustNext.detail}
+              onPress={() => {
+                if (trustNext.nav === 'EmailVerification') {
+                  navigation.navigate('EmailVerification');
+                } else if (trustNext.nav === 'VerificationId') {
+                  navigation.navigate('VerificationId');
+                } else {
+                  navigation.navigate('Verification');
+                }
+              }}
             />
           ) : null}
         </View>
