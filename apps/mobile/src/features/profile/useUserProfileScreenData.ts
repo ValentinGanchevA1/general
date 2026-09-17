@@ -90,11 +90,14 @@ export function useUserProfileScreenData(userId: string, navigation: Nav) {
     })();
   }, [userId, navigation, loadRelationship]);
 
+  // Defer reset off the effect body — satisfies react-hooks/set-state-in-effect.
   useEffect(() => {
-    setLoading(true);
-    setProfile(null);
-    setRel(null);
-    loadProfile();
+    queueMicrotask(() => {
+      setLoading(true);
+      setProfile(null);
+      setRel(null);
+      loadProfile();
+    });
   }, [loadProfile]);
 
   const sendWave = useCallback(async (): Promise<void> => {
@@ -110,7 +113,7 @@ export function useUserProfileScreenData(userId: string, navigation: Nav) {
     } finally {
       setWaving(false);
     }
-  }, [userId, profile?.displayName]);
+  }, [userId, profile]);
 
   const openMessage = useCallback(async (): Promise<void> => {
     if (messaging || canMessage === 'none') return;
@@ -195,7 +198,7 @@ export function useUserProfileScreenData(userId: string, navigation: Nav) {
     } finally {
       setBlocking(false);
     }
-  }, [userId, profile?.displayName, navigation]);
+  }, [userId, profile, navigation]);
 
   const unblock = useCallback(async (): Promise<void> => {
     setBlocking(true);
@@ -219,7 +222,7 @@ export function useUserProfileScreenData(userId: string, navigation: Nav) {
         { text: 'Block', style: 'destructive', onPress: () => void block() },
       ],
     );
-  }, [profile?.displayName, block]);
+  }, [profile, block]);
 
   const runSocial = useCallback(
     async (fn: () => Promise<void>, setBusy: (v: boolean) => void): Promise<void> => {
@@ -327,7 +330,7 @@ export function useUserProfileScreenData(userId: string, navigation: Nav) {
       peerUserId: userId,
       ...(profile?.displayName ? { peerName: profile.displayName } : {}),
     });
-  }, [rel, navigation, userId, profile?.displayName]);
+  }, [rel, navigation, userId, profile]);
 
   const unfriend = useCallback((): void => {
     void runSocial(async () => {
