@@ -102,13 +102,13 @@ export function NearbyPeopleStrip(props: Props): React.JSX.Element | null {
 }
 
 const S = StyleSheet.create({
-  section: { paddingVertical: 8, paddingBottom: 4 },
+  section: { paddingTop: 2, paddingBottom: 2 },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 16,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   sectionTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
   sectionCount: {
