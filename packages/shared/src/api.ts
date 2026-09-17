@@ -8,6 +8,9 @@ export type EntityKind = 'user' | 'event' | 'listing';
 
 export type VerificationLevel = 'none' | 'email' | 'phone' | 'selfie' | 'id';
 
+/** Server-side map discovery sort. Default relevance. */
+export type DiscoveryRankBy = 'relevance' | 'distance' | 'newest';
+
 // ─── Discovery ─────────────────────────────────────────────────────────────
 
 export interface DiscoveryQuery {
@@ -26,6 +29,13 @@ export interface DiscoveryQuery {
    * Offline friends remain visible; online is still presence-based.
    */
   friendsOnly?: boolean;
+  /**
+   * Sort mode for entity zoom. Default 'relevance'.
+   * - relevance: multi-signal rank (distance + trust + social + freshness + activity)
+   * - distance: geographic proximity only
+   * - newest: listing created / event starts (when available)
+   */
+  rankBy?: DiscoveryRankBy;
 }
 
 export interface ClusterPoint {
@@ -46,6 +56,8 @@ interface EntityBase {
   id: string;
   lat: number;
   lng: number;
+  /** Present when rankBy=relevance (optional; clients may ignore). */
+  rankScore?: number;
 }
 
 export interface UserMeta {
@@ -89,6 +101,8 @@ export interface ListingMeta {
   sellerId?: string;
   /** Seller display name for chat header; paired with sellerId. */
   sellerDisplayName?: string;
+  /** Optional for ranking freshness when present on discovery rows. */
+  createdAt?: string;
 }
 
 export type DiscoveryPoint = ClusterPoint | EntityPoint;
