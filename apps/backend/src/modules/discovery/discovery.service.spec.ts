@@ -340,7 +340,8 @@ describe('DiscoveryService', () => {
 
       expect(res.diff).toBeTruthy();
       expect(res.diff!.removed).toEqual(['e1']);
-      expect(asPoints(res.diff!.added)).toEqual([fresh]);
+      expect(asPoints(res.diff!.added).map((x) => x.id)).toEqual(['e1']);
+      expect(asPoints(res.diff!.added)[0]?.meta).toEqual({ attendeeCount: 9 });
     });
 
     it('does not flag a real overlap as changed due to key-insertion-order alone', async () => {
