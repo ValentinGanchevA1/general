@@ -5,11 +5,13 @@
 // Priority: post-social boost → email → phone → ID → streak milestone.
 // Post-social (after Wave/Message) bypasses age gates for the next trust step.
 // Dismissals persist with per-nudge cooldown (no net-new backend).
+// Trust ladder step comes from shared resolveTrustNextStep (Profile + Settings).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { IdVerificationStatus } from '@g88/shared';
+import { resolveTrustNextStep } from '@g88/shared';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { useGamification } from '@/features/gamification/useGamification';
@@ -113,98 +115,97 @@ export function selectNudge({
   const socialBoost = isPostSocialActive(postSocial, now);
   const verb = postSocial?.source === 'message' ? 'messaged someone' : 'connected nearby';
 
-  // 0) Post-social boost — same ladder steps, no age gate, contextual copy.
-  if (socialBoost) {
-    if (!emailVerified) {
-      candidates.push({
+  // Shared ladder next step (same as TrustNextCard + Settings).
+  const trust = resolveTrustNextStep({
+    emailVerified,
+    phoneVerified,
+    idStatus: idStatus as IdVerificationStatus | null | undefined,
+  });
+
+  const trustNudgeBase = (): Nudge | null => {
+    if (trust.kind !== 'actionable' || trust.step == null || trust.nav == null) {
+      return null;
+    }
+    if (trust.step === 'email') {
+      return {
         id: 'verify-email',
         icon: 'email-check-outline',
         accent: colors.primary,
         label: 'Trust',
-        title: `You just ${verb} — verify email so people can trust you`,
+        title: 'Verify your email to unlock stories and more reach',
         cta: 'Verify',
         target: 'EmailVerification',
         cooldownDays: 2,
-      });
-    } else if (!phoneVerified) {
-      candidates.push({
+      };
+    }
+    if (trust.step === 'phone') {
+      return {
         id: 'verify-phone',
         icon: 'cellphone-check',
         accent: colors.primary,
         label: 'Trust',
-        title: `You just ${verb} — add a phone for stronger identity`,
+        title: 'Add a verified phone for stronger identity on the map',
         cta: 'Add phone',
         target: 'Verification',
         cooldownDays: 3,
-      });
-    } else {
-      const idNone = idStatus === 'none' || idStatus == null || idStatus === undefined;
-      const idRejected = idStatus === 'rejected';
-      if (idNone || idRejected) {
+      };
+    }
+    const rejected = idStatus === 'rejected';
+    return {
+      id: 'verify-id',
+      icon: 'shield-alert',
+      accent: colors.entityEvent,
+      label: 'Verification',
+      title: rejected
+        ? 'Your ID was rejected — resubmit to get verified'
+        : 'Get ID-verified to build trust on the map',
+      cta: rejected ? 'Resubmit' : 'Verify',
+      target: 'VerificationId',
+      cooldownDays: 3,
+    };
+  };
+
+  // 0) Post-social boost — same ladder step, no age gate, contextual copy.
+  if (socialBoost) {
+    const base = trustNudgeBase();
+    if (base) {
+      if (base.id === 'verify-email') {
         candidates.push({
-          id: 'verify-id',
-          icon: 'shield-alert',
-          accent: colors.entityEvent,
-          label: 'Verification',
-          title: idRejected
-            ? 'Your ID was rejected — resubmit to get verified'
-            : `You're active nearby — get ID-verified for the trust badge`,
-          cta: idRejected ? 'Resubmit' : 'Verify',
-          target: 'VerificationId',
-          cooldownDays: 3,
+          ...base,
+          title: `You just ${verb} — verify email so people can trust you`,
+        });
+      } else if (base.id === 'verify-phone') {
+        candidates.push({
+          ...base,
+          title: `You just ${verb} — add a phone for stronger identity`,
+        });
+      } else {
+        candidates.push({
+          ...base,
+          title:
+            idStatus === 'rejected'
+              ? 'Your ID was rejected — resubmit to get verified'
+              : `You're active nearby — get ID-verified for the trust badge`,
         });
       }
     }
   }
 
-  // 1) Email — earliest activation step (story soft gate + trust baseline).
-  if (!emailVerified && age >= VERIFY_EMAIL_MIN_AGE_MS) {
-    candidates.push({
-      id: 'verify-email',
-      icon: 'email-check-outline',
-      accent: colors.primary,
-      label: 'Trust',
-      title: 'Verify your email to unlock stories and more reach',
-      cta: 'Verify',
-      target: 'EmailVerification',
-      cooldownDays: 2,
-    });
-  }
-
-  // 2) Phone — after email is done (or never had email path blocked).
-  if (emailVerified && !phoneVerified && age >= VERIFY_PHONE_MIN_AGE_MS) {
-    candidates.push({
-      id: 'verify-phone',
-      icon: 'cellphone-check',
-      accent: colors.primary,
-      label: 'Trust',
-      title: 'Add a verified phone for stronger identity on the map',
-      cta: 'Add phone',
-      target: 'Verification',
-      cooldownDays: 3,
-    });
-  }
-
-  // 3) ID — after phone when possible; rejected always bypasses age.
-  const idNone = idStatus === 'none' || idStatus == null || idStatus === undefined;
-  const idRejected = idStatus === 'rejected';
-  if (
-    emailVerified &&
-    phoneVerified &&
-    ((idNone && age >= VERIFY_ID_MIN_AGE_MS) || idRejected)
-  ) {
-    candidates.push({
-      id: 'verify-id',
-      icon: 'shield-alert',
-      accent: colors.entityEvent,
-      label: 'Verification',
-      title: idRejected
-        ? 'Your ID was rejected — resubmit to get verified'
-        : 'Get ID-verified to build trust on the map',
-      cta: idRejected ? 'Resubmit' : 'Verify',
-      target: 'VerificationId',
-      cooldownDays: 3,
-    });
+  // 1–3) Passive ladder with age gates (pending/done → no trust candidate).
+  if (trust.kind === 'actionable' && trust.step != null) {
+    const base = trustNudgeBase();
+    if (base) {
+      if (trust.step === 'email' && age >= VERIFY_EMAIL_MIN_AGE_MS) {
+        candidates.push(base);
+      } else if (trust.step === 'phone' && age >= VERIFY_PHONE_MIN_AGE_MS) {
+        candidates.push(base);
+      } else if (trust.step === 'id') {
+        const idRejected = idStatus === 'rejected';
+        if (idRejected || age >= VERIFY_ID_MIN_AGE_MS) {
+          candidates.push(base);
+        }
+      }
+    }
   }
 
   // 4) Streak milestone celebration (lowest priority).
@@ -289,8 +290,6 @@ export function useNudges(): UseNudgesResult {
       void AsyncStorage.setItem(DISMISS_KEY, JSON.stringify(next)).catch(() => {});
       return next;
     });
-    // Trust dismiss after a social action clears the boost so it does not reappear
-    // until the next Wave/Message.
     if (id === 'verify-email' || id === 'verify-phone' || id === 'verify-id') {
       void clearPostSocialActivation();
       setPostSocial(null);
