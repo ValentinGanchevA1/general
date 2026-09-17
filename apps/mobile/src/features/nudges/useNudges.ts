@@ -52,11 +52,9 @@ export interface Nudge {
 
 const DISMISS_KEY = 'g88:nudges:dismissed';
 const DAY_MS = 24 * 60 * 60 * 1000;
-// Soft hold before phone/ID nudges (explore first). Email is earlier — stories/chat soft gates.
 const VERIFY_EMAIL_MIN_AGE_MS = 1 * DAY_MS;
 const VERIFY_PHONE_MIN_AGE_MS = 2 * DAY_MS;
 const VERIFY_ID_MIN_AGE_MS = 2 * DAY_MS;
-// Streak days worth celebrating (secured by foreground ping — no daily nag).
 const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100, 180, 365];
 
 function streakTitle(streak: number): string {
@@ -66,26 +64,17 @@ function streakTitle(streak: number): string {
   return `🔥 ${streak}-day streak — nice work!`;
 }
 
-type DismissMap = Record<string, number>; // nudge id → epoch ms of last dismiss
+type DismissMap = Record<string, number>;
 
 /** Inputs for pure selectNudge (unit-tested). */
 export interface NudgeInputs {
-  /** badges.email — true when email verified. */
   emailVerified: boolean;
-  /** badges.phone — true when phone verified. */
   phoneVerified: boolean;
   idVerificationStatus: IdVerificationStatus | string | undefined;
-  /** ISO account-creation timestamp, for age gates. */
   createdAt: string | undefined;
   currentStreak: number;
-  /** nudge id → epoch ms of last dismissal. */
   dismissed: DismissMap;
-  /** Captured wall-clock (epoch ms). */
   now: number;
-  /**
-   * When set and within TTL, trust steps bypass age gates and use post-social copy.
-   * Armed after a successful Wave or Message.
-   */
   postSocial?: PostSocialPayload | null;
 }
 
@@ -96,10 +85,6 @@ function accountAgeMs(createdAt: string | undefined, now: number): number {
   return Math.max(0, now - t);
 }
 
-/**
- * Pure nudge selection: candidate list in priority order (activation ladder
- * outranks streak) and return the first that applies and isn't on cooldown.
- */
 export function selectNudge({
   emailVerified,
   phoneVerified,
@@ -115,11 +100,15 @@ export function selectNudge({
   const socialBoost = isPostSocialActive(postSocial, now);
   const verb = postSocial?.source === 'message' ? 'messaged someone' : 'connected nearby';
 
-  // Shared ladder next step (same as TrustNextCard + Settings).
   const trust = resolveTrustNextStep({
     emailVerified,
     phoneVerified,
-    idStatus: idStatus as IdVerificationStatus | null | undefined,
+    ...(idStatus === 'none' ||
+    idStatus === 'pending' ||
+    idStatus === 'verified' ||
+    idStatus === 'rejected'
+      ? { idStatus }
+      : {}),
   });
 
   const trustNudgeBase = (): Nudge | null => {
@@ -165,7 +154,6 @@ export function selectNudge({
     };
   };
 
-  // 0) Post-social boost — same ladder step, no age gate, contextual copy.
   if (socialBoost) {
     const base = trustNudgeBase();
     if (base) {
@@ -191,7 +179,6 @@ export function selectNudge({
     }
   }
 
-  // 1–3) Passive ladder with age gates (pending/done → no trust candidate).
   if (trust.kind === 'actionable' && trust.step != null) {
     const base = trustNudgeBase();
     if (base) {
@@ -208,7 +195,6 @@ export function selectNudge({
     }
   }
 
-  // 4) Streak milestone celebration (lowest priority).
   if (STREAK_MILESTONES.includes(currentStreak)) {
     candidates.push({
       id: 'streak-milestone',
@@ -222,7 +208,6 @@ export function selectNudge({
     });
   }
 
-  // Deduplicate by id (post-social copy wins over passive when both present).
   const seen = new Set<string>();
   const ordered: Nudge[] = [];
   for (const c of candidates) {
@@ -240,9 +225,7 @@ export function selectNudge({
 }
 
 interface UseNudgesResult {
-  /** Highest-priority active nudge, or null when nothing to show. */
   nudge: Nudge | null;
-  /** Persist a dismissal; the nudge is hidden for its cooldown window. */
   dismiss: (id: string) => void;
 }
 
@@ -273,7 +256,7 @@ export function useNudges(): UseNudgesResult {
         const raw = await AsyncStorage.getItem(DISMISS_KEY);
         if (raw) setDismissed(JSON.parse(raw) as DismissMap);
       } catch {
-        // ignore corrupt/missing storage
+        // ignore
       } finally {
         setNow(Date.now());
       }
