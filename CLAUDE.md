@@ -1,7 +1,7 @@
 # G88 — Project Instructions
 
 > Repo: local monorepo under `apps/`. Anything under `legacy/` is read-only reference.  
-> **Last synced:** 2026-09-14 (master through EntityBottomSheet P1 + Map polish Option 1).
+> **Last synced:** 2026-09-17 (theme ownership + Skeleton convention documented).
 
 ## Role & Persona
 
@@ -127,6 +127,7 @@ g88/
 - Path alias `@/` → `src/`. RTK + `useAppSelector` / `useAppDispatch`. Tokens in Keychain.
 - Single Axios client; single-flight refresh. Socket singleton in `useSocket.ts`.
 - Navigation: nested stacks + `openRootScreen` for cross-tab jumps (Map focus, Chat, etc.).
+- **Theme:** `apps/mobile/src/theme/index.ts` is the sole UI palette. Lists/grids cold-start → `Skeleton` / `SkeletonListRow` / `SkeletonMarketGrid`; button in-flight → `ActivityIndicator` only.
 
 ### Admin
 
@@ -136,7 +137,7 @@ g88/
 
 ### Shared
 
-- Single source of truth for API + socket contracts. Geo helpers (`fuzzLocation`, viewport cells) live here.
+- Single source of truth for API + socket contracts. Geo helpers (`fuzzLocation`, viewport cells) live here. **No brand palette** — UI tokens stay in mobile theme.
 
 ## Privacy invariants (non-negotiable)
 
@@ -154,5 +155,6 @@ Stripe Connect / paid gifts · Elasticsearch · Kafka · gRPC · Kubernetes · G
 | `admin.guard.spec.ts` | Missing dedicated unit spec |
 | StoryViewer video playback | Create supports video; viewer still partial |
 | Events/listings block-by-author | Optional; needs authorId in discovery meta |
-| Hex theme lint | Convention only; prefer tokens |
+| Hex theme lint | Convention only; prefer tokens. **Ownership:** `apps/mobile/src/theme/index.ts` sole mobile palette (not shared). Intentional hex: mapStyle, socialConfig. Toast tints → `colors.toast*`; shadows → `colors.shadowInk` |
 | Strike escalation policy | Schema + UI surface; product rules not finalized |
+| Full-screen Spinner → Skeleton | Migrate as-you-touch; Marketplace/Friends/Interactions already use Skeleton |
