@@ -34,6 +34,8 @@ import { useReceivedInteractions } from '@/features/interactions/useReceivedInte
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { useSocket } from '@/realtime/useSocket';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { focusUserOnMap } from '@/navigation/focusUserOnMap';
+import { appAlert } from '@/ui/appAlert';
 import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -58,7 +60,6 @@ function signalLabel(item: InboxItem): string {
   if (item.type === 'wave') return 'waved at you';
   if (item.type === 'friend_request') return 'sent you a friend request';
   if (item.type === 'follow') return 'started following you';
-  // Story reactions (and any future reaction-bearing types)
   if (item.reactionKind === 'heart') return '❤️ reacted to your story';
   if (item.reactionKind === 'wave') return '👋 reacted to your story';
   if (item.reactionKind != null) return 'reacted to your story';
@@ -81,6 +82,7 @@ function InboxRow({
   onDecline,
   onFollowBack,
   onOpenProfile,
+  onViewOnMap,
 }: {
   item: InboxItem;
   busy: boolean;
@@ -89,6 +91,7 @@ function InboxRow({
   onDecline: (requestId: string) => void;
   onFollowBack: (userId: string) => void;
   onOpenProfile: (userId: string) => void;
+  onViewOnMap: (item: InboxItem) => void;
 }): React.JSX.Element {
   return (
     <TouchableOpacity
@@ -115,25 +118,40 @@ function InboxRow({
         </Text>
       </View>
 
-      {item.type === 'wave' &&
-        (item.isMutual ? (
-          <View style={styles.mutualBadge}>
-            <Text style={styles.mutualText}>Match</Text>
-          </View>
-        ) : (
+      {item.type === 'wave' ? (
+        <View style={styles.actions}>
           <TouchableOpacity
-            style={styles.primaryBtn}
+            style={styles.mapBtn}
             disabled={busy}
             onPress={(e) => {
               e.stopPropagation?.();
-              onMatch(item.fromUser.id);
+              onViewOnMap(item);
             }}
             accessibilityRole="button"
-            accessibilityLabel={`Match ${item.fromUser.displayName}`}
+            accessibilityLabel={`View ${item.fromUser.displayName} on map`}
           >
-            <Text style={styles.primaryBtnText}>Match</Text>
+            <Text style={styles.mapBtnText}>Map</Text>
           </TouchableOpacity>
-        ))}
+          {item.isMutual ? (
+            <View style={styles.mutualBadge}>
+              <Text style={styles.mutualText}>Match</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              disabled={busy}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onMatch(item.fromUser.id);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Match ${item.fromUser.displayName}`}
+            >
+              <Text style={styles.primaryBtnText}>Match</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : null}
 
       {item.type === 'friend_request' && item.requestId ? (
         <View style={styles.actions}>
@@ -411,6 +429,30 @@ export function InteractionsScreen(): React.JSX.Element {
     [navigation],
   );
 
+  const onViewOnMap = useCallback(
+    async (item: InboxItem): Promise<void> => {
+      const id = item.fromUser.id;
+      setBusy(id, true);
+      try {
+        const result = await focusUserOnMap(navigation, {
+          userId: id,
+          displayName: item.fromUser.displayName,
+          avatarUrl: item.fromUser.avatarUrl,
+          verification: item.fromUser.verification ?? null,
+        });
+        if (result === 'no_pin') {
+          appAlert(
+            'Location unavailable',
+            'They have no map pin right now. Open their profile or try again when they are nearby.',
+          );
+        }
+      } finally {
+        setBusy(id, false);
+      }
+    },
+    [navigation, setBusy],
+  );
+
   const onOpenChat = useCallback(
     (c: ConversationSummary): void => {
       const peer = peerOf(c, myUserId);
@@ -506,6 +548,7 @@ export function InteractionsScreen(): React.JSX.Element {
                 onDecline={(id) => void onDecline(id)}
                 onFollowBack={(id) => void onFollowBack(id)}
                 onOpenProfile={onOpenProfile}
+                onViewOnMap={(it) => void onViewOnMap(it)}
               />
             )
           }
@@ -582,6 +625,15 @@ const styles = StyleSheet.create({
   },
   unreadBadgeText: { color: colors.onPrimary, fontSize: 11, fontWeight: '800' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  mapBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: spacing.sm,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+  },
+  mapBtnText: { color: colors.textPrimary, fontWeight: '700', fontSize: fontSize.sm },
   primaryBtn: {
     paddingHorizontal: 14,
     paddingVertical: spacing.sm,
