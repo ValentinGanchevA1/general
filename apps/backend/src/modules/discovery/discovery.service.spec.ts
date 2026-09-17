@@ -36,6 +36,7 @@ type LoosePoint = {
   count?: number;
   by?: Record<string, number>;
   meta?: Record<string, unknown>;
+  rankScore?: number;
 };
 const asPoints = (ps: unknown): LoosePoint[] => ps as LoosePoint[];
 
@@ -88,7 +89,6 @@ describe('DiscoveryService', () => {
     });
 
     it('refuses a runaway viewport (>5000 cells) without querying', async () => {
-      // City-scale VIEWPORT passes the area estimate; post-enumeration guard fires.
       (cellsForViewport as jest.Mock).mockReturnValue(new Array(5001).fill('c'));
       const res = await call();
       expect(res.points).toEqual([]);
@@ -96,8 +96,6 @@ describe('DiscoveryService', () => {
     });
 
     it('refuses before polygonToCells when area estimate exceeds soft cap', async () => {
-      // Continent-scale box → estimate >> 4000 at r8; must not call cellsForViewport.
-      // Module mock accumulates calls across tests — clear before asserting zero.
       (cellsForViewport as jest.Mock).mockClear();
       const huge: Viewport = { ne: { lat: 50, lng: 30 }, sw: { lat: 0, lng: 0 } };
       const res = await call({ viewport: huge });
@@ -107,11 +105,6 @@ describe('DiscoveryService', () => {
     });
 
     it('does not refuse a narrow antimeridian-crossing viewport (normalized lng delta)', async () => {
-      // sw.lng=179, ne.lng=-179 is a ~2° span across the dateline. A naive
-      // ne.lng - sw.lng = -358° would inflate the area estimate past the cell
-      // cap and wrongly refuse; the normalized delta keeps it queryable.
-      // Lat span stays city-scale (~0.05°) so estimate at r8 stays under the
-      // soft cap (~1676 cells); a 1° lat strip was ~33k and refused for size.
       const antimeridian: Viewport = {
         ne: { lat: 1.05, lng: -179 },
         sw: { lat: 1.0, lng: 179 },
@@ -121,9 +114,6 @@ describe('DiscoveryService', () => {
     });
 
     it('still refuses a genuinely wide antimeridian-crossing viewport', async () => {
-      // sw.lng=179, ne.lng=-1 wraps the dateline by a real ~180° span. The raw
-      // ne.lng - sw.lng = -180° would give a negative area that slips under the
-      // cap; the normalized 180° delta correctly estimates it past the limit.
       const wide: Viewport = { ne: { lat: 2, lng: -1 }, sw: { lat: 1, lng: 179 } };
       const res = await call({ viewport: wide });
       expect(res.points).toEqual([]);
@@ -133,8 +123,8 @@ describe('DiscoveryService', () => {
     it('defaults to all kinds and excludes the requester / private rows', async () => {
       await call();
       const [, params] = query.mock.calls[0]!;
-      expect(params[1]).toEqual(['user', 'event', 'listing']); // DEFAULT_KINDS
-      expect(params[2]).toBe('me'); // requester excluded
+      expect(params[1]).toEqual(['user', 'event', 'listing']);
+      expect(params[2]).toBe('me');
       expect(query.mock.calls[0]![0]).toContain("visibility = 'public'");
     });
   });
@@ -171,7 +161,7 @@ describe('DiscoveryService', () => {
         { id: 'u1', kind: 'user', lat: 10, lng: 20, meta: { ...userMeta } },
       ]);
       whichAreOnline.mockResolvedValue(new Set(['u1']));
-      listFriendIds.mockResolvedValue([]); // not a friend
+      listFriendIds.mockResolvedValue([]);
       listWhoAllowFriendsOnline.mockResolvedValue(new Set());
 
       const res = await call();
@@ -187,7 +177,7 @@ describe('DiscoveryService', () => {
       ]);
       whichAreOnline.mockResolvedValue(new Set(['u1']));
       listFriendIds.mockResolvedValue(['u1']);
-      listWhoAllowFriendsOnline.mockResolvedValue(new Set()); // disallowed
+      listWhoAllowFriendsOnline.mockResolvedValue(new Set());
 
       const res = await call();
       const user = asPoints(res.points).find((p) => p.kind === 'user');
@@ -204,15 +194,56 @@ describe('DiscoveryService', () => {
     });
   });
 
+  describe('relevance ranking', () => {
+    beforeEach(() => (isEntityZoom as jest.Mock).mockReturnValue(true));
+
+    it('orders friend ID-verified online near viewer above stranger far away', async () => {
+      query.mockResolvedValueOnce([
+        {
+          id: 'stranger',
+          kind: 'user',
+          lat: 1.04,
+          lng: 1.04,
+          meta: {
+            displayName: 'Far',
+            avatarUrl: null,
+            verification: 'none',
+            online: false,
+            lastSeenAt: null,
+          },
+        },
+        {
+          id: 'buddy',
+          kind: 'user',
+          lat: 1.025,
+          lng: 1.025,
+          meta: {
+            displayName: 'Buddy',
+            avatarUrl: null,
+            verification: 'id',
+            online: false,
+            lastSeenAt: null,
+          },
+        },
+      ]);
+      listFriendIds.mockResolvedValue(['buddy']);
+      listWhoAllowFriendsOnline.mockResolvedValue(new Set(['buddy']));
+      whichAreOnline.mockResolvedValue(new Set(['buddy']));
+
+      const res = await call({ rankBy: 'relevance' });
+      const points = asPoints(res.points).filter((p) => p.kind === 'user');
+      expect(points.map((p) => p.id)).toEqual(['buddy', 'stranger']);
+      expect(typeof points[0]?.rankScore).toBe('number');
+      expect((points[0]?.rankScore as number) > (points[1]?.rankScore as number)).toBe(true);
+    });
+  });
+
   describe('topic filter (P3.6)', () => {
     it('restricts kinds to event/listing, slugifies, and binds the normalized topic', async () => {
       await call({ topic: '#Open-Mic' });
       const [sql, params] = query.mock.calls[0]!;
-      // users dropped (no topic), only event/listing remain
       expect(params[1]).toEqual(['event', 'listing']);
-      // slug clause present, matching on g88_slugify of title/category
       expect(sql).toContain('g88_slugify');
-      // '#Open-Mic' normalized to bare lowercase slug, bound as the last param
       expect(params).toContain('open-mic');
     });
 
@@ -266,12 +297,12 @@ describe('DiscoveryService', () => {
     });
 
     it('returns a diff (and empty points) when a prior snapshot overlaps', async () => {
-      query.mockResolvedValueOnce([p('e1'), p('e2')]); // current
-      redisGet.mockResolvedValue(JSON.stringify([p('e1')])); // prev had only e1
+      query.mockResolvedValueOnce([p('e1'), p('e2')]);
+      redisGet.mockResolvedValue(JSON.stringify([p('e1')]));
 
       const res = await call({ prevViewportHash: 'prev' });
 
-      expect(res.points).toEqual([]); // client keeps cache, applies diff
+      expect(res.points).toEqual([]);
       expect(res.diff).toBeTruthy();
       expect(asPoints(res.diff!.added).map((x) => x.id)).toEqual(['e2']);
       expect(res.diff!.removed).toEqual([]);
@@ -279,7 +310,7 @@ describe('DiscoveryService', () => {
 
     it('falls back to a full response when the prior snapshot expired', async () => {
       query.mockResolvedValueOnce([p('e1')]);
-      redisGet.mockResolvedValue(null); // expired / missing
+      redisGet.mockResolvedValue(null);
 
       const res = await call({ prevViewportHash: 'prev' });
       expect(res.diff).toBeNull();
@@ -287,7 +318,7 @@ describe('DiscoveryService', () => {
     });
 
     it('falls back to a full response on a big viewport jump (>60% removed)', async () => {
-      query.mockResolvedValueOnce([p('e9')]); // current shares nothing with prev
+      query.mockResolvedValueOnce([p('e9')]);
       redisGet.mockResolvedValue(JSON.stringify([p('e1'), p('e2'), p('e3')]));
 
       const res = await call({ prevViewportHash: 'prev' });
@@ -305,8 +336,6 @@ describe('DiscoveryService', () => {
     });
 
     it('treats a same-key content change as remove+add, not silently stale', async () => {
-      // Same id, different meta — a naive presence-only diff would drop this
-      // update entirely since the key ('e1') exists in both snapshots.
       const fresh = { id: 'e1', kind: 'event', lat: 1, lng: 2, meta: { attendeeCount: 9 } };
       query.mockResolvedValueOnce([fresh]);
       redisGet.mockResolvedValue(
@@ -321,9 +350,6 @@ describe('DiscoveryService', () => {
     });
 
     it('does not flag a real overlap as changed due to key-insertion-order alone', async () => {
-      // Regression guard for the canonical-JSON comparator: a hand-rolled
-      // fixture (id-first key order) vs. the service's own construction order
-      // must compare equal when content is identical.
       query.mockResolvedValueOnce([p('e1')]);
       redisGet.mockResolvedValue(JSON.stringify([p('e1')]));
 
