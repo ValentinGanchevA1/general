@@ -42,12 +42,31 @@ const isProd = (): boolean => process.env.NODE_ENV === 'production';
 const DEV_CODE = '000000';
 const EMAIL_OTP_TTL_SEC = 10 * 60;
 const EMAIL_OTP_PREFIX = 'verify:email:';
+const PHONE_OTP_TTL_SEC = 10 * 60;
+/** Keyed by E.164 so approvePhone can resolve without userId. */
+const PHONE_OTP_PREFIX = 'verify:phone:';
 
 function maskEmail(email: string): string {
   const [local, domain] = email.split('@');
   if (!local || !domain) return '***';
   const head = local.slice(0, 1);
   return `${head}***@${domain}`;
+}
+
+function maskPhone(phone: string): string {
+  if (phone.length < 6) return '***';
+  return `${phone.slice(0, 3)}***${phone.slice(-2)}`;
+}
+
+function otpCode(): string {
+  if (!isProd()) return process.env.DEV_OTP_CODE ?? DEV_CODE;
+  return String(randomInt(100_000, 999_999));
+}
+
+function allowDevOtp(kind: 'email' | 'phone'): boolean {
+  if (!isProd()) return true;
+  if (kind === 'email') return process.env.ALLOW_DEV_EMAIL_OTP === 'true';
+  return process.env.ALLOW_DEV_PHONE_OTP === 'true';
 }
 
 /** Ladder rank — numeric so comparisons are never possibly-undefined under strictNullChecks. */
@@ -102,7 +121,6 @@ export class VerificationService {
     const idStatus = row.id_verification_status ?? 'none';
     const rank = levelRank(level);
 
-    // ID fully done → no next step.
     if (idStatus === 'verified' || level === 'id') {
       return {
         level: level === 'id' ? 'id' : level,
@@ -115,7 +133,6 @@ export class VerificationService {
       };
     }
 
-    // After the early return, idStatus is narrowed away from 'verified'.
     const canStartEmail = rank < LEVEL_RANK.email && !!row.email;
     const canStartPhone = rank < LEVEL_RANK.phone;
     const canStartId = idStatus !== 'pending';
@@ -136,7 +153,6 @@ export class VerificationService {
           ? 'ID was rejected — you can resubmit'
           : 'Submit photo ID and selfie for full verification';
     } else {
-      // idStatus === 'pending'
       nextStep = null;
       message = 'ID under review';
     }
@@ -152,29 +168,43 @@ export class VerificationService {
     };
   }
 
+  /**
+   * Prefer Twilio Verify SMS. On missing config or API failure (trial unverified
+   * destination, channel disabled, etc.) fall back to Redis OTP — same pattern
+   * as email. Channel `dev` means the code is not delivered by SMS; non-prod and
+   * ALLOW_DEV_PHONE_OTP accept DEV_OTP_CODE; otherwise read the code from logs.
+   */
   async startPhone(
     userId: string,
     phone: string,
   ): Promise<StartPhoneVerificationResponse> {
     const client = await getTwilio();
-    if (!client) {
-      if (isProd()) {
-        throw new ServiceUnavailableException({
-          code: 'verification.unavailable',
-          message: 'Phone verification is temporarily unavailable',
-        });
+    if (client) {
+      try {
+        await client.verify.v2
+          .services(process.env.TWILIO_VERIFY_SERVICE_SID as string)
+          .verifications.create({ to: phone, channel: 'sms' });
+        return { sent: true, channel: 'sms' };
+      } catch (e) {
+        this.logger.warn(
+          `[verify] Twilio SMS failed for ${maskPhone(phone)} (user ${userId}): ${String(e)}`,
+        );
       }
-      this.logger.warn(
-        `[verify] Twilio not configured — phone OTP for ${phone} uses DEV code`,
-      );
-      return { sent: true, channel: 'dev' };
     }
 
-    await client.verify.v2
-      .services(process.env.TWILIO_VERIFY_SERVICE_SID as string)
-      .verifications.create({ to: phone, channel: 'sms' });
+    return this.issuePhoneRedisOtp(userId, phone);
+  }
 
-    return { sent: true, channel: 'sms' };
+  private async issuePhoneRedisOtp(
+    userId: string,
+    phone: string,
+  ): Promise<StartPhoneVerificationResponse> {
+    const code = otpCode();
+    await this.redis.setex(`${PHONE_OTP_PREFIX}${phone}`, PHONE_OTP_TTL_SEC, code);
+    this.logger.warn(
+      `[verify] Phone OTP (Redis/dev channel) for ${phone} (user ${userId}): ${code} (ttl ${PHONE_OTP_TTL_SEC}s)`,
+    );
+    return { sent: true, channel: 'dev' };
   }
 
   async checkPhone(userId: string, phone: string, code: string): Promise<UserProfile> {
@@ -208,6 +238,7 @@ export class VerificationService {
       throw e;
     }
 
+    await this.redis.del(`${PHONE_OTP_PREFIX}${phone}`);
     return this.users.getProfile(userId);
   }
 
@@ -233,9 +264,7 @@ export class VerificationService {
         await client.verify.v2
           .services(process.env.TWILIO_VERIFY_SERVICE_SID as string)
           .verifications.create({ to: row.email, channel: 'email' });
-        const backup = isProd()
-          ? String(randomInt(100_000, 999_999))
-          : (process.env.DEV_OTP_CODE ?? DEV_CODE);
+        const backup = otpCode();
         await this.redis.setex(`${EMAIL_OTP_PREFIX}${userId}`, EMAIL_OTP_TTL_SEC, backup);
         this.logger.log(
           `[verify] Twilio email OTP started for ${maskEmail(row.email)}; Redis backup stored`,
@@ -252,9 +281,7 @@ export class VerificationService {
       );
     }
 
-    const code = isProd()
-      ? String(randomInt(100_000, 999_999))
-      : (process.env.DEV_OTP_CODE ?? DEV_CODE);
+    const code = otpCode();
     await this.redis.setex(`${EMAIL_OTP_PREFIX}${userId}`, EMAIL_OTP_TTL_SEC, code);
     this.logger.warn(
       `[verify] Email OTP (Redis/dev channel) for ${row.email} (user ${userId}): ${code} (ttl ${EMAIL_OTP_TTL_SEC}s)`,
@@ -307,21 +334,34 @@ export class VerificationService {
   }
 
   private async approvePhone(phone: string, code: string): Promise<boolean> {
-    const client = await getTwilio();
-    if (!client) {
-      if (isProd()) {
-        throw new ServiceUnavailableException({
-          code: 'verification.unavailable',
-          message: 'Phone verification is temporarily unavailable',
-        });
-      }
-      return code === (process.env.DEV_OTP_CODE ?? DEV_CODE);
+    const trimmed = code.trim();
+
+    const stored = await this.redis.get(`${PHONE_OTP_PREFIX}${phone}`);
+    if (stored && stored === trimmed) return true;
+
+    if (allowDevOtp('phone') && trimmed === (process.env.DEV_OTP_CODE ?? DEV_CODE)) {
+      this.logger.warn(`[verify] ALLOW_DEV_PHONE_OTP / non-prod accepted for ${maskPhone(phone)}`);
+      return true;
     }
 
-    const check = await client.verify.v2
-      .services(process.env.TWILIO_VERIFY_SERVICE_SID as string)
-      .verificationChecks.create({ to: phone, code });
-    return check.status === 'approved';
+    const client = await getTwilio();
+    if (client) {
+      try {
+        const check = await client.verify.v2
+          .services(process.env.TWILIO_VERIFY_SERVICE_SID as string)
+          .verificationChecks.create({ to: phone, code: trimmed });
+        if (check.status === 'approved') return true;
+      } catch {
+        // invalid / expired / trial
+      }
+    } else if (isProd() && !stored) {
+      throw new ServiceUnavailableException({
+        code: 'verification.unavailable',
+        message: 'Phone verification is temporarily unavailable',
+      });
+    }
+
+    return false;
   }
 
   private async approveEmail(
@@ -334,16 +374,9 @@ export class VerificationService {
     const stored = await this.redis.get(`${EMAIL_OTP_PREFIX}${userId}`);
     if (stored && stored === trimmed) return true;
 
-    if (!isProd() && trimmed === (process.env.DEV_OTP_CODE ?? DEV_CODE)) {
-      return true;
-    }
-
-    if (
-      process.env.ALLOW_DEV_EMAIL_OTP === 'true' &&
-      trimmed === (process.env.DEV_OTP_CODE ?? DEV_CODE)
-    ) {
+    if (allowDevOtp('email') && trimmed === (process.env.DEV_OTP_CODE ?? DEV_CODE)) {
       this.logger.warn(
-        `[verify] ALLOW_DEV_EMAIL_OTP accepted for ${maskEmail(email)} (user ${userId})`,
+        `[verify] ALLOW_DEV_EMAIL_OTP / non-prod accepted for ${maskEmail(email)} (user ${userId})`,
       );
       return true;
     }
