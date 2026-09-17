@@ -1,24 +1,23 @@
-# G88 architecture
+# G88 Architecture
 
-Living doc. Decisions here are explicit so they can be argued with. Change log at the bottom.
+Map-first, real-time, identity-verified social + local marketplace monorepo.
 
-## 1. Goals (priority order)
+## 1. Monorepo layout
 
-1. **Discovery feels instant.** Map opens; nearby points render <500ms on a warm cache.
-2. **Realtime is reliable.** Waves, presence, and chat survive flaky networks and restarts.
-3. **Privacy by default.** Precise location is never exposed to other users.
-4. **Cheap early, scalable later.** One Render service per role at MVP.
+| Path | Role |
+|------|------|
+| `apps/mobile` | React Native (TypeScript), Redux Toolkit, Socket.IO client |
+| `apps/backend` | NestJS, PostGIS, Redis, Socket.IO gateway |
+| `apps/admin` | Vite + React + shadcn — ID verification queue |
+| `packages/shared` | DTOs, socket events, pure helpers (no UI palette) |
 
-Anti-goal: microservices-from-day-one.
+## 2. Stack
 
-## 2. Tier map
-
-| Tier | Component | Tech |
-|------|-----------|------|
-| Client | Mobile | React Native 0.83 + TS, RTK, react-native-maps |
-| Client | Admin (`apps/admin`) | Vite + React + shadcn — ID queue; origin `http://127.0.0.1:5173` |
-| Application | REST + realtime | NestJS 11; Socket.IO **in-process** (`/realtime`) |
-| Data | Primary | Postgres 16 + PostGIS + H3-PG |
+| Layer | Choice | Notes |
+|-------|--------|-------|
+| Mobile | RN + TS | Strict TS, no `any` |
+| API | NestJS | Modules, DTOs, guards |
+| Data | Postgres 16 + PostGIS + H3-PG | |
 | Data | Cache / presence | Redis 7 |
 | Data | Objects | S3 presigned + buffer uploads |
 | External | Push / OTP / Pay | FCM · Twilio · Stripe (test) |
@@ -73,11 +72,29 @@ Submit → S3 → pending. Admin decide atomic. **Rekognition assist-only.** Par
 
 Location and tokens never in Sentry. Scrubber: `packages/shared/src/scrub.ts`.
 
+### 3.13 Theme & loading UI (mobile)
+
+**Token ownership:** `apps/mobile/src/theme/index.ts` is the **only** brand/UI palette for the React Native app. Do not reintroduce `packages/shared` brand exports — shared stays DTOs, socket events, and pure helpers (`resolveTrustNextStep`, `strikeStanding`, scrubbers).
+
+**Admin** (`apps/admin`) uses its own Vite/shadcn tokens; no requirement to share hex with mobile.
+
+**Intentional non-token hex:**
+- `mapStyle.ts` — Google Maps JSON style array
+- `socialConfig.ts` — third-party provider brand colours
+
+**Loading convention:**
+- **Lists / grids / detail cold-start** → `Skeleton`, `SkeletonListRow`, `SkeletonMarketGrid` (`components/Skeleton.tsx`)
+- **Button / toggle in-flight** → `ActivityIndicator` on the control only
+- **Map first paint** → spinner or blank map is acceptable; region settle is not a skeleton surface
+
+Migrate remaining full-screen `ActivityIndicator` placeholders **as-you-touch** (same policy as the hex cleanup). Not a sprint gate.
+
 ## 4. Module map (backend)
 
 auth · users · discovery · presence · interactions · chat · blocks · friends · stories · listings · events · gifts · gamification · challenges · achievements · notifications · alerts · geofences · verification · id-verification · subscriptions · feed · trending · admin
 
 ## 5. Change log
 
+- **2026-09-17** — Theme ownership (`mobile/theme` sole UI tokens); toast tints + shadowInk; loading Skeleton convention.
 - **2026-09-14** — Docs restore. Migrations 0001–0040 / next 0041. listingMode, friendsOnly, MAX_CELLS 5k, map polish Option 1, EntityBottomSheet, offers/counter, friends online privacy. Privacy invariant unchanged.
 - **2026-06–08** — H3, clustering, r10 fuzz, presence-in-Redis, in-process realtime, admin app established.
