@@ -3,15 +3,11 @@
 // Stable speed-dial FAB (Phase-1 UX pass).
 // - Fixed identity: a "Create" button, bottom-right, with an always-visible
 //   label pill. The button never changes meaning — it always opens the menu.
-// - Single tap → toggle the actions menu. No long-press, no double-tap, no
-//   tap-disambiguation delay (the old morphing-primary model made the button
-//   unpredictable and every tap felt laggy).
-// - Context (zoom/density/visibility/goal) is used ONLY to order the menu, so
-//   the most relevant action sits at the top — it no longer swaps what a tap
-//   does.
-// - Backdrop tap → collapse. Lightweight in-tree overlay (no full-screen Modal,
-//   so the map stays visible behind a light scrim).
+// - Single tap → toggle the actions menu.
+// - Context (zoom/density/visibility/goal) is used ONLY to order the menu.
+// - Backdrop tap → collapse.
 // - Placed maximum bottom (tab-bar clearance only) unless host passes bottomOffset.
+// Product: deferred wiring on MapScreen — component kept for future use.
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -38,13 +34,7 @@ interface Props {
   zoom: number;
   points: DiscoveryPoint[];
   nearestUserId: string | null;
-  /**
-   * Host (MapScreen) can intercept specific actions for optimistic UX
-   * (e.g. wave_nearest). Returning truthy means handled; falsy = fall
-   * through to default routing.
-   */
   onAction?: (id: FabActionId, ctxKey: string) => boolean | Promise<boolean>;
-  /** Extra bottom clearance to sit above sibling overlays (e.g. EventsRail). */
   bottomOffset?: number;
 }
 
@@ -62,7 +52,6 @@ export function ContextualFab(props: Props): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const fabBottom = mapFabBottom(insets.bottom, bottomOffset);
 
-  // useState (not useRef) so identity is stable without a render-time ref read.
   const [anim] = useState(() => new Animated.Value(0));
   const [expandAt, setExpandAt] = useState(0);
 
@@ -82,7 +71,7 @@ export function ContextualFab(props: Props): React.JSX.Element {
     setOpen(true);
     setExpandAt(Date.now());
     animateTo(1);
-    try { Vibration.vibrate(10); } catch { /* no-op on web/sim */ }
+    try { Vibration.vibrate(10); } catch { /* no-op */ }
     track('fab.expand', { contextKey: ctx.key, primaryActionId: ctx.primary, gesture: 'tap' });
   }, [open, collapse, animateTo, ctx.key, ctx.primary]);
 
@@ -100,7 +89,6 @@ export function ContextualFab(props: Props): React.JSX.Element {
       if (handled) { collapse(); return; }
     }
 
-    // Default routing — host did not intercept.
     switch (id) {
       case 'open_pulse':
         dispatch(setPendingFilter('all'));
@@ -113,21 +101,18 @@ export function ContextualFab(props: Props): React.JSX.Element {
         openRootScreen(nav, 'EventCreate');
         break;
       case 'create_listing':
-        // Single destination — matches MapScreen onFabAction intercept.
         openRootScreen(nav, 'Marketplace');
         break;
       case 'toggle_visibility':
         openRootScreen(nav, 'Settings');
         break;
       default:
-        // wave_nearest should be intercepted by host; fall through safely.
         dispatch(setPendingFilter('all'));
         nav.navigate('Main', { screen: 'Pulse' });
     }
     collapse();
   }, [ctx.key, ctx.primary, expandAt, onAction, dispatch, nav, collapse]);
 
-  // Context decides ORDER only: most relevant first, then ranked secondaries.
   const menu: FabActionId[] = [ctx.primary, ...ctx.secondary];
 
   return (
@@ -214,7 +199,7 @@ const S = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1, borderColor: colors.borderStrong,
     justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 6, elevation: 6,
+    shadowColor: colors.shadowInk, shadowOpacity: 0.4, shadowRadius: 6, elevation: 6,
   },
   itemLabel: {
     color: colors.textPrimary, fontSize: fontSize.sm, fontWeight: '500',

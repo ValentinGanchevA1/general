@@ -4,9 +4,14 @@
 // inline across screens (no visual change intended) so a UX pass can converge
 // on one source of truth instead of re-declaring hexes per StyleSheet.
 //
-// Adoption: most UI StyleSheets now import tokens from here. Remaining
-// intentional hex: Google Maps style JSON (mapStyle.ts), third-party brand
-// colours (socialConfig providers), ambient toast gradient tints, shadowColor #000.
+// Ownership: this file is the sole mobile UI token source of truth.
+// packages/shared carries DTOs/socket contracts only — no brand palette.
+// Admin (Vite) keeps its own shadcn tokens.
+//
+// Intentional remaining hex outside this file:
+//   - mapStyle.ts (Google Maps JSON style array)
+//   - socialConfig.ts (third-party brand colours: Instagram, X, …)
+// Prefer tokens for all app UI. Migrate residual literals when touching a file.
 
 export const colors = {
   /** App background (near-black). */
@@ -73,6 +78,16 @@ export const colors = {
   premiumBorder: '#FFD70040',
   /** Premium tier purple (subscription badge). */
   premiumTier: '#9C27B0',
+
+  /** Ambient toast gradient start tints (end = surface / bg). */
+  toastXp: '#2a1a08',
+  toastSuccess: '#0d2818',
+  toastAchievement: '#1a1030',
+  toastRank: '#0a2030',
+  toastWave: '#0a2430',
+  toastGift: '#2a1030',
+  /** Neutral shadow ink (elevation). Prefer over raw #000 in StyleSheets. */
+  shadowInk: '#000000',
 
   /** Translucent primary tints (chips, selected rows). */
   primarySoft: 'rgba(0, 212, 255, 0.07)',

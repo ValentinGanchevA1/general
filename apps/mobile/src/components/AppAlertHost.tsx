@@ -31,7 +31,6 @@ export function AppAlertHost(): React.JSX.Element | null {
 
   const onButton = useCallback((btn: AppAlertButton) => {
     setReq(null);
-    // Defer past modal unmount (RN has no reliable queueMicrotask in all targets).
     setTimeout(() => {
       btn.onPress?.();
     }, 0);
@@ -42,7 +41,6 @@ export function AppAlertHost(): React.JSX.Element | null {
   const orderedButtons = useMemo(() => {
     if (!req) return [];
     const btns = [...req.buttons];
-    // Cancel first, then defaults, destructive last — readable on stacked layouts.
     btns.sort((a, b) => {
       const rank = (s?: string) =>
         s === 'cancel' ? 0 : s === 'destructive' ? 2 : 1;
@@ -53,7 +51,6 @@ export function AppAlertHost(): React.JSX.Element | null {
 
   if (!req) return null;
 
-  // 1–2 actions: optional side-by-side. 3+: always stack so labels never wrap mid-word.
   const useRow = orderedButtons.length === 2;
 
   return (
@@ -133,7 +130,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.lg,
-    shadowColor: '#000',
+    shadowColor: colors.shadowInk,
     shadowOpacity: 0.45,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 12 },
