@@ -28,6 +28,7 @@ describe('VerificationService', () => {
     delete process.env.TWILIO_VERIFY_SERVICE_SID;
     delete process.env.DEV_OTP_CODE;
     delete process.env.ALLOW_DEV_EMAIL_OTP;
+    delete process.env.ALLOW_DEV_PHONE_OTP;
 
     query = jest.fn().mockResolvedValue([]);
     getProfile = jest.fn().mockResolvedValue({ id: 'u1', verificationLevel: 'phone' });
@@ -133,18 +134,24 @@ describe('VerificationService', () => {
   });
 
   describe('startPhone', () => {
-    it('returns the dev channel when Twilio is not configured (non-prod)', async () => {
+    it('returns the dev channel and stores Redis OTP when Twilio is not configured (non-prod)', async () => {
       await expect(service.startPhone('u1', '+15550001111')).resolves.toEqual({
         sent: true,
         channel: 'dev',
       });
+      expect(redis.setex).toHaveBeenCalledWith('verify:phone:+15550001111', 600, '000000');
     });
 
-    it('is unavailable in production without Twilio creds', async () => {
+    it('falls back to Redis OTP in production without Twilio (no 503)', async () => {
       process.env.NODE_ENV = 'production';
-      await expect(service.startPhone('u1', '+15550001111')).rejects.toBeInstanceOf(
-        ServiceUnavailableException,
-      );
+      const res = await service.startPhone('u1', '+15550001111');
+      expect(res).toEqual({ sent: true, channel: 'dev' });
+      expect(redis.setex).toHaveBeenCalled();
+      const [key, ttl, code] = redis.setex.mock.calls[0]!;
+      expect(key).toBe('verify:phone:+15550001111');
+      expect(ttl).toBe(600);
+      expect(code).toMatch(/^\d{6}$/);
+      expect(code).not.toBe('000000');
     });
   });
 
@@ -164,6 +171,14 @@ describe('VerificationService', () => {
       expect(res).toMatchObject({ id: 'u1' });
     });
 
+    it('accepts Redis-stored OTP and clears the key', async () => {
+      redis.get.mockResolvedValueOnce('654321');
+      const res = await service.checkPhone('u1', '+15550001111', '654321');
+      expect(redis.get).toHaveBeenCalledWith('verify:phone:+15550001111');
+      expect(redis.del).toHaveBeenCalledWith('verify:phone:+15550001111');
+      expect(res).toMatchObject({ id: 'u1' });
+    });
+
     it('maps a unique-violation to phone_taken', async () => {
       const err = new QueryFailedError('q', undefined, new Error('dup'));
       (err as unknown as { code: string }).code = '23505';
@@ -171,6 +186,23 @@ describe('VerificationService', () => {
       await expect(service.checkPhone('u1', '+1555', '000000')).rejects.toBeInstanceOf(
         ConflictException,
       );
+    });
+
+    it('rejects fixed DEV code in production without ALLOW_DEV_PHONE_OTP', async () => {
+      process.env.NODE_ENV = 'production';
+      redis.get.mockResolvedValueOnce(null);
+      await expect(service.checkPhone('u1', '+1555', '000000')).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
+      );
+    });
+
+    it('accepts DEV code in production when ALLOW_DEV_PHONE_OTP=true', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.ALLOW_DEV_PHONE_OTP = 'true';
+      redis.get.mockResolvedValueOnce(null);
+      await expect(service.checkPhone('u1', '+1555', '000000')).resolves.toMatchObject({
+        id: 'u1',
+      });
     });
   });
 
