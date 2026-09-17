@@ -13,7 +13,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import type { EntityKind, ListingMode } from '@g88/shared';
+import type { DiscoveryRankBy, EntityKind, ListingMode } from '@g88/shared';
 
 class LatLngDto {
   @IsLatitude()
@@ -67,4 +67,12 @@ export class DiscoveryQueryDto {
   @IsOptional()
   @IsBoolean()
   friendsOnly?: boolean;
+
+  /**
+   * Entity sort mode. Default relevance (multi-signal).
+   * distance = geographic only; newest = listing/event time when available.
+   */
+  @IsOptional()
+  @IsIn(['relevance', 'distance', 'newest'])
+  rankBy?: DiscoveryRankBy;
 }
