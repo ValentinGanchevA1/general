@@ -1,1 +1,210 @@
-PLACEHOLDER
+// apps/mobile/src/components/ContextualFab/index.tsx
+//
+// Stable speed-dial FAB (Phase-1 UX pass).
+// - Fixed identity: a "Create" button, bottom-right, with an always-visible
+//   label pill. The button never changes meaning — it always opens the menu.
+// - Single tap → toggle the actions menu.
+// - Context (zoom/density/visibility/goal) is used ONLY to order the menu.
+// - Backdrop tap → collapse.
+// - Placed maximum bottom (tab-bar clearance only) unless host passes bottomOffset.
+// Product: deferred wiring on MapScreen — component kept for future use.
+
+import React, { useCallback, useState } from 'react';
+import {
+  Animated, Pressable, StyleSheet, Text, Vibration, View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+import type { DiscoveryPoint } from '@g88/shared';
+import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { openRootScreen } from '@/navigation/openRootScreen';
+import { useAppDispatch } from '@/hooks/redux';
+import { setPendingFilter } from '@/features/pulse/pulseSlice';
+import { track } from '@/lib/analytics';
+import { colors, radius, spacing, fontSize, shadow } from '@/theme';
+import { mapFabBottom } from '@/components/map/mapChromeLayout';
+
+import { useFabContext, type FabActionId } from './useFabContext';
+import { FAB_ACTIONS } from './fabActions';
+
+interface Props {
+  zoom: number;
+  points: DiscoveryPoint[];
+  nearestUserId: string | null;
+  onAction?: (id: FabActionId, ctxKey: string) => boolean | Promise<boolean>;
+  bottomOffset?: number;
+}
+
+const FAB_SIZE = 56;
+const ITEM_SIZE = 48;
+const ITEM_GAP = 14;
+
+export function ContextualFab(props: Props): React.JSX.Element {
+  const { zoom, points, nearestUserId, onAction, bottomOffset = 0 } = props;
+  const ctx = useFabContext({ zoom, points, nearestUserId });
+
+  const [open, setOpen] = useState(false);
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const dispatch = useAppDispatch();
+  const insets = useSafeAreaInsets();
+  const fabBottom = mapFabBottom(insets.bottom, bottomOffset);
+
+  const [anim] = useState(() => new Animated.Value(0));
+  const [expandAt, setExpandAt] = useState(0);
+
+  const animateTo = useCallback((toValue: number): void => {
+    Animated.spring(anim, {
+      toValue, useNativeDriver: true, friction: 7, tension: 80,
+    }).start();
+  }, [anim]);
+
+  const collapse = useCallback((): void => {
+    animateTo(0);
+    setOpen(false);
+  }, [animateTo]);
+
+  const toggle = useCallback((): void => {
+    if (open) { collapse(); return; }
+    setOpen(true);
+    setExpandAt(Date.now());
+    animateTo(1);
+    try { Vibration.vibrate(10); } catch { /* no-op */ }
+    track('fab.expand', { contextKey: ctx.key, primaryActionId: ctx.primary, gesture: 'tap' });
+  }, [open, collapse, animateTo, ctx.key, ctx.primary]);
+
+  const runAction = useCallback(async (id: FabActionId): Promise<void> => {
+    const isPrimary = id === ctx.primary;
+    track(isPrimary ? 'fab.tap.primary' : 'fab.tap.secondary', {
+      contextKey: ctx.key,
+      primaryActionId: ctx.primary,
+      secondaryActionId: isPrimary ? null : id,
+      dwellMs: Date.now() - expandAt,
+    });
+
+    if (onAction) {
+      const handled = await onAction(id, ctx.key);
+      if (handled) { collapse(); return; }
+    }
+
+    switch (id) {
+      case 'open_pulse':
+        dispatch(setPendingFilter('all'));
+        nav.navigate('Main', { screen: 'Pulse' });
+        break;
+      case 'post_alert':
+        nav.navigate('AlertComposer', { presetCategory: 'general' });
+        break;
+      case 'create_event':
+        openRootScreen(nav, 'EventCreate');
+        break;
+      case 'create_listing':
+        openRootScreen(nav, 'Marketplace');
+        break;
+      case 'toggle_visibility':
+        openRootScreen(nav, 'Settings');
+        break;
+      default:
+        dispatch(setPendingFilter('all'));
+        nav.navigate('Main', { screen: 'Pulse' });
+    }
+    collapse();
+  }, [ctx.key, ctx.primary, expandAt, onAction, dispatch, nav, collapse]);
+
+  const menu: FabActionId[] = [ctx.primary, ...ctx.secondary];
+
+  return (
+    <>
+      {open && (
+        <Pressable style={S.backdrop} onPress={collapse} testID="fab-backdrop" />
+      )}
+
+      {open && menu.map((id, i) => {
+        const def = FAB_ACTIONS[id];
+        const bottom = fabBottom + FAB_SIZE + ITEM_GAP + i * (ITEM_SIZE + ITEM_GAP);
+        const opacity = anim;
+        const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] });
+        return (
+          <Animated.View
+            key={id}
+            style={[S.itemRow, { bottom, opacity, transform: [{ translateY }] }]}
+            pointerEvents="box-none"
+          >
+            <Text style={S.itemLabel}>{def.label}</Text>
+            <Pressable
+              testID={`fab-secondary-${id}`}
+              style={S.item}
+              onPress={() => { void runAction(id); }}
+              accessibilityRole="button"
+              accessibilityLabel={def.label}
+            >
+              <MCI name={def.icon} size={20} color={colors.primary} />
+            </Pressable>
+          </Animated.View>
+        );
+      })}
+
+      <Pressable
+        style={({ pressed }) => [S.fabRow, { bottom: fabBottom }, pressed && S.pressed]}
+        onPress={toggle}
+        testID="contextual-fab"
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={open ? 'Close actions menu' : 'Create. Opens the actions menu.'}
+        hitSlop={8}
+      >
+        <Text style={S.fabLabel}>{open ? 'Close' : 'Create'}</Text>
+        <View style={S.fab}>
+          <MCI name={open ? 'close' : 'plus'} size={28} color={colors.onPrimary} />
+        </View>
+      </Pressable>
+    </>
+  );
+}
+
+const S = StyleSheet.create({
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    zIndex: 90,
+  },
+
+  fabRow: {
+    position: 'absolute', right: spacing.lg,
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    zIndex: 102,
+  },
+  pressed: { opacity: 0.9, transform: [{ scale: 0.97 }] },
+  fab: {
+    width: FAB_SIZE, height: FAB_SIZE, borderRadius: radius.fab,
+    backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',
+    ...shadow.fab,
+  },
+  fabLabel: {
+    color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '700',
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderRadius: radius.pill, overflow: 'hidden',
+  },
+
+  itemRow: {
+    position: 'absolute', right: spacing.lg,
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    zIndex: 101,
+  },
+  item: {
+    width: ITEM_SIZE, height: ITEM_SIZE, borderRadius: ITEM_SIZE / 2,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1, borderColor: colors.borderStrong,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: colors.shadowInk, shadowOpacity: 0.4, shadowRadius: 6, elevation: 6,
+  },
+  itemLabel: {
+    color: colors.textPrimary, fontSize: fontSize.sm, fontWeight: '500',
+    backgroundColor: 'rgba(26,26,46,0.9)',
+    paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+    borderRadius: radius.md, overflow: 'hidden',
+  },
+});
