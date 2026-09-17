@@ -22,6 +22,7 @@ import {
 } from '@react-native-firebase/messaging';
 
 import { api } from '@/api/client';
+import { focusUserOnMapViaRef } from '@/navigation/focusUserOnMap';
 
 const messaging = () => getMessaging();
 
@@ -91,6 +92,13 @@ function handleNotificationTap(
   if (!data) return;
   if (data['type'] === 'message' && data['conversationId']) {
     navigate('Chat', { conversationId: data['conversationId'], otherUserName: '' });
+  } else if (data['type'] === 'wave' && data['fromUserId']) {
+    // Core loop: inbound wave → peer pin on map (fallback: Interactions).
+    void focusUserOnMapViaRef({ userId: data['fromUserId'] }).then((result) => {
+      if (result === 'error') {
+        navigate('Interactions');
+      }
+    });
   } else if (data['type'] === 'alert') {
     // Open the Pulse tab pre-filtered to alerts.
     navigate('Main', { screen: 'Pulse', params: { filter: 'alerts' } });
