@@ -20,6 +20,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { deleteAccount, logout } from '@/features/auth/authSlice';
 import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
 import { ListRow } from '@/components/ListRow';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { APP_VERSION } from '@/constants/app';
 import { colors, spacing, fontSize, radius } from '@/theme';
 import { resolveTrustNextStep, strikeStanding } from '@g88/shared';
@@ -104,6 +105,7 @@ export function SettingsScreen(): React.JSX.Element {
 
   return (
     <View style={styles.root}>
+      <ScreenHeader title="Settings" />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Discovery</Text>
