@@ -91,13 +91,15 @@ export function useUserProfileScreenData(userId: string, navigation: Nav) {
   }, [userId, navigation, loadRelationship]);
 
   // Defer reset off the effect body — satisfies react-hooks/set-state-in-effect.
+  // setTimeout(0) (not queueMicrotask): mobile tsconfig lib lacks queueMicrotask (TS2304).
   useEffect(() => {
-    queueMicrotask(() => {
+    const t = setTimeout(() => {
       setLoading(true);
       setProfile(null);
       setRel(null);
       loadProfile();
-    });
+    }, 0);
+    return () => clearTimeout(t);
   }, [loadProfile]);
 
   const sendWave = useCallback(async (): Promise<void> => {
