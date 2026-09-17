@@ -226,28 +226,26 @@ jobs:
           path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 14
 
-      # Give the APK a stable, human-friendly filename so the
-      # releases/latest/download/g88-v1.0.apk link is permanent.
+      # Stable filename for releases/latest/download/g88-v1.0.apk.
+      # Copy to workspace root — softprops temp-dir logic is more reliable with a
+      # short path (deep android/… paths + Node 20→24 force caused
+      # "Error creating asset temp dir" on v2.2.1).
       - name: Stage APK for release
-        run: cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/g88-v1.0.apk
+        working-directory: .
+        run: |
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/g88-v1.0.apk"
+          ls -la "$GITHUB_WORKSPACE/g88-v1.0.apk"
 
-      # Publishes a GitHub Release per run with the signed APK attached. The
-      # per-run tag (apk-v1.0.<run_number>) is immutable history; make_latest
-      # keeps releases/latest/download/g88-v1.0.apk pointing at the newest build,
-      # so the share link never changes. Full release (not prerelease) is
-      # required for the /latest/ redirect to resolve.
-      # Requires contents:write (workflow + job). If this still fails with
-      # "Resource not accessible by integration", set repo Settings → Actions
-      # → General → Workflow permissions → Read and write permissions.
-      # Optional override: create a classic PAT (repo scope) as secret
-      # RELEASE_GITHUB_TOKEN when the default GITHUB_TOKEN is restricted by org policy.
+      # softprops v3 = Node 24 runtime (matches FORCE_JAVASCRIPT_ACTIONS_TO_NODE24).
+      # Per-run tag apk-v1.0.<run_number>; make_latest keeps the permanent download URL.
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2.2.1
+        uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.RELEASE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           tag_name: apk-v1.0.${{ github.run_number }}
           name: "G88 v1.0 (build ${{ github.run_number }}) — Android sideload APK"
-          files: apps/mobile/android/app/build/outputs/apk/release/g88-v1.0.apk
+          files: g88-v1.0.apk
+          working_directory: ${{ github.workspace }}
           make_latest: "true"
           fail_on_unmatched_files: true
           target_commitish: ${{ github.sha }}
