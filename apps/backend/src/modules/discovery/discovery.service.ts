@@ -217,17 +217,21 @@ export class DiscoveryService {
     return { added, removed };
   }
 
+  /** Stable identity for diff — omit rankScore (request-derived, not entity content). */
   private canonicalJson(value: unknown): string {
-    return JSON.stringify(value, (_key, val) =>
-      val && typeof val === 'object' && !Array.isArray(val)
-        ? Object.keys(val as Record<string, unknown>)
-            .sort()
-            .reduce<Record<string, unknown>>((acc, k) => {
-              acc[k] = (val as Record<string, unknown>)[k];
-              return acc;
-            }, {})
-        : val,
-    );
+    return JSON.stringify(value, (key, val) => {
+      if (key === 'rankScore') return undefined;
+      if (val && typeof val === 'object' && !Array.isArray(val)) {
+        return Object.keys(val as Record<string, unknown>)
+          .sort()
+          .reduce<Record<string, unknown>>((acc, k) => {
+            if (k === 'rankScore') return acc;
+            acc[k] = (val as Record<string, unknown>)[k];
+            return acc;
+          }, {});
+      }
+      return val;
+    });
   }
 
   private async clusterByCell(
