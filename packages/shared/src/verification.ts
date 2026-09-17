@@ -60,7 +60,7 @@ export interface TrustNextStep {
 export function resolveTrustNextStep(input: {
   emailVerified: boolean;
   phoneVerified: boolean;
-  idStatus?: IdVerificationStatus | null;
+  idStatus?: IdVerificationStatus | null | undefined;
 }): TrustNextStep {
   if (!input.emailVerified) {
     return {
