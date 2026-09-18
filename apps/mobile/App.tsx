@@ -11,12 +11,19 @@ import { scrubSentryPayload } from '@g88/shared';
 import { store } from '@/store';
 import { AppNavigator } from '@/navigation/AppNavigator';
 import { Config } from '@/config';
-import { navigationIntegration } from '@/lib/sentry';
+import {
+  navigationIntegration,
+  resolveSentryDist,
+  resolveSentryRelease,
+} from '@/lib/sentry';
 
 Sentry.init({
   dsn: Config.SENTRY_DSN,
   enabled: !__DEV__ && !!Config.SENTRY_DSN,
   environment: __DEV__ ? 'development' : 'production',
+  // Tie events to the build that produced them (must match CI / upload release name).
+  release: resolveSentryRelease(),
+  dist: resolveSentryDist(),
   sendDefaultPii: false,
   // Performance tracing — 100% in local validation builds; sample in prod.
   tracesSampleRate: __DEV__ ? 1.0 : 0.2,
