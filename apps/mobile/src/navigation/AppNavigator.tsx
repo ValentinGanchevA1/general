@@ -56,6 +56,7 @@ import {
 import { pingGamification } from '@/features/gamification/useGamification';
 import { AmbientToastHost } from '@/components/AmbientToastHost';
 import { AppAlertHost } from '@/components/AppAlertHost';
+import { navigationIntegration } from '@/lib/sentry';
 import { navigationRef } from './navigationRef';
 import { openViaRef } from './openRootScreen';
 import { takePendingPhoneVerify } from '@/services/pendingPhone';
@@ -318,7 +319,12 @@ export function AppNavigator(): React.JSX.Element {
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer
+      ref={navigationRef}
+      onReady={() => {
+        navigationIntegration.registerNavigationContainer(navigationRef);
+      }}
+    >
       <BottomSheetModalProvider>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {user ? (
