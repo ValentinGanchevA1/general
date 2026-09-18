@@ -11,12 +11,16 @@ import { scrubSentryPayload } from '@g88/shared';
 import { store } from '@/store';
 import { AppNavigator } from '@/navigation/AppNavigator';
 import { Config } from '@/config';
+import { navigationIntegration } from '@/lib/sentry';
 
 Sentry.init({
   dsn: Config.SENTRY_DSN,
   enabled: !__DEV__ && !!Config.SENTRY_DSN,
   environment: __DEV__ ? 'development' : 'production',
   sendDefaultPii: false,
+  // Performance tracing — 100% in local validation builds; sample in prod.
+  tracesSampleRate: __DEV__ ? 1.0 : 0.2,
+  integrations: [navigationIntegration],
   // Shared PII/secret scrubber (OB1) — same denylist + token redaction as the
   // backend. Last line of defence before anything leaves the device.
   beforeSend: (event) => scrubSentryPayload(event),
