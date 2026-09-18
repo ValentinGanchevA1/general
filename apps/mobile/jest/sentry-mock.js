@@ -25,4 +25,8 @@ module.exports = {
   close: () => Promise.resolve(true),
   // Sentry.wrap(App) must return a usable component.
   wrap: (component) => component,
+  // Used by src/lib/sentry.ts navigationIntegration.
+  reactNavigationIntegration: () => ({
+    registerNavigationContainer: noop,
+  }),
 };
