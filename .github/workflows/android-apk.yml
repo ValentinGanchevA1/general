@@ -13,6 +13,14 @@ name: Android APK (sideload)
 # "Print signing certificate fingerprints" step below — NOT the Play App Signing
 # SHA-1. Add it once in Google Cloud Console → Credentials → the release Maps key.
 #
+# Sentry:
+#   - secrets.SENTRY_DSN — public DSN inlined into the JS bundle (events + traces).
+#   - SENTRY_RELEASE / SENTRY_DIST — stamped on every event so they match future
+#     source-map / native symbol uploads (format: com.g88@0.1.0+<run_number>).
+#   - secrets.SENTRY_AUTH_TOKEN — NOT used yet. Required after
+#     `npx @sentry/wizard@latest -i reactNative` wires Gradle/Xcode upload hooks.
+#     Token scopes: org:read, project:releases, project:write. Never commit it.
+#
 # Trigger: manual via the Actions tab (once this file is on the default branch),
 # or by pushing the ci/android-apk branch.
 on:
@@ -185,9 +193,17 @@ jobs:
         # process env, otherwise they inline as '' and Google Sign-In + Sentry are
         # silently disabled in the APK. The web client id is public (OAuth web
         # client); SENTRY_DSN is a public DSN kept as a secret for hygiene.
+        #
+        # SENTRY_RELEASE / SENTRY_DIST must match versionCodeOverride so that
+        # when source-map upload is wired (wizard + SENTRY_AUTH_TOKEN), artifacts
+        # attach to the same release the client stamps on events.
         env:
           GOOGLE_WEB_CLIENT_ID: 689098029576-r7hoijre01nvocb25elp2q0ufb5v0geu.apps.googleusercontent.com
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_DIST: ${{ github.run_number }}
+          SENTRY_RELEASE: com.g88@0.1.0+${{ github.run_number }}
+          # Present for future Gradle/Xcode upload hooks; unused until wizard is run.
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           cd android
           # Maven Central rate-limits GHA (HTTP 429). Mirror + init-script reduce
@@ -264,5 +280,6 @@ jobs:
             - Signed with the G88 upload key (stable identity — builds install over each other).
             - Connects to the production backend (`api.g88.app`).
             - If the map is blank, the app's upload-key SHA-1 still needs whitelisting on the release Maps key.
+            - Sentry release tag: `com.g88@0.1.0+${{ github.run_number }}` (events only until wizard + SENTRY_AUTH_TOKEN upload hooks).
 
             Commit: ${{ github.sha }} · Build: ${{ github.run_number }}
