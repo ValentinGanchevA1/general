@@ -57,6 +57,12 @@ describe('PresenceService', () => {
       expect(res.lat).toBeCloseTo(expected.lat, 5);
       expect(res.lng).toBeCloseTo(expected.lng, 5);
       expect(pipe.set).toHaveBeenCalledWith('presence:user:u1', '1', 'EX', 120);
+      expect(pipe.set).toHaveBeenCalledWith(
+        'presence:last_seen:u1',
+        expect.any(String),
+        'EX',
+        30 * 24 * 60 * 60,
+      );
       expect(pipe.exec).toHaveBeenCalled();
       expect(query).toHaveBeenCalledTimes(1); // persistLocation ran (cell changed from null)
     });
@@ -83,11 +89,32 @@ describe('PresenceService', () => {
   });
 
   describe('markOffline', () => {
-    it('deletes presence keys and drops the user from their cell set', async () => {
+    it('deletes presence keys, stamps last_seen, and drops the user from their cell set', async () => {
       redis.get.mockResolvedValue('cell-x');
       await service.markOffline('u1');
       expect(pipe.del).toHaveBeenCalledWith('presence:user:u1');
+      expect(pipe.set).toHaveBeenCalledWith(
+        'presence:last_seen:u1',
+        expect.any(String),
+        'EX',
+        30 * 24 * 60 * 60,
+      );
       expect(pipe.zrem).toHaveBeenCalledWith('presence:cell:cell-x', 'u1');
+    });
+  });
+
+  describe('lastSeenMap', () => {
+    it('returns empty map for no candidates', async () => {
+      await expect(service.lastSeenMap([])).resolves.toEqual(new Map());
+      expect(redis.mget).not.toHaveBeenCalled();
+    });
+
+    it('maps epoch-ms strings to ISO and skips invalid values', async () => {
+      const t = 1_700_000_000_000;
+      redis.mget.mockResolvedValue([String(t), null, 'nope', '']);
+      const map = await service.lastSeenMap(['a', 'b', 'c', 'd']);
+      expect(map.size).toBe(1);
+      expect(map.get('a')).toBe(new Date(t).toISOString());
     });
   });
 
