@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryFailedError } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
 
@@ -60,12 +60,20 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(password, AuthService.BCRYPT_ROUNDS);
-    const rows = await this.db.query<UserRow[]>(
-      `INSERT INTO users (email, password_hash, display_name)
-            VALUES ($1, $2, $3)
-         RETURNING id, email, password_hash, display_name, avatar_url, verification_level`,
-      [email, passwordHash, displayName],
-    );
+    let rows: UserRow[];
+    try {
+      rows = await this.db.query<UserRow[]>(
+        `INSERT INTO users (email, password_hash, display_name)
+              VALUES ($1, $2, $3)
+           RETURNING id, email, password_hash, display_name, avatar_url, verification_level`,
+        [email, passwordHash, displayName],
+      );
+    } catch (err) {
+      if (err instanceof QueryFailedError && (err as QueryFailedError & { code: string }).code === '23505') {
+        throw new ConflictException({ code: 'auth.email_taken', message: 'Email already in use' });
+      }
+      throw err;
+    }
 
     const user = rows[0];
     if (!user) {
