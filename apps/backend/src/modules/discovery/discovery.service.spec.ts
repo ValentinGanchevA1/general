@@ -19,9 +19,20 @@ import { FriendsService } from '../friends/friends.service';
 import { REDIS_CLIENT } from '../../config/redis.provider';
 
 const VIEWPORT: Viewport = {
-  ne: { lat: 42.72, lng: 23.35 },
-  sw: { lat: 42.68, lng: 23.25 },
+  ne: { lat: 1.05, lng: 1.05 },
+  sw: { lat: 1.0, lng: 1.0 },
 };
+
+type LoosePoint = {
+  kind: string;
+  id?: string;
+  cellId?: string;
+  count?: number;
+  by?: Record<string, number>;
+  meta?: Record<string, unknown>;
+  rankScore?: number;
+};
+const asPoints = (ps: unknown): LoosePoint[] => ps as LoosePoint[];
 
 describe('DiscoveryService', () => {
   let service: DiscoveryService;
@@ -34,6 +45,10 @@ describe('DiscoveryService', () => {
   let redisSet: jest.Mock;
 
   beforeEach(async () => {
+    (h3ResolutionForZoom as jest.Mock).mockReturnValue(8);
+    (isEntityZoom as jest.Mock).mockReturnValue(true);
+    (cellsForViewport as jest.Mock).mockReturnValue(['c1']);
+
     query = jest.fn().mockResolvedValue([]);
     whichAreOnline = jest.fn().mockResolvedValue(new Set<string>());
     lastSeenMap = jest.fn().mockResolvedValue(new Map<string, string>());
@@ -41,10 +56,6 @@ describe('DiscoveryService', () => {
     listWhoAllowFriendsOnline = jest.fn().mockResolvedValue(new Set<string>());
     redisGet = jest.fn().mockResolvedValue(null);
     redisSet = jest.fn().mockResolvedValue('OK');
-
-    (h3ResolutionForZoom as jest.Mock).mockReturnValue(8);
-    (isEntityZoom as jest.Mock).mockReturnValue(true);
-    (cellsForViewport as jest.Mock).mockReturnValue(['cell1']);
 
     const mod = await Test.createTestingModule({
       providers: [
@@ -61,27 +72,80 @@ describe('DiscoveryService', () => {
     service = mod.get(DiscoveryService);
   });
 
-  it('returns empty when friendsOnly and no friends', async () => {
-    listFriendIds.mockResolvedValueOnce([]);
-    const res = await service.nearby({
-      viewport: VIEWPORT,
-      zoom: 14,
-      requesterId: 'me',
-      friendsOnly: true,
+  const call = (over: Record<string, unknown> = {}) =>
+    service.nearby({ viewport: VIEWPORT, zoom: 16, requesterId: 'me', ...over });
+
+  describe('guards', () => {
+    it('returns empty (no DB hit) when the viewport produces no cells', async () => {
+      (cellsForViewport as jest.Mock).mockReturnValue([]);
+      const res = await call();
+      expect(res.points).toEqual([]);
+      expect(query).not.toHaveBeenCalled();
     });
-    expect(res.points).toEqual([]);
-    expect(query).not.toHaveBeenCalled();
+
+    it('returns empty when friendsOnly and no friends', async () => {
+      listFriendIds.mockResolvedValueOnce([]);
+      const res = await call({ friendsOnly: true });
+      expect(res.points).toEqual([]);
+      expect(query).not.toHaveBeenCalled();
+    });
+
+    it('refuses oversize viewport before polygonToCells', async () => {
+      (cellsForViewport as jest.Mock).mockReturnValue(
+        Array.from({ length: 6000 }, (_, i) => `c${i}`),
+      );
+      const res = await call();
+      expect(res.points).toEqual([]);
+    });
   });
 
-  it('refuses oversize viewport estimate before polygonToCells', async () => {
-    (cellsForViewport as jest.Mock).mockReturnValue(
-      Array.from({ length: 6000 }, (_, i) => `c${i}`),
-    );
-    const res = await service.nearby({
-      viewport: VIEWPORT,
-      zoom: 14,
-      requesterId: 'me',
+  describe('presence enrichment', () => {
+    const userMeta = {
+      displayName: 'A',
+      avatarUrl: null,
+      verification: 'email',
+      online: false,
+      lastSeenAt: null,
+    };
+
+    it('sets online + lastSeenAt for friends who allow presence', async () => {
+      query.mockResolvedValueOnce([
+        { id: 'u1', kind: 'user', lat: 1.02, lng: 1.02, meta: { ...userMeta } },
+      ]);
+      listFriendIds.mockResolvedValueOnce(['u1']);
+      listWhoAllowFriendsOnline.mockResolvedValueOnce(new Set(['u1']));
+      whichAreOnline.mockResolvedValueOnce(new Set(['u1']));
+      lastSeenMap.mockResolvedValueOnce(
+        new Map([['u1', '2026-09-19T12:00:00.000Z']]),
+      );
+
+      const res = await call();
+      const pts = asPoints(res.points);
+      expect(pts).toHaveLength(1);
+      expect(pts[0]!.meta).toMatchObject({
+        online: true,
+        isFriend: true,
+        lastSeenAt: '2026-09-19T12:00:00.000Z',
+      });
+      expect(lastSeenMap).toHaveBeenCalledWith(['u1']);
     });
-    expect(res.points).toEqual([]);
+
+    it('hides online and lastSeen when friend disallows friends_see_online_status', async () => {
+      query.mockResolvedValueOnce([
+        { id: 'u1', kind: 'user', lat: 1.02, lng: 1.02, meta: { ...userMeta } },
+      ]);
+      listFriendIds.mockResolvedValueOnce(['u1']);
+      listWhoAllowFriendsOnline.mockResolvedValueOnce(new Set());
+
+      const res = await call();
+      const pts = asPoints(res.points);
+      expect(pts[0]!.meta).toMatchObject({
+        online: false,
+        isFriend: true,
+        lastSeenAt: null,
+      });
+      expect(whichAreOnline).not.toHaveBeenCalled();
+      expect(lastSeenMap).not.toHaveBeenCalled();
+    });
   });
 });
