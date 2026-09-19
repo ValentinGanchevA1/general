@@ -232,6 +232,44 @@ describe('DiscoveryService', () => {
     });
   });
 
+  describe('distance ranking', () => {
+    beforeEach(() => (isEntityZoom as jest.Mock).mockReturnValue(true));
+
+    it('orders nearer entity before farther when rankBy=distance', async () => {
+      // VIEWPORT centre ≈ 1.025, 1.025 — near sits on centre, far is outward.
+      query.mockResolvedValueOnce([
+        {
+          id: 'far',
+          kind: 'event',
+          lat: 1.04,
+          lng: 1.04,
+          meta: { title: 'Far' },
+        },
+        {
+          id: 'near',
+          kind: 'event',
+          lat: 1.025,
+          lng: 1.025,
+          meta: { title: 'Near' },
+        },
+      ]);
+
+      const res = await call({ rankBy: 'distance' });
+      const ids = asPoints(res.points).map((p) => p.id);
+      expect(ids).toEqual(['near', 'far']);
+    });
+
+    it('binds viewport centre for PostGIS KNN order when rankBy=distance', async () => {
+      query.mockResolvedValueOnce([]);
+      await call({ rankBy: 'distance' });
+      const [sql, params] = query.mock.calls[0]!;
+      expect(sql).toContain('<->');
+      expect(sql).toContain('ST_MakePoint');
+      // centreLng / centreLat appended after base params
+      expect(params).toContain(1.025);
+    });
+  });
+
   describe('topic filter (P3.6)', () => {
     it('restricts kinds to event/listing, slugifies, and binds the normalized topic', async () => {
       await call({ topic: '#Open-Mic' });
