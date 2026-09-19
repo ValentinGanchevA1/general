@@ -26,6 +26,7 @@ import { PresenceService } from '../presence/presence.service';
 import { FriendsService } from '../friends/friends.service';
 import {
   computeRankScore,
+  haversineM,
   type RankableEntity,
   type RankContext,
 } from './ranking/scoring';
@@ -309,6 +310,8 @@ export class DiscoveryService {
   ): Promise<DiscoveryPoint[]> {
     const cellCol = this.cellColumn(resolution);
     const listingClause = listingModeSql(listingMode);
+    const centreLat = (viewport.ne.lat + viewport.sw.lat) / 2;
+    const centreLng = (viewport.ne.lng + viewport.sw.lng) / 2;
     const queryParams: unknown[] = [cells, kinds, requesterId, MAX_POINTS_PER_RESPONSE];
     let friendsClause = '';
     if (friendIds != null) {
@@ -319,6 +322,14 @@ export class DiscoveryService {
     if (topicSlug) {
       queryParams.push(topicSlug);
       topicClause = `AND ${TOPIC_MATCH_SQL('$' + String(queryParams.length))}`;
+    }
+    // rankBy=distance: KNN so LIMIT keeps nearest, not arbitrary id order.
+    let orderClause = 'ORDER BY v_discoverable_entity.id';
+    if (rankBy === 'distance') {
+      const lngIdx = queryParams.length + 1;
+      const latIdx = queryParams.length + 2;
+      queryParams.push(centreLng, centreLat);
+      orderClause = `ORDER BY location::geography <-> ST_SetSRID(ST_MakePoint($${lngIdx}, $${latIdx}), 4326)::geography`;
     }
     const rows: EntityRow[] = await this.db.query(
       `
@@ -339,7 +350,7 @@ export class DiscoveryService {
          ${topicClause}
          ${listingClause}
          ${friendsClause}
-       ORDER BY v_discoverable_entity.id
+       ${orderClause}
        LIMIT $4
       `,
       queryParams,
@@ -388,8 +399,6 @@ export class DiscoveryService {
     });
 
     if (rankBy === 'relevance') {
-      const centreLat = (viewport.ne.lat + viewport.sw.lat) / 2;
-      const centreLng = (viewport.ne.lng + viewport.sw.lng) / 2;
       const ctx: RankContext = {
         viewerLat: centreLat,
         viewerLng: centreLng,
@@ -413,8 +422,17 @@ export class DiscoveryService {
         const tb = this.timeKey(b);
         return tb - ta;
       });
+    } else if (rankBy === 'distance') {
+      // In-memory haversine: deterministic for unit tests + stable after enrichment.
+      // SQL KNN above already biased LIMIT toward nearest.
+      points = [...points].sort((a, b) => {
+        if (a.kind === 'cluster' || b.kind === 'cluster') return 0;
+        return (
+          haversineM(centreLat, centreLng, a.lat, a.lng) -
+          haversineM(centreLat, centreLng, b.lat, b.lng)
+        );
+      });
     }
-    // rankBy === 'distance' keeps SQL / id order (geographic enough for v1)
 
     return points.slice(0, MAX_POINTS_PER_RESPONSE);
   }
