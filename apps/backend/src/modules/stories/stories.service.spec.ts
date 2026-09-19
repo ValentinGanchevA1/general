@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
 
-import { STORY_LIMITS } from '@g88/shared';
+import { STORY_LIMITS, STRIKE_THRESHOLDS } from '@g88/shared';
 
 import { S3Service } from '../../common/s3.service';
 import { REDIS_CLIENT } from '../../config/redis.provider';
@@ -33,8 +33,6 @@ describe('StoriesService', () => {
   const OTHER_USER_URL =
     'https://g88-uploads-dev.s3.eu-north-1.amazonaws.com/stories/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/x.jpg';
 
-  // assertCanPost selects verification_level, created_at, story_suspended_until
-  // then SUM(user_strikes) then 24h story count — mocks must follow that order.
   type GateUser = {
     verification_level: 'none' | 'email' | 'phone' | 'selfie' | 'id';
     created_at: Date;
@@ -62,9 +60,8 @@ describe('StoriesService', () => {
     story_suspended_until: null,
   };
 
-  /** User row + zero strikes (gate passes age/level). Count is mocked by the caller. */
-  function mockUserAndStrikes(user: GateUser) {
-    query.mockResolvedValueOnce([user]).mockResolvedValueOnce([{ pts: 0 }]);
+  function mockUserAndStrikes(user: GateUser, strikePts = 0) {
+    query.mockResolvedValueOnce([user]).mockResolvedValueOnce([{ pts: strikePts }]);
   }
 
   beforeEach(async () => {
@@ -98,7 +95,6 @@ describe('StoriesService', () => {
 
   describe('assertCanPost / presign gate', () => {
     it('rejects email_unverified before S3', async () => {
-      // Gate fails on verification before strike/count queries run.
       query.mockResolvedValueOnce([noneUser]);
       await expect(
         service.presign(USER, { contentType: 'image/jpeg' }),
@@ -120,11 +116,8 @@ describe('StoriesService', () => {
     it('rejects rate limit for email-only at softerGateMaxPer24h', async () => {
       mockUserAndStrikes(emailOldUser);
       query
-        // 24h create count at the softer-gate cap
         .mockResolvedValueOnce([{ n: STORY_LIMITS.softerGateMaxPer24h }])
-        // recordStrike: INSERT
         .mockResolvedValueOnce([])
-        // recordStrike: re-sum weights (below suspend threshold)
         .mockResolvedValueOnce([{ pts: 1 }]);
       await expect(
         service.presign(USER, { contentType: 'image/jpeg' }),
@@ -134,7 +127,7 @@ describe('StoriesService', () => {
 
     it('phone+ skips age and stores Redis presign token', async () => {
       mockUserAndStrikes(phoneUser);
-      query.mockResolvedValueOnce([{ n: 0 }]); // under 24h cap
+      query.mockResolvedValueOnce([{ n: 0 }]);
       const res = await service.presign(USER, { contentType: 'image/jpeg' });
       expect(res.publicUrl).toBe(PUBLIC_URL);
       expect(storyPresignedUrl).toHaveBeenCalledWith(USER, 'image/jpeg');
@@ -145,6 +138,48 @@ describe('StoriesService', () => {
         300,
       );
     });
+
+    it('rejects phone_required when email-only has strikePoints >= phoneRequired', async () => {
+      mockUserAndStrikes(emailOldUser, STRIKE_THRESHOLDS.phoneRequired);
+      await expect(
+        service.presign(USER, { contentType: 'image/jpeg' }),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'story.phone_required' }),
+      });
+      expect(storyPresignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('rejects suspended when story_suspended_until is in the future', async () => {
+      const suspended = {
+        ...emailOldUser,
+        story_suspended_until: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+      };
+      mockUserAndStrikes(suspended, 0);
+      await expect(
+        service.presign(USER, { contentType: 'image/jpeg' }),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'story.suspended' }),
+      });
+      expect(storyPresignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('rate limit at suspend threshold sets story_suspended_until', async () => {
+      mockUserAndStrikes(emailOldUser);
+      query
+        .mockResolvedValueOnce([{ n: STORY_LIMITS.softerGateMaxPer24h }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ pts: STRIKE_THRESHOLDS.suspend }])
+        .mockResolvedValueOnce([]);
+      await expect(
+        service.presign(USER, { contentType: 'image/jpeg' }),
+      ).rejects.toBeInstanceOf(HttpException);
+      const updateCalls = query.mock.calls.filter(
+        (c: unknown[]) =>
+          typeof c[0] === 'string' &&
+          (c[0] as string).includes('story_suspended_until'),
+      );
+      expect(updateCalls.length).toBeGreaterThanOrEqual(1);
+    });
   });
 
   describe('create — mediaUrl trust', () => {
@@ -154,7 +189,6 @@ describe('StoriesService', () => {
       location: { lat: 42.7, lng: 23.3 },
     };
 
-    /** assertCanPost succeeds (phone, no strikes, under rate limit). */
     function mockGateOk() {
       mockUserAndStrikes(phoneUser);
       query.mockResolvedValueOnce([{ n: 0 }]);
@@ -200,9 +234,7 @@ describe('StoriesService', () => {
       mockGateOk();
       redisGet.mockResolvedValueOnce(PUBLIC_URL);
       query
-        // active stories count
         .mockResolvedValueOnce([{ n: 0 }])
-        // INSERT RETURNING
         .mockResolvedValueOnce([
           {
             id: 'story-1',
@@ -219,7 +251,6 @@ describe('StoriesService', () => {
             location_h3_r7: 'cell7',
           },
         ])
-        // enrichOne user
         .mockResolvedValueOnce([
           {
             display_name: 'Me',
