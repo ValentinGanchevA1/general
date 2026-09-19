@@ -74,37 +74,24 @@ export class DiscoveryService {
     prevViewportHash?: string;
     topic?: string;
     listingMode?: ListingMode;
-    /** Close-friend user pins only (events/listings omitted). */
     friendsOnly?: boolean;
     rankBy?: DiscoveryRankBy;
   }): Promise<DiscoveryResponse> {
-    const friendsOnly = params.friendsOnly === true;
     const rankBy: DiscoveryRankBy = params.rankBy ?? 'relevance';
-    const topicSlug = friendsOnly
-      ? ''
-      : params.topic
-        ? params.topic.replace(/^#/, '').trim().toLowerCase()
-        : '';
-    const requested = params.kinds?.length ? params.kinds : DEFAULT_KINDS;
-    let kinds = topicSlug
-      ? requested.filter((k) => k === 'event' || k === 'listing')
-      : requested;
-    if (friendsOnly) kinds = ['user'];
-    const listingMode: ListingMode | undefined = friendsOnly
-      ? undefined
-      : params.listingMode === 'buy' || params.listingMode === 'sell'
-        ? params.listingMode
-        : undefined;
+    const kinds = params.kinds?.length ? params.kinds : DEFAULT_KINDS;
+    const topicSlug = params.topic?.trim() ? params.topic.trim().toLowerCase() : undefined;
+    const listingMode = params.listingMode;
+    const friendsOnly = params.friendsOnly === true;
+    const resolution = h3ResolutionForZoom(params.zoom);
+
     const friendIds = friendsOnly
       ? await this.friends.listFriendIds(params.requesterId)
       : null;
-    const resolution = h3ResolutionForZoom(params.zoom);
-
     if (friendsOnly && (friendIds == null || friendIds.length === 0)) {
       return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, true, rankBy);
     }
 
-    const estimate = this.estimateCellCount(params.viewport, resolution);
+    const estimate = this.estimateCells(params.viewport, resolution);
     if (estimate > MAX_CELLS_PER_VIEWPORT * ESTIMATE_CELL_MARGIN) {
       this.logger.warn(
         `Viewport estimate ${estimate} cells at r${resolution} — refusing before polygonToCells`,
@@ -148,8 +135,8 @@ export class DiscoveryService {
         return {
           points: [],
           resolution,
-          generatedAt: new Date().toISOString(),
           viewportHash,
+          generatedAt: new Date().toISOString(),
           diff,
         };
       }
@@ -158,81 +145,20 @@ export class DiscoveryService {
     return {
       points,
       resolution,
-      generatedAt: new Date().toISOString(),
       viewportHash,
-      diff: null,
+      generatedAt: new Date().toISOString(),
     };
   }
 
-  private snapshotKey(hash: string): string {
-    return `discovery:snap:${hash}`;
-  }
-
-  private pointKey(p: DiscoveryPoint): string {
-    return p.kind === 'cluster' ? p.cellId : p.id;
-  }
-
-  private async storeSnapshot(hash: string, points: DiscoveryPoint[]): Promise<void> {
-    await this.redis.set(this.snapshotKey(hash), JSON.stringify(points), 'EX', SNAPSHOT_TTL_SECONDS);
-  }
-
-  private async computeDiff(
-    prevHash: string,
-    currentPoints: DiscoveryPoint[],
-  ): Promise<DiscoveryDiff | null> {
-    const raw = await this.redis.get(this.snapshotKey(prevHash));
-    if (!raw) return null;
-    let prevPoints: DiscoveryPoint[];
-    try {
-      prevPoints = JSON.parse(raw) as DiscoveryPoint[];
-    } catch {
-      return null;
-    }
-
-    const currentByKey = new Map(currentPoints.map((p) => [this.pointKey(p), p]));
-    const prevByKey = new Map(prevPoints.map((p) => [this.pointKey(p), p]));
-    const removed: string[] = [];
-    const added: DiscoveryPoint[] = [];
-    let pureRemovedCount = 0;
-
-    for (const [key, prevPoint] of prevByKey) {
-      const curPoint = currentByKey.get(key);
-      if (!curPoint) {
-        removed.push(key);
-        pureRemovedCount += 1;
-      } else if (this.canonicalJson(prevPoint) !== this.canonicalJson(curPoint)) {
-        removed.push(key);
-        added.push(curPoint);
-      }
-    }
-    for (const [key, curPoint] of currentByKey) {
-      if (!prevByKey.has(key)) added.push(curPoint);
-    }
-
-    if (prevPoints.length > 0 && pureRemovedCount / prevPoints.length > DIFF_FALLBACK_THRESHOLD) {
-      return null;
-    }
-    if (added.length === 0 && removed.length === 0) {
-      return { added: [], removed: [] };
-    }
-    return { added, removed };
-  }
-
-  /** Stable identity for diff — omit rankScore (request-derived, not entity content). */
-  private canonicalJson(value: unknown): string {
-    return JSON.stringify(value, (key, val) => {
-      if (key === 'rankScore') return undefined;
-      if (val && typeof val === 'object' && !Array.isArray(val)) {
-        return Object.keys(val as Record<string, unknown>)
-          .sort()
-          .reduce<Record<string, unknown>>((acc, k) => {
-            if (k === 'rankScore') return acc;
-            acc[k] = (val as Record<string, unknown>)[k];
-            return acc;
-          }, {});
-      }
-      return val;
-    });
+  private estimateCells(viewport: Viewport, resolution: number): number {
+    const areaKm2 =
+      Math.abs(viewport.ne.lat - viewport.sw.lat) *
+      Math.abs(viewport.ne.lng - viewport.sw.lng) *
+      111 *
+      111 *
+      Math.cos((((viewport.ne.lat + viewport.sw.lat) / 2) * Math.PI) / 180);
+    const cellArea = H3_CELL_AREA_KM2[resolution] ?? 0.1;
+    return Math.ceil(areaKm2 / cellArea);
   }
 
   private async clusterByCell(
@@ -240,59 +166,54 @@ export class DiscoveryService {
     resolution: number,
     kinds: EntityKind[],
     requesterId: string,
-    topicSlug: string,
-    listingMode?: ListingMode,
-    friendIds: string[] | null = null,
+    topicSlug: string | undefined,
+    listingMode: ListingMode | undefined,
+    friendIds: string[] | null,
   ): Promise<DiscoveryPoint[]> {
-    const cellCol = this.cellColumn(resolution);
-    const listingClause = listingModeSql(listingMode);
+    const col = `location_h3_r${resolution}`;
+    const topicClause = topicSlug ? ` AND ${TOPIC_MATCH_SQL('$4')}` : '';
+    const modeClause = listingModeSql(listingMode);
+    const friendClause =
+      friendIds != null ? ` AND kind = 'user' AND id = ANY($${topicSlug ? 5 : 4}::uuid[])` : '';
+
     const queryParams: unknown[] = [cells, kinds, requesterId];
-    let friendsClause = '';
-    if (friendIds != null) {
-      queryParams.push(friendIds);
-      friendsClause = `AND id = ANY($${queryParams.length}::uuid[])`;
-    }
-    let topicClause = '';
-    if (topicSlug) {
-      queryParams.push(topicSlug);
-      topicClause = `AND ${TOPIC_MATCH_SQL('$' + String(queryParams.length))}`;
-    }
-    const rows: Array<{ cell: string; kind: EntityKind; n: string }> = await this.db.query(
-      `
-      SELECT ${cellCol} AS cell, kind, COUNT(*)::text AS n
-        FROM v_discoverable_entity
-       WHERE ${cellCol} = ANY($1::text[])
-         AND kind = ANY($2::text[])
-         AND visibility = 'public'
-         AND id <> $3
-         AND NOT (kind = 'user' AND EXISTS (
-           SELECT 1 FROM user_blocks ub
-            WHERE (ub.blocker_id = $3 AND ub.blocked_id = id)
-               OR (ub.blocker_id = id AND ub.blocked_id = $3)
-         ))
-         ${topicClause}
-         ${listingClause}
-         ${friendsClause}
-       GROUP BY ${cellCol}, kind
-      `,
+    if (topicSlug) queryParams.push(topicSlug);
+    if (friendIds != null) queryParams.push(friendIds);
+
+    const rows = (await this.db.query(
+      `SELECT ${col} AS cell_id,
+              COUNT(*)::int AS count,
+              jsonb_object_agg(kind, cnt) AS by
+         FROM (
+           SELECT ${col}, kind, COUNT(*)::int AS cnt
+             FROM discovery_entity_view
+            WHERE ${col} = ANY($1::text[])
+              AND kind = ANY($2::text[])
+              AND id <> $3
+              AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $3 AND ub.blocked_id = id)
+                    OR (ub.blocker_id = id AND ub.blocked_id = $3)
+              )
+              ${topicClause}${modeClause}${friendClause}
+            GROUP BY ${col}, kind
+         ) t
+        GROUP BY ${col}`,
       queryParams,
-    );
+    )) as Array<{ cell_id: string; count: number; by: Record<string, number> }>;
 
-    const byCell = new Map<string, { count: number; by: Partial<Record<EntityKind, number>> }>();
-    for (const row of rows) {
-      const n = Number(row.n);
-      const slot = byCell.get(row.cell) ?? { count: 0, by: {} };
-      slot.count += n;
-      slot.by[row.kind] = (slot.by[row.kind] ?? 0) + n;
-      byCell.set(row.cell, slot);
-    }
-
-    const sortedCells = [...byCell].sort((a, b) => b[1].count - a[1].count);
     const points: DiscoveryPoint[] = [];
-    for (const [cellId, slot] of sortedCells) {
-      const [lat, lng] = h3.cellToLatLng(cellId);
-      points.push({ kind: 'cluster', cellId, lat, lng, count: slot.count, by: slot.by });
+    for (const r of rows) {
       if (points.length >= MAX_POINTS_PER_RESPONSE) break;
+      const [lat, lng] = h3.cellToLatLng(r.cell_id);
+      points.push({
+        kind: 'cluster',
+        cellId: r.cell_id,
+        lat,
+        lng,
+        count: r.count,
+        by: r.by,
+      });
     }
     return points;
   }
@@ -302,59 +223,57 @@ export class DiscoveryService {
     resolution: number,
     kinds: EntityKind[],
     requesterId: string,
-    topicSlug: string,
+    topicSlug: string | undefined,
     listingMode: ListingMode | undefined,
     friendIds: string[] | null,
     viewport: Viewport,
     rankBy: DiscoveryRankBy,
   ): Promise<DiscoveryPoint[]> {
-    const cellCol = this.cellColumn(resolution);
-    const listingClause = listingModeSql(listingMode);
+    const col = `location_h3_r${resolution}`;
+    const topicClause = topicSlug ? ` AND ${TOPIC_MATCH_SQL('$5')}` : '';
+    const modeClause = listingModeSql(listingMode);
+    const friendClause =
+      friendIds != null
+        ? ` AND kind = 'user' AND id = ANY($${topicSlug ? 6 : 5}::uuid[])`
+        : '';
+
     const centreLat = (viewport.ne.lat + viewport.sw.lat) / 2;
     const centreLng = (viewport.ne.lng + viewport.sw.lng) / 2;
+
     const queryParams: unknown[] = [cells, kinds, requesterId, MAX_POINTS_PER_RESPONSE];
-    let friendsClause = '';
-    if (friendIds != null) {
-      queryParams.push(friendIds);
-      friendsClause = `AND id = ANY($${queryParams.length}::uuid[])`;
-    }
-    let topicClause = '';
-    if (topicSlug) {
-      queryParams.push(topicSlug);
-      topicClause = `AND ${TOPIC_MATCH_SQL('$' + String(queryParams.length))}`;
-    }
+    if (topicSlug) queryParams.push(topicSlug);
+    if (friendIds != null) queryParams.push(friendIds);
+
     // rankBy=distance: KNN so LIMIT keeps nearest, not arbitrary id order.
-    let orderClause = 'ORDER BY v_discoverable_entity.id';
-    if (rankBy === 'distance') {
-      const lngIdx = queryParams.length + 1;
-      const latIdx = queryParams.length + 2;
-      queryParams.push(centreLng, centreLat);
-      orderClause = `ORDER BY location::geography <-> ST_SetSRID(ST_MakePoint($${lngIdx}, $${latIdx}), 4326)::geography`;
-    }
-    const rows: EntityRow[] = await this.db.query(
-      `
-      SELECT id, kind,
-             ST_Y(location::geometry) AS lat,
-             ST_X(location::geometry) AS lng,
-             meta
-        FROM v_discoverable_entity
-       WHERE ${cellCol} = ANY($1::text[])
-         AND kind = ANY($2::text[])
-         AND visibility = 'public'
-         AND id <> $3
-         AND NOT (kind = 'user' AND EXISTS (
-           SELECT 1 FROM user_blocks ub
-            WHERE (ub.blocker_id = $3 AND ub.blocked_id = id)
-               OR (ub.blocker_id = id AND ub.blocked_id = $3)
-         ))
-         ${topicClause}
-         ${listingClause}
-         ${friendsClause}
-       ${orderClause}
-       LIMIT $4
-      `,
+    const orderSql =
+      rankBy === 'distance'
+        ? `ORDER BY location <-> ST_SetSRID(ST_MakePoint(${centreLng}, ${centreLat}), 4326)::geography`
+        : `ORDER BY id`;
+
+    const rows = (await this.db.query(
+      `SELECT id, kind, meta,
+              ST_Y(location::geometry) AS lat,
+              ST_X(location::geometry) AS lng
+         FROM discovery_entity_view
+        WHERE ${col} = ANY($1::text[])
+          AND kind = ANY($2::text[])
+          AND id <> $3
+          AND NOT EXISTS (
+            SELECT 1 FROM user_blocks ub
+             WHERE (ub.blocker_id = $3 AND ub.blocked_id = id)
+                OR (ub.blocker_id = id AND ub.blocked_id = $3)
+          )
+          ${topicClause}${modeClause}${friendClause}
+        ${orderSql}
+        LIMIT $4`,
       queryParams,
-    );
+    )) as Array<{
+      id: string;
+      kind: EntityKind;
+      meta: Record<string, unknown>;
+      lat: number;
+      lng: number;
+    }>;
 
     const userIds = rows.filter((r) => r.kind === 'user').map((r) => r.id);
     const friendIdSet =
@@ -372,11 +291,17 @@ export class DiscoveryService {
     const onlineSet = presenceIds.length
       ? await this.presence.whichAreOnline(presenceIds)
       : new Set<string>();
+    // lastSeen feeds ranking activityScore for offline-but-recent friends.
+    const lastSeen =
+      presenceIds.length > 0
+        ? await this.presence.lastSeenMap(presenceIds)
+        : new Map<string, string>();
 
     let points: DiscoveryPoint[] = rows.map((r) => {
       if (r.kind === 'user') {
         const viewMeta = r.meta as unknown as UserMeta;
         const isFriend = friendIdSet.has(r.id);
+        const canShowPresence = isFriend && allowOnlineSet.has(r.id);
         return {
           kind: 'user' as const,
           id: r.id,
@@ -384,7 +309,8 @@ export class DiscoveryService {
           lng: r.lng,
           meta: {
             ...viewMeta,
-            online: isFriend && allowOnlineSet.has(r.id) && onlineSet.has(r.id),
+            online: canShowPresence && onlineSet.has(r.id),
+            lastSeenAt: canShowPresence ? (lastSeen.get(r.id) ?? null) : null,
             isFriend,
           },
         };
@@ -423,8 +349,6 @@ export class DiscoveryService {
         return tb - ta;
       });
     } else if (rankBy === 'distance') {
-      // In-memory haversine: deterministic for unit tests + stable after enrichment.
-      // SQL KNN above already biased LIMIT toward nearest.
       points = [...points].sort((a, b) => {
         if (a.kind === 'cluster' || b.kind === 'cluster') return 0;
         return (
@@ -461,7 +385,7 @@ export class DiscoveryService {
         kind: 'event',
         lat: p.lat,
         lng: p.lng,
-        startsAt: m.startsAt,
+        startsAt: m.startsAt ?? null,
       };
     }
     const m = p.meta as ListingMeta;
@@ -470,105 +394,104 @@ export class DiscoveryService {
       kind: 'listing',
       lat: p.lat,
       lng: p.lng,
-      mode: m.mode,
       createdAt: m.createdAt ?? null,
+      mode: m.mode,
     };
   }
 
   private timeKey(p: DiscoveryPoint): number {
+    if (p.kind === 'cluster') return 0;
+    if (p.kind === 'user') return 0;
     if (p.kind === 'event') {
-      const s = (p.meta as EventMeta).startsAt;
-      return s ? new Date(s).getTime() : 0;
+      const t = (p.meta as EventMeta).startsAt;
+      return t ? new Date(t).getTime() : 0;
     }
-    if (p.kind === 'listing') {
-      const c = (p.meta as ListingMeta).createdAt;
-      return c ? new Date(c).getTime() : 0;
-    }
-    return 0;
-  }
-
-  private estimateCellCount(viewport: Viewport, resolution: number): number {
-    const KM_PER_DEG = 111.32;
-    const midLatRad = ((viewport.ne.lat + viewport.sw.lat) / 2) * (Math.PI / 180);
-    const latKm = Math.abs(viewport.ne.lat - viewport.sw.lat) * KM_PER_DEG;
-    const lngDeg = (((viewport.ne.lng - viewport.sw.lng) % 360) + 360) % 360;
-    const lngKm = lngDeg * KM_PER_DEG * Math.cos(midLatRad);
-    const areaKm2 = latKm * lngKm;
-    const cellKm2 = H3_CELL_AREA_KM2[resolution] ?? 0.01504;
-    return Math.ceil(areaKm2 / cellKm2);
-  }
-
-  private cellColumn(resolution: number): string {
-    const allowed = new Set([4, 5, 6, 7, 8, 9, 10]);
-    if (!allowed.has(resolution)) {
-      const clamped = Math.min(10, Math.max(4, resolution));
-      return `location_h3_r${clamped}`;
-    }
-    return `location_h3_r${resolution}`;
+    const t = (p.meta as ListingMeta).createdAt;
+    return t ? new Date(t).getTime() : 0;
   }
 
   private hashViewport(
     viewport: Viewport,
     zoom: number,
     kinds: EntityKind[],
-    topicSlug: string,
-    listingMode?: ListingMode,
-    friendsOnly = false,
-    rankBy: DiscoveryRankBy = 'relevance',
+    topicSlug: string | undefined,
+    listingMode: ListingMode | undefined,
+    friendsOnly: boolean,
+    rankBy: DiscoveryRankBy,
   ): string {
-    return createHash('sha1')
-      .update(
-        JSON.stringify({
-          viewport,
-          zoom,
-          kinds: [...kinds].sort(),
-          topicSlug,
-          listingMode: listingMode ?? null,
-          friendsOnly,
-          rankBy,
-        }),
-      )
-      .digest('hex')
-      .slice(0, 12);
+    const payload = JSON.stringify({
+      viewport,
+      zoom,
+      kinds: [...kinds].sort(),
+      topicSlug: topicSlug ?? null,
+      listingMode: listingMode ?? null,
+      friendsOnly,
+      rankBy,
+    });
+    return createHash('sha256').update(payload).digest('hex').slice(0, 32);
+  }
+
+  private async storeSnapshot(hash: string, points: DiscoveryPoint[]): Promise<void> {
+    await this.redis.set(
+      `discovery:snap:${hash}`,
+      JSON.stringify(points),
+      'EX',
+      SNAPSHOT_TTL_SECONDS,
+    );
+  }
+
+  private async computeDiff(
+    prevHash: string,
+    next: DiscoveryPoint[],
+  ): Promise<DiscoveryDiff | null> {
+    const raw = await this.redis.get(`discovery:snap:${prevHash}`);
+    if (!raw) return null;
+    let prev: DiscoveryPoint[];
+    try {
+      prev = JSON.parse(raw) as DiscoveryPoint[];
+    } catch {
+      return null;
+    }
+    const prevIds = new Set(prev.map((p) => this.pointKey(p)));
+    const nextIds = new Set(next.map((p) => this.pointKey(p)));
+    const added = next.filter((p) => !prevIds.has(this.pointKey(p)));
+    const removed = prev
+      .filter((p) => !nextIds.has(this.pointKey(p)))
+      .map((p) => this.pointKey(p));
+    const changeRatio =
+      next.length === 0 ? 1 : (added.length + removed.length) / Math.max(next.length, 1);
+    if (changeRatio >= DIFF_FALLBACK_THRESHOLD) return null;
+    return { added, removed };
+  }
+
+  private pointKey(p: DiscoveryPoint): string {
+    if (p.kind === 'cluster') return `cluster:${p.cellId}`;
+    return `${p.kind}:${p.id}`;
   }
 
   private empty(
     resolution: number,
     viewport: Viewport,
     kinds: EntityKind[],
-    topicSlug: string,
-    listingMode?: ListingMode,
-    friendsOnly = false,
+    topicSlug: string | undefined,
+    listingMode: ListingMode | undefined,
+    friendsOnly: boolean,
     rankBy: DiscoveryRankBy = 'relevance',
   ): DiscoveryResponse {
+    const viewportHash = this.hashViewport(
+      viewport,
+      0,
+      kinds,
+      topicSlug,
+      listingMode,
+      friendsOnly,
+      rankBy,
+    );
     return {
       points: [],
       resolution,
+      viewportHash,
       generatedAt: new Date().toISOString(),
-      viewportHash: this.hashViewport(viewport, 0, kinds, topicSlug, listingMode, friendsOnly, rankBy),
-      diff: null,
     };
   }
-}
-
-type ViewVisibility = 'public' | 'private' | 'blocked';
-
-interface DiscoverableEntityViewRow {
-  id: string;
-  kind: EntityKind;
-  location: unknown;
-  location_h3_r4: string;
-  location_h3_r5: string;
-  location_h3_r6: string;
-  location_h3_r7: string;
-  location_h3_r8: string;
-  location_h3_r9: string;
-  location_h3_r10: string;
-  visibility: ViewVisibility;
-  meta: Record<string, unknown>;
-}
-
-interface EntityRow extends Pick<DiscoverableEntityViewRow, 'id' | 'kind' | 'meta'> {
-  lat: number;
-  lng: number;
 }
