@@ -16,6 +16,9 @@ import { REDIS_CLIENT } from '../../config/redis.provider';
  *   presence:user:{userId}                  → string "1", TTL 120s
  *     Existence = online. Refreshed on each heartbeat.
  *
+ *   presence:last_seen:{userId}             → epoch ms string, TTL 30d
+ *     Written on heartbeat and markOffline for ranking activityScore.
+ *
  *   presence:cell:{h3r8}                    → ZSET, member = userId,
  *                                              score = last-heartbeat epoch ms
  *     For per-cell scans (presence delta fan-out, "who's nearby right now").
@@ -27,6 +30,8 @@ import { REDIS_CLIENT } from '../../config/redis.provider';
 export class PresenceService {
   private readonly logger = new Logger(PresenceService.name);
   private static readonly TTL_SECONDS = 120;
+  /** Keep last-seen long enough for ranking activity decay (see scoring.activityScore). */
+  private static readonly LAST_SEEN_TTL_SECONDS = 30 * 24 * 60 * 60;
 
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
@@ -54,6 +59,12 @@ export class PresenceService {
 
     const pipe = this.redis.pipeline();
     pipe.set(`presence:user:${userId}`, '1', 'EX', PresenceService.TTL_SECONDS);
+    pipe.set(
+      `presence:last_seen:${userId}`,
+      String(now),
+      'EX',
+      PresenceService.LAST_SEEN_TTL_SECONDS,
+    );
     pipe.set(prevCellKey, cellId, 'EX', PresenceService.TTL_SECONDS);
     pipe.zadd(`presence:cell:${cellId}`, now, userId);
     pipe.expire(`presence:cell:${cellId}`, PresenceService.TTL_SECONDS);
@@ -105,8 +116,15 @@ export class PresenceService {
   async markOffline(userId: string): Promise<void> {
     const cellKey = `presence:user_cell:${userId}`;
     const cellId = await this.redis.get(cellKey);
+    const now = Date.now();
     const pipe = this.redis.pipeline();
     pipe.del(`presence:user:${userId}`);
+    pipe.set(
+      `presence:last_seen:${userId}`,
+      String(now),
+      'EX',
+      PresenceService.LAST_SEEN_TTL_SECONDS,
+    );
     pipe.del(cellKey);
     if (cellId) pipe.zrem(`presence:cell:${cellId}`, userId);
     await pipe.exec();
@@ -125,6 +143,26 @@ export class PresenceService {
       }
     });
     return online;
+  }
+
+  /**
+   * Last heartbeat/offline stamp for ranking (activityScore).
+   * Keys are written on every heartbeat and on markOffline.
+   * Returns ISO timestamps; missing keys are omitted.
+   */
+  async lastSeenMap(userIds: string[]): Promise<Map<string, string>> {
+    if (userIds.length === 0) return new Map();
+    const keys = userIds.map((id) => `presence:last_seen:${id}`);
+    const values = await this.redis.mget(keys);
+    const out = new Map<string, string>();
+    values.forEach((v, i) => {
+      if (v == null || v === '') return;
+      const ms = Number(v);
+      if (!Number.isFinite(ms) || ms <= 0) return;
+      const id = userIds[i];
+      if (id !== undefined) out.set(id, new Date(ms).toISOString());
+    });
+    return out;
   }
 
   /** Garbage-collect expired entries from a cell ZSET. Cheap; runs opportunistically. */
