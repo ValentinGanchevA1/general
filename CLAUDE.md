@@ -1,7 +1,7 @@
 # G88 — Project Instructions
 
 > Repo: local monorepo under `apps/`. Anything under `legacy/` is read-only reference.  
-> **Last synced:** 2026-09-19 (StoryViewer video residual closed; map activation empty CTA).
+> **Last synced:** 2026-09-19 (Week1–3 closed: activation, strikes, presence/ranking, discovery lastSeen; STATUS_CURRENT next free **0043**).
 
 ## Role & Persona
 
@@ -43,27 +43,19 @@ Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md`.
 
 | Layer | Tech |
 |-------|------|
-| Monorepo / tooling | pnpm 11 workspaces (`apps/*`, `packages/*`). TypeScript 5.5. Node ≥22.13 |
-| Mobile | React Native 0.83 (CLI), React 19, RTK 2, React Navigation 7 |
-| Admin dashboard | Vite + React 19 + shadcn/ui + TanStack Query + Socket.IO (`apps/admin`). Origin **`http://127.0.0.1:5173`** (must be in `CORS_ORIGINS`). ID-verification queue |
-| Backend (REST) | NestJS 11, TypeORM 0.3 (DataSource only, raw SQL), Node ≥22.13 |
-| Realtime gateway | Socket.IO 4 (Redis adapter), **in-process** with REST |
+| Mobile | React Native CLI + TypeScript, Redux Toolkit, react-native-maps |
+| Backend | NestJS + TypeORM, PostgreSQL 16 + PostGIS + H3-PG |
+| Realtime | Socket.IO (presence, chat, verification) |
+| Cache | Redis (presence, OTP, discovery snapshots, presign) |
+| Shared | `@g88/shared` DTOs + geo helpers |
+| Admin | Vite + React ID queue @ `127.0.0.1:5173` |
 | Database | PostgreSQL 16 + PostGIS + H3-PG. Migrations sequential; see `STATUS.md` for next free |
-| Cache / Presence / Pub-Sub | Redis 7 |
-| Storage | AWS S3 (presigned + buffer uploads) |
-| Auth | JWT access 15m + opaque rotating refresh 30d. Google OAuth live; Apple removed (`0019`) |
-| Payments | Stripe subscriptions (test mode); Connect deferred |
-| Verification | Twilio phone OTP · email OTP (Redis/Twilio) · ID-document: user submit → S3; **assist-only AWS Rekognition**; **human decide** via `apps/admin`. No auto `pending→verified` |
-| Push | FCM |
-| Observability | Sentry (shared PII scrubber). Structured request logging deferred |
-| Deploy | Render `g88-api` + `g88-redis`; Supabase Postgres; GitHub Actions CI |
 
-## Repo Layout
+## Repo layout
 
 ```
-g88/
-├── apps/
-│   ├── backend/            NestJS REST + in-process Socket.IO
+apps/
+│   ├── backend/            NestJS API + migrations + Socket.IO
 │   ├── mobile/             React Native client (src/features/{domain}/)
 │   └── admin/              Vite + React ID-verification queue
 ├── packages/
@@ -96,5 +88,5 @@ Stripe Connect / paid gifts · Elasticsearch · Kafka · gRPC · Kubernetes · G
 | `admin.guard.spec.ts` | Missing dedicated unit spec |
 | Events/listings block-by-author | Optional; needs authorId in discovery meta |
 | Hex theme lint | Convention only; prefer tokens. **Ownership:** `apps/mobile/src/theme/index.ts` sole mobile palette (not shared). Intentional hex: mapStyle, socialConfig. Toast tints → `colors.toast*`; shadows → `colors.shadowInk` |
-| Strike escalation policy | Schema + UI surface; product rules not finalized |
+| Strike escalation | **Enforced** in stories (phone_required @3, suspend @5); Settings/Profile standing surfaces shipped. Appeal/copy polish optional |
 | Full-screen Spinner → Skeleton | Migrate as-you-touch; Marketplace/Friends/Interactions already use Skeleton |

@@ -3,11 +3,11 @@
 ## Approve a pending submission
 
 ### A) Admin UI
-1. User UUID must be in backend `ADMIN_USER_IDS` (comma-separated).
+1. User UUID must be in backend `ADMIN_USER_IDS` (comma-separated) **on the same env** (local / Render).
 2. `cd apps/admin && pnpm dev` → http://127.0.0.1:5173
 3. Login with that account (`POST /auth/login`).
 4. Queue → open row → Approve / Reject.
-5. Live badge needs CORS (`127.0.0.1:5173`) + backend up; Refresh works offline.
+5. Live badge needs CORS (`127.0.0.1:5173` in `CORS_ORIGINS`) + backend up; Refresh works offline.
 
 ### B) CLI (same API as UI)
 ```bash
@@ -51,3 +51,14 @@ IAM (attach to `g88-dev` or uploads user):
 Plus `s3:GetObject` on `arn:aws:s3:::BUCKET/verifications/*`.
 
 Fail-open: DNS/IAM errors → `rekognition_status=error`, row still `pending` for human decide. **Never auto-approves.**
+
+## Render E2E (do this once per env)
+
+1. Set on Render backend: `REKOGNITION_ENABLED=true`, `AWS_REGION=eu-north-1`, S3 keys/bucket, `ADMIN_USER_IDS=<admin-uuid>`.
+2. Redeploy backend.
+3. Mobile: submit ID (selfie + document) as a test user.
+4. Admin UI or `id:review` → confirm `rekognition_status` is `ok` / `no_face_*` / `error` (not stuck `skipped` when enabled).
+5. Approve or reject via UI / `id:approve`.
+6. Mobile should receive `verification:updated` (WS) and ladder level → `id`.
+
+If step 4 stays `skipped` with `REKOGNITION_ENABLED=true`, check region mismatch or missing IAM — not application code.
