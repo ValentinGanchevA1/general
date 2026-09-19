@@ -33,11 +33,7 @@ import {
 
 const DEFAULT_KINDS: EntityKind[] = ['user', 'event', 'listing'];
 const MAX_POINTS_PER_RESPONSE = 500;
-/** Hard cap — refuse before h3.polygonToCells when estimate exceeds this.
- *  Must match the post-enumeration guard below so free-tier (512MB) never
- *  materializes tens of thousands of cell ids (OOM root cause 2026-09-11). */
 const MAX_CELLS_PER_VIEWPORT = 5_000;
-/** Area estimate can undercount vs polygonToCells; refuse a bit early. */
 const ESTIMATE_CELL_MARGIN = 0.8;
 const H3_CELL_AREA_KM2: Record<number, number> = {
   4: 1770.3, 5: 252.9, 6: 36.13, 7: 5.161, 8: 0.7373, 9: 0.1053, 10: 0.01504,
@@ -74,7 +70,6 @@ export class DiscoveryService {
     prevViewportHash?: string;
     topic?: string;
     listingMode?: ListingMode;
-    /** Close-friend user pins only (events/listings omitted). */
     friendsOnly?: boolean;
     rankBy?: DiscoveryRankBy;
   }): Promise<DiscoveryResponse> {
@@ -218,7 +213,6 @@ export class DiscoveryService {
     return { added, removed };
   }
 
-  /** Stable identity for diff — omit rankScore (request-derived, not entity content). */
   private canonicalJson(value: unknown): string {
     return JSON.stringify(value, (key, val) => {
       if (key === 'rankScore') return undefined;
@@ -323,7 +317,6 @@ export class DiscoveryService {
       queryParams.push(topicSlug);
       topicClause = `AND ${TOPIC_MATCH_SQL('$' + String(queryParams.length))}`;
     }
-    // rankBy=distance: KNN so LIMIT keeps nearest, not arbitrary id order.
     let orderClause = 'ORDER BY v_discoverable_entity.id';
     if (rankBy === 'distance') {
       const lngIdx = queryParams.length + 1;
@@ -361,8 +354,6 @@ export class DiscoveryService {
       userIds.length > 0
         ? new Set(await this.friends.listFriendIds(requesterId))
         : new Set<string>();
-    // Presence is only visible to close friends, and only when the peer allows it
-    // (friends_see_online_status). Non-friends never see online on the map.
     const friendUserIds = userIds.filter((id) => friendIdSet.has(id));
     const allowOnlineSet =
       friendUserIds.length > 0
@@ -372,11 +363,16 @@ export class DiscoveryService {
     const onlineSet = presenceIds.length
       ? await this.presence.whichAreOnline(presenceIds)
       : new Set<string>();
+    const lastSeen =
+      presenceIds.length > 0
+        ? await this.presence.lastSeenMap(presenceIds)
+        : new Map<string, string>();
 
     let points: DiscoveryPoint[] = rows.map((r) => {
       if (r.kind === 'user') {
         const viewMeta = r.meta as unknown as UserMeta;
         const isFriend = friendIdSet.has(r.id);
+        const canShowPresence = isFriend && allowOnlineSet.has(r.id);
         return {
           kind: 'user' as const,
           id: r.id,
@@ -384,7 +380,8 @@ export class DiscoveryService {
           lng: r.lng,
           meta: {
             ...viewMeta,
-            online: isFriend && allowOnlineSet.has(r.id) && onlineSet.has(r.id),
+            online: canShowPresence && onlineSet.has(r.id),
+            lastSeenAt: canShowPresence ? (lastSeen.get(r.id) ?? null) : null,
             isFriend,
           },
         };
@@ -418,13 +415,9 @@ export class DiscoveryService {
     } else if (rankBy === 'newest') {
       points = [...points].sort((a, b) => {
         if (a.kind === 'cluster' || b.kind === 'cluster') return 0;
-        const ta = this.timeKey(a);
-        const tb = this.timeKey(b);
-        return tb - ta;
+        return this.timeKey(b) - this.timeKey(a);
       });
     } else if (rankBy === 'distance') {
-      // In-memory haversine: deterministic for unit tests + stable after enrichment.
-      // SQL KNN above already biased LIMIT toward nearest.
       points = [...points].sort((a, b) => {
         if (a.kind === 'cluster' || b.kind === 'cluster') return 0;
         return (
