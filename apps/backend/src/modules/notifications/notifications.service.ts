@@ -376,9 +376,41 @@ export class NotificationsService {
       return;
     }
     try {
-      await messaging.sendEachForMulticast({ tokens, notification, data });
+      const res = await messaging.sendEachForMulticast({ tokens, notification, data });
+      if (res.failureCount > 0) {
+        await this.pruneInvalidTokens(tokens, res.responses);
+      }
     } catch (err) {
       this.logger.error(`FCM sendEachForMulticast failed: ${err}`);
+    }
+  }
+
+  /**
+   * Drop dead registration tokens so the next send does not burn quota
+   * on devices that uninstalled or rotated tokens.
+   */
+  private async pruneInvalidTokens(
+    tokens: string[],
+    responses: Array<{ success: boolean; error?: { code?: string } }>,
+  ): Promise<void> {
+    const deadCodes = new Set([
+      'messaging/registration-token-not-registered',
+      'messaging/invalid-registration-token',
+    ]);
+    const dead: string[] = [];
+    responses.forEach((r, i) => {
+      const code = r.error?.code;
+      if (!r.success && code && deadCodes.has(code)) {
+        const t = tokens[i];
+        if (t) dead.push(t);
+      }
+    });
+    if (dead.length === 0) return;
+    try {
+      await this.db.query(`DELETE FROM device_tokens WHERE token = ANY($1::text[])`, [dead]);
+      this.logger.warn(`Pruned ${dead.length} invalid FCM token(s)`);
+    } catch (err) {
+      this.logger.error(`Failed to prune invalid FCM tokens: ${err}`);
     }
   }
 }
