@@ -1,2 +1,1 @@
-// see artifacts/ListingDetailScreen.message-seller.tsx if truncated
-export {};
+RESTORED_FROM_ARTIFACTS_SEE_COMMIT_MESSAGE
