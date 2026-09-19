@@ -1,6 +1,6 @@
 # STATUS — G88
 
-> **Last updated:** 2026-09-14  
+> **Last updated:** 2026-09-19  
 > **Authority:** live progress. Sequence/gates → `ROADMAP.md`. System design → `ARCHITECTURE.md`. Feature contracts → `SPECIFICATION.md`.
 
 ### ✅ Where we are / ⏭️ What's next
@@ -13,7 +13,7 @@
 | **P2 pre-launch hardening** | ✅ Gate list complete (incl. **P2.B1 blocks** — wave path returns `wave.blocked`) |
 | **P3 habit-forming** | ✅ Gamification, gifts, push/geofences, verification UI, events, trending, trading (offers + counter) |
 | **Friends** | ✅ 0032/0033 — requests, list, presence privacy (`friends_see_online_status`), mutual, suggestions, request notifications + badge, interactions inbox |
-| **Stories (P4.S)** | ✅ 0029 — create/nearby/view/react; soft gate (email + 24h age); Pulse strip; video picker partial; mediaUrl trust |
+| **Stories (P4.S)** | ✅ 0029 — create/nearby/view/react; soft gate (email + 24h age); Pulse strip; **video create + viewer playback** (mute, progress, fail/retry overlay); mediaUrl trust |
 | **Profile origin** | ✅ 0031 — DOB (18+), hometown, showAge/showHometown |
 | **Profile cover** | ✅ Cover photo + setCover |
 | **ID verification** | ✅ Submit → S3 → pending; admin queue; atomic decide; partial UNIQUE pending (0034); `verification:updated` WS; **assist-only Rekognition** |
@@ -25,8 +25,9 @@
 | **UX chrome** | ✅ ScreenHeader, FormField, ListRow, EmptyState, IdentityBlock, Avatar rings (friend teal) |
 | **Theme residual** | ✅ Hex → tokens mass + residual tail closed (#346/#347) |
 | **Offers / strikes** | ✅ Schema 0038–0040; counter-offer wire; buyer accept seller counter; strike standing surface |
+| **Map activation** | ✅ Trust ladder NudgeBanner (email→phone→ID→streak) with `openRootScreen` deep-links; map empty CTAs (friends / listing mode / **verify email** when unverified) |
 | **Admin** | ✅ `apps/admin` Vite queue @ `127.0.0.1:5173`; CORS; AdminGuard |
-| **Migrations** | **0001–0040** applied; **next free 0041**. Dual-0030 resolved (0030 chat location + 0031 profile origin). Filesystem prefix CI guard. |
+| **Migrations** | **0001–0042** applied on recent master waves; dual-0030 resolved. Filesystem prefix CI guard. |
 | **Android** | Sideload APK + signed AAB pipelines; privacy policy live |
 
 **Ops gaps (not code blockers):**
@@ -42,7 +43,7 @@
 2. Confirm `ADMIN_USER_IDS` on Render; approve pending via UI or `pnpm --filter @g88/backend id:approve`.
 3. Play closed testing (owner).
 4. Live-verify phone OTP + Stripe test webhook.
-5. Optional residual: deepen SPEC against future shared changes as they land.
+5. Week-2 backlog: strike escalation enforcement · offer→chat handoff polish.
 
 ---
 
@@ -53,33 +54,7 @@
 | P1 — foundation | ✅ shipped | Auth → Profile → Map → Presence → Wave → Chat |
 | P2 — pre-launch hardening | ✅ shipped | B1 blocks closed in code; Android beta path engineering-complete |
 | P3 — habit-forming | ✅ shipped | P3.1–P3.7 + friends + interactions inbox |
-| P4+ — horizon | 🟡 partial | **P4.S Stories shipped**; monetization / group chat / web still gated |
-
----
-
-## Recent master wave (2026-09-01 → 2026-09-13)
-
-- Entity sheet stats (level, allTimeRank, achievements); goals stay on UserProfile.
-- Profile cover photo + CI type fixes.
-- Design-system identity (Avatar ringVariant, IdentityBlock, EmptyState).
-- IA: Social nested stack; Profile Marketplace card → openRootScreen.
-- EntityBottomSheet v2: event/listing cards; Block → overflow menu.
-- Map brand tokens + dark MAP_STYLE; listing mode + Wanted violet.
-- Onboarding coach (pin → wave → Pulse).
-- Auth F2–F4 legal + validation + ScrollView.
-- ScreenHeader / FormField / EmptyState rollout across create/detail/settings screens.
-- Offers schema + counter-offer + buyer respond to seller counter.
-- Friends-only discovery layer; map online privacy (friendship + preference).
-- Friend ring color unify (`entityFriend` teal).
-- Chat bubble avatar → UserProfile; ListRow primitive + rollout.
-- Strike standing surface (UserProfile / Pulse / Settings).
-- Map empty polish; discovery cell-cap OOM guard (MAX_CELLS 5k); city-scale center.
-- EntityBottomSheet Message path → `/conversations` + openRootScreen Chat.
-- Stories video E5 status (preview + fail overlay).
-- Theme hex residual tail closed.
-- Docs + CI: migration range 0001–0040; `check-no-secrets.sh` hard gate.
-- Map polish Option 1 complete: SearchBar · CategoryFilterBar · TrendingCard.
-- EntityBottomSheet P1: sync reset, profile error+Retry, 45s module cache; event/listing media enrichment.
+| P4+ — horizon | 🟡 partial | **P4.S Stories shipped** (incl. video viewer); monetization / group chat / web still gated |
 
 ---
 
@@ -89,7 +64,6 @@
 |------|--------|
 | `admin.guard.spec.ts` | Still missing |
 | Events/listings block-by-author | Optional; needs authorId in discovery meta |
-| StoryViewer video playback | Create path has video; viewer still partial |
 | Strike escalation product rules | Schema + surface; full escalation policy not product-finalized |
 | Hex theme lint | Convention only; not enforced |
 

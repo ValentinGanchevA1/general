@@ -1,7 +1,7 @@
 # G88 — Project Instructions
 
 > Repo: local monorepo under `apps/`. Anything under `legacy/` is read-only reference.  
-> **Last synced:** 2026-09-17 (theme ownership + Skeleton convention documented).
+> **Last synced:** 2026-09-19 (StoryViewer video residual closed; map activation empty CTA).
 
 ## Role & Persona
 
@@ -26,7 +26,7 @@ Act as a **Senior Full-Stack Architect** specialized in high-performance mobile 
 
 G88 is a **map-first, location-based social platform**. Users appear as interactive avatars on a real-time map.
 
-**Shipped surface:** nearby people · presence · wave · 1:1 chat · friends (requests, mutual, suggestions, online privacy) · events · marketplace (listings, offers, counter) · gifts · gamification · stories (Pulse) · progressive verification (email → phone → ID) · interactions inbox.
+**Shipped surface:** nearby people · presence · wave · 1:1 chat · friends (requests, mutual, suggestions, online privacy) · events · marketplace (listings, offers, counter) · gifts · gamification · stories (Pulse) · progressive verification (email → phone · ID) · interactions inbox.
 
 **Privacy is a hard constraint:** exact GPS never lands in the DB. Locations are fuzzed at write time to H3 r10 cell centroid (~120m). Exception: explicit timed chat live-location sessions. See `ARCHITECTURE.md §3.3`.
 
@@ -37,7 +37,7 @@ Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md`.
 - **P1 — foundation: ✅ shipped.** Auth → Profile → Map discovery → Presence → Wave → Chat.
 - **P2 — pre-launch hardening: ✅ shipped.** Sentry, chat outbox, viewport-diff, per-module specs, synthetic soak, **blocks (B1)**. Android-first beta path engineering-complete; iOS deferred.
 - **P3 — habit-forming: ✅ shipped.** Gamification, gifts, events, trading, push/geofences, verification visibility, friends, interactions inbox.
-- **P4+ — horizon: 🟡 partial.** **P4.S Stories shipped.** Monetization, group chat, web client — no go-ahead without explicit ask.
+- **P4+ — horizon: 🟡 partial.** **P4.S Stories shipped** (incl. video viewer). Monetization, group chat, web client — no go-ahead without explicit ask.
 
 ## Current Stack (in use)
 
@@ -48,7 +48,7 @@ Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md`.
 | Admin dashboard | Vite + React 19 + shadcn/ui + TanStack Query + Socket.IO (`apps/admin`). Origin **`http://127.0.0.1:5173`** (must be in `CORS_ORIGINS`). ID-verification queue |
 | Backend (REST) | NestJS 11, TypeORM 0.3 (DataSource only, raw SQL), Node ≥22.13 |
 | Realtime gateway | Socket.IO 4 (Redis adapter), **in-process** with REST |
-| Database | PostgreSQL 16 + PostGIS + H3-PG. Migrations **0001–0040**; next free **0041** |
+| Database | PostgreSQL 16 + PostGIS + H3-PG. Migrations sequential; see `STATUS.md` for next free |
 | Cache / Presence / Pub-Sub | Redis 7 |
 | Storage | AWS S3 (presigned + buffer uploads) |
 | Auth | JWT access 15m + opaque rotating refresh 30d. Google OAuth live; Apple removed (`0019`) |
@@ -64,19 +64,12 @@ Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md`.
 g88/
 ├── apps/
 │   ├── backend/            NestJS REST + in-process Socket.IO
-│   │   ├── src/modules/    auth, users, discovery, chat, interactions, presence,
-│   │   │                   notifications, alerts, geofences, social, verification,
-│   │   │                   id-verification, subscriptions, gamification, challenges,
-│   │   │                   achievements, gifts, trending, feed, blocks, friends,
-│   │   │                   stories, listings, events, ...
-│   │   ├── src/realtime/   Socket.IO gateway (namespace /realtime)
-│   │   └── migrations/     0001–0040 raw SQL (next free 0041)
 │   ├── mobile/             React Native client (src/features/{domain}/)
 │   └── admin/              Vite + React ID-verification queue
 ├── packages/
 │   └── shared/             API DTOs, socket events, geo helpers
 ├── legacy/                 Read-only. Never import.
-├── docs/                   Ops + Play listing (STATUS_CURRENT, ID_VERIFICATION_OPS, …)
+├── docs/                   Ops + Play listing
 ├── ARCHITECTURE.md
 ├── ROADMAP.md
 ├── STATUS.md
@@ -86,58 +79,6 @@ g88/
 ├── CLAUDE.md               This file
 └── docker-compose.yml
 ```
-
-**Key URLs**
-
-- Local API: `http://localhost:3001/api/v1` (emulator: `http://10.0.2.2:3001/api/v1`)
-- Realtime: `ws://localhost:3001/realtime`
-- **Admin:** `http://127.0.0.1:5173` — **must** be in `CORS_ORIGINS` (`localhost` ≠ `127.0.0.1`)
-- Prod: `https://api.g88.app/api/v1` / `https://g88-api.onrender.com`
-
-## Where to Find Authoritative Info
-
-| Question | Source |
-|----------|--------|
-| System design, decisions | `ARCHITECTURE.md` |
-| What's shipping / blocked | `STATUS.md` |
-| Schema | `apps/backend/migrations/` |
-| API + socket contracts | `packages/shared/src/` |
-| Phase sequence / cuts | `ROADMAP.md` |
-| Feature contracts | `SPECIFICATION.md` |
-| Quick start | `README.md` |
-
-## Important Conventions
-
-### Backend
-
-- TypeORM used **only** for `DataSource.query()` — raw parameterized SQL. No entities / repositories.
-- Path alias `@/` → `src/`.
-- Single `main.ts`: Socket.IO in-process with REST (`/realtime`).
-- Errors → `{ statusCode, code, message, details? }` via `AllExceptionsFilter`.
-- DTO validation: `ValidationPipe(whitelist, transform, forbidNonWhitelisted)`.
-
-### Realtime
-
-- Namespace `/realtime`. Auth handshake: function-form `auth: async (cb) => cb({ token })`.
-- Rooms: `user:{userId}`, `cell:{h3r8}`, `convo:{conversationId}`, event rooms as needed.
-- Typed contracts in `@g88/shared`.
-
-### Mobile
-
-- Path alias `@/` → `src/`. RTK + `useAppSelector` / `useAppDispatch`. Tokens in Keychain.
-- Single Axios client; single-flight refresh. Socket singleton in `useSocket.ts`.
-- Navigation: nested stacks + `openRootScreen` for cross-tab jumps (Map focus, Chat, etc.).
-- **Theme:** `apps/mobile/src/theme/index.ts` is the sole UI palette. Lists/grids cold-start → `Skeleton` / `SkeletonListRow` / `SkeletonMarketGrid`; button in-flight → `ActivityIndicator` only.
-
-### Admin
-
-- Same `g88-api` REST + `/realtime`. Login → localStorage `adminToken` / `adminRefreshToken` / `adminUser`.
-- User UUID must be in `ADMIN_USER_IDS`. Routes: `JwtAuthGuard` + `AdminGuard`.
-- Vite host **`127.0.0.1:5173`** `strictPort`. Rekognition scores assist-only.
-
-### Shared
-
-- Single source of truth for API + socket contracts. Geo helpers (`fuzzLocation`, viewport cells) live here. **No brand palette** — UI tokens stay in mobile theme.
 
 ## Privacy invariants (non-negotiable)
 
@@ -153,7 +94,6 @@ Stripe Connect / paid gifts · Elasticsearch · Kafka · gRPC · Kubernetes · G
 | Gap | Notes |
 |-----|--------|
 | `admin.guard.spec.ts` | Missing dedicated unit spec |
-| StoryViewer video playback | Create supports video; viewer still partial |
 | Events/listings block-by-author | Optional; needs authorId in discovery meta |
 | Hex theme lint | Convention only; prefer tokens. **Ownership:** `apps/mobile/src/theme/index.ts` sole mobile palette (not shared). Intentional hex: mapStyle, socialConfig. Toast tints → `colors.toast*`; shadows → `colors.shadowInk` |
 | Strike escalation policy | Schema + UI surface; product rules not finalized |

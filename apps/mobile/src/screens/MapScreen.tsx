@@ -33,7 +33,7 @@ import { useDiscovery } from '@/features/discovery/useDiscovery';
 import { setPoints } from '@/features/discovery/discoverySlice';
 import { useSocket } from '@/realtime/useSocket';
 import { postJson } from '@/api/client';
-import { useAppDispatch } from '@/hooks/redux';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { MapMarkers } from '@/components/map/MapMarkers';
 import { prefetchAvatars } from '@/services/avatarCache';
@@ -82,11 +82,12 @@ import { useChallenges } from '@/features/gamification/useChallenges';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
-type MapEmptyActionKind = 'show_everyone' | 'create';
+type MapEmptyActionKind = 'show_everyone' | 'create' | 'verify_email';
 
 function mapEmptyCopy(opts: {
 	friendsOnly: boolean;
 	listingMode: ListingModeFilterValue;
+	emailVerified: boolean;
 }): {
 	icon: string;
 	title: string;
@@ -121,6 +122,16 @@ function mapEmptyCopy(opts: {
 			actionKind: 'create',
 		};
 	}
+	// Default empty: prefer trust conversion before create when email is still open.
+	if (!opts.emailVerified) {
+		return {
+			icon: 'email-check-outline',
+			title: 'Nothing nearby yet',
+			body: 'Verify your email to unlock stories and show up more clearly on the map — then be the first to post here.',
+			actionLabel: 'Verify email',
+			actionKind: 'verify_email',
+		};
+	}
 	return {
 		icon: 'map-marker-radius-outline',
 		title: 'Nothing nearby yet',
@@ -132,6 +143,8 @@ function mapEmptyCopy(opts: {
 
 export function MapScreen(): React.JSX.Element {
 	const dispatch = useAppDispatch();
+	const emailVerified =
+		useAppSelector((s) => s.profile.profile?.badges?.email === true);
 	const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 	const route = useRoute<RouteProp<TabParamList, 'Map'>>();
 	const { coords: myCoords, requestPermission } = useUserLocation();
@@ -409,6 +422,7 @@ export function MapScreen(): React.JSX.Element {
 	const emptyCopy = mapEmptyCopy({
 		friendsOnly,
 		listingMode: listingModeFilter,
+		emailVerified,
 	});
 
 	return (
@@ -482,7 +496,9 @@ export function MapScreen(): React.JSX.Element {
 						onAction={
 							emptyCopy.actionKind === 'show_everyone'
 								? () => setFriendsOnly(false)
-								: openCreateNearby
+								: emptyCopy.actionKind === 'verify_email'
+									? () => openRootScreen(navigation, 'EmailVerification')
+									: openCreateNearby
 						}
 					/>
 				</View>
