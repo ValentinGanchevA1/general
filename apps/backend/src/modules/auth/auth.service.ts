@@ -69,7 +69,7 @@ export class AuthService {
         [email, passwordHash, displayName],
       );
     } catch (err) {
-      if (err instanceof QueryFailedError && (err as any).code === '23505') {
+      if (err instanceof QueryFailedError && (err as QueryFailedError & { code: string }).code === '23505') {
         throw new ConflictException({ code: 'auth.email_taken', message: 'Email already in use' });
       }
       throw err;
