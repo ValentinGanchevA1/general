@@ -152,8 +152,14 @@ jest.mock('@gorhom/bottom-sheet', () => {
 
 // PulseScreen → Avatar → useCachedImageUri → avatarCache → blob-util native fs.
 // Without stub: TypeError Cannot read properties of null (reading 'getConstants').
+// Paths stay under the project cwd (not world-writable /tmp) for Sonar.
 jest.mock('react-native-blob-util', () => {
-  const dirs = { CacheDir: '/tmp/g88-jest-cache', DocumentDir: '/tmp/g88-jest-docs' };
+  const path = require('path');
+  const base = path.join(process.cwd(), '.jest-g88');
+  const dirs = {
+    CacheDir: path.join(base, 'cache'),
+    DocumentDir: path.join(base, 'docs'),
+  };
   const fs = {
     dirs,
     isDir: jest.fn(() => Promise.resolve(true)),

@@ -33,7 +33,33 @@ try {
   ({ io } = require('./apps/mobile/node_modules/socket.io-client'));
 }
 
-const BASE = (process.env.MONITOR_API_URL ?? 'https://g88-api.onrender.com').replace(/\/$/, '');
+/** Allowed API origins for the monitor (SSRF / open-fetch guard). */
+const ALLOWED_ORIGINS = new Set([
+  'https://g88-api.onrender.com',
+  'https://api.g88.app',
+  'http://127.0.0.1:3000',
+  'http://localhost:3000',
+]);
+
+function resolveBase(raw) {
+  const trimmed = (raw ?? 'https://g88-api.onrender.com').replace(/\/$/, '');
+  let origin;
+  try {
+    origin = new URL(trimmed).origin;
+  } catch {
+    console.error(`Invalid MONITOR_API_URL: ${raw}`);
+    process.exit(1);
+  }
+  if (!ALLOWED_ORIGINS.has(origin) && !ALLOWED_ORIGINS.has(trimmed)) {
+    console.error(
+      `MONITOR_API_URL origin not allowlisted: ${origin}. Allowed: ${[...ALLOWED_ORIGINS].join(', ')}`,
+    );
+    process.exit(1);
+  }
+  return trimmed;
+}
+
+const BASE = resolveBase(process.env.MONITOR_API_URL);
 const API  = `${BASE}/api/v1`;
 
 const USER_A = {
