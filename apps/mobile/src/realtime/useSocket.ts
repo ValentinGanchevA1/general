@@ -47,7 +47,8 @@ let clientMessageSeq = 0;
 
 function nextClientMessageId(): string {
   clientMessageSeq += 1;
-  return `c-${Date.now()}-${clientMessageSeq}-${Math.random().toString(36).slice(2, 8)}`;
+  // Deterministic client id (time + monotonic seq). No Math.random — Sonar + no need for crypto here.
+  return `c-${Date.now()}-${clientMessageSeq}`;
 }
 
 /**
