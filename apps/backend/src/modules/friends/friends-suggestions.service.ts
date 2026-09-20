@@ -262,14 +262,13 @@ export class FriendsSuggestionsService {
       throw new NotFoundException({ code: 'user.not_found', message: 'User not found' });
     }
 
+    // null = permanent dismiss; Date = snooze until; snoozeDays computes a window.
     let snoozeUntil: Date | null = null;
     if (opts.snoozeUntil instanceof Date) {
       snoozeUntil = opts.snoozeUntil;
     } else if (typeof opts.snoozeDays === 'number' && opts.snoozeDays > 0) {
       const days = Math.min(Math.max(Math.floor(opts.snoozeDays), 1), 30);
       snoozeUntil = new Date(Date.now() + days * 86_400_000);
-    } else if (opts.snoozeUntil === null || opts.snoozeUntil === undefined) {
-      snoozeUntil = null; // permanent
     }
 
     await this.db.query(
