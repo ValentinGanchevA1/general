@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS friend_suggestion_dismissals (
   CHECK (actor_id <> target_id)
 );
 
-CREATE INDEX IF NOT EXISTS friend_suggestion_dismissals_actor_active_idx
-  ON friend_suggestion_dismissals (actor_id)
-  WHERE snooze_until IS NULL OR snooze_until > NOW();
+-- Plain actor index (NOW() is STABLE — cannot appear in partial index predicates).
+-- Active filter (snooze_until IS NULL OR snooze_until > NOW()) stays in queries.
+CREATE INDEX IF NOT EXISTS friend_suggestion_dismissals_actor_idx
+  ON friend_suggestion_dismissals (actor_id);
