@@ -328,11 +328,7 @@ export function VerificationDetailModal({
                     onClick={handleSubmit}
                     disabled={!decision || isSubmitting}
                     className={
-                      decision === 'approved'
-                        ? 'bg-green-600 hover:bg-green-700'
-                        : decision === 'rejected'
-                          ? ''
-                          : ''
+                      decision === 'approved' ? 'bg-green-600 hover:bg-green-700' : undefined
                     }
                     variant={decision === 'rejected' ? 'destructive' : 'default'}
                   >

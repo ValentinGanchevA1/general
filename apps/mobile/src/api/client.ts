@@ -29,6 +29,30 @@ type RefreshOutcome =
   | { ok: true; tokens: AuthTokens }
   | { ok: false; authFailed: boolean };
 
+/** Error subclass so Promise rejections are always `Error` (Sonar) while preserving ApiError fields. */
+export class ApiClientError extends Error {
+  readonly statusCode: number;
+  readonly code: string;
+  readonly details?: unknown;
+
+  constructor(api: ApiError) {
+    super(api.message);
+    this.name = 'ApiClientError';
+    this.statusCode = api.statusCode;
+    this.code = api.code;
+    if (api.details !== undefined) this.details = api.details;
+  }
+
+  toApiError(): ApiError {
+    return {
+      statusCode: this.statusCode,
+      code: this.code,
+      message: this.message,
+      ...(this.details !== undefined ? { details: this.details } : {}),
+    };
+  }
+}
+
 let refreshInFlight: Promise<RefreshOutcome> | null = null;
 
 export const api: AxiosInstance = axios.create({
@@ -68,7 +92,7 @@ api.interceptors.response.use(
         // Await clear so any listener reading tokens after the event sees null.
         await tokenStore.clear();
         authEvents.emit('logout', 'refresh_failed');
-        return Promise.reject(normalizeError(err));
+        return Promise.reject(toClientError(normalizeError(err)));
       }
       // Transient refresh failure (timeout / offline / 5xx cold-start): keep the
       // tokens and surface a network-style error so callers (e.g. restoreSession)
@@ -78,11 +102,15 @@ api.interceptors.response.use(
         code: 'refresh_unavailable',
         message: 'Could not reach the server to refresh your session. Please try again.',
       };
-      return Promise.reject(transient);
+      return Promise.reject(toClientError(transient));
     }
-    return Promise.reject(normalizeError(err));
+    return Promise.reject(toClientError(normalizeError(err)));
   },
 );
+
+function toClientError(api: ApiError): ApiClientError {
+  return new ApiClientError(api);
+}
 
 async function refreshOnce(): Promise<RefreshOutcome> {
   if (refreshInFlight) return refreshInFlight;

@@ -19,7 +19,8 @@ import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { FormField } from '@/components/FormField';
 import { colors, spacing, fontSize } from '@/theme';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Linear character classes only — avoids super-linear backtracking on adversarial input.
+const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const MIN_PASSWORD_LEN = 8;
 
 interface FieldErrors {

@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { randomInt } from 'node:crypto';
 
 import { S3Service } from '../../common/s3.service';
 
@@ -19,7 +20,9 @@ export class StoriesCleanupService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    const delay = 30_000 + Math.floor(Math.random() * 30_000);
+    // Stagger first sweep across instances (crypto RNG — not security-sensitive,
+    // but avoids Sonar pseudorandom warning on Math.random).
+    const delay = 30_000 + randomInt(0, 30_000);
     setTimeout(() => {
       void this.sweep();
       this.timer = setInterval(() => void this.sweep(), 15 * 60_000);
