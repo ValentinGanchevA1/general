@@ -246,8 +246,8 @@ export function AuthScreen(): React.JSX.Element {
             By continuing you agree to our{' '}
             <Text style={styles.legalLink} onPress={openTerms}>
               Terms of Service
-            </Text>{' '}
-            and{' '}
+            </Text>
+            {' '}and{' '}
             <Text style={styles.legalLink} onPress={openPrivacy}>
               Privacy Policy
             </Text>
@@ -260,87 +260,59 @@ export function AuthScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
+  root: { flex: 1, backgroundColor: colors.bg },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: spacing.lg,
+    padding: spacing.xxl,
+    paddingVertical: 40,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
+  card: { gap: spacing.md },
   logo: {
-    fontSize: 32,
-    fontWeight: '800',
     color: colors.primary,
+    fontSize: 40,
+    fontWeight: '800',
     textAlign: 'center',
+    marginBottom: spacing.xs,
   },
   subtitle: {
-    fontSize: fontSize.md,
     color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  error: {
-    color: colors.danger,
     fontSize: fontSize.sm,
+    textAlign: 'center',
+    marginBottom: spacing.md,
   },
+  error: { color: colors.danger, fontSize: fontSize.sm, textAlign: 'center' },
   btn: {
     backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: spacing.md,
+    borderRadius: 10,
+    padding: 14,
     alignItems: 'center',
+    marginTop: spacing.xs,
   },
-  btnText: {
-    color: colors.onPrimary,
-    fontWeight: '700',
-    fontSize: fontSize.md,
-  },
-  toggle: {
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  toggleText: {
-    color: colors.primary,
-    fontSize: fontSize.sm,
-  },
+  btnText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
+  toggle: { alignItems: 'center', marginTop: spacing.sm },
+  toggleText: { color: colors.primary, fontSize: fontSize.sm },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginVertical: spacing.lg,
     gap: spacing.sm,
   },
-  dividerLine: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
-  },
-  dividerText: {
-    color: colors.textSecondary,
-    fontSize: fontSize.xs,
-  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.borderStrong },
+  dividerText: { color: colors.textFaint, fontSize: fontSize.xs },
   googleBtn: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: spacing.md,
+    backgroundColor: colors.textPrimary,
+    borderRadius: 10,
+    padding: 14,
     alignItems: 'center',
   },
-  googleBtnText: {
-    color: colors.text,
-    fontWeight: '600',
-    fontSize: fontSize.md,
-  },
+  googleBtnText: { color: colors.onPrimary, fontWeight: '600', fontSize: fontSize.md },
   legal: {
-    color: colors.textSecondary,
+    color: colors.textMuted,
     fontSize: fontSize.xs,
     textAlign: 'center',
     lineHeight: 18,
+    marginTop: spacing.lg,
   },
   legalLink: {
     color: colors.primary,
