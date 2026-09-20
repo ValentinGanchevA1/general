@@ -218,7 +218,7 @@ export class DiscoveryService {
       if (key === 'rankScore') return undefined;
       if (val && typeof val === 'object' && !Array.isArray(val)) {
         return Object.keys(val as Record<string, unknown>)
-          .sort()
+          .sort((a, b) => a.localeCompare(b))
           .reduce<Record<string, unknown>>((acc, k) => {
             if (k === 'rankScore') return acc;
             acc[k] = (val as Record<string, unknown>)[k];
@@ -514,7 +514,7 @@ export class DiscoveryService {
         JSON.stringify({
           viewport,
           zoom,
-          kinds: [...kinds].sort(),
+          kinds: [...kinds].sort((a, b) => a.localeCompare(b)),
           topicSlug,
           listingMode: listingMode ?? null,
           friendsOnly,
