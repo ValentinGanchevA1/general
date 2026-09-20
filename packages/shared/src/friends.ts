@@ -68,7 +68,19 @@ export interface FriendRequestsPage {
 }
 
 /** Why a user appears in friend suggestions. */
-export type SuggestionReason = 'mutual_friends' | 'recent_wave' | 'recent_chat';
+export type SuggestionReason =
+  | 'mutual_friends'
+  | 'recent_wave'
+  | 'recent_chat'
+  | 'nearby'
+  | 'shared_interests';
+
+/** Compact mutual friend for density preview on a suggestion card. */
+export interface MutualPreviewFace {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
 
 /** Ranked "people you may know" card. */
 export interface SuggestionCard {
@@ -76,13 +88,30 @@ export interface SuggestionCard {
   displayName: string;
   avatarUrl: string | null;
   mutualFriendsCount: number;
+  /** Up to 3 mutual friends for avatar stack (density). */
+  mutualPreview?: MutualPreviewFace[];
   reason: SuggestionReason;
+  /** Fuzzed distance meters when both sides have a map pin. */
+  distanceMeters?: number | null;
+  verification?: VerificationLevel;
+  /** Overlap count on interests[] (0 when none). */
+  sharedInterestsCount?: number;
+  /** Server rank score (debug / stable sort); clients may ignore. */
+  rankScore?: number;
   /** Viewer already follows this user. */
   isFollowing: boolean;
   /** Outgoing pending friend request exists. */
   hasPendingOutgoing: boolean;
   /** Incoming pending friend request exists. */
   hasPendingIncoming: boolean;
+}
+
+/** POST /friends/suggestions/:userId/dismiss body. */
+export interface DismissSuggestionBody {
+  /** When set, hide until that ISO time. Omit/null = permanent dismiss. */
+  snoozeUntil?: string | null;
+  /** Convenience: snooze days from now (1–30). Ignored if snoozeUntil set. */
+  snoozeDays?: number;
 }
 
 /** Pending incoming friend-request count (badge). */
