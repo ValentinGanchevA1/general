@@ -16,7 +16,7 @@ const migrationsDir = path.join(__dirname, '..', 'migrations');
 const files = fs
   .readdirSync(migrationsDir)
   .filter((f) => f.endsWith('.sql'))
-  .sort();
+  .sort((a, b) => a.localeCompare(b));
 
 /** @type {Map<string, string[]>} */
 const byPrefix = new Map();
@@ -47,6 +47,6 @@ if (!ok) {
   process.exit(1);
 }
 
-const max = [...byPrefix.keys()].sort().at(-1) ?? '0000';
+const max = [...byPrefix.keys()].sort((a, b) => a.localeCompare(b)).at(-1) ?? '0000';
 const next = String(Number(max) + 1).padStart(4, '0');
 console.log(`OK: ${files.length} migrations, unique prefixes 0001–${max}. Next free: ${next}`);
