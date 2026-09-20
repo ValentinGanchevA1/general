@@ -54,7 +54,7 @@ export class MessagingService {
 
   /** Sorted participant pair — the stable uniqueness key for a 1:1 conversation. */
   private pairKey(a: string, b: string): string[] {
-    return [a, b].sort();
+    return [a, b].sort((x, y) => x.localeCompare(y));
   }
 
   /**

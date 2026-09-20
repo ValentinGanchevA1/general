@@ -188,7 +188,7 @@ export class InteractionsService {
     tx: { query: (sql: string, params?: unknown[]) => Promise<Array<{ id: string }>> },
     participantIds: string[],
   ): Promise<string> {
-    const sorted = [...participantIds].sort();
+    const sorted = [...participantIds].sort((a, b) => a.localeCompare(b));
     const existing = await tx.query(
       `SELECT id FROM conversations WHERE participant_ids = $1::uuid[] LIMIT 1`,
       [sorted],
