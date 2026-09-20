@@ -13,7 +13,7 @@ import { appAlert } from '@/ui/appAlert';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import type { ApiError, SuggestionCard, SuggestionReason } from '@g88/shared';
+import type { ApiError, SuggestionCard } from '@g88/shared';
 
 import type { SocialStackParamList } from '@/navigation/stacks';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
@@ -29,7 +29,9 @@ type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
 function formatDistance(meters: number | null | undefined): string | null {
   if (meters == null || !Number.isFinite(meters)) return null;
   if (meters < 1000) return `${Math.max(1, Math.round(meters))} m away`;
-  return `${(meters / 1000).toFixed(meters < 10_000 ? 1 : 0)} km away`;
+  const km = meters / 1000;
+  const digits = meters < 10_000 ? 1 : 0;
+  return `${km.toFixed(digits)} km away`;
 }
 
 function reasonLabel(item: SuggestionCard): string {
@@ -65,9 +67,9 @@ function isApiError(e: unknown): e is ApiError {
 
 function MutualPreviewStack({
   faces,
-}: {
+}: Readonly<{
   faces: NonNullable<SuggestionCard['mutualPreview']>;
-}): React.JSX.Element {
+}>): React.JSX.Element {
   return (
     <View style={S.previewRow}>
       {faces.slice(0, 3).map((f, i) => (
@@ -125,7 +127,7 @@ export function SuggestionsScreen(): React.JSX.Element {
   const markFollowing = useCallback((userId: string) => {
     setItems((prev) =>
       prev.map((c) => (c.userId === userId ? { ...c, isFollowing: true } : c)),
-    );
+  );
   }, []);
 
   const markRequested = useCallback((userId: string) => {
