@@ -1,9 +1,11 @@
 // Runs all migration files in apps/backend/migrations/ in filename order.
 // Usage: node scripts/migrate.js
+// Requires DATABASE_URL (or apps/backend/.env via dotenv).
 const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+
 async function run(client) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -97,8 +99,13 @@ async function run(client) {
 }
 
 async function main() {
-  const connectionString =
-    process.env.DATABASE_URL ?? 'postgres://g88:g88dev@localhost:5432/g88';
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    console.error(
+      'DATABASE_URL is required. Set it in the environment or in apps/backend/.env',
+    );
+    process.exit(1);
+  }
   const client = new Client({ connectionString });
   await client.connect();
   try {

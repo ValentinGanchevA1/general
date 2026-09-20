@@ -2,15 +2,23 @@
 // Usage:  npm run seed          (from apps/backend/)
 //   or:  DATABASE_URL=postgres://... node scripts/seed.js
 //
+// Requires DATABASE_URL (or apps/backend/.env via dotenv).
 // Change CENTER below to match the area you are testing.
 // All seed users get password: Test1234!
 
 const { Client } = require('pg');
 const bcrypt = require('bcrypt');
 const h3 = require('h3-js');
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-const CONNECTION_STRING =
-  process.env.DATABASE_URL ?? 'postgres://g88:g88dev@localhost:5432/g88';
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  console.error(
+    'DATABASE_URL is required. Set it in the environment or in apps/backend/.env',
+  );
+  process.exit(1);
+}
 
 // ── Drop this pin where you want users to appear ─────────────────────────────
 const CENTER = { lat: 43.2141, lng: 27.9147 }; // Varna, Bulgaria — city centre
@@ -60,7 +68,7 @@ function computeCells(lat, lng) {
 }
 
 async function run() {
-  const client = new Client({ connectionString: CONNECTION_STRING });
+  const client = new Client({ connectionString });
   await client.connect();
   console.log('Connected.\n');
 
