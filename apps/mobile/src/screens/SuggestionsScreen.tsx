@@ -49,7 +49,9 @@ function reasonLabel(item: SuggestionCard): string {
     }
     case 'shared_interests': {
       const c = item.sharedInterestsCount ?? 0;
-      return c > 0 ? `${c} shared interest${c === 1 ? '' : 's'}` : 'Shared interests';
+      if (c <= 0) return 'Shared interests';
+      const noun = c === 1 ? 'interest' : 'interests';
+      return `${c} shared ${noun}`;
     }
     default:
       return 'Suggested for you';
