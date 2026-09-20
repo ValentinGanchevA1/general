@@ -19,8 +19,22 @@ export interface DiscoveryQuery {
   kinds?: EntityKind[];
   prevViewportHash?: string;
   topic?: string;
+  /**
+   * When set, only listings matching this mode are returned.
+   * Users and events are unaffected. Omit for all listings.
+   */
   listingMode?: ListingMode;
+  /**
+   * When true, only close-friend user pins are returned (events/listings omitted).
+   * Offline friends remain visible; online is still presence-based.
+   */
   friendsOnly?: boolean;
+  /**
+   * Sort mode for entity zoom. Default 'relevance'.
+   * - relevance: multi-signal rank (distance + trust + social + freshness + activity)
+   * - distance: geographic proximity only
+   * - newest: listing created / event starts (when available)
+   */
   rankBy?: DiscoveryRankBy;
 }
 
@@ -42,6 +56,7 @@ interface EntityBase {
   id: string;
   lat: number;
   lng: number;
+  /** Present when rankBy=relevance (optional; clients may ignore). */
   rankScore?: number;
 }
 
@@ -52,6 +67,7 @@ export interface UserMeta {
   online: boolean;
   lastSeenAt: string | null;
   verifiedBadge?: boolean;
+  /** True when viewer and this user are close friends (map tier styling). */
   isFriend?: boolean;
 }
 
@@ -61,7 +77,12 @@ export interface EventMeta {
   startsAt: string;
   attendeeCount: number;
   capacity: number | null;
+  /**
+   * Event host. Present after migration 0042 on discovery points.
+   * Used by EntityBottomSheet Message host (same chat path as user / seller).
+   */
   hostId?: string;
+  /** Host display name for chat header; paired with hostId. */
   hostDisplayName?: string;
 }
 
@@ -71,9 +92,16 @@ export interface ListingMeta {
   priceCents: number;
   currency: string;
   category: string;
+  /** sell (default) | buy (wanted). Omitted on legacy rows → treat as sell. */
   mode?: ListingMode;
+  /**
+   * Listing owner. Present after migration 0041 on discovery points.
+   * Used by EntityBottomSheet Message seller (same chat path as user pins).
+   */
   sellerId?: string;
+  /** Seller display name for chat header; paired with sellerId. */
   sellerDisplayName?: string;
+  /** Optional for ranking freshness when present on discovery rows. */
   createdAt?: string;
 }
 
@@ -136,6 +164,7 @@ export interface LoginResponse {
 // ─── Profile ───────────────────────────────────────────────────────────────
 
 export type SubscriptionTier = 'free' | 'basic' | 'premium';
+
 export type SocialProvider =
   | 'instagram'
   | 'twitter'
@@ -161,12 +190,412 @@ export interface ProfileBadges {
   verified: boolean;
 }
 
+export interface UpdateProfileRequest {
+  displayName?: string;
+  bio?: string;
+  avatarUrl?: string;
+  visibility?: 'public' | 'private';
+  goals?: string[];
+  interests?: string[];
+  /** ISO date YYYY-MM-DD; null clears. Must yield age >= 18. */
+  dateOfBirth?: string | null;
+  hometownCity?: string | null;
+  /** ISO 3166-1 alpha-2 preferred (e.g. BG), or short country name. */
+  hometownCountry?: string | null;
+  showAge?: boolean;
+  showHometown?: boolean;
+  /** When false, close friends cannot see you as online. Default true. */
+  friendsSeeOnlineStatus?: boolean;
+  /** Full-bleed cover/background URL; null clears. Independent of avatar. */
+  coverUrl?: string | null;
+}
+
+export type IdVerificationStatus = 'none' | 'pending' | 'verified' | 'rejected';
+
+export interface UserProfile extends AuthenticatedUser {
+  bio: string | null;
+  visibility: 'public' | 'private';
+  goals: string[];
+  interests: string[];
+  profileComplete: boolean;
+  phone: string | null;
+  /** Derived from dateOfBirth; null when unset. */
+  age: number | null;
+  /** ISO date YYYY-MM-DD for the owner only (edit form). */
+  dateOfBirth: string | null;
+  hometownCity: string | null;
+  hometownCountry: string | null;
+  showAge: boolean;
+  showHometown: boolean;
+  /** Close friends may see online status when true. */
+  friendsSeeOnlineStatus: boolean;
+  photoUrls: string[];
+  /** Full-bleed cover/background; independent of avatarUrl / gallery primary. */
+  coverUrl: string | null;
+  subscriptionTier: SubscriptionTier;
+  socialLinks: SocialLink[];
+  verificationScore: number;
+  badges: ProfileBadges;
+  idVerificationStatus: IdVerificationStatus;
+  verifiedBadge: boolean;
+  createdAt: string;
+  /**
+   * Owner-only: sum of strike weights in the last 30 days (stories / spam ladder).
+   * Omitted or 0 when clear.
+   */
+  strikePoints?: number;
+  /**
+   * Owner-only: when set and in the future, story create is blocked.
+   */
+  storySuspendedUntil?: string | null;
+}
+
+/** Public status shown only inside EntityBottomSheet / profile (not on map markers). */
+export interface PublicUserStatus {
+  level: number;
+  xpIntoLevel: number;
+  xpForNextLevel: number;
+  currentStreak: number;
+  /**
+   * All-time leaderboard rank (1-based) when the user has total XP > 0.
+   * null when unranked.
+   */
+  allTimeRank?: number | null;
+  /**
+   * Unlocked achievement icons (emoji from the catalog) for compact public display.
+   * Ordered by catalog definition order; empty when none unlocked.
+   */
+  achievementIcons?: string[];
+}
+
+/** Public-facing profile returned by GET /users/:id */
+export interface PublicUserProfile {
+  id: string;
+  displayName: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  /** Full-bleed cover/background when set. Independent of avatar. */
+  coverUrl: string | null;
+  verification: VerificationLevel;
+  verificationScore: number;
+  idVerified: boolean;
+  goals: string[];
+  online: boolean;
+  /** Present only when the user opted to show age. */
+  age?: number | null;
+  /** Present only when the user opted to show hometown. */
+  hometownCity?: string | null;
+  hometownCountry?: string | null;
+  /**
+   * Ordered gallery URLs for the public profile photo album.
+   * Omitted or empty when the user has no gallery photos.
+   */
+  photoUrls?: string[];
+  status?: PublicUserStatus;
+  relationship?: ProfileRelationship;
+  blockedByViewer?: boolean;
+  /**
+   * Approximate distance (meters) from the viewer's last known map location
+   * to this user. Both locations are already fuzzed (r10). Omitted when either
+   * side has no location, or when viewing your own profile.
+   */
+  distanceMeters?: number;
+  /**
+   * Subject's last fuzzed map pin (r10). Present for authenticated viewers of a
+   * public profile when the subject has a location. Used to focus the map camera.
+   * Never exact GPS — same privacy as discovery markers.
+   */
+  mapLat?: number;
+  mapLng?: number;
+}
+
+export interface BlockedUser {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+  blockedAt: string;
+}
+
+export type MessagePermission = 'chat' | 'request' | 'none';
+
+export interface ProfileRelationship {
+  matched: boolean;
+  sharedInterests: string[];
+  canMessage: MessagePermission;
+}
+
+export interface PresignedUploadResponse {
+  uploadUrl: string;
+  publicUrl: string;
+}
+
+// ─── Gallery photos ──────────────────────────────────────────────────────────
+
+export interface UserPhoto {
+  id: string;
+  url: string;
+  position: number;
+}
+
+export interface AddPhotoRequest {
+  url: string;
+}
+
+export interface UploadPhotoBase64Request {
+  data: string;
+  contentType: string;
+  fileName?: string;
+}
+
+export interface ReorderPhotosRequest {
+  photoIds: string[];
+}
+
+/** Set or clear the profile cover (background) photo. */
+export interface SetCoverRequest {
+  /** Gallery photo id to use as cover. */
+  photoId?: string;
+  /** When true, clears cover_url. */
+  clear?: boolean;
+}
+
+export interface DeleteAccountRequest {
+  confirm: 'DELETE';
+  password?: string;
+}
+
+// ─── Verification ────────────────────────────────────────────────────────────
+
+export interface StartPhoneVerificationRequest {
+  phone: string;
+}
+
+export interface StartPhoneVerificationResponse {
+  sent: boolean;
+  channel: 'sms' | 'dev';
+}
+
+export interface CheckPhoneVerificationRequest {
+  phone: string;
+  code: string;
+}
+
+// ─── Subscriptions ───────────────────────────────────────────────────────────
+
+export type PaidTier = Exclude<SubscriptionTier, 'free'>;
+
+export interface SubscriptionPlan {
+  tier: SubscriptionTier;
+  name: string;
+  priceLabel: string;
+  features: string[];
+}
+
+export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
+  {
+    tier: 'free',
+    name: 'Free',
+    priceLabel: '$0',
+    features: ['Appear on the map', 'Waves & chat', 'Daily challenges'],
+  },
+  {
+    tier: 'basic',
+    name: 'Basic',
+    priceLabel: '$4.99/mo',
+    features: ['Everything in Free', 'See who viewed you', 'Wider map reach'],
+  },
+  {
+    tier: 'premium',
+    name: 'Premium',
+    priceLabel: '$9.99/mo',
+    features: ['Everything in Basic', 'Priority in discovery', 'Premium badge'],
+  },
+];
+
+export interface CreateCheckoutRequest {
+  tier: PaidTier;
+}
+
+export interface CheckoutSessionResponse {
+  url: string;
+}
+
+export interface PortalSessionResponse {
+  url: string;
+}
+
+// ─── Social linking ──────────────────────────────────────────────────────────
+
+export interface SocialAuthorizeResponse {
+  url: string;
+}
+
+// ─── Chat (REST) ───────────────────────────────────────────────────────────
+
+export type ChatMessageType = 'text' | 'location' | 'location_session';
+
+export type LocationShareDuration = '15m' | '60m' | 'until_off';
+
+export type LocationShareStatus = 'active' | 'ended';
+
+export type LocationShareEndReason =
+  | 'expired'
+  | 'stopped'
+  | 'timeout'
+  | 'blocked'
+  | 'conversation_closed';
+
+export interface ChatLocation {
+  lat: number;
+  lng: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  /** Defaults to 'text' for messages created before live-location shipped. */
+  type: ChatMessageType;
+  location?: ChatLocation | null;
+  locationSessionId?: string | null;
+  createdAt: string;
+}
+
+export interface LocationShareSession {
+  id: string;
+  conversationId: string;
+  sharerId: string;
+  status: LocationShareStatus;
+  duration: LocationShareDuration;
+  startedAt: string;
+  endsAt: string | null;
+  lastLocation: ChatLocation;
+  lastUpdatedAt: string;
+  endedAt?: string | null;
+  endReason?: LocationShareEndReason | null;
+}
+
+export interface ConversationParticipant {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+export type ConversationStatus = 'pending' | 'accepted';
+
+export interface ConversationSummary {
+  id: string;
+  participantIds: string[];
+  participants: ConversationParticipant[];
+  lastMessageAt: string | null;
+  lastMessage: { senderId: string; body: string } | null;
+  status: ConversationStatus;
+  initiatedBy: string | null;
+  /** True when the other participant is a close friend. */
+  isFriend?: boolean;
+  /**
+   * Peer online for friend threads only (respects friendsSeeOnlineStatus).
+   * null/undefined for non-friends or when privacy hides status.
+   */
+  peerOnline?: boolean | null;
+  /** Messages from the peer after the viewer's last_read_at (0 when fully read). */
+  unreadCount?: number;
+}
+
+export interface MessagePage {
+  messages: ChatMessage[];
+  nextCursor: string | null;
+}
+
+export interface CreateConversationRequest {
+  targetUserId: string;
+}
+
+export interface CreateConversationResponse {
+  conversationId: string;
+  status: ConversationStatus;
+  permission: Exclude<MessagePermission, 'none'>;
+}
+
+// ─── Notifications ─────────────────────────────────────────────────────────
+
+export interface RegisterDeviceTokenRequest {
+  token: string;
+  platform: 'ios' | 'android';
+}
+
+// ─── Geofences ─────────────────────────────────────────────────────────────
+
+export interface CreateGeofenceRequest {
+  label?: string;
+  radiusRings?: number;
+}
+
+export interface GeofenceResponse {
+  id: string;
+  label: string;
+  centerH3R7: string;
+  radiusRings: number;
+  inside: boolean;
+  active: boolean;
+  createdAt: string;
+}
+
+// ─── Alerts ────────────────────────────────────────────────────────────────
+
+export interface CreateAlertRequest {
+  category: AreaCategory;
+  body: string;
+  tag?: string;
+}
+
+export interface AlertResponse {
+  id: string;
+  category: AreaCategory;
+  body: string;
+  tag: string | null;
+  createdAt: string;
+}
+
+// ─── Trending ──────────────────────────────────────────────────────────────
+
+export interface TrendingResponse {
+  topics: string[];
+  generatedAt: string;
+}
+
+// ─── Received interactions (waves + story reactions toward me) ─────────────
+
+export type ReceivedInteractionType = 'wave' | 'story_reaction';
+
+export interface ReceivedInteraction {
+  id: string;
+  type: ReceivedInteractionType;
+  fromUser: {
+    id: string;
+    displayName: string;
+    avatarUrl: string | null;
+    verification: VerificationLevel;
+  };
+  storyId?: string;
+  reactionKind?: 'heart' | 'wave';
+  createdAt: string;
+  distanceMeters?: number;
+  isMutual: boolean;
+}
+
+export interface ReceivedInteractionsResponse {
+  items: ReceivedInteraction[];
+}
+
 // ─── Error envelope ────────────────────────────────────────────────────────
 
 export interface ApiError {
   statusCode: number;
   code: string;
   message: string;
+  /** Optional structured payload; null allowed for strict exactOptional interop. */
   details?: Record<string, unknown> | null;
 }
 
