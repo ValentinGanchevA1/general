@@ -33,7 +33,7 @@ type RefreshOutcome =
 export class ApiClientError extends Error {
   readonly statusCode: number;
   readonly code: string;
-  readonly details?: unknown;
+  readonly details?: Record<string, unknown> | null;
 
   constructor(api: ApiError) {
     super(api.message);
@@ -44,12 +44,15 @@ export class ApiClientError extends Error {
   }
 
   toApiError(): ApiError {
-    return {
+    const out: ApiError = {
       statusCode: this.statusCode,
       code: this.code,
       message: this.message,
-      ...(this.details !== undefined ? { details: this.details } : {}),
     };
+    if (this.details !== undefined) {
+      out.details = this.details;
+    }
+    return out;
   }
 }
 
