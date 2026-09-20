@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS friend_suggestion_dismissals (
   actor_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   target_id    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   dismissed_at timestamptz NOT NULL DEFAULT NOW(),
-  /** NULL = permanent dismiss; otherwise hide until this time. */
+  -- NULL = permanent dismiss; otherwise hide until this time.
   snooze_until timestamptz,
   PRIMARY KEY (actor_id, target_id),
   CHECK (actor_id <> target_id)
