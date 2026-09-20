@@ -13,7 +13,7 @@ import { appAlert } from '@/ui/appAlert';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import type { ApiError, SuggestionCard, SuggestionReason } from '@g88/shared';
+import type { ApiError, SuggestionCard } from '@g88/shared';
 
 import type { SocialStackParamList } from '@/navigation/stacks';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
@@ -26,15 +26,31 @@ import { colors, spacing, radius, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
 
-function reasonLabel(reason: SuggestionReason, mutual: number | null | undefined): string {
-  const n = mutual ?? 0;
-  switch (reason) {
+function formatDistance(meters: number | null | undefined): string | null {
+  if (meters == null || !Number.isFinite(meters)) return null;
+  if (meters < 1000) return `${Math.max(1, Math.round(meters))} m away`;
+  const km = meters / 1000;
+  const digits = meters < 10_000 ? 1 : 0;
+  return `${km.toFixed(digits)} km away`;
+}
+
+function reasonLabel(item: SuggestionCard): string {
+  const n = item.mutualFriendsCount ?? 0;
+  switch (item.reason) {
     case 'mutual_friends':
       return n === 1 ? '1 mutual friend' : `${n} mutual friends`;
     case 'recent_wave':
-      return 'Recent wave';
+      return n > 0 ? `Recent wave · ${n} mutual` : 'Recent wave';
     case 'recent_chat':
-      return 'Recent chat';
+      return n > 0 ? `Recent chat · ${n} mutual` : 'Recent chat';
+    case 'nearby': {
+      const d = formatDistance(item.distanceMeters);
+      return d ? `Nearby · ${d}` : 'Nearby';
+    }
+    case 'shared_interests': {
+      const c = item.sharedInterestsCount ?? 0;
+      return c > 0 ? `${c} shared interest${c === 1 ? '' : 's'}` : 'Shared interests';
+    }
     default:
       return 'Suggested for you';
   }
@@ -46,6 +62,22 @@ function isApiError(e: unknown): e is ApiError {
     e !== null &&
     'code' in e &&
     typeof (e as { code: unknown }).code === 'string'
+  );
+}
+
+function MutualPreviewStack({
+  faces,
+}: Readonly<{
+  faces: NonNullable<SuggestionCard['mutualPreview']>;
+}>): React.JSX.Element {
+  return (
+    <View style={S.previewRow}>
+      {faces.slice(0, 3).map((f, i) => (
+        <View key={f.userId} style={[S.previewFace, { marginLeft: i === 0 ? 0 : -8, zIndex: 3 - i }]}>
+          <Avatar uri={f.avatarUrl} name={f.displayName} size={22} />
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -95,7 +127,7 @@ export function SuggestionsScreen(): React.JSX.Element {
   const markFollowing = useCallback((userId: string) => {
     setItems((prev) =>
       prev.map((c) => (c.userId === userId ? { ...c, isFollowing: true } : c)),
-    );
+  );
   }, []);
 
   const markRequested = useCallback((userId: string) => {
@@ -155,9 +187,68 @@ export function SuggestionsScreen(): React.JSX.Element {
     [markRequested, removeCard, setBusy],
   );
 
+  const onDismiss = useCallback(
+    (item: SuggestionCard) => {
+      appAlert(
+        'Hide suggestion?',
+        `Remove ${item.displayName} from suggestions.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Snooze 7 days',
+            onPress: () => {
+              void (async () => {
+                setBusy(item.userId, true);
+                try {
+                  await postJson<{ snoozeDays: number }, { ok: true }>(
+                    `/friends/suggestions/${item.userId}/dismiss`,
+                    { snoozeDays: 7 },
+                  );
+                  removeCard(item.userId);
+                } catch (e) {
+                  appAlert('Could not hide', isApiError(e) ? e.message : 'Try again.');
+                } finally {
+                  setBusy(item.userId, false);
+                }
+              })();
+            },
+          },
+          {
+            text: 'Dismiss',
+            style: 'destructive',
+            onPress: () => {
+              void (async () => {
+                setBusy(item.userId, true);
+                try {
+                  await postJson<Record<string, never>, { ok: true }>(
+                    `/friends/suggestions/${item.userId}/dismiss`,
+                    {},
+                  );
+                  removeCard(item.userId);
+                } catch (e) {
+                  appAlert('Could not hide', isApiError(e) ? e.message : 'Try again.');
+                } finally {
+                  setBusy(item.userId, false);
+                }
+              })();
+            },
+          },
+        ],
+      );
+    },
+    [removeCard, setBusy],
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: SuggestionCard }) => {
       const busy = busyIds.includes(item.userId);
+      const label = reasonLabel(item);
+      const showMutualLink =
+        item.mutualFriendsCount > 0 &&
+        (item.reason === 'mutual_friends' || item.reason === 'recent_wave' || item.reason === 'recent_chat');
+      const distLine =
+        item.reason !== 'nearby' ? formatDistance(item.distanceMeters) : null;
+
       return (
         <View style={S.card}>
           <TouchableOpacity
@@ -171,30 +262,50 @@ export function SuggestionsScreen(): React.JSX.Element {
               <Text style={S.name} numberOfLines={1}>
                 {item.displayName}
               </Text>
-              {item.reason === 'mutual_friends' && item.mutualFriendsCount > 0 ? (
-                <TouchableOpacity
-                  onPress={() =>
-                    navigation.navigate('MutualFriends', {
-                      peerUserId: item.userId,
-                      peerName: item.displayName,
-                    })
-                  }
-                  accessibilityRole="button"
-                  accessibilityLabel={reasonLabel(item.reason, item.mutualFriendsCount)}
-                  hitSlop={6}
-                >
-                  <Text style={[S.reason, S.reasonLink]}>
-                    {reasonLabel(item.reason, item.mutualFriendsCount)}
+              <View style={S.reasonRow}>
+                {item.mutualPreview && item.mutualPreview.length > 0 ? (
+                  <MutualPreviewStack faces={item.mutualPreview} />
+                ) : null}
+                {showMutualLink ? (
+                  <TouchableOpacity
+                    onPress={() =>
+                      navigation.navigate('MutualFriends', {
+                        peerUserId: item.userId,
+                        peerName: item.displayName,
+                      })
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={label}
+                    hitSlop={6}
+                  >
+                    <Text style={[S.reason, S.reasonLink]} numberOfLines={1}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={S.reason} numberOfLines={1}>
+                    {label}
                   </Text>
-                </TouchableOpacity>
-              ) : (
-                <Text style={S.reason}>
-                  {reasonLabel(item.reason, item.mutualFriendsCount)}
+                )}
+              </View>
+              {distLine ? (
+                <Text style={S.dist} numberOfLines={1}>
+                  {distLine}
                 </Text>
-              )}
+              ) : null}
             </View>
           </TouchableOpacity>
           <View style={S.actions}>
+            <TouchableOpacity
+              style={S.btnDismiss}
+              onPress={() => onDismiss(item)}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel={`Hide ${item.displayName}`}
+              hitSlop={8}
+            >
+              <Text style={S.btnDismissText}>✕</Text>
+            </TouchableOpacity>
             {!item.isFollowing ? (
               <TouchableOpacity
                 style={S.btnSecondary}
@@ -237,7 +348,7 @@ export function SuggestionsScreen(): React.JSX.Element {
         </View>
       );
     },
-    [busyIds, navigation, onAddFriend, onFollow, openProfile],
+    [busyIds, navigation, onAddFriend, onDismiss, onFollow, openProfile],
   );
 
   return (
@@ -301,7 +412,7 @@ const S = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -310,9 +421,25 @@ const S = StyleSheet.create({
   cardMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
   cardMeta: { flex: 1, minWidth: 0 },
   name: { color: colors.textPrimary, fontWeight: '600', fontSize: fontSize.md },
-  reason: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
+  reasonRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  reason: { color: colors.textMuted, fontSize: fontSize.xs, flexShrink: 1 },
   reasonLink: { color: colors.primary, fontWeight: '600' },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
+  dist: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
+  previewRow: { flexDirection: 'row', alignItems: 'center' },
+  previewFace: {
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: colors.bg,
+    overflow: 'hidden',
+  },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  btnDismiss: {
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnDismissText: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
   btnPrimary: {
     paddingHorizontal: 14,
     paddingVertical: 8,

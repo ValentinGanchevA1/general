@@ -13,7 +13,7 @@ import { Throttle } from '@nestjs/throttler';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { TargetUserDto } from './dto';
+import { DismissSuggestionDto, TargetUserDto } from './dto';
 import { FriendsService } from './friends.service';
 import { FriendsSuggestionsService } from './friends-suggestions.service';
 
@@ -130,7 +130,7 @@ export class FriendsController {
     return this.friends.listFollowers(userId, cursor, limit);
   }
 
-  /** Ranked people-you-may-know (FoF + recent wave/chat). */
+  /** Ranked people-you-may-know (FoF + wave/chat + nearby + interests). */
   @Get('suggestions')
   listSuggestions(
     @CurrentUser('id') userId: string,
@@ -138,6 +138,24 @@ export class FriendsController {
   ) {
     const limit = limitRaw ? Number(limitRaw) : undefined;
     return this.suggestions.listSuggestions(userId, limit);
+  }
+
+  /** Permanent dismiss or snooze a suggestion card. */
+  @Post('suggestions/:userId/dismiss')
+  @Throttle({ default: { limit: 40, ttl: 60_000 } })
+  dismissSuggestion(
+    @CurrentUser('id') userId: string,
+    @Param('userId', ParseUUIDPipe) targetId: string,
+    @Body() body: DismissSuggestionDto,
+  ) {
+    const snoozeUntil =
+      body.snoozeUntil != null && body.snoozeUntil !== ''
+        ? new Date(body.snoozeUntil)
+        : undefined;
+    return this.suggestions.dismissSuggestion(userId, targetId, {
+      ...(snoozeUntil !== undefined ? { snoozeUntil } : {}),
+      ...(body.snoozeDays !== undefined ? { snoozeDays: body.snoozeDays } : {}),
+    });
   }
 
   @Get('mutual/:userId')
