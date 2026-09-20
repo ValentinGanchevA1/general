@@ -299,6 +299,9 @@ export function useMapFocus({
     focusAppliedKeyRef.current = null;
   }, [focusUserId, focusListingId, focusLat, focusLng, focusMyPin]);
 
+  // Cold start: city-scale on GPS. World default is MapView with no initialRegion;
+  // a single animateToRegion is often dropped before map is ready — match peer focus
+  // (setRegion + InteractionManager + retries).
   useEffect(() => {
     if (!myCoords || hasCenteredOnUserRef.current) return;
     if (
@@ -311,30 +314,42 @@ export function useMapFocus({
       return;
     }
     hasCenteredOnUserRef.current = true;
-    mapRef.current?.animateToRegion(
-      {
-        latitude: myCoords.lat,
-        longitude: myCoords.lng,
-        latitudeDelta: 0.02,
-        longitudeDelta: 0.02,
-      },
-      400,
-    );
-  }, [myCoords, focusMyPin, focusUserId, focusListingId, mapRef]);
+    const nextRegion: Region = {
+      latitude: myCoords.lat,
+      longitude: myCoords.lng,
+      latitudeDelta: 0.02,
+      longitudeDelta: 0.02,
+    };
+    setRegion(nextRegion);
+    const runCamera = (): void => {
+      mapRef.current?.animateToRegion(nextRegion, 400);
+    };
+    InteractionManager.runAfterInteractions(() => {
+      runCamera();
+      setTimeout(runCamera, 120);
+      setTimeout(runCamera, 400);
+    });
+  }, [myCoords, focusMyPin, focusUserId, focusListingId, mapRef, setRegion]);
 
   useFocusEffect(
     useCallback(() => {
       if (focusMyPin && myCoords) {
         hasCenteredOnUserRef.current = true;
-        mapRef.current?.animateToRegion(
-          {
-            latitude: myCoords.lat,
-            longitude: myCoords.lng,
-            latitudeDelta: 0.015,
-            longitudeDelta: 0.015,
-          },
-          450,
-        );
+        const nextRegion: Region = {
+          latitude: myCoords.lat,
+          longitude: myCoords.lng,
+          latitudeDelta: 0.015,
+          longitudeDelta: 0.015,
+        };
+        setRegion(nextRegion);
+        const runCamera = (): void => {
+          mapRef.current?.animateToRegion(nextRegion, 450);
+        };
+        InteractionManager.runAfterInteractions(() => {
+          runCamera();
+          setTimeout(runCamera, 120);
+          setTimeout(runCamera, 400);
+        });
         clearFocusParams();
         return;
       }
@@ -391,6 +406,7 @@ export function useMapFocus({
       clearFocusParams,
       tryApplyPendingFocus,
       mapRef,
+      setRegion,
     ]),
   );
 
