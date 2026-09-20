@@ -19,7 +19,8 @@ import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { FormField } from '@/components/FormField';
 import { colors, spacing, fontSize } from '@/theme';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Linear character classes only — avoids super-linear backtracking on adversarial input.
+const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const MIN_PASSWORD_LEN = 8;
 
 interface FieldErrors {
@@ -92,27 +93,24 @@ export function AuthScreen(): React.JSX.Element {
         void dispatch(login({ email: email.trim(), password }));
         return;
       }
-      const action = await dispatch(
+
+      const result = await dispatch(
         register({ email: email.trim(), password, displayName: displayName.trim() }),
       );
-      if (register.fulfilled.match(action) && phone.trim().length >= 8) {
-        await setPendingPhoneVerify(phone.trim());
+      if (register.fulfilled.match(result) && phone.trim()) {
+        setPendingPhoneVerify(phone.trim());
       }
     })();
   };
 
-  const toggleMode = () => {
-    dispatch(clearError());
+  const switchMode = (next: 'login' | 'register') => {
+    setMode(next);
     setFieldErrors({});
-    setMode((m) => (m === 'login' ? 'register' : 'login'));
+    dispatch(clearError());
   };
 
-  const openTerms = () => {
-    void Linking.openURL(TERMS_OF_SERVICE_URL);
-  };
-
-  const openPrivacy = () => {
-    void Linking.openURL(PRIVACY_POLICY_URL);
+  const openLegal = (url: string) => {
+    void Linking.openURL(url);
   };
 
   return (
@@ -121,16 +119,14 @@ export function AuthScreen(): React.JSX.Element {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.card}>
-          <Text style={styles.logo}>G88</Text>
-          <Text style={styles.subtitle}>
-            {mode === 'login' ? 'Sign in to continue' : 'Create your account'}
-          </Text>
+        <Text style={styles.brand}>G88</Text>
+        <Text style={styles.subtitle}>{mode === 'login' ? 'Welcome back' : 'Create account'}</Text>
 
+        <View style={styles.form}>
           {mode === 'register' ? (
             <FormField
               placeholder="Display name"
@@ -140,6 +136,7 @@ export function AuthScreen(): React.JSX.Element {
                 clearFieldError('displayName');
               }}
               autoCapitalize="words"
+              autoComplete="name"
               returnKeyType="next"
               onSubmitEditing={() => emailRef.current?.focus()}
               error={fieldErrors.displayName}
@@ -198,42 +195,22 @@ export function AuthScreen(): React.JSX.Element {
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <TouchableOpacity
-            style={styles.btn}
+            style={[styles.primaryBtn, loading && styles.btnDisabled]}
             onPress={submit}
             disabled={loading}
             accessibilityRole="button"
-            accessibilityLabel={mode === 'login' ? 'Sign in' : 'Create account'}
+            accessibilityLabel={mode === 'login' ? 'Log in' : 'Create account'}
           >
             {loading ? (
               <ActivityIndicator color={colors.onPrimary} />
             ) : (
-              <Text style={styles.btnText}>
-                {mode === 'login' ? 'Sign in' : 'Create account'}
-              </Text>
+              <Text style={styles.primaryBtnText}>{mode === 'login' ? 'Log in' : 'Sign up'}</Text>
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={toggleMode} style={styles.toggle}>
-            <Text style={styles.toggleText}>
-              {mode === 'login'
-                ? "Don't have an account? Sign up"
-                : 'Already have an account? Sign in'}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
           <TouchableOpacity
             style={styles.googleBtn}
-            onPress={() => {
-              dispatch(clearError());
-              setFieldErrors({});
-              void dispatch(loginWithGoogle());
-            }}
+            onPress={() => void dispatch(loginWithGoogle())}
             disabled={loading}
             accessibilityRole="button"
             accessibilityLabel="Continue with Google"
@@ -241,13 +218,22 @@ export function AuthScreen(): React.JSX.Element {
             <Text style={styles.googleBtnText}>Continue with Google</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            onPress={() => switchMode(mode === 'login' ? 'register' : 'login')}
+            accessibilityRole="button"
+          >
+            <Text style={styles.switchText}>
+              {mode === 'login' ? 'Need an account? Sign up' : 'Already have an account? Log in'}
+            </Text>
+          </TouchableOpacity>
+
           <Text style={styles.legal}>
             By continuing you agree to our{' '}
-            <Text style={styles.legalLink} onPress={openTerms}>
-              Terms of Service
-            </Text>
-            {' '}and{' '}
-            <Text style={styles.legalLink} onPress={openPrivacy}>
+            <Text style={styles.legalLink} onPress={() => openLegal(TERMS_OF_SERVICE_URL)}>
+              Terms
+            </Text>{' '}
+            and{' '}
+            <Text style={styles.legalLink} onPress={() => openLegal(PRIVACY_POLICY_URL)}>
               Privacy Policy
             </Text>
             .
@@ -260,61 +246,56 @@ export function AuthScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  scrollContent: {
+  scroll: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: spacing.xxl,
-    paddingVertical: 40,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
   },
-  card: { gap: spacing.md },
-  logo: {
-    color: colors.primary,
+  brand: {
     fontSize: 40,
     fontWeight: '800',
+    color: colors.primary,
     textAlign: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   subtitle: {
+    fontSize: fontSize.lg,
     color: colors.textSecondary,
-    fontSize: fontSize.sm,
     textAlign: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.xl,
   },
-  error: { color: colors.danger, fontSize: fontSize.sm, textAlign: 'center' },
-  btn: {
+  form: { gap: spacing.md },
+  error: { color: colors.danger, fontSize: fontSize.sm },
+  primaryBtn: {
     backgroundColor: colors.primary,
-    borderRadius: 10,
-    padding: 14,
+    borderRadius: 12,
+    paddingVertical: spacing.md,
     alignItems: 'center',
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
   },
-  btnText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
-  toggle: { alignItems: 'center', marginTop: spacing.sm },
-  toggleText: { color: colors.primary, fontSize: fontSize.sm },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: spacing.lg,
-    gap: spacing.sm,
-  },
-  dividerLine: { flex: 1, height: 1, backgroundColor: colors.borderStrong },
-  dividerText: { color: colors.textFaint, fontSize: fontSize.xs },
+  btnDisabled: { opacity: 0.6 },
+  primaryBtnText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
   googleBtn: {
-    backgroundColor: colors.textPrimary,
-    borderRadius: 10,
-    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingVertical: spacing.md,
     alignItems: 'center',
   },
-  googleBtnText: { color: colors.onPrimary, fontWeight: '600', fontSize: fontSize.md },
+  googleBtnText: { color: colors.text, fontWeight: '600', fontSize: fontSize.md },
+  switchText: {
+    color: colors.primary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    fontSize: fontSize.sm,
+  },
   legal: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontSize: fontSize.xs,
     textAlign: 'center',
-    lineHeight: 18,
     marginTop: spacing.lg,
+    lineHeight: 18,
   },
-  legalLink: {
-    color: colors.primary,
-    textDecorationLine: 'underline',
-  },
+  legalLink: { color: colors.primary, textDecorationLine: 'underline' },
 });
