@@ -22,6 +22,7 @@ import type {
 	ApiError,
 	DiscoveryPoint,
 	DiscoveryRankBy,
+	EntityKind,
 	EntityPoint,
 	ClusterPoint,
 	Viewport,
@@ -57,6 +58,7 @@ import { useReceivedInteractions } from '@/features/interactions/useReceivedInte
 import { MapCoachMarks } from '@/components/map/MapCoachMarks';
 import {
 	MapFilterRow,
+	DEFAULT_MAP_LAYERS,
 	type ListingModeFilterValue,
 } from '@/components/map/MapFilterRow';
 import { EmptyState } from '@/components/EmptyState';
@@ -122,7 +124,6 @@ function mapEmptyCopy(opts: {
 			actionKind: 'create',
 		};
 	}
-	// Default empty: prefer trust conversion before create when email is still open.
 	if (!opts.emailVerified) {
 		return {
 			icon: 'email-check-outline',
@@ -161,6 +162,7 @@ export function MapScreen(): React.JSX.Element {
 
 	const [listingModeFilter, setListingModeFilter] =
 		useState<ListingModeFilterValue>('all');
+	const [layers, setLayers] = useState<EntityKind[]>(DEFAULT_MAP_LAYERS);
 	const [friendsOnly, setFriendsOnly] = useState(false);
 	const [rankBy, setRankBy] = useState<DiscoveryRankBy>('relevance');
 	const [searchQuery, setSearchQuery] = useState('');
@@ -172,11 +174,16 @@ export function MapScreen(): React.JSX.Element {
 	const listingMode =
 		listingModeFilter === 'all' ? undefined : listingModeFilter;
 
+	const kinds = layers.length > 0 ? layers : DEFAULT_MAP_LAYERS;
+	const peopleLayer = kinds.includes('user');
+	const listingsLayer = kinds.includes('listing');
+
 	const { data, loading } = useDiscovery({
 		viewport,
 		zoom,
-		listingMode: friendsOnly ? undefined : listingMode,
-		friendsOnly,
+		kinds,
+		listingMode: peopleLayer && friendsOnly ? undefined : listingsLayer ? listingMode : undefined,
+		friendsOnly: peopleLayer && friendsOnly,
 		rankBy,
 	});
 	const points = data?.points ?? EMPTY_POINTS;
@@ -460,6 +467,8 @@ export function MapScreen(): React.JSX.Element {
 				<MapFilterRow
 					value={searchQuery}
 					onChangeText={setSearchQuery}
+					layers={layers}
+					onLayersChange={setLayers}
 					listingMode={listingModeFilter}
 					onListingModeChange={setListingModeFilter}
 					friendsOnly={friendsOnly}
@@ -467,7 +476,6 @@ export function MapScreen(): React.JSX.Element {
 					rankBy={rankBy}
 					onRankByChange={setRankBy}
 					top={filterRowTop}
-					showListingMode={!friendsOnly}
 				/>
 			) : null}
 

@@ -1,6 +1,6 @@
 // Shared layout math for map chrome (top stack + bottom clearance).
-// Tops collapse when challenge/nudge are hidden so filter/trending do not float
-// over empty reserved slots (residual density after PR #355 / #362).
+// Stack (closed sheet): challenge → nudge → filter row → interactions badge → trending.
+// Tops collapse when challenge/nudge are hidden.
 
 import { CHALLENGE_CARD_HEIGHT } from '@/features/gamification/DailyChallengeCard';
 import { spacing } from '@/theme';
@@ -11,10 +11,10 @@ export const INTERACTION_BADGE_SIZE = 44;
 export const MAP_CHROME_H_INSET = spacing.lg;
 export const FAB_BOTTOM = spacing.md;
 export const EVENTS_RAIL_BOTTOM = spacing.lg;
-/** @deprecated Prefer COMBINED_FILTER_ROW_HEIGHT — kept for any residual callers. */
+/** @deprecated Prefer COMBINED_FILTER_ROW_HEIGHT — kept for residual callers. */
 export const LISTING_MODE_FILTER_HEIGHT = 40;
 export const MAP_SEARCH_BAR_HEIGHT = 44;
-/** Single row height for Search | Category chips. */
+/** Single row: layer chips + search + sort. */
 export const COMBINED_FILTER_ROW_HEIGHT = 44;
 
 export const MAP_CHROME = {
@@ -59,10 +59,11 @@ export function mapNudgeTop(
 }
 
 /**
- * Interaction badge under the last visible top card.
- * Sheet open → pinned under safe area (challenge/nudge hidden by MapChrome).
+ * Top of the combined layer + search + sort row.
+ * Under last visible challenge/nudge (not under interactions badge).
+ * Sheet open → pinned under safe area.
  */
-export function mapBadgeTop(
+export function mapFilterRowTop(
 	insetsTop: number,
 	sheetOpen: boolean,
 	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
@@ -79,21 +80,10 @@ export function mapBadgeTop(
 }
 
 /**
- * Top of the combined Search + CategoryFilter row.
- * Sheet-aware + visibility-aware (no phantom gap when challenge/nudge absent).
+ * Interaction badge under the filter row.
+ * Sheet open → under filter (still below safe area via filter top).
  */
-export function mapFilterRowTop(
-	insetsTop: number,
-	sheetOpen: boolean,
-	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
-): number {
-	return mapBadgeTop(insetsTop, sheetOpen, visibility) + INTERACTION_BADGE_SIZE + MAP_CHROME_GAP;
-}
-
-/**
- * Top of TrendingCard under the combined filter row.
- */
-export function mapTrendingTop(
+export function mapBadgeTop(
 	insetsTop: number,
 	sheetOpen: boolean,
 	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
@@ -105,12 +95,27 @@ export function mapTrendingTop(
 	);
 }
 
-/** @deprecated Use mapFilterRowTop(insetsTop, sheetOpen, visibility). */
-export function mapSearchBarTop(insetsTop: number): number {
-	return mapBadgeTop(insetsTop, false) + INTERACTION_BADGE_SIZE + MAP_CHROME_GAP;
+/**
+ * Top of TrendingCard under interactions badge.
+ */
+export function mapTrendingTop(
+	insetsTop: number,
+	sheetOpen: boolean,
+	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
+): number {
+	return (
+		mapBadgeTop(insetsTop, sheetOpen, visibility) +
+		INTERACTION_BADGE_SIZE +
+		MAP_CHROME_GAP
+	);
 }
 
 /** @deprecated Use mapFilterRowTop(insetsTop, sheetOpen, visibility). */
+export function mapSearchBarTop(insetsTop: number): number {
+	return mapFilterRowTop(insetsTop, false);
+}
+
+/** @deprecated Use mapFilterRowTop. */
 export function mapListingModeFilterTop(insetsTop: number): number {
 	return mapSearchBarTop(insetsTop) + MAP_SEARCH_BAR_HEIGHT + MAP_CHROME_GAP;
 }
@@ -127,15 +132,15 @@ export function mapChromeTops(
 ): {
 	challenge: number;
 	nudge: number;
-	badge: number;
 	filterRow: number;
+	badge: number;
 	trending: number;
 } {
 	return {
 		challenge: mapChallengeTop(insetsTop),
 		nudge: mapNudgeTop(insetsTop, visibility),
-		badge: mapBadgeTop(insetsTop, sheetOpen, visibility),
 		filterRow: mapFilterRowTop(insetsTop, sheetOpen, visibility),
+		badge: mapBadgeTop(insetsTop, sheetOpen, visibility),
 		trending: mapTrendingTop(insetsTop, sheetOpen, visibility),
 	};
 }

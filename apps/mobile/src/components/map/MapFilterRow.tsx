@@ -1,7 +1,7 @@
-// Map chrome: single row — Search (flex) + listing mode chips + Friends + Sort cycle.
-// Replaces separate MapSearchBar + CategoryFilterBar stack for density.
+// Map chrome: layer chips (Dating · Events · Trading) + search + sort.
+// Layers map to discovery kinds (user · event · listing).
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
 	Pressable,
 	ScrollView,
@@ -12,26 +12,20 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { DiscoveryRankBy, ListingMode } from '@g88/shared';
+import type { DiscoveryRankBy, EntityKind, ListingMode } from '@g88/shared';
 import { colors, fontSize, radius, spacing } from '@/theme';
 
 import { COMBINED_FILTER_ROW_HEIGHT } from './mapChromeLayout';
 
 export type ListingModeFilterValue = 'all' | ListingMode;
 
-export interface MapFilterRowProps {
-	value: string;
-	onChangeText: (text: string) => void;
-	listingMode: ListingModeFilterValue;
-	onListingModeChange: (next: ListingModeFilterValue) => void;
-	friendsOnly: boolean;
-	onFriendsOnlyChange: (next: boolean) => void;
-	rankBy: DiscoveryRankBy;
-	onRankByChange: (next: DiscoveryRankBy) => void;
-	top: number;
-	showListingMode: boolean;
-	placeholder?: string;
-}
+export const DEFAULT_MAP_LAYERS: EntityKind[] = ['user', 'event', 'listing'];
+
+const LAYER_OPTIONS: Array<{ id: EntityKind; label: string; a11y: string }> = [
+	{ id: 'user', label: 'Dating', a11y: 'People / dating layer' },
+	{ id: 'event', label: 'Events', a11y: 'Events layer' },
+	{ id: 'listing', label: 'Trading', a11y: 'Listings / trading layer' },
+];
 
 const LISTING_OPTIONS: Array<{ id: ListingModeFilterValue; label: string }> = [
 	{ id: 'all', label: 'All' },
@@ -52,9 +46,27 @@ function nextRank(current: DiscoveryRankBy): DiscoveryRankBy {
 	return RANK_CYCLE[(i + 1) % RANK_CYCLE.length]!;
 }
 
+export interface MapFilterRowProps {
+	value: string;
+	onChangeText: (text: string) => void;
+	/** Active discovery layers (at least one). */
+	layers: EntityKind[];
+	onLayersChange: (next: EntityKind[]) => void;
+	listingMode: ListingModeFilterValue;
+	onListingModeChange: (next: ListingModeFilterValue) => void;
+	friendsOnly: boolean;
+	onFriendsOnlyChange: (next: boolean) => void;
+	rankBy: DiscoveryRankBy;
+	onRankByChange: (next: DiscoveryRankBy) => void;
+	top: number;
+	placeholder?: string;
+}
+
 export function MapFilterRow({
 	value,
 	onChangeText,
+	layers,
+	onLayersChange,
 	listingMode,
 	onListingModeChange,
 	friendsOnly,
@@ -62,13 +74,86 @@ export function MapFilterRow({
 	rankBy,
 	onRankByChange,
 	top,
-	showListingMode,
 	placeholder = 'Search nearby…',
 }: MapFilterRowProps): React.JSX.Element {
 	const rankActive = rankBy !== 'relevance';
+	const layerSet = new Set(layers);
+	const showPeople = layerSet.has('user');
+	const showListings = layerSet.has('listing');
+
+	const toggleLayer = useCallback(
+		(id: EntityKind) => {
+			const has = layerSet.has(id);
+			if (has) {
+				if (layers.length <= 1) return;
+				onLayersChange(layers.filter((k) => k !== id));
+			} else {
+				onLayersChange([...layers, id]);
+			}
+		},
+		[layerSet, layers, onLayersChange],
+	);
+
 	return (
 		<View style={[styles.wrap, { top }]} pointerEvents="box-none">
-			<View style={styles.row}>
+			<ScrollView
+				horizontal
+				showsHorizontalScrollIndicator={false}
+				contentContainerStyle={styles.row}
+				keyboardShouldPersistTaps="handled"
+			>
+				{LAYER_OPTIONS.map((opt) => {
+					const active = layerSet.has(opt.id);
+					return (
+						<Pressable
+							key={opt.id}
+							onPress={() => toggleLayer(opt.id)}
+							style={[styles.chip, active && styles.chipActiveLayer]}
+							accessibilityRole="button"
+							accessibilityState={{ selected: active }}
+							accessibilityLabel={opt.a11y}
+						>
+							<Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
+								{opt.label}
+							</Text>
+						</Pressable>
+					);
+				})}
+
+				{showListings
+					? LISTING_OPTIONS.map((opt) => {
+							const active = listingMode === opt.id;
+							return (
+								<Pressable
+									key={opt.id}
+									onPress={() => onListingModeChange(opt.id)}
+									style={[styles.chip, active && styles.chipActiveListing]}
+									accessibilityRole="button"
+									accessibilityState={{ selected: active }}
+									accessibilityLabel={`Show ${opt.label} listings`}
+								>
+									<Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
+										{opt.label}
+									</Text>
+								</Pressable>
+							);
+					  })
+					: null}
+
+				{showPeople ? (
+					<Pressable
+						onPress={() => onFriendsOnlyChange(!friendsOnly)}
+						style={[styles.chip, friendsOnly && styles.chipActiveFriends]}
+						accessibilityRole="button"
+						accessibilityState={{ selected: friendsOnly }}
+						accessibilityLabel={friendsOnly ? 'Show everyone nearby' : 'Show friends only'}
+					>
+						<Text style={[styles.chipText, friendsOnly && styles.chipTextActive]} numberOfLines={1}>
+							Friends
+						</Text>
+					</Pressable>
+				) : null}
+
 				<View style={styles.searchBar}>
 					<Icon name="magnify" size={18} color={colors.textMuted} style={styles.searchIcon} />
 					<TextInput
@@ -84,47 +169,104 @@ export function MapFilterRow({
 						accessibilityLabel="Search nearby people, events, and listings"
 					/>
 					{value.length > 0 ? (
-						<Pressable onPress={() => onChangeText('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear search" style={styles.clear}>
+						<Pressable
+							onPress={() => onChangeText('')}
+							hitSlop={8}
+							accessibilityRole="button"
+							accessibilityLabel="Clear search"
+						>
 							<Icon name="close-circle" size={16} color={colors.textMuted} />
 						</Pressable>
 					) : null}
 				</View>
-				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll} style={styles.chipsScrollView} keyboardShouldPersistTaps="handled">
-					{showListingMode
-						? LISTING_OPTIONS.map((opt) => {
-								const active = listingMode === opt.id;
-								return (
-									<Pressable key={opt.id} onPress={() => onListingModeChange(opt.id)} style={[styles.chip, active && styles.chipActiveListing]} accessibilityRole="button" accessibilityState={{ selected: active }} accessibilityLabel={`Show ${opt.label} listings`}>
-										<Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>{opt.label}</Text>
-									</Pressable>
-								);
-						  })
-						: null}
-					<Pressable onPress={() => onFriendsOnlyChange(!friendsOnly)} style={[styles.chip, friendsOnly && styles.chipActiveFriends]} accessibilityRole="button" accessibilityState={{ selected: friendsOnly }} accessibilityLabel={friendsOnly ? 'Show everyone nearby' : 'Show friends only'}>
-						<Text style={[styles.chipText, friendsOnly && styles.chipTextActive]} numberOfLines={1}>Friends</Text>
-					</Pressable>
-					<Pressable onPress={() => onRankByChange(nextRank(rankBy))} style={[styles.chip, rankActive && styles.chipActiveRank]} accessibilityRole="button" accessibilityState={{ selected: rankActive }} accessibilityLabel={`Sort by ${rankLabel(rankBy)}. Tap to change.`}>
-						<Text style={[styles.chipText, rankActive && styles.chipTextActive]} numberOfLines={1}>{rankLabel(rankBy)}</Text>
-					</Pressable>
-				</ScrollView>
-			</View>
+
+				<Pressable
+					onPress={() => onRankByChange(nextRank(rankBy))}
+					style={[styles.chip, rankActive && styles.chipActiveRank]}
+					accessibilityRole="button"
+					accessibilityLabel={`Sort by ${rankLabel(rankBy)}. Tap to change.`}
+				>
+					<Text
+						style={[styles.chipText, rankActive && styles.chipTextRankActive]}
+						numberOfLines={1}
+					>
+						{rankLabel(rankBy)}
+					</Text>
+				</Pressable>
+			</ScrollView>
 		</View>
 	);
 }
 
 const styles = StyleSheet.create({
-	wrap: { position: 'absolute', left: spacing.lg, right: spacing.lg, zIndex: 19 },
-	row: { height: COMBINED_FILTER_ROW_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 8 },
-	searchBar: { flex: 1, minWidth: 0, height: COMBINED_FILTER_ROW_HEIGHT, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(18,18,31,0.94)', borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.pill, paddingHorizontal: 10 },
-	searchIcon: { marginRight: 6 },
-	input: { flex: 1, minWidth: 0, color: colors.textPrimary, fontSize: fontSize.sm, paddingVertical: 0, includeFontPadding: false },
-	clear: { marginLeft: 4, padding: 2 },
-	chipsScrollView: { flexGrow: 0, flexShrink: 0, maxWidth: '58%' },
-	chipsScroll: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 2 },
-	chip: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: 'rgba(18,18,31,0.92)', borderWidth: 1, borderColor: colors.borderStrong },
-	chipActiveListing: { backgroundColor: colors.primary, borderColor: colors.primary },
-	chipActiveFriends: { backgroundColor: colors.entityFriend, borderColor: colors.entityFriend },
-	chipActiveRank: { backgroundColor: colors.accent, borderColor: colors.accent },
-	chipText: { color: colors.textSecondary, fontSize: fontSize.xs, fontWeight: '700' },
-	chipTextActive: { color: colors.onPrimary },
+	wrap: {
+		position: 'absolute',
+		left: spacing.md,
+		right: spacing.md,
+		height: COMBINED_FILTER_ROW_HEIGHT,
+		zIndex: 20,
+	},
+	row: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		paddingRight: 4,
+		minHeight: COMBINED_FILTER_ROW_HEIGHT,
+	},
+	searchBar: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		minWidth: 120,
+		maxWidth: 180,
+		height: 36,
+		paddingHorizontal: 10,
+		borderRadius: radius.pill,
+		backgroundColor: 'rgba(18,18,31,0.92)',
+		borderWidth: 1,
+		borderColor: colors.borderStrong,
+	},
+	searchIcon: { marginRight: 4 },
+	input: {
+		flex: 1,
+		padding: 0,
+		margin: 0,
+		color: colors.textPrimary,
+		fontSize: fontSize.sm,
+		minWidth: 64,
+	},
+	chip: {
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		borderRadius: radius.pill,
+		backgroundColor: 'rgba(18,18,31,0.92)',
+		borderWidth: 1,
+		borderColor: colors.borderStrong,
+	},
+	chipActiveLayer: {
+		backgroundColor: colors.primary,
+		borderColor: colors.primary,
+	},
+	chipActiveListing: {
+		backgroundColor: colors.entityListing,
+		borderColor: colors.entityListing,
+	},
+	chipActiveFriends: {
+		backgroundColor: colors.entityFriend,
+		borderColor: colors.entityFriend,
+	},
+	chipActiveRank: {
+		backgroundColor: colors.primarySoft,
+		borderColor: colors.primaryBorder,
+	},
+	chipText: {
+		color: colors.textSecondary,
+		fontSize: fontSize.xs,
+		fontWeight: '700',
+	},
+	chipTextActive: {
+		color: colors.onPrimary,
+	},
+	chipTextRankActive: {
+		color: colors.primary,
+	},
 });
