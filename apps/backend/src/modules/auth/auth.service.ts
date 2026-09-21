@@ -51,14 +51,6 @@ export class AuthService {
     password: string,
     displayName: string,
   ): Promise<LoginResponse> {
-    const existing = await this.db.query<UserRow[]>(
-      `SELECT id FROM users WHERE email = $1 AND deleted_at IS NULL LIMIT 1`,
-      [email],
-    );
-    if (existing.length > 0) {
-      throw new ConflictException({ code: 'auth.email_taken', message: 'Email already in use' });
-    }
-
     const passwordHash = await bcrypt.hash(password, AuthService.BCRYPT_ROUNDS);
     let rows: UserRow[];
     try {
