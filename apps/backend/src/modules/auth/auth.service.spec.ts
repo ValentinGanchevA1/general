@@ -3,6 +3,7 @@ import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
+import { QueryFailedError } from 'typeorm';
 
 import { AuthService } from './auth.service';
 
@@ -56,9 +57,16 @@ describe('AuthService', () => {
   });
 
   describe('register()', () => {
-    it('throws ConflictException when email is already taken', async () => {
-      db.query.mockResolvedValueOnce([{ id: 'existing' }]);
-      await expect(service.register('taken@x.com', 'pw', 'Name')).rejects.toBeInstanceOf(ConflictException);
+    it('throws ConflictException when email unique constraint fails (23505)', async () => {
+      // register() is INSERT-only; concurrent/taken email surfaces as Postgres unique_violation.
+      const err = Object.assign(
+        new QueryFailedError('INSERT', [], new Error('duplicate key value violates unique constraint')),
+        { code: '23505' },
+      );
+      db.query.mockRejectedValueOnce(err);
+      await expect(service.register('taken@x.com', 'pw', 'Name')).rejects.toBeInstanceOf(
+        ConflictException,
+      );
     });
   });
 });
