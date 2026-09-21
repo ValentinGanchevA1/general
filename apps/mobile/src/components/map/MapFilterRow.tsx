@@ -77,21 +77,19 @@ export function MapFilterRow({
 	placeholder = 'Search nearby…',
 }: MapFilterRowProps): React.JSX.Element {
 	const rankActive = rankBy !== 'relevance';
-	const layerSet = new Set(layers);
-	const showPeople = layerSet.has('user');
-	const showListings = layerSet.has('listing');
+	const showPeople = layers.includes('user');
+	const showListings = layers.includes('listing');
 
 	const toggleLayer = useCallback(
 		(id: EntityKind) => {
-			const has = layerSet.has(id);
-			if (has) {
+			if (layers.includes(id)) {
 				if (layers.length <= 1) return;
 				onLayersChange(layers.filter((k) => k !== id));
 			} else {
 				onLayersChange([...layers, id]);
 			}
 		},
-		[layerSet, layers, onLayersChange],
+		[layers, onLayersChange],
 	);
 
 	return (
@@ -103,7 +101,7 @@ export function MapFilterRow({
 				keyboardShouldPersistTaps="handled"
 			>
 				{LAYER_OPTIONS.map((opt) => {
-					const active = layerSet.has(opt.id);
+					const active = layers.includes(opt.id);
 					return (
 						<Pressable
 							key={opt.id}
