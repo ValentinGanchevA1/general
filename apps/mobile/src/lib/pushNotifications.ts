@@ -6,11 +6,16 @@
  *   iOS:     place GoogleService-Info.plist in apps/mobile/ios/G88/
  *            + add Push Notifications capability in Xcode
  *
+ * Without those native config files the DEFAULT Firebase app is never created
+ * and getMessaging() throws. All public entry points soft-fail in that case
+ * so the rest of the app still boots (dev / CI without FCM credentials).
+ *
  * Call registerPushToken() after every successful login/session restore.
  * Call unregisterPushToken() on logout / deleteAccount (best-effort).
  * Call setupNotificationHandlers(navigate) once at app boot after login.
  */
 import { Platform, PermissionsAndroid } from 'react-native';
+import { getApps } from '@react-native-firebase/app';
 import {
   getMessaging,
   getToken,
@@ -24,7 +29,21 @@ import {
 import { api } from '@/api/client';
 import { focusUserOnMapViaRef } from '@/navigation/focusUserOnMap';
 
-const messaging = () => getMessaging();
+/** True only when native Firebase DEFAULT app exists (google-services / plist present). */
+function isFirebaseReady(): boolean {
+  try {
+    return getApps().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function messaging() {
+  if (!isFirebaseReady()) {
+    throw new Error('Firebase DEFAULT app not initialized');
+  }
+  return getMessaging();
+}
 
 // ─── Permission ──────────────────────────────────────────────────────────────
 
@@ -48,6 +67,16 @@ async function requestPermission(): Promise<boolean> {
 // ─── Token registration ──────────────────────────────────────────────────────
 
 export async function registerPushToken(): Promise<void> {
+  if (!isFirebaseReady()) {
+    if (__DEV__) {
+      console.warn(
+        '[push] Firebase not initialized — skip registerPushToken. ' +
+          'Add android/app/google-services.json and/or ios GoogleService-Info.plist, then rebuild.',
+      );
+    }
+    return;
+  }
+
   try {
     const granted = await requestPermission();
     if (!granted) return;
@@ -71,6 +100,13 @@ export async function registerPushToken(): Promise<void> {
  * Must run while the access token is still valid (before tokenStore.clear).
  */
 export async function unregisterPushToken(): Promise<void> {
+  if (!isFirebaseReady()) {
+    if (__DEV__) {
+      console.warn('[push] Firebase not initialized — skip unregisterPushToken.');
+    }
+    return;
+  }
+
   try {
     const token = await getToken(messaging());
     if (!token) return;
@@ -110,24 +146,39 @@ function handleNotificationTap(
 // ─── Handler setup (call once after login) ───────────────────────────────────
 
 export function setupNotificationHandlers(navigate: NavigateFn): () => void {
-  const unsubForeground = onMessage(messaging(), async () => {
-    // No-op: socket delivers the message live.
-  });
-
-  const unsubBackgroundTap = onNotificationOpenedApp(messaging(), (remoteMessage) => {
-    handleNotificationTap(remoteMessage.data as Record<string, string>, navigate);
-  });
-
-  void getInitialNotification(messaging()).then((remoteMessage) => {
-    if (remoteMessage) {
-      setTimeout(() => {
-        handleNotificationTap(remoteMessage.data as Record<string, string>, navigate);
-      }, 300);
+  if (!isFirebaseReady()) {
+    if (__DEV__) {
+      console.warn(
+        '[push] Firebase not initialized — skip setupNotificationHandlers. ' +
+          'Add android/app/google-services.json and/or ios GoogleService-Info.plist, then rebuild.',
+      );
     }
-  });
+    return () => undefined;
+  }
 
-  return () => {
-    unsubForeground();
-    unsubBackgroundTap();
-  };
+  try {
+    const unsubForeground = onMessage(messaging(), async () => {
+      // No-op: socket delivers the message live.
+    });
+
+    const unsubBackgroundTap = onNotificationOpenedApp(messaging(), (remoteMessage) => {
+      handleNotificationTap(remoteMessage.data as Record<string, string>, navigate);
+    });
+
+    void getInitialNotification(messaging()).then((remoteMessage) => {
+      if (remoteMessage) {
+        setTimeout(() => {
+          handleNotificationTap(remoteMessage.data as Record<string, string>, navigate);
+        }, 300);
+      }
+    });
+
+    return () => {
+      unsubForeground();
+      unsubBackgroundTap();
+    };
+  } catch (err) {
+    if (__DEV__) console.warn('[push] setupNotificationHandlers failed:', err);
+    return () => undefined;
+  }
 }
