@@ -517,6 +517,7 @@ export function MapScreen(): React.JSX.Element {
 					onFriendsOnlyChange={setFriendsOnly}
 					rankBy={rankBy}
 					onRankByChange={setRankBy}
+					onPressCreate={openCreateNearby}
 					top={filterRowTop}
 				/>
 			) : null}
