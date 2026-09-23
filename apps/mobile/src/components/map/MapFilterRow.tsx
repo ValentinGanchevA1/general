@@ -1,7 +1,6 @@
-// Map chrome: layer chips (Dating · Events · Trading) + search + sort.
-// Layers map to discovery kinds (user · event · listing).
+// Map chrome v3: exclusive segments (All · People · Events · Listings) + search + Filters.
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import {
 	Pressable,
 	ScrollView,
@@ -12,52 +11,37 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { DiscoveryRankBy, EntityKind, ListingMode } from '@g88/shared';
+import type { EntityKind } from '@g88/shared';
 import { colors, fontSize, radius, spacing } from '@/theme';
 
 import { COMBINED_FILTER_ROW_HEIGHT } from './mapChromeLayout';
 
-export type ListingModeFilterValue = 'all' | ListingMode;
+/** Exclusive map layer segment. */
+export type MapLayerSegment = 'all' | EntityKind;
 
 export const DEFAULT_MAP_LAYERS: EntityKind[] = ['user', 'event', 'listing'];
 
-const LAYER_OPTIONS: Array<{ id: EntityKind; label: string; a11y: string }> = [
-	{ id: 'user', label: 'Dating', a11y: 'People / dating layer' },
-	{ id: 'event', label: 'Events', a11y: 'Events layer' },
-	{ id: 'listing', label: 'Trading', a11y: 'Listings / trading layer' },
+const SEGMENTS: Array<{ id: MapLayerSegment; label: string; a11y: string }> = [
+	{ id: 'all', label: 'All', a11y: 'Show people, events, and listings' },
+	{ id: 'user', label: 'People', a11y: 'People layer only' },
+	{ id: 'event', label: 'Events', a11y: 'Events layer only' },
+	{ id: 'listing', label: 'Listings', a11y: 'Listings layer only' },
 ];
 
-const LISTING_OPTIONS: Array<{ id: ListingModeFilterValue; label: string }> = [
-	{ id: 'all', label: 'All' },
-	{ id: 'sell', label: 'For sale' },
-	{ id: 'buy', label: 'Wanted' },
-];
-
-const RANK_CYCLE: DiscoveryRankBy[] = ['relevance', 'distance', 'newest'];
-
-function rankLabel(r: DiscoveryRankBy): string {
-	if (r === 'distance') return 'Near';
-	if (r === 'newest') return 'New';
-	return 'Relevant';
-}
-
-function nextRank(current: DiscoveryRankBy): DiscoveryRankBy {
-	const i = RANK_CYCLE.indexOf(current);
-	return RANK_CYCLE[(i + 1) % RANK_CYCLE.length]!;
+export function segmentToKinds(segment: MapLayerSegment): EntityKind[] {
+	if (segment === 'all') return [...DEFAULT_MAP_LAYERS];
+	return [segment];
 }
 
 export interface MapFilterRowProps {
 	value: string;
 	onChangeText: (text: string) => void;
-	/** Active discovery layers (at least one). */
-	layers: EntityKind[];
-	onLayersChange: (next: EntityKind[]) => void;
-	listingMode: ListingModeFilterValue;
-	onListingModeChange: (next: ListingModeFilterValue) => void;
-	friendsOnly: boolean;
-	onFriendsOnlyChange: (next: boolean) => void;
-	rankBy: DiscoveryRankBy;
-	onRankByChange: (next: DiscoveryRankBy) => void;
+	segment: MapLayerSegment;
+	onSegmentChange: (next: MapLayerSegment) => void;
+	/** Opens MapFiltersSheet (Friends / sort / listing mode). */
+	onPressFilters: () => void;
+	/** Visual hint when non-default filters are active. */
+	filtersActive?: boolean;
 	top: number;
 	placeholder?: string;
 }
@@ -65,33 +49,13 @@ export interface MapFilterRowProps {
 export function MapFilterRow({
 	value,
 	onChangeText,
-	layers,
-	onLayersChange,
-	listingMode,
-	onListingModeChange,
-	friendsOnly,
-	onFriendsOnlyChange,
-	rankBy,
-	onRankByChange,
+	segment,
+	onSegmentChange,
+	onPressFilters,
+	filtersActive = false,
 	top,
 	placeholder = 'Search nearby…',
 }: MapFilterRowProps): React.JSX.Element {
-	const rankActive = rankBy !== 'relevance';
-	const showPeople = layers.includes('user');
-	const showListings = layers.includes('listing');
-
-	const toggleLayer = useCallback(
-		(id: EntityKind) => {
-			if (layers.includes(id)) {
-				if (layers.length <= 1) return;
-				onLayersChange(layers.filter((k) => k !== id));
-			} else {
-				onLayersChange([...layers, id]);
-			}
-		},
-		[layers, onLayersChange],
-	);
-
 	return (
 		<View style={[styles.wrap, { top }]} pointerEvents="box-none">
 			<ScrollView
@@ -100,13 +64,13 @@ export function MapFilterRow({
 				contentContainerStyle={styles.row}
 				keyboardShouldPersistTaps="handled"
 			>
-				{LAYER_OPTIONS.map((opt) => {
-					const active = layers.includes(opt.id);
+				{SEGMENTS.map((opt) => {
+					const active = segment === opt.id;
 					return (
 						<Pressable
 							key={opt.id}
-							onPress={() => toggleLayer(opt.id)}
-							style={[styles.chip, active && styles.chipActiveLayer]}
+							onPress={() => onSegmentChange(opt.id)}
+							style={[styles.chip, active && styles.chipActive]}
 							accessibilityRole="button"
 							accessibilityState={{ selected: active }}
 							accessibilityLabel={opt.a11y}
@@ -117,40 +81,6 @@ export function MapFilterRow({
 						</Pressable>
 					);
 				})}
-
-				{showListings
-					? LISTING_OPTIONS.map((opt) => {
-							const active = listingMode === opt.id;
-							return (
-								<Pressable
-									key={opt.id}
-									onPress={() => onListingModeChange(opt.id)}
-									style={[styles.chip, active && styles.chipActiveListing]}
-									accessibilityRole="button"
-									accessibilityState={{ selected: active }}
-									accessibilityLabel={`Show ${opt.label} listings`}
-								>
-									<Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
-										{opt.label}
-									</Text>
-								</Pressable>
-							);
-					  })
-					: null}
-
-				{showPeople ? (
-					<Pressable
-						onPress={() => onFriendsOnlyChange(!friendsOnly)}
-						style={[styles.chip, friendsOnly && styles.chipActiveFriends]}
-						accessibilityRole="button"
-						accessibilityState={{ selected: friendsOnly }}
-						accessibilityLabel={friendsOnly ? 'Show everyone nearby' : 'Show friends only'}
-					>
-						<Text style={[styles.chipText, friendsOnly && styles.chipTextActive]} numberOfLines={1}>
-							Friends
-						</Text>
-					</Pressable>
-				) : null}
 
 				<View style={styles.searchBar}>
 					<Icon name="magnify" size={18} color={colors.textMuted} style={styles.searchIcon} />
@@ -179,16 +109,21 @@ export function MapFilterRow({
 				</View>
 
 				<Pressable
-					onPress={() => onRankByChange(nextRank(rankBy))}
-					style={[styles.chip, rankActive && styles.chipActiveRank]}
+					onPress={onPressFilters}
+					style={[styles.chip, styles.filtersChip, filtersActive && styles.chipActive]}
 					accessibilityRole="button"
-					accessibilityLabel={`Sort by ${rankLabel(rankBy)}. Tap to change.`}
+					accessibilityLabel="Map filters"
 				>
+					<Icon
+						name="tune-variant"
+						size={16}
+						color={filtersActive ? colors.onPrimary : colors.textSecondary}
+					/>
 					<Text
-						style={[styles.chipText, rankActive && styles.chipTextRankActive]}
+						style={[styles.chipText, filtersActive && styles.chipTextActive]}
 						numberOfLines={1}
 					>
-						{rankLabel(rankBy)}
+						Filters
 					</Text>
 				</Pressable>
 			</ScrollView>
@@ -215,7 +150,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		minWidth: 120,
-		maxWidth: 180,
+		maxWidth: 160,
 		height: 36,
 		paddingHorizontal: 10,
 		borderRadius: radius.pill,
@@ -230,7 +165,7 @@ const styles = StyleSheet.create({
 		margin: 0,
 		color: colors.textPrimary,
 		fontSize: fontSize.sm,
-		minWidth: 64,
+		minWidth: 56,
 	},
 	chip: {
 		paddingHorizontal: 12,
@@ -240,21 +175,14 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: colors.borderStrong,
 	},
-	chipActiveLayer: {
+	filtersChip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+	},
+	chipActive: {
 		backgroundColor: colors.primary,
 		borderColor: colors.primary,
-	},
-	chipActiveListing: {
-		backgroundColor: colors.entityListing,
-		borderColor: colors.entityListing,
-	},
-	chipActiveFriends: {
-		backgroundColor: colors.entityFriend,
-		borderColor: colors.entityFriend,
-	},
-	chipActiveRank: {
-		backgroundColor: colors.primarySoft,
-		borderColor: colors.primaryBorder,
 	},
 	chipText: {
 		color: colors.textSecondary,
@@ -263,8 +191,5 @@ const styles = StyleSheet.create({
 	},
 	chipTextActive: {
 		color: colors.onPrimary,
-	},
-	chipTextRankActive: {
-		color: colors.primary,
 	},
 });
