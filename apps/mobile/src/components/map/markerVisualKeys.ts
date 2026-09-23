@@ -26,6 +26,7 @@ export function entityVisualKey(point: EntityPoint): string {
       point.meta.verification,
       point.meta.verifiedBadge === true ? '1' : '0',
       point.meta.isFriend === true ? 'f' : '0',
+      point.meta.online === true ? 'on' : 'off',
     ].join('|');
   }
   if (point.kind === 'event') {

@@ -139,7 +139,7 @@ function mapEmptyCopy(opts: {
 	return {
 		icon: 'map-marker-radius-outline',
 		title: 'Nothing nearby yet',
-		body: 'Be the first — sell something, post a wanted, create an event, or drop a local alert. Long-press the map anytime.',
+		body: 'Be the first — sell something, post a wanted, create an event, or drop a local alert. Tap + in the filter bar or long-press the map.',
 		actionLabel: 'Create here',
 		actionKind: 'create',
 	};

@@ -29,7 +29,7 @@ export function MapCreateNudgeBanner({
         <Icon name="map-marker-plus-outline" size={22} color={colors.primary} />
         <View style={styles.body}>
           <Text style={styles.title}>Be the first nearby</Text>
-          <Text style={styles.subtitle}>Post a listing, event, or alert here.</Text>
+          <Text style={styles.subtitle}>Tap + in the filter bar or long-press the map.</Text>
         </View>
         <TouchableOpacity
           style={styles.cta}
@@ -79,20 +79,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   subtitle: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
   cta: {
     backgroundColor: colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
   },
   ctaText: {
     color: colors.onPrimary,
     fontSize: 13,
     fontWeight: '700',
   },
-  close: { padding: 8 },
+  close: {
+    padding: 8,
+  },
 });

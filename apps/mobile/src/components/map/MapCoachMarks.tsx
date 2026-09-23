@@ -82,8 +82,12 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
 
   useEffect(() => {
     if (shouldShow !== true || !mapReady) return;
-    setVisible(true);
-    track('map.coach_shown', { step: STEPS[0]!.id });
+    // Defer so we do not call setState synchronously inside the effect body (eslint).
+    const t = setTimeout(() => {
+      setVisible(true);
+      track('map.coach_shown', { step: STEPS[0]!.id });
+    }, 0);
+    return () => clearTimeout(t);
   }, [shouldShow, mapReady]);
 
   const persistDone = useCallback(async () => {
