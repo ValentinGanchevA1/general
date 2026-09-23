@@ -1,12 +1,13 @@
 // Shared layout math for map chrome (top stack + bottom clearance).
-// Stack (closed sheet): challenge → nudge → filter row → interactions badge → trending.
-// Tops collapse when challenge/nudge are hidden.
+// Stack (closed sheet): challenge → nudge → filter row → trending.
+// Interactions live on Pulse (inbox), not map chrome.
 
 import { CHALLENGE_CARD_HEIGHT } from '@/features/gamification/DailyChallengeCard';
 import { spacing } from '@/theme';
 
 export const MAP_CHROME_GAP = 8;
 export const NUDGE_CARD_HEIGHT = 56;
+/** @deprecated Interactions badge removed from map (Pulse is inbox home). */
 export const INTERACTION_BADGE_SIZE = 44;
 export const MAP_CHROME_H_INSET = spacing.lg;
 export const FAB_BOTTOM = spacing.md;
@@ -14,7 +15,7 @@ export const EVENTS_RAIL_BOTTOM = spacing.lg;
 /** @deprecated Prefer COMBINED_FILTER_ROW_HEIGHT — kept for residual callers. */
 export const LISTING_MODE_FILTER_HEIGHT = 40;
 export const MAP_SEARCH_BAR_HEIGHT = 44;
-/** Single row: layer chips + search + sort. */
+/** Layer segments + search + filters control. */
 export const COMBINED_FILTER_ROW_HEIGHT = 44;
 
 export const MAP_CHROME = {
@@ -59,8 +60,7 @@ export function mapNudgeTop(
 }
 
 /**
- * Top of the combined layer + search + sort row.
- * Under last visible challenge/nudge (not under interactions badge).
+ * Top of the layer segment + search + filters row.
  * Sheet open → pinned under safe area.
  */
 export function mapFilterRowTop(
@@ -80,23 +80,18 @@ export function mapFilterRowTop(
 }
 
 /**
- * Interaction badge under the filter row.
- * Sheet open → under filter (still below safe area via filter top).
+ * @deprecated Badge removed from map stack — returns same as mapTrendingTop for callers.
  */
 export function mapBadgeTop(
 	insetsTop: number,
 	sheetOpen: boolean,
 	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
 ): number {
-	return (
-		mapFilterRowTop(insetsTop, sheetOpen, visibility) +
-		COMBINED_FILTER_ROW_HEIGHT +
-		MAP_CHROME_GAP
-	);
+	return mapTrendingTop(insetsTop, sheetOpen, visibility);
 }
 
 /**
- * Top of TrendingCard under interactions badge.
+ * Top of TrendingCard under the filter row.
  */
 export function mapTrendingTop(
 	insetsTop: number,
@@ -104,8 +99,8 @@ export function mapTrendingTop(
 	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
 ): number {
 	return (
-		mapBadgeTop(insetsTop, sheetOpen, visibility) +
-		INTERACTION_BADGE_SIZE +
+		mapFilterRowTop(insetsTop, sheetOpen, visibility) +
+		COMBINED_FILTER_ROW_HEIGHT +
 		MAP_CHROME_GAP
 	);
 }
@@ -133,14 +128,12 @@ export function mapChromeTops(
 	challenge: number;
 	nudge: number;
 	filterRow: number;
-	badge: number;
 	trending: number;
 } {
 	return {
 		challenge: mapChallengeTop(insetsTop),
 		nudge: mapNudgeTop(insetsTop, visibility),
 		filterRow: mapFilterRowTop(insetsTop, sheetOpen, visibility),
-		badge: mapBadgeTop(insetsTop, sheetOpen, visibility),
 		trending: mapTrendingTop(insetsTop, sheetOpen, visibility),
 	};
 }
