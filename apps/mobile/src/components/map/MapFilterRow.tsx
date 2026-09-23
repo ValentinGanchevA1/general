@@ -1,5 +1,5 @@
-// Map chrome: calm filter row — People · Events · Listings + search + sort + More.
-// Friends + listing mode live in the More sheet (less vertical chrome).
+// Map chrome: People · Events · Listings + search + sort + create (+) + More.
+// Friends + listing mode live in the More sheet.
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -59,6 +59,8 @@ export interface MapFilterRowProps {
 	onFriendsOnlyChange: (next: boolean) => void;
 	rankBy: DiscoveryRankBy;
 	onRankByChange: (next: DiscoveryRankBy) => void;
+	/** Opens create-nearby sheet (sell / wanted / event / alert). */
+	onPressCreate: () => void;
 	top: number;
 	placeholder?: string;
 }
@@ -74,6 +76,7 @@ export function MapFilterRow({
 	onFriendsOnlyChange,
 	rankBy,
 	onRankByChange,
+	onPressCreate,
 	top,
 	placeholder = 'Search this area…',
 }: MapFilterRowProps): React.JSX.Element {
@@ -170,6 +173,15 @@ export function MapFilterRow({
 						>
 							{rankLabel(rankBy)}
 						</Text>
+					</Pressable>
+
+					<Pressable
+						onPress={onPressCreate}
+						style={[styles.chip, styles.chipCreate]}
+						accessibilityRole="button"
+						accessibilityLabel="Create nearby — sell, wanted, event, or alert"
+					>
+						<Icon name="plus" size={18} color={colors.onPrimary} />
 					</Pressable>
 
 					<Pressable
@@ -324,6 +336,11 @@ const styles = StyleSheet.create({
 		backgroundColor: 'rgba(18,18,31,0.92)',
 		borderWidth: 1,
 		borderColor: colors.borderStrong,
+	},
+	chipCreate: {
+		backgroundColor: colors.primary,
+		borderColor: colors.primary,
+		paddingHorizontal: 10,
 	},
 	chipActiveLayer: {
 		backgroundColor: colors.primary,

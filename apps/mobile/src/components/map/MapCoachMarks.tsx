@@ -1,5 +1,5 @@
 // First map session after sign-in / profile setup.
-// Four steps for the core loop (incl. long-press create), then permanent dismiss (AsyncStorage).
+// Four steps: pin → create (+ / long-press) → wave → pulse. v2 key re-shows for users who finished v1.
 // Skip always available — never block power users.
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -16,8 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fontSize, radius, spacing } from '@/theme';
 import { track } from '@/lib/analytics';
 
-/** Persist key — do not rename (users who finished v1 stay done). */
-const STORAGE_KEY = 'g88:map_coach_v1';
+/** Persist key — v2 re-shows coach so users who finished v1 see create (+ / long-press). */
+const STORAGE_KEY = 'g88:map_coach_v2';
 
 interface Step {
   id: 'pin' | 'wave' | 'create' | 'pulse';
@@ -34,16 +34,16 @@ const STEPS: Step[] = [
     body: 'Your pin is your presence. Other pins are people, events, and listings nearby. Pan and zoom to explore the area.',
   },
   {
+    id: 'create',
+    emoji: '➕',
+    title: 'Post on the map',
+    body: 'Tap + in the filter bar, or long-press anywhere on the map, to sell something, post a wanted, create an event, or drop a local alert.',
+  },
+  {
     id: 'wave',
     emoji: '👋',
     title: 'Wave to say hi',
     body: 'Tap a person to open their card, then Wave. If they wave back, you can chat — no cold DMs.',
-  },
-  {
-    id: 'create',
-    emoji: '📌',
-    title: 'Long-press to post',
-    body: 'Press and hold anywhere on the map to sell an item, post a wanted, create an event, or drop a local alert at that spot.',
   },
   {
     id: 'pulse',
@@ -81,35 +81,33 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
   }, []);
 
   useEffect(() => {
-    if (shouldShow !== true || !mapReady || visible) return;
-    // Short delay so markers / chrome paint before the overlay.
-    const t = setTimeout(() => {
-      setVisible(true);
-      track('map.coach_shown', { step: STEPS[0]!.id });
-    }, 700);
-    return () => clearTimeout(t);
-  }, [shouldShow, mapReady, visible]);
+    if (shouldShow !== true || !mapReady) return;
+    setVisible(true);
+    track('map.coach_shown', { step: STEPS[0]!.id });
+  }, [shouldShow, mapReady]);
 
-  const persistDone = useCallback(
-    async (reason: 'completed' | 'skipped') => {
-      try {
-        await AsyncStorage.setItem(STORAGE_KEY, 'done');
-      } catch {
-        // still hide UI
-      }
-      track('map.coach_dismissed', {
-        reason,
-        step: STEPS[step]?.id ?? 'unknown',
-      });
-      setShouldShow(false);
-      setVisible(false);
-    },
-    [step],
-  );
+  const persistDone = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, 'done');
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const onSkip = useCallback(() => {
+    setVisible(false);
+    void persistDone();
+    track('map.coach_dismissed', {
+      reason: 'skip',
+      step: STEPS[step]?.id ?? 'unknown',
+    });
+  }, [persistDone, step]);
 
   const onNext = useCallback(() => {
     if (step >= STEPS.length - 1) {
-      void persistDone('completed');
+      setVisible(false);
+      void persistDone();
+      track('map.coach_dismissed', { reason: 'complete', step: 'pulse' });
       return;
     }
     const next = step + 1;
@@ -117,24 +115,15 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
     track('map.coach_step', { step: STEPS[next]!.id });
   }, [step, persistDone]);
 
-  const onSkip = useCallback(() => {
-    void persistDone('skipped');
-  }, [persistDone]);
-
   if (!visible) return null;
 
   const current = STEPS[step]!;
   const isLast = step === STEPS.length - 1;
 
   return (
-    <Modal visible transparent animationType="fade" statusBarTranslucent>
-      <View style={styles.backdrop} accessibilityViewIsModal>
-        <View
-          style={[
-            styles.card,
-            { marginBottom: Math.max(insets.bottom, spacing.lg) + 72 },
-          ]}
-        >
+    <Modal visible transparent animationType="fade" onRequestClose={onSkip}>
+      <View style={[styles.backdrop, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+        <View style={styles.card}>
           <Text style={styles.progress}>
             {step + 1} of {STEPS.length}
           </Text>
@@ -142,10 +131,10 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
           <Text style={styles.title}>{current.title}</Text>
           <Text style={styles.body}>{current.body}</Text>
 
-          <View style={styles.dots} accessibilityElementsHidden>
-            {STEPS.map((s, i) => (
+          <View style={styles.dots}>
+            {STEPS.map((_, i) => (
               <View
-                key={s.id}
+                key={STEPS[i]!.id}
                 style={[styles.dot, i === step && styles.dotActive]}
               />
             ))}
