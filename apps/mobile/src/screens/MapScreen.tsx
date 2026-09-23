@@ -2,10 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
 	InteractionManager,
+	Pressable,
 	StyleSheet,
 	Text,
 	View,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { appAlert } from '@/ui/appAlert';
 import MapView, {
@@ -75,6 +77,7 @@ import { useMapCreateNudge } from '@/features/map/useMapCreateNudge';
 import { MapCreateNudgeBanner } from '@/features/map/MapCreateNudgeBanner';
 import { sheetChrome, useSheetBackdrop } from '@/components/sheets';
 import {
+	mapFabBottom,
 	mapFilterRowTop,
 	mapTrendingTop,
 	type MapTopStackVisibility,
@@ -400,6 +403,45 @@ export function MapScreen(): React.JSX.Element {
 	const { nudge } = useNudges();
 	const { challenges } = useChallenges();
 	const [challengeDismissed, setChallengeDismissed] = useState(false);
+	/** First region settle does not count as a pan; subsequent moves dismiss daily challenge (session). */
+	const regionSettledOnceRef = useRef(false);
+	const lastRegionRef = useRef<Region | null>(null);
+
+	const onRegionChangeComplete = useCallback(
+		(next: Region) => {
+			setRegion(next);
+			if (!regionSettledOnceRef.current) {
+				regionSettledOnceRef.current = true;
+				lastRegionRef.current = next;
+				return;
+			}
+			const prev = lastRegionRef.current;
+			lastRegionRef.current = next;
+			if (challengeDismissed || !prev) return;
+			const moved =
+				Math.abs(prev.latitude - next.latitude) > 0.0005 ||
+				Math.abs(prev.longitude - next.longitude) > 0.0005 ||
+				Math.abs(prev.latitudeDelta - next.latitudeDelta) > 0.01;
+			if (moved) setChallengeDismissed(true);
+		},
+		[challengeDismissed],
+	);
+
+	const onRecenter = useCallback(() => {
+		if (myCoords == null || mapRef.current == null) return;
+		const latitudeDelta = region?.latitudeDelta ?? 0.04;
+		const longitudeDelta = region?.longitudeDelta ?? 0.04;
+		mapRef.current.animateToRegion(
+			{
+				latitude: myCoords.lat,
+				longitude: myCoords.lng,
+				latitudeDelta,
+				longitudeDelta,
+			},
+			350,
+		);
+	}, [myCoords, region?.latitudeDelta, region?.longitudeDelta]);
+
 	const topStack = useMemo<MapTopStackVisibility>(
 		() => ({
 			challengeVisible:
@@ -440,7 +482,7 @@ export function MapScreen(): React.JSX.Element {
 					provider={PROVIDER_GOOGLE}
 					customMapStyle={MAP_STYLE}
 					style={StyleSheet.absoluteFill}
-					onRegionChangeComplete={setRegion}
+					onRegionChangeComplete={onRegionChangeComplete}
 					onLongPress={onMapLongPress}
 					showsUserLocation
 					showsMyLocationButton={false}
@@ -559,6 +601,17 @@ export function MapScreen(): React.JSX.Element {
 				onSelect={onCreateNearbySelect}
 			/>
 
+			{myCoords && !sheetOpen ? (
+				<Pressable
+					style={[styles.recenterBtn, { bottom: mapFabBottom(insets.bottom) + 56 }]}
+					onPress={onRecenter}
+					accessibilityRole="button"
+					accessibilityLabel="Recenter map on my location"
+				>
+					<Icon name="crosshairs-gps" size={22} color={colors.primary} />
+				</Pressable>
+			) : null}
+
 			{waveToast ? (
 				<View
 					style={[styles.waveToast, { top: insets.top + 12 }]}
@@ -619,6 +672,24 @@ const styles = StyleSheet.create({
 		color: colors.textPrimary,
 		fontSize: 14,
 		fontWeight: '600',
+	},
+	recenterBtn: {
+		position: 'absolute',
+		right: 16,
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: 'rgba(18,18,31,0.94)',
+		borderWidth: 1,
+		borderColor: colors.borderStrong,
+		zIndex: 25,
+		elevation: 4,
+		shadowColor: colors.shadowInk,
+		shadowOpacity: 0.2,
+		shadowRadius: 6,
+		shadowOffset: { width: 0, height: 2 },
 	},
 	root: { flex: 1, backgroundColor: colors.bg },
 	emptyWrap: {
