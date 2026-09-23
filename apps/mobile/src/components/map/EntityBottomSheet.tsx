@@ -23,12 +23,14 @@ import type {
   UserMeta,
   VerificationLevel,
 } from '@g88/shared';
+import { haversineMeters } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { deleteJson, getJson, postJson } from '@/api/client';
 import { signalPostSocialActivation } from '@/features/nudges/postSocialActivation';
 import { IdentityBlock } from '@/components/IdentityBlock';
 import { useAppSelector } from '@/hooks/redux';
+import { useUserLocation } from '@/features/location/useUserLocation';
 import { colors } from '@/theme';
 import { styles } from './EntityBottomSheet.styles';
 
@@ -70,6 +72,18 @@ function formatStartsAt(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   try {
+    const now = new Date();
+    const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const dayDiff = Math.round((startOfDay - startOfToday) / 86_400_000);
+    if (dayDiff === 0) return `Today ${time}`;
+    if (dayDiff === 1) return `Tomorrow ${time}`;
+    if (dayDiff === -1) return `Yesterday ${time}`;
+    if (dayDiff > 1 && dayDiff < 7) {
+      const weekday = d.toLocaleDateString(undefined, { weekday: 'short' });
+      return `${weekday} ${time}`;
+    }
     return d.toLocaleString(undefined, {
       weekday: 'short',
       month: 'short',
@@ -98,6 +112,14 @@ function formatPrice(cents: number, currency: string): string {
 function formatDistanceMeters(meters: number): string {
   if (meters < 1000) return `${Math.round(meters)} m`;
   return `${(meters / 1000).toFixed(meters < 10_000 ? 1 : 0)} km`;
+}
+
+/** Viewer → pin distance from live GPS (null while location unknown). */
+function usePinDistanceMeters(lat: number, lng: number): number | null {
+  const { coords } = useUserLocation();
+  if (coords == null) return null;
+  const m = haversineMeters(coords, { lat, lng });
+  return Number.isFinite(m) && m >= 0 ? m : null;
 }
 
 type UserEntityPoint = EntityPoint & { kind: 'user'; meta: UserMeta };
@@ -553,6 +575,9 @@ function EventCard({
   const hostName = meta.hostDisplayName?.trim() || 'Host';
   const canMessageHost =
     hostId != null && hostId.length > 0 && viewerId != null && hostId !== viewerId;
+  const distanceMeters = usePinDistanceMeters(point.lat, point.lng);
+  const distanceLabel =
+    distanceMeters != null ? formatDistanceMeters(distanceMeters) : null;
 
   const openDetail = (): void => {
     onClose();
@@ -604,6 +629,12 @@ function EventCard({
       </Text>
       <View style={styles.metaRow}>
         <Text style={styles.metaText}>{formatStartsAt(meta.startsAt)}</Text>
+        {distanceLabel ? (
+          <>
+            <Text style={styles.metaDot}>·</Text>
+            <Text style={styles.metaText}>{distanceLabel}</Text>
+          </>
+        ) : null}
         <Text style={styles.metaDot}>·</Text>
         <Text style={styles.metaText}>{capacity}</Text>
       </View>
@@ -672,6 +703,9 @@ function ListingCard({
   const sellerName = meta.sellerDisplayName?.trim() || 'Seller';
   const canMessageSeller =
     sellerId != null && sellerId.length > 0 && viewerId != null && sellerId !== viewerId;
+  const distanceMeters = usePinDistanceMeters(point.lat, point.lng);
+  const distanceLabel =
+    distanceMeters != null ? formatDistanceMeters(distanceMeters) : null;
 
   const openDetail = (): void => {
     onClose();
@@ -736,6 +770,12 @@ function ListingCard({
           </Text>
           <View style={styles.metaRow}>
             <Text style={styles.priceText}>{price}</Text>
+            {distanceLabel ? (
+              <>
+                <Text style={styles.metaDot}>·</Text>
+                <Text style={styles.metaText}>{distanceLabel}</Text>
+              </>
+            ) : null}
             {category ? (
               <>
                 <Text style={styles.metaDot}>·</Text>
@@ -798,25 +838,19 @@ export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): Re
         point={point as UserEntityPoint}
         waving={waving}
         onClose={onClose}
-        onWave={onWave}
+        {...(onWave != null ? { onWave } : {})}
       />
     );
   }
-
   if (point.kind === 'event') {
     return <EventCard point={point as EventEntityPoint} onClose={onClose} />;
   }
-
   if (point.kind === 'listing') {
     return <ListingCard point={point as ListingEntityPoint} onClose={onClose} />;
   }
-
   return (
     <View style={styles.sheet}>
       <Text style={styles.entityTitle}>Unknown</Text>
-      <TouchableOpacity style={[styles.primaryBtn, styles.entityPrimaryBtn]} onPress={onClose}>
-        <Text style={styles.primaryBtnText}>Close</Text>
-      </TouchableOpacity>
     </View>
   );
 }
