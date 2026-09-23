@@ -1,7 +1,7 @@
 # G88 — Project Instructions
 
 > Repo: local monorepo under `apps/`. Anything under `legacy/` is read-only reference.  
-> **Last synced:** 2026-09-19 (Week1–3 closed: activation, strikes, presence/ranking, discovery lastSeen; STATUS_CURRENT next free **0043**).
+> **Last synced:** 2026-09-24 (map calm v1 + empty create + online dots; STATUS_CURRENT next free **0044**; migrations through **0043**).
 
 ## Role & Persona
 
@@ -32,7 +32,7 @@ G88 is a **map-first, location-based social platform**. Users appear as interact
 
 ## Phase Scope (where we are)
 
-Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md`.
+Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md` / `docs/STATUS_CURRENT.md`.
 
 - **P1 — foundation: ✅ shipped.** Auth → Profile → Map discovery → Presence → Wave → Chat.
 - **P2 — pre-launch hardening: ✅ shipped.** Sentry, chat outbox, viewport-diff, per-module specs, synthetic soak, **blocks (B1)**. Android-first beta path engineering-complete; iOS deferred.
@@ -49,7 +49,7 @@ Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md`.
 | Cache | Redis (presence, OTP, discovery snapshots, presign) |
 | Shared | `@g88/shared` DTOs + geo helpers |
 | Admin | Vite + React ID queue @ `127.0.0.1:5173` |
-| Database | PostgreSQL 16 + PostGIS + H3-PG. Migrations sequential; see `STATUS.md` for next free |
+| Database | PostgreSQL 16 + PostGIS + H3-PG. Migrations sequential through **0043**; next free **0044** |
 
 ## Repo layout
 
@@ -61,7 +61,7 @@ apps/
 ├── packages/
 │   └── shared/             API DTOs, socket events, geo helpers
 ├── legacy/                 Read-only. Never import.
-├── docs/                   Ops + Play listing
+├── docs/                   Ops + Play listing + STATUS_CURRENT
 ├── ARCHITECTURE.md
 ├── ROADMAP.md
 ├── STATUS.md
@@ -90,3 +90,4 @@ Stripe Connect / paid gifts · Elasticsearch · Kafka · gRPC · Kubernetes · G
 | Hex theme lint | Convention only; prefer tokens. **Ownership:** `apps/mobile/src/theme/index.ts` sole mobile palette (not shared). Intentional hex: mapStyle, socialConfig. Toast tints → `colors.toast*`; shadows → `colors.shadowInk` |
 | Strike escalation | **Enforced** in stories (phone_required @3, suspend @5); Settings/Profile standing surfaces shipped. Appeal/copy polish optional |
 | Full-screen Spinner → Skeleton | Migrate as-you-touch; Marketplace/Friends/Interactions already use Skeleton |
+| Trust ops (Render) | Rekognition + `ADMIN_USER_IDS` — see `docs/ID_VERIFICATION_OPS.md` |
