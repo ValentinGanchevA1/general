@@ -32,6 +32,7 @@ import {
   type FriendsTab,
   unfriendUser,
 } from '@/features/friends/friendsSlice';
+import { FriendsSuggestionsRail } from '@/features/friends/FriendsSuggestionsRail';
 import { useSocket } from '@/realtime/useSocket';
 import { Avatar } from '@/components/Avatar';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -270,6 +271,14 @@ export function FriendsListScreen(): React.JSX.Element {
     [isBusy, openProfile, onAccept, onDecline],
   );
 
+  const suggestionsHeader =
+    tab === 'friends' ? (
+      <FriendsSuggestionsRail
+        onSeeAll={openSuggestions}
+        onOpenProfile={openProfile}
+      />
+    ) : null;
+
   return (
     <View style={S.root}>
       <ScreenHeader
@@ -313,6 +322,7 @@ export function FriendsListScreen(): React.JSX.Element {
 
       {list.loading && data.length === 0 ? (
         <View style={S.listContent}>
+          {suggestionsHeader}
           <SkeletonListRow />
           <SkeletonListRow />
           <SkeletonListRow />
@@ -350,6 +360,7 @@ export function FriendsListScreen(): React.JSX.Element {
           }
           onEndReached={onEndReached}
           onEndReachedThreshold={0.4}
+          ListHeaderComponent={suggestionsHeader}
           ListEmptyComponent={
             <EmptyState
               variant="plain"
