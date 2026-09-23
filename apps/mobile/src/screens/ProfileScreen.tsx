@@ -222,6 +222,7 @@ export function ProfileScreen(): React.JSX.Element {
         <ProfileFriendsCard
           pendingCount={pendingCount}
           onPress={() => openRootScreen(navigation, 'FriendsList')}
+          onPressSuggestions={() => openRootScreen(navigation, 'Suggestions')}
         />
 
         {p.id ? (
