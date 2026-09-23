@@ -57,6 +57,8 @@ function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element 
   const isVerified =
     point.kind === 'user' &&
     (point.meta.verifiedBadge === true || point.meta.verification === 'id');
+  /** Backend already gates online via friendship + friends_see_online_status. */
+  const isOnline = point.kind === 'user' && point.meta.online === true;
 
   const remoteAvatar = point.kind === 'user' ? point.meta.avatarUrl : null;
   const cachedAvatar = useCachedImageUri(remoteAvatar);
@@ -116,6 +118,13 @@ function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element 
             <Icon name="check-decagram" size={12} color={colors.accent} />
           </View>
         ) : null}
+        {isOnline ? (
+          <View
+            style={styles.onlineDot}
+            accessibilityLabel="Online"
+            accessibilityRole="image"
+          />
+        ) : null}
       </View>
       <Text style={[styles.label, { color }]} numberOfLines={1}>
         {label}
@@ -168,5 +177,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10,10,15,0.9)',
     borderRadius: 8,
     padding: 1,
+  },
+  /** Top-right presence pip — only when server said online (privacy already applied). */
+  onlineDot: {
+    position: 'absolute',
+    top: -1,
+    right: -1,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: colors.success,
+    borderWidth: 2,
+    borderColor: 'rgba(10,10,15,0.95)',
   },
 });
