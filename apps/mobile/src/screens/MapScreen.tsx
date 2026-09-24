@@ -130,8 +130,8 @@ function mapEmptyCopy(opts: {
 	if (!opts.emailVerified) {
 		return {
 			icon: 'email-check-outline',
-			title: 'Nothing nearby yet',
-			body: 'Verify your email to unlock stories and show up more clearly on the map — then be the first to post here.',
+			title: 'Verify email to get started',
+			body: 'Confirm your email so people can trust you on the map — then be the first to post something nearby.',
 			actionLabel: 'Verify email',
 			actionKind: 'verify_email',
 		};
@@ -536,7 +536,8 @@ export function MapScreen(): React.JSX.Element {
 				onToggleCollapse={() => setTrendingCollapsed((c) => !c)}
 			/>
 
-			{isEmpty && !createNudgeVisible ? (
+			{/* One activation surface: trust NudgeBanner or create nudge wins over empty card */}
+			{isEmpty && !createNudgeVisible && nudge == null ? (
 				<View style={styles.emptyWrap} pointerEvents="box-none">
 					<EmptyState
 						variant="card"
@@ -574,30 +575,27 @@ export function MapScreen(): React.JSX.Element {
 			<BottomSheetModal
 				ref={entitySheetRef}
 				snapPoints={entitySnapPoints}
-				enablePanDownToClose
 				onDismiss={onSheetDismiss}
+				enablePanDownToClose
 				backdropComponent={renderBackdrop}
+				handleIndicatorStyle={sheetChrome.handleIndicator}
 				backgroundStyle={sheetChrome.background}
-				handleIndicatorStyle={sheetChrome.handle}
 			>
-				<BottomSheetView style={sheetChrome.content}>
+				<BottomSheetView style={{ flex: 1 }}>
 					{selected ? (
-						<ErrorBoundary fallback={<Text style={styles.sheetError}>Could not load card</Text>}>
-							<EntityBottomSheet
-								point={selected}
-								waving={selected.kind === 'user' && waving === selected.id}
-								onClose={closeSheet}
-								{...(selected.kind === 'user'
-									? { onWave: () => onSheetWavePress(selected.id) }
-									: {})}
-							/>
-						</ErrorBoundary>
+						<EntityBottomSheet
+							key={`${selected.kind}:${selected.id}`}
+							point={selected}
+							onClose={closeSheet}
+							onWave={onSheetWavePress}
+							waving={waving === selected.id}
+						/>
 					) : null}
 				</BottomSheetView>
 			</BottomSheetModal>
 
 			<CreateNearbySheet
-				visible={createNearbyOpen}
+				open={createNearbyOpen}
 				onClose={() => setCreateNearbyOpen(false)}
 				onSelect={onCreateNearbySelect}
 			/>
