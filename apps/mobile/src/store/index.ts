@@ -7,6 +7,7 @@ import discoveryReducer from '@/features/discovery/discoverySlice';
 import idVerificationReducer from '@/features/verification/idVerificationSlice';
 import storiesReducer from '@/features/stories/storiesSlice';
 import friendsReducer from '@/features/friends/friendsSlice';
+import mapNoveltyReducer from '@/features/map/mapNoveltySlice';
 
 export const store = configureStore({
   reducer: {
@@ -18,6 +19,7 @@ export const store = configureStore({
     idVerification: idVerificationReducer,
     stories: storiesReducer,
     friends: friendsReducer,
+    mapNovelty: mapNoveltyReducer,
   },
 });
 
