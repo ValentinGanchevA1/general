@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { appAlert } from '@/ui/appAlert';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -23,6 +24,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonListRow } from '@/components/Skeleton';
 import { colors, spacing, radius, fontSize } from '@/theme';
+import { focusUserOnMap } from '@/navigation/focusUserOnMap';
 
 type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
 
@@ -120,6 +122,18 @@ export function SuggestionsScreen(): React.JSX.Element {
     [navigation],
   );
 
+  const onViewOnMap = useCallback(
+    (item: SuggestionCard) => {
+      void focusUserOnMap(navigation, {
+        userId: item.userId,
+        displayName: item.displayName,
+        avatarUrl: item.avatarUrl,
+        ...(item.verification != null ? { verification: item.verification } : {}),
+      });
+    },
+    [navigation],
+  );
+
   const setBusy = useCallback((userId: string, on: boolean) => {
     setBusyIds((prev) =>
       on ? (prev.includes(userId) ? prev : [...prev, userId]) : prev.filter((id) => id !== userId),
@@ -129,7 +143,7 @@ export function SuggestionsScreen(): React.JSX.Element {
   const markFollowing = useCallback((userId: string) => {
     setItems((prev) =>
       prev.map((c) => (c.userId === userId ? { ...c, isFollowing: true } : c)),
-  );
+    );
   }, []);
 
   const markRequested = useCallback((userId: string) => {
@@ -308,6 +322,16 @@ export function SuggestionsScreen(): React.JSX.Element {
             >
               <Text style={S.btnDismissText}>✕</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={S.btnMap}
+              onPress={() => onViewOnMap(item)}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel={`View ${item.displayName} on map`}
+              hitSlop={8}
+            >
+              <Icon name="map-marker-radius" size={18} color={colors.primary} />
+            </TouchableOpacity>
             {!item.isFollowing ? (
               <TouchableOpacity
                 style={S.btnSecondary}
@@ -350,7 +374,7 @@ export function SuggestionsScreen(): React.JSX.Element {
         </View>
       );
     },
-    [busyIds, navigation, onAddFriend, onDismiss, onFollow, openProfile],
+    [busyIds, navigation, onAddFriend, onDismiss, onFollow, onViewOnMap, openProfile],
   );
 
   return (
@@ -442,6 +466,12 @@ const S = StyleSheet.create({
     justifyContent: 'center',
   },
   btnDismissText: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
+  btnMap: {
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   btnPrimary: {
     paddingHorizontal: 14,
     paddingVertical: 8,

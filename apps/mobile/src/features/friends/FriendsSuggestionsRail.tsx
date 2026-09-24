@@ -14,6 +14,10 @@ import type { ApiError, SuggestionCard } from '@g88/shared';
 import { getJson, postJson } from '@/api/client';
 import { Avatar } from '@/components/Avatar';
 import { colors, fontSize, radius, spacing } from '@/theme';
+import { focusUserOnMap } from '@/navigation/focusUserOnMap';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '@/navigation/AppNavigator';
 
 function shortReason(item: SuggestionCard): string {
   const n = item.mutualFriendsCount ?? 0;
@@ -60,9 +64,22 @@ export function FriendsSuggestionsRail({
   onOpenProfile,
   hideWhenEmpty = true,
 }: Props): React.JSX.Element | null {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [items, setItems] = useState<SuggestionCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  const onViewOnMap = useCallback(
+    (item: SuggestionCard) => {
+      void focusUserOnMap(navigation, {
+        userId: item.userId,
+        displayName: item.displayName,
+        avatarUrl: item.avatarUrl,
+        ...(item.verification != null ? { verification: item.verification } : {}),
+      });
+    },
+    [navigation],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -175,25 +192,36 @@ export function FriendsSuggestionsRail({
                   {shortReason(item)}
                 </Text>
               </TouchableOpacity>
-              {item.hasPendingOutgoing ? (
-                <View style={styles.ghostBtn}>
-                  <Text style={styles.ghostText}>Requested</Text>
-                </View>
-              ) : (
+              <View style={styles.actionRow}>
                 <TouchableOpacity
-                  style={styles.addBtn}
-                  disabled={busy}
-                  onPress={() => void onAdd(item.userId)}
+                  style={styles.mapBtn}
+                  onPress={() => onViewOnMap(item)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Add ${item.displayName} as friend`}
+                  accessibilityLabel={`View ${item.displayName} on map`}
+                  hitSlop={6}
                 >
-                  {busy ? (
-                    <ActivityIndicator size="small" color={colors.onPrimary} />
-                  ) : (
-                    <Text style={styles.addText}>Add</Text>
-                  )}
+                  <Icon name="map-marker-radius" size={16} color={colors.primary} />
                 </TouchableOpacity>
-              )}
+                {item.hasPendingOutgoing ? (
+                  <View style={styles.ghostBtn}>
+                    <Text style={styles.ghostText}>Requested</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.addBtn}
+                    disabled={busy}
+                    onPress={() => void onAdd(item.userId)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add ${item.displayName} as friend`}
+                  >
+                    {busy ? (
+                      <ActivityIndicator size="small" color={colors.onPrimary} />
+                    ) : (
+                      <Text style={styles.addText}>Add</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           );
         }}
@@ -268,6 +296,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
     maxWidth: 96,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  mapBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addBtn: {
     backgroundColor: colors.action,
