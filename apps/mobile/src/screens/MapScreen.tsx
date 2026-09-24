@@ -130,8 +130,8 @@ function mapEmptyCopy(opts: {
 	if (!opts.emailVerified) {
 		return {
 			icon: 'email-check-outline',
-			title: 'Nothing nearby yet',
-			body: 'Verify your email to unlock stories and show up more clearly on the map — then be the first to post here.',
+			title: 'Verify email to get started',
+			body: 'Confirm your email so people can trust you on the map — then be the first to post something nearby.',
 			actionLabel: 'Verify email',
 			actionKind: 'verify_email',
 		};
@@ -536,7 +536,8 @@ export function MapScreen(): React.JSX.Element {
 				onToggleCollapse={() => setTrendingCollapsed((c) => !c)}
 			/>
 
-			{isEmpty && !createNudgeVisible ? (
+			{/* One activation surface: trust NudgeBanner or create nudge wins over empty card */}
+			{isEmpty && !createNudgeVisible && nudge == null ? (
 				<View style={styles.emptyWrap} pointerEvents="box-none">
 					<EmptyState
 						variant="card"
