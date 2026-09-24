@@ -94,4 +94,30 @@ export function useActivationChecklist(opts: {
 		[emailVerified, hasLocation, hasWaved, hasPosted, storageState],
 	);
 
-	// Persist 
+	// Persist "done" once every step is complete.
+	useEffect(() => {
+		if (!hydrated || !selected.allDone || storageState === 'done') return;
+		void AsyncStorage.setItem(ACTIVATION_STORAGE_KEY, 'done').catch(() => undefined);
+		setTimeout(() => setStorageState('done'), 0);
+		track('activation.checklist_done');
+	}, [hydrated, selected.allDone, storageState]);
+
+	useEffect(() => {
+		if (!hydrated || !selected.visible) return;
+		track('activation.checklist_shown', { incomplete: selected.incompleteCount });
+	}, [hydrated, selected.visible, selected.incompleteCount]);
+
+	const dismiss = useCallback(() => {
+		setStorageState('dismissed');
+		void AsyncStorage.setItem(ACTIVATION_STORAGE_KEY, 'dismissed').catch(() => undefined);
+		track('activation.checklist_dismissed');
+	}, []);
+
+	return {
+		visible: hydrated && selected.visible,
+		steps: selected.steps,
+		incompleteCount: selected.incompleteCount,
+		dismiss,
+		refreshLocal: load,
+	};
+}
