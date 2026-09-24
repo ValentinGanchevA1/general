@@ -49,7 +49,7 @@ import {
 	fetchNearbyStories,
 	storyReceived,
 } from '@/features/stories/storiesSlice';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
@@ -74,6 +74,15 @@ import { CreateNearbySheet } from '@/components/map/CreateNearbySheet';
 import { useCreateNearby } from '@/features/map/useCreateNearby';
 import { useMapFocus } from '@/features/map/useMapFocus';
 import { useMapCreateNudge } from '@/features/map/useMapCreateNudge';
+import {
+	countUnseen,
+	loadSeenKeys,
+	mergeSeen,
+	saveSeenKeys,
+	isEntityPoint,
+	entityPointKey,
+} from '@/features/map/mapNovelty';
+import { clearMapNewCount, setMapNewCount } from '@/features/map/mapNoveltySlice';
 import { MapCreateNudgeBanner } from '@/features/map/MapCreateNudgeBanner';
 import { sheetChrome, useSheetBackdrop } from '@/components/sheets';
 import {
@@ -181,7 +190,7 @@ export function MapScreen(): React.JSX.Element {
 	const peopleLayer = kinds.includes('user');
 	const listingsLayer = kinds.includes('listing');
 
-	const { data, loading } = useDiscovery({
+	const { data, loading, refresh: refreshDiscovery } = useDiscovery({
 		viewport,
 		zoom,
 		kinds,
@@ -190,6 +199,9 @@ export function MapScreen(): React.JSX.Element {
 		rankBy,
 	});
 	const points = data?.points ?? EMPTY_POINTS;
+	const mapFocused = useIsFocused();
+	const seenKeysRef = useRef<Set<string>>(new Set());
+	const [seenReady, setSeenReady] = useState(false);
 
 	const filteredPoints = useMemo(() => {
 		const q = searchQuery.trim().toLowerCase();
@@ -474,6 +486,45 @@ export function MapScreen(): React.JSX.Element {
 		emailVerified,
 	});
 
+	// --- New near you (client seen-set + tab badge) ---
+	useEffect(() => {
+		let cancelled = false;
+		void (async () => {
+			const seen = await loadSeenKeys();
+			if (cancelled) return;
+			seenKeysRef.current = seen;
+			setSeenReady(true);
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!seenReady || loading) return;
+		const seen = seenKeysRef.current;
+		const entityKeys = points.filter(isEntityPoint).map(entityPointKey);
+		const { count } = countUnseen(points, seen);
+		if (mapFocused) {
+			dispatch(clearMapNewCount());
+			const t = setTimeout(() => {
+				const merged = mergeSeen(seenKeysRef.current, entityKeys);
+				seenKeysRef.current = merged;
+				void saveSeenKeys(merged);
+			}, 1200);
+			return () => clearTimeout(t);
+		}
+		dispatch(setMapNewCount(count));
+	}, [points, loading, mapFocused, seenReady, dispatch]);
+
+	useEffect(() => {
+		if (mapFocused || region == null) return;
+		const t = setInterval(() => {
+			refreshDiscovery();
+		}, 60_000);
+		return () => clearInterval(t);
+	}, [mapFocused, region, refreshDiscovery]);
+
 	return (
 		<View style={styles.root}>
 			<ErrorBoundary fallback={<MapUnavailableFallback />}>
@@ -536,7 +587,6 @@ export function MapScreen(): React.JSX.Element {
 				onToggleCollapse={() => setTrendingCollapsed((c) => !c)}
 			/>
 
-			{/* One activation surface: trust NudgeBanner or create nudge wins over empty card */}
 			{isEmpty && !createNudgeVisible && nudge == null ? (
 				<View style={styles.emptyWrap} pointerEvents="box-none">
 					<EmptyState
