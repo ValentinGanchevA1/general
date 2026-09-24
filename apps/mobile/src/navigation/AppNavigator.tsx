@@ -214,6 +214,7 @@ function MainTabs(): React.JSX.Element {
   const chatUnread = useAppSelector((s) =>
     s.chat.conversations.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0),
   );
+  const mapNewCount = useAppSelector((s) => s.mapNovelty.newCount);
 
   return (
     <Tab.Navigator
@@ -241,7 +242,23 @@ function MainTabs(): React.JSX.Element {
         },
       })}
     >
-      <Tab.Screen name="Map" component={MapScreen} />
+      <Tab.Screen
+        name="Map"
+        component={MapScreen}
+        options={
+          mapNewCount > 0
+            ? {
+                tabBarBadge: mapNewCount > 99 ? '99+' : mapNewCount,
+                tabBarBadgeStyle: {
+                  backgroundColor: colors.primary,
+                  color: colors.onPrimary,
+                  fontSize: 11,
+                  fontWeight: '700' as const,
+                },
+              }
+            : {}
+        }
+      />
       <Tab.Screen
         name="Pulse"
         component={PulseScreen}
