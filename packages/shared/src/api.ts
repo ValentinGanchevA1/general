@@ -103,6 +103,10 @@ export interface ListingMeta {
   sellerDisplayName?: string;
   /** Optional for ranking freshness when present on discovery rows. */
   createdAt?: string;
+  /** ISO expiry — listing leaves map when past. */
+  expiresAt?: string | null;
+  /** ISO last bump. */
+  bumpedAt?: string | null;
 }
 
 export type DiscoveryPoint = ClusterPoint | EntityPoint;
