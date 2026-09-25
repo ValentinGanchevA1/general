@@ -26,6 +26,16 @@ export const LISTING_LIMITS = {
   categoryMax: 40,
   priceCentsMax: 100_000_000, // $1,000,000 cap
   offerMessageMax: 500,
+  /** Default active window for sell listings. */
+  ttlDaysSell: 14,
+  /** Default active window for wanted (buy) posts. */
+  ttlDaysBuy: 7,
+  /** How many days a bump extends expires_at. */
+  bumpExtendDays: 14,
+  /** Minimum hours between bumps. */
+  bumpCooldownHours: 12,
+  /** Max bumps per listing per rolling day. */
+  bumpMaxPerDay: 3,
 } as const;
 
 // ─── Create / read ────────────────────────────────────────────────────────────
@@ -70,6 +80,10 @@ export interface ListingSummary {
   mode: ListingMode;
   location: LatLng;
   createdAt: string;
+  /** When the listing leaves discovery if still active. */
+  expiresAt: string | null;
+  /** Last seller bump (extends expiresAt). */
+  bumpedAt: string | null;
   /** Whether the calling user has saved this listing. */
   favoritedByMe: boolean;
 }

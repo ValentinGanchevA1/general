@@ -99,6 +99,17 @@ export class ListingsController {
     return this.listings.updateStatus(userId, id, dto.status);
   }
 
+  /** POST /api/v1/listings/:id/bump — seller extends expires_at (rate-limited). */
+  @Post(':id/bump')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  bump(
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ListingDetail> {
+    return this.listings.bump(userId, id);
+  }
+
   /** PUT /api/v1/listings/:id/favorite — toggle save-for-later. */
   @Put(':id/favorite')
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
