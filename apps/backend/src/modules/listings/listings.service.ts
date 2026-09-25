@@ -17,6 +17,7 @@ import {
   type OfferStatus,
   type ToggleFavoriteResponse,
   type UploadListingImageResponse,
+  LISTING_LIMITS,
 } from '@g88/shared';
 
 import {
@@ -44,6 +45,8 @@ interface ListingRow {
   lat: number;
   lng: number;
   created_at: Date;
+  expires_at: Date | null;
+  bumped_at: Date | null;
   favorited_by_me: boolean;
 }
 
@@ -93,20 +96,26 @@ export class ListingsService {
   async create(sellerId: string, dto: CreateListingDto): Promise<ListingSummary> {
     const cells = computeH3Cells(dto.location.lat, dto.location.lng);
     const mode = dto.mode === 'buy' ? 'buy' : 'sell';
+    const ttlDays = mode === 'buy' ? LISTING_LIMITS.ttlDaysBuy : LISTING_LIMITS.ttlDaysSell;
+    const expiresAt = new Date(Date.now() + ttlDays * 86_400_000);
     const rows = (await this.db.query(
       `INSERT INTO listings
          (seller_id, title, description, thumbnail_url, price_cents, currency, category, visibility, mode,
+          expires_at,
           location, location_h3_r4, location_h3_r5, location_h3_r6,
           location_h3_r7, location_h3_r8, location_h3_r9, location_h3_r10)
        VALUES
          ($1, $2, $3, $4, $5, $6, $7, $8, $9,
-          ST_SetSRID(ST_MakePoint($10, $11), 4326)::geography,
-          $12, $13, $14, $15, $16, $17, $18)
+          $10,
+          ST_SetSRID(ST_MakePoint($11, $12), 4326)::geography,
+          $13, $14, $15, $16, $17, $18, $19)
        RETURNING id, seller_id, title, thumbnail_url, price_cents, currency, category, status, mode,
-                 created_at, ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng`,
+                 created_at, expires_at, bumped_at,
+                 ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng`,
       [
         sellerId, dto.title, dto.description ?? null, dto.thumbnailUrl ?? null, dto.priceCents,
         dto.currency ?? 'USD', dto.category, dto.visibility ?? 'public', mode,
+        expiresAt,
         dto.location.lng, dto.location.lat,
         cells.r4, cells.r5, cells.r6, cells.r7, cells.r8, cells.r9, cells.r10,
       ],
@@ -125,13 +134,14 @@ export class ListingsService {
     const limit = dto.limit ?? 50;
     const rows = (await this.db.query(
       `SELECT l.id, l.seller_id, l.title, l.thumbnail_url, l.price_cents, l.currency,
-              l.category, l.status, l.mode, l.created_at,
+              l.category, l.status, l.mode, l.created_at, l.expires_at, l.bumped_at,
               ST_Y(l.location::geometry) AS lat, ST_X(l.location::geometry) AS lng,
               (f.user_id IS NOT NULL) AS favorited_by_me
          FROM listings l
          LEFT JOIN trade_favorites f ON f.listing_id = l.id AND f.user_id = $1
         WHERE l.deleted_at IS NULL
           AND l.status = 'active'
+          AND (l.expires_at IS NULL OR l.expires_at > NOW())
           AND (l.visibility = 'public' OR l.seller_id = $1)
           AND ($5::text IS NULL OR l.category = $5)
           AND ($7::text IS NULL OR l.mode = $7)
@@ -150,6 +160,7 @@ export class ListingsService {
     const [row] = (await this.db.query(
       `SELECT l.id, l.seller_id, l.title, l.description, l.thumbnail_url, l.price_cents,
               l.currency, l.category, l.status, l.mode, l.visibility, l.created_at,
+              l.expires_at, l.bumped_at,
               ST_Y(l.location::geometry) AS lat, ST_X(l.location::geometry) AS lng,
               s.display_name AS seller_display_name, s.avatar_url AS seller_avatar_url,
               (f.user_id IS NOT NULL) AS favorited_by_me,
@@ -450,7 +461,7 @@ export class ListingsService {
   async listFavorites(userId: string): Promise<ListingSummary[]> {
     const rows = (await this.db.query(
       `SELECT l.id, l.seller_id, l.title, l.thumbnail_url, l.price_cents, l.currency,
-              l.category, l.status, l.mode, l.created_at,
+              l.category, l.status, l.mode, l.created_at, l.expires_at, l.bumped_at,
               ST_Y(l.location::geometry) AS lat, ST_X(l.location::geometry) AS lng,
               true AS favorited_by_me
          FROM trade_favorites f
@@ -461,6 +472,55 @@ export class ListingsService {
       [userId],
     )) as ListingRow[];
     return rows.map((r) => this.toSummary(r));
+  }
+
+  /**
+   * Seller extends expires_at (bump). Rate-limited: min hours between bumps,
+   * max bumps per rolling day. Keeps status active.
+   */
+  async bump(userId: string, listingId: string): Promise<ListingDetail> {
+    await this.assertSeller(userId, listingId);
+    const [row] = (await this.db.query(
+      `SELECT status, expires_at, bumped_at, mode FROM listings
+        WHERE id = $1 AND deleted_at IS NULL`,
+      [listingId],
+    )) as Array<{
+      status: ListingStatus;
+      expires_at: Date | null;
+      bumped_at: Date | null;
+      mode: 'sell' | 'buy';
+    }>;
+    if (!row) {
+      throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
+    }
+    if (row.status !== 'active') {
+      throw new ConflictException({
+        code: 'listing.not_active',
+        message: 'Only active listings can be bumped.',
+      });
+    }
+    const now = Date.now();
+    if (row.bumped_at) {
+      const hours = (now - new Date(row.bumped_at).getTime()) / 3_600_000;
+      if (hours < LISTING_LIMITS.bumpCooldownHours) {
+        throw new ConflictException({
+          code: 'listing.bump_cooldown',
+          message: `Wait ${LISTING_LIMITS.bumpCooldownHours}h between bumps.`,
+        });
+      }
+    }
+    const extendDays = LISTING_LIMITS.bumpExtendDays;
+    const base = row.expires_at && new Date(row.expires_at).getTime() > now
+      ? new Date(row.expires_at).getTime()
+      : now;
+    const newExpires = new Date(base + extendDays * 86_400_000);
+    await this.db.query(
+      `UPDATE listings
+          SET expires_at = $2, bumped_at = NOW(), updated_at = NOW()
+        WHERE id = $1`,
+      [listingId, newExpires],
+    );
+    return this.detail(userId, listingId);
   }
 
   private async assertSeller(userId: string, listingId: string): Promise<void> {
@@ -518,6 +578,8 @@ export class ListingsService {
       mode: row.mode === 'buy' ? 'buy' : 'sell',
       location: { lat: row.lat, lng: row.lng },
       createdAt: new Date(row.created_at).toISOString(),
+      expiresAt: row.expires_at ? new Date(row.expires_at).toISOString() : null,
+      bumpedAt: row.bumped_at ? new Date(row.bumped_at).toISOString() : null,
       favoritedByMe: row.favorited_by_me,
     };
   }
