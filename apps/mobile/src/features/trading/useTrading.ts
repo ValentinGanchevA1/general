@@ -191,3 +191,8 @@ export function counterOffer(offerId: string, req: CounterOfferRequest): Promise
 export function updateListingStatus(listingId: string, status: ListingStatus): Promise<ListingDetail> {
   return putJson<{ status: ListingStatus }, ListingDetail>(`/listings/${listingId}/status`, { status });
 }
+
+/** Seller extends expires_at (12h cooldown server-side). */
+export function bumpListing(listingId: string): Promise<ListingDetail> {
+  return postJson<Record<string, never>, ListingDetail>(`/listings/${listingId}/bump`, {});
+}
