@@ -32,6 +32,7 @@ import {
 	type ActionSheetItem,
 } from '@/components/sheets';
 import { useUserProfileScreenData } from '@/features/profile/useUserProfileScreenData';
+import { formatPublicIdentityParts } from '@g88/shared';
 import { colors, spacing, radius, fontSize } from '@/theme';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -210,6 +211,14 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 
 	if (!profile) return <View style={styles.centered} />;
 
+	const identityLine = formatPublicIdentityParts({
+		gender: profile.gender ?? null,
+		genderSelfDescribe: profile.genderSelfDescribe ?? null,
+		sexualOrientation: profile.sexualOrientation ?? null,
+		orientationSelfDescribe: profile.orientationSelfDescribe ?? null,
+		nationality: profile.nationality ?? null,
+	}).join(' · ') || null;
+
 	return (
 		<View style={styles.root}>
 			<ScrollView
@@ -242,6 +251,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 							/>
 						</View>
 						{hometown ? <Text style={styles.originLine}>{hometown}</Text> : null}
+						{identityLine ? <Text style={styles.originLine}>{identityLine}</Text> : null}
 						<View style={styles.placeRow}>
 							{profile.online ? (
 								<Text style={styles.onlineLabel}>Online now</Text>
@@ -291,7 +301,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 							style={[
 								styles.outlineBtn,
 								(rel?.state === 'friends' || rel?.state === 'request_outgoing') &&
-									styles.outlineBtnActive,
+								styles.outlineBtnActive,
 								rel?.state === 'request_incoming' && styles.outlineBtnAccent,
 							]}
 							onPress={onFriendAction}

@@ -23,7 +23,7 @@ import type {
 	UserMeta,
 	VerificationLevel,
 } from '@g88/shared';
-import { haversineMeters } from '@g88/shared';
+import { formatPublicIdentityParts, haversineMeters } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { deleteJson, getJson, postJson } from '@/api/client';
@@ -244,6 +244,15 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 		if (profile == null) return null;
 		const parts: string[] = [];
 		if (profile.age != null) parts.push(`${profile.age}`);
+		for (const p of formatPublicIdentityParts({
+			gender: profile.gender ?? null,
+			genderSelfDescribe: profile.genderSelfDescribe ?? null,
+			sexualOrientation: profile.sexualOrientation ?? null,
+			orientationSelfDescribe: profile.orientationSelfDescribe ?? null,
+			nationality: profile.nationality ?? null,
+		})) {
+			parts.push(p);
+		}
 		const home = [profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ');
 		if (home) parts.push(home);
 		if (distanceMeters != null && distanceMeters >= 0) {
