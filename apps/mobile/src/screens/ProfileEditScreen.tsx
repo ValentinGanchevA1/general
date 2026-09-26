@@ -14,6 +14,13 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 
+import type { Gender, SexualOrientation } from '@g88/shared';
+import {
+  GENDERS,
+  GENDER_LABELS,
+  ORIENTATION_LABELS,
+  SEXUAL_ORIENTATIONS,
+} from '@g88/shared';
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { updateProfile } from '@/features/profile/profileSlice';
@@ -36,6 +43,39 @@ function isAdult(isoDate: string): boolean {
   return years >= 18;
 }
 
+function ChipRow<T extends string>({
+  options,
+  labels,
+  value,
+  onChange,
+}: {
+  options: readonly T[];
+  labels: Record<T, string>;
+  value: T | null;
+  onChange: (v: T | null) => void;
+}): React.JSX.Element {
+  return (
+    <View style={styles.chipRow}>
+      {options.map((opt) => {
+        const selected = value === opt;
+        return (
+          <TouchableOpacity
+            key={opt}
+            style={[styles.chip, selected ? styles.chipOn : undefined]}
+            onPress={() => onChange(selected ? null : opt)}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+          >
+            <Text style={[styles.chipText, selected ? styles.chipTextOn : undefined]}>
+              {labels[opt]}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
 export function ProfileEditScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const dispatch = useAppDispatch();
@@ -50,6 +90,21 @@ export function ProfileEditScreen(): React.JSX.Element {
   const [hometownCountry, setHometownCountry] = useState(profile?.hometownCountry ?? '');
   const [showAge, setShowAge] = useState(profile?.showAge ?? true);
   const [showHometown, setShowHometown] = useState(profile?.showHometown ?? true);
+
+  const [gender, setGender] = useState<Gender | null>(profile?.gender ?? null);
+  const [genderSelfDescribe, setGenderSelfDescribe] = useState(
+    profile?.genderSelfDescribe ?? '',
+  );
+  const [sexualOrientation, setSexualOrientation] = useState<SexualOrientation | null>(
+    profile?.sexualOrientation ?? null,
+  );
+  const [orientationSelfDescribe, setOrientationSelfDescribe] = useState(
+    profile?.orientationSelfDescribe ?? '',
+  );
+  const [nationality, setNationality] = useState(profile?.nationality ?? '');
+  const [showGender, setShowGender] = useState(profile?.showGender ?? true);
+  const [showOrientation, setShowOrientation] = useState(profile?.showOrientation ?? false);
+  const [showNationality, setShowNationality] = useState(profile?.showNationality ?? true);
 
   const { errors, setErrors, clear } = useFieldErrors<FieldKey>();
 
@@ -81,6 +136,18 @@ export function ProfileEditScreen(): React.JSX.Element {
         hometownCountry: hometownCountry.trim() || null,
         showAge,
         showHometown,
+        gender,
+        genderSelfDescribe:
+          gender === 'self_describe' ? genderSelfDescribe.trim() || null : null,
+        sexualOrientation,
+        orientationSelfDescribe:
+          sexualOrientation === 'self_describe'
+            ? orientationSelfDescribe.trim() || null
+            : null,
+        nationality: nationality.trim() || null,
+        showGender,
+        showOrientation,
+        showNationality,
       }),
     );
     if (updateProfile.fulfilled.match(result)) {
@@ -99,7 +166,9 @@ export function ProfileEditScreen(): React.JSX.Element {
         onBack={() => navigation.goBack()}
         right={
           <TouchableOpacity
-            onPress={() => { void save(); }}
+            onPress={() => {
+              void save();
+            }}
             disabled={loading}
             hitSlop={8}
             accessibilityRole="button"
@@ -211,6 +280,89 @@ export function ProfileEditScreen(): React.JSX.Element {
           />
         </View>
 
+        <Text style={styles.section}>ABOUT YOU</Text>
+        <Text style={styles.hint}>Optional — used later for matching. Not required for the map.</Text>
+
+        <Text style={styles.fieldLabel}>Gender</Text>
+        <ChipRow
+          options={GENDERS}
+          labels={GENDER_LABELS}
+          value={gender}
+          onChange={setGender}
+        />
+        {gender === 'self_describe' ? (
+          <FormField
+            label="Describe gender"
+            value={genderSelfDescribe}
+            onChangeText={setGenderSelfDescribe}
+            placeholder="Your terms"
+            maxLength={40}
+            testID="profile-edit-gender-self"
+          />
+        ) : null}
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleText}>
+            <Text style={styles.toggleLabel}>Show gender on profile</Text>
+          </View>
+          <Switch
+            value={showGender}
+            onValueChange={setShowGender}
+            trackColor={{ false: colors.borderStrong, true: 'rgba(0,212,255,0.35)' }}
+            thumbColor={showGender ? colors.primary : colors.textFaint}
+          />
+        </View>
+
+        <Text style={styles.fieldLabel}>Sexual orientation</Text>
+        <ChipRow
+          options={SEXUAL_ORIENTATIONS}
+          labels={ORIENTATION_LABELS}
+          value={sexualOrientation}
+          onChange={setSexualOrientation}
+        />
+        {sexualOrientation === 'self_describe' ? (
+          <FormField
+            label="Describe orientation"
+            value={orientationSelfDescribe}
+            onChangeText={setOrientationSelfDescribe}
+            placeholder="Your terms"
+            maxLength={40}
+            testID="profile-edit-orientation-self"
+          />
+        ) : null}
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleText}>
+            <Text style={styles.toggleLabel}>Show orientation on profile</Text>
+            <Text style={styles.toggleSub}>Off by default — only you see it until enabled</Text>
+          </View>
+          <Switch
+            value={showOrientation}
+            onValueChange={setShowOrientation}
+            trackColor={{ false: colors.borderStrong, true: 'rgba(0,212,255,0.35)' }}
+            thumbColor={showOrientation ? colors.primary : colors.textFaint}
+          />
+        </View>
+
+        <FormField
+          label="Nationality"
+          value={nationality}
+          onChangeText={setNationality}
+          placeholder="BG"
+          autoCapitalize="characters"
+          maxLength={40}
+          testID="profile-edit-nationality"
+        />
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleText}>
+            <Text style={styles.toggleLabel}>Show nationality on profile</Text>
+          </View>
+          <Switch
+            value={showNationality}
+            onValueChange={setShowNationality}
+            trackColor={{ false: colors.borderStrong, true: 'rgba(0,212,255,0.35)' }}
+            thumbColor={showNationality ? colors.primary : colors.textFaint}
+          />
+        </View>
+
         <Text style={styles.section}>PHONE</Text>
         <Text style={styles.hint}>
           {profile?.phone
@@ -267,6 +419,28 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: 4,
   },
+  fieldLabel: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    marginTop: spacing.sm,
+    marginBottom: 6,
+  },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceAlt,
+  },
+  chipOn: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(0,212,255,0.15)',
+  },
+  chipText: { color: colors.textPrimary, fontSize: fontSize.sm },
+  chipTextOn: { color: colors.primary, fontWeight: '700' },
   bioInput: { minHeight: 100, textAlignVertical: 'top' as const },
   charCount: { color: colors.textFaint, fontSize: fontSize.xs, textAlign: 'right' },
   hint: { color: colors.textFaint, fontSize: fontSize.xs, marginBottom: 4 },

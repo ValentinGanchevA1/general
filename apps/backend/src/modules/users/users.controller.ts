@@ -58,6 +58,32 @@ class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(40) hometownCountry?: string | null;
   @IsOptional() @IsBoolean() showAge?: boolean;
   @IsOptional() @IsBoolean() showHometown?: boolean;
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsIn(['woman', 'man', 'non_binary', 'self_describe'])
+  gender?: 'woman' | 'man' | 'non_binary' | 'self_describe' | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(40)
+  genderSelfDescribe?: string | null;
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsIn(['straight', 'gay', 'lesbian', 'bisexual', 'pansexual', 'asexual', 'queer', 'self_describe'])
+  sexualOrientation?:
+    | 'straight'
+    | 'gay'
+    | 'lesbian'
+    | 'bisexual'
+    | 'pansexual'
+    | 'asexual'
+    | 'queer'
+    | 'self_describe'
+    | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(40)
+  orientationSelfDescribe?: string | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(40)
+  nationality?: string | null;
+  @IsOptional() @IsBoolean() showGender?: boolean;
+  @IsOptional() @IsBoolean() showOrientation?: boolean;
+  @IsOptional() @IsBoolean() showNationality?: boolean;
   /** When false, close friends cannot see online status. */
   @IsOptional() @IsBoolean() friendsSeeOnlineStatus?: boolean;
 }
