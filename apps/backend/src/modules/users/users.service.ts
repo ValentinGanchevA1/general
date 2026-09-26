@@ -31,6 +31,7 @@ import {
   isGender,
   isSexualOrientation,
   SELF_DESCRIBE_MAX,
+  parseSeekingGenders,
 } from '@g88/shared';
 
 import { PresenceService } from '../presence/presence.service';
@@ -63,6 +64,8 @@ interface UserRow {
   show_gender: boolean;
   show_orientation: boolean;
   show_nationality: boolean;
+  open_to_dating: boolean;
+  seeking_genders: string[] | null;
   friends_see_online_status: boolean;
   subscription_tier: SubscriptionTier;
   id_verification_status: IdVerificationStatus;
@@ -110,6 +113,8 @@ const USER_COLUMNS = `
   COALESCE(show_gender, true) AS show_gender,
   COALESCE(show_orientation, false) AS show_orientation,
   COALESCE(show_nationality, true) AS show_nationality,
+  COALESCE(open_to_dating, false) AS open_to_dating,
+  COALESCE(seeking_genders, '{}') AS seeking_genders,
   COALESCE(friends_see_online_status, true) AS friends_see_online_status,
   date_part('year', age(date_of_birth))::int AS age,
   story_suspended_until`;
@@ -551,6 +556,14 @@ export class UsersService {
       params.push(req.showNationality);
       setClauses.push(`show_nationality = $${params.length}`);
     }
+    if (req.openToDating !== undefined) {
+      params.push(req.openToDating);
+      setClauses.push(`open_to_dating = $${params.length}`);
+    }
+    if (req.seekingGenders !== undefined) {
+      params.push(parseSeekingGenders(req.seekingGenders));
+      setClauses.push(`seeking_genders = $${params.length}`);
+    }
     if (req.friendsSeeOnlineStatus !== undefined) {
       params.push(req.friendsSeeOnlineStatus);
       setClauses.push(`friends_see_online_status = $${params.length}`);
@@ -779,6 +792,8 @@ export class UsersService {
       showGender: r.show_gender ?? true,
       showOrientation: r.show_orientation ?? false,
       showNationality: r.show_nationality ?? true,
+      openToDating: r.open_to_dating ?? false,
+      seekingGenders: parseSeekingGenders(r.seeking_genders),
       friendsSeeOnlineStatus: r.friends_see_online_status ?? true,
       coverUrl: r.cover_url ?? null,
       photoUrls,

@@ -31,6 +31,11 @@ export interface DiscoveryQuery {
    */
   friendsOnly?: boolean;
   /**
+   * When true, only users with open_to_dating (viewer must also be open).
+   * Forces kinds=user; mutually exclusive with friendsOnly in practice.
+   */
+  datingOnly?: boolean;
+  /**
    * Sort mode for entity zoom. Default 'relevance'.
    * - relevance: multi-signal rank (distance + trust + social + freshness + activity)
    * - distance: geographic proximity only
@@ -220,6 +225,10 @@ export interface UpdateProfileRequest {
   /** Default false — orientation is sensitive. */
   showOrientation?: boolean;
   showNationality?: boolean;
+  /** Opt into Dating map filter / appear for others using datingOnly. */
+  openToDating?: boolean;
+  /** Empty = any gender. Owner-only preference. */
+  seekingGenders?: Gender[];
   /** When false, close friends cannot see you as online. Default true. */
   friendsSeeOnlineStatus?: boolean;
   /** Full-bleed cover/background URL; null clears. Independent of avatar. */
@@ -251,6 +260,8 @@ export interface UserProfile extends AuthenticatedUser {
   showGender: boolean;
   showOrientation: boolean;
   showNationality: boolean;
+  openToDating: boolean;
+  seekingGenders: Gender[];
   /** Close friends may see online status when true. */
   friendsSeeOnlineStatus: boolean;
   photoUrls: string[];

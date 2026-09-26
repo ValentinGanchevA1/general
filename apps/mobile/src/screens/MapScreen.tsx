@@ -176,6 +176,7 @@ export function MapScreen(): React.JSX.Element {
 		useState<ListingModeFilterValue>('all');
 	const [layers, setLayers] = useState<EntityKind[]>(DEFAULT_MAP_LAYERS);
 	const [friendsOnly, setFriendsOnly] = useState(false);
+	const [datingOnly, setDatingOnly] = useState(false);
 	const [rankBy, setRankBy] = useState<DiscoveryRankBy>('relevance');
 	const [searchQuery, setSearchQuery] = useState('');
 	const [trendingCollapsed, setTrendingCollapsed] = useState(true);
@@ -194,8 +195,9 @@ export function MapScreen(): React.JSX.Element {
 		viewport,
 		zoom,
 		kinds,
-		listingMode: peopleLayer && friendsOnly ? undefined : listingsLayer ? listingMode : undefined,
+		listingMode: peopleLayer && (friendsOnly || datingOnly) ? undefined : listingsLayer ? listingMode : undefined,
 		friendsOnly: peopleLayer && friendsOnly,
+		datingOnly: peopleLayer && datingOnly && !friendsOnly,
 		rankBy,
 	});
 	const points = data?.points ?? EMPTY_POINTS;
@@ -566,6 +568,8 @@ export function MapScreen(): React.JSX.Element {
 					onListingModeChange={setListingModeFilter}
 					friendsOnly={friendsOnly}
 					onFriendsOnlyChange={setFriendsOnly}
+					datingOnly={datingOnly}
+					onDatingOnlyChange={setDatingOnly}
 					rankBy={rankBy}
 					onRankByChange={setRankBy}
 					onPressCreate={openCreateNearby}

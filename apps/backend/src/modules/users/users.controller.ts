@@ -84,6 +84,9 @@ class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @IsBoolean() showGender?: boolean;
   @IsOptional() @IsBoolean() showOrientation?: boolean;
   @IsOptional() @IsBoolean() showNationality?: boolean;
+  @IsOptional() @IsBoolean() openToDating?: boolean;
+  @IsOptional() @IsArray() @IsIn(['woman', 'man', 'non_binary', 'self_describe'], { each: true })
+  seekingGenders?: Array<'woman' | 'man' | 'non_binary' | 'self_describe'>;
   /** When false, close friends cannot see online status. */
   @IsOptional() @IsBoolean() friendsSeeOnlineStatus?: boolean;
 }
