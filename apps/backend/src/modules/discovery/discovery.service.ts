@@ -71,9 +71,12 @@ export class DiscoveryService {
     topic?: string;
     listingMode?: ListingMode;
     friendsOnly?: boolean;
+    datingOnly?: boolean;
     rankBy?: DiscoveryRankBy;
   }): Promise<DiscoveryResponse> {
     const friendsOnly = params.friendsOnly === true;
+    /** Dating mode wins only when friends-only is off. */
+    const datingOnly = params.datingOnly === true && !friendsOnly;
     const rankBy: DiscoveryRankBy = params.rankBy ?? 'relevance';
     const topicSlug = friendsOnly
       ? ''
@@ -84,15 +87,35 @@ export class DiscoveryService {
     let kinds = topicSlug
       ? requested.filter((k) => k === 'event' || k === 'listing')
       : requested;
-    if (friendsOnly) kinds = ['user'];
-    const listingMode: ListingMode | undefined = friendsOnly
-      ? undefined
-      : params.listingMode === 'buy' || params.listingMode === 'sell'
-        ? params.listingMode
-        : undefined;
+    if (friendsOnly || datingOnly) kinds = ['user'];
+    const listingMode: ListingMode | undefined =
+      friendsOnly || datingOnly
+        ? undefined
+        : params.listingMode === 'buy' || params.listingMode === 'sell'
+          ? params.listingMode
+          : undefined;
     const friendIds = friendsOnly
       ? await this.friends.listFriendIds(params.requesterId)
       : null;
+
+    if (datingOnly) {
+      const openRows = await this.db.query<Array<{ open_to_dating: boolean }>>(
+        `SELECT COALESCE(open_to_dating, false) AS open_to_dating
+           FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+        [params.requesterId],
+      );
+      if (!openRows[0]?.open_to_dating) {
+        return this.empty(
+          h3ResolutionForZoom(params.zoom),
+          params.viewport,
+          kinds,
+          '',
+          undefined,
+          false,
+          rankBy,
+        );
+      }
+    }
     const resolution = h3ResolutionForZoom(params.zoom);
 
     if (friendsOnly && (friendIds == null || friendIds.length === 0)) {
@@ -125,11 +148,12 @@ export class DiscoveryService {
           topicSlug,
           listingMode,
           friendIds,
+          datingOnly,
           params.viewport,
           rankBy,
         )
       : await this.clusterByCell(
-          cells, resolution, kinds, params.requesterId, topicSlug, listingMode, friendIds,
+          cells, resolution, kinds, params.requesterId, topicSlug, listingMode, friendIds, datingOnly,
         );
 
     const viewportHash = this.hashViewport(
@@ -237,6 +261,7 @@ export class DiscoveryService {
     topicSlug: string,
     listingMode?: ListingMode,
     friendIds: string[] | null = null,
+    datingOnly = false,
   ): Promise<DiscoveryPoint[]> {
     const cellCol = this.cellColumn(resolution);
     const listingClause = listingModeSql(listingMode);
@@ -245,6 +270,15 @@ export class DiscoveryService {
     if (friendIds != null) {
       queryParams.push(friendIds);
       friendsClause = `AND id = ANY($${queryParams.length}::uuid[])`;
+    }
+    let datingClause = '';
+    if (datingOnly) {
+      datingClause = `AND kind = 'user' AND EXISTS (
+           SELECT 1 FROM users du
+            WHERE du.id = v_discoverable_entity.id
+              AND du.open_to_dating = true
+              AND du.deleted_at IS NULL
+         )`;
     }
     let topicClause = '';
     if (topicSlug) {
@@ -267,6 +301,7 @@ export class DiscoveryService {
          ${topicClause}
          ${listingClause}
          ${friendsClause}
+         ${datingClause}
        GROUP BY ${cellCol}, kind
       `,
       queryParams,
@@ -299,6 +334,7 @@ export class DiscoveryService {
     topicSlug: string,
     listingMode: ListingMode | undefined,
     friendIds: string[] | null,
+    datingOnly: boolean,
     viewport: Viewport,
     rankBy: DiscoveryRankBy,
   ): Promise<DiscoveryPoint[]> {
@@ -311,6 +347,15 @@ export class DiscoveryService {
     if (friendIds != null) {
       queryParams.push(friendIds);
       friendsClause = `AND id = ANY($${queryParams.length}::uuid[])`;
+    }
+    let datingClause = '';
+    if (datingOnly) {
+      datingClause = `AND kind = 'user' AND EXISTS (
+           SELECT 1 FROM users du
+            WHERE du.id = v_discoverable_entity.id
+              AND du.open_to_dating = true
+              AND du.deleted_at IS NULL
+         )`;
     }
     let topicClause = '';
     if (topicSlug) {
@@ -343,13 +388,60 @@ export class DiscoveryService {
          ${topicClause}
          ${listingClause}
          ${friendsClause}
+         ${datingClause}
        ${orderClause}
        LIMIT $4
       `,
       queryParams,
     );
 
-    const userIds = rows.filter((r) => r.kind === 'user').map((r) => r.id);
+    let filteredRows = rows;
+    if (datingOnly) {
+      const userIdsForDating = rows.filter((r) => r.kind === 'user').map((r) => r.id);
+      if (userIdsForDating.length > 0) {
+        const prefRows = await this.db.query<
+          Array<{
+            id: string;
+            gender: string | null;
+            seeking_genders: string[] | null;
+          }>
+        >(
+          `SELECT id, gender, COALESCE(seeking_genders, '{}') AS seeking_genders
+             FROM users
+            WHERE id = ANY($1::uuid[]) OR id = $2`,
+          [userIdsForDating, requesterId],
+        );
+        const byId = new Map(prefRows.map((p) => [p.id, p]));
+        const viewer = byId.get(requesterId);
+        const viewerGender = viewer?.gender ?? null;
+        const viewerSeeking = Array.isArray(viewer?.seeking_genders)
+          ? viewer!.seeking_genders.filter((g): g is string => typeof g === 'string')
+          : [];
+        filteredRows = rows.filter((r) => {
+          if (r.kind !== 'user') return false;
+          const c = byId.get(r.id);
+          if (!c) return false;
+          const candidateSeeking = Array.isArray(c.seeking_genders)
+            ? c.seeking_genders.filter((g): g is string => typeof g === 'string')
+            : [];
+          // Inline gate (avoid shared import churn if tree-shaken differently)
+          if (viewerSeeking.length > 0 && c.gender != null && !viewerSeeking.includes(c.gender)) {
+            return false;
+          }
+          if (
+            candidateSeeking.length > 0 &&
+            viewerGender != null &&
+            !candidateSeeking.includes(viewerGender)
+          ) {
+            return false;
+          }
+          return true;
+        });
+      } else {
+        filteredRows = [];
+      }
+    }
+    const userIds = filteredRows.filter((r) => r.kind === 'user').map((r) => r.id);
     const friendIdSet =
       userIds.length > 0
         ? new Set(await this.friends.listFriendIds(requesterId))
@@ -368,7 +460,7 @@ export class DiscoveryService {
         ? await this.presence.lastSeenMap(presenceIds)
         : new Map<string, string>();
 
-    let points: DiscoveryPoint[] = rows.map((r) => {
+    let points: DiscoveryPoint[] = filteredRows.map((r) => {
       if (r.kind === 'user') {
         const viewMeta = r.meta as unknown as UserMeta;
         const isFriend = friendIdSet.has(r.id);

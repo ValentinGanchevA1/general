@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
 		gap: 4,
 		paddingHorizontal: 12,
 		height: 36,
-		borderRadius: radius.full,
+		borderRadius: radius.pill,
 		backgroundColor: colors.surface,
 		borderWidth: StyleSheet.hairlineWidth,
 		borderColor: colors.borderStrong,
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		width: 36,
 		height: 36,
-		borderRadius: radius.full,
+		borderRadius: radius.pill,
 		backgroundColor: colors.primary,
 	},
 	chipText: {
