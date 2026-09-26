@@ -1,75 +1,119 @@
 # G88 — current status (authoritative snapshot)
 
-> **Synced:** 2026-09-24  
-> **HEAD:** master · **Next free migration:** `0044`  
-> Full historical log: root `STATUS.md`.
+> **Synced:** 2026-09-26  
+> **HEAD truth:** master + merged PRs through #423  
+> **Next free migration:** `0046`  
+> Historical log: root `STATUS.md` (stale as of 2026-09-24 — replace with this file).
 
-## Where we are
+---
 
-### Shipped on master (code)
+## 1. One-liner (what G88 is today)
 
-| Area | Notes |
-|---|---|
-| **P1–P3 core** | Auth, map, presence, wave, chat, gamification, gifts, push/geofences, verification UI, events, trading |
-| **Friends** | Migrations `0032`/`0033`; requests, presence privacy, mutual, suggestions (rank C + dismiss `0043`), notifications + badge, interactions inbox |
-| **Stories (P4.S)** | Create (photo/video ≤15s), Pulse strip, viewer (`react-native-video`), reactions; soft post gate (email + 24h); strike thresholds enforced |
-| **Profile** | Origin (DOB 18+, hometown), cover photo, storyline, follow/friend CTAs, strike standing surfaces |
-| **Map discovery** | City-scale GPS center, rankBy relevance/distance/newest, PostGIS KNN distance, listing mode + friendsOnly, cell-cap ≤5k, content-aware diff |
-| **Map chrome (calm v1)** | People/Events/Listings labels · More sheet (Friends + listing mode) · GPS recenter · pan-dismiss daily challenge · `+` create chip in filter row · coach v2 (pin → create → wave → pulse) |
-| **Map empty / create** | Context empty copy · one-shot create nudge after coach v1|v2 · Tap + / long-press copy |
-| **Map online dots** | Green pip on user markers when `meta.online` (server-gated: friendship + `friends_see_online_status`) |
-| **EntityBottomSheet** | Above-fold listing price·distance · event time·distance · Message seller/host · mutual · stats |
-| **Marketplace** | Listings sell/wanted, offers + counter, ListingDetail Message seller, map focus post-create |
-| **Presence / ranking** | Redis `presence:last_seen`; discovery `lastSeenAt` for allowlisted friends; scoring activityScore |
-| **Push** | FCM multicast + invalid-token prune |
-| **ID verification** | Submit → S3 → pending; admin queue; atomic decide; partial UNIQUE pending; WS `verification:updated`; Rekognition **assist-only** |
-| **Admin** | Vite @ `127.0.0.1:5173`; `ADMIN_USER_IDS`; `pnpm id:approve` / `id:review` |
-| **Migrations** | Through **`0043`** (`friend_suggestion_dismissals`). **Next free: `0044`** |
+**Map-first, identity-verified, real-time social app.**  
+See people / events / listings nearby → wave, message, friend, trade, attend, post story.  
+Launch market: **Varna, BG** (α).
 
-### Closed since STATUS_CURRENT 2026-09-19
+Not a feed. Not a swipe deck. Not a super-app yet.
 
-| PR / area | What |
-|-----------|------|
-| #394 | Map cold-start city-scale (`useMapFocus` setRegion + animate retries) |
-| #401 / #403 | Friends suggestions rank C + migration `0043` (immutable index fix) |
-| #404–#405 | Map layers Dating/Events/Trading → discovery kinds; Interactions badge under filter |
-| #408 | FCM soft-fail when no default Firebase app |
-| #409 | Map calm v1 — labels, More sheet, recenter, pan-dismiss challenge |
-| #410 | `+` create chip + coach v2 |
-| #411 | EntityBottomSheet above-fold price/time + distance |
-| #412 | Empty create nudge after coach v2 + map online dots; MapCoachMarks set-state-in-effect defer |
+---
 
-### Offer → chat handoff
+## 2. Old plans → reality
 
-- ListingDetail: Message → `POST /conversations` → Chat (on master).
-- EntityBottomSheet Message aligned to `/conversations` (seller/host after 0041/0042).
+| Source | Claimed | Reality 2026-09-26 |
+|--------|---------|--------------------|
+| **BG 14-day MVP** (area posts + basic map + chat) | Auth, map, hyperlocal posts, 1:1 chat, push | **Superseded.** Area posts never shipped as primary surface. Map discovery + people/events/listings + friends + marketplace + stories + verification ladder are the product. |
+| **HTML Phase 1–2** (microservices, Kafka, GraphQL, ML matching, Neo4j) | Months 1–6 foundation | **Rejected architecture.** Monolith NestJS + PostGIS + Redis + Socket.IO. No Kafka/GraphQL/K8s. Matching is rankBy + friends suggestions, not TensorFlow. |
+| **HTML Phase 3** (live streaming, WebRTC, NFT, blockchain gifts) | Months 7–9 | **Explicitly deferred / cut.** Stories (ephemeral photo/video ≤15s) shipped instead. Live streaming stays P4.L horizon. |
+| **HTML Phase 4** (full commerce, crypto, logistics) | Months 10–12 | **Partial.** Local marketplace + offers + counter + urgency (expires/bump) shipped. No Stripe live, no crypto, no logistics. |
+| **HTML Phase 5–6** (AR nav, news, enterprise API, white-label) | Months 13–24 | **Out of scope.** Do not build. |
+| **v2/v3 from BG plan** (marketplace then streaming+dating) | Sequential | **Marketplace ahead of streaming.** Dating layer is map filter + identity prefs (gender/orientation/nationality) — not a swipe product. |
 
-## Ops gaps (not code blockers)
+**Kill list (do not re-open without explicit go-ahead):**  
+Kafka · GraphQL Federation · Neo4j · TensorFlow matching · WebRTC live · NFT/blockchain · multi-CDN streaming · enterprise white-label · AR indoor nav.
 
-1. **Rekognition on Render** — set `REKOGNITION_ENABLED=true`, matching `AWS_REGION`/S3, IAM `DetectFaces` + `CompareFaces` on upload user. Until then assist stays `skipped`/`error`; human decide still works. See `docs/ID_VERIFICATION_OPS.md`.
-2. **`ADMIN_USER_IDS` on Render** — production admin cannot queue-decide without it.
-3. **Twilio email OTP** — often fails in prod; Redis/dev fallback logs codes. Wire real email channel for prod.
-4. **Play Console** — owner closed testing still open (`DEPLOY.md`).
-5. **G2/G3 live exercise** — Twilio SMS + Stripe test checkout not fully run-verified on deploy.
+---
 
-## Next (priority order)
+## 3. Shipped on master (code)
 
-1. **Trust ops (Render)** — env + one E2E: ID submit → admin score/similarity → approve via UI or `id:approve`.
-2. **Device smoke** — cold start city map · create banner after coach v2 · online pip · sheet Message → chat · ListingDetail Message seller · story photo+video · listing photo upload.
-3. **Twilio email** — prod OTP without DEV code.
-4. **Play closed testing** (owner).
-5. **Product** — friends density / suggestions quality surfaces; push delivery metrics beyond token prune.
+| Area | State | Key migrations / PRs |
+|------|--------|----------------------|
+| **P1 foundation** | ✅ | Auth · Profile · Map discovery · Presence · Wave · Chat |
+| **P2 hardening** | ✅ | Blocks (wave.blocked) · outbox · viewport diff · Sentry |
+| **P3 habit** | ✅ | Gamification · gifts · push · events · trading (offers+counter) |
+| **Friends graph** | ✅ | 0032/0033 · requests · mutual · suggestions rank C (0043) · presence privacy · notifications + badge · interactions inbox |
+| **Stories (P4.S)** | ✅ | 0029 · photo/video create ≤15s · Pulse strip · viewer · soft gate (email+24h) · strikes enforced |
+| **Profile** | ✅ | Origin (DOB 18+, hometown) · cover · storyline · **identity** (gender, orientation, nationality + show_* flags) **0045** · public surface #423 |
+| **Map discovery** | ✅ | rankBy relevance/distance/newest · PostGIS KNN · listingMode · friendsOnly · cell-cap 5k · content-aware diff · lastSeen activity |
+| **Map chrome** | ✅ | Calm v1 (#409–410) · Search · CategoryFilter · TrendingCard · coach v2 · empty/create nudge · online pip (privacy-gated) · activation trust ladder |
+| **EntityBottomSheet** | ✅ | Above-fold price/time/distance · Wave→Message→Profile · mutual · stats · Message seller/host |
+| **Marketplace** | ✅ | Sell/Wanted · offers + counter · urgency (expires_at/bumped_at **0044**) · Message seller · post-create map focus |
+| **Verification** | ✅ | Email OTP · phone (Redis fallback) · ID submit→admin queue · atomic decide · assist-only Rekognition · WS verification:updated |
+| **UX primitives** | ✅ | ScreenHeader · FormField · ListRow · EmptyState · IdentityBlock · Avatar friend teal · theme tokens (hex residual closed) |
+| **Admin** | ✅ | Vite `127.0.0.1:5173` · AdminGuard · id:approve CLI |
+| **Migrations** | **0001–0045** on master. dual-0030 resolved. Prefix CI guard. **Next free: 0046** |
 
-## Rekognition checklist (do this now)
+---
 
-1. IAM on upload/`g88-dev` user: `rekognition:DetectFaces`, `rekognition:CompareFaces`, `s3:GetObject` on `verifications/*`.
-2. Render backend env: `REKOGNITION_ENABLED=true`, `AWS_REGION=eu-north-1` (must match S3), keys, `AWS_S3_BUCKET`.
-3. Ensure `ADMIN_USER_IDS` includes at least one real admin UUID (comma-separated).
-4. Redeploy → mobile ID submit → admin detail shows similarity (or `no_face_*` / `error`).
-5. Human decides via admin UI (`127.0.0.1:5173`) or:
-   ```bash
-   pnpm --filter @g88/backend id:approve -- --user <uuid>
-   pnpm --filter @g88/backend id:review
-   ```
+## 4. Ops gaps (not code blockers)
 
-Update this file when migrations or product state change. Single source of truth for “where are we?”.
+1. **Rekognition on Render** — `REKOGNITION_ENABLED=true`, region = S3, IAM DetectFaces/CompareFaces. Until then scores skip/error; human decide still works.
+2. **`ADMIN_USER_IDS` on Render** — required for prod queue.
+3. **Twilio email OTP** — often fails; Redis/DEV fallback. Wire real channel for prod.
+4. **Play Console** — owner closed testing still open.
+5. **Live G2/G3** — Twilio SMS + Stripe test checkout not fully exercised on deploy.
+6. **0045 (identity) on Render** — run migrate after deploy.
+
+---
+
+## 5. Next (priority order)
+
+| # | Item | Why |
+|---|------|-----|
+| 1 | **Trust ops** | Enable Rekognition + ADMIN_USER_IDS; one E2E ID submit → score → approve |
+| 2 | **Device smoke** | Cold-start city map · coach v2 → create · online pip · sheet Message → chat · story photo+video · listing photo + urgency |
+| 3 | **Dating prefs (0046)** | Draft already in artifacts (`0046_dating_preferences.sql`). Wire only if map Dating layer needs server preferences; keep opt-in + privacy. |
+| 4 | **Listing urgency mobile** | Backend 0044 shipped; mobile EntityBottomSheet + ListingDetail still need local apply from artifacts `.tmp-*-urgency.tsx` |
+| 5 | **Play closed testing** | Owner path |
+| 6 | **Retention metrics** | D1/D7 on verified users before any monetization talk |
+
+**Explicitly not next:** live streaming, group chat, web client, premium paywall, ML matching.
+
+---
+
+## 6. Architecture that actually runs
+
+```
+Mobile (RN + TS)  ──REST + Socket.IO──►  NestJS monolith
+                                              │
+                    PostGIS (viewport / KNN)  Redis (presence, OTP, rate)
+                                              S3 (media, ID docs)
+                                              FCM (push)
+apps/admin (Vite) ──JWT AdminGuard──► same API
+```
+
+No microservices. No Kafka. No GraphQL. Shared types in `packages/shared`.
+
+---
+
+## 7. Success metrics (α — Varna)
+
+- D1 / D7 retention on **verified** users (email+).
+- Waves → chat conversion.
+- Listings with ≥1 offer within 48h.
+- Zero unblocked harassment paths (blocks + strikes).
+
+---
+
+## 8. Doc ownership
+
+| File | Role |
+|------|------|
+| **docs/STATUS_CURRENT.md** (this) | Single source of “where are we?” |
+| STATUS.md | Historical log — keep short, point here |
+| ROADMAP.md | Sequence + cuts (needs migration number fix → 0046) |
+| PRODUCT.md | What/why (still accurate) |
+| ARCHITECTURE.md / SPECIFICATION.md | How / contracts |
+
+**Action:** replace root `STATUS.md` progress section and `docs/STATUS_CURRENT.md` with this content on next docs PR. Update ROADMAP migration line and P4 table if dating prefs ship.
+
+Update this file when migrations or product state change.
