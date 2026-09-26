@@ -1,6 +1,7 @@
 import type { LatLng, Viewport } from './geo';
 import type { AreaCategory } from './activity';
 import type { ListingMode } from './listing';
+import type { Gender, SexualOrientation } from './identity';
 
 // ─── Domain enums ──────────────────────────────────────────────────────────
 
@@ -208,6 +209,17 @@ export interface UpdateProfileRequest {
   hometownCountry?: string | null;
   showAge?: boolean;
   showHometown?: boolean;
+  /** Identity — optional; not required for Dating layer. */
+  gender?: Gender | null;
+  genderSelfDescribe?: string | null;
+  sexualOrientation?: SexualOrientation | null;
+  orientationSelfDescribe?: string | null;
+  /** ISO 3166-1 alpha-2 or short country name. */
+  nationality?: string | null;
+  showGender?: boolean;
+  /** Default false — orientation is sensitive. */
+  showOrientation?: boolean;
+  showNationality?: boolean;
   /** When false, close friends cannot see you as online. Default true. */
   friendsSeeOnlineStatus?: boolean;
   /** Full-bleed cover/background URL; null clears. Independent of avatar. */
@@ -231,6 +243,14 @@ export interface UserProfile extends AuthenticatedUser {
   hometownCountry: string | null;
   showAge: boolean;
   showHometown: boolean;
+  gender: Gender | null;
+  genderSelfDescribe: string | null;
+  sexualOrientation: SexualOrientation | null;
+  orientationSelfDescribe: string | null;
+  nationality: string | null;
+  showGender: boolean;
+  showOrientation: boolean;
+  showNationality: boolean;
   /** Close friends may see online status when true. */
   friendsSeeOnlineStatus: boolean;
   photoUrls: string[];
@@ -290,6 +310,14 @@ export interface PublicUserProfile {
   /** Present only when the user opted to show hometown. */
   hometownCity?: string | null;
   hometownCountry?: string | null;
+  /** Present only when showGender. */
+  gender?: Gender | null;
+  genderSelfDescribe?: string | null;
+  /** Present only when showOrientation (default hidden). */
+  sexualOrientation?: SexualOrientation | null;
+  orientationSelfDescribe?: string | null;
+  /** Present only when showNationality. */
+  nationality?: string | null;
   /**
    * Ordered gallery URLs for the public profile photo album.
    * Omitted or empty when the user has no gallery photos.
