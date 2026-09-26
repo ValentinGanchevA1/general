@@ -84,6 +84,9 @@ class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @IsBoolean() showGender?: boolean;
   @IsOptional() @IsBoolean() showOrientation?: boolean;
   @IsOptional() @IsBoolean() showNationality?: boolean;
+  @IsOptional() @IsBoolean() openToDating?: boolean;
+  @IsOptional() @IsArray() @IsIn(['woman', 'man', 'non_binary', 'self_describe'], { each: true })
+  seekingGenders?: Array<'woman' | 'man' | 'non_binary' | 'self_describe'>;
   /** When false, close friends cannot see online status. */
   @IsOptional() @IsBoolean() friendsSeeOnlineStatus?: boolean;
 }
@@ -171,7 +174,7 @@ export class UsersController {
   }
 
   @Post('me/avatar/presigned-url')
-  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @Throttle({ default: { limit: 20, delta: 60000 } })
   async avatarPresignedUrl(
     @CurrentUser('id') userId: string,
     @Body() dto: PresignedUrlDto,
@@ -180,7 +183,7 @@ export class UsersController {
   }
 
   @Post('me/photos/base64')
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Throttle({ default: { limit: 10, delta: 60000 } })
   async uploadPhotoBase64(
     @CurrentUser('id') userId: string,
     @Body() dto: UploadPhotoBase64Dto,
@@ -207,7 +210,7 @@ export class UsersController {
   }
 
   @Post('me/photos/presigned-url')
-  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @Throttle({ default: { limit: 20, delta: 60000 } })
   async photoPresignedUrl(
     @CurrentUser('id') userId: string,
     @Body() dto: PresignedUrlDto,
