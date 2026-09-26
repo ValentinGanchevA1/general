@@ -506,7 +506,7 @@ export class UsersService {
         setClauses.push(`gender_self_describe = $${params.length}`);
       }
     }
-    if (req.genderSelfDescribe !== undefined) {
+    if (req.genderSelfDescribe !== undefined && !(req.gender !== undefined && req.gender !== 'self_describe')) {
       const g =
         req.genderSelfDescribe === null || req.genderSelfDescribe.trim() === ''
           ? null
@@ -528,7 +528,7 @@ export class UsersService {
         setClauses.push(`orientation_self_describe = $${params.length}`);
       }
     }
-    if (req.orientationSelfDescribe !== undefined) {
+    if (req.orientationSelfDescribe !== undefined && !(req.sexualOrientation !== undefined && req.sexualOrientation !== 'self_describe')) {
       const o =
         req.orientationSelfDescribe === null || req.orientationSelfDescribe.trim() === ''
           ? null
