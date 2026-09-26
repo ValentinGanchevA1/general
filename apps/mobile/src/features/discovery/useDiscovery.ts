@@ -20,6 +20,7 @@ interface UseDiscoveryArgs {
   topic?: string | null;
   listingMode?: ListingMode | undefined;
   friendsOnly?: boolean;
+  datingOnly?: boolean;
   rankBy?: DiscoveryRankBy;
   debounceMs?: number;
   enabled?: boolean;
@@ -51,6 +52,7 @@ export function useDiscovery({
   topic,
   listingMode,
   friendsOnly = false,
+  datingOnly = false,
   rankBy = 'relevance',
   debounceMs = 250,
   enabled = true,
@@ -67,6 +69,7 @@ export function useDiscovery({
   const lastTopicRef = useRef<string | null>(null);
   const lastListingModeRef = useRef<string | null>(null);
   const lastFriendsOnlyRef = useRef(false);
+  const lastDatingOnlyRef = useRef(false);
   const lastRankByRef = useRef<DiscoveryRankBy>('relevance');
 
   const fetchNow = useCallback(
@@ -77,6 +80,7 @@ export function useDiscovery({
       t?: string | null,
       lm?: ListingMode,
       fo?: boolean,
+      dating?: boolean,
       rb?: DiscoveryRankBy,
     ) => {
       if (isViewportTooLarge(vp)) {
@@ -100,6 +104,7 @@ export function useDiscovery({
         t,
         lm: lm ?? null,
         fo: fo === true,
+        dating: dating === true,
         rb: effectiveRank,
       });
       if (key === lastFetchKey.current) return;
@@ -107,18 +112,19 @@ export function useDiscovery({
       const topicChanged = lastTopicRef.current !== (t ?? null);
       const modeChanged = lastListingModeRef.current !== (lm ?? null);
       const friendsChanged = lastFriendsOnlyRef.current !== (fo === true);
+      const datingChanged = lastDatingOnlyRef.current !== (dating === true);
       const rankChanged = lastRankByRef.current !== effectiveRank;
-      if (topicChanged || modeChanged || friendsChanged || rankChanged) {
+      if (topicChanged || modeChanged || friendsChanged || datingChanged || rankChanged) {
         prevHashRef.current = null;
         cachedPointsRef.current = [];
         lastTopicRef.current = t ?? null;
         lastListingModeRef.current = lm ?? null;
         lastFriendsOnlyRef.current = fo === true;
+        lastDatingOnlyRef.current = dating === true;
         lastRankByRef.current = effectiveRank;
       }
 
       lastFetchKey.current = key;
-
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
@@ -134,6 +140,7 @@ export function useDiscovery({
           ...(t ? { topic: t } : {}),
           ...(lm ? { listingMode: lm } : {}),
           ...(fo ? { friendsOnly: true } : {}),
+          ...(dating ? { datingOnly: true } : {}),
           ...(effectiveRank !== 'relevance' ? { rankBy: effectiveRank } : {}),
           ...(prevHashRef.current ? { prevViewportHash: prevHashRef.current } : {}),
         };
@@ -172,12 +179,12 @@ export function useDiscovery({
     if (!enabled || !viewport) return;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
-      void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly, rankBy);
+      void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly, datingOnly, rankBy);
     }, debounceMs);
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [enabled, viewport, zoom, kinds, topic, listingMode, friendsOnly, rankBy, debounceMs, fetchNow]);
+  }, [enabled, viewport, zoom, kinds, topic, listingMode, friendsOnly, datingOnly, rankBy, debounceMs, fetchNow]);
 
   useEffect(() => {
     return () => abortRef.current?.abort();
@@ -188,8 +195,8 @@ export function useDiscovery({
     lastFetchKey.current = '';
     prevHashRef.current = null;
     cachedPointsRef.current = [];
-    void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly, rankBy);
-  }, [viewport, zoom, kinds, topic, listingMode, friendsOnly, rankBy, fetchNow]);
+    void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly, datingOnly, rankBy);
+  }, [viewport, zoom, kinds, topic, listingMode, friendsOnly, datingOnly, rankBy, fetchNow]);
 
   return { data, loading, error, refresh };
 }
