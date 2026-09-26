@@ -68,6 +68,11 @@ export class DiscoveryQueryDto {
   @IsBoolean()
   friendsOnly?: boolean;
 
+  /** Users open to dating only (viewer must also be open). Forces kinds=user. */
+  @IsOptional()
+  @IsBoolean()
+  datingOnly?: boolean;
+
   /**
    * Entity sort mode. Default relevance (multi-signal).
    * distance = geographic only; newest = listing/event time when available.

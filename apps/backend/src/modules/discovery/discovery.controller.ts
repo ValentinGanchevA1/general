@@ -43,6 +43,7 @@ export class DiscoveryController {
       topic: dto.topic,
       listingMode: dto.listingMode,
       friendsOnly: dto.friendsOnly === true,
+      datingOnly: dto.datingOnly === true,
       rankBy: dto.rankBy,
     });
   }
