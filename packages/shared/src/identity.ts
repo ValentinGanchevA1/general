@@ -62,3 +62,50 @@ export function isSexualOrientation(v: unknown): v is SexualOrientation {
 
 /** Max length for free-text self-describe fields. */
 export const SELF_DESCRIBE_MAX = 40;
+
+/** Public label for gender (respects self-describe). Null when unset. */
+export function genderDisplayLabel(
+  gender: Gender | null | undefined,
+  selfDescribe?: string | null,
+): string | null {
+  if (gender == null) return null;
+  if (gender === 'self_describe') {
+    const s = selfDescribe?.trim();
+    return s && s.length > 0 ? s : GENDER_LABELS.self_describe;
+  }
+  return GENDER_LABELS[gender];
+}
+
+/** Public label for orientation (respects self-describe). Null when unset. */
+export function orientationDisplayLabel(
+  orientation: SexualOrientation | null | undefined,
+  selfDescribe?: string | null,
+): string | null {
+  if (orientation == null) return null;
+  if (orientation === 'self_describe') {
+    const s = selfDescribe?.trim();
+    return s && s.length > 0 ? s : ORIENTATION_LABELS.self_describe;
+  }
+  return ORIENTATION_LABELS[orientation];
+}
+
+/**
+ * Compact public identity chips for profile hero / sheet subtitle.
+ * Only pass fields already gated by show_* on the server.
+ */
+export function formatPublicIdentityParts(opts: {
+  gender?: Gender | null;
+  genderSelfDescribe?: string | null;
+  sexualOrientation?: SexualOrientation | null;
+  orientationSelfDescribe?: string | null;
+  nationality?: string | null;
+}): string[] {
+  const parts: string[] = [];
+  const g = genderDisplayLabel(opts.gender, opts.genderSelfDescribe);
+  if (g) parts.push(g);
+  const o = orientationDisplayLabel(opts.sexualOrientation, opts.orientationSelfDescribe);
+  if (o) parts.push(o);
+  const n = opts.nationality?.trim();
+  if (n) parts.push(n);
+  return parts;
+}
