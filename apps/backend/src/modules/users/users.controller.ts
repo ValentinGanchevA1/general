@@ -174,7 +174,7 @@ export class UsersController {
   }
 
   @Post('me/avatar/presigned-url')
-  @Throttle({ default: { limit: 20, delta: 60000 } })
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async avatarPresignedUrl(
     @CurrentUser('id') userId: string,
     @Body() dto: PresignedUrlDto,
@@ -183,7 +183,7 @@ export class UsersController {
   }
 
   @Post('me/photos/base64')
-  @Throttle({ default: { limit: 10, delta: 60000 } })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async uploadPhotoBase64(
     @CurrentUser('id') userId: string,
     @Body() dto: UploadPhotoBase64Dto,
@@ -210,7 +210,7 @@ export class UsersController {
   }
 
   @Post('me/photos/presigned-url')
-  @Throttle({ default: { limit: 20, delta: 60000 } })
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async photoPresignedUrl(
     @CurrentUser('id') userId: string,
     @Body() dto: PresignedUrlDto,
