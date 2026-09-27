@@ -1,0 +1,103 @@
+--- a/apps/mobile/src/screens/MapScreen.tsx
++++ b/apps/mobile/src/screens/MapScreen.tsx
+@@ -64,6 +64,7 @@
+ 	type ListingModeFilterValue,
+ } from '@/components/map/MapFilterRow';
+ import { EmptyState } from '@/components/EmptyState';
++import { mapEmptyCopy } from '@/components/map/mapEmptyCopy';
+ import { MapChrome } from '@/components/map/MapChrome';
+ import { TrendingCard } from '@/components/map/TrendingCard';
+ import {
+@@ -96,63 +97,7 @@
+ 
+ const EMPTY_POINTS: DiscoveryPoint[] = [];
+ 
+-type MapEmptyActionKind = 'show_everyone' | 'create' | 'verify_email';
+-
+-function mapEmptyCopy(opts: {
+-	friendsOnly: boolean;
+-	listingMode: ListingModeFilterValue;
+-	emailVerified: boolean;
+-}): {
+-	icon: string;
+-	title: string;
+-	body: string;
+-	actionLabel: string;
+-	actionKind: MapEmptyActionKind;
+-} {
+-	if (opts.friendsOnly) {
+-		return {
+-			icon: 'account-group-outline',
+-			title: 'No friends nearby',
+-			body: 'None of your friends are in this area right now. Pan the map or turn Friends off.',
+-			actionLabel: 'Show everyone',
+-			actionKind: 'show_everyone',
+-		};
+-	}
+-	if (opts.listingMode === 'sell') {
+-		return {
+-			icon: 'tag-outline',
+-			title: 'No for-sale listings here',
+-			body: 'Nothing for sale in this area. Post one, or switch the filter to All.',
+-			actionLabel: 'Create here',
+-			actionKind: 'create',
+-		};
+-	}
+-	if (opts.listingMode === 'buy') {
+-		return {
+-			icon: 'cart-outline',
+-			title: 'No wanted posts here',
+-			body: 'Nobody is looking to buy in this area yet. Post a wanted, or switch the filter to All.',
+-			actionLabel: 'Create here',
+-			actionKind: 'create',
+-		};
+-	}
+-	if (!opts.emailVerified) {
+-		return {
+-			icon: 'email-check-outline',
+-			title: 'Verify email to get started',
+-			body: 'Confirm your email so people can trust you on the map — then be the first to post something nearby.',
+-			actionLabel: 'Verify email',
+-			actionKind: 'verify_email',
+-		};
+-	}
+-	return {
+-		icon: 'map-marker-radius-outline',
+-		title: 'Nothing nearby yet',
+-		body: 'Be the first — sell something, post a wanted, create an event, or drop a local alert. Tap + in the filter bar or long-press the map.',
+-		actionLabel: 'Create here',
+-		actionKind: 'create',
+-	};
+-}
+-
+ export function MapScreen(): React.JSX.Element {
+ 	const dispatch = useAppDispatch();
+ 	const emailVerified =
+ 		useAppSelector((s) => s.profile.profile?.badges?.email === true);
++	const openToDating =
++		useAppSelector((s) => s.profile.profile?.openToDating === true);
+ 	const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+@@ -482,6 +427,8 @@
+ 
+ 	const emptyCopy = mapEmptyCopy({
+ 		friendsOnly,
++		datingOnly,
++		openToDating,
+ 		listingMode: listingModeFilter,
+ 		emailVerified,
+ 	});
+@@ -600,9 +547,13 @@
+ 						onAction={
+ 							emptyCopy.actionKind === 'show_everyone'
+ 								? () => setFriendsOnly(false)
+-								: emptyCopy.actionKind === 'verify_email'
+-									? () => openRootScreen(navigation, 'EmailVerification')
+-									: openCreateNearby
++								: emptyCopy.actionKind === 'clear_dating'
++									? () => setDatingOnly(false)
++									: emptyCopy.actionKind === 'dating_prefs'
++										? () => openRootScreen(navigation, 'ProfileEdit')
++										: emptyCopy.actionKind === 'verify_email'
++											? () => openRootScreen(navigation, 'EmailVerification')
++											: openCreateNearby
+ 						}
