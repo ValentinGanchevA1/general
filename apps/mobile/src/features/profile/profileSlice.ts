@@ -35,10 +35,31 @@ function applyOptimistic(profile: UserProfile, req: UpdateProfileRequest): UserP
     ...(req.displayName !== undefined ? { displayName: req.displayName } : {}),
     ...(req.bio !== undefined ? { bio: req.bio } : {}),
     ...(req.avatarUrl !== undefined ? { avatarUrl: req.avatarUrl } : {}),
+    ...(req.coverUrl !== undefined ? { coverUrl: req.coverUrl } : {}),
     ...(req.visibility !== undefined ? { visibility: req.visibility } : {}),
     ...(req.goals !== undefined ? { goals: req.goals } : {}),
     ...(req.interests !== undefined ? { interests: req.interests } : {}),
-    ...(req.dateOfBirth !== undefined ? { dateOfBirth: req.dateOfBirth } as Partial<UserProfile> : {}),
+    ...(req.dateOfBirth !== undefined ? { dateOfBirth: req.dateOfBirth } : {}),
+    ...(req.hometownCity !== undefined ? { hometownCity: req.hometownCity } : {}),
+    ...(req.hometownCountry !== undefined ? { hometownCountry: req.hometownCountry } : {}),
+    ...(req.showAge !== undefined ? { showAge: req.showAge } : {}),
+    ...(req.showHometown !== undefined ? { showHometown: req.showHometown } : {}),
+    ...(req.gender !== undefined ? { gender: req.gender } : {}),
+    ...(req.genderSelfDescribe !== undefined
+      ? { genderSelfDescribe: req.genderSelfDescribe }
+      : {}),
+    ...(req.sexualOrientation !== undefined
+      ? { sexualOrientation: req.sexualOrientation }
+      : {}),
+    ...(req.orientationSelfDescribe !== undefined
+      ? { orientationSelfDescribe: req.orientationSelfDescribe }
+      : {}),
+    ...(req.nationality !== undefined ? { nationality: req.nationality } : {}),
+    ...(req.showGender !== undefined ? { showGender: req.showGender } : {}),
+    ...(req.showOrientation !== undefined ? { showOrientation: req.showOrientation } : {}),
+    ...(req.showNationality !== undefined ? { showNationality: req.showNationality } : {}),
+    ...(req.openToDating !== undefined ? { openToDating: req.openToDating } : {}),
+    ...(req.seekingGenders !== undefined ? { seekingGenders: req.seekingGenders } : {}),
     ...(req.friendsSeeOnlineStatus !== undefined
       ? { friendsSeeOnlineStatus: req.friendsSeeOnlineStatus }
       : {}),
