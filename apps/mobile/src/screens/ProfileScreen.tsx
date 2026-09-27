@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -35,13 +35,14 @@ import { ProfileLoadingState, ProfileErrorState } from '@/components/Profile/Pro
 import { useProfileScreenData } from '@/features/profile/useProfileScreenData';
 import { useAppSelector } from '@/hooks/redux';
 import { useSocket } from '@/realtime/useSocket';
-import { colors, spacing } from '@/theme';
+import { formatPublicIdentityParts } from '@g88/shared';
+import { colors, spacing, fontSize } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 /**
  * Self profile — public-facing identity + activity.
- * Order: Hero → Bio → Tags → Trust → Activity → Friends → Storyline → Photos → Premium.
+ * Order: Hero → public identity preview → Bio → Tags → Trust → Activity → Friends → Storyline → Photos → Premium.
  * Trust details open from the % badge (bottom sheet). Account controls in Settings.
  */
 export function ProfileScreen(): React.JSX.Element {
@@ -171,6 +172,23 @@ export function ProfileScreen(): React.JSX.Element {
 
   const verificationItems = buildVerificationItems(p);
 
+  /** Same string visitors see on UserProfile / sheet (only opted-in fields). */
+  const publicIdentityLine =
+    formatPublicIdentityParts({
+      gender: p.showGender ? p.gender : null,
+      genderSelfDescribe: p.showGender ? p.genderSelfDescribe : null,
+      sexualOrientation: p.showOrientation ? p.sexualOrientation : null,
+      orientationSelfDescribe: p.showOrientation ? p.orientationSelfDescribe : null,
+      nationality: p.showNationality ? p.nationality : null,
+    }).join(' · ') || null;
+
+  const publicHometown =
+    p.showHometown && (p.hometownCity || p.hometownCountry)
+      ? [p.hometownCity, p.hometownCountry].filter(Boolean).join(', ')
+      : null;
+
+  const hasPublicIdentityPreview = Boolean(publicIdentityLine || publicHometown);
+
   return (
     <>
       <ScrollView
@@ -197,6 +215,31 @@ export function ProfileScreen(): React.JSX.Element {
           onPressPhoto={() => openRootScreen(navigation, 'Photos')}
           onPressVisibility={openMapPresence}
         />
+
+        {/* P1: what visitors see — public-gated identity + hometown */}
+        <TouchableOpacity
+          style={styles.identityPreview}
+          onPress={() => openRootScreen(navigation, 'ProfileEdit')}
+          accessibilityRole="button"
+          accessibilityLabel="Edit public identity"
+        >
+          {hasPublicIdentityPreview ? (
+            <>
+              {publicHometown ? (
+                <Text style={styles.identityPreviewLine}>{publicHometown}</Text>
+              ) : null}
+              {publicIdentityLine ? (
+                <Text style={styles.identityPreviewLine}>{publicIdentityLine}</Text>
+              ) : null}
+              <Text style={styles.identityPreviewHint}>Visible on profile · Edit</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.identityPreviewEmpty}>No public identity details</Text>
+              <Text style={styles.identityPreviewHint}>Add gender, nationality · Edit</Text>
+            </>
+          )}
+        </TouchableOpacity>
 
         {p.bio ? <ProfileBio bio={p.bio} /> : null}
 
@@ -291,6 +334,33 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { paddingBottom: spacing.xxl },
   section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl },
+  identityPreview: {
+    marginTop: spacing.sm,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    gap: 2,
+  },
+  identityPreviewLine: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: '500',
+  },
+  identityPreviewEmpty: {
+    color: colors.textFaint,
+    fontSize: fontSize.sm,
+  },
+  identityPreviewHint: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+  },
   sheetBackground: {
     backgroundColor: colors.surfaceRaised,
   },
