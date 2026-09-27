@@ -1,1 +1,1 @@
-PLACEHOLDER_WILL_FAIL
+LOAD_FROM_/tmp/ms_final.tsx
