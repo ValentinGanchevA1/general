@@ -58,6 +58,15 @@ type Args = {
   params: MapFocusParams;
 };
 
+/** Continent / default MapView scale — not usable for discovery. */
+function isWorldScale(r: Region | null): boolean {
+  if (r == null) return true;
+  return r.latitudeDelta > 0.5 || r.longitudeDelta > 0.5;
+}
+
+const COLD_START_DELTA = 0.02;
+const COLD_START_MAX_ATTEMPTS = 6;
+
 /**
  * Orchestrates "View on map" / post-create pin focus:
  * route params + pendingMapFocus module → city-scale camera + entity sheet.
@@ -84,7 +93,9 @@ export function useMapFocus({
   const pendingFocusRef = useRef<PendingFocus | null>(null);
   const pendingFocusReaderRef = useRef(() => peekPendingMapFocus());
   const focusAppliedKeyRef = useRef<string | null>(null);
+  /** True only after camera is known city-scale (or focusMyPin applied). */
   const hasCenteredOnUserRef = useRef(false);
+  const coldStartAttemptsRef = useRef(0);
 
   const clearFocusParams = useCallback(() => {
     navigation.setParams({
@@ -118,6 +129,7 @@ export function useMapFocus({
       // (MapView not ready → continent default stays on screen).
       setRegion(nextRegion);
       hasCenteredOnUserRef.current = true;
+      coldStartAttemptsRef.current = COLD_START_MAX_ATTEMPTS;
       pendingFocusRef.current = null;
       clearPendingMapFocus(token);
       clearFocusParams();
@@ -299,11 +311,18 @@ export function useMapFocus({
     focusAppliedKeyRef.current = null;
   }, [focusUserId, focusListingId, focusLat, focusLng, focusMyPin]);
 
-  // Cold start: city-scale on GPS. World default is MapView with no initialRegion;
-  // a single animateToRegion is often dropped before map is ready — match peer focus
-  // (setRegion + InteractionManager + retries).
+  // Mark cold-start complete once discovery region is city-scale.
   useEffect(() => {
-    if (!myCoords || hasCenteredOnUserRef.current) return;
+    if (!isWorldScale(region)) {
+      hasCenteredOnUserRef.current = true;
+    }
+  }, [region]);
+
+  // Cold start: city-scale on GPS. World default is MapView with no initialRegion;
+  // a single animateToRegion is often dropped before map is ready. Retry while
+  // region is still world-scale (do not treat "attempted" as "landed").
+  useEffect(() => {
+    if (!myCoords) return;
     if (
       focusMyPin ||
       focusUserId ||
@@ -313,12 +332,15 @@ export function useMapFocus({
     ) {
       return;
     }
-    hasCenteredOnUserRef.current = true;
+    if (!isWorldScale(region) && hasCenteredOnUserRef.current) return;
+    if (coldStartAttemptsRef.current >= COLD_START_MAX_ATTEMPTS) return;
+
+    coldStartAttemptsRef.current += 1;
     const nextRegion: Region = {
       latitude: myCoords.lat,
       longitude: myCoords.lng,
-      latitudeDelta: 0.02,
-      longitudeDelta: 0.02,
+      latitudeDelta: COLD_START_DELTA,
+      longitudeDelta: COLD_START_DELTA,
     };
     setRegion(nextRegion);
     const runCamera = (): void => {
@@ -328,13 +350,15 @@ export function useMapFocus({
       runCamera();
       setTimeout(runCamera, 120);
       setTimeout(runCamera, 400);
+      setTimeout(runCamera, 900);
     });
-  }, [myCoords, focusMyPin, focusUserId, focusListingId, mapRef, setRegion]);
+  }, [myCoords, region, focusMyPin, focusUserId, focusListingId, mapRef, setRegion]);
 
   useFocusEffect(
     useCallback(() => {
       if (focusMyPin && myCoords) {
         hasCenteredOnUserRef.current = true;
+        coldStartAttemptsRef.current = COLD_START_MAX_ATTEMPTS;
         const nextRegion: Region = {
           latitude: myCoords.lat,
           longitude: myCoords.lng,
