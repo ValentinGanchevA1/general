@@ -27,6 +27,8 @@ import { formatPublicIdentityParts, haversineMeters } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { deleteJson, getJson, postJson } from '@/api/client';
+import { bumpListing } from '@/features/trading/useTrading';
+import { formatListingExpiry } from '@/features/trading/formatPrice';
 import { signalPostSocialActivation } from '@/features/nudges/postSocialActivation';
 import { IdentityBlock } from '@/components/IdentityBlock';
 import { useAppSelector } from '@/hooks/redux';
@@ -114,22 +116,6 @@ function formatDistanceMeters(meters: number): string {
 	return `${(meters / 1000).toFixed(meters < 10_000 ? 1 : 0)} km`;
 }
 
-function formatListingExpiry(expiresAt: string | null | undefined): string | null {
-	if (expiresAt == null || expiresAt === '') return null;
-	const end = new Date(expiresAt).getTime();
-	if (Number.isNaN(end)) return null;
-	const ms = end - Date.now();
-	if (ms <= 0) return 'Expired';
-	const hours = Math.ceil(ms / 3_600_000);
-	if (hours < 24) return `Ends in ${hours}h`;
-	const days = Math.ceil(ms / 86_400_000);
-	if (days <= 14) return `Ends in ${days}d`;
-	try {
-		return `Ends ${new Date(expiresAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
-	} catch {
-		return `Ends in ${days}d`;
-	}
-}
 
 /** Viewer → pin distance from live GPS (null while location unknown). */
 function usePinDistanceMeters(lat: number, lng: number): number | null {
@@ -746,7 +732,7 @@ function ListingCard({
 		if (!isOwnListing || bumping) return;
 		setBumping(true);
 		try {
-			await postJson<Record<string, never>, unknown>(`/listings/${point.id}/bump`, {});
+			await bumpListing(point.id);
 			appAlert('Listing bumped', 'Expiry extended. Nearby buyers will see it as fresher.');
 		} catch (e) {
 			const msg =

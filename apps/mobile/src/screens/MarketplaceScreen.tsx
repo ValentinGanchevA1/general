@@ -22,7 +22,7 @@ import type { ListingMode, ListingSummary } from '@g88/shared';
 import type { CommerceStackParamList } from '@/navigation/stacks';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { useBrowseListings, useFavorites } from '@/features/trading/useTrading';
-import { formatPrice } from '@/features/trading/formatPrice';
+import { formatListingExpiry, formatPrice } from '@/features/trading/formatPrice';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonMarketGrid } from '@/components/Skeleton';
@@ -90,7 +90,13 @@ export function MarketplaceScreen(): React.JSX.Element {
           </Text>
           <Text style={S.cardPrice}>{formatPrice(item.priceCents, item.currency)}</Text>
           <Text style={S.cardMeta} numberOfLines={1}>
-            {item.mode === 'buy' ? 'Wanted · ' : ''}{item.category}
+            {[
+              item.mode === 'buy' ? 'Wanted' : null,
+              item.category,
+              formatListingExpiry(item.expiresAt),
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </Text>
         </View>
       </TouchableOpacity>
