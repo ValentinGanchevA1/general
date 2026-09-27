@@ -29,6 +29,11 @@ import {
   declineFriendRequest,
 } from '@/features/friends/friendsSlice';
 import { fetchConversations } from '@/features/chat/chatSlice';
+import {
+  aggregateInbox,
+  aggregatedSignalLabel,
+  type AggregatedInboxRow,
+} from '@/features/interactions/aggregateInbox';
 import { useInboxInteractions } from '@/features/interactions/useInboxInteractions';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
@@ -42,7 +47,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 type HubRow =
   | { kind: 'chat'; sortAt: number; conversation: ConversationSummary }
-  | { kind: 'inbox'; sortAt: number; item: InboxItem };
+  | { kind: 'inbox'; sortAt: number; aggregated: AggregatedInboxRow };
 
 type HubTab = 'activity' | 'chats';
 
@@ -56,16 +61,6 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-function signalLabel(item: InboxItem): string {
-  if (item.type === 'wave') return 'waved at you';
-  if (item.type === 'friend_request') return 'sent you a friend request';
-  if (item.type === 'follow') return 'started following you';
-  if (item.reactionKind === 'heart') return '❤️ reacted to your story';
-  if (item.reactionKind === 'wave') return '👋 reacted to your story';
-  if (item.reactionKind != null) return 'reacted to your story';
-  return 'interacted with you';
-}
-
 function peerOf(convo: ConversationSummary, myUserId: string) {
   return (
     convo.participants.find((p) => p.id !== myUserId) ??
@@ -75,7 +70,7 @@ function peerOf(convo: ConversationSummary, myUserId: string) {
 }
 
 function InboxRow({
-  item,
+  aggregated,
   busy,
   onMatch,
   onAccept,
@@ -84,7 +79,7 @@ function InboxRow({
   onOpenProfile,
   onViewOnMap,
 }: {
-  item: InboxItem;
+  aggregated: AggregatedInboxRow;
   busy: boolean;
   onMatch: (userId: string) => void;
   onAccept: (requestId: string) => void;
@@ -93,13 +88,16 @@ function InboxRow({
   onOpenProfile: (userId: string) => void;
   onViewOnMap: (item: InboxItem) => void;
 }): React.JSX.Element {
+  const item = aggregated.primary;
+  const label = aggregatedSignalLabel(item, aggregated.count);
+
   return (
     <TouchableOpacity
       style={styles.row}
       onPress={() => onOpenProfile(item.fromUser.id)}
       activeOpacity={0.7}
       accessibilityRole="button"
-      accessibilityLabel={`${item.fromUser.displayName}, ${signalLabel(item)}`}
+      accessibilityLabel={`${item.fromUser.displayName}, ${label}`}
     >
       <Avatar
         uri={item.fromUser.avatarUrl}
@@ -114,7 +112,7 @@ function InboxRow({
           <VerificationBadge verification={item.fromUser.verification ?? 'none'} size={14} />
         </View>
         <Text style={styles.signal} numberOfLines={1}>
-          {signalLabel(item)} · {timeAgo(item.createdAt)}
+          {label} · {timeAgo(aggregated.latestAt)}
         </Text>
       </View>
 
@@ -330,17 +328,14 @@ export function InteractionsScreen(): React.JSX.Element {
     [conversations],
   );
 
-  const activityRows: HubRow[] = useMemo(
-    () =>
-      items
-        .map((item) => ({
-          kind: 'inbox' as const,
-          sortAt: new Date(item.createdAt).getTime(),
-          item,
-        }))
-        .sort((a, b) => b.sortAt - a.sortAt),
-    [items],
-  );
+  const activityRows: HubRow[] = useMemo(() => {
+    const aggregated = aggregateInbox(items);
+    return aggregated.map((row) => ({
+      kind: 'inbox' as const,
+      sortAt: new Date(row.latestAt).getTime(),
+      aggregated: row,
+    }));
+  }, [items]);
 
   const rows: HubRow[] = tab === 'chats' ? chatRows : activityRows;
 
@@ -508,7 +503,7 @@ export function InteractionsScreen(): React.JSX.Element {
         <FlatList
           data={rows}
           keyExtractor={(r) =>
-            r.kind === 'chat' ? `chat-${r.conversation.id}` : `inbox-${r.item.id}`
+            r.kind === 'chat' ? `chat-${r.conversation.id}` : r.aggregated.key
           }
           refreshControl={
             <RefreshControl
@@ -541,8 +536,10 @@ export function InteractionsScreen(): React.JSX.Element {
               />
             ) : (
               <InboxRow
-                item={row.item}
-                busy={busyIds.includes(row.item.requestId ?? row.item.fromUser.id)}
+                aggregated={row.aggregated}
+                busy={busyIds.includes(
+                  row.aggregated.primary.requestId ?? row.aggregated.primary.fromUser.id,
+                )}
                 onMatch={(id) => void onMatch(id)}
                 onAccept={(id) => void onAccept(id)}
                 onDecline={(id) => void onDecline(id)}
