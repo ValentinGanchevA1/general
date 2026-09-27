@@ -54,6 +54,11 @@ function formatDistanceAway(meters: number): string {
 
 const COVER_BODY = 160;
 
+/**
+ * Visitor profile — P0/P1 CTA hierarchy:
+ * Hero → Wave+Message (primary) → Follow/Friend (secondary) → Trust/Stats → content
+ * Sticky footer: Wave | Message | ⋯ (Gift + Report + Block + Unfriend in menu)
+ */
 export function UserProfileScreen({ route, navigation }: Props): React.JSX.Element {
 	const { userId, focus } = route.params;
 	const insets = useSafeAreaInsets();
@@ -115,7 +120,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 	);
 
 	const optionsRef = useRef<BottomSheetModal>(null);
-	const optionsSnap = useMemo(() => ['28%', '36%'], []);
+	const optionsSnap = useMemo(() => ['32%', '42%'], []);
 	const renderBackdrop = useSheetBackdrop(0.55);
 	const [menuItems, setMenuItems] = useState<ActionSheetItem[]>([]);
 
@@ -153,7 +158,17 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 				},
 			];
 		} else {
-			items = [];
+			items = [
+				{
+					key: 'gift',
+					label: 'Send gift',
+					icon: 'gift-outline',
+					onPress: () => {
+						dismiss();
+						setGiftSheetOpen(true);
+					},
+				},
+			];
 			if (rel?.state === 'friends') {
 				items.push({
 					key: 'unfriend',
@@ -211,13 +226,121 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 
 	if (!profile) return <View style={styles.centered} />;
 
-	const identityLine = formatPublicIdentityParts({
-		gender: profile.gender ?? null,
-		genderSelfDescribe: profile.genderSelfDescribe ?? null,
-		sexualOrientation: profile.sexualOrientation ?? null,
-		orientationSelfDescribe: profile.orientationSelfDescribe ?? null,
-		nationality: profile.nationality ?? null,
-	}).join(' · ') || null;
+	const identityLine =
+		formatPublicIdentityParts({
+			gender: profile.gender ?? null,
+			genderSelfDescribe: profile.genderSelfDescribe ?? null,
+			sexualOrientation: profile.sexualOrientation ?? null,
+			orientationSelfDescribe: profile.orientationSelfDescribe ?? null,
+			nationality: profile.nationality ?? null,
+		}).join(' · ') || null;
+
+	const isFriends = rel?.state === 'friends';
+	const hasPhotos = photoUrls.length > 0;
+	const hasGoals = (profile.goals?.length ?? 0) > 0;
+	const hasStats =
+		profile.status != null &&
+		(profile.status.level != null ||
+			profile.status.allTimeRank != null ||
+			(profile.status.achievementIcons?.length ?? 0) > 0);
+
+	const trustEarned = ((): Array<{ ok: boolean; label: string }> => {
+		const order: Array<{ ok: boolean; label: string }> = [
+			{ ok: profile.verification !== 'none', label: 'Email' },
+			{
+				ok:
+					profile.verification === 'phone' ||
+					profile.verification === 'selfie' ||
+					profile.verification === 'id',
+				label: 'Phone',
+			},
+			{
+				ok: profile.verification === 'selfie' || profile.verification === 'id',
+				label: 'Photo',
+			},
+			{ ok: profile.idVerified === true, label: 'ID' },
+			];
+		return order.filter((b) => b.ok);
+	})();
+
+	const primaryCtas = !blocked ? (
+		<View style={styles.primaryCtaRow}>
+			<TouchableOpacity
+				style={[styles.primaryCta, styles.wavePrimary, waving && styles.btnDisabled]}
+				onPress={() => void sendWave()}
+				disabled={waving}
+				accessibilityRole="button"
+				accessibilityLabel="Wave"
+			>
+				{waving ? (
+					<ActivityIndicator size="small" color={colors.onPrimary} />
+				) : (
+					<Text style={styles.primaryCtaText}>👋 Wave</Text>
+				)}
+			</TouchableOpacity>
+			{showMessage ? (
+				<TouchableOpacity
+					style={[styles.primaryCta, styles.messagePrimary, messaging && styles.btnDisabled]}
+					onPress={() => void openMessage()}
+					disabled={messaging}
+					accessibilityRole="button"
+					accessibilityLabel={canMessage === 'request' ? 'Request chat' : 'Message'}
+				>
+					{messaging ? (
+						<ActivityIndicator size="small" color={colors.primary} />
+					) : (
+						<Text style={styles.messagePrimaryText}>
+							{canMessage === 'request' ? 'Request chat' : 'Message'}
+						</Text>
+					)}
+				</TouchableOpacity>
+			) : null}
+		</View>
+	) : null;
+
+	const socialSecondary = !blocked ? (
+		<View style={styles.socialSecondary}>
+			<TouchableOpacity
+				onPress={onFollowToggle}
+				disabled={followBusy || friendBusy}
+				hitSlop={8}
+				accessibilityRole="button"
+			>
+				{followBusy ? (
+					<ActivityIndicator size="small" color={colors.primary} />
+				) : (
+					<Text style={[styles.socialLink, isFollowing && styles.socialLinkActive]}>
+						{isFollowing ? 'Following' : 'Follow'}
+					</Text>
+				)}
+			</TouchableOpacity>
+			<Text style={styles.socialDot}>·</Text>
+			{isFriends ? (
+				<Text style={styles.socialLinkMuted}>Friends</Text>
+			) : (
+				<TouchableOpacity
+					onPress={onFriendAction}
+					disabled={friendBusy || followBusy}
+					hitSlop={8}
+					accessibilityRole="button"
+				>
+					{friendBusy ? (
+						<ActivityIndicator size="small" color={colors.primary} />
+					) : (
+						<Text
+							style={[
+								styles.socialLink,
+								(rel?.state === 'request_outgoing' || rel?.state === 'request_incoming') &&
+									styles.socialLinkActive,
+							]}
+						>
+							{friendLabel}
+						</Text>
+					)}
+				</TouchableOpacity>
+			)}
+		</View>
+	) : null;
 
 	return (
 		<View style={styles.root}>
@@ -251,7 +374,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 							/>
 						</View>
 						{hometown ? <Text style={styles.originLine}>{hometown}</Text> : null}
-						{identityLine ? <Text style={styles.originLine}>{identityLine}</Text> : null}
+						{identityLine ? <Text style={styles.identityLine}>{identityLine}</Text> : null}
 						<View style={styles.placeRow}>
 							{profile.online ? (
 								<Text style={styles.onlineLabel}>Online now</Text>
@@ -284,37 +407,8 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 					</View>
 				</View>
 
-				{!blocked ? (
-					<View style={styles.socialRow}>
-						<TouchableOpacity
-							style={[styles.outlineBtn, isFollowing && styles.outlineBtnActive]}
-							onPress={onFollowToggle}
-							disabled={followBusy || friendBusy}
-						>
-							{followBusy ? (
-								<ActivityIndicator size="small" color={colors.primary} />
-							) : (
-								<Text style={styles.outlineBtnText}>{isFollowing ? 'Following' : 'Follow'}</Text>
-							)}
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={[
-								styles.outlineBtn,
-								(rel?.state === 'friends' || rel?.state === 'request_outgoing') &&
-								styles.outlineBtnActive,
-								rel?.state === 'request_incoming' && styles.outlineBtnAccent,
-							]}
-							onPress={onFriendAction}
-							disabled={friendBusy || followBusy || rel?.state === 'friends'}
-						>
-							{friendBusy ? (
-								<ActivityIndicator size="small" color={colors.primary} />
-							) : (
-								<Text style={styles.outlineBtnText}>{friendLabel}</Text>
-							)}
-						</TouchableOpacity>
-					</View>
-				) : null}
+				{primaryCtas}
+				{socialSecondary}
 
 				{!blocked && profile ? (
 					<View style={styles.infoBlocks} onLayout={onSectionLayout('trust')}>
@@ -325,45 +419,33 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 									{profile.verificationScore != null ? `${profile.verificationScore}%` : '0%'}
 								</Text>
 							</View>
-							<View style={styles.trustBadges}>
-								{((): React.ReactNode => {
-									const order: Array<{ ok: boolean; label: string }> = [
-										{ ok: profile.verification !== 'none', label: 'Email' },
-										{
-											ok:
-												profile.verification === 'phone' ||
-												profile.verification === 'selfie' ||
-												profile.verification === 'id',
-											label: 'Phone',
-										},
-										{
-											ok: profile.verification === 'selfie' || profile.verification === 'id',
-											label: 'Photo',
-										},
-										{ ok: profile.idVerified === true, label: 'ID' },
-									];
-									const earned = order.filter((b) => b.ok);
-									if (earned.length === 0) {
-										return <Text style={styles.trustEmpty}>No verification yet</Text>;
-									}
-									return earned.map((b) => (
+							{trustEarned.length === 0 ? (
+								<Text style={styles.trustEmpty}>No verification yet</Text>
+							) : (
+								<View style={styles.trustBadges}>
+									{trustEarned.map((b) => (
 										<View
 											key={b.label}
-											style={[styles.trustChip, b.label === 'ID' ? styles.trustChipStrong : undefined]}
+											style={[
+												styles.trustChip,
+												b.label === 'ID' ? styles.trustChipStrong : undefined,
+											]}
 										>
 											<Text
-												style={b.label === 'ID' ? styles.trustChipStrongText : styles.trustChipText}
+												style={
+													b.label === 'ID' ? styles.trustChipStrongText : styles.trustChipText
+												}
 											>
 												{b.label}
 											</Text>
 										</View>
-									));
-								})()}
-							</View>
+									))}
+								</View>
+							)}
 						</View>
-						{profile.status != null ? (
+						{hasStats ? (
 							<View style={styles.statsBlock} onLayout={onSectionLayout('stats')}>
-								<Text style={styles.sectionLabel}>Stats</Text>
+								<Text style={styles.sectionLabel}>Activity</Text>
 								<View style={styles.statsRow}>
 									{profile.status?.level != null ? (
 										<View style={styles.statPill}>
@@ -400,16 +482,26 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 					<ProfileStoryline userId={userId} />
 				</View>
 
-				<View onLayout={onSectionLayout('photos')}>
-					<ProfilePhotosSection photos={photoUrls} isSelf={false} padded={false} />
-				</View>
+				{hasPhotos ? (
+					<View onLayout={onSectionLayout('photos')}>
+						<ProfilePhotosSection photos={photoUrls} isSelf={false} padded={false} />
+					</View>
+				) : (
+					<View onLayout={onSectionLayout('photos')} />
+				)}
 
-				<ProfileTagsSection goals={profile.goals ?? []} goalsTitle="Goals" padded={false} />
+				{hasGoals ? (
+					<ProfileTagsSection goals={profile.goals ?? []} goalsTitle="Goals" padded={false} />
+				) : null}
 			</ScrollView>
 
-			<View style={styles.footer}>
+			<View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
 				{blocked ? (
-					<TouchableOpacity style={styles.unblockBtn} onPress={() => void unblock()} disabled={blocking}>
+					<TouchableOpacity
+						style={styles.unblockBtn}
+						onPress={() => void unblock()}
+						disabled={blocking}
+					>
 						<Text style={styles.unblockBtnText}>Unblock</Text>
 					</TouchableOpacity>
 				) : (
@@ -429,18 +521,11 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 								onPress={() => void openMessage()}
 								disabled={messaging}
 							>
-								<Text style={styles.footerBtnTextOnPrimary}>
-									{messaging ? '…' : canMessage === 'request' ? 'Request chat' : 'Message'}
+								<Text style={styles.messageFooterText}>
+									{messaging ? '…' : canMessage === 'request' ? 'Request' : 'Message'}
 								</Text>
 							</TouchableOpacity>
 						) : null}
-						<TouchableOpacity
-							style={[styles.footerBtn, styles.giftBtn]}
-							onPress={() => setGiftSheetOpen(true)}
-							accessibilityLabel="Send gift"
-						>
-							<Text style={styles.giftBtnText}>🎁</Text>
-						</TouchableOpacity>
 						<TouchableOpacity
 							style={[styles.footerBtn, styles.menuBtn]}
 							onPress={openMenu}
@@ -477,9 +562,14 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 
 const styles = StyleSheet.create({
 	root: { flex: 1, backgroundColor: colors.bg },
-	centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
-	scroll: { paddingBottom: 24 },
-	heroBlock: { marginBottom: 16 },
+	centered: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: colors.bg,
+	},
+	scroll: { paddingBottom: 16 },
+	heroBlock: { marginBottom: 12 },
 	cover: { width: '100%', backgroundColor: colors.surfaceRaised, overflow: 'hidden' },
 	coverImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
 	coverPlaceholder: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.surfaceRaised },
@@ -500,45 +590,66 @@ const styles = StyleSheet.create({
 	nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 	displayName: { color: colors.textPrimary, fontSize: fontSize.xl, fontWeight: '700' },
 	originLine: { color: colors.textMuted, fontSize: 14 },
-	placeRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: 2 },
+	identityLine: { color: colors.textFaint, fontSize: 13 },
+	placeRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flexWrap: 'wrap',
+		gap: 4,
+		marginTop: 2,
+	},
 	onlineLabel: { color: colors.success, fontWeight: '600', fontSize: 13 },
 	distanceLabel: { color: colors.textMuted, fontSize: 13 },
 	offlineLabel: { color: colors.textMuted, fontSize: 13 },
 	placeDot: { color: colors.textFaint, fontSize: 13 },
 	viewOnMap: { color: colors.primary, fontWeight: '600', fontSize: 13 },
 	mutualLine: { color: colors.primary, fontSize: 13, fontWeight: '600', marginTop: 4 },
-	socialRow: {
+
+	primaryCtaRow: {
 		flexDirection: 'row',
 		gap: 10,
 		paddingHorizontal: spacing.xl,
-		marginBottom: 16,
+		marginBottom: 10,
 	},
-	outlineBtn: {
+	primaryCta: {
 		flex: 1,
 		borderRadius: radius.md,
-		paddingVertical: 11,
+		paddingVertical: 12,
 		alignItems: 'center',
 		justifyContent: 'center',
-		minHeight: 42,
+		minHeight: 48,
+	},
+	wavePrimary: {
+		backgroundColor: colors.primary,
+	},
+	messagePrimary: {
 		backgroundColor: colors.surfaceAlt,
 		borderWidth: 1,
-		borderColor: colors.borderStrong,
+		borderColor: colors.primaryBorder,
 	},
-	outlineBtnActive: {
-		borderColor: colors.primary,
+	primaryCtaText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
+	messagePrimaryText: { color: colors.primary, fontWeight: '700', fontSize: 15 },
+
+	socialSecondary: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 8,
+		paddingHorizontal: spacing.xl,
+		marginBottom: 16,
+		minHeight: 28,
 	},
-	outlineBtnAccent: {
-		borderColor: colors.primary,
-		backgroundColor: colors.primarySoft,
-	},
-	outlineBtnText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.md },
+	socialLink: { color: colors.primary, fontWeight: '600', fontSize: 14 },
+	socialLinkActive: { color: colors.textSecondary },
+	socialLinkMuted: { color: colors.textMuted, fontWeight: '600', fontSize: 14 },
+	socialDot: { color: colors.textFaint, fontSize: 14 },
+
 	section: { paddingHorizontal: spacing.xl, gap: 10 },
 	footer: {
 		flexDirection: 'row',
 		gap: 10,
 		paddingHorizontal: spacing.xl,
 		paddingTop: 12,
-		paddingBottom: 36,
 		borderTopWidth: StyleSheet.hairlineWidth,
 		borderTopColor: colors.borderStrong,
 		backgroundColor: colors.bg,
@@ -556,10 +667,6 @@ const styles = StyleSheet.create({
 	},
 	messageBtn: {
 		flex: 1,
-		backgroundColor: colors.primary,
-	},
-	giftBtn: {
-		width: 56,
 		backgroundColor: colors.surfaceAlt,
 		borderWidth: 1,
 		borderColor: colors.primaryBorder,
@@ -571,7 +678,7 @@ const styles = StyleSheet.create({
 		borderColor: colors.borderStrong,
 	},
 	footerBtnTextOnPrimary: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
-	giftBtnText: { fontSize: 20 },
+	messageFooterText: { color: colors.primary, fontWeight: '700', fontSize: 15 },
 	btnDisabled: { opacity: 0.55 },
 	unblockBtn: {
 		flex: 1,
@@ -585,8 +692,8 @@ const styles = StyleSheet.create({
 	unblockBtnText: { color: colors.dangerMuted, fontWeight: '700', fontSize: 16 },
 	infoBlocks: {
 		paddingHorizontal: spacing.xl,
-		gap: 14,
-		marginBottom: 16,
+		gap: 12,
+		marginBottom: 14,
 	},
 	trustBlock: { gap: 6 },
 	trustHeader: {
