@@ -137,6 +137,13 @@ export const styles = StyleSheet.create({
   },
   waveBtn: { backgroundColor: colors.primary },
   messageBtn: { backgroundColor: colors.action },
+  /** Placeholder while relationship loads — same height as primary CTA. */
+  ctaSkeleton: {
+    backgroundColor: colors.surfaceAlt,
+    minHeight: 40,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
   /** Secondary solid when Message is primary (open chat) — Wave stays available. */
   secondarySolidBtn: {
     backgroundColor: colors.surfaceAlt,

@@ -247,9 +247,14 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 		return parts.length > 0 ? parts.join(' · ') : null;
 	})();
 
+	/** Relationship known only after profile fetch (or cache hit). */
+	const relationshipKnown = profile != null;
+	const matched = profile?.relationship?.matched === true;
 	const messageAllowed = canMessage !== 'none' && !blocked;
 	const waveAllowed = Boolean(onWave) && !blocked;
-	const preferMessagePrimary = canMessage === 'chat' && messageAllowed;
+	/** Single primary: Message when chat unlocked or matched; else Wave. */
+	const preferMessagePrimary =
+		relationshipKnown && (canMessage === 'chat' || matched) && messageAllowed;
 
 	const openProfile = (focus?: 'trust' | 'stats' | 'storyline' | 'photos' | 'bio' | 'mutual'): void => {
 		onClose();
@@ -359,46 +364,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 		}
 	};
 
-	const waveButton = waveAllowed ? (
-		<TouchableOpacity
-			key="wave"
-			style={[
-				styles.primaryBtn,
-				preferMessagePrimary ? styles.secondarySolidBtn : styles.waveBtn,
-				waving ? styles.btnDisabled : undefined,
-				styles.ctaFlex,
-			]}
-			onPress={onWave}
-			disabled={waving}
-			accessibilityRole="button"
-			accessibilityLabel="Wave"
-		>
-			<Text
-				style={preferMessagePrimary ? styles.secondarySolidBtnText : styles.primaryBtnText}
-			>
-				{waving ? '…' : 'Wave'}
-			</Text>
-		</TouchableOpacity>
-	) : null;
-
-	const messageButton = messageAllowed ? (
-		<TouchableOpacity
-			key="message"
-			style={[
-				styles.primaryBtn,
-				preferMessagePrimary ? styles.waveBtn : styles.messageBtn,
-				opening ? styles.btnDisabled : undefined,
-				styles.ctaFlex,
-			]}
-			onPress={() => void onMessage()}
-			disabled={opening}
-			accessibilityRole="button"
-			accessibilityLabel="Message"
-		>
-			<Text style={styles.primaryBtnText}>{opening ? '…' : 'Message'}</Text>
-		</TouchableOpacity>
-	) : null;
-
 	const profileButton = (
 		<TouchableOpacity
 			key="profile"
@@ -411,9 +376,69 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 		</TouchableOpacity>
 	);
 
-	const actionOrder = preferMessagePrimary
-		? [messageButton, waveButton, profileButton]
-		: [waveButton, messageButton, profileButton];
+	const messageButton = (
+		<TouchableOpacity
+			key="message"
+			style={[
+				styles.primaryBtn,
+				styles.messageBtn,
+				opening ? styles.btnDisabled : undefined,
+				styles.ctaFlex,
+			]}
+			onPress={() => void onMessage()}
+			disabled={opening}
+			accessibilityRole="button"
+			accessibilityLabel="Message"
+		>
+			<Text style={styles.primaryBtnText}>{opening ? '…' : 'Message'}</Text>
+		</TouchableOpacity>
+	);
+
+	const waveButton = (
+		<TouchableOpacity
+			key="wave"
+			style={[
+				styles.primaryBtn,
+				styles.waveBtn,
+				waving ? styles.btnDisabled : undefined,
+				styles.ctaFlex,
+			]}
+			onPress={onWave}
+			disabled={waving}
+			accessibilityRole="button"
+			accessibilityLabel="Wave"
+		>
+			<Text style={styles.primaryBtnText}>{waving ? '…' : 'Wave'}</Text>
+		</TouchableOpacity>
+	);
+
+	const ctaSkeleton = (
+		<View
+			key="cta-skeleton"
+			style={[styles.primaryBtn, styles.ctaSkeleton, styles.ctaFlex]}
+			accessibilityLabel="Loading actions"
+		/>
+	);
+
+	/**
+	 * CTA lock (activation):
+	 * - loading: skeleton primary + Profile (no Wave→Message flash)
+	 * - blocked: Profile only
+	 * - chat unlocked or matched: Message + Profile (Wave dropped)
+	 * - else: Wave + Profile
+	 */
+	let actionOrder: React.ReactNode[];
+	if (!relationshipKnown) {
+		actionOrder = [ctaSkeleton, profileButton];
+	} else if (blocked) {
+		actionOrder = [profileButton];
+	} else if (preferMessagePrimary) {
+		actionOrder = [messageButton, profileButton];
+	} else if (waveAllowed) {
+		actionOrder = [waveButton, profileButton];
+	} else {
+		actionOrder = [profileButton];
+	}
 
 	return (
 		<View style={styles.sheet}>
