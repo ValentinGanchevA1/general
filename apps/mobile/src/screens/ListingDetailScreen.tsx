@@ -59,7 +59,7 @@ export function ListingDetailScreen(): React.JSX.Element {
 	const { listingId } = route.params;
 	const myId = useAppSelector((s) => s.auth.user?.id);
 
-	const { listing, offers, loading, refresh, refreshOffers } = useListing(listingId);
+	const { listing, offers, loading, error, refresh, refreshOffers } = useListing(listingId);
 	const [favBusy, setFavBusy] = useState(false);
 
 	const onToggleFav = useCallback(async () => {
@@ -81,6 +81,15 @@ export function ListingDetailScreen(): React.JSX.Element {
 				<View style={[S.container, S.center]}>
 					{loading ? (
 						<ActivityIndicator color={colors.primary} />
+					) : error != null ? (
+						<EmptyState
+							variant="plain"
+							icon="alert-circle-outline"
+							title="Couldn't load listing"
+							body="Check your connection and try again."
+							actionLabel="Retry"
+							onAction={refresh}
+						/>
 					) : (
 						<EmptyState
 							variant="plain"

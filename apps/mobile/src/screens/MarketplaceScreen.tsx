@@ -53,7 +53,9 @@ export function MarketplaceScreen(): React.JSX.Element {
 
   const data = tab === 'browse' ? browse.listings : saved.favorites;
   const loading = tab === 'browse' ? browse.loading : saved.loading;
+  const error = tab === 'browse' ? browse.error : saved.error;
   const refresh = tab === 'browse' ? browse.refresh : saved.refresh;
+  const showErrorEmpty = error != null && data.length === 0 && !loading;
 
   const emptyTitle =
     tab === 'browse'
@@ -163,6 +165,15 @@ export function MarketplaceScreen(): React.JSX.Element {
         ListEmptyComponent={
           loading ? (
             <SkeletonMarketGrid count={4} />
+          ) : showErrorEmpty ? (
+            <EmptyState
+              variant="plain"
+              icon="alert-circle-outline"
+              title="Couldn't load listings"
+              body="Check your connection and try again."
+              actionLabel="Retry"
+              onAction={refresh}
+            />
           ) : (
             <EmptyState
               variant="plain"
