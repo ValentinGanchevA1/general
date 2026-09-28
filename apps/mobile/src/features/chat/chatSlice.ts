@@ -4,6 +4,7 @@ import type { ConversationSummary, ChatMessage, MessagePage } from '@g88/shared'
 
 import { getJson, postJson } from '@/api/client';
 import { logout } from '@/features/auth/authSlice';
+import { clearChatOutbox } from './chatOutboxPersist';
 
 export interface OutboxEntry {
   optimisticId: string;
@@ -21,6 +22,8 @@ interface ChatState {
   outbox: OutboxEntry[];
   failedIds: string[];
   activeConversationId: string | null;
+  /** True after AsyncStorage hydrate attempt (success or empty). */
+  outboxHydrated: boolean;
 }
 
 const MAX_RETRIES = 3;
@@ -34,6 +37,7 @@ const initialState: ChatState = {
   outbox: [],
   failedIds: [],
   activeConversationId: null,
+  outboxHydrated: false,
 };
 
 export const fetchConversations = createAsyncThunk(
@@ -166,6 +170,34 @@ const chatSlice = createSlice({
     failedMessageCleared(state, action: PayloadAction<string>) {
       state.failedIds = state.failedIds.filter((id) => id !== action.payload);
     },
+
+    /** Restore outbox after cold start (AsyncStorage). Idempotent. */
+    outboxHydrated(
+      state,
+      action: PayloadAction<{
+        outbox: OutboxEntry[];
+        failedIds: string[];
+        pendingMessages: ChatMessage[];
+      }>,
+    ) {
+      if (state.outboxHydrated) return;
+      state.outboxHydrated = true;
+      const { outbox, failedIds, pendingMessages } = action.payload;
+      for (const e of outbox) {
+        if (!state.outbox.some((x) => x.optimisticId === e.optimisticId)) {
+          state.outbox.push(e);
+        }
+      }
+      for (const id of failedIds) {
+        if (!state.failedIds.includes(id)) state.failedIds.push(id);
+      }
+      for (const m of pendingMessages) {
+        const list = state.messages[m.conversationId] ?? [];
+        if (!list.some((x) => x.id === m.id)) {
+          state.messages[m.conversationId] = [m, ...list];
+        }
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -187,6 +219,7 @@ const chatSlice = createSlice({
         state.messagesLoading[conversationId] = false;
         const existing = state.messages[conversationId] ?? [];
         const seen = new Set(existing.map((m) => m.id));
+        // Append server page without dropping optimistic / failed rows still in existing.
         state.messages[conversationId] = [
           ...existing,
           ...page.messages.filter((m) => !seen.has(m.id)),
@@ -205,8 +238,14 @@ const chatSlice = createSlice({
         if (convo) convo.unreadCount = 0;
       })
       // Both paths: logout is best-effort and clears locally even when the network POST fails.
-      .addCase(logout.fulfilled, () => initialState)
-      .addCase(logout.rejected, () => initialState);
+      .addCase(logout.fulfilled, () => {
+        void clearChatOutbox();
+        return initialState;
+      })
+      .addCase(logout.rejected, () => {
+        void clearChatOutbox();
+        return initialState;
+      });
   },
 });
 
@@ -219,6 +258,7 @@ export const {
   failedMessageCleared,
   conversationMarkedRead,
   setActiveConversation,
+  outboxHydrated,
 } = chatSlice.actions;
 
 export { MAX_RETRIES };
