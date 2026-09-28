@@ -33,6 +33,10 @@ import {
 } from '@/components/sheets';
 import { useUserProfileScreenData } from '@/features/profile/useUserProfileScreenData';
 import { formatPublicIdentityParts } from '@g88/shared';
+import {
+	formatTrustScoreLabel,
+	trustEmptyCopy,
+} from '@/features/profile/formatTrustScore';
 import { resolveUserPrimaryCta } from '@/features/social/resolveUserPrimaryCta';
 import { colors, spacing, radius, fontSize } from '@/theme';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -424,11 +428,11 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 							<View style={styles.trustHeader}>
 								<Text style={styles.sectionLabel}>Trust</Text>
 								<Text style={styles.trustScore}>
-									{profile.verificationScore != null ? `${profile.verificationScore}%` : '0%'}
+									{formatTrustScoreLabel(profile.verificationScore)}
 								</Text>
 							</View>
 							{trustEarned.length === 0 ? (
-								<Text style={styles.trustEmpty}>No verification yet</Text>
+								<Text style={styles.trustEmpty}>{trustEmptyCopy()}</Text>
 							) : (
 								<View style={styles.trustBadges}>
 									{trustEarned.map((b) => (

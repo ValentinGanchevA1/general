@@ -82,6 +82,8 @@ function viewportAround(
   };
 }
 
+type EmptyActionKind = 'story' | 'map' | 'verify_email' | 'verify_phone';
+
 export function PulseScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<Nav>();
@@ -236,7 +238,7 @@ export function PulseScreen(): React.JSX.Element {
           title: 'No trades nearby',
           body: 'Post a listing from the map, or wait for neighbours to list something.',
           actionLabel: 'Open map',
-          actionKind: 'map' as const,
+          actionKind: 'map' as EmptyActionKind,
         };
       case 'alerts':
         return {
@@ -244,18 +246,66 @@ export function PulseScreen(): React.JSX.Element {
           title: 'No local alerts',
           body: 'Drop an alert from the map when something is happening nearby.',
           actionLabel: 'Open map',
-          actionKind: 'map' as const,
+          actionKind: 'map' as EmptyActionKind,
         };
-      default:
+      default: {
+        if (!storyEligibility.allowed) {
+          const reason = storyEligibility.reason;
+          if (reason === 'email_unverified') {
+            return {
+              icon: 'email-check-outline',
+              title: 'Quiet around here',
+              body: 'Verify your email to post a story and join the local pulse.',
+              actionLabel: 'Verify email',
+              actionKind: 'verify_email' as EmptyActionKind,
+            };
+          }
+          if (reason === 'phone_required') {
+            return {
+              icon: 'cellphone-check',
+              title: 'Quiet around here',
+              body: 'Add a phone number to unlock stories after recent strikes.',
+              actionLabel: 'Add phone',
+              actionKind: 'verify_phone' as EmptyActionKind,
+            };
+          }
+          return {
+            icon: 'pulse',
+            title: 'Quiet around here',
+            body: storyGateMessage(reason),
+            actionLabel: 'Open map',
+            actionKind: 'map' as EmptyActionKind,
+          };
+        }
         return {
           icon: 'pulse',
           title: 'Quiet around here',
-          body: 'Post a story above, or open the map. Chats and waves live in Interactions.',
-          actionLabel: storyEligibility.allowed ? 'Add story' : 'Open map',
-          actionKind: storyEligibility.allowed ? ('story' as const) : ('map' as const),
+          body: 'Be the first — post a story above, or open the map. Chats and waves live in Interactions.',
+          actionLabel: 'Add story',
+          actionKind: 'story' as EmptyActionKind,
         };
+      }
     }
-  }, [filter, storyEligibility.allowed]);
+  }, [filter, storyEligibility]);
+
+  const onEmptyAction = useCallback(() => {
+    switch (emptyCopy.actionKind) {
+      case 'story':
+        onCreatePress();
+        break;
+      case 'verify_email':
+        openRootScreen(navigation, 'EmailVerification');
+        break;
+      case 'verify_phone':
+        openRootScreen(navigation, 'Verification', {
+          initialPhone: profile?.phone ?? undefined,
+        });
+        break;
+      default:
+        navigation.navigate('Main', { screen: 'Map' } as never);
+        break;
+    }
+  }, [emptyCopy.actionKind, onCreatePress, navigation, profile?.phone]);
 
   const Header = (
     <View>
@@ -371,13 +421,7 @@ export function PulseScreen(): React.JSX.Element {
               title={emptyCopy.title}
               body={emptyCopy.body}
               actionLabel={emptyCopy.actionLabel}
-              onAction={() => {
-                if (emptyCopy.actionKind === 'story') {
-                  onCreatePress();
-                } else {
-                  navigation.navigate('Main', { screen: 'Map' } as never);
-                }
-              }}
+              onAction={onEmptyAction}
             />
           </View>
         }

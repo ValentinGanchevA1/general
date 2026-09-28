@@ -34,6 +34,10 @@ import { IdentityBlock } from '@/components/IdentityBlock';
 import { useAppSelector } from '@/hooks/redux';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { colors } from '@/theme';
+import {
+	formatTrustScoreLabel,
+	trustEmptyCopy,
+} from '@/features/profile/formatTrustScore';
 import { styles } from './EntityBottomSheet.styles';
 
 const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
@@ -525,12 +529,12 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 					<View style={styles.trustHeader}>
 						<Text style={styles.sectionLabel}>Trust</Text>
 						<Text style={styles.trustText}>
-							{trustScore != null ? `${trustScore}%` : '0%'}
+							{formatTrustScoreLabel(trustScore)}
 						</Text>
 					</View>
 					<View style={styles.trustBadges}>
 						{badges.length === 0 ? (
-							<Text style={styles.trustEmpty}>No verification yet</Text>
+							<Text style={styles.trustEmpty}>{trustEmptyCopy()}</Text>
 						) : (
 							badges.map((b) => (
 								<View key={b} style={[styles.trustChip, b === 'ID' ? styles.trustChipStrong : undefined]}>
