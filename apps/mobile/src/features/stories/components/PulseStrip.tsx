@@ -133,7 +133,13 @@ export function PulseStrip({
           </Pressable>
         }
         ListEmptyComponent={
-          loading ? null : <Text style={styles.empty}>No stories nearby</Text>
+          loading ? null : (
+            <View style={styles.emptyWrap}>
+              <Text style={styles.empty}>
+                {canCreate ? 'Be the first nearby' : 'No stories nearby'}
+              </Text>
+            </View>
+          )
         }
       />
     </View>
@@ -180,5 +186,11 @@ const styles = StyleSheet.create({
     maxWidth: 72,
     textAlign: 'center',
   },
-  empty: { color: colors.textMuted, fontSize: 13, paddingHorizontal: 8, alignSelf: 'center' },
+  emptyWrap: {
+    justifyContent: 'center',
+    alignSelf: 'center',
+    paddingHorizontal: 8,
+    minHeight: 64,
+  },
+  empty: { color: colors.textMuted, fontSize: 13 },
 });
