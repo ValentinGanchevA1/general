@@ -514,7 +514,433 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 				</TouchableOpacity>
 			) : null}
 			<View style={styles.actions}>{actionOrder}</View>
-			{/* rest of UserCard continues below - truncated intentionally for partial write */}
+			{!fetching && profile != null ? (
+				<TouchableOpacity
+					style={styles.trustBlock}
+					onPress={() => openProfile('trust')}
+					accessibilityRole="button"
+					accessibilityLabel="View trust on profile"
+					activeOpacity={0.85}
+				>
+					<View style={styles.trustHeader}>
+						<Text style={styles.sectionLabel}>Trust</Text>
+						<Text style={styles.trustText}>
+							{trustScore != null ? `${trustScore}%` : '0%'}
+						</Text>
+					</View>
+					<View style={styles.trustBadges}>
+						{badges.length === 0 ? (
+							<Text style={styles.trustEmpty}>No verification yet</Text>
+						) : (
+							badges.map((b) => (
+								<View key={b} style={[styles.trustChip, b === 'ID' ? styles.trustChipStrong : undefined]}>
+									<Text style={b === 'ID' ? styles.trustChipStrongText : styles.trustChipText}>
+										{b}
+									</Text>
+								</View>
+							))
+						)}
+					</View>
+				</TouchableOpacity>
+			) : null}
+			{!fetching && hasStats ? (
+				<TouchableOpacity
+					style={styles.statsBlock}
+					onPress={() => openProfile('stats')}
+					accessibilityRole="button"
+					accessibilityLabel="View stats on profile"
+					activeOpacity={0.85}
+				>
+					<Text style={styles.sectionLabel}>Stats</Text>
+					<View style={styles.statsRow}>
+						{status?.level != null ? (
+							<View style={styles.statPill}>
+								<Text style={styles.statPillValue}>Lv {status.level}</Text>
+							</View>
+						) : null}
+						{allTimeRank != null ? (
+							<View style={styles.statPill}>
+								<Text style={styles.statPillValue}>#{allTimeRank}</Text>
+							</View>
+						) : null}
+						{achievementIcons.length > 0 ? (
+							<View style={styles.achievementIcons}>
+								{achievementIcons.slice(0, 3).map((icon, i) => (
+									<Text key={`${icon}-${i}`} style={styles.achievementIcon}>
+										{icon}
+									</Text>
+								))}
+							</View>
+						) : null}
+					</View>
+				</TouchableOpacity>
+			) : null}
+			{profile?.bio ? (
+				<TouchableOpacity
+					onPress={() => openProfile('bio')}
+					accessibilityRole="button"
+					accessibilityLabel="View full bio on profile"
+					activeOpacity={0.85}
+				>
+					<Text style={styles.bio} numberOfLines={3}>
+						{profile.bio}
+					</Text>
+				</TouchableOpacity>
+			) : null}
+		</View>
+	);
+}
+
+function EventCard({
+					   point,
+					   onClose,
+				   }: {
+	point: EventEntityPoint;
+	onClose: () => void;
+}): React.JSX.Element {
+	const navigation = useNavigation<Nav>();
+	const viewerId = useAppSelector((s) => s.auth.user?.id ?? null);
+	const [opening, setOpening] = useState(false);
+	const meta = point.meta;
+	const title = meta.title?.trim() || 'Event';
+	const coverUrl = meta.coverUrl?.trim() || null;
+	const capacity =
+		meta.capacity != null && meta.capacity > 0
+			? `${meta.attendeeCount}/${meta.capacity} going`
+			: `${meta.attendeeCount} going`;
+	const hostId = meta.hostId?.trim() || null;
+	const hostName = meta.hostDisplayName?.trim() || 'Host';
+	const canMessageHost =
+		hostId != null && hostId.length > 0 && viewerId != null && hostId !== viewerId;
+	const distanceMeters = usePinDistanceMeters(point.lat, point.lng);
+	const distanceLabel =
+		distanceMeters != null ? formatDistanceMeters(distanceMeters) : null;
+
+	const openDetail = (): void => {
+		onClose();
+		openRootScreen(navigation, 'EventDetail', { eventId: point.id });
+	};
+
+	const onMessageHost = async (): Promise<void> => {
+		if (!canMessageHost || opening || hostId == null) return;
+		setOpening(true);
+		try {
+			const res = await postJson<CreateConversationRequest, CreateConversationResponse>(
+				'/conversations',
+				{ targetUserId: hostId },
+			);
+			void signalPostSocialActivation('message');
+			onClose();
+			openRootScreen(navigation, 'Chat', {
+				conversationId: res.conversationId,
+				otherUserName: hostName,
+				otherUserId: hostId,
+				requestPending: res.status === 'pending' && res.permission === 'request',
+			});
+		} catch (e) {
+			const msg =
+				e && typeof e === 'object' && 'message' in e
+					? String((e as { message: unknown }).message)
+					: 'Try again in a moment.';
+			appAlert('Could not open chat', msg);
+		} finally {
+			setOpening(false);
+		}
+	};
+
+	return (
+		<View style={styles.sheet}>
+			{coverUrl ? (
+				<Image
+					source={{ uri: coverUrl }}
+					style={styles.entityCover}
+					accessibilityLabel={`${title} cover`}
+				/>
+			) : null}
+			<View style={styles.kindHeader}>
+				<View style={[styles.kindDot, styles.kindDotEvent]} />
+				<Text style={styles.kindLabel}>Event</Text>
+			</View>
+			<Text style={styles.entityTitle} numberOfLines={2}>
+				{title}
+			</Text>
+			<View style={styles.metaRow}>
+				<Text style={styles.metaText}>{formatStartsAt(meta.startsAt)}</Text>
+				{distanceLabel ? (
+					<>
+						<Text style={styles.metaDot}>·</Text>
+						<Text style={styles.metaText}>{distanceLabel}</Text>
+					</>
+				) : null}
+				<Text style={styles.metaDot}>·</Text>
+				<Text style={styles.metaText}>{capacity}</Text>
+			</View>
+			<View style={styles.entityActions}>
+				{canMessageHost ? (
+					<TouchableOpacity
+						style={[
+							styles.primaryBtn,
+							styles.entityPrimaryBtn,
+							styles.messageBtn,
+							styles.entityActionPrimary,
+							opening ? styles.btnDisabled : undefined,
+						]}
+						onPress={() => void onMessageHost()}
+						disabled={opening}
+						accessibilityRole="button"
+						accessibilityLabel="Message host"
+					>
+						<Text style={styles.primaryBtnText}>{opening ? '…' : 'Message'}</Text>
+					</TouchableOpacity>
+				) : null}
+				<TouchableOpacity
+					style={[
+						styles.primaryBtn,
+						styles.entityPrimaryBtn,
+						styles.eventPrimaryBtn,
+						canMessageHost ? styles.entityActionSecondary : styles.entityActionPrimary,
+					]}
+					onPress={openDetail}
+					accessibilityRole="button"
+					accessibilityLabel="View event"
+				>
+					<Text style={styles.primaryBtnText}>View event</Text>
+				</TouchableOpacity>
+				<TouchableOpacity
+					style={[styles.profileBtn, styles.entityActionSecondary]}
+					onPress={onClose}
+					accessibilityRole="button"
+					accessibilityLabel="Close"
+				>
+					<Text style={styles.profileBtnText}>Close</Text>
+				</TouchableOpacity>
+			</View>
+		</View>
+	);
+}
+
+function ListingCard({
+						 point,
+						 onClose,
+					 }: {
+	point: ListingEntityPoint;
+	onClose: () => void;
+}): React.JSX.Element {
+	const navigation = useNavigation<Nav>();
+	const viewerId = useAppSelector((s) => s.auth.user?.id ?? null);
+	const [opening, setOpening] = useState(false);
+	const [bumping, setBumping] = useState(false);
+	const meta = point.meta;
+	const title = meta.title?.trim() || 'Listing';
+	const isBuy = meta.mode === 'buy';
+	const mode = isBuy ? 'Wanted' : 'For sale';
+	const price = formatPrice(meta.priceCents, meta.currency);
+	const category = meta.category?.trim() || null;
+	const thumbUrl = meta.thumbnailUrl?.trim() || null;
+	const sellerId = meta.sellerId?.trim() || null;
+	const sellerName = meta.sellerDisplayName?.trim() || 'Seller';
+	const isOwnListing =
+		sellerId != null && viewerId != null && sellerId === viewerId;
+	const canMessageSeller =
+		sellerId != null && sellerId.length > 0 && viewerId != null && sellerId !== viewerId;
+	const distanceMeters = usePinDistanceMeters(point.lat, point.lng);
+	const distanceLabel =
+		distanceMeters != null ? formatDistanceMeters(distanceMeters) : null;
+	const expiryLabel = formatListingExpiry(meta.expiresAt);
+
+	const openDetail = (): void => {
+		onClose();
+		openRootScreen(navigation, 'ListingDetail', { listingId: point.id });
+	};
+
+	const onBump = async (): Promise<void> => {
+		if (!isOwnListing || bumping) return;
+		setBumping(true);
+		try {
+			await bumpListing(point.id);
+			appAlert('Listing bumped', 'Expiry extended. Nearby buyers will see it as fresher.');
+		} catch (e) {
+			const msg =
+				e && typeof e === 'object' && 'message' in e
+					? String((e as { message: unknown }).message)
+					: 'Try again later.';
+			const code =
+				e && typeof e === 'object' && 'code' in e
+					? String((e as { code: unknown }).code)
+					: '';
+			appAlert(
+				code === 'listing.bump_cooldown' ? 'Bump cooling down' : 'Could not bump',
+				msg,
+			);
+		} finally {
+			setBumping(false);
+		}
+	};
+
+	const onMessageSeller = async (): Promise<void> => {
+		if (!canMessageSeller || opening || sellerId == null) return;
+		setOpening(true);
+		try {
+			const res = await postJson<CreateConversationRequest, CreateConversationResponse>(
+				'/conversations',
+				{ targetUserId: sellerId },
+			);
+			void signalPostSocialActivation('message');
+			onClose();
+			openRootScreen(navigation, 'Chat', {
+				conversationId: res.conversationId,
+				otherUserName: sellerName,
+				otherUserId: sellerId,
+				requestPending: res.status === 'pending' && res.permission === 'request',
+			});
+		} catch (e) {
+			const msg =
+				e && typeof e === 'object' && 'message' in e
+					? String((e as { message: unknown }).message)
+					: 'Try again in a moment.';
+			appAlert('Could not open chat', msg);
+		} finally {
+			setOpening(false);
+		}
+	};
+
+	return (
+		<View style={styles.sheet}>
+			<View style={styles.listingTop}>
+				{thumbUrl ? (
+					<Image
+						source={{ uri: thumbUrl }}
+						style={styles.listingThumb}
+						accessibilityLabel={`${title} photo`}
+					/>
+				) : (
+					<View style={[styles.listingThumb, styles.listingThumbPlaceholder]}>
+						<Text style={styles.listingThumbPlaceholderText}>{isBuy ? '🔍' : '🏷️'}</Text>
+					</View>
+				)}
+				<View style={styles.listingTopText}>
+					<View style={styles.kindHeader}>
+						<View
+							style={[
+								styles.kindDot,
+								isBuy ? styles.kindDotWanted : styles.kindDotListing,
+							]}
+						/>
+						<Text style={[styles.kindLabel, isBuy ? styles.kindLabelWanted : undefined]}>
+							{mode}
+						</Text>
+					</View>
+					<Text style={styles.entityTitle} numberOfLines={2}>
+						{title}
+					</Text>
+					<View style={styles.metaRow}>
+						<Text style={styles.priceText}>{price}</Text>
+						{distanceLabel ? (
+							<>
+								<Text style={styles.metaDot}>·</Text>
+								<Text style={styles.metaText}>{distanceLabel}</Text>
+							</>
+						) : null}
+						{category ? (
+							<>
+								<Text style={styles.metaDot}>·</Text>
+								<Text style={styles.metaText}>{category}</Text>
+							</>
+						) : null}
+						{expiryLabel ? (
+							<>
+								<Text style={styles.metaDot}>·</Text>
+								<Text style={styles.metaText}>{expiryLabel}</Text>
+							</>
+						) : null}
+					</View>
+				</View>
+			</View>
+			<View style={styles.entityActions}>
+				{isOwnListing ? (
+					<TouchableOpacity
+						style={[
+							styles.primaryBtn,
+							styles.entityPrimaryBtn,
+							styles.messageBtn,
+							styles.entityActionPrimary,
+							bumping ? styles.btnDisabled : undefined,
+						]}
+						onPress={() => void onBump()}
+						disabled={bumping}
+						accessibilityRole="button"
+						accessibilityLabel="Bump listing"
+					>
+						<Text style={styles.primaryBtnText}>{bumping ? '…' : 'Bump'}</Text>
+					</TouchableOpacity>
+				) : null}
+				{canMessageSeller ? (
+					<TouchableOpacity
+						style={[
+							styles.primaryBtn,
+							styles.entityPrimaryBtn,
+							styles.messageBtn,
+							styles.entityActionPrimary,
+							opening ? styles.btnDisabled : undefined,
+						]}
+						onPress={() => void onMessageSeller()}
+						disabled={opening}
+						accessibilityRole="button"
+						accessibilityLabel="Message seller"
+					>
+						<Text style={styles.primaryBtnText}>{opening ? '…' : 'Message'}</Text>
+					</TouchableOpacity>
+				) : null}
+				<TouchableOpacity
+					style={[
+						styles.primaryBtn,
+						styles.entityPrimaryBtn,
+						styles.listingPrimaryBtn,
+						canMessageSeller || isOwnListing
+							? styles.entityActionSecondary
+							: styles.entityActionPrimary,
+					]}
+					onPress={openDetail}
+					accessibilityRole="button"
+					accessibilityLabel="View listing"
+				>
+					<Text style={styles.primaryBtnText}>View listing</Text>
+				</TouchableOpacity>
+				<TouchableOpacity
+					style={[styles.profileBtn, styles.entityActionSecondary]}
+					onPress={onClose}
+					accessibilityRole="button"
+					accessibilityLabel="Close"
+				>
+					<Text style={styles.profileBtnText}>Close</Text>
+				</TouchableOpacity>
+			</View>
+		</View>
+	);
+}
+
+/** Content only — host mounts inside BottomSheetModal. */
+export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): React.JSX.Element {
+	if (point.kind === 'user') {
+		return (
+			<UserCard
+				key={point.id}
+				point={point as UserEntityPoint}
+				waving={waving}
+				onClose={onClose}
+				{...(onWave != null ? { onWave } : {})}
+			/>
+		);
+	}
+	if (point.kind === 'event') {
+		return <EventCard point={point as EventEntityPoint} onClose={onClose} />;
+	}
+	if (point.kind === 'listing') {
+		return <ListingCard point={point as ListingEntityPoint} onClose={onClose} />;
+	}
+	return (
+		<View style={styles.sheet}>
+			<Text style={styles.entityTitle}>Unknown</Text>
 		</View>
 	);
 }
