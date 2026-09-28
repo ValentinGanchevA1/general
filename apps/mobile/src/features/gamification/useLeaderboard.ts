@@ -1,36 +1,29 @@
 // Reads the ranked leaderboard + the caller's own rank from
 // GET /gamification/leaderboard?scope=weekly|all_time.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 
 import type { LeaderboardPage, LeaderboardScope } from '@g88/shared';
 import { getJson } from '@/api/client';
+import { useAsyncResource } from '@/features/common/useAsyncResource';
 
 interface UseLeaderboardResult {
   page: LeaderboardPage | null;
   loading: boolean;
+  error: unknown | null;
   refresh: () => void;
 }
 
 export function useLeaderboard(scope: LeaderboardScope): UseLeaderboardResult {
-  const [page, setPage] = useState<LeaderboardPage | null>(null);
-  const [loading, setLoading] = useState(false);
+  const fetcher = useCallback(
+    () => getJson<LeaderboardPage>(`/gamification/leaderboard?scope=${scope}`),
+    [scope],
+  );
 
-  const refresh = useCallback(() => {
-    void (async () => {
-      setLoading(true);
-      try {
-        setPage(await getJson<LeaderboardPage>(`/gamification/leaderboard?scope=${scope}`));
-      } catch {
-        // keep stale data on error
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [scope]);
+  const { data, loading, error, refresh } = useAsyncResource<LeaderboardPage | null>({
+    resourceKey: `gamification.leaderboard.${scope}`,
+    fetcher,
+    initialData: null,
+  });
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  return { page, loading, refresh };
+  return { page: data, loading, error, refresh };
 }
