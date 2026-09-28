@@ -42,11 +42,14 @@ export function useAsyncResource<T>(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown | null>(null);
   const fetcherRef = useRef(fetcher);
-  fetcherRef.current = fetcher;
   const initialDataRef = useRef(initialData);
-  initialDataRef.current = initialData;
   const keepStaleRef = useRef(keepStale);
-  keepStaleRef.current = keepStale;
+
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+    initialDataRef.current = initialData;
+    keepStaleRef.current = keepStale;
+  }, [fetcher, initialData, keepStale]);
 
   const refresh = useCallback(() => {
     void (async () => {
