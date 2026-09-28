@@ -1,1 +1,1 @@
-{{FILE:/tmp/EventDetailScreen.tsx}}
+// PLACEHOLDER_WILL_REPLACE
