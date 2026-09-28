@@ -75,7 +75,7 @@ export function ProfileView({
 }: ProfileViewProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollViewType>(null);
-  const sectionY = useRef<Partial<Record<ProfileFocusSection, number>>>({{}});
+  const sectionY = useRef<Partial<Record<ProfileFocusSection, number>>>({});
   const didFocusScroll = useRef(false);
 
   useEffect(() => {
