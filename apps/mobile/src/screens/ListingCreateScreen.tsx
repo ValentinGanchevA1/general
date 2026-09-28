@@ -39,7 +39,8 @@ type R = RouteProp<CommerceStackParamList, 'ListingCreate'>;
 
 const FALLBACK: LatLng = { lat: 43.21, lng: 27.92 };
 const CATEGORIES = ['Electronics', 'Furniture', 'Clothing', 'Sports', 'Home', 'Books', 'Other'] as const;
-const CURRENCIES = ['USD', 'EUR', 'BGN', 'GBP'] as const;
+/** Local marketplace (Varna): EUR only. */
+const DEFAULT_CURRENCY = 'EUR';
 
 export function ListingCreateScreen(): React.JSX.Element {
   const nav = useNavigation<Nav>();
@@ -56,7 +57,7 @@ export function ListingCreateScreen(): React.JSX.Element {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
-  const [currency, setCurrency] = useState<string>('USD');
+  const [currency] = useState<string>(DEFAULT_CURRENCY);
   const [category, setCategory] = useState<string>(mode === 'buy' ? 'Other' : 'Electronics');
   const [pin, setPin] = useState<LatLng | null>(initialLocation ?? null);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
@@ -226,11 +227,9 @@ export function ListingCreateScreen(): React.JSX.Element {
             onSubmitEditing={() => descriptionRef.current?.focus()}
             testID="listing-create-price"
           />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.chips}>
-            {CURRENCIES.map((c) => (
-              <Chip key={c} active={c === currency} label={c} onPress={() => setCurrency(c)} />
-            ))}
-          </ScrollView>
+          <View style={S.currencyBadge}>
+            <Text style={S.currencyBadgeText}>{currency}</Text>
+          </View>
         </View>
 
         <Text style={S.label}>Category</Text>
@@ -310,6 +309,17 @@ const S = StyleSheet.create({
   },
   photoEditText: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  currencyBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    minWidth: 56,
+    alignItems: 'center',
+  },
+  currencyBadgeText: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
   chips: { gap: 8, paddingRight: 8 },
   chip: {
     paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20,
