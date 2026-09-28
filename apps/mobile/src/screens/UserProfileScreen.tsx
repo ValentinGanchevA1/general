@@ -25,6 +25,11 @@ import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline
 import { ProfileBio } from '@/components/Profile/ProfileBio';
 import { ProfileTagsSection } from '@/components/Profile/ProfileTagsSection';
 import { ProfilePhotosSection } from '@/components/Profile/ProfilePhotosSection';
+import { ProfileIdentityLine } from '@/components/Profile/ProfileIdentityLine';
+import { ProfileTrustBlock } from '@/components/Profile/ProfileTrustBlock';
+import { ProfileStatsRow } from '@/components/Profile/ProfileStatsRow';
+import { ProfilePrimaryCtaRow } from '@/components/Profile/ProfilePrimaryCtaRow';
+import { ProfileSocialSecondary } from '@/components/Profile/ProfileSocialSecondary';
 import {
 	ActionSheetList,
 	sheetChrome,
@@ -33,10 +38,6 @@ import {
 } from '@/components/sheets';
 import { useUserProfileScreenData } from '@/features/profile/useUserProfileScreenData';
 import { formatPublicIdentityParts } from '@g88/shared';
-import {
-	formatTrustScoreLabel,
-	trustEmptyCopy,
-} from '@/features/profile/formatTrustScore';
 import { resolveUserPrimaryCta } from '@/features/social/resolveUserPrimaryCta';
 import { colors, spacing, radius, fontSize } from '@/theme';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -239,33 +240,8 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 			nationality: profile.nationality ?? null,
 		}).join(' · ') || null;
 
-	const isFriends = rel?.state === 'friends';
 	const hasPhotos = photoUrls.length > 0;
 	const hasGoals = (profile.goals?.length ?? 0) > 0;
-	const hasStats =
-		profile.status != null &&
-		(profile.status.level != null ||
-			profile.status.allTimeRank != null ||
-			(profile.status.achievementIcons?.length ?? 0) > 0);
-
-	const trustEarned = ((): Array<{ ok: boolean; label: string }> => {
-		const order: Array<{ ok: boolean; label: string }> = [
-			{ ok: profile.verification !== 'none', label: 'Email' },
-			{
-				ok:
-					profile.verification === 'phone' ||
-					profile.verification === 'selfie' ||
-					profile.verification === 'id',
-				label: 'Phone',
-			},
-			{
-				ok: profile.verification === 'selfie' || profile.verification === 'id',
-				label: 'Photo',
-			},
-			{ ok: profile.idVerified === true, label: 'ID' },
-		];
-		return order.filter((b) => b.ok);
-	})();
 
 	const primaryCta = resolveUserPrimaryCta({
 		relationshipKnown: true,
@@ -274,85 +250,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 		matched: profile.relationship?.matched === true,
 		waveAvailable: true,
 	});
-
-	const primaryCtas =
-		primaryCta.kind === 'message' ? (
-			<View style={styles.primaryCtaRow}>
-				<TouchableOpacity
-					style={[styles.primaryCta, styles.messagePrimaryFill, messaging && styles.btnDisabled]}
-					onPress={() => void openMessage()}
-					disabled={messaging}
-					accessibilityRole="button"
-					accessibilityLabel="Message"
-				>
-					{messaging ? (
-						<ActivityIndicator size="small" color={colors.onPrimary} />
-					) : (
-						<Text style={styles.primaryCtaText}>{primaryCta.label}</Text>
-					)}
-				</TouchableOpacity>
-			</View>
-		) : primaryCta.kind === 'wave' ? (
-			<View style={styles.primaryCtaRow}>
-				<TouchableOpacity
-					style={[styles.primaryCta, styles.wavePrimary, waving && styles.btnDisabled]}
-					onPress={() => void sendWave()}
-					disabled={waving}
-					accessibilityRole="button"
-					accessibilityLabel="Wave"
-				>
-					{waving ? (
-						<ActivityIndicator size="small" color={colors.onPrimary} />
-					) : (
-						<Text style={styles.primaryCtaText}>👋 {primaryCta.label}</Text>
-					)}
-				</TouchableOpacity>
-			</View>
-		) : null;
-
-	const socialSecondary = !blocked ? (
-		<View style={styles.socialSecondary}>
-			<TouchableOpacity
-				onPress={onFollowToggle}
-				disabled={followBusy || friendBusy}
-				hitSlop={8}
-				accessibilityRole="button"
-			>
-				{followBusy ? (
-					<ActivityIndicator size="small" color={colors.primary} />
-				) : (
-					<Text style={[styles.socialLink, isFollowing && styles.socialLinkActive]}>
-						{isFollowing ? 'Following' : 'Follow'}
-					</Text>
-				)}
-			</TouchableOpacity>
-			<Text style={styles.socialDot}>·</Text>
-			{isFriends ? (
-				<Text style={styles.socialLinkMuted}>Friends</Text>
-			) : (
-				<TouchableOpacity
-					onPress={onFriendAction}
-					disabled={friendBusy || followBusy}
-					hitSlop={8}
-					accessibilityRole="button"
-				>
-					{friendBusy ? (
-						<ActivityIndicator size="small" color={colors.primary} />
-					) : (
-						<Text
-							style={[
-								styles.socialLink,
-								(rel?.state === 'request_outgoing' || rel?.state === 'request_incoming') &&
-								styles.socialLinkActive,
-							]}
-						>
-							{friendLabel}
-						</Text>
-					)}
-				</TouchableOpacity>
-			)}
-		</View>
-	) : null;
 
 	return (
 		<View style={styles.root}>
@@ -385,8 +282,11 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 								size={18}
 							/>
 						</View>
-						{hometown ? <Text style={styles.originLine}>{hometown}</Text> : null}
-						{identityLine ? <Text style={styles.identityLine}>{identityLine}</Text> : null}
+						<ProfileIdentityLine
+							mode="other"
+							identityLine={identityLine}
+							hometownLine={hometown || null}
+						/>
 						<View style={styles.placeRow}>
 							{profile.online ? (
 								<Text style={styles.onlineLabel}>Online now</Text>
@@ -419,68 +319,39 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 					</View>
 				</View>
 
-				{primaryCtas}
-				{socialSecondary}
+				<ProfilePrimaryCtaRow
+					primaryCta={primaryCta}
+					onPress={() => {
+						if (primaryCta.kind === 'message') void openMessage();
+						else if (primaryCta.kind === 'wave') void sendWave();
+					}}
+					waving={waving}
+					messaging={messaging}
+				/>
+				<ProfileSocialSecondary
+					blocked={blocked}
+					isFollowing={isFollowing}
+					friendState={rel?.state}
+					friendLabel={friendLabel}
+					followBusy={followBusy}
+					friendBusy={friendBusy}
+					onFollowToggle={onFollowToggle}
+					onFriendAction={onFriendAction}
+				/>
 
 				{!blocked && profile ? (
 					<View style={styles.infoBlocks} onLayout={onSectionLayout('trust')}>
-						<View style={styles.trustBlock}>
-							<View style={styles.trustHeader}>
-								<Text style={styles.sectionLabel}>Trust</Text>
-								<Text style={styles.trustScore}>
-									{formatTrustScoreLabel(profile.verificationScore)}
-								</Text>
-							</View>
-							{trustEarned.length === 0 ? (
-								<Text style={styles.trustEmpty}>{trustEmptyCopy()}</Text>
-							) : (
-								<View style={styles.trustBadges}>
-									{trustEarned.map((b) => (
-										<View
-											key={b.label}
-											style={[
-												styles.trustChip,
-												b.label === 'ID' ? styles.trustChipStrong : undefined,
-											]}
-										>
-											<Text
-												style={
-													b.label === 'ID' ? styles.trustChipStrongText : styles.trustChipText
-												}
-											>
-												{b.label}
-											</Text>
-										</View>
-									))}
-								</View>
-							)}
-						</View>
-						{hasStats ? (
-							<View style={styles.statsBlock} onLayout={onSectionLayout('stats')}>
-								<Text style={styles.sectionLabel}>Activity</Text>
-								<View style={styles.statsRow}>
-									{profile.status?.level != null ? (
-										<View style={styles.statPill}>
-											<Text style={styles.statPillValue}>Lv {profile.status.level}</Text>
-										</View>
-									) : null}
-									{profile.status?.allTimeRank != null ? (
-										<View style={styles.statPill}>
-											<Text style={styles.statPillValue}>#{profile.status.allTimeRank}</Text>
-										</View>
-									) : null}
-									{(profile.status?.achievementIcons?.length ?? 0) > 0 ? (
-										<View style={styles.achievementIcons}>
-											{profile.status!.achievementIcons!.slice(0, 3).map((icon, i) => (
-												<Text key={`${icon}-${i}`} style={styles.achievementIcon}>
-													{icon}
-												</Text>
-											))}
-										</View>
-									) : null}
-								</View>
-							</View>
-						) : null}
+						<ProfileTrustBlock
+							verification={profile.verification}
+							idVerified={profile.idVerified}
+							verificationScore={profile.verificationScore}
+						/>
+						<ProfileStatsRow
+							level={profile.status?.level}
+							allTimeRank={profile.status?.allTimeRank}
+							achievementIcons={profile.status?.achievementIcons}
+							onLayout={onSectionLayout('stats')}
+						/>
 					</View>
 				) : null}
 
@@ -581,8 +452,6 @@ const styles = StyleSheet.create({
 	},
 	nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 	displayName: { color: colors.textPrimary, fontSize: fontSize.xl, fontWeight: '700' },
-	originLine: { color: colors.textMuted, fontSize: 14 },
-	identityLine: { color: colors.textFaint, fontSize: 13 },
 	placeRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -596,50 +465,6 @@ const styles = StyleSheet.create({
 	placeDot: { color: colors.textFaint, fontSize: 13 },
 	viewOnMap: { color: colors.primary, fontWeight: '600', fontSize: 13 },
 	mutualLine: { color: colors.primary, fontSize: 13, fontWeight: '600', marginTop: 4 },
-
-	primaryCtaRow: {
-		flexDirection: 'row',
-		gap: 10,
-		paddingHorizontal: spacing.xl,
-		marginBottom: 10,
-	},
-	primaryCta: {
-		flex: 1,
-		borderRadius: radius.md,
-		paddingVertical: 12,
-		alignItems: 'center',
-		justifyContent: 'center',
-		minHeight: 48,
-	},
-	wavePrimary: {
-		backgroundColor: colors.primary,
-	},
-	messagePrimary: {
-		backgroundColor: colors.surfaceAlt,
-		borderWidth: 1,
-		borderColor: colors.primaryBorder,
-	},
-	messagePrimaryFill: {
-		backgroundColor: colors.action,
-		borderColor: colors.action,
-	},
-	primaryCtaText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
-	messagePrimaryText: { color: colors.primary, fontWeight: '700', fontSize: 15 },
-
-	socialSecondary: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		gap: 8,
-		paddingHorizontal: spacing.xl,
-		marginBottom: 16,
-		minHeight: 28,
-	},
-	socialLink: { color: colors.primary, fontWeight: '600', fontSize: 14 },
-	socialLinkActive: { color: colors.textSecondary },
-	socialLinkMuted: { color: colors.textMuted, fontWeight: '600', fontSize: 14 },
-	socialDot: { color: colors.textFaint, fontSize: 14 },
-
 	section: { paddingHorizontal: spacing.xl, gap: 10 },
 	footer: {
 		flexDirection: 'row',
@@ -657,16 +482,6 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		minHeight: 50,
 	},
-	waveBtn: {
-		flex: 1,
-		backgroundColor: colors.primary,
-	},
-	messageBtn: {
-		flex: 1,
-		backgroundColor: colors.surfaceAlt,
-		borderWidth: 1,
-		borderColor: colors.primaryBorder,
-	},
 	menuBtn: {
 		width: 56,
 		backgroundColor: colors.surfaceAlt,
@@ -677,9 +492,6 @@ const styles = StyleSheet.create({
 		marginLeft: 'auto',
 		flex: 0,
 	},
-	footerBtnTextOnPrimary: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
-	messageFooterText: { color: colors.primary, fontWeight: '700', fontSize: 15 },
-	btnDisabled: { opacity: 0.55 },
 	unblockBtn: {
 		flex: 1,
 		borderRadius: 14,
@@ -695,41 +507,5 @@ const styles = StyleSheet.create({
 		gap: 12,
 		marginBottom: 14,
 	},
-	trustBlock: { gap: 6 },
-	trustHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	sectionLabel: {
-		color: colors.textFaint,
-		fontSize: 11,
-		fontWeight: '700',
-		textTransform: 'uppercase',
-		letterSpacing: 1,
-	},
-	trustScore: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
-	trustBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-	trustChip: {
-		backgroundColor: colors.surface,
-		borderRadius: radius.md,
-		paddingHorizontal: 10,
-		paddingVertical: 5,
-	},
-	trustChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
-	trustChipStrong: { backgroundColor: colors.primary },
-	trustChipStrongText: { color: colors.onPrimary, fontSize: 12, fontWeight: '700' },
-	trustEmpty: { color: colors.textFaint, fontSize: 12 },
-	statsBlock: { gap: 6 },
-	statsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
-	statPill: {
-		backgroundColor: colors.surface,
-		borderRadius: radius.md,
-		paddingHorizontal: 10,
-		paddingVertical: 5,
-	},
-	statPillValue: { color: colors.textPrimary, fontSize: 12, fontWeight: '700' },
-	achievementIcons: { flexDirection: 'row', gap: 4 },
-	achievementIcon: { fontSize: 16 },
 	sheetBody: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 });
