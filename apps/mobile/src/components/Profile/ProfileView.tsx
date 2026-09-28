@@ -1,6 +1,7 @@
 /**
  * ProfileView — shared presentational body for self + other profiles.
- * PR-C: mode="other" is fully wired. mode="self" remains shell until PR-D.
+ * PR-C: mode="other" fully wired.
+ * PR-D: mode="self" fully wired (header + identity + content + selfSlots).
  * Screens own data hooks, navigation, and sheets.
  */
 import React, { useCallback, useEffect, useRef } from 'react';
@@ -19,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/Avatar';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { ProfileBio } from '@/components/Profile/ProfileBio';
+import { ProfileHeaderPhoto } from '@/components/Profile/ProfileHeaderPhoto';
 import { ProfileIdentityLine } from '@/components/Profile/ProfileIdentityLine';
 import { ProfilePhotosSection } from '@/components/Profile/ProfilePhotosSection';
 import { ProfilePrimaryCtaRow } from '@/components/Profile/ProfilePrimaryCtaRow';
@@ -36,6 +38,7 @@ export type {
   ProfileViewActions,
   ProfileViewProps,
   ProfileFocusSection,
+  ProfileViewSelfSlots,
 } from './profileView.types';
 
 const COVER_BODY = 160;
@@ -68,10 +71,11 @@ export function ProfileView({
   followBusy = false,
   friendBusy = false,
   focus,
-  activePhotoIndex: _activePhotoIndex = 0,
+  activePhotoIndex = 0,
   headerExtra,
   footerExtra,
-  pendingFriendCount,
+  selfSlots,
+  refreshControl,
 }: ProfileViewProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollViewType>(null);
@@ -102,29 +106,74 @@ export function ProfileView({
     [tryScrollToFocus],
   );
 
-  // mode=self: shell until PR-D
+  // ── mode="self" ───────────────────────────────────────────────────────────
   if (mode === 'self') {
+    const mainPhoto = profile.photoUrls[0] ?? profile.avatarUrl ?? null;
+    const score = profile.verificationScore ?? 0;
+
     return (
       <View style={styles.root} testID="profile-view-self">
         <ScrollView
+          ref={scrollRef}
           style={styles.scroll}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
         >
           {headerExtra}
-          <View style={styles.placeholder} accessibilityLabel="Profile view shell">
-            <Text style={styles.placeholderTitle}>
-              {profile.displayName}
-              {profile.age != null ? `, ${profile.age}` : ''}
-            </Text>
-            <Text style={styles.placeholderMeta}>mode=self</Text>
-            {profile.identityLine ? (
-              <Text style={styles.placeholderLine}>{profile.identityLine}</Text>
-            ) : null}
-            {pendingFriendCount != null && pendingFriendCount > 0 ? (
-              <Text style={styles.placeholderMeta}>pending friends: {pendingFriendCount}</Text>
-            ) : null}
+
+          <ProfileHeaderPhoto
+            photoUrl={mainPhoto}
+            coverUrl={profile.coverUrl}
+            displayName={profile.displayName}
+            verificationPercent={score}
+            isVisibleOnMap={profile.mapVisible === true}
+            isPaid={profile.isPaid}
+            {...(profile.tierLabel != null ? { tierLabel: profile.tierLabel } : {})}
+            photoCount={profile.photoUrls.length}
+            activePhotoIndex={activePhotoIndex}
+            onSelectPhoto={actions.onSelectPhotoIndex}
+            onPressSettings={actions.onPressSettings}
+            onPressBack={actions.onBack}
+            onPressVerificationBadge={actions.onPressVerificationBadge}
+            onPressPhoto={actions.onPressPhoto}
+            onPressVisibility={actions.onPressVisibility}
+          />
+
+          <ProfileIdentityLine
+            mode="self"
+            identityLine={profile.identityLine}
+            hometownLine={profile.hometownLine}
+            onPress={actions.onPressIdentityPreview}
+          />
+
+          {profile.bio ? <ProfileBio bio={profile.bio} /> : null}
+
+          <ProfileTagsSection interests={profile.interests} goals={profile.goals} />
+
+          {selfSlots?.trustNext}
+
+          {selfSlots?.activity}
+
+          {selfSlots?.friends}
+
+          {profile.userId ? (
+            <View style={styles.section} onLayout={onSectionLayout('storyline')}>
+              <ProfileStoryline userId={profile.userId} isSelf />
+            </View>
+          ) : null}
+
+          <View onLayout={onSectionLayout('photos')}>
+            <ProfilePhotosSection
+              photos={profile.photoUrls}
+              isSelf
+              activeIndex={activePhotoIndex}
+              onSelect={actions.onSelectPhotoIndex}
+              onManage={actions.onPressPhotosManage}
+            />
           </View>
+
+          {selfSlots?.premium}
         </ScrollView>
         {footerExtra}
       </View>
@@ -138,10 +187,6 @@ export function ProfileView({
   const hasPhotos = profile.photoUrls.length > 0;
   const hasGoals = profile.goals.length > 0;
   const mutualCount = profile.mutualFriendsCount ?? 0;
-
-  const onPrimaryPress = (): void => {
-    actions.onPrimaryCta?.();
-  };
 
   return (
     <View style={styles.root} testID="profile-view-other">
@@ -220,7 +265,7 @@ export function ProfileView({
         {primaryCta != null ? (
           <ProfilePrimaryCtaRow
             primaryCta={primaryCta}
-            onPress={onPrimaryPress}
+            onPress={() => actions.onPrimaryCta?.()}
             waving={waving}
             messaging={messaging}
           />
@@ -289,30 +334,6 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingBottom: spacing.xxl },
   scrollContent: { paddingBottom: 16 },
-  placeholder: {
-    marginTop: spacing.lg,
-    marginHorizontal: spacing.xl,
-    padding: spacing.md,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    gap: 4,
-  },
-  placeholderTitle: {
-    color: colors.textPrimary,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-  },
-  placeholderMeta: {
-    color: colors.textFaint,
-    fontSize: fontSize.sm,
-  },
-  placeholderLine: {
-    color: colors.textMuted,
-    fontSize: fontSize.sm,
-    fontWeight: '500',
-  },
   heroBlock: { marginBottom: 12 },
   cover: { width: '100%', backgroundColor: colors.surfaceRaised, overflow: 'hidden' },
   coverImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
@@ -351,5 +372,5 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 14,
   },
-  section: { paddingHorizontal: spacing.xl, gap: 10 },
+  section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl, gap: 10 },
 });
