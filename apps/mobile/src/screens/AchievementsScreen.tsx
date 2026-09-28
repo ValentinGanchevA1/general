@@ -11,6 +11,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { AchievementStatus } from '@g88/shared';
 import { useAchievements } from '@/features/gamification/useAchievements';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/EmptyState';
 import { SkeletonListRow } from '@/components/Skeleton';
 import { colors } from '@/theme';
 
@@ -41,8 +42,9 @@ function AchievementRow({ a }: { a: AchievementStatus }): React.JSX.Element {
 }
 
 export function AchievementsScreen(): React.JSX.Element {
-  const { achievements, loading, refresh } = useAchievements();
+  const { achievements, loading, error, refresh } = useAchievements();
   const unlockedCount = achievements.filter((a) => a.unlocked).length;
+  const showErrorEmpty = error != null && achievements.length === 0 && !loading;
 
   return (
     <View style={styles.container}>
@@ -65,6 +67,15 @@ export function AchievementsScreen(): React.JSX.Element {
             <SkeletonListRow />
             <SkeletonListRow />
           </>
+        ) : showErrorEmpty ? (
+          <EmptyState
+            variant="plain"
+            icon="alert-circle-outline"
+            title="Couldn't load achievements"
+            body="Check your connection and try again."
+            actionLabel="Retry"
+            onAction={refresh}
+          />
         ) : null}
 
         {achievements.map((a) => (
