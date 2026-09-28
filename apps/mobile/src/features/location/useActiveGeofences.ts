@@ -8,6 +8,7 @@
 // pass `geofences` into useFabContext to let the FAB consider watched areas.
 
 import { useEffect, useRef, useState } from 'react';
+import * as Sentry from '@sentry/react-native';
 
 import type { GeofenceResponse } from '@g88/shared';
 import { computeH3Cells } from '@g88/shared';
@@ -16,10 +17,15 @@ import { useUserLocation } from './useUserLocation';
 
 const REFRESH_MS = 5 * 60 * 1_000;
 
-export function useActiveGeofences(): { geofences: GeofenceResponse[]; loading: boolean } {
+export function useActiveGeofences(): {
+  geofences: GeofenceResponse[];
+  loading: boolean;
+  error: unknown | null;
+} {
   const { coords } = useUserLocation();
   const [geofences, setGeofences] = useState<GeofenceResponse[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<unknown | null>(null);
   const prevCellRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -37,8 +43,10 @@ export function useActiveGeofences(): { geofences: GeofenceResponse[]; loading: 
       try {
         const data = await getJson<GeofenceResponse[]>('/geofences/me/active');
         setGeofences(data);
-      } catch {
-        // keep stale data on error
+        setError(null);
+      } catch (err) {
+        Sentry.captureException(err, { tags: { resource: 'geofences.active' } });
+        setError(err);
       } finally {
         setLoading(false);
       }
@@ -53,8 +61,8 @@ export function useActiveGeofences(): { geofences: GeofenceResponse[]; loading: 
       if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coords?.lat, coords?.lng]);
 
-  return { geofences, loading };
+  return { geofences, loading, error };
 }

@@ -1,11 +1,10 @@
 // apps/mobile/src/features/events/useEvents.ts
 //
-// Data layer for the P3.5 events surface. Mirrors the useGamification /
-// useChallenges pattern (useState + refresh) and wraps the /events REST API
-// (see apps/backend/src/modules/events). Mutations are plain async helpers the
-// screens call directly, then refresh the relevant hook.
+// Data layer for the P3.5 events surface. Wraps /events REST + live poll/Q&A.
+// Read hooks expose error + report to Sentry (keep stale on failure).
 
 import { useCallback, useEffect, useState } from 'react';
+import * as Sentry from '@sentry/react-native';
 
 import type {
   CreateEventRequest,
@@ -29,12 +28,14 @@ import { applyQuestionUpvote, mergePoll, mergeQuestion } from './eventMerge';
 interface UseNearbyEventsResult {
   events: EventSummary[];
   loading: boolean;
+  error: unknown | null;
   refresh: () => void;
 }
 
 export function useNearbyEvents(location: LatLng | null): UseNearbyEventsResult {
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<unknown | null>(null);
 
   const refresh = useCallback(() => {
     if (!location) return;
@@ -44,17 +45,21 @@ export function useNearbyEvents(location: LatLng | null): UseNearbyEventsResult 
         setEvents(
           await postJson<NearbyEventsRequest, EventSummary[]>('/events/nearby', { location }),
         );
-      } catch {
-        // keep stale data on error
+        setError(null);
+      } catch (err) {
+        Sentry.captureException(err, { tags: { resource: 'events.nearby' } });
+        setError(err);
       } finally {
         setLoading(false);
       }
     })();
   }, [location?.lat, location?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
-  return { events, loading, refresh };
+  return { events, loading, error, refresh };
 }
 
 // ─── Single event (detail + polls + Q&A) ─────────────────────────────────────
@@ -64,6 +69,7 @@ interface UseEventResult {
   polls: PollResult[];
   questions: EventQuestion[];
   loading: boolean;
+  error: unknown | null;
   refresh: () => void;
   refreshPolls: () => void;
   refreshQuestions: () => void;
@@ -74,13 +80,14 @@ export function useEvent(eventId: string): UseEventResult {
   const [polls, setPolls] = useState<PollResult[]>([]);
   const [questions, setQuestions] = useState<EventQuestion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<unknown | null>(null);
 
   const refreshPolls = useCallback(() => {
     void (async () => {
       try {
         setPolls(await getJson<PollResult[]>(`/events/${eventId}/polls`));
-      } catch {
-        /* keep stale */
+      } catch (err) {
+        Sentry.captureException(err, { tags: { resource: 'events.polls' } });
       }
     })();
   }, [eventId]);
@@ -89,8 +96,8 @@ export function useEvent(eventId: string): UseEventResult {
     void (async () => {
       try {
         setQuestions(await getJson<EventQuestion[]>(`/events/${eventId}/questions`));
-      } catch {
-        /* keep stale */
+      } catch (err) {
+        Sentry.captureException(err, { tags: { resource: 'events.questions' } });
       }
     })();
   }, [eventId]);
@@ -100,8 +107,10 @@ export function useEvent(eventId: string): UseEventResult {
       setLoading(true);
       try {
         setEvent(await getJson<EventDetail>(`/events/${eventId}`));
-      } catch {
-        /* keep stale */
+        setError(null);
+      } catch (err) {
+        Sentry.captureException(err, { tags: { resource: 'events.detail' } });
+        setError(err);
       } finally {
         setLoading(false);
       }
@@ -110,7 +119,9 @@ export function useEvent(eventId: string): UseEventResult {
     refreshQuestions();
   }, [eventId, refreshPolls, refreshQuestions]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   // Live deltas: join the event room and fold poll/Q&A broadcasts into local
   // state so every viewer sees votes, new questions, and upvotes without a
@@ -141,7 +152,7 @@ export function useEvent(eventId: string): UseEventResult {
     };
   }, [connected, eventId, on, joinEvent, leaveEvent]);
 
-  return { event, polls, questions, loading, refresh, refreshPolls, refreshQuestions };
+  return { event, polls, questions, loading, error, refresh, refreshPolls, refreshQuestions };
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
