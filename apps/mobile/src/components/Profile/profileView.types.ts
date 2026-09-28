@@ -1,8 +1,7 @@
 /**
  * Shared presentational contract for ProfileScreen (self) and UserProfileScreen (other).
- * PR-A: types only — screens still own data hooks and sheets.
  */
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import type { MessagePermission, VerificationLevel } from '@g88/shared';
 import type { RelationshipState } from '@g88/shared';
 import type { UserPrimaryCta } from '@/features/social/resolveUserPrimaryCta';
@@ -86,6 +85,17 @@ export type ProfileViewActions = {
   onOpenTrustDetails?: () => void;
 };
 
+/**
+ * Self-only blocks that still depend on UserProfile / Redux slices.
+ * Keeps ProfileViewModel free of owner DTOs; screen owns composition.
+ */
+export type ProfileViewSelfSlots = {
+  trustNext?: ReactNode;
+  activity?: ReactNode;
+  friends?: ReactNode;
+  premium?: ReactNode;
+};
+
 export type ProfileViewProps = {
   mode: 'self' | 'other';
   profile: ProfileViewModel;
@@ -97,11 +107,17 @@ export type ProfileViewProps = {
   followBusy?: boolean;
   friendBusy?: boolean;
 
-  /** Self activity strip — opaque until PR-D wires real types. */
+  /** Self activity strip (also available via selfSlots.activity). */
   gamification?: unknown;
   challenges?: unknown;
   spendableXp?: number;
   pendingFriendCount?: number;
+
+  /** Self-only opaque slots (TrustNextCard, ActivityLinks, Friends, Premium). */
+  selfSlots?: ProfileViewSelfSlots;
+
+  /** Pull-to-refresh (self ProfileScreen). */
+  refreshControl?: ReactElement;
 
   focus?: ProfileFocusSection;
   activePhotoIndex?: number;

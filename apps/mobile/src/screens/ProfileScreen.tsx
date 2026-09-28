@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, StyleSheet } from 'react-native';
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -16,8 +16,7 @@ import {
   fetchPendingCount,
   pendingCountSet,
 } from '@/features/friends/friendsSlice';
-import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline';
-import { ProfileHeaderPhoto } from '@/components/Profile/ProfileHeaderPhoto';
+import { ProfileView } from '@/components/Profile/ProfileView';
 import { MapPresenceCard } from '@/components/Profile/MapPresenceCard';
 import {
   VerificationStatusSheet,
@@ -25,25 +24,22 @@ import {
   type VerificationItemId,
 } from '@/components/Profile/VerificationStatusSheet';
 import { TrustNextCard } from '@/components/Profile/TrustNextCard';
-import { ProfileBio } from '@/components/Profile/ProfileBio';
 import { ProfileFriendsCard } from '@/components/Profile/ProfileFriendsCard';
 import { ProfileActivityLinks } from '@/components/Profile/ProfileActivityLinks';
-import { ProfilePhotosSection } from '@/components/Profile/ProfilePhotosSection';
-import { ProfileTagsSection } from '@/components/Profile/ProfileTagsSection';
 import { ProfilePremiumCard } from '@/components/Profile/ProfilePremiumCard';
 import { ProfileLoadingState, ProfileErrorState } from '@/components/Profile/ProfileScreenStates';
 import { useProfileScreenData } from '@/features/profile/useProfileScreenData';
+import { mapSelfToViewModel } from '@/features/profile/mapToProfileViewModel';
 import { useAppSelector } from '@/hooks/redux';
 import { useSocket } from '@/realtime/useSocket';
-import { formatPublicIdentityParts } from '@g88/shared';
-import { colors, spacing, fontSize } from '@/theme';
+import { colors, spacing } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 /**
- * Self profile — public-facing identity + activity.
- * Order: Hero → public identity preview → Bio → Tags → Trust → Activity → Friends → Storyline → Photos → Premium.
- * Trust details open from the % badge (bottom sheet). Account controls in Settings.
+ * Self profile — data + sheets.
+ * Layout lives in ProfileView mode="self" (PR-D).
+ * Order: Hero → identity → Bio → Tags → Trust → Activity → Friends → Storyline → Photos → Premium.
  */
 export function ProfileScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
@@ -130,7 +126,6 @@ export function ProfileScreen(): React.JSX.Element {
         });
         return;
       }
-      // id — always the ID flow (pending/rejected/not-started handled inside VerificationIdScreen)
       openRootScreen(navigation, 'VerificationId');
     },
     [closeVerification, navigation, derived?.p.phone],
@@ -141,7 +136,6 @@ export function ProfileScreen(): React.JSX.Element {
       navigation.goBack();
       return;
     }
-    // Tab root — send user to Map (primary home surface).
     navigation.navigate('Main', { screen: 'Map' });
   }, [navigation]);
 
@@ -160,132 +154,86 @@ export function ProfileScreen(): React.JSX.Element {
   const {
     p,
     photos,
-    mainPhoto,
-    coverUrl,
-    interests,
-    goals,
-    verificationScore,
+    verificationScore: _score,
     isPaid,
-    displayName,
     tierLabel,
   } = derived;
 
   const verificationItems = buildVerificationItems(p);
 
-  /** Same string visitors see on UserProfile / sheet (only opted-in fields). */
-  const publicIdentityLine =
-    formatPublicIdentityParts({
-      gender: p.showGender ? p.gender : null,
-      genderSelfDescribe: p.showGender ? p.genderSelfDescribe : null,
-      sexualOrientation: p.showOrientation ? p.sexualOrientation : null,
-      orientationSelfDescribe: p.showOrientation ? p.orientationSelfDescribe : null,
-      nationality: p.showNationality ? p.nationality : null,
-    }).join(' · ') || null;
-
-  const publicHometown =
-    p.showHometown && (p.hometownCity || p.hometownCountry)
-      ? [p.hometownCity, p.hometownCountry].filter(Boolean).join(', ')
-      : null;
-
-  const hasPublicIdentityPreview = Boolean(publicIdentityLine || publicHometown);
+  const viewModel = mapSelfToViewModel(p, {
+    photoUrls: photos,
+    tierLabel,
+    isPaid,
+    mapVisible,
+  });
 
   return (
     <>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
+      <ProfileView
+        mode="self"
+        profile={viewModel}
+        activePhotoIndex={activePhotoIndex}
+        pendingFriendCount={pendingCount}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
         }
-      >
-        <ProfileHeaderPhoto
-          photoUrl={mainPhoto ?? null}
-          coverUrl={coverUrl}
-          displayName={displayName}
-          verificationPercent={verificationScore}
-          isVisibleOnMap={mapVisible}
-          isPaid={isPaid}
-          tierLabel={tierLabel}
-          photoCount={photos.length}
-          activePhotoIndex={activePhotoIndex}
-          onSelectPhoto={setActivePhotoIndex}
-          onPressSettings={() => openRootScreen(navigation, 'Settings')}
-          onPressBack={handleBack}
-          onPressVerificationBadge={openVerification}
-          onPressPhoto={() => openRootScreen(navigation, 'Photos')}
-          onPressVisibility={openMapPresence}
-        />
-
-        {/* P1: what visitors see — public-gated identity + hometown */}
-        <TouchableOpacity
-          style={styles.identityPreview}
-          onPress={() => openRootScreen(navigation, 'ProfileEdit')}
-          accessibilityRole="button"
-          accessibilityLabel="Edit public identity"
-        >
-          {hasPublicIdentityPreview ? (
-            <>
-              {publicHometown ? (
-                <Text style={styles.identityPreviewLine}>{publicHometown}</Text>
-              ) : null}
-              {publicIdentityLine ? (
-                <Text style={styles.identityPreviewLine}>{publicIdentityLine}</Text>
-              ) : null}
-              <Text style={styles.identityPreviewHint}>Visible on profile · Edit</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.identityPreviewEmpty}>No public identity details</Text>
-              <Text style={styles.identityPreviewHint}>Add gender, nationality · Edit</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        {p.bio ? <ProfileBio bio={p.bio} /> : null}
-
-        <ProfileTagsSection interests={interests} goals={goals} />
-
-        <TrustNextCard
-          profile={p}
-          onContinue={handleVerificationItem}
-          onOpenDetails={openVerification}
-        />
-
-        <ProfileActivityLinks
-          gamification={gamification ?? null}
-          challenges={challenges}
-          spendableXp={spendableXp}
-          onChallenges={() => openRootScreen(navigation, 'Challenges')}
-          onLeaderboard={() => openRootScreen(navigation, 'Leaderboard')}
-          onAchievements={() => openRootScreen(navigation, 'Achievements')}
-          onGifts={() => openRootScreen(navigation, 'GiftsInbox')}
-          onMarketplace={() => openRootScreen(navigation, 'Marketplace')}
-        />
-
-        <ProfileFriendsCard
-          pendingCount={pendingCount}
-          onPress={() => openRootScreen(navigation, 'FriendsList')}
-          onPressSuggestions={() => openRootScreen(navigation, 'Suggestions')}
-        />
-
-        {p.id ? (
-          <View style={styles.section}>
-            <ProfileStoryline userId={p.id} isSelf />
-          </View>
-        ) : null}
-
-        <ProfilePhotosSection
-          photos={photos}
-          isSelf
-          activeIndex={activePhotoIndex}
-          onSelect={setActivePhotoIndex}
-          onManage={() => openRootScreen(navigation, 'Photos')}
-        />
-
-        {!isPaid ? (
-          <ProfilePremiumCard onPress={() => openRootScreen(navigation, 'Subscription')} />
-        ) : null}
-      </ScrollView>
+        actions={{
+          onBack: handleBack,
+          onPressSettings: () => openRootScreen(navigation, 'Settings'),
+          onPressVerificationBadge: openVerification,
+          onPressPhoto: () => openRootScreen(navigation, 'Photos'),
+          onSelectPhotoIndex: setActivePhotoIndex,
+          onPressIdentityPreview: () => openRootScreen(navigation, 'ProfileEdit'),
+          onPressVisibility: openMapPresence,
+          onPressPhotosManage: () => openRootScreen(navigation, 'Photos'),
+          onPressPremium: () => openRootScreen(navigation, 'Subscription'),
+          onPressFriends: () => openRootScreen(navigation, 'FriendsList'),
+          onPressSuggestions: () => openRootScreen(navigation, 'Suggestions'),
+          onPressChallenges: () => openRootScreen(navigation, 'Challenges'),
+          onPressLeaderboard: () => openRootScreen(navigation, 'Leaderboard'),
+          onPressAchievements: () => openRootScreen(navigation, 'Achievements'),
+          onPressGifts: () => openRootScreen(navigation, 'GiftsInbox'),
+          onPressMarketplace: () => openRootScreen(navigation, 'Marketplace'),
+          onTrustContinue: handleVerificationItem,
+          onOpenTrustDetails: openVerification,
+        }}
+        selfSlots={{
+          trustNext: (
+            <TrustNextCard
+              profile={p}
+              onContinue={handleVerificationItem}
+              onOpenDetails={openVerification}
+            />
+          ),
+          activity: (
+            <ProfileActivityLinks
+              gamification={gamification ?? null}
+              challenges={challenges}
+              spendableXp={spendableXp}
+              onChallenges={() => openRootScreen(navigation, 'Challenges')}
+              onLeaderboard={() => openRootScreen(navigation, 'Leaderboard')}
+              onAchievements={() => openRootScreen(navigation, 'Achievements')}
+              onGifts={() => openRootScreen(navigation, 'GiftsInbox')}
+              onMarketplace={() => openRootScreen(navigation, 'Marketplace')}
+            />
+          ),
+          friends: (
+            <ProfileFriendsCard
+              pendingCount={pendingCount}
+              onPress={() => openRootScreen(navigation, 'FriendsList')}
+              onPressSuggestions={() => openRootScreen(navigation, 'Suggestions')}
+            />
+          ),
+          premium: !isPaid ? (
+            <ProfilePremiumCard onPress={() => openRootScreen(navigation, 'Subscription')} />
+          ) : null,
+        }}
+      />
 
       <BottomSheetModal
         ref={mapPresenceRef}
@@ -320,7 +268,7 @@ export function ProfileScreen(): React.JSX.Element {
       >
         <BottomSheetView style={styles.sheetContent}>
           <VerificationStatusSheet
-            score={verificationScore}
+            score={p.verificationScore ?? 0}
             items={verificationItems}
             onItemPress={handleVerificationItem}
           />
@@ -331,36 +279,6 @@ export function ProfileScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: spacing.xxl },
-  section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl },
-  identityPreview: {
-    marginTop: spacing.sm,
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    gap: 2,
-  },
-  identityPreviewLine: {
-    color: colors.textMuted,
-    fontSize: fontSize.sm,
-    fontWeight: '500',
-  },
-  identityPreviewEmpty: {
-    color: colors.textFaint,
-    fontSize: fontSize.sm,
-  },
-  identityPreviewHint: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 4,
-  },
   sheetBackground: {
     backgroundColor: colors.surfaceRaised,
   },
