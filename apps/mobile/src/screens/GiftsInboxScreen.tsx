@@ -62,8 +62,18 @@ function SentRow({ g }: { g: SentGift }): React.JSX.Element {
 
 export function GiftsInboxScreen(): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('received');
-  const { gifts: received, loading: loadingReceived, refresh: refreshReceived } = useReceivedGifts();
-  const { gifts: sent, loading: loadingSent, refresh: refreshSent } = useSentGifts();
+  const {
+    gifts: received,
+    loading: loadingReceived,
+    error: errorReceived,
+    refresh: refreshReceived,
+  } = useReceivedGifts();
+  const {
+    gifts: sent,
+    loading: loadingSent,
+    error: errorSent,
+    refresh: refreshSent,
+  } = useSentGifts();
   const { spendableXp, refresh: refreshBalance } = useGiftBalance();
 
   const loading = tab === 'received' ? loadingReceived : loadingSent;
@@ -111,6 +121,15 @@ export function GiftsInboxScreen(): React.JSX.Element {
               <SkeletonListRow />
               <SkeletonListRow />
             </>
+          ) : errorReceived != null ? (
+            <EmptyState
+              variant="plain"
+              icon="alert-circle-outline"
+              title="Couldn't load gifts"
+              body="Check your connection and try again."
+              actionLabel="Retry"
+              onAction={onRefresh}
+            />
           ) : (
             <EmptyState
               variant="plain"
@@ -127,6 +146,15 @@ export function GiftsInboxScreen(): React.JSX.Element {
             <SkeletonListRow />
             <SkeletonListRow />
           </>
+        ) : errorSent != null ? (
+          <EmptyState
+            variant="plain"
+            icon="alert-circle-outline"
+            title="Couldn't load sent gifts"
+            body="Check your connection and try again."
+            actionLabel="Retry"
+            onAction={onRefresh}
+          />
         ) : (
           <EmptyState
             variant="plain"

@@ -53,10 +53,11 @@ function Row({ entry }: { entry: LeaderboardEntry }): React.JSX.Element {
 
 export function LeaderboardScreen(): React.JSX.Element {
   const [scope, setScope] = useState<LeaderboardScope>('weekly');
-  const { page, loading, refresh } = useLeaderboard(scope);
+  const { page, loading, error, refresh } = useLeaderboard(scope);
 
   const meOffPage =
     page?.me != null && !page.entries.some((e) => e.userId === page.me!.userId);
+  const showErrorEmpty = error != null && page == null && !loading;
 
   return (
     <View style={styles.container}>
@@ -93,6 +94,15 @@ export function LeaderboardScreen(): React.JSX.Element {
             <SkeletonListRow />
             <SkeletonListRow />
           </>
+        ) : showErrorEmpty ? (
+          <EmptyState
+            variant="plain"
+            icon="alert-circle-outline"
+            title="Couldn't load leaderboard"
+            body="Check your connection and try again."
+            actionLabel="Retry"
+            onAction={refresh}
+          />
         ) : page && page.entries.length === 0 ? (
           <EmptyState
             variant="plain"
