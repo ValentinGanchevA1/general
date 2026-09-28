@@ -33,6 +33,7 @@ import {
 } from '@/components/sheets';
 import { useUserProfileScreenData } from '@/features/profile/useUserProfileScreenData';
 import { formatPublicIdentityParts } from '@g88/shared';
+import { resolveUserPrimaryCta } from '@/features/social/resolveUserPrimaryCta';
 import { colors, spacing, radius, fontSize } from '@/theme';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -80,7 +81,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 		isFollowing,
 		friendLabel,
 		hometown,
-		showMessage,
 		sendWave,
 		openMessage,
 		viewOnMap,
@@ -263,40 +263,48 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 		return order.filter((b) => b.ok);
 	})();
 
-	const primaryCtas = !blocked ? (
-		<View style={styles.primaryCtaRow}>
-			<TouchableOpacity
-				style={[styles.primaryCta, styles.wavePrimary, waving && styles.btnDisabled]}
-				onPress={() => void sendWave()}
-				disabled={waving}
-				accessibilityRole="button"
-				accessibilityLabel="Wave"
-			>
-				{waving ? (
-					<ActivityIndicator size="small" color={colors.onPrimary} />
-				) : (
-					<Text style={styles.primaryCtaText}>👋 Wave</Text>
-				)}
-			</TouchableOpacity>
-			{showMessage ? (
+	const primaryCta = resolveUserPrimaryCta({
+		relationshipKnown: true,
+		blocked,
+		canMessage: canMessage ?? 'none',
+		matched: profile.relationship?.matched === true,
+		waveAvailable: true,
+	});
+
+	const primaryCtas =
+		primaryCta.kind === 'message' ? (
+			<View style={styles.primaryCtaRow}>
 				<TouchableOpacity
-					style={[styles.primaryCta, styles.messagePrimary, messaging && styles.btnDisabled]}
+					style={[styles.primaryCta, styles.messagePrimaryFill, messaging && styles.btnDisabled]}
 					onPress={() => void openMessage()}
 					disabled={messaging}
 					accessibilityRole="button"
-					accessibilityLabel={canMessage === 'request' ? 'Request chat' : 'Message'}
+					accessibilityLabel="Message"
 				>
 					{messaging ? (
-						<ActivityIndicator size="small" color={colors.primary} />
+						<ActivityIndicator size="small" color={colors.onPrimary} />
 					) : (
-						<Text style={styles.messagePrimaryText}>
-							{canMessage === 'request' ? 'Request chat' : 'Message'}
-						</Text>
+						<Text style={styles.primaryCtaText}>{primaryCta.label}</Text>
 					)}
 				</TouchableOpacity>
-			) : null}
-		</View>
-	) : null;
+			</View>
+		) : primaryCta.kind === 'wave' ? (
+			<View style={styles.primaryCtaRow}>
+				<TouchableOpacity
+					style={[styles.primaryCta, styles.wavePrimary, waving && styles.btnDisabled]}
+					onPress={() => void sendWave()}
+					disabled={waving}
+					accessibilityRole="button"
+					accessibilityLabel="Wave"
+				>
+					{waving ? (
+						<ActivityIndicator size="small" color={colors.onPrimary} />
+					) : (
+						<Text style={styles.primaryCtaText}>👋 {primaryCta.label}</Text>
+					)}
+				</TouchableOpacity>
+			</View>
+		) : null;
 
 	const socialSecondary = !blocked ? (
 		<View style={styles.socialSecondary}>
@@ -606,6 +614,10 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.surfaceAlt,
 		borderWidth: 1,
 		borderColor: colors.primaryBorder,
+	},
+	messagePrimaryFill: {
+		backgroundColor: colors.action,
+		borderColor: colors.action,
 	},
 	primaryCtaText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
 	messagePrimaryText: { color: colors.primary, fontWeight: '700', fontSize: 15 },
