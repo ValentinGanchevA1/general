@@ -1,1 +1,1 @@
-// PLACEHOLDER_WILL_REPLACE
+{{ARTIFACT:/home/workdir/artifacts/.tmp-EventDetailScreen-nav-typed.tsx}}

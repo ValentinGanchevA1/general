@@ -1,1 +1,1 @@
-{{FILE:/tmp/ListingDetailScreen.tsx}}
+{{ARTIFACT:/home/workdir/artifacts/.tmp-ListingDetailScreen-nav-typed.tsx}}
