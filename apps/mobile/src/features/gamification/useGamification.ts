@@ -3,37 +3,25 @@
 // Reads the signed-in user's XP / level / streak from GET /gamification/me,
 // and exposes pingGamification() to advance the daily streak on app foreground.
 
-import { useCallback, useEffect, useState } from 'react';
-
 import type { GamificationSummary } from '@g88/shared';
 import { getJson, api } from '@/api/client';
+import { useAsyncResource } from '@/features/common/useAsyncResource';
 
 interface UseGamificationResult {
   summary: GamificationSummary | null;
   loading: boolean;
+  error: unknown | null;
   refresh: () => void;
 }
 
 export function useGamification(): UseGamificationResult {
-  const [summary, setSummary] = useState<GamificationSummary | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { data, loading, error, refresh } = useAsyncResource<GamificationSummary | null>({
+    resourceKey: 'gamification.me',
+    fetcher: () => getJson<GamificationSummary>('/gamification/me'),
+    initialData: null,
+  });
 
-  const refresh = useCallback(() => {
-    void (async () => {
-      setLoading(true);
-      try {
-        setSummary(await getJson<GamificationSummary>('/gamification/me'));
-      } catch {
-        // keep stale data on error
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  useEffect(() => { refresh(); }, [refresh]);
-
-  return { summary, loading, refresh };
+  return { summary: data, loading, error, refresh };
 }
 
 /**

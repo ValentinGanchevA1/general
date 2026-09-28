@@ -59,8 +59,9 @@ function ChallengeRow({ c }: { c: ChallengeToday }): React.JSX.Element {
 }
 
 export function ChallengesScreen(): React.JSX.Element {
-  const { challenges, loading, refresh } = useChallenges();
+  const { challenges, loading, error, refresh } = useChallenges();
   const completedCount = challenges.filter((c) => c.completed).length;
+  const showErrorEmpty = error != null && challenges.length === 0 && !loading;
 
   return (
     <View style={styles.container}>
@@ -69,7 +70,9 @@ export function ChallengesScreen(): React.JSX.Element {
       <ScrollView
         style={styles.flex}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />
+        }
       >
         {challenges.length > 0 ? (
           <Text style={styles.summary}>
@@ -82,6 +85,15 @@ export function ChallengesScreen(): React.JSX.Element {
             <SkeletonListRow />
             <SkeletonListRow />
           </>
+        ) : showErrorEmpty ? (
+          <EmptyState
+            variant="plain"
+            icon="alert-circle-outline"
+            title="Couldn't load challenges"
+            body="Check your connection and try again."
+            actionLabel="Retry"
+            onAction={refresh}
+          />
         ) : (
           <EmptyState
             variant="plain"
