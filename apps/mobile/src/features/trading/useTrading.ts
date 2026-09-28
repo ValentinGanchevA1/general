@@ -1,11 +1,11 @@
 // apps/mobile/src/features/trading/useTrading.ts
 //
-// Data layer for the P3.7 trading surface. Mirrors useEvents: useState + refresh
-// hooks for reads, plain async helpers for writes (screens refresh after).
-// Wraps the /listings REST API (offer-based v1, no payment processing).
+// Data layer for the P3.7 trading surface. Read hooks expose error + Sentry;
+// browse keeps AbortController so filter/location churn does not race.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
+import * as Sentry from '@sentry/react-native';
 
 import type {
   BrowseListingsRequest,
@@ -27,6 +27,7 @@ import { getJson, postJson, putJson } from '@/api/client';
 interface UseBrowseResult {
   listings: ListingSummary[];
   loading: boolean;
+  error: unknown | null;
   refresh: () => void;
 }
 
@@ -42,6 +43,7 @@ export function useBrowseListings(
   const mode = options?.mode;
   const [listings, setListings] = useState<ListingSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<unknown | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const refresh = useCallback(() => {
@@ -66,9 +68,11 @@ export function useBrowseListings(
         );
         if (ctrl.signal.aborted) return;
         setListings(next);
+        setError(null);
       } catch (err) {
         if (axios.isCancel(err) || ctrl.signal.aborted) return;
-        // keep stale data on error
+        Sentry.captureException(err, { tags: { resource: 'listings.browse' } });
+        setError(err);
       } finally {
         if (!ctrl.signal.aborted) setLoading(false);
       }
@@ -83,7 +87,7 @@ export function useBrowseListings(
     return () => abortRef.current?.abort();
   }, []);
 
-  return { listings, loading, refresh };
+  return { listings, loading, error, refresh };
 }
 
 // ─── Single listing (detail + offers) ─────────────────────────────────────────
@@ -92,6 +96,7 @@ interface UseListingResult {
   listing: ListingDetail | null;
   offers: ListingOffer[];
   loading: boolean;
+  error: unknown | null;
   refresh: () => void;
   refreshOffers: () => void;
 }
@@ -100,13 +105,14 @@ export function useListing(listingId: string): UseListingResult {
   const [listing, setListing] = useState<ListingDetail | null>(null);
   const [offers, setOffers] = useState<ListingOffer[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<unknown | null>(null);
 
   const refreshOffers = useCallback(() => {
     void (async () => {
       try {
         setOffers(await getJson<ListingOffer[]>(`/listings/${listingId}/offers`));
-      } catch {
-        /* keep stale */
+      } catch (err) {
+        Sentry.captureException(err, { tags: { resource: 'listings.offers' } });
       }
     })();
   }, [listingId]);
@@ -116,8 +122,10 @@ export function useListing(listingId: string): UseListingResult {
       setLoading(true);
       try {
         setListing(await getJson<ListingDetail>(`/listings/${listingId}`));
-      } catch {
-        /* keep stale */
+        setError(null);
+      } catch (err) {
+        Sentry.captureException(err, { tags: { resource: 'listings.detail' } });
+        setError(err);
       } finally {
         setLoading(false);
       }
@@ -129,16 +137,20 @@ export function useListing(listingId: string): UseListingResult {
     refresh();
   }, [refresh]);
 
-  return { listing, offers, loading, refresh, refreshOffers };
+  return { listing, offers, loading, error, refresh, refreshOffers };
 }
 
 // ─── My saved listings ────────────────────────────────────────────────────────
 
-export function useFavorites(
-  enabled = true,
-): { favorites: ListingSummary[]; loading: boolean; refresh: () => void } {
+export function useFavorites(enabled = true): {
+  favorites: ListingSummary[];
+  loading: boolean;
+  error: unknown | null;
+  refresh: () => void;
+} {
   const [favorites, setFavorites] = useState<ListingSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<unknown | null>(null);
 
   const refresh = useCallback(() => {
     if (!enabled) return;
@@ -146,8 +158,10 @@ export function useFavorites(
       setLoading(true);
       try {
         setFavorites(await getJson<ListingSummary[]>('/listings/favorites'));
-      } catch {
-        /* keep stale */
+        setError(null);
+      } catch (err) {
+        Sentry.captureException(err, { tags: { resource: 'listings.favorites' } });
+        setError(err);
       } finally {
         setLoading(false);
       }
@@ -158,7 +172,7 @@ export function useFavorites(
     refresh();
   }, [refresh]);
 
-  return { favorites, loading, refresh };
+  return { favorites, loading, error, refresh };
 }
 
 // ─── Mutations ──────────────────────────────────────────────────────────────
@@ -180,7 +194,9 @@ export function withdrawOffer(listingId: string): Promise<ListingOffer> {
 }
 
 export function respondToOffer(offerId: string, status: 'accepted' | 'declined'): Promise<ListingOffer> {
-  return putJson<{ status: 'accepted' | 'declined' }, ListingOffer>(`/listings/offers/${offerId}`, { status });
+  return putJson<{ status: 'accepted' | 'declined' }, ListingOffer>(`/listings/offers/${offerId}`, {
+    status,
+  });
 }
 
 /** Seller counter while keeping status=pending (last_actor=seller). */
