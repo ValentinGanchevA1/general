@@ -43,6 +43,10 @@ export function useAsyncResource<T>(
   const [error, setError] = useState<unknown | null>(null);
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
+  const initialDataRef = useRef(initialData);
+  initialDataRef.current = initialData;
+  const keepStaleRef = useRef(keepStale);
+  keepStaleRef.current = keepStale;
 
   const refresh = useCallback(() => {
     void (async () => {
@@ -56,14 +60,14 @@ export function useAsyncResource<T>(
           tags: { resource: resourceKey },
         });
         setError(err);
-        if (!keepStale) {
-          setData(initialData);
+        if (!keepStaleRef.current) {
+          setData(initialDataRef.current);
         }
       } finally {
         setLoading(false);
       }
     })();
-  }, [resourceKey, keepStale, initialData]);
+  }, [resourceKey]);
 
   useEffect(() => {
     if (autoFetch) refresh();
