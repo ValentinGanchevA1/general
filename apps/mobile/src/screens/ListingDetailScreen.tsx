@@ -1,1 +1,1 @@
-PLACEHOLDER
+{{FILE:/tmp/g88/apps/mobile/src/screens/ListingDetailScreen.tsx}}
