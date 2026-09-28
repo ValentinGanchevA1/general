@@ -219,18 +219,11 @@ const chatSlice = createSlice({
         state.messagesLoading[conversationId] = false;
         const existing = state.messages[conversationId] ?? [];
         const seen = new Set(existing.map((m) => m.id));
-        // Keep optimistic rows that are not yet on the server page.
-        const optimistic = existing.filter(
-          (m) =>
-            !seen.has(m.id) === false
-              ? false
-              : state.outbox.some((e) => e.optimisticId === m.id) ||
-                state.failedIds.includes(m.id),
-        );
-        // existing already includes optimistics; merge server page without dropping them
-        const serverOnly = page.messages.filter((m) => !seen.has(m.id));
-        state.messages[conversationId] = [...existing, ...serverOnly];
-        void optimistic; // kept via existing
+        // Append server page without dropping optimistic / failed rows still in existing.
+        state.messages[conversationId] = [
+          ...existing,
+          ...page.messages.filter((m) => !seen.has(m.id)),
+        ];
         state.nextCursor[conversationId] = page.nextCursor;
         if (!action.meta.arg.cursor) {
           const convo = state.conversations.find((c) => c.id === conversationId);
