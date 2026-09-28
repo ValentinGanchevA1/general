@@ -54,7 +54,7 @@ export function EventDetailScreen(): React.JSX.Element {
   const myId = useAppSelector((s) => s.auth.user?.id);
 
   const {
-    event, polls, questions, loading, refresh, refreshPolls, refreshQuestions,
+    event, polls, questions, loading, error, refresh, refreshPolls, refreshQuestions,
   } = useEvent(eventId);
   const [rsvpBusy, setRsvpBusy] = useState(false);
 
@@ -80,6 +80,15 @@ export function EventDetailScreen(): React.JSX.Element {
         <View style={[styles.container, styles.center]}>
           {loading ? (
             <ActivityIndicator color={colors.primary} />
+          ) : error != null ? (
+            <EmptyState
+              variant="plain"
+              icon="alert-circle-outline"
+              title="Couldn't load event"
+              body="Check your connection and try again."
+              actionLabel="Retry"
+              onAction={refresh}
+            />
           ) : (
             <EmptyState
               variant="plain"
