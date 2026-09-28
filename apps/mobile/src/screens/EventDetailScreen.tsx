@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -48,7 +49,7 @@ const RSVP_META: Record<RsvpStatus, { label: string; icon: string }> = {
 
 export function EventDetailScreen(): React.JSX.Element {
   const route = useRoute<R>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<EventsStackParamList>>();
   const { eventId } = route.params;
   const myId = useAppSelector((s) => s.auth.user?.id);
 

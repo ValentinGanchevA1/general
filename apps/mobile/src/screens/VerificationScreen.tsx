@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AccountStackParamList } from '@/navigation/stacks';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -30,7 +31,7 @@ import { colors, fontSize, spacing, radius } from '@/theme';
 type Step = 'phone' | 'code';
 
 export function VerificationScreen(): React.JSX.Element {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<AccountStackParamList>>();
   const route = useRoute<RouteProp<AccountStackParamList, 'Verification'>>();
   const dispatch = useAppDispatch();
   const [step, setStep] = useState<Step>('phone');

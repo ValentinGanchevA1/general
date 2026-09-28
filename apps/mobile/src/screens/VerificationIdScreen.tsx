@@ -10,6 +10,7 @@ import {
 
 import { appAlert } from '@/ui/appAlert';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   launchImageLibrary,
   launchCamera,
@@ -24,6 +25,7 @@ import {
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { extractMessage } from '@/utils/extractMessage';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import type { AccountStackParamList } from '@/navigation/stacks';
 import { colors, fontSize, spacing, radius } from '@/theme';
 
 type StepKey = 'selfie' | 'idFront' | 'idBack';
@@ -38,7 +40,7 @@ const STEPS: { key: StepKey; title: string; optional?: boolean }[] = [
 ];
 
 export default function VerificationIdScreen(): React.ReactElement {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<AccountStackParamList>>();
   const dispatch = useAppDispatch();
   const status = useAppSelector((s) => s.idVerification.status);
 
