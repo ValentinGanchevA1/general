@@ -64,6 +64,7 @@ import {
 	type ListingModeFilterValue,
 } from '@/components/map/MapFilterRow';
 import { EmptyState } from '@/components/EmptyState';
+import { mapEmptyCopy } from '@/components/map/mapEmptyCopy';
 import { MapChrome } from '@/components/map/MapChrome';
 import { TrendingCard } from '@/components/map/TrendingCard';
 import {
@@ -96,68 +97,12 @@ import { useChallenges } from '@/features/gamification/useChallenges';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
-type MapEmptyActionKind = 'show_everyone' | 'create' | 'verify_email';
-
-function mapEmptyCopy(opts: {
-	friendsOnly: boolean;
-	listingMode: ListingModeFilterValue;
-	emailVerified: boolean;
-}): {
-	icon: string;
-	title: string;
-	body: string;
-	actionLabel: string;
-	actionKind: MapEmptyActionKind;
-} {
-	if (opts.friendsOnly) {
-		return {
-			icon: 'account-group-outline',
-			title: 'No friends nearby',
-			body: 'None of your friends are in this area right now. Pan the map or turn Friends off.',
-			actionLabel: 'Show everyone',
-			actionKind: 'show_everyone',
-		};
-	}
-	if (opts.listingMode === 'sell') {
-		return {
-			icon: 'tag-outline',
-			title: 'No for-sale listings here',
-			body: 'Nothing for sale in this area. Post one, or switch the filter to All.',
-			actionLabel: 'Create here',
-			actionKind: 'create',
-		};
-	}
-	if (opts.listingMode === 'buy') {
-		return {
-			icon: 'cart-outline',
-			title: 'No wanted posts here',
-			body: 'Nobody is looking to buy in this area yet. Post a wanted, or switch the filter to All.',
-			actionLabel: 'Create here',
-			actionKind: 'create',
-		};
-	}
-	if (!opts.emailVerified) {
-		return {
-			icon: 'email-check-outline',
-			title: 'Verify email to get started',
-			body: 'Confirm your email so people can trust you on the map — then be the first to post something nearby.',
-			actionLabel: 'Verify email',
-			actionKind: 'verify_email',
-		};
-	}
-	return {
-		icon: 'map-marker-radius-outline',
-		title: 'Nothing nearby yet',
-		body: 'Be the first — sell something, post a wanted, create an event, or drop a local alert. Tap + in the filter bar or long-press the map.',
-		actionLabel: 'Create here',
-		actionKind: 'create',
-	};
-}
-
 export function MapScreen(): React.JSX.Element {
 	const dispatch = useAppDispatch();
 	const emailVerified =
 		useAppSelector((s) => s.profile.profile?.badges?.email === true);
+	const openToDating =
+		useAppSelector((s) => s.profile.profile?.openToDating === true);
 	const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 	const route = useRoute<RouteProp<TabParamList, 'Map'>>();
 	const { coords: myCoords, requestPermission } = useUserLocation();
@@ -484,6 +429,8 @@ export function MapScreen(): React.JSX.Element {
 
 	const emptyCopy = mapEmptyCopy({
 		friendsOnly,
+		datingOnly,
+		openToDating,
 		listingMode: listingModeFilter,
 		emailVerified,
 	});
@@ -560,10 +507,8 @@ export function MapScreen(): React.JSX.Element {
 
 			{region ? (
 				<MapFilterRow
-					value={searchQuery}
-					onChangeText={setSearchQuery}
-					layers={layers}
-					onLayersChange={setLayers}
+					value={layers}
+					onChange={setLayers}
 					listingMode={listingModeFilter}
 					onListingModeChange={setListingModeFilter}
 					friendsOnly={friendsOnly}
@@ -572,8 +517,10 @@ export function MapScreen(): React.JSX.Element {
 					onDatingOnlyChange={setDatingOnly}
 					rankBy={rankBy}
 					onRankByChange={setRankBy}
-					onPressCreate={openCreateNearby}
+					searchQuery={searchQuery}
+					onSearchQueryChange={setSearchQuery}
 					top={filterRowTop}
+					onCreatePress={openCreateNearby}
 				/>
 			) : null}
 
@@ -602,9 +549,13 @@ export function MapScreen(): React.JSX.Element {
 						onAction={
 							emptyCopy.actionKind === 'show_everyone'
 								? () => setFriendsOnly(false)
-								: emptyCopy.actionKind === 'verify_email'
-									? () => openRootScreen(navigation, 'EmailVerification')
-									: openCreateNearby
+								: emptyCopy.actionKind === 'clear_dating'
+									? () => setDatingOnly(false)
+									: emptyCopy.actionKind === 'dating_prefs'
+										? () => openRootScreen(navigation, 'ProfileEdit')
+										: emptyCopy.actionKind === 'verify_email'
+											? () => openRootScreen(navigation, 'EmailVerification')
+											: openCreateNearby
 						}
 					/>
 				</View>
@@ -629,142 +580,122 @@ export function MapScreen(): React.JSX.Element {
 			<BottomSheetModal
 				ref={entitySheetRef}
 				snapPoints={entitySnapPoints}
-				enablePanDownToClose
 				onDismiss={onSheetDismiss}
+				enablePanDownToClose
 				backdropComponent={renderBackdrop}
+				handleIndicatorStyle={sheetChrome.handleIndicator}
 				backgroundStyle={sheetChrome.background}
-				handleIndicatorStyle={sheetChrome.handle}
 			>
 				<BottomSheetView style={sheetChrome.content}>
 					{selected ? (
-						<ErrorBoundary fallback={<Text style={styles.sheetError}>Could not load card</Text>}>
-							<EntityBottomSheet
-								point={selected}
-								waving={selected.kind === 'user' && waving === selected.id}
-								onClose={closeSheet}
-								{...(selected.kind === 'user'
-									? { onWave: () => onSheetWavePress(selected.id) }
-									: {})}
-							/>
-						</ErrorBoundary>
+						<EntityBottomSheet
+							point={selected}
+							waving={waving === selected.id}
+							onClose={closeSheet}
+							{...(selected.kind === 'user'
+								? { onWave: onSheetWavePress }
+								: {})}
+						/>
 					) : null}
 				</BottomSheetView>
 			</BottomSheetModal>
 
-			<CreateNearbySheet
-				visible={createNearbyOpen}
-				onClose={() => setCreateNearbyOpen(false)}
-				onSelect={onCreateNearbySelect}
-			/>
+			{waveToast ? (
+				<View style={styles.toast} pointerEvents="none">
+					<Text style={styles.toastText}>{waveToast}</Text>
+				</View>
+			) : null}
 
-			{myCoords && !sheetOpen ? (
+			{/* Recenter FAB */}
+			{myCoords != null ? (
 				<Pressable
-					style={[styles.recenterBtn, { bottom: mapFabBottom(insets.bottom) + 56 }]}
+					style={[styles.recenterFab, { bottom: mapFabBottom(sheetOpen) }]}
 					onPress={onRecenter}
 					accessibilityRole="button"
-					accessibilityLabel="Recenter map on my location"
+					accessibilityLabel="Recenter map on me"
 				>
-					<Icon name="crosshairs-gps" size={22} color={colors.primary} />
+					<Icon name="crosshairs-gps" size={22} color={colors.textPrimary} />
 				</Pressable>
 			) : null}
 
-			{waveToast ? (
-				<View
-					style={[styles.waveToast, { top: insets.top + 12 }]}
-					pointerEvents="none"
-					accessibilityLiveRegion="polite"
-				>
-					<Text style={styles.waveToastText}>{waveToast}</Text>
-				</View>
-			) : null}
+			<CreateNearbySheet
+				open={createNearbyOpen}
+				onClose={() => setCreateNearbyOpen(false)}
+				onSelect={onCreateNearbySelect}
+			/>
 		</View>
 	);
 }
 
 function MapUnavailableFallback(): React.JSX.Element {
 	return (
-		<View style={[StyleSheet.absoluteFill, styles.unavailable]}>
+		<View style={styles.unavailable}>
 			<Text style={styles.unavailableTitle}>Map unavailable</Text>
 			<Text style={styles.unavailableBody}>
-				Google Maps could not be initialized. Verify your API key in local.properties.
+				Something went wrong loading the map. Try again in a moment.
 			</Text>
 		</View>
 	);
 }
 
-function regionToViewport(r: Region | null): Viewport | null {
-	if (!r) return null;
-	const halfLat = r.latitudeDelta / 2;
-	const halfLng = r.longitudeDelta / 2;
+function regionToViewport(region: Region | null): Viewport | null {
+	if (!region) return null;
+	const halfLat = region.latitudeDelta / 2;
+	const halfLng = region.longitudeDelta / 2;
 	return {
-		ne: { lat: r.latitude + halfLat, lng: r.longitude + halfLng },
-		sw: { lat: r.latitude - halfLat, lng: r.longitude - halfLng },
+		minLat: region.latitude - halfLat,
+		maxLat: region.latitude + halfLat,
+		minLng: region.longitude - halfLng,
+		maxLng: region.longitude + halfLng,
 	};
 }
 
-function approxZoomFromRegion(r: Region): number {
-	const latDelta = Math.max(r.latitudeDelta, 0.0001);
-	return Math.round(Math.log(360 / latDelta) / Math.LN2);
+function approxZoomFromRegion(region: Region): number {
+	const latDelta = Math.max(region.latitudeDelta, 0.0001);
+	return Math.round(Math.log2(360 / latDelta));
 }
 
 const styles = StyleSheet.create({
-	waveToast: {
-		position: 'absolute',
-		alignSelf: 'center',
-		backgroundColor: colors.surface,
-		borderWidth: 1,
-		borderColor: colors.border,
-		borderRadius: 20,
-		paddingHorizontal: 16,
-		paddingVertical: 10,
-		zIndex: 50,
-		elevation: 6,
-		shadowColor: colors.shadowInk,
-		shadowOpacity: 0.25,
-		shadowRadius: 8,
-		shadowOffset: { width: 0, height: 2 },
-	},
-	waveToastText: {
-		color: colors.textPrimary,
-		fontSize: 14,
-		fontWeight: '600',
-	},
-	recenterBtn: {
-		position: 'absolute',
-		right: 16,
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: 'rgba(18,18,31,0.94)',
-		borderWidth: 1,
-		borderColor: colors.borderStrong,
-		zIndex: 25,
-		elevation: 4,
-		shadowColor: colors.shadowInk,
-		shadowOpacity: 0.2,
-		shadowRadius: 6,
-		shadowOffset: { width: 0, height: 2 },
-	},
 	root: { flex: 1, backgroundColor: colors.bg },
 	emptyWrap: {
-		position: 'absolute',
-		left: 24,
-		right: 24,
-		bottom: 120,
-		alignItems: 'center',
+		...StyleSheet.absoluteFillObject,
+		justifyContent: 'center',
+		paddingHorizontal: 24,
 	},
 	loadingWrap: {
 		...StyleSheet.absoluteFillObject,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	sheetError: { color: colors.danger, padding: 16 },
-	unavailable: {
+	toast: {
+		position: 'absolute',
+		alignSelf: 'center',
+		top: 120,
+		backgroundColor: colors.surface,
+		paddingHorizontal: 16,
+		paddingVertical: 10,
+		borderRadius: 20,
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: colors.borderStrong,
+	},
+	toastText: { color: colors.textPrimary, fontWeight: '600', fontSize: 14 },
+	recenterFab: {
+		position: 'absolute',
+		right: 16,
+		width: 48,
+		height: 48,
+		borderRadius: 24,
+		backgroundColor: colors.surface,
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: colors.bg,
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: colors.borderStrong,
+		elevation: 4,
+	},
+	unavailable: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
 		padding: 24,
 	},
 	unavailableTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
