@@ -284,63 +284,81 @@ export function SuggestionsScreen(): React.JSX.Element {
 										accessibilityLabel={label}
 										hitSlop={6}
 									>
-										<Text style={S.reasonLink}>{label}</Text>
+										<Text style={[S.reason, S.reasonLink]} numberOfLines={1}>
+											{label}
+										</Text>
 									</TouchableOpacity>
 								) : (
-									<Text style={S.reason}>{label}</Text>
+									<Text style={S.reason} numberOfLines={1}>
+										{label}
+									</Text>
 								)}
 							</View>
-							{distLine ? <Text style={S.dist}>{distLine}</Text> : null}
+							{distLine ? (
+								<Text style={S.dist} numberOfLines={1}>
+									{distLine}
+								</Text>
+							) : null}
 						</View>
 					</TouchableOpacity>
 					<View style={S.actions}>
 						<TouchableOpacity
-							style={S.iconBtn}
-							onPress={() => onViewOnMap(item)}
-							accessibilityRole="button"
-							accessibilityLabel={`View ${item.displayName} on map`}
-						>
-							<Icon name="map-marker-outline" size={20} color={colors.textMuted} />
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={S.iconBtn}
+							style={S.btnDismiss}
 							onPress={() => onDismiss(item)}
 							disabled={busy}
 							accessibilityRole="button"
 							accessibilityLabel={`Hide ${item.displayName}`}
+							hitSlop={8}
 						>
-							<Icon name="close" size={20} color={colors.textFaint} />
+							<Text style={S.btnDismissText}>✕</Text>
 						</TouchableOpacity>
-						{item.hasPendingOutgoing ? (
-							<Text style={S.sent}>Sent</Text>
-						) : item.isFollowing ? (
+						<TouchableOpacity
+							style={S.btnMap}
+							onPress={() => onViewOnMap(item)}
+							disabled={busy}
+							accessibilityRole="button"
+							accessibilityLabel={`View ${item.displayName} on map`}
+							hitSlop={8}
+						>
+							<Icon name="map-marker-radius" size={18} color={colors.primary} />
+						</TouchableOpacity>
+						{!item.isFollowing ? (
 							<TouchableOpacity
-								style={S.secondaryBtn}
-								onPress={() => void onAddFriend(item.userId)}
-								disabled={busy}
-								accessibilityRole="button"
-								accessibilityLabel={`Add ${item.displayName} as friend`}
-							>
-								{busy ? (
-									<ActivityIndicator size="small" color={colors.primary} />
-								) : (
-									<Text style={S.secondaryText}>Add friend</Text>
-								)}
-							</TouchableOpacity>
-						) : (
-							<TouchableOpacity
-								style={S.primaryBtn}
+								style={S.btnSecondary}
 								onPress={() => void onFollow(item.userId)}
 								disabled={busy}
 								accessibilityRole="button"
 								accessibilityLabel={`Follow ${item.displayName}`}
 							>
 								{busy ? (
-									<ActivityIndicator size="small" color={colors.onPrimary} />
+									<ActivityIndicator size="small" color={colors.primary} />
 								) : (
-									<Text style={S.primaryText}>Follow</Text>
+									<Text style={S.btnSecondaryText}>Follow</Text>
 								)}
 							</TouchableOpacity>
+						) : (
+							<View style={S.btnGhost}>
+								<Text style={S.btnGhostText}>Following</Text>
+							</View>
+						)}
+						{!item.hasPendingOutgoing ? (
+							<TouchableOpacity
+								style={S.btnPrimary}
+								onPress={() => void onAddFriend(item.userId)}
+								disabled={busy}
+								accessibilityRole="button"
+								accessibilityLabel={`Add ${item.displayName} as friend`}
+							>
+								{busy ? (
+									<ActivityIndicator size="small" color={colors.onPrimary} />
+								) : (
+									<Text style={S.btnPrimaryText}>Add</Text>
+								)}
+							</TouchableOpacity>
+						) : (
+							<View style={S.btnGhost}>
+								<Text style={S.btnGhostText}>Requested</Text>
+							</View>
 						)}
 					</View>
 				</View>
@@ -367,19 +385,12 @@ export function SuggestionsScreen(): React.JSX.Element {
 					<SkeletonListRow />
 				</View>
 			) : error && items.length === 0 ? (
-				<EmptyState
-					icon="alert-circle-outline"
-					title="Could not load"
-					body={error}
-					actionLabel="Retry"
-					onAction={() => void load()}
-				/>
-			) : items.length === 0 ? (
-				<EmptyState
-					icon="account-search-outline"
-					title="No suggestions right now"
-					body="Wave, chat, or meet people nearby — then check back for people you may know."
-				/>
+				<View style={S.centered}>
+					<Text style={S.errorText}>{error}</Text>
+					<TouchableOpacity style={S.retry} onPress={() => void load()}>
+						<Text style={S.retryText}>Retry</Text>
+					</TouchableOpacity>
+				</View>
 			) : (
 				<FlatList
 					data={items}
@@ -388,9 +399,17 @@ export function SuggestionsScreen(): React.JSX.Element {
 					contentContainerStyle={S.list}
 					refreshControl={
 						<RefreshControl
-							refreshing={loading}
+							refreshing={loading && items.length > 0}
 							onRefresh={() => void load()}
 							tintColor={colors.primary}
+						/>
+					}
+					ListEmptyComponent={
+						<EmptyState
+							variant="plain"
+							icon="account-plus-outline"
+							title="No suggestions yet"
+							body="Wave at people on the map, chat, or grow your friend graph — suggestions show up here."
 						/>
 					}
 				/>
@@ -407,44 +426,68 @@ const S = StyleSheet.create({
 		paddingBottom: spacing.sm,
 	},
 	root: { flex: 1, backgroundColor: colors.bg },
-	list: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
+	centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+	errorText: { color: colors.danger, marginBottom: 12, textAlign: 'center' },
+	retry: {
+		backgroundColor: colors.primary,
+		paddingHorizontal: 20,
+		paddingVertical: 10,
+		borderRadius: radius.md,
+	},
+	retryText: { color: colors.onPrimary, fontWeight: '700' },
+	list: { paddingBottom: 40, flexGrow: 1 },
 	card: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: colors.surfaceRaised,
-		borderRadius: radius.md,
-		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: colors.border,
-		padding: spacing.md,
 		gap: spacing.sm,
+		paddingVertical: spacing.md,
+		paddingHorizontal: spacing.lg,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: colors.border,
 	},
-	cardMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+	cardMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
 	cardMeta: { flex: 1, minWidth: 0 },
-	name: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '700' },
-	reasonRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' },
-	reason: { color: colors.textMuted, fontSize: fontSize.sm },
-	reasonLink: { color: colors.primary, fontSize: fontSize.sm, fontWeight: '600' },
-	dist: { color: colors.textFaint, fontSize: 12, marginTop: 2 },
-	actions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-	iconBtn: { padding: 6 },
-	primaryBtn: {
+	name: { color: colors.textPrimary, fontWeight: '600', fontSize: fontSize.md },
+	reasonRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+	reason: { color: colors.textMuted, fontSize: fontSize.xs, flexShrink: 1 },
+	reasonLink: { color: colors.primary, fontWeight: '600' },
+	dist: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
+	actions: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+	btnDismiss: {
+		paddingHorizontal: 6,
+		paddingVertical: 6,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	btnDismissText: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
+	btnMap: {
+		paddingHorizontal: 6,
+		paddingVertical: 6,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	btnPrimary: {
+		paddingHorizontal: 14,
+		paddingVertical: 8,
+		borderRadius: 16,
 		backgroundColor: colors.action,
+		alignItems: 'center',
+	},
+	btnPrimaryText: { color: colors.textPrimary, fontWeight: '700', fontSize: 13 },
+	btnSecondary: {
 		paddingHorizontal: 12,
 		paddingVertical: 8,
-		borderRadius: radius.pill,
-		minWidth: 72,
-		alignItems: 'center',
-	},
-	primaryText: { color: colors.textPrimary, fontWeight: '700', fontSize: 13 },
-	secondaryBtn: {
+		borderRadius: 16,
+		backgroundColor: colors.surfaceAlt,
 		borderWidth: StyleSheet.hairlineWidth,
 		borderColor: colors.borderStrong,
-		paddingHorizontal: 10,
-		paddingVertical: 8,
-		borderRadius: radius.pill,
-		minWidth: 88,
 		alignItems: 'center',
 	},
-	secondaryText: { color: colors.primary, fontWeight: '600', fontSize: 12 },
-	sent: { color: colors.textMuted, fontSize: 12, fontWeight: '600', paddingHorizontal: 8 },
+	btnSecondaryText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+	btnGhost: {
+		paddingHorizontal: 10,
+		paddingVertical: 8,
+		alignItems: 'center',
+	},
+	btnGhostText: { color: colors.textMuted, fontWeight: '600', fontSize: 13 },
 });
