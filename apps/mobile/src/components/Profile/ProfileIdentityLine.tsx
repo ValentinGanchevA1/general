@@ -15,6 +15,11 @@ export type ProfileIdentityLineProps = {
   onPress?: () => void;
   /** Self empty state copy when nothing public yet. */
   emptyHint?: string;
+  /**
+   * other-mode horizontal alignment.
+   * Profile hero centers; map sheet uses start.
+   */
+  align?: 'center' | 'start';
 };
 
 /**
@@ -27,6 +32,7 @@ export function ProfileIdentityLine({
   mode = 'other',
   onPress,
   emptyHint = 'Add gender, nationality · Edit',
+  align = 'center',
 }: ProfileIdentityLineProps): React.JSX.Element | null {
   const hasContent = Boolean(identityLine || hometownLine);
 
@@ -57,9 +63,22 @@ export function ProfileIdentityLine({
   if (!hasContent) return null;
 
   return (
-    <View style={styles.otherWrap}>
-      {hometownLine ? <Text style={styles.originLine}>{hometownLine}</Text> : null}
-      {identityLine ? <Text style={styles.identityLine}>{identityLine}</Text> : null}
+    <View
+      style={[
+        styles.otherWrap,
+        align === 'start' ? styles.otherWrapStart : null,
+      ]}
+    >
+      {hometownLine ? (
+        <Text style={[styles.originLine, align === 'start' ? styles.textStart : null]}>
+          {hometownLine}
+        </Text>
+      ) : null}
+      {identityLine ? (
+        <Text style={[styles.identityLine, align === 'start' ? styles.textStart : null]}>
+          {identityLine}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -68,6 +87,12 @@ const styles = StyleSheet.create({
   otherWrap: {
     alignItems: 'center',
     gap: 2,
+  },
+  otherWrapStart: {
+    alignItems: 'flex-start',
+  },
+  textStart: {
+    textAlign: 'left',
   },
   originLine: { color: colors.textMuted, fontSize: 14 },
   identityLine: { color: colors.textFaint, fontSize: 13 },
