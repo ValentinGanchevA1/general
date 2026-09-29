@@ -88,12 +88,6 @@ export function FriendsSuggestionsRail({
     void load();
   }, [load]);
 
-  useEffect(() => {
-    if (!feedback) return;
-    const t = setTimeout(() => setFeedback(null), 2200);
-    return () => clearTimeout(t);
-  }, [feedback]);
-
   const onViewOnMap = useCallback(
     (item: SuggestionCard) => {
       void focusUserOnMap(navigation, {
@@ -129,6 +123,7 @@ export function FriendsSuggestionsRail({
                   );
                   removeCard(item.userId);
                   setFeedback('Hidden for 7 days');
+                  setTimeout(() => setFeedback(null), 2200);
                 } catch (e) {
                   appAlert('Could not hide', isApiError(e) ? e.message : 'Try again.');
                 } finally {
@@ -150,6 +145,7 @@ export function FriendsSuggestionsRail({
                   );
                   removeCard(item.userId);
                   setFeedback('Removed from suggestions');
+                  setTimeout(() => setFeedback(null), 2200);
                 } catch (e) {
                   appAlert('Could not hide', isApiError(e) ? e.message : 'Try again.');
                 } finally {

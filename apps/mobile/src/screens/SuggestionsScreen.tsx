@@ -70,7 +70,6 @@ function isApiError(e: unknown): e is ApiError {
 	);
 }
 
-
 export function SuggestionsScreen(): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
 	const [items, setItems] = useState<SuggestionCard[]>([]);
@@ -101,12 +100,6 @@ export function SuggestionsScreen(): React.JSX.Element {
 			void load();
 		}, [load]),
 	);
-
-	React.useEffect(() => {
-		if (!feedback) return;
-		const t = setTimeout(() => setFeedback(null), 2200);
-		return () => clearTimeout(t);
-	}, [feedback]);
 
 	const openProfile = useCallback(
 		(userId: string) => {
@@ -215,6 +208,7 @@ export function SuggestionsScreen(): React.JSX.Element {
 									);
 									removeCard(item.userId);
 									setFeedback('Hidden for 7 days');
+									setTimeout(() => setFeedback(null), 2200);
 								} catch (e) {
 									appAlert('Could not hide', isApiError(e) ? e.message : 'Try again.');
 								} finally {
@@ -236,6 +230,7 @@ export function SuggestionsScreen(): React.JSX.Element {
 									);
 									removeCard(item.userId);
 									setFeedback('Removed from suggestions');
+									setTimeout(() => setFeedback(null), 2200);
 								} catch (e) {
 									appAlert('Could not hide', isApiError(e) ? e.message : 'Try again.');
 								} finally {
@@ -457,7 +452,6 @@ const S = StyleSheet.create({
 	reason: { color: colors.textMuted, fontSize: fontSize.xs, flexShrink: 1 },
 	reasonLink: { color: colors.primary, fontWeight: '600' },
 	dist: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
-
 	actions: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
 	btnDismiss: {
 		paddingHorizontal: 6,
