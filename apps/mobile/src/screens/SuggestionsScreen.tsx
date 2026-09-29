@@ -11,6 +11,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { appAlert } from '@/ui/appAlert';
+import { track } from '@/lib/analytics';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -77,6 +78,7 @@ export function SuggestionsScreen(): React.JSX.Element {
 	const [error, setError] = useState<string | null>(null);
 	const [busyIds, setBusyIds] = useState<string[]>([]);
 	const [feedback, setFeedback] = useState<string | null>(null);
+	const [sessionDismissed, setSessionDismissed] = useState(0);
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -167,6 +169,7 @@ export function SuggestionsScreen(): React.JSX.Element {
 				await postJson<{ userId: string }, { requestId: string }>('/friends/requests', {
 					userId,
 				});
+				track('suggestions.add', { surface: 'list' });
 				markRequested(userId);
 			} catch (e) {
 				if (isApiError(e)) {
@@ -207,6 +210,8 @@ export function SuggestionsScreen(): React.JSX.Element {
 										{ snoozeDays: 7 },
 									);
 									removeCard(item.userId);
+									setSessionDismissed((n) => n + 1);
+									track('suggestions.dismiss', { mode: 'snooze', surface: 'list' });
 									setFeedback('Hidden for 7 days');
 									setTimeout(() => setFeedback(null), 2200);
 								} catch (e) {
@@ -229,6 +234,8 @@ export function SuggestionsScreen(): React.JSX.Element {
 										{},
 									);
 									removeCard(item.userId);
+									setSessionDismissed((n) => n + 1);
+									track('suggestions.dismiss', { mode: 'permanent', surface: 'list' });
 									setFeedback('Removed from suggestions');
 									setTimeout(() => setFeedback(null), 2200);
 								} catch (e) {
@@ -408,8 +415,16 @@ export function SuggestionsScreen(): React.JSX.Element {
 						<EmptyState
 							variant="plain"
 							icon="account-plus-outline"
-							title="No suggestions yet"
-							body="Wave at people on the map, chat, or grow your friend graph — suggestions show up here."
+							title={
+								sessionDismissed > 0
+									? 'Caught up for now'
+									: 'No suggestions yet'
+							}
+							body={
+								sessionDismissed > 0
+									? 'You hid everyone in this batch. Wave on the map or check back later for new people.'
+									: 'Wave at people on the map, chat, or grow your friend graph — suggestions show up here.'
+							}
 						/>
 					}
 				/>
