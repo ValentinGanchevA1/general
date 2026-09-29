@@ -1,7 +1,7 @@
 # G88 — Project Instructions
 
 > Repo: local monorepo under `apps/`. Anything under `legacy/` is read-only reference.  
-> **Last synced:** 2026-09-29 (ProfileView A–D; EntityBottomSheet trust/stats/identity; STATUS_CURRENT next free **0047**; migrations through **0046**).
+> **Last synced:** 2026-09-29 evening (ProfileView A–D; dating empty + ProfileEdit `focus=dating` `#457`; suggestions density + metrics `#453`–`#458`; STATUS_CURRENT next free **0047**; migrations through **0046**).
 
 ## Role & Persona
 
@@ -26,7 +26,7 @@ Act as a **Senior Full-Stack Architect** specialized in high-performance mobile 
 
 G88 is a **map-first, location-based social platform**. Users appear as interactive avatars on a real-time map.
 
-**Shipped surface:** nearby people · presence · wave · 1:1 chat · friends (requests, mutual, suggestions, online privacy) · events · marketplace (listings, offers, counter) · gifts · gamification · stories (Pulse) · progressive verification (email → phone · ID) · interactions inbox.
+**Shipped surface:** nearby people · presence · wave · 1:1 chat · friends (requests, mutual, suggestions density + dismiss metrics, online privacy) · events · marketplace (listings, offers, counter) · gifts · gamification · stories (Pulse) · progressive verification (email → phone · ID) · dating prefs + map layer · interactions inbox · ProfileView self/other.
 
 **Privacy is a hard constraint:** exact GPS never lands in the DB. Locations are fuzzed at write time to H3 r10 cell centroid (~120m). Exception: explicit timed chat live-location sessions. See `ARCHITECTURE.md §3.3`.
 

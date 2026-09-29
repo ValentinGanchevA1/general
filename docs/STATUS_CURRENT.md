@@ -1,6 +1,6 @@
 # G88 — current status (authoritative snapshot)
 
-> **Synced:** 2026-09-29  
+> **Synced:** 2026-09-29 (evening)  
 > **HEAD:** master · **Next free migration:** `0047`  
 > Full historical log: root `STATUS.md`.
 
@@ -11,10 +11,10 @@
 | Area | Notes |
 |---|---|
 | **P1–P3 core** | Auth, map, presence, wave, chat, gamification, gifts, push/geofences, verification UI, events, trading |
-| **Friends** | Migrations `0032`/`0033`; requests, presence privacy, mutual, suggestions (rank C + dismiss `0043`), notifications + badge, interactions inbox |
+| **Friends** | Migrations `0032`/`0033`; requests, presence privacy, mutual, suggestions (rank C + dismiss `0043`), density UI + dismiss metrics (`#453`–`#458`), notifications + badge, interactions inbox |
 | **Stories (P4.S)** | Create (photo/video ≤15s), Pulse strip, viewer (`react-native-video`), reactions; soft post gate (email + 24h); strike thresholds enforced |
-| **Profile** | Origin (DOB 18+, hometown), cover, storyline, identity (gender/orientation/nationality `0045`), ProfileView self+other, follow/friend CTAs, strike standing |
-| **Dating prefs** | Migration `0046` `open_to_dating` + seeking; discovery `datingOnly`; Map Dating filter + empty copy |
+| **Profile** | Origin (DOB 18+, hometown), cover, storyline, identity (gender/orientation/nationality `0045`), ProfileView self+other, follow/friend CTAs, strike standing, `resolveUserPrimaryCta` |
+| **Dating prefs** | Migration `0046` `open_to_dating` + seeking; discovery `datingOnly`; Map Dating filter; empty → ProfileEdit `focus=dating` (`#452`/`#457`) |
 | **Map discovery** | City-scale GPS center, rankBy relevance/distance/newest, PostGIS KNN, listing mode + friendsOnly + datingOnly, cell-cap ≤5k |
 | **Map chrome** | People/Events/Listings · More sheet · GPS recenter · pan-dismiss challenge · `+` create · coach v2 |
 | **EntityBottomSheet** | Listing/event above-fold meta · Message seller/host · mutual · ProfileTrustBlock + ProfileStatsRow · identity via ProfileIdentityLine |
@@ -30,10 +30,12 @@
 | Area | What |
 |---|---|
 | ProfileView A–D | Shared presentational body; ProfileScreen + UserProfile thin data wrappers (`#445`–`#448`) |
-| #449 | EntityBottomSheet ProfileTrustBlock + ProfileStatsRow; ListingDetail typecheck |
+| #449–#451 | EntityBottomSheet trust/stats + identity line + CTA styles restore |
 | Listing urgency | `0044` expires_at/bumped_at + bump API + mobile surfaces |
 | Profile identity public | `0045` + formatPublicIdentityParts on profile + sheet |
-| Dating prefs | `0046` + Map Dating filter |
+| Dating prefs + activation | `0046` + Map Dating filter; empty CTA → ProfileEdit (`#452`); `focus=dating` scroll (`#457`) |
+| Friends suggestions density | MutualPreviewStack, rail dismiss, Suggestions feedback (`#453`–`#455`); MapScreen typecheck (`#456`) |
+| Suggestions metrics | `track('suggestions.dismiss'|'add')` rail+list; session empty copy (`#458`) |
 
 ## Ops gaps (not code blockers)
 
@@ -47,10 +49,10 @@
 ## Next (priority order)
 
 1. **Trust ops (Render)** — env + E2E: ID submit → admin score → approve.
-2. **Device smoke** — cold-start city map · Dating filter · sheet identity/trust · ListingDetail Message · story photo+video.
+2. **Device smoke** — cold-start city map · Dating filter + ProfileEdit focus · sheet identity/trust · ListingDetail Message · story photo+video · suggestions dismiss.
 3. **Twilio email** — prod OTP without DEV code.
 4. **Play closed testing** (owner).
-5. **Product** — friends density / suggestions quality; push delivery metrics.
+5. **Product** — push delivery metrics; optional block-by-author on events/listings; next slice TBD.
 
 ## Rekognition checklist
 
