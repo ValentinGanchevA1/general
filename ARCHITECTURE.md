@@ -54,7 +54,7 @@ JWT access 15m + opaque rotating refresh 30d. Google OAuth live; Apple dropped (
 
 ### 3.8 Migrations
 
-Raw SQL. **0001–0040** on master; **next free 0041**. Dual-0030 resolved. Prefix CI guard.
+Raw SQL. **0001–0046** on master; **next free 0047**. Dual-0030 resolved. Prefix CI guard.
 
 ### 3.9 Shared contracts
 
@@ -95,6 +95,7 @@ auth · users · discovery · presence · interactions · chat · blocks · frie
 
 ## 5. Change log
 
+- **2026-09-29** — ProfileView A–D; EntityBottomSheet trust/stats/identity; migrations through 0046; next free 0047.
 - **2026-09-17** — Theme ownership (`mobile/theme` sole UI tokens); toast tints + shadowInk; loading Skeleton convention.
-- **2026-09-14** — Docs restore. Migrations 0001–0040 / next 0041. listingMode, friendsOnly, MAX_CELLS 5k, map polish Option 1, EntityBottomSheet, offers/counter, friends online privacy. Privacy invariant unchanged.
+- **2026-09-14** — Docs restore. Migrations 0001–0046 / next 0047. listingMode, friendsOnly, MAX_CELLS 5k, map polish Option 1, EntityBottomSheet, offers/counter, friends online privacy. Privacy invariant unchanged.
 - **2026-06–08** — H3, clustering, r10 fuzz, presence-in-Redis, in-process realtime, admin app established.

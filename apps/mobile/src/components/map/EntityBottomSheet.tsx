@@ -22,7 +22,7 @@ import type {
 	RelationshipSummary,
 	UserMeta,
 } from '@g88/shared';
-import {formatPublicIdentityParts, haversineMeters} from '@g88/shared';
+import {haversineMeters} from '@g88/shared';
 import type {RootStackParamList} from '@/navigation/AppNavigator';
 import {openRootScreen} from '@/navigation/openRootScreen';
 import {deleteJson, getJson, postJson} from '@/api/client';
@@ -35,6 +35,8 @@ import {useUserLocation} from '@/features/location/useUserLocation';
 import {colors} from '@/theme';
 import {ProfileTrustBlock} from '@/components/Profile/ProfileTrustBlock';
 import {ProfileStatsRow} from '@/components/Profile/ProfileStatsRow';
+import {ProfileIdentityLine} from '@/components/Profile/ProfileIdentityLine';
+import {publicIdentityLines} from '@/features/profile/mapToProfileViewModel';
 import {styles} from './EntityBottomSheet.styles';
 
 /** Short TTL cache so re-opening the same pin does not triple-fetch. */
@@ -208,21 +210,15 @@ function UserCard({point, waving, onWave, onClose}: UserCardProps): React.JSX.El
 	const idVerified = profile?.idVerified === true;
 	const ringVariant = idVerified ? 'verified' : isFriend ? 'friend' : 'brand';
 	const distanceMeters = profile?.distanceMeters;
+	const {identityLine, hometownLine} =
+		profile != null
+			? publicIdentityLines(profile)
+			: {identityLine: null, hometownLine: null};
+	/** Map context only — identity/hometown live in ProfileIdentityLine below. */
 	const subtitle = (() => {
 		if (profile == null) return null;
 		const parts: string[] = [];
 		if (profile.age != null) parts.push(`${profile.age}`);
-		for (const p of formatPublicIdentityParts({
-			gender: profile.gender ?? null,
-			genderSelfDescribe: profile.genderSelfDescribe ?? null,
-			sexualOrientation: profile.sexualOrientation ?? null,
-			orientationSelfDescribe: profile.orientationSelfDescribe ?? null,
-			nationality: profile.nationality ?? null,
-		})) {
-			parts.push(p);
-		}
-		const home = [profile.hometownCity, profile.hometownCountry].filter(Boolean).join(', ');
-		if (home) parts.push(home);
 		if (distanceMeters != null && distanceMeters >= 0) {
 			parts.push(formatDistanceMeters(distanceMeters));
 		}
@@ -449,6 +445,16 @@ function UserCard({point, waving, onWave, onClose}: UserCardProps): React.JSX.El
 					<Text style={styles.overflowBtnText}>···</Text>
 				</TouchableOpacity>
 			</View>
+			{!fetching && profile != null ? (
+				<View style={styles.identityLineWrap}>
+					<ProfileIdentityLine
+						mode="other"
+						align="start"
+						identityLine={identityLine}
+						hometownLine={hometownLine}
+					/>
+				</View>
+			) : null}
 			{fetching && profile == null ? (
 				<ActivityIndicator color={colors.primary} size="small" style={{alignSelf: 'flex-start'}}/>
 			) : null}

@@ -1,7 +1,7 @@
 # G88 — Project Instructions
 
 > Repo: local monorepo under `apps/`. Anything under `legacy/` is read-only reference.  
-> **Last synced:** 2026-09-24 (map calm v1 + empty create + online dots; STATUS_CURRENT next free **0044**; migrations through **0043**).
+> **Last synced:** 2026-09-29 (ProfileView A–D; EntityBottomSheet trust/stats/identity; STATUS_CURRENT next free **0047**; migrations through **0046**).
 
 ## Role & Persona
 
@@ -41,15 +41,15 @@ Authoritative sequence + gates: `ROADMAP.md`. Live progress: `STATUS.md` / `docs
 
 ## Current Stack (in use)
 
-| Layer | Tech |
-|-------|------|
-| Mobile | React Native CLI + TypeScript, Redux Toolkit, react-native-maps |
-| Backend | NestJS + TypeORM, PostgreSQL 16 + PostGIS + H3-PG |
-| Realtime | Socket.IO (presence, chat, verification) |
-| Cache | Redis (presence, OTP, discovery snapshots, presign) |
-| Shared | `@g88/shared` DTOs + geo helpers |
-| Admin | Vite + React ID queue @ `127.0.0.1:5173` |
-| Database | PostgreSQL 16 + PostGIS + H3-PG. Migrations sequential through **0043**; next free **0044** |
+| Layer    | Tech                                                                                        |
+|----------|---------------------------------------------------------------------------------------------|
+| Mobile   | React Native CLI + TypeScript, Redux Toolkit, react-native-maps; ProfileView self+other     |
+| Backend  | NestJS + TypeORM, PostgreSQL 16 + PostGIS + H3-PG                                           |
+| Realtime | Socket.IO (presence, chat, verification)                                                    |
+| Cache    | Redis (presence, OTP, discovery snapshots, presign)                                         |
+| Shared   | `@g88/shared` DTOs + geo helpers                                                            |
+| Admin    | Vite + React ID queue @ `127.0.0.1:5173`                                                    |
+| Database | PostgreSQL 16 + PostGIS + H3-PG. Migrations sequential through **0046**; next free **0047** |
 
 ## Repo layout
 
@@ -83,11 +83,11 @@ Stripe Connect / paid gifts · Elasticsearch · Kafka · gRPC · Kubernetes · G
 
 ## Known gaps (docs / residual engineering)
 
-| Gap | Notes |
-|-----|--------|
-| `admin.guard.spec.ts` | Missing dedicated unit spec |
-| Events/listings block-by-author | Optional; needs authorId in discovery meta |
-| Hex theme lint | Convention only; prefer tokens. **Ownership:** `apps/mobile/src/theme/index.ts` sole mobile palette (not shared). Intentional hex: mapStyle, socialConfig. Toast tints → `colors.toast*`; shadows → `colors.shadowInk` |
-| Strike escalation | **Enforced** in stories (phone_required @3, suspend @5); Settings/Profile standing surfaces shipped. Appeal/copy polish optional |
-| Full-screen Spinner → Skeleton | Migrate as-you-touch; Marketplace/Friends/Interactions already use Skeleton |
-| Trust ops (Render) | Rekognition + `ADMIN_USER_IDS` — see `docs/ID_VERIFICATION_OPS.md` |
+| Gap                             | Notes                                                                                                                                                                                                                  |
+|---------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `admin.guard.spec.ts`           | Missing dedicated unit spec                                                                                                                                                                                            |
+| Events/listings block-by-author | Optional; needs authorId in discovery meta                                                                                                                                                                             |
+| Hex theme lint                  | Convention only; prefer tokens. **Ownership:** `apps/mobile/src/theme/index.ts` sole mobile palette (not shared). Intentional hex: mapStyle, socialConfig. Toast tints → `colors.toast*`; shadows → `colors.shadowInk` |
+| Strike escalation               | **Enforced** in stories (phone_required @3, suspend @5); Settings/Profile standing surfaces shipped. Appeal/copy polish optional                                                                                       |
+| Full-screen Spinner → Skeleton  | Migrate as-you-touch; Marketplace/Friends/Interactions already use Skeleton                                                                                                                                            |
+| Trust ops (Render)              | Rekognition + `ADMIN_USER_IDS` — see `docs/ID_VERIFICATION_OPS.md`                                                                                                                                                     |
