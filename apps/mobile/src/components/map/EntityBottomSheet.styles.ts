@@ -113,11 +113,9 @@ export const styles = StyleSheet.create({
   },
   trustChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
   trustChipStrong: {
-    backgroundColor: colors.primarySoft,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.primaryBorder,
+    backgroundColor: colors.primary,
   },
-  trustChipStrongText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  trustChipStrongText: { color: colors.onPrimary, fontSize: 12, fontWeight: '700' },
   trustEmpty: { color: colors.textFaint, fontSize: 12 },
   statsBlock: { gap: 6 },
   statsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
@@ -132,17 +130,25 @@ export const styles = StyleSheet.create({
   achievementIcon: { fontSize: 16 },
   bio: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  ctaFlex: { flexGrow: 1 },
+  ctaFlexShrink: { flexGrow: 0 },
   primaryBtn: {
-    flexGrow: 1,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: radius.md,
-    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaSkeleton: { opacity: 0.35 },
-  ctaFlex: { minWidth: 120 },
+  waveBtn: { backgroundColor: colors.primary },
+  messageBtn: { backgroundColor: colors.action },
+  /** Placeholder while relationship loads — same height as primary CTA. */
+  ctaSkeleton: {
+    backgroundColor: colors.surfaceAlt,
+    minHeight: 40,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  /** Secondary solid when Message is primary (open chat) — Wave stays available. */
   secondarySolidBtn: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
