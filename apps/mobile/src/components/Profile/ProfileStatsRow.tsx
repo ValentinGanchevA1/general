@@ -4,8 +4,8 @@ import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { colors, radius } from '@/theme';
 
 export type ProfileStatsRowProps = {
-  level: number | null | undefined;
-  allTimeRank: number | null | undefined;
+  level?: number | null;
+  allTimeRank?: number | null;
   achievementIcons?: string[] | null;
   onLayout?: (e: LayoutChangeEvent) => void;
 };
