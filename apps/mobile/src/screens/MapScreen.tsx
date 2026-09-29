@@ -362,7 +362,6 @@ export function MapScreen(): React.JSX.Element {
 	const { nudge } = useNudges();
 	const { challenges } = useChallenges();
 	const [challengeDismissed, setChallengeDismissed] = useState(false);
-	/** First region settle does not count as a pan; subsequent moves dismiss daily challenge (session). */
 	const regionSettledOnceRef = useRef(false);
 	const lastRegionRef = useRef<Region | null>(null);
 
@@ -435,7 +434,6 @@ export function MapScreen(): React.JSX.Element {
 		emailVerified,
 	});
 
-	// --- New near you (client seen-set + tab badge) ---
 	useEffect(() => {
 		let cancelled = false;
 		void (async () => {
@@ -552,7 +550,7 @@ export function MapScreen(): React.JSX.Element {
 								: emptyCopy.actionKind === 'clear_dating'
 									? () => setDatingOnly(false)
 									: emptyCopy.actionKind === 'dating_prefs'
-										? () => openRootScreen(navigation, 'ProfileEdit')
+										? () => openRootScreen(navigation, 'ProfileEdit', { focus: 'dating' })
 										: emptyCopy.actionKind === 'verify_email'
 											? () => openRootScreen(navigation, 'EmailVerification')
 											: openCreateNearby
@@ -610,7 +608,6 @@ export function MapScreen(): React.JSX.Element {
 				</View>
 			) : null}
 
-			{/* Recenter FAB */}
 			{myCoords != null ? (
 				<Pressable
 					style={[styles.recenterFab, { bottom: mapFabBottom(insets.bottom) }]}
