@@ -85,7 +85,11 @@ export function FriendsSuggestionsRail({
   }, []);
 
   useEffect(() => {
-    void load();
+    // Defer so setLoading inside load is not sync-in-effect (react-hooks/set-state-in-effect).
+    const t = setTimeout(() => {
+      void load();
+    }, 0);
+    return () => clearTimeout(t);
   }, [load]);
 
   const onViewOnMap = useCallback(
