@@ -507,8 +507,10 @@ export function MapScreen(): React.JSX.Element {
 
 			{region ? (
 				<MapFilterRow
-					value={layers}
-					onChange={setLayers}
+					value={searchQuery}
+					onChangeText={setSearchQuery}
+					layers={layers}
+					onLayersChange={setLayers}
 					listingMode={listingModeFilter}
 					onListingModeChange={setListingModeFilter}
 					friendsOnly={friendsOnly}
@@ -517,10 +519,8 @@ export function MapScreen(): React.JSX.Element {
 					onDatingOnlyChange={setDatingOnly}
 					rankBy={rankBy}
 					onRankByChange={setRankBy}
-					searchQuery={searchQuery}
-					onSearchQueryChange={setSearchQuery}
 					top={filterRowTop}
-					onCreatePress={openCreateNearby}
+					onPressCreate={openCreateNearby}
 				/>
 			) : null}
 
@@ -583,7 +583,7 @@ export function MapScreen(): React.JSX.Element {
 				onDismiss={onSheetDismiss}
 				enablePanDownToClose
 				backdropComponent={renderBackdrop}
-				handleIndicatorStyle={sheetChrome.handleIndicator}
+				handleIndicatorStyle={sheetChrome.handle}
 				backgroundStyle={sheetChrome.background}
 			>
 				<BottomSheetView style={sheetChrome.content}>
@@ -593,7 +593,11 @@ export function MapScreen(): React.JSX.Element {
 							waving={waving === selected.id}
 							onClose={closeSheet}
 							{...(selected.kind === 'user'
-								? { onWave: onSheetWavePress }
+								? {
+										onWave: () => {
+											onSheetWavePress(selected.id);
+										},
+									}
 								: {})}
 						/>
 					) : null}
@@ -609,7 +613,7 @@ export function MapScreen(): React.JSX.Element {
 			{/* Recenter FAB */}
 			{myCoords != null ? (
 				<Pressable
-					style={[styles.recenterFab, { bottom: mapFabBottom(sheetOpen) }]}
+					style={[styles.recenterFab, { bottom: mapFabBottom(insets.bottom) }]}
 					onPress={onRecenter}
 					accessibilityRole="button"
 					accessibilityLabel="Recenter map on me"
@@ -619,7 +623,7 @@ export function MapScreen(): React.JSX.Element {
 			) : null}
 
 			<CreateNearbySheet
-				open={createNearbyOpen}
+				visible={createNearbyOpen}
 				onClose={() => setCreateNearbyOpen(false)}
 				onSelect={onCreateNearbySelect}
 			/>
@@ -643,10 +647,14 @@ function regionToViewport(region: Region | null): Viewport | null {
 	const halfLat = region.latitudeDelta / 2;
 	const halfLng = region.longitudeDelta / 2;
 	return {
-		minLat: region.latitude - halfLat,
-		maxLat: region.latitude + halfLat,
-		minLng: region.longitude - halfLng,
-		maxLng: region.longitude + halfLng,
+		ne: {
+			lat: region.latitude + halfLat,
+			lng: region.longitude + halfLng,
+		},
+		sw: {
+			lat: region.latitude - halfLat,
+			lng: region.longitude - halfLng,
+		},
 	};
 }
 
