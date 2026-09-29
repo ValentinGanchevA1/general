@@ -2,6 +2,7 @@
  * Shared presentational contract for ProfileScreen (self) and UserProfileScreen (other).
  */
 import type { ReactElement, ReactNode } from 'react';
+import type { RefreshControlProps } from 'react-native';
 import type { MessagePermission, VerificationLevel } from '@g88/shared';
 import type { RelationshipState } from '@g88/shared';
 import type { UserPrimaryCta } from '@/features/social/resolveUserPrimaryCta';
@@ -117,7 +118,7 @@ export type ProfileViewProps = {
   selfSlots?: ProfileViewSelfSlots;
 
   /** Pull-to-refresh (self ProfileScreen). */
-  refreshControl?: ReactElement;
+  refreshControl?: ReactElement<RefreshControlProps>;
 
   focus?: ProfileFocusSection;
   activePhotoIndex?: number;

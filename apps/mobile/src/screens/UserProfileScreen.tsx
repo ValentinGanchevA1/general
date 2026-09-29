@@ -216,7 +216,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 				messaging={messaging}
 				followBusy={followBusy}
 				friendBusy={friendBusy}
-				focus={focus}
+				{...(focus ? { focus } : {})}
 				actions={{
 					onPressViewOnMap: viewOnMap,
 					onPressMutual: openMutualFriends,

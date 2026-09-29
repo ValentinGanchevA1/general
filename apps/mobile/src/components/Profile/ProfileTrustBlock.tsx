@@ -6,7 +6,7 @@ import {
   formatTrustScoreLabel,
   trustEmptyCopy,
 } from '@/features/profile/formatTrustScore';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius } from '@/theme';
 
 export type TrustChip = { label: string };
 
@@ -62,24 +62,22 @@ export function ProfileTrustBlock({
         <Text style={styles.sectionLabel}>Trust</Text>
         <Text style={styles.trustScore}>{formatTrustScoreLabel(verificationScore)}</Text>
       </View>
-      {chips.length === 0 ? (
-        <Text style={styles.trustEmpty}>{trustEmptyCopy()}</Text>
-      ) : (
-        <View style={styles.trustBadges}>
-          {chips.map((b) => (
+      <View style={styles.trustBadges}>
+        {chips.length === 0 ? (
+          <Text style={styles.trustEmpty}>{trustEmptyCopy()}</Text>
+        ) : (
+          chips.map((b) => (
             <View
               key={b.label}
               style={[styles.trustChip, b.label === 'ID' ? styles.trustChipStrong : undefined]}
             >
-              <Text
-                style={b.label === 'ID' ? styles.trustChipStrongText : styles.trustChipText}
-              >
+              <Text style={b.label === 'ID' ? styles.trustChipStrongText : styles.trustChipText}>
                 {b.label}
               </Text>
             </View>
-          ))}
-        </View>
-      )}
+          ))
+        )}
+      </View>
     </View>
   );
 }
@@ -98,16 +96,20 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  trustScore: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
+  trustScore: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
   trustBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  trustEmpty: { color: colors.textFaint, fontSize: 12 },
   trustChip: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4,
   },
-  trustChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
-  trustChipStrong: { backgroundColor: colors.primary },
-  trustChipStrongText: { color: colors.onPrimary, fontSize: 12, fontWeight: '700' },
-  trustEmpty: { color: colors.textFaint, fontSize: 12 },
+  trustChipStrong: {
+    backgroundColor: colors.primarySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.primaryBorder,
+  },
+  trustChipText: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
+  trustChipStrongText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
 });

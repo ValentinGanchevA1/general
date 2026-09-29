@@ -154,7 +154,6 @@ export function ProfileScreen(): React.JSX.Element {
   const {
     p,
     photos,
-    verificationScore: _score,
     isPaid,
     tierLabel,
   } = derived;

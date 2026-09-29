@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
 	ActivityIndicator,
 	Image,
@@ -7,9 +7,9 @@ import {
 	View,
 } from 'react-native';
 
-import { appAlert } from '@/ui/appAlert';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import {appAlert} from '@/ui/appAlert';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {
 	CreateConversationRequest,
 	CreateConversationResponse,
@@ -21,32 +21,21 @@ import type {
 	PublicUserProfile,
 	RelationshipSummary,
 	UserMeta,
-	VerificationLevel,
 } from '@g88/shared';
-import { formatPublicIdentityParts, haversineMeters } from '@g88/shared';
-import type { RootStackParamList } from '@/navigation/AppNavigator';
-import { openRootScreen } from '@/navigation/openRootScreen';
-import { deleteJson, getJson, postJson } from '@/api/client';
-import { bumpListing } from '@/features/trading/useTrading';
-import { formatListingExpiry } from '@/features/trading/formatPrice';
-import { signalPostSocialActivation } from '@/features/nudges/postSocialActivation';
-import { IdentityBlock } from '@/components/IdentityBlock';
-import { useAppSelector } from '@/hooks/redux';
-import { useUserLocation } from '@/features/location/useUserLocation';
-import { colors } from '@/theme';
-import {
-	formatTrustScoreLabel,
-	trustEmptyCopy,
-} from '@/features/profile/formatTrustScore';
-import { styles } from './EntityBottomSheet.styles';
-
-const LADDER: VerificationLevel[] = ['none', 'email', 'phone', 'selfie', 'id'];
-const LADDER_BADGES: Array<{ level: VerificationLevel; label: string }> = [
-	{ level: 'email', label: 'Email' },
-	{ level: 'phone', label: 'Phone' },
-	{ level: 'selfie', label: 'Photo' },
-	{ level: 'id', label: 'ID' },
-];
+import {formatPublicIdentityParts, haversineMeters} from '@g88/shared';
+import type {RootStackParamList} from '@/navigation/AppNavigator';
+import {openRootScreen} from '@/navigation/openRootScreen';
+import {deleteJson, getJson, postJson} from '@/api/client';
+import {bumpListing} from '@/features/trading/useTrading';
+import {formatListingExpiry} from '@/features/trading/formatPrice';
+import {signalPostSocialActivation} from '@/features/nudges/postSocialActivation';
+import {IdentityBlock} from '@/components/IdentityBlock';
+import {useAppSelector} from '@/hooks/redux';
+import {useUserLocation} from '@/features/location/useUserLocation';
+import {colors} from '@/theme';
+import {ProfileTrustBlock} from '@/components/Profile/ProfileTrustBlock';
+import {ProfileStatsRow} from '@/components/Profile/ProfileStatsRow';
+import {styles} from './EntityBottomSheet.styles';
 
 /** Short TTL cache so re-opening the same pin does not triple-fetch. */
 const PROFILE_CACHE_TTL_MS = 45_000;
@@ -66,20 +55,16 @@ function getCachedProfile(userId: string): PublicUserProfile | null {
 }
 
 function setCachedProfile(userId: string, profile: PublicUserProfile): void {
-	profileCache.set(userId, { profile, fetchedAt: Date.now() });
+	profileCache.set(userId, {profile, fetchedAt: Date.now()});
 }
 
-function earnedBadges(level: VerificationLevel): string[] {
-	const rank = LADDER.indexOf(level);
-	return LADDER_BADGES.filter((b) => rank >= LADDER.indexOf(b.level)).map((b) => b.label);
-}
 
 function formatStartsAt(iso: string): string {
 	const d = new Date(iso);
 	if (Number.isNaN(d.getTime())) return iso;
 	try {
 		const now = new Date();
-		const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+		const time = d.toLocaleTimeString(undefined, {hour: '2-digit', minute: '2-digit'});
 		const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 		const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 		const dayDiff = Math.round((startOfDay - startOfToday) / 86_400_000);
@@ -87,7 +72,7 @@ function formatStartsAt(iso: string): string {
 		if (dayDiff === 1) return `Tomorrow ${time}`;
 		if (dayDiff === -1) return `Yesterday ${time}`;
 		if (dayDiff > 1 && dayDiff < 7) {
-			const weekday = d.toLocaleDateString(undefined, { weekday: 'short' });
+			const weekday = d.toLocaleDateString(undefined, {weekday: 'short'});
 			return `${weekday} ${time}`;
 		}
 		return d.toLocaleString(undefined, {
@@ -123,9 +108,9 @@ function formatDistanceMeters(meters: number): string {
 
 /** Viewer → pin distance from live GPS (null while location unknown). */
 function usePinDistanceMeters(lat: number, lng: number): number | null {
-	const { coords } = useUserLocation();
+	const {coords} = useUserLocation();
 	if (coords == null) return null;
-	const m = haversineMeters(coords, { lat, lng });
+	const m = haversineMeters(coords, {lat, lng});
 	return Number.isFinite(m) && m >= 0 ? m : null;
 }
 
@@ -149,7 +134,7 @@ interface UserCardProps {
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.Element {
+function UserCard({point, waving, onWave, onClose}: UserCardProps): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
 	const cached = getCachedProfile(point.id);
 	const [profile, setProfile] = useState<PublicUserProfile | null>(cached);
@@ -219,13 +204,6 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 	const displayName = meta.displayName?.trim() || 'User';
 	const canMessage = profile?.relationship?.canMessage ?? 'none';
 	const blocked = profile?.blockedByViewer ?? false;
-	const status = profile?.status;
-	const trustScore = profile?.verificationScore;
-	const badges = profile ? earnedBadges(profile.verification) : [];
-	const achievementIcons = status?.achievementIcons ?? [];
-	const allTimeRank = status?.allTimeRank ?? null;
-	const hasStats =
-		status != null || allTimeRank != null || achievementIcons.length > 0;
 	const isFriend = meta.isFriend === true;
 	const idVerified = profile?.idVerified === true;
 	const ringVariant = idVerified ? 'verified' : isFriend ? 'friend' : 'brand';
@@ -264,7 +242,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 		onClose();
 		navigation.navigate('UserProfile', {
 			userId: point.id,
-			...(focus != null ? { focus } : {}),
+			...(focus != null ? {focus} : {}),
 		});
 	};
 	const handleOpenProfile = (): void => {
@@ -276,7 +254,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 		onClose();
 		navigation.navigate('MutualFriends', {
 			peerUserId: point.id,
-			...(displayName ? { peerName: displayName } : {}),
+			...(displayName ? {peerName: displayName} : {}),
 		});
 	};
 
@@ -288,7 +266,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 				await deleteJson<{ blocked: boolean }>(`/blocks/${point.id}`);
 				setProfile((p) => {
 					if (!p) return p;
-					const next = { ...p, blockedByViewer: false };
+					const next = {...p, blockedByViewer: false};
 					setCachedProfile(point.id, next);
 					return next;
 				});
@@ -296,7 +274,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 				await postJson<undefined, { blocked: boolean }>(`/blocks/${point.id}`, undefined);
 				setProfile((p) => {
 					if (!p) return p;
-					const next = { ...p, blockedByViewer: true };
+					const next = {...p, blockedByViewer: true};
 					setCachedProfile(point.id, next);
 					return next;
 				});
@@ -313,8 +291,8 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 		if (blocking) return;
 		if (blocked) {
 			appAlert(displayName, undefined, [
-				{ text: 'Unblock', onPress: () => void runBlockToggle() },
-				{ text: 'Cancel', style: 'cancel' },
+				{text: 'Unblock', onPress: () => void runBlockToggle()},
+				{text: 'Cancel', style: 'cancel'},
 			]);
 			return;
 		}
@@ -327,13 +305,13 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 						'Block this user?',
 						'They will not be able to wave or message you. You can unblock later in Settings.',
 						[
-							{ text: 'Cancel', style: 'cancel' },
-							{ text: 'Block', style: 'destructive', onPress: () => void runBlockToggle() },
+							{text: 'Cancel', style: 'cancel'},
+							{text: 'Block', style: 'destructive', onPress: () => void runBlockToggle()},
 						],
 					);
 				},
 			},
-			{ text: 'Cancel', style: 'cancel' },
+			{text: 'Cancel', style: 'cancel'},
 		]);
 	};
 
@@ -344,7 +322,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 			const res = await postJson<
 				CreateConversationRequest,
 				CreateConversationResponse
-			>('/conversations', { targetUserId: point.id });
+			>('/conversations', {targetUserId: point.id});
 			void signalPostSocialActivation('message');
 			onClose();
 			openRootScreen(navigation, 'Chat', {
@@ -353,7 +331,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 				otherUserId: point.id,
 				requestPending: res.status === 'pending' && res.permission === 'request',
 				...(profile?.verification != null
-					? { otherUserVerification: profile.verification }
+					? {otherUserVerification: profile.verification}
 					: {}),
 				otherUserIdVerified: profile?.idVerified ?? false,
 			});
@@ -466,13 +444,13 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 					disabled={blocking || (fetching && profile == null)}
 					accessibilityRole="button"
 					accessibilityLabel="More actions"
-					hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+					hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
 				>
 					<Text style={styles.overflowBtnText}>···</Text>
 				</TouchableOpacity>
 			</View>
 			{fetching && profile == null ? (
-				<ActivityIndicator color={colors.primary} size="small" style={{ alignSelf: 'flex-start' }} />
+				<ActivityIndicator color={colors.primary} size="small" style={{alignSelf: 'flex-start'}}/>
 			) : null}
 			{fetchError && profile == null ? (
 				<View style={styles.fetchErrorRow}>
@@ -481,7 +459,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 						onPress={onRetryProfile}
 						accessibilityRole="button"
 						accessibilityLabel="Retry loading profile"
-						hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+						hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}
 					>
 						<Text style={styles.fetchErrorRetry}>Retry</Text>
 					</TouchableOpacity>
@@ -501,7 +479,7 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 								style={[styles.mutualAvatarWrap, i > 0 ? styles.mutualAvatarOverlap : undefined]}
 							>
 								{f.avatarUrl ? (
-									<Image source={{ uri: f.avatarUrl }} style={styles.mutualAvatar} />
+									<Image source={{uri: f.avatarUrl}} style={styles.mutualAvatar}/>
 								) : (
 									<View style={[styles.mutualAvatar, styles.mutualAvatarPlaceholder]}>
 										<Text style={styles.mutualInitial}>
@@ -526,57 +504,34 @@ function UserCard({ point, waving, onWave, onClose }: UserCardProps): React.JSX.
 					accessibilityLabel="View trust on profile"
 					activeOpacity={0.85}
 				>
-					<View style={styles.trustHeader}>
-						<Text style={styles.sectionLabel}>Trust</Text>
-						<Text style={styles.trustText}>
-							{formatTrustScoreLabel(trustScore)}
-						</Text>
-					</View>
-					<View style={styles.trustBadges}>
-						{badges.length === 0 ? (
-							<Text style={styles.trustEmpty}>{trustEmptyCopy()}</Text>
-						) : (
-							badges.map((b) => (
-								<View key={b} style={[styles.trustChip, b === 'ID' ? styles.trustChipStrong : undefined]}>
-									<Text style={b === 'ID' ? styles.trustChipStrongText : styles.trustChipText}>
-										{b}
-									</Text>
-								</View>
-							))
-						)}
-					</View>
+					<ProfileTrustBlock
+						verification={profile.verification}
+						idVerified={profile.idVerified}
+						verificationScore={profile.verificationScore}
+					/>
 				</TouchableOpacity>
 			) : null}
-			{!fetching && hasStats ? (
+			{!fetching &&
+			profile != null &&
+			(profile.status?.level != null ||
+				profile.status?.allTimeRank != null ||
+				(profile.status?.achievementIcons?.length ?? 0) > 0) ? (
 				<TouchableOpacity
 					style={styles.statsBlock}
 					onPress={() => openProfile('stats')}
 					accessibilityRole="button"
-					accessibilityLabel="View stats on profile"
+					accessibilityLabel="View activity on profile"
 					activeOpacity={0.85}
 				>
-					<Text style={styles.sectionLabel}>Stats</Text>
-					<View style={styles.statsRow}>
-						{status?.level != null ? (
-							<View style={styles.statPill}>
-								<Text style={styles.statPillValue}>Lv {status.level}</Text>
-							</View>
-						) : null}
-						{allTimeRank != null ? (
-							<View style={styles.statPill}>
-								<Text style={styles.statPillValue}>#{allTimeRank}</Text>
-							</View>
-						) : null}
-						{achievementIcons.length > 0 ? (
-							<View style={styles.achievementIcons}>
-								{achievementIcons.slice(0, 3).map((icon, i) => (
-									<Text key={`${icon}-${i}`} style={styles.achievementIcon}>
-										{icon}
-									</Text>
-								))}
-							</View>
-						) : null}
-					</View>
+					<ProfileStatsRow
+						{...(profile.status?.level != null ? {level: profile.status.level} : {})}
+						{...(profile.status?.allTimeRank != null
+							? {allTimeRank: profile.status.allTimeRank}
+							: {})}
+						{...(profile.status?.achievementIcons != null
+							? {achievementIcons: profile.status.achievementIcons}
+							: {})}
+					/>
 				</TouchableOpacity>
 			) : null}
 			{profile?.bio ? (
@@ -622,7 +577,7 @@ function EventCard({
 
 	const openDetail = (): void => {
 		onClose();
-		openRootScreen(navigation, 'EventDetail', { eventId: point.id });
+		openRootScreen(navigation, 'EventDetail', {eventId: point.id});
 	};
 
 	const onMessageHost = async (): Promise<void> => {
@@ -631,7 +586,7 @@ function EventCard({
 		try {
 			const res = await postJson<CreateConversationRequest, CreateConversationResponse>(
 				'/conversations',
-				{ targetUserId: hostId },
+				{targetUserId: hostId},
 			);
 			void signalPostSocialActivation('message');
 			onClose();
@@ -656,13 +611,13 @@ function EventCard({
 		<View style={styles.sheet}>
 			{coverUrl ? (
 				<Image
-					source={{ uri: coverUrl }}
+					source={{uri: coverUrl}}
 					style={styles.entityCover}
 					accessibilityLabel={`${title} cover`}
 				/>
 			) : null}
 			<View style={styles.kindHeader}>
-				<View style={[styles.kindDot, styles.kindDotEvent]} />
+				<View style={[styles.kindDot, styles.kindDotEvent]}/>
 				<Text style={styles.kindLabel}>Event</Text>
 			</View>
 			<Text style={styles.entityTitle} numberOfLines={2}>
@@ -754,7 +709,7 @@ function ListingCard({
 
 	const openDetail = (): void => {
 		onClose();
-		openRootScreen(navigation, 'ListingDetail', { listingId: point.id });
+		openRootScreen(navigation, 'ListingDetail', {listingId: point.id});
 	};
 
 	const onBump = async (): Promise<void> => {
@@ -787,7 +742,7 @@ function ListingCard({
 		try {
 			const res = await postJson<CreateConversationRequest, CreateConversationResponse>(
 				'/conversations',
-				{ targetUserId: sellerId },
+				{targetUserId: sellerId},
 			);
 			void signalPostSocialActivation('message');
 			onClose();
@@ -813,7 +768,7 @@ function ListingCard({
 			<View style={styles.listingTop}>
 				{thumbUrl ? (
 					<Image
-						source={{ uri: thumbUrl }}
+						source={{uri: thumbUrl}}
 						style={styles.listingThumb}
 						accessibilityLabel={`${title} photo`}
 					/>
@@ -924,7 +879,7 @@ function ListingCard({
 }
 
 /** Content only — host mounts inside BottomSheetModal. */
-export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): React.JSX.Element {
+export function EntityBottomSheet({point, waving, onClose, onWave}: Props): React.JSX.Element {
 	if (point.kind === 'user') {
 		return (
 			<UserCard
@@ -932,15 +887,15 @@ export function EntityBottomSheet({ point, waving, onClose, onWave }: Props): Re
 				point={point as UserEntityPoint}
 				waving={waving}
 				onClose={onClose}
-				{...(onWave != null ? { onWave } : {})}
+				{...(onWave != null ? {onWave} : {})}
 			/>
 		);
 	}
 	if (point.kind === 'event') {
-		return <EventCard point={point as EventEntityPoint} onClose={onClose} />;
+		return <EventCard point={point as EventEntityPoint} onClose={onClose}/>;
 	}
 	if (point.kind === 'listing') {
-		return <ListingCard point={point as ListingEntityPoint} onClose={onClose} />;
+		return <ListingCard point={point as ListingEntityPoint} onClose={onClose}/>;
 	}
 	return (
 		<View style={styles.sheet}>

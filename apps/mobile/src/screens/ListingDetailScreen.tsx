@@ -1,9 +1,4 @@
-// apps/mobile/src/screens/ListingDetailScreen.tsx
-//
-// P3.7 listing detail. Buyer: favorite, make/withdraw an offer, wave the seller.
-// Seller: review offers (accept / counter / decline) and mark sold/withdrawn.
-
-import React, { useCallback, useState } from 'react';
+import React, {useCallback, useState} from 'react';
 import {
 	ActivityIndicator,
 	Image,
@@ -16,15 +11,15 @@ import {
 	View,
 } from 'react-native';
 
-import { appAlert } from '@/ui/appAlert';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import type { RouteProp } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import {appAlert} from '@/ui/appAlert';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import type {RouteProp} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { ScreenHeader } from '@/components/ScreenHeader';
-import { EmptyState } from '@/components/EmptyState';
-import { colors } from '@/theme';
+import {ScreenHeader} from '@/components/ScreenHeader';
+import {EmptyState} from '@/components/EmptyState';
+import {colors} from '@/theme';
 
 import type {
 	ApiError,
@@ -34,9 +29,9 @@ import type {
 	WaveRequest,
 	WaveResponse,
 } from '@g88/shared';
-import type { CommerceStackParamList } from '@/navigation/stacks';
-import { useAppSelector } from '@/hooks/redux';
-import { postJson } from '@/api/client';
+import type {CommerceStackParamList} from '@/navigation/stacks';
+import {useAppSelector} from '@/hooks/redux';
+import {postJson} from '@/api/client';
 import {
 	bumpListing,
 	counterOffer,
@@ -47,19 +42,19 @@ import {
 	useListing,
 	withdrawOffer,
 } from '@/features/trading/useTrading';
-import { formatListingExpiry, formatPrice } from '@/features/trading/formatPrice';
-import { openRootScreen, openViaRef } from '@/navigation/openRootScreen';
-import { signalPostSocialActivation } from '@/features/nudges/postSocialActivation';
+import {formatListingExpiry, formatPrice} from '@/features/trading/formatPrice';
+import {openRootScreen} from '@/navigation/openRootScreen';
+import {signalPostSocialActivation} from '@/features/nudges/postSocialActivation';
 
 type R = RouteProp<CommerceStackParamList, 'ListingDetail'>;
 
 export function ListingDetailScreen(): React.JSX.Element {
 	const route = useRoute<R>();
 	const navigation = useNavigation<NativeStackNavigationProp<CommerceStackParamList>>();
-	const { listingId } = route.params;
+	const {listingId} = route.params;
 	const myId = useAppSelector((s) => s.auth.user?.id);
 
-	const { listing, offers, loading, error, refresh, refreshOffers } = useListing(listingId);
+	const {listing, offers, loading, error, refresh, refreshOffers} = useListing(listingId);
 	const [favBusy, setFavBusy] = useState(false);
 
 	const onToggleFav = useCallback(async () => {
@@ -77,10 +72,10 @@ export function ListingDetailScreen(): React.JSX.Element {
 	if (!listing) {
 		return (
 			<View style={S.container}>
-				<ScreenHeader title="Listing" />
+				<ScreenHeader title="Listing"/>
 				<View style={[S.container, S.center]}>
 					{loading ? (
-						<ActivityIndicator color={colors.primary} />
+						<ActivityIndicator color={colors.primary}/>
 					) : error != null ? (
 						<EmptyState
 							variant="plain"
@@ -109,7 +104,7 @@ export function ListingDetailScreen(): React.JSX.Element {
 		<ScrollView
 			style={S.container}
 			contentContainerStyle={S.content}
-			refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />}
+			refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary}/>}
 		>
 			<ScreenHeader
 				title="Listing"
@@ -131,10 +126,10 @@ export function ListingDetailScreen(): React.JSX.Element {
 			/>
 
 			{listing.thumbnailUrl ? (
-				<Image source={{ uri: listing.thumbnailUrl }} style={S.image} />
+				<Image source={{uri: listing.thumbnailUrl}} style={S.image}/>
 			) : (
 				<View style={[S.image, S.imagePlaceholder]}>
-					<Icon name="image-off-outline" size={40} color={colors.borderStrong} />
+					<Icon name="image-off-outline" size={40} color={colors.borderStrong}/>
 				</View>
 			)}
 
@@ -156,13 +151,14 @@ export function ListingDetailScreen(): React.JSX.Element {
 					<TouchableOpacity
 						style={S.sellerIdentity}
 						activeOpacity={0.7}
-						onPress={() => openRootScreen(navigation, 'UserProfile', { userId: listing.sellerId })}
+						onPress={() => openRootScreen(navigation, 'UserProfile', {userId: listing.sellerId})}
 					>
 						{listing.sellerAvatarUrl ? (
-							<Image source={{ uri: listing.sellerAvatarUrl }} style={S.sellerAvatar} />
+							<Image source={{uri: listing.sellerAvatarUrl}} style={S.sellerAvatar}/>
 						) : (
 							<View style={[S.sellerAvatar, S.sellerAvatarPlaceholder]}>
-								<Text style={S.sellerInitial}>{listing.sellerDisplayName[0]?.toUpperCase() ?? '?'}</Text>
+								<Text
+									style={S.sellerInitial}>{listing.sellerDisplayName[0]?.toUpperCase() ?? '?'}</Text>
 							</View>
 						)}
 						<Text style={S.sellerName}>{listing.sellerDisplayName}</Text>
@@ -183,7 +179,10 @@ export function ListingDetailScreen(): React.JSX.Element {
 						status={listing.status}
 						offers={offers}
 						currency={listing.currency}
-						onChanged={() => { refresh(); refreshOffers(); }}
+						onChanged={() => {
+							refresh();
+							refreshOffers();
+						}}
 					/>
 				) : (
 					<BuyerOffer
@@ -217,7 +216,7 @@ function SellerContactButtons({
 		try {
 			const res = await postJson<CreateConversationRequest, CreateConversationResponse>(
 				'/conversations',
-				{ targetUserId: sellerId },
+				{targetUserId: sellerId},
 			);
 			void signalPostSocialActivation('message');
 			openRootScreen(navigation, 'Chat', {
@@ -260,17 +259,17 @@ function SellerContactButtons({
 				accessibilityLabel="Message seller"
 			>
 				{messaging ? (
-					<ActivityIndicator size="small" color={colors.onPrimary} />
+					<ActivityIndicator size="small" color={colors.onPrimary}/>
 				) : (
-					<Icon name="message-text-outline" size={16} color={colors.onPrimary} />
+					<Icon name="message-text-outline" size={16} color={colors.onPrimary}/>
 				)}
 				<Text style={S.waveText}>{messaging ? '…' : 'Message'}</Text>
 			</TouchableOpacity>
 			<TouchableOpacity style={S.waveBtn} onPress={() => void onWave()} disabled={waving}>
 				{waving ? (
-					<ActivityIndicator size="small" color={colors.onPrimary} />
+					<ActivityIndicator size="small" color={colors.onPrimary}/>
 				) : (
-					<Icon name="hand-wave" size={16} color={colors.onPrimary} />
+					<Icon name="hand-wave" size={16} color={colors.onPrimary}/>
 				)}
 				<Text style={S.waveText}>Wave</Text>
 			</TouchableOpacity>
@@ -306,10 +305,11 @@ function BuyerOffer({
 		setBusy(true);
 		try {
 			await makeOffer(listingId, {
-				...(offerCents != null ? { offerCents } : {}),
-				...(message.trim() ? { message: message.trim() } : {}),
+				...(offerCents != null ? {offerCents} : {}),
+				...(message.trim() ? {message: message.trim()} : {}),
 			});
-			setAmount(''); setMessage('');
+			setAmount('');
+			setMessage('');
 			onChanged();
 		} catch (e) {
 			appAlert('Could not send offer', (e as ApiError).message || 'Try again.');
@@ -382,10 +382,13 @@ function BuyerOffer({
 						onChangeText={setMessage}
 						multiline
 					/>
-					<TouchableOpacity style={[S.primaryBtn, busy && S.btnDisabled]} disabled={busy} onPress={() => void submit()}>
-						{busy ? <ActivityIndicator size="small" color={colors.onPrimary} /> : <Text style={S.primaryBtnText}>Send counter</Text>}
+					<TouchableOpacity style={[S.primaryBtn, busy && S.btnDisabled]} disabled={busy}
+									  onPress={() => void submit()}>
+						{busy ? <ActivityIndicator size="small" color={colors.onPrimary}/> :
+							<Text style={S.primaryBtnText}>Send counter</Text>}
 					</TouchableOpacity>
-					<TouchableOpacity style={[S.secondaryBtn, { marginTop: 10 }]} disabled={busy} onPress={() => setReofferOpen(false)}>
+					<TouchableOpacity style={[S.secondaryBtn, {marginTop: 10}]} disabled={busy}
+									  onPress={() => setReofferOpen(false)}>
 						<Text style={S.secondaryBtnText}>Cancel</Text>
 					</TouchableOpacity>
 				</View>
@@ -409,7 +412,7 @@ function BuyerOffer({
 				{myOffer.status === 'pending' ? (
 					<>
 						{isSellerCounter ? (
-							<View style={{ marginTop: 12, gap: 10 }}>
+							<View style={{marginTop: 12, gap: 10}}>
 								<TouchableOpacity
 									style={[S.primaryBtn, busy && S.btnDisabled]}
 									disabled={busy}
@@ -417,7 +420,7 @@ function BuyerOffer({
 									accessibilityLabel="Accept counter offer"
 								>
 									{busy ? (
-										<ActivityIndicator size="small" color={colors.onPrimary} />
+										<ActivityIndicator size="small" color={colors.onPrimary}/>
 									) : (
 										<Text style={S.primaryBtnText}>Accept counter</Text>
 									)}
@@ -442,7 +445,8 @@ function BuyerOffer({
 								</TouchableOpacity>
 							</View>
 						) : (
-							<TouchableOpacity style={[S.secondaryBtn, { marginTop: 10 }]} disabled={busy} onPress={() => void onWithdraw()}>
+							<TouchableOpacity style={[S.secondaryBtn, {marginTop: 10}]} disabled={busy}
+											  onPress={() => void onWithdraw()}>
 								<Text style={S.secondaryBtnText}>Withdraw offer</Text>
 							</TouchableOpacity>
 						)}
@@ -479,8 +483,10 @@ function BuyerOffer({
 				onChangeText={setMessage}
 				multiline
 			/>
-			<TouchableOpacity style={[S.primaryBtn, busy && S.btnDisabled]} disabled={busy} onPress={() => void submit()}>
-				{busy ? <ActivityIndicator size="small" color={colors.onPrimary} /> : <Text style={S.primaryBtnText}>Send offer</Text>}
+			<TouchableOpacity style={[S.primaryBtn, busy && S.btnDisabled]} disabled={busy}
+							  onPress={() => void submit()}>
+				{busy ? <ActivityIndicator size="small" color={colors.onPrimary}/> :
+					<Text style={S.primaryBtnText}>Send offer</Text>}
 			</TouchableOpacity>
 		</View>
 	);
@@ -524,7 +530,7 @@ function SellerControls({
 			try {
 				await counterOffer(offerId, {
 					offerCents: Math.round(parsed * 100),
-					...(counterMsg.trim() ? { message: counterMsg.trim() } : {}),
+					...(counterMsg.trim() ? {message: counterMsg.trim()} : {}),
 				});
 				setCounterFor(null);
 				setCounterAmount('');
@@ -570,7 +576,8 @@ function SellerControls({
 			{status === 'active' ? (
 				<View style={S.sellerActions}>
 					<TouchableOpacity style={S.secondaryBtn} onPress={() => void onBump()} disabled={bumping}>
-						{bumping ? <ActivityIndicator size="small" color={colors.primary} /> : <Text style={S.secondaryBtnText}>Bump listing</Text>}
+						{bumping ? <ActivityIndicator size="small" color={colors.primary}/> :
+							<Text style={S.secondaryBtnText}>Bump listing</Text>}
 					</TouchableOpacity>
 					<TouchableOpacity style={S.secondaryBtn} onPress={() => void setStatus('sold')}>
 						<Text style={S.secondaryBtnText}>Mark sold</Text>
@@ -588,15 +595,16 @@ function SellerControls({
 				offers.map((o) => (
 					<View key={o.id} style={S.card}>
 						<Text style={S.offerLine}>
-							o.offerCents != null ? formatPrice(o.offerCents, currency) : 'At asking'}
+							{o.offerCents != null ? formatPrice(o.offerCents, currency) : 'At asking'}
 							{'  ·  '}
-							<Text style={S.offerStatus}>{o.status}{o.lastActor === 'seller' ? ' (you countered)' : ''}</Text>
+							<Text
+								style={S.offerStatus}>{o.status}{o.lastActor === 'seller' ? ' (you countered)' : ''}</Text>
 						</Text>
 						{o.message ? <Text style={S.offerMsg}>{o.message}</Text> : null}
 						{o.status === 'pending' && o.lastActor !== 'seller' ? (
 							<>
 								{counterFor === o.id ? (
-									<View style={{ marginTop: 10 }}>
+									<View style={{marginTop: 10}}>
 										<TextInput
 											style={S.input}
 											placeholder="Counter amount"
@@ -614,24 +622,36 @@ function SellerControls({
 											multiline
 										/>
 										<View style={S.offerActions}>
-											<TouchableOpacity style={S.acceptBtn} disabled={counterBusy} onPress={() => void submitCounter(o.id)}>
-												{counterBusy ? <ActivityIndicator size="small" color={colors.onPrimary} /> : <Icon name="check" size={18} color={colors.onPrimary} />}
+											<TouchableOpacity style={S.acceptBtn} disabled={counterBusy}
+															  onPress={() => void submitCounter(o.id)}>
+												{counterBusy ?
+													<ActivityIndicator size="small" color={colors.onPrimary}/> :
+													<Icon name="check" size={18} color={colors.onPrimary}/>}
 											</TouchableOpacity>
-											<TouchableOpacity style={S.declineBtn} disabled={counterBusy} onPress={() => setCounterFor(null)}>
-												<Icon name="close" size={18} color={colors.textPrimary} />
+											<TouchableOpacity style={S.declineBtn} disabled={counterBusy}
+															  onPress={() => setCounterFor(null)}>
+												<Icon name="close" size={18} color={colors.textPrimary}/>
 											</TouchableOpacity>
 										</View>
 									</View>
 								) : (
-									<View style={[S.offerActions, { marginTop: 10 }]}>
-										<TouchableOpacity style={S.acceptBtn} onPress={() => void respond(o.id, 'accepted')} accessibilityLabel="Accept offer">
-											<Icon name="check" size={18} color={colors.onPrimary} />
+									<View style={[S.offerActions, {marginTop: 10}]}>
+										<TouchableOpacity style={S.acceptBtn}
+														  onPress={() => void respond(o.id, 'accepted')}
+														  accessibilityLabel="Accept offer">
+											<Icon name="check" size={18} color={colors.onPrimary}/>
 										</TouchableOpacity>
-										<TouchableOpacity style={S.counterBtn} onPress={() => { setCounterFor(o.id); setCounterAmount(o.offerCents != null ? String(o.offerCents / 100) : ''); setCounterMsg(''); }} accessibilityLabel="Counter offer">
-											<Icon name="swap-horizontal" size={18} color={colors.textPrimary} />
+										<TouchableOpacity style={S.counterBtn} onPress={() => {
+											setCounterFor(o.id);
+											setCounterAmount(o.offerCents != null ? String(o.offerCents / 100) : '');
+											setCounterMsg('');
+										}} accessibilityLabel="Counter offer">
+											<Icon name="swap-horizontal" size={18} color={colors.textPrimary}/>
 										</TouchableOpacity>
-										<TouchableOpacity style={S.declineBtn} onPress={() => void respond(o.id, 'declined')} accessibilityLabel="Decline offer">
-											<Icon name="close" size={18} color={colors.textPrimary} />
+										<TouchableOpacity style={S.declineBtn}
+														  onPress={() => void respond(o.id, 'declined')}
+														  accessibilityLabel="Decline offer">
+											<Icon name="close" size={18} color={colors.textPrimary}/>
 										</TouchableOpacity>
 									</View>
 								)}
@@ -645,49 +665,113 @@ function SellerControls({
 }
 
 const S = StyleSheet.create({
-	container: { flex: 1, backgroundColor: colors.bg },
-	content: { paddingBottom: 48 },
-	center: { alignItems: 'center', justifyContent: 'center' },
-	body: { paddingHorizontal: 20 },
-	image: { width: '100%', height: 220, backgroundColor: colors.surface },
-	imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-	title: { color: colors.textPrimary, fontSize: 22, fontWeight: '800', marginTop: 16 },
-	price: { color: colors.primary, fontSize: 20, fontWeight: '700', marginTop: 6 },
-	metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-	categoryPill: { backgroundColor: colors.surfaceAlt, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-	categoryText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
-	statusPill: { backgroundColor: colors.warningSoft ?? colors.surfaceAlt, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-	statusText: { color: colors.warning, fontSize: 12, fontWeight: '600', textTransform: 'capitalize' },
-	favCount: { color: colors.textMuted, fontSize: 13 },
-	sellerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
-	sellerIdentity: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-	sellerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface },
-	sellerAvatarPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-	sellerInitial: { color: colors.primary, fontSize: 15, fontWeight: '700' },
-	sellerName: { color: colors.textSecondary, fontSize: 15, fontWeight: '600' },
-	description: { color: colors.textSecondary, fontSize: 15, lineHeight: 22, marginTop: 16 },
-	contactRow: { flexDirection: 'row', gap: 8 },
-	messageBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-	waveBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-	waveText: { color: colors.onPrimary, fontSize: 13, fontWeight: '700' },
-	card: { marginTop: 16, padding: 16, backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border },
-	cardTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '700', marginBottom: 10 },
-	input: { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.textPrimary, fontSize: 15, marginBottom: 10 },
-	multiline: { minHeight: 72, textAlignVertical: 'top' },
-	primaryBtn: { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-	primaryBtnText: { color: colors.onPrimary, fontSize: 14, fontWeight: '700' },
-	secondaryBtn: { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: 10, paddingVertical: 12, alignItems: 'center', paddingHorizontal: 12 },
-	secondaryBtnText: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
-	btnDisabled: { opacity: 0.4 },
-	offerLine: { color: colors.textSecondary, fontSize: 15, fontWeight: '600' },
-	offerStatus: { color: colors.textMuted, fontWeight: '500', textTransform: 'capitalize' },
-	offerMsg: { color: colors.textMuted, fontSize: 13, marginTop: 6 },
-	counterHint: { color: colors.textMuted, fontSize: 13, marginBottom: 10 },
-	emptyHint: { color: colors.textFaint, fontSize: 14, marginTop: 8 },
-	sectionTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginTop: 24, marginBottom: 8 },
-	sellerActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16 },
-	offerActions: { flexDirection: 'row', gap: 8 },
-	acceptBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-	counterBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' },
-	declineBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' },
+	container: {flex: 1, backgroundColor: colors.bg},
+	content: {paddingBottom: 48},
+	center: {alignItems: 'center', justifyContent: 'center'},
+	body: {paddingHorizontal: 20},
+	image: {width: '100%', height: 220, backgroundColor: colors.surface},
+	imagePlaceholder: {alignItems: 'center', justifyContent: 'center'},
+	title: {color: colors.textPrimary, fontSize: 22, fontWeight: '800', marginTop: 16},
+	price: {color: colors.primary, fontSize: 20, fontWeight: '700', marginTop: 6},
+	metaRow: {flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 10},
+	categoryPill: {backgroundColor: colors.surfaceAlt, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4},
+	categoryText: {color: colors.textSecondary, fontSize: 12, fontWeight: '600'},
+	statusPill: {backgroundColor: colors.surfaceAlt, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4},
+	statusText: {color: colors.warning, fontSize: 12, fontWeight: '600', textTransform: 'capitalize'},
+	favCount: {color: colors.textMuted, fontSize: 13},
+	sellerRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16},
+	sellerIdentity: {flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1},
+	sellerAvatar: {width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface},
+	sellerAvatarPlaceholder: {alignItems: 'center', justifyContent: 'center'},
+	sellerInitial: {color: colors.primary, fontSize: 15, fontWeight: '700'},
+	sellerName: {color: colors.textSecondary, fontSize: 15, fontWeight: '600'},
+	description: {color: colors.textSecondary, fontSize: 15, lineHeight: 22, marginTop: 16},
+	contactRow: {flexDirection: 'row', gap: 8},
+	messageBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		backgroundColor: colors.primary,
+		borderRadius: 10,
+		paddingHorizontal: 12,
+		paddingVertical: 8
+	},
+	waveBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		backgroundColor: colors.primary,
+		borderRadius: 10,
+		paddingHorizontal: 12,
+		paddingVertical: 8
+	},
+	waveText: {color: colors.onPrimary, fontSize: 13, fontWeight: '700'},
+	card: {
+		marginTop: 16,
+		padding: 16,
+		backgroundColor: colors.surface,
+		borderRadius: 14,
+		borderWidth: 1,
+		borderColor: colors.border
+	},
+	cardTitle: {color: colors.textPrimary, fontSize: 15, fontWeight: '700', marginBottom: 10},
+	input: {
+		backgroundColor: colors.surfaceAlt,
+		borderWidth: 1,
+		borderColor: colors.borderStrong,
+		borderRadius: 10,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		color: colors.textPrimary,
+		fontSize: 15,
+		marginBottom: 10
+	},
+	multiline: {minHeight: 72, textAlignVertical: 'top'},
+	primaryBtn: {backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center'},
+	primaryBtnText: {color: colors.onPrimary, fontSize: 14, fontWeight: '700'},
+	secondaryBtn: {
+		backgroundColor: colors.surfaceAlt,
+		borderWidth: 1,
+		borderColor: colors.borderStrong,
+		borderRadius: 10,
+		paddingVertical: 12,
+		alignItems: 'center',
+		paddingHorizontal: 12
+	},
+	secondaryBtnText: {color: colors.textPrimary, fontSize: 14, fontWeight: '600'},
+	btnDisabled: {opacity: 0.4},
+	offerLine: {color: colors.textSecondary, fontSize: 15, fontWeight: '600'},
+	offerStatus: {color: colors.textMuted, fontWeight: '500', textTransform: 'capitalize'},
+	offerMsg: {color: colors.textMuted, fontSize: 13, marginTop: 6},
+	counterHint: {color: colors.textMuted, fontSize: 13, marginBottom: 10},
+	emptyHint: {color: colors.textFaint, fontSize: 14, marginTop: 8},
+	sectionTitle: {color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginTop: 24, marginBottom: 8},
+	sellerActions: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16},
+	offerActions: {flexDirection: 'row', gap: 8},
+	acceptBtn: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		backgroundColor: colors.primary,
+		alignItems: 'center',
+		justifyContent: 'center'
+	},
+	counterBtn: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		backgroundColor: colors.surfaceAlt,
+		borderWidth: 1,
+		borderColor: colors.borderStrong,
+		alignItems: 'center',
+		justifyContent: 'center'
+	},
+	declineBtn: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		backgroundColor: colors.borderStrong,
+		alignItems: 'center',
+		justifyContent: 'center'
+	},
 });
