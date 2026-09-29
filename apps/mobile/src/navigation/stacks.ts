@@ -34,7 +34,7 @@ export type AccountStackParamList = {
   VerificationId: undefined;
   Subscription: undefined;
   SocialLinking: undefined;
-  ProfileEdit: undefined;
+  ProfileEdit: { focus?: 'dating' } | undefined;
   Photos: undefined;
 };
 
