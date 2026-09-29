@@ -4,8 +4,10 @@
  */
 import {
   formatPublicIdentityParts,
+  type Gender,
   type PublicUserProfile,
   type RelationshipSummary,
+  type SexualOrientation,
   type UserProfile,
 } from '@g88/shared';
 
@@ -25,12 +27,17 @@ export type MapPublicOptions = {
  * Map GET /users/:id + relationship into the shared view model.
  * Identity fields are already server-gated by show_*.
  */
-export function mapPublicToViewModel(
-  p: PublicUserProfile,
-  opts: MapPublicOptions,
-): ProfileViewModel {
-  const { rel, friendLabel, blocked, isPaid = false, tierLabel = null } = opts;
 
+/** Shared identity + hometown lines (server already gates by show_*). */
+export function publicIdentityLines(p: {
+  gender?: Gender | null;
+  genderSelfDescribe?: string | null;
+  sexualOrientation?: SexualOrientation | null;
+  orientationSelfDescribe?: string | null;
+  nationality?: string | null;
+  hometownCity?: string | null;
+  hometownCountry?: string | null;
+}): { identityLine: string | null; hometownLine: string | null } {
   const identityLine =
     formatPublicIdentityParts({
       gender: p.gender ?? null,
@@ -42,6 +49,17 @@ export function mapPublicToViewModel(
 
   const hometownLine =
     [p.hometownCity, p.hometownCountry].filter(Boolean).join(', ') || null;
+
+  return { identityLine, hometownLine };
+}
+
+export function mapPublicToViewModel(
+  p: PublicUserProfile,
+  opts: MapPublicOptions,
+): ProfileViewModel {
+  const { rel, friendLabel, blocked, isPaid = false, tierLabel = null } = opts;
+
+  const { identityLine, hometownLine } = publicIdentityLines(p);
 
   const status = p.status
     ? {
