@@ -13,11 +13,13 @@ import type { ApiError, SuggestionCard } from '@g88/shared';
 
 import { getJson, postJson } from '@/api/client';
 import { Avatar } from '@/components/Avatar';
+import { MutualPreviewStack } from '@/features/friends/MutualPreviewStack';
 import { colors, fontSize, radius, spacing } from '@/theme';
 import { focusUserOnMap } from '@/navigation/focusUserOnMap';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { appAlert } from '@/ui/appAlert';
 
 function shortReason(item: SuggestionCard): string {
   const n = item.mutualFriendsCount ?? 0;
@@ -57,7 +59,7 @@ interface Props {
 
 /**
  * Compact horizontal "People you may know" strip for Friends list header.
- * Rank C API + Add friend; full list lives on SuggestionsScreen.
+ * Density: mutual avatar stack when API returns mutualPreview; dismiss + Add.
  */
 export function FriendsSuggestionsRail({
   onSeeAll,
@@ -68,6 +70,29 @@ export function FriendsSuggestionsRail({
   const [items, setItems] = useState<SuggestionCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getJson<SuggestionCard[]>('/friends/suggestions?limit=12');
+      setItems(Array.isArray(data) ? data : []);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!feedback) return;
+    const t = setTimeout(() => setFeedback(null), 2200);
+    return () => clearTimeout(t);
+  }, [feedback]);
 
   const onViewOnMap = useCallback(
     (item: SuggestionCard) => {
@@ -81,53 +106,89 @@ export function FriendsSuggestionsRail({
     [navigation],
   );
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getJson<SuggestionCard[]>('/friends/suggestions?limit=8');
-      setItems(Array.isArray(data) ? data : []);
-    } catch {
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
+  const removeCard = useCallback((userId: string) => {
+    setItems((prev) => prev.filter((c) => c.userId !== userId));
   }, []);
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      void load();
-    }, 0);
-    return () => clearTimeout(t);
-  }, [load]);
+  const onDismiss = useCallback(
+    (item: SuggestionCard) => {
+      appAlert(
+        'Hide suggestion?',
+        `Remove ${item.displayName} from suggestions.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Snooze 7 days',
+            onPress: () => {
+              void (async () => {
+                setBusyId(item.userId);
+                try {
+                  await postJson<{ snoozeDays: number }, { ok: true }>(
+                    `/friends/suggestions/${item.userId}/dismiss`,
+                    { snoozeDays: 7 },
+                  );
+                  removeCard(item.userId);
+                  setFeedback('Hidden for 7 days');
+                } catch (e) {
+                  appAlert('Could not hide', isApiError(e) ? e.message : 'Try again.');
+                } finally {
+                  setBusyId(null);
+                }
+              })();
+            },
+          },
+          {
+            text: 'Dismiss',
+            style: 'destructive',
+            onPress: () => {
+              void (async () => {
+                setBusyId(item.userId);
+                try {
+                  await postJson<Record<string, never>, { ok: true }>(
+                    `/friends/suggestions/${item.userId}/dismiss`,
+                    {},
+                  );
+                  removeCard(item.userId);
+                  setFeedback('Removed from suggestions');
+                } catch (e) {
+                  appAlert('Could not hide', isApiError(e) ? e.message : 'Try again.');
+                } finally {
+                  setBusyId(null);
+                }
+              })();
+            },
+          },
+        ],
+      );
+    },
+    [removeCard],
+  );
 
-  const onAdd = useCallback(
-    async (userId: string) => {
-      setBusyId(userId);
-      try {
-        await postJson<{ userId: string }, { requestId: string }>('/friends/requests', {
-          userId,
-        });
+  const onAdd = useCallback(async (userId: string) => {
+    setBusyId(userId);
+    try {
+      await postJson<{ userId: string }, { requestId: string }>('/friends/requests', {
+        userId,
+      });
+      setItems((prev) =>
+        prev.map((c) =>
+          c.userId === userId ? { ...c, hasPendingOutgoing: true } : c,
+        ),
+      );
+    } catch (e) {
+      if (isApiError(e) && e.code === 'friends.already_friends') {
+        setItems((prev) => prev.filter((c) => c.userId !== userId));
+      } else if (isApiError(e) && e.code === 'friends.request_pending') {
         setItems((prev) =>
           prev.map((c) =>
             c.userId === userId ? { ...c, hasPendingOutgoing: true } : c,
           ),
         );
-      } catch (e) {
-        if (isApiError(e) && e.code === 'friends.already_friends') {
-          setItems((prev) => prev.filter((c) => c.userId !== userId));
-        } else if (isApiError(e) && e.code === 'friends.request_pending') {
-          setItems((prev) =>
-            prev.map((c) =>
-              c.userId === userId ? { ...c, hasPendingOutgoing: true } : c,
-            ),
-          );
-        }
-      } finally {
-        setBusyId(null);
       }
-    },
-    [],
-  );
+    } finally {
+      setBusyId(null);
+    }
+  }, []);
 
   if (loading && items.length === 0) {
     return (
@@ -159,6 +220,11 @@ export function FriendsSuggestionsRail({
           <Text style={styles.seeAll}>See all</Text>
         </TouchableOpacity>
       </View>
+      {feedback ? (
+        <Text style={styles.feedback} accessibilityLiveRegion="polite">
+          {feedback}
+        </Text>
+      ) : null}
       <FlatList
         horizontal
         data={items}
@@ -169,8 +235,19 @@ export function FriendsSuggestionsRail({
           const busy = busyId === item.userId;
           const verified =
             item.verification === 'id' || item.verification === 'phone';
+          const faces = item.mutualPreview ?? [];
           return (
             <View style={styles.card}>
+              <TouchableOpacity
+                style={styles.dismissBtn}
+                onPress={() => onDismiss(item)}
+                disabled={busy}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={`Hide ${item.displayName}`}
+              >
+                <Icon name="close" size={14} color={colors.textFaint} />
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => onOpenProfile(item.userId)}
                 accessibilityRole="button"
@@ -191,6 +268,11 @@ export function FriendsSuggestionsRail({
                 <Text style={styles.reason} numberOfLines={1}>
                   {shortReason(item)}
                 </Text>
+                {faces.length > 0 ? (
+                  <View style={styles.previewWrap}>
+                    <MutualPreviewStack faces={faces} size={16} />
+                  </View>
+                ) : null}
               </TouchableOpacity>
               <View style={styles.actionRow}>
                 <TouchableOpacity
@@ -198,21 +280,20 @@ export function FriendsSuggestionsRail({
                   onPress={() => onViewOnMap(item)}
                   accessibilityRole="button"
                   accessibilityLabel={`View ${item.displayName} on map`}
-                  hitSlop={6}
                 >
-                  <Icon name="map-marker-radius" size={16} color={colors.primary} />
+                  <Icon name="map-marker-outline" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
                 {item.hasPendingOutgoing ? (
                   <View style={styles.ghostBtn}>
-                    <Text style={styles.ghostText}>Requested</Text>
+                    <Text style={styles.ghostText}>Sent</Text>
                   </View>
                 ) : (
                   <TouchableOpacity
                     style={styles.addBtn}
-                    disabled={busy}
                     onPress={() => void onAdd(item.userId)}
+                    disabled={busy}
                     accessibilityRole="button"
-                    accessibilityLabel={`Add ${item.displayName} as friend`}
+                    accessibilityLabel={`Add ${item.displayName}`}
                   >
                     {busy ? (
                       <ActivityIndicator size="small" color={colors.onPrimary} />
@@ -254,6 +335,12 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: '600',
   },
+  feedback: {
+    color: colors.textMuted,
+    fontSize: 12,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
+  },
   loadingRow: {
     height: 120,
     alignItems: 'center',
@@ -265,13 +352,21 @@ const styles = StyleSheet.create({
   },
   card: {
     width: 112,
-    paddingVertical: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
     paddingHorizontal: spacing.sm,
     borderRadius: radius.md,
     backgroundColor: colors.surfaceRaised,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     alignItems: 'center',
+  },
+  dismissBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    zIndex: 2,
+    padding: 2,
   },
   cardTap: { alignItems: 'center', width: '100%' },
   avatarWrap: { marginBottom: 6 },
@@ -293,14 +388,18 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 10,
     marginTop: 2,
-    marginBottom: 8,
     textAlign: 'center',
     maxWidth: 96,
+  },
+  previewWrap: {
+    marginTop: 4,
+    marginBottom: 4,
   },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    marginTop: 4,
   },
   mapBtn: {
     paddingHorizontal: 6,
