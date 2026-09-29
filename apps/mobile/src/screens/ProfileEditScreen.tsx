@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
 	ActivityIndicator,
 	KeyboardAvoidingView,
@@ -11,7 +11,8 @@ import {
 	TouchableOpacity,
 	View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { Gender, SexualOrientation } from '@g88/shared';
@@ -31,6 +32,7 @@ import { useFieldErrors } from '@/hooks/useFieldErrors';
 import { colors, fontSize, spacing, radius } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
+type EditRoute = RouteProp<AccountStackParamList, 'ProfileEdit'>;
 type FieldKey = 'displayName' | 'dateOfBirth' | 'hometownCity' | 'hometownCountry';
 
 function isAdult(isoDate: string): boolean {
@@ -44,11 +46,11 @@ function isAdult(isoDate: string): boolean {
 }
 
 function ChipRow<T extends string>({
-									   options,
-									   labels,
-									   value,
-									   onChange,
-								   }: {
+	options,
+	labels,
+	value,
+	onChange,
+}: {
 	options: readonly T[];
 	labels: Record<T, string>;
 	value: T | null;
@@ -116,6 +118,19 @@ export function ProfileEditScreen(): React.JSX.Element {
 	const dobRef = useRef<TextInput>(null);
 	const cityRef = useRef<TextInput>(null);
 	const countryRef = useRef<TextInput>(null);
+	const scrollRef = useRef<ScrollView>(null);
+	const datingYRef = useRef(0);
+	const route = useRoute<EditRoute>();
+	const focus = route.params?.focus;
+
+	useEffect(() => {
+		if (focus !== 'dating') return;
+		const t = setTimeout(() => {
+			const y = Math.max(0, datingYRef.current - 16);
+			scrollRef.current?.scrollTo({ y, animated: true });
+		}, 120);
+		return () => clearTimeout(t);
+	}, [focus]);
 
 	const save = async (): Promise<void> => {
 		const next: Partial<Record<FieldKey, string>> = {};
@@ -188,7 +203,11 @@ export function ProfileEditScreen(): React.JSX.Element {
 					</TouchableOpacity>
 				}
 			/>
-			<ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+			<ScrollView
+				ref={scrollRef}
+				contentContainerStyle={styles.scroll}
+				keyboardShouldPersistTaps="handled"
+			>
 				<FormField
 					label="Display name"
 					value={displayName}
@@ -369,48 +388,53 @@ export function ProfileEditScreen(): React.JSX.Element {
 					/>
 				</View>
 
-
-				<Text style={styles.section}>DATING</Text>
-				<Text style={styles.hint}>
-					Opt in to appear when others use the Dating map filter. Seeking is private — never shown on your public profile.
-				</Text>
-				<View style={styles.toggleRow}>
-					<View style={styles.toggleText}>
-						<Text style={styles.toggleLabel}>Open to dating</Text>
-					</View>
-					<Switch
-						value={openToDating}
-						onValueChange={setOpenToDating}
-						trackColor={{ false: colors.borderStrong, true: 'rgba(0,212,255,0.35)' }}
-						thumbColor={openToDating ? colors.primary : colors.textFaint}
-					/>
-				</View>
-				{openToDating ? (
-					<>
-						<Text style={styles.fieldLabel}>Interested in</Text>
-						<View style={styles.chipRow}>
-							{GENDERS.filter((g) => g !== 'self_describe').map((g) => {
-								const on = seekingGenders.includes(g);
-								return (
-									<TouchableOpacity
-										key={g}
-										style={[styles.chip, on && styles.chipOn]}
-										onPress={() => {
-											setSeekingGenders((prev) =>
-												on ? prev.filter((x) => x !== g) : [...prev, g],
-											);
-										}}
-									>
-										<Text style={[styles.chipText, on && styles.chipTextOn]}>
-											{GENDER_LABELS[g]}
-										</Text>
-									</TouchableOpacity>
-								);
-							})}
+				<View
+					onLayout={(e) => {
+						datingYRef.current = e.nativeEvent.layout.y;
+					}}
+				>
+					<Text style={styles.section}>DATING</Text>
+					<Text style={styles.hint}>
+						Opt in to appear when others use the Dating map filter. Seeking is private — never shown on your public profile.
+					</Text>
+					<View style={styles.toggleRow}>
+						<View style={styles.toggleText}>
+							<Text style={styles.toggleLabel}>Open to dating</Text>
 						</View>
-						<Text style={styles.hint}>Leave empty to match any gender.</Text>
-					</>
-				) : null}
+						<Switch
+							value={openToDating}
+							onValueChange={setOpenToDating}
+							trackColor={{ false: colors.borderStrong, true: 'rgba(0,212,255,0.35)' }}
+							thumbColor={openToDating ? colors.primary : colors.textFaint}
+						/>
+					</View>
+					{openToDating ? (
+						<>
+							<Text style={styles.fieldLabel}>Interested in</Text>
+							<View style={styles.chipRow}>
+								{GENDERS.filter((g) => g !== 'self_describe').map((g) => {
+									const on = seekingGenders.includes(g);
+									return (
+										<TouchableOpacity
+											key={g}
+											style={[styles.chip, on && styles.chipOn]}
+											onPress={() => {
+												setSeekingGenders((prev) =>
+													on ? prev.filter((x) => x !== g) : [...prev, g],
+												);
+											}}
+										>
+											<Text style={[styles.chipText, on && styles.chipTextOn]}>
+												{GENDER_LABELS[g]}
+											</Text>
+										</TouchableOpacity>
+									);
+								})}
+							</View>
+							<Text style={styles.hint}>Leave empty to match any gender.</Text>
+						</>
+					) : null}
+				</View>
 
 				<Text style={styles.section}>PHONE</Text>
 				<Text style={styles.hint}>
