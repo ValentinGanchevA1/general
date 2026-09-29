@@ -20,6 +20,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { appAlert } from '@/ui/appAlert';
+import { track } from '@/lib/analytics';
 
 function shortReason(item: SuggestionCard): string {
   const n = item.mutualFriendsCount ?? 0;
@@ -126,6 +127,7 @@ export function FriendsSuggestionsRail({
                     { snoozeDays: 7 },
                   );
                   removeCard(item.userId);
+                  track('suggestions.dismiss', { mode: 'snooze', surface: 'rail' });
                   setFeedback('Hidden for 7 days');
                   setTimeout(() => setFeedback(null), 2200);
                 } catch (e) {
@@ -148,6 +150,7 @@ export function FriendsSuggestionsRail({
                     {},
                   );
                   removeCard(item.userId);
+                  track('suggestions.dismiss', { mode: 'permanent', surface: 'rail' });
                   setFeedback('Removed from suggestions');
                   setTimeout(() => setFeedback(null), 2200);
                 } catch (e) {
@@ -170,6 +173,7 @@ export function FriendsSuggestionsRail({
       await postJson<{ userId: string }, { requestId: string }>('/friends/requests', {
         userId,
       });
+      track('suggestions.add', { surface: 'rail' });
       setItems((prev) =>
         prev.map((c) =>
           c.userId === userId ? { ...c, hasPendingOutgoing: true } : c,
@@ -399,34 +403,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 4,
+    marginTop: 6,
   },
   mapBtn: {
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 6,
   },
   addBtn: {
-    backgroundColor: colors.action,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    minWidth: 64,
-    alignItems: 'center',
-  },
-  addText: {
-    color: colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  ghostBtn: {
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: colors.action,
   },
-  ghostText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
+  addText: { color: colors.textPrimary, fontWeight: '700', fontSize: 11 },
+  ghostBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
   },
+  ghostText: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
 });
