@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 
 import { appAlert } from '@/ui/appAlert';
 import { useNavigation } from '@react-navigation/native';
@@ -135,8 +136,8 @@ export default function VerificationIdScreen(): React.ReactElement {
         e,
         'There was an error uploading your documents. Please try again.',
       );
-      // eslint-disable-next-line no-console -- debug path for emulator submit failures
-      console.warn('[id-verify] submit failed', e);
+      Sentry.captureException(e, { tags: { resource: 'verification.id_submit' } });
+      if (__DEV__) console.warn('[id-verify] submit failed', e);
       appAlert('Upload Failed', msg);
     } finally {
       setUploading(false);
