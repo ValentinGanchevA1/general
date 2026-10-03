@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Sentry from '@sentry/react-native';
 
 import type { InboxItem, InboxResponse } from '@g88/shared';
 
@@ -9,10 +10,12 @@ import { onSocketConnected, useSocket } from '@/realtime/useSocket';
 export function useInboxInteractions(): {
   items: InboxItem[];
   loading: boolean;
+  error: unknown | null;
   refresh: () => Promise<void>;
 } {
   const [items, setItems] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<unknown | null>(null);
   const { on } = useSocket();
   const mountedRef = useRef(true);
   const inFlightRef = useRef<Promise<void> | null>(null);
@@ -36,10 +39,12 @@ export function useInboxInteractions(): {
         const res = await getJson<InboxResponse>('/interactions/inbox?limit=50');
         if (mountedRef.current) {
           setItems(res.items);
+          setError(null);
         }
       } catch (err) {
-        if (__DEV__) {
-          console.warn('[inbox] /interactions/inbox failed', err);
+        Sentry.captureException(err, { tags: { resource: 'interactions.inbox' } });
+        if (mountedRef.current) {
+          setError(err);
         }
         // Keep previous items on transient failure.
       } finally {
@@ -103,5 +108,5 @@ export function useInboxInteractions(): {
     };
   }, [on, refresh]);
 
-  return { items, loading, refresh };
+  return { items, loading, error, refresh };
 }
