@@ -9,6 +9,7 @@ import {
 	View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import * as Sentry from '@sentry/react-native';
 
 import { appAlert } from '@/ui/appAlert';
 import { track } from '@/lib/analytics';
@@ -24,6 +25,7 @@ import { Avatar } from '@/components/Avatar';
 import { MutualPreviewStack } from '@/features/friends/MutualPreviewStack';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
+import { SoftErrorBanner } from '@/components/SoftErrorBanner';
 import { SkeletonListRow } from '@/components/Skeleton';
 import { colors, spacing, radius, fontSize } from '@/theme';
 import { focusUserOnMap } from '@/navigation/focusUserOnMap';
@@ -75,23 +77,21 @@ export function SuggestionsScreen(): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
 	const [items, setItems] = useState<SuggestionCard[]>([]);
 	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
+	const [error, setError] = useState<unknown | null>(null);
 	const [busyIds, setBusyIds] = useState<string[]>([]);
 	const [feedback, setFeedback] = useState<string | null>(null);
 	const [sessionDismissed, setSessionDismissed] = useState(0);
 
 	const load = useCallback(async () => {
 		setLoading(true);
-		setError(null);
 		try {
 			const data = await getJson<SuggestionCard[]>('/friends/suggestions?limit=20');
 			setItems(Array.isArray(data) ? data : []);
+			setError(null);
 		} catch (e) {
-			const msg =
-				e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string'
-					? (e as { message: string }).message
-					: 'Could not load suggestions.';
-			setError(msg);
+			Sentry.captureException(e, { tags: { resource: 'friends.suggestions' } });
+			setError(e);
+			// Keep previous items on transient failure (keep-stale).
 		} finally {
 			setLoading(false);
 		}
@@ -252,6 +252,9 @@ export function SuggestionsScreen(): React.JSX.Element {
 		[removeCard, setBusy],
 	);
 
+	const showErrorEmpty = error != null && items.length === 0 && !loading;
+	const showSoftError = error != null && items.length > 0;
+
 	const renderItem = useCallback(
 		({ item }: { item: SuggestionCard }) => {
 			const busy = busyIds.includes(item.userId);
@@ -383,6 +386,8 @@ export function SuggestionsScreen(): React.JSX.Element {
 				</Text>
 			) : null}
 
+			{showSoftError ? <SoftErrorBanner onRetry={() => void load()} /> : null}
+
 			{loading && items.length === 0 ? (
 				<View style={S.list}>
 					<SkeletonListRow />
@@ -391,13 +396,15 @@ export function SuggestionsScreen(): React.JSX.Element {
 					<SkeletonListRow />
 					<SkeletonListRow />
 				</View>
-			) : error && items.length === 0 ? (
-				<View style={S.centered}>
-					<Text style={S.errorText}>{error}</Text>
-					<TouchableOpacity style={S.retry} onPress={() => void load()}>
-						<Text style={S.retryText}>Retry</Text>
-					</TouchableOpacity>
-				</View>
+			) : showErrorEmpty ? (
+				<EmptyState
+					variant="plain"
+					icon="alert-circle-outline"
+					title="Couldn't load suggestions"
+					body="Check your connection and try again."
+					actionLabel="Retry"
+					onAction={() => void load()}
+				/>
 			) : (
 				<FlatList
 					data={items}
@@ -441,15 +448,6 @@ const S = StyleSheet.create({
 		paddingBottom: spacing.sm,
 	},
 	root: { flex: 1, backgroundColor: colors.bg },
-	centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-	errorText: { color: colors.danger, marginBottom: 12, textAlign: 'center' },
-	retry: {
-		backgroundColor: colors.primary,
-		paddingHorizontal: 20,
-		paddingVertical: 10,
-		borderRadius: radius.md,
-	},
-	retryText: { color: colors.onPrimary, fontWeight: '700' },
 	list: { paddingBottom: 40, flexGrow: 1 },
 	card: {
 		flexDirection: 'row',

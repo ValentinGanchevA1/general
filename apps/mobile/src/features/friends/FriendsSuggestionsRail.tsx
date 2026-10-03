@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import * as Sentry from '@sentry/react-native';
 
 import type { ApiError, SuggestionCard } from '@g88/shared';
 
@@ -78,8 +79,9 @@ export function FriendsSuggestionsRail({
     try {
       const data = await getJson<SuggestionCard[]>('/friends/suggestions?limit=12');
       setItems(Array.isArray(data) ? data : []);
-    } catch {
-      setItems([]);
+    } catch (e) {
+      Sentry.captureException(e, { tags: { resource: 'friends.suggestions.rail' } });
+      // Keep previous items on transient failure; hideWhenEmpty still applies if cold fail.
     } finally {
       setLoading(false);
     }
