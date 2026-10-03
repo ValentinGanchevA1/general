@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
+import * as Sentry from '@sentry/react-native';
 
 import type {
   ClientToServerEvents,
@@ -73,8 +74,9 @@ export function onSocketConnected(fn: () => void): () => void {
   if (sharedSocket?.connected) {
     try {
       fn();
-    } catch {
-      /* ignore */
+    } catch (e) {
+      Sentry.captureException(e, { tags: { resource: 'socket.connect_listener' } });
+      if (__DEV__) console.warn('[socket] connect listener failed', e);
     }
   }
   return () => {
@@ -107,6 +109,7 @@ function notifyConnectListeners(): void {
     try {
       fn();
     } catch (e) {
+      Sentry.captureException(e, { tags: { resource: 'socket.connect_listener' } });
       if (__DEV__) console.warn('[socket] connect listener failed', e);
     }
   }
@@ -120,6 +123,7 @@ async function onConnectedSideEffects(): Promise<void> {
     const { fetchPendingCount } = await import('@/features/friends/friendsSlice');
     void store.dispatch(fetchPendingCount());
   } catch (e) {
+    Sentry.captureException(e, { tags: { resource: 'socket.fetch_pending_count' } });
     if (__DEV__) console.warn('[socket] fetchPendingCount on connect failed', e);
   }
   // Drain chat outbox (dynamic import avoids circular dep).
@@ -148,6 +152,7 @@ async function onConnectedSideEffects(): Promise<void> {
       }
     }
   } catch (e) {
+    Sentry.captureException(e, { tags: { resource: 'socket.outbox_drain' } });
     if (__DEV__) console.warn('[socket] outbox drain failed', e);
   }
 }
