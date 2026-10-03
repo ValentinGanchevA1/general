@@ -25,6 +25,8 @@ export interface IdentityBlockProps {
   ringVariant?: AvatarRing;
   size?: number;
   onPress?: () => void;
+  /** Override default "Open profile for {name}" when interactive. */
+  accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -42,6 +44,7 @@ export function IdentityBlock({
   ringVariant = 'brand',
   size = 56,
   onPress,
+  accessibilityLabel,
   style,
 }: IdentityBlockProps): React.JSX.Element {
   const content = (
@@ -80,7 +83,12 @@ export function IdentityBlock({
 
   if (onPress) {
     return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.85} accessibilityRole="button">
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? `Open profile for ${name}`}
+      >
         {content}
       </TouchableOpacity>
     );
