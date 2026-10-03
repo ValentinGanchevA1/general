@@ -12,6 +12,7 @@ import type { ChallengeToday } from '@g88/shared';
 import { useChallenges } from '@/features/gamification/useChallenges';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
+import { SoftErrorBanner } from '@/components/SoftErrorBanner';
 import { SkeletonListRow } from '@/components/Skeleton';
 import { colors } from '@/theme';
 
@@ -74,6 +75,9 @@ export function ChallengesScreen(): React.JSX.Element {
           <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />
         }
       >
+        {error != null && challenges.length > 0 ? (
+          <SoftErrorBanner onRetry={refresh} />
+        ) : null}
         {challenges.length > 0 ? (
           <Text style={styles.summary}>
             {completedCount} of {challenges.length} completed today · resets at midnight
