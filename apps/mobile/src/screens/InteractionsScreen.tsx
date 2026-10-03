@@ -21,6 +21,7 @@ import type {
 import { postJson } from '@/api/client';
 import { Avatar } from '@/components/Avatar';
 import { EmptyState } from '@/components/EmptyState';
+import { SoftErrorBanner } from '@/components/SoftErrorBanner';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SkeletonListRow } from '@/components/Skeleton';
 import { VerificationBadge } from '@/components/VerificationBadge';
@@ -276,7 +277,7 @@ export function InteractionsScreen(): React.JSX.Element {
   const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
   const conversations = useAppSelector((s) => s.chat.conversations);
   const conversationsLoading = useAppSelector((s) => s.chat.conversationsLoading);
-  const { items, loading: inboxLoading, refresh } = useInboxInteractions();
+  const { items, loading: inboxLoading, error: inboxError, refresh } = useInboxInteractions();
   const { markSeen } = useReceivedInteractions();
   const { on } = useSocket();
   const [busyIds, setBusyIds] = React.useState<string[]>([]);
@@ -342,6 +343,15 @@ export function InteractionsScreen(): React.JSX.Element {
   const coldLoading =
     rows.length === 0 &&
     (tab === 'chats' ? conversationsLoading : inboxLoading || conversationsLoading);
+
+  const showInboxErrorEmpty =
+    tab === 'activity' &&
+    inboxError != null &&
+    items.length === 0 &&
+    !inboxLoading;
+
+  const showInboxSoftError =
+    tab === 'activity' && inboxError != null && items.length > 0;
 
   const onRefresh = useCallback(() => {
     loadChats();
@@ -490,6 +500,8 @@ export function InteractionsScreen(): React.JSX.Element {
         </TouchableOpacity>
       </View>
 
+      {showInboxSoftError ? <SoftErrorBanner onRetry={() => void refresh()} /> : null}
+
       {coldLoading ? (
         <View style={styles.list}>
           <SkeletonListRow />
@@ -516,16 +528,27 @@ export function InteractionsScreen(): React.JSX.Element {
             rows.length === 0 ? styles.emptyContainer : styles.list
           }
           ListEmptyComponent={
-            <EmptyState
-              variant="plain"
-              icon={tab === 'chats' ? 'message-text-outline' : 'bell-outline'}
-              title={tab === 'chats' ? 'No chats yet' : 'No activity yet'}
-              body={
-                tab === 'chats'
-                  ? 'Start a conversation from a profile or after a match.'
-                  : 'Waves, friend requests, and new followers show up here.'
-              }
-            />
+            showInboxErrorEmpty ? (
+              <EmptyState
+                variant="plain"
+                icon="alert-circle-outline"
+                title="Couldn't load activity"
+                body="Check your connection and try again."
+                actionLabel="Retry"
+                onAction={() => void refresh()}
+              />
+            ) : (
+              <EmptyState
+                variant="plain"
+                icon={tab === 'chats' ? 'message-text-outline' : 'bell-outline'}
+                title={tab === 'chats' ? 'No chats yet' : 'No activity yet'}
+                body={
+                  tab === 'chats'
+                    ? 'Start a conversation from a profile or after a match.'
+                    : 'Waves, friend requests, and new followers show up here.'
+                }
+              />
+            )
           }
           renderItem={({ item: row }) =>
             row.kind === 'chat' ? (
@@ -615,52 +638,50 @@ const styles = StyleSheet.create({
     minWidth: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: colors.action,
-    paddingHorizontal: 6,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 6,
   },
   unreadBadgeText: { color: colors.onPrimary, fontSize: 11, fontWeight: '800' },
+  pendingBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+  },
+  pendingText: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   mapBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: spacing.sm,
-    borderRadius: 16,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+    borderWidth: 1,
     borderColor: colors.borderStrong,
   },
-  mapBtnText: { color: colors.textPrimary, fontWeight: '700', fontSize: fontSize.sm },
+  mapBtnText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '600' },
   primaryBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: spacing.sm,
-    borderRadius: 16,
-    backgroundColor: colors.action,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primary,
   },
-  primaryBtnText: { color: colors.textPrimary, fontWeight: '700', fontSize: fontSize.sm },
+  primaryBtnText: { color: colors.onPrimary, fontSize: fontSize.sm, fontWeight: '700' },
   declineBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 16,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+    borderWidth: 1,
     borderColor: colors.borderStrong,
   },
-  declineBtnText: { color: colors.textSecondary, fontWeight: '600', fontSize: fontSize.sm },
+  declineBtnText: { color: colors.textMuted, fontSize: fontSize.sm, fontWeight: '600' },
   mutualBadge: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primaryBorderSoft,
   },
-  mutualText: { color: colors.action, fontWeight: '700', fontSize: fontSize.xs },
-  pendingBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceAlt,
-  },
-  pendingText: { color: colors.warning, fontWeight: '700', fontSize: fontSize.xs },
+  mutualText: { color: colors.primary, fontSize: fontSize.sm, fontWeight: '700' },
 });
