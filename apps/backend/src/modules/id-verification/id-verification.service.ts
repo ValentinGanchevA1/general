@@ -139,12 +139,15 @@ export class IdVerificationService {
     const result = await this.db.transaction(async (manager) => {
       const updated = await manager.query<{ id: string }[]>(
         `UPDATE user_id_verifications
-         SET status = $1, reviewed_by = $2, reviewed_at = now(), rejection_reason = $3
-         WHERE user_id = $4
-           AND status = 'pending'
+         SET status = $1::id_verification_status,
+             reviewed_by = $2::uuid,
+             reviewed_at = now(),
+             rejection_reason = $3
+         WHERE user_id = $4::uuid
+           AND status = 'pending'::id_verification_status
            AND id = (
              SELECT id FROM user_id_verifications
-             WHERE user_id = $4 AND status = 'pending'
+             WHERE user_id = $4::uuid AND status = 'pending'::id_verification_status
              ORDER BY created_at DESC
              LIMIT 1
            )
@@ -165,16 +168,23 @@ export class IdVerificationService {
       }
 
       // Keep ladder + ID status aligned: approve promotes verification_level to 'id'.
+      // Cast $1 to id_verification_status everywhere — bare $1 = 'verified' makes
+      // Postgres deduce text vs enum and fail with 500 (inconsistent types for $1).
       await manager.query(
         `UPDATE users
-         SET id_verification_status = $1,
-             id_verified_at = CASE WHEN $1 = 'verified' THEN now() ELSE id_verified_at END,
+         SET id_verification_status = $1::id_verification_status,
+             id_verified_at = CASE
+               WHEN $1::id_verification_status = 'verified'::id_verification_status
+               THEN now()
+               ELSE id_verified_at
+             END,
              verification_level = CASE
-               WHEN $1 = 'verified' THEN 'id'
+               WHEN $1::id_verification_status = 'verified'::id_verification_status
+               THEN 'id'
                ELSE verification_level
              END,
              updated_at = NOW()
-         WHERE id = $2`,
+         WHERE id = $2::uuid`,
         [newStatus, targetUserId],
       );
 
