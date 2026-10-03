@@ -8,33 +8,33 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { AchievementStatus } from '@g88/shared';
+import type { Achievement } from '@g88/shared';
 import { useAchievements } from '@/features/gamification/useAchievements';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
+import { SoftErrorBanner } from '@/components/SoftErrorBanner';
 import { SkeletonListRow } from '@/components/Skeleton';
 import { colors } from '@/theme';
 
-function AchievementRow({ a }: { a: AchievementStatus }): React.JSX.Element {
-  const pct = a.threshold > 0 ? Math.min(100, Math.round((a.progress / a.threshold) * 100)) : 0;
+function AchievementRow({ a }: { a: Achievement }): React.JSX.Element {
   return (
-    <View style={[styles.row, a.unlocked && styles.rowUnlocked]}>
-      <Text style={[styles.emoji, !a.unlocked && styles.emojiLocked]}>{a.icon}</Text>
+    <View style={[styles.row, a.unlocked && styles.rowDone]}>
+      <View style={[styles.iconWrap, a.unlocked && styles.iconWrapDone]}>
+        <Icon
+          name={a.unlocked ? 'trophy' : 'trophy-outline'}
+          size={22}
+          color={a.unlocked ? colors.bg : colors.premium}
+        />
+      </View>
       <View style={styles.info}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>{a.title}</Text>
-          {a.unlocked ? <Icon name="check-decagram" size={16} color={colors.premium} /> : null}
-        </View>
-        <Text style={styles.desc}>{a.description}</Text>
-        {!a.unlocked ? (
-          <>
-            <View style={styles.barTrack}>
-              <View style={[styles.barFill, { width: `${pct}%` }]} />
-            </View>
-            <Text style={styles.progressText}>
-              {a.progress}/{a.threshold}
-            </Text>
-          </>
+        <Text style={styles.title}>{a.title}</Text>
+        {a.description ? <Text style={styles.body}>{a.description}</Text> : null}
+        {a.unlocked ? (
+          <Text style={styles.doneText}>Unlocked</Text>
+        ) : a.target != null && a.progress != null ? (
+          <Text style={styles.progressText}>
+            {a.progress}/{a.target}
+          </Text>
         ) : null}
       </View>
     </View>
@@ -55,6 +55,9 @@ export function AchievementsScreen(): React.JSX.Element {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />}
       >
+        {error != null && achievements.length > 0 ? (
+          <SoftErrorBanner onRetry={refresh} />
+        ) : null}
         {achievements.length > 0 ? (
           <Text style={styles.summary}>
             {unlockedCount} of {achievements.length} unlocked
@@ -93,6 +96,7 @@ const styles = StyleSheet.create({
   summary: { color: colors.textMuted, fontSize: 14, textAlign: 'center', marginBottom: 16 },
   row: {
     flexDirection: 'row',
+    alignItems: 'center',
     marginHorizontal: 20,
     marginBottom: 12,
     padding: 16,
@@ -101,16 +105,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     gap: 14,
-    opacity: 0.7,
   },
-  rowUnlocked: { opacity: 1, borderColor: colors.premiumBorder },
-  emoji: { fontSize: 32 },
-  emojiLocked: { opacity: 0.4 },
+  rowDone: { borderColor: colors.premiumBorderSoft, backgroundColor: colors.premiumSoft },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.premiumMutedBg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconWrapDone: { backgroundColor: colors.premium },
   info: { flex: 1, gap: 4 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   title: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
-  desc: { color: colors.textMuted, fontSize: 13 },
-  barTrack: { height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden', marginTop: 6 },
-  barFill: { height: 6, backgroundColor: colors.primary, borderRadius: 3 },
-  progressText: { color: colors.textFaint, fontSize: 11, marginTop: 4 },
+  body: { color: colors.textMuted, fontSize: 13 },
+  doneText: { color: colors.premium, fontSize: 13, fontWeight: '600', marginTop: 2 },
+  progressText: { color: colors.textFaint, fontSize: 11, marginTop: 2 },
 });
