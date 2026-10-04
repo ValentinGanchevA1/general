@@ -146,6 +146,7 @@ jobs:
           done <<< "$CANDIDATES"
 
       - name: Inject Maps keys
+        if: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG != '' && secrets.GOOGLE_SERVICES_JSON != '' && secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 != '' }}
         env:
           GOOGLE_MAPS_API_KEY_DEBUG: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG }}
           GOOGLE_MAPS_API_KEY_RELEASE: ${{ secrets.GOOGLE_MAPS_API_KEY_RELEASE }}
@@ -156,16 +157,19 @@ jobs:
           EOF
 
       - name: Inject google-services.json
+        if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json
 
       - name: Decode upload keystore
+        if: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 != '' }}
         env:
           ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
         run: echo "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 -d > android/app/upload.keystore
 
       - name: Inject release signing config
+        if: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD != '' && secrets.ANDROID_UPLOAD_KEY_ALIAS != '' && secrets.ANDROID_UPLOAD_KEY_PASSWORD != '' }}
         env:
           ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
           ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
@@ -179,6 +183,7 @@ jobs:
           EOF
 
       - name: Print signing certificate fingerprints
+        if: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD != '' && secrets.ANDROID_UPLOAD_KEY_ALIAS != '' }}
         env:
           ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
           ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
@@ -193,6 +198,7 @@ jobs:
             | grep -E "SHA1:|SHA256:"
 
       - name: Cache Gradle
+        if: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG != '' && secrets.GOOGLE_SERVICES_JSON != '' && secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 != '' }}
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
@@ -202,6 +208,7 @@ jobs:
           restore-keys: gradle-
 
       - name: Build signed release APK
+        if: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG != '' && secrets.GOOGLE_SERVICES_JSON != '' && secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 != '' }}
         # GOOGLE_WEB_CLIENT_ID / SENTRY_DSN are read via process.env at JS bundle
         # time (babel inline-env transform) — they must be present in the gradle
         # process env, otherwise they inline as '' and Google Sign-In + Sentry are
@@ -239,6 +246,7 @@ jobs:
           done
 
       - name: Verify the APK is not debug-signed
+        if: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG != '' && secrets.GOOGLE_SERVICES_JSON != '' && secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 != '' }}
         run: |
           APK=android/app/build/outputs/apk/release/app-release.apk
           test -f "$APK" || { echo "::error::APK not produced"; exit 1; }
@@ -250,6 +258,7 @@ jobs:
           fi
 
       - name: Upload APK artifact
+        if: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG != '' && secrets.GOOGLE_SERVICES_JSON != '' && secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: g88-release-apk
@@ -261,6 +270,7 @@ jobs:
       # short path (deep android/… paths + Node 20→24 force caused
       # "Error creating asset temp dir" on v2.2.1).
       - name: Stage APK for release
+        if: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG != '' && secrets.GOOGLE_SERVICES_JSON != '' && secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 != '' }}
         working-directory: .
         run: |
           cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/g88-v1.0.apk"
@@ -269,6 +279,7 @@ jobs:
       # softprops v3 = Node 24 runtime (matches FORCE_JAVASCRIPT_ACTIONS_TO_NODE24).
       # Per-run tag apk-v1.0.<run_number>; make_latest keeps the permanent download URL.
       - name: Publish GitHub Release
+        if: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG != '' && secrets.GOOGLE_SERVICES_JSON != '' && secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 != '' }}
         uses: softprops/action-gh-release@5113cdc90fd4d541c801c55356214017bf5ae34b # v3
         with:
           token: ${{ secrets.RELEASE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -297,3 +308,9 @@ jobs:
             - Sentry release tag: `com.g88@0.1.0+${{ github.run_number }}` (events only until wizard + SENTRY_AUTH_TOKEN upload hooks).
 
             Commit: ${{ github.sha }} · Build: ${{ github.run_number }}
+
+      - name: Notify secrets unavailable
+        if: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG == '' || secrets.GOOGLE_SERVICES_JSON == '' || secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 == '' }}
+        run: |
+          echo "::warning::Skipping Android APK build — required secrets are not available."
+          echo "Required: GOOGLE_MAPS_API_KEY_DEBUG, GOOGLE_SERVICES_JSON, ANDROID_UPLOAD_KEYSTORE_BASE64"
