@@ -8,6 +8,7 @@
  * - Mutual like opens separate dating chat thread
  * - Super Like reserved in context, no UI in v1
  * - LAYER_CHANGED resets to idle
+ * - PIN_TAP accepted from any state (switch pin while preview/sheet open)
  */
 import {assign, fromPromise, setup} from 'xstate';
 import type {
@@ -26,14 +27,18 @@ import type {
 } from '@g88/shared';
 import {getJson, postJson} from '@/api/client';
 
-function peerModeFromProfile(profile: PublicUserProfile): PeerMode {
+function peerModeFromProfile(
+  profile: PublicUserProfile,
+  viewerMode: ViewerMode,
+): PeerMode {
   // openToDating is owner-only on UserProfile; public profile may omit it.
-  // Prefer explicit field when present; else 'social' until backend exposes it.
-  const open =
+  // Dating layer only shows peers who are open_to_dating → treat as 'both'.
+  const explicit =
     'openToDating' in profile
-      ? Boolean((profile as PublicUserProfile & {openToDating?: boolean}).openToDating)
-      : false;
-  if (open) return 'both';
+      ? (profile as PublicUserProfile & {openToDating?: boolean}).openToDating
+      : undefined;
+  if (explicit === true) return 'both';
+  if (explicit === undefined && viewerMode === 'dating') return 'both';
   return 'social';
 }
 
@@ -62,7 +67,7 @@ const loadPinActor = fromPromise<
   {pinId: string; viewerMode: ViewerMode}
 >(async ({input}) => {
   const profile = await getJson<PublicUserProfile>(`/users/${input.pinId}`);
-  const peerMode = peerModeFromProfile(profile);
+  const peerMode = peerModeFromProfile(profile, input.viewerMode);
   const relationship = relationshipFromProfile(profile);
   return {
     profile,
@@ -213,7 +218,16 @@ export const pinInteractionMachine = setup({
     stage: 'preview',
   },
   on: {
+    // Accept PIN_TAP from any state so switching pins while preview/sheet open works.
+    PIN_TAP: {
+      target: '.loadingPin',
+      actions: 'assignPin',
+    },
     LAYER_CHANGED: {
+      target: '.idle',
+      actions: 'resetToIdle',
+    },
+    DISMISS: {
       target: '.idle',
       actions: 'resetToIdle',
     },
@@ -227,14 +241,7 @@ export const pinInteractionMachine = setup({
     },
   },
   states: {
-    idle: {
-      on: {
-        PIN_TAP: {
-          target: 'loadingPin',
-          actions: 'assignPin',
-        },
-      },
-    },
+    idle: {},
 
     loadingPin: {
       invoke: {
@@ -269,7 +276,6 @@ export const pinInteractionMachine = setup({
     preview: {
       entry: assign({stage: 'preview'}),
       on: {
-        DISMISS: 'idle',
         OPEN_DETAIL: 'detailSheet',
         QUICK_WAVE: {
           guard: 'canWave',
@@ -295,7 +301,6 @@ export const pinInteractionMachine = setup({
       },
       on: {
         OPEN_FULL: 'fullProfile',
-        DISMISS: 'idle',
         BACK: 'preview',
       },
     },
@@ -304,7 +309,6 @@ export const pinInteractionMachine = setup({
       entry: assign({stage: 'full'}),
       on: {
         BACK: 'detailSheet',
-        DISMISS: 'idle',
         SEND_WAVE: {guard: 'canWave', target: 'social.wavePending'},
         SEND_LIKE: {guard: 'canLike', target: 'dating.likePending'},
         PASS: {guard: 'isDatingMode', target: 'dating.passed'},
@@ -356,21 +360,16 @@ export const pinInteractionMachine = setup({
           on: {
             WAVE_MUTUAL: {target: 'mutualWave', actions: 'setMutualWave'},
             MESSAGE: {guard: 'canMessageSocial', target: 'messaging'},
-            DISMISS: '#pinInteraction.idle',
           },
         },
         mutualWave: {
           entry: 'setMutualWave',
           on: {
             MESSAGE: 'messaging',
-            DISMISS: '#pinInteraction.idle',
           },
         },
         messaging: {
           entry: assign({lastResult: 'message_opened'}),
-          on: {
-            DISMISS: '#pinInteraction.idle',
-          },
         },
       },
     },
@@ -415,21 +414,16 @@ export const pinInteractionMachine = setup({
         liked: {
           on: {
             MATCH_CREATED: {target: 'matched', actions: 'setMatched'},
-            DISMISS: '#pinInteraction.idle',
           },
         },
         matched: {
           entry: 'setMatched',
           on: {
             MESSAGE: 'messaging',
-            DISMISS: '#pinInteraction.idle',
           },
         },
         messaging: {
           entry: assign({lastResult: 'message_opened'}),
-          on: {
-            DISMISS: '#pinInteraction.idle',
-          },
         },
         passed: {
           entry: 'setPassed',
@@ -463,7 +457,6 @@ export const pinInteractionMachine = setup({
     error: {
       on: {
         RETRY: 'loadingPin',
-        DISMISS: 'idle',
       },
     },
   },
