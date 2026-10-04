@@ -50,7 +50,8 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
 
   const showPreview = state.matches('preview') || state.matches('loadingPin');
   const pending =
-    state.matches('social.wavePending') || state.matches('dating.likePending');
+    state.matches({ social: 'wavePending' }) ||
+    state.matches({ dating: 'likePending' });
 
   const ctx = state.context;
 
@@ -89,16 +90,14 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
         profile && 'idVerified' in profile
           ? Boolean(profile.idVerified)
           : false,
-      verification:
-        (profile &&
-          'verification' in profile &&
-          (profile.verification as
-            | 'none'
-            | 'email'
-            | 'phone'
-            | 'id'
-            | 'social')) ||
-        'none',
+      verification: (() => {
+        const v =
+          profile && 'verification' in profile
+            ? (profile.verification as string | undefined)
+            : undefined;
+        if (v === 'email' || v === 'phone' || v === 'selfie' || v === 'id') return v;
+        return 'none' as const;
+      })(),
       viewerMode: ctx.viewerMode,
       peerAllowsDating,
       pending,
