@@ -1,126 +1,197 @@
-import {useCallback, useEffect, useMemo} from 'react';
-import {useMachine} from '@xstate/react';
+import React, {useMemo} from 'react';
+import {
+  ActivityIndicator,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-import type {EntityPoint} from '@g88/shared';
-import {pinInteractionMachine} from './pinInteraction.machine';
-import type {ViewerMode} from './pinInteraction.types';
+import type {VerificationLevel} from '@g88/shared';
+import {IdentityBlock} from '@/components/IdentityBlock';
+import {colors} from '@/theme';
+import type {ViewerMode} from '@/features/map/pinInteraction.types';
+import {styles} from './PreviewCallout.styles';
 
-export interface UsePinInteractionOptions {
-  /** Current map interaction mode (People vs Dating layer). */
+export interface PreviewCalloutProps {
+  /** Display name from pin meta or loaded profile. */
+  name: string;
+  avatarUrl?: string | null;
+  /** e.g. "240 m" or "1.2 km". */
+  distanceLabel?: string | null;
+  /** Age when known (optional). */
+  age?: number | null;
+  online?: boolean;
+  idVerified?: boolean;
+  verification?: VerificationLevel;
+  /** Active map interaction mode. */
   viewerMode: ViewerMode;
+  /** Peer allows dating interactions. */
+  peerAllowsDating: boolean;
+  /** True while wave/like request is in flight. */
+  pending?: boolean;
+  /** Wave already sent (social). */
+  waveSent?: boolean;
+  /** Like already sent (dating). */
+  likeSent?: boolean;
+  /** Viewer or peer blocked. */
+  blocked?: boolean;
+  onQuickWave?: () => void;
+  onQuickLike?: () => void;
+  onOpenDetail?: () => void;
+  onDismiss?: () => void;
 }
 
-export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
-  const [state, send] = useMachine(pinInteractionMachine);
+function formatSubtitle(age?: number | null, distanceLabel?: string | null): string | null {
+  const parts: string[] = [];
+  if (age != null && age > 0) parts.push(String(age));
+  if (distanceLabel) parts.push(distanceLabel);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
 
-  // Layer switch must reset open preview / sheet context
-  useEffect(() => {
-    send({type: 'LAYER_CHANGED', viewerMode});
-  }, [viewerMode, send]);
-
-  const openUserPin = useCallback(
-    (point: EntityPoint & {kind: 'user'}) => {
-      send({
-        type: 'PIN_TAP',
-        pinId: point.id,
-        pinType: 'user',
-        lat: point.lat,
-        lng: point.lng,
-        viewerMode,
-      });
-    },
-    [send, viewerMode],
+/**
+ * Stage-1 floating map callout for pin interaction.
+ * Quick Wave (social) or Like (dating) + Open detail.
+ * Driven by pinInteraction machine state; no internal side-effects.
+ */
+export function PreviewCallout({
+  name,
+  avatarUrl,
+  distanceLabel,
+  age,
+  online,
+  idVerified = false,
+  verification = 'none',
+  viewerMode,
+  peerAllowsDating,
+  pending = false,
+  waveSent = false,
+  likeSent = false,
+  blocked = false,
+  onQuickWave,
+  onQuickLike,
+  onOpenDetail,
+  onDismiss,
+}: PreviewCalloutProps): React.JSX.Element {
+  const subtitle = useMemo(
+    () => formatSubtitle(age, distanceLabel),
+    [age, distanceLabel],
   );
 
-  const dismiss = useCallback(() => {
-    send({type: 'DISMISS'});
-  }, [send]);
+  const showWave =
+    viewerMode === 'social' && !blocked && !waveSent && Boolean(onQuickWave);
+  const showLike =
+    viewerMode === 'dating' &&
+    peerAllowsDating &&
+    !blocked &&
+    !likeSent &&
+    Boolean(onQuickLike);
 
-  const openDetail = useCallback(() => {
-    send({type: 'OPEN_DETAIL'});
-  }, [send]);
+  const primaryLabel = (() => {
+    if (pending) return '…';
+    if (viewerMode === 'dating') {
+      if (likeSent) return 'Liked';
+      if (!peerAllowsDating) return 'Open';
+      return 'Like';
+    }
+    if (waveSent) return 'Waved';
+    return 'Wave';
+  })();
 
-  const quickWave = useCallback(() => {
-    send({type: 'QUICK_WAVE'});
-  }, [send]);
-
-  const quickLike = useCallback(() => {
-    send({type: 'QUICK_LIKE'});
-  }, [send]);
-
-  const showPreview = state.matches('preview') || state.matches('loadingPin');
-  const pending =
-    state.matches('social.wavePending') || state.matches('dating.likePending');
-
-  const ctx = state.context;
-
-  const previewProps = useMemo(() => {
-    if (!showPreview || !ctx.pinId) return null;
-    const profile = ctx.profile;
-    const name =
-      profile && 'displayName' in profile && typeof profile.displayName === 'string'
-        ? profile.displayName
-        : 'User';
-    const distanceLabel =
-      ctx.distanceMeters != null
-        ? ctx.distanceMeters < 1000
-          ? `${Math.round(ctx.distanceMeters)} m`
-          : `${(ctx.distanceMeters / 1000).toFixed(1)} km`
-        : null;
-    const peerAllowsDating =
-      ctx.peerMode === 'dating' || ctx.peerMode === 'both';
-
-    return {
-      name,
-      avatarUrl:
-        profile && 'avatarUrl' in profile
-          ? (profile.avatarUrl as string | null | undefined)
-          : null,
-      distanceLabel,
-      age:
-        profile && 'age' in profile && typeof profile.age === 'number'
-          ? profile.age
-          : null,
-      online:
-        profile && 'online' in profile
-          ? (profile.online as boolean | undefined)
-          : undefined,
-      idVerified:
-        profile && 'idVerified' in profile
-          ? Boolean(profile.idVerified)
-          : false,
-      verification:
-        (profile &&
-          'verification' in profile &&
-          (profile.verification as
-            | 'none'
-            | 'email'
-            | 'phone'
-            | 'id'
-            | 'social')) ||
-        'none',
-      viewerMode: ctx.viewerMode,
-      peerAllowsDating,
-      pending,
-      waveSent: ctx.waveSent,
-      likeSent: ctx.likeSent,
-      blocked: ctx.blockedByViewer || ctx.blockedByPeer,
-    };
-  }, [showPreview, ctx, pending]);
-
-  return {
-    state,
-    send,
-    openUserPin,
-    dismiss,
-    openDetail,
-    quickWave,
-    quickLike,
-    showPreview,
-    previewProps,
-    /** Pin id currently in machine context (for sheet handoff). */
-    activePinId: ctx.pinId || null,
-    stage: ctx.stage,
-    isDetail: state.matches('detailSheet') || state.matches('fullProfile'),
+  const onPrimary = (): void => {
+    if (pending || blocked) return;
+    if (viewerMode === 'dating') {
+      if (peerAllowsDating && !likeSent && onQuickLike) {
+        onQuickLike();
+        return;
+      }
+      onOpenDetail?.();
+      return;
+    }
+    if (!waveSent && onQuickWave) {
+      onQuickWave();
+      return;
+    }
+    onOpenDetail?.();
   };
+
+  const primaryDisabled =
+    pending ||
+    blocked ||
+    (viewerMode === 'social' && waveSent) ||
+    (viewerMode === 'dating' && (likeSent || !peerAllowsDating));
+
+  const primaryA11y =
+    viewerMode === 'dating'
+      ? likeSent
+        ? 'Already liked'
+        : peerAllowsDating
+          ? 'Like'
+          : 'Open profile'
+      : waveSent
+        ? 'Already waved'
+        : 'Wave';
+
+  return (
+    <View style={styles.card} accessibilityRole="summary">
+      <View style={styles.header}>
+        <View style={styles.identity}>
+          <IdentityBlock
+            name={name}
+            avatarUrl={avatarUrl}
+            verification={verification}
+            idVerified={idVerified}
+            online={online}
+            subtitle={subtitle}
+            ringVariant={idVerified ? 'verified' : 'brand'}
+            size={44}
+            onPress={onOpenDetail}
+            accessibilityLabel={`Open detail for ${name}`}
+          />
+        </View>
+        {onDismiss ? (
+          <TouchableOpacity
+            style={styles.dismissBtn}
+            onPress={onDismiss}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+          >
+            <Text style={styles.dismissText}>✕</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      <View style={styles.actions}>
+        {(showWave || showLike || viewerMode === 'dating') && (
+          <TouchableOpacity
+            style={[
+              styles.primaryBtn,
+              viewerMode === 'dating' ? styles.likeBtn : styles.waveBtn,
+              primaryDisabled ? styles.btnDisabled : undefined,
+            ]}
+            onPress={onPrimary}
+            disabled={primaryDisabled && !onOpenDetail}
+            accessibilityRole="button"
+            accessibilityLabel={primaryA11y}
+          >
+            {pending ? (
+              <ActivityIndicator color={colors.onPrimary} size="small" />
+            ) : (
+              <Text style={styles.primaryBtnText}>{primaryLabel}</Text>
+            )}
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={styles.openBtn}
+          onPress={onOpenDetail}
+          accessibilityRole="button"
+          accessibilityLabel="Open detail"
+        >
+          <Text style={styles.openBtnText}>Open</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 }
+

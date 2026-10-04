@@ -1,113 +1,154 @@
+// Compact "Trending nearby" card from viewport points (client-only).
+// Collapsible: default collapsed to one-line header to free map real estate.
+
 import React from 'react';
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, radius, spacing } from '@/theme';
+import { colors, fontSize, radius, spacing } from '@/theme';
 
-export interface EmptyStateProps {
-  title: string;
-  body?: string | undefined;
-  actionLabel?: string | undefined;
-  onAction?: (() => void) | undefined;
-  /** Optional MCI icon name shown above the title. */
-  icon?: string | undefined;
-  /**
-   * `card` (default) — bordered panel for map overlays.
-   * `plain` — no card chrome; for full-screen list empties.
-   */
-  variant?: 'card' | 'plain' | undefined;
-  style?: StyleProp<ViewStyle> | undefined;
+import {
+	type TrendingItem,
+	formatDistanceM,
+} from './buildTrending';
+
+const KIND_DOT: Record<TrendingItem['kind'], string> = {
+	user: colors.entityUser,
+	event: colors.entityEvent,
+	listing: colors.entityListing,
+};
+
+export interface TrendingCardProps {
+	items: TrendingItem[];
+	onPressItem: (item: TrendingItem) => void;
+	/** Absolute top from safe-area stack (mapChromeLayout.mapTrendingTop). */
+	top: number;
+	visible: boolean;
+	/** When true, only the header row is shown. */
+	collapsed?: boolean;
+	onToggleCollapse?: () => void;
 }
 
-/**
- * Shared empty / sparse state for map overlays and list screens.
- */
-export function EmptyState({
-  title,
-  body,
-  actionLabel,
-  onAction,
-  icon,
-  variant = 'card',
-  style,
-}: EmptyStateProps): React.JSX.Element {
-  const plain = variant === 'plain';
+export function TrendingCard({
+	items,
+	onPressItem,
+	top,
+	visible,
+	collapsed = true,
+	onToggleCollapse,
+}: TrendingCardProps): React.JSX.Element | null {
+	if (!visible || items.length === 0) return null;
 
-  return (
-    <View
-      style={[plain ? styles.plain : styles.card, style]}
-      accessibilityRole="summary"
-    >
-      {icon ? (
-        <Icon
-          name={icon}
-          size={plain ? 48 : 32}
-          color={plain ? colors.borderStrong : colors.textMuted}
-          style={styles.icon}
-        />
-      ) : null}
-      <Text style={styles.title}>{title}</Text>
-      {body ? <Text style={styles.body}>{body}</Text> : null}
-      {actionLabel && onAction ? (
-        <TouchableOpacity
-          style={styles.btn}
-          onPress={onAction}
-          accessibilityRole="button"
-          accessibilityLabel={actionLabel}
-        >
-          <Text style={styles.btnText}>{actionLabel}</Text>
-        </TouchableOpacity>
-      ) : null}
-    </View>
-  );
+	const canToggle = typeof onToggleCollapse === 'function';
+
+	return (
+		<View style={[styles.wrap, { top }]} pointerEvents="box-none">
+			<View style={styles.card}>
+				<Pressable
+					onPress={canToggle ? onToggleCollapse : undefined}
+					style={styles.headerRow}
+					accessibilityRole={canToggle ? 'button' : undefined}
+					accessibilityLabel={
+						canToggle
+							? collapsed
+								? 'Expand trending nearby'
+								: 'Collapse trending nearby'
+							: 'Trending nearby'
+					}
+					accessibilityState={canToggle ? { expanded: !collapsed } : undefined}
+					hitSlop={6}
+				>
+					<Text style={styles.heading}>Trending nearby</Text>
+					{canToggle ? (
+						<Icon
+							name={collapsed ? 'chevron-down' : 'chevron-up'}
+							size={18}
+							color={colors.textMuted}
+						/>
+					) : null}
+				</Pressable>
+
+				{!collapsed
+					? items.map((item, index) => (
+							<Pressable
+								key={`${item.kind}:${item.id}`}
+								onPress={() => onPressItem(item)}
+								style={[styles.row, index > 0 && styles.rowBorder]}
+								accessibilityRole="button"
+								accessibilityLabel={`${item.title}, ${formatDistanceM(item.distanceM) || 'nearby'}`}
+							>
+								<View
+									style={[styles.dot, { backgroundColor: KIND_DOT[item.kind] }]}
+								/>
+								<Text style={styles.title} numberOfLines={1}>
+									{item.title}
+								</Text>
+								{item.distanceM != null ? (
+									<Text style={styles.distance}>
+										{formatDistanceM(item.distanceM)}
+									</Text>
+								) : null}
+							</Pressable>
+					  ))
+					: null}
+			</View>
+		</View>
+	);
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.xl,
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  plain: {
-    paddingHorizontal: spacing.xxl,
-    paddingVertical: spacing.xxl * 2,
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  icon: { marginBottom: spacing.xs },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  body: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  btn: {
-    marginTop: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
-  },
-  btnText: {
-    color: colors.onPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
+	wrap: {
+		position: 'absolute',
+		left: spacing.lg,
+		right: spacing.lg,
+		zIndex: 17,
+	},
+	card: {
+		backgroundColor: 'rgba(18,18,31,0.94)',
+		borderWidth: 1,
+		borderColor: colors.borderStrong,
+		borderRadius: radius.md,
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+	},
+	headerRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		minHeight: 22,
+	},
+	heading: {
+		color: colors.textMuted,
+		fontSize: fontSize.xs,
+		fontWeight: '700',
+		textTransform: 'uppercase',
+		letterSpacing: 0.4,
+	},
+	row: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 8,
+		gap: 8,
+	},
+	rowBorder: {
+		borderTopWidth: StyleSheet.hairlineWidth,
+		borderTopColor: colors.border,
+	},
+	dot: {
+		width: 8,
+		height: 8,
+		borderRadius: 4,
+	},
+	title: {
+		flex: 1,
+		color: colors.textPrimary,
+		fontSize: fontSize.sm,
+		fontWeight: '600',
+	},
+	distance: {
+		color: colors.textMuted,
+		fontSize: fontSize.xs,
+		fontWeight: '600',
+	},
 });
+
