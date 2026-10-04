@@ -1,95 +1,195 @@
-import type {PublicUserProfile} from '@g88/shared';
+import React, {useMemo} from 'react';
+import {
+  ActivityIndicator,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-export type ViewerMode = 'social' | 'dating';
-export type PeerMode = 'social' | 'dating' | 'both' | 'none';
-export type PinType = 'user' | 'event' | 'listing';
-export type Stage = 'preview' | 'detail' | 'full';
-export type CanMessage = 'none' | 'request' | 'chat';
+import {IdentityBlock} from '@/components/IdentityBlock';
+import {colors} from '@/theme';
+import type {ViewerMode} from '@/features/map/pinInteraction.types';
+import {styles} from './PreviewCallout.styles';
 
-export interface RelationshipSnapshot {
-  waveSent: boolean;
-  hasMutualWave: boolean;
-  canMessage: CanMessage;
-  isFriend: boolean;
-  blockedByViewer: boolean;
-  blockedByPeer: boolean;
-  likeSent: boolean;
-  isMatch: boolean;
-  passed: boolean;
-}
-
-export interface PinContext {
-  pinId: string;
-  pinType: PinType;
-  lat: number;
-  lng: number;
-
+export interface PreviewCalloutProps {
+  /** Display name from pin meta or loaded profile. */
+  name: string;
+  avatarUrl?: string | null;
+  /** e.g. "240 m" or "1.2 km". */
+  distanceLabel?: string | null;
+  /** Age when known (optional). */
+  age?: number | null;
+  online?: boolean;
+  idVerified?: boolean;
+  verification?: 'none' | 'email' | 'phone' | 'id' | 'social';
+  /** Active map interaction mode. */
   viewerMode: ViewerMode;
-  peerMode: PeerMode;
-
-  profile?: PublicUserProfile;
-  distanceMeters?: number;
-
-  waveSent: boolean;
-  hasMutualWave: boolean;
-  canMessage: CanMessage;
-  isFriend: boolean;
-  blockedByViewer: boolean;
-  blockedByPeer: boolean;
-
-  likeSent: boolean;
-  /** Reserved for premium; unused in v1 UI. */
-  superLiked: boolean;
-  isMatch: boolean;
-  passed: boolean;
-
-  stage: Stage;
-  error?: string;
-  lastResult?:
-    | 'wave_sent'
-    | 'like_sent'
-    | 'matched'
-    | 'message_opened'
-    | 'blocked'
-    | 'passed';
+  /** Peer allows dating interactions. */
+  peerAllowsDating: boolean;
+  /** True while wave/like request is in flight. */
+  pending?: boolean;
+  /** Wave already sent (social). */
+  waveSent?: boolean;
+  /** Like already sent (dating). */
+  likeSent?: boolean;
+  /** Viewer or peer blocked. */
+  blocked?: boolean;
+  onQuickWave?: () => void;
+  onQuickLike?: () => void;
+  onOpenDetail?: () => void;
+  onDismiss?: () => void;
 }
 
-export type PinEvent =
-  | {
-      type: 'PIN_TAP';
-      pinId: string;
-      pinType: PinType;
-      lat: number;
-      lng: number;
-      viewerMode: ViewerMode;
-    }
-  | {type: 'LAYER_CHANGED'; viewerMode: ViewerMode}
-  | {type: 'DISMISS'}
-  | {type: 'OPEN_DETAIL'}
-  | {type: 'OPEN_FULL'}
-  | {type: 'BACK'}
-  | {type: 'QUICK_WAVE'}
-  | {type: 'QUICK_LIKE'}
-  | {type: 'SEND_WAVE'}
-  | {type: 'SEND_LIKE'}
-  | {type: 'PASS'}
-  | {type: 'MESSAGE'}
-  | {type: 'BLOCK'}
-  | {type: 'REPORT'}
-  | {type: 'RETRY'}
-  | {type: 'WAVE_MUTUAL'}
-  | {type: 'MATCH_CREATED'; datingConversationId: string}
-  | {type: 'USER_BLOCKED'}
-  | {type: 'PROFILE_UPDATED'; profile: PublicUserProfile}
-  | {type: 'PEER_MODE_CHANGED'; peerMode: PeerMode}
-  | {
-      type: 'LOAD_SUCCESS';
-      profile: PublicUserProfile;
-      peerMode: PeerMode;
-      distanceMeters?: number;
-      relationship: RelationshipSnapshot;
-    }
-  | {type: 'LOAD_FAILURE'; error: string}
-  | {type: 'ACTION_SUCCESS'; result: NonNullable<PinContext['lastResult']>}
-  | {type: 'ACTION_FAILURE'; error: string};
+function formatSubtitle(age?: number | null, distanceLabel?: string | null): string | null {
+  const parts: string[] = [];
+  if (age != null && age > 0) parts.push(String(age));
+  if (distanceLabel) parts.push(distanceLabel);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
 
+/**
+ * Stage-1 floating map callout for pin interaction.
+ * Quick Wave (social) or Like (dating) + Open detail.
+ * Driven by pinInteraction machine state; no internal side-effects.
+ */
+export function PreviewCallout({
+  name,
+  avatarUrl,
+  distanceLabel,
+  age,
+  online,
+  idVerified = false,
+  verification = 'none',
+  viewerMode,
+  peerAllowsDating,
+  pending = false,
+  waveSent = false,
+  likeSent = false,
+  blocked = false,
+  onQuickWave,
+  onQuickLike,
+  onOpenDetail,
+  onDismiss,
+}: PreviewCalloutProps): React.JSX.Element {
+  const subtitle = useMemo(
+    () => formatSubtitle(age, distanceLabel),
+    [age, distanceLabel],
+  );
+
+  const showWave =
+    viewerMode === 'social' && !blocked && !waveSent && Boolean(onQuickWave);
+  const showLike =
+    viewerMode === 'dating' &&
+    peerAllowsDating &&
+    !blocked &&
+    !likeSent &&
+    Boolean(onQuickLike);
+
+  const primaryLabel = (() => {
+    if (pending) return '…';
+    if (viewerMode === 'dating') {
+      if (likeSent) return 'Liked';
+      if (!peerAllowsDating) return 'Open';
+      return 'Like';
+    }
+    if (waveSent) return 'Waved';
+    return 'Wave';
+  })();
+
+  const onPrimary = (): void => {
+    if (pending || blocked) return;
+    if (viewerMode === 'dating') {
+      if (peerAllowsDating && !likeSent && onQuickLike) {
+        onQuickLike();
+        return;
+      }
+      onOpenDetail?.();
+      return;
+    }
+    if (!waveSent && onQuickWave) {
+      onQuickWave();
+      return;
+    }
+    onOpenDetail?.();
+  };
+
+  const primaryDisabled =
+    pending ||
+    blocked ||
+    (viewerMode === 'social' && waveSent) ||
+    (viewerMode === 'dating' && (likeSent || !peerAllowsDating));
+
+  const primaryA11y =
+    viewerMode === 'dating'
+      ? likeSent
+        ? 'Already liked'
+        : peerAllowsDating
+          ? 'Like'
+          : 'Open profile'
+      : waveSent
+        ? 'Already waved'
+        : 'Wave';
+
+  return (
+    <View style={styles.card} accessibilityRole="summary">
+      <View style={styles.header}>
+        <View style={styles.identity}>
+          <IdentityBlock
+            name={name}
+            avatarUrl={avatarUrl}
+            verification={verification}
+            idVerified={idVerified}
+            online={online}
+            subtitle={subtitle}
+            ringVariant={idVerified ? 'verified' : 'brand'}
+            size={44}
+            onPress={onOpenDetail}
+            accessibilityLabel={`Open detail for ${name}`}
+          />
+        </View>
+        {onDismiss ? (
+          <TouchableOpacity
+            style={styles.dismissBtn}
+            onPress={onDismiss}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+          >
+            <Text style={styles.dismissText}>✕</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      <View style={styles.actions}>
+        {(showWave || showLike || viewerMode === 'dating') && (
+          <TouchableOpacity
+            style={[
+              styles.primaryBtn,
+              viewerMode === 'dating' ? styles.likeBtn : styles.waveBtn,
+              primaryDisabled ? styles.btnDisabled : undefined,
+            ]}
+            onPress={onPrimary}
+            disabled={primaryDisabled && !onOpenDetail}
+            accessibilityRole="button"
+            accessibilityLabel={primaryA11y}
+          >
+            {pending ? (
+              <ActivityIndicator color={colors.onPrimary} size="small" />
+            ) : (
+              <Text style={styles.primaryBtnText}>{primaryLabel}</Text>
+            )}
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={styles.openBtn}
+          onPress={onOpenDetail}
+          accessibilityRole="button"
+          accessibilityLabel="Open detail"
+        >
+          <Text style={styles.openBtnText}>Open</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
