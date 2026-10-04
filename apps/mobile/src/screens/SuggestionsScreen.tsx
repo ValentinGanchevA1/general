@@ -27,7 +27,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SoftErrorBanner } from '@/components/SoftErrorBanner';
 import { SkeletonListRow } from '@/components/Skeleton';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { colors, spacing, fontSize } from '@/theme';
 import { focusUserOnMap } from '@/navigation/focusUserOnMap';
 
 type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
