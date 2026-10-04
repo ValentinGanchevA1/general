@@ -563,13 +563,10 @@ export function MapScreen(): React.JSX.Element {
 				onPressInteractions={() => openRootScreen(navigation, 'Interactions')}
 				sheetOpen={sheetOpen}
 				topStack={topStack}
-				onDismissChallenge={() => setChallengeDismissed(true)}
 			/>
 
-			{region ? (
+			{!sheetOpen ? (
 				<MapFilterRow
-					value={searchQuery}
-					onChangeText={setSearchQuery}
 					layers={layers}
 					onLayersChange={setLayers}
 					listingMode={listingModeFilter}
@@ -578,6 +575,8 @@ export function MapScreen(): React.JSX.Element {
 					onFriendsOnlyChange={setFriendsOnly}
 					datingOnly={datingOnly}
 					onDatingOnlyChange={setDatingOnly}
+					searchQuery={searchQuery}
+					onSearchQueryChange={setSearchQuery}
 					rankBy={rankBy}
 					onRankByChange={setRankBy}
 					top={filterRowTop}
@@ -589,7 +588,7 @@ export function MapScreen(): React.JSX.Element {
 				items={trendingItems}
 				top={trendingTop}
 				collapsed={trendingCollapsed}
-				onToggleCollapsed={() => setTrendingCollapsed((v) => !v)}
+				onToggleCollapse={() => setTrendingCollapsed((v) => !v)}
 				onPressItem={onTrendingPress}
 				visible={isCityScale && !sheetOpen && trendingItems.length > 0}
 			/>
@@ -598,15 +597,20 @@ export function MapScreen(): React.JSX.Element {
 				<View style={styles.emptyWrap} pointerEvents="box-none">
 					<EmptyState
 						title={emptyCopy.title}
-						description={emptyCopy.body}
-						primaryLabel={emptyCopy.ctaLabel}
-						onPrimaryPress={() => {
-							if (emptyCopy.cta === 'email') {
+						body={emptyCopy.body}
+						actionLabel={emptyCopy.actionLabel}
+						icon={emptyCopy.icon}
+						onAction={() => {
+							if (emptyCopy.actionKind === 'verify_email') {
 								openRootScreen(navigation, 'EmailVerification');
-							} else if (emptyCopy.cta === 'dating_prefs') {
+							} else if (emptyCopy.actionKind === 'dating_prefs') {
 								openRootScreen(navigation, 'ProfileEdit', { focus: 'dating' });
-							} else if (emptyCopy.cta === 'create') {
+							} else if (emptyCopy.actionKind === 'create') {
 								openCreateNearby();
+							} else if (emptyCopy.actionKind === 'show_everyone') {
+								setFriendsOnly(false);
+							} else if (emptyCopy.actionKind === 'clear_dating') {
+								setDatingOnly(false);
 							}
 						}}
 					/>
@@ -666,10 +670,11 @@ export function MapScreen(): React.JSX.Element {
 			{showPreview && previewProps ? (
 				<PinInteractionHost
 					visible
-					{...previewProps}
+					previewProps={previewProps}
 					onDismiss={dismissPinPreview}
-					onOpen={onPreviewOpenDetail}
-					onPrimary={viewerMode === 'dating' ? quickLike : quickWave}
+					onOpenDetail={onPreviewOpenDetail}
+					onQuickWave={quickWave}
+					onQuickLike={quickLike}
 				/>
 			) : null}
 
@@ -681,7 +686,7 @@ export function MapScreen(): React.JSX.Element {
 
 			{myCoords ? (
 				<Pressable
-					style={[styles.recenterFab, { bottom: mapFabBottom(sheetOpen) }]}
+					style={[styles.recenterFab, { bottom: mapFabBottom(insets.bottom, sheetOpen ? 80 : 0) }]}
 					onPress={onRecenter}
 					accessibilityRole="button"
 					accessibilityLabel="Recenter map on my location"
@@ -720,27 +725,33 @@ function approxZoomFromRegion(region: Region): number {
 const styles = StyleSheet.create({
 	root: { flex: 1, backgroundColor: colors.bg },
 	emptyWrap: {
-		...StyleSheet.absoluteFillObject,
-		justifyContent: 'center',
-		paddingHorizontal: 24,
+		position: 'absolute',
+		left: 24,
+		right: 24,
+		top: '38%',
+		zIndex: 12,
 	},
 	loadingWrap: {
-		...StyleSheet.absoluteFillObject,
+		position: 'absolute',
+		top: '45%',
+		left: 0,
+		right: 0,
 		alignItems: 'center',
-		justifyContent: 'center',
+		zIndex: 10,
 	},
 	toast: {
 		position: 'absolute',
+		bottom: 120,
 		alignSelf: 'center',
-		top: 120,
 		backgroundColor: colors.surface,
+		borderRadius: 20,
 		paddingHorizontal: 16,
 		paddingVertical: 10,
-		borderRadius: 20,
-		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: colors.borderStrong,
+		borderWidth: 1,
+		borderColor: colors.border,
+		zIndex: 30,
 	},
-	toastText: { color: colors.textPrimary, fontWeight: '600', fontSize: 14 },
+	toastText: { color: colors.textPrimary, fontWeight: '600' },
 	recenterFab: {
 		position: 'absolute',
 		right: 16,
@@ -748,11 +759,11 @@ const styles = StyleSheet.create({
 		height: 48,
 		borderRadius: 24,
 		backgroundColor: colors.surface,
+		borderWidth: 1,
+		borderColor: colors.border,
 		alignItems: 'center',
 		justifyContent: 'center',
-		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: colors.borderStrong,
-		elevation: 4,
+		zIndex: 20,
 	},
 	unavailable: {
 		flex: 1,

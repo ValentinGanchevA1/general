@@ -8,6 +8,7 @@ import {
 
 import {IdentityBlock} from '@/components/IdentityBlock';
 import {colors} from '@/theme';
+import type { VerificationLevel } from '@g88/shared';
 import type {ViewerMode} from '@/features/map/pinInteraction.types';
 import {styles} from './PreviewCallout.styles';
 
@@ -21,7 +22,7 @@ export interface PreviewCalloutProps {
   age?: number | null;
   online?: boolean;
   idVerified?: boolean;
-  verification?: 'none' | 'email' | 'phone' | 'id' | 'social';
+  verification?: VerificationLevel;
   /** Active map interaction mode. */
   viewerMode: ViewerMode;
   /** Peer allows dating interactions. */
