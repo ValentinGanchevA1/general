@@ -24,7 +24,7 @@ import type {
   WaveRequest,
   WaveResponse,
 } from '@g88/shared';
-import {getJson, postJson, deleteJson} from '@/api/client';
+import {getJson, postJson} from '@/api/client';
 
 function peerModeFromProfile(profile: PublicUserProfile): PeerMode {
   // openToDating is owner-only on UserProfile; public profile may omit it.
@@ -468,6 +468,3 @@ export const pinInteractionMachine = setup({
     },
   },
 });
-
-// Keep deleteJson import used if unblock is added later; silence unused for now.
-void deleteJson;
