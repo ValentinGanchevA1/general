@@ -1,9 +1,6 @@
 /**
  * Pin interaction state machine (Social Wave + Dating Like/Match).
  *
- * Requires: pnpm add xstate @xstate/react --filter @g88/mobile
- * Actors are mocked — replace with real API calls when wiring MapScreen.
- *
  * Product rules (locked):
  * - viewerMode is exclusive toggle (map layer)
  * - Dating layer hides non open_to_dating peers
@@ -20,7 +17,40 @@ import type {
   RelationshipSnapshot,
   ViewerMode,
 } from './pinInteraction.types';
-import type {PublicUserProfile} from '@g88/shared';
+import type {
+  LikeRequest,
+  LikeResponse,
+  PublicUserProfile,
+  WaveRequest,
+  WaveResponse,
+} from '@g88/shared';
+import {getJson, postJson, deleteJson} from '@/api/client';
+
+function peerModeFromProfile(profile: PublicUserProfile): PeerMode {
+  // openToDating is owner-only on UserProfile; public profile may omit it.
+  // Prefer explicit field when present; else 'social' until backend exposes it.
+  const open =
+    'openToDating' in profile
+      ? Boolean((profile as PublicUserProfile & {openToDating?: boolean}).openToDating)
+      : false;
+  if (open) return 'both';
+  return 'social';
+}
+
+function relationshipFromProfile(profile: PublicUserProfile): RelationshipSnapshot {
+  const rel = profile.relationship;
+  return {
+    waveSent: false,
+    hasMutualWave: rel?.matched === true,
+    canMessage: rel?.canMessage ?? 'none',
+    isFriend: false,
+    blockedByViewer: profile.blockedByViewer === true,
+    blockedByPeer: false,
+    likeSent: false,
+    isMatch: false,
+    passed: false,
+  };
+}
 
 const loadPinActor = fromPromise<
   {
@@ -31,44 +61,59 @@ const loadPinActor = fromPromise<
   },
   {pinId: string; viewerMode: ViewerMode}
 >(async ({input}) => {
-  // TODO: GET /users/:id + relationship + dating status
-  void input;
+  const profile = await getJson<PublicUserProfile>(`/users/${input.pinId}`);
+  const peerMode = peerModeFromProfile(profile);
+  const relationship = relationshipFromProfile(profile);
   return {
-    profile: {id: input.pinId} as PublicUserProfile,
-    peerMode: 'both',
-    distanceMeters: 240,
-    relationship: {
-      waveSent: false,
-      hasMutualWave: false,
-      canMessage: 'none',
-      isFriend: false,
-      blockedByViewer: false,
-      blockedByPeer: false,
-      likeSent: false,
-      isMatch: false,
-      passed: false,
-    },
+    profile,
+    peerMode,
+    ...(profile.distanceMeters != null
+      ? {distanceMeters: profile.distanceMeters}
+      : {}),
+    relationship,
   };
 });
 
-const sendWaveActor = fromPromise<void, {pinId: string}>(async ({input}) => {
-  // TODO: POST /waves
-  void input;
+/** Real wave — same endpoint as EntityBottomSheet / MapScreen onWave. */
+const sendWaveActor = fromPromise<
+  {mutual: boolean; conversationId: string | null},
+  {pinId: string}
+>(async ({input}) => {
+  const res = await postJson<WaveRequest, WaveResponse>('/interactions/wave', {
+    toUserId: input.pinId,
+    context: 'map',
+  });
+  return {
+    mutual: res.conversationId != null,
+    conversationId: res.conversationId,
+  };
 });
 
-const sendLikeActor = fromPromise<void, {pinId: string}>(async ({input}) => {
-  // TODO: POST /dating/likes
-  void input;
+/** Dating like — backend ships with migration 0047. */
+const sendLikeActor = fromPromise<
+  {matched: boolean; datingConversationId: string | null},
+  {pinId: string}
+>(async ({input}) => {
+  const res = await postJson<LikeRequest, LikeResponse>('/dating/likes', {
+    toUserId: input.pinId,
+  });
+  return {
+    matched: res.matched,
+    datingConversationId: res.datingConversationId,
+  };
 });
 
 const passActor = fromPromise<void, {pinId: string}>(async ({input}) => {
-  // TODO: POST /dating/pass
-  void input;
+  await postJson<{toUserId: string}, {ok: true}>('/dating/pass', {
+    toUserId: input.pinId,
+  });
 });
 
 const blockActor = fromPromise<void, {pinId: string}>(async ({input}) => {
-  // TODO: POST /blocks/:id
-  void input;
+  await postJson<undefined, {blocked: boolean}>(
+    `/blocks/${input.pinId}`,
+    undefined,
+  );
 });
 
 export const pinInteractionMachine = setup({
@@ -285,7 +330,17 @@ export const pinInteractionMachine = setup({
           invoke: {
             src: 'sendWave',
             input: ({context}) => ({pinId: context.pinId}),
-            onDone: {target: 'waveSent', actions: 'setWaveSent'},
+            onDone: [
+              {
+                guard: ({event}) => event.output.mutual === true,
+                target: 'mutualWave',
+                actions: ['setWaveSent', 'setMutualWave'],
+              },
+              {
+                target: 'waveSent',
+                actions: 'setWaveSent',
+              },
+            ],
             onError: {
               target: 'viewing',
               actions: assign({
@@ -335,7 +390,17 @@ export const pinInteractionMachine = setup({
           invoke: {
             src: 'sendLike',
             input: ({context}) => ({pinId: context.pinId}),
-            onDone: {target: 'liked', actions: 'setLikeSent'},
+            onDone: [
+              {
+                guard: ({event}) => event.output.matched === true,
+                target: 'matched',
+                actions: ['setLikeSent', 'setMatched'],
+              },
+              {
+                target: 'liked',
+                actions: 'setLikeSent',
+              },
+            ],
             onError: {
               target: 'viewing',
               actions: assign({
@@ -403,3 +468,6 @@ export const pinInteractionMachine = setup({
     },
   },
 });
+
+// Keep deleteJson import used if unblock is added later; silence unused for now.
+void deleteJson;

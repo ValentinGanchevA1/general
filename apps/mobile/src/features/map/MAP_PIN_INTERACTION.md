@@ -1,24 +1,29 @@
-# Pin interaction (Stage 1)
+# Pin interaction (Stage 1+)
 
-## Files
-- `pinInteraction.types.ts` — context + events
-- `pinInteraction.machine.ts` — XState v5 machine (mocked API actors)
-- `usePinInteraction.ts` — React hook for MapScreen
-- `PreviewCallout` + `PinInteractionHost` — Stage-1 UI
+## Status
+- Stage-1 PreviewCallout wired on MapScreen
+- **Wave actor**: real `POST /interactions/wave`
+- **loadPin**: real `GET /users/:id`
+- **block**: real `POST /blocks/:id`
+- **Like / pass**: client contract + migration **0047**; Nest module not yet implemented
 
-## MapScreen wiring
-1. `viewerMode = datingOnly ? 'dating' : 'social'`
-2. User pin press → `openUserPin(point)` → machine `PIN_TAP` → preview
-3. Event / listing pin press → existing EntityBottomSheet path (unchanged)
-4. Preview **Open** → `openDetail()` + present EntityBottomSheet for that user
-5. `datingOnly` toggle → `LAYER_CHANGED` → machine idle + hide preview
+## API contracts
 
-## Install
-```bash
-pnpm install --filter @g88/mobile
-```
+### Wave (exists)
+`POST /api/v1/interactions/wave`  
+Body: `{ toUserId, context?: 'map' }`  
+Response: `WaveResponse` — `conversationId != null` ⇒ mutual
 
-## Next
-- Replace mocked actors with real POST /waves and POST /dating/likes
-- Socket: `wave:mutual`, `match:created` → `send({ type: ... })`
-- Stage 2/3: drive EntityBottomSheet from machine `detailSheet` / `fullProfile`
+### Dating like (0047 — backend TBD)
+`POST /api/v1/dating/likes`  
+Body: `{ toUserId }`  
+Response: `{ id, fromUserId, toUserId, createdAt, matched, datingConversationId }`
+
+`POST /api/v1/dating/pass`  
+Body: `{ toUserId }`  
+Response: `{ ok: true }`
+
+### Migration
+`apps/backend/migrations/0047_dating_likes.sql` — `dating_likes`, `dating_passes`, `dating_matches`
+
+## Next free migration after this branch merges + 0047 applied: **0048**
