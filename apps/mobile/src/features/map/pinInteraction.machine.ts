@@ -1,3 +1,15 @@
+/**
+ * Pin interaction state machine (Social Wave + Dating Like/Match).
+ *
+ * Product rules (locked):
+ * - viewerMode is exclusive toggle (map layer)
+ * - Dating layer hides non open_to_dating peers
+ * - People layer shows them but only Wave (no Like)
+ * - Mutual like opens separate dating chat thread
+ * - Super Like reserved in context, no UI in v1
+ * - LAYER_CHANGED resets to idle
+ * - PIN_TAP accepted from any state (switch pin while preview/sheet open)
+ */
 import {assign, fromPromise, setup} from 'xstate';
 import type {
   PeerMode,
