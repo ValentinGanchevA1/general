@@ -9,7 +9,7 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type {
   PresenceUpdateEvent,
   ChatMessageEvent,
@@ -18,12 +18,9 @@ import type {
   ChallengeCompletedEvent,
   FriendRequestEvent,
   FriendAcceptedEvent,
-  LocationShareEndedEvent,
   VerificationProgressEvent,
   SocketData,
 } from '@g88/shared';
-
-import { WsJwtGuard } from './ws-jwt.guard';
 import { PresenceService } from '../modules/presence/presence.service';
 import { ChatService } from '../modules/chat/chat.service';
 import { AuthService } from '../modules/auth/auth.service';
@@ -84,7 +81,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         userId: user.id,
         rooms: new Set(),
       };
-      (client as any).data = data;
+      (client as Socket & { data: SocketData }).data = data;
 
       this.logger.debug(`[connect] user=${user.id}`);
     } catch (err) {
