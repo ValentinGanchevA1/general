@@ -154,6 +154,7 @@ export const pinInteractionMachine = setup({
   actions: {
     assignPin: assign(({event}) => {
       if (event.type !== 'PIN_TAP') return {};
+      // exactOptionalPropertyTypes: omit optional keys instead of assigning undefined
       return {
         pinId: event.pinId,
         pinType: event.pinType,
@@ -161,8 +162,6 @@ export const pinInteractionMachine = setup({
         lng: event.lng,
         viewerMode: event.viewerMode,
         stage: 'preview' as const,
-        error: undefined,
-        lastResult: undefined,
         waveSent: false,
         hasMutualWave: false,
         likeSent: false,
@@ -173,7 +172,6 @@ export const pinInteractionMachine = setup({
         blockedByPeer: false,
         canMessage: 'none' as const,
         isFriend: false,
-        profile: undefined,
         peerMode: 'none' as const,
       };
     }),
@@ -190,9 +188,17 @@ export const pinInteractionMachine = setup({
       pinId: '',
       pinType: 'user' as const,
       stage: 'preview' as const,
-      error: undefined,
-      lastResult: undefined,
-      profile: undefined,
+      waveSent: false,
+      hasMutualWave: false,
+      likeSent: false,
+      isMatch: false,
+      passed: false,
+      superLiked: false,
+      blockedByViewer: false,
+      blockedByPeer: false,
+      canMessage: 'none' as const,
+      isFriend: false,
+      peerMode: 'none' as const,
     }),
   },
 }).createMachine({
@@ -252,14 +258,17 @@ export const pinInteractionMachine = setup({
         }),
         onDone: {
           target: 'preview',
-          actions: assign(({event}) => ({
-            profile: event.output.profile,
-            peerMode: event.output.peerMode,
-            distanceMeters: event.output.distanceMeters,
-            ...event.output.relationship,
-            stage: 'preview' as const,
-            error: undefined,
-          })),
+          actions: assign(({event}) => {
+            const base = {
+              profile: event.output.profile,
+              peerMode: event.output.peerMode,
+              ...event.output.relationship,
+              stage: 'preview' as const,
+            };
+            return event.output.distanceMeters != null
+              ? { ...base, distanceMeters: event.output.distanceMeters }
+              : base;
+          }),
         },
         onError: {
           target: 'error',
