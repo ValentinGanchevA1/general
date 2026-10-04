@@ -94,6 +94,8 @@ import {
 } from '@/components/map/mapChromeLayout';
 import { useNudges } from '@/features/nudges/useNudges';
 import { useChallenges } from '@/features/gamification/useChallenges';
+import { usePinInteraction } from '@/features/map/usePinInteraction';
+import { PinInteractionHost } from '@/components/map/PinInteractionHost';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
@@ -126,6 +128,19 @@ export function MapScreen(): React.JSX.Element {
 	const [searchQuery, setSearchQuery] = useState('');
 	const [trendingCollapsed, setTrendingCollapsed] = useState(true);
 	const insets = useSafeAreaInsets();
+
+	const viewerMode = datingOnly ? 'dating' : 'social';
+	const {
+		openUserPin,
+		dismiss: dismissPinPreview,
+		openDetail: openPinDetail,
+		quickWave,
+		quickLike,
+		showPreview,
+		previewProps,
+		activePinId,
+		send: pinSend,
+	} = usePinInteraction({ viewerMode });
 
 	const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
 	const zoom = useMemo(() => (region ? approxZoomFromRegion(region) : 12), [region]);
@@ -170,7 +185,7 @@ export function MapScreen(): React.JSX.Element {
 		setCreateNearbyOpen,
 		onMapLongPress,
 		onCreateNearbySelect,
-	} = useCreateNearby(navigation, selected != null);
+	} = useCreateNearby(navigation, selected != null || showPreview);
 
 	useMapFocus({
 		mapRef,
@@ -197,13 +212,14 @@ export function MapScreen(): React.JSX.Element {
 	const onSheetDismiss = useCallback(() => {
 		presentedIdRef.current = null;
 		setSelected(null);
-	}, []);
+		dismissPinPreview();
+	}, [dismissPinPreview]);
 
 	const closeSheet = useCallback(() => {
 		entitySheetRef.current?.dismiss();
 	}, []);
 
-	const onEntityPress = useCallback((point: EntityPoint) => {
+	const presentEntitySheet = useCallback((point: EntityPoint) => {
 		const id = `${point.kind}:${point.id}`;
 		if (presentedIdRef.current !== id) {
 			presentedIdRef.current = null;
@@ -219,6 +235,32 @@ export function MapScreen(): React.JSX.Element {
 			}
 		});
 	}, []);
+
+	const onEntityPress = useCallback(
+		(point: EntityPoint) => {
+			if (point.kind === 'user') {
+				entitySheetRef.current?.dismiss();
+				setSelected(null);
+				presentedIdRef.current = null;
+				openUserPin(point);
+				return;
+			}
+			dismissPinPreview();
+			presentEntitySheet(point);
+		},
+		[openUserPin, dismissPinPreview, presentEntitySheet],
+	);
+
+	const onPreviewOpenDetail = useCallback(() => {
+		openPinDetail();
+		if (activePinId == null) return;
+		const fromViewport = points.find(
+			(p): p is EntityPoint => p.kind === 'user' && p.id === activePinId,
+		);
+		if (fromViewport) {
+			presentEntitySheet(fromViewport);
+		}
+	}, [openPinDetail, activePinId, points, presentEntitySheet]);
 
 	useEffect(() => {
 		if (!selected) {
@@ -285,6 +327,27 @@ export function MapScreen(): React.JSX.Element {
 		});
 	}, [on, dispatch]);
 
+	// Pin machine: reciprocal wave / dating match while preview is open
+	useEffect(() => {
+		const unsubMutual = on('wave:mutual', (e) => {
+			if (activePinId != null && e.peerUserId === activePinId) {
+				pinSend({ type: 'WAVE_MUTUAL' });
+			}
+		});
+		const unsubMatch = on('dating:match_created', (e) => {
+			if (activePinId != null && e.peerUserId === activePinId) {
+				pinSend({
+					type: 'MATCH_CREATED',
+					datingConversationId: e.datingConversationId,
+				});
+			}
+		});
+		return () => {
+			unsubMutual();
+			unsubMatch();
+		};
+	}, [on, activePinId, pinSend]);
+
 	const onClusterPress = useCallback(
 		(c: ClusterPoint) => {
 			mapRef.current?.animateToRegion(
@@ -338,7 +401,7 @@ export function MapScreen(): React.JSX.Element {
 		return () => clearTimeout(t);
 	}, [waveToast]);
 
-	const sheetOpen = selected != null;
+	const sheetOpen = selected != null || showPreview;
 	const isCityScale =
 		region != null &&
 		region.latitudeDelta > 0 &&
@@ -524,37 +587,28 @@ export function MapScreen(): React.JSX.Element {
 
 			<TrendingCard
 				items={trendingItems}
-				onPressItem={onTrendingPress}
 				top={trendingTop}
-				visible={
-					isCityScale &&
-					!sheetOpen &&
-					!isEmpty &&
-					searchQuery.trim() === ''
-				}
 				collapsed={trendingCollapsed}
-				onToggleCollapse={() => setTrendingCollapsed((c) => !c)}
+				onToggleCollapsed={() => setTrendingCollapsed((v) => !v)}
+				onPressItem={onTrendingPress}
+				visible={isCityScale && !sheetOpen && trendingItems.length > 0}
 			/>
 
-			{isEmpty && !createNudgeVisible && nudge == null ? (
+			{isEmpty && !createNudgeVisible ? (
 				<View style={styles.emptyWrap} pointerEvents="box-none">
 					<EmptyState
-						variant="card"
-						icon={emptyCopy.icon}
 						title={emptyCopy.title}
-						body={emptyCopy.body}
-						actionLabel={emptyCopy.actionLabel}
-						onAction={
-							emptyCopy.actionKind === 'show_everyone'
-								? () => setFriendsOnly(false)
-								: emptyCopy.actionKind === 'clear_dating'
-									? () => setDatingOnly(false)
-									: emptyCopy.actionKind === 'dating_prefs'
-										? () => openRootScreen(navigation, 'ProfileEdit', { focus: 'dating' })
-										: emptyCopy.actionKind === 'verify_email'
-											? () => openRootScreen(navigation, 'EmailVerification')
-											: openCreateNearby
-						}
+						description={emptyCopy.body}
+						primaryLabel={emptyCopy.ctaLabel}
+						onPrimaryPress={() => {
+							if (emptyCopy.cta === 'email') {
+								openRootScreen(navigation, 'EmailVerification');
+							} else if (emptyCopy.cta === 'dating_prefs') {
+								openRootScreen(navigation, 'ProfileEdit', { focus: 'dating' });
+							} else if (emptyCopy.cta === 'create') {
+								openCreateNearby();
+							}
+						}}
 					/>
 				</View>
 			) : null}
@@ -573,16 +627,17 @@ export function MapScreen(): React.JSX.Element {
 			) : null}
 
 			<EventsRail location={myCoords} />
+
 			<MapCoachMarks mapReady={region != null} />
 
 			<BottomSheetModal
 				ref={entitySheetRef}
 				snapPoints={entitySnapPoints}
-				onDismiss={onSheetDismiss}
 				enablePanDownToClose
+				onDismiss={onSheetDismiss}
 				backdropComponent={renderBackdrop}
-				handleIndicatorStyle={sheetChrome.handle}
 				backgroundStyle={sheetChrome.background}
+				handleIndicatorStyle={sheetChrome.handle}
 			>
 				<BottomSheetView style={sheetChrome.content}>
 					{selected ? (
@@ -608,15 +663,14 @@ export function MapScreen(): React.JSX.Element {
 				</View>
 			) : null}
 
-			{myCoords != null ? (
-				<Pressable
-					style={[styles.recenterFab, { bottom: mapFabBottom(insets.bottom) }]}
-					onPress={onRecenter}
-					accessibilityRole="button"
-					accessibilityLabel="Recenter map on me"
-				>
-					<Icon name="crosshairs-gps" size={22} color={colors.textPrimary} />
-				</Pressable>
+			{showPreview && previewProps ? (
+				<PinInteractionHost
+					visible
+					{...previewProps}
+					onDismiss={dismissPinPreview}
+					onOpen={onPreviewOpenDetail}
+					onPrimary={viewerMode === 'dating' ? quickLike : quickWave}
+				/>
 			) : null}
 
 			<CreateNearbySheet
@@ -624,6 +678,17 @@ export function MapScreen(): React.JSX.Element {
 				onClose={() => setCreateNearbyOpen(false)}
 				onSelect={onCreateNearbySelect}
 			/>
+
+			{myCoords ? (
+				<Pressable
+					style={[styles.recenterFab, { bottom: mapFabBottom(sheetOpen) }]}
+					onPress={onRecenter}
+					accessibilityRole="button"
+					accessibilityLabel="Recenter map on my location"
+				>
+					<Icon name="crosshairs-gps" size={22} color={colors.textPrimary} />
+				</Pressable>
+			) : null}
 		</View>
 	);
 }
@@ -632,9 +697,7 @@ function MapUnavailableFallback(): React.JSX.Element {
 	return (
 		<View style={styles.unavailable}>
 			<Text style={styles.unavailableTitle}>Map unavailable</Text>
-			<Text style={styles.unavailableBody}>
-				Something went wrong loading the map. Try again in a moment.
-			</Text>
+			<Text style={styles.unavailableBody}>Pull to refresh or restart the app.</Text>
 		</View>
 	);
 }
@@ -644,14 +707,8 @@ function regionToViewport(region: Region | null): Viewport | null {
 	const halfLat = region.latitudeDelta / 2;
 	const halfLng = region.longitudeDelta / 2;
 	return {
-		ne: {
-			lat: region.latitude + halfLat,
-			lng: region.longitude + halfLng,
-		},
-		sw: {
-			lat: region.latitude - halfLat,
-			lng: region.longitude - halfLng,
-		},
+		ne: { lat: region.latitude + halfLat, lng: region.longitude + halfLng },
+		sw: { lat: region.latitude - halfLat, lng: region.longitude - halfLng },
 	};
 }
 

@@ -1,4 +1,4 @@
-/** Dating map preferences (v1). Identity fields stay optional. */
+/** Dating map preferences + like/match contracts (v1). Identity fields stay optional. */
 
 import type { Gender } from './identity';
 import { isGender } from './identity';
@@ -37,4 +37,29 @@ export function passesDatingGenderGate(opts: {
     if (!candidateSeeking.includes(viewerGender)) return false;
   }
   return true;
+}
+
+// ─── Dating likes / matches (migration 0047) ─────────────────────────────────
+
+export interface LikeRequest {
+  toUserId: string;
+}
+
+export interface LikeResponse {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  createdAt: string;
+  /** True when the peer had already liked the viewer (mutual). */
+  matched: boolean;
+  /** Present only when matched — separate dating conversation thread. */
+  datingConversationId: string | null;
+}
+
+export interface PassRequest {
+  toUserId: string;
+}
+
+export interface PassResponse {
+  ok: true;
 }

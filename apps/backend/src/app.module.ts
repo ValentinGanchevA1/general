@@ -30,6 +30,7 @@ import { EventsModule } from './modules/events/events.module';
 import { ListingsModule } from './modules/listings/listings.module';
 import { HealthModule } from './modules/health/health.module';
 import { StoriesModule } from './modules/stories/stories.module';
+import { DatingModule } from './modules/dating/dating.module';
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
@@ -82,6 +83,7 @@ import { StoriesModule } from './modules/stories/stories.module';
     BlocksModule,
     FriendsModule,
     StoriesModule,
+    DatingModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

@@ -26,6 +26,34 @@ export interface WaveReceivedEvent {
   createdAt: string;
 }
 
+/** Reciprocal wave — both participants; pin machine uses for WAVE_MUTUAL. */
+export interface WaveMutualEvent {
+  peerUserId: string;
+  conversationId: string;
+  waveId: string;
+  createdAt: string;
+}
+
+/** One-way dating like received (no match yet). */
+export interface DatingLikeReceivedEvent {
+  likeId: string;
+  fromUser: {
+    id: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+  createdAt: string;
+}
+
+/** Mutual dating like — opens dating conversation. */
+export interface DatingMatchCreatedEvent {
+  peerUserId: string;
+  peerDisplayName: string;
+  peerAvatarUrl: string | null;
+  datingConversationId: string;
+  createdAt: string;
+}
+
 export interface PresenceDelta {
   cellId: string;
   /** Users that became online in this cell since the last delta. */
@@ -170,6 +198,9 @@ export interface EventQuestionUpvoteDelta {
 
 export interface ServerToClientEvents {
   'wave:received': (e: WaveReceivedEvent) => void;
+  'wave:mutual': (e: WaveMutualEvent) => void;
+  'dating:like_received': (e: DatingLikeReceivedEvent) => void;
+  'dating:match_created': (e: DatingMatchCreatedEvent) => void;
   'presence:delta': (e: PresenceDelta) => void;
   /** A close friend went online/offline (delivered to each friend's user room). */
   'friend:presence': (e: FriendPresenceEvent) => void;

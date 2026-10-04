@@ -40,23 +40,11 @@ export class InteractionsService {
     private readonly blocks: BlocksService,
   ) {}
 
-  /**
-   * Wave flow:
-   *   1. Validate target exists and isn't self.
-   *   2. Reject if either user has blocked the other (symmetric).
-   *   3. Check cooldown window.
-   *   4. If target has an OUTSTANDING wave to me → reciprocal. Open a conversation.
-   *   5. Otherwise → insert wave row.
-   *   6. Emit socket event to recipient (push fallback if offline).
-   *
-   * Runs in a single transaction so partial state never escapes.
-   */
   async wave(fromUserId: string, req: WaveRequest): Promise<WaveResponse> {
     if (fromUserId === req.toUserId) {
       throw new BadRequestException({ code: 'wave.self', message: 'Cannot wave to yourself' });
     }
 
-    // Symmetric block — either direction suppresses waves (mirrors gifts/messaging).
     if (await this.blocks.isBlocked(fromUserId, req.toUserId)) {
       throw new ForbiddenException({
         code: 'wave.blocked',
@@ -64,7 +52,6 @@ export class InteractionsService {
       });
     }
 
-    // Fetch sender for hydrated notification — single lookup, outside the tx.
     const senderRows = await this.db.query<Array<{ display_name: string; avatar_url: string | null; verification_level: string }>>(
       `SELECT display_name, avatar_url, verification_level FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
       [fromUserId],
@@ -128,7 +115,6 @@ export class InteractionsService {
         conversationId,
       };
 
-      // Build the fully-hydrated event — gateway no longer does the lookup.
       const evt: WaveReceivedEvent = {
         waveId: wave.id,
         fromUser: {
@@ -145,16 +131,10 @@ export class InteractionsService {
         .emitWaveReceived(req.toUserId, evt)
         .catch((err) => this.logger.error(`emitWaveReceived failed: ${err}`));
 
-      // Push fallback: always fire — FCM is a no-op if the user is online
-      // (socket delivery takes precedence on client; push arrives as silent update).
       this.notifications
         .notifyWave(req.toUserId, { id: fromUserId, displayName: sender.display_name }, req.context ?? 'map')
         .catch((err) => this.logger.error(`notifyWave failed: ${err}`));
 
-      // Challenge progress: every wave counts toward "send waves" quests.
-      // Awaited (but non-fatal) so the progress is committed before we return —
-      // the client refetches /challenges/today right after the wave resolves, and
-      // a fire-and-forget write here would race that refetch and read stale data.
       await this.challenges
         .increment(fromUserId, 'wave_sent')
         .catch((err) => this.logger.error(`challenge wave_sent failed: ${err}`));
@@ -164,7 +144,15 @@ export class InteractionsService {
           .emitConversationOpened(conversationId, [fromUserId, req.toUserId], wave.id)
           .catch((err) => this.logger.error(`emitConversationOpened failed: ${err}`));
 
-        // A reciprocated wave = a match. Reward both participants once per match.
+        const mutualAt = wave.createdAt;
+        const mutualBase = { conversationId, waveId: wave.id, createdAt: mutualAt };
+        this.realtime
+          .emitWaveMutual(fromUserId, { ...mutualBase, peerUserId: req.toUserId })
+          .catch((err) => this.logger.error(`emitWaveMutual from failed: ${err}`));
+        this.realtime
+          .emitWaveMutual(req.toUserId, { ...mutualBase, peerUserId: fromUserId })
+          .catch((err) => this.logger.error(`emitWaveMutual to failed: ${err}`));
+
         for (const uid of [fromUserId, req.toUserId]) {
           void this.gamification
             .award(uid, 'wave.reciprocated', { dedupeKey: `match:${conversationId}` })
@@ -172,8 +160,6 @@ export class InteractionsService {
           void this.challenges
             .increment(uid, 'match_made')
             .catch((err) => this.logger.error(`challenge match_made failed: ${err}`));
-          // Re-check achievements: the reciprocated-wave count + any level-up
-          // from the XP just awarded may have crossed a threshold.
           void this.achievements
             .evaluate(uid)
             .catch((err) => this.logger.error(`achievement evaluate failed: ${err}`));
@@ -194,8 +180,6 @@ export class InteractionsService {
       [sorted],
     );
     if (existing.length > 0) {
-      // A reciprocal wave is a match — promote any prior interest-request out of
-      // the pending state so messaging is unrestricted both ways.
       await tx.query(
         `UPDATE conversations SET status = 'accepted' WHERE id = $1 AND status <> 'accepted'`,
         [existing[0]!.id],
@@ -210,11 +194,6 @@ export class InteractionsService {
     return created[0]!.id;
   }
 
-  /**
-   * Unified inbound list: waves + story reactions received by `userId`.
-   * Used by the "People who interacted with you" surface.
-   * isMutual is true when a reciprocal wave already exists OR an accepted conversation.
-   */
   async listReceived(userId: string, limit = 50): Promise<ReceivedInteraction[]> {
     const rows = await this.db.query<
       Array<{
@@ -314,12 +293,6 @@ export class InteractionsService {
     }));
   }
 
-  /**
-   * Domain inbox projection: waves + story reactions + pending friend requests +
-   * recent followers (14d). Friends REST endpoints remain the source of truth
-   * for the Requests tab; this is a read-only merge for the unified inbox UI
-   * and future consistent badge/unread counts.
-   */
   async listInbox(userId: string, limit = 50): Promise<InboxItem[]> {
     const take = Math.min(Math.max(limit, 1), 100);
     const rows = await this.db.query<
