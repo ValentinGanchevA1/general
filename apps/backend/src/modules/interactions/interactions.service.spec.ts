@@ -17,6 +17,7 @@ describe('InteractionsService', () => {
   let txQuery: jest.Mock; // tx.query — everything inside the transaction
   let emitWaveReceived: jest.Mock;
   let emitConversationOpened: jest.Mock;
+  let emitWaveMutual: jest.Mock;
   let notifyWave: jest.Mock;
   let award: jest.Mock;
   let increment: jest.Mock;
@@ -36,6 +37,7 @@ describe('InteractionsService', () => {
 
     emitWaveReceived = jest.fn().mockResolvedValue(undefined);
     emitConversationOpened = jest.fn().mockResolvedValue(undefined);
+    emitWaveMutual = jest.fn().mockResolvedValue(undefined);
     notifyWave = jest.fn().mockResolvedValue(undefined);
     award = jest.fn().mockResolvedValue(undefined);
     increment = jest.fn().mockResolvedValue(undefined);
@@ -49,7 +51,10 @@ describe('InteractionsService', () => {
           provide: getDataSourceToken(),
           useValue: { query, transaction } as unknown as DataSource,
         },
-        { provide: RealtimeGateway, useValue: { emitWaveReceived, emitConversationOpened } },
+        {
+          provide: RealtimeGateway,
+          useValue: { emitWaveReceived, emitConversationOpened, emitWaveMutual },
+        },
         { provide: NotificationsService, useValue: { notifyWave } },
         { provide: GamificationService, useValue: { award } },
         { provide: ChallengesService, useValue: { increment } },
@@ -140,6 +145,7 @@ describe('InteractionsService', () => {
 
       // No match → no conversation, no reciprocal rewards.
       expect(emitConversationOpened).not.toHaveBeenCalled();
+      expect(emitWaveMutual).not.toHaveBeenCalled();
       expect(award).not.toHaveBeenCalled();
     });
   });
@@ -159,6 +165,22 @@ describe('InteractionsService', () => {
 
       expect(res.conversationId).toBe('conv1');
       expect(emitConversationOpened).toHaveBeenCalledWith('conv1', ['me', 'target'], 'w1');
+      expect(emitWaveMutual).toHaveBeenCalledWith(
+        'me',
+        expect.objectContaining({
+          conversationId: 'conv1',
+          waveId: 'w1',
+          peerUserId: 'target',
+        }),
+      );
+      expect(emitWaveMutual).toHaveBeenCalledWith(
+        'target',
+        expect.objectContaining({
+          conversationId: 'conv1',
+          waveId: 'w1',
+          peerUserId: 'me',
+        }),
+      );
 
       // Both participants rewarded once per match (idempotent dedupeKey).
       expect(award).toHaveBeenCalledTimes(2);
@@ -187,6 +209,7 @@ describe('InteractionsService', () => {
       const res = await service.wave('me', { toUserId: 'target' });
 
       expect(res.conversationId).toBe('conv-existing');
+      expect(emitWaveMutual).toHaveBeenCalledTimes(2);
       const acceptCall = txQuery.mock.calls[4]!;
       expect(acceptCall[0]).toContain("status = 'accepted'");
       // No INSERT conversations call was made.
