@@ -1,29 +1,28 @@
-# Pin interaction (Stage 1+)
+# Pin interaction (Stage 1–2)
 
 ## Status
-- Stage-1 PreviewCallout wired on MapScreen
+- **Stage-1 PreviewCallout** wired on MapScreen (`PinInteractionHost`)
+- **C2a sheet handoff**: Open detail → machine `detailSheet` + `EntityBottomSheet`
+  - Prefer viewport `EntityPoint`; if peer left viewport, seed minimal user point from machine lat/lng + profile name
+  - Sheet dismiss → machine `DISMISS`
+  - User pin tap → machine only (no parallel sheet open)
 - **Wave actor**: real `POST /interactions/wave`
 - **loadPin**: real `GET /users/:id`
 - **block**: real `POST /blocks/:id`
-- **Like / pass**: client contract + migration **0047**; Nest module not yet implemented
+- **Like / pass**: client + migration **0047** + DatingModule
 
-## API contracts
+## Stages
+| Stage | Machine | UI |
+|---|---|---|
+| preview | `preview` / `loadingPin` | PreviewCallout |
+| detail | `detailSheet` | EntityBottomSheet |
+| full | `fullProfile` | UserProfile (C3 — not machine-driven yet) |
 
-### Wave (exists)
-`POST /api/v1/interactions/wave`  
-Body: `{ toUserId, context?: 'map' }`  
-Response: `WaveResponse` — `conversationId != null` ⇒ mutual
+## Dual-mode
+- `viewerMode` from map Dating layer toggle
+- Preview CTAs: Wave (social) / Like (dating)
+- Sheet CTAs still EntityBottomSheet defaults (C2b next)
 
-### Dating like (0047 — backend TBD)
-`POST /api/v1/dating/likes`  
-Body: `{ toUserId }`  
-Response: `{ id, fromUserId, toUserId, createdAt, matched, datingConversationId }`
-
-`POST /api/v1/dating/pass`  
-Body: `{ toUserId }`  
-Response: `{ ok: true }`
-
-### Migration
-`apps/backend/migrations/0047_dating_likes.sql` — `dating_likes`, `dating_passes`, `dating_matches`
-
-## Next free migration after this branch merges + 0047 applied: **0048**
+## Next
+- **C2b** dual-mode sheet CTAs (Like/Pass vs Wave/Message)
+- **C3** OPEN_FULL → UserProfile with BACK to sheet
