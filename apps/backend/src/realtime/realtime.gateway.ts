@@ -101,162 +101,201 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   private readonly logger = new Logger(RealtimeGateway.name);
 
   constructor(
-    private readonly jwt: JwtService,
     private readonly presence: PresenceService,
     private readonly chat: ChatService,
     private readonly locationShare: LocationShareService,
     private readonly notifications: NotificationsService,
-    private readonly friends: FriendsService,
     @Inject(forwardRef(() => ChallengesService))
     private readonly challenges: ChallengesService,
+    private readonly friends: FriendsService,
+    private readonly jwt: JwtService,
     @InjectDataSource() private readonly db: DataSource,
   ) {}
 
   async handleConnection(client: G88Socket): Promise<void> {
-    try {
-      const token =
-        (client.handshake.auth?.token as string | undefined) ||
-        (client.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '') as string | undefined);
-      if (!token) {
-        client.disconnect(true);
-        return;
-      }
-      const payload = this.jwt.verify<JwtPayload>(token);
-      if (!payload?.sub) {
-        client.disconnect(true);
-        return;
-      }
-      client.data = {
-        userId: payload.sub,
-        rooms: new Set(),
-      };
-      client.join(this.userRoom(payload.sub));
-      await this.presence.setOnline(payload.sub, true);
-      void this.notifyFriendsPresence(payload.sub, true);
-      this.logger.debug(`connected user=${payload.sub}`);
-    } catch (err) {
-      this.logger.warn(`connect rejected: ${err}`);
+    const token = client.handshake.auth?.['token'] as string | undefined;
+    if (!token) {
       client.disconnect(true);
+      return;
     }
+    try {
+      const payload = this.jwt.verify<JwtPayload>(token, { secret: process.env.JWT_SECRET! });
+      client.data.userId = payload.sub;
+    } catch {
+      client.disconnect(true);
+      return;
+    }
+
+    const userId = client.data.userId;
+    client.data.rooms = new Set();
+    client.data.friendPresenceAnnounced = false;
+    client.join(this.userRoom(userId));
+    this.logger.log(`socket connected: user=${userId} sid=${client.id}`);
   }
 
   async handleDisconnect(client: G88Socket): Promise<void> {
-    const userId = client.data?.userId;
+    const userId = client.data.userId;
     if (!userId) return;
-    try {
-      await this.presence.setOnline(userId, false);
-      void this.notifyFriendsPresence(userId, false);
-    } catch (err) {
-      this.logger.error(`disconnect cleanup failed user=${userId}: ${err}`);
+    const remaining = await this.server.in(this.userRoom(userId)).fetchSockets();
+    const others = remaining.filter((s) => s.id !== client.id);
+    if (others.length === 0) {
+      await this.presence.markOffline(userId);
+      if (client.data.friendPresenceAnnounced) {
+        void this.notifyFriendsPresence(userId, false);
+      }
     }
+    this.logger.log(`socket disconnected: user=${userId} sid=${client.id}`);
   }
 
-  @UseGuards(WsJwtGuard)
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @SubscribeMessage('presence:update')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onPresenceUpdate(
     @ConnectedSocket() client: G88Socket,
-    @MessageBody() body: PresenceUpdateDto,
-  ): Promise<AckResult> {
-    const userId = client.data.userId;
+    @MessageBody() payload: PresenceUpdateDto,
+  ): Promise<AckResult<{ cellId: string }>> {
     try {
-      const cell = await this.presence.updateLocation(userId, body.location);
-      if (cell) {
-        client.join(this.cellRoom(cell));
-        this.server.to(this.cellRoom(cell)).emit('presence:nearby', {
-          userId,
-          location: body.location,
-          timestamp: new Date().toISOString(),
+      const result = await this.presence.heartbeat(client.data.userId, payload.location);
+      const newRoom = this.cellRoom(result.cellId);
+
+      for (const room of client.data.rooms) {
+        if (room.startsWith('cell:')) {
+          client.leave(room);
+          client.data.rooms.delete(room);
+        }
+      }
+      client.join(newRoom);
+      client.data.rooms.add(newRoom);
+
+      if (result.prevCellId) {
+        this.server.to(this.cellRoom(result.prevCellId)).emit('presence:delta', {
+          cellId: result.prevCellId,
+          added: [],
+          removed: [client.data.userId],
+        });
+        this.server.to(newRoom).emit('presence:delta', {
+          cellId: result.cellId,
+          added: [{ userId: client.data.userId, lat: result.lat, lng: result.lng }],
+          removed: [],
         });
       }
-      return { ok: true };
+
+      if (!client.data.friendPresenceAnnounced) {
+        client.data.friendPresenceAnnounced = true;
+        void this.notifyFriendsPresence(client.data.userId, true);
+      }
+
+      return { ok: true, data: { cellId: result.cellId } };
     } catch (err) {
-      const { code, message } = extractApiError(err);
-      return { ok: false, code, message };
+      this.logger.error(`presence:update failed: ${err}`);
+      return { ok: false, code: 'presence.failed', message: 'Failed to update presence' };
     }
   }
 
-  @UseGuards(WsJwtGuard)
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @SubscribeMessage('conversation:join')
+  @UseGuards(WsJwtGuard)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onConversationJoin(
     @ConnectedSocket() client: G88Socket,
-    @MessageBody() body: ConversationJoinDto,
-  ): Promise<AckResult> {
-    const userId = client.data.userId;
+    @MessageBody() payload: ConversationJoinDto,
+  ): Promise<AckResult<{ joined: true }>> {
     try {
-      await this.chat.assertParticipant(userId, body.conversationId);
-      client.join(this.conversationRoom(body.conversationId));
-      client.data.rooms.add(this.conversationRoom(body.conversationId));
-      return { ok: true };
+      const ok = await this.chat.isParticipant(payload.conversationId, client.data.userId);
+      if (!ok) {
+        return { ok: false, code: 'chat.forbidden', message: 'Not a participant' };
+      }
+      const room = this.conversationRoom(payload.conversationId);
+      client.join(room);
+      client.data.rooms.add(room);
+      return { ok: true, data: { joined: true } };
     } catch (err) {
       const { code, message } = extractApiError(err);
       return { ok: false, code, message };
     }
   }
 
-  @UseGuards(WsJwtGuard)
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @SubscribeMessage('event:join')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onEventJoin(
     @ConnectedSocket() client: G88Socket,
-    @MessageBody() body: EventRoomDto,
-  ): Promise<AckResult> {
-    client.join(this.eventRoom(body.eventId));
-    client.data.rooms.add(this.eventRoom(body.eventId));
-    return { ok: true };
+    @MessageBody() payload: EventRoomDto,
+  ): Promise<AckResult<{ joined: true }>> {
+    const room = this.eventRoom(payload.eventId);
+    client.join(room);
+    client.data.rooms.add(room);
+    return { ok: true, data: { joined: true } };
   }
 
-  @UseGuards(WsJwtGuard)
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @SubscribeMessage('event:leave')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onEventLeave(
     @ConnectedSocket() client: G88Socket,
-    @MessageBody() body: EventRoomDto,
-  ): Promise<AckResult> {
-    client.leave(this.eventRoom(body.eventId));
-    client.data.rooms.delete(this.eventRoom(body.eventId));
-    return { ok: true };
+    @MessageBody() payload: EventRoomDto,
+  ): Promise<AckResult<{ left: true }>> {
+    const room = this.eventRoom(payload.eventId);
+    client.leave(room);
+    client.data.rooms.delete(room);
+    return { ok: true, data: { left: true } };
   }
 
-  @UseGuards(WsJwtGuard)
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @SubscribeMessage('chat:send')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onChatSend(
     @ConnectedSocket() client: G88Socket,
-    @MessageBody() body: ChatSendDto,
-  ): Promise<AckResult & { data?: ChatMessageEvent }> {
-    const userId = client.data.userId;
+    @MessageBody() payload: ChatSendDto,
+  ): Promise<AckResult<ChatMessageEvent>> {
+    if (!client.rooms.has(this.conversationRoom(payload.conversationId))) {
+      return { ok: false, code: 'chat.forbidden', message: 'Join the conversation first' };
+    }
+
     try {
-      const msg = await this.chat.sendMessage(userId, body.conversationId, body.body, body.clientMessageId);
-      this.server.to(this.conversationRoom(body.conversationId)).emit('chat:received', msg);
-      void this.pushToOfflineParticipants(body.conversationId, userId, body.body);
+      const msg = await this.chat.persist(
+        payload.conversationId,
+        client.data.userId,
+        payload.body,
+      );
+
+      this.server.to(this.conversationRoom(payload.conversationId)).emit('chat:message', msg);
+      void this.pushToOfflineParticipants(payload.conversationId, client.data.userId, msg.body);
+      void this.challenges
+        .increment(client.data.userId, 'chat_sent')
+        .catch((err) => this.logger.error(`challenge chat_sent failed: ${err}`));
+
       return { ok: true, data: msg };
     } catch (err) {
       const { code, message } = extractApiError(err);
-      return { ok: false, code, message };
+      if (!(err instanceof ForbiddenException) && !(err instanceof NotFoundException)) {
+        this.logger.error(`chat:send failed: ${err}`);
+      }
+      return { ok: false, code: code === 'unknown_error' ? 'chat.failed' : code, message };
     }
   }
 
-  @UseGuards(WsJwtGuard)
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @SubscribeMessage('location:share:start')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onLocationShareStart(
     @ConnectedSocket() client: G88Socket,
     @MessageBody() payload: LocationShareStartDto,
   ): Promise<AckResult<LocationShareSession>> {
-    const userId = client.data.userId;
+    if (!client.rooms.has(this.conversationRoom(payload.conversationId))) {
+      return { ok: false, code: 'chat.forbidden', message: 'Join the conversation first' };
+    }
+
     try {
       const { session, message } = await this.locationShare.start(
-        userId,
+        client.data.userId,
         payload.conversationId,
+        payload.duration,
         payload.location,
-        payload.ttlMinutes,
       );
+
       const room = this.conversationRoom(payload.conversationId);
-      client.join(room);
-      client.data.rooms.add(room);
       this.server.to(room).emit('location:share:started', { session, message });
+      this.server.to(room).emit('chat:message', message);
+      void this.pushToOfflineParticipants(
+        payload.conversationId,
+        client.data.userId,
+        message.body,
+      );
       return { ok: true, data: session };
     } catch (err) {
       const { code, message } = extractApiError(err);
@@ -267,17 +306,15 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
-  @UseGuards(WsJwtGuard)
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @SubscribeMessage('location:share:update')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onLocationShareUpdate(
     @ConnectedSocket() client: G88Socket,
     @MessageBody() payload: LocationShareUpdateDto,
-  ): Promise<AckResult> {
-    const userId = client.data.userId;
+  ): Promise<AckResult<{ updatedAt: string }>> {
     try {
       const { updatedAt, conversationId } = await this.locationShare.update(
-        userId,
+        client.data.userId,
         payload.sessionId,
         payload.location,
       );
@@ -287,7 +324,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         location: payload.location,
         updatedAt,
       });
-      return { ok: true };
+      return { ok: true, data: { updatedAt } };
     } catch (err) {
       const { code, message } = extractApiError(err);
       if (code === 'unknown_error') {
@@ -297,26 +334,24 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
-  @UseGuards(WsJwtGuard)
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @SubscribeMessage('location:share:stop')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onLocationShareStop(
     @ConnectedSocket() client: G88Socket,
     @MessageBody() payload: LocationShareStopDto,
-  ): Promise<AckResult> {
-    const userId = client.data.userId;
+  ): Promise<AckResult<{ ended: true }>> {
     try {
       const { conversationId, endedAt } = await this.locationShare.stop(
-        userId,
+        client.data.userId,
         payload.sessionId,
       );
       this.server.to(this.conversationRoom(conversationId)).emit('location:share:ended', {
         sessionId: payload.sessionId,
         conversationId,
-        reason: 'user_stopped' as const,
+        reason: 'stopped',
         endedAt,
       });
-      return { ok: true };
+      return { ok: true, data: { ended: true } };
     } catch (err) {
       const { code, message } = extractApiError(err);
       if (code === 'unknown_error') {
@@ -383,7 +418,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   emitLocationShareEnded(
     conversationId: string,
     sessionId: string,
-    reason: 'expired' | 'timeout' | 'blocked' | 'conversation_closed',
+    reason: 'expired' | 'timeout' | 'blocked' | 'conversation_closed' | 'stopped',
     endedAt: string,
   ): void {
     this.server.to(this.conversationRoom(conversationId)).emit('location:share:ended', {
