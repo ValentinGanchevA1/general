@@ -150,7 +150,6 @@ export function MapScreen(): React.JSX.Element {
 		sendLike: pinSendLike,
 		sendPass: pinSendPass,
 		pending: pinActionPending,
-		waveSent: pinWaveSent,
 		likeSent: pinLikeSent,
 		isMatch: pinIsMatch,
 		hasMutualWave: pinHasMutualWave,
@@ -550,22 +549,18 @@ export function MapScreen(): React.JSX.Element {
 		}
 	}, []);
 
-	const onSheetWavePress = useCallback(
-		(userId: string) => {
-			void onWave(userId);
-		},
-		[onWave],
-	);
 
-
-	// B: toast when machine wave succeeds (non-mutual)
+	// B: toast when machine wave succeeds (non-mutual) — defer setState (lint)
 	useEffect(() => {
+		let msg: string | null = null;
 		if (pinLastResult === 'wave_sent' && !pinHasMutualWave) {
-			setWaveToast('Wave sent');
+			msg = 'Wave sent';
+		} else if (pinLastResult === 'like_sent' && !pinIsMatch) {
+			msg = 'Like sent';
 		}
-		if (pinLastResult === 'like_sent' && !pinIsMatch) {
-			setWaveToast('Like sent');
-		}
+		if (msg == null) return;
+		const t = setTimeout(() => setWaveToast(msg), 0);
+		return () => clearTimeout(t);
 	}, [pinLastResult, pinHasMutualWave, pinIsMatch]);
 
 	useEffect(() => {

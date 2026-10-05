@@ -181,7 +181,6 @@ function UserCard({
 	const [localLikeSent, setLocalLikeSent] = useState(false);
 	const [localPassing, setLocalPassing] = useState(false);
 	const [localMatched, setLocalMatched] = useState(false);
-	const machineOwned = onLike != null || onPass != null;
 	const likeSent = likeSentControlled ?? localLikeSent;
 	const datingMatched = isMatchControlled ?? localMatched;
 	const liking = Boolean(actionPending && viewerMode === 'dating' && !likeSent) || localLiking;
