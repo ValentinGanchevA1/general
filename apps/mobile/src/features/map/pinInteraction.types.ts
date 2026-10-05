@@ -43,6 +43,11 @@ export interface PinContext {
   isMatch: boolean;
   passed: boolean;
 
+  /** Social mutual-wave chat thread (from wave response or WS). */
+  conversationId?: string | null;
+  /** Dating match thread (from like response or MATCH_CREATED). */
+  datingConversationId?: string | null;
+
   stage: Stage;
   error?: string;
   lastResult?:
