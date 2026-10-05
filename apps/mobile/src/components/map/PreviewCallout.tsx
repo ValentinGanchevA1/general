@@ -6,9 +6,9 @@ import {
   View,
 } from 'react-native';
 
+import type {VerificationLevel} from '@g88/shared';
 import {IdentityBlock} from '@/components/IdentityBlock';
 import {colors} from '@/theme';
-import type { VerificationLevel } from '@g88/shared';
 import type {ViewerMode} from '@/features/map/pinInteraction.types';
 import {styles} from './PreviewCallout.styles';
 
@@ -137,10 +137,10 @@ export function PreviewCallout({
         <View style={styles.identity}>
           <IdentityBlock
             name={name}
-            avatarUrl={avatarUrl}
+            avatarUrl={avatarUrl ?? null}
             verification={verification}
             idVerified={idVerified}
-            online={online}
+            {...(online !== undefined ? {online} : {})}
             subtitle={subtitle}
             ringVariant={idVerified ? 'verified' : 'brand'}
             size={44}
