@@ -9,6 +9,7 @@
  * - Super Like reserved in context, no UI in v1
  * - LAYER_CHANGED resets to idle
  * - PIN_TAP accepted from any state (switch pin while preview/sheet open)
+ * - C3: OPEN_FULL from detail/viewing → fullProfile; BACK restores detailSheet
  */
 import {assign, fromPromise, setup} from 'xstate';
 import type {
@@ -31,8 +32,6 @@ function peerModeFromProfile(
   profile: PublicUserProfile,
   viewerMode: ViewerMode,
 ): PeerMode {
-  // openToDating is owner-only on UserProfile; public profile may omit it.
-  // Dating layer only shows peers who are open_to_dating → treat as 'both'.
   const explicit =
     'openToDating' in profile
       ? (profile as PublicUserProfile & {openToDating?: boolean}).openToDating
@@ -79,7 +78,6 @@ const loadPinActor = fromPromise<
   };
 });
 
-/** Real wave — same endpoint as EntityBottomSheet / MapScreen onWave. */
 const sendWaveActor = fromPromise<
   {mutual: boolean; conversationId: string | null},
   {pinId: string}
@@ -94,7 +92,6 @@ const sendWaveActor = fromPromise<
   };
 });
 
-/** Dating like — backend ships with migration 0047. */
 const sendLikeActor = fromPromise<
   {matched: boolean; datingConversationId: string | null},
   {pinId: string}
@@ -154,7 +151,6 @@ export const pinInteractionMachine = setup({
   actions: {
     assignPin: assign(({event}) => {
       if (event.type !== 'PIN_TAP') return {};
-      // exactOptionalPropertyTypes: omit optional keys instead of assigning undefined
       return {
         pinId: event.pinId,
         pinType: event.pinType,
@@ -224,7 +220,6 @@ export const pinInteractionMachine = setup({
     stage: 'preview',
   },
   on: {
-    // Accept PIN_TAP from any state so switching pins while preview/sheet open works.
     PIN_TAP: {
       target: '.loadingPin',
       actions: 'assignPin',
@@ -334,6 +329,7 @@ export const pinInteractionMachine = setup({
       states: {
         viewing: {
           on: {
+            OPEN_FULL: '#pinInteraction.fullProfile',
             SEND_WAVE: {guard: 'canWave', target: 'wavePending'},
             MESSAGE: {guard: 'canMessageSocial', target: 'messaging'},
             BLOCK: '#pinInteraction.blocking',
@@ -369,12 +365,14 @@ export const pinInteractionMachine = setup({
           on: {
             WAVE_MUTUAL: {target: 'mutualWave', actions: 'setMutualWave'},
             MESSAGE: {guard: 'canMessageSocial', target: 'messaging'},
+            OPEN_FULL: '#pinInteraction.fullProfile',
           },
         },
         mutualWave: {
           entry: 'setMutualWave',
           on: {
             MESSAGE: 'messaging',
+            OPEN_FULL: '#pinInteraction.fullProfile',
           },
         },
         messaging: {
@@ -388,6 +386,7 @@ export const pinInteractionMachine = setup({
       states: {
         viewing: {
           on: {
+            OPEN_FULL: '#pinInteraction.fullProfile',
             SEND_LIKE: {guard: 'canLike', target: 'likePending'},
             PASS: 'passed',
             MESSAGE: {guard: 'canMessageDating', target: 'messaging'},
@@ -423,12 +422,14 @@ export const pinInteractionMachine = setup({
         liked: {
           on: {
             MATCH_CREATED: {target: 'matched', actions: 'setMatched'},
+            OPEN_FULL: '#pinInteraction.fullProfile',
           },
         },
         matched: {
           entry: 'setMatched',
           on: {
             MESSAGE: 'messaging',
+            OPEN_FULL: '#pinInteraction.fullProfile',
           },
         },
         messaging: {

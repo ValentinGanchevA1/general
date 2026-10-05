@@ -49,7 +49,7 @@ import {
 	fetchNearbyStories,
 	storyReceived,
 } from '@/features/stories/storiesSlice';
-import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
@@ -134,6 +134,9 @@ export function MapScreen(): React.JSX.Element {
 		openUserPin,
 		dismiss: dismissPinPreview,
 		openDetail: openPinDetail,
+		openFull: openPinFull,
+		backFromFull: backFromPinFull,
+		isFull: pinIsFull,
 		quickWave,
 		quickLike,
 		showPreview,
@@ -144,6 +147,7 @@ export function MapScreen(): React.JSX.Element {
 		seedDisplayName,
 		send: pinSend,
 	} = usePinInteraction({ viewerMode });
+	const suppressPinDismissRef = useRef(false);
 
 	const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
 	const zoom = useMemo(() => (region ? approxZoomFromRegion(region) : 12), [region]);
@@ -215,6 +219,10 @@ export function MapScreen(): React.JSX.Element {
 	const onSheetDismiss = useCallback(() => {
 		presentedIdRef.current = null;
 		setSelected(null);
+		if (suppressPinDismissRef.current) {
+			suppressPinDismissRef.current = false;
+			return;
+		}
 		dismissPinPreview();
 	}, [dismissPinPreview]);
 
@@ -238,6 +246,62 @@ export function MapScreen(): React.JSX.Element {
 			}
 		});
 	}, []);
+
+	const onSheetOpenFull = useCallback(
+		(focus?: 'trust' | 'stats' | 'storyline' | 'photos' | 'bio' | 'mutual') => {
+			if (activePinId == null) return;
+			openPinFull();
+			suppressPinDismissRef.current = true;
+			presentedIdRef.current = null;
+			setSelected(null);
+			entitySheetRef.current?.dismiss();
+			navigation.navigate('UserProfile', {
+				userId: activePinId,
+				...(focus != null ? { focus } : {}),
+			});
+		},
+		[activePinId, openPinFull, navigation],
+	);
+
+	useFocusEffect(
+		useCallback(() => {
+			if (!pinIsFull || activePinId == null) return;
+			backFromPinFull();
+			const fromViewport = points.find(
+				(p): p is EntityPoint => p.kind === 'user' && p.id === activePinId,
+			);
+			if (fromViewport) {
+				presentEntitySheet(fromViewport);
+				return;
+			}
+			const lat = pinLat ?? region?.latitude ?? 0;
+			const lng = pinLng ?? region?.longitude ?? 0;
+			presentEntitySheet({
+				kind: 'user',
+				id: activePinId,
+				lat,
+				lng,
+				meta: {
+					displayName: seedDisplayName,
+					avatarUrl: null,
+					verification: 'none',
+					online: false,
+					lastSeenAt: null,
+				},
+			});
+		}, [
+			pinIsFull,
+			activePinId,
+			backFromPinFull,
+			points,
+			presentEntitySheet,
+			pinLat,
+			pinLng,
+			seedDisplayName,
+			region?.latitude,
+			region?.longitude,
+		]),
+	);
 
 	const onEntityPress = useCallback(
 		(point: EntityPoint) => {
@@ -571,12 +635,12 @@ export function MapScreen(): React.JSX.Element {
 					provider={PROVIDER_GOOGLE}
 					customMapStyle={MAP_STYLE}
 					style={StyleSheet.absoluteFill}
-					onRegionChangeComplete={onRegionChangeComplete}
-					onLongPress={onMapLongPress}
 					showsUserLocation
 					showsMyLocationButton={false}
 					showsCompass={false}
 					toolbarEnabled={false}
+					onRegionChangeComplete={onRegionChangeComplete}
+					onLongPress={onMapLongPress}
 				>
 					<MapMarkers
 						points={filteredPoints}
@@ -587,8 +651,9 @@ export function MapScreen(): React.JSX.Element {
 			</ErrorBoundary>
 
 			<MapChrome
-				interactionUnread={interactionUnread}
-				onPressInteractions={() => openRootScreen(navigation, 'Interactions')}
+				nudge={nudge}
+				challenges={challenges}
+				challengeDismissed={challengeDismissed}
 				onDismissChallenge={() => setChallengeDismissed(true)}
 			/>
 
@@ -604,13 +669,14 @@ export function MapScreen(): React.JSX.Element {
 					onDatingOnlyChange={setDatingOnly}
 					rankBy={rankBy}
 					onRankByChange={setRankBy}
-					value={searchQuery}
-					onChangeText={setSearchQuery}
+					searchQuery={searchQuery}
+					onSearchQueryChange={setSearchQuery}
 					onCreatePress={openCreateNearby}
+					interactionUnread={interactionUnread}
 				/>
 			</View>
 
-			{!sheetOpen && trendingItems.length > 0 ? (
+			{trendingItems.length > 0 && !sheetOpen ? (
 				<View style={[styles.trendingWrap, { top: trendingTop }]} pointerEvents="box-none">
 					<TrendingCard
 						items={trendingItems}
@@ -621,32 +687,36 @@ export function MapScreen(): React.JSX.Element {
 				</View>
 			) : null}
 
-			{myCoords ? <EventsRail location={myCoords} sheetOpen={sheetOpen} /> : null}
+			{createNudgeVisible ? (
+				<MapCreateNudgeBanner
+					onCreate={onCreateNudgeCreate}
+					onDismiss={() => dismissCreateNudge('dismiss')}
+				/>
+			) : null}
 
 			{isEmpty && !createNudgeVisible ? (
 				<View style={styles.emptyWrap} pointerEvents="box-none">
 					<EmptyState
 						title={emptyCopy.title}
 						body={emptyCopy.body}
-						actionLabel={emptyCopy.actionLabel}
-						onAction={() => {
-							if (emptyCopy.action === 'email') {
-								openRootScreen(navigation, 'EmailVerification');
-							} else if (emptyCopy.action === 'dating_prefs') {
-								openRootScreen(navigation, 'ProfileEdit', { focus: 'dating' });
-							} else {
-								openCreateNearby();
+						{...(emptyCopy.primaryLabel != null
+							? {
+								primaryLabel: emptyCopy.primaryLabel,
+								onPrimary: () => {
+									if (emptyCopy.primaryAction === 'verify_email') {
+										navigation.navigate('EmailVerification');
+										return;
+									}
+									if (emptyCopy.primaryAction === 'dating_prefs') {
+										navigation.navigate('ProfileEdit', { focus: 'dating' });
+										return;
+									}
+									openCreateNearby();
+								},
 							}
-						}}
+							: {})}
 					/>
 				</View>
-			) : null}
-
-			{createNudgeVisible ? (
-				<MapCreateNudgeBanner
-					onCreate={onCreateNudgeCreate}
-					onDismiss={() => dismissCreateNudge('dismiss')}
-				/>
 			) : null}
 
 			{loading && points.length === 0 ? (
@@ -674,12 +744,15 @@ export function MapScreen(): React.JSX.Element {
 							waving={waving === selected.id}
 							onClose={closeSheet}
 							viewerMode={viewerMode}
+							{...(selected.kind === 'user'
+								? { onOpenFull: onSheetOpenFull }
+								: {})}
 							{...(selected.kind === 'user' && viewerMode === 'social'
 								? {
-										onWave: () => {
-											onSheetWavePress(selected.id);
-										},
-									}
+									onWave: () => {
+										onSheetWavePress(selected.id);
+									},
+								}
 								: {})}
 						/>
 					) : null}
@@ -718,6 +791,10 @@ export function MapScreen(): React.JSX.Element {
 				>
 					<Icon name="crosshairs-gps" size={22} color={colors.textPrimary} />
 				</Pressable>
+			) : null}
+
+			{myCoords ? (
+				<EventsRail location={myCoords} />
 			) : null}
 		</View>
 	);
@@ -790,6 +867,7 @@ const styles = StyleSheet.create({
 		shadowColor: colors.shadowInk,
 		shadowOpacity: 0.2,
 		shadowRadius: 6,
+		shadowOffset: { width: 0, height: 2 },
 		elevation: 4,
 	},
 	unavailable: {
@@ -799,10 +877,6 @@ const styles = StyleSheet.create({
 		padding: 24,
 		backgroundColor: colors.bg,
 	},
-	unavailableTitle: {
-		color: colors.textPrimary,
-		fontSize: 18,
-		fontWeight: '700',
-	},
+	unavailableTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
 	unavailableBody: { color: colors.textMuted, marginTop: 8, textAlign: 'center' },
 });

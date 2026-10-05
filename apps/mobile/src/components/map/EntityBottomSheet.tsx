@@ -120,6 +120,8 @@ type UserEntityPoint = EntityPoint & { kind: 'user'; meta: UserMeta };
 type EventEntityPoint = EntityPoint & { kind: 'event'; meta: EventMeta };
 type ListingEntityPoint = EntityPoint & { kind: 'listing'; meta: ListingMeta };
 
+type ProfileFocus = 'trust' | 'stats' | 'storyline' | 'photos' | 'bio' | 'mutual';
+
 interface Props {
 	point: EntityPoint;
 	waving: boolean;
@@ -127,6 +129,8 @@ interface Props {
 	onWave?: () => void;
 	/** Map layer mode — dating swaps Wave for Like/Pass. Default social. */
 	viewerMode?: 'social' | 'dating';
+	/** C3: machine-owned full profile — parent sends OPEN_FULL and navigates. */
+	onOpenFull?: (focus?: ProfileFocus) => void;
 }
 
 interface UserCardProps {
@@ -135,11 +139,12 @@ interface UserCardProps {
 	onClose: () => void;
 	onWave?: (() => void) | undefined;
 	viewerMode: 'social' | 'dating';
+	onOpenFull?: (focus?: ProfileFocus) => void;
 }
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-function UserCard({point, waving, onWave, onClose, viewerMode}: UserCardProps): React.JSX.Element {
+function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull}: UserCardProps): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
 	const cached = getCachedProfile(point.id);
 	const [profile, setProfile] = useState<PublicUserProfile | null>(cached);
@@ -241,7 +246,11 @@ function UserCard({point, waving, onWave, onClose, viewerMode}: UserCardProps): 
 	const preferMessagePrimary =
 		relationshipKnown && (canMessage === 'chat' || matched) && messageAllowed;
 
-	const openProfile = (focus?: 'trust' | 'stats' | 'storyline' | 'photos' | 'bio' | 'mutual'): void => {
+	const openProfile = (focus?: ProfileFocus): void => {
+		if (onOpenFull != null) {
+			onOpenFull(focus);
+			return;
+		}
 		onClose();
 		navigation.navigate('UserProfile', {
 			userId: point.id,
@@ -358,7 +367,7 @@ function UserCard({point, waving, onWave, onClose, viewerMode}: UserCardProps): 
 			const res = await postJson<
 				{ toUserId: string },
 				{ id: string; matched: boolean; datingConversationId: string | null }
-			>('/dating/likes', { toUserId: point.id });
+			>('/dating/likes', {toUserId: point.id});
 			setLikeSent(true);
 			if (res.matched) {
 				setDatingMatched(true);
@@ -614,27 +623,53 @@ function UserCard({point, waving, onWave, onClose, viewerMode}: UserCardProps): 
 					/>
 				</TouchableOpacity>
 			) : null}
-			{/* remainder of UserCard body preserved below via master structure */}
-			{!fetching && profile != null && profile.bio ? (
-				<Text style={styles.bio} numberOfLines={4}>
-					{profile.bio}
-				</Text>
+			{!fetching &&
+			profile != null &&
+			(profile.status?.level != null ||
+				profile.status?.allTimeRank != null ||
+				(profile.status?.achievementIcons?.length ?? 0) > 0) ? (
+				<TouchableOpacity
+					style={styles.statsBlock}
+					onPress={() => openProfile('stats')}
+					accessibilityRole="button"
+					accessibilityLabel="View activity on profile"
+					activeOpacity={0.85}
+				>
+					<ProfileStatsRow
+						{...(profile.status?.level != null ? {level: profile.status.level} : {})}
+						{...(profile.status?.allTimeRank != null
+							? {allTimeRank: profile.status.allTimeRank}
+							: {})}
+						{...(profile.status?.achievementIcons != null
+							? {achievementIcons: profile.status.achievementIcons}
+							: {})}
+					/>
+				</TouchableOpacity>
+			) : null}
+			{profile?.bio ? (
+				<TouchableOpacity
+					onPress={() => openProfile('bio')}
+					accessibilityRole="button"
+					accessibilityLabel="View full bio on profile"
+					activeOpacity={0.85}
+				>
+					<Text style={styles.bio} numberOfLines={3}>
+						{profile.bio}
+					</Text>
+				</TouchableOpacity>
 			) : null}
 		</View>
 	);
 }
 
-// EventCard / ListingCard / export — see full file continuation in commit.
-// Minimal export wiring for user dual-mode (events/listings unchanged from master).
-
-function EventCard({point, onClose}: {point: EventEntityPoint; onClose: () => void}): React.JSX.Element {
+function EventCard({point, onClose}: { point: EventEntityPoint; onClose: () => void }): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
 	const meta = point.meta;
 	const distanceM = usePinDistanceMeters(point.lat, point.lng);
 	return (
 		<View style={styles.sheet}>
 			<View style={styles.kindHeader}>
-				<View style={[styles.kindDot, styles.kindDotEvent]} />
+				<View style={[styles.kindDot, styles.kindDotEvent]}/>
 				<Text style={styles.kindLabel}>Event</Text>
 			</View>
 			<Text style={styles.entityTitle}>{meta.title}</Text>
@@ -651,7 +686,7 @@ function EventCard({point, onClose}: {point: EventEntityPoint; onClose: () => vo
 				style={[styles.primaryBtn, styles.eventPrimaryBtn, styles.entityPrimaryBtn]}
 				onPress={() => {
 					onClose();
-					navigation.navigate('EventDetail', { eventId: point.id });
+					navigation.navigate('EventDetail', {eventId: point.id});
 				}}
 				accessibilityRole="button"
 				accessibilityLabel="View event"
@@ -662,7 +697,7 @@ function EventCard({point, onClose}: {point: EventEntityPoint; onClose: () => vo
 	);
 }
 
-function ListingCard({point, onClose}: {point: ListingEntityPoint; onClose: () => void}): React.JSX.Element {
+function ListingCard({point, onClose}: { point: ListingEntityPoint; onClose: () => void }): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
 	const meta = point.meta;
 	const distanceM = usePinDistanceMeters(point.lat, point.lng);
@@ -670,7 +705,7 @@ function ListingCard({point, onClose}: {point: ListingEntityPoint; onClose: () =
 	return (
 		<View style={styles.sheet}>
 			<View style={styles.kindHeader}>
-				<View style={[styles.kindDot, wanted ? styles.kindDotWanted : styles.kindDotListing]} />
+				<View style={[styles.kindDot, wanted ? styles.kindDotWanted : styles.kindDotListing]}/>
 				<Text style={[styles.kindLabel, wanted ? styles.kindLabelWanted : undefined]}>
 					{wanted ? 'Wanted' : 'Listing'}
 				</Text>
@@ -689,7 +724,7 @@ function ListingCard({point, onClose}: {point: ListingEntityPoint; onClose: () =
 				style={[styles.primaryBtn, styles.listingPrimaryBtn, styles.entityPrimaryBtn]}
 				onPress={() => {
 					onClose();
-					navigation.navigate('ListingDetail', { listingId: point.id });
+					navigation.navigate('ListingDetail', {listingId: point.id});
 				}}
 				accessibilityRole="button"
 				accessibilityLabel="View listing"
@@ -701,12 +736,13 @@ function ListingCard({point, onClose}: {point: ListingEntityPoint; onClose: () =
 }
 
 export function EntityBottomSheet({
-	point,
-	waving,
-	onClose,
-	onWave,
-	viewerMode = 'social',
-}: Props): React.JSX.Element {
+									  point,
+									  waving,
+									  onClose,
+									  onWave,
+									  viewerMode = 'social',
+									  onOpenFull,
+								  }: Props): React.JSX.Element {
 	if (point.kind === 'user') {
 		return (
 			<UserCard
@@ -716,14 +752,15 @@ export function EntityBottomSheet({
 				onClose={onClose}
 				viewerMode={viewerMode}
 				{...(onWave != null ? {onWave} : {})}
+				{...(onOpenFull != null ? {onOpenFull} : {})}
 			/>
 		);
 	}
 	if (point.kind === 'event') {
-		return <EventCard point={point as EventEntityPoint} onClose={onClose} />;
+		return <EventCard point={point as EventEntityPoint} onClose={onClose}/>;
 	}
 	if (point.kind === 'listing') {
-		return <ListingCard point={point as ListingEntityPoint} onClose={onClose} />;
+		return <ListingCard point={point as ListingEntityPoint} onClose={onClose}/>;
 	}
 	return (
 		<View style={styles.sheet}>
