@@ -140,6 +140,8 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   waveBtn: { backgroundColor: colors.primary },
+  /** Dating Like — distinct from social Wave. */
+  likeBtn: { backgroundColor: colors.action },
   messageBtn: { backgroundColor: colors.action },
   /** Placeholder while relationship loads — same height as primary CTA. */
   ctaSkeleton: {

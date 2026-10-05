@@ -255,7 +255,6 @@ export function MapScreen(): React.JSX.Element {
 	);
 
 	const onPreviewOpenDetail = useCallback(() => {
-		// Machine owns stage: preview → detailSheet
 		openPinDetail();
 		if (activePinId == null) return;
 		const fromViewport = points.find(
@@ -265,7 +264,6 @@ export function MapScreen(): React.JSX.Element {
 			presentEntitySheet(fromViewport);
 			return;
 		}
-		// Peer scrolled off viewport — seed minimal user point so sheet can load by id
 		const lat = pinLat ?? region?.latitude ?? 0;
 		const lng = pinLng ?? region?.longitude ?? 0;
 		presentEntitySheet({
@@ -358,7 +356,6 @@ export function MapScreen(): React.JSX.Element {
 		});
 	}, [on, dispatch]);
 
-	// Pin machine: reciprocal wave / dating match while preview is open
 	useEffect(() => {
 		const unsubMutual = on('wave:mutual', (e) => {
 			if (activePinId != null && e.peerUserId === activePinId) {
@@ -624,9 +621,7 @@ export function MapScreen(): React.JSX.Element {
 				</View>
 			) : null}
 
-			{myCoords ? (
-				<EventsRail location={myCoords} sheetOpen={sheetOpen} />
-			) : null}
+			{myCoords ? <EventsRail location={myCoords} sheetOpen={sheetOpen} /> : null}
 
 			{isEmpty && !createNudgeVisible ? (
 				<View style={styles.emptyWrap} pointerEvents="box-none">
@@ -678,7 +673,8 @@ export function MapScreen(): React.JSX.Element {
 							point={selected}
 							waving={waving === selected.id}
 							onClose={closeSheet}
-							{...(selected.kind === 'user'
+							viewerMode={viewerMode}
+							{...(selected.kind === 'user' && viewerMode === 'social'
 								? {
 										onWave: () => {
 											onSheetWavePress(selected.id);
@@ -756,18 +752,8 @@ function approxZoomFromRegion(region: Region): number {
 
 const styles = StyleSheet.create({
 	root: { flex: 1, backgroundColor: colors.bg },
-	filterRow: {
-		position: 'absolute',
-		left: 0,
-		right: 0,
-		zIndex: 20,
-	},
-	trendingWrap: {
-		position: 'absolute',
-		left: 0,
-		right: 0,
-		zIndex: 19,
-	},
+	filterRow: { position: 'absolute', left: 0, right: 0, zIndex: 20 },
+	trendingWrap: { position: 'absolute', left: 0, right: 0, zIndex: 19 },
 	emptyWrap: {
 		...StyleSheet.absoluteFillObject,
 		justifyContent: 'center',
