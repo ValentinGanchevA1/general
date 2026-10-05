@@ -144,7 +144,7 @@ export function PreviewCallout({
             subtitle={subtitle}
             ringVariant={idVerified ? 'verified' : 'brand'}
             size={44}
-            onPress={onOpenDetail}
+            {...(onOpenDetail ? {onPress: onOpenDetail} : {})}
             accessibilityLabel={`Open detail for ${name}`}
           />
         </View>

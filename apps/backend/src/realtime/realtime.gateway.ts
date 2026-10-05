@@ -238,6 +238,94 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+  @UseGuards(WsJwtGuard)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @SubscribeMessage('location:share:start')
+  async onLocationShareStart(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() payload: LocationShareStartDto,
+  ): Promise<AckResult<LocationShareSession>> {
+    const userId = client.data.userId;
+    try {
+      const { session, message } = await this.locationShare.start(
+        userId,
+        payload.conversationId,
+        payload.location,
+        payload.ttlMinutes,
+      );
+      const room = this.conversationRoom(payload.conversationId);
+      client.join(room);
+      client.data.rooms.add(room);
+      this.server.to(room).emit('location:share:started', { session, message });
+      return { ok: true, data: session };
+    } catch (err) {
+      const { code, message } = extractApiError(err);
+      if (code === 'unknown_error') {
+        this.logger.error(`location:share:start failed: ${err}`);
+      }
+      return { ok: false, code, message };
+    }
+  }
+
+  @UseGuards(WsJwtGuard)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @SubscribeMessage('location:share:update')
+  async onLocationShareUpdate(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() payload: LocationShareUpdateDto,
+  ): Promise<AckResult> {
+    const userId = client.data.userId;
+    try {
+      const { updatedAt, conversationId } = await this.locationShare.update(
+        userId,
+        payload.sessionId,
+        payload.location,
+      );
+      this.server.to(this.conversationRoom(conversationId)).emit('location:share:update', {
+        sessionId: payload.sessionId,
+        conversationId,
+        location: payload.location,
+        updatedAt,
+      });
+      return { ok: true };
+    } catch (err) {
+      const { code, message } = extractApiError(err);
+      if (code === 'unknown_error') {
+        this.logger.error(`location:share:update failed: ${err}`);
+      }
+      return { ok: false, code, message };
+    }
+  }
+
+  @UseGuards(WsJwtGuard)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @SubscribeMessage('location:share:stop')
+  async onLocationShareStop(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() payload: LocationShareStopDto,
+  ): Promise<AckResult> {
+    const userId = client.data.userId;
+    try {
+      const { conversationId, endedAt } = await this.locationShare.stop(
+        userId,
+        payload.sessionId,
+      );
+      this.server.to(this.conversationRoom(conversationId)).emit('location:share:ended', {
+        sessionId: payload.sessionId,
+        conversationId,
+        reason: 'user_stopped' as const,
+        endedAt,
+      });
+      return { ok: true };
+    } catch (err) {
+      const { code, message } = extractApiError(err);
+      if (code === 'unknown_error') {
+        this.logger.error(`location:share:stop failed: ${err}`);
+      }
+      return { ok: false, code, message };
+    }
+  }
+
   async emitWaveReceived(toUserId: string, evt: WaveReceivedEvent): Promise<void> {
     this.server.to(this.userRoom(toUserId)).emit('wave:received', evt);
   }
@@ -254,46 +342,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         triggeringWaveId,
       });
     }
-  }
-
-  async emitWaveMutual(
-    toUserId: string,
-    evt: {
-      conversationId: string;
-      waveId: string;
-      createdAt: string;
-      peerUserId: string;
-    },
-  ): Promise<void> {
-    this.server.to(this.userRoom(toUserId)).emit('wave:mutual', evt);
-  }
-
-  async emitDatingMatchCreated(
-    toUserId: string,
-    evt: {
-      peerUserId: string;
-      peerDisplayName: string;
-      peerAvatarUrl: string | null;
-      datingConversationId: string;
-      createdAt: string;
-    },
-  ): Promise<void> {
-    this.server.to(this.userRoom(toUserId)).emit('dating:match_created', evt);
-  }
-
-  async emitDatingLikeReceived(
-    toUserId: string,
-    evt: {
-      likeId: string;
-      fromUser: {
-        id: string;
-        displayName: string;
-        avatarUrl: string | null;
-      };
-      createdAt: string;
-    },
-  ): Promise<void> {
-    this.server.to(this.userRoom(toUserId)).emit('dating:like_received', evt);
   }
 
   async emitGiftReceived(toUserId: string, evt: GiftReceivedEvent): Promise<void> {
@@ -352,6 +400,46 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   async emitFriendAccepted(toUserId: string, evt: FriendAcceptedEvent): Promise<void> {
     this.server.to(this.userRoom(toUserId)).emit('friend:accepted', evt);
+  }
+
+  async emitWaveMutual(
+    toUserId: string,
+    evt: {
+      conversationId: string;
+      waveId: string;
+      createdAt: string;
+      peerUserId: string;
+    },
+  ): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('wave:mutual', evt);
+  }
+
+  async emitDatingMatchCreated(
+    toUserId: string,
+    evt: {
+      peerUserId: string;
+      peerDisplayName: string;
+      peerAvatarUrl: string | null;
+      datingConversationId: string;
+      createdAt: string;
+    },
+  ): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('dating:match_created', evt);
+  }
+
+  async emitDatingLikeReceived(
+    toUserId: string,
+    evt: {
+      likeId: string;
+      fromUser: {
+        id: string;
+        displayName: string;
+        avatarUrl: string | null;
+      };
+      createdAt: string;
+    },
+  ): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('dating:like_received', evt);
   }
 
   private async notifyFriendsPresence(userId: string, online: boolean): Promise<void> {
