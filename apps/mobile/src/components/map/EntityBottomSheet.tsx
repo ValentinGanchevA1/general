@@ -683,7 +683,7 @@ function EventCard({point, onClose}: { point: EventEntityPoint; onClose: () => v
 				style={[styles.primaryBtn, styles.eventPrimaryBtn, styles.entityPrimaryBtn]}
 				onPress={() => {
 					onClose();
-					navigation.navigate('EventDetail', {eventId: point.id});
+					openRootScreen(navigation, 'EventDetail', {eventId: point.id});
 				}}
 				accessibilityRole="button"
 				accessibilityLabel="View event"
@@ -721,7 +721,7 @@ function ListingCard({point, onClose}: { point: ListingEntityPoint; onClose: () 
 				style={[styles.primaryBtn, styles.listingPrimaryBtn, styles.entityPrimaryBtn]}
 				onPress={() => {
 					onClose();
-					navigation.navigate('ListingDetail', {listingId: point.id});
+					openRootScreen(navigation, 'ListingDetail', {listingId: point.id});
 				}}
 				accessibilityRole="button"
 				accessibilityLabel="View listing"

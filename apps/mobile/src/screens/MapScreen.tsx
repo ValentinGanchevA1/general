@@ -54,6 +54,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
+import { openRootScreen } from '@/navigation/openRootScreen';
 import { colors } from '@/theme';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
 import { MapCoachMarks } from '@/components/map/MapCoachMarks';
@@ -650,41 +651,43 @@ export function MapScreen(): React.JSX.Element {
 			</ErrorBoundary>
 
 			<MapChrome
-				nudge={nudge}
-				challenges={challenges}
-				challengeDismissed={challengeDismissed}
+				sheetOpen={sheetOpen}
+				interactionUnread={interactionUnread}
+				onPressInteractions={() => openRootScreen(navigation, 'Interactions')}
+				topStack={topStack}
 				onDismissChallenge={() => setChallengeDismissed(true)}
 			/>
 
-			<View style={[styles.filterRow, { top: filterRowTop }]} pointerEvents="box-none">
-				<MapFilterRow
-					layers={layers}
-					onLayersChange={setLayers}
-					listingMode={listingModeFilter}
-					onListingModeChange={setListingModeFilter}
-					friendsOnly={friendsOnly}
-					onFriendsOnlyChange={setFriendsOnly}
-					datingOnly={datingOnly}
-					onDatingOnlyChange={setDatingOnly}
-					rankBy={rankBy}
-					onRankByChange={setRankBy}
-					searchQuery={searchQuery}
-					onSearchQueryChange={setSearchQuery}
-					onCreatePress={openCreateNearby}
-					interactionUnread={interactionUnread}
-				/>
-			</View>
+			<MapFilterRow
+				value={searchQuery}
+				onChangeText={setSearchQuery}
+				layers={layers}
+				onLayersChange={setLayers}
+				listingMode={listingModeFilter}
+				onListingModeChange={setListingModeFilter}
+				friendsOnly={friendsOnly}
+				onFriendsOnlyChange={setFriendsOnly}
+				datingOnly={datingOnly}
+				onDatingOnlyChange={setDatingOnly}
+				rankBy={rankBy}
+				onRankByChange={setRankBy}
+				top={filterRowTop}
+				onPressCreate={openCreateNearby}
+			/>
 
-			{trendingItems.length > 0 && !sheetOpen ? (
-				<View style={[styles.trendingWrap, { top: trendingTop }]} pointerEvents="box-none">
-					<TrendingCard
-						items={trendingItems}
-						collapsed={trendingCollapsed}
-						onToggleCollapse={() => setTrendingCollapsed((v) => !v)}
-						onPressItem={onTrendingPress}
-					/>
-				</View>
-			) : null}
+			<TrendingCard
+				items={trendingItems}
+				onPressItem={onTrendingPress}
+				top={trendingTop}
+				visible={
+					isCityScale &&
+					!sheetOpen &&
+					!isEmpty &&
+					searchQuery.trim() === ''
+				}
+				collapsed={trendingCollapsed}
+				onToggleCollapse={() => setTrendingCollapsed((v) => !v)}
+			/>
 
 			{createNudgeVisible ? (
 				<MapCreateNudgeBanner
@@ -693,27 +696,28 @@ export function MapScreen(): React.JSX.Element {
 				/>
 			) : null}
 
-			{isEmpty && !createNudgeVisible ? (
+			{isEmpty && !createNudgeVisible && nudge == null ? (
 				<View style={styles.emptyWrap} pointerEvents="box-none">
 					<EmptyState
+						variant="card"
+						icon={emptyCopy.icon}
 						title={emptyCopy.title}
 						body={emptyCopy.body}
-						{...(emptyCopy.primaryLabel != null
-							? {
-								primaryLabel: emptyCopy.primaryLabel,
-								onPrimary: () => {
-									if (emptyCopy.primaryAction === 'verify_email') {
-										navigation.navigate('EmailVerification');
-										return;
-									}
-									if (emptyCopy.primaryAction === 'dating_prefs') {
-										navigation.navigate('ProfileEdit', { focus: 'dating' });
-										return;
-									}
-									openCreateNearby();
-								},
-							}
-							: {})}
+						actionLabel={emptyCopy.actionLabel}
+						onAction={
+							emptyCopy.actionKind === 'show_everyone'
+								? () => setFriendsOnly(false)
+								: emptyCopy.actionKind === 'clear_dating'
+									? () => setDatingOnly(false)
+									: emptyCopy.actionKind === 'dating_prefs'
+										? () =>
+											openRootScreen(navigation, 'ProfileEdit', {
+												focus: 'dating',
+											})
+										: emptyCopy.actionKind === 'verify_email'
+											? () => openRootScreen(navigation, 'EmailVerification')
+											: openCreateNearby
+						}
 					/>
 				</View>
 			) : null}
