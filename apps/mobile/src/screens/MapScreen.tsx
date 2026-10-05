@@ -563,6 +563,7 @@ export function MapScreen(): React.JSX.Element {
 				onPressInteractions={() => openRootScreen(navigation, 'Interactions')}
 				sheetOpen={sheetOpen}
 				topStack={topStack}
+				onDismissChallenge={() => setChallengeDismissed(true)}
 			/>
 
 			{!sheetOpen ? (
@@ -575,8 +576,8 @@ export function MapScreen(): React.JSX.Element {
 					onFriendsOnlyChange={setFriendsOnly}
 					datingOnly={datingOnly}
 					onDatingOnlyChange={setDatingOnly}
-					searchQuery={searchQuery}
-					onSearchQueryChange={setSearchQuery}
+					value={searchQuery}
+					onChangeText={setSearchQuery}
 					rankBy={rankBy}
 					onRankByChange={setRankBy}
 					top={filterRowTop}
@@ -728,12 +729,12 @@ const styles = StyleSheet.create({
 		position: 'absolute',
 		left: 24,
 		right: 24,
-		top: '38%',
-		zIndex: 12,
+		bottom: 140,
+		zIndex: 15,
 	},
 	loadingWrap: {
 		position: 'absolute',
-		top: '45%',
+		top: '50%',
 		left: 0,
 		right: 0,
 		alignItems: 'center',
@@ -748,10 +749,10 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 		paddingVertical: 10,
 		borderWidth: 1,
-		borderColor: colors.border,
-		zIndex: 30,
+		borderColor: colors.borderStrong,
+		zIndex: 50,
 	},
-	toastText: { color: colors.textPrimary, fontWeight: '600' },
+	toastText: { color: colors.textPrimary, fontWeight: '600', fontSize: 14 },
 	recenterFab: {
 		position: 'absolute',
 		right: 16,
@@ -760,10 +761,10 @@ const styles = StyleSheet.create({
 		borderRadius: 24,
 		backgroundColor: colors.surface,
 		borderWidth: 1,
-		borderColor: colors.border,
+		borderColor: colors.borderStrong,
 		alignItems: 'center',
 		justifyContent: 'center',
-		zIndex: 20,
+		zIndex: 25,
 	},
 	unavailable: {
 		flex: 1,
