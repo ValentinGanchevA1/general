@@ -139,6 +139,9 @@ export function MapScreen(): React.JSX.Element {
 		showPreview,
 		previewProps,
 		activePinId,
+		pinLat,
+		pinLng,
+		seedDisplayName,
 		send: pinSend,
 	} = usePinInteraction({ viewerMode });
 
@@ -252,6 +255,7 @@ export function MapScreen(): React.JSX.Element {
 	);
 
 	const onPreviewOpenDetail = useCallback(() => {
+		// Machine owns stage: preview → detailSheet
 		openPinDetail();
 		if (activePinId == null) return;
 		const fromViewport = points.find(
@@ -259,8 +263,35 @@ export function MapScreen(): React.JSX.Element {
 		);
 		if (fromViewport) {
 			presentEntitySheet(fromViewport);
+			return;
 		}
-	}, [openPinDetail, activePinId, points, presentEntitySheet]);
+		// Peer scrolled off viewport — seed minimal user point so sheet can load by id
+		const lat = pinLat ?? region?.latitude ?? 0;
+		const lng = pinLng ?? region?.longitude ?? 0;
+		presentEntitySheet({
+			kind: 'user',
+			id: activePinId,
+			lat,
+			lng,
+			meta: {
+				displayName: seedDisplayName,
+				avatarUrl: null,
+				verification: 'none',
+				online: false,
+				lastSeenAt: null,
+			},
+		});
+	}, [
+		openPinDetail,
+		activePinId,
+		points,
+		presentEntitySheet,
+		pinLat,
+		pinLng,
+		seedDisplayName,
+		region?.latitude,
+		region?.longitude,
+	]);
 
 	useEffect(() => {
 		if (!selected) {
@@ -561,12 +592,10 @@ export function MapScreen(): React.JSX.Element {
 			<MapChrome
 				interactionUnread={interactionUnread}
 				onPressInteractions={() => openRootScreen(navigation, 'Interactions')}
-				sheetOpen={sheetOpen}
-				topStack={topStack}
 				onDismissChallenge={() => setChallengeDismissed(true)}
 			/>
 
-			{!sheetOpen ? (
+			<View style={[styles.filterRow, { top: filterRowTop }]} pointerEvents="box-none">
 				<MapFilterRow
 					layers={layers}
 					onLayersChange={setLayers}
@@ -576,23 +605,28 @@ export function MapScreen(): React.JSX.Element {
 					onFriendsOnlyChange={setFriendsOnly}
 					datingOnly={datingOnly}
 					onDatingOnlyChange={setDatingOnly}
-					value={searchQuery}
-					onChangeText={setSearchQuery}
 					rankBy={rankBy}
 					onRankByChange={setRankBy}
-					top={filterRowTop}
-					onPressCreate={openCreateNearby}
+					value={searchQuery}
+					onChangeText={setSearchQuery}
+					onCreatePress={openCreateNearby}
 				/>
+			</View>
+
+			{!sheetOpen && trendingItems.length > 0 ? (
+				<View style={[styles.trendingWrap, { top: trendingTop }]} pointerEvents="box-none">
+					<TrendingCard
+						items={trendingItems}
+						collapsed={trendingCollapsed}
+						onToggleCollapse={() => setTrendingCollapsed((v) => !v)}
+						onPressItem={onTrendingPress}
+					/>
+				</View>
 			) : null}
 
-			<TrendingCard
-				items={trendingItems}
-				top={trendingTop}
-				collapsed={trendingCollapsed}
-				onToggleCollapse={() => setTrendingCollapsed((v) => !v)}
-				onPressItem={onTrendingPress}
-				visible={isCityScale && !sheetOpen && trendingItems.length > 0}
-			/>
+			{myCoords ? (
+				<EventsRail location={myCoords} sheetOpen={sheetOpen} />
+			) : null}
 
 			{isEmpty && !createNudgeVisible ? (
 				<View style={styles.emptyWrap} pointerEvents="box-none">
@@ -600,27 +634,16 @@ export function MapScreen(): React.JSX.Element {
 						title={emptyCopy.title}
 						body={emptyCopy.body}
 						actionLabel={emptyCopy.actionLabel}
-						icon={emptyCopy.icon}
 						onAction={() => {
-							if (emptyCopy.actionKind === 'verify_email') {
+							if (emptyCopy.action === 'email') {
 								openRootScreen(navigation, 'EmailVerification');
-							} else if (emptyCopy.actionKind === 'dating_prefs') {
+							} else if (emptyCopy.action === 'dating_prefs') {
 								openRootScreen(navigation, 'ProfileEdit', { focus: 'dating' });
-							} else if (emptyCopy.actionKind === 'create') {
+							} else {
 								openCreateNearby();
-							} else if (emptyCopy.actionKind === 'show_everyone') {
-								setFriendsOnly(false);
-							} else if (emptyCopy.actionKind === 'clear_dating') {
-								setDatingOnly(false);
 							}
 						}}
 					/>
-				</View>
-			) : null}
-
-			{loading && points.length === 0 ? (
-				<View style={styles.loadingWrap} pointerEvents="none">
-					<ActivityIndicator color={colors.primary} />
 				</View>
 			) : null}
 
@@ -631,12 +654,17 @@ export function MapScreen(): React.JSX.Element {
 				/>
 			) : null}
 
-			<EventsRail location={myCoords} />
+			{loading && points.length === 0 ? (
+				<View style={styles.loading} pointerEvents="none">
+					<ActivityIndicator color={colors.primary} />
+				</View>
+			) : null}
 
 			<MapCoachMarks mapReady={region != null} />
 
 			<BottomSheetModal
 				ref={entitySheetRef}
+				index={0}
 				snapPoints={entitySnapPoints}
 				enablePanDownToClose
 				onDismiss={onSheetDismiss}
@@ -710,12 +738,15 @@ function MapUnavailableFallback(): React.JSX.Element {
 
 function regionToViewport(region: Region | null): Viewport | null {
 	if (!region) return null;
-	const halfLat = region.latitudeDelta / 2;
-	const halfLng = region.longitudeDelta / 2;
-	return {
-		ne: { lat: region.latitude + halfLat, lng: region.longitude + halfLng },
-		sw: { lat: region.latitude - halfLat, lng: region.longitude - halfLng },
+	const ne = {
+		lat: region.latitude + region.latitudeDelta / 2,
+		lng: region.longitude + region.longitudeDelta / 2,
 	};
+	const sw = {
+		lat: region.latitude - region.latitudeDelta / 2,
+		lng: region.longitude - region.longitudeDelta / 2,
+	};
+	return { ne, sw };
 }
 
 function approxZoomFromRegion(region: Region): number {
@@ -725,34 +756,41 @@ function approxZoomFromRegion(region: Region): number {
 
 const styles = StyleSheet.create({
 	root: { flex: 1, backgroundColor: colors.bg },
-	emptyWrap: {
+	filterRow: {
 		position: 'absolute',
-		left: 24,
-		right: 24,
-		bottom: 140,
-		zIndex: 15,
-	},
-	loadingWrap: {
-		position: 'absolute',
-		top: '50%',
 		left: 0,
 		right: 0,
+		zIndex: 20,
+	},
+	trendingWrap: {
+		position: 'absolute',
+		left: 0,
+		right: 0,
+		zIndex: 19,
+	},
+	emptyWrap: {
+		...StyleSheet.absoluteFillObject,
+		justifyContent: 'center',
+		paddingHorizontal: 24,
+		zIndex: 15,
+	},
+	loading: {
+		...StyleSheet.absoluteFillObject,
+		justifyContent: 'center',
 		alignItems: 'center',
 		zIndex: 10,
 	},
 	toast: {
 		position: 'absolute',
-		bottom: 120,
 		alignSelf: 'center',
+		top: '42%',
 		backgroundColor: colors.surface,
-		borderRadius: 20,
 		paddingHorizontal: 16,
 		paddingVertical: 10,
-		borderWidth: 1,
-		borderColor: colors.borderStrong,
+		borderRadius: 20,
 		zIndex: 50,
 	},
-	toastText: { color: colors.textPrimary, fontWeight: '600', fontSize: 14 },
+	toastText: { color: colors.textPrimary, fontWeight: '600' },
 	recenterFab: {
 		position: 'absolute',
 		right: 16,
@@ -760,18 +798,25 @@ const styles = StyleSheet.create({
 		height: 48,
 		borderRadius: 24,
 		backgroundColor: colors.surface,
-		borderWidth: 1,
-		borderColor: colors.borderStrong,
 		alignItems: 'center',
 		justifyContent: 'center',
 		zIndex: 25,
+		shadowColor: colors.shadowInk,
+		shadowOpacity: 0.2,
+		shadowRadius: 6,
+		elevation: 4,
 	},
 	unavailable: {
 		flex: 1,
 		alignItems: 'center',
 		justifyContent: 'center',
 		padding: 24,
+		backgroundColor: colors.bg,
 	},
-	unavailableTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
+	unavailableTitle: {
+		color: colors.textPrimary,
+		fontSize: 18,
+		fontWeight: '700',
+	},
 	unavailableBody: { color: colors.textMuted, marginTop: 8, textAlign: 'center' },
 });

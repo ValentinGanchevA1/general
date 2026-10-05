@@ -121,6 +121,15 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     };
   }, [showPreview, ctx, pending]);
 
+  /** Display name for seeding EntityBottomSheet when pin left the viewport. */
+  const seedDisplayName = useMemo(() => {
+    const profile = ctx.profile;
+    if (profile && 'displayName' in profile && typeof profile.displayName === 'string') {
+      return profile.displayName;
+    }
+    return 'User';
+  }, [ctx.profile]);
+
   return {
     state,
     send,
@@ -133,6 +142,10 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     previewProps,
     /** Pin id currently in machine context (for sheet handoff). */
     activePinId: ctx.pinId || null,
+    /** Lat/lng captured at PIN_TAP — seed sheet when peer is off-viewport. */
+    pinLat: ctx.pinId ? ctx.lat : null,
+    pinLng: ctx.pinId ? ctx.lng : null,
+    seedDisplayName,
     stage: ctx.stage,
     isDetail: state.matches('detailSheet') || state.matches('fullProfile'),
   };
