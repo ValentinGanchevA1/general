@@ -10,6 +10,8 @@
  * - LAYER_CHANGED resets to idle
  * - PIN_TAP accepted from any state (switch pin while preview/sheet open)
  * - C3: OPEN_FULL from detail/viewing → fullProfile; BACK restores detailSheet
+ * - B: sheet CTAs use SEND_WAVE / SEND_LIKE / PASS (same actors as quick)
+ * - C: conversationId / datingConversationId stored for Chat handoff
  */
 import {assign, fromPromise, setup} from 'xstate';
 import type {
@@ -164,6 +166,8 @@ export const pinInteractionMachine = setup({
         isMatch: false,
         passed: false,
         superLiked: false,
+        conversationId: null as string | null,
+        datingConversationId: null as string | null,
         blockedByViewer: false,
         blockedByPeer: false,
         canMessage: 'none' as const,
@@ -175,6 +179,10 @@ export const pinInteractionMachine = setup({
     setLikeSent: assign({likeSent: true, lastResult: 'like_sent' as const}),
     setMatched: assign({isMatch: true, lastResult: 'matched' as const}),
     setPassed: assign({passed: true, lastResult: 'passed' as const}),
+    clearThreadIds: assign({
+      conversationId: null as string | null,
+      datingConversationId: null as string | null,
+    }),
     setBlocked: assign({blockedByViewer: true, lastResult: 'blocked' as const}),
     setMutualWave: assign({
       hasMutualWave: true,
@@ -190,6 +198,8 @@ export const pinInteractionMachine = setup({
       isMatch: false,
       passed: false,
       superLiked: false,
+      conversationId: null as string | null,
+      datingConversationId: null as string | null,
       blockedByViewer: false,
       blockedByPeer: false,
       canMessage: 'none' as const,
@@ -343,11 +353,22 @@ export const pinInteractionMachine = setup({
               {
                 guard: ({event}) => event.output.mutual === true,
                 target: 'mutualWave',
-                actions: ['setWaveSent', 'setMutualWave'],
+                actions: [
+                  'setWaveSent',
+                  'setMutualWave',
+                  assign(({event}) => ({
+                    conversationId: event.output.conversationId,
+                  })),
+                ],
               },
               {
                 target: 'waveSent',
-                actions: 'setWaveSent',
+                actions: [
+                  'setWaveSent',
+                  assign(({event}) => ({
+                    conversationId: event.output.conversationId,
+                  })),
+                ],
               },
             ],
             onError: {
@@ -401,11 +422,22 @@ export const pinInteractionMachine = setup({
               {
                 guard: ({event}) => event.output.matched === true,
                 target: 'matched',
-                actions: ['setLikeSent', 'setMatched'],
+                actions: [
+                  'setLikeSent',
+                  'setMatched',
+                  assign(({event}) => ({
+                    datingConversationId: event.output.datingConversationId,
+                  })),
+                ],
               },
               {
                 target: 'liked',
-                actions: 'setLikeSent',
+                actions: [
+                  'setLikeSent',
+                  assign(({event}) => ({
+                    datingConversationId: event.output.datingConversationId,
+                  })),
+                ],
               },
             ],
             onError: {
@@ -421,7 +453,15 @@ export const pinInteractionMachine = setup({
         },
         liked: {
           on: {
-            MATCH_CREATED: {target: 'matched', actions: 'setMatched'},
+            MATCH_CREATED: {
+              target: 'matched',
+              actions: [
+                'setMatched',
+                assign(({event}) => ({
+                  datingConversationId: event.datingConversationId,
+                })),
+              ],
+            },
             OPEN_FULL: '#pinInteraction.fullProfile',
           },
         },

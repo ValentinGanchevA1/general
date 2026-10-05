@@ -128,6 +128,13 @@ interface Props {
 	viewerMode?: 'social' | 'dating';
 	/** C3: machine-owned full profile — parent sends OPEN_FULL and navigates. */
 	onOpenFull?: (focus?: ProfileFocus) => void;
+	/** B: machine-owned dating CTAs (MapScreen → pin machine). */
+	onLike?: () => void;
+	onPass?: () => void;
+	/** Controlled flags from pin machine (preferred over local state). */
+	likeSent?: boolean;
+	isMatch?: boolean;
+	actionPending?: boolean;
 }
 
 interface UserCardProps {
@@ -137,11 +144,28 @@ interface UserCardProps {
 	onWave?: (() => void) | undefined;
 	viewerMode: 'social' | 'dating';
 	onOpenFull?: (focus?: ProfileFocus) => void;
+	onLike?: (() => void) | undefined;
+	onPass?: (() => void) | undefined;
+	likeSentControlled?: boolean | undefined;
+	isMatchControlled?: boolean | undefined;
+	actionPending?: boolean | undefined;
 }
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull}: UserCardProps): React.JSX.Element {
+function UserCard({
+					  point,
+					  waving,
+					  onWave,
+					  onClose,
+					  viewerMode,
+					  onOpenFull,
+					  onLike,
+					  onPass,
+					  likeSentControlled,
+					  isMatchControlled,
+					  actionPending,
+				  }: UserCardProps): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
 	const cached = getCachedProfile(point.id);
 	const [profile, setProfile] = useState<PublicUserProfile | null>(cached);
@@ -152,10 +176,16 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull}: User
 	const [mutualCount, setMutualCount] = useState(0);
 	const [mutualPreview, setMutualPreview] = useState<FriendCard[]>([]);
 	const [reloadToken, setReloadToken] = useState(0);
-	const [liking, setLiking] = useState(false);
-	const [likeSent, setLikeSent] = useState(false);
-	const [passing, setPassing] = useState(false);
-	const [datingMatched, setDatingMatched] = useState(false);
+	/** Local fallback only when parent does not own CTAs (non-map callers). */
+	const [localLiking, setLocalLiking] = useState(false);
+	const [localLikeSent, setLocalLikeSent] = useState(false);
+	const [localPassing, setLocalPassing] = useState(false);
+	const [localMatched, setLocalMatched] = useState(false);
+	const machineOwned = onLike != null || onPass != null;
+	const likeSent = likeSentControlled ?? localLikeSent;
+	const datingMatched = isMatchControlled ?? localMatched;
+	const liking = Boolean(actionPending && viewerMode === 'dating' && !likeSent) || localLiking;
+	const passing = localPassing;
 
 	const loadProfile = useCallback(async (userId: string): Promise<void> => {
 		const hit = getCachedProfile(userId);
@@ -357,17 +387,21 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull}: User
 
 	const isDating = viewerMode === 'dating';
 
-	const onLike = async (): Promise<void> => {
+	const handleLike = async (): Promise<void> => {
 		if (liking || likeSent || blocked || !isDating) return;
-		setLiking(true);
+		if (onLike != null) {
+			onLike();
+			return;
+		}
+		setLocalLiking(true);
 		try {
 			const res = await postJson<
 				{ toUserId: string },
 				{ id: string; matched: boolean; datingConversationId: string | null }
 			>('/dating/likes', {toUserId: point.id});
-			setLikeSent(true);
+			setLocalLikeSent(true);
 			if (res.matched) {
-				setDatingMatched(true);
+				setLocalMatched(true);
 				appAlert("It's a match!", 'You can message each other now.');
 			}
 		} catch (e) {
@@ -377,13 +411,17 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull}: User
 					: 'Try again in a moment.';
 			appAlert('Like failed', msg);
 		} finally {
-			setLiking(false);
+			setLocalLiking(false);
 		}
 	};
 
-	const onPass = async (): Promise<void> => {
+	const handlePass = async (): Promise<void> => {
 		if (passing || blocked || !isDating) return;
-		setPassing(true);
+		if (onPass != null) {
+			onPass();
+			return;
+		}
+		setLocalPassing(true);
 		try {
 			await postJson<{ toUserId: string }, { ok: true }>('/dating/pass', {
 				toUserId: point.id,
@@ -396,7 +434,7 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull}: User
 					: 'Try again in a moment.';
 			appAlert('Pass failed', msg);
 		} finally {
-			setPassing(false);
+			setLocalPassing(false);
 		}
 	};
 
@@ -457,7 +495,7 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull}: User
 				liking || likeSent ? styles.btnDisabled : undefined,
 				styles.ctaFlex,
 			]}
-			onPress={() => void onLike()}
+			onPress={() => void handleLike()}
 			disabled={liking || likeSent}
 			accessibilityRole="button"
 			accessibilityLabel={likeSent ? 'Liked' : 'Like'}
@@ -472,7 +510,7 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull}: User
 		<TouchableOpacity
 			key="pass"
 			style={[styles.profileBtn, styles.ctaFlexShrink, passing ? styles.btnDisabled : undefined]}
-			onPress={() => void onPass()}
+			onPress={() => void handlePass()}
 			disabled={passing}
 			accessibilityRole="button"
 			accessibilityLabel="Pass"
@@ -739,6 +777,11 @@ export function EntityBottomSheet({
 									  onWave,
 									  viewerMode = 'social',
 									  onOpenFull,
+									  onLike,
+									  onPass,
+									  likeSent,
+									  isMatch,
+									  actionPending,
 								  }: Props): React.JSX.Element {
 	if (point.kind === 'user') {
 		return (
@@ -750,6 +793,11 @@ export function EntityBottomSheet({
 				viewerMode={viewerMode}
 				{...(onWave != null ? {onWave} : {})}
 				{...(onOpenFull != null ? {onOpenFull} : {})}
+				{...(onLike != null ? {onLike} : {})}
+				{...(onPass != null ? {onPass} : {})}
+				{...(likeSent != null ? {likeSentControlled: likeSent} : {})}
+				{...(isMatch != null ? {isMatchControlled: isMatch} : {})}
+				{...(actionPending != null ? {actionPending} : {})}
 			/>
 		);
 	}

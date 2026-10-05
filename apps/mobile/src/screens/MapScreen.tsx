@@ -146,6 +146,18 @@ export function MapScreen(): React.JSX.Element {
 		pinLng,
 		seedDisplayName,
 		send: pinSend,
+		sendWave: pinSendWave,
+		sendLike: pinSendLike,
+		sendPass: pinSendPass,
+		pending: pinActionPending,
+		waveSent: pinWaveSent,
+		likeSent: pinLikeSent,
+		isMatch: pinIsMatch,
+		hasMutualWave: pinHasMutualWave,
+		conversationId: pinConversationId,
+		datingConversationId: pinDatingConversationId,
+		lastResult: pinLastResult,
+		machineError: pinMachineError,
 	} = usePinInteraction({ viewerMode });
 	const suppressPinDismissRef = useRef(false);
 
@@ -440,6 +452,64 @@ export function MapScreen(): React.JSX.Element {
 		};
 	}, [on, activePinId, pinSend]);
 
+
+	// B/C: surface machine action errors once
+	useEffect(() => {
+		if (pinMachineError == null || pinMachineError === '') return;
+		appAlert('Action failed', pinMachineError);
+	}, [pinMachineError]);
+
+	// C: dating match or social mutual → open chat when we have a thread id
+	useEffect(() => {
+		if (pinLastResult === 'matched' && pinDatingConversationId) {
+			const name = seedDisplayName;
+			const conversationId = pinDatingConversationId;
+			const peerId = activePinId;
+			appAlert("It's a match!", 'Say hi in chat.', [
+				{ text: 'Later', style: 'cancel' },
+				{
+					text: 'Message',
+					onPress: () => {
+						if (peerId == null) return;
+						openRootScreen(navigation, 'Chat', {
+							conversationId,
+							otherUserName: name,
+							otherUserId: peerId,
+						});
+					},
+				},
+			]);
+			return;
+		}
+		if (pinLastResult === 'wave_sent' && pinHasMutualWave && pinConversationId) {
+			const name = seedDisplayName;
+			const conversationId = pinConversationId;
+			const peerId = activePinId;
+			appAlert('Match!', 'You both waved — say hi.', [
+				{ text: 'Later', style: 'cancel' },
+				{
+					text: 'Message',
+					onPress: () => {
+						if (peerId == null) return;
+						openRootScreen(navigation, 'Chat', {
+							conversationId,
+							otherUserName: name,
+							otherUserId: peerId,
+						});
+					},
+				},
+			]);
+		}
+	}, [
+		pinLastResult,
+		pinDatingConversationId,
+		pinConversationId,
+		pinHasMutualWave,
+		seedDisplayName,
+		activePinId,
+		navigation,
+	]);
+
 	const onClusterPress = useCallback(
 		(c: ClusterPoint) => {
 			mapRef.current?.animateToRegion(
@@ -486,6 +556,17 @@ export function MapScreen(): React.JSX.Element {
 		},
 		[onWave],
 	);
+
+
+	// B: toast when machine wave succeeds (non-mutual)
+	useEffect(() => {
+		if (pinLastResult === 'wave_sent' && !pinHasMutualWave) {
+			setWaveToast('Wave sent');
+		}
+		if (pinLastResult === 'like_sent' && !pinIsMatch) {
+			setWaveToast('Like sent');
+		}
+	}, [pinLastResult, pinHasMutualWave, pinIsMatch]);
 
 	useEffect(() => {
 		if (!waveToast) return;
@@ -744,7 +825,10 @@ export function MapScreen(): React.JSX.Element {
 					{selected ? (
 						<EntityBottomSheet
 							point={selected}
-							waving={waving === selected.id}
+							waving={
+								waving === selected.id ||
+								(pinActionPending && activePinId === selected.id)
+							}
 							onClose={closeSheet}
 							viewerMode={viewerMode}
 							{...(selected.kind === 'user'
@@ -753,8 +837,22 @@ export function MapScreen(): React.JSX.Element {
 							{...(selected.kind === 'user' && viewerMode === 'social'
 								? {
 									onWave: () => {
-										onSheetWavePress(selected.id);
+										pinSendWave();
 									},
+								}
+								: {})}
+							{...(selected.kind === 'user' && viewerMode === 'dating'
+								? {
+									onLike: () => {
+										pinSendLike();
+									},
+									onPass: () => {
+										pinSendPass();
+										closeSheet();
+									},
+									likeSent: pinLikeSent,
+									isMatch: pinIsMatch,
+									actionPending: pinActionPending,
 								}
 								: {})}
 						/>

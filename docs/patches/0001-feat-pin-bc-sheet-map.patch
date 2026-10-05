@@ -1,0 +1,16 @@
+--- a/apps/mobile/src/components/map/EntityBottomSheet.tsx
++++ b/apps/mobile/src/components/map/EntityBottomSheet.tsx
+@@ -128,6 +128,13 @@
+ 	viewerMode?: 'social' | 'dating';
+ 	/** C3: machine-owned full profile — parent sends OPEN_FULL and navigates. */
+ 	onOpenFull?: (focus?: ProfileFocus) => void;
++	/** B: machine-owned dating CTAs (MapScreen → pin machine). */
++	onLike?: () => void;
++	onPass?: () => void;
++	/** Controlled flags from pin machine (preferred over local state). */
++	likeSent?: boolean;
++	isMatch?: boolean;
++	actionPending?: boolean;
+ }
+
+SEE_FULL_PATCH_IN_ARTIFACTS

@@ -73,6 +73,23 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     send({type: 'QUICK_LIKE'});
   }, [send]);
 
+  /** Sheet / full: machine-owned CTAs (no parallel API in EntityBottomSheet). */
+  const sendWave = useCallback(() => {
+    send({type: 'SEND_WAVE'});
+  }, [send]);
+
+  const sendLike = useCallback(() => {
+    send({type: 'SEND_LIKE'});
+  }, [send]);
+
+  const sendPass = useCallback(() => {
+    send({type: 'PASS'});
+  }, [send]);
+
+  const sendMessage = useCallback(() => {
+    send({type: 'MESSAGE'});
+  }, [send]);
+
   const showPreview = state.matches('preview') || state.matches('loadingPin');
   const pending =
     state.matches({social: 'wavePending'}) ||
@@ -80,16 +97,20 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
 
   const ctx = state.context;
   const isFull = state.matches('fullProfile');
-  // detail stage: explicit detailSheet or social/dating viewing after OPEN_DETAIL
+  // detail stage: keep sheet mounted through pending / sent / matched
   const isDetail =
     state.matches('detailSheet') ||
     (ctx.stage === 'detail' &&
       (state.matches({social: 'viewing'}) ||
-        state.matches({dating: 'viewing'}) ||
+        state.matches({social: 'wavePending'}) ||
         state.matches({social: 'waveSent'}) ||
         state.matches({social: 'mutualWave'}) ||
+        state.matches({social: 'messaging'}) ||
+        state.matches({dating: 'viewing'}) ||
+        state.matches({dating: 'likePending'}) ||
         state.matches({dating: 'liked'}) ||
-        state.matches({dating: 'matched'})));
+        state.matches({dating: 'matched'}) ||
+        state.matches({dating: 'messaging'})));
 
   const previewProps = useMemo(() => {
     if (!showPreview || !ctx.pinId) return null;
@@ -172,5 +193,19 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     stage: ctx.stage,
     isDetail,
     isFull,
+    sendWave,
+    sendLike,
+    sendPass,
+    sendMessage,
+    pending,
+    waveSent: ctx.waveSent,
+    likeSent: ctx.likeSent,
+    isMatch: ctx.isMatch,
+    hasMutualWave: ctx.hasMutualWave,
+    passed: ctx.passed,
+    conversationId: ctx.conversationId ?? null,
+    datingConversationId: ctx.datingConversationId ?? null,
+    lastResult: ctx.lastResult,
+    machineError: ctx.error,
   };
 }

@@ -3,29 +3,27 @@
 ## Status
 - **Stage-1 PreviewCallout** wired on MapScreen (`PinInteractionHost`)
 - **C2a sheet handoff**: Open detail → machine `detailSheet` + `EntityBottomSheet`
-  - Prefer viewport `EntityPoint`; if peer left viewport, seed minimal user point from machine lat/lng + profile name
-  - Sheet dismiss → machine `DISMISS`
-  - User pin tap → machine only (no parallel sheet open)
 - **C2b dual-mode sheet CTAs**: Wave/Message (social) · Like/Pass/Message (dating)
 - **C3 full profile**: OPEN_FULL → UserProfile; BACK restores detail sheet
+- **B machine-owned sheet CTAs**: sheet Wave/Like/Pass → `SEND_WAVE` / `SEND_LIKE` / `PASS` (no parallel API)
+- **C match→chat**: `conversationId` / `datingConversationId` in context; alert + open Chat
 - **Wave actor**: real `POST /interactions/wave`
 - **loadPin**: real `GET /users/:id`
 - **block**: real `POST /blocks/:id`
-- **Like / pass**: client + migration **0047** + DatingModule
+- **Like / pass**: migration **0047** + DatingModule
 
 ## Stages
 | Stage | Machine | UI |
 |---|---|---|
 | preview | `preview` / `loadingPin` | PreviewCallout |
-| detail | `detailSheet` + social/dating viewing | EntityBottomSheet |
+| detail | `detailSheet` + social/dating viewing (+ pending/sent/matched) | EntityBottomSheet |
 | full | `fullProfile` | UserProfile (OPEN_FULL); BACK restores sheet |
 
 ## Dual-mode
 - `viewerMode` from map Dating layer toggle
-- Preview CTAs: Wave (social) / Like (dating)
-- Sheet CTAs: Wave/Message (social) · Like/Pass/Message (dating)
+- Preview CTAs: Wave (social) / Like (dating) → QUICK_*
+- Sheet CTAs: SEND_WAVE / SEND_LIKE / PASS (machine-owned when from MapScreen)
 
-## C3
-- EntityBottomSheet `onOpenFull` → MapScreen sends OPEN_FULL + navigates UserProfile
-- `suppressPinDismissRef` avoids machine DISMISS while navigating to full
-- Map `useFocusEffect` on return → BACK + re-present sheet
+## B / C
+- Context holds `conversationId` + `datingConversationId`
+- Mutual wave / match → alert with Message → `openRootScreen(Chat, …)`
