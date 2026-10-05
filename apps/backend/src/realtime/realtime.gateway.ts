@@ -1,42 +1,92 @@
 import {
-  WebSocketGateway,
-  WebSocketServer,
-  SubscribeMessage,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  OnGatewayInit,
+  ForbiddenException,
+  GoneException,
+  Inject,
+  Logger,
+  NotFoundException,
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
+  forwardRef,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import {
   ConnectedSocket,
   MessageBody,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Injectable, Logger } from '@nestjs/common';
+
 import type {
-  PresenceUpdateEvent,
+  ClientToServerEvents,
+  ServerToClientEvents,
+  SocketData,
+  AckResult,
+  WaveReceivedEvent,
   ChatMessageEvent,
-  LevelUpEvent,
   GiftReceivedEvent,
+  AchievementUnlockedEvent,
+  LevelUpEvent,
   ChallengeCompletedEvent,
+  LeaderboardRankUpEvent,
+  EventPollDelta,
+  EventQuestionDelta,
+  EventQuestionUpvoteDelta,
+  StoryNewEvent,
+  LocationShareSession,
   FriendRequestEvent,
   FriendAcceptedEvent,
-  VerificationProgressEvent,
-  SocketData,
 } from '@g88/shared';
+
+import { WsJwtGuard } from './ws-jwt.guard';
+import {
+  ChatSendDto,
+  ConversationJoinDto,
+  EventRoomDto,
+  LocationShareStartDto,
+  LocationShareStopDto,
+  LocationShareUpdateDto,
+  PresenceUpdateDto,
+} from './realtime.dto';
 import { PresenceService } from '../modules/presence/presence.service';
 import { ChatService } from '../modules/chat/chat.service';
-import { AuthService } from '../modules/auth/auth.service';
+import { LocationShareService } from '../modules/chat/location-share.service';
+import { NotificationsService } from '../modules/notifications/notifications.service';
+import { ChallengesService } from '../modules/challenges/challenges.service';
+import { FriendsService } from '../modules/friends/friends.service';
+import type { JwtPayload } from '../modules/auth/jwt.strategy';
 import { corsOrigins } from '../common/cors-origins';
 
-/**
- * Main Socket.IO gateway for G88 realtime: presence, chat, notifications, events.
- * Namespace: `/realtime`
- *
- * Auth: JWT via socket.handshake.auth.token
- * Rooms:
- *   - `user:<userId>` — user-scoped events (level up, gifts, challenges, friend requests)
- *   - `conversation:<conversationId>` — chat in a conversation
- *   - `event:<eventId>` — RSVP polling, attendee updates
- *   - `cell:<h3CellId>` — presence updates for nearby users at that cell
- */
+type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
+type G88Socket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
+
+function extractApiError(err: unknown): { code: string; message: string } {
+  if (
+    err instanceof ForbiddenException ||
+    err instanceof NotFoundException ||
+    err instanceof GoneException
+  ) {
+    const response = err.getResponse();
+    if (typeof response === 'object' && response !== null) {
+      const r = response as { code?: string; message?: string | string[] };
+      const message = Array.isArray(r.message)
+        ? r.message.join(', ')
+        : (r.message ?? err.message);
+      return { code: r.code ?? 'forbidden', message };
+    }
+  }
+  if (err instanceof Error) {
+    return { code: 'unknown_error', message: err.message };
+  }
+  return { code: 'unknown_error', message: String(err) };
+}
+
 @WebSocketGateway({
   namespace: '/realtime',
   cors: {
@@ -44,254 +94,312 @@ import { corsOrigins } from '../common/cors-origins';
     credentials: true,
   },
 })
-@Injectable()
-export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
-  server!: Server;
+  server!: G88Server;
 
   private readonly logger = new Logger(RealtimeGateway.name);
 
   constructor(
-    private readonly auth: AuthService,
+    private readonly jwt: JwtService,
     private readonly presence: PresenceService,
     private readonly chat: ChatService,
+    private readonly locationShare: LocationShareService,
+    private readonly notifications: NotificationsService,
+    private readonly friends: FriendsService,
+    @Inject(forwardRef(() => ChallengesService))
+    private readonly challenges: ChallengesService,
+    @InjectDataSource() private readonly db: DataSource,
   ) {}
 
-  afterInit(): void {
-    this.logger.log(`Socket.IO /realtime namespace ready. CORS: ${corsOrigins().join(', ')}`);
-  }
-
-  async handleConnection(client: Socket): Promise<void> {
-    const token = client.handshake.auth.token;
-    if (!token) {
-      this.logger.warn(`[connect] rejected: no auth token`);
-      client.disconnect(true);
-      return;
-    }
-
+  async handleConnection(client: G88Socket): Promise<void> {
     try {
-      const user = await this.auth.validateToken(token);
-      if (!user) {
-        this.logger.warn(`[connect] rejected: invalid token`);
+      const token =
+        (client.handshake.auth?.token as string | undefined) ||
+        (client.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '') as string | undefined);
+      if (!token) {
         client.disconnect(true);
         return;
       }
-
-      const data: SocketData = {
-        userId: user.id,
+      const payload = this.jwt.verify<JwtPayload>(token);
+      if (!payload?.sub) {
+        client.disconnect(true);
+        return;
+      }
+      client.data = {
+        userId: payload.sub,
         rooms: new Set(),
       };
-      (client as Socket & { data: SocketData }).data = data;
-
-      this.logger.debug(`[connect] user=${user.id}`);
+      client.join(this.userRoom(payload.sub));
+      await this.presence.setOnline(payload.sub, true);
+      void this.notifyFriendsPresence(payload.sub, true);
+      this.logger.debug(`connected user=${payload.sub}`);
     } catch (err) {
-      this.logger.warn(`[connect] auth error: ${err}`);
+      this.logger.warn(`connect rejected: ${err}`);
       client.disconnect(true);
     }
   }
 
-  handleDisconnect(client: Socket): void {
-    const userId = (client.data as SocketData | undefined)?.userId;
+  async handleDisconnect(client: G88Socket): Promise<void> {
+    const userId = client.data?.userId;
     if (!userId) return;
-    this.logger.debug(`[disconnect] user=${userId}`);
+    try {
+      await this.presence.setOnline(userId, false);
+      void this.notifyFriendsPresence(userId, false);
+    } catch (err) {
+      this.logger.error(`disconnect cleanup failed user=${userId}: ${err}`);
+    }
   }
 
-  /**
-   * Client: send presence update (location + online status).
-   * Broadcasts to cell-scoped rooms for nearby discovery.
-   */
+  @UseGuards(WsJwtGuard)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @SubscribeMessage('presence:update')
-  async handlePresenceUpdate(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() payload: PresenceUpdateEvent,
-  ): Promise<{ ok: boolean; error?: string }> {
-    const userId = (client.data as SocketData).userId;
-
+  async onPresenceUpdate(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() body: PresenceUpdateDto,
+  ): Promise<AckResult> {
+    const userId = client.data.userId;
     try {
-      const cell = await this.presence.updatePresence(userId, payload.location);
-      // Announce to the new cell so nearby users see the arrival.
+      const cell = await this.presence.updateLocation(userId, body.location);
       if (cell) {
-        client.join(`cell:${cell}`);
-        this.server.to(`cell:${cell}`).emit('presence:nearby', {
+        client.join(this.cellRoom(cell));
+        this.server.to(this.cellRoom(cell)).emit('presence:nearby', {
           userId,
-          location: payload.location,
+          location: body.location,
           timestamp: new Date().toISOString(),
         });
       }
       return { ok: true };
     } catch (err) {
-      this.logger.error(`presence:update failed: ${err}`);
-      return { ok: false, error: String(err) };
+      const { code, message } = extractApiError(err);
+      return { ok: false, code, message };
     }
   }
 
-  /**
-   * Client: join a conversation for live chat.
-   */
+  @UseGuards(WsJwtGuard)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @SubscribeMessage('conversation:join')
-  async handleConversationJoin(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { conversationId: string },
-  ): Promise<{ ok: boolean; error?: string }> {
-    const userId = (client.data as SocketData).userId;
-
+  async onConversationJoin(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() body: ConversationJoinDto,
+  ): Promise<AckResult> {
+    const userId = client.data.userId;
     try {
-      await this.chat.validateConversationAccess(userId, payload.conversationId);
-      client.join(`conversation:${payload.conversationId}`);
-      (client.data as SocketData).rooms.add(`conversation:${payload.conversationId}`);
+      await this.chat.assertParticipant(userId, body.conversationId);
+      client.join(this.conversationRoom(body.conversationId));
+      client.data.rooms.add(this.conversationRoom(body.conversationId));
       return { ok: true };
     } catch (err) {
-      this.logger.error(`conversation:join failed: ${err}`);
-      return { ok: false, error: String(err) };
+      const { code, message } = extractApiError(err);
+      return { ok: false, code, message };
     }
   }
 
-  /**
-   * Client: send a chat message in a conversation.
-   */
-  @SubscribeMessage('chat:send')
-  async handleChatSend(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { conversationId: string; body: string; clientMessageId: string },
-  ): Promise<{ ok: boolean; data?: ChatMessageEvent; error?: string }> {
-    const userId = (client.data as SocketData).userId;
+  @UseGuards(WsJwtGuard)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @SubscribeMessage('event:join')
+  async onEventJoin(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() body: EventRoomDto,
+  ): Promise<AckResult> {
+    client.join(this.eventRoom(body.eventId));
+    client.data.rooms.add(this.eventRoom(body.eventId));
+    return { ok: true };
+  }
 
+  @UseGuards(WsJwtGuard)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @SubscribeMessage('event:leave')
+  async onEventLeave(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() body: EventRoomDto,
+  ): Promise<AckResult> {
+    client.leave(this.eventRoom(body.eventId));
+    client.data.rooms.delete(this.eventRoom(body.eventId));
+    return { ok: true };
+  }
+
+  @UseGuards(WsJwtGuard)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @SubscribeMessage('chat:send')
+  async onChatSend(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() body: ChatSendDto,
+  ): Promise<AckResult & { data?: ChatMessageEvent }> {
+    const userId = client.data.userId;
     try {
-      const msg = await this.chat.sendMessage(userId, payload.conversationId, payload.body);
-      // Broadcast to all sockets in the conversation.
-      this.server.to(`conversation:${payload.conversationId}`).emit('chat:received', msg);
+      const msg = await this.chat.sendMessage(userId, body.conversationId, body.body, body.clientMessageId);
+      this.server.to(this.conversationRoom(body.conversationId)).emit('chat:received', msg);
+      void this.pushToOfflineParticipants(body.conversationId, userId, body.body);
       return { ok: true, data: msg };
     } catch (err) {
-      this.logger.error(`chat:send failed: ${err}`);
-      return { ok: false, error: String(err) };
+      const { code, message } = extractApiError(err);
+      return { ok: false, code, message };
     }
   }
 
-  /**
-   * Client: join an event to receive poll/RSVP updates.
-   */
-  @SubscribeMessage('event:join')
-  async handleEventJoin(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { eventId: string },
-  ): Promise<{ ok: boolean; error?: string }> {
-    client.join(`event:${payload.eventId}`);
-    (client.data as SocketData).rooms.add(`event:${payload.eventId}`);
-    return { ok: true };
+  async emitWaveReceived(toUserId: string, evt: WaveReceivedEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('wave:received', evt);
   }
 
-  /**
-   * Client: leave an event.
-   */
-  @SubscribeMessage('event:leave')
-  handleEventLeave(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { eventId: string },
-  ): { ok: boolean } {
-    client.leave(`event:${payload.eventId}`);
-    (client.data as SocketData).rooms.delete(`event:${payload.eventId}`);
-    return { ok: true };
-  }
-
-  // ─── Server-initiated emits (called by services) ───────────────────────────────────
-
-  /**
-   * Emit a level-up notification to a user.
-   * Called by GamificationService after XP award and level calculation.
-   */
-  emitLevelUp(userId: string, evt: LevelUpEvent): void {
-    if (!this.server) {
-      this.logger.warn('emitLevelUp skipped: server not ready');
-      return;
+  async emitConversationOpened(
+    conversationId: string,
+    participantIds: string[],
+    triggeringWaveId: string,
+  ): Promise<void> {
+    for (const userId of participantIds) {
+      this.server.to(this.userRoom(userId)).emit('conversation:opened', {
+        conversationId,
+        participantIds,
+        triggeringWaveId,
+      });
     }
-    this.server.to(`user:${userId}`).emit('level:up', evt);
   }
 
-  /**
-   * Emit a gift received notification.
-   * Called by GiftsService after delivery.
-   */
-  emitGiftReceived(userId: string, evt: GiftReceivedEvent): void {
-    if (!this.server) {
-      this.logger.warn('emitGiftReceived skipped: server not ready');
-      return;
-    }
-    this.server.to(`user:${userId}`).emit('gift:received', evt);
+  async emitWaveMutual(
+    toUserId: string,
+    evt: {
+      conversationId: string;
+      waveId: string;
+      createdAt: string;
+      peerUserId: string;
+    },
+  ): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('wave:mutual', evt);
   }
 
-  /**
-   * Emit a challenge completed notification.
-   * Called by ChallengesService after completion.
-   */
-  emitChallengeCompleted(userId: string, evt: ChallengeCompletedEvent): void {
-    if (!this.server) {
-      this.logger.warn('emitChallengeCompleted skipped: server not ready');
-      return;
-    }
-    this.server.to(`user:${userId}`).emit('challenge:completed', evt);
+  async emitDatingMatchCreated(
+    toUserId: string,
+    evt: {
+      peerUserId: string;
+      peerDisplayName: string;
+      peerAvatarUrl: string | null;
+      datingConversationId: string;
+      createdAt: string;
+    },
+  ): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('dating:match_created', evt);
   }
 
-  /**
-   * Emit a friend request notification.
-   * Called by FriendsNotifyService.
-   */
-  emitFriendRequest(userId: string, evt: FriendRequestEvent): void {
-    if (!this.server) {
-      this.logger.warn('emitFriendRequest skipped: server not ready');
-      return;
-    }
-    this.server.to(`user:${userId}`).emit('friend:request', evt);
+  async emitDatingLikeReceived(
+    toUserId: string,
+    evt: {
+      likeId: string;
+      fromUser: {
+        id: string;
+        displayName: string;
+        avatarUrl: string | null;
+      };
+      createdAt: string;
+    },
+  ): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('dating:like_received', evt);
   }
 
-  /**
-   * Emit a friend request accepted notification.
-   * Called by FriendsNotifyService.
-   */
-  emitFriendAccepted(userId: string, evt: FriendAcceptedEvent): void {
-    if (!this.server) {
-      this.logger.warn('emitFriendAccepted skipped: server not ready');
-      return;
-    }
-    this.server.to(`user:${userId}`).emit('friend:accepted', evt);
+  async emitGiftReceived(toUserId: string, evt: GiftReceivedEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('gift:received', evt);
   }
 
-  /**
-   * Emit location share session ended.
-   * Called by LocationShareSweepService.
-   */
+  async emitAchievementUnlocked(toUserId: string, evt: AchievementUnlockedEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('achievement:unlocked', evt);
+  }
+
+  async emitLevelUp(toUserId: string, evt: LevelUpEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('level:up', evt);
+  }
+
+  async emitChallengeCompleted(toUserId: string, evt: ChallengeCompletedEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('challenge:completed', evt);
+  }
+
+  async emitLeaderboardRankUp(toUserId: string, evt: LeaderboardRankUpEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('leaderboard:rank_up', evt);
+  }
+
+  emitEventPoll(delta: EventPollDelta): void {
+    this.server.to(this.eventRoom(delta.eventId)).emit('event:poll', delta);
+  }
+
+  emitEventQuestion(delta: EventQuestionDelta): void {
+    this.server.to(this.eventRoom(delta.eventId)).emit('event:question', delta);
+  }
+
+  emitEventQuestionUpvote(delta: EventQuestionUpvoteDelta): void {
+    this.server.to(this.eventRoom(delta.eventId)).emit('event:question:upvote', delta);
+  }
+
+  emitStoryNew(evt: StoryNewEvent): void {
+    this.server.to(this.cellRoom(evt.cellId)).emit('story:new', evt);
+  }
+
   emitLocationShareEnded(
     conversationId: string,
     sessionId: string,
-    reason: string,
+    reason: 'expired' | 'timeout' | 'blocked' | 'conversation_closed',
     endedAt: string,
   ): void {
-    if (!this.server) {
-      this.logger.warn('emitLocationShareEnded skipped: server not ready');
-      return;
-    }
-    this.server.to(`conversation:${conversationId}`).emit('location:share:ended', {
+    this.server.to(this.conversationRoom(conversationId)).emit('location:share:ended', {
       sessionId,
+      conversationId,
       reason,
       endedAt,
     });
   }
 
-  /**
-   * Emit verification status update (admin).
-   * Called by VerificationService.
-   */
-  emitVerificationProgress(userId: string, evt: VerificationProgressEvent): void {
-    if (!this.server) {
-      this.logger.warn('emitVerificationProgress skipped: server not ready');
-      return;
-    }
-    this.server.to(`user:${userId}`).emit('verification:progress', evt);
+  async emitFriendRequest(toUserId: string, evt: FriendRequestEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('friend:request', evt);
   }
 
-  /**
-   * Get the number of connected clients (for health checks).
-   */
-  getConnectedCount(): number {
-    return this.server?.engine?.clientsCount ?? 0;
+  async emitFriendAccepted(toUserId: string, evt: FriendAcceptedEvent): Promise<void> {
+    this.server.to(this.userRoom(toUserId)).emit('friend:accepted', evt);
+  }
+
+  private async notifyFriendsPresence(userId: string, online: boolean): Promise<void> {
+    try {
+      if (online && !(await this.friends.friendsSeeOnlineStatus(userId))) {
+        return;
+      }
+      const friendIds = await this.friends.listFriendIds(userId);
+      for (const friendId of friendIds) {
+        this.server.to(this.userRoom(friendId)).emit('friend:presence', {
+          userId,
+          online,
+        });
+      }
+    } catch (err) {
+      this.logger.error(`notifyFriendsPresence failed user=${userId}: ${err}`);
+    }
+  }
+
+  private async pushToOfflineParticipants(
+    conversationId: string,
+    senderId: string,
+    body: string,
+  ): Promise<void> {
+    try {
+      const participantIds = await this.chat.getParticipantIds(conversationId);
+      for (const recipientId of participantIds) {
+        if (recipientId === senderId) continue;
+        const sockets = await this.server.in(this.userRoom(recipientId)).fetchSockets();
+        if (sockets.length === 0) {
+          await this.notifications.notifyMessageFrom(recipientId, senderId, body, conversationId);
+        }
+      }
+    } catch (err) {
+      this.logger.error(`pushToOfflineParticipants failed: ${err}`);
+    }
+  }
+
+  private userRoom(userId: string): string {
+    return `user:${userId}`;
+  }
+  private cellRoom(cellId: string): string {
+    return `cell:${cellId}`;
+  }
+  private conversationRoom(convoId: string): string {
+    return `convo:${convoId}`;
+  }
+  private eventRoom(eventId: string): string {
+    return `event:${eventId}`;
   }
 }
