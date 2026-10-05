@@ -21,29 +21,23 @@ import {
 } from '@gorhom/bottom-sheet';
 
 import type {
-	ApiError,
 	DiscoveryPoint,
 	DiscoveryRankBy,
 	EntityKind,
 	EntityPoint,
 	ClusterPoint,
 	Viewport,
-	WaveRequest,
-	WaveResponse,
 } from '@g88/shared';
 
 import { useDiscovery } from '@/features/discovery/useDiscovery';
 import { setPoints } from '@/features/discovery/discoverySlice';
 import { useSocket } from '@/realtime/useSocket';
-import { postJson } from '@/api/client';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { MapMarkers } from '@/components/map/MapMarkers';
 import { prefetchAvatars } from '@/services/avatarCache';
 import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { challengeEvents } from '@/features/gamification/challengeEvents';
-import { signalPostSocialActivation } from '@/features/nudges/postSocialActivation';
 import { EventsRail } from '@/features/events/EventsRail';
 import {
 	fetchNearbyStories,
@@ -111,7 +105,6 @@ export function MapScreen(): React.JSX.Element {
 	const [region, setRegion] = useState<Region | null>(null);
 	const [selected, setSelected] = useState<EntityPoint | null>(null);
 	const [waveToast, setWaveToast] = useState<string | null>(null);
-	const [waving, setWaving] = useState<string | null>(null);
 	const mapRef = useRef<MapView>(null);
 	const entitySheetRef = useRef<BottomSheetModal>(null);
 	const presentedIdRef = useRef<string | null>(null);
@@ -524,32 +517,6 @@ export function MapScreen(): React.JSX.Element {
 		[region?.latitudeDelta, region?.longitudeDelta],
 	);
 
-	const onWave = useCallback(async (toUserId: string) => {
-		setWaving(toUserId);
-		try {
-			const res = await postJson<WaveRequest, WaveResponse>('/interactions/wave', {
-				toUserId,
-				context: 'map',
-			});
-			challengeEvents.emit('progress');
-			void signalPostSocialActivation('wave');
-			if (res.conversationId) {
-				appAlert('Match!', 'You both waved — say hi.');
-			} else {
-				setWaveToast('Wave sent');
-			}
-		} catch (e) {
-			const msg =
-				e && typeof e === 'object' && 'message' in e
-					? String((e as ApiError).message)
-					: 'Could not send wave.';
-			appAlert('Wave failed', msg);
-		} finally {
-			setWaving(null);
-		}
-	}, []);
-
-
 	// B: toast when machine wave succeeds (non-mutual) — defer setState (lint)
 	useEffect(() => {
 		let msg: string | null = null;
@@ -820,10 +787,7 @@ export function MapScreen(): React.JSX.Element {
 					{selected ? (
 						<EntityBottomSheet
 							point={selected}
-							waving={
-								waving === selected.id ||
-								(pinActionPending && activePinId === selected.id)
-							}
+							waving={pinActionPending && activePinId === selected.id}
 							onClose={closeSheet}
 							viewerMode={viewerMode}
 							{...(selected.kind === 'user'
