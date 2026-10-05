@@ -55,6 +55,16 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     send({type: 'OPEN_DETAIL'});
   }, [send]);
 
+  /** Stage 3: sheet → full UserProfile (machine fullProfile). */
+  const openFull = useCallback(() => {
+    send({type: 'OPEN_FULL'});
+  }, [send]);
+
+  /** Stage 3 back: fullProfile → detailSheet (re-present sheet). */
+  const backFromFull = useCallback(() => {
+    send({type: 'BACK'});
+  }, [send]);
+
   const quickWave = useCallback(() => {
     send({type: 'QUICK_WAVE'});
   }, [send]);
@@ -69,6 +79,17 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     state.matches({dating: 'likePending'});
 
   const ctx = state.context;
+  const isFull = state.matches('fullProfile');
+  // detail stage: explicit detailSheet or social/dating viewing after OPEN_DETAIL
+  const isDetail =
+    state.matches('detailSheet') ||
+    (ctx.stage === 'detail' &&
+      (state.matches({social: 'viewing'}) ||
+        state.matches({dating: 'viewing'}) ||
+        state.matches({social: 'waveSent'}) ||
+        state.matches({social: 'mutualWave'}) ||
+        state.matches({dating: 'liked'}) ||
+        state.matches({dating: 'matched'})));
 
   const previewProps = useMemo(() => {
     if (!showPreview || !ctx.pinId) return null;
@@ -136,6 +157,8 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     openUserPin,
     dismiss,
     openDetail,
+    openFull,
+    backFromFull,
     quickWave,
     quickLike,
     showPreview,
@@ -147,6 +170,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     pinLng: ctx.pinId ? ctx.lng : null,
     seedDisplayName,
     stage: ctx.stage,
-    isDetail: state.matches('detailSheet') || state.matches('fullProfile'),
+    isDetail,
+    isFull,
   };
 }
