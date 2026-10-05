@@ -1,9 +1,24 @@
 import {useCallback, useEffect, useMemo} from 'react';
 import {useMachine} from '@xstate/react';
 
-import type {EntityPoint} from '@g88/shared';
+import type {EntityPoint, VerificationLevel} from '@g88/shared';
 import {pinInteractionMachine} from './pinInteraction.machine';
 import type {ViewerMode} from './pinInteraction.types';
+
+const VERIFICATION_LEVELS = new Set<VerificationLevel>([
+  'none',
+  'email',
+  'phone',
+  'selfie',
+  'id',
+]);
+
+function asVerificationLevel(value: unknown): VerificationLevel {
+  if (typeof value === 'string' && VERIFICATION_LEVELS.has(value as VerificationLevel)) {
+    return value as VerificationLevel;
+  }
+  return 'none';
+}
 
 export interface UsePinInteractionOptions {
   /** Current map interaction mode (People vs Dating layer). */
@@ -50,8 +65,8 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
 
   const showPreview = state.matches('preview') || state.matches('loadingPin');
   const pending =
-    state.matches({ social: 'wavePending' }) ||
-    state.matches({ dating: 'likePending' });
+    state.matches({social: 'wavePending'}) ||
+    state.matches({dating: 'likePending'});
 
   const ctx = state.context;
 
@@ -71,33 +86,32 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     const peerAllowsDating =
       ctx.peerMode === 'dating' || ctx.peerMode === 'both';
 
+    const rawAvatar =
+      profile && 'avatarUrl' in profile
+        ? (profile.avatarUrl as string | null | undefined)
+        : null;
+
+    const online =
+      profile && 'online' in profile && typeof profile.online === 'boolean'
+        ? profile.online
+        : undefined;
+
     return {
       name,
-      avatarUrl:
-        profile && 'avatarUrl' in profile
-          ? (profile.avatarUrl as string | null | undefined)
-          : null,
+      avatarUrl: rawAvatar ?? null,
       distanceLabel,
       age:
         profile && 'age' in profile && typeof profile.age === 'number'
           ? profile.age
           : null,
-      online:
-        profile && 'online' in profile
-          ? (profile.online as boolean | undefined)
-          : undefined,
+      ...(online !== undefined ? {online} : {}),
       idVerified:
         profile && 'idVerified' in profile
           ? Boolean(profile.idVerified)
           : false,
-      verification: (() => {
-        const v =
-          profile && 'verification' in profile
-            ? (profile.verification as string | undefined)
-            : undefined;
-        if (v === 'email' || v === 'phone' || v === 'selfie' || v === 'id') return v;
-        return 'none' as const;
-      })(),
+      verification: asVerificationLevel(
+        profile && 'verification' in profile ? profile.verification : undefined,
+      ),
       viewerMode: ctx.viewerMode,
       peerAllowsDating,
       pending,
