@@ -11,6 +11,7 @@ import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
+import { openTrustCenter, openTrustStep } from '@/navigation/openTrust';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import {
   fetchPendingCount,
@@ -93,8 +94,8 @@ export function ProfileScreen(): React.JSX.Element {
   }, []);
 
   const openVerification = useCallback(() => {
-    verificationRef.current?.present();
-  }, []);
+    openTrustCenter(navigation);
+  }, [navigation]);
 
   const closeVerification = useCallback(() => {
     verificationRef.current?.dismiss();
@@ -116,17 +117,9 @@ export function ProfileScreen(): React.JSX.Element {
   const handleVerificationItem = useCallback(
     (id: VerificationItemId) => {
       closeVerification();
-      if (id === 'email') {
-        openRootScreen(navigation, 'EmailVerification');
-        return;
-      }
-      if (id === 'phone') {
-        openRootScreen(navigation, 'Verification', {
-          initialPhone: derived?.p.phone ?? undefined,
-        });
-        return;
-      }
-      openRootScreen(navigation, 'VerificationId');
+      openTrustStep(navigation, id, {
+        initialPhone: derived?.p.phone ?? undefined,
+      });
     },
     [closeVerification, navigation, derived?.p.phone],
   );
