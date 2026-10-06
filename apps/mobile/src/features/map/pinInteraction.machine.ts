@@ -131,9 +131,10 @@ export const pinInteractionMachine = setup({
     loadPin: loadPinActor,
     sendWave: sendWaveActor,
     sendLike: sendLikeActor,
-    // exactOptionalPropertyTypes: xstate PromiseActorLogic optional-prop mismatch
-    pass: passActor as never,
-    block: blockActor as never,
+    // @ts-expect-error exactOptionalPropertyTypes + xstate PromiseActorLogic mismatch
+    pass: passActor,
+    // @ts-expect-error exactOptionalPropertyTypes + xstate PromiseActorLogic mismatch
+    block: blockActor,
   },
   guards: {
     isDatingMode: ({context}) => context.viewerMode === 'dating',
