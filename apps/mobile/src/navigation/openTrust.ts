@@ -31,9 +31,12 @@ export function openTrustStep(
     return;
   }
   if (step === 'phone') {
-    openRootScreen(navigation, 'Verification', {
-      initialPhone: opts?.initialPhone,
-    });
+    const phone = opts?.initialPhone;
+    if (phone != null && phone !== '') {
+      openRootScreen(navigation, 'Verification', { initialPhone: phone });
+    } else {
+      openRootScreen(navigation, 'Verification');
+    }
     return;
   }
   openRootScreen(navigation, 'VerificationId');
@@ -56,7 +59,12 @@ export function openTrustStepViaRef(
     return;
   }
   if (step === 'phone') {
-    openViaRef('Verification', { initialPhone: opts?.initialPhone });
+    const phone = opts?.initialPhone;
+    if (phone != null && phone !== '') {
+      openViaRef('Verification', { initialPhone: phone });
+    } else {
+      openViaRef('Verification');
+    }
     return;
   }
   openViaRef('VerificationId');
