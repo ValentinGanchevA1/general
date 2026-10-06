@@ -107,17 +107,19 @@ const sendLikeActor = fromPromise<
   };
 });
 
-const passActor = fromPromise<void, {pinId: string}>(async ({input}) => {
+const passActor = fromPromise<{ok: true}, {pinId: string}>(async ({input}) => {
   await postJson<{toUserId: string}, {ok: true}>('/dating/pass', {
     toUserId: input.pinId,
   });
+  return {ok: true as const};
 });
 
-const blockActor = fromPromise<void, {pinId: string}>(async ({input}) => {
+const blockActor = fromPromise<{ok: true}, {pinId: string}>(async ({input}) => {
   await postJson<undefined, {blocked: boolean}>(
     `/blocks/${input.pinId}`,
     undefined,
   );
+  return {ok: true as const};
 });
 
 export const pinInteractionMachine = setup({
@@ -253,7 +255,6 @@ export const pinInteractionMachine = setup({
   },
   states: {
     idle: {},
-
     loadingPin: {
       invoke: {
         src: 'loadPin',
@@ -263,250 +264,184 @@ export const pinInteractionMachine = setup({
         }),
         onDone: {
           target: 'preview',
-          actions: assign(({event}) => {
-            const base = {
-              profile: event.output.profile,
-              peerMode: event.output.peerMode,
-              ...event.output.relationship,
-              stage: 'preview' as const,
-            };
-            return event.output.distanceMeters != null
-              ? { ...base, distanceMeters: event.output.distanceMeters }
-              : base;
-          }),
+          actions: assign(({event}) => ({
+            peerMode: event.output.peerMode,
+            distanceMeters: event.output.distanceMeters,
+            waveSent: event.output.relationship.waveSent,
+            hasMutualWave: event.output.relationship.hasMutualWave,
+            canMessage: event.output.relationship.canMessage,
+            isFriend: event.output.relationship.isFriend,
+            blockedByViewer: event.output.relationship.blockedByViewer,
+            blockedByPeer: event.output.relationship.blockedByPeer,
+            likeSent: event.output.relationship.likeSent,
+            isMatch: event.output.relationship.isMatch,
+            passed: event.output.relationship.passed,
+            displayName: event.output.profile.displayName,
+            avatarUrl: event.output.profile.avatarUrl ?? null,
+            stage: 'preview' as const,
+            lastResult: undefined,
+            error: undefined,
+          })),
         },
         onError: {
-          target: 'error',
+          target: 'idle',
           actions: assign({
-            error: ({event}) =>
-              event.error instanceof Error
-                ? event.error.message
-                : 'Failed to load pin',
+            error: 'Failed to load pin',
+            lastResult: 'error' as const,
           }),
         },
       },
     },
-
     preview: {
-      entry: assign({stage: 'preview'}),
       on: {
-        OPEN_DETAIL: 'detailSheet',
+        OPEN_DETAIL: {target: 'detailSheet'},
         QUICK_WAVE: {
+          target: 'sendingWave',
           guard: 'canWave',
-          target: 'social.wavePending',
         },
         QUICK_LIKE: {
+          target: 'sendingLike',
           guard: 'canLike',
-          target: 'dating.likePending',
         },
+        PASS: {
+          target: 'passing',
+          guard: 'canLike',
+        },
+        BLOCK: {target: 'blocking'},
       },
     },
-
     detailSheet: {
-      entry: assign({stage: 'detail'}),
-      initial: 'branch',
-      states: {
-        branch: {
-          always: [
-            {guard: 'isDatingMode', target: '#pinInteraction.dating.viewing'},
-            {target: '#pinInteraction.social.viewing'},
-          ],
-        },
-      },
+      entry: assign({stage: 'sheet' as const}),
       on: {
-        OPEN_FULL: 'fullProfile',
-        BACK: 'preview',
+        OPEN_FULL: {target: 'fullProfile'},
+        SEND_WAVE: {
+          target: 'sendingWave',
+          guard: 'canWave',
+        },
+        SEND_LIKE: {
+          target: 'sendingLike',
+          guard: 'canLike',
+        },
+        PASS: {
+          target: 'passing',
+          guard: 'canLike',
+        },
+        BLOCK: {target: 'blocking'},
+        BACK: {target: 'preview'},
       },
     },
-
     fullProfile: {
-      entry: assign({stage: 'full'}),
+      entry: assign({stage: 'full' as const}),
       on: {
-        BACK: 'detailSheet',
-        SEND_WAVE: {guard: 'canWave', target: 'social.wavePending'},
-        SEND_LIKE: {guard: 'canLike', target: 'dating.likePending'},
-        PASS: {guard: 'isDatingMode', target: 'dating.passed'},
-        MESSAGE: [
-          {guard: 'canMessageDating', target: 'dating.messaging'},
-          {guard: 'canMessageSocial', target: 'social.messaging'},
+        BACK: {target: 'detailSheet'},
+        SEND_WAVE: {
+          target: 'sendingWave',
+          guard: 'canWave',
+        },
+        SEND_LIKE: {
+          target: 'sendingLike',
+          guard: 'canLike',
+        },
+        PASS: {
+          target: 'passing',
+          guard: 'canLike',
+        },
+        BLOCK: {target: 'blocking'},
+      },
+    },
+    sendingWave: {
+      invoke: {
+        src: 'sendWave',
+        input: ({context}) => ({pinId: context.pinId}),
+        onDone: [
+          {
+            guard: ({event}) => event.output.mutual,
+            target: 'detailSheet',
+            actions: [
+              'setWaveSent',
+              'setMutualWave',
+              assign({
+                conversationId: ({event}) => event.output.conversationId,
+              }),
+            ],
+          },
+          {
+            target: 'detailSheet',
+            actions: 'setWaveSent',
+          },
         ],
-        BLOCK: 'blocking',
+        onError: {
+          target: 'detailSheet',
+          actions: assign({
+            error: 'Wave failed',
+            lastResult: 'error' as const,
+          }),
+        },
       },
     },
-
-    social: {
-      initial: 'viewing',
-      states: {
-        viewing: {
-          on: {
-            OPEN_FULL: '#pinInteraction.fullProfile',
-            SEND_WAVE: {guard: 'canWave', target: 'wavePending'},
-            MESSAGE: {guard: 'canMessageSocial', target: 'messaging'},
-            BLOCK: '#pinInteraction.blocking',
-          },
-        },
-        wavePending: {
-          invoke: {
-            src: 'sendWave',
-            input: ({context}) => ({pinId: context.pinId}),
-            onDone: [
-              {
-                guard: ({event}) => event.output.mutual === true,
-                target: 'mutualWave',
-                actions: [
-                  'setWaveSent',
-                  'setMutualWave',
-                  assign(({event}) => ({
-                    conversationId: event.output.conversationId,
-                  })),
-                ],
-              },
-              {
-                target: 'waveSent',
-                actions: [
-                  'setWaveSent',
-                  assign(({event}) => ({
-                    conversationId: event.output.conversationId,
-                  })),
-                ],
-              },
-            ],
-            onError: {
-              target: 'viewing',
-              actions: assign({
-                error: ({event}) =>
-                  event.error instanceof Error
-                    ? event.error.message
-                    : 'Wave failed',
+    sendingLike: {
+      invoke: {
+        src: 'sendLike',
+        input: ({context}) => ({pinId: context.pinId}),
+        onDone: [
+          {
+            guard: ({event}) => event.output.matched,
+            target: 'detailSheet',
+            actions: [
+              'setLikeSent',
+              'setMatched',
+              assign({
+                datingConversationId: ({event}) =>
+                  event.output.datingConversationId,
               }),
-            },
-          },
-        },
-        waveSent: {
-          on: {
-            WAVE_MUTUAL: {target: 'mutualWave', actions: 'setMutualWave'},
-            MESSAGE: {guard: 'canMessageSocial', target: 'messaging'},
-            OPEN_FULL: '#pinInteraction.fullProfile',
-          },
-        },
-        mutualWave: {
-          entry: 'setMutualWave',
-          on: {
-            MESSAGE: 'messaging',
-            OPEN_FULL: '#pinInteraction.fullProfile',
-          },
-        },
-        messaging: {
-          entry: assign({lastResult: 'message_opened'}),
-        },
-      },
-    },
-
-    dating: {
-      initial: 'viewing',
-      states: {
-        viewing: {
-          on: {
-            OPEN_FULL: '#pinInteraction.fullProfile',
-            SEND_LIKE: {guard: 'canLike', target: 'likePending'},
-            PASS: 'passed',
-            MESSAGE: {guard: 'canMessageDating', target: 'messaging'},
-            BLOCK: '#pinInteraction.blocking',
-          },
-        },
-        likePending: {
-          invoke: {
-            src: 'sendLike',
-            input: ({context}) => ({pinId: context.pinId}),
-            onDone: [
-              {
-                guard: ({event}) => event.output.matched === true,
-                target: 'matched',
-                actions: [
-                  'setLikeSent',
-                  'setMatched',
-                  assign(({event}) => ({
-                    datingConversationId: event.output.datingConversationId,
-                  })),
-                ],
-              },
-              {
-                target: 'liked',
-                actions: [
-                  'setLikeSent',
-                  assign(({event}) => ({
-                    datingConversationId: event.output.datingConversationId,
-                  })),
-                ],
-              },
             ],
-            onError: {
-              target: 'viewing',
-              actions: assign({
-                error: ({event}) =>
-                  event.error instanceof Error
-                    ? event.error.message
-                    : 'Like failed',
-              }),
-            },
           },
-        },
-        liked: {
-          on: {
-            MATCH_CREATED: {
-              target: 'matched',
-              actions: [
-                'setMatched',
-                assign(({event}) => ({
-                  datingConversationId: event.datingConversationId,
-                })),
-              ],
-            },
-            OPEN_FULL: '#pinInteraction.fullProfile',
+          {
+            target: 'detailSheet',
+            actions: 'setLikeSent',
           },
-        },
-        matched: {
-          entry: 'setMatched',
-          on: {
-            MESSAGE: 'messaging',
-            OPEN_FULL: '#pinInteraction.fullProfile',
-          },
-        },
-        messaging: {
-          entry: assign({lastResult: 'message_opened'}),
-        },
-        passed: {
-          entry: 'setPassed',
-          invoke: {
-            src: 'pass',
-            input: ({context}) => ({pinId: context.pinId}),
-            onDone: {target: '#pinInteraction.idle'},
-            onError: {target: '#pinInteraction.idle'},
-          },
+        ],
+        onError: {
+          target: 'detailSheet',
+          actions: assign({
+            error: 'Like failed',
+            lastResult: 'error' as const,
+          }),
         },
       },
     },
-
+    passing: {
+      invoke: {
+        src: 'pass',
+        input: ({context}) => ({pinId: context.pinId}),
+        onDone: {
+          target: 'idle',
+          actions: ['setPassed', 'resetToIdle'],
+        },
+        onError: {
+          target: 'detailSheet',
+          actions: assign({
+            error: 'Pass failed',
+            lastResult: 'error' as const,
+          }),
+        },
+      },
+    },
     blocking: {
       invoke: {
         src: 'block',
         input: ({context}) => ({pinId: context.pinId}),
-        onDone: {target: 'idle', actions: 'setBlocked'},
+        onDone: {
+          target: 'idle',
+          actions: ['setBlocked', 'resetToIdle'],
+        },
         onError: {
           target: 'detailSheet',
           actions: assign({
-            error: ({event}) =>
-              event.error instanceof Error
-                ? event.error.message
-                : 'Block failed',
+            error: 'Block failed',
+            lastResult: 'error' as const,
           }),
         },
-      },
-    },
-
-    error: {
-      on: {
-        RETRY: 'loadingPin',
       },
     },
   },
