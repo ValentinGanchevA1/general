@@ -190,15 +190,15 @@ export function SettingsScreen(): React.JSX.Element {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Trust & posting</Text>
           <ListRow
-            title="Verification"
+            title="Trust"
             subtitle={
               trustNext.kind === 'done'
-                ? 'Fully verified · Email → phone · ID'
+                ? 'Fully verified · Email · Phone · ID'
                 : trustNext.kind === 'pending'
                   ? trustNext.detail
                   : `Next: ${trustNext.title} · ${trustNext.detail}`
             }
-            onPress={() => navigation.navigate('Verification')}
+            onPress={() => navigation.navigate('TrustCenter')}
           />
           {trustNext.kind === 'actionable' && trustNext.nav ? (
             <ListRow
