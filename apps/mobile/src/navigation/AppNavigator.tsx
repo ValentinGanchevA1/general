@@ -33,6 +33,7 @@ import { ChallengesScreen } from '@/screens/ChallengesScreen';
 import { GiftsInboxScreen } from '@/screens/GiftsInboxScreen';
 import { InteractionsScreen } from '@/screens/InteractionsScreen';
 import VerificationIdScreen from '@/screens/VerificationIdScreen';
+import { TrustCenterScreen } from '@/screens/TrustCenterScreen';
 import { EventDetailScreen } from '@/screens/EventDetailScreen';
 import { EventCreateScreen } from '@/screens/EventCreateScreen';
 import { MarketplaceScreen } from '@/screens/MarketplaceScreen';
@@ -155,6 +156,11 @@ function AccountNavigator(): React.JSX.Element {
   return (
     <AccountStack.Navigator screenOptions={stackScreenOpts}>
       <AccountStack.Screen name="Settings" component={SettingsScreen} />
+      <AccountStack.Screen
+        name="TrustCenter"
+        component={TrustCenterScreen}
+        options={{ headerShown: false, title: 'Trust' }}
+      />
       <AccountStack.Screen name="Privacy" component={PrivacyScreen} />
       <AccountStack.Screen name="Help" component={HelpScreen} />
       <AccountStack.Screen name="About" component={AboutScreen} />
