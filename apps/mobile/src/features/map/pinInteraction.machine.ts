@@ -345,7 +345,6 @@ export const pinInteractionMachine = setup({
             SEND_WAVE: {guard: 'canWave', target: 'wavePending'},
             MESSAGE: {guard: 'canMessageSocial', target: 'messaging'},
             BLOCK: '#pinInteraction.blocking',
-            WAVE_MUTUAL: {target: 'mutualWave', actions: 'setMutualWave'},
           },
         },
         wavePending: {
@@ -365,7 +364,7 @@ export const pinInteractionMachine = setup({
                 ],
               },
               {
-                target: 'viewing',
+                target: 'waveSent',
                 actions: 'setWaveSent',
               },
             ],
@@ -378,6 +377,14 @@ export const pinInteractionMachine = setup({
                     : 'Wave failed',
               }),
             },
+          },
+        },
+        waveSent: {
+          on: {
+            OPEN_FULL: '#pinInteraction.fullProfile',
+            MESSAGE: {guard: 'canMessageSocial', target: 'messaging'},
+            BLOCK: '#pinInteraction.blocking',
+            WAVE_MUTUAL: {target: 'mutualWave', actions: 'setMutualWave'},
           },
         },
         mutualWave: {
@@ -403,18 +410,6 @@ export const pinInteractionMachine = setup({
             PASS: 'passed',
             MESSAGE: {guard: 'canMessageDating', target: 'messaging'},
             BLOCK: '#pinInteraction.blocking',
-            MATCH_CREATED: {
-              target: 'matched',
-              actions: [
-                'setMatched',
-                assign({
-                  datingConversationId: ({event}) =>
-                    event.type === 'MATCH_CREATED'
-                      ? event.datingConversationId
-                      : null,
-                }),
-              ],
-            },
           },
         },
         likePending: {
@@ -435,7 +430,7 @@ export const pinInteractionMachine = setup({
                 ],
               },
               {
-                target: 'viewing',
+                target: 'liked',
                 actions: 'setLikeSent',
               },
             ],
@@ -447,6 +442,25 @@ export const pinInteractionMachine = setup({
                     ? event.error.message
                     : 'Like failed',
               }),
+            },
+          },
+        },
+        liked: {
+          on: {
+            OPEN_FULL: '#pinInteraction.fullProfile',
+            MESSAGE: {guard: 'canMessageDating', target: 'messaging'},
+            BLOCK: '#pinInteraction.blocking',
+            MATCH_CREATED: {
+              target: 'matched',
+              actions: [
+                'setMatched',
+                assign({
+                  datingConversationId: ({event}) =>
+                    event.type === 'MATCH_CREATED'
+                      ? event.datingConversationId
+                      : null,
+                }),
+              ],
             },
           },
         },
