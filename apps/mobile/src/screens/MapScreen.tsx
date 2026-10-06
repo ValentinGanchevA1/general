@@ -758,7 +758,7 @@ export function MapScreen(): React.JSX.Element {
 												focus: 'dating',
 											})
 										: emptyCopy.actionKind === 'verify_email'
-											? () => openRootScreen(navigation, 'EmailVerification')
+											? () => openRootScreen(navigation, 'TrustCenter', { focusStep: 'email' })
 											: openCreateNearby
 						}
 					/>
