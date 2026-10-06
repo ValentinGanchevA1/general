@@ -27,9 +27,7 @@ import {
 
 /** Logical screens a nudge can deep-link to (resolved via openRootScreen). */
 export type NudgeTarget =
-  | 'EmailVerification'
-  | 'Verification'
-  | 'VerificationId'
+  | 'TrustCenter'
   | 'Challenges';
 
 export interface Nudge {
@@ -40,6 +38,8 @@ export interface Nudge {
   title: string;
   cta: string;
   target: NudgeTarget;
+  /** When target is TrustCenter, highlight this ladder step. */
+  focusStep?: 'email' | 'phone' | 'id';
   cooldownDays: number;
 }
 
@@ -115,7 +115,8 @@ export function selectNudge({
         label: 'Trust',
         title: 'Verify your email to unlock stories and more reach',
         cta: 'Verify',
-        target: 'EmailVerification',
+        target: 'TrustCenter',
+        focusStep: 'email',
         cooldownDays: 2,
       };
     }
@@ -127,7 +128,8 @@ export function selectNudge({
         label: 'Trust',
         title: 'Add a verified phone for stronger identity on the map',
         cta: 'Add phone',
-        target: 'Verification',
+        target: 'TrustCenter',
+        focusStep: 'phone',
         cooldownDays: 3,
       };
     }
@@ -141,7 +143,8 @@ export function selectNudge({
         ? 'Your ID was rejected — resubmit to get verified'
         : 'Get ID-verified to build trust on the map',
       cta: rejected ? 'Resubmit' : 'Verify',
-      target: 'VerificationId',
+      target: 'TrustCenter',
+      focusStep: 'id',
       cooldownDays: 3,
     };
   };
