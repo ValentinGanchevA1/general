@@ -12,6 +12,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
+import { openTrustCenter } from '@/navigation/openTrust';
 import { track } from '@/lib/analytics';
 import { useNudges } from './useNudges';
 import { colors } from '@/theme';
@@ -37,8 +38,12 @@ export function NudgeBanner({ top }: Props): React.JSX.Element | null {
           style={styles.main}
           onPress={() => {
             track('nudge.tap', { id: nudge.id });
-            if (nudge.target === 'TrustCenter' && nudge.focusStep != null) {
-              openRootScreen(navigation, 'TrustCenter', { focusStep: nudge.focusStep });
+            if (nudge.target === 'TrustCenter') {
+              if (nudge.focusStep != null) {
+                openTrustCenter(navigation, nudge.focusStep);
+              } else {
+                openTrustCenter(navigation);
+              }
             } else {
               openRootScreen(navigation, nudge.target);
             }

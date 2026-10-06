@@ -66,7 +66,7 @@ export function TrustCenterScreen(): React.JSX.Element {
           ? { idStatus: profile.idVerificationStatus }
           : {}),
       }),
-    [profile?.badges?.email, profile?.badges?.phone, profile?.idVerificationStatus],
+    [profile],
   );
 
   const items = useMemo(() => buildVerificationItems(profile), [profile]);
@@ -80,14 +80,17 @@ export function TrustCenterScreen(): React.JSX.Element {
         return;
       }
       if (id === 'phone') {
-        navigation.navigate('Verification', {
-          initialPhone: profile?.phone ?? undefined,
-        });
+        const phone = profile?.phone;
+        if (phone != null && phone !== '') {
+          navigation.navigate('Verification', { initialPhone: phone });
+        } else {
+          navigation.navigate('Verification');
+        }
         return;
       }
       navigation.navigate('VerificationId');
     },
-    [navigation, profile?.phone],
+    [navigation, profile],
   );
 
   const onPrimaryCta = useCallback(() => {
