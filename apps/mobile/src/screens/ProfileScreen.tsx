@@ -117,9 +117,12 @@ export function ProfileScreen(): React.JSX.Element {
   const handleVerificationItem = useCallback(
     (id: VerificationItemId) => {
       closeVerification();
-      openTrustStep(navigation, id, {
-        initialPhone: derived?.p.phone ?? undefined,
-      });
+      const phone = derived?.p.phone;
+      if (phone != null && phone !== '') {
+        openTrustStep(navigation, id, { initialPhone: phone });
+      } else {
+        openTrustStep(navigation, id);
+      }
     },
     [closeVerification, navigation, derived?.p.phone],
   );
