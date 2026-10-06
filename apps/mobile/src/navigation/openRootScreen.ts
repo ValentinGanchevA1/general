@@ -16,6 +16,7 @@ type Leaf =
   | 'About'
   | 'NotificationSettings'
   | 'BlockedUsers'
+  | 'TrustCenter'
   | 'Verification'
   | 'EmailVerification'
   | 'VerificationId'
@@ -48,6 +49,7 @@ const NEST: Partial<Record<Leaf, { stack: NestedStack; screen: string }>> = {
   About: { stack: 'Account', screen: 'About' },
   NotificationSettings: { stack: 'Account', screen: 'NotificationSettings' },
   BlockedUsers: { stack: 'Account', screen: 'BlockedUsers' },
+  TrustCenter: { stack: 'Account', screen: 'TrustCenter' },
   Verification: { stack: 'Account', screen: 'Verification' },
   EmailVerification: { stack: 'Account', screen: 'EmailVerification' },
   VerificationId: { stack: 'Account', screen: 'VerificationId' },
