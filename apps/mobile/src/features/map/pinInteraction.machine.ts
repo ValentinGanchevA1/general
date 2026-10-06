@@ -111,7 +111,7 @@ const passActor = fromPromise<{ok: true}, {pinId: string}>(async ({input}) => {
   await postJson<{toUserId: string}, {ok: true}>('/dating/pass', {
     toUserId: input.pinId,
   });
-  return {ok: true as const};
+  return {ok: true};
 });
 
 const blockActor = fromPromise<{ok: true}, {pinId: string}>(async ({input}) => {
@@ -119,7 +119,7 @@ const blockActor = fromPromise<{ok: true}, {pinId: string}>(async ({input}) => {
     `/blocks/${input.pinId}`,
     undefined,
   );
-  return {ok: true as const};
+  return {ok: true};
 });
 
 export const pinInteractionMachine = setup({
@@ -131,8 +131,9 @@ export const pinInteractionMachine = setup({
     loadPin: loadPinActor,
     sendWave: sendWaveActor,
     sendLike: sendLikeActor,
-    pass: passActor,
-    block: blockActor,
+    // exactOptionalPropertyTypes: xstate PromiseActorLogic optional-prop mismatch
+    pass: passActor as never,
+    block: blockActor as never,
   },
   guards: {
     isDatingMode: ({context}) => context.viewerMode === 'dating',
