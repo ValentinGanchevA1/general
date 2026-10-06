@@ -345,6 +345,7 @@ export const pinInteractionMachine = setup({
             SEND_WAVE: {guard: 'canWave', target: 'wavePending'},
             MESSAGE: {guard: 'canMessageSocial', target: 'messaging'},
             BLOCK: '#pinInteraction.blocking',
+            WAVE_MUTUAL: {target: 'mutualWave', actions: 'setMutualWave'},
           },
         },
         wavePending: {
@@ -354,22 +355,18 @@ export const pinInteractionMachine = setup({
             onDone: [
               {
                 guard: ({event}) => event.output.mutual === true,
-                target: 'matched',
+                target: 'mutualWave',
                 actions: [
                   'setWaveSent',
                   'setMutualWave',
                   assign({
                     conversationId: ({event}) => event.output.conversationId,
-                    lastResult: 'wave_sent' as const,
                   }),
                 ],
               },
               {
                 target: 'viewing',
-                actions: [
-                  'setWaveSent',
-                  assign({lastResult: 'wave_sent' as const}),
-                ],
+                actions: 'setWaveSent',
               },
             ],
             onError: {
@@ -383,7 +380,7 @@ export const pinInteractionMachine = setup({
             },
           },
         },
-        matched: {
+        mutualWave: {
           on: {
             MESSAGE: 'messaging',
             OPEN_FULL: '#pinInteraction.fullProfile',
@@ -406,6 +403,18 @@ export const pinInteractionMachine = setup({
             PASS: 'passed',
             MESSAGE: {guard: 'canMessageDating', target: 'messaging'},
             BLOCK: '#pinInteraction.blocking',
+            MATCH_CREATED: {
+              target: 'matched',
+              actions: [
+                'setMatched',
+                assign({
+                  datingConversationId: ({event}) =>
+                    event.type === 'MATCH_CREATED'
+                      ? event.datingConversationId
+                      : null,
+                }),
+              ],
+            },
           },
         },
         likePending: {
@@ -422,16 +431,12 @@ export const pinInteractionMachine = setup({
                   assign({
                     datingConversationId: ({event}) =>
                       event.output.datingConversationId,
-                    lastResult: 'matched' as const,
                   }),
                 ],
               },
               {
                 target: 'viewing',
-                actions: [
-                  'setLikeSent',
-                  assign({lastResult: 'like_sent' as const}),
-                ],
+                actions: 'setLikeSent',
               },
             ],
             onError: {
