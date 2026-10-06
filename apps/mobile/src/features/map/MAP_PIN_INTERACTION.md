@@ -11,6 +11,20 @@
 - **loadPin**: real `GET /users/:id`
 - **block**: real `POST /blocks/:id`
 - **Like / pass**: migration **0047** + DatingModule
+- **Specs**: `pinInteraction.machine.spec.ts` (#487)
+
+## Create / FAB (product decision 2026-10-06)
+
+| Control | Role |
+|---------|------|
+| `MapFilterRow` Create chip | Primary create entry |
+| `CreateNearbySheet` | Event / listing / story picker |
+| Long-press map | Create at coordinate |
+| Empty-state CTA | Activation path |
+| GPS recenter FAB | Location only (bottom-right) |
+| **`ContextualFab`** | **Deferred** — component kept; **not mounted** on MapScreen. Revisit only if device smoke shows users cannot find create. |
+
+Do **not** wire speed-dial alongside Create chip (chrome collision).
 
 ## Stages
 | Stage | Machine | UI |
