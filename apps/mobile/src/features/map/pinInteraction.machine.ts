@@ -107,17 +107,19 @@ const sendLikeActor = fromPromise<
   };
 });
 
-const passActor = fromPromise<void, {pinId: string}>(async ({input}) => {
+const passActor = fromPromise<{ok: true}, {pinId: string}>(async ({input}) => {
   await postJson<{toUserId: string}, {ok: true}>('/dating/pass', {
     toUserId: input.pinId,
   });
+  return {ok: true as const};
 });
 
-const blockActor = fromPromise<void, {pinId: string}>(async ({input}) => {
+const blockActor = fromPromise<{ok: true}, {pinId: string}>(async ({input}) => {
   await postJson<undefined, {blocked: boolean}>(
     `/blocks/${input.pinId}`,
     undefined,
   );
+  return {ok: true as const};
 });
 
 export const pinInteractionMachine = setup({
@@ -343,6 +345,7 @@ export const pinInteractionMachine = setup({
             SEND_WAVE: {guard: 'canWave', target: 'wavePending'},
             MESSAGE: {guard: 'canMessageSocial', target: 'messaging'},
             BLOCK: '#pinInteraction.blocking',
+            WAVE_MUTUAL: {target: 'mutualWave', actions: 'setMutualWave'},
           },
         },
         wavePending: {
@@ -356,19 +359,14 @@ export const pinInteractionMachine = setup({
                 actions: [
                   'setWaveSent',
                   'setMutualWave',
-                  assign(({event}) => ({
-                    conversationId: event.output.conversationId,
-                  })),
+                  assign({
+                    conversationId: ({event}) => event.output.conversationId,
+                  }),
                 ],
               },
               {
-                target: 'waveSent',
-                actions: [
-                  'setWaveSent',
-                  assign(({event}) => ({
-                    conversationId: event.output.conversationId,
-                  })),
-                ],
+                target: 'viewing',
+                actions: 'setWaveSent',
               },
             ],
             onError: {
@@ -382,22 +380,15 @@ export const pinInteractionMachine = setup({
             },
           },
         },
-        waveSent: {
-          on: {
-            WAVE_MUTUAL: {target: 'mutualWave', actions: 'setMutualWave'},
-            MESSAGE: {guard: 'canMessageSocial', target: 'messaging'},
-            OPEN_FULL: '#pinInteraction.fullProfile',
-          },
-        },
         mutualWave: {
-          entry: 'setMutualWave',
           on: {
             MESSAGE: 'messaging',
             OPEN_FULL: '#pinInteraction.fullProfile',
+            BLOCK: '#pinInteraction.blocking',
           },
         },
         messaging: {
-          entry: assign({lastResult: 'message_opened'}),
+          type: 'final',
         },
       },
     },
@@ -412,6 +403,18 @@ export const pinInteractionMachine = setup({
             PASS: 'passed',
             MESSAGE: {guard: 'canMessageDating', target: 'messaging'},
             BLOCK: '#pinInteraction.blocking',
+            MATCH_CREATED: {
+              target: 'matched',
+              actions: [
+                'setMatched',
+                assign({
+                  datingConversationId: ({event}) =>
+                    event.type === 'MATCH_CREATED'
+                      ? event.datingConversationId
+                      : null,
+                }),
+              ],
+            },
           },
         },
         likePending: {
@@ -425,19 +428,15 @@ export const pinInteractionMachine = setup({
                 actions: [
                   'setLikeSent',
                   'setMatched',
-                  assign(({event}) => ({
-                    datingConversationId: event.output.datingConversationId,
-                  })),
+                  assign({
+                    datingConversationId: ({event}) =>
+                      event.output.datingConversationId,
+                  }),
                 ],
               },
               {
-                target: 'liked',
-                actions: [
-                  'setLikeSent',
-                  assign(({event}) => ({
-                    datingConversationId: event.output.datingConversationId,
-                  })),
-                ],
+                target: 'viewing',
+                actions: 'setLikeSent',
               },
             ],
             onError: {
@@ -451,38 +450,35 @@ export const pinInteractionMachine = setup({
             },
           },
         },
-        liked: {
-          on: {
-            MATCH_CREATED: {
-              target: 'matched',
-              actions: [
-                'setMatched',
-                assign(({event}) => ({
-                  datingConversationId: event.datingConversationId,
-                })),
-              ],
-            },
-            OPEN_FULL: '#pinInteraction.fullProfile',
-          },
-        },
         matched: {
-          entry: 'setMatched',
           on: {
             MESSAGE: 'messaging',
             OPEN_FULL: '#pinInteraction.fullProfile',
+            BLOCK: '#pinInteraction.blocking',
           },
-        },
-        messaging: {
-          entry: assign({lastResult: 'message_opened'}),
         },
         passed: {
           entry: 'setPassed',
           invoke: {
             src: 'pass',
             input: ({context}) => ({pinId: context.pinId}),
-            onDone: {target: '#pinInteraction.idle'},
-            onError: {target: '#pinInteraction.idle'},
+            onDone: {
+              target: '#pinInteraction.idle',
+              actions: 'resetToIdle',
+            },
+            onError: {
+              target: 'viewing',
+              actions: assign({
+                error: ({event}) =>
+                  event.error instanceof Error
+                    ? event.error.message
+                    : 'Pass failed',
+              }),
+            },
           },
+        },
+        messaging: {
+          type: 'final',
         },
       },
     },
@@ -491,7 +487,10 @@ export const pinInteractionMachine = setup({
       invoke: {
         src: 'block',
         input: ({context}) => ({pinId: context.pinId}),
-        onDone: {target: 'idle', actions: 'setBlocked'},
+        onDone: {
+          target: 'idle',
+          actions: ['setBlocked', 'resetToIdle'],
+        },
         onError: {
           target: 'detailSheet',
           actions: assign({
@@ -506,6 +505,10 @@ export const pinInteractionMachine = setup({
 
     error: {
       on: {
+        DISMISS: {
+          target: 'idle',
+          actions: 'resetToIdle',
+        },
         RETRY: 'loadingPin',
       },
     },
