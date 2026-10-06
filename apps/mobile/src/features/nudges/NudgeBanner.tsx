@@ -37,7 +37,11 @@ export function NudgeBanner({ top }: Props): React.JSX.Element | null {
           style={styles.main}
           onPress={() => {
             track('nudge.tap', { id: nudge.id });
-            openRootScreen(navigation, nudge.target);
+            if (nudge.target === 'TrustCenter' && nudge.focusStep != null) {
+              openRootScreen(navigation, 'TrustCenter', { focusStep: nudge.focusStep });
+            } else {
+              openRootScreen(navigation, nudge.target);
+            }
           }}
         >
           <Icon name={nudge.icon} size={20} color={nudge.accent} />
