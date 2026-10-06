@@ -12,6 +12,7 @@
 //   - mapStyle.ts (Google Maps JSON style array)
 //   - socialConfig.ts (third-party brand colours: Instagram, X, …)
 // Prefer tokens for all app UI. Migrate residual literals when touching a file.
+// Active StyleSheets should not introduce new #hex; _deprecated/ActionHub tokenized 2026-10-06.
 
 export const colors = {
   /** App background (near-black). */

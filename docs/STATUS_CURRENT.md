@@ -1,7 +1,7 @@
 # G88 — current status (authoritative snapshot)
 
 > **Synced:** 2026-10-06  
-> **HEAD truth:** master through **#486** (`05a7917`)  
+> **HEAD truth:** master through **#487** (`cc665c4`) + polish FAB-A / theme residual  
 > **Next free migration:** `0048`  
 > Historical log: root `STATUS.md` (may lag — prefer this file).
 
@@ -28,24 +28,26 @@ Not a feed. Not a swipe deck.
 | **Marketplace** | ✅ | Sell/Wanted · offers + counter · urgency **0044** · Message seller |
 | **Verification** | ✅ | Email OTP · phone Redis fallback · ID queue · atomic decide · Rekognition assist-only |
 | **Dating layer** | ✅ | Prefs **0046** · likes **0047** · map Dating filter · empty nudge |
-| **Pin interaction ladder** | ✅ | Preview → sheet → full + back · dual-mode · machine-owned CTAs · match→chat (**#468–#486**) |
-| **Map chrome** | ✅ | Calm v1 · Search · filters · TrendingCard · coach v2 · trust nudge |
+| **Pin interaction ladder** | ✅ | Preview → sheet → full + back · dual-mode · machine-owned CTAs · match→chat (**#468–#487**) |
+| **Map chrome** | ✅ | Calm v1 · Search · filters · TrendingCard · coach v2 · trust nudge · Create chip |
 | **UX primitives** | ✅ | ScreenHeader · FormField · ListRow · EmptyState · IdentityBlock · theme |
 | **Admin** | ✅ | Vite `127.0.0.1:5173` · AdminGuard · id:approve CLI |
 | **Migrations** | **0001–0047** on master. dual-0030 resolved. Prefix CI guard. **Next free: 0048** |
 
-### Pin interaction (2026-10-05)
+### Pin interaction
 
 | Slice | PR | Status |
 |-------|-----|--------|
-| Stage-1 PreviewCallout + machine | #468+ | ✅ |
-| C2a sheet handoff | #478 | ✅ |
-| C2b dual-mode Like/Pass | #479 | ✅ |
-| C3 full profile + back-to-sheet | #481 | ✅ |
-| B machine-owned CTAs + C match→chat | #484 | ✅ |
-| Lint cleanup | #485 · #486 | ✅ CI green |
+| Stage-1 → C3 + B/C CTAs + match→chat | #468–#486 | ✅ |
+| Machine unit specs | #487 | ✅ |
 
-Machine owns Wave / Like / Pass; context holds `conversationId` / `datingConversationId` for Chat handoff.
+### Polish decisions (2026-10-06)
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| **ContextualFab** | **A — deferred** | Map already has Create (`MapFilterRow` + `CreateNearbySheet` + long-press + empty CTA) and GPS recenter FAB. Speed-dial stays in tree, unwired on MapScreen. Revisit only if smoke shows create discovery failure. |
+| **Theme residual** | **P1 clean** | Active UI uses `theme/index.ts`. Intentional non-token hex: `mapStyle.ts`, `socialConfig.ts` brand colours. `_deprecated/ActionHub` tokenized. No mass `no-hex` lint. |
+| **Density** | **No change** | Calm v1 + filter More sheet sufficient until device feedback. |
 
 ---
 
@@ -66,12 +68,10 @@ Machine owns Wave / Like / Pass; context holds `conversationId` / `datingConvers
 |---|------|-----|
 | 1 | **Device smoke** | Pin ladder + cold-start map + story + listing urgency |
 | 2 | **Trust ops** | Rekognition + ADMIN_USER_IDS; one E2E ID decide |
-| 3 | **pinInteraction.machine.spec.ts** | Lock B/C transitions (artifact ready — apply + PR) |
-| 4 | **STATUS / CLAUDE sync** | Keep docs aligned after pin merge |
-| 5 | **Play closed testing** | Owner path |
-| 6 | **Retention metrics** | D1/D7 on verified users before monetization |
+| 3 | **Play closed testing** | Owner path |
+| 4 | **Retention metrics** | D1/D7 on verified users before monetization |
 
-**Explicitly not next:** live streaming · group chat · web client · premium paywall · ML matching · Kafka/GraphQL.
+**Explicitly not next:** live streaming · group chat · web client · premium paywall · ML matching · Kafka/GraphQL · ContextualFab wire · density epic.
 
 ---
 

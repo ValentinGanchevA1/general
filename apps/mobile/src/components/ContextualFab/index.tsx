@@ -1,13 +1,14 @@
 // apps/mobile/src/components/ContextualFab/index.tsx
 //
-// Stable speed-dial FAB (Phase-1 UX pass).
-// - Fixed identity: a "Create" button, bottom-right, with an always-visible
-//   label pill. The button never changes meaning — it always opens the menu.
-// - Single tap → toggle the actions menu.
-// - Context (zoom/density/visibility/goal) is used ONLY to order the menu.
-// - Backdrop tap → collapse.
-// - Placed maximum bottom (tab-bar clearance only) unless host passes bottomOffset.
-// Product: deferred wiring on MapScreen — component kept for future use.
+// Stable speed-dial FAB (Phase-1 UX pass) — PRODUCT DECISION A (2026-10-06):
+// NOT mounted on MapScreen. Map create = FilterRow Create + CreateNearbySheet +
+// long-press + empty CTA; GPS recenter is the only map FAB.
+// Component kept for a possible future swap if smoke shows create is undiscoverable.
+//
+// Behaviour when mounted:
+// - Fixed identity: "Create" button; context only orders the menu.
+// - Single tap → toggle menu; backdrop → collapse.
+// - bottomOffset via mapFabBottom (tab-bar clearance).
 
 import React, { useCallback, useState } from 'react';
 import {
