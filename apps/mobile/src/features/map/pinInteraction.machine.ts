@@ -131,9 +131,7 @@ export const pinInteractionMachine = setup({
     loadPin: loadPinActor,
     sendWave: sendWaveActor,
     sendLike: sendLikeActor,
-    // @ts-expect-error exactOptionalPropertyTypes + xstate PromiseActorLogic mismatch
     pass: passActor,
-    // @ts-expect-error exactOptionalPropertyTypes + xstate PromiseActorLogic mismatch
     block: blockActor,
   },
   guards: {
