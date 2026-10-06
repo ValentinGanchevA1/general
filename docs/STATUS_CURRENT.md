@@ -1,65 +1,97 @@
 # G88 — current status (authoritative snapshot)
 
-> **Synced:** 2026-09-29 (evening)  
-> **HEAD:** master · **Next free migration:** `0047`  
-> Full historical log: root `STATUS.md`.
+> **Synced:** 2026-10-06  
+> **HEAD truth:** master through **#486** (`05a7917`)  
+> **Next free migration:** `0048`  
+> Historical log: root `STATUS.md` (may lag — prefer this file).
 
-## Where we are
+---
 
-### Shipped on master (code)
+## 1. One-liner
 
-| Area | Notes |
-|---|---|
-| **P1–P3 core** | Auth, map, presence, wave, chat, gamification, gifts, push/geofences, verification UI, events, trading |
-| **Friends** | Migrations `0032`/`0033`; requests, presence privacy, mutual, suggestions (rank C + dismiss `0043`), density UI + dismiss metrics (`#453`–`#458`), notifications + badge, interactions inbox |
-| **Stories (P4.S)** | Create (photo/video ≤15s), Pulse strip, viewer (`react-native-video`), reactions; soft post gate (email + 24h); strike thresholds enforced |
-| **Profile** | Origin (DOB 18+, hometown), cover, storyline, identity (gender/orientation/nationality `0045`), ProfileView self+other, follow/friend CTAs, strike standing, `resolveUserPrimaryCta` |
-| **Dating prefs** | Migration `0046` `open_to_dating` + seeking; discovery `datingOnly`; Map Dating filter; empty → ProfileEdit `focus=dating` (`#452`/`#457`) |
-| **Map discovery** | City-scale GPS center, rankBy relevance/distance/newest, PostGIS KNN, listing mode + friendsOnly + datingOnly, cell-cap ≤5k |
-| **Map chrome** | People/Events/Listings · More sheet · GPS recenter · pan-dismiss challenge · `+` create · coach v2 |
-| **EntityBottomSheet** | Listing/event above-fold meta · Message seller/host · mutual · ProfileTrustBlock + ProfileStatsRow · identity via ProfileIdentityLine |
-| **Marketplace** | Listings sell/wanted, offers + counter, urgency (`0044` expires/bump), ListingDetail Message seller, post-create map focus |
-| **Presence / ranking** | Redis `presence:last_seen`; discovery `lastSeenAt` for allowlisted friends |
-| **Push** | FCM multicast + invalid-token prune |
-| **ID verification** | Submit → S3 → pending; admin queue; atomic decide; partial UNIQUE pending; WS `verification:updated`; Rekognition **assist-only** |
-| **Admin** | Vite @ `127.0.0.1:5173`; `ADMIN_USER_IDS`; `pnpm id:approve` / `id:review` |
-| **Migrations** | Through **`0046`** (`dating_preferences`). **Next free: `0047`** |
+**Map-first, identity-verified, real-time social app.**  
+People / events / listings nearby → wave, like (dating), message, friend, trade, attend, story.  
+Launch market: **Varna, BG** (α).
 
-### Closed recently (code)
+Not a feed. Not a swipe deck.
 
-| Area | What |
-|---|---|
-| ProfileView A–D | Shared presentational body; ProfileScreen + UserProfile thin data wrappers (`#445`–`#448`) |
-| #449–#451 | EntityBottomSheet trust/stats + identity line + CTA styles restore |
-| Listing urgency | `0044` expires_at/bumped_at + bump API + mobile surfaces |
-| Profile identity public | `0045` + formatPublicIdentityParts on profile + sheet |
-| Dating prefs + activation | `0046` + Map Dating filter; empty CTA → ProfileEdit (`#452`); `focus=dating` scroll (`#457`) |
-| Friends suggestions density | MutualPreviewStack, rail dismiss, Suggestions feedback (`#453`–`#455`); MapScreen typecheck (`#456`) |
-| Suggestions metrics | `track('suggestions.dismiss'|'add')` rail+list; session empty copy (`#458`) |
+---
 
-## Ops gaps (not code blockers)
+## 2. Shipped on master (code)
 
-1. **Rekognition on Render** — `REKOGNITION_ENABLED=true`, matching `AWS_REGION`/S3, IAM `DetectFaces` + `CompareFaces`. See `docs/ID_VERIFICATION_OPS.md`.
-2. **`ADMIN_USER_IDS` on Render** — required for production queue-decide.
-3. **Twilio email OTP** — prod channel; Redis/dev fallback still logs codes.
-4. **Play Console** — closed testing (`DEPLOY.md`).
-5. **Migrations on Render** — ensure **0044–0046** applied on prod.
-6. **G2/G3 live exercise** — Twilio SMS + Stripe test checkout not fully run-verified.
+| Area | State | Notes |
+|------|--------|--------|
+| **P1 foundation** | ✅ | Auth · Profile · Map discovery · Presence · Wave · Chat |
+| **P2 hardening** | ✅ | Blocks · outbox · viewport diff · Sentry · cell-cap |
+| **Friends** | ✅ | Requests · suggestions · mutual · presence privacy · map tier |
+| **Stories** | ✅ | Create photo/video · Pulse strip · strike escalation |
+| **Marketplace** | ✅ | Sell/Wanted · offers + counter · urgency **0044** · Message seller |
+| **Verification** | ✅ | Email OTP · phone Redis fallback · ID queue · atomic decide · Rekognition assist-only |
+| **Dating layer** | ✅ | Prefs **0046** · likes **0047** · map Dating filter · empty nudge |
+| **Pin interaction ladder** | ✅ | Preview → sheet → full + back · dual-mode · machine-owned CTAs · match→chat (**#468–#486**) |
+| **Map chrome** | ✅ | Calm v1 · Search · filters · TrendingCard · coach v2 · trust nudge |
+| **UX primitives** | ✅ | ScreenHeader · FormField · ListRow · EmptyState · IdentityBlock · theme |
+| **Admin** | ✅ | Vite `127.0.0.1:5173` · AdminGuard · id:approve CLI |
+| **Migrations** | **0001–0047** on master. dual-0030 resolved. Prefix CI guard. **Next free: 0048** |
 
-## Next (priority order)
+### Pin interaction (2026-10-05)
 
-1. **Trust ops (Render)** — env + E2E: ID submit → admin score → approve.
-2. **Device smoke** — cold-start city map · Dating filter + ProfileEdit focus · sheet identity/trust · ListingDetail Message · story photo+video · suggestions dismiss.
-3. **Twilio email** — prod OTP without DEV code.
-4. **Play closed testing** (owner).
-5. **Product** — push delivery metrics; optional block-by-author on events/listings; next slice TBD.
+| Slice | PR | Status |
+|-------|-----|--------|
+| Stage-1 PreviewCallout + machine | #468+ | ✅ |
+| C2a sheet handoff | #478 | ✅ |
+| C2b dual-mode Like/Pass | #479 | ✅ |
+| C3 full profile + back-to-sheet | #481 | ✅ |
+| B machine-owned CTAs + C match→chat | #484 | ✅ |
+| Lint cleanup | #485 · #486 | ✅ CI green |
 
-## Rekognition checklist
+Machine owns Wave / Like / Pass; context holds `conversationId` / `datingConversationId` for Chat handoff.
 
-1. IAM: `rekognition:DetectFaces`, `rekognition:CompareFaces`, `s3:GetObject` on `verifications/*`.
-2. Render: `REKOGNITION_ENABLED=true`, `AWS_REGION=eu-north-1`, keys, `AWS_S3_BUCKET`.
-3. `ADMIN_USER_IDS` includes at least one admin UUID.
-4. Redeploy → mobile ID submit → admin similarity (or `no_face_*` / `error`).
-5. Decide via admin UI or `pnpm --filter @g88/backend id:approve -- --user <uuid>`.
+---
 
-Update this file when migrations or product state change.
+## 3. Ops gaps (not code blockers)
+
+1. **Rekognition on Render** — `REKOGNITION_ENABLED=true`, region = S3, IAM DetectFaces/CompareFaces.
+2. **`ADMIN_USER_IDS` on Render** — required for prod ID queue.
+3. **Twilio email OTP** — Redis/DEV fallback; wire real channel for prod.
+4. **Migrations on Render** — ensure through **0047** (dating likes).
+5. **Play Console** — closed testing still open.
+6. **Device smoke** — pin ladder (Wave / Like / match→Chat / Pass / full back).
+
+---
+
+## 4. Next (priority order)
+
+| # | Item | Why |
+|---|------|-----|
+| 1 | **Device smoke** | Pin ladder + cold-start map + story + listing urgency |
+| 2 | **Trust ops** | Rekognition + ADMIN_USER_IDS; one E2E ID decide |
+| 3 | **pinInteraction.machine.spec.ts** | Lock B/C transitions (artifact ready — apply + PR) |
+| 4 | **STATUS / CLAUDE sync** | Keep docs aligned after pin merge |
+| 5 | **Play closed testing** | Owner path |
+| 6 | **Retention metrics** | D1/D7 on verified users before monetization |
+
+**Explicitly not next:** live streaming · group chat · web client · premium paywall · ML matching · Kafka/GraphQL.
+
+---
+
+## 5. Architecture that runs
+
+```
+Mobile (RN + TS)  ──REST + Socket.IO──►  NestJS monolith
+                                              │
+                    PostGIS (viewport / KNN)  Redis (presence, OTP, rate)
+                                              S3 (media, ID docs)
+                                              FCM (push)
+apps/admin (Vite) ──JWT AdminGuard──► same API
+```
+
+Shared types: `packages/shared`. Pin UX: XState `pinInteractionMachine` on MapScreen.
+
+---
+
+## 6. Success metrics (α — Varna)
+
+- D1 / D7 retention on **verified** users (email+).
+- Map session depth: pin open → CTA → chat.
+- Trust funnel: email → phone → ID approve rate.
