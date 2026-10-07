@@ -1,6 +1,17 @@
 name: Android Build
 
+# Builds a **release** APK with the JS bundle embedded so it runs on a
+# physical device without Metro. Debug APKs (assembleDebug) intentionally
+# skip bundling and show "Unable to load script" when sideloaded offline.
+#
+# Signing: uses the upload keystore when secrets are present; otherwise
+# falls back to the debug keystore (see app/build.gradle) so the artifact
+# is still installable for smoke tests.
+#
+# For a stable signed identity + GitHub Release link, use the dedicated
+# "Android APK (sideload)" workflow (android-apk.yml) via workflow_dispatch.
 on:
+  workflow_dispatch:
   push:
     branches: [master, "claude/**"]
     paths:
@@ -21,7 +32,7 @@ env:
 
 jobs:
   build:
-    name: Debug APK
+    name: Release APK (sideload)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -46,6 +57,36 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: .
 
+      - name: Ensure Hermes hermesc is executable
+        working-directory: .
+        run: |
+          # liberate every ELF hermesc under node_modules (pnpm may ship
+          # multiple platform folders; Gradle picks one at build time).
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libz3-4
+          CANDIDATES=$(find node_modules -type f -name "hermesc" 2>/dev/null || true)
+          if [ -z "$CANDIDATES" ]; then
+            echo "::error::No hermesc binary found under node_modules — run pnpm install"
+            exit 1
+          fi
+          ELF_COUNT=0
+          while IFS= read -r candidate; do
+            [ -z "$candidate" ] && continue
+            if file "$candidate" | grep -q "ELF"; then
+              chmod +x "$candidate"
+              ELF_COUNT=$((ELF_COUNT + 1))
+              "$candidate" -version || {
+                echo "::error::$candidate is not runnable"
+                exit 1
+              }
+            fi
+          done <<< "$CANDIDATES"
+          if [ "$ELF_COUNT" -eq 0 ]; then
+            echo "::error::No ELF hermesc found on this runner"
+            exit 1
+          fi
+          echo "hermesc ready ($ELF_COUNT ELF binary/ies)"
+
       - name: Inject Maps keys
         env:
           GOOGLE_MAPS_API_KEY_DEBUG: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG }}
@@ -59,7 +100,50 @@ jobs:
       - name: Inject google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::warning::GOOGLE_SERVICES_JSON secret empty — FCM will soft-fail at runtime"
+            # Minimal placeholder so Google Services plugin does not fail the build.
+            cat > android/app/google-services.json <<'JSON'
+          {
+            "project_info": { "project_number": "0", "project_id": "g88-ci-placeholder" },
+            "client": [{
+              "client_info": {
+                "mobilesdk_app_id": "1:0:android:0",
+                "android_client_info": { "package_name": "com.g88" }
+              },
+              "api_key": [{ "current_key": "placeholder" }]
+            }]
+          }
+          JSON
+          else
+            echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json
+          fi
+
+      - name: Decode upload keystore (optional)
+        env:
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_UPLOAD_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 -d > android/app/upload.keystore
+          else
+            echo "::notice::No upload keystore — release APK will use debug signing (still embeds JS bundle)"
+          fi
+
+      - name: Inject release signing config (optional)
+        env:
+          ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          if [ -f android/app/upload.keystore ] && [ -n "$ANDROID_UPLOAD_STORE_PASSWORD" ]; then
+            cat >> android/local.properties <<EOF
+          RELEASE_STORE_FILE=app/upload.keystore
+          RELEASE_STORE_PASSWORD=${ANDROID_UPLOAD_STORE_PASSWORD}
+          RELEASE_KEY_ALIAS=${ANDROID_UPLOAD_KEY_ALIAS}
+          RELEASE_KEY_PASSWORD=${ANDROID_UPLOAD_KEY_PASSWORD}
+          EOF
+          fi
 
       - name: Cache Gradle
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
@@ -70,16 +154,24 @@ jobs:
           key: gradle-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: gradle-
 
-      - name: Build debug APK
+      - name: Build release APK (JS bundle embedded)
+        # process.env values inlined into the JS bundle at packager time.
+        env:
+          GOOGLE_WEB_CLIENT_ID: 689098029576-r7hoijre01nvocb25elp2q0ufb5v0geu.apps.googleusercontent.com
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_DIST: ${{ github.run_number }}
+          SENTRY_RELEASE: com.g88@0.1.0+${{ github.run_number }}
         run: |
           cd android
           ATTEMPTS=5
           for i in $(seq 1 "$ATTEMPTS"); do
-            if ./gradlew assembleDebug --no-daemon --init-script ci-init.gradle; then
+            if ./gradlew assembleRelease --no-daemon \
+              --init-script ci-init.gradle \
+              -PversionCodeOverride=${{ github.run_number }}; then
               exit 0
             fi
             if [ "$i" -eq "$ATTEMPTS" ]; then
-              echo "::error::assembleDebug failed after $ATTEMPTS attempts"
+              echo "::error::assembleRelease failed after $ATTEMPTS attempts"
               exit 1
             fi
             sleep_s=$((i * 45))
@@ -87,9 +179,22 @@ jobs:
             sleep "$sleep_s"
           done
 
+      - name: Verify APK embeds JS bundle
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          test -f "$APK" || { echo "::error::APK not produced at $APK"; exit 1; }
+          # Release builds must ship index.android.bundle inside assets.
+          if ! unzip -l "$APK" | grep -q "assets/index.android.bundle"; then
+            echo "::error::APK is missing assets/index.android.bundle — would crash with Unable to load script on device"
+            unzip -l "$APK" | head -40
+            exit 1
+          fi
+          echo "✓ index.android.bundle present ($(unzip -l "$APK" | grep index.android.bundle))"
+          ls -lh "$APK"
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: debug-apk
-          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 7
+          name: g88-sideload-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
