@@ -76,8 +76,8 @@ function machineWithActors(opts?: {
               ? 'dating-conv-1'
               : null,
       })),
-      pass: fromPromise(async () => undefined),
-      block: fromPromise(async () => undefined),
+      pass: fromPromise<{ok: true}, {pinId: string}>(async () => ({ok: true})),
+      block: fromPromise<{ok: true}, {pinId: string}>(async () => ({ok: true})),
     },
   });
 }
