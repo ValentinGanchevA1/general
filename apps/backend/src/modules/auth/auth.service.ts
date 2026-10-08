@@ -179,6 +179,7 @@ export class AuthService {
                   WHEN verification_level = 'none' THEN 'email'
                   ELSE verification_level
                 END,
+                email_verified_at = COALESCE(email_verified_at, NOW()),
                 updated_at = NOW()
           WHERE id = $2`,
         [googleId, user.id],
@@ -191,8 +192,8 @@ export class AuthService {
       if (refreshed[0]) user = refreshed[0];
     } else {
       const rows = await this.db.query<UserRow[]>(
-        `INSERT INTO users (email, display_name, avatar_url, google_id, verification_level)
-              VALUES ($1, $2, $3, $4, 'email')
+        `INSERT INTO users (email, display_name, avatar_url, google_id, verification_level, email_verified_at)
+              VALUES ($1, $2, $3, $4, 'email', NOW())
            RETURNING id, email, display_name, avatar_url, verification_level`,
         [email, name ?? email.split('@')[0], picture ?? null, googleId],
       );
