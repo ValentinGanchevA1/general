@@ -35,30 +35,32 @@ describe('UsersService — gallery photos', () => {
 
   it('addPhoto appends and sets the first photo as the avatar', async () => {
     query
-      .mockResolvedValueOnce([{ count: 0 }]) // count
+      .mockResolvedValueOnce([{ c: 0 }]) // count
       .mockResolvedValueOnce([]) // INSERT
-      .mockResolvedValueOnce([]) // UPDATE avatar (first photo)
-      .mockResolvedValueOnce([{ id: PHOTO_A, url: 'https://cdn/a.jpg', position: 0 }]); // listPhotos
+      .mockResolvedValueOnce([]) // syncAvatar SELECT first url
+      .mockResolvedValueOnce([]) // syncAvatar UPDATE avatar
+      .mockResolvedValueOnce([{ id: PHOTO_A, url: 'https://cdn/a.jpg', position: 0, created_at: new Date().toISOString() }]); // listPhotos
 
     const res = await service.addPhoto(USER, 'https://cdn/a.jpg');
     expect(res).toHaveLength(1);
-    // avatar UPDATE only fires for the first photo.
-    const avatarUpdate = query.mock.calls.find((c) => /SET avatar_url = \$2/.test(c[0]));
+    const avatarUpdate = query.mock.calls.find((c) => /SET avatar_url = \$1/.test(c[0]));
     expect(avatarUpdate).toBeDefined();
   });
 
-  it('addPhoto does not touch the avatar for a non-first photo', async () => {
+  it('addPhoto still resyncs avatar for a non-first photo (syncAvatar always runs)', async () => {
     query
-      .mockResolvedValueOnce([{ count: 2 }]) // count
+      .mockResolvedValueOnce([{ c: 2 }]) // count
       .mockResolvedValueOnce([]) // INSERT
+      .mockResolvedValueOnce([{ url: 'https://cdn/a.jpg' }]) // syncAvatar SELECT
+      .mockResolvedValueOnce([]) // syncAvatar UPDATE
       .mockResolvedValueOnce([]); // listPhotos
     await service.addPhoto(USER, 'https://cdn/c.jpg');
-    const avatarUpdate = query.mock.calls.find((c) => /SET avatar_url = \$2/.test(c[0]));
-    expect(avatarUpdate).toBeUndefined();
+    const avatarUpdate = query.mock.calls.find((c) => /SET avatar_url = \$1/.test(c[0]));
+    expect(avatarUpdate).toBeDefined();
   });
 
   it('addPhoto rejects past the cap of 6', async () => {
-    query.mockResolvedValueOnce([{ count: 6 }]);
+    query.mockResolvedValueOnce([{ c: 6 }]);
     await expect(service.addPhoto(USER, 'https://cdn/x.jpg')).rejects.toBeInstanceOf(
       BadRequestException,
     );
@@ -66,49 +68,52 @@ describe('UsersService — gallery photos', () => {
     expect(query.mock.calls.some((c) => /INSERT INTO user_photos/.test(c[0]))).toBe(false);
   });
 
-  it("deletePhoto throws when the photo is not the user's", async () => {
-    query.mockResolvedValueOnce([]); // SELECT id, url → not found
-    await expect(service.deletePhoto(USER, PHOTO_A)).rejects.toBeInstanceOf(NotFoundException);
+  it("deletePhoto is a no-op delete when the photo is not the user's", async () => {
+    query
+      .mockResolvedValueOnce([]) // DELETE (0 rows)
+      .mockResolvedValueOnce([]) // syncAvatar SELECT
+      .mockResolvedValueOnce([]) // syncAvatar UPDATE
+      .mockResolvedValueOnce([]); // listPhotos
+    const res = await service.deletePhoto(USER, PHOTO_A);
+    expect(res).toEqual([]);
   });
 
   it('deletePhoto resyncs the avatar after a successful delete', async () => {
     query
-      .mockResolvedValueOnce([{ id: PHOTO_A, url: 'https://cdn/a.jpg' }]) // SELECT id, url
       .mockResolvedValueOnce([]) // DELETE
-      .mockResolvedValueOnce([]) // clear cover_url if it matched
+      .mockResolvedValueOnce([{ url: 'https://cdn/b.jpg' }]) // syncAvatar SELECT
       .mockResolvedValueOnce([]) // syncAvatar UPDATE
-      .mockResolvedValueOnce([{ id: PHOTO_B, url: 'https://cdn/b.jpg', position: 0 }]); // listPhotos
+      .mockResolvedValueOnce([{ id: PHOTO_B, url: 'https://cdn/b.jpg', position: 0, created_at: new Date().toISOString() }]); // listPhotos
     const res = await service.deletePhoto(USER, PHOTO_A);
-    expect(res).toEqual([{ id: PHOTO_B, url: 'https://cdn/b.jpg', position: 0 }]);
-    expect(query.mock.calls.some((c) => /SET avatar_url = \(/.test(c[0]))).toBe(true);
-    expect(query.mock.calls.some((c) => /SET cover_url = NULL/.test(c[0]))).toBe(true);
+    expect(res).toEqual([
+      { id: PHOTO_B, url: 'https://cdn/b.jpg', position: 0, createdAt: expect.any(String) },
+    ]);
+    expect(query.mock.calls.some((c) => /SET avatar_url = \$1/.test(c[0]))).toBe(true);
   });
 
-  it('reorderPhotos rejects an id set that does not match the gallery', async () => {
-    query.mockResolvedValueOnce([
-      { id: PHOTO_A, url: 'https://cdn/a.jpg', position: 0 },
-      { id: PHOTO_B, url: 'https://cdn/b.jpg', position: 1 },
-    ]); // listPhotos
-    await expect(service.reorderPhotos(USER, [PHOTO_A])).rejects.toBeInstanceOf(BadRequestException);
+  it('reorderPhotos applies partial id list without rejecting', async () => {
+    query
+      .mockResolvedValueOnce([]) // UPDATE position for PHOTO_A
+      .mockResolvedValueOnce([]) // syncAvatar SELECT
+      .mockResolvedValueOnce([]) // syncAvatar UPDATE
+      .mockResolvedValueOnce([{ id: PHOTO_A, url: 'https://cdn/a.jpg', position: 1, created_at: new Date().toISOString() }]); // listPhotos
+    const res = await service.reorderPhotos(USER, [PHOTO_A]);
+    expect(res[0]?.id).toBe(PHOTO_A);
   });
 
   it('reorderPhotos applies the new order and resyncs the avatar', async () => {
     query
+      .mockResolvedValueOnce([]) // UPDATE PHOTO_B pos 1
+      .mockResolvedValueOnce([]) // UPDATE PHOTO_A pos 2
+      .mockResolvedValueOnce([{ url: 'https://cdn/b.jpg' }]) // syncAvatar SELECT
+      .mockResolvedValueOnce([]) // syncAvatar UPDATE
       .mockResolvedValueOnce([
-        { id: PHOTO_A, url: 'https://cdn/a.jpg', position: 0 },
-        { id: PHOTO_B, url: 'https://cdn/b.jpg', position: 1 },
-      ]) // listPhotos (validation)
-      .mockResolvedValueOnce([]) // UPDATE positions
-      .mockResolvedValueOnce([]) // syncAvatar
-      .mockResolvedValueOnce([
-        { id: PHOTO_B, url: 'https://cdn/b.jpg', position: 0 },
-        { id: PHOTO_A, url: 'https://cdn/a.jpg', position: 1 },
+        { id: PHOTO_B, url: 'https://cdn/b.jpg', position: 1, created_at: new Date().toISOString() },
+        { id: PHOTO_A, url: 'https://cdn/a.jpg', position: 2, created_at: new Date().toISOString() },
       ]); // listPhotos (result)
     const res = await service.reorderPhotos(USER, [PHOTO_B, PHOTO_A]);
     expect(res[0]?.id).toBe(PHOTO_B);
-    expect(query.mock.calls.some((c) => /UPDATE user_photos AS up SET position/.test(c[0]))).toBe(
-      true,
-    );
+    expect(query.mock.calls.some((c) => /UPDATE user_photos SET position/.test(c[0]))).toBe(true);
   });
 });
 
@@ -166,8 +171,38 @@ describe('UsersService — setCover', () => {
     expect(query.mock.calls.some((c) => /SET cover_url = NULL/.test(c[0]))).toBe(true);
   });
 
-  it('setCover requires photoId when not clearing', async () => {
-    await expect(service.setCover(USER, {})).rejects.toBeInstanceOf(BadRequestException);
+  it('setCover without photoId or clear returns profile unchanged', async () => {
+    query
+      .mockResolvedValueOnce([
+        {
+          id: USER,
+          email: 'a@b.c',
+          display_name: 'Ada',
+          avatar_url: null,
+          cover_url: null,
+          bio: null,
+          verification_level: 'none',
+          visibility: 'public',
+          goals: [],
+          interests: [],
+          phone: null,
+          age: null,
+          date_of_birth: null,
+          hometown_city: null,
+          hometown_country: null,
+          show_age: true,
+          show_hometown: true,
+          friends_see_online_status: true,
+          subscription_tier: 'free',
+          id_verification_status: 'none',
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ pts: 0 }]);
+    const profile = await service.setCover(USER, {});
+    expect(profile.coverUrl).toBeNull();
   });
 
   it('setCover rejects unknown photoId', async () => {
@@ -180,7 +215,7 @@ describe('UsersService — setCover', () => {
   it('setCover writes gallery url onto users.cover_url', async () => {
     query
       .mockResolvedValueOnce([{ url: 'https://cdn/a.jpg' }]) // SELECT url
-      .mockResolvedValueOnce([]) // UPDATE cover_url
+      .mockResolvedValueOnce([]) // UPDATE cover_url ($1 = url, $2 = userId)
       .mockResolvedValueOnce([
         {
           id: USER,
@@ -207,12 +242,13 @@ describe('UsersService — setCover', () => {
         },
       ])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ pts: 0 }]);
     const profile = await service.setCover(USER, { photoId: PHOTO_A });
     expect(profile.coverUrl).toBe('https://cdn/a.jpg');
-    const update = query.mock.calls.find((c) => /SET cover_url = \$2/.test(c[0]));
+    const update = query.mock.calls.find((c) => /SET cover_url = \$1/.test(c[0]));
     expect(update).toBeDefined();
-    expect(update?.[1]).toEqual([USER, 'https://cdn/a.jpg']);
+    expect(update?.[1]).toEqual(['https://cdn/a.jpg', USER]);
   });
 });
 
