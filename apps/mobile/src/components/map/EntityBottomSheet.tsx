@@ -501,7 +501,7 @@ function UserCard({
 	 * - loading: skeleton + Profile
 	 * - blocked: Profile only
 	 * - dating match or chat: Message + Profile
-	 * - else: Like + Pass + Profile
+	 * - else: Like + Pass + Profile (requires onLike+onPass)
 	 */
 	let actionOrder: React.ReactNode[];
 	if (!relationshipKnown) {
@@ -586,152 +586,169 @@ function UserCard({
 					accessibilityLabel={`${mutualCount} mutual friends`}
 				>
 					<View style={styles.mutualAvatars}>
-						{mutualPreview.map((f, i) => (
-							<View
-								key={f.userId}
-								style={[styles.mutualAvatarWrap, i > 0 ? styles.mutualAvatarOverlap : undefined]}
-							>
-								{f.avatarUrl ? (
-									<Image source={{uri: f.avatarUrl}} style={styles.mutualAvatar}/>
-								) : (
-									<View style={[styles.mutualAvatar, styles.mutualAvatarPlaceholder]}>
-										<Text style={styles.mutualInitial}>
-											{(f.displayName[0] ?? '?').toUpperCase()}
-										</Text>
-									</View>
-								)}
-							</View>
-						))}
+						{mutualPreview.map((f, i) =>
+							f.avatarUrl ? (
+								<Image
+									key={f.id}
+									source={{uri: f.avatarUrl}}
+									style={[styles.mutualAvatar, i > 0 ? styles.mutualAvatarOverlap : null]}
+								/>
+							) : (
+								<View
+									key={f.id}
+									style={[
+										styles.mutualAvatar,
+										styles.mutualAvatarPlaceholder,
+										i > 0 ? styles.mutualAvatarOverlap : null,
+									]}
+								/>
+							),
+						)}
 					</View>
 					<Text style={styles.mutualText}>
 						{mutualCount} mutual friend{mutualCount === 1 ? '' : 's'}
 					</Text>
 				</TouchableOpacity>
 			) : null}
-			<View style={styles.actions}>{actionOrder}</View>
-			{!fetching && profile != null ? (
-				<TouchableOpacity
-					style={styles.trustBlock}
-					onPress={() => openProfile('trust')}
-					accessibilityRole="button"
-					accessibilityLabel="View trust on profile"
-					activeOpacity={0.85}
-				>
+			{profile != null ? (
+				<>
 					<ProfileTrustBlock
 						verification={profile.verification}
-						idVerified={profile.idVerified}
+						idVerified={profile.idVerified === true}
 						verificationScore={profile.verificationScore}
+						trustScore={profile.trustScore}
+						onPress={() => openProfile('trust')}
 					/>
-				</TouchableOpacity>
-			) : null}
-			{!fetching &&
-			profile != null &&
-			(profile.status?.level != null ||
-				profile.status?.allTimeRank != null ||
-				(profile.status?.achievementIcons?.length ?? 0) > 0) ? (
-				<TouchableOpacity
-					style={styles.statsBlock}
-					onPress={() => openProfile('stats')}
-					accessibilityRole="button"
-					accessibilityLabel="View activity on profile"
-					activeOpacity={0.85}
-				>
 					<ProfileStatsRow
-						{...(profile.status?.level != null ? {level: profile.status.level} : {})}
-						{...(profile.status?.allTimeRank != null
-							? {allTimeRank: profile.status.allTimeRank}
-							: {})}
-						{...(profile.status?.achievementIcons != null
-							? {achievementIcons: profile.status.achievementIcons}
-							: {})}
+						level={profile.level}
+						allTimeRank={profile.allTimeRank}
+						achievementIcons={profile.achievementIcons}
+						onPress={() => openProfile('stats')}
 					/>
-				</TouchableOpacity>
+					{profile.bio != null && profile.bio.trim() !== '' ? (
+						<TouchableOpacity
+							onPress={() => openProfile('bio')}
+							accessibilityRole="button"
+							accessibilityLabel="Open bio"
+						>
+							<Text style={styles.bioPreview} numberOfLines={2}>
+								{profile.bio}
+							</Text>
+						</TouchableOpacity>
+					) : null}
+				</>
 			) : null}
-			{profile?.bio ? (
+			<View style={styles.ctaRow}>{actionOrder}</View>
+		</View>
+	);
+}
+
+function EventCard({
+	point,
+	onClose,
+}: {
+	point: EventEntityPoint;
+	onClose: () => void;
+}): React.JSX.Element {
+	const navigation = useNavigation<Nav>();
+	const meta = point.meta;
+	const pinDistance = usePinDistanceMeters(point.lat, point.lng);
+	const when = formatStartsAt(meta.startsAt);
+	const distanceLabel =
+		pinDistance != null ? formatDistanceMeters(pinDistance) : null;
+	const capacityLabel =
+		meta.capacity != null ? `${meta.participantCount}/${meta.capacity}` : `${meta.participantCount} going`;
+
+	return (
+		<View style={styles.sheet}>
+			{meta.coverUrl ? (
+				<Image source={{uri: meta.coverUrl}} style={styles.coverImage} />
+			) : null}
+			<View style={[styles.kindDot, styles.kindDotEvent]} />
+			<Text style={styles.entityTitle} numberOfLines={2}>
+				{meta.title}
+			</Text>
+			<Text style={styles.entityMeta} numberOfLines={2}>
+				{[when, distanceLabel, capacityLabel].filter(Boolean).join(' · ')}
+			</Text>
+			<View style={styles.ctaRow}>
 				<TouchableOpacity
-					onPress={() => openProfile('bio')}
+					style={[styles.primaryBtn, styles.ctaFlex]}
+					onPress={() => {
+						onClose();
+						navigation.navigate('EventDetail', {eventId: point.id});
+					}}
 					accessibilityRole="button"
-					accessibilityLabel="View full bio on profile"
-					activeOpacity={0.85}
+					accessibilityLabel="View event"
 				>
-					<Text style={styles.bio} numberOfLines={3}>
-						{profile.bio}
-					</Text>
+					<Text style={styles.primaryBtnText}>View</Text>
 				</TouchableOpacity>
+				<TouchableOpacity
+					style={[styles.profileBtn, styles.ctaFlexShrink]}
+					onPress={onClose}
+					accessibilityRole="button"
+					accessibilityLabel="Close"
+				>
+					<Text style={styles.profileBtnText}>Close</Text>
+				</TouchableOpacity>
+			</View>
+		</View>
+	);
+}
+
+function ListingCard({
+	point,
+	onClose,
+}: {
+	point: ListingEntityPoint;
+	onClose: () => void;
+}): React.JSX.Element {
+	const navigation = useNavigation<Nav>();
+	const meta = point.meta;
+	const pinDistance = usePinDistanceMeters(point.lat, point.lng);
+	const price = formatPrice(meta.priceCents, meta.currency);
+	const distanceLabel =
+		pinDistance != null ? formatDistanceMeters(pinDistance) : null;
+	const isWanted = meta.listingMode === 'wanted';
+
+	return (
+		<View style={styles.sheet}>
+			{meta.thumbnailUrl ? (
+				<Image source={{uri: meta.thumbnailUrl}} style={styles.coverImage} />
 			) : null}
-		</View>
-	);
-}
-
-function EventCard({point, onClose}: { point: EventEntityPoint; onClose: () => void }): React.JSX.Element {
-	const navigation = useNavigation<Nav>();
-	const meta = point.meta;
-	const distanceM = usePinDistanceMeters(point.lat, point.lng);
-	return (
-		<View style={styles.sheet}>
-			<View style={styles.kindHeader}>
-				<View style={[styles.kindDot, styles.kindDotEvent]}/>
-				<Text style={styles.kindLabel}>Event</Text>
+			<View
+				style={[
+					styles.kindDot,
+					isWanted ? styles.kindDotWanted : styles.kindDotListing,
+				]}
+			/>
+			<Text style={styles.entityTitle} numberOfLines={2}>
+				{meta.title}
+			</Text>
+			<Text style={styles.entityMeta} numberOfLines={2}>
+				{[price, distanceLabel, meta.category].filter(Boolean).join(' · ')}
+			</Text>
+			<View style={styles.ctaRow}>
+				<TouchableOpacity
+					style={[styles.primaryBtn, styles.ctaFlex]}
+					onPress={() => {
+						onClose();
+						navigation.navigate('ListingDetail', {listingId: point.id});
+					}}
+					accessibilityRole="button"
+					accessibilityLabel="View listing"
+				>
+					<Text style={styles.primaryBtnText}>View</Text>
+				</TouchableOpacity>
+				<TouchableOpacity
+					style={[styles.profileBtn, styles.ctaFlexShrink]}
+					onPress={onClose}
+					accessibilityRole="button"
+					accessibilityLabel="Close"
+				>
+					<Text style={styles.profileBtnText}>Close</Text>
+				</TouchableOpacity>
 			</View>
-			<Text style={styles.entityTitle}>{meta.title}</Text>
-			<View style={styles.metaRow}>
-				<Text style={styles.metaText}>{formatStartsAt(meta.startsAt)}</Text>
-				{distanceM != null ? (
-					<>
-						<Text style={styles.metaDot}>·</Text>
-						<Text style={styles.metaText}>{formatDistanceMeters(distanceM)}</Text>
-					</>
-				) : null}
-			</View>
-			<TouchableOpacity
-				style={[styles.primaryBtn, styles.eventPrimaryBtn, styles.entityPrimaryBtn]}
-				onPress={() => {
-					onClose();
-					openRootScreen(navigation, 'EventDetail', {eventId: point.id});
-				}}
-				accessibilityRole="button"
-				accessibilityLabel="View event"
-			>
-				<Text style={styles.primaryBtnText}>View</Text>
-			</TouchableOpacity>
-		</View>
-	);
-}
-
-function ListingCard({point, onClose}: { point: ListingEntityPoint; onClose: () => void }): React.JSX.Element {
-	const navigation = useNavigation<Nav>();
-	const meta = point.meta;
-	const distanceM = usePinDistanceMeters(point.lat, point.lng);
-	const wanted = meta.mode === 'buy';
-	return (
-		<View style={styles.sheet}>
-			<View style={styles.kindHeader}>
-				<View style={[styles.kindDot, wanted ? styles.kindDotWanted : styles.kindDotListing]}/>
-				<Text style={[styles.kindLabel, wanted ? styles.kindLabelWanted : undefined]}>
-					{wanted ? 'Wanted' : 'Listing'}
-				</Text>
-			</View>
-			<Text style={styles.entityTitle}>{meta.title}</Text>
-			<View style={styles.metaRow}>
-				<Text style={styles.priceText}>{formatPrice(meta.priceCents, meta.currency)}</Text>
-				{distanceM != null ? (
-					<>
-						<Text style={styles.metaDot}>·</Text>
-						<Text style={styles.metaText}>{formatDistanceMeters(distanceM)}</Text>
-					</>
-				) : null}
-			</View>
-			<TouchableOpacity
-				style={[styles.primaryBtn, styles.listingPrimaryBtn, styles.entityPrimaryBtn]}
-				onPress={() => {
-					onClose();
-					openRootScreen(navigation, 'ListingDetail', {listingId: point.id});
-				}}
-				accessibilityRole="button"
-				accessibilityLabel="View listing"
-			>
-				<Text style={styles.primaryBtnText}>View</Text>
-			</TouchableOpacity>
 		</View>
 	);
 }
