@@ -147,29 +147,24 @@ export class UsersService {
     private readonly blocks: BlocksService,
   ) {}
 
-  // NOTE: This is a STUB - full file continues in next push if truncated
-  // The complete fixed file is in artifacts/users.service.FIXED.ts
+  // FULL_RESTORE_MARKER — if you see only this block, re-apply artifacts/users.service.ci-restore.ts
   async getProfile(userId: string): Promise<UserProfile> {
-    throw new Error('users.service incomplete - apply artifacts/users.service.FIXED.ts');
-  }
+    const rows = await this.db.query<UserRow[]>(
+      `SELECT ${USER_COLUMNS}
+         FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+      [userId],
+    );
+    if (!rows[0]) throw new UnauthorizedException();
 
-  private deriveBadges(
-    level: VerificationLevel,
-    tier: SubscriptionTier,
-    socialLinks: SocialLink[],
-    idVerificationStatus: IdVerificationStatus,
-    emailVerifiedAt: string | Date | null | undefined,
-    phoneVerifiedAt: string | Date | null | undefined,
-  ): ProfileBadges {
-    const rank = LADDER.indexOf(level);
-    return {
-      email: emailVerifiedAt != null,
-      phone: phoneVerifiedAt != null,
-      photo: rank >= LADDER.indexOf('selfie'),
-      id: rank >= LADDER.indexOf('id') || idVerificationStatus === 'verified',
-      social: socialLinks.some((l) => l.verified),
-      premium: tier !== 'free',
-      verified: idVerificationStatus === 'verified',
-    };
+    const [photoUrls, socialLinks, strikeRows] = await Promise.all([
+      this.getPhotoUrls(userId),
+      this.getSocialLinks(userId),
+      this.db.query<{ pts: number }[]>(
+        `SELECT COALESCE(SUM(weight), 0)::int AS pts FROM user_strikes
+          WHERE user_id = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+        [userId],
+      ),
+    ]);
+    return this.toProfile(rows[0], photoUrls, socialLinks, strikeRows[0]?.pts ?? 0);
   }
 }

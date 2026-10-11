@@ -57,7 +57,6 @@ function setCachedProfile(userId: string, profile: PublicUserProfile): void {
 	profileCache.set(userId, {profile, fetchedAt: Date.now()});
 }
 
-
 function formatStartsAt(iso: string): string {
 	const d = new Date(iso);
 	if (Number.isNaN(d.getTime())) return iso;
@@ -104,8 +103,6 @@ function formatDistanceMeters(meters: number): string {
 	return `${(meters / 1000).toFixed(meters < 10_000 ? 1 : 0)} km`;
 }
 
-
-/** Viewer → pin distance from live GPS (null while location unknown). */
 function usePinDistanceMeters(lat: number, lng: number): number | null {
 	const {coords} = useUserLocation();
 	if (coords == null) return null;
@@ -124,22 +121,13 @@ interface Props {
 	waving: boolean;
 	onClose: () => void;
 	onWave?: () => void;
-	/** Map layer mode — dating swaps Wave for Like/Pass. Default social. */
 	viewerMode?: 'social' | 'dating';
-	/** C3: machine-owned full profile — parent sends OPEN_FULL and navigates. */
 	onOpenFull?: (focus?: ProfileFocus) => void;
-	/**
-	 * Required when viewerMode === 'dating' (MapScreen → pin machine).
-	 * No sheet-local POST /dating/* fallback.
-	 */
+	/** Required when viewerMode === 'dating' (MapScreen → pin machine). */
 	onLike?: () => void;
 	onPass?: () => void;
-	/**
-	 * C: parent-owned Message (MapScreen prefers pin thread ids / creates conversation).
-	 * When omitted, sheet keeps POST /conversations (non-map only).
-	 */
+	/** Parent-owned Message; when omitted, sheet keeps POST /conversations. */
 	onMessage?: () => void;
-	/** Controlled flags from pin machine (preferred over local state). */
 	likeSent?: boolean;
 	isMatch?: boolean;
 	actionPending?: boolean;
@@ -163,19 +151,19 @@ interface UserCardProps {
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 function UserCard({
-					  point,
-					  waving,
-					  onWave,
-					  onClose,
-					  viewerMode,
-					  onOpenFull,
-					  onLike,
-					  onPass,
-					  onMessage: onMessageFromParent,
-					  likeSentControlled,
-					  isMatchControlled,
-					  actionPending,
-				  }: UserCardProps): React.JSX.Element {
+	point,
+	waving,
+	onWave,
+	onClose,
+	viewerMode,
+	onOpenFull,
+	onLike,
+	onPass,
+	onMessage: onMessageFromParent,
+	likeSentControlled,
+	isMatchControlled,
+	actionPending,
+}: UserCardProps): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
 	const cached = getCachedProfile(point.id);
 	const [profile, setProfile] = useState<PublicUserProfile | null>(cached);
@@ -186,10 +174,6 @@ function UserCard({
 	const [mutualCount, setMutualCount] = useState(0);
 	const [mutualPreview, setMutualPreview] = useState<FriendCard[]>([]);
 	const [reloadToken, setReloadToken] = useState(0);
-	/**
-	 * Option A: Like/Pass are parent-owned only (MapScreen → pin machine).
-	 * No local POST /dating/* — dual-path deleted.
-	 */
 	const likeSent = likeSentControlled === true;
 	const datingMatched = isMatchControlled === true;
 	const liking = Boolean(actionPending && viewerMode === 'dating' && !likeSent);
@@ -261,7 +245,6 @@ function UserCard({
 		profile != null
 			? publicIdentityLines(profile)
 			: {identityLine: null, hometownLine: null};
-	/** Map context only — identity/hometown live in ProfileIdentityLine below. */
 	const subtitle = (() => {
 		if (profile == null) return null;
 		const parts: string[] = [];
@@ -272,14 +255,11 @@ function UserCard({
 		return parts.length > 0 ? parts.join(' · ') : null;
 	})();
 
-	/** Relationship known only after profile fetch (or cache hit). */
 	const relationshipKnown = profile != null;
 	const matched = profile?.relationship?.matched === true;
 	const messageAllowed = canMessage !== 'none' && !blocked;
 	const waveAllowed = Boolean(onWave) && !blocked;
-	/** Dating Like/Pass only when parent supplies handlers (required on map). */
 	const datingActionsAllowed = Boolean(onLike) && Boolean(onPass) && !blocked;
-	/** Single primary: Message when chat unlocked or matched; else Wave. */
 	const preferMessagePrimary =
 		relationshipKnown && (canMessage === 'chat' || matched) && messageAllowed;
 
@@ -366,12 +346,10 @@ function UserCard({
 
 	const onMessage = async (): Promise<void> => {
 		if (opening || canMessage === 'none' || blocked) return;
-		// C: parent-owned (MapScreen pin thread / create)
 		if (onMessageFromParent != null) {
 			onMessageFromParent();
 			return;
 		}
-		// Non-map fallback only
 		setOpening(true);
 		try {
 			const res = await postJson<
@@ -402,120 +380,44 @@ function UserCard({
 	};
 
 	const isDating = viewerMode === 'dating';
-
-	/** Parent-required when viewerMode === 'dating' (MapScreen wires pin machine). */
 	const handleLike = (): void => {
 		if (liking || likeSent || blocked || !isDating) return;
 		onLike?.();
 	};
-
 	const handlePass = (): void => {
 		if (passing || blocked || !isDating) return;
 		onPass?.();
 	};
 
 	const profileButton = (
-		<TouchableOpacity
-			key="profile"
-			style={[styles.profileBtn, styles.ctaFlexShrink]}
-			onPress={handleOpenProfile}
-			accessibilityRole="button"
-			accessibilityLabel="Open profile"
-		>
+		<TouchableOpacity key="profile" style={[styles.profileBtn, styles.ctaFlexShrink]} onPress={handleOpenProfile} accessibilityRole="button" accessibilityLabel="Open profile">
 			<Text style={styles.profileBtnText}>Profile</Text>
 		</TouchableOpacity>
 	);
-
 	const messageButton = (
-		<TouchableOpacity
-			key="message"
-			style={[
-				styles.primaryBtn,
-				styles.messageBtn,
-				opening ? styles.btnDisabled : undefined,
-				styles.ctaFlex,
-			]}
-			onPress={() => void onMessage()}
-			disabled={opening}
-			accessibilityRole="button"
-			accessibilityLabel="Message"
-		>
+		<TouchableOpacity key="message" style={[styles.primaryBtn, styles.messageBtn, opening ? styles.btnDisabled : undefined, styles.ctaFlex]} onPress={() => void onMessage()} disabled={opening} accessibilityRole="button" accessibilityLabel="Message">
 			<Text style={styles.primaryBtnText}>{opening ? '…' : 'Message'}</Text>
 		</TouchableOpacity>
 	);
-
 	const waveButton = (
-		<TouchableOpacity
-			key="wave"
-			style={[
-				styles.primaryBtn,
-				styles.waveBtn,
-				waving ? styles.btnDisabled : undefined,
-				styles.ctaFlex,
-			]}
-			onPress={onWave}
-			disabled={waving}
-			accessibilityRole="button"
-			accessibilityLabel="Wave"
-		>
+		<TouchableOpacity key="wave" style={[styles.primaryBtn, styles.waveBtn, waving ? styles.btnDisabled : undefined, styles.ctaFlex]} onPress={onWave} disabled={waving} accessibilityRole="button" accessibilityLabel="Wave">
 			<Text style={styles.primaryBtnText}>{waving ? '…' : 'Wave'}</Text>
 		</TouchableOpacity>
 	);
-
 	const likeButton = (
-		<TouchableOpacity
-			key="like"
-			style={[
-				styles.primaryBtn,
-				styles.likeBtn,
-				liking || likeSent ? styles.btnDisabled : undefined,
-				styles.ctaFlex,
-			]}
-			onPress={handleLike}
-			disabled={liking || likeSent}
-			accessibilityRole="button"
-			accessibilityLabel={likeSent ? 'Liked' : 'Like'}
-		>
-			<Text style={styles.primaryBtnText}>
-				{liking ? '…' : likeSent ? 'Liked' : 'Like'}
-			</Text>
+		<TouchableOpacity key="like" style={[styles.primaryBtn, styles.likeBtn, liking || likeSent ? styles.btnDisabled : undefined, styles.ctaFlex]} onPress={handleLike} disabled={liking || likeSent} accessibilityRole="button" accessibilityLabel={likeSent ? 'Liked' : 'Like'}>
+			<Text style={styles.primaryBtnText}>{liking ? '…' : likeSent ? 'Liked' : 'Like'}</Text>
 		</TouchableOpacity>
 	);
-
 	const passButton = (
-		<TouchableOpacity
-			key="pass"
-			style={[styles.profileBtn, styles.ctaFlexShrink, passing ? styles.btnDisabled : undefined]}
-			onPress={handlePass}
-			disabled={passing}
-			accessibilityRole="button"
-			accessibilityLabel="Pass"
-		>
+		<TouchableOpacity key="pass" style={[styles.profileBtn, styles.ctaFlexShrink, passing ? styles.btnDisabled : undefined]} onPress={handlePass} disabled={passing} accessibilityRole="button" accessibilityLabel="Pass">
 			<Text style={styles.profileBtnText}>{passing ? '…' : 'Pass'}</Text>
 		</TouchableOpacity>
 	);
-
 	const ctaSkeleton = (
-		<View
-			key="cta-skeleton"
-			style={[styles.primaryBtn, styles.ctaSkeleton, styles.ctaFlex]}
-			accessibilityLabel="Loading actions"
-		/>
+		<View key="cta-skeleton" style={[styles.primaryBtn, styles.ctaSkeleton, styles.ctaFlex]} accessibilityLabel="Loading actions" />
 	);
 
-	/**
-	 * CTA lock (activation):
-	 * Social:
-	 * - loading: skeleton + Profile
-	 * - blocked: Profile only
-	 * - chat/matched: Message + Profile
-	 * - else: Wave + Profile
-	 * Dating:
-	 * - loading: skeleton + Profile
-	 * - blocked: Profile only
-	 * - dating match or chat: Message + Profile
-	 * - else: Like + Pass + Profile (requires onLike+onPass)
-	 */
 	let actionOrder: React.ReactNode[];
 	if (!relationshipKnown) {
 		actionOrder = [ctaSkeleton, profileButton];
@@ -527,7 +429,6 @@ function UserCard({
 		} else if (datingActionsAllowed) {
 			actionOrder = [likeButton, passButton, profileButton];
 		} else {
-			// Missing onLike/onPass — parent must wire (map); no local fallback
 			actionOrder = [profileButton];
 		}
 	} else if (preferMessagePrimary) {
@@ -542,244 +443,129 @@ function UserCard({
 		<View style={styles.sheet}>
 			<View style={styles.userHeader}>
 				<View style={styles.userHeaderMain}>
-					<IdentityBlock
-						name={displayName}
-						avatarUrl={meta.avatarUrl ?? null}
-						verification={meta.verification ?? profile?.verification ?? 'none'}
-						idVerified={idVerified}
-						online={meta.online}
-						subtitle={subtitle}
-						ringVariant={ringVariant}
-						size={56}
-						onPress={handleOpenProfile}
-					/>
+					<IdentityBlock name={displayName} avatarUrl={meta.avatarUrl ?? null} verification={meta.verification ?? profile?.verification ?? 'none'} idVerified={idVerified} online={meta.online} subtitle={subtitle} ringVariant={ringVariant} size={56} onPress={handleOpenProfile} />
 				</View>
-				<TouchableOpacity
-					style={styles.overflowBtn}
-					onPress={onOverflow}
-					disabled={blocking || (fetching && profile == null)}
-					accessibilityRole="button"
-					accessibilityLabel="More actions"
-					hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
-				>
+				<TouchableOpacity style={styles.overflowBtn} onPress={onOverflow} disabled={blocking || (fetching && profile == null)} accessibilityRole="button" accessibilityLabel="More actions" hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
 					<Text style={styles.overflowBtnText}>···</Text>
 				</TouchableOpacity>
 			</View>
 			{!fetching && profile != null ? (
 				<View style={styles.identityLineWrap}>
-					<ProfileIdentityLine
-						mode="other"
-						align="start"
-						identityLine={identityLine}
-						hometownLine={hometownLine}
-					/>
+					<ProfileIdentityLine mode="other" align="start" identityLine={identityLine} hometownLine={hometownLine} />
 				</View>
 			) : null}
 			{fetching && profile == null ? (
-				<ActivityIndicator color={colors.primary} size="small" style={{alignSelf: 'flex-start'}}/>
+				<ActivityIndicator color={colors.primary} size="small" style={{alignSelf: 'flex-start'}} />
 			) : null}
 			{fetchError && profile == null ? (
 				<View style={styles.fetchErrorRow}>
 					<Text style={styles.fetchErrorText}>Could not load profile</Text>
-					<TouchableOpacity
-						onPress={onRetryProfile}
-						accessibilityRole="button"
-						accessibilityLabel="Retry loading profile"
-						hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}
-					>
+					<TouchableOpacity onPress={onRetryProfile} accessibilityRole="button" accessibilityLabel="Retry loading profile" hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}>
 						<Text style={styles.fetchErrorRetry}>Retry</Text>
 					</TouchableOpacity>
 				</View>
 			) : null}
 			{!fetching && mutualCount > 0 ? (
-				<TouchableOpacity
-					style={styles.mutualRow}
-					onPress={openMutualFriends}
-					accessibilityRole="button"
-					accessibilityLabel={`${mutualCount} mutual friends`}
-				>
+				<TouchableOpacity style={styles.mutualRow} onPress={openMutualFriends} accessibilityRole="button" accessibilityLabel={`${mutualCount} mutual friends`}>
 					<View style={styles.mutualAvatars}>
-						{mutualPreview.map((f, i) =>
-							f.avatarUrl ? (
-								<Image
-									key={f.id}
-									source={{uri: f.avatarUrl}}
-									style={[styles.mutualAvatar, i > 0 ? styles.mutualAvatarOverlap : null]}
-								/>
-							) : (
-								<View
-									key={f.id}
-									style={[
-										styles.mutualAvatar,
-										styles.mutualAvatarPlaceholder,
-										i > 0 ? styles.mutualAvatarOverlap : null,
-									]}
-								/>
-							),
-						)}
+						{mutualPreview.map((f, i) => (
+							<View key={f.userId} style={[styles.mutualAvatarWrap, i > 0 ? styles.mutualAvatarOverlap : undefined]}>
+								{f.avatarUrl ? (
+									<Image source={{uri: f.avatarUrl}} style={styles.mutualAvatar} />
+								) : (
+									<View style={[styles.mutualAvatar, styles.mutualAvatarPlaceholder]}>
+										<Text style={styles.mutualInitial}>{(f.displayName[0] ?? '?').toUpperCase()}</Text>
+									</View>
+								)}
+							</View>
+						))}
 					</View>
-					<Text style={styles.mutualText}>
-						{mutualCount} mutual friend{mutualCount === 1 ? '' : 's'}
-					</Text>
+					<Text style={styles.mutualText}>{mutualCount} mutual friend{mutualCount === 1 ? '' : 's'}</Text>
 				</TouchableOpacity>
 			) : null}
-			{profile != null ? (
-				<>
-					<ProfileTrustBlock
-						verification={profile.verification}
-						idVerified={profile.idVerified === true}
-						verificationScore={profile.verificationScore}
-						trustScore={profile.trustScore}
-						onPress={() => openProfile('trust')}
-					/>
+			<View style={styles.actions}>{actionOrder}</View>
+			{!fetching && profile != null ? (
+				<TouchableOpacity style={styles.trustBlock} onPress={() => openProfile('trust')} accessibilityRole="button" accessibilityLabel="View trust on profile" activeOpacity={0.85}>
+					<ProfileTrustBlock verification={profile.verification} idVerified={profile.idVerified} verificationScore={profile.verificationScore} />
+				</TouchableOpacity>
+			) : null}
+			{!fetching && profile != null && (profile.status?.level != null || profile.status?.allTimeRank != null || (profile.status?.achievementIcons?.length ?? 0) > 0) ? (
+				<TouchableOpacity style={styles.statsBlock} onPress={() => openProfile('stats')} accessibilityRole="button" accessibilityLabel="View activity on profile" activeOpacity={0.85}>
 					<ProfileStatsRow
-						level={profile.level}
-						allTimeRank={profile.allTimeRank}
-						achievementIcons={profile.achievementIcons}
-						onPress={() => openProfile('stats')}
+						{...(profile.status?.level != null ? {level: profile.status.level} : {})}
+						{...(profile.status?.allTimeRank != null ? {allTimeRank: profile.status.allTimeRank} : {})}
+						{...(profile.status?.achievementIcons != null ? {achievementIcons: profile.status.achievementIcons} : {})}
 					/>
-					{profile.bio != null && profile.bio.trim() !== '' ? (
-						<TouchableOpacity
-							onPress={() => openProfile('bio')}
-							accessibilityRole="button"
-							accessibilityLabel="Open bio"
-						>
-							<Text style={styles.bioPreview} numberOfLines={2}>
-								{profile.bio}
-							</Text>
-						</TouchableOpacity>
-					) : null}
-				</>
+				</TouchableOpacity>
 			) : null}
-			<View style={styles.ctaRow}>{actionOrder}</View>
+			{profile?.bio ? (
+				<TouchableOpacity onPress={() => openProfile('bio')} accessibilityRole="button" accessibilityLabel="View full bio on profile" activeOpacity={0.85}>
+					<Text style={styles.bio} numberOfLines={3}>{profile.bio}</Text>
+				</TouchableOpacity>
+			) : null}
 		</View>
 	);
 }
 
-function EventCard({
-	point,
-	onClose,
-}: {
-	point: EventEntityPoint;
-	onClose: () => void;
-}): React.JSX.Element {
+function EventCard({point, onClose}: { point: EventEntityPoint; onClose: () => void }): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
 	const meta = point.meta;
-	const pinDistance = usePinDistanceMeters(point.lat, point.lng);
-	const when = formatStartsAt(meta.startsAt);
-	const distanceLabel =
-		pinDistance != null ? formatDistanceMeters(pinDistance) : null;
-	const capacityLabel =
-		meta.capacity != null ? `${meta.participantCount}/${meta.capacity}` : `${meta.participantCount} going`;
-
+	const distanceM = usePinDistanceMeters(point.lat, point.lng);
 	return (
 		<View style={styles.sheet}>
-			{meta.coverUrl ? (
-				<Image source={{uri: meta.coverUrl}} style={styles.coverImage} />
-			) : null}
-			<View style={[styles.kindDot, styles.kindDotEvent]} />
-			<Text style={styles.entityTitle} numberOfLines={2}>
-				{meta.title}
-			</Text>
-			<Text style={styles.entityMeta} numberOfLines={2}>
-				{[when, distanceLabel, capacityLabel].filter(Boolean).join(' · ')}
-			</Text>
-			<View style={styles.ctaRow}>
-				<TouchableOpacity
-					style={[styles.primaryBtn, styles.ctaFlex]}
-					onPress={() => {
-						onClose();
-						navigation.navigate('EventDetail', {eventId: point.id});
-					}}
-					accessibilityRole="button"
-					accessibilityLabel="View event"
-				>
-					<Text style={styles.primaryBtnText}>View</Text>
-				</TouchableOpacity>
-				<TouchableOpacity
-					style={[styles.profileBtn, styles.ctaFlexShrink]}
-					onPress={onClose}
-					accessibilityRole="button"
-					accessibilityLabel="Close"
-				>
-					<Text style={styles.profileBtnText}>Close</Text>
-				</TouchableOpacity>
+			<View style={styles.kindHeader}>
+				<View style={[styles.kindDot, styles.kindDotEvent]} />
+				<Text style={styles.kindLabel}>Event</Text>
 			</View>
+			<Text style={styles.entityTitle}>{meta.title}</Text>
+			<View style={styles.metaRow}>
+				<Text style={styles.metaText}>{formatStartsAt(meta.startsAt)}</Text>
+				{distanceM != null ? (<><Text style={styles.metaDot}>·</Text><Text style={styles.metaText}>{formatDistanceMeters(distanceM)}</Text></>) : null}
+			</View>
+			<TouchableOpacity style={[styles.primaryBtn, styles.eventPrimaryBtn, styles.entityPrimaryBtn]} onPress={() => { onClose(); navigation.navigate('EventDetail', {eventId: point.id}); }} accessibilityRole="button" accessibilityLabel="View event">
+				<Text style={styles.primaryBtnText}>View</Text>
+			</TouchableOpacity>
 		</View>
 	);
 }
 
-function ListingCard({
-	point,
-	onClose,
-}: {
-	point: ListingEntityPoint;
-	onClose: () => void;
-}): React.JSX.Element {
+function ListingCard({point, onClose}: { point: ListingEntityPoint; onClose: () => void }): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
 	const meta = point.meta;
-	const pinDistance = usePinDistanceMeters(point.lat, point.lng);
-	const price = formatPrice(meta.priceCents, meta.currency);
-	const distanceLabel =
-		pinDistance != null ? formatDistanceMeters(pinDistance) : null;
+	const distanceM = usePinDistanceMeters(point.lat, point.lng);
 	const isWanted = meta.listingMode === 'wanted';
-
 	return (
 		<View style={styles.sheet}>
-			{meta.thumbnailUrl ? (
-				<Image source={{uri: meta.thumbnailUrl}} style={styles.coverImage} />
-			) : null}
-			<View
-				style={[
-					styles.kindDot,
-					isWanted ? styles.kindDotWanted : styles.kindDotListing,
-				]}
-			/>
-			<Text style={styles.entityTitle} numberOfLines={2}>
-				{meta.title}
-			</Text>
-			<Text style={styles.entityMeta} numberOfLines={2}>
-				{[price, distanceLabel, meta.category].filter(Boolean).join(' · ')}
-			</Text>
-			<View style={styles.ctaRow}>
-				<TouchableOpacity
-					style={[styles.primaryBtn, styles.ctaFlex]}
-					onPress={() => {
-						onClose();
-						navigation.navigate('ListingDetail', {listingId: point.id});
-					}}
-					accessibilityRole="button"
-					accessibilityLabel="View listing"
-				>
-					<Text style={styles.primaryBtnText}>View</Text>
-				</TouchableOpacity>
-				<TouchableOpacity
-					style={[styles.profileBtn, styles.ctaFlexShrink]}
-					onPress={onClose}
-					accessibilityRole="button"
-					accessibilityLabel="Close"
-				>
-					<Text style={styles.profileBtnText}>Close</Text>
-				</TouchableOpacity>
+			<View style={styles.kindHeader}>
+				<View style={[styles.kindDot, isWanted ? styles.kindDotWanted : styles.kindDotListing]} />
+				<Text style={styles.kindLabel}>{isWanted ? 'Wanted' : 'Listing'}</Text>
 			</View>
+			<Text style={styles.entityTitle}>{meta.title}</Text>
+			<View style={styles.metaRow}>
+				<Text style={styles.metaText}>{formatPrice(meta.priceCents, meta.currency)}</Text>
+				{distanceM != null ? (<><Text style={styles.metaDot}>·</Text><Text style={styles.metaText}>{formatDistanceMeters(distanceM)}</Text></>) : null}
+			</View>
+			<TouchableOpacity style={[styles.primaryBtn, styles.entityPrimaryBtn]} onPress={() => { onClose(); navigation.navigate('ListingDetail', {listingId: point.id}); }} accessibilityRole="button" accessibilityLabel="View listing">
+				<Text style={styles.primaryBtnText}>View</Text>
+			</TouchableOpacity>
 		</View>
 	);
 }
 
 export function EntityBottomSheet({
-									  point,
-									  waving,
-									  onClose,
-									  onWave,
-									  viewerMode = 'social',
-									  onOpenFull,
-									  onLike,
-									  onPass,
-									  onMessage,
-									  likeSent,
-									  isMatch,
-									  actionPending,
-								  }: Props): React.JSX.Element {
+	point,
+	waving,
+	onClose,
+	onWave,
+	viewerMode = 'social',
+	onOpenFull,
+	onLike,
+	onPass,
+	onMessage,
+	likeSent,
+	isMatch,
+	actionPending,
+}: Props): React.JSX.Element {
 	if (point.kind === 'user') {
 		return (
 			<UserCard
@@ -800,10 +586,10 @@ export function EntityBottomSheet({
 		);
 	}
 	if (point.kind === 'event') {
-		return <EventCard point={point as EventEntityPoint} onClose={onClose}/>;
+		return <EventCard point={point as EventEntityPoint} onClose={onClose} />;
 	}
 	if (point.kind === 'listing') {
-		return <ListingCard point={point as ListingEntityPoint} onClose={onClose}/>;
+		return <ListingCard point={point as ListingEntityPoint} onClose={onClose} />;
 	}
 	return (
 		<View style={styles.sheet}>
