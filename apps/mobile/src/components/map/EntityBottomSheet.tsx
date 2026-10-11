@@ -134,6 +134,11 @@ interface Props {
 	 */
 	onLike?: () => void;
 	onPass?: () => void;
+	/**
+	 * C: parent-owned Message (MapScreen prefers pin thread ids / creates conversation).
+	 * When omitted, sheet keeps POST /conversations (non-map only).
+	 */
+	onMessage?: () => void;
 	/** Controlled flags from pin machine (preferred over local state). */
 	likeSent?: boolean;
 	isMatch?: boolean;
@@ -149,6 +154,7 @@ interface UserCardProps {
 	onOpenFull?: (focus?: ProfileFocus) => void;
 	onLike?: (() => void) | undefined;
 	onPass?: (() => void) | undefined;
+	onMessage?: (() => void) | undefined;
 	likeSentControlled?: boolean | undefined;
 	isMatchControlled?: boolean | undefined;
 	actionPending?: boolean | undefined;
@@ -165,6 +171,7 @@ function UserCard({
 					  onOpenFull,
 					  onLike,
 					  onPass,
+					  onMessage: onMessageFromParent,
 					  likeSentControlled,
 					  isMatchControlled,
 					  actionPending,
@@ -359,6 +366,12 @@ function UserCard({
 
 	const onMessage = async (): Promise<void> => {
 		if (opening || canMessage === 'none' || blocked) return;
+		// C: parent-owned (MapScreen pin thread / create)
+		if (onMessageFromParent != null) {
+			onMessageFromParent();
+			return;
+		}
+		// Non-map fallback only
 		setOpening(true);
 		try {
 			const res = await postJson<
@@ -762,6 +775,7 @@ export function EntityBottomSheet({
 									  onOpenFull,
 									  onLike,
 									  onPass,
+									  onMessage,
 									  likeSent,
 									  isMatch,
 									  actionPending,
@@ -778,6 +792,7 @@ export function EntityBottomSheet({
 				{...(onOpenFull != null ? {onOpenFull} : {})}
 				{...(onLike != null ? {onLike} : {})}
 				{...(onPass != null ? {onPass} : {})}
+				{...(onMessage != null ? {onMessage} : {})}
 				{...(likeSent != null ? {likeSentControlled: likeSent} : {})}
 				{...(isMatch != null ? {isMatchControlled: isMatch} : {})}
 				{...(actionPending != null ? {actionPending} : {})}
