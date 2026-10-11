@@ -220,6 +220,7 @@ export class VerificationService {
       await this.db.query(
         `UPDATE users
             SET phone = $2,
+                phone_verified_at = COALESCE(phone_verified_at, NOW()),
                 verification_level = CASE
                   WHEN verification_level IN ('selfie', 'id') THEN verification_level
                   ELSE 'phone'
@@ -244,17 +245,17 @@ export class VerificationService {
 
   async startEmail(userId: string): Promise<StartEmailVerificationResponse> {
     const [row] = (await this.db.query(
-      `SELECT email, verification_level FROM users
+      `SELECT email, verification_level, email_verified_at FROM users
         WHERE id = $1 AND deleted_at IS NULL`,
       [userId],
-    )) as Array<{ email: string; verification_level: string }>;
+    )) as Array<{ email: string; verification_level: string; email_verified_at: string | Date | null }>;
     if (!row?.email) {
       throw new BadRequestException({
         code: 'verification.no_email',
         message: 'No email on this account',
       });
     }
-    if (['email', 'phone', 'selfie', 'id'].includes(row.verification_level)) {
+    if (row.email_verified_at != null) {
       return { sent: true, channel: 'dev', maskedEmail: maskEmail(row.email) };
     }
 
@@ -295,10 +296,10 @@ export class VerificationService {
 
   async checkEmail(userId: string, code: string): Promise<UserProfile> {
     const [row] = (await this.db.query(
-      `SELECT email, verification_level FROM users
+      `SELECT email, verification_level, email_verified_at FROM users
         WHERE id = $1 AND deleted_at IS NULL`,
       [userId],
-    )) as Array<{ email: string; verification_level: string }>;
+    )) as Array<{ email: string; verification_level: string; email_verified_at: string | Date | null }>;
     if (!row?.email) {
       throw new BadRequestException({
         code: 'verification.no_email',
@@ -306,7 +307,7 @@ export class VerificationService {
       });
     }
 
-    if (['email', 'phone', 'selfie', 'id'].includes(row.verification_level)) {
+    if (row.email_verified_at != null) {
       return this.users.getProfile(userId);
     }
 
@@ -320,7 +321,8 @@ export class VerificationService {
 
     await this.db.query(
       `UPDATE users
-          SET verification_level = CASE
+          SET email_verified_at = COALESCE(email_verified_at, NOW()),
+              verification_level = CASE
                 WHEN verification_level IN ('phone', 'selfie', 'id') THEN verification_level
                 ELSE 'email'
               END,
