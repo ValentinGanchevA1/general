@@ -27,6 +27,8 @@ import type {
 	EntityPoint,
 	ClusterPoint,
 	Viewport,
+	CreateConversationRequest,
+	CreateConversationResponse,
 } from '@g88/shared';
 
 import { useDiscovery } from '@/features/discovery/useDiscovery';
@@ -49,6 +51,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
+import { postJson } from '@/api/client';
 import { colors } from '@/theme';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
 import { MapCoachMarks } from '@/components/map/MapCoachMarks';
@@ -142,6 +145,7 @@ export function MapScreen(): React.JSX.Element {
 		sendWave: pinSendWave,
 		sendLike: pinSendLike,
 		sendPass: pinSendPass,
+		sendMessage: pinSendMessage,
 		pending: pinActionPending,
 		likeSent: pinLikeSent,
 		isMatch: pinIsMatch,
@@ -502,6 +506,59 @@ export function MapScreen(): React.JSX.Element {
 		navigation,
 	]);
 
+	/** C: Message from sheet — prefer pin machine thread ids, else create conversation. */
+	const openSheetMessage = useCallback(async (): Promise<void> => {
+		if (selected == null || selected.kind !== 'user') return;
+		const peerId = selected.id;
+		const name =
+			selected.meta && 'displayName' in selected.meta && typeof selected.meta.displayName === 'string'
+				? selected.meta.displayName
+				: seedDisplayName;
+		const existing =
+			viewerMode === 'dating'
+				? pinDatingConversationId
+				: pinConversationId ?? pinDatingConversationId;
+		if (existing != null && existing !== '') {
+			pinSendMessage();
+			closeSheet();
+			openRootScreen(navigation, 'Chat', {
+				conversationId: existing,
+				otherUserName: name,
+				otherUserId: peerId,
+			});
+			return;
+		}
+		try {
+			const res = await postJson<CreateConversationRequest, CreateConversationResponse>(
+				'/conversations',
+				{ targetUserId: peerId },
+			);
+			pinSendMessage();
+			closeSheet();
+			openRootScreen(navigation, 'Chat', {
+				conversationId: res.conversationId,
+				otherUserName: name,
+				otherUserId: peerId,
+				requestPending: res.status === 'pending' && res.permission === 'request',
+			});
+		} catch (e) {
+			const msg =
+				e && typeof e === 'object' && 'message' in e
+					? String((e as { message: unknown }).message)
+					: 'Try again in a moment.';
+			appAlert('Could not open chat', msg);
+		}
+	}, [
+		selected,
+		seedDisplayName,
+		viewerMode,
+		pinConversationId,
+		pinDatingConversationId,
+		pinSendMessage,
+		closeSheet,
+		navigation,
+	]);
+
 	const onClusterPress = useCallback(
 		(c: ClusterPoint) => {
 			mapRef.current?.animateToRegion(
@@ -792,6 +849,13 @@ export function MapScreen(): React.JSX.Element {
 							viewerMode={viewerMode}
 							{...(selected.kind === 'user'
 								? { onOpenFull: onSheetOpenFull }
+								: {})}
+							{...(selected.kind === 'user'
+								? {
+									onMessage: () => {
+										void openSheetMessage();
+									},
+								}
 								: {})}
 							{...(selected.kind === 'user' && viewerMode === 'social'
 								? {
