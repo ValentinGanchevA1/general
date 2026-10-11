@@ -128,7 +128,10 @@ interface Props {
 	viewerMode?: 'social' | 'dating';
 	/** C3: machine-owned full profile — parent sends OPEN_FULL and navigates. */
 	onOpenFull?: (focus?: ProfileFocus) => void;
-	/** B: machine-owned dating CTAs (MapScreen → pin machine). */
+	/**
+	 * Required when viewerMode === 'dating' (MapScreen → pin machine).
+	 * No sheet-local POST /dating/* fallback.
+	 */
 	onLike?: () => void;
 	onPass?: () => void;
 	/** Controlled flags from pin machine (preferred over local state). */
@@ -176,15 +179,14 @@ function UserCard({
 	const [mutualCount, setMutualCount] = useState(0);
 	const [mutualPreview, setMutualPreview] = useState<FriendCard[]>([]);
 	const [reloadToken, setReloadToken] = useState(0);
-	/** Local fallback only when parent does not own CTAs (non-map callers). */
-	const [localLiking, setLocalLiking] = useState(false);
-	const [localLikeSent, setLocalLikeSent] = useState(false);
-	const [localPassing, setLocalPassing] = useState(false);
-	const [localMatched, setLocalMatched] = useState(false);
-	const likeSent = likeSentControlled ?? localLikeSent;
-	const datingMatched = isMatchControlled ?? localMatched;
-	const liking = Boolean(actionPending && viewerMode === 'dating' && !likeSent) || localLiking;
-	const passing = localPassing;
+	/**
+	 * Option A: Like/Pass are parent-owned only (MapScreen → pin machine).
+	 * No local POST /dating/* — dual-path deleted.
+	 */
+	const likeSent = likeSentControlled === true;
+	const datingMatched = isMatchControlled === true;
+	const liking = Boolean(actionPending && viewerMode === 'dating' && !likeSent);
+	const passing = Boolean(actionPending && viewerMode === 'dating');
 
 	const loadProfile = useCallback(async (userId: string): Promise<void> => {
 		const hit = getCachedProfile(userId);
@@ -268,6 +270,8 @@ function UserCard({
 	const matched = profile?.relationship?.matched === true;
 	const messageAllowed = canMessage !== 'none' && !blocked;
 	const waveAllowed = Boolean(onWave) && !blocked;
+	/** Dating Like/Pass only when parent supplies handlers (required on map). */
+	const datingActionsAllowed = Boolean(onLike) && Boolean(onPass) && !blocked;
 	/** Single primary: Message when chat unlocked or matched; else Wave. */
 	const preferMessagePrimary =
 		relationshipKnown && (canMessage === 'chat' || matched) && messageAllowed;
@@ -386,55 +390,15 @@ function UserCard({
 
 	const isDating = viewerMode === 'dating';
 
-	const handleLike = async (): Promise<void> => {
+	/** Parent-required when viewerMode === 'dating' (MapScreen wires pin machine). */
+	const handleLike = (): void => {
 		if (liking || likeSent || blocked || !isDating) return;
-		if (onLike != null) {
-			onLike();
-			return;
-		}
-		setLocalLiking(true);
-		try {
-			const res = await postJson<
-				{ toUserId: string },
-				{ id: string; matched: boolean; datingConversationId: string | null }
-			>('/dating/likes', {toUserId: point.id});
-			setLocalLikeSent(true);
-			if (res.matched) {
-				setLocalMatched(true);
-				appAlert("It's a match!", 'You can message each other now.');
-			}
-		} catch (e) {
-			const msg =
-				e && typeof e === 'object' && 'message' in e
-					? String((e as { message: unknown }).message)
-					: 'Try again in a moment.';
-			appAlert('Like failed', msg);
-		} finally {
-			setLocalLiking(false);
-		}
+		onLike?.();
 	};
 
-	const handlePass = async (): Promise<void> => {
+	const handlePass = (): void => {
 		if (passing || blocked || !isDating) return;
-		if (onPass != null) {
-			onPass();
-			return;
-		}
-		setLocalPassing(true);
-		try {
-			await postJson<{ toUserId: string }, { ok: true }>('/dating/pass', {
-				toUserId: point.id,
-			});
-			onClose();
-		} catch (e) {
-			const msg =
-				e && typeof e === 'object' && 'message' in e
-					? String((e as { message: unknown }).message)
-					: 'Try again in a moment.';
-			appAlert('Pass failed', msg);
-		} finally {
-			setLocalPassing(false);
-		}
+		onPass?.();
 	};
 
 	const profileButton = (
@@ -494,7 +458,7 @@ function UserCard({
 				liking || likeSent ? styles.btnDisabled : undefined,
 				styles.ctaFlex,
 			]}
-			onPress={() => void handleLike()}
+			onPress={handleLike}
 			disabled={liking || likeSent}
 			accessibilityRole="button"
 			accessibilityLabel={likeSent ? 'Liked' : 'Like'}
@@ -509,7 +473,7 @@ function UserCard({
 		<TouchableOpacity
 			key="pass"
 			style={[styles.profileBtn, styles.ctaFlexShrink, passing ? styles.btnDisabled : undefined]}
-			onPress={() => void handlePass()}
+			onPress={handlePass}
 			disabled={passing}
 			accessibilityRole="button"
 			accessibilityLabel="Pass"
@@ -547,8 +511,11 @@ function UserCard({
 	} else if (isDating) {
 		if (datingMatched || preferMessagePrimary) {
 			actionOrder = [messageButton, profileButton];
-		} else {
+		} else if (datingActionsAllowed) {
 			actionOrder = [likeButton, passButton, profileButton];
+		} else {
+			// Missing onLike/onPass — parent must wire (map); no local fallback
+			actionOrder = [profileButton];
 		}
 	} else if (preferMessagePrimary) {
 		actionOrder = [messageButton, profileButton];
