@@ -522,7 +522,7 @@ function EventCard({point, onClose}: { point: EventEntityPoint; onClose: () => v
 				<Text style={styles.metaText}>{formatStartsAt(meta.startsAt)}</Text>
 				{distanceM != null ? (<><Text style={styles.metaDot}>·</Text><Text style={styles.metaText}>{formatDistanceMeters(distanceM)}</Text></>) : null}
 			</View>
-			<TouchableOpacity style={[styles.primaryBtn, styles.eventPrimaryBtn, styles.entityPrimaryBtn]} onPress={() => { onClose(); navigation.navigate('EventDetail', {eventId: point.id}); }} accessibilityRole="button" accessibilityLabel="View event">
+			<TouchableOpacity style={[styles.primaryBtn, styles.eventPrimaryBtn, styles.entityPrimaryBtn]} onPress={() => { onClose(); openRootScreen(navigation, 'EventDetail', {eventId: point.id}); }} accessibilityRole="button" accessibilityLabel="View event">
 				<Text style={styles.primaryBtnText}>View</Text>
 			</TouchableOpacity>
 		</View>
@@ -533,7 +533,7 @@ function ListingCard({point, onClose}: { point: ListingEntityPoint; onClose: () 
 	const navigation = useNavigation<Nav>();
 	const meta = point.meta;
 	const distanceM = usePinDistanceMeters(point.lat, point.lng);
-	const isWanted = meta.listingMode === 'wanted';
+	const isWanted = meta.mode === 'buy';
 	return (
 		<View style={styles.sheet}>
 			<View style={styles.kindHeader}>
@@ -545,7 +545,7 @@ function ListingCard({point, onClose}: { point: ListingEntityPoint; onClose: () 
 				<Text style={styles.metaText}>{formatPrice(meta.priceCents, meta.currency)}</Text>
 				{distanceM != null ? (<><Text style={styles.metaDot}>·</Text><Text style={styles.metaText}>{formatDistanceMeters(distanceM)}</Text></>) : null}
 			</View>
-			<TouchableOpacity style={[styles.primaryBtn, styles.entityPrimaryBtn]} onPress={() => { onClose(); navigation.navigate('ListingDetail', {listingId: point.id}); }} accessibilityRole="button" accessibilityLabel="View listing">
+			<TouchableOpacity style={[styles.primaryBtn, styles.entityPrimaryBtn]} onPress={() => { onClose(); openRootScreen(navigation, 'ListingDetail', {listingId: point.id}); }} accessibilityRole="button" accessibilityLabel="View listing">
 				<Text style={styles.primaryBtnText}>View</Text>
 			</TouchableOpacity>
 		</View>
