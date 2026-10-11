@@ -686,7 +686,6 @@ export class UsersService {
       displayName: r.display_name,
       avatarUrl: r.avatar_url,
       verification: level,
-      idVerified: r.id_verification_status === 'verified',
     };
   }
 
