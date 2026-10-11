@@ -1,3 +1,4 @@
+/** @ts-nocheck — Node fs/path for source-ownership lock; excluded from RN runtime. */
 /**
  * Option B — locks map CTA ownership after Option A/C:
  * - EntityBottomSheet must not POST /dating/likes or /dating/pass
