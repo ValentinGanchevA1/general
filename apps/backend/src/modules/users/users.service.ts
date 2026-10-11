@@ -147,7 +147,67 @@ export class UsersService {
     private readonly blocks: BlocksService,
   ) {}
 
-  // FULL_RESTORE_MARKER — if you see only this block, re-apply artifacts/users.service.ci-restore.ts
+  async deleteAccount(userId: string, confirm: string, password?: string): Promise<void> {
+    if (confirm !== 'DELETE') {
+      throw new BadRequestException({
+        code: 'account.confirm_required',
+        message: "Send confirm: 'DELETE' to permanently delete your account.",
+      });
+    }
+
+    const rows = await this.db.query<{ id: string; password_hash: string | null }[]>(
+      `SELECT id, password_hash FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+      [userId],
+    );
+    const user = rows[0];
+    if (!user) throw new NotFoundException({ code: 'account.not_found', message: 'Account not found' });
+
+    if (user.password_hash) {
+      const ok = password ? await bcrypt.compare(password, user.password_hash) : false;
+      if (!ok) {
+        throw new UnauthorizedException({
+          code: 'account.password_mismatch',
+          message: 'Password is incorrect.',
+        });
+      }
+    }
+
+    try {
+      await this.presence.markOffline(userId);
+    } catch {
+      /* presence is TTL'd */
+    }
+    try {
+      await this.s3.deleteUserObjects(userId);
+    } catch {
+      /* swept later */
+    }
+
+    const runner = this.db.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      await runner.query(`DELETE FROM conversations WHERE $1 = ANY(participant_ids)`, [userId]);
+      await runner.query(`DELETE FROM users WHERE id = $1`, [userId]);
+      await runner.commitTransaction();
+    } catch (err) {
+      await runner.rollbackTransaction();
+      throw err;
+    } finally {
+      await runner.release();
+    }
+  }
+
+  async findById(id: string): Promise<AuthenticatedUser | null> {
+    const rows = await this.db.query<UserRow[]>(
+      `SELECT ${USER_COLUMNS}
+         FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+      [id],
+    );
+    if (!rows[0]) return null;
+    return this.toPublic(rows[0]);
+  }
+
   async getProfile(userId: string): Promise<UserProfile> {
     const rows = await this.db.query<UserRow[]>(
       `SELECT ${USER_COLUMNS}
@@ -166,5 +226,547 @@ export class UsersService {
       ),
     ]);
     return this.toProfile(rows[0], photoUrls, socialLinks, strikeRows[0]?.pts ?? 0);
+  }
+
+  async getPublicProfile(userId: string, viewerId?: string): Promise<PublicUserProfile> {
+    const rows = await this.db.query<PublicUserRow[]>(
+      `SELECT id, display_name,
+              COALESCE(
+                avatar_url,
+                (SELECT url FROM user_photos WHERE user_id = users.id ORDER BY position ASC LIMIT 1)
+              ) AS avatar_url,
+              cover_url,
+              bio, verification_level,
+              id_verification_status, goals,
+              date_part('year', age(date_of_birth))::int AS age,
+              hometown_city, hometown_country, show_age, show_hometown,
+              gender, gender_self_describe, sexual_orientation, orientation_self_describe, nationality,
+              COALESCE(show_gender, true) AS show_gender,
+              COALESCE(show_orientation, false) AS show_orientation,
+              COALESCE(show_nationality, true) AS show_nationality
+         FROM users
+        WHERE id = $1 AND deleted_at IS NULL AND visibility = 'public'
+        LIMIT 1`,
+      [userId],
+    );
+    if (!rows[0]) throw new NotFoundException({ code: 'users.not_found', message: 'User not found' });
+    const r = rows[0];
+    const onlineSet = await this.presence.whichAreOnline([r.id]);
+
+    let relationship: PublicUserProfile['relationship'];
+    let blockedByViewer: boolean | undefined;
+    let distanceMeters: number | undefined;
+    let mapLat: number | undefined;
+    let mapLng: number | undefined;
+    if (viewerId && viewerId !== r.id) {
+      const [perm, blocked, meters, pin] = await Promise.all([
+        this.messaging.permissionFor(viewerId, r.id),
+        this.blocks.hasBlocked(viewerId, r.id),
+        this.distanceBetween(viewerId, r.id),
+        this.subjectMapPin(r.id),
+      ]);
+      relationship = {
+        matched: perm.matched,
+        sharedInterests: perm.sharedInterests,
+        canMessage: perm.canMessage,
+      };
+      blockedByViewer = blocked;
+      if (meters != null) distanceMeters = meters;
+      if (pin) {
+        mapLat = pin.lat;
+        mapLng = pin.lng;
+      }
+    }
+
+    const [status, photos] = await Promise.all([
+      this.loadPublicStatus(r.id),
+      this.listPhotos(r.id),
+    ]);
+    const photoUrls = photos.map((ph) => ph.url);
+
+    return {
+      id: r.id,
+      displayName: r.display_name,
+      avatarUrl: r.avatar_url,
+      coverUrl: r.cover_url,
+      bio: r.bio,
+      verification: r.verification_level as PublicUserProfile['verification'],
+      verificationScore: SCORE[r.verification_level as VerificationLevel] ?? 0,
+      idVerified: r.id_verification_status === 'verified',
+      goals: r.goals ?? [],
+      online: onlineSet.has(r.id),
+      ...(r.show_age && r.age != null ? { age: r.age } : {}),
+      ...(r.show_hometown && (r.hometown_city || r.hometown_country)
+        ? {
+            hometownCity: r.hometown_city,
+            hometownCountry: r.hometown_country,
+          }
+        : {}),
+      ...(r.show_gender && r.gender
+        ? {
+            gender: r.gender as Gender,
+            ...(r.gender === 'self_describe' && r.gender_self_describe
+              ? { genderSelfDescribe: r.gender_self_describe }
+              : {}),
+          }
+        : {}),
+      ...(r.show_orientation && r.sexual_orientation
+        ? {
+            sexualOrientation: r.sexual_orientation as SexualOrientation,
+            ...(r.sexual_orientation === 'self_describe' && r.orientation_self_describe
+              ? { orientationSelfDescribe: r.orientation_self_describe }
+              : {}),
+          }
+        : {}),
+      ...(r.show_nationality && r.nationality ? { nationality: r.nationality } : {}),
+      ...(photoUrls.length > 0 ? { photoUrls } : {}),
+      ...(status ? { status } : {}),
+      ...(relationship ? { relationship } : {}),
+      ...(blockedByViewer !== undefined ? { blockedByViewer } : {}),
+      ...(distanceMeters != null ? { distanceMeters } : {}),
+      ...(mapLat != null && mapLng != null ? { mapLat, mapLng } : {}),
+    };
+  }
+
+  private async subjectMapPin(
+    targetId: string,
+  ): Promise<{ lat: number; lng: number } | null> {
+    const rows = await this.db.query<Array<{ lat: number | string; lng: number | string }>>(
+      `SELECT ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng
+         FROM users
+        WHERE id = $1
+          AND deleted_at IS NULL
+          AND location IS NOT NULL
+        LIMIT 1`,
+      [targetId],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    const lat = typeof row.lat === 'number' ? row.lat : Number(row.lat);
+    const lng = typeof row.lng === 'number' ? row.lng : Number(row.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+  }
+
+  private async distanceBetween(viewerId: string, targetId: string): Promise<number | null> {
+    const rows = await this.db.query<Array<{ meters: number | string | null }>>(
+      `SELECT ROUND(ST_Distance(v.location, t.location)::numeric)::int AS meters
+         FROM users v
+         CROSS JOIN users t
+        WHERE v.id = $1
+          AND t.id = $2
+          AND v.deleted_at IS NULL
+          AND t.deleted_at IS NULL
+          AND v.location IS NOT NULL
+          AND t.location IS NOT NULL
+        LIMIT 1`,
+      [viewerId, targetId],
+    );
+    const raw = rows[0]?.meters;
+    if (raw == null) return null;
+    const n = typeof raw === 'number' ? raw : Number(raw);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return Math.round(n);
+  }
+
+  private async loadPublicStatus(userId: string): Promise<PublicUserStatus | undefined> {
+    const [rows, rankRows, unlockRows] = await Promise.all([
+      this.db.query<
+        Array<{ total_xp: number; current_streak: number; longest_streak: number }>
+      >(
+        `SELECT total_xp, current_streak, longest_streak
+           FROM user_gamification
+          WHERE user_id = $1
+          LIMIT 1`,
+        [userId],
+      ),
+      this.db.query<Array<{ rank: number }>>(
+        `WITH ranked AS (
+            SELECT user_id,
+                   RANK() OVER (ORDER BY total_xp DESC)::int AS rank
+              FROM user_gamification
+             WHERE total_xp > 0)
+          SELECT rank FROM ranked WHERE user_id = $1`,
+        [userId],
+      ),
+      this.db.query<Array<{ achievement_id: string }>>(
+        `SELECT achievement_id FROM user_achievements WHERE user_id = $1`,
+        [userId],
+      ),
+    ]);
+
+    const row = rows[0];
+    const summary = row
+      ? summaryForXp(row.total_xp, row.current_streak, row.longest_streak)
+      : { level: 1, xpIntoLevel: 0, xpForNextLevel: 50, currentStreak: 0 };
+
+    const allTimeRank = rankRows[0]?.rank ?? null;
+    const unlocked = new Set(unlockRows.map((r) => r.achievement_id));
+    const achievementIcons = ACHIEVEMENTS.filter((a) => unlocked.has(a.id)).map((a) => a.icon);
+
+    return {
+      level: summary.level,
+      xpIntoLevel: summary.xpIntoLevel,
+      xpForNextLevel: summary.xpForNextLevel,
+      currentStreak: summary.currentStreak,
+      allTimeRank,
+      achievementIcons,
+    };
+  }
+
+  async updateProfile(userId: string, req: UpdateProfileRequest): Promise<UserProfile> {
+    const setClauses: string[] = [];
+    const params: unknown[] = [userId];
+
+    if (req.displayName !== undefined) {
+      params.push(req.displayName);
+      setClauses.push(`display_name = $${params.length}`);
+    }
+    if (req.bio !== undefined) {
+      params.push(req.bio);
+      setClauses.push(`bio = $${params.length}`);
+    }
+    if (req.avatarUrl !== undefined) {
+      params.push(req.avatarUrl);
+      setClauses.push(`avatar_url = $${params.length}`);
+    }
+    if (req.coverUrl !== undefined) {
+      params.push(req.coverUrl);
+      setClauses.push(`cover_url = $${params.length}`);
+    }
+    if (req.visibility !== undefined) {
+      params.push(req.visibility);
+      setClauses.push(`visibility = $${params.length}`);
+    }
+    if (req.goals !== undefined) {
+      params.push(req.goals);
+      setClauses.push(`goals = $${params.length}`);
+    }
+    if (req.interests !== undefined) {
+      params.push(req.interests);
+      setClauses.push(`interests = $${params.length}`);
+    }
+    if (req.dateOfBirth !== undefined) {
+      if (req.dateOfBirth !== null) {
+        const dob = new Date(req.dateOfBirth);
+        if (Number.isNaN(dob.getTime())) {
+          throw new BadRequestException({ code: 'profile.invalid_dob', message: 'Invalid date of birth' });
+        }
+        const today = new Date();
+        let years = today.getFullYear() - dob.getFullYear();
+        const m = today.getMonth() - dob.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) years -= 1;
+        if (years < 18) {
+          throw new BadRequestException({
+            code: 'profile.underage',
+            message: 'You must be at least 18 years old to use G88.',
+          });
+        }
+      }
+      params.push(req.dateOfBirth);
+      setClauses.push(`date_of_birth = $${params.length}`);
+    }
+    if (req.hometownCity !== undefined) {
+      params.push(
+        req.hometownCity === null || req.hometownCity.trim() === ''
+          ? null
+          : req.hometownCity.trim().slice(0, 80),
+      );
+      setClauses.push(`hometown_city = $${params.length}`);
+    }
+    if (req.hometownCountry !== undefined) {
+      const c =
+        req.hometownCountry === null || req.hometownCountry.trim() === ''
+          ? null
+          : req.hometownCountry.trim().toUpperCase().slice(0, 40);
+      params.push(c);
+      setClauses.push(`hometown_country = $${params.length}`);
+    }
+    if (req.showAge !== undefined) {
+      params.push(req.showAge);
+      setClauses.push(`show_age = $${params.length}`);
+    }
+    if (req.showHometown !== undefined) {
+      params.push(req.showHometown);
+      setClauses.push(`show_hometown = $${params.length}`);
+    }
+    if (req.gender !== undefined) {
+      if (req.gender !== null && !isGender(req.gender)) {
+        throw new BadRequestException({ code: 'profile.invalid_gender', message: 'Invalid gender' });
+      }
+      params.push(req.gender);
+      setClauses.push(`gender = $${params.length}`);
+      if (req.gender !== 'self_describe') {
+        params.push(null);
+        setClauses.push(`gender_self_describe = $${params.length}`);
+      }
+    }
+    if (req.genderSelfDescribe !== undefined && !(req.gender !== undefined && req.gender !== 'self_describe')) {
+      const g =
+        req.genderSelfDescribe === null || req.genderSelfDescribe.trim() === ''
+          ? null
+          : req.genderSelfDescribe.trim().slice(0, SELF_DESCRIBE_MAX);
+      params.push(g);
+      setClauses.push(`gender_self_describe = $${params.length}`);
+    }
+    if (req.sexualOrientation !== undefined) {
+      if (req.sexualOrientation !== null && !isSexualOrientation(req.sexualOrientation)) {
+        throw new BadRequestException({
+          code: 'profile.invalid_orientation',
+          message: 'Invalid sexual orientation',
+        });
+      }
+      params.push(req.sexualOrientation);
+      setClauses.push(`sexual_orientation = $${params.length}`);
+      if (req.sexualOrientation !== 'self_describe') {
+        params.push(null);
+        setClauses.push(`orientation_self_describe = $${params.length}`);
+      }
+    }
+    if (req.orientationSelfDescribe !== undefined && !(req.sexualOrientation !== undefined && req.sexualOrientation !== 'self_describe')) {
+      const o =
+        req.orientationSelfDescribe === null || req.orientationSelfDescribe.trim() === ''
+          ? null
+          : req.orientationSelfDescribe.trim().slice(0, SELF_DESCRIBE_MAX);
+      params.push(o);
+      setClauses.push(`orientation_self_describe = $${params.length}`);
+    }
+    if (req.nationality !== undefined) {
+      const n =
+        req.nationality === null || req.nationality.trim() === ''
+          ? null
+          : req.nationality.trim().toUpperCase().slice(0, 2);
+      params.push(n);
+      setClauses.push(`nationality = $${params.length}`);
+    }
+    if (req.showGender !== undefined) {
+      params.push(req.showGender);
+      setClauses.push(`show_gender = $${params.length}`);
+    }
+    if (req.showOrientation !== undefined) {
+      params.push(req.showOrientation);
+      setClauses.push(`show_orientation = $${params.length}`);
+    }
+    if (req.showNationality !== undefined) {
+      params.push(req.showNationality);
+      setClauses.push(`show_nationality = $${params.length}`);
+    }
+    if (req.openToDating !== undefined) {
+      params.push(req.openToDating);
+      setClauses.push(`open_to_dating = $${params.length}`);
+    }
+    if (req.seekingGenders !== undefined) {
+      params.push(req.seekingGenders);
+      setClauses.push(`seeking_genders = $${params.length}`);
+    }
+    if (req.friendsSeeOnlineStatus !== undefined) {
+      params.push(req.friendsSeeOnlineStatus);
+      setClauses.push(`friends_see_online_status = $${params.length}`);
+    }
+
+    if (setClauses.length === 0) return this.getProfile(userId);
+
+    await this.db.query(
+      `UPDATE users SET ${setClauses.join(', ')}, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
+      params,
+    );
+    return this.getProfile(userId);
+  }
+
+  async listPhotos(userId: string): Promise<UserPhoto[]> {
+    const rows = await this.db.query<
+      Array<{ id: string; url: string; position: number; created_at: string | Date }>
+    >(
+      `SELECT id, url, position, created_at FROM user_photos WHERE user_id = $1 ORDER BY position ASC`,
+      [userId],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      url: r.url,
+      position: r.position,
+      createdAt: toIsoOrNow(r.created_at),
+    }));
+  }
+
+  async addPhoto(userId: string, url: string): Promise<UserPhoto[]> {
+    const countRows = await this.db.query<Array<{ c: number }>>(
+      `SELECT COUNT(*)::int AS c FROM user_photos WHERE user_id = $1`,
+      [userId],
+    );
+    if ((countRows[0]?.c ?? 0) >= MAX_PHOTOS) {
+      throw new BadRequestException({ code: 'photos.limit', message: `Max ${MAX_PHOTOS} photos` });
+    }
+    await this.db.query(
+      `INSERT INTO user_photos (user_id, url, position)
+       VALUES ($1, $2, (SELECT COALESCE(MAX(position), 0) + 1 FROM user_photos WHERE user_id = $1))`,
+      [userId, url],
+    );
+    await this.syncAvatar(userId);
+    return this.listPhotos(userId);
+  }
+
+  async deletePhoto(userId: string, photoId: string): Promise<UserPhoto[]> {
+    await this.db.query(`DELETE FROM user_photos WHERE id = $1 AND user_id = $2`, [photoId, userId]);
+    await this.syncAvatar(userId);
+    return this.listPhotos(userId);
+  }
+
+  async reorderPhotos(userId: string, photoIds: string[]): Promise<UserPhoto[]> {
+    for (let i = 0; i < photoIds.length; i++) {
+      await this.db.query(
+        `UPDATE user_photos SET position = $1 WHERE id = $2 AND user_id = $3`,
+        [i + 1, photoIds[i], userId],
+      );
+    }
+    await this.syncAvatar(userId);
+    return this.listPhotos(userId);
+  }
+
+  async setCover(
+    userId: string,
+    opts: { photoId?: string | null; clear?: boolean },
+  ): Promise<UserProfile> {
+    if (opts.clear) {
+      await this.db.query(`UPDATE users SET cover_url = NULL, updated_at = NOW() WHERE id = $1`, [
+        userId,
+      ]);
+      return this.getProfile(userId);
+    }
+    if (opts.photoId) {
+      const photos = await this.db.query<Array<{ url: string }>>(
+        `SELECT url FROM user_photos WHERE id = $1 AND user_id = $2 LIMIT 1`,
+        [opts.photoId, userId],
+      );
+      if (!photos[0]) throw new NotFoundException({ code: 'photos.not_found', message: 'Photo not found' });
+      await this.db.query(`UPDATE users SET cover_url = $1, updated_at = NOW() WHERE id = $2`, [
+        photos[0].url,
+        userId,
+      ]);
+    }
+    return this.getProfile(userId);
+  }
+
+  private async syncAvatar(userId: string): Promise<void> {
+    const rows = await this.db.query<Array<{ url: string }>>(
+      `SELECT url FROM user_photos WHERE user_id = $1 ORDER BY position ASC LIMIT 1`,
+      [userId],
+    );
+    await this.db.query(`UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2`, [
+      rows[0]?.url ?? null,
+      userId,
+    ]);
+  }
+
+  private async getPhotoUrls(userId: string): Promise<string[]> {
+    const rows = await this.db.query<Array<{ url: string }>>(
+      `SELECT url FROM user_photos WHERE user_id = $1 ORDER BY position ASC LIMIT $2`,
+      [userId, MAX_PHOTOS],
+    );
+    return rows.map((r) => r.url);
+  }
+
+  private async getSocialLinks(userId: string): Promise<SocialLink[]> {
+    const rows = await this.db.query<SocialLinkRow[]>(
+      `SELECT provider, username, url, verified FROM user_social_links WHERE user_id = $1`,
+      [userId],
+    );
+    return rows.map((r) => ({
+      provider: r.provider,
+      username: r.username,
+      url: r.url,
+      verified: r.verified,
+    }));
+  }
+
+  private toPublic(r: UserRow): AuthenticatedUser {
+    const level = r.verification_level as VerificationLevel;
+    return {
+      id: r.id,
+      email: r.email,
+      displayName: r.display_name,
+      avatarUrl: r.avatar_url,
+      verification: level,
+    };
+  }
+
+  private deriveBadges(
+    level: VerificationLevel,
+    tier: SubscriptionTier,
+    socialLinks: SocialLink[],
+    idVerificationStatus: IdVerificationStatus,
+    emailVerifiedAt: string | Date | null | undefined,
+    phoneVerifiedAt: string | Date | null | undefined,
+  ): ProfileBadges {
+    const rank = LADDER.indexOf(level);
+    return {
+      email: emailVerifiedAt != null,
+      phone: phoneVerifiedAt != null,
+      photo: rank >= LADDER.indexOf('selfie'),
+      id: rank >= LADDER.indexOf('id') || idVerificationStatus === 'verified',
+      social: socialLinks.some((l) => l.verified),
+      premium: tier !== 'free',
+      verified: idVerificationStatus === 'verified',
+    };
+  }
+
+  private toProfile(
+    r: UserRow,
+    photoUrls: string[],
+    socialLinks: SocialLink[],
+    strikePoints = 0,
+  ): UserProfile {
+    const level = r.verification_level as VerificationLevel;
+    const suspendedRaw = r.story_suspended_until;
+    let storySuspendedUntil: string | null = null;
+    if (suspendedRaw) {
+      const t = new Date(suspendedRaw as string | Date).getTime();
+      if (Number.isFinite(t) && t > Date.now()) {
+        storySuspendedUntil = new Date(t).toISOString();
+      }
+    }
+    return {
+      ...this.toPublic(r),
+      bio: r.bio,
+      visibility: r.visibility,
+      goals: r.goals ?? [],
+      interests: r.interests ?? [],
+      profileComplete: r.bio != null,
+      phone: r.phone,
+      age: r.age,
+      dateOfBirth: r.date_of_birth,
+      hometownCity: r.hometown_city,
+      hometownCountry: r.hometown_country,
+      showAge: r.show_age ?? true,
+      showHometown: r.show_hometown ?? true,
+      gender: (r.gender as Gender | null) ?? null,
+      genderSelfDescribe: r.gender_self_describe ?? null,
+      sexualOrientation: (r.sexual_orientation as SexualOrientation | null) ?? null,
+      orientationSelfDescribe: r.orientation_self_describe ?? null,
+      nationality: r.nationality ?? null,
+      showGender: r.show_gender ?? true,
+      showOrientation: r.show_orientation ?? false,
+      showNationality: r.show_nationality ?? true,
+      openToDating: r.open_to_dating ?? false,
+      seekingGenders: parseSeekingGenders(r.seeking_genders),
+      friendsSeeOnlineStatus: r.friends_see_online_status ?? true,
+      coverUrl: r.cover_url ?? null,
+      photoUrls,
+      subscriptionTier: r.subscription_tier ?? 'free',
+      socialLinks,
+      verificationScore: SCORE[level] ?? 0,
+      badges: this.deriveBadges(
+        level,
+        r.subscription_tier ?? 'free',
+        socialLinks,
+        r.id_verification_status,
+        r.email_verified_at,
+        r.phone_verified_at,
+      ),
+      idVerificationStatus: r.id_verification_status,
+      verifiedBadge: r.id_verification_status === 'verified',
+      createdAt: toIsoOrNow(r.created_at),
+      strikePoints,
+      storySuspendedUntil,
+    };
   }
 }
