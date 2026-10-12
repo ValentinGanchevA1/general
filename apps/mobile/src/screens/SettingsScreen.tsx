@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -21,7 +22,7 @@ import { deleteAccount, logout } from '@/features/auth/authSlice';
 import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
 import { ListRow } from '@/components/ListRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { APP_VERSION } from '@/constants/app';
+import { APP_VERSION, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { colors, spacing, fontSize, radius } from '@/theme';
 import { resolveTrustNextStep, strikeStanding } from '@g88/shared';
 
@@ -92,6 +93,10 @@ export function SettingsScreen(): React.JSX.Element {
 
   const handleLogout = (): void => {
     void dispatch(logout());
+  };
+
+  const openTerms = (): void => {
+    void Linking.openURL(TERMS_OF_SERVICE_URL);
   };
 
   const confirmDelete = async (): Promise<void> => {
@@ -260,6 +265,12 @@ export function SettingsScreen(): React.JSX.Element {
           />
           <ListRow
             style={styles.rowSpaced}
+            title="Terms of Service"
+            subtitle="Rules for using G88"
+            onPress={openTerms}
+          />
+          <ListRow
+            style={styles.rowSpaced}
             title="Help & Support"
             subtitle="FAQ and contact"
             onPress={() => navigation.navigate('Help')}
@@ -267,7 +278,7 @@ export function SettingsScreen(): React.JSX.Element {
           <ListRow
             style={styles.rowSpaced}
             title="About"
-            subtitle="Version and credits"
+            subtitle="Version and product overview"
             onPress={() => navigation.navigate('About')}
           />
 
