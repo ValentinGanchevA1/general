@@ -607,6 +607,18 @@ export function MapScreen(): React.JSX.Element {
 		[points, myLat, myLng],
 	);
 
+	const trendingSummary = useMemo(() => {
+		let people = 0;
+		let events = 0;
+		let listings = 0;
+		for (const p of points) {
+			if (p.kind === 'user') people += 1;
+			else if (p.kind === 'event') events += 1;
+			else if (p.kind === 'listing') listings += 1;
+		}
+		return { people, events, listings };
+	}, [points]);
+
 	const onTrendingPress = useCallback(
 		(item: TrendingItem) => {
 			onEntityPress(item.point);
@@ -787,6 +799,7 @@ export function MapScreen(): React.JSX.Element {
 				}
 				collapsed={trendingCollapsed}
 				onToggleCollapse={() => setTrendingCollapsed((v) => !v)}
+				summary={trendingSummary}
 			/>
 
 			{createNudgeVisible ? (
@@ -811,9 +824,9 @@ export function MapScreen(): React.JSX.Element {
 									? () => setDatingOnly(false)
 									: emptyCopy.actionKind === 'dating_prefs'
 										? () =>
-											openRootScreen(navigation, 'ProfileEdit', {
-												focus: 'dating',
-											})
+												openRootScreen(navigation, 'ProfileEdit', {
+													focus: 'dating',
+												})
 										: emptyCopy.actionKind === 'verify_email'
 											? () => openRootScreen(navigation, 'TrustCenter', { focusStep: 'email' })
 											: openCreateNearby
@@ -852,31 +865,31 @@ export function MapScreen(): React.JSX.Element {
 								: {})}
 							{...(selected.kind === 'user'
 								? {
-									onMessage: () => {
-										void openSheetMessage();
-									},
-								}
+										onMessage: () => {
+											void openSheetMessage();
+										},
+									}
 								: {})}
 							{...(selected.kind === 'user' && viewerMode === 'social'
 								? {
-									onWave: () => {
-										pinSendWave();
-									},
-								}
+										onWave: () => {
+											pinSendWave();
+										},
+									}
 								: {})}
 							{...(selected.kind === 'user' && viewerMode === 'dating'
 								? {
-									onLike: () => {
-										pinSendLike();
-									},
-									onPass: () => {
-										pinSendPass();
-										closeSheet();
-									},
-									likeSent: pinLikeSent,
-									isMatch: pinIsMatch,
-									actionPending: pinActionPending,
-								}
+										onLike: () => {
+											pinSendLike();
+										},
+										onPass: () => {
+											pinSendPass();
+											closeSheet();
+										},
+										likeSent: pinLikeSent,
+										isMatch: pinIsMatch,
+										actionPending: pinActionPending,
+									}
 								: {})}
 						/>
 					) : null}
