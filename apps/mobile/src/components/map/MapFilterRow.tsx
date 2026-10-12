@@ -1,5 +1,6 @@
 // Map chrome: People · Events · Listings + search + sort + create (+) + More.
 // Friends + listing mode live in the More sheet.
+// Cold start default: People only (reduce visual noise).
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -20,7 +21,8 @@ import { COMBINED_FILTER_ROW_HEIGHT } from './mapChromeLayout';
 
 export type ListingModeFilterValue = 'all' | ListingMode;
 
-export const DEFAULT_MAP_LAYERS: EntityKind[] = ['user', 'event', 'listing'];
+/** Cold-start layers — People only; Events/Listings are intentional toggles. */
+export const DEFAULT_MAP_LAYERS: EntityKind[] = ['user'];
 
 const LAYER_OPTIONS: Array<{ id: EntityKind; label: string; a11y: string }> = [
 	{ id: 'user', label: 'People', a11y: 'People layer' },
