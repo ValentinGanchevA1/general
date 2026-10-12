@@ -1,7 +1,8 @@
 // Compact "Trending nearby" card from viewport points (client-only).
-// Collapsible: default collapsed to one-line header to free map real estate.
+// Collapsed: title + activity counters (screenshot contract).
+// Expanded: ranked entity rows.
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -18,15 +19,36 @@ const KIND_DOT: Record<TrendingItem['kind'], string> = {
 	listing: colors.entityListing,
 };
 
+export interface TrendingSummary {
+	/** People (users) in viewport. */
+	people: number;
+	events: number;
+	listings: number;
+}
+
 export interface TrendingCardProps {
 	items: TrendingItem[];
 	onPressItem: (item: TrendingItem) => void;
 	/** Absolute top from safe-area stack (mapChromeLayout.mapTrendingTop). */
 	top: number;
 	visible: boolean;
-	/** When true, only the header row is shown. */
+	/** When true, only the header + counters are shown. */
 	collapsed?: boolean;
 	onToggleCollapse?: () => void;
+	/** Viewport activity counts shown before expand. */
+	summary?: TrendingSummary;
+}
+
+function formatSummary(summary: TrendingSummary | undefined): string | null {
+	if (!summary) return null;
+	const { people, events, listings } = summary;
+	const total = people + events + listings;
+	if (total <= 0) return null;
+	const parts: string[] = [];
+	if (people > 0) parts.push(`${people} active`);
+	if (events > 0) parts.push(`${events} event${events === 1 ? '' : 's'}`);
+	if (listings > 0) parts.push(`${listings} listing${listings === 1 ? '' : 's'}`);
+	return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 export function TrendingCard({
@@ -36,39 +58,50 @@ export function TrendingCard({
 	visible,
 	collapsed = true,
 	onToggleCollapse,
+	summary,
 }: TrendingCardProps): React.JSX.Element | null {
-	if (!visible || items.length === 0) return null;
+	const summaryLine = useMemo(() => formatSummary(summary), [summary]);
+	const hasBody = items.length > 0;
+	if (!visible) return null;
+	if (!hasBody && summaryLine == null) return null;
 
-	const canToggle = typeof onToggleCollapse === 'function';
+	const canToggle = typeof onToggleCollapse === 'function' && hasBody;
 
 	return (
 		<View style={[styles.wrap, { top }]} pointerEvents="box-none">
 			<View style={styles.card}>
 				<Pressable
 					onPress={canToggle ? onToggleCollapse : undefined}
-					style={styles.headerRow}
+					style={styles.headerBlock}
 					accessibilityRole={canToggle ? 'button' : undefined}
 					accessibilityLabel={
 						canToggle
 							? collapsed
-								? 'Expand trending nearby'
+								? `Expand trending nearby. ${summaryLine ?? ''}`
 								: 'Collapse trending nearby'
-							: 'Trending nearby'
+							: `Trending nearby. ${summaryLine ?? ''}`
 					}
 					accessibilityState={canToggle ? { expanded: !collapsed } : undefined}
 					hitSlop={6}
 				>
-					<Text style={styles.heading}>Trending nearby</Text>
+					<View style={styles.headerTextCol}>
+						<Text style={styles.heading}>Trending nearby</Text>
+						{summaryLine ? (
+							<Text style={styles.summary} numberOfLines={1}>
+								{summaryLine}
+							</Text>
+						) : null}
+					</View>
 					{canToggle ? (
 						<Icon
 							name={collapsed ? 'chevron-down' : 'chevron-up'}
-							size={18}
+							size={20}
 							color={colors.textMuted}
 						/>
 					) : null}
 				</Pressable>
 
-				{!collapsed
+				{!collapsed && hasBody
 					? items.map((item, index) => (
 							<Pressable
 								key={`${item.kind}:${item.id}`}
@@ -104,25 +137,34 @@ const styles = StyleSheet.create({
 		zIndex: 17,
 	},
 	card: {
-		backgroundColor: 'rgba(18,18,31,0.94)',
+		backgroundColor: 'rgba(15, 20, 36, 0.94)',
 		borderWidth: 1,
 		borderColor: colors.borderStrong,
-		borderRadius: radius.md,
-		paddingVertical: 8,
-		paddingHorizontal: 12,
+		borderRadius: 16,
+		paddingVertical: 12,
+		paddingHorizontal: 14,
 	},
-	headerRow: {
+	headerBlock: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		minHeight: 22,
+		gap: 10,
+		minHeight: 36,
+	},
+	headerTextCol: {
+		flex: 1,
+		minWidth: 0,
+		gap: 2,
 	},
 	heading: {
-		color: colors.textMuted,
-		fontSize: fontSize.xs,
+		color: colors.primary,
+		fontSize: 15,
 		fontWeight: '700',
-		textTransform: 'uppercase',
-		letterSpacing: 0.4,
+	},
+	summary: {
+		color: colors.textMuted,
+		fontSize: 13,
+		fontWeight: '500',
 	},
 	row: {
 		flexDirection: 'row',
