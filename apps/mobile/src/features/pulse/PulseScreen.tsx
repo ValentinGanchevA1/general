@@ -1,1 +1,609 @@
-PLACEHOLDER
+// apps/mobile/src/features/pulse/PulseScreen.tsx
+//
+// Pulse — activity hub + stories (screenshot contract 2026-10-12).
+// Layout: header (+ badge) → story strip → filter chips (All|Waves|Chats|Matches)
+//         → activity cards with type CTAs.
+// Social activity re-merged into Pulse (was split to Interactions).
+
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+
+import { appAlert } from '@/ui/appAlert';
+import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
+
+import type { ActivityItem, ActivityType, StoryCard, Viewport } from '@g88/shared';
+import { canPostStory, storyGateMessage } from '@g88/shared';
+import type { WaveRequest, WaveResponse } from '@g88/shared';
+
+import type { PulseFilter, RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
+import { openRootScreen } from '@/navigation/openRootScreen';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { fetchFeed, clearPendingFilter } from './pulseSlice';
+import { useUserLocation } from '@/features/location/useUserLocation';
+import {
+  fetchNearbyStories,
+  storyReceived,
+} from '@/features/stories/storiesSlice';
+import { PulseStrip } from '@/features/stories/components/PulseStrip';
+import { colors, spacing } from '@/theme';
+import { EmptyState } from '@/components/EmptyState';
+import { StoryViewer } from '@/features/stories/components/StoryViewer';
+import { StoryCreateSheet } from '@/features/stories/components/StoryCreateSheet';
+import { pickAndUploadStoryMedia } from '@/features/stories/storyMedia';
+import { useSocket } from '@/realtime/useSocket';
+import { track } from '@/lib/analytics';
+import { postJson } from '@/api/client';
+
+import { ActivityCard } from './components/ActivityCard';
+import { NearbyPeopleStrip } from './components/NearbyPeopleStrip';
+import { TrendingStrip } from './components/TrendingStrip';
+import { useTrendingNearby } from './useTrendingNearby';
+
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+type R = RouteProp<TabParamList, 'Pulse'>;
+
+interface FilterDef {
+  key: PulseFilter;
+  label: string;
+  type: ActivityType | null;
+}
+
+/** Screenshot contract: All | Waves | Chats | Matches. */
+const FILTERS: FilterDef[] = [
+  { key: 'all', label: 'All', type: null },
+  { key: 'waves', label: 'Waves', type: 'wave' },
+  { key: 'chats', label: 'Chats', type: 'chat' },
+  { key: 'matches', label: 'Matches', type: 'match' },
+];
+
+const ALLOWED_FILTER_KEYS = new Set(FILTERS.map((f) => f.key));
+
+function resolveFilter(raw: PulseFilter | undefined): PulseFilter {
+  if (raw && ALLOWED_FILTER_KEYS.has(raw)) return raw;
+  return 'all';
+}
+
+function viewportAround(lat: number, lng: number, delta = 0.02): Viewport {
+  return {
+    ne: { lat: lat + delta / 2, lng: lng + delta / 2 },
+    sw: { lat: lat - delta / 2, lng: lng - delta / 2 },
+  };
+}
+
+type EmptyActionKind = 'story' | 'map' | 'verify_email' | 'verify_phone';
+
+export function PulseScreen(): React.JSX.Element {
+  const dispatch = useAppDispatch();
+  const navigation = useNavigation<Nav>();
+  const route = useRoute<R>();
+
+  const { items, loading, error, pendingFilter } = useAppSelector((s) => s.pulse);
+  const discoveryPoints = useAppSelector((s) => s.discovery.points);
+  const nearbyStories = useAppSelector((s) => s.stories.nearby);
+  const profile = useAppSelector((s) => s.profile.profile);
+  const pendingFriends = useAppSelector((s) => s.friends.pendingCount);
+  const chatUnread = useAppSelector((s) =>
+    s.chat.conversations.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0),
+  );
+  const { topics: trendingTopics } = useTrendingNearby();
+  const { coords: myCoords, requestPermission } = useUserLocation();
+  const { on } = useSocket();
+
+  const [filter, setFilter] = useState<PulseFilter>(() =>
+    resolveFilter(route.params?.filter),
+  );
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [trendingCollapsed, setTrendingCollapsed] = useState(true);
+  const [actionBusyId, setActionBusyId] = useState<string | null>(null);
+  const insets = useContext(SafeAreaInsetsContext) ?? {
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  };
+
+  useEffect(() => {
+    if (route.params?.filter == null) return;
+    const next = resolveFilter(route.params.filter);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync from route
+    setFilter(next);
+  }, [route.params?.filter]);
+
+  useEffect(() => {
+    if (!pendingFilter) return;
+    const next = resolveFilter(pendingFilter as PulseFilter);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync from redux
+    setFilter(next);
+    dispatch(clearPendingFilter());
+  }, [pendingFilter, dispatch]);
+
+  const load = useCallback(() => {
+    const f = FILTERS.find((x) => x.key === filter);
+    void dispatch(fetchFeed(f?.type ? { types: [f.type] } : {}));
+  }, [dispatch, filter]);
+
+  const loadStories = useCallback(() => {
+    if (!myCoords) return;
+    void dispatch(
+      fetchNearbyStories({
+        viewport: viewportAround(myCoords.lat, myCoords.lng),
+        zoom: 14,
+      }),
+    );
+  }, [dispatch, myCoords]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void requestPermission();
+      load();
+      loadStories();
+    }, [requestPermission, load, loadStories]),
+  );
+
+  useEffect(() => {
+    const unsub = on('story:new', (e) => {
+      dispatch(storyReceived(e));
+    });
+    return unsub;
+  }, [on, dispatch]);
+
+  /** Include social types — no withoutPeople strip. */
+  const filtered = useMemo(() => {
+    const f = FILTERS.find((x) => x.key === filter);
+    if (!f?.type) return items;
+    return items.filter((i) => i.type === f.type);
+  }, [items, filter]);
+
+  const badgeCount = Math.max(pendingFriends, chatUnread);
+
+  const onTap = useCallback(
+    (it: ActivityItem): void => {
+      const { screen, params } = it.deepLink;
+      if (
+        screen === 'ListingDetail' ||
+        screen === 'EventDetail' ||
+        screen === 'OfferDetail' ||
+        screen === 'TradeDetail'
+      ) {
+        openRootScreen(navigation, screen as 'ListingDetail' | 'EventDetail', params);
+        return;
+      }
+      if (screen === 'Chat' || screen === 'Conversation') {
+        openRootScreen(navigation, 'Chat', params as never);
+        return;
+      }
+      if (screen === 'UserProfile' && it.actorId) {
+        navigation.navigate('UserProfile', { userId: it.actorId });
+        return;
+      }
+      if (screen === 'Main') {
+        navigation.navigate('Main', params as never);
+        return;
+      }
+      if (it.type === 'listing' && it.id) {
+        openRootScreen(navigation, 'ListingDetail', { listingId: it.id });
+        return;
+      }
+      if (it.actorId) {
+        navigation.navigate('UserProfile', { userId: it.actorId });
+        return;
+      }
+      (navigation.navigate as (s: string, p?: object) => void)(screen, params);
+    },
+    [navigation],
+  );
+
+  const onWaveBack = useCallback(
+    async (it: ActivityItem) => {
+      if (!it.actorId || actionBusyId) return;
+      setActionBusyId(it.id);
+      try {
+        await postJson<WaveRequest, WaveResponse>('/interactions/wave', {
+          toUserId: it.actorId,
+        });
+        track('pulse.wave_back', { actorId: it.actorId });
+        load();
+      } catch {
+        appAlert('Wave', 'Could not send wave. Try again.');
+      } finally {
+        setActionBusyId(null);
+      }
+    },
+    [actionBusyId, load],
+  );
+
+  const onMessage = useCallback(
+    (it: ActivityItem) => {
+      if (it.deepLink.screen === 'Chat' || it.deepLink.screen === 'Conversation') {
+        openRootScreen(navigation, 'Chat', it.deepLink.params as never);
+        return;
+      }
+      if (it.actorId) {
+        navigation.navigate('UserProfile', { userId: it.actorId });
+      }
+    },
+    [navigation],
+  );
+
+  const storyEligibility = useMemo(() => {
+    if (!profile) return { allowed: false as const, reason: 'email_unverified' as const };
+    return canPostStory({
+      verification: profile.verification,
+      createdAt: profile.createdAt,
+      strikePoints: profile.strikePoints ?? 0,
+      storySuspendedUntil: profile.storySuspendedUntil ?? null,
+    });
+  }, [profile]);
+
+  const onOpenStory = useCallback((story: StoryCard, index: number) => {
+    setViewerIndex(index);
+    setViewerOpen(true);
+    track('story.open', { storyId: story.id, index, surface: 'pulse' });
+  }, []);
+
+  const onCreatePress = useCallback(() => {
+    if (!storyEligibility.allowed) {
+      const reason = storyEligibility.reason;
+      track('story.gate_tap', { reason, surface: 'pulse' });
+
+      if (reason === 'email_unverified') {
+        openRootScreen(navigation, 'EmailVerification');
+        return;
+      }
+      if (reason === 'phone_required') {
+        openRootScreen(navigation, 'Verification', {
+          initialPhone: profile?.phone ?? undefined,
+        });
+        return;
+      }
+      appAlert('Stories', storyGateMessage(reason), [{ text: 'OK' }]);
+      return;
+    }
+    setCreateOpen(true);
+    track('story.create_open', { surface: 'pulse' });
+  }, [storyEligibility, navigation, profile?.phone]);
+
+  const emptyCopy = useMemo(() => {
+    switch (filter) {
+      case 'waves':
+        return {
+          icon: 'hand-wave',
+          title: 'No waves yet',
+          body: 'Wave at someone on the map — mutual waves show up here.',
+          actionLabel: 'Open map',
+          actionKind: 'map' as EmptyActionKind,
+        };
+      case 'chats':
+        return {
+          icon: 'message-text-outline',
+          title: 'No chats',
+          body: 'Start a conversation from a profile or match.',
+          actionLabel: 'Open map',
+          actionKind: 'map' as EmptyActionKind,
+        };
+      case 'matches':
+        return {
+          icon: 'heart-outline',
+          title: 'No matches',
+          body: 'Turn on Dating prefs and Like nearby people to match.',
+          actionLabel: 'Open map',
+          actionKind: 'map' as EmptyActionKind,
+        };
+      default: {
+        if (!storyEligibility.allowed) {
+          const reason = storyEligibility.reason;
+          if (reason === 'email_unverified') {
+            return {
+              icon: 'email-check-outline',
+              title: 'Quiet around here',
+              body: 'Verify your email to post a story and join the local pulse.',
+              actionLabel: 'Verify email',
+              actionKind: 'verify_email' as EmptyActionKind,
+            };
+          }
+          if (reason === 'phone_required') {
+            return {
+              icon: 'cellphone-check',
+              title: 'Quiet around here',
+              body: 'Add a phone number to unlock stories after recent strikes.',
+              actionLabel: 'Add phone',
+              actionKind: 'verify_phone' as EmptyActionKind,
+            };
+          }
+          return {
+            icon: 'pulse',
+            title: 'Quiet around here',
+            body: storyGateMessage(reason),
+            actionLabel: 'Open map',
+            actionKind: 'map' as EmptyActionKind,
+          };
+        }
+        return {
+          icon: 'pulse',
+          title: 'Quiet around here',
+          body: 'Be the first — post a story above, or wave at someone on the map.',
+          actionLabel: 'Add story',
+          actionKind: 'story' as EmptyActionKind,
+        };
+      }
+    }
+  }, [filter, storyEligibility]);
+
+  const onEmptyAction = useCallback(() => {
+    switch (emptyCopy.actionKind) {
+      case 'story':
+        onCreatePress();
+        break;
+      case 'verify_email':
+        openRootScreen(navigation, 'EmailVerification');
+        break;
+      case 'verify_phone':
+        openRootScreen(navigation, 'Verification', {
+          initialPhone: profile?.phone ?? undefined,
+        });
+        break;
+      default:
+        navigation.navigate('Main', { screen: 'Map' } as never);
+        break;
+    }
+  }, [emptyCopy.actionKind, onCreatePress, navigation, profile?.phone]);
+
+  const Header = (
+    <View>
+      <View style={[S.headerBar, { paddingTop: Math.max(insets.top, 8) + 8 }]}>
+        <Text style={S.headerTitle}>Pulse</Text>
+        <TouchableOpacity
+          style={S.badgeBtn}
+          onPress={() => navigation.navigate('Interactions')}
+          accessibilityLabel={
+            badgeCount > 0 ? `${badgeCount} notifications` : 'Notifications'
+          }
+          testID="pulse-notifications"
+        >
+          <MCI name="bell-outline" size={22} color={colors.textSecondary} />
+          {badgeCount > 0 ? (
+            <View style={S.badge}>
+              <Text style={S.badgeText}>{badgeCount > 9 ? '9+' : badgeCount}</Text>
+            </View>
+          ) : null}
+        </TouchableOpacity>
+      </View>
+
+      <PulseStrip
+        onOpenStory={onOpenStory}
+        onCreatePress={onCreatePress}
+        canCreate={storyEligibility.allowed}
+        {...(!storyEligibility.allowed ? { gateReason: storyEligibility.reason } : {})}
+      />
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={S.chips}
+        contentContainerStyle={S.chipsContent}
+      >
+        {FILTERS.map((f) => {
+          const active = filter === f.key;
+          return (
+            <TouchableOpacity
+              key={f.key}
+              style={[S.chip, active && S.chipActive]}
+              onPress={() => setFilter(f.key)}
+              testID={`pulse-filter-${f.key}`}
+            >
+              <Text style={[S.chipText, active && S.chipTextActive]}>{f.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      <NearbyPeopleStrip
+        points={discoveryPoints}
+        onTapUser={(userId) => navigation.navigate('UserProfile', { userId })}
+      />
+    </View>
+  );
+
+  const Footer = (
+    <View style={S.footer}>
+      <TrendingStrip
+        topics={trendingTopics}
+        collapsed={trendingCollapsed && filtered.length > 0}
+        onToggleCollapse={() => setTrendingCollapsed((c) => !c)}
+        onTapTopic={(t) =>
+          navigation.navigate('AlertComposer', { presetCategory: 'general', presetTag: t })
+        }
+      />
+    </View>
+  );
+
+  if (loading && items.length === 0) {
+    return (
+      <View style={S.container}>
+        {Header}
+        <View style={S.center}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+        <StoryViewer
+          stories={nearbyStories}
+          initialIndex={viewerIndex}
+          visible={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+        />
+        <StoryCreateSheet
+          visible={createOpen}
+          onClose={() => setCreateOpen(false)}
+          location={myCoords}
+          pickAndUpload={pickAndUploadStoryMedia}
+        />
+      </View>
+    );
+  }
+
+  if (error && items.length === 0) {
+    return (
+      <View style={S.container}>
+        {Header}
+        <View style={S.center}>
+          <Text style={S.errorText}>{error}</Text>
+          <TouchableOpacity onPress={load} style={S.retry}>
+            <Text style={S.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+        <StoryViewer
+          stories={nearbyStories}
+          initialIndex={viewerIndex}
+          visible={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+        />
+        <StoryCreateSheet
+          visible={createOpen}
+          onClose={() => setCreateOpen(false)}
+          location={myCoords}
+          pickAndUpload={pickAndUploadStoryMedia}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={S.container}>
+      <FlatList
+        data={filtered}
+        keyExtractor={(i) => i.id}
+        renderItem={({ item }) => (
+          <ActivityCard
+            item={item}
+            busy={actionBusyId === item.id}
+            onPress={() => onTap(item)}
+            onWaveBack={
+              item.type === 'wave' ? () => void onWaveBack(item) : undefined
+            }
+            onMessage={
+              item.type === 'match' || item.type === 'chat'
+                ? () => onMessage(item)
+                : undefined
+            }
+            onView={
+              item.type === 'listing' || item.type === 'alert'
+                ? () => onTap(item)
+                : undefined
+            }
+          />
+        )}
+        ListHeaderComponent={Header}
+        ListFooterComponent={Footer}
+        ListEmptyComponent={
+          <View style={S.emptyWrap}>
+            <EmptyState
+              variant="plain"
+              icon={emptyCopy.icon}
+              title={emptyCopy.title}
+              body={emptyCopy.body}
+              actionLabel={emptyCopy.actionLabel}
+              onAction={onEmptyAction}
+            />
+          </View>
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={() => {
+              load();
+              loadStories();
+            }}
+            tintColor={colors.primary}
+          />
+        }
+        contentContainerStyle={{ paddingBottom: 100 + Math.max(insets.bottom, 8) }}
+      />
+
+      <StoryViewer
+        stories={nearbyStories}
+        initialIndex={viewerIndex}
+        visible={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+      />
+      <StoryCreateSheet
+        visible={createOpen}
+        onClose={() => setCreateOpen(false)}
+        location={myCoords}
+        pickAndUpload={pickAndUploadStoryMedia}
+      />
+    </View>
+  );
+}
+
+const S = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg },
+
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 2,
+  },
+  headerTitle: { color: colors.textPrimary, fontSize: 26, fontWeight: '700' },
+  badgeBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: { color: colors.textPrimary, fontSize: 10, fontWeight: '700' },
+
+  chips: { maxHeight: 44 },
+  chipsContent: { paddingHorizontal: 12, paddingVertical: 6, gap: 8 },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: colors.textSecondary, fontSize: 13, fontWeight: '500' },
+  chipTextActive: { color: colors.onPrimary, fontWeight: '700' },
+
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  errorText: { color: colors.danger, fontSize: 14, marginBottom: 12, textAlign: 'center' },
+  retry: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  retryText: { color: colors.onPrimary, fontWeight: '700' },
+
+  emptyWrap: { paddingVertical: spacing.lg, paddingHorizontal: spacing.sm },
+  footer: { paddingTop: 8, paddingBottom: 16 },
+});
