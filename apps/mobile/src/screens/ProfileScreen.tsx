@@ -1,9 +1,8 @@
 // apps/mobile/src/screens/ProfileScreen.tsx
 //
-// Self profile — screenshot contract 2026-10-12:
-// Hero (avatar + name/age/verified + identity line) → Edit profile
-// → Trust row + Trust Center → Activity → Friends → Marketplace → View my pin.
-// Account controls remain in Settings.
+// Self profile — screenshot contract + density Option B (2026-10-13):
+// Hero → Edit → Trust → Activity → Friends / Marketplace / View pin
+// → Photos / Bio / Storyline / Premium. Account controls stay in Settings.
 
 import React, { useCallback, useEffect, useMemo } from 'react';
 import {
@@ -40,12 +39,19 @@ import { VerificationBadge } from '@/components/VerificationBadge';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
+function truncateBio(raw: string, max = 100): string {
+  const t = raw.trim().replace(/\s+/g, ' ');
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1).trimEnd()}…`;
+}
+
 export function ProfileScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const { on } = useSocket();
   const pendingCount = useAppSelector((s) => s.friends.pendingCount);
   const friendsCount = useAppSelector((s) => s.friends.friends.items.length);
+  const myUserId = useAppSelector((s) => s.auth.user?.id ?? null);
 
   const {
     loading,
@@ -124,9 +130,11 @@ export function ProfileScreen(): React.JSX.Element {
     );
   }
 
-  const { p, mainPhoto, displayName } = derived;
+  const { p, mainPhoto, displayName, photos, tierLabel, isPaid } = derived;
   const nameOnly = p.displayName ?? displayName.split(',')[0] ?? 'You';
   const ageSuffix = p.age != null ? `, ${p.age}` : '';
+  const bioRaw = (p.bio ?? '').trim();
+  const photoCount = photos.length;
 
   return (
     <ScrollView
@@ -217,7 +225,7 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
       ) : null}
 
-      {/* Rows */}
+      {/* Core rows */}
       <ListRow
         icon="account-group-outline"
         title="Friends"
@@ -244,6 +252,43 @@ export function ProfileScreen(): React.JSX.Element {
             params: { focusMyPin: true },
           })
         }
+      />
+
+      {/* Density Option B — content under social/commerce rows */}
+      <ListRow
+        icon="image-multiple-outline"
+        title="Photos"
+        subtitle={
+          photoCount > 0
+            ? `${photoCount} photo${photoCount === 1 ? '' : 's'}`
+            : 'Add photos'
+        }
+        onPress={() => openRootScreen(navigation, 'Photos')}
+      />
+      <ListRow
+        icon="text-box-outline"
+        title="Bio"
+        subtitle={bioRaw ? truncateBio(bioRaw) : 'Add a bio'}
+        onPress={() => openRootScreen(navigation, 'ProfileEdit')}
+      />
+      {myUserId ? (
+        <ListRow
+          icon="filmstrip"
+          title="Storyline"
+          subtitle="Your posts · 24h"
+          onPress={() =>
+            navigation.navigate('UserProfile', {
+              userId: myUserId,
+              focus: 'storyline',
+            })
+          }
+        />
+      ) : null}
+      <ListRow
+        icon={isPaid ? 'crown' : 'crown-outline'}
+        title="Premium"
+        subtitle={isPaid ? tierLabel : 'Unlock premium features'}
+        onPress={() => openRootScreen(navigation, 'Subscription')}
       />
     </ScrollView>
   );
@@ -278,7 +323,9 @@ function ListRow({
       </View>
       <View style={S.listBody}>
         <Text style={S.listTitle}>{title}</Text>
-        <Text style={S.listSub}>{subtitle}</Text>
+        <Text style={S.listSub} numberOfLines={2}>
+          {subtitle}
+        </Text>
       </View>
       <MCI name="chevron-right" size={22} color={colors.textMuted} />
     </Pressable>
@@ -435,7 +482,7 @@ const S = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  listBody: { flex: 1 },
+  listBody: { flex: 1, minWidth: 0 },
   listTitle: {
     color: colors.textPrimary,
     fontSize: 15,
