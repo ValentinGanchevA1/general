@@ -1,11 +1,11 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { AccountStackParamList } from '@/navigation/stacks';
-import { APP_VERSION } from '@/constants/app';
+import { APP_VERSION, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { ListRow } from '@/components/ListRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { colors, radius, spacing } from '@/theme';
@@ -26,6 +26,10 @@ function Feature({ icon, title, body }: { icon: string; title: string; body: str
 
 export function AboutScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
+
+  const openTerms = (): void => {
+    void Linking.openURL(TERMS_OF_SERVICE_URL);
+  };
 
   return (
     <View style={styles.container}>
@@ -54,12 +58,12 @@ export function AboutScreen(): React.JSX.Element {
           <Feature
             icon="map"
             title="Map & discovery"
-            body="Live map of people, events, and listings. Filters (for sale / wanted / friends), clusters, search, and presence while the app is open."
+            body="Live map of people, events, listings, and dating prefs. Filters, clusters, search, and presence while the app is open."
           />
           <Feature
             icon="pulse"
             title="Pulse"
-            body="Local activity: trades, alerts, and nearby story rings. Chats, waves, and matches live in Interactions — not in Pulse."
+            body="Local activity hub: story rings plus waves, chats, and matches. Filter the feed and act from each card (Wave back, Message, View)."
           />
           <Feature
             icon="circle-outline"
@@ -68,8 +72,8 @@ export function AboutScreen(): React.JSX.Element {
           />
           <Feature
             icon="hand-wave"
-            title="Waves, chat & Interactions"
-            body="Lightweight signals first. Chat unlocks when interest is mutual. Interactions is one inbox for waves, chats, friend requests, and followers — with Map on inbound waves."
+            title="Waves, chat & dating"
+            body="Lightweight signals first. Chat unlocks when interest is mutual. Dating likes and matches appear on Pulse and the map pin ladder."
           />
           <Feature
             icon="account-group"
@@ -89,12 +93,19 @@ export function AboutScreen(): React.JSX.Element {
           <Feature
             icon="shield-check"
             title="Trust ladder"
-            body="Email → phone → ID review builds verification. Soft gates protect the network without blocking exploration."
+            body="Email → phone → ID review builds verification. Soft gates protect the network without blocking exploration. Manage it from Trust Center."
           />
         </View>
 
         <Text style={styles.sectionTitle}>Legal</Text>
         <View style={styles.group}>
+          <ListRow
+            variant="inset"
+            icon="file-document-outline"
+            title="Terms of Service"
+            onPress={openTerms}
+            trailing={<Icon name="open-in-new" size={18} color={colors.textFaint} />}
+          />
           <ListRow
             variant="inset"
             icon="shield-lock"
