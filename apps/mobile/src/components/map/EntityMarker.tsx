@@ -40,6 +40,54 @@ function initialsFromName(name: string): string {
     .slice(0, 2);
 }
 
+/** Compact event time for pin badge — Today / Tomorrow / weekday + HH:mm. */
+function formatEventBadge(startsAt: string): string {
+  const d = new Date(startsAt);
+  if (Number.isNaN(d.getTime())) return 'Event';
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfEvent = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dayDiff = Math.round(
+    (startOfEvent.getTime() - startOfToday.getTime()) / 86_400_000,
+  );
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const time = `${hh}:${mm}`;
+  if (dayDiff === 0) return `Today ${time}`;
+  if (dayDiff === 1) return `Tmrw ${time}`;
+  if (dayDiff > 1 && dayDiff < 7) {
+    const wd = d.toLocaleDateString(undefined, { weekday: 'short' });
+    return `${wd} ${time}`;
+  }
+  const md = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `${md}`;
+}
+
+/** Compact listing price for pin badge. EUR-first (product default). */
+function formatListingBadge(
+  priceCents: number,
+  currency: string,
+  mode: string | undefined,
+): string {
+  if (mode === 'buy') return 'Wanted';
+  const code = (currency || 'EUR').toUpperCase();
+  const amount = priceCents / 100;
+  if (code === 'EUR') {
+    if (amount >= 1000) return `€${Math.round(amount / 100) / 10}k`;
+    if (Number.isInteger(amount)) return `€${amount}`;
+    return `€${amount.toFixed(2)}`;
+  }
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: code,
+      maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    }).format(amount);
+  } catch {
+    return `${code} ${amount}`;
+  }
+}
+
 function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element {
   const isFriend = point.kind === 'user' && point.meta.isFriend === true;
   const isBuyListing = point.kind === 'listing' && point.meta.mode === 'buy';
@@ -53,6 +101,17 @@ function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element 
     point.kind === 'user'
       ? point.meta.displayName.slice(0, 8)
       : point.meta.title.slice(0, 10);
+
+  const badge =
+    point.kind === 'event'
+      ? formatEventBadge(point.meta.startsAt)
+      : point.kind === 'listing'
+        ? formatListingBadge(
+            point.meta.priceCents,
+            point.meta.currency,
+            point.meta.mode,
+          )
+        : null;
 
   const isVerified =
     point.kind === 'user' &&
@@ -126,9 +185,17 @@ function EntityMarkerImpl({ point, onVisualSettled }: Props): React.JSX.Element 
           />
         ) : null}
       </View>
-      <Text style={[styles.label, { color }]} numberOfLines={1}>
-        {label}
-      </Text>
+      {badge ? (
+        <View style={[styles.badge, { borderColor: color }]}>
+          <Text style={[styles.badgeText, { color }]} numberOfLines={1}>
+            {badge}
+          </Text>
+        </View>
+      ) : (
+        <Text style={[styles.label, { color }]} numberOfLines={1}>
+          {label}
+        </Text>
+      )}
     </View>
   );
 }
@@ -169,7 +236,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   icon: { fontSize: 16 },
-  label: { fontSize: 10, fontWeight: '600', maxWidth: 64 },
+  label: { fontSize: 10, fontWeight: '600', maxWidth: 72 },
+  badge: {
+    maxWidth: 72,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(10,10,15,0.92)',
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   verifiedBadge: {
     position: 'absolute',
     bottom: -2,
