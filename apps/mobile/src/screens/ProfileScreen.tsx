@@ -1,70 +1,59 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { RefreshControl, StyleSheet } from 'react-native';
+// apps/mobile/src/screens/ProfileScreen.tsx
+//
+// Self profile — screenshot contract 2026-10-12:
+// Hero (avatar + name/age/verified + identity line) → Edit profile
+// → Trust row + Trust Center → Activity → Friends → Marketplace → View my pin.
+// Account controls remain in Settings.
+
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
-  BottomSheetBackdrop,
-  BottomSheetModal,
-  BottomSheetView,
-  type BottomSheetBackdropProps,
-} from '@gorhom/bottom-sheet';
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
-import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
-import { openTrustCenter, openTrustStep } from '@/navigation/openTrust';
+import { openTrustCenter } from '@/navigation/openTrust';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import {
   fetchPendingCount,
   pendingCountSet,
 } from '@/features/friends/friendsSlice';
-import { ProfileView } from '@/components/Profile/ProfileView';
-import { MapPresenceCard } from '@/components/Profile/MapPresenceCard';
 import {
-  VerificationStatusSheet,
-  buildVerificationItems,
-  type VerificationItemId,
-} from '@/components/Profile/VerificationStatusSheet';
-import { TrustNextCard } from '@/components/Profile/TrustNextCard';
-import { ProfileFriendsCard } from '@/components/Profile/ProfileFriendsCard';
-import { ProfileActivityLinks } from '@/components/Profile/ProfileActivityLinks';
-import { ProfilePremiumCard } from '@/components/Profile/ProfilePremiumCard';
-import { ProfileLoadingState, ProfileErrorState } from '@/components/Profile/ProfileScreenStates';
+  ProfileLoadingState,
+  ProfileErrorState,
+} from '@/components/Profile/ProfileScreenStates';
 import { useProfileScreenData } from '@/features/profile/useProfileScreenData';
-import { mapSelfToViewModel } from '@/features/profile/mapToProfileViewModel';
 import { useAppSelector } from '@/hooks/redux';
 import { useSocket } from '@/realtime/useSocket';
 import { colors, spacing } from '@/theme';
+import { VerificationBadge } from '@/components/VerificationBadge';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-/**
- * Self profile — data + sheets.
- * Layout lives in ProfileView mode="self" (PR-D).
- * Order: Hero → identity → Bio → Tags → Trust → Activity → Friends → Storyline → Photos → Premium.
- */
 export function ProfileScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
   const { on } = useSocket();
   const pendingCount = useAppSelector((s) => s.friends.pendingCount);
-  const mapPresenceRef = useRef<BottomSheetModal>(null);
-  const verificationRef = useRef<BottomSheetModal>(null);
-  const mapSnapPoints = useMemo(() => ['34%'], []);
-  const verificationSnapPoints = useMemo(() => ['42%'], []);
+  const friendsCount = useAppSelector((s) => s.friends.friends.items.length);
 
   const {
     loading,
     error,
-    saving,
     refreshing,
-    activePhotoIndex,
-    setActivePhotoIndex,
     gamification,
-    challenges,
-    spendableXp,
-    mapVisible,
     derived,
     onRefresh,
-    handleMapToggle,
     dispatch,
   } = useProfileScreenData();
 
@@ -76,63 +65,51 @@ export function ProfileScreen(): React.JSX.Element {
     const unsubReq = on('friend:request', (e) => {
       dispatch(pendingCountSet(e.pendingCount));
     });
-    const unsubAcc = on('friend:accepted', () => {
-      // no badge change for acceptor
-    });
     return () => {
       unsubReq();
-      unsubAcc();
     };
   }, [on, dispatch]);
 
-  const openMapPresence = useCallback(() => {
-    mapPresenceRef.current?.present();
-  }, []);
+  const identityLine = useMemo(() => {
+    if (!derived) return '';
+    const p = derived.p;
+    const parts: string[] = [];
+    if (p.hometownCity) parts.push(p.hometownCity);
+    else if (p.hometownCountry) parts.push(p.hometownCountry);
+    const interests = (p.interests ?? []).slice(0, 2);
+    for (const tag of interests) {
+      if (tag && !parts.includes(tag)) parts.push(tag);
+    }
+    return parts.join(' · ');
+  }, [derived]);
 
-  const closeMapPresence = useCallback(() => {
-    mapPresenceRef.current?.dismiss();
-  }, []);
+  const trustStatus = useMemo(() => {
+    if (!derived) {
+      return { email: false, phone: false, id: false };
+    }
+    const b = derived.badges;
+    return {
+      email: !!b.email,
+      phone: !!b.phone,
+      id: derived.p.idVerificationStatus === 'verified' || !!b.id,
+    };
+  }, [derived]);
 
-  const openVerification = useCallback(() => {
+  const activityLine = useMemo(() => {
+    if (!gamification) return null;
+    const level = gamification.level ?? 0;
+    const streak = gamification.currentStreak ?? 0;
+    const parts: string[] = [`Level ${level}`];
+    if (streak > 0) parts.push(`${streak} day`);
+    return parts.join(' · ');
+  }, [gamification]);
+
+  const openTrust = useCallback(() => {
     openTrustCenter(navigation);
   }, [navigation]);
 
-  const closeVerification = useCallback(() => {
-    verificationRef.current?.dismiss();
-  }, []);
-
-  const renderBackdrop = useCallback(
-    (props: BottomSheetBackdropProps) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-        opacity={0.55}
-        pressBehavior="close"
-      />
-    ),
-    [],
-  );
-
-  const handleVerificationItem = useCallback(
-    (id: VerificationItemId) => {
-      closeVerification();
-      const phone = derived?.p.phone;
-      if (phone != null && phone !== '') {
-        openTrustStep(navigation, id, { initialPhone: phone });
-      } else {
-        openTrustStep(navigation, id);
-      }
-    },
-    [closeVerification, navigation, derived?.p.phone],
-  );
-
-  const handleBack = useCallback(() => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-      return;
-    }
-    navigation.navigate('Main', { screen: 'Map' });
+  const openSettings = useCallback(() => {
+    openRootScreen(navigation, 'Settings');
   }, [navigation]);
 
   if (loading && !derived) {
@@ -147,141 +124,326 @@ export function ProfileScreen(): React.JSX.Element {
     );
   }
 
-  const {
-    p,
-    photos,
-    isPaid,
-    tierLabel,
-  } = derived;
-
-  const verificationItems = buildVerificationItems(p);
-
-  const viewModel = mapSelfToViewModel(p, {
-    photoUrls: photos,
-    tierLabel,
-    isPaid,
-    mapVisible,
-  });
+  const { p, mainPhoto, displayName } = derived;
+  const nameOnly = p.displayName ?? displayName.split(',')[0] ?? 'You';
+  const ageSuffix = p.age != null ? `, ${p.age}` : '';
 
   return (
-    <>
-      <ProfileView
-        mode="self"
-        profile={viewModel}
-        activePhotoIndex={activePhotoIndex}
-        pendingFriendCount={pendingCount}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
+    <ScrollView
+      style={S.container}
+      contentContainerStyle={[S.content, { paddingBottom: spacing.xxl + insets.bottom }]}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.primary}
+        />
+      }
+    >
+      {/* Cover + settings */}
+      <View style={S.cover}>
+        <View style={S.coverGradient} />
+        <Pressable
+          style={[S.settingsBtn, { top: insets.top + 8 }]}
+          onPress={openSettings}
+          accessibilityLabel="Settings"
+          hitSlop={12}
+        >
+          <MCI name="cog-outline" size={22} color={colors.textSecondary} />
+        </Pressable>
+      </View>
+
+      {/* Avatar */}
+      <View style={S.avatarWrap}>
+        <View style={S.avatarRing}>
+          {mainPhoto ? (
+            <Image source={{ uri: mainPhoto }} style={S.avatarImg} />
+          ) : (
+            <View style={[S.avatarImg, S.avatarPlaceholder]}>
+              <MCI name="account" size={48} color={colors.textMuted} />
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* Name + identity */}
+      <View style={S.identityBlock}>
+        <View style={S.nameRow}>
+          <Text style={S.name}>
+            {nameOnly}
+            {ageSuffix}
+          </Text>
+          <VerificationBadge
+            verification={
+              trustStatus.id || trustStatus.email || trustStatus.phone
+                ? 'email'
+                : 'none'
+            }
+            idVerified={trustStatus.id}
+            size={18}
           />
+        </View>
+        {!!identityLine && <Text style={S.subtitle}>{identityLine}</Text>}
+
+        <Pressable
+          style={S.editBtn}
+          onPress={() => openRootScreen(navigation, 'ProfileEdit')}
+          testID="profile-edit"
+        >
+          <Text style={S.editBtnText}>Edit profile</Text>
+        </Pressable>
+      </View>
+
+      {/* Trust */}
+      <View style={S.card}>
+        <View style={S.cardHeader}>
+          <Text style={S.cardLabel}>Trust</Text>
+          <Pressable style={S.trustCenterBtn} onPress={openTrust}>
+            <Text style={S.trustCenterText}>Trust Center</Text>
+          </Pressable>
+        </View>
+        <View style={S.trustRow}>
+          <TrustPill label="Email" ok={trustStatus.email} />
+          <TrustPill label="Phone" ok={trustStatus.phone} />
+          <TrustPill label="ID" ok={trustStatus.id} />
+        </View>
+      </View>
+
+      {/* Activity */}
+      {activityLine ? (
+        <View style={S.card}>
+          <Text style={S.cardLabel}>Activity</Text>
+          <Text style={S.activityText}>{activityLine}</Text>
+        </View>
+      ) : null}
+
+      {/* Rows */}
+      <ListRow
+        icon="account-group-outline"
+        title="Friends"
+        subtitle={
+          pendingCount > 0
+            ? `${friendsCount} friends · ${pendingCount} request${pendingCount === 1 ? '' : 's'}`
+            : `${friendsCount} friends`
         }
-        actions={{
-          onBack: handleBack,
-          onPressSettings: () => openRootScreen(navigation, 'Settings'),
-          onPressVerificationBadge: openVerification,
-          onPressPhoto: () => openRootScreen(navigation, 'Photos'),
-          onSelectPhotoIndex: setActivePhotoIndex,
-          onPressIdentityPreview: () => openRootScreen(navigation, 'ProfileEdit'),
-          onPressVisibility: openMapPresence,
-          onPressPhotosManage: () => openRootScreen(navigation, 'Photos'),
-          onPressPremium: () => openRootScreen(navigation, 'Subscription'),
-          onPressFriends: () => openRootScreen(navigation, 'FriendsList'),
-          onPressSuggestions: () => openRootScreen(navigation, 'Suggestions'),
-          onPressChallenges: () => openRootScreen(navigation, 'Challenges'),
-          onPressLeaderboard: () => openRootScreen(navigation, 'Leaderboard'),
-          onPressAchievements: () => openRootScreen(navigation, 'Achievements'),
-          onPressGifts: () => openRootScreen(navigation, 'GiftsInbox'),
-          onPressMarketplace: () => openRootScreen(navigation, 'Marketplace'),
-          onTrustContinue: handleVerificationItem,
-          onOpenTrustDetails: openVerification,
-        }}
-        selfSlots={{
-          trustNext: (
-            <TrustNextCard
-              profile={p}
-              onContinue={handleVerificationItem}
-              onOpenDetails={openVerification}
-            />
-          ),
-          activity: (
-            <ProfileActivityLinks
-              gamification={gamification ?? null}
-              challenges={challenges}
-              spendableXp={spendableXp}
-              onChallenges={() => openRootScreen(navigation, 'Challenges')}
-              onLeaderboard={() => openRootScreen(navigation, 'Leaderboard')}
-              onAchievements={() => openRootScreen(navigation, 'Achievements')}
-              onGifts={() => openRootScreen(navigation, 'GiftsInbox')}
-              onMarketplace={() => openRootScreen(navigation, 'Marketplace')}
-            />
-          ),
-          friends: (
-            <ProfileFriendsCard
-              pendingCount={pendingCount}
-              onPress={() => openRootScreen(navigation, 'FriendsList')}
-              onPressSuggestions={() => openRootScreen(navigation, 'Suggestions')}
-            />
-          ),
-          premium: !isPaid ? (
-            <ProfilePremiumCard onPress={() => openRootScreen(navigation, 'Subscription')} />
-          ) : null,
-        }}
+        onPress={() => openRootScreen(navigation, 'FriendsList')}
       />
-
-      <BottomSheetModal
-        ref={mapPresenceRef}
-        snapPoints={mapSnapPoints}
-        enablePanDownToClose
-        enableDynamicSizing={false}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={styles.sheetBackground}
-        handleIndicatorStyle={styles.sheetHandle}
-      >
-        <BottomSheetView style={styles.sheetContent}>
-          <MapPresenceCard
-            isVisible={mapVisible}
-            saving={saving}
-            onToggle={handleMapToggle}
-            onViewPin={() => {
-              closeMapPresence();
-              navigation.navigate('Main', { screen: 'Map', params: { focusMyPin: true } });
-            }}
-          />
-        </BottomSheetView>
-      </BottomSheetModal>
-
-      <BottomSheetModal
-        ref={verificationRef}
-        snapPoints={verificationSnapPoints}
-        enablePanDownToClose
-        enableDynamicSizing={false}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={styles.sheetBackground}
-        handleIndicatorStyle={styles.sheetHandle}
-      >
-        <BottomSheetView style={styles.sheetContent}>
-          <VerificationStatusSheet
-            score={p.verificationScore ?? 0}
-            items={verificationItems}
-            onItemPress={handleVerificationItem}
-          />
-        </BottomSheetView>
-      </BottomSheetModal>
-    </>
+      <ListRow
+        icon="storefront-outline"
+        title="Marketplace"
+        subtitle="Active listings"
+        onPress={() => openRootScreen(navigation, 'Marketplace')}
+      />
+      <ListRow
+        icon="map-marker-radius-outline"
+        title="View my pin on map"
+        subtitle="Focus on map"
+        onPress={() =>
+          navigation.navigate('Main', {
+            screen: 'Map',
+            params: { focusMyPin: true },
+          })
+        }
+      />
+    </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  sheetBackground: {
-    backgroundColor: colors.surfaceRaised,
+function TrustPill({ label, ok }: { label: string; ok: boolean }): React.JSX.Element {
+  return (
+    <View style={S.pill}>
+      <Text style={S.pillLabel}>{label}</Text>
+      <Text style={[S.pillMark, ok ? S.pillOk : S.pillMissing]}>
+        {ok ? '✓' : '—'}
+      </Text>
+    </View>
+  );
+}
+
+function ListRow({
+  icon,
+  title,
+  subtitle,
+  onPress,
+}: {
+  icon: string;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}): React.JSX.Element {
+  return (
+    <Pressable style={S.listRow} onPress={onPress}>
+      <View style={S.listIcon}>
+        <MCI name={icon} size={22} color={colors.primary} />
+      </View>
+      <View style={S.listBody}>
+        <Text style={S.listTitle}>{title}</Text>
+        <Text style={S.listSub}>{subtitle}</Text>
+      </View>
+      <MCI name="chevron-right" size={22} color={colors.textMuted} />
+    </Pressable>
+  );
+}
+
+const S = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingBottom: spacing.xxl },
+  cover: {
+    height: 120,
+    backgroundColor: '#1a2744',
+    overflow: 'hidden',
   },
-  sheetHandle: {
-    backgroundColor: colors.textMuted,
+  coverGradient: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#243056',
+    opacity: 0.85,
+  },
+  settingsBtn: {
+    position: 'absolute',
+    right: spacing.xl,
     width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sheetContent: {
-    paddingBottom: spacing.xl,
+  avatarWrap: {
+    alignItems: 'center',
+    marginTop: -48,
+  },
+  avatarRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 3,
+    borderColor: colors.primary,
+    backgroundColor: colors.bg,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarImg: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+  },
+  avatarPlaceholder: {
+    backgroundColor: colors.surfaceRaised,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  identityBlock: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    marginTop: spacing.md,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  name: {
+    color: colors.textPrimary,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  subtitle: {
+    color: colors.textMuted,
+    fontSize: 14,
+    marginTop: 4,
+  },
+  editBtn: {
+    marginTop: spacing.md,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 28,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  editBtnText: {
+    color: colors.onPrimary,
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  card: {
+    marginTop: spacing.lg,
+    marginHorizontal: spacing.xl,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: 16,
+    padding: spacing.md,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  cardLabel: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  trustCenterBtn: {
+    backgroundColor: colors.action,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  trustCenterText: {
+    color: colors.onPrimary,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  trustRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pillLabel: {
+    color: colors.textSecondary,
+    fontSize: 13,
+  },
+  pillMark: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  pillOk: { color: colors.action },
+  pillMissing: { color: colors.textMuted },
+  activityText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    marginTop: 4,
+  },
+  listRow: {
+    marginTop: spacing.sm,
+    marginHorizontal: spacing.xl,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  listIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listBody: { flex: 1 },
+  listTitle: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  listSub: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
   },
 });
