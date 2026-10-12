@@ -14,7 +14,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { AccountStackParamList } from '@/navigation/stacks';
-import { SUPPORT_EMAIL, APP_VERSION } from '@/constants/app';
+import { SUPPORT_EMAIL, APP_VERSION, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { track } from '@/lib/analytics';
 import { ListRow } from '@/components/ListRow';
 import { colors, spacing, fontSize } from '@/theme';
@@ -35,7 +35,7 @@ const FAQS: Faq[] = [
   },
   {
     q: 'What is Pulse?',
-    a: 'Pulse is your local activity feed: trades, alerts, and nearby story rings. Post a story from the strip at the top. Chats, waves, and friend activity live in Interactions — not in Pulse.',
+    a: 'Pulse is your local activity hub: nearby story rings plus waves, chats, and matches. Use the filter chips (All / Waves / Chats / Matches) and act from each card — Wave back, Message, or View. Trades and alerts still surface when they appear in your feed.',
   },
   {
     q: 'How do stories work?',
@@ -43,7 +43,7 @@ const FAQS: Faq[] = [
   },
   {
     q: 'What is the Interactions screen?',
-    a: 'Interactions is one inbox for chats, inbound waves, pending friend requests, and recent followers. On a wave you can Match or open Map to see their pin when they have one. Your Friends → Requests tab stays available for requests only.',
+    a: 'Interactions is a focused inbox for pending friend requests, recent followers, and related social notifications. Waves, chats, and matches also live on Pulse. Your Friends → Requests tab stays available for requests only.',
   },
   {
     q: 'How do friends and online status work?',
@@ -51,11 +51,11 @@ const FAQS: Faq[] = [
   },
   {
     q: 'How do I find someone on the map?',
-    a: 'From a profile use View on map when they have a public pin. From Interactions, use Map on an inbound wave. The map centers on their coarsened pin and opens their card when available.',
+    a: 'From a profile use View on map when they have a public pin. From a wave or match, open their profile or use View on map when available. The map centers on their coarsened pin and opens their card when available.',
   },
   {
     q: 'What do the verification badges mean?',
-    a: 'They show progress on the trust ladder: email → phone → ID review. Optional, but they raise trust. Email verification unlocks story posting. Start from Settings → Verification. ID review is assisted by automated face checks and always finished by a human.',
+    a: 'They show progress on the trust ladder: email → phone → ID review. Optional, but they raise trust. Email verification unlocks story posting. Start from Settings → Trust or Trust Center. ID review is assisted by automated face checks and always finished by a human.',
   },
   {
     q: 'How does local trade work?',
@@ -106,6 +106,10 @@ export function HelpScreen(): React.JSX.Element {
     }
   };
 
+  const openTerms = (): void => {
+    void Linking.openURL(TERMS_OF_SERVICE_URL);
+  };
+
   return (
     <View style={styles.container}>
       <ScreenHeader title="Help & Support" />
@@ -129,6 +133,13 @@ export function HelpScreen(): React.JSX.Element {
           title="Privacy"
           subtitle="How your data, friends, and location are handled"
           onPress={() => navigation.navigate('Privacy')}
+        />
+        <ListRow
+          style={styles.rowSpaced}
+          icon="file-document-outline"
+          title="Terms of Service"
+          subtitle="Rules for using G88"
+          onPress={openTerms}
         />
       </ScrollView>
     </View>
