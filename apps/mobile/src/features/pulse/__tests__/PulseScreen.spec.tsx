@@ -86,6 +86,7 @@ import chatReducer from '@/features/chat/chatSlice';
 import pulseReducer from '@/features/pulse/pulseSlice';
 import discoveryReducer from '@/features/discovery/discoverySlice';
 import storiesReducer from '@/features/stories/storiesSlice';
+import friendsReducer from '@/features/friends/friendsSlice';
 
 function wrap(children: React.ReactElement) {
   const store = configureStore({
@@ -96,6 +97,7 @@ function wrap(children: React.ReactElement) {
       pulse: pulseReducer,
       discovery: discoveryReducer,
       stories: storiesReducer,
+      friends: friendsReducer,
     },
   });
   return (
@@ -111,20 +113,20 @@ describe('PulseScreen v2', () => {
     expect(queryByTestId('share-cta')).toBeNull();
     // No profile in the test store → soft gate locks create; strip still mounts.
     expect(getByLabelText(/Create your story|Story posting locked/)).toBeTruthy();
-    // Chats / Waves / Matches moved to Interactions — Pulse keeps All / Trades / Alerts.
+    // Screenshot contract 2026-10-12: All | Waves | Chats | Matches (social re-merged).
     expect(getByTestId('pulse-filter-all')).toBeTruthy();
-    expect(getByTestId('pulse-filter-listings')).toBeTruthy();
-    expect(getByTestId('pulse-filter-alerts')).toBeTruthy();
-    expect(queryByTestId('pulse-filter-chats')).toBeNull();
-    expect(queryByTestId('pulse-filter-waves')).toBeNull();
-    expect(queryByTestId('pulse-filter-matches')).toBeNull();
+    expect(getByTestId('pulse-filter-waves')).toBeTruthy();
+    expect(getByTestId('pulse-filter-chats')).toBeTruthy();
+    expect(getByTestId('pulse-filter-matches')).toBeTruthy();
+    expect(queryByTestId('pulse-filter-listings')).toBeNull();
+    expect(queryByTestId('pulse-filter-alerts')).toBeNull();
   });
 
   it('switches filter when a chip is tapped', () => {
     const { getByTestId } = render(wrap(<PulseScreen />));
-    fireEvent.press(getByTestId('pulse-filter-listings'));
+    fireEvent.press(getByTestId('pulse-filter-waves'));
     // The chip should remain rendered after press — no crash, basic interaction works.
-    expect(getByTestId('pulse-filter-listings')).toBeTruthy();
+    expect(getByTestId('pulse-filter-waves')).toBeTruthy();
   });
 
   it('renders the trending strip with mock topics', () => {
