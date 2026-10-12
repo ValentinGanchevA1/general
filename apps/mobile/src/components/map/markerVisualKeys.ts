@@ -30,7 +30,21 @@ export function entityVisualKey(point: EntityPoint): string {
     ].join('|');
   }
   if (point.kind === 'event') {
-    return [point.id, point.kind, point.meta.title, point.meta.coverUrl ?? ''].join('|');
+    return [
+      point.id,
+      point.kind,
+      point.meta.title,
+      point.meta.coverUrl ?? '',
+      point.meta.startsAt,
+    ].join('|');
   }
-  return [point.id, point.kind, point.meta.title, point.meta.thumbnailUrl ?? '', point.meta.mode ?? 'sell'].join('|');
+  return [
+    point.id,
+    point.kind,
+    point.meta.title,
+    point.meta.thumbnailUrl ?? '',
+    point.meta.mode ?? 'sell',
+    String(point.meta.priceCents),
+    point.meta.currency,
+  ].join('|');
 }
