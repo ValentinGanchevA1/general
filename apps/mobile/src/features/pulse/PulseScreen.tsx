@@ -486,26 +486,25 @@ export function PulseScreen(): React.JSX.Element {
       <FlatList
         data={filtered}
         keyExtractor={(i) => i.id}
-        renderItem={({ item }) => (
-          <ActivityCard
-            item={item}
-            busy={actionBusyId === item.id}
-            onPress={() => onTap(item)}
-            onWaveBack={
-              item.type === 'wave' ? () => void onWaveBack(item) : undefined
-            }
-            onMessage={
-              item.type === 'match' || item.type === 'chat'
-                ? () => onMessage(item)
-                : undefined
-            }
-            onView={
-              item.type === 'listing' || item.type === 'alert'
-                ? () => onTap(item)
-                : undefined
-            }
-          />
-        )}
+        renderItem={({ item }) => {
+          const cardBusy = actionBusyId === item.id;
+          return (
+            <ActivityCard
+              item={item}
+              onPress={() => onTap(item)}
+              {...(cardBusy ? { busy: true } : {})}
+              {...(item.type === 'wave'
+                ? { onWaveBack: () => void onWaveBack(item) }
+                : {})}
+              {...(item.type === 'match' || item.type === 'chat'
+                ? { onMessage: () => onMessage(item) }
+                : {})}
+              {...(item.type === 'listing' || item.type === 'alert'
+                ? { onView: () => onTap(item) }
+                : {})}
+            />
+          );
+        }}
         ListHeaderComponent={Header}
         ListFooterComponent={Footer}
         ListEmptyComponent={

@@ -54,7 +54,15 @@ export function ActivityCard({
   const metaParts = [relTime(item.createdAt), distance].filter(Boolean);
   const meta = metaParts.join(' · ');
 
-  const cta = resolveCta(item, { onWaveBack, onMessage, onView });
+  const handlers: {
+    onWaveBack?: () => void;
+    onMessage?: () => void;
+    onView?: () => void;
+  } = {};
+  if (onWaveBack) handlers.onWaveBack = onWaveBack;
+  if (onMessage) handlers.onMessage = onMessage;
+  if (onView) handlers.onView = onView;
+  const cta = resolveCta(item, handlers);
 
   return (
     <Pressable
@@ -90,7 +98,7 @@ export function ActivityCard({
           <TouchableCta
             label={cta.label}
             variant={cta.variant}
-            busy={busy}
+            {...(busy != null ? { busy } : {})}
             onPress={(e) => {
               e?.stopPropagation?.();
               cta.onPress();
