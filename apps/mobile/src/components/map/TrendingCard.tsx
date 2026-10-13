@@ -6,7 +6,7 @@ import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { colors, fontSize, spacing } from '@/theme';
 
 import {
 	type TrendingItem,
@@ -122,7 +122,7 @@ export function TrendingCard({
 									</Text>
 								) : null}
 							</Pressable>
-					  ))
+						))
 					: null}
 			</View>
 		</View>
