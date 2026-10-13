@@ -21,11 +21,13 @@ import type {
 	PublicUserProfile,
 	RelationshipSummary,
 	UserMeta,
+	RsvpStatus,
 } from '@g88/shared';
 import {haversineMeters} from '@g88/shared';
 import type {RootStackParamList} from '@/navigation/AppNavigator';
 import {openRootScreen} from '@/navigation/openRootScreen';
 import {deleteJson, getJson, postJson} from '@/api/client';
+import {rsvpToEvent} from '@/features/events/useEvents';
 import {signalPostSocialActivation} from '@/features/nudges/postSocialActivation';
 import {IdentityBlock} from '@/components/IdentityBlock';
 import {useUserLocation} from '@/features/location/useUserLocation';
@@ -34,6 +36,7 @@ import {ProfileTrustBlock} from '@/components/Profile/ProfileTrustBlock';
 import {ProfileStatsRow} from '@/components/Profile/ProfileStatsRow';
 import {ProfileIdentityLine} from '@/components/Profile/ProfileIdentityLine';
 import {publicIdentityLines} from '@/features/profile/mapToProfileViewModel';
+import {softCompatibilityPercent} from '@/features/profile/softCompatibility';
 import {styles} from './EntityBottomSheet.styles';
 
 /** Short TTL cache so re-opening the same pin does not triple-fetch. */
@@ -151,19 +154,19 @@ interface UserCardProps {
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 function UserCard({
-	point,
-	waving,
-	onWave,
-	onClose,
-	viewerMode,
-	onOpenFull,
-	onLike,
-	onPass,
-	onMessage: onMessageFromParent,
-	likeSentControlled,
-	isMatchControlled,
-	actionPending,
-}: UserCardProps): React.JSX.Element {
+					  point,
+					  waving,
+					  onWave,
+					  onClose,
+					  viewerMode,
+					  onOpenFull,
+					  onLike,
+					  onPass,
+					  onMessage: onMessageFromParent,
+					  likeSentControlled,
+					  isMatchControlled,
+					  actionPending,
+				  }: UserCardProps): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
 	const cached = getCachedProfile(point.id);
 	const [profile, setProfile] = useState<PublicUserProfile | null>(cached);
@@ -454,6 +457,42 @@ function UserCard({
 					<ProfileIdentityLine mode="other" align="start" identityLine={identityLine} hometownLine={hometownLine} />
 				</View>
 			) : null}
+			{!fetching && profile != null ? (() => {
+				const shared = profile.relationship?.sharedInterests ?? [];
+				const compat = softCompatibilityPercent(shared);
+				if (compat == null && shared.length < 1 && mutualCount < 1) return null;
+				return (
+					<View style={styles.compatRow}>
+						{compat != null ? (
+							<View style={styles.compatStat}>
+								<Text style={styles.compatValue}>{compat}%</Text>
+								<Text style={styles.compatLabel}>Compatibility</Text>
+							</View>
+						) : null}
+						{shared.length > 0 ? (
+							<View style={styles.compatStat}>
+								<Text style={styles.compatValue}>{shared.length}</Text>
+								<Text style={styles.compatLabel}>Mutual interests</Text>
+							</View>
+						) : null}
+						{mutualCount > 0 ? (
+							<View style={styles.compatStat}>
+								<Text style={styles.compatValue}>{mutualCount}</Text>
+								<Text style={styles.compatLabel}>Mutual friends</Text>
+							</View>
+						) : null}
+					</View>
+				);
+			})() : null}
+			{!fetching && (profile?.relationship?.sharedInterests?.length ?? 0) > 0 ? (
+				<View style={styles.interestChips}>
+					{(profile?.relationship?.sharedInterests ?? []).slice(0, 6).map((tag) => (
+						<View key={tag} style={styles.interestChip}>
+							<Text style={styles.interestChipText}>{tag}</Text>
+						</View>
+					))}
+				</View>
+			) : null}
 			{fetching && profile == null ? (
 				<ActivityIndicator color={colors.primary} size="small" style={{alignSelf: 'flex-start'}} />
 			) : null}
@@ -498,11 +537,6 @@ function UserCard({
 					/>
 				</TouchableOpacity>
 			) : null}
-			{profile?.bio ? (
-				<TouchableOpacity onPress={() => openProfile('bio')} accessibilityRole="button" accessibilityLabel="View full bio on profile" activeOpacity={0.85}>
-					<Text style={styles.bio} numberOfLines={3}>{profile.bio}</Text>
-				</TouchableOpacity>
-			) : null}
 		</View>
 	);
 }
@@ -511,6 +545,44 @@ function EventCard({point, onClose}: { point: EventEntityPoint; onClose: () => v
 	const navigation = useNavigation<Nav>();
 	const meta = point.meta;
 	const distanceM = usePinDistanceMeters(point.lat, point.lng);
+	const [rsvpBusy, setRsvpBusy] = useState(false);
+	const [myRsvp, setMyRsvp] = useState<RsvpStatus | null>(null);
+
+	const capacityLine = (() => {
+		const parts: string[] = [];
+		if (meta.attendeeCount > 0) {
+			parts.push(`${meta.attendeeCount} going`);
+		}
+		if (meta.capacity != null) {
+			parts.push(`${meta.capacity} cap`);
+		}
+		return parts.length > 0 ? parts.join(' · ') : null;
+	})();
+
+	const onRsvpGoing = async (): Promise<void> => {
+		if (rsvpBusy) return;
+		setRsvpBusy(true);
+		try {
+			const res = await rsvpToEvent(point.id, 'going');
+			setMyRsvp(res.status ?? 'going');
+		} catch (e) {
+			const msg =
+				e && typeof e === 'object' && 'message' in e
+					? String((e as { message: unknown }).message)
+					: 'Try again in a moment.';
+			appAlert('Could not RSVP', msg);
+		} finally {
+			setRsvpBusy(false);
+		}
+	};
+
+	const openDetail = (): void => {
+		onClose();
+		openRootScreen(navigation, 'EventDetail', {eventId: point.id});
+	};
+
+	const going = myRsvp === 'going';
+
 	return (
 		<View style={styles.sheet}>
 			<View style={styles.kindHeader}>
@@ -520,11 +592,40 @@ function EventCard({point, onClose}: { point: EventEntityPoint; onClose: () => v
 			<Text style={styles.entityTitle}>{meta.title}</Text>
 			<View style={styles.metaRow}>
 				<Text style={styles.metaText}>{formatStartsAt(meta.startsAt)}</Text>
-				{distanceM != null ? (<><Text style={styles.metaDot}>·</Text><Text style={styles.metaText}>{formatDistanceMeters(distanceM)}</Text></>) : null}
+				{distanceM != null ? (
+					<>
+						<Text style={styles.metaDot}>·</Text>
+						<Text style={styles.metaText}>{formatDistanceMeters(distanceM)}</Text>
+					</>
+				) : null}
 			</View>
-			<TouchableOpacity style={[styles.primaryBtn, styles.eventPrimaryBtn, styles.entityPrimaryBtn]} onPress={() => { onClose(); openRootScreen(navigation, 'EventDetail', {eventId: point.id}); }} accessibilityRole="button" accessibilityLabel="View event">
-				<Text style={styles.primaryBtnText}>View</Text>
-			</TouchableOpacity>
+			{capacityLine ? <Text style={styles.metaText}>{capacityLine}</Text> : null}
+			<View style={styles.actions}>
+				<TouchableOpacity
+					style={[
+						styles.primaryBtn,
+						styles.eventPrimaryBtn,
+						styles.ctaFlex,
+						rsvpBusy || going ? styles.btnDisabled : undefined,
+					]}
+					onPress={() => void onRsvpGoing()}
+					disabled={rsvpBusy || going}
+					accessibilityRole="button"
+					accessibilityLabel={going ? 'Going' : 'RSVP Going'}
+				>
+					<Text style={styles.primaryBtnText}>
+						{rsvpBusy ? '…' : going ? 'Going' : 'RSVP'}
+					</Text>
+				</TouchableOpacity>
+				<TouchableOpacity
+					style={[styles.profileBtn, styles.ctaFlexShrink]}
+					onPress={openDetail}
+					accessibilityRole="button"
+					accessibilityLabel="View event details"
+				>
+					<Text style={styles.profileBtnText}>Details</Text>
+				</TouchableOpacity>
+			</View>
 		</View>
 	);
 }
@@ -534,6 +635,43 @@ function ListingCard({point, onClose}: { point: ListingEntityPoint; onClose: () 
 	const meta = point.meta;
 	const distanceM = usePinDistanceMeters(point.lat, point.lng);
 	const isWanted = meta.mode === 'buy';
+	const sellerId = meta.sellerId;
+	const sellerName = meta.sellerDisplayName?.trim() || 'Seller';
+	const [messaging, setMessaging] = useState(false);
+
+	const openDetail = (): void => {
+		onClose();
+		openRootScreen(navigation, 'ListingDetail', {listingId: point.id});
+	};
+
+	const onMessageSeller = async (): Promise<void> => {
+		if (messaging || sellerId == null || sellerId === '') return;
+		setMessaging(true);
+		try {
+			const res = await postJson<CreateConversationRequest, CreateConversationResponse>(
+				'/conversations',
+				{targetUserId: sellerId},
+			);
+			onClose();
+			openRootScreen(navigation, 'Chat', {
+				conversationId: res.conversationId,
+				otherUserName: sellerName,
+				otherUserId: sellerId,
+				requestPending: res.status === 'pending' && res.permission === 'request',
+			});
+		} catch (e) {
+			const msg =
+				e && typeof e === 'object' && 'message' in e
+					? String((e as { message: unknown }).message)
+					: 'Try again in a moment.';
+			appAlert('Could not open chat', msg);
+		} finally {
+			setMessaging(false);
+		}
+	};
+
+	const hasSeller = sellerId != null && sellerId !== '';
+
 	return (
 		<View style={styles.sheet}>
 			<View style={styles.kindHeader}>
@@ -543,29 +681,72 @@ function ListingCard({point, onClose}: { point: ListingEntityPoint; onClose: () 
 			<Text style={styles.entityTitle}>{meta.title}</Text>
 			<View style={styles.metaRow}>
 				<Text style={styles.metaText}>{formatPrice(meta.priceCents, meta.currency)}</Text>
-				{distanceM != null ? (<><Text style={styles.metaDot}>·</Text><Text style={styles.metaText}>{formatDistanceMeters(distanceM)}</Text></>) : null}
+				{distanceM != null ? (
+					<>
+						<Text style={styles.metaDot}>·</Text>
+						<Text style={styles.metaText}>{formatDistanceMeters(distanceM)}</Text>
+					</>
+				) : null}
+				{meta.category ? (
+					<>
+						<Text style={styles.metaDot}>·</Text>
+						<Text style={styles.metaText}>{meta.category}</Text>
+					</>
+				) : null}
 			</View>
-			<TouchableOpacity style={[styles.primaryBtn, styles.entityPrimaryBtn]} onPress={() => { onClose(); openRootScreen(navigation, 'ListingDetail', {listingId: point.id}); }} accessibilityRole="button" accessibilityLabel="View listing">
-				<Text style={styles.primaryBtnText}>View</Text>
-			</TouchableOpacity>
+			{hasSeller && meta.sellerDisplayName ? (
+				<Text style={styles.metaText}>Seller · {meta.sellerDisplayName}</Text>
+			) : null}
+			<View style={styles.actions}>
+				{hasSeller ? (
+					<>
+						<TouchableOpacity
+							style={[styles.primaryBtn, styles.ctaFlex, messaging ? styles.btnDisabled : undefined]}
+							onPress={() => void onMessageSeller()}
+							disabled={messaging}
+							accessibilityRole="button"
+							accessibilityLabel="Message seller"
+						>
+							<Text style={styles.primaryBtnText}>{messaging ? '…' : 'Message seller'}</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={[styles.profileBtn, styles.ctaFlexShrink]}
+							onPress={openDetail}
+							accessibilityRole="button"
+							accessibilityLabel="Make offer"
+						>
+							<Text style={styles.profileBtnText}>Make offer</Text>
+						</TouchableOpacity>
+					</>
+				) : (
+					<TouchableOpacity
+						style={[styles.primaryBtn, styles.entityPrimaryBtn, styles.ctaFlex]}
+						onPress={openDetail}
+						accessibilityRole="button"
+						accessibilityLabel="View listing"
+					>
+						<Text style={styles.primaryBtnText}>View</Text>
+					</TouchableOpacity>
+				)}
+			</View>
 		</View>
 	);
 }
 
 export function EntityBottomSheet({
-	point,
-	waving,
-	onClose,
-	onWave,
-	viewerMode = 'social',
-	onOpenFull,
-	onLike,
-	onPass,
-	onMessage,
-	likeSent,
-	isMatch,
-	actionPending,
-}: Props): React.JSX.Element {
+									  point,
+									  waving,
+									  onClose,
+									  onWave,
+									  viewerMode = 'social',
+									  onOpenFull,
+									  onLike,
+									  onPass,
+									  onMessage,
+									  likeSent,
+									  isMatch,
+									  actionPending,
+								  }: Props): React.JSX.Element {
 	if (point.kind === 'user') {
 		return (
 			<UserCard

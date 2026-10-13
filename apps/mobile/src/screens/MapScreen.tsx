@@ -92,6 +92,10 @@ import {
 import { useNudges } from '@/features/nudges/useNudges';
 import { useChallenges } from '@/features/gamification/useChallenges';
 import { usePinInteraction } from '@/features/map/usePinInteraction';
+import {
+	takePendingOpenCreateNearby,
+	subscribePendingOpenCreateNearby,
+} from '@/features/map/pendingCreateNearby';
 import { PinInteractionHost } from '@/components/map/PinInteractionHost';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
@@ -682,6 +686,17 @@ export function MapScreen(): React.JSX.Element {
 		setCreateNearbyOpen(true);
 	}, [setCreateNearbyOpen]);
 
+	// Create tab / external request → open CreateNearbySheet
+	useEffect(() => {
+		const open = () => {
+			if (takePendingOpenCreateNearby()) {
+				setCreateNearbyOpen(true);
+			}
+		};
+		open();
+		return subscribePendingOpenCreateNearby(open);
+	}, [setCreateNearbyOpen]);
+
 	const { visible: createNudgeVisible, dismiss: dismissCreateNudge } = useMapCreateNudge({
 		mapReady: region != null,
 		isEmpty,
@@ -824,9 +839,9 @@ export function MapScreen(): React.JSX.Element {
 									? () => setDatingOnly(false)
 									: emptyCopy.actionKind === 'dating_prefs'
 										? () =>
-												openRootScreen(navigation, 'ProfileEdit', {
-													focus: 'dating',
-												})
+											openRootScreen(navigation, 'ProfileEdit', {
+												focus: 'dating',
+											})
 										: emptyCopy.actionKind === 'verify_email'
 											? () => openRootScreen(navigation, 'TrustCenter', { focusStep: 'email' })
 											: openCreateNearby
@@ -865,31 +880,31 @@ export function MapScreen(): React.JSX.Element {
 								: {})}
 							{...(selected.kind === 'user'
 								? {
-										onMessage: () => {
-											void openSheetMessage();
-										},
-									}
+									onMessage: () => {
+										void openSheetMessage();
+									},
+								}
 								: {})}
 							{...(selected.kind === 'user' && viewerMode === 'social'
 								? {
-										onWave: () => {
-											pinSendWave();
-										},
-									}
+									onWave: () => {
+										pinSendWave();
+									},
+								}
 								: {})}
 							{...(selected.kind === 'user' && viewerMode === 'dating'
 								? {
-										onLike: () => {
-											pinSendLike();
-										},
-										onPass: () => {
-											pinSendPass();
-											closeSheet();
-										},
-										likeSent: pinLikeSent,
-										isMatch: pinIsMatch,
-										actionPending: pinActionPending,
-									}
+									onLike: () => {
+										pinSendLike();
+									},
+									onPass: () => {
+										pinSendPass();
+										closeSheet();
+									},
+									likeSent: pinLikeSent,
+									isMatch: pinIsMatch,
+									actionPending: pinActionPending,
+								}
 								: {})}
 						/>
 					) : null}

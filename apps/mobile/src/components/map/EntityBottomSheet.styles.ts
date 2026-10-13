@@ -20,6 +20,48 @@ export const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  compatRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  compatStat: {
+    alignItems: 'center',
+    minWidth: 72,
+  },
+  compatValue: {
+    color: colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  compatLabel: {
+    color: colors.textMuted,
+    fontSize: 11,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  interestChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  interestChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,212,255,0.12)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+  },
+  interestChipText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   mutualRow: {
     flexDirection: 'row',
     alignItems: 'center',
