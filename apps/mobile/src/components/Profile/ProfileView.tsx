@@ -26,6 +26,7 @@ import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline
 import { colors, fontSize, spacing } from '@/theme';
 
 import type { ProfileFocusSection, ProfileViewProps } from './profileView.types';
+import {ProfileTrustScoreCard} from "@/components/Profile/ProfileTrustScoreCard";
 
 export type {
 	ProfileViewModel,
@@ -150,7 +151,17 @@ export function ProfileView({
 							? { onPress: actions.onPressIdentityPreview }
 							: {})}
 					/>
-
+					<View onLayout={onSectionLayout('trust')}>
+						<ProfileTrustScoreCard
+							score={profile.verificationScore}
+							idVerified={profile.idVerified}
+							{...(actions.onOpenTrustDetails != null
+								? { onPress: actions.onOpenTrustDetails }
+								: actions.onPressVerificationBadge != null
+									? { onPress: actions.onPressVerificationBadge }
+									: {})}
+						/>
+					</View>
 					{profile.bio ? <ProfileBio bio={profile.bio} /> : null}
 
 					<ProfileTagsSection interests={profile.interests} goals={profile.goals} />

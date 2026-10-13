@@ -19,7 +19,7 @@ import {
 	BottomSheetModal,
 	BottomSheetView,
 } from '@gorhom/bottom-sheet';
-
+import { NearbyPeopleRail } from '@/components/map/NearbyPeopleRail';
 import type {
 	DiscoveryPoint,
 	DiscoveryRankBy,
@@ -606,6 +606,13 @@ export function MapScreen(): React.JSX.Element {
 		region.longitudeDelta <= 0.25;
 	const isEmpty = !loading && points.length === 0 && isCityScale;
 
+	const peopleLayerOn = layers.includes('user');
+	const showNearbyPeopleRail =
+		peopleLayerOn &&
+		isCityScale &&
+		!sheetOpen &&
+		!createNearbyOpen;
+
 	const trendingItems = useMemo(
 		() => buildTrending(points, myLat, myLng, 3),
 		[points, myLat, myLng],
@@ -945,9 +952,13 @@ export function MapScreen(): React.JSX.Element {
 				</Pressable>
 			) : null}
 
-			{myCoords ? (
-				<EventsRail location={myCoords} />
-			) : null}
+			<NearbyPeopleRail
+				points={filteredPoints}
+				visible={showNearbyPeopleRail}
+				onPressUser={(p) => onEntityPress(p)}
+			/>
+
+			{myCoords ? <EventsRail location={myCoords} /> : null}
 		</View>
 	);
 }
