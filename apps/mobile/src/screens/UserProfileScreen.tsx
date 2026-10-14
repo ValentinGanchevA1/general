@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
 	ActivityIndicator,
 	StyleSheet,
@@ -6,30 +6,24 @@ import {
 	TouchableOpacity,
 	View,
 } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { appAlert } from '@/ui/appAlert';
 import {
 	BottomSheetModal,
 	BottomSheetView,
 } from '@gorhom/bottom-sheet';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+
 import type { RootStackParamList } from '@/navigation/AppNavigator';
-import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
 import { ProfileView } from '@/components/Profile/ProfileView';
-import {
-	ActionSheetList,
-	sheetChrome,
-	useSheetBackdrop,
-	type ActionSheetItem,
-} from '@/components/sheets';
+import { ActionSheetList, type ActionSheetItem } from '@/components/ActionSheetList';
+import { useSheetBackdrop } from '@/hooks/useSheetBackdrop';
 import { useUserProfileScreenData } from '@/features/profile/useUserProfileScreenData';
 import {
 	friendLabelFromRel,
 	mapPublicToViewModel,
 } from '@/features/profile/mapToProfileViewModel';
 import { resolveUserPrimaryCta } from '@/features/social/resolveUserPrimaryCta';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, useAppTheme } from '@/theme';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
@@ -39,6 +33,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
  * Layout lives in ProfileView mode="other" (PR-C).
  */
 export function UserProfileScreen({ route, navigation }: Props): React.JSX.Element {
+	const { colors: themeColors } = useAppTheme();
 	const { userId, focus } = route.params;
 	const insets = useSafeAreaInsets();
 	const {
@@ -80,72 +75,52 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 		});
 	}, [profile, focus, rel, navigation, userId]);
 
-	const openMenu = (): void => {
-		const name = profile?.displayName ?? 'this user';
-		const dismiss = (): void => {
-			optionsRef.current?.dismiss();
-		};
+	const dismiss = useCallback(() => {
+		optionsRef.current?.dismiss();
+	}, []);
 
-		let items: ActionSheetItem[];
-		if (blocked) {
-			items = [
-				{
-					key: 'unblock',
-					label: 'Unblock',
-					icon: 'account-check-outline',
-					onPress: () => {
-						dismiss();
-						void unblock();
-					},
+	const openMenu = (): void => {
+		const items: ActionSheetItem[] = [];
+		if (!blocked) {
+			items.push({
+				key: 'wave',
+				label: 'Send wave',
+				onPress: () => {
+					dismiss();
+					void sendWave();
 				},
-			];
-		} else {
-			items = [
-				{
-					key: 'gift',
-					label: 'Send gift',
-					icon: 'gift-outline',
-					onPress: () => {
-						dismiss();
-						setGiftSheetOpen(true);
-					},
-				},
-			];
-			if (rel?.state === 'friends') {
+			});
+			if (canMessage && canMessage !== 'none') {
 				items.push({
-					key: 'unfriend',
-					label: 'Unfriend',
-					icon: 'account-remove-outline',
-					destructive: true,
+					key: 'message',
+					label: 'Message',
 					onPress: () => {
 						dismiss();
-						appAlert('Unfriend', `Remove ${name} from friends?`, [
-							{ text: 'Cancel', style: 'cancel' },
-							{
-								text: 'Unfriend',
-								style: 'destructive',
-								onPress: () => void unfriend(),
-							},
-						]);
+						void openMessage();
 					},
 				});
 			}
 			items.push({
-				key: 'report',
-				label: 'Report',
-				icon: 'flag-outline',
+				key: 'gift',
+				label: 'Send gift',
 				onPress: () => {
 					dismiss();
-					appAlert(
-						'Report submitted',
-						'Thanks — our team will review this profile. For serious harm use local emergency services.',
-					);
+					setGiftSheetOpen(true);
 				},
 			});
+			if (rel?.isFriend) {
+				items.push({
+					key: 'unfriend',
+					label: 'Unfriend',
+					onPress: () => {
+						dismiss();
+						void unfriend();
+					},
+				});
+			}
 			items.push({
 				key: 'block',
-				label: 'Block user',
-				icon: 'block-helper',
+				label: 'Block',
 				destructive: true,
 				onPress: () => {
 					dismiss();
@@ -160,13 +135,13 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 
 	if (loading) {
 		return (
-			<View style={styles.centered}>
+			<View style={[styles.centered, { backgroundColor: themeColors.bg }]}>
 				<ActivityIndicator color={colors.primary} size="large" />
 			</View>
 		);
 	}
 
-	if (!profile) return <View style={styles.centered} />;
+	if (!profile) return <View style={[styles.centered, { backgroundColor: themeColors.bg }]} />;
 
 	const friendLabel = friendLabelFromRel(rel);
 	const viewModel = mapPublicToViewModel(profile, {
@@ -228,26 +203,17 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 					onFriendAction,
 					onPressMenu: openMenu,
 				}}
-				footerExtra={footer}
+				footer={footer}
 			/>
-
-			<SendGiftSheet
-				visible={giftSheetOpen}
-				onClose={() => setGiftSheetOpen(false)}
-				recipientId={userId}
-				recipientName={profile.displayName}
-			/>
-
 			<BottomSheetModal
 				ref={optionsRef}
+				index={0}
 				snapPoints={optionsSnap}
-				enablePanDownToClose
 				backdropComponent={renderBackdrop}
-				backgroundStyle={sheetChrome.background}
-				handleIndicatorStyle={sheetChrome.handle}
+				enablePanDownToClose
 			>
 				<BottomSheetView style={styles.sheetBody}>
-					<ActionSheetList items={menuItems} />
+					<ActionSheetList items={menuItems} onCancel={dismiss} />
 				</BottomSheetView>
 			</BottomSheetModal>
 		</>
@@ -263,39 +229,37 @@ const styles = StyleSheet.create({
 	},
 	footer: {
 		flexDirection: 'row',
-		gap: 10,
-		paddingHorizontal: spacing.xl,
-		paddingTop: 12,
+		alignItems: 'center',
+		justifyContent: 'flex-end',
+		paddingHorizontal: spacing.lg,
+		paddingTop: spacing.sm,
 		borderTopWidth: StyleSheet.hairlineWidth,
 		borderTopColor: colors.borderStrong,
 		backgroundColor: colors.bg,
 	},
 	footerBtn: {
-		borderRadius: 14,
-		paddingVertical: 14,
+		minHeight: 48,
+		minWidth: 48,
 		alignItems: 'center',
 		justifyContent: 'center',
-		minHeight: 50,
+		borderRadius: 12,
 	},
 	menuBtn: {
-		width: 56,
 		backgroundColor: colors.surfaceAlt,
 		borderWidth: 1,
 		borderColor: colors.borderStrong,
 	},
-	footerMenuOnly: {
-		marginLeft: 'auto',
-		flex: 0,
-	},
+	footerMenuOnly: { marginLeft: 'auto' },
 	unblockBtn: {
 		flex: 1,
-		borderRadius: 14,
-		padding: 16,
+		minHeight: 48,
 		alignItems: 'center',
+		justifyContent: 'center',
+		borderRadius: 12,
 		backgroundColor: colors.surfaceAlt,
 		borderWidth: 1,
 		borderColor: colors.dangerBorderSoft,
 	},
 	unblockBtnText: { color: colors.dangerMuted, fontWeight: '700', fontSize: 16 },
-	sheetBody: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+	sheetBody: { paddingBottom: spacing.lg },
 });
