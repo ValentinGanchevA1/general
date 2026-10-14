@@ -11,7 +11,7 @@ import {
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors } from '@/theme';
+import { useAppTheme } from '@/theme';
 import { requestOpenCreateNearby } from '@/features/map/pendingCreateNearby';
 
 /**
@@ -22,10 +22,11 @@ import { requestOpenCreateNearby } from '@/features/map/pendingCreateNearby';
  * `delayLongPress: null` from the tab-bar props (TS2322).
  */
 export function CreateTabButton({
-									accessibilityState,
-									onPress,
-									testID,
-								}: BottomTabBarButtonProps): React.JSX.Element {
+	accessibilityState,
+	onPress,
+	testID,
+}: BottomTabBarButtonProps): React.JSX.Element {
+	const { colors, shadow } = useAppTheme();
 	const focused = accessibilityState?.selected === true;
 
 	const handlePress = (e: GestureResponderEvent): void => {
@@ -44,7 +45,14 @@ export function CreateTabButton({
 			style={styles.wrap}
 			testID={testID}
 		>
-			<View style={[styles.fab, focused && styles.fabFocused]}>
+			<View
+				style={[
+					styles.fab,
+					{ backgroundColor: colors.primary },
+					shadow(0.3),
+					focused && styles.fabFocused,
+				]}
+			>
 				<MCI name="plus" size={28} color={colors.onPrimary} />
 			</View>
 		</TouchableOpacity>
@@ -62,14 +70,8 @@ const styles = StyleSheet.create({
 		width: 52,
 		height: 52,
 		borderRadius: 26,
-		backgroundColor: colors.primary,
 		alignItems: 'center',
 		justifyContent: 'center',
-		shadowColor: '#000',
-		shadowOpacity: 0.25,
-		shadowRadius: 6,
-		shadowOffset: { width: 0, height: 3 },
-		elevation: 6,
 	},
 	fabFocused: {
 		opacity: 0.95,
