@@ -23,6 +23,7 @@ import {
 	mapPublicToViewModel,
 } from '@/features/profile/mapToProfileViewModel';
 import { resolveUserPrimaryCta } from '@/features/social/resolveUserPrimaryCta';
+import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
 import { colors, spacing, useAppTheme } from '@/theme';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -85,6 +86,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 			items.push({
 				key: 'wave',
 				label: 'Send wave',
+				icon: 'hand-wave-outline',
 				onPress: () => {
 					dismiss();
 					void sendWave();
@@ -94,6 +96,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 				items.push({
 					key: 'message',
 					label: 'Message',
+					icon: 'message-outline',
 					onPress: () => {
 						dismiss();
 						void openMessage();
@@ -103,6 +106,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 			items.push({
 				key: 'gift',
 				label: 'Send gift',
+				icon: 'gift-outline',
 				onPress: () => {
 					dismiss();
 					setGiftSheetOpen(true);
@@ -112,6 +116,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 				items.push({
 					key: 'unfriend',
 					label: 'Unfriend',
+					icon: 'account-remove-outline',
 					onPress: () => {
 						dismiss();
 						void unfriend();
@@ -121,6 +126,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 			items.push({
 				key: 'block',
 				label: 'Block',
+				icon: 'block-helper',
 				destructive: true,
 				onPress: () => {
 					dismiss();
@@ -216,6 +222,12 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 					<ActionSheetList items={menuItems} onCancel={dismiss} />
 				</BottomSheetView>
 			</BottomSheetModal>
+			<SendGiftSheet
+				visible={giftSheetOpen}
+				onClose={() => setGiftSheetOpen(false)}
+				toUserId={userId}
+				toDisplayName={profile.displayName}
+			/>
 		</>
 	);
 }
@@ -261,5 +273,5 @@ const styles = StyleSheet.create({
 		borderColor: colors.dangerBorderSoft,
 	},
 	unblockBtnText: { color: colors.dangerMuted, fontWeight: '700', fontSize: 16 },
-	sheetBody: { paddingBottom: spacing.lg },
+	sheetBody: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 });
