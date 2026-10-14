@@ -393,8 +393,8 @@ function UserCard({
 	};
 
 	const profileButton = (
-		<TouchableOpacity key="profile" style={[styles.profileBtn, styles.ctaFlexShrink]} onPress={handleOpenProfile} accessibilityRole="button" accessibilityLabel="Open profile">
-			<Text style={styles.profileBtnText}>Profile</Text>
+		<TouchableOpacity key="profile" style={[styles.profileBtn, styles.ctaFlexShrink]} onPress={handleOpenProfile} accessibilityRole="button" accessibilityLabel="View full profile">
+			<Text style={styles.profileBtnText}>View Full Profile</Text>
 		</TouchableOpacity>
 	);
 	const messageButton = (
@@ -437,7 +437,11 @@ function UserCard({
 	} else if (preferMessagePrimary) {
 		actionOrder = [messageButton, profileButton];
 	} else if (waveAllowed) {
-		actionOrder = [waveButton, profileButton];
+		actionOrder = messageAllowed
+			? [waveButton, messageButton, profileButton]
+			: [waveButton, profileButton];
+	} else if (messageAllowed) {
+		actionOrder = [messageButton, profileButton];
 	} else {
 		actionOrder = [profileButton];
 	}
