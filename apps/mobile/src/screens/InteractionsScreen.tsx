@@ -1,21 +1,21 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import {
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+	FlatList,
+	RefreshControl,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type {
-  ConversationSummary,
-  FollowRequest,
-  InboxItem,
-  WaveRequest,
-  WaveResponse,
+	ConversationSummary,
+	FollowRequest,
+	InboxItem,
+	WaveRequest,
+	WaveResponse,
 } from '@g88/shared';
 
 import { postJson } from '@/api/client';
@@ -26,14 +26,14 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { SkeletonListRow } from '@/components/Skeleton';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import {
-  acceptFriendRequest,
-  declineFriendRequest,
+	acceptFriendRequest,
+	declineFriendRequest,
 } from '@/features/friends/friendsSlice';
 import { fetchConversations } from '@/features/chat/chatSlice';
 import {
-  aggregateInbox,
-  aggregatedSignalLabel,
-  type AggregatedInboxRow,
+	aggregateInbox,
+	aggregatedSignalLabel,
+	type AggregatedInboxRow,
 } from '@/features/interactions/aggregateInbox';
 import { useInboxInteractions } from '@/features/interactions/useInboxInteractions';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
@@ -47,641 +47,659 @@ import { colors, spacing, radius, fontSize, useAppTheme } from '@/theme';
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 type HubRow =
-  | { kind: 'chat'; sortAt: number; conversation: ConversationSummary }
-  | { kind: 'inbox'; sortAt: number; aggregated: AggregatedInboxRow };
+	| { kind: 'chat'; sortAt: number; conversation: ConversationSummary }
+	| { kind: 'inbox'; sortAt: number; aggregated: AggregatedInboxRow };
 
 type HubTab = 'activity' | 'chats';
 
 function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+	const diff = Date.now() - new Date(iso).getTime();
+	const mins = Math.floor(diff / 60_000);
+	if (mins < 1) return 'just now';
+	if (mins < 60) return `${mins}m ago`;
+	const hrs = Math.floor(mins / 60);
+	if (hrs < 24) return `${hrs}h ago`;
+	return `${Math.floor(hrs / 24)}d ago`;
 }
 
 function peerOf(convo: ConversationSummary, myUserId: string) {
-  return (
-    convo.participants.find((p) => p.id !== myUserId) ??
-    convo.participants[0] ??
-    null
-  );
+	return (
+		convo.participants.find((p) => p.id !== myUserId) ??
+		convo.participants[0] ??
+		null
+	);
 }
 
 function InboxRow({
-  aggregated,
-  busy,
-  onMatch,
-  onAccept,
-  onDecline,
-  onFollowBack,
-  onOpenProfile,
-  onViewOnMap,
-}: {
-  aggregated: AggregatedInboxRow;
-  busy: boolean;
-  onMatch: (userId: string) => void;
-  onAccept: (requestId: string) => void;
-  onDecline: (requestId: string) => void;
-  onFollowBack: (userId: string) => void;
-  onOpenProfile: (userId: string) => void;
-  onViewOnMap: (item: InboxItem) => void;
+					  aggregated,
+					  busy,
+					  onMatch,
+					  onAccept,
+					  onDecline,
+					  onFollowBack,
+					  onOpenProfile,
+					  onViewOnMap,
+				  }: {
+	aggregated: AggregatedInboxRow;
+	busy: boolean;
+	onMatch: (userId: string) => void;
+	onAccept: (requestId: string) => void;
+	onDecline: (requestId: string) => void;
+	onFollowBack: (userId: string) => void;
+	onOpenProfile: (userId: string) => void;
+	onViewOnMap: (item: InboxItem) => void;
 }): React.JSX.Element {
-  const item = aggregated.primary;
-  const label = aggregatedSignalLabel(item, aggregated.count);
+	const item = aggregated.primary;
+	const label = aggregatedSignalLabel(item, aggregated.count);
 
-  return (
-    <TouchableOpacity
-      style={styles.row}
-      onPress={() => onOpenProfile(item.fromUser.id)}
-      activeOpacity={0.7}
-      accessibilityRole="button"
-      accessibilityLabel={`${item.fromUser.displayName}, ${label}`}
-    >
-      <Avatar
-        uri={item.fromUser.avatarUrl}
-        name={item.fromUser.displayName}
-        size={48}
-      />
-      <View style={styles.info}>
-        <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>
-            {item.fromUser.displayName}
-          </Text>
-          <VerificationBadge verification={item.fromUser.verification ?? 'none'} size={14} />
-        </View>
-        <Text style={styles.signal} numberOfLines={1}>
-          {label} · {timeAgo(aggregated.latestAt)}
-        </Text>
-      </View>
+	return (
+		<TouchableOpacity
+			style={styles.row}
+			onPress={() => onOpenProfile(item.fromUser.id)}
+			activeOpacity={0.7}
+			accessibilityRole="button"
+			accessibilityLabel={`${item.fromUser.displayName}, ${label}`}
+		>
+			<Avatar
+				uri={item.fromUser.avatarUrl}
+				name={item.fromUser.displayName}
+				size={48}
+			/>
+			<View style={styles.info}>
+				<View style={styles.nameRow}>
+					<Text style={styles.name} numberOfLines={1}>
+						{item.fromUser.displayName}
+					</Text>
+					<VerificationBadge verification={item.fromUser.verification ?? 'none'} size={14} />
+				</View>
+				<Text style={styles.signal} numberOfLines={1}>
+					{label} · {timeAgo(aggregated.latestAt)}
+				</Text>
+			</View>
 
-      {item.type === 'wave' ? (
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.mapBtn}
-            disabled={busy}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              onViewOnMap(item);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`View ${item.fromUser.displayName} on map`}
-          >
-            <Text style={styles.mapBtnText}>Map</Text>
-          </TouchableOpacity>
-          {item.isMutual ? (
-            <View style={styles.mutualBadge}>
-              <Text style={styles.mutualText}>Match</Text>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              disabled={busy}
-              onPress={(e) => {
-                e.stopPropagation?.();
-                onMatch(item.fromUser.id);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`Match ${item.fromUser.displayName}`}
-            >
-              <Text style={styles.primaryBtnText}>Match</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : null}
+			{item.type === 'wave' ? (
+				<View style={styles.actions}>
+					<TouchableOpacity
+						style={styles.mapBtn}
+						disabled={busy}
+						onPress={(e) => {
+							e.stopPropagation?.();
+							onViewOnMap(item);
+						}}
+						accessibilityRole="button"
+						accessibilityLabel={`View ${item.fromUser.displayName} on map`}
+					>
+						<Text style={styles.mapBtnText}>Map</Text>
+					</TouchableOpacity>
+					{item.isMutual ? (
+						<View style={styles.mutualBadge}>
+							<Text style={styles.mutualText}>Match</Text>
+						</View>
+					) : (
+						<TouchableOpacity
+							style={styles.primaryBtn}
+							disabled={busy}
+							onPress={(e) => {
+								e.stopPropagation?.();
+								onMatch(item.fromUser.id);
+							}}
+							accessibilityRole="button"
+							accessibilityLabel={`Match ${item.fromUser.displayName}`}
+						>
+							<Text style={styles.primaryBtnText}>Match</Text>
+						</TouchableOpacity>
+					)}
+				</View>
+			) : null}
 
-      {item.type === 'friend_request' && item.requestId ? (
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.declineBtn}
-            disabled={busy}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              onDecline(item.requestId!);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`Decline request from ${item.fromUser.displayName}`}
-          >
-            <Text style={styles.declineBtnText}>Decline</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.primaryBtn}
-            disabled={busy}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              onAccept(item.requestId!);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`Accept request from ${item.fromUser.displayName}`}
-          >
-            <Text style={styles.primaryBtnText}>Accept</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
+			{item.type === 'friend_request' && item.requestId ? (
+				<View style={styles.actions}>
+					<TouchableOpacity
+						style={styles.declineBtn}
+						disabled={busy}
+						onPress={(e) => {
+							e.stopPropagation?.();
+							onDecline(item.requestId!);
+						}}
+						accessibilityRole="button"
+						accessibilityLabel={`Decline request from ${item.fromUser.displayName}`}
+					>
+						<Text style={styles.declineBtnText}>Decline</Text>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={styles.primaryBtn}
+						disabled={busy}
+						onPress={(e) => {
+							e.stopPropagation?.();
+							onAccept(item.requestId!);
+						}}
+						accessibilityRole="button"
+						accessibilityLabel={`Accept request from ${item.fromUser.displayName}`}
+					>
+						<Text style={styles.primaryBtnText}>Accept</Text>
+					</TouchableOpacity>
+				</View>
+			) : null}
 
-      {item.type === 'follow' &&
-        (item.isFollowingBack ? (
-          <View style={styles.mutualBadge}>
-            <Text style={styles.mutualText}>Following</Text>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={styles.primaryBtn}
-            disabled={busy}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              onFollowBack(item.fromUser.id);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`Follow back ${item.fromUser.displayName}`}
-          >
-            <Text style={styles.primaryBtnText}>Follow back</Text>
-          </TouchableOpacity>
-        ))}
-    </TouchableOpacity>
-  );
+			{item.type === 'follow' &&
+				(item.isFollowingBack ? (
+					<View style={styles.mutualBadge}>
+						<Text style={styles.mutualText}>Following</Text>
+					</View>
+				) : (
+					<TouchableOpacity
+						style={styles.primaryBtn}
+						disabled={busy}
+						onPress={(e) => {
+							e.stopPropagation?.();
+							onFollowBack(item.fromUser.id);
+						}}
+						accessibilityRole="button"
+						accessibilityLabel={`Follow back ${item.fromUser.displayName}`}
+					>
+						<Text style={styles.primaryBtnText}>Follow back</Text>
+					</TouchableOpacity>
+				))}
+		</TouchableOpacity>
+	);
 }
 
 function ChatRow({
-  conversation,
-  myUserId,
-  onOpen,
-}: {
-  conversation: ConversationSummary;
-  myUserId: string;
-  onOpen: (c: ConversationSummary) => void;
+					 conversation,
+					 myUserId,
+					 onOpen,
+				 }: {
+	conversation: ConversationSummary;
+	myUserId: string;
+	onOpen: (c: ConversationSummary) => void;
 }): React.JSX.Element {
-  const peer = peerOf(conversation, myUserId);
-  const name = peer?.displayName ?? 'Chat';
-  const last = conversation.lastMessage;
-  const isFromMe = last?.senderId === myUserId;
-  const unread = (conversation.unreadCount ?? 0) > 0;
-  const preview = last
-    ? `${isFromMe ? 'You: ' : ''}${last.body}`
-    : conversation.status === 'pending'
-      ? 'Message request'
-      : 'No messages yet';
-  const when = conversation.lastMessageAt ? timeAgo(conversation.lastMessageAt) : '';
-  const online = conversation.peerOnline === true;
-  const badge =
-    (conversation.unreadCount ?? 0) > 99
-      ? '99+'
-      : String(conversation.unreadCount ?? 0);
+	const peer = peerOf(conversation, myUserId);
+	const name = peer?.displayName ?? 'Chat';
+	const last = conversation.lastMessage;
+	const isFromMe = last?.senderId === myUserId;
+	const unread = (conversation.unreadCount ?? 0) > 0;
+	const preview = last
+		? `${isFromMe ? 'You: ' : ''}${last.body}`
+		: conversation.status === 'pending'
+			? 'Message request'
+			: 'No messages yet';
+	const when = conversation.lastMessageAt ? timeAgo(conversation.lastMessageAt) : '';
+	const online = conversation.peerOnline === true;
+	const badge =
+		(conversation.unreadCount ?? 0) > 99
+			? '99+'
+			: String(conversation.unreadCount ?? 0);
 
-  return (
-    <TouchableOpacity
-      style={styles.row}
-      onPress={() => onOpen(conversation)}
-      activeOpacity={0.7}
-      accessibilityRole="button"
-      accessibilityLabel={`Chat with ${name}`}
-    >
-      <View style={styles.avatarWrap}>
-        <Avatar uri={peer?.avatarUrl ?? null} name={name} size={48} />
-        {online ? <View style={styles.onlineDot} /> : null}
-      </View>
-      <View style={styles.info}>
-        <View style={styles.nameRow}>
-          <Text style={[styles.name, unread && styles.nameUnread]} numberOfLines={1}>
-            {name}
-          </Text>
-          {conversation.isFriend ? (
-            <Text style={styles.friendHint}>Friend</Text>
-          ) : null}
-        </View>
-        <Text style={[styles.preview, unread && styles.previewUnread]} numberOfLines={1}>
-          {preview}
-        </Text>
-        {when ? <Text style={styles.time}>{when}</Text> : null}
-      </View>
-      <View style={styles.chatRight}>
-        {unread ? (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadBadgeText}>{badge}</Text>
-          </View>
-        ) : conversation.status === 'pending' ? (
-          <View style={styles.pendingBadge}>
-            <Text style={styles.pendingText}>Pending</Text>
-          </View>
-        ) : null}
-      </View>
-    </TouchableOpacity>
-  );
+	return (
+		<TouchableOpacity
+			style={styles.row}
+			onPress={() => onOpen(conversation)}
+			activeOpacity={0.7}
+			accessibilityRole="button"
+			accessibilityLabel={`Chat with ${name}`}
+		>
+			<View style={styles.avatarWrap}>
+				<Avatar uri={peer?.avatarUrl ?? null} name={name} size={48} />
+				{online ? <View style={styles.onlineDot} /> : null}
+			</View>
+			<View style={styles.info}>
+				<View style={styles.nameRow}>
+					<Text style={[styles.name, unread && styles.nameUnread]} numberOfLines={1}>
+						{name}
+					</Text>
+					{conversation.isFriend ? (
+						<Text style={styles.friendHint}>Friend</Text>
+					) : null}
+				</View>
+				<Text style={[styles.preview, unread && styles.previewUnread]} numberOfLines={1}>
+					{preview}
+				</Text>
+				{when ? <Text style={styles.time}>{when}</Text> : null}
+			</View>
+			<View style={styles.chatRight}>
+				{unread ? (
+					<View style={styles.unreadBadge}>
+						<Text style={styles.unreadBadgeText}>{badge}</Text>
+					</View>
+				) : conversation.status === 'pending' ? (
+					<View style={styles.pendingBadge}>
+						<Text style={styles.pendingText}>Pending</Text>
+					</View>
+				) : null}
+			</View>
+		</TouchableOpacity>
+	);
 }
 
 export function InteractionsScreen(): React.JSX.Element {
-  const { colors: themeColors } = useAppTheme();
+	const { colors: themeColors } = useAppTheme();
 
-  const navigation = useNavigation<Nav>();
-  const dispatch = useAppDispatch();
-  const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
-  const conversations = useAppSelector((s) => s.chat.conversations);
-  const conversationsLoading = useAppSelector((s) => s.chat.conversationsLoading);
-  const { items, loading: inboxLoading, error: inboxError, refresh } = useInboxInteractions();
-  const { markSeen } = useReceivedInteractions();
-  const { on } = useSocket();
-  const [busyIds, setBusyIds] = React.useState<string[]>([]);
-  const [tab, setTab] = React.useState<HubTab>('activity');
+	const navigation = useNavigation<Nav>();
+	const dispatch = useAppDispatch();
+	const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
+	const conversations = useAppSelector((s) => s.chat.conversations);
+	const conversationsLoading = useAppSelector((s) => s.chat.conversationsLoading);
+	const { items, loading: inboxLoading, error: inboxError, refresh } = useInboxInteractions();
+	const { markSeen } = useReceivedInteractions();
+	const { on } = useSocket();
+	const [busyIds, setBusyIds] = React.useState<string[]>([]);
+	const [tab, setTab] = React.useState<HubTab>('activity');
 
-  const loadChats = useCallback(() => {
-    void dispatch(fetchConversations());
-  }, [dispatch]);
+	const loadChats = useCallback(() => {
+		void dispatch(fetchConversations());
+	}, [dispatch]);
 
-  useEffect(() => {
-    void Promise.resolve().then(() => {
-      markSeen();
-    });
-  }, [markSeen]);
+	useEffect(() => {
+		void Promise.resolve().then(() => {
+			markSeen();
+		});
+	}, [markSeen]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadChats();
-    }, [loadChats]),
-  );
+	useFocusEffect(
+		useCallback(() => {
+			loadChats();
+		}, [loadChats]),
+	);
 
-  useEffect(() => {
-    const unsubs = [
-      on('chat:message', () => {
-        loadChats();
-      }),
-      on('wave:received', () => {
-        void refresh();
-      }),
-      on('friend:request', () => {
-        void refresh();
-      }),
-      on('friend:accepted', () => {
-        void refresh();
-      }),
-    ];
-    return () => {
-      for (const u of unsubs) u();
-    };
-  }, [on, loadChats, refresh]);
+	useEffect(() => {
+		const unsubs = [
+			on('chat:message', () => {
+				loadChats();
+			}),
+			on('wave:received', () => {
+				void refresh();
+			}),
+			on('friend:request', () => {
+				void refresh();
+			}),
+			on('friend:accepted', () => {
+				void refresh();
+			}),
+		];
+		return () => {
+			for (const u of unsubs) u();
+		};
+	}, [on, loadChats, refresh]);
 
-  const chatRows: HubRow[] = useMemo(
-    () =>
-      conversations.map((c) => ({
-        kind: 'chat' as const,
-        sortAt: c.lastMessageAt ? new Date(c.lastMessageAt).getTime() : 0,
-        conversation: c,
-      })),
-    [conversations],
-  );
+	const chatRows: HubRow[] = useMemo(
+		() =>
+			conversations.map((c) => ({
+				kind: 'chat' as const,
+				sortAt: c.lastMessageAt ? new Date(c.lastMessageAt).getTime() : 0,
+				conversation: c,
+			})),
+		[conversations],
+	);
 
-  const activityRows: HubRow[] = useMemo(() => {
-    const aggregated = aggregateInbox(items);
-    return aggregated.map((row) => ({
-      kind: 'inbox' as const,
-      sortAt: new Date(row.latestAt).getTime(),
-      aggregated: row,
-    }));
-  }, [items]);
+	const activityRows: HubRow[] = useMemo(() => {
+		const aggregated = aggregateInbox(items);
+		return aggregated.map((row) => ({
+			kind: 'inbox' as const,
+			sortAt: new Date(row.latestAt).getTime(),
+			aggregated: row,
+		}));
+	}, [items]);
 
-  const rows: HubRow[] = tab === 'chats' ? chatRows : activityRows;
+	const rows: HubRow[] = tab === 'chats' ? chatRows : activityRows;
 
-  const coldLoading =
-    rows.length === 0 &&
-    (tab === 'chats' ? conversationsLoading : inboxLoading || conversationsLoading);
+	const coldLoading =
+		rows.length === 0 &&
+		(tab === 'chats' ? conversationsLoading : inboxLoading || conversationsLoading);
 
-  const showInboxErrorEmpty =
-    tab === 'activity' &&
-    inboxError != null &&
-    items.length === 0 &&
-    !inboxLoading;
+	const showInboxErrorEmpty =
+		tab === 'activity' &&
+		inboxError != null &&
+		items.length === 0 &&
+		!inboxLoading;
 
-  const showInboxSoftError =
-    tab === 'activity' && inboxError != null && items.length > 0;
+	const showInboxSoftError =
+		tab === 'activity' && inboxError != null && items.length > 0;
 
-  const onRefresh = useCallback(() => {
-    loadChats();
-    void refresh();
-  }, [loadChats, refresh]);
+	const onRefresh = useCallback(() => {
+		loadChats();
+		void refresh();
+	}, [loadChats, refresh]);
 
-  const setBusy = useCallback((id: string, onFlag: boolean) => {
-    setBusyIds((prev) => (onFlag ? [...prev, id] : prev.filter((x) => x !== id)));
-  }, []);
+	const setBusy = useCallback((id: string, onFlag: boolean) => {
+		setBusyIds((prev) => (onFlag ? [...prev, id] : prev.filter((x) => x !== id)));
+	}, []);
 
-  const onMatch = useCallback(
-    async (userId: string): Promise<void> => {
-      setBusy(userId, true);
-      try {
-        await postJson<WaveRequest, WaveResponse>('/interactions/wave', {
-          toUserId: userId,
-          context: 'profile',
-        });
-        await refresh();
-      } catch {
-        // global error path
-      } finally {
-        setBusy(userId, false);
-      }
-    },
-    [refresh, setBusy],
-  );
+	const onMatch = useCallback(
+		async (userId: string): Promise<void> => {
+			setBusy(userId, true);
+			try {
+				await postJson<WaveRequest, WaveResponse>('/interactions/wave', {
+					toUserId: userId,
+					context: 'profile',
+				});
+				await refresh();
+			} catch {
+				// global error path
+			} finally {
+				setBusy(userId, false);
+			}
+		},
+		[refresh, setBusy],
+	);
 
-  const onAccept = useCallback(
-    async (requestId: string): Promise<void> => {
-      setBusy(requestId, true);
-      try {
-        await dispatch(acceptFriendRequest(requestId)).unwrap();
-        await refresh();
-      } catch {
-        // slice surfaces error
-      } finally {
-        setBusy(requestId, false);
-      }
-    },
-    [dispatch, refresh, setBusy],
-  );
+	const onAccept = useCallback(
+		async (requestId: string): Promise<void> => {
+			setBusy(requestId, true);
+			try {
+				await dispatch(acceptFriendRequest(requestId)).unwrap();
+				await refresh();
+			} catch {
+				// slice surfaces error
+			} finally {
+				setBusy(requestId, false);
+			}
+		},
+		[dispatch, refresh, setBusy],
+	);
 
-  const onDecline = useCallback(
-    async (requestId: string): Promise<void> => {
-      setBusy(requestId, true);
-      try {
-        await dispatch(declineFriendRequest(requestId)).unwrap();
-        await refresh();
-      } catch {
-        // slice surfaces error
-      } finally {
-        setBusy(requestId, false);
-      }
-    },
-    [dispatch, refresh, setBusy],
-  );
+	const onDecline = useCallback(
+		async (requestId: string): Promise<void> => {
+			setBusy(requestId, true);
+			try {
+				await dispatch(declineFriendRequest(requestId)).unwrap();
+				await refresh();
+			} catch {
+				// slice surfaces error
+			} finally {
+				setBusy(requestId, false);
+			}
+		},
+		[dispatch, refresh, setBusy],
+	);
 
-  const onFollowBack = useCallback(
-    async (userId: string): Promise<void> => {
-      setBusy(userId, true);
-      try {
-        await postJson<FollowRequest, { following: true }>('/friends/follow', {
-          userId,
-        });
-        await refresh();
-      } catch {
-        // global error path
-      } finally {
-        setBusy(userId, false);
-      }
-    },
-    [refresh, setBusy],
-  );
+	const onFollowBack = useCallback(
+		async (userId: string): Promise<void> => {
+			setBusy(userId, true);
+			try {
+				await postJson<FollowRequest, { following: true }>('/friends/follow', {
+					userId,
+				});
+				await refresh();
+			} catch {
+				// global error path
+			} finally {
+				setBusy(userId, false);
+			}
+		},
+		[refresh, setBusy],
+	);
 
-  const onOpenProfile = useCallback(
-    (userId: string): void => {
-      navigation.navigate('UserProfile', { userId });
-    },
-    [navigation],
-  );
+	const onOpenProfile = useCallback(
+		(userId: string): void => {
+			navigation.navigate('UserProfile', { userId });
+		},
+		[navigation],
+	);
 
-  const onViewOnMap = useCallback(
-    async (item: InboxItem): Promise<void> => {
-      const id = item.fromUser.id;
-      setBusy(id, true);
-      try {
-        const result = await focusUserOnMap(navigation, {
-          userId: id,
-          displayName: item.fromUser.displayName,
-          avatarUrl: item.fromUser.avatarUrl,
-          verification: item.fromUser.verification ?? null,
-        });
-        if (result === 'no_pin') {
-          appAlert(
-            'Location unavailable',
-            'They have no map pin right now. Open their profile or try again when they are nearby.',
-          );
-        }
-      } finally {
-        setBusy(id, false);
-      }
-    },
-    [navigation, setBusy],
-  );
+	const onViewOnMap = useCallback(
+		async (item: InboxItem): Promise<void> => {
+			const id = item.fromUser.id;
+			setBusy(id, true);
+			try {
+				const result = await focusUserOnMap(navigation, {
+					userId: id,
+					displayName: item.fromUser.displayName,
+					avatarUrl: item.fromUser.avatarUrl,
+					verification: item.fromUser.verification ?? null,
+				});
+				if (result === 'no_pin') {
+					appAlert(
+						'Location unavailable',
+						'They have no map pin right now. Open their profile or try again when they are nearby.',
+					);
+				}
+			} finally {
+				setBusy(id, false);
+			}
+		},
+		[navigation, setBusy],
+	);
 
-  const onOpenChat = useCallback(
-    (c: ConversationSummary): void => {
-      const peer = peerOf(c, myUserId);
-      navigation.navigate('Chat', {
-        conversationId: c.id,
-        otherUserName: peer?.displayName ?? 'Chat',
-        requestPending: c.status === 'pending',
-        ...(peer?.id ? { otherUserId: peer.id } : {}),
-      });
-    },
-    [navigation, myUserId],
-  );
+	const onOpenChat = useCallback(
+		(c: ConversationSummary): void => {
+			const peer = peerOf(c, myUserId);
+			navigation.navigate('Chat', {
+				conversationId: c.id,
+				otherUserName: peer?.displayName ?? 'Chat',
+				requestPending: c.status === 'pending',
+				...(peer?.id ? { otherUserId: peer.id } : {}),
+			});
+		},
+		[navigation, myUserId],
+	);
 
-  return (
-    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
-      <ScreenHeader title="Interactions" bordered />
+	return (
+		<View style={[styles.root, { backgroundColor: themeColors.bg }]}>
+			<ScreenHeader title="Interactions" bordered />
 
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'activity' && styles.tabActive]}
-          onPress={() => setTab('activity')}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: tab === 'activity' }}
-          accessibilityLabel="Activity"
-        >
-          <Text style={[styles.tabText, tab === 'activity' && styles.tabTextActive]}>
-            Activity
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'chats' && styles.tabActive]}
-          onPress={() => setTab('chats')}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: tab === 'chats' }}
-          accessibilityLabel="Chats"
-        >
-          <Text style={[styles.tabText, tab === 'chats' && styles.tabTextActive]}>
-            Chats
-          </Text>
-        </TouchableOpacity>
-      </View>
+			<View style={[styles.tabs, { borderBottomColor: themeColors.border }]}>
+				<TouchableOpacity
+					style={[
+						styles.tab,
+						tab === 'activity' && styles.tabActive,
+						tab === 'activity' && { borderBottomColor: themeColors.primary },
+					]}
+					onPress={() => setTab('activity')}
+					accessibilityRole="tab"
+					accessibilityState={{ selected: tab === 'activity' }}
+					accessibilityLabel="Activity"
+				>
+					<Text
+						style={[
+							styles.tabText,
+							{ color: tab === 'activity' ? themeColors.primary : themeColors.textMuted },
+						]}
+					>
+						Activity
+					</Text>
+				</TouchableOpacity>
+				<TouchableOpacity
+					style={[
+						styles.tab,
+						tab === 'chats' && styles.tabActive,
+						tab === 'chats' && { borderBottomColor: themeColors.primary },
+					]}
+					onPress={() => setTab('chats')}
+					accessibilityRole="tab"
+					accessibilityState={{ selected: tab === 'chats' }}
+					accessibilityLabel="Chats"
+				>
+					<Text
+						style={[
+							styles.tabText,
+							{ color: tab === 'chats' ? themeColors.primary : themeColors.textMuted },
+						]}
+					>
+						Chats
+					</Text>
+				</TouchableOpacity>
+			</View>
 
-      {showInboxSoftError ? <SoftErrorBanner onRetry={() => void refresh()} /> : null}
+			{showInboxSoftError ? <SoftErrorBanner onRetry={() => void refresh()} /> : null}
 
-      {coldLoading ? (
-        <View style={styles.list}>
-          <SkeletonListRow />
-          <SkeletonListRow />
-          <SkeletonListRow />
-          <SkeletonListRow />
-          <SkeletonListRow />
-          <SkeletonListRow />
-        </View>
-      ) : (
-        <FlatList
-          data={rows}
-          keyExtractor={(r) =>
-            r.kind === 'chat' ? `chat-${r.conversation.id}` : r.aggregated.key
-          }
-          refreshControl={
-            <RefreshControl
-              refreshing={inboxLoading || conversationsLoading}
-              onRefresh={onRefresh}
-              tintColor={colors.primary}
-            />
-          }
-          contentContainerStyle={
-            rows.length === 0 ? styles.emptyContainer : styles.list
-          }
-          ListEmptyComponent={
-            showInboxErrorEmpty ? (
-              <EmptyState
-                variant="plain"
-                icon="alert-circle-outline"
-                title="Couldn't load activity"
-                body="Check your connection and try again."
-                actionLabel="Retry"
-                onAction={() => void refresh()}
-              />
-            ) : (
-              <EmptyState
-                variant="plain"
-                icon={tab === 'chats' ? 'message-text-outline' : 'bell-outline'}
-                title={tab === 'chats' ? 'No chats yet' : 'No activity yet'}
-                body={
-                  tab === 'chats'
-                    ? 'Start a conversation from a profile or after a match.'
-                    : 'Waves, friend requests, and new followers show up here.'
-                }
-              />
-            )
-          }
-          renderItem={({ item: row }) =>
-            row.kind === 'chat' ? (
-              <ChatRow
-                conversation={row.conversation}
-                myUserId={myUserId}
-                onOpen={onOpenChat}
-              />
-            ) : (
-              <InboxRow
-                aggregated={row.aggregated}
-                busy={busyIds.includes(
-                  row.aggregated.primary.requestId ?? row.aggregated.primary.fromUser.id,
-                )}
-                onMatch={(id) => void onMatch(id)}
-                onAccept={(id) => void onAccept(id)}
-                onDecline={(id) => void onDecline(id)}
-                onFollowBack={(id) => void onFollowBack(id)}
-                onOpenProfile={onOpenProfile}
-                onViewOnMap={(it) => void onViewOnMap(it)}
-              />
-            )
-          }
-        />
-      )}
-    </View>
-  );
+			{coldLoading ? (
+				<View style={styles.list}>
+					<SkeletonListRow />
+					<SkeletonListRow />
+					<SkeletonListRow />
+					<SkeletonListRow />
+					<SkeletonListRow />
+					<SkeletonListRow />
+				</View>
+			) : (
+				<FlatList
+					data={rows}
+					keyExtractor={(r) =>
+						r.kind === 'chat' ? `chat-${r.conversation.id}` : r.aggregated.key
+					}
+					refreshControl={
+						<RefreshControl
+							refreshing={inboxLoading || conversationsLoading}
+							onRefresh={onRefresh}
+							tintColor={colors.primary}
+						/>
+					}
+					contentContainerStyle={
+						rows.length === 0 ? styles.emptyContainer : styles.list
+					}
+					ListEmptyComponent={
+						showInboxErrorEmpty ? (
+							<EmptyState
+								variant="plain"
+								icon="alert-circle-outline"
+								title="Couldn't load activity"
+								body="Check your connection and try again."
+								actionLabel="Retry"
+								onAction={() => void refresh()}
+							/>
+						) : (
+							<EmptyState
+								variant="plain"
+								icon={tab === 'chats' ? 'message-text-outline' : 'bell-outline'}
+								title={tab === 'chats' ? 'No chats yet' : 'No activity yet'}
+								body={
+									tab === 'chats'
+										? 'Start a conversation from a profile or after a match.'
+										: 'Waves, friend requests, and new followers show up here.'
+								}
+							/>
+						)
+					}
+					renderItem={({ item: row }) =>
+						row.kind === 'chat' ? (
+							<ChatRow
+								conversation={row.conversation}
+								myUserId={myUserId}
+								onOpen={onOpenChat}
+							/>
+						) : (
+							<InboxRow
+								aggregated={row.aggregated}
+								busy={busyIds.includes(
+									row.aggregated.primary.requestId ?? row.aggregated.primary.fromUser.id,
+								)}
+								onMatch={(id) => void onMatch(id)}
+								onAccept={(id) => void onAccept(id)}
+								onDecline={(id) => void onDecline(id)}
+								onFollowBack={(id) => void onFollowBack(id)}
+								onOpenProfile={onOpenProfile}
+								onViewOnMap={(it) => void onViewOnMap(it)}
+							/>
+						)
+					}
+				/>
+			)}
+		</View>
+	);
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  tabs: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabActive: { borderBottomColor: colors.primary },
-  tabText: { color: colors.textMuted, fontSize: fontSize.sm, fontWeight: '600' },
-  tabTextActive: { color: colors.primary },
-  list: { paddingVertical: spacing.sm, flexGrow: 1 },
-  emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  avatarWrap: { position: 'relative' },
-  onlineDot: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.action,
-    borderWidth: 2,
-    borderColor: colors.bg,
-  },
-  info: { flex: 1, minWidth: 0 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: {
-    color: colors.textPrimary,
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    flexShrink: 1,
-  },
-  nameUnread: { fontWeight: '700' },
-  friendHint: { color: colors.action, fontSize: 11, fontWeight: '600' },
-  signal: { color: colors.textSecondary, fontSize: fontSize.sm },
-  preview: { color: colors.textSecondary, fontSize: fontSize.sm },
-  previewUnread: { color: colors.textPrimary, fontWeight: '600' },
-  time: { color: colors.textFaint, fontSize: fontSize.xs },
-  chatRight: { alignItems: 'flex-end', gap: 4 },
-  unreadBadge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-  },
-  unreadBadgeText: { color: colors.onPrimary, fontSize: 11, fontWeight: '800' },
-  pendingBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceAlt,
-  },
-  pendingText: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  mapBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  mapBtnText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '600' },
-  primaryBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
-  },
-  primaryBtnText: { color: colors.onPrimary, fontSize: fontSize.sm, fontWeight: '700' },
-  declineBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  declineBtnText: { color: colors.textMuted, fontSize: fontSize.sm, fontWeight: '600' },
-  mutualBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceAlt,
-  },
-  mutualText: { color: colors.action, fontSize: fontSize.sm, fontWeight: '700' },
+	root: { flex: 1, backgroundColor: colors.bg },
+	tabs: {
+		flexDirection: 'row',
+		paddingHorizontal: spacing.md,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: colors.border,
+	},
+	tab: {
+		flex: 1,
+		alignItems: 'center',
+		paddingVertical: spacing.md,
+		borderBottomWidth: 2,
+		borderBottomColor: 'transparent',
+	},
+	tabActive: { borderBottomColor: colors.primary },
+	tabText: { color: colors.textMuted, fontSize: fontSize.sm, fontWeight: '600' },
+	tabTextActive: { color: colors.primary },
+	list: { paddingVertical: spacing.sm, flexGrow: 1 },
+	emptyContainer: { flexGrow: 1, justifyContent: 'center' },
+	row: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: spacing.lg,
+		paddingVertical: spacing.md,
+		gap: spacing.md,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: colors.border,
+	},
+	avatarWrap: { position: 'relative' },
+	onlineDot: {
+		position: 'absolute',
+		right: 0,
+		bottom: 0,
+		width: 12,
+		height: 12,
+		borderRadius: 6,
+		backgroundColor: colors.action,
+		borderWidth: 2,
+		borderColor: colors.bg,
+	},
+	info: { flex: 1, minWidth: 0 },
+	nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+	name: {
+		color: colors.textPrimary,
+		fontSize: fontSize.md,
+		fontWeight: '600',
+		flexShrink: 1,
+	},
+	nameUnread: { fontWeight: '700' },
+	friendHint: { color: colors.action, fontSize: 11, fontWeight: '600' },
+	signal: { color: colors.textSecondary, fontSize: fontSize.sm },
+	preview: { color: colors.textSecondary, fontSize: fontSize.sm },
+	previewUnread: { color: colors.textPrimary, fontWeight: '600' },
+	time: { color: colors.textFaint, fontSize: fontSize.xs },
+	chatRight: { alignItems: 'flex-end', gap: 4 },
+	unreadBadge: {
+		minWidth: 20,
+		height: 20,
+		borderRadius: 10,
+		backgroundColor: colors.primary,
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingHorizontal: 6,
+	},
+	unreadBadgeText: { color: colors.onPrimary, fontSize: 11, fontWeight: '800' },
+	pendingBadge: {
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: radius.sm,
+		backgroundColor: colors.surfaceAlt,
+	},
+	pendingText: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
+	actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+	mapBtn: {
+		paddingHorizontal: 10,
+		paddingVertical: 8,
+		borderRadius: radius.md,
+		borderWidth: 1,
+		borderColor: colors.borderStrong,
+	},
+	mapBtnText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '600' },
+	primaryBtn: {
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		borderRadius: radius.md,
+		backgroundColor: colors.primary,
+	},
+	primaryBtnText: { color: colors.onPrimary, fontSize: fontSize.sm, fontWeight: '700' },
+	declineBtn: {
+		paddingHorizontal: 10,
+		paddingVertical: 8,
+		borderRadius: radius.md,
+		borderWidth: 1,
+		borderColor: colors.borderStrong,
+	},
+	declineBtnText: { color: colors.textMuted, fontSize: fontSize.sm, fontWeight: '600' },
+	mutualBadge: {
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		borderRadius: radius.md,
+		backgroundColor: colors.surfaceAlt,
+	},
+	mutualText: { color: colors.action, fontSize: fontSize.sm, fontWeight: '700' },
 });
