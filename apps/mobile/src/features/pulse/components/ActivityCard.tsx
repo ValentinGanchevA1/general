@@ -34,41 +34,6 @@ interface Props {
   onView?: () => void;
 }
 
-function formatDistance(m: number): string {
-  if (m < 1000) return `${Math.round(m)} m`;
-  return `${(m / 1000).toFixed(1)} km`;
-}
-
-function relTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)}d`;
-}
-
-function resolveCta(
-  item: ActivityItem,
-  handlers: {
-    onWaveBack?: () => void;
-    onMessage?: () => void;
-    onView?: () => void;
-  },
-): { label: string; onPress: () => void; tone: 'wave' | 'message' | 'view' } | null {
-  if (item.type === 'wave' && handlers.onWaveBack) {
-    return { label: 'Wave back', onPress: handlers.onWaveBack, tone: 'wave' };
-  }
-  if ((item.type === 'match' || item.type === 'chat') && handlers.onMessage) {
-    return { label: 'Message', onPress: handlers.onMessage, tone: 'message' };
-  }
-  if ((item.type === 'listing' || item.type === 'alert') && handlers.onView) {
-    return { label: 'View', onPress: handlers.onView, tone: 'view' };
-  }
-  return null;
-}
-
 export function ActivityCard({
   item,
   onPress,
@@ -103,11 +68,7 @@ export function ActivityCard({
 
   return (
     <Pressable
-      style={({ pressed }) => [
-        S.card,
-        { backgroundColor: themeColors.surfaceAlt },
-        pressed && S.cardPressed,
-      ]}
+      style={({ pressed }) => [S.card, { backgroundColor: themeColors.surfaceAlt }, pressed && S.cardPressed]}
       onPress={onPress}
       testID={`activity-card-${item.id}`}
     >
@@ -136,57 +97,115 @@ export function ActivityCard({
         </View>
 
         {cta ? (
-          <Pressable
-            style={[S.cta, cta.tone === 'wave' && S.ctaWave, cta.tone === 'message' && S.ctaMessage]}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              if (!busy) cta.onPress();
-            }}
-            disabled={!!busy}
-            accessibilityRole="button"
-            accessibilityLabel={cta.label}
-          >
-            {busy ? (
-              <ActivityIndicator size="small" color={colors.onPrimary} />
-            ) : (
-              <Text
-                style={[
-                  S.ctaText,
-                  cta.tone === 'wave' && S.ctaTextWave,
-                  cta.tone === 'view' && S.ctaTextView,
-                ]}
-              >
-                {cta.label}
-              </Text>
-            )}
-          </Pressable>
+          <TouchableCta
+            label={cta.label}
+            tone={cta.tone}
+            busy={!!busy}
+            onPress={cta.onPress}
+          />
         ) : (
-          <MCI name="chevron-right" size={20} color={colors.textMuted} />
+          <MCI name={ICON_BY_TYPE[item.type]} size={18} color={colors.textMuted} />
         )}
       </View>
     </Pressable>
   );
 }
 
+function formatDistance(m: number): string {
+  if (m < 1000) return `${Math.round(m)}m`;
+  return `${(m / 1000).toFixed(1)}km`;
+}
+
+function relTime(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  return `${Math.floor(hrs / 24)}d`;
+}
+
+type CtaTone = 'wave' | 'message' | 'view';
+
+function resolveCta(
+  item: ActivityItem,
+  handlers: {
+    onWaveBack?: () => void;
+    onMessage?: () => void;
+    onView?: () => void;
+  },
+): { label: string; tone: CtaTone; onPress: () => void } | null {
+  if (item.type === 'wave' && handlers.onWaveBack) {
+    return { label: 'Wave back', tone: 'wave', onPress: handlers.onWaveBack };
+  }
+  if ((item.type === 'chat' || item.type === 'match') && handlers.onMessage) {
+    return { label: 'Message', tone: 'message', onPress: handlers.onMessage };
+  }
+  if ((item.type === 'listing' || item.type === 'alert') && handlers.onView) {
+    return { label: 'View', tone: 'view', onPress: handlers.onView };
+  }
+  return null;
+}
+
+function TouchableCta({
+  label,
+  tone,
+  busy,
+  onPress,
+}: {
+  label: string;
+  tone: CtaTone;
+  busy: boolean;
+  onPress: () => void;
+}): React.JSX.Element {
+  return (
+    <Pressable
+      onPress={(e) => {
+        e.stopPropagation?.();
+        if (!busy) onPress();
+      }}
+      disabled={busy}
+      hitSlop={8}
+      style={[S.cta, tone === 'wave' && S.ctaWave, tone === 'view' && S.ctaView]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      {busy ? (
+        <ActivityIndicator size="small" color={colors.textPrimary} />
+      ) : (
+        <Text
+          style={[
+            S.ctaText,
+            tone === 'wave' && S.ctaTextWave,
+            tone === 'view' && S.ctaTextView,
+          ]}
+        >
+          {label}
+        </Text>
+      )}
+    </Pressable>
+  );
+}
+
 const S = StyleSheet.create({
   card: {
-    backgroundColor: colors.surfaceAlt,
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
+    padding: spacing.md,
     borderRadius: 14,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    backgroundColor: colors.surfaceAlt,
   },
-  cardPressed: { opacity: 0.9 },
+  cardPressed: { opacity: 0.85 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
+    borderWidth: 2,
     backgroundColor: colors.bg,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
   },
   avatarText: {
     color: colors.primary,
@@ -197,7 +216,7 @@ const S = StyleSheet.create({
   title: {
     color: colors.textPrimary,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   titleUnread: { fontWeight: '700' },
   preview: {
@@ -213,23 +232,21 @@ const S = StyleSheet.create({
   cta: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 12,
-    minHeight: 36,
-    minWidth: 72,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.action,
+    minWidth: 88,
+    alignItems: 'center',
   },
   ctaWave: {
     backgroundColor: colors.danger,
     borderColor: colors.danger,
   },
-  ctaMessage: {
+  ctaView: {
     backgroundColor: colors.surfaceRaised,
     borderColor: colors.borderStrong,
   },
-  ctaText: { fontSize: 13, fontWeight: '700', color: colors.onPrimary },
+  ctaText: { fontSize: 13, fontWeight: '700', color: colors.action },
   ctaTextWave: { color: colors.onPrimary },
   ctaTextView: { color: colors.primary },
 });
