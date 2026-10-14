@@ -23,10 +23,10 @@ import { ProfileStatsRow } from '@/components/Profile/ProfileStatsRow';
 import { ProfileTagsSection } from '@/components/Profile/ProfileTagsSection';
 import { ProfileTrustBlock } from '@/components/Profile/ProfileTrustBlock';
 import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline';
-import { colors, fontSize, spacing } from '@/theme';
+import { colors, fontSize, spacing, useAppTheme } from '@/theme';
 
 import type { ProfileFocusSection, ProfileViewProps } from './profileView.types';
-import {ProfileTrustScoreCard} from "@/components/Profile/ProfileTrustScoreCard";
+import { ProfileTrustScoreCard } from '@/components/Profile/ProfileTrustScoreCard';
 
 export type {
 	ProfileViewModel,
@@ -72,6 +72,7 @@ export function ProfileView({
 								selfSlots,
 								refreshControl,
 							}: ProfileViewProps): React.JSX.Element {
+	const { colors: themeColors } = useAppTheme();
 	const insets = useSafeAreaInsets();
 	const scrollRef = useRef<ScrollViewType>(null);
 	const sectionY = useRef<Partial<Record<ProfileFocusSection, number>>>({});
@@ -107,7 +108,7 @@ export function ProfileView({
 		const score = profile.verificationScore ?? 0;
 
 		return (
-			<View style={styles.root} testID="profile-view-self">
+			<View style={[styles.root, { backgroundColor: themeColors.bg }]} testID="profile-view-self">
 				<ScrollView
 					ref={scrollRef}
 					style={styles.scroll}
@@ -208,7 +209,7 @@ export function ProfileView({
 	const mutualCount = profile.mutualFriendsCount ?? 0;
 
 	return (
-		<View style={styles.root} testID="profile-view-other">
+		<View style={[styles.root, { backgroundColor: themeColors.bg }]} testID="profile-view-other">
 			<ScrollView
 				ref={scrollRef}
 				contentContainerStyle={styles.scrollContent}
