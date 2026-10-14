@@ -81,17 +81,19 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 		});
 	}, [profile, focus, rel, navigation, userId]);
 
-	const dismiss = (): void => {
-		optionsRef.current?.dismiss();
-	};
-
 	const openMenu = (): void => {
+		const name = profile?.displayName ?? 'this user';
+		const dismiss = (): void => {
+			optionsRef.current?.dismiss();
+		};
+
 		let items: ActionSheetItem[];
 		if (blocked) {
 			items = [
 				{
 					key: 'unblock',
 					label: 'Unblock',
+					icon: 'account-check-outline',
 					onPress: () => {
 						dismiss();
 						void unblock();
@@ -100,24 +102,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 			];
 		} else {
 			items = [
-				{
-					key: 'wave',
-					label: 'Send wave',
-					icon: 'hand-wave-outline',
-					onPress: () => {
-						dismiss();
-						void sendWave();
-					},
-				},
-				{
-					key: 'message',
-					label: 'Message',
-					icon: 'message-outline',
-					onPress: () => {
-						dismiss();
-						void openMessage();
-					},
-				},
 				{
 					key: 'gift',
 					label: 'Send gift',
@@ -128,20 +112,40 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 					},
 				},
 			];
-			if (rel?.friendshipStatus === 'friends') {
+			if (rel?.state === 'friends') {
 				items.push({
 					key: 'unfriend',
 					label: 'Unfriend',
 					icon: 'account-remove-outline',
+					destructive: true,
 					onPress: () => {
 						dismiss();
-						void unfriend();
+						appAlert('Unfriend', `Remove ${name} from friends?`, [
+							{ text: 'Cancel', style: 'cancel' },
+							{
+								text: 'Unfriend',
+								style: 'destructive',
+								onPress: () => void unfriend(),
+							},
+						]);
 					},
 				});
 			}
 			items.push({
+				key: 'report',
+				label: 'Report',
+				icon: 'flag-outline',
+				onPress: () => {
+					dismiss();
+					appAlert(
+						'Report submitted',
+						'Thanks — our team will review this profile. For serious harm use local emergency services.',
+					);
+				},
+			});
+			items.push({
 				key: 'block',
-				label: 'Block',
+				label: 'Block user',
 				icon: 'block-helper',
 				destructive: true,
 				onPress: () => {
@@ -150,6 +154,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 				},
 			});
 		}
+
 		setMenuItems(items);
 		optionsRef.current?.present();
 	};
