@@ -229,26 +229,28 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 					onFriendAction,
 					onPressMenu: openMenu,
 				}}
-				footer={footer}
+				footerExtra={footer}
 			/>
-			<BottomSheetModal
-				ref={optionsRef}
-				index={0}
-				snapPoints={optionsSnap}
-				backdropComponent={renderBackdrop}
-				enablePanDownToClose
-				{...sheetChrome}
-			>
-				<BottomSheetView style={styles.sheetBody}>
-					<ActionSheetList items={menuItems} />
-				</BottomSheetView>
-			</BottomSheetModal>
+
 			<SendGiftSheet
 				visible={giftSheetOpen}
 				onClose={() => setGiftSheetOpen(false)}
 				recipientId={userId}
 				recipientName={profile.displayName}
 			/>
+
+			<BottomSheetModal
+				ref={optionsRef}
+				snapPoints={optionsSnap}
+				enablePanDownToClose
+				backdropComponent={renderBackdrop}
+				backgroundStyle={sheetChrome.background}
+				handleIndicatorStyle={sheetChrome.handle}
+			>
+				<BottomSheetView style={styles.sheetBody}>
+					<ActionSheetList items={menuItems} />
+				</BottomSheetView>
+			</BottomSheetModal>
 		</>
 	);
 }
@@ -262,33 +264,35 @@ const styles = StyleSheet.create({
 	},
 	footer: {
 		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'flex-end',
-		paddingHorizontal: spacing.lg,
-		paddingTop: spacing.sm,
+		gap: 10,
+		paddingHorizontal: spacing.xl,
+		paddingTop: 12,
 		borderTopWidth: StyleSheet.hairlineWidth,
 		borderTopColor: colors.borderStrong,
 		backgroundColor: colors.bg,
 	},
 	footerBtn: {
-		minHeight: 48,
-		minWidth: 48,
+		borderRadius: 14,
+		paddingVertical: 14,
 		alignItems: 'center',
 		justifyContent: 'center',
-		borderRadius: 12,
+		minHeight: 50,
 	},
 	menuBtn: {
+		width: 56,
 		backgroundColor: colors.surfaceAlt,
 		borderWidth: 1,
 		borderColor: colors.borderStrong,
 	},
-	footerMenuOnly: { marginLeft: 'auto' },
+	footerMenuOnly: {
+		marginLeft: 'auto',
+		flex: 0,
+	},
 	unblockBtn: {
 		flex: 1,
-		minHeight: 48,
+		borderRadius: 14,
+		padding: 16,
 		alignItems: 'center',
-		justifyContent: 'center',
-		borderRadius: 12,
 		backgroundColor: colors.surfaceAlt,
 		borderWidth: 1,
 		borderColor: colors.dangerBorderSoft,
