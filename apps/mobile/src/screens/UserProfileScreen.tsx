@@ -29,7 +29,7 @@ import {
 	mapPublicToViewModel,
 } from '@/features/profile/mapToProfileViewModel';
 import { resolveUserPrimaryCta } from '@/features/social/resolveUserPrimaryCta';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, useAppTheme } from '@/theme';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
@@ -39,6 +39,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
  * Layout lives in ProfileView mode="other" (PR-C).
  */
 export function UserProfileScreen({ route, navigation }: Props): React.JSX.Element {
+	const { colors: themeColors } = useAppTheme();
 	const { userId, focus } = route.params;
 	const insets = useSafeAreaInsets();
 	const {
@@ -160,13 +161,13 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 
 	if (loading) {
 		return (
-			<View style={styles.centered}>
+			<View style={[styles.centered, { backgroundColor: themeColors.bg }]}>
 				<ActivityIndicator color={colors.primary} size="large" />
 			</View>
 		);
 	}
 
-	if (!profile) return <View style={styles.centered} />;
+	if (!profile) return <View style={[styles.centered, { backgroundColor: themeColors.bg }]} />;
 
 	const friendLabel = friendLabelFromRel(rel);
 	const viewModel = mapPublicToViewModel(profile, {

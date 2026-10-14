@@ -15,7 +15,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { DiscoveryRankBy, EntityKind, ListingMode } from '@g88/shared';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { colors, fontSize, radius, spacing, useAppTheme } from '@/theme';
 
 import { COMBINED_FILTER_ROW_HEIGHT } from './mapChromeLayout';
 
@@ -84,8 +84,9 @@ export function MapFilterRow({
 	onRankByChange,
 	onPressCreate,
 	top,
-	placeholder = 'Search this area…',
+	placeholder = 'Search people, places, events, listings…',
 }: MapFilterRowProps): React.JSX.Element {
+	const { colors: c } = useAppTheme();
 	const rankActive = rankBy !== 'relevance';
 	const showPeople = layers.includes('user');
 	const showListings = layers.includes('listing');
@@ -113,14 +114,14 @@ export function MapFilterRow({
 				contentContainerStyle={styles.row}
 				keyboardShouldPersistTaps="handled"
 			>
-				<View style={styles.searchBox}>
-					<Icon name="magnify" size={18} color={colors.textMuted} />
+				<View style={[styles.searchBox, { backgroundColor: c.surface, borderColor: c.borderStrong }]}>
+					<Icon name="magnify" size={18} color={c.textMuted} />
 					<TextInput
 						value={value}
 						onChangeText={onChangeText}
 						placeholder={placeholder}
-						placeholderTextColor={colors.textFaint}
-						style={styles.searchInput}
+						placeholderTextColor={c.textFaint}
+						style={[styles.searchInput, { color: c.textPrimary }]}
 						returnKeyType="search"
 						autoCorrect={false}
 						autoCapitalize="none"
