@@ -16,6 +16,7 @@ import {
   resolveSentryDist,
   resolveSentryRelease,
 } from '@/lib/sentry';
+import { ThemeProvider } from '@/theme';
 
 Sentry.init({
   dsn: Config.SENTRY_DSN,
@@ -43,7 +44,9 @@ function App(): React.JSX.Element {
     <GestureHandlerRootView style={styles.root}>
       <Provider store={store}>
         <SafeAreaProvider>
-          <AppNavigator />
+          <ThemeProvider>
+            <AppNavigator />
+          </ThemeProvider>
         </SafeAreaProvider>
       </Provider>
     </GestureHandlerRootView>
