@@ -7,7 +7,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { ActivityItem, ActivityType } from '@g88/shared';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, useAppTheme } from '@/theme';
 
 const ICON_BY_TYPE: Record<ActivityType, string> = {
   chat: 'message-text-outline',
@@ -34,6 +34,41 @@ interface Props {
   onView?: () => void;
 }
 
+function formatDistance(m: number): string {
+  if (m < 1000) return `${Math.round(m)} m`;
+  return `${(m / 1000).toFixed(1)} km`;
+}
+
+function relTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  return `${Math.floor(hrs / 24)}d`;
+}
+
+function resolveCta(
+  item: ActivityItem,
+  handlers: {
+    onWaveBack?: () => void;
+    onMessage?: () => void;
+    onView?: () => void;
+  },
+): { label: string; onPress: () => void; tone: 'wave' | 'message' | 'view' } | null {
+  if (item.type === 'wave' && handlers.onWaveBack) {
+    return { label: 'Wave back', onPress: handlers.onWaveBack, tone: 'wave' };
+  }
+  if ((item.type === 'match' || item.type === 'chat') && handlers.onMessage) {
+    return { label: 'Message', onPress: handlers.onMessage, tone: 'message' };
+  }
+  if ((item.type === 'listing' || item.type === 'alert') && handlers.onView) {
+    return { label: 'View', onPress: handlers.onView, tone: 'view' };
+  }
+  return null;
+}
+
 export function ActivityCard({
   item,
   onPress,
@@ -42,6 +77,8 @@ export function ActivityCard({
   onMessage,
   onView,
 }: Props): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const initials = (item.actorName ?? '?')
     .split(' ')
     .map((w) => w[0] ?? '')
@@ -66,7 +103,11 @@ export function ActivityCard({
 
   return (
     <Pressable
-      style={({ pressed }) => [S.card, pressed && S.cardPressed]}
+      style={({ pressed }) => [
+        S.card,
+        { backgroundColor: themeColors.surfaceAlt },
+        pressed && S.cardPressed,
+      ]}
       onPress={onPress}
       testID={`activity-card-${item.id}`}
     >
@@ -95,131 +136,62 @@ export function ActivityCard({
         </View>
 
         {cta ? (
-          <TouchableCta
-            label={cta.label}
-            variant={cta.variant}
-            {...(busy != null ? { busy } : {})}
+          <Pressable
+            style={[S.cta, cta.tone === 'wave' && S.ctaWave, cta.tone === 'message' && S.ctaMessage]}
             onPress={(e) => {
-              e?.stopPropagation?.();
-              cta.onPress();
+              e.stopPropagation?.();
+              if (!busy) cta.onPress();
             }}
-          />
+            disabled={!!busy}
+            accessibilityRole="button"
+            accessibilityLabel={cta.label}
+          >
+            {busy ? (
+              <ActivityIndicator size="small" color={colors.onPrimary} />
+            ) : (
+              <Text
+                style={[
+                  S.ctaText,
+                  cta.tone === 'wave' && S.ctaTextWave,
+                  cta.tone === 'view' && S.ctaTextView,
+                ]}
+              >
+                {cta.label}
+              </Text>
+            )}
+          </Pressable>
         ) : (
-          <MCI
-            name={ICON_BY_TYPE[item.type]}
-            size={18}
-            color={colors.textMuted}
-          />
+          <MCI name="chevron-right" size={20} color={colors.textMuted} />
         )}
       </View>
     </Pressable>
   );
 }
 
-function resolveCta(
-  item: ActivityItem,
-  handlers: {
-    onWaveBack?: () => void;
-    onMessage?: () => void;
-    onView?: () => void;
-  },
-): { label: string; variant: 'wave' | 'message' | 'view'; onPress: () => void } | null {
-  if (item.type === 'wave' && handlers.onWaveBack) {
-    return { label: 'Wave back', variant: 'wave', onPress: handlers.onWaveBack };
-  }
-  if ((item.type === 'match' || item.type === 'chat') && handlers.onMessage) {
-    return { label: 'Message', variant: 'message', onPress: handlers.onMessage };
-  }
-  if ((item.type === 'listing' || item.type === 'alert') && handlers.onView) {
-    return { label: 'View', variant: 'view', onPress: handlers.onView };
-  }
-  return null;
-}
-
-function TouchableCta({
-  label,
-  variant,
-  busy,
-  onPress,
-}: {
-  label: string;
-  variant: 'wave' | 'message' | 'view';
-  busy?: boolean;
-  onPress: (e?: { stopPropagation?: () => void }) => void;
-}): React.JSX.Element {
-  return (
-    <Pressable
-      style={[
-        S.cta,
-        variant === 'wave' && S.ctaWave,
-        variant === 'message' && S.ctaMessage,
-        variant === 'view' && S.ctaView,
-      ]}
-      onPress={onPress}
-      disabled={busy}
-      hitSlop={8}
-    >
-      {busy ? (
-        <ActivityIndicator size="small" color="#fff" />
-      ) : (
-        <Text
-          style={[
-            S.ctaText,
-            variant === 'wave' && S.ctaTextWave,
-            variant === 'message' && S.ctaTextMessage,
-            variant === 'view' && S.ctaTextView,
-          ]}
-        >
-          {label}
-        </Text>
-      )}
-    </Pressable>
-  );
-}
-
-function formatDistance(m: number): string {
-  if (m < 1000) return `${Math.round(m)} m`;
-  return `${(m / 1000).toFixed(1)} km`;
-}
-
-function relTime(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(ms / 60000);
-  if (m < 1) return 'now';
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
-}
-
 const S = StyleSheet.create({
   card: {
     backgroundColor: colors.surfaceAlt,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    marginHorizontal: spacing.xl,
-    marginBottom: 10,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    borderRadius: 14,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
-  cardPressed: { opacity: 0.85 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
+  cardPressed: { opacity: 0.9 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.bg,
-    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
   },
   avatarText: {
     color: colors.primary,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 14,
   },
   body: { flex: 1, minWidth: 0 },
   title: {
@@ -236,30 +208,28 @@ const S = StyleSheet.create({
   meta: {
     color: colors.textMuted,
     fontSize: 12,
-    marginTop: 4,
+    marginTop: 2,
   },
   cta: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
+    minHeight: 36,
     minWidth: 72,
     alignItems: 'center',
-  },
-  ctaWave: {
-    backgroundColor: 'transparent',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.action,
   },
-  ctaMessage: {
+  ctaWave: {
     backgroundColor: colors.danger,
+    borderColor: colors.danger,
   },
-  ctaView: {
+  ctaMessage: {
     backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
     borderColor: colors.borderStrong,
   },
-  ctaText: { fontSize: 13, fontWeight: '700' },
-  ctaTextWave: { color: colors.action },
-  ctaTextMessage: { color: '#fff' },
+  ctaText: { fontSize: 13, fontWeight: '700', color: colors.onPrimary },
+  ctaTextWave: { color: colors.onPrimary },
   ctaTextView: { color: colors.primary },
 });
