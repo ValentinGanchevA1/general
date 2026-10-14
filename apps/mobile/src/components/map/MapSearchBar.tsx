@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { fontSize, radius, spacing, useAppTheme } from '@/theme';
 
 export const MAP_SEARCH_BAR_HEIGHT = 44;
 
@@ -25,11 +25,22 @@ export function MapSearchBar({
 	value,
 	onChangeText,
 	top,
-	placeholder = 'Search nearby…',
+	placeholder = 'Search people, places, events, listings…',
 }: MapSearchBarProps): React.JSX.Element {
+	const { colors, shadow } = useAppTheme();
+
 	return (
 		<View style={[styles.wrap, { top }]} pointerEvents="box-none">
-			<View style={styles.bar}>
+			<View
+				style={[
+					styles.bar,
+					{
+						backgroundColor: colors.surface,
+						borderColor: colors.borderStrong,
+					},
+					shadow(0.12),
+				]}
+			>
 				<Icon
 					name="magnify"
 					size={20}
@@ -40,8 +51,8 @@ export function MapSearchBar({
 					value={value}
 					onChangeText={onChangeText}
 					placeholder={placeholder}
-					placeholderTextColor={colors.textMuted}
-					style={styles.input}
+					placeholderTextColor={colors.textFaint}
+					style={[styles.input, { color: colors.textPrimary }]}
 					returnKeyType="search"
 					autoCorrect={false}
 					autoCapitalize="none"
@@ -75,24 +86,21 @@ const styles = StyleSheet.create({
 		height: MAP_SEARCH_BAR_HEIGHT,
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: 'rgba(18,18,31,0.94)',
 		borderWidth: 1,
-		borderColor: colors.borderStrong,
 		borderRadius: radius.pill,
-		paddingHorizontal: 12,
+		paddingHorizontal: spacing.md,
 	},
-	icon: {
-		marginRight: 8,
-	},
+	icon: { marginRight: spacing.xs },
 	input: {
 		flex: 1,
-		color: colors.textPrimary,
-		fontSize: fontSize.sm,
+		fontSize: fontSize.md,
 		paddingVertical: 0,
-		includeFontPadding: false,
 	},
 	clear: {
-		marginLeft: 6,
-		padding: 2,
+		padding: 4,
+		minWidth: 32,
+		minHeight: 32,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 });
