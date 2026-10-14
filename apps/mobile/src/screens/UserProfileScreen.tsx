@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
 	ActivityIndicator,
 	StyleSheet,
@@ -6,24 +6,29 @@ import {
 	TouchableOpacity,
 	View,
 } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { appAlert } from '@/ui/appAlert';
 import {
 	BottomSheetModal,
 	BottomSheetView,
 } from '@gorhom/bottom-sheet';
-
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
 import { ProfileView } from '@/components/Profile/ProfileView';
-import { ActionSheetList, type ActionSheetItem } from '@/components/ActionSheetList';
-import { useSheetBackdrop } from '@/hooks/useSheetBackdrop';
+import {
+	ActionSheetList,
+	sheetChrome,
+	useSheetBackdrop,
+	type ActionSheetItem,
+} from '@/components/sheets';
 import { useUserProfileScreenData } from '@/features/profile/useUserProfileScreenData';
 import {
 	friendLabelFromRel,
 	mapPublicToViewModel,
 } from '@/features/profile/mapToProfileViewModel';
 import { resolveUserPrimaryCta } from '@/features/social/resolveUserPrimaryCta';
-import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
 import { colors, spacing, useAppTheme } from '@/theme';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -76,24 +81,35 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 		});
 	}, [profile, focus, rel, navigation, userId]);
 
-	const dismiss = useCallback(() => {
+	const dismiss = (): void => {
 		optionsRef.current?.dismiss();
-	}, []);
+	};
 
 	const openMenu = (): void => {
-		const items: ActionSheetItem[] = [];
-		if (!blocked) {
-			items.push({
-				key: 'wave',
-				label: 'Send wave',
-				icon: 'hand-wave-outline',
-				onPress: () => {
-					dismiss();
-					void sendWave();
+		let items: ActionSheetItem[];
+		if (blocked) {
+			items = [
+				{
+					key: 'unblock',
+					label: 'Unblock',
+					onPress: () => {
+						dismiss();
+						void unblock();
+					},
 				},
-			});
-			if (canMessage && canMessage !== 'none') {
-				items.push({
+			];
+		} else {
+			items = [
+				{
+					key: 'wave',
+					label: 'Send wave',
+					icon: 'hand-wave-outline',
+					onPress: () => {
+						dismiss();
+						void sendWave();
+					},
+				},
+				{
 					key: 'message',
 					label: 'Message',
 					icon: 'message-outline',
@@ -101,18 +117,18 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 						dismiss();
 						void openMessage();
 					},
-				});
-			}
-			items.push({
-				key: 'gift',
-				label: 'Send gift',
-				icon: 'gift-outline',
-				onPress: () => {
-					dismiss();
-					setGiftSheetOpen(true);
 				},
-			});
-			if (rel?.isFriend) {
+				{
+					key: 'gift',
+					label: 'Send gift',
+					icon: 'gift-outline',
+					onPress: () => {
+						dismiss();
+						setGiftSheetOpen(true);
+					},
+				},
+			];
+			if (rel?.friendshipStatus === 'friends') {
 				items.push({
 					key: 'unfriend',
 					label: 'Unfriend',
@@ -134,7 +150,6 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 				},
 			});
 		}
-
 		setMenuItems(items);
 		optionsRef.current?.present();
 	};
@@ -217,16 +232,17 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 				snapPoints={optionsSnap}
 				backdropComponent={renderBackdrop}
 				enablePanDownToClose
+				{...sheetChrome}
 			>
 				<BottomSheetView style={styles.sheetBody}>
-					<ActionSheetList items={menuItems} onCancel={dismiss} />
+					<ActionSheetList items={menuItems} />
 				</BottomSheetView>
 			</BottomSheetModal>
 			<SendGiftSheet
 				visible={giftSheetOpen}
 				onClose={() => setGiftSheetOpen(false)}
-				toUserId={userId}
-				toDisplayName={profile.displayName}
+				recipientId={userId}
+				recipientName={profile.displayName}
 			/>
 		</>
 	);
