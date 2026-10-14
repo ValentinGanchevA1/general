@@ -23,7 +23,7 @@ import {
 	type VerificationItemId,
 } from '@/components/Profile/VerificationStatusSheet';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { colors, fontSize, radius, spacing, useAppTheme } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 type Route = RouteProp<AccountStackParamList, 'TrustCenter'>;
@@ -103,6 +103,7 @@ const ringStyles = StyleSheet.create({
  * Does not embed OTP / ID forms.
  */
 export function TrustCenterScreen(): React.JSX.Element {
+	const { colors: themeColors } = useAppTheme();
 	const navigation = useNavigation<Nav>();
 	const route = useRoute<Route>();
 	const dispatch = useAppDispatch();
@@ -161,7 +162,7 @@ export function TrustCenterScreen(): React.JSX.Element {
 	}, [next, openStep]);
 
 	return (
-		<View style={styles.root}>
+		<View style={[styles.root, { backgroundColor: themeColors.bg }]}>
 			<ScreenHeader title="Trust" />
 			<ScrollView
 				contentContainerStyle={styles.body}
