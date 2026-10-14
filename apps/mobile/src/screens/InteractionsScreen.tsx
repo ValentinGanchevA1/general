@@ -42,7 +42,7 @@ import { useSocket } from '@/realtime/useSocket';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { focusUserOnMap } from '@/navigation/focusUserOnMap';
 import { appAlert } from '@/ui/appAlert';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { colors, spacing, radius, fontSize, useAppTheme } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -272,6 +272,8 @@ function ChatRow({
 }
 
 export function InteractionsScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const navigation = useNavigation<Nav>();
   const dispatch = useAppDispatch();
   const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
@@ -472,7 +474,7 @@ export function InteractionsScreen(): React.JSX.Element {
   );
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="Interactions" bordered />
 
       <View style={styles.tabs}>
@@ -619,25 +621,25 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.bg,
   },
-  info: { flex: 1, gap: 2, minWidth: 0 },
+  info: { flex: 1, minWidth: 0 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: {
     color: colors.textPrimary,
-    fontWeight: '600',
     fontSize: fontSize.md,
-    maxWidth: 160,
+    fontWeight: '600',
+    flexShrink: 1,
   },
-  nameUnread: { fontWeight: '800' },
+  nameUnread: { fontWeight: '700' },
   friendHint: { color: colors.action, fontSize: 11, fontWeight: '600' },
   signal: { color: colors.textSecondary, fontSize: fontSize.sm },
   preview: { color: colors.textSecondary, fontSize: fontSize.sm },
   previewUnread: { color: colors.textPrimary, fontWeight: '600' },
   time: { color: colors.textFaint, fontSize: fontSize.xs },
-  chatRight: { alignItems: 'flex-end', justifyContent: 'center', minWidth: 28 },
+  chatRight: { alignItems: 'flex-end', gap: 4 },
   unreadBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -651,11 +653,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   pendingText: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   mapBtn: {
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderStrong,
   },
@@ -663,14 +665,14 @@ const styles = StyleSheet.create({
   primaryBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     backgroundColor: colors.primary,
   },
   primaryBtnText: { color: colors.onPrimary, fontSize: fontSize.sm, fontWeight: '700' },
   declineBtn: {
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderStrong,
   },
@@ -678,10 +680,8 @@ const styles = StyleSheet.create({
   mutualBadge: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: radius.sm,
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1,
-    borderColor: colors.primaryBorderSoft,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
   },
-  mutualText: { color: colors.primary, fontSize: fontSize.sm, fontWeight: '700' },
+  mutualText: { color: colors.action, fontSize: fontSize.sm, fontWeight: '700' },
 });
