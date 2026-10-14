@@ -38,7 +38,7 @@ import {
   storyReceived,
 } from '@/features/stories/storiesSlice';
 import { PulseStrip } from '@/features/stories/components/PulseStrip';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, useAppTheme } from '@/theme';
 import { EmptyState } from '@/components/EmptyState';
 import { StoryViewer } from '@/features/stories/components/StoryViewer';
 import { StoryCreateSheet } from '@/features/stories/components/StoryCreateSheet';
@@ -86,6 +86,8 @@ function viewportAround(lat: number, lng: number, delta = 0.02): Viewport {
 type EmptyActionKind = 'story' | 'map' | 'verify_email' | 'verify_phone';
 
 export function PulseScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const dispatch = useAppDispatch();
   const navigation = useNavigation<Nav>();
   const route = useRoute<R>();
@@ -434,7 +436,7 @@ export function PulseScreen(): React.JSX.Element {
 
   if (loading && items.length === 0) {
     return (
-      <View style={S.container}>
+      <View style={[S.container, { backgroundColor: themeColors.bg }]}>
         {Header}
         <View style={S.center}>
           <ActivityIndicator color={colors.primary} />
@@ -457,7 +459,7 @@ export function PulseScreen(): React.JSX.Element {
 
   if (error && items.length === 0) {
     return (
-      <View style={S.container}>
+      <View style={[S.container, { backgroundColor: themeColors.bg }]}>
         {Header}
         <View style={S.center}>
           <Text style={S.errorText}>{error}</Text>
@@ -482,7 +484,7 @@ export function PulseScreen(): React.JSX.Element {
   }
 
   return (
-    <View style={S.container}>
+    <View style={[S.container, { backgroundColor: themeColors.bg }]}>
       <FlatList
         data={filtered}
         keyExtractor={(i) => i.id}
@@ -593,16 +595,16 @@ const S = StyleSheet.create({
   chipText: { color: colors.textSecondary, fontSize: 13, fontWeight: '500' },
   chipTextActive: { color: colors.onPrimary, fontWeight: '700' },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   errorText: { color: colors.danger, fontSize: 14, marginBottom: 12, textAlign: 'center' },
   retry: {
     backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
   },
   retryText: { color: colors.onPrimary, fontWeight: '700' },
 
-  emptyWrap: { paddingVertical: spacing.lg, paddingHorizontal: spacing.sm },
+  emptyWrap: { paddingTop: spacing.xl, paddingHorizontal: spacing.sm },
   footer: { paddingTop: 8, paddingBottom: 16 },
 });
