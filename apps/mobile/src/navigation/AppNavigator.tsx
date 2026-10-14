@@ -10,7 +10,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors } from '@/theme';
+import { colors, useAppTheme } from '@/theme';
 
 import { MapScreen } from '@/screens/MapScreen';
 import { PulseScreen } from '@/features/pulse/PulseScreen';
@@ -223,23 +223,40 @@ function EventsNavigator(): React.JSX.Element {
 }
 
 function MainTabs(): React.JSX.Element {
+	const { colors: c } = useAppTheme();
 	const chatUnread = useAppSelector((s) =>
-		s.chat.conversations.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0),
+		s.chat.conversations.reduce((sum, conv) => sum + (conv.unreadCount ?? 0), 0),
 	);
 	const mapNewCount = useAppSelector((s) => s.mapNovelty.newCount);
+	const friendPending = useAppSelector((s) => s.friends.pendingCount);
+	// Interactions hub = chats + friend requests (communication unread lives here, not Pulse)
+	const interactionsBadge = chatUnread + friendPending;
+
+	const badgeStyle = {
+		backgroundColor: c.danger,
+		color: c.onPrimary,
+		fontSize: 11,
+		fontWeight: '700' as const,
+	};
+	const mapBadgeStyle = {
+		backgroundColor: c.primary,
+		color: c.onPrimary,
+		fontSize: 11,
+		fontWeight: '700' as const,
+	};
 
 	return (
 		<Tab.Navigator
 			screenOptions={({ route }) => ({
 				headerShown: false,
 				tabBarStyle: {
-					backgroundColor: colors.bg,
-					borderTopColor: colors.surfaceAlt,
+					backgroundColor: c.bg,
+					borderTopColor: c.border,
 					height: 64,
 					paddingTop: 6,
 				},
-				tabBarActiveTintColor: colors.primary,
-				tabBarInactiveTintColor: colors.textFaint,
+				tabBarActiveTintColor: c.primary,
+				tabBarInactiveTintColor: c.textFaint,
 				tabBarIcon: ({ color, size }) => {
 					if (route.name === 'Create') {
 						return null;
@@ -263,34 +280,13 @@ function MainTabs(): React.JSX.Element {
 				options={
 					mapNewCount > 0
 						? {
-							tabBarBadge: mapNewCount > 99 ? '99+' : mapNewCount,
-							tabBarBadgeStyle: {
-								backgroundColor: colors.primary,
-								color: colors.onPrimary,
-								fontSize: 11,
-								fontWeight: '700' as const,
-							},
-						}
+								tabBarBadge: mapNewCount > 99 ? '99+' : mapNewCount,
+								tabBarBadgeStyle: mapBadgeStyle,
+							}
 						: {}
 				}
 			/>
-			<Tab.Screen
-				name="Pulse"
-				component={PulseScreen}
-				options={
-					chatUnread > 0
-						? {
-							tabBarBadge: chatUnread > 99 ? '99+' : chatUnread,
-							tabBarBadgeStyle: {
-								backgroundColor: colors.danger,
-								color: colors.textPrimary,
-								fontSize: 11,
-								fontWeight: '700' as const,
-							},
-						}
-						: {}
-				}
-			/>
+			<Tab.Screen name="Pulse" component={PulseScreen} />
 			<Tab.Screen
 				name="Create"
 				component={MapScreen}
@@ -317,6 +313,12 @@ function MainTabs(): React.JSX.Element {
 							color={color}
 						/>
 					),
+					...(interactionsBadge > 0
+						? {
+								tabBarBadge: interactionsBadge > 99 ? '99+' : interactionsBadge,
+								tabBarBadgeStyle: badgeStyle,
+							}
+						: {}),
 				}}
 			/>
 			<Tab.Screen name="Profile" component={ProfileScreen} />
@@ -325,6 +327,7 @@ function MainTabs(): React.JSX.Element {
 }
 
 export function AppNavigator(): React.JSX.Element {
+	const { colors: themeColors } = useAppTheme();
 	const dispatch = useAppDispatch();
 	const user = useAppSelector(s => s.auth.user);
 	const restoring = useAppSelector(s => s.auth.restoring);
@@ -368,12 +371,12 @@ export function AppNavigator(): React.JSX.Element {
 			<View
 				style={{
 					flex: 1,
-					backgroundColor: colors.bg,
+					backgroundColor: themeColors.bg,
 					alignItems: 'center',
 					justifyContent: 'center',
 				}}
 			>
-				<ActivityIndicator size="large" color={colors.primary} />
+				<ActivityIndicator size="large" color={themeColors.primary} />
 			</View>
 		);
 	}
