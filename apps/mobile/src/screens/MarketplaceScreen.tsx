@@ -26,7 +26,7 @@ import { formatListingExpiry, formatPrice } from '@/features/trading/formatPrice
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonMarketGrid } from '@/components/Skeleton';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { colors, spacing, radius, fontSize, useAppTheme } from '@/theme';
 
 type Nav = NativeStackNavigationProp<CommerceStackParamList>;
 type Tab = 'browse' | 'saved';
@@ -39,6 +39,8 @@ const MODE_OPTIONS: Array<{ value: ModeFilter; label: string }> = [
 ];
 
 export function MarketplaceScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const nav = useNavigation<Nav>();
   const { coords } = useUserLocation();
   const [tab, setTab] = useState<Tab>('browse');
@@ -107,7 +109,7 @@ export function MarketplaceScreen(): React.JSX.Element {
   );
 
   return (
-    <View style={S.root}>
+    <View style={[S.root, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader
         title="Marketplace"
         right={
@@ -180,15 +182,12 @@ export function MarketplaceScreen(): React.JSX.Element {
               icon={tab === 'browse' ? 'storefront-outline' : 'heart-outline'}
               title={emptyTitle}
               body={emptyBody}
-              {...(tab === 'browse'
-                ? {
-                    actionLabel: modeFilter === 'buy' ? 'Post a wanted' : 'Sell an item',
-                    onAction: () =>
-                      nav.navigate('ListingCreate', {
-                        mode: modeFilter === 'buy' ? 'buy' : 'sell',
-                      }),
-                  }
-                : {})}
+              actionLabel={tab === 'browse' ? 'Sell something' : undefined}
+              onAction={
+                tab === 'browse'
+                  ? () => nav.navigate('ListingCreate', { mode: 'sell' })
+                  : undefined
+              }
             />
           )
         }
@@ -199,27 +198,26 @@ export function MarketplaceScreen(): React.JSX.Element {
 
 const S = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  headerAction: { color: colors.primary, fontSize: fontSize.md, fontWeight: '700' },
+  headerAction: { color: colors.primary, fontWeight: '700', fontSize: fontSize.md },
   tabs: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    gap: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
   tab: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
   tabActive: { borderBottomColor: colors.primary },
-  tabText: { color: colors.textMuted, fontSize: fontSize.md, fontWeight: '600' },
+  tabText: { color: colors.textMuted, fontWeight: '600', fontSize: fontSize.sm },
   tabTextActive: { color: colors.primary },
   modeRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
+    gap: 8,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   modeChip: {
@@ -231,23 +229,21 @@ const S = StyleSheet.create({
     borderColor: colors.borderStrong,
   },
   modeChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  modeChipText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '600' },
-  modeChipTextActive: { color: colors.onPrimary },
-  grid: { padding: spacing.md, gap: spacing.md, flexGrow: 1 },
-  row: { gap: spacing.md },
+  modeChipText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '500' },
+  modeChipTextActive: { color: colors.onPrimary, fontWeight: '700' },
+  grid: { padding: spacing.sm, flexGrow: 1 },
+  row: { gap: spacing.sm },
   card: {
     flex: 1,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
     overflow: 'hidden',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   thumb: { width: '100%', height: 120, backgroundColor: colors.surfaceAlt },
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  cardBody: { padding: spacing.sm, gap: 2 },
-  cardTitle: { color: colors.textPrimary, fontSize: fontSize.sm, fontWeight: '600' },
-  cardPrice: { color: colors.primary, fontSize: fontSize.md, fontWeight: '700' },
-  cardMeta: { color: colors.textMuted, fontSize: fontSize.xs },
+  cardBody: { padding: spacing.sm },
+  cardTitle: { color: colors.textPrimary, fontWeight: '600', fontSize: fontSize.sm },
+  cardPrice: { color: colors.primary, fontWeight: '700', fontSize: fontSize.sm, marginTop: 4 },
+  cardMeta: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
 });
