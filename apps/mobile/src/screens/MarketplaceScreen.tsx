@@ -149,59 +149,49 @@ export function MarketplaceScreen(): React.JSX.Element {
                 style={[S.modeChip, active && S.modeChipActive]}
                 onPress={() => setModeFilter(opt.value)}
               >
-                <Text style={[S.modeChipText, active && S.modeChipTextActive]}>
-                  {opt.label}
-                </Text>
+                <Text style={[S.modeChipText, active && S.modeChipTextActive]}>{opt.label}</Text>
               </Pressable>
             );
           })}
         </View>
       ) : null}
 
-      {loading && data.length === 0 ? (
-        <SkeletonMarketGrid />
-      ) : (
-        <FlatList
-          data={data}
-          keyExtractor={(i) => i.id}
-          numColumns={2}
-          columnWrapperStyle={S.row}
-          contentContainerStyle={S.list}
-          renderItem={renderItem}
-          refreshControl={
-            <RefreshControl
-              refreshing={loading}
-              onRefresh={() => void refresh()}
-              tintColor={colors.primary}
+      <FlatList
+        data={data}
+        keyExtractor={(l) => l.id}
+        renderItem={renderItem}
+        numColumns={2}
+        columnWrapperStyle={S.row}
+        contentContainerStyle={S.grid}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />}
+        ListEmptyComponent={
+          loading ? (
+            <SkeletonMarketGrid count={4} />
+          ) : showErrorEmpty ? (
+            <EmptyState
+              variant="plain"
+              icon="alert-circle-outline"
+              title="Couldn't load listings"
+              body="Check your connection and try again."
+              actionLabel="Retry"
+              onAction={refresh}
             />
-          }
-          ListEmptyComponent={
-            showErrorEmpty ? (
-              <EmptyState
-                variant="plain"
-                icon="alert-circle-outline"
-                title="Couldn't load listings"
-                body="Check your connection and try again."
-                actionLabel="Retry"
-                onAction={() => void refresh()}
-              />
-            ) : (
-              <EmptyState
-                variant="plain"
-                icon="storefront-outline"
-                title={emptyTitle}
-                body={emptyBody}
-                actionLabel={tab === 'browse' ? 'Sell an item' : undefined}
-                onAction={
-                  tab === 'browse'
-                    ? () => nav.navigate('ListingCreate', { mode: 'sell' })
-                    : undefined
-                }
-              />
-            )
-          }
-        />
-      )}
+          ) : (
+            <EmptyState
+              variant="plain"
+              icon="storefront-outline"
+              title={emptyTitle}
+              body={emptyBody}
+              actionLabel={tab === 'browse' ? 'Sell something' : undefined}
+              onAction={
+                tab === 'browse'
+                  ? () => nav.navigate('ListingCreate', { mode: 'sell' })
+                  : undefined
+              }
+            />
+          )
+        }
+      />
     </View>
   );
 }
@@ -241,7 +231,7 @@ const S = StyleSheet.create({
   modeChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   modeChipText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '500' },
   modeChipTextActive: { color: colors.onPrimary, fontWeight: '700' },
-  list: { padding: spacing.sm, flexGrow: 1 },
+  grid: { padding: spacing.sm, flexGrow: 1 },
   row: { gap: spacing.sm },
   card: {
     flex: 1,
