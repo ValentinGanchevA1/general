@@ -9,17 +9,17 @@ type BrandLogoProps = {
 
 /**
  * Canonical G88 mark (antenna / signal). Use for splash, Auth, and marketing surfaces.
- * Asset: src/assets/logo.png (opaque dark field matching launcher).
+ * Asset co-located: g88-icon-1024.png (opaque dark field matching launcher).
  */
 export function BrandLogo({ size = 96, style }: BrandLogoProps): React.JSX.Element {
   return (
-      <Image
-          source={require('../../assets/logo.png')}
-          style={[styles.base, { width: size, height: size, borderRadius: size * 0.22 }, style]}
-          accessibilityRole="image"
-          accessibilityLabel="G88"
-          resizeMode="contain"
-      />
+    <Image
+      source={require('./g88-icon-1024.png')}
+      style={[styles.base, { width: size, height: size, borderRadius: size * 0.22 }, style]}
+      accessibilityRole="image"
+      accessibilityLabel="G88"
+      resizeMode="contain"
+    />
   );
 }
 
