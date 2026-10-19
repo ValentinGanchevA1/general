@@ -1,0 +1,55 @@
+--- a/apps/mobile/src/screens/AuthScreen.tsx
++++ b/apps/mobile/src/screens/AuthScreen.tsx
+@@ -12,6 +12,7 @@
+   View,
+ } from 'react-native';
+ 
++import { BrandLogo } from '@/components/Brand/BrandLogo';
+ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+ import { login, register, clearError, loginWithGoogle } from '@/features/auth/authSlice';
+ import { setPendingPhoneVerify } from '@/services/pendingPhone';
+@@ -127,7 +128,7 @@
+         showsVerticalScrollIndicator={false}
+       >
+         <View style={styles.card}>
+-          <Text style={styles.logo}>G88</Text>
++          <BrandLogo size={88} style={styles.logoImage} />
+           <Text style={styles.subtitle}>
+             {mode === 'login' ? 'Sign in to continue' : 'Create your account'}
+           </Text>
+@@ -268,12 +269,8 @@
+     paddingVertical: 40,
+   },
+   card: { gap: spacing.md },
+-  logo: {
+-    color: colors.primary,
+-    fontSize: 40,
+-    fontWeight: '800',
+-    textAlign: 'center',
+-    marginBottom: spacing.xs,
++  logoImage: {
++    marginBottom: spacing.sm,
+   },
+   subtitle: {
+     color: colors.textSecondary,
+--- a/apps/mobile/src/navigation/AppNavigator.tsx
++++ b/apps/mobile/src/navigation/AppNavigator.tsx
+@@ -1,6 +1,7 @@
+ // apps/mobile/src/navigation/AppNavigator.tsx
+ import React, { useEffect, useRef } from 'react';
+ import { ActivityIndicator, View } from 'react-native';
++import { BrandLogo } from '@/components/Brand/BrandLogo';
+ import {
+ 	NavigationContainer,
+ 	type NavigatorScreenParams,
+@@ -374,8 +375,10 @@
+ 					backgroundColor: themeColors.bg,
+ 					alignItems: 'center',
+ 					justifyContent: 'center',
++					gap: 20,
+ 				}}
+ 			>
++				<BrandLogo size={120} />
+ 				<ActivityIndicator size="large" color={themeColors.primary} />
+ 			</View>
+ 		);

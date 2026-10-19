@@ -15,6 +15,7 @@ export interface AppChipProps {
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
+  testID?: string;
 }
 
 /** Filter / interest chip with selected state (not color-only — weight + border). */
@@ -24,6 +25,7 @@ export function AppChip({
   onPress,
   style,
   accessibilityLabel,
+  testID,
 }: AppChipProps): React.JSX.Element {
   const { colors, radius, fontSize, spacing } = useAppTheme();
 
@@ -34,6 +36,7 @@ export function AppChip({
       accessibilityRole={onPress ? 'button' : 'text'}
       accessibilityState={{ selected }}
       accessibilityLabel={accessibilityLabel ?? label}
+      testID={testID}
       style={({ pressed }) => [
         styles.chip,
         {

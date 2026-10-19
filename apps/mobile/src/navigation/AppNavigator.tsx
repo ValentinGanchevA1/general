@@ -1,6 +1,7 @@
 // apps/mobile/src/navigation/AppNavigator.tsx
 import React, { useEffect, useRef } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
+import { BrandLogo } from '@/components/Brand/BrandLogo';
 import {
 	NavigationContainer,
 	type NavigatorScreenParams,
@@ -280,9 +281,9 @@ function MainTabs(): React.JSX.Element {
 				options={
 					mapNewCount > 0
 						? {
-								tabBarBadge: mapNewCount > 99 ? '99+' : mapNewCount,
-								tabBarBadgeStyle: mapBadgeStyle,
-							}
+							tabBarBadge: mapNewCount > 99 ? '99+' : mapNewCount,
+							tabBarBadgeStyle: mapBadgeStyle,
+						}
 						: {}
 				}
 			/>
@@ -315,9 +316,9 @@ function MainTabs(): React.JSX.Element {
 					),
 					...(interactionsBadge > 0
 						? {
-								tabBarBadge: interactionsBadge > 99 ? '99+' : interactionsBadge,
-								tabBarBadgeStyle: badgeStyle,
-							}
+							tabBarBadge: interactionsBadge > 99 ? '99+' : interactionsBadge,
+							tabBarBadgeStyle: badgeStyle,
+						}
 						: {}),
 				}}
 			/>
@@ -366,6 +367,7 @@ export function AppNavigator(): React.JSX.Element {
 		};
 	}, [user, restoring]);
 
+	// Brand-only restore gate — continues native SplashTheme without a second spinner.
 	if (restoring && user === null) {
 		return (
 			<View
@@ -375,8 +377,10 @@ export function AppNavigator(): React.JSX.Element {
 					alignItems: 'center',
 					justifyContent: 'center',
 				}}
+				accessibilityLabel="Loading"
+				accessibilityRole="progressbar"
 			>
-				<ActivityIndicator size="large" color={themeColors.primary} />
+				<BrandLogo size={120} />
 			</View>
 		);
 	}

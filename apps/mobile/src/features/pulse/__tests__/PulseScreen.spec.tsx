@@ -109,24 +109,25 @@ function wrap(children: React.ReactElement) {
 
 describe('PulseScreen v2', () => {
   it('renders story strip and filter chips (no Share CTA)', () => {
-    const { getByTestId, queryByTestId, getByLabelText } = render(wrap(<PulseScreen />));
+    const { queryByTestId, getByLabelText } = render(wrap(<PulseScreen />));
     expect(queryByTestId('share-cta')).toBeNull();
     // No profile in the test store → soft gate locks create; strip still mounts.
     expect(getByLabelText(/Create your story|Story posting locked/)).toBeTruthy();
     // Screenshot contract 2026-10-12: All | Waves | Chats | Matches (social re-merged).
-    expect(getByTestId('pulse-filter-all')).toBeTruthy();
-    expect(getByTestId('pulse-filter-waves')).toBeTruthy();
-    expect(getByTestId('pulse-filter-chats')).toBeTruthy();
-    expect(getByTestId('pulse-filter-matches')).toBeTruthy();
+    // AppChip uses accessibilityLabel `Filter ${label}` (testIDs optional).
+    expect(getByLabelText('Filter All')).toBeTruthy();
+    expect(getByLabelText('Filter Waves')).toBeTruthy();
+    expect(getByLabelText('Filter Chats')).toBeTruthy();
+    expect(getByLabelText('Filter Matches')).toBeTruthy();
     expect(queryByTestId('pulse-filter-listings')).toBeNull();
     expect(queryByTestId('pulse-filter-alerts')).toBeNull();
   });
 
   it('switches filter when a chip is tapped', () => {
-    const { getByTestId } = render(wrap(<PulseScreen />));
-    fireEvent.press(getByTestId('pulse-filter-waves'));
+    const { getByLabelText } = render(wrap(<PulseScreen />));
+    fireEvent.press(getByLabelText('Filter Waves'));
     // The chip should remain rendered after press — no crash, basic interaction works.
-    expect(getByTestId('pulse-filter-waves')).toBeTruthy();
+    expect(getByLabelText('Filter Waves')).toBeTruthy();
   });
 
   it('renders the trending strip with mock topics', () => {
