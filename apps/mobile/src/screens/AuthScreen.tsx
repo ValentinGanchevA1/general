@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { BrandLogo } from '@/components/Brand/BrandLogo';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { login, register, clearError, loginWithGoogle } from '@/features/auth/authSlice';
 import { setPendingPhoneVerify } from '@/services/pendingPhone';
@@ -129,7 +130,7 @@ export function AuthScreen(): React.JSX.Element {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.card}>
-          <Text style={styles.logo}>G88</Text>
+          <BrandLogo size={88} style={styles.logoImage} />
           <Text style={styles.subtitle}>
             {mode === 'login' ? 'Sign in to continue' : 'Create your account'}
           </Text>
@@ -270,12 +271,8 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   card: { gap: spacing.md },
-  logo: {
-    color: colors.primary,
-    fontSize: 40,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: spacing.xs,
+  logoImage: {
+    marginBottom: spacing.sm,
   },
   subtitle: {
     color: colors.textSecondary,
