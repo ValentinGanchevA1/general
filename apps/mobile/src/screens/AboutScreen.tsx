@@ -8,7 +8,7 @@ import type { AccountStackParamList } from '@/navigation/stacks';
 import { APP_VERSION, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { ListRow } from '@/components/ListRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, useAppTheme } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
@@ -25,6 +25,8 @@ function Feature({ icon, title, body }: { icon: string; title: string; body: str
 }
 
 export function AboutScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const navigation = useNavigation<Nav>();
 
   const openTerms = (): void => {
@@ -32,7 +34,7 @@ export function AboutScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="About" />
 
       <ScrollView contentContainerStyle={styles.body}>
@@ -56,44 +58,24 @@ export function AboutScreen(): React.JSX.Element {
         <Text style={styles.sectionTitle}>What you can do</Text>
         <View style={styles.featureGroup}>
           <Feature
-            icon="map"
-            title="Map & discovery"
-            body="Live map of people, events, listings, and dating prefs. Filters, clusters, search, and presence while the app is open."
-          />
-          <Feature
-            icon="pulse"
-            title="Pulse"
-            body="Local activity hub: story rings plus waves, chats, and matches. Filter the feed and act from each card (Wave back, Message, View)."
-          />
-          <Feature
-            icon="circle-outline"
-            title="Stories"
-            body="24-hour posts for people nearby. Photo or short video. Reactions count toward mutual interest."
+            icon="map-search"
+            title="Discover nearby"
+            body="Browse people, events, and listings on a live map around your location."
           />
           <Feature
             icon="hand-wave"
-            title="Waves, chat & dating"
-            body="Lightweight signals first. Chat unlocks when interest is mutual. Dating likes and matches appear on Pulse and the map pin ladder."
-          />
-          <Feature
-            icon="account-group"
-            title="Friends"
-            body="Requests, suggestions, mutual friends, and optional online status for friends only. Unfriending keeps mutual follows unless you unfollow."
-          />
-          <Feature
-            icon="calendar-star"
-            title="Events"
-            body="Create and discover local events from the map. Message the host when listed."
-          />
-          <Feature
-            icon="storefront-outline"
-            title="Local trade"
-            body="Listings, wanted posts, offers and counters. Settlement stays offline — no in-app payments required."
+            title="Wave & chat"
+            body="Light-weight waves, then 1:1 chat when both sides are interested."
           />
           <Feature
             icon="shield-check"
             title="Trust ladder"
-            body="Email → phone → ID review builds verification. Soft gates protect the network without blocking exploration. Manage it from Trust Center."
+            body="Email, phone, and ID verification raise your trust score step by step."
+          />
+          <Feature
+            icon="storefront"
+            title="Local marketplace"
+            body="List items for sale or wanted, negotiate offers, meet in person."
           />
         </View>
 
