@@ -1,6 +1,6 @@
 // apps/mobile/src/navigation/AppNavigator.tsx
 import React, { useEffect, useRef } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { BrandLogo } from '@/components/Brand/BrandLogo';
 import {
 	NavigationContainer,
@@ -367,6 +367,7 @@ export function AppNavigator(): React.JSX.Element {
 		};
 	}, [user, restoring]);
 
+	// Brand-only restore gate — continues native SplashTheme without a second spinner.
 	if (restoring && user === null) {
 		return (
 			<View
@@ -375,11 +376,11 @@ export function AppNavigator(): React.JSX.Element {
 					backgroundColor: themeColors.bg,
 					alignItems: 'center',
 					justifyContent: 'center',
-					gap: 20,
 				}}
+				accessibilityLabel="Loading"
+				accessibilityRole="progressbar"
 			>
 				<BrandLogo size={120} />
-				<ActivityIndicator size="large" color={themeColors.primary} />
 			</View>
 		);
 	}
