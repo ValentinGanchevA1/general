@@ -47,15 +47,23 @@ const FAQS: Faq[] = [
   },
   {
     q: 'How do friends and online status work?',
-    a: 'Send or accept a friend request from a profile. Friends can appear with a distinct map style. Online status is shown only to friends, and only if you allow it in Settings → Friends can see when I’m online.',
+    a: 'Send or accept a friend request from a profile. Friends can appear with a distinct map style. Online status is shown only to friends, and only if you allow it in Settings → Friends can see when I’m online. Unfriending does not remove mutual follows.',
   },
   {
-    q: 'How does verification work?',
-    a: 'Start with email, then phone, then optional ID review. Each step raises your trust level and unlocks more actions. Open Trust Center from Profile or Settings.',
+    q: 'How do I find someone on the map?',
+    a: 'From a profile use View on map when they have a public pin. From a wave or match, open their profile or use View on map when available. The map centers on their coarsened pin and opens their card when available.',
   },
   {
-    q: 'Can I delete my account?',
-    a: 'Yes. Settings → Account → Delete account. This permanently removes your profile, listings, and messages after a short grace period.',
+    q: 'What do the verification badges mean?',
+    a: 'They show progress on the trust ladder: email → phone → ID review. Optional, but they raise trust. Email verification unlocks story posting. Start from Settings → Trust or Trust Center. ID review is assisted by automated face checks and always finished by a human.',
+  },
+  {
+    q: 'How does local trade work?',
+    a: 'Create a listing (for sale or wanted) from the map or Marketplace. Nearby people can message the seller, wave, or make an offer and counter. Meet in public places; G88 does not process payments.',
+  },
+  {
+    q: 'I found a bug or something feels wrong.',
+    a: 'Use Email support below with what you were doing and a screenshot if you can. We read every report.',
   },
 ];
 
@@ -65,14 +73,15 @@ function FaqItem({ q, a }: Faq): React.JSX.Element {
     <TouchableOpacity
       style={styles.faqCard}
       onPress={() => setOpen((v) => !v)}
-      activeOpacity={0.8}
-      accessibilityRole="button"
-      accessibilityState={{ expanded: open }}
-      accessibilityLabel={q}
+      activeOpacity={0.85}
     >
       <View style={styles.faqHead}>
         <Text style={styles.faqQ}>{q}</Text>
-        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textMuted} />
+        <Icon
+          name={open ? 'chevron-up' : 'chevron-down'}
+          size={22}
+          color={colors.textMuted}
+        />
       </View>
       {open ? <Text style={styles.faqA}>{a}</Text> : null}
     </TouchableOpacity>
@@ -84,8 +93,8 @@ export function HelpScreen(): React.JSX.Element {
 
   const navigation = useNavigation<Nav>();
 
-  const emailSupport = async (): Promise<void> => {
-    track('support_email_tapped');
+  const emailSupport = async () => {
+    track('help.email_support');
     const subject = encodeURIComponent('G88 support');
     const body = encodeURIComponent(
       `App version: ${APP_VERSION}\n\nPlease describe what happened above this line.`,
