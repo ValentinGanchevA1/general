@@ -17,7 +17,7 @@ import type { AccountStackParamList } from '@/navigation/stacks';
 import { SUPPORT_EMAIL, APP_VERSION, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { track } from '@/lib/analytics';
 import { ListRow } from '@/components/ListRow';
-import { colors, spacing, fontSize } from '@/theme';
+import { colors, spacing, fontSize, useAppTheme } from '@/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
@@ -89,6 +89,8 @@ function FaqItem({ q, a }: Faq): React.JSX.Element {
 }
 
 export function HelpScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const navigation = useNavigation<Nav>();
 
   const emailSupport = async () => {
@@ -111,7 +113,7 @@ export function HelpScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="Help & Support" />
 
       <ScrollView contentContainerStyle={styles.body}>

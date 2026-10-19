@@ -18,7 +18,7 @@ import { login, register, clearError, loginWithGoogle } from '@/features/auth/au
 import { setPendingPhoneVerify } from '@/services/pendingPhone';
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { FormField } from '@/components/FormField';
-import { colors, spacing, fontSize } from '@/theme';
+import { colors, spacing, fontSize, useAppTheme } from '@/theme';
 
 // Linear character classes only — avoids super-linear backtracking on adversarial input.
 const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
@@ -60,6 +60,8 @@ function validate(
 }
 
 export function AuthScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((s) => s.auth);
 
@@ -119,7 +121,7 @@ export function AuthScreen(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={[styles.root, { backgroundColor: themeColors.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
