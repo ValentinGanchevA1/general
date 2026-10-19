@@ -17,13 +17,15 @@ import { NOTIFICATION_CHANNELS, NOTIFICATION_CHANNEL_META } from '@g88/shared';
 import { useNotificationPreferences } from '@/features/notifications/useNotificationPreferences';
 import { ListRow } from '@/components/ListRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, fontSize, spacing } from '@/theme';
+import { colors, fontSize, spacing, useAppTheme } from '@/theme';
 
 export function NotificationSettingsScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const { prefs, loading, saving, setChannel } = useNotificationPreferences();
 
   return (
-    <View style={S.container}>
+    <View style={[S.container, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="Notifications" />
 
       <ScrollView style={S.flex} contentContainerStyle={S.content}>
