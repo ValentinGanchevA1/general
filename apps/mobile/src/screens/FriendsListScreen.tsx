@@ -39,7 +39,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonListRow } from '@/components/Skeleton';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { colors, spacing, radius, fontSize, useAppTheme } from '@/theme';
 
 type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
 
@@ -51,6 +51,8 @@ const TABS: { key: FriendsTab; label: string }[] = [
 ];
 
 export function FriendsListScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const navigation = useNavigation<Nav>();
   const dispatch = useAppDispatch();
   const { on } = useSocket();
@@ -280,7 +282,7 @@ export function FriendsListScreen(): React.JSX.Element {
     ) : null;
 
   return (
-    <View style={S.root}>
+    <View style={[S.root, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader
         title="Friends"
         right={

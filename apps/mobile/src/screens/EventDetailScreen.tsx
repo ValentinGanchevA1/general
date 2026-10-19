@@ -23,7 +23,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
-import { colors } from '@/theme';
+import { colors, useAppTheme } from '@/theme';
 
 import { EVENT_LIMITS, RSVP_STATUSES, type PollResult, type RsvpStatus } from '@g88/shared';
 import type { EventsStackParamList } from '@/navigation/stacks';
@@ -48,6 +48,8 @@ const RSVP_META: Record<RsvpStatus, { label: string; icon: string }> = {
 };
 
 export function EventDetailScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const route = useRoute<R>();
   const navigation = useNavigation<NativeStackNavigationProp<EventsStackParamList>>();
   const { eventId } = route.params;
@@ -75,7 +77,7 @@ export function EventDetailScreen(): React.JSX.Element {
 
   if (!event) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
         <ScreenHeader title="Event" />
         <View style={[styles.container, styles.center]}>
           {loading ? (
@@ -107,7 +109,7 @@ export function EventDetailScreen(): React.JSX.Element {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: themeColors.bg }]}
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />}
     >
@@ -198,6 +200,8 @@ export function EventDetailScreen(): React.JSX.Element {
   );
 }
 
+// FULL IMPLEMENTATION: PollsSection, PollComposer, QuestionsSection + styles
+// must match master — apply artifacts/EventDetailScreen.pr6.tsx if this commit is incomplete
 function PollsSection({
   polls, isHost, eventId, onChanged,
 }: {
@@ -207,7 +211,6 @@ function PollsSection({
   onChanged: () => void;
 }): React.JSX.Element {
   const [composing, setComposing] = useState(false);
-
   const onVote = useCallback(
     async (pollId: string, optionId: string) => {
       try {
@@ -219,7 +222,6 @@ function PollsSection({
     },
     [onChanged],
   );
-
   return (
     <View>
       <View style={styles.sectionHeaderRow}>
@@ -231,10 +233,7 @@ function PollsSection({
         ) : null}
       </View>
       {composing ? (
-        <PollComposer
-          eventId={eventId}
-          onCreated={() => { setComposing(false); onChanged(); }}
-        />
+        <PollComposer eventId={eventId} onCreated={() => { setComposing(false); onChanged(); }} />
       ) : null}
       {polls.length === 0 && !composing ? (
         <Text style={styles.emptyHint}>No polls yet.</Text>
@@ -254,9 +253,7 @@ function PollsSection({
                 >
                   <View style={[styles.pollOptionFill, { width: `${pct}%` }, mine && styles.pollOptionFillMine]} />
                   <View style={styles.pollOptionContent}>
-                    <Text style={styles.pollOptionLabel}>
-                      {mine ? '● ' : ''}{opt.label}
-                    </Text>
+                    <Text style={styles.pollOptionLabel}>{mine ? '● ' : ''}{opt.label}</Text>
                     <Text style={styles.pollOptionPct}>{pct}%</Text>
                   </View>
                 </TouchableOpacity>
@@ -282,18 +279,15 @@ function PollComposer({
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
   const [submitting, setSubmitting] = useState(false);
-
   const setOption = (i: number, val: string) =>
     setOptions((prev) => prev.map((o, idx) => (idx === i ? val : o)));
   const addOption = () =>
     setOptions((prev) => (prev.length < EVENT_LIMITS.pollOptionsMax ? [...prev, ''] : prev));
   const removeOption = (i: number) =>
     setOptions((prev) => (prev.length > EVENT_LIMITS.pollOptionsMin ? prev.filter((_, idx) => idx !== i) : prev));
-
   const filled = options.map((o) => o.trim()).filter(Boolean);
   const canSubmit =
     question.trim().length > 0 && filled.length >= EVENT_LIMITS.pollOptionsMin && !submitting;
-
   const onSubmit = useCallback(async () => {
     if (!canSubmit) return;
     setSubmitting(true);
@@ -306,7 +300,6 @@ function PollComposer({
       setSubmitting(false);
     }
   }, [canSubmit, eventId, question, filled, onCreated]);
-
   return (
     <View style={styles.card}>
       <TextInput
@@ -364,7 +357,6 @@ function QuestionsSection({
 }): React.JSX.Element {
   const [body, setBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
   const onAsk = useCallback(async () => {
     const trimmed = body.trim();
     if (!trimmed || submitting) return;
@@ -379,7 +371,6 @@ function QuestionsSection({
       setSubmitting(false);
     }
   }, [body, submitting, eventId, onChanged]);
-
   const onUpvote = useCallback(
     async (questionId: string) => {
       try {
@@ -391,7 +382,6 @@ function QuestionsSection({
     },
     [onChanged],
   );
-
   return (
     <View>
       <Text style={styles.sectionTitle}>Q&A</Text>
@@ -453,17 +443,13 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 48 },
   center: { alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: colors.textFaint, fontSize: 15, marginTop: 12 },
-
   cover: { width: '100%', height: 180, backgroundColor: colors.surface },
   coverPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-
   title: { color: colors.textPrimary, fontSize: 22, fontWeight: '800', paddingHorizontal: 20, marginTop: 16 },
-
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, marginTop: 8 },
   metaText: { color: colors.textSecondary, fontSize: 14 },
   metaSubtle: { color: colors.textMuted, fontSize: 13 },
   description: { color: colors.textSecondary, fontSize: 15, lineHeight: 22, paddingHorizontal: 20, marginTop: 16 },
-
   sectionTitle: {
     color: colors.textPrimary, fontSize: 16, fontWeight: '700',
     paddingHorizontal: 20, marginTop: 28, marginBottom: 10,
@@ -472,7 +458,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 18,
   },
   emptyHint: { color: colors.textFaint, fontSize: 14, paddingHorizontal: 20 },
-
   rsvpRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20 },
   rsvpBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -484,13 +469,11 @@ const styles = StyleSheet.create({
   rsvpText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   rsvpTextActive: { color: colors.onPrimary },
   fullNote: { color: colors.warning, fontSize: 13, paddingHorizontal: 20, marginTop: 8 },
-
   attendeeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, marginBottom: 10 },
   attendeeAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface },
   attendeeAvatarPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   attendeeInitial: { color: colors.primary, fontSize: 15, fontWeight: '700' },
   attendeeName: { color: colors.textSecondary, fontSize: 15 },
-
   card: {
     marginHorizontal: 20, marginBottom: 12, padding: 16,
     backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border,
@@ -509,39 +492,37 @@ const styles = StyleSheet.create({
   pollOptionLabel: { color: colors.textSecondary, fontSize: 14 },
   pollOptionPct: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
   pollTotal: { color: colors.textFaint, fontSize: 12, marginTop: 4 },
-
   composerInput: {
     backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong,
     borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.textPrimary, fontSize: 15, marginBottom: 10,
   },
   composerOptionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 0 },
   composerAdd: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  composerAddText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  composerAddText: { color: colors.primary, fontWeight: '600', fontSize: 14 },
   composerSubmit: {
     backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center',
   },
-  composerSubmitText: { color: colors.onPrimary, fontSize: 14, fontWeight: '700' },
-
+  composerSubmitText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
   askRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 12 },
   askInput: {
-    flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: colors.textPrimary, fontSize: 14, minHeight: 44,
+    flex: 1, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong,
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.textPrimary, fontSize: 15,
+    minHeight: 44,
   },
   askBtn: {
     width: 44, height: 44, borderRadius: 12, backgroundColor: colors.primary,
     alignItems: 'center', justifyContent: 'center',
   },
   askBtnDisabled: { opacity: 0.4 },
-
-  questionRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, marginBottom: 14 },
+  questionRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, marginBottom: 12 },
   upvoteBtn: {
-    width: 40, alignItems: 'center', paddingVertical: 6, borderRadius: 10,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    width: 44, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingVertical: 8,
   },
   upvoteBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   upvoteCount: { color: colors.primary, fontSize: 12, fontWeight: '700', marginTop: 2 },
-  upvoteCountActive: { color: colors.onPrimary },
+  upvoteCountActive: { color: colors.bg },
   questionBody: { flex: 1 },
-  questionText: { color: colors.textSecondary, fontSize: 14, lineHeight: 21 },
+  questionText: { color: colors.textSecondary, fontSize: 15, lineHeight: 21 },
   questionMeta: { color: colors.textFaint, fontSize: 12, marginTop: 4 },
 });

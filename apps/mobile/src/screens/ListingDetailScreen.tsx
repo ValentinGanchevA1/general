@@ -19,7 +19,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import {ScreenHeader} from '@/components/ScreenHeader';
 import {EmptyState} from '@/components/EmptyState';
-import {colors} from '@/theme';
+import {colors, useAppTheme} from '@/theme';
 
 import type {
 	ApiError,
@@ -49,6 +49,8 @@ import {signalPostSocialActivation} from '@/features/nudges/postSocialActivation
 type R = RouteProp<CommerceStackParamList, 'ListingDetail'>;
 
 export function ListingDetailScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
 	const route = useRoute<R>();
 	const navigation = useNavigation<NativeStackNavigationProp<CommerceStackParamList>>();
 	const {listingId} = route.params;
@@ -71,7 +73,7 @@ export function ListingDetailScreen(): React.JSX.Element {
 
 	if (!listing) {
 		return (
-			<View style={S.container}>
+			<View style={[S.container, { backgroundColor: themeColors.bg }]}>
 				<ScreenHeader title="Listing"/>
 				<View style={[S.container, S.center]}>
 					{loading ? (
@@ -102,7 +104,7 @@ export function ListingDetailScreen(): React.JSX.Element {
 
 	return (
 		<ScrollView
-			style={S.container}
+			style={[S.container, { backgroundColor: themeColors.bg }]}
 			contentContainerStyle={S.content}
 			refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary}/>}
 		>
@@ -623,13 +625,13 @@ function SellerControls({
 										/>
 										<View style={S.offerActions}>
 											<TouchableOpacity style={S.acceptBtn} disabled={counterBusy}
-															  onPress={() => void submitCounter(o.id)}>
+																  onPress={() => void submitCounter(o.id)}>
 												{counterBusy ?
 													<ActivityIndicator size="small" color={colors.onPrimary}/> :
 													<Icon name="check" size={18} color={colors.onPrimary}/>}
 											</TouchableOpacity>
 											<TouchableOpacity style={S.declineBtn} disabled={counterBusy}
-															  onPress={() => setCounterFor(null)}>
+																  onPress={() => setCounterFor(null)}>
 												<Icon name="close" size={18} color={colors.textPrimary}/>
 											</TouchableOpacity>
 										</View>
@@ -637,20 +639,20 @@ function SellerControls({
 								) : (
 									<View style={[S.offerActions, {marginTop: 10}]}>
 										<TouchableOpacity style={S.acceptBtn}
-														  onPress={() => void respond(o.id, 'accepted')}
-														  accessibilityLabel="Accept offer">
+															  onPress={() => void respond(o.id, 'accepted')}
+															  accessibilityLabel="Accept offer">
 											<Icon name="check" size={18} color={colors.onPrimary}/>
 										</TouchableOpacity>
 										<TouchableOpacity style={S.counterBtn} onPress={() => {
 											setCounterFor(o.id);
 											setCounterAmount(o.offerCents != null ? String(o.offerCents / 100) : '');
 											setCounterMsg('');
-										}} accessibilityLabel="Counter offer">
-											<Icon name="swap-horizontal" size={18} color={colors.textPrimary}/>
+										}}>
+											<Text style={S.counterBtnText}>Counter</Text>
 										</TouchableOpacity>
 										<TouchableOpacity style={S.declineBtn}
-														  onPress={() => void respond(o.id, 'declined')}
-														  accessibilityLabel="Decline offer">
+															  onPress={() => void respond(o.id, 'declined')}
+															  accessibilityLabel="Decline offer">
 											<Icon name="close" size={18} color={colors.textPrimary}/>
 										</TouchableOpacity>
 									</View>
@@ -668,110 +670,75 @@ const S = StyleSheet.create({
 	container: {flex: 1, backgroundColor: colors.bg},
 	content: {paddingBottom: 48},
 	center: {alignItems: 'center', justifyContent: 'center'},
-	body: {paddingHorizontal: 20},
+	body: {padding: 20},
 	image: {width: '100%', height: 220, backgroundColor: colors.surface},
 	imagePlaceholder: {alignItems: 'center', justifyContent: 'center'},
-	title: {color: colors.textPrimary, fontSize: 22, fontWeight: '800', marginTop: 16},
+	title: {color: colors.textPrimary, fontSize: 22, fontWeight: '800'},
 	price: {color: colors.primary, fontSize: 20, fontWeight: '700', marginTop: 6},
-	metaRow: {flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 10},
+	metaRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12, alignItems: 'center'},
 	categoryPill: {backgroundColor: colors.surfaceAlt, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4},
 	categoryText: {color: colors.textSecondary, fontSize: 12, fontWeight: '600'},
-	statusPill: {backgroundColor: colors.surfaceAlt, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4},
-	statusText: {color: colors.warning, fontSize: 12, fontWeight: '600', textTransform: 'capitalize'},
-	favCount: {color: colors.textMuted, fontSize: 13},
+	statusPill: {backgroundColor: colors.warning, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4},
+	statusText: {color: colors.bg, fontSize: 12, fontWeight: '700'},
+	favCount: {color: colors.textMuted, fontSize: 12},
 	sellerRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16},
-	sellerIdentity: {flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1},
+	sellerIdentity: {flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1},
 	sellerAvatar: {width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface},
 	sellerAvatarPlaceholder: {alignItems: 'center', justifyContent: 'center'},
-	sellerInitial: {color: colors.primary, fontSize: 15, fontWeight: '700'},
+	sellerInitial: {color: colors.primary, fontWeight: '700'},
 	sellerName: {color: colors.textSecondary, fontSize: 15, fontWeight: '600'},
 	description: {color: colors.textSecondary, fontSize: 15, lineHeight: 22, marginTop: 16},
 	contactRow: {flexDirection: 'row', gap: 8},
 	messageBtn: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-		backgroundColor: colors.primary,
-		borderRadius: 10,
-		paddingHorizontal: 12,
-		paddingVertical: 8
+		flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary,
+		borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8,
 	},
 	waveBtn: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-		backgroundColor: colors.primary,
-		borderRadius: 10,
-		paddingHorizontal: 12,
-		paddingVertical: 8
+		flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.action,
+		borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8,
 	},
-	waveText: {color: colors.onPrimary, fontSize: 13, fontWeight: '700'},
+	waveText: {color: colors.onPrimary, fontWeight: '700', fontSize: 13},
 	card: {
-		marginTop: 16,
-		padding: 16,
-		backgroundColor: colors.surface,
-		borderRadius: 14,
-		borderWidth: 1,
-		borderColor: colors.border
+		marginTop: 16, padding: 16, backgroundColor: colors.surface, borderRadius: 14,
+		borderWidth: 1, borderColor: colors.border,
 	},
-	cardTitle: {color: colors.textPrimary, fontSize: 15, fontWeight: '700', marginBottom: 10},
-	input: {
-		backgroundColor: colors.surfaceAlt,
-		borderWidth: 1,
-		borderColor: colors.borderStrong,
-		borderRadius: 10,
-		paddingHorizontal: 12,
-		paddingVertical: 10,
-		color: colors.textPrimary,
-		fontSize: 15,
-		marginBottom: 10
-	},
-	multiline: {minHeight: 72, textAlignVertical: 'top'},
-	primaryBtn: {backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center'},
-	primaryBtnText: {color: colors.onPrimary, fontSize: 14, fontWeight: '700'},
-	secondaryBtn: {
-		backgroundColor: colors.surfaceAlt,
-		borderWidth: 1,
-		borderColor: colors.borderStrong,
-		borderRadius: 10,
-		paddingVertical: 12,
-		alignItems: 'center',
-		paddingHorizontal: 12
-	},
-	secondaryBtnText: {color: colors.textPrimary, fontSize: 14, fontWeight: '600'},
-	btnDisabled: {opacity: 0.4},
-	offerLine: {color: colors.textSecondary, fontSize: 15, fontWeight: '600'},
-	offerStatus: {color: colors.textMuted, fontWeight: '500', textTransform: 'capitalize'},
-	offerMsg: {color: colors.textMuted, fontSize: 13, marginTop: 6},
-	counterHint: {color: colors.textMuted, fontSize: 13, marginBottom: 10},
-	emptyHint: {color: colors.textFaint, fontSize: 14, marginTop: 8},
+	cardTitle: {color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginBottom: 8},
 	sectionTitle: {color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginTop: 24, marginBottom: 8},
-	sellerActions: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16},
-	offerActions: {flexDirection: 'row', gap: 8},
-	acceptBtn: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		backgroundColor: colors.primary,
-		alignItems: 'center',
-		justifyContent: 'center'
+	counterHint: {color: colors.textMuted, fontSize: 13, marginBottom: 8},
+	offerLine: {color: colors.textSecondary, fontSize: 15, fontWeight: '600'},
+	offerStatus: {color: colors.textMuted, fontWeight: '500'},
+	offerMsg: {color: colors.textMuted, fontSize: 13, marginTop: 6},
+	emptyHint: {color: colors.textFaint, fontSize: 14},
+	input: {
+		backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong,
+		borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.textPrimary,
+		fontSize: 15, marginBottom: 10,
 	},
-	counterBtn: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		backgroundColor: colors.surfaceAlt,
-		borderWidth: 1,
-		borderColor: colors.borderStrong,
-		alignItems: 'center',
-		justifyContent: 'center'
+	multiline: {minHeight: 64, textAlignVertical: 'top'},
+	primaryBtn: {
+		backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 12, alignItems: 'center',
+	},
+	primaryBtnText: {color: colors.onPrimary, fontWeight: '700', fontSize: 15},
+	secondaryBtn: {
+		backgroundColor: colors.surfaceAlt, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14,
+		alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong,
+	},
+	secondaryBtnText: {color: colors.textSecondary, fontWeight: '600', fontSize: 13},
+	btnDisabled: {opacity: 0.5},
+	sellerActions: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8},
+	offerActions: {flexDirection: 'row', gap: 8, alignItems: 'center'},
+	acceptBtn: {
+		width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary,
+		alignItems: 'center', justifyContent: 'center',
 	},
 	declineBtn: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		backgroundColor: colors.borderStrong,
-		alignItems: 'center',
-		justifyContent: 'center'
+		width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceAlt,
+		alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth,
+		borderColor: colors.borderStrong,
 	},
+	counterBtn: {
+		paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, backgroundColor: colors.surfaceAlt,
+		borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong,
+	},
+	counterBtnText: {color: colors.textSecondary, fontWeight: '600', fontSize: 13},
 });

@@ -26,7 +26,7 @@ import { formatListingExpiry, formatPrice } from '@/features/trading/formatPrice
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonMarketGrid } from '@/components/Skeleton';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { colors, spacing, radius, fontSize, useAppTheme } from '@/theme';
 
 type Nav = NativeStackNavigationProp<CommerceStackParamList>;
 type Tab = 'browse' | 'saved';
@@ -39,6 +39,8 @@ const MODE_OPTIONS: Array<{ value: ModeFilter; label: string }> = [
 ];
 
 export function MarketplaceScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const nav = useNavigation<Nav>();
   const { coords } = useUserLocation();
   const [tab, setTab] = useState<Tab>('browse');
@@ -107,7 +109,7 @@ export function MarketplaceScreen(): React.JSX.Element {
   );
 
   return (
-    <View style={S.root}>
+    <View style={[S.root, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader
         title="Marketplace"
         right={
