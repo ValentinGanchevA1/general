@@ -8,7 +8,7 @@ import type { AccountStackParamList } from '@/navigation/stacks';
 import { APP_VERSION, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { ListRow } from '@/components/ListRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, useAppTheme } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
@@ -25,6 +25,8 @@ function Feature({ icon, title, body }: { icon: string; title: string; body: str
 }
 
 export function AboutScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const navigation = useNavigation<Nav>();
 
   const openTerms = (): void => {
@@ -32,7 +34,7 @@ export function AboutScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="About" />
 
       <ScrollView contentContainerStyle={styles.body}>
@@ -93,7 +95,7 @@ export function AboutScreen(): React.JSX.Element {
           <Feature
             icon="shield-check"
             title="Trust ladder"
-            body="Email → phone → ID review builds verification. Soft gates protect the network without blocking exploration. Manage it from Trust Center."
+            body="Email → phone → ID review builds verification. Soft gates protect higher-stakes actions."
           />
         </View>
 
