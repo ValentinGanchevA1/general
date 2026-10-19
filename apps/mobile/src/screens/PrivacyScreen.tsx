@@ -7,7 +7,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { PRIVACY_POLICY_URL } from '@/constants/app';
 import { ListRow } from '@/components/ListRow';
-import { colors, spacing, fontSize } from '@/theme';
+import { colors, spacing, fontSize, useAppTheme } from '@/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
@@ -37,6 +37,8 @@ function Point({
  * hosted policy (PRIVACY_POLICY_URL) — this screen is product-aligned explainer only.
  */
 export function PrivacyScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const navigation = useNavigation<Nav>();
 
   const openFullPolicy = (): void => {
@@ -44,7 +46,7 @@ export function PrivacyScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="Privacy" />
 
       <ScrollView contentContainerStyle={styles.body}>
