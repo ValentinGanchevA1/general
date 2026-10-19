@@ -23,10 +23,12 @@ import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
 import { ListRow } from '@/components/ListRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { APP_VERSION, TERMS_OF_SERVICE_URL } from '@/constants/app';
-import { colors, spacing, fontSize, radius } from '@/theme';
+import { colors, spacing, fontSize, radius, useAppTheme } from '@/theme';
 import { resolveTrustNextStep, strikeStanding } from '@g88/shared';
 
 export function SettingsScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NativeStackNavigationProp<AccountStackParamList>>();
   const profile = useAppSelector((s) => s.profile.profile);
@@ -109,7 +111,7 @@ export function SettingsScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="Settings" />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.section}>
