@@ -14,7 +14,8 @@
     "env:device": "node -e \"require('fs').copyFileSync('.env.device','.env');console.log('[env] active .env -> device preset (edit API_HOST for your LAN IP). Now run: pnpm start:reset')\"",
     "test": "jest",
     "lint": "eslint src --ext .ts,.tsx --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "brand:install": "node ./scripts/install-brand-assets.js"
   },
   "dependencies": {
     "@babel/runtime": "^7.29.2",
