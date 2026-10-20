@@ -5,12 +5,12 @@ import type { FeedResponse, ActivityType } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { FeedService } from './feed.service';
+import { PulseDiscoveryFeedService } from './pulse-discovery-feed.service';
 
 @Controller('feed')
 @UseGuards(JwtAuthGuard)
 export class FeedController {
-  constructor(private readonly feed: FeedService) {}
+  constructor(private readonly feed: PulseDiscoveryFeedService) {}
 
   @Get()
   async list(
