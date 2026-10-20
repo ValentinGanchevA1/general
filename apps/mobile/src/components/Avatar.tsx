@@ -2,65 +2,42 @@ import React, { useState } from 'react';
 import { useCachedImageUri } from '@/hooks/useCachedImageUri';
 import { Image, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { colors } from '@/theme';
+import { useAppTheme, type ThemeColors } from '@/theme';
 
-/**
- * Ring styles for map sheet, profile, stories, and markers.
- * - brand: primary cyan
- * - friend: entityFriend teal (shared with map pins)
- * - story: accent (stories strip / ring)
- * - verified: accent for ID trust
- * - none: no ring
- */
 export type AvatarRing = 'none' | 'brand' | 'friend' | 'story' | 'verified';
-
-/** @deprecated Use AvatarRing — kept for branches that imported AvatarRingVariant. */
 export type AvatarRingVariant = AvatarRing;
 
 export interface AvatarProps {
   uri?: string | null;
   name: string;
   size?: number;
-  /**
-   * Cyan ring used on profile cards / map sheet.
-   * Prefer `ringVariant` for new call sites; `ring` kept for backward compat.
-   */
   ring?: boolean;
-  /**
-   * Visual ring style. See AvatarRing.
-   */
   ringVariant?: AvatarRing;
-  /** Friend marker — entityFriend ring when ringVariant is unset. */
   isFriend?: boolean;
   online?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
-const RING_COLOR: Record<Exclude<AvatarRing, 'none'>, string> = {
-  brand: colors.primary,
-  friend: colors.entityFriend,
-  story: colors.accent,
-  verified: colors.accent,
-};
-
 function resolveRingColor(
+  colors: ThemeColors,
   ringVariant: AvatarRing | undefined,
   ring: boolean | undefined,
   isFriend: boolean | undefined,
 ): string | null {
   if (ringVariant && ringVariant !== 'none') {
-    return RING_COLOR[ringVariant];
+    const ringColors: Record<Exclude<AvatarRing, 'none'>, string> = {
+      brand: colors.primary,
+      friend: colors.entityFriend,
+      story: colors.accent,
+      verified: colors.accent,
+    };
+    return ringColors[ringVariant];
   }
   if (isFriend) return colors.entityFriend;
   if (ring) return colors.primary;
   return null;
 }
 
-/**
- * Circular avatar: primary photo when available, initials fallback.
- * Image load errors fall back to initials so a broken CDN URL never blanks the UI.
- * Remote URLs resolve through offline disk cache (file:// when warmed).
- */
 export function Avatar({
   uri,
   name,
@@ -71,11 +48,12 @@ export function Avatar({
   online = false,
   style,
 }: AvatarProps): React.JSX.Element {
+  const { colors } = useAppTheme();
   const cachedUri = useCachedImageUri(uri);
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(cachedUri) && !failed;
 
-  const ringColor = resolveRingColor(ringVariant, ring, isFriend);
+  const ringColor = resolveRingColor(colors, ringVariant, ring, isFriend);
   const hasRing = ringColor != null;
   const ringWidth = hasRing ? Math.max(2, Math.round(size * 0.04)) : 0;
 
@@ -147,17 +125,7 @@ export function Avatar({
 }
 
 const styles = StyleSheet.create({
-  circle: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  initials: {
-    fontWeight: '700',
-  },
-  onlineDot: {
-    position: 'absolute',
-    bottom: 1,
-    right: 1,
-  },
+  circle: { justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  initials: { fontWeight: '700' },
+  onlineDot: { position: 'absolute', bottom: 1, right: 1 },
 });
