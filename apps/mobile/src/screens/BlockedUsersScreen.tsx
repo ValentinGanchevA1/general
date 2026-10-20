@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,9 +14,11 @@ import type { BlockedUser } from '@g88/shared';
 import { deleteJson, getJson } from '@/api/client';
 import { EmptyState } from '@/components/EmptyState';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, spacing, radius, fontSize, useAppTheme } from '@/theme';
+import { spacing, radius, fontSize, useAppTheme, type ThemeColors } from '@/theme';
 
 function InitialsAvatar({ name }: { name: string }): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const initials = name
     .split(' ')
     .map((w) => w[0] ?? '')
@@ -31,12 +33,10 @@ function InitialsAvatar({ name }: { name: string }): React.JSX.Element {
 }
 
 export function BlockedUsersScreen(): React.JSX.Element {
-  const { colors: themeColors } = useAppTheme();
-
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [users, setUsers] = useState<BlockedUser[]>([]);
   const [loading, setLoading] = useState(true);
-  // Track every in-flight unblock by id so rapid taps on different rows don't
-  // clobber each other's spinner state.
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(() => {
@@ -70,9 +70,8 @@ export function BlockedUsersScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
+    <View style={styles.root}>
       <ScreenHeader title="Blocked users" bordered />
-
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={colors.primary} size="large" />
@@ -115,41 +114,43 @@ export function BlockedUsersScreen(): React.JSX.Element {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  listContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: 10 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.primary + '66',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: { color: colors.primary, fontSize: fontSize.md, fontWeight: '700' },
-  name: { flex: 1, color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '500' },
-  unblockBtn: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 9,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.primary + '66',
-    minWidth: 92,
-    alignItems: 'center',
-  },
-  unblockBtnDisabled: { opacity: 0.6 },
-  unblockText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.sm + 1 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bg },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    listContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: 10 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: radius.md,
+      padding: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    avatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.bg,
+      borderWidth: 1,
+      borderColor: colors.primaryBorder,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    avatarText: { color: colors.primary, fontSize: fontSize.md, fontWeight: '700' },
+    name: { flex: 1, color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '500' },
+    unblockBtn: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: 9,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.primaryBorder,
+      minWidth: 92,
+      alignItems: 'center',
+    },
+    unblockBtnDisabled: { opacity: 0.6 },
+    unblockText: { color: colors.primary, fontWeight: '700', fontSize: fontSize.sm + 1 },
+  });
+}
