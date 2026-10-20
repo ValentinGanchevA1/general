@@ -4,6 +4,7 @@ import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
 
 import { nexaHaptics } from '@/haptics/nexaHaptics';
 import { useAppSelector } from '@/hooks/redux';
+import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
 
 import { ClusterMarker } from './ClusterMarker';
 import { EntityMarker } from './EntityMarker';
@@ -13,6 +14,11 @@ import {
   resolveNexaMapZoomPolicy,
   type NexaMapZoomPolicy,
 } from './nexaMapZoomDensity';
+import {
+  NEXA_INITIAL_MARKER_REVEAL_COUNT,
+  NEXA_MARKER_REVEAL_INTERVAL_MS,
+  nextNexaMarkerRevealCount,
+} from './nexaProgressiveReveal';
 import { clusterVisualKey, entityVisualKey } from './markerVisualKeys';
 import { useTracksViewChanges } from './useTracksViewChanges';
 
@@ -54,11 +60,13 @@ function MapMarkersImpl({
   onEntityPress,
 }: MapMarkersProps): React.JSX.Element {
   const committedDiscoveryZoom = useAppSelector((state) => state.discovery.zoom);
+  const reduceMotion = useNexaReducedMotion();
   const effectiveZoomPolicy =
     zoomPolicy ?? resolveNexaMapZoomPolicy(committedDiscoveryZoom);
 
   const [localSelectedEntityKey, setLocalSelectedEntityKey] = useState<string | null>(null);
   const [localSelectedClusterCellId, setLocalSelectedClusterCellId] = useState<string | null>(null);
+  const [revealCount, setRevealCount] = useState(NEXA_INITIAL_MARKER_REVEAL_COUNT);
 
   const effectiveSelectedEntityKey =
     selectedEntityKey === undefined ? localSelectedEntityKey : selectedEntityKey;
@@ -110,6 +118,32 @@ function MapMarkersImpl({
     ],
   );
 
+  useEffect(() => {
+    if (reduceMotion || visiblePoints.length <= revealCount) return;
+    const timer = setTimeout(() => {
+      setRevealCount((current) =>
+        nextNexaMarkerRevealCount(current, visiblePoints.length, false),
+      );
+    }, NEXA_MARKER_REVEAL_INTERVAL_MS);
+    return () => clearTimeout(timer);
+  }, [reduceMotion, revealCount, visiblePoints.length]);
+
+  const revealedPoints = useMemo(() => {
+    if (reduceMotion || visiblePoints.length <= revealCount) return visiblePoints;
+    return limitVisibleMapPoints(visiblePoints, revealCount, {
+      selectedEntityKey: effectiveSelectedEntityKey,
+      selectedClusterCellId: effectiveSelectedClusterCellId,
+      ownEntityKey,
+    });
+  }, [
+    effectiveSelectedClusterCellId,
+    effectiveSelectedEntityKey,
+    ownEntityKey,
+    reduceMotion,
+    revealCount,
+    visiblePoints,
+  ]);
+
   const handleEntityPress = useCallback(
     (point: EntityPoint) => {
       nexaHaptics.select();
@@ -138,7 +172,7 @@ function MapMarkersImpl({
 
   return (
     <>
-      {visiblePoints.map((point) => {
+      {revealedPoints.map((point) => {
         if (point.kind === 'cluster') {
           return (
             <ClusterMarkerItem

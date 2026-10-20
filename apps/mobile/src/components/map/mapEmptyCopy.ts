@@ -7,24 +7,28 @@ export type MapEmptyActionKind =
   | 'dating_prefs'
   | 'clear_dating';
 
+export interface MapEmptyCopy {
+  icon: string;
+  eyebrow: string;
+  title: string;
+  body: string;
+  actionLabel: string;
+  actionKind: MapEmptyActionKind;
+}
+
 export function mapEmptyCopy(opts: {
   friendsOnly: boolean;
   datingOnly: boolean;
   openToDating: boolean;
   listingMode: ListingModeFilterValue;
   emailVerified: boolean;
-}): {
-  icon: string;
-  title: string;
-  body: string;
-  actionLabel: string;
-  actionKind: MapEmptyActionKind;
-} {
+}): MapEmptyCopy {
   if (opts.friendsOnly) {
     return {
       icon: 'account-group-outline',
-      title: 'No friends nearby',
-      body: 'None of your friends are in this area right now. Pan the map or turn Friends off.',
+      eyebrow: 'People layer',
+      title: 'No friends in this view',
+      body: 'Move the map to another area or show everyone nearby.',
       actionLabel: 'Show everyone',
       actionKind: 'show_everyone',
     };
@@ -33,16 +37,18 @@ export function mapEmptyCopy(opts: {
     if (!opts.openToDating) {
       return {
         icon: 'heart-outline',
-        title: 'Turn on Dating to see matches',
-        body: 'Enable Open to dating in your profile and set who you are seeking. Only people who opted in appear on this layer.',
+        eyebrow: 'Dating layer',
+        title: 'Dating discovery is off',
+        body: 'Turn on Open to dating and choose who you want to discover. Only opted-in people can appear here.',
         actionLabel: 'Dating preferences',
         actionKind: 'dating_prefs',
       };
     }
     return {
       icon: 'heart-outline',
-      title: 'No dating matches here',
-      body: 'Nobody nearby matches your preferences right now. Pan the map, widen who you seek, or turn Dating off.',
+      eyebrow: 'Dating layer',
+      title: 'No matches in this view',
+      body: 'Move the map, adjust your preferences, or clear the Dating filter to discover more nearby.',
       actionLabel: 'Clear Dating filter',
       actionKind: 'clear_dating',
     };
@@ -50,8 +56,9 @@ export function mapEmptyCopy(opts: {
   if (opts.listingMode === 'sell') {
     return {
       icon: 'tag-outline',
-      title: 'No for-sale listings here',
-      body: 'Nothing for sale in this area. Post one, or switch the filter to All.',
+      eyebrow: 'Marketplace layer',
+      title: 'No for-sale listings here yet',
+      body: 'Create the first local listing in this view or switch the marketplace filter to All.',
       actionLabel: 'Create here',
       actionKind: 'create',
     };
@@ -59,8 +66,9 @@ export function mapEmptyCopy(opts: {
   if (opts.listingMode === 'buy') {
     return {
       icon: 'cart-outline',
-      title: 'No wanted posts here',
-      body: 'Nobody is looking to buy in this area yet. Post a wanted, or switch the filter to All.',
+      eyebrow: 'Marketplace layer',
+      title: 'No wanted posts here yet',
+      body: 'Create the first wanted post in this view or switch the marketplace filter to All.',
       actionLabel: 'Create here',
       actionKind: 'create',
     };
@@ -68,16 +76,18 @@ export function mapEmptyCopy(opts: {
   if (!opts.emailVerified) {
     return {
       icon: 'email-check-outline',
-      title: 'Verify email to get started',
-      body: 'Confirm your email so people can trust you on the map — then be the first to post something nearby.',
+      eyebrow: 'Trust required',
+      title: 'Verify email to participate nearby',
+      body: 'Confirm your email, then create the first event, listing, wanted post, or local alert in this view.',
       actionLabel: 'Verify email',
       actionKind: 'verify_email',
     };
   }
   return {
     icon: 'map-marker-radius-outline',
-    title: 'Nothing nearby yet',
-    body: 'Be the first — sell something, post a wanted, create an event, or drop a local alert. Tap + in the filter bar or long-press the map.',
+    eyebrow: 'Quiet area',
+    title: 'Nothing has surfaced here yet',
+    body: 'Create the first local signal: an event, listing, wanted post, or alert. You can also move the map to keep discovering.',
     actionLabel: 'Create here',
     actionKind: 'create',
   };
