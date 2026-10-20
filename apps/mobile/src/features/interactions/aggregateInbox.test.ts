@@ -50,7 +50,7 @@ describe('aggregateInbox', () => {
     expect(rows[0]?.latestAt).toBe('2026-10-20T12:00:00.000Z');
   });
 
-  it('labels matches and gifts explicitly', () => {
+  it('labels matches, gifts, and durable personal notifications explicitly', () => {
     const match = item({
       id: 'match:1',
       type: 'match',
@@ -62,9 +62,29 @@ describe('aggregateInbox', () => {
       createdAt: '2026-10-20T12:00:00.000Z',
       gift: { emoji: '🌹', label: 'Rose', message: 'Hi' },
     });
+    const accepted = item({
+      id: 'notification:1',
+      type: 'notification',
+      createdAt: '2026-10-20T12:00:00.000Z',
+      notification: {
+        kind: 'friend_accepted',
+        destination: { type: 'profile', userId: 'peer' },
+      },
+    });
+    const mention = item({
+      id: 'notification:2',
+      type: 'notification',
+      createdAt: '2026-10-20T12:00:00.000Z',
+      notification: {
+        kind: 'mention',
+        destination: { type: 'event', eventId: 'event-1' },
+      },
+    });
 
     expect(aggregatedSignalLabel(match, 1)).toBe('matched with you');
     expect(aggregatedSignalLabel(gift, 1)).toBe('sent you 🌹 Rose');
+    expect(aggregatedSignalLabel(accepted, 1)).toBe('accepted your friend request');
+    expect(aggregatedSignalLabel(mention, 1)).toBe('mentioned you');
     expect(aggregatedSignalLabel(match, 3)).toBe('matched with you · 3×');
   });
 

@@ -133,6 +133,14 @@ export interface RecentFollowersResponse {
   items: RecentFollowerCard[];
 }
 
+export type PersonalNotificationKind = 'friend_accepted' | 'mention';
+
+export type PersonalNotificationDestination =
+  | { type: 'profile'; userId: string }
+  | { type: 'chat'; conversationId: string }
+  | { type: 'event'; eventId: string }
+  | { type: 'listing'; listingId: string };
+
 /**
  * Unified Interactions inbox item.
  * Backend: GET /interactions/inbox (domain projection).
@@ -144,7 +152,8 @@ export type InboxItemType =
   | 'friend_request'
   | 'follow'
   | 'story_reaction'
-  | 'gift';
+  | 'gift'
+  | 'notification';
 
 export interface InboxItem {
   id: string;
@@ -171,6 +180,11 @@ export interface InboxItem {
     emoji: string;
     label: string;
     message: string | null;
+  };
+  /** Durable personal activity that has no canonical wave/gift/request/match row. */
+  notification?: {
+    kind: PersonalNotificationKind;
+    destination: PersonalNotificationDestination;
   };
 }
 
