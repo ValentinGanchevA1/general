@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { useAppSelector } from '@/hooks/redux';
+import { fetchConversations } from '@/features/chat/chatSlice';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { onSocketConnected, useSocket } from '@/realtime/useSocket';
 
 import { interactionsBadgeCounts, interactionsBadgeLabel } from './interactionsBadge';
 import {
@@ -17,9 +19,11 @@ export function useInteractionsBadge(): {
   label: string | undefined;
   ready: boolean;
 } {
+  const dispatch = useAppDispatch();
   const userId = useAppSelector((state) => state.auth.user?.id ?? null);
   const conversations = useAppSelector((state) => state.chat.conversations);
   const { items } = useInboxInteractions();
+  const { on } = useSocket();
   const [seenAtMs, setSeenAtMs] = useState(getInboxSeenAt);
   const [ready, setReady] = useState(isInboxSeenHydrated);
 
@@ -37,8 +41,25 @@ export function useInteractionsBadge(): {
       resetInboxSeen();
       return;
     }
+
     void hydrateInboxSeen(userId);
-  }, [userId]);
+    void dispatch(fetchConversations());
+  }, [dispatch, userId]);
+
+  useEffect(
+    () =>
+      onSocketConnected(() => {
+        if (userId) void dispatch(fetchConversations());
+      }),
+    [dispatch, userId],
+  );
+
+  useEffect(() => {
+    const unsub = on('chat:message', () => {
+      if (userId) void dispatch(fetchConversations());
+    });
+    return unsub;
+  }, [dispatch, on, userId]);
 
   const counts = useMemo(
     () => interactionsBadgeCounts(items, conversations, seenAtMs),
