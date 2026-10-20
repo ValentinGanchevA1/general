@@ -9,8 +9,13 @@ import { useTracksViewChanges } from './useTracksViewChanges';
 
 interface MapMarkersProps {
   points: DiscoveryPoint[];
+  selectedEntityKey?: string | null;
   onClusterPress: (p: ClusterPoint) => void;
   onEntityPress: (p: EntityPoint) => void;
+}
+
+function entityKey(point: EntityPoint): string {
+  return `${point.kind}:${point.id}`;
 }
 
 /**
@@ -19,22 +24,24 @@ interface MapMarkersProps {
  */
 function MapMarkersImpl({
   points,
+  selectedEntityKey = null,
   onClusterPress,
   onEntityPress,
 }: MapMarkersProps): React.JSX.Element {
   return (
     <>
-      {points.map((p) =>
-        p.kind === 'cluster' ? (
+      {points.map((point) =>
+        point.kind === 'cluster' ? (
           <ClusterMarkerItem
-            key={`c:${p.cellId}`}
-            point={p}
+            key={`c:${point.cellId}`}
+            point={point}
             onPress={onClusterPress}
           />
         ) : (
           <EntityMarkerItem
-            key={`e:${p.kind}:${p.id}`}
-            point={p}
+            key={`e:${point.kind}:${point.id}`}
+            point={point}
+            selected={entityKey(point) === selectedEntityKey}
             onPress={onEntityPress}
           />
         ),
@@ -46,6 +53,7 @@ function MapMarkersImpl({
 function mapMarkersPropsEqual(prev: MapMarkersProps, next: MapMarkersProps): boolean {
   return (
     prev.points === next.points &&
+    prev.selectedEntityKey === next.selectedEntityKey &&
     prev.onClusterPress === next.onClusterPress &&
     prev.onEntityPress === next.onEntityPress
   );
@@ -66,6 +74,7 @@ function ClusterMarkerItemImpl({ point, onPress }: ClusterItemProps): React.JSX.
     () => ({ latitude: point.lat, longitude: point.lng }),
     [point.lat, point.lng],
   );
+
   // Do NOT call e.stopPropagation() — on Android Google Maps that can native-crash.
   const handlePress = useCallback(() => {
     onPress(point);
@@ -77,6 +86,7 @@ function ClusterMarkerItemImpl({ point, onPress }: ClusterItemProps): React.JSX.
       onPress={handlePress}
       tracksViewChanges={tracksViewChanges}
       anchor={{ x: 0.5, y: 0.5 }}
+      zIndex={5}
     >
       <ClusterMarker point={point} />
     </Marker>
@@ -96,31 +106,40 @@ const ClusterMarkerItem = React.memo(ClusterMarkerItemImpl, clusterItemPropsEqua
 
 interface EntityItemProps {
   point: EntityPoint;
+  selected: boolean;
   onPress: (p: EntityPoint) => void;
 }
 
-function EntityMarkerItemImpl({ point, onPress }: EntityItemProps): React.JSX.Element {
-  const [mediaSettled, setMediaSettled] = useState(false);
-  const visualKey = entityVisualKey(point);
-  const tracksFromKey = useTracksViewChanges([visualKey]);
+function EntityMarkerItemImpl({
+  point,
+  selected,
+  onPress,
+}: EntityItemProps): React.JSX.Element {
+  const [visualSettled, setVisualSettled] = useState(false);
+  const baseVisualKey = entityVisualKey(point);
+  const renderKey = `${baseVisualKey}|${selected ? 'selected' : 'default'}`;
+  const tracksFromKey = useTracksViewChanges([renderKey]);
 
-  // Reset settle when the painted media identity changes (new avatar URL).
+  // react-native-maps snapshots marker children. Re-open tracking whenever a
+  // painted NEXA marker state changes, then freeze again after layout settles.
   useEffect(() => {
     void Promise.resolve().then(() => {
-      setMediaSettled(false);
+      setVisualSettled(false);
     });
-  }, [visualKey]);
+  }, [renderKey]);
 
-  const tracksViewChanges = tracksFromKey || !mediaSettled;
+  const tracksViewChanges = tracksFromKey || !visualSettled;
   const coordinate = useMemo(
     () => ({ latitude: point.lat, longitude: point.lng }),
     [point.lat, point.lng],
   );
+  const isLive = point.kind === 'user' && point.meta.online === true;
+
   // Do NOT call e.stopPropagation() — Android Google Maps MarkerPress can native-crash.
   const handlePress = useCallback(() => {
     onPress(point);
   }, [onPress, point]);
-  const onVisualSettled = useCallback(() => setMediaSettled(true), []);
+  const onVisualSettled = useCallback(() => setVisualSettled(true), []);
 
   return (
     <Marker
@@ -128,8 +147,13 @@ function EntityMarkerItemImpl({ point, onPress }: EntityItemProps): React.JSX.El
       onPress={handlePress}
       tracksViewChanges={tracksViewChanges}
       anchor={{ x: 0.5, y: 0.5 }}
+      zIndex={selected ? 40 : isLive ? 20 : 10}
     >
-      <EntityMarker point={point} onVisualSettled={onVisualSettled} />
+      <EntityMarker
+        point={point}
+        selected={selected}
+        onVisualSettled={onVisualSettled}
+      />
     </Marker>
   );
 }
@@ -137,6 +161,7 @@ function EntityMarkerItemImpl({ point, onPress }: EntityItemProps): React.JSX.El
 function entityItemPropsEqual(prev: EntityItemProps, next: EntityItemProps): boolean {
   return (
     prev.onPress === next.onPress &&
+    prev.selected === next.selected &&
     entityVisualKey(prev.point) === entityVisualKey(next.point) &&
     prev.point.lat === next.point.lat &&
     prev.point.lng === next.point.lng
