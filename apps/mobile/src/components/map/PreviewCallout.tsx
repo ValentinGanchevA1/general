@@ -8,9 +8,9 @@ import {
 
 import type {VerificationLevel} from '@g88/shared';
 import {IdentityBlock} from '@/components/IdentityBlock';
-import {colors} from '@/theme';
+import {useAppTheme} from '@/theme';
 import type {ViewerMode} from '@/features/map/pinInteraction.types';
-import {styles} from './PreviewCallout.styles';
+import {createPreviewCalloutStyles} from './PreviewCallout.styles';
 
 export interface PreviewCalloutProps {
   /** Display name from pin meta or loaded profile. */
@@ -72,6 +72,8 @@ export function PreviewCallout({
   onOpenDetail,
   onDismiss,
 }: PreviewCalloutProps): React.JSX.Element {
+  const {colors} = useAppTheme();
+  const styles = useMemo(() => createPreviewCalloutStyles(colors), [colors]);
   const subtitle = useMemo(
     () => formatSubtitle(age, distanceLabel),
     [age, distanceLabel],
