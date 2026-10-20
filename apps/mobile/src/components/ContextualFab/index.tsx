@@ -25,7 +25,7 @@ import { openRootScreen } from '@/navigation/openRootScreen';
 import { useAppDispatch } from '@/hooks/redux';
 import { setPendingFilter } from '@/features/pulse/pulseSlice';
 import { track } from '@/lib/analytics';
-import { radius, spacing, fontSize, useAppTheme, type ThemeColors } from '@/theme';
+import { radius, spacing, fontSize, useAppTheme, type Theme, type ThemeColors } from '@/theme';
 import { mapFabBottom } from '@/components/map/mapChromeLayout';
 import { nexaHaptics } from '@/haptics/nexaHaptics';
 import { NEXA_MOTION_SCALE } from '@/motion/nexaMotion';
@@ -49,7 +49,7 @@ const ITEM_GAP = 14;
 export function ContextualFab(props: Props): React.JSX.Element {
   const { zoom, points, nearestUserId, onAction, bottomOffset = 0 } = props;
   const { colors, shadow } = useAppTheme();
-  const S = useMemo(() => createStyles(colors, shadow.fab), [colors, shadow]);
+  const S = useMemo(() => createStyles(colors, shadow(0.22)), [colors, shadow]);
   const ctx = useFabContext({ zoom, points, nearestUserId });
 
   const [open, setOpen] = useState(false);
@@ -180,7 +180,7 @@ export function ContextualFab(props: Props): React.JSX.Element {
 
 function createStyles(
   colors: ThemeColors,
-  fabShadow: ReturnType<typeof useAppTheme>['shadow'] extends (...args: never[]) => infer R ? R : never,
+  fabShadow: ReturnType<Theme['shadow']>,
 ) {
   return StyleSheet.create({
     backdrop: {
