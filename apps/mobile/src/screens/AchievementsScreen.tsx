@@ -14,7 +14,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SoftErrorBanner } from '@/components/SoftErrorBanner';
 import { SkeletonListRow } from '@/components/Skeleton';
-import { colors } from '@/theme';
+import { colors, useAppTheme } from '@/theme';
 
 function AchievementRow({ a }: { a: AchievementStatus }): React.JSX.Element {
   const pct = a.threshold > 0 ? Math.min(100, Math.round((a.progress / a.threshold) * 100)) : 0;
@@ -43,12 +43,14 @@ function AchievementRow({ a }: { a: AchievementStatus }): React.JSX.Element {
 }
 
 export function AchievementsScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const { achievements, loading, error, refresh } = useAchievements();
   const unlockedCount = achievements.filter((a) => a.unlocked).length;
   const showErrorEmpty = error != null && achievements.length === 0 && !loading;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="Achievements" />
 
       <ScrollView
