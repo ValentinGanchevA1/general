@@ -14,7 +14,7 @@ import type { BlockedUser } from '@g88/shared';
 import { deleteJson, getJson } from '@/api/client';
 import { EmptyState } from '@/components/EmptyState';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { colors, spacing, radius, fontSize, useAppTheme } from '@/theme';
 
 function InitialsAvatar({ name }: { name: string }): React.JSX.Element {
   const initials = name
@@ -31,6 +31,8 @@ function InitialsAvatar({ name }: { name: string }): React.JSX.Element {
 }
 
 export function BlockedUsersScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const [users, setUsers] = useState<BlockedUser[]>([]);
   const [loading, setLoading] = useState(true);
   // Track every in-flight unblock by id so rapid taps on different rows don't
@@ -68,7 +70,7 @@ export function BlockedUsersScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="Blocked users" bordered />
 
       {loading ? (

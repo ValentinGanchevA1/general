@@ -26,7 +26,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { extractMessage } from '@/utils/extractMessage';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, useAppTheme } from '@/theme';
 
 const MAX_PHOTOS = 6;
 const { width } = Dimensions.get('window');
@@ -39,6 +39,8 @@ function urlsMatch(a: string | null | undefined, b: string | null | undefined): 
 }
 
 export function PhotosScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const dispatch = useAppDispatch();
   const profileCoverUrl = useAppSelector((s) => s.profile.profile?.coverUrl ?? null);
   const [photos, setPhotos] = useState<UserPhoto[]>([]);
@@ -140,7 +142,7 @@ export function PhotosScreen(): React.JSX.Element {
   );
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="Photos" />
 
       {loading ? (

@@ -27,7 +27,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SoftErrorBanner } from '@/components/SoftErrorBanner';
 import { SkeletonListRow } from '@/components/Skeleton';
-import { colors, spacing, fontSize } from '@/theme';
+import { colors, spacing, fontSize, useAppTheme } from '@/theme';
 import { focusUserOnMap } from '@/navigation/focusUserOnMap';
 
 type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
@@ -74,6 +74,8 @@ function isApiError(e: unknown): e is ApiError {
 }
 
 export function SuggestionsScreen(): React.JSX.Element {
+	const { colors: themeColors } = useAppTheme();
+
 	const navigation = useNavigation<Nav>();
 	const [items, setItems] = useState<SuggestionCard[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -378,7 +380,7 @@ export function SuggestionsScreen(): React.JSX.Element {
 	);
 
 	return (
-		<View style={S.root}>
+		<View style={[S.root, { backgroundColor: themeColors.bg }]}>
 			<ScreenHeader title="Suggestions" />
 			{feedback ? (
 				<Text style={S.feedback} accessibilityLiveRegion="polite">

@@ -24,12 +24,14 @@ import { useAppDispatch } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { extractMessage } from '@/utils/extractMessage';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, fontSize, spacing, radius } from '@/theme';
+import { colors, fontSize, spacing, radius, useAppTheme } from '@/theme';
 
 /**
  * Email ownership OTP — required by the soft story-post gate (and badge ladder).
  */
 export default function EmailVerificationScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const navigation = useNavigation<NativeStackNavigationProp<Record<string, object | undefined>>>();
   const dispatch = useAppDispatch();
   const [code, setCode] = useState('');
@@ -82,7 +84,7 @@ export default function EmailVerificationScreen(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={[styles.root, { backgroundColor: themeColors.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScreenHeader title="Verify email" bordered />

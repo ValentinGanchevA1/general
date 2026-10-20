@@ -31,7 +31,7 @@ import { createEvent } from '@/features/events/useEvents';
 import { pickAndUploadListingImage } from '@/features/trading/listingImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
-import { colors } from '@/theme';
+import { colors, useAppTheme } from '@/theme';
 
 type Nav = NativeStackNavigationProp<EventsStackParamList>;
 type Route = NativeStackScreenProps<EventsStackParamList, 'EventCreate'>['route'];
@@ -59,6 +59,8 @@ function timeLabel(minutes: number): string {
 }
 
 export function EventCreateScreen(): React.JSX.Element {
+	const { colors: themeColors } = useAppTheme();
+
 	const nav = useNavigation<Nav>();
 	const route = useRoute<Route>();
 	const initialLocation = route.params?.initialLocation;
@@ -166,7 +168,7 @@ export function EventCreateScreen(): React.JSX.Element {
 	}, [coords, initialLocation]);
 
 	return (
-		<KeyboardAvoidingView style={S.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+		<KeyboardAvoidingView style={[S.root, { backgroundColor: themeColors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 			<ScreenHeader
 				title="New event"
 				right={
