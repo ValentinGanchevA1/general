@@ -37,6 +37,7 @@ const THEME_OPTIONS: ReadonlyArray<{ mode: ThemeMode; label: string; description
   { mode: 'system', label: 'System', description: 'Follow your device appearance' },
   { mode: 'light', label: 'Light', description: 'Always use light appearance' },
   { mode: 'dark', label: 'Dark', description: 'Always use dark appearance' },
+  { mode: 'protos-nexus', label: 'PROTOS NEXUS ✦', description: 'Exclusive postmodern neon appearance' },
 ];
 
 function createStyles(colors: ThemeColors) {
@@ -49,11 +50,18 @@ function createStyles(colors: ThemeColors) {
     appearanceOption: { minHeight: 58, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
     appearanceDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
     appearanceCopy: { flex: 1 },
+    appearanceLabelRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
     appearanceLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
+    nexusLabel: { color: colors.premiumTier, fontWeight: '800' },
+    premiumBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: colors.premiumBorder, backgroundColor: colors.premiumSoft },
+    premiumBadgeText: { color: colors.premiumTier, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
     appearanceDescription: { color: colors.textSecondary, fontSize: fontSize.sm, marginTop: 2 },
+    lockedDescription: { color: colors.premiumTier },
     radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' },
     radioOuterSelected: { borderColor: colors.primary },
+    radioOuterLocked: { borderColor: colors.premiumBorder },
     radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
+    lockMark: { color: colors.premiumTier, fontSize: 12, fontWeight: '800' },
     rowSpaced: { marginTop: spacing.md },
     standingCard: { backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.borderStrong },
     standingWarn: { borderColor: colors.warning },
@@ -81,7 +89,7 @@ function createStyles(colors: ThemeColors) {
 }
 
 export function SettingsScreen(): React.JSX.Element {
-  const { colors, mode, setMode } = useAppTheme();
+  const { colors, mode, setMode, canUseProtosNexus } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NativeStackNavigationProp<AccountStackParamList>>();
@@ -124,10 +132,19 @@ export function SettingsScreen(): React.JSX.Element {
           <View style={styles.appearanceCard} accessibilityRole="radiogroup">
             {THEME_OPTIONS.map((option, index) => {
               const selected = mode === option.mode;
+              const isNexus = option.mode === 'protos-nexus';
+              const locked = isNexus && canUseProtosNexus === false;
+              const onPress = (): void => {
+                if (locked) { navigation.navigate('Subscription'); return; }
+                setMode(option.mode);
+              };
               return (
-                <TouchableOpacity key={option.mode} style={[styles.appearanceOption, index > 0 ? styles.appearanceDivider : undefined]} onPress={() => setMode(option.mode)} accessibilityRole="radio" accessibilityState={{ checked: selected }} accessibilityLabel={`${option.label} appearance`}>
-                  <View style={styles.appearanceCopy}><Text style={styles.appearanceLabel}>{option.label}</Text><Text style={styles.appearanceDescription}>{option.description}</Text></View>
-                  <View style={[styles.radioOuter, selected ? styles.radioOuterSelected : undefined]}>{selected ? <View style={styles.radioInner} /> : null}</View>
+                <TouchableOpacity key={option.mode} style={[styles.appearanceOption, index > 0 ? styles.appearanceDivider : undefined]} onPress={onPress} accessibilityRole="radio" accessibilityState={{ checked: selected, disabled: locked }} accessibilityLabel={`${option.label} appearance${locked ? ', Premium membership required' : ''}`} accessibilityHint={locked ? 'Opens Premium membership options' : undefined}>
+                  <View style={styles.appearanceCopy}>
+                    <View style={styles.appearanceLabelRow}><Text style={[styles.appearanceLabel, isNexus ? styles.nexusLabel : undefined]}>{option.label}</Text>{isNexus ? <View style={styles.premiumBadge}><Text style={styles.premiumBadgeText}>PREMIUM</Text></View> : null}</View>
+                    <Text style={[styles.appearanceDescription, locked ? styles.lockedDescription : undefined]}>{locked ? 'Premium exclusive · Tap to unlock' : option.description}</Text>
+                  </View>
+                  <View style={[styles.radioOuter, selected ? styles.radioOuterSelected : undefined, locked ? styles.radioOuterLocked : undefined]}>{selected ? <View style={styles.radioInner} /> : locked ? <Text style={styles.lockMark}>✦</Text> : null}</View>
                 </TouchableOpacity>
               );
             })}
