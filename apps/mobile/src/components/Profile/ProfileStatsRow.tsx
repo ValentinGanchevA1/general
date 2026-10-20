@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 
-import { colors, radius } from '@/theme';
+import { radius, useAppTheme, type ThemeColors } from '@/theme';
 
 export type ProfileStatsRowProps = {
   level?: number | null;
@@ -20,9 +20,10 @@ export function ProfileStatsRow({
   achievementIcons,
   onLayout,
 }: ProfileStatsRowProps): React.JSX.Element | null {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const icons = achievementIcons?.slice(0, 3) ?? [];
-  const has =
-    level != null || allTimeRank != null || icons.length > 0;
+  const has = level != null || allTimeRank != null || icons.length > 0;
   if (!has) return null;
 
   return (
@@ -53,23 +54,25 @@ export function ProfileStatsRow({
   );
 }
 
-const styles = StyleSheet.create({
-  statsBlock: { gap: 6 },
-  sectionLabel: {
-    color: colors.textFaint,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  statsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
-  statPill: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  statPillValue: { color: colors.textPrimary, fontSize: 12, fontWeight: '700' },
-  achievementIcons: { flexDirection: 'row', gap: 4 },
-  achievementIcon: { fontSize: 16 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    statsBlock: { gap: 6 },
+    sectionLabel: {
+      color: colors.textFaint,
+      fontSize: 11,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    statsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+    statPill: {
+      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    statPillValue: { color: colors.textPrimary, fontSize: 12, fontWeight: '700' },
+    achievementIcons: { flexDirection: 'row', gap: 4 },
+    achievementIcon: { fontSize: 16 },
+  });
+}
