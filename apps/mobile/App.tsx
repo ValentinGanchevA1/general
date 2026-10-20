@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Provider } from 'react-redux';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -17,6 +17,8 @@ import {
   resolveSentryRelease,
 } from '@/lib/sentry';
 import { ThemeProvider } from '@/theme';
+import { useAppSelector } from '@/hooks/redux';
+import { NexaLaunchOverlay } from '@/components/Brand/NexaLaunchOverlay';
 
 Sentry.init({
   dsn: Config.SENTRY_DSN,
@@ -37,6 +39,17 @@ Sentry.init({
 
 GoogleSignin.configure({ webClientId: Config.GOOGLE_WEB_CLIENT_ID });
 
+function AppShell(): React.JSX.Element {
+  const restoring = useAppSelector((state) => state.auth.restoring);
+
+  return (
+    <View style={styles.root}>
+      <AppNavigator />
+      <NexaLaunchOverlay ready={!restoring} />
+    </View>
+  );
+}
+
 function App(): React.JSX.Element {
   // BottomSheetModalProvider lives inside NavigationContainer (AppNavigator)
   // so portal content keeps navigation context (EntityBottomSheet useNavigation).
@@ -45,7 +58,7 @@ function App(): React.JSX.Element {
       <Provider store={store}>
         <SafeAreaProvider>
           <ThemeProvider>
-            <AppNavigator />
+            <AppShell />
           </ThemeProvider>
         </SafeAreaProvider>
       </Provider>
