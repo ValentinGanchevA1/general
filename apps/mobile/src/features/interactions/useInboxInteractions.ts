@@ -28,7 +28,6 @@ export function useInboxInteractions(): {
   }, []);
 
   const refresh = useCallback(async (): Promise<void> => {
-    // Coalesce focus, reconnect, socket and action refreshes.
     if (inFlightRef.current) {
       await inFlightRef.current;
       return;
@@ -78,11 +77,9 @@ export function useInboxInteractions(): {
   );
 
   useEffect(() => {
-    // Keep this list aligned with every personal-activity domain that can
-    // change the hub. Unsupported categories are harmless until the inbox
-    // projection starts returning them.
     const unsubs = [
       on('wave:received', () => void refresh()),
+      on('wave:mutual', () => void refresh()),
       on('friend:request', () => void refresh()),
       on('friend:accepted', () => void refresh()),
       on('gift:received', () => void refresh()),
