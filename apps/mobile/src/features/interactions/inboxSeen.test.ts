@@ -18,6 +18,7 @@ const storage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
 describe('inboxSeen persistence', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    storage.setItem.mockResolvedValue();
     resetInboxSeen();
   });
 
