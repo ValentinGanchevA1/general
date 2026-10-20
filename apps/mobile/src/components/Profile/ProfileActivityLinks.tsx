@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { ChallengeToday, GamificationSummary } from '@g88/shared';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { spacing, radius, fontSize, useAppTheme, type ThemeColors } from '@/theme';
 import { ProfileProgressCard } from './ProfileProgressCard';
 import { ProfileChallengesCard } from './ProfileChallengesCard';
 
@@ -29,6 +29,8 @@ export function ProfileActivityLinks({
   onGifts,
   onMarketplace,
 }: Props): React.JSX.Element | null {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   // Progressive disclosure: hide gamification chrome until the user has real signal.
   const challengeStarted = challenges.some((c) => (c.progress ?? 0) > 0);
   const hasXp = (gamification?.totalXp ?? 0) > 0;
@@ -95,40 +97,42 @@ export function ProfileActivityLinks({
   );
 }
 
-const styles = StyleSheet.create({
-  sectionPadded: { paddingHorizontal: spacing.xl, marginTop: spacing.lg },
-  blockLabel: {
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    marginBottom: spacing.sm,
-  },
-  gamificationRow: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: spacing.xl,
-    marginTop: spacing.md,
-  },
-  gamificationCard: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.surfaceRaised,
-    paddingVertical: 14,
-    borderRadius: radius.md,
-  },
-  gamificationTitle: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
-  giftsCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.xl,
-    marginTop: spacing.md,
-    padding: spacing.md,
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.md,
-    gap: 12,
-  },
-  giftsCardBody: { flex: 1 },
-  giftsCardTitle: { color: colors.textPrimary, fontWeight: '700', fontSize: 15 },
-  giftsCardSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    sectionPadded: { paddingHorizontal: spacing.xl, marginTop: spacing.lg },
+    blockLabel: {
+      color: colors.textSecondary,
+      fontSize: fontSize.sm,
+      fontWeight: '600',
+      marginBottom: spacing.sm,
+    },
+    gamificationRow: {
+      flexDirection: 'row',
+      gap: 10,
+      paddingHorizontal: spacing.xl,
+      marginTop: spacing.md,
+    },
+    gamificationCard: {
+      flex: 1,
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.surfaceRaised,
+      paddingVertical: 14,
+      borderRadius: radius.md,
+    },
+    gamificationTitle: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
+    giftsCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: spacing.xl,
+      marginTop: spacing.md,
+      padding: spacing.md,
+      backgroundColor: colors.surfaceRaised,
+      borderRadius: radius.md,
+      gap: 12,
+    },
+    giftsCardBody: { flex: 1 },
+    giftsCardTitle: { color: colors.textPrimary, fontWeight: '700', fontSize: 15 },
+    giftsCardSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  });
+}
