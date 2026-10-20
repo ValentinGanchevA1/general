@@ -80,7 +80,7 @@ export class PulseDiscoveryFeedService {
               e.created_at,
               ST_Distance(
                 e.location,
-                ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography
+                ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
               ) AS distance_m
          FROM events e
          JOIN users u ON u.id = e.host_id AND u.deleted_at IS NULL
@@ -89,12 +89,12 @@ export class PulseDiscoveryFeedService {
           AND e.starts_at > NOW()
           AND ST_DWithin(
                 e.location,
-                ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
-                $4
+                ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+                $3
               )
         ORDER BY e.starts_at ASC
-        LIMIT $5`,
-      [userId, lng, lat, MAX_DISTANCE_M, limit],
+        LIMIT $4`,
+      [lng, lat, MAX_DISTANCE_M, limit],
     );
 
     return rows.map((row): ActivityItem => ({
