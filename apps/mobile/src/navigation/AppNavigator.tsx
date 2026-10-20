@@ -72,13 +72,7 @@ import type {
 	SocialStackParamList,
 } from './stacks';
 
-export type PulseFilter =
-	| 'all'
-	| 'chats'
-	| 'waves'
-	| 'listings'
-	| 'alerts'
-	| 'matches';
+export type PulseFilter = 'for-you' | 'nearby' | 'events' | 'marketplace';
 
 export type TabParamList = {
 	Map: {
