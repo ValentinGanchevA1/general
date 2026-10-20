@@ -27,7 +27,7 @@ import { challengeEvents } from '@/features/gamification/challengeEvents';
 import { postJson } from '@/api/client';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
-import { colors, fontSize, spacing, radius } from '@/theme';
+import { colors, fontSize, spacing, radius, useAppTheme } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type R = RouteProp<RootStackParamList, 'AlertComposer'>;
@@ -45,6 +45,8 @@ const CATEGORY_META: Record<AreaCategory, { label: string; icon: string }> = {
 };
 
 export function AlertComposerScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const nav = useNavigation<Nav>();
   const route = useRoute<R>();
   const dispatch = useAppDispatch();
@@ -84,7 +86,7 @@ export function AlertComposerScreen(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView
-      style={S.root}
+      style={[S.root, { backgroundColor: themeColors.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScreenHeader

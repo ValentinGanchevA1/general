@@ -25,11 +25,13 @@ import { fetchProfile } from '@/features/profile/profileSlice';
 import { TIER_COLOR } from '@/features/profile/socialConfig';
 import { extractMessage } from '@/utils/extractMessage';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, fontSize, spacing, radius } from '@/theme';
+import { colors, fontSize, spacing, radius, useAppTheme } from '@/theme';
 
 const TIER_RANK: Record<string, number> = { free: 0, basic: 1, premium: 2 };
 
 export function SubscriptionScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const dispatch = useAppDispatch();
   const profile = useAppSelector((s) => s.profile.profile);
   const currentTier = profile?.subscriptionTier ?? 'free';
@@ -78,7 +80,7 @@ export function SubscriptionScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="Premium" />
 
       <ScrollView style={styles.flex} contentContainerStyle={styles.content}>

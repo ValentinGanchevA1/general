@@ -14,7 +14,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SoftErrorBanner } from '@/components/SoftErrorBanner';
 import { SkeletonListRow } from '@/components/Skeleton';
-import { colors } from '@/theme';
+import { colors, useAppTheme } from '@/theme';
 
 function iconForChallenge(id: string): string {
   if (id.startsWith('wave')) return 'hand-wave';
@@ -60,12 +60,14 @@ function ChallengeRow({ c }: { c: ChallengeToday }): React.JSX.Element {
 }
 
 export function ChallengesScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const { challenges, loading, error, refresh } = useChallenges();
   const completedCount = challenges.filter((c) => c.completed).length;
   const showErrorEmpty = error != null && challenges.length === 0 && !loading;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="Challenges" />
 
       <ScrollView
