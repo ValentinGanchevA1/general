@@ -23,11 +23,13 @@ import { Avatar } from '@/components/Avatar';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonListRow } from '@/components/Skeleton';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { colors, spacing, radius, fontSize, useAppTheme } from '@/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MutualFriends'>;
 
 export function MutualFriendsScreen({ route, navigation }: Props): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const { peerUserId, peerName } = route.params;
   const [items, setItems] = useState<FriendCard[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -106,7 +108,7 @@ export function MutualFriendsScreen({ route, navigation }: Props): React.JSX.Ele
   );
 
   return (
-    <View style={S.root}>
+    <View style={[S.root, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title={title} />
 
       {loading && items.length === 0 ? (
@@ -139,7 +141,8 @@ export function MutualFriendsScreen({ route, navigation }: Props): React.JSX.Ele
             if (nextCursor && !loadingMore && !loading) {
               void load(nextCursor);
             }
-          }}
+          }
+          }
           onEndReachedThreshold={0.4}
           ListEmptyComponent={
             <EmptyState
