@@ -1,4 +1,4 @@
-// Map chrome: concept-board category chips only.
+// Map chrome: concept-board category chips + fixed recenter action.
 // Search and duplicate create controls are intentionally absent from MapScreen;
 // create remains the centered bottom-tab action and advanced filters live in More.
 
@@ -115,6 +115,13 @@ export function MapFilterRow({
 		navigation.navigate('AlertComposer', { presetCategory: 'general' });
 	}, [navigation]);
 
+	const recenterMap = useCallback((): void => {
+		navigation.navigate('Main', {
+			screen: 'Map',
+			params: { focusMyPin: true },
+		});
+	}, [navigation]);
+
 	const layerTone = useCallback(
 		(id: EntityKind): string => {
 			if (id === 'event') return c.accent;
@@ -126,68 +133,86 @@ export function MapFilterRow({
 
 	return (
 		<View style={[styles.wrap, { top }]} pointerEvents="box-none">
-			<ScrollView
-				horizontal
-				showsHorizontalScrollIndicator={false}
-				contentContainerStyle={styles.row}
-			>
-				{LAYER_OPTIONS.map((option) => {
-					const active = layers.includes(option.id);
-					const tone = layerTone(option.id);
-					return (
-						<Pressable
-							key={option.id}
-							onPress={() => toggleLayer(option.id)}
-							style={[
-								styles.chip,
-								{
-									backgroundColor: active ? c.primarySoft : 'rgba(10,10,15,0.88)',
-									borderColor: active ? tone : c.borderStrong,
-								},
-							]}
-							accessibilityRole="button"
-							accessibilityState={{ selected: active }}
-							accessibilityLabel={option.a11y}
-						>
-							<Icon name={option.icon} size={17} color={tone} />
-							<Text style={[styles.chipText, { color: active ? tone : c.textSecondary }]}>
-								{option.label}
-							</Text>
-						</Pressable>
-					);
-				})}
+			<View style={styles.toolbar}>
+				<ScrollView
+					horizontal
+					style={styles.scroll}
+					showsHorizontalScrollIndicator={false}
+					contentContainerStyle={styles.row}
+				>
+					{LAYER_OPTIONS.map((option) => {
+						const active = layers.includes(option.id);
+						const tone = layerTone(option.id);
+						return (
+							<Pressable
+								key={option.id}
+								onPress={() => toggleLayer(option.id)}
+								style={[
+									styles.chip,
+									{
+										backgroundColor: active ? c.primarySoft : 'rgba(10,10,15,0.88)',
+										borderColor: active ? tone : c.borderStrong,
+									},
+								]}
+								accessibilityRole="button"
+								accessibilityState={{ selected: active }}
+								accessibilityLabel={option.a11y}
+							>
+								<Icon name={option.icon} size={17} color={tone} />
+								<Text style={[styles.chipText, { color: active ? tone : c.textSecondary }]}>
+									{option.label}
+								</Text>
+							</Pressable>
+						);
+					})}
+
+					<Pressable
+						onPress={openAlerts}
+						style={[
+							styles.chip,
+							{
+								backgroundColor: 'rgba(10,10,15,0.88)',
+								borderColor: c.borderStrong,
+							},
+						]}
+						accessibilityRole="button"
+						accessibilityLabel="Create a local alert"
+					>
+						<Icon name="bell-outline" size={17} color={c.dangerMuted} />
+						<Text style={[styles.chipText, { color: c.textSecondary }]}>Alerts</Text>
+					</Pressable>
+
+					<Pressable
+						onPress={() => setMoreOpen(true)}
+						style={[
+							styles.moreChip,
+							{
+								backgroundColor: 'rgba(10,10,15,0.88)',
+								borderColor: moreActive ? c.primary : c.borderStrong,
+							},
+						]}
+						accessibilityRole="button"
+						accessibilityLabel="More map filters"
+					>
+						<Icon name="tune-variant" size={17} color={moreActive ? c.primary : c.textMuted} />
+					</Pressable>
+				</ScrollView>
 
 				<Pressable
-					onPress={openAlerts}
+					onPress={recenterMap}
 					style={[
-						styles.chip,
+						styles.recenter,
 						{
-							backgroundColor: 'rgba(10,10,15,0.88)',
-							borderColor: c.borderStrong,
+							backgroundColor: 'rgba(10,10,15,0.94)',
+							borderColor: c.primary,
 						},
 					]}
 					accessibilityRole="button"
-					accessibilityLabel="Create a local alert"
+					accessibilityLabel="Center map on my location"
 				>
-					<Icon name="bell-outline" size={17} color={c.dangerMuted} />
-					<Text style={[styles.chipText, { color: c.textSecondary }]}>Alerts</Text>
+					<Icon name="crosshairs-gps" size={19} color={c.primary} />
 				</Pressable>
-
-				<Pressable
-					onPress={() => setMoreOpen(true)}
-					style={[
-						styles.moreChip,
-						{
-							backgroundColor: 'rgba(10,10,15,0.88)',
-							borderColor: moreActive ? c.primary : c.borderStrong,
-						},
-					]}
-					accessibilityRole="button"
-					accessibilityLabel="More map filters"
-				>
-					<Icon name="tune-variant" size={17} color={moreActive ? c.primary : c.textMuted} />
-				</Pressable>
-			</ScrollView>
+			</View>
 
 			<Modal
 				visible={moreOpen}
@@ -318,10 +343,20 @@ const styles = StyleSheet.create({
 		right: 0,
 		zIndex: 20,
 	},
+	toolbar: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		minHeight: COMBINED_FILTER_ROW_HEIGHT,
+		paddingRight: spacing.sm,
+	},
+	scroll: {
+		flex: 1,
+	},
 	row: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingHorizontal: spacing.md,
+		paddingLeft: spacing.sm,
+		paddingRight: spacing.xs,
 		gap: 10,
 		minHeight: COMBINED_FILTER_ROW_HEIGHT,
 	},
@@ -345,6 +380,15 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		alignItems: 'center',
 		justifyContent: 'center',
+	},
+	recenter: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		borderWidth: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginLeft: spacing.xs,
 	},
 	modalBackdrop: {
 		flex: 1,
