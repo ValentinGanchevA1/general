@@ -1,26 +1,28 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  Image,
-  StyleSheet,
   Dimensions,
+  Image,
   Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { colors, spacing, fontSize } from '@/theme';
+
+import { colors, fontSize, spacing } from '@/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PHOTO_HEIGHT = SCREEN_WIDTH * 1.05;
 
 interface ProfileHeaderPhotoProps {
   photoUrl: string | null;
-  /** Independent cover/background; falls back to photoUrl when unset. */
   coverUrl?: string | null;
   displayName: string;
   handle?: string | null;
-  verificationPercent: number;
+  /** @deprecated Retained for compatibility. Numeric trust is not rendered. */
+  verificationPercent?: number;
+  idVerified?: boolean;
   isVisibleOnMap: boolean;
   isPaid?: boolean;
   tierLabel?: string;
@@ -29,10 +31,8 @@ interface ProfileHeaderPhotoProps {
   onPressPhoto?: () => void;
   onPressVerificationBadge?: () => void;
   onPressSettings?: () => void;
-  /** Shown when the screen was pushed onto a stack (not tab root). */
   onPressBack?: () => void;
   onSelectPhoto?: (index: number) => void;
-  /** Opens map visibility sheet (How others see you). */
   onPressVisibility?: () => void;
 }
 
@@ -41,7 +41,7 @@ export function ProfileHeaderPhoto({
   coverUrl,
   displayName,
   handle,
-  verificationPercent,
+  idVerified = false,
   isVisibleOnMap,
   isPaid,
   tierLabel,
@@ -66,7 +66,7 @@ export function ProfileHeaderPhoto({
           <Text style={styles.placeholderInitials}>
             {displayName
               .split(' ')
-              .map((w) => w[0] ?? '')
+              .map((word) => word[0] ?? '')
               .join('')
               .toUpperCase()
               .slice(0, 2) || '?'}
@@ -74,7 +74,6 @@ export function ProfileHeaderPhoto({
         </View>
       )}
 
-      {/* Top chrome — back (stack) or tier; settings always when provided */}
       <View style={[styles.topChrome, { top: insets.top + 6 }]} pointerEvents="box-none">
         <View style={styles.topLeft} pointerEvents="box-none">
           {onPressBack ? (
@@ -108,16 +107,15 @@ export function ProfileHeaderPhoto({
         ) : null}
       </View>
 
-      {/* Bottom readability + identity */}
       <View style={styles.overlayContent} pointerEvents="box-none">
         {photoCount > 1 ? (
           <View style={styles.dots}>
-            {Array.from({ length: photoCount }).map((_, i) => (
+            {Array.from({ length: photoCount }).map((_, index) => (
               <Pressable
-                key={i}
-                onPress={() => onSelectPhoto?.(i)}
+                key={index}
+                onPress={() => onSelectPhoto?.(index)}
                 hitSlop={6}
-                style={[styles.dot, i === activePhotoIndex && styles.dotActive]}
+                style={[styles.dot, index === activePhotoIndex && styles.dotActive]}
               />
             ))}
           </View>
@@ -154,12 +152,27 @@ export function ProfileHeaderPhoto({
 
           <Pressable
             onPress={onPressVerificationBadge}
-            style={styles.percentBadge}
+            style={[
+              styles.verificationBadge,
+              idVerified && styles.verificationBadgeVerified,
+            ]}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel={`Verification ${verificationPercent} percent`}
+            accessibilityLabel={idVerified ? 'Identity verified' : 'Open identity verification'}
           >
-            <Text style={styles.percentText}>{verificationPercent}%</Text>
+            <Icon
+              name={idVerified ? 'shield-check' : 'shield-outline'}
+              size={15}
+              color={idVerified ? colors.verified : colors.actionPrimary}
+            />
+            <Text
+              style={[
+                styles.verificationText,
+                { color: idVerified ? colors.verified : colors.textPrimary },
+              ]}
+            >
+              {idVerified ? 'Verified' : 'Verify'}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -173,23 +186,19 @@ const styles = StyleSheet.create({
     height: PHOTO_HEIGHT,
     backgroundColor: colors.surfaceRaised,
   },
-  photo: {
-    width: '100%',
-    height: '100%',
-  },
+  photo: { width: '100%', height: '100%' },
   placeholder: {
     backgroundColor: colors.surfaceRaised,
     justifyContent: 'center',
     alignItems: 'center',
   },
   placeholderInitials: {
-    color: colors.primary,
+    color: colors.actionPrimary,
     fontSize: 64,
     fontWeight: '700',
   },
   topChrome: {
     position: 'absolute',
-    // top set inline from safe-area insets
     left: spacing.lg,
     right: spacing.lg,
     flexDirection: 'row',
@@ -287,17 +296,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
-  percentBadge: {
+  verificationBadge: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     backgroundColor: 'rgba(0,0,0,0.55)',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 14,
+    borderRadius: 17,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: colors.actionBorderSoft,
   },
-  percentText: {
-    color: colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '600',
+  verificationBadgeVerified: {
+    borderColor: colors.discoveryBorder,
+  },
+  verificationText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
