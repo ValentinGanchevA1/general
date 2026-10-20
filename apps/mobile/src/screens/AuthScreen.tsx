@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     maxWidth: 360,
     fontSize: 28,
     lineHeight: 34,
-    fontWeight: '750',
+    fontWeight: '800',
     textAlign: 'center',
     letterSpacing: -0.4,
   },
