@@ -1,9 +1,9 @@
 // Map chrome: Friends toggle — discovery friendsOnly layer.
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 interface Props {
   active: boolean;
@@ -17,6 +17,9 @@ export function FriendsOnlyFilter({
   onChange,
   top,
 }: Props): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={[styles.wrap, { top }]} pointerEvents="box-none">
       <Pressable
@@ -34,30 +37,32 @@ export function FriendsOnlyFilter({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    position: 'absolute',
-    right: spacing.lg,
-    zIndex: 18,
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(18,18,31,0.92)',
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  chipActive: {
-    backgroundColor: colors.entityFriend,
-    borderColor: colors.entityFriend,
-  },
-  chipText: {
-    color: colors.textSecondary,
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-  },
-  chipTextActive: {
-    color: colors.onPrimary,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrap: {
+      position: 'absolute',
+      right: spacing.lg,
+      zIndex: 18,
+    },
+    chip: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: radius.pill,
+      backgroundColor: colors.surfacePrimary,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    chipActive: {
+      backgroundColor: colors.entityFriend,
+      borderColor: colors.entityFriend,
+    },
+    chipText: {
+      color: colors.textSecondary,
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+    },
+    chipTextActive: {
+      color: colors.onPrimary,
+    },
+  });
+}
