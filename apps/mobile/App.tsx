@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StatusBar, StyleSheet, View } from 'react-native';
 import { Provider } from 'react-redux';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -16,7 +16,7 @@ import {
   resolveSentryDist,
   resolveSentryRelease,
 } from '@/lib/sentry';
-import { ThemeProvider } from '@/theme';
+import { ThemeProvider, useAppTheme } from '@/theme';
 import { useAppSelector } from '@/hooks/redux';
 import { NexaLaunchOverlay } from '@/components/Brand/NexaLaunchOverlay';
 
@@ -24,15 +24,11 @@ Sentry.init({
   dsn: Config.SENTRY_DSN,
   enabled: !__DEV__ && !!Config.SENTRY_DSN,
   environment: __DEV__ ? 'development' : 'production',
-  // Tie events to the build that produced them (must match CI / upload release name).
   release: resolveSentryRelease(),
   dist: resolveSentryDist(),
   sendDefaultPii: false,
-  // Performance tracing — 100% in local validation builds; sample in prod.
   tracesSampleRate: __DEV__ ? 1.0 : 0.2,
   integrations: [navigationIntegration],
-  // Shared PII/secret scrubber (OB1) — same denylist + token redaction as the
-  // backend. Last line of defence before anything leaves the device.
   beforeSend: (event) => scrubSentryPayload(event),
   beforeBreadcrumb: (breadcrumb) => scrubSentryPayload(breadcrumb),
 });
@@ -41,9 +37,14 @@ GoogleSignin.configure({ webClientId: Config.GOOGLE_WEB_CLIENT_ID });
 
 function AppShell(): React.JSX.Element {
   const restoring = useAppSelector((state) => state.auth.restoring);
+  const { colors, scheme } = useAppTheme();
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: colors.bg }]}>
+      <StatusBar
+        barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.bg}
+      />
       <AppNavigator />
       <NexaLaunchOverlay ready={!restoring} />
     </View>
