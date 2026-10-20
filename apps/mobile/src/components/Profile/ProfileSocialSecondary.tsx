@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 
 import type { RelationshipState } from '@g88/shared';
-import { colors, spacing } from '@/theme';
+import { spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 export type ProfileSocialSecondaryProps = {
   blocked: boolean;
@@ -35,6 +35,9 @@ export function ProfileSocialSecondary({
   onFollowToggle,
   onFriendAction,
 }: ProfileSocialSecondaryProps): React.JSX.Element | null {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   if (blocked) return null;
 
   const isFriends = friendState === 'friends';
@@ -80,18 +83,20 @@ export function ProfileSocialSecondary({
   );
 }
 
-const styles = StyleSheet.create({
-  socialSecondary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: spacing.xl,
-    marginBottom: 16,
-    minHeight: 28,
-  },
-  socialLink: { color: colors.primary, fontWeight: '600', fontSize: 14 },
-  socialLinkActive: { color: colors.textSecondary },
-  socialLinkMuted: { color: colors.textMuted, fontWeight: '600', fontSize: 14 },
-  socialDot: { color: colors.textFaint, fontSize: 14 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    socialSecondary: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingHorizontal: spacing.xl,
+      marginBottom: 16,
+      minHeight: 28,
+    },
+    socialLink: { color: colors.primary, fontWeight: '600', fontSize: 14 },
+    socialLinkActive: { color: colors.textSecondary },
+    socialLinkMuted: { color: colors.textMuted, fontWeight: '600', fontSize: 14 },
+    socialDot: { color: colors.textFaint, fontSize: 14 },
+  });
+}
