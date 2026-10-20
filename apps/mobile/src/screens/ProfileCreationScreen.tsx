@@ -16,7 +16,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { updateProfile } from '@/features/profile/profileSlice';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { FormField } from '@/components/FormField';
-import { colors, fontSize, spacing, radius } from '@/theme';
+import { colors, fontSize, spacing, radius, useAppTheme } from '@/theme';
 
 const TOTAL_STEPS = 5;
 
@@ -251,6 +251,8 @@ function StepVisibility({
 }
 
 export function ProfileCreationScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((s) => s.auth.user);
   const { loading, error } = useAppSelector((s) => s.profile);
@@ -326,7 +328,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
 
   if (step === 0) {
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
         <View style={styles.welcomeBody}>
           <Text style={styles.logo}>G88</Text>
           <Text style={styles.welcomeHeading}>Welcome to G88</Text>
@@ -348,7 +350,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={[styles.root, { backgroundColor: themeColors.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.progressRow}>

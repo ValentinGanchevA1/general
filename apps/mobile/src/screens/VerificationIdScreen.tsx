@@ -27,7 +27,7 @@ import { fetchProfile } from '@/features/profile/profileSlice';
 import { extractMessage } from '@/utils/extractMessage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import type { AccountStackParamList } from '@/navigation/stacks';
-import { colors, fontSize, spacing, radius } from '@/theme';
+import { colors, fontSize, spacing, radius, useAppTheme } from '@/theme';
 
 type StepKey = 'selfie' | 'idFront' | 'idBack';
 
@@ -41,6 +41,8 @@ const STEPS: { key: StepKey; title: string; optional?: boolean }[] = [
 ];
 
 export default function VerificationIdScreen(): React.ReactElement {
+  const { colors: themeColors } = useAppTheme();
+
   const navigation = useNavigation<NativeStackNavigationProp<AccountStackParamList>>();
   const dispatch = useAppDispatch();
   const status = useAppSelector((s) => s.idVerification.status);
@@ -162,7 +164,7 @@ export default function VerificationIdScreen(): React.ReactElement {
 
   if (status === 'pending') {
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
         <ScreenHeader title="ID verification" bordered onBack={() => navigation.goBack()} />
         <View style={[styles.body, styles.centered]}>
           <Text style={styles.title}>Under review</Text>
@@ -179,7 +181,7 @@ export default function VerificationIdScreen(): React.ReactElement {
   }
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader
         title="ID verification"
         bordered
