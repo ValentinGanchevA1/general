@@ -5,6 +5,8 @@ import {
   COMBINED_FILTER_ROW_HEIGHT,
   FAB_BOTTOM,
   MAP_CHROME_GAP,
+  MAP_LAYER_ROW_HEIGHT,
+  MAP_SEARCH_BAR_HEIGHT,
   NUDGE_CARD_HEIGHT,
   WEATHER_WIDGET_HEIGHT,
   mapBadgeTop,
@@ -25,14 +27,23 @@ const CHALLENGE_ONLY: MapTopStackVisibility = { challengeVisible: true, nudgeVis
 const NUDGE_ONLY: MapTopStackVisibility = { challengeVisible: false, nudgeVisible: true };
 
 describe('mapChromeLayout', () => {
-  it('pins the filter row directly below the safe area', () => {
+  it('pins the primary chrome directly below the safe area', () => {
     const expected = insetsTop + MAP_CHROME_GAP;
     expect(mapFilterRowTop(insetsTop, false, BOTH)).toBe(expected);
     expect(mapFilterRowTop(insetsTop, false, NONE)).toBe(expected);
     expect(mapFilterRowTop(insetsTop, true, BOTH)).toBe(expected);
   });
 
-  it('places weather directly below the primary filter row', () => {
+  it('builds the primary stack from search, gap and layer controls', () => {
+    expect(MAP_SEARCH_BAR_HEIGHT).toBe(48);
+    expect(MAP_LAYER_ROW_HEIGHT).toBe(44);
+    expect(COMBINED_FILTER_ROW_HEIGHT).toBe(
+      MAP_SEARCH_BAR_HEIGHT + MAP_CHROME_GAP + MAP_LAYER_ROW_HEIGHT,
+    );
+    expect(COMBINED_FILTER_ROW_HEIGHT).toBe(100);
+  });
+
+  it('places weather directly below the primary chrome', () => {
     const filter = mapFilterRowTop(insetsTop, false, BOTH);
     const weather = mapWeatherTop(insetsTop, false, BOTH);
     expect(weather).toBe(filter + COMBINED_FILTER_ROW_HEIGHT + MAP_CHROME_GAP);
@@ -75,9 +86,8 @@ describe('mapChromeLayout', () => {
     expect(mapFabBottom(34, 88)).toBe(FAB_BOTTOM + 34 + 88);
   });
 
-  it('uses matching card heights so stack math stays consistent', () => {
+  it('uses matching supporting card heights so stack math stays consistent', () => {
     expect(CHALLENGE_CARD_HEIGHT).toBe(56);
     expect(NUDGE_CARD_HEIGHT).toBe(56);
-    expect(COMBINED_FILTER_ROW_HEIGHT).toBe(44);
   });
 });
