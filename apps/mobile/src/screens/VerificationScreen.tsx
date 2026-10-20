@@ -26,11 +26,13 @@ import { useAppDispatch } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { extractMessage } from '@/utils/extractMessage';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, fontSize, spacing, radius } from '@/theme';
+import { colors, fontSize, spacing, radius, useAppTheme } from '@/theme';
 
 type Step = 'phone' | 'code';
 
 export function VerificationScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const navigation = useNavigation<NativeStackNavigationProp<AccountStackParamList>>();
   const route = useRoute<RouteProp<AccountStackParamList, 'Verification'>>();
   const dispatch = useAppDispatch();
@@ -77,7 +79,7 @@ export function VerificationScreen(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: themeColors.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScreenHeader title="Verify phone" />
