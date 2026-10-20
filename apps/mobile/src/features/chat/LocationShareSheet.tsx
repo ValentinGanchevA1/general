@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -11,7 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { LocationShareDuration } from '@g88/shared';
-import { colors, spacing } from '@/theme';
+import { spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 interface Props {
   visible: boolean;
@@ -33,6 +33,8 @@ export function LocationShareSheet({
   onShare,
 }: Props): React.JSX.Element {
   const insets = useSafeAreaInsets();
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [duration, setDuration] = useState<LocationShareDuration>('15m');
 
   const handleShare = (): void => {
@@ -96,75 +98,77 @@ export function LocationShareSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.67)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    // paddingBottom set inline from safe-area insets
-    gap: 14,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.borderStrong,
-  },
-  title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
-  subtitle: { color: colors.textMuted, fontSize: 13, lineHeight: 18, marginTop: -6 },
-  options: { gap: 8 },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  optionSelected: { borderColor: colors.primary, backgroundColor: colors.primary + '12' },
-  radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: colors.textFaint,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioOn: { borderColor: colors.primary },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primary,
-  },
-  optionText: { flex: 1 },
-  optionLabel: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
-  optionHint: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  cancelText: { color: colors.textSecondary, fontWeight: '600', fontSize: 15 },
-  shareBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-  },
-  shareBtnDisabled: { opacity: 0.5 },
-  shareText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.67)', justifyContent: 'flex-end' },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 20,
+      // paddingBottom set inline from safe-area insets
+      gap: 14,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.borderStrong,
+    },
+    title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
+    subtitle: { color: colors.textMuted, fontSize: 13, lineHeight: 18, marginTop: -6 },
+    options: { gap: 8 },
+    option: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 14,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    optionSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+    radio: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: colors.textFaint,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    radioOn: { borderColor: colors.primary },
+    radioDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: colors.primary,
+    },
+    optionText: { flex: 1 },
+    optionLabel: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
+    optionHint: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+    actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+    cancelBtn: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 14,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    cancelText: { color: colors.textSecondary, fontWeight: '600', fontSize: 15 },
+    shareBtn: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 14,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+    },
+    shareBtnDisabled: { opacity: 0.5 },
+    shareText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
+  });
+}
