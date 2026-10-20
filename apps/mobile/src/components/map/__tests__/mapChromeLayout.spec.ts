@@ -4,7 +4,6 @@ import {
 import {
   COMBINED_FILTER_ROW_HEIGHT,
   FAB_BOTTOM,
-  INTERACTION_BADGE_SIZE,
   MAP_CHROME_GAP,
   NUDGE_CARD_HEIGHT,
   WEATHER_WIDGET_HEIGHT,
@@ -15,6 +14,7 @@ import {
   mapFilterRowTop,
   mapNudgeTop,
   mapTrendingTop,
+  mapWeatherTop,
   type MapTopStackVisibility,
 } from '../mapChromeLayout';
 
@@ -25,68 +25,59 @@ const CHALLENGE_ONLY: MapTopStackVisibility = { challengeVisible: true, nudgeVis
 const NUDGE_ONLY: MapTopStackVisibility = { challengeVisible: false, nudgeVisible: true };
 
 describe('mapChromeLayout', () => {
-  it('stacks challenge → nudge → filter → badge when both visible (closed sheet)', () => {
-    const challenge = mapChallengeTop(insetsTop);
-    const nudge = mapNudgeTop(insetsTop, BOTH);
+  it('pins the filter row directly below the safe area', () => {
+    const expected = insetsTop + MAP_CHROME_GAP;
+    expect(mapFilterRowTop(insetsTop, false, BOTH)).toBe(expected);
+    expect(mapFilterRowTop(insetsTop, false, NONE)).toBe(expected);
+    expect(mapFilterRowTop(insetsTop, true, BOTH)).toBe(expected);
+  });
+
+  it('places weather directly below the primary filter row', () => {
     const filter = mapFilterRowTop(insetsTop, false, BOTH);
-    const badge = mapBadgeTop(insetsTop, false, BOTH);
-    expect(challenge).toBe(insetsTop + MAP_CHROME_GAP);
-    expect(nudge).toBe(challenge + CHALLENGE_CARD_HEIGHT + MAP_CHROME_GAP);
-    expect(filter).toBe(nudge + NUDGE_CARD_HEIGHT + MAP_CHROME_GAP);
-    expect(badge).toBe(filter + COMBINED_FILTER_ROW_HEIGHT + MAP_CHROME_GAP);
-    expect(badge).toBeGreaterThan(filter);
+    const weather = mapWeatherTop(insetsTop, false, BOTH);
+    expect(weather).toBe(filter + COMBINED_FILTER_ROW_HEIGHT + MAP_CHROME_GAP);
+    expect(mapBadgeTop(insetsTop, false, BOTH)).toBe(weather);
   });
 
-  it('collapses filter under safe area when neither card is visible', () => {
-    const filter = mapFilterRowTop(insetsTop, false, NONE);
-    expect(filter).toBe(insetsTop + MAP_CHROME_GAP);
-    expect(filter).toBe(mapChallengeTop(insetsTop));
+  it('places challenge below the weather row', () => {
+    const weather = mapWeatherTop(insetsTop, false, BOTH);
+    expect(mapChallengeTop(insetsTop)).toBe(
+      weather + WEATHER_WIDGET_HEIGHT + MAP_CHROME_GAP,
+    );
   });
 
-  it('skips nudge slot when only challenge is visible', () => {
+  it('stacks nudge after challenge only when challenge is visible', () => {
     const challenge = mapChallengeTop(insetsTop);
-    const filter = mapFilterRowTop(insetsTop, false, CHALLENGE_ONLY);
-    expect(filter).toBe(challenge + CHALLENGE_CARD_HEIGHT + MAP_CHROME_GAP);
     expect(mapNudgeTop(insetsTop, CHALLENGE_ONLY)).toBe(
       challenge + CHALLENGE_CARD_HEIGHT + MAP_CHROME_GAP,
     );
+    expect(mapNudgeTop(insetsTop, NUDGE_ONLY)).toBe(challenge);
   });
 
-  it('nudge shares challenge top when challenge is hidden', () => {
-    expect(mapNudgeTop(insetsTop, NUDGE_ONLY)).toBe(mapChallengeTop(insetsTop));
-    const filter = mapFilterRowTop(insetsTop, false, NUDGE_ONLY);
-    expect(filter).toBe(
-      mapChallengeTop(insetsTop) + NUDGE_CARD_HEIGHT + MAP_CHROME_GAP,
+  it('places trending after visible supporting cards', () => {
+    const base = mapChallengeTop(insetsTop);
+    expect(mapTrendingTop(insetsTop, false, NONE)).toBe(base);
+    expect(mapTrendingTop(insetsTop, false, CHALLENGE_ONLY)).toBe(
+      base + CHALLENGE_CARD_HEIGHT + MAP_CHROME_GAP,
     );
-  });
-
-  it('badge sits under filter; filter lifts under safe area when sheet open', () => {
-    const closedFilter = mapFilterRowTop(insetsTop, false, BOTH);
-    const openFilter = mapFilterRowTop(insetsTop, true, BOTH);
-    expect(openFilter).toBe(insetsTop + MAP_CHROME_GAP);
-    expect(openFilter).toBeLessThan(closedFilter);
-    expect(mapBadgeTop(insetsTop, true, BOTH)).toBe(
-      openFilter + COMBINED_FILTER_ROW_HEIGHT + MAP_CHROME_GAP,
+    expect(mapTrendingTop(insetsTop, false, NUDGE_ONLY)).toBe(
+      base + NUDGE_CARD_HEIGHT + MAP_CHROME_GAP,
     );
-  });
-
-  it('mapTrendingTop sits under the taller badge/weather row and is sheet + visibility aware', () => {
-    const closedBoth = mapTrendingTop(insetsTop, false, BOTH);
-    expect(closedBoth).toBe(
-      mapBadgeTop(insetsTop, false, BOTH) +
-        Math.max(INTERACTION_BADGE_SIZE, WEATHER_WIDGET_HEIGHT) +
+    expect(mapTrendingTop(insetsTop, false, BOTH)).toBe(
+      base +
+        CHALLENGE_CARD_HEIGHT +
+        MAP_CHROME_GAP +
+        NUDGE_CARD_HEIGHT +
         MAP_CHROME_GAP,
     );
-    const closedNone = mapTrendingTop(insetsTop, false, NONE);
-    expect(closedNone).toBeLessThan(closedBoth);
-    const open = mapTrendingTop(insetsTop, true, BOTH);
-    expect(open).toBeLessThan(closedBoth);
   });
 
-  it('mapChromeTops exposes filter before badge', () => {
+  it('mapChromeTops keeps primary controls ahead of supporting chrome', () => {
     const tops = mapChromeTops(insetsTop, false, BOTH);
-    expect(tops.filterRow).toBeLessThan(tops.badge);
-    expect(tops.badge).toBeLessThan(tops.trending);
+    expect(tops.filterRow).toBeLessThan(tops.weather);
+    expect(tops.weather).toBeLessThan(tops.challenge);
+    expect(tops.challenge).toBeLessThan(tops.nudge);
+    expect(tops.nudge).toBeLessThan(tops.trending);
   });
 
   it('mapFabBottom adds safe area and optional offset', () => {
