@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { colors, fontSize, spacing } from '@/theme';
+import { fontSize, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 interface Props {
   onRetry: () => void;
@@ -12,6 +12,9 @@ interface Props {
  * into an empty map with no recovery path (UX-11).
  */
 export function LocationPermissionBanner({ onRetry }: Props): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.banner} accessibilityRole="summary">
       <View style={styles.copy}>
@@ -44,40 +47,42 @@ export function LocationPermissionBanner({ onRetry }: Props): React.JSX.Element 
   );
 }
 
-const styles = StyleSheet.create({
-  banner: {
-    position: 'absolute',
-    left: spacing.md,
-    right: spacing.md,
-    top: spacing.md,
-    zIndex: 20,
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  copy: { gap: 4 },
-  title: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '700' },
-  body: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 18 },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: 4 },
-  secondary: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    alignItems: 'center',
-  },
-  secondaryText: { color: colors.textSecondary, fontWeight: '600', fontSize: fontSize.sm },
-  primary: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-  },
-  primaryText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.sm },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    banner: {
+      position: 'absolute',
+      left: spacing.md,
+      right: spacing.md,
+      top: spacing.md,
+      zIndex: 20,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      padding: spacing.md,
+      gap: spacing.sm,
+    },
+    copy: { gap: 4 },
+    title: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '700' },
+    body: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 18 },
+    actions: { flexDirection: 'row', gap: spacing.sm, marginTop: 4 },
+    secondary: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      alignItems: 'center',
+    },
+    secondaryText: { color: colors.textSecondary, fontWeight: '600', fontSize: fontSize.sm },
+    primary: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+    },
+    primaryText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.sm },
+  });
+}
