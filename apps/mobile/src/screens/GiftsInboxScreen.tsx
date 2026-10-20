@@ -14,7 +14,7 @@ import { useGiftBalance, useReceivedGifts, useSentGifts } from '@/features/gifts
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonListRow } from '@/components/Skeleton';
-import { colors } from '@/theme';
+import { colors, useAppTheme } from '@/theme';
 
 type Tab = 'received' | 'sent';
 
@@ -61,6 +61,8 @@ function SentRow({ g }: { g: SentGift }): React.JSX.Element {
 }
 
 export function GiftsInboxScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const [tab, setTab] = useState<Tab>('received');
   const {
     gifts: received,
@@ -84,7 +86,7 @@ export function GiftsInboxScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="Gifts" />
 
       <ScrollView
