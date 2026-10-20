@@ -8,28 +8,30 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
-import { appAlert } from '@/ui/appAlert';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { SocialAuthorizeResponse, SocialLink, SocialProvider, UserProfile } from '@g88/shared';
-
+import type {
+  SocialAuthorizeResponse,
+  SocialLink,
+  SocialProvider,
+  UserProfile,
+} from '@g88/shared';
 import { deleteJson, getJson } from '@/api/client';
-import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { SOCIAL_PROVIDER_CONFIG } from '@/features/profile/socialConfig';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { fontSize, radius, spacing, useAppTheme } from '@/theme';
+import { appAlert } from '@/ui/appAlert';
 import { extractMessage } from '@/utils/extractMessage';
-import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, fontSize, spacing, radius, useAppTheme } from '@/theme';
 
 const PROVIDERS = Object.keys(SOCIAL_PROVIDER_CONFIG) as SocialProvider[];
 
 export function SocialLinkingScreen(): React.JSX.Element {
-  const { colors: themeColors } = useAppTheme();
-
+  const { colors } = useAppTheme();
   const dispatch = useAppDispatch();
-  const links = useAppSelector((s) => s.profile.profile?.socialLinks ?? []);
+  const links = useAppSelector((state) => state.profile.profile?.socialLinks ?? []);
   const [busy, setBusy] = useState<SocialProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,17 +41,21 @@ export function SocialLinkingScreen(): React.JSX.Element {
     }, [dispatch]),
   );
 
-  const linkFor = (p: SocialProvider): SocialLink | undefined => links.find((l) => l.provider === p);
+  const linkFor = (provider: SocialProvider): SocialLink | undefined =>
+    links.find((link) => link.provider === provider);
 
   const connect = async (provider: SocialProvider): Promise<void> => {
     setBusy(provider);
     setError(null);
     try {
-      const res = await getJson<SocialAuthorizeResponse>(`/social/${provider}/start`);
-      const ok = await Linking.canOpenURL(res.url);
-      if (ok) await Linking.openURL(res.url);
-      else setError('Could not open the provider login.');
-    } catch (e) {
+      const response = await getJson<SocialAuthorizeResponse>(`/social/${provider}/start`);
+      const canOpen = await Linking.canOpenURL(response.url);
+      if (canOpen) {
+        await Linking.openURL(response.url);
+      } else {
+        setError('Could not open the provider login.');
+      }
+    } catch (e: unknown) {
       setError(extractMessage(e, `${provider} linking is unavailable right now.`));
     } finally {
       setBusy(null);
@@ -68,7 +74,7 @@ export function SocialLinkingScreen(): React.JSX.Element {
           try {
             await deleteJson<UserProfile>(`/social/${provider}`);
             await dispatch(fetchProfile());
-          } catch (e) {
+          } catch (e: unknown) {
             setError(extractMessage(e, 'Could not disconnect.'));
           } finally {
             setBusy(null);
@@ -79,89 +85,179 @@ export function SocialLinkingScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
-      <ScreenHeader title="Connected Accounts" />
-
+    <View style={[styles.container, { backgroundColor: colors.canvas }]}>
+      <ScreenHeader title="Connected profiles" />
       <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
-        <Text style={styles.intro}>Link your accounts to boost your trust score.</Text>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <View
+          style={[
+            styles.identityNote,
+            {
+              backgroundColor: colors.discoverySoft,
+              borderColor: colors.discoveryBorderSoft,
+            },
+          ]}
+        >
+          <Icon name="account-link-outline" size={22} color={colors.discovery} />
+          <View style={styles.identityNoteBody}>
+            <Text style={[styles.identityNoteTitle, { color: colors.textPrimary }]}>Supporting signal</Text>
+            <Text style={[styles.identityNoteText, { color: colors.textSecondary }]}> 
+              Connected profiles can strengthen identity context, but they are optional and never replace government ID verification.
+            </Text>
+          </View>
+        </View>
 
-        {PROVIDERS.map((provider) => {
-          const cfg = SOCIAL_PROVIDER_CONFIG[provider];
-          const link = linkFor(provider);
-          const connected = !!link;
-          return (
-            <View key={provider} style={styles.row}>
-              <View style={[styles.icon, { backgroundColor: cfg.color }]}>
-                <Icon name={cfg.icon} size={22} color={colors.textPrimary} />
-              </View>
-              <View style={styles.info}>
-                <Text style={styles.name}>{cfg.label}</Text>
-                {connected && link?.username ? (
-                  <Text style={styles.username}>@{link.username}</Text>
+        {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
+
+        <View style={styles.list}>
+          {PROVIDERS.map((provider) => {
+            const config = SOCIAL_PROVIDER_CONFIG[provider];
+            const link = linkFor(provider);
+            const connected = link != null;
+
+            return (
+              <View
+                key={provider}
+                style={[
+                  styles.row,
+                  {
+                    backgroundColor: colors.surfacePrimary,
+                    borderColor: connected ? colors.discoveryBorderSoft : colors.borderDefault,
+                  },
+                ]}
+              >
+                <View style={[styles.icon, { backgroundColor: config.color }]}>
+                  <Icon name={config.icon} size={22} color="#FFFFFF" />
+                </View>
+                <View style={styles.info}>
+                  <View style={styles.nameRow}>
+                    <Text style={[styles.name, { color: colors.textPrimary }]}>{config.label}</Text>
+                    {connected ? (
+                      <Icon name="check-circle" size={15} color={colors.verified} />
+                    ) : null}
+                  </View>
+                  {connected && link.username ? (
+                    <Text style={[styles.username, { color: colors.textSecondary }]}>
+                      @{link.username}
+                    </Text>
+                  ) : (
+                    <Text style={[styles.notLinked, { color: colors.textTertiary }]}>Not connected</Text>
+                  )}
+                </View>
+                {busy === provider ? (
+                  <ActivityIndicator color={colors.discovery} />
+                ) : connected ? (
+                  <TouchableOpacity
+                    style={styles.textAction}
+                    onPress={() => disconnect(provider)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Disconnect ${config.label}`}
+                  >
+                    <Text style={[styles.disconnect, { color: colors.danger }]}>Disconnect</Text>
+                  </TouchableOpacity>
                 ) : (
-                  <Text style={styles.notLinked}>Not connected</Text>
+                  <TouchableOpacity
+                    style={[styles.connectButton, { backgroundColor: colors.actionPrimary }]}
+                    onPress={() => void connect(provider)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Connect ${config.label}`}
+                  >
+                    <Text style={[styles.connectText, { color: colors.onPrimary }]}>Connect</Text>
+                  </TouchableOpacity>
                 )}
               </View>
-              {busy === provider ? (
-                <ActivityIndicator color={colors.primary} />
-              ) : connected ? (
-                <TouchableOpacity onPress={() => disconnect(provider)}>
-                  <Text style={styles.disconnect}>Disconnect</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity style={styles.connectBtn} onPress={() => void connect(provider)}>
-                  <Text style={styles.connectText}>Connect</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          );
-        })}
+            );
+          })}
+        </View>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1 },
   flex: { flex: 1 },
-  content: { paddingBottom: 40 },
-  intro: {
-    color: colors.textMuted,
-    fontSize: fontSize.md - 1,
-    textAlign: 'center',
-    paddingHorizontal: 24,
+  content: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: 40,
+  },
+  identityNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    marginTop: spacing.md,
     marginBottom: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  identityNoteBody: { flex: 1 },
+  identityNoteTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+  identityNoteText: {
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    marginTop: 4,
   },
   error: {
-    color: colors.danger,
     fontSize: fontSize.sm,
     textAlign: 'center',
     marginBottom: spacing.md,
-    paddingHorizontal: 24,
   },
+  list: { gap: spacing.sm },
   row: {
+    minHeight: 72,
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.md,
-    padding: 14,
-    backgroundColor: colors.surface,
-    borderRadius: 14,
+    padding: spacing.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
   },
-  icon: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  icon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   info: { flex: 1, marginLeft: 14 },
-  name: { color: colors.textPrimary, fontSize: fontSize.md + 1, fontWeight: '600' },
-  username: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: 2 },
-  notLinked: { color: colors.textFaint, fontSize: fontSize.sm, marginTop: 2 },
-  connectBtn: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.primary,
-    borderRadius: radius.pill - 4,
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  connectText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.sm },
-  disconnect: { color: colors.danger, fontWeight: '600', fontSize: fontSize.sm },
+  name: {
+    fontSize: fontSize.md + 1,
+    fontWeight: '600',
+  },
+  username: {
+    fontSize: fontSize.sm,
+    marginTop: 2,
+  },
+  notLinked: {
+    fontSize: fontSize.sm,
+    marginTop: 2,
+  },
+  connectButton: {
+    minHeight: 44,
+    minWidth: 84,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  connectText: {
+    fontWeight: '700',
+    fontSize: fontSize.sm,
+  },
+  textAction: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  disconnect: {
+    fontWeight: '600',
+    fontSize: fontSize.sm,
+  },
 });
