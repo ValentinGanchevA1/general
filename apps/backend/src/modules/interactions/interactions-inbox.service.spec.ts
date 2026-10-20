@@ -19,14 +19,8 @@ describe('InteractionsInboxService', () => {
     const mod = await Test.createTestingModule({
       providers: [
         InteractionsInboxService,
-        {
-          provide: getDataSourceToken(),
-          useValue: { query } as unknown as DataSource,
-        },
-        {
-          provide: InteractionsService,
-          useValue: { listInbox },
-        },
+        { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
+        { provide: InteractionsService, useValue: { listInbox } },
       ],
     }).compile();
 
@@ -43,55 +37,63 @@ describe('InteractionsInboxService', () => {
     listInbox.mockResolvedValue([social]);
 
     query
-      .mockResolvedValueOnce([
-        {
-          conversation_id: 'c1',
-          peer_id: 'match-user',
-          display_name: 'Match User',
-          avatar_url: null,
-          verification_level: 'phone',
-          matched_at: new Date('2026-10-20T12:00:00.000Z'),
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          id: 'g1',
-          emoji: '🎁',
-          label: 'Gift',
-          message: null,
-          created_at: new Date('2026-10-20T11:00:00.000Z'),
-          sender_id: 'gift-user',
-          display_name: 'Gift User',
-          avatar_url: null,
-          verification_level: null,
-        },
-      ]);
+      .mockResolvedValueOnce([{
+        conversation_id: 'c1', peer_id: 'match-user', display_name: 'Match User',
+        avatar_url: null, verification_level: 'phone',
+        matched_at: new Date('2026-10-20T12:00:00.000Z'),
+      }])
+      .mockResolvedValueOnce([{
+        id: 'g1', emoji: '🎁', label: 'Gift', message: null,
+        created_at: new Date('2026-10-20T11:00:00.000Z'), sender_id: 'gift-user',
+        display_name: 'Gift User', avatar_url: null, verification_level: null,
+      }]);
 
     const result = await service.list('me', 2);
 
     expect(result).toHaveLength(2);
     expect(result.map((item) => item.type)).toEqual(['match', 'gift']);
-    expect(result[0]).toMatchObject({
-      id: 'match:c1',
-      match: { conversationId: 'c1' },
-      isMutual: true,
-    });
-    expect(result[1]).toMatchObject({
-      id: 'gift:g1',
-      gift: { emoji: '🎁', label: 'Gift', message: null },
-    });
+    expect(result[0]).toMatchObject({ id: 'match:c1', match: { conversationId: 'c1' }, isMutual: true });
+    expect(result[1]).toMatchObject({ id: 'gift:g1', gift: { emoji: '🎁', label: 'Gift', message: null } });
     expect(listInbox).toHaveBeenCalledWith('me', 2);
+  });
+
+  it('suppresses a mutual wave when the same peer has a first-class match', async () => {
+    listInbox.mockResolvedValue([
+      {
+        id: 'wave:mutual',
+        type: 'wave',
+        createdAt: '2026-10-20T12:00:00.000Z',
+        fromUser: { id: 'peer', displayName: 'Peer', avatarUrl: null },
+        isMutual: true,
+      },
+      {
+        id: 'wave:other',
+        type: 'wave',
+        createdAt: '2026-10-20T11:00:00.000Z',
+        fromUser: { id: 'other', displayName: 'Other', avatarUrl: null },
+        isMutual: false,
+      },
+    ] satisfies InboxItem[]);
+    query
+      .mockResolvedValueOnce([{
+        conversation_id: 'c1', peer_id: 'peer', display_name: 'Peer', avatar_url: null,
+        verification_level: null, matched_at: new Date('2026-10-20T12:00:00.000Z'),
+      }])
+      .mockResolvedValueOnce([]);
+
+    const result = await service.list('me', 50);
+
+    expect(result.map((item) => item.id)).toEqual(['match:c1', 'wave:other']);
+    expect(result.some((item) => item.id === 'wave:mutual')).toBe(false);
   });
 
   it('uses symmetric block filtering and deleted-user filtering for matches and gifts', async () => {
     query.mockResolvedValue([]);
-
     await service.list('me', 50);
 
     expect(query).toHaveBeenCalledTimes(2);
     const matchSql = String(query.mock.calls[0]?.[0]);
     const giftSql = String(query.mock.calls[1]?.[0]);
-
     for (const sql of [matchSql, giftSql]) {
       expect(sql).toContain('user_blocks');
       expect(sql).toContain('blocker_id = $1');
@@ -102,7 +104,6 @@ describe('InteractionsInboxService', () => {
 
   it('projects matches only from conversation-linked reciprocal waves and accepted conversations', async () => {
     query.mockResolvedValue([]);
-
     await service.list('me', 50);
 
     const matchSql = String(query.mock.calls[0]?.[0]);
@@ -113,7 +114,6 @@ describe('InteractionsInboxService', () => {
 
   it('does not mutate gift seen state while reading the unified inbox', async () => {
     query.mockResolvedValue([]);
-
     await service.list('me', 50);
 
     const sql = query.mock.calls.map((call) => String(call[0])).join('\n');
