@@ -289,62 +289,65 @@ export function NexaLaunchOverlay({
         style={[styles.backdrop, { opacity: backdropOpacity }]}
       />
 
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.settleHalo,
-          {
-            opacity: settleHaloOpacity,
-            transform: [{ scale: settleHaloScale }],
-          },
-        ]}
-      />
+      <View pointerEvents="none" style={styles.haloStage}>
+        <Animated.View
+          style={[
+            styles.settleHalo,
+            {
+              opacity: settleHaloOpacity,
+              transform: [{ scale: settleHaloScale }],
+            },
+          ]}
+        />
+      </View>
 
-      <Animated.View
-        style={[
-          styles.center,
-          {
-            opacity: brandOpacity,
-            transform: [{ translateY: brandTranslateY }],
-          },
-        ]}
-      >
-        <View style={styles.symbolStage}>
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.pulse,
-              styles.primaryPulse,
-              {
-                opacity: primaryPulseOpacity,
-                transform: [{ scale: primaryPulseScale }],
-              },
-            ]}
-          />
+      <View style={styles.opticalCenter}>
+        <Animated.View
+          style={[
+            styles.center,
+            {
+              opacity: brandOpacity,
+              transform: [{ translateY: brandTranslateY }],
+            },
+          ]}
+        >
+          <View style={styles.symbolStage}>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.pulse,
+                styles.primaryPulse,
+                {
+                  opacity: primaryPulseOpacity,
+                  transform: [{ scale: primaryPulseScale }],
+                },
+              ]}
+            />
 
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.pulse,
-              styles.secondaryPulse,
-              {
-                opacity: secondaryPulseOpacity,
-                transform: [{ scale: secondaryPulseScale }],
-              },
-            ]}
-          />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.pulse,
+                styles.secondaryPulse,
+                {
+                  opacity: secondaryPulseOpacity,
+                  transform: [{ scale: secondaryPulseScale }],
+                },
+              ]}
+            />
 
-          <Animated.View style={{ transform: [{ scale: symbolScale }] }}>
-            <NexaSymbol size={96} />
+            <Animated.View style={{ transform: [{ scale: symbolScale }] }}>
+              <NexaSymbol size={96} />
+            </Animated.View>
+          </View>
+
+          <Animated.View style={{ opacity: wordmarkOpacity }}>
+            <Text style={styles.wordmark} accessibilityElementsHidden>
+              NEXA
+            </Text>
           </Animated.View>
-        </View>
-
-        <Animated.View style={{ opacity: wordmarkOpacity }}>
-          <Text style={styles.wordmark} accessibilityElementsHidden>
-            NEXA
-          </Text>
         </Animated.View>
-      </Animated.View>
+      </View>
     </View>
   );
 }
@@ -361,7 +364,17 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: SPLASH_BACKGROUND,
   },
+  opticalCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ translateY: -20 }],
+  },
   center: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  haloStage: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{ translateY: -20 }],
@@ -395,7 +408,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
   },
   settleHalo: {
-    position: 'absolute',
     width: 220,
     height: 220,
     borderRadius: 110,
