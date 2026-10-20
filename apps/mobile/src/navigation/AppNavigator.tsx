@@ -1,17 +1,20 @@
 // apps/mobile/src/navigation/AppNavigator.tsx
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import { BrandLogo } from '@/components/Brand/BrandLogo';
 import {
+	DarkTheme,
+	DefaultTheme,
 	NavigationContainer,
 	type NavigatorScreenParams,
+	type Theme as NavigationTheme,
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, useAppTheme } from '@/theme';
+import { useAppTheme, type ThemeColors } from '@/theme';
 
 import { MapScreen } from '@/screens/MapScreen';
 import { PulseScreen } from '@/features/pulse/PulseScreen';
@@ -51,10 +54,7 @@ import type { AreaCategory, VerificationLevel } from '@g88/shared';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { restoreSession } from '@/features/auth/authSlice';
-import {
-	registerPushToken,
-	setupNotificationHandlers,
-} from '@/lib/pushNotifications';
+import { registerPushToken, setupNotificationHandlers } from '@/lib/pushNotifications';
 import { pingGamification } from '@/features/gamification/useGamification';
 import { AmbientToastHost } from '@/components/AmbientToastHost';
 import { AppAlertHost } from '@/components/AppAlertHost';
@@ -64,52 +64,25 @@ import { openViaRef } from './openRootScreen';
 import { takePendingPhoneVerify } from '@/services/pendingPhone';
 import { CreateTabButton } from '@/navigation/CreateTabButton';
 import { requestOpenCreateNearby } from '@/features/map/pendingCreateNearby';
-import type {
-	AccountStackParamList,
-	CommerceStackParamList,
-	EventsStackParamList,
-	GamificationStackParamList,
-	SocialStackParamList,
-} from './stacks';
+import type { AccountStackParamList, CommerceStackParamList, EventsStackParamList, GamificationStackParamList, SocialStackParamList } from './stacks';
 
 export type PulseFilter = 'for-you' | 'nearby' | 'events' | 'marketplace';
-
 export type TabParamList = {
-	Map: {
-		focusMyPin?: boolean;
-		focusUserId?: string;
-		focusListingId?: string;
-		focusLat?: number;
-		focusLng?: number;
-		openCreate?: boolean;
-	} | undefined;
+	Map: { focusMyPin?: boolean; focusUserId?: string; focusListingId?: string; focusLat?: number; focusLng?: number; openCreate?: boolean } | undefined;
 	Pulse: { filter?: PulseFilter } | undefined;
 	Create: undefined;
 	Interactions: undefined;
 	Profile: undefined;
 };
-
 export type RootStackParamList = {
 	Auth: undefined;
 	ProfileCreation: undefined;
 	Main: NavigatorScreenParams<TabParamList> | undefined;
-	Chat: {
-		conversationId: string;
-		otherUserName: string;
-		requestPending?: boolean;
-		otherUserId?: string;
-		otherUserVerification?: VerificationLevel;
-		otherUserIdVerified?: boolean;
-	};
-	UserProfile: {
-		userId: string;
-		/** Scroll target after load — mirrors EntityBottomSheet deep sections. */
-		focus?: 'trust' | 'stats' | 'storyline' | 'photos' | 'bio' | 'mutual';
-	};
+	Chat: { conversationId: string; otherUserName: string; requestPending?: boolean; otherUserId?: string; otherUserVerification?: VerificationLevel; otherUserIdVerified?: boolean };
+	UserProfile: { userId: string; focus?: 'trust' | 'stats' | 'storyline' | 'photos' | 'bio' | 'mutual' };
 	MutualFriends: { peerUserId: string; peerName?: string };
 	AlertComposer: { presetCategory?: AreaCategory; presetTag?: string };
 	GiftsInbox: undefined;
-	/** Kept for deep links / notifications; primary entry is the Interactions tab. */
 	Interactions: undefined;
 	Gamification: NavigatorScreenParams<GamificationStackParamList>;
 	Commerce: NavigatorScreenParams<CommerceStackParamList>;
@@ -127,326 +100,77 @@ const SocialStack = createNativeStackNavigator<SocialStackParamList>();
 const EventsStack = createNativeStackNavigator<EventsStackParamList>();
 export { navigationRef };
 
-const stackScreenOpts = {
-	headerStyle: { backgroundColor: colors.bg },
-	headerTintColor: colors.textPrimary,
-	contentStyle: { backgroundColor: colors.bg },
-} as const;
+function useStackScreenOptions() {
+	const { colors } = useAppTheme();
+	return { headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.textPrimary, headerTitleStyle: { color: colors.textPrimary }, contentStyle: { backgroundColor: colors.bg } } as const;
+}
 
 function GamificationNavigator(): React.JSX.Element {
-	return (
-		<GamificationStack.Navigator screenOptions={stackScreenOpts}>
-			<GamificationStack.Screen name="Challenges" component={ChallengesScreen} />
-			<GamificationStack.Screen name="Leaderboard" component={LeaderboardScreen} />
-			<GamificationStack.Screen name="Achievements" component={AchievementsScreen} />
-		</GamificationStack.Navigator>
-	);
+	const screenOptions = useStackScreenOptions();
+	return <GamificationStack.Navigator screenOptions={screenOptions}><GamificationStack.Screen name="Challenges" component={ChallengesScreen} /><GamificationStack.Screen name="Leaderboard" component={LeaderboardScreen} /><GamificationStack.Screen name="Achievements" component={AchievementsScreen} /></GamificationStack.Navigator>;
 }
-
 function CommerceNavigator(): React.JSX.Element {
-	return (
-		<CommerceStack.Navigator screenOptions={stackScreenOpts}>
-			<CommerceStack.Screen name="Marketplace" component={MarketplaceScreen} />
-			<CommerceStack.Screen name="ListingDetail" component={ListingDetailScreen} />
-			<CommerceStack.Screen name="ListingCreate" component={ListingCreateScreen} />
-		</CommerceStack.Navigator>
-	);
+	const screenOptions = useStackScreenOptions();
+	return <CommerceStack.Navigator screenOptions={screenOptions}><CommerceStack.Screen name="Marketplace" component={MarketplaceScreen} /><CommerceStack.Screen name="ListingDetail" component={ListingDetailScreen} /><CommerceStack.Screen name="ListingCreate" component={ListingCreateScreen} /></CommerceStack.Navigator>;
 }
-
 function AccountNavigator(): React.JSX.Element {
-	return (
-		<AccountStack.Navigator screenOptions={stackScreenOpts}>
-			<AccountStack.Screen name="Settings" component={SettingsScreen} />
-			<AccountStack.Screen
-				name="TrustCenter"
-				component={TrustCenterScreen}
-				options={{ headerShown: false, title: 'Trust' }}
-			/>
-			<AccountStack.Screen name="Privacy" component={PrivacyScreen} />
-			<AccountStack.Screen name="Help" component={HelpScreen} />
-			<AccountStack.Screen name="About" component={AboutScreen} />
-			<AccountStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
-			<AccountStack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
-			<AccountStack.Screen name="Verification" component={VerificationScreen} />
-			<AccountStack.Screen
-				name="EmailVerification"
-				component={EmailVerificationScreen}
-				options={{ title: 'Verify email', presentation: 'modal' }}
-			/>
-			<AccountStack.Screen
-				name="VerificationId"
-				options={{ headerShown: false, title: 'ID Verification', presentation: 'modal' }}
-			>
-				{() => <VerificationIdScreen />}
-			</AccountStack.Screen>
-			<AccountStack.Screen name="Subscription" component={SubscriptionScreen} />
-			<AccountStack.Screen name="SocialLinking" component={SocialLinkingScreen} />
-			<AccountStack.Screen
-				name="ProfileEdit"
-				component={ProfileEditScreen}
-				options={{ headerShown: false, title: 'Edit profile' }}
-			/>
-			<AccountStack.Screen name="Photos" component={PhotosScreen} />
-		</AccountStack.Navigator>
-	);
+	const screenOptions = useStackScreenOptions();
+	return <AccountStack.Navigator screenOptions={screenOptions}>
+		<AccountStack.Screen name="Settings" component={SettingsScreen} />
+		<AccountStack.Screen name="TrustCenter" component={TrustCenterScreen} options={{ headerShown: false, title: 'Trust' }} />
+		<AccountStack.Screen name="Privacy" component={PrivacyScreen} /><AccountStack.Screen name="Help" component={HelpScreen} /><AccountStack.Screen name="About" component={AboutScreen} /><AccountStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} /><AccountStack.Screen name="BlockedUsers" component={BlockedUsersScreen} /><AccountStack.Screen name="Verification" component={VerificationScreen} />
+		<AccountStack.Screen name="EmailVerification" component={EmailVerificationScreen} options={{ title: 'Verify email', presentation: 'modal' }} />
+		<AccountStack.Screen name="VerificationId" options={{ headerShown: false, title: 'ID Verification', presentation: 'modal' }}>{() => <VerificationIdScreen />}</AccountStack.Screen>
+		<AccountStack.Screen name="Subscription" component={SubscriptionScreen} /><AccountStack.Screen name="SocialLinking" component={SocialLinkingScreen} />
+		<AccountStack.Screen name="ProfileEdit" component={ProfileEditScreen} options={{ headerShown: false, title: 'Edit profile' }} /><AccountStack.Screen name="Photos" component={PhotosScreen} />
+	</AccountStack.Navigator>;
 }
-
 function SocialNavigator(): React.JSX.Element {
-	return (
-		<SocialStack.Navigator screenOptions={stackScreenOpts}>
-			<SocialStack.Screen
-				name="FriendsList"
-				component={FriendsListScreen}
-				options={{ headerShown: false, title: 'Friends' }}
-			/>
-			<SocialStack.Screen
-				name="Suggestions"
-				component={SuggestionsScreen}
-				options={{ headerShown: false, title: 'Suggestions' }}
-			/>
-		</SocialStack.Navigator>
-	);
+	const screenOptions = useStackScreenOptions();
+	return <SocialStack.Navigator screenOptions={screenOptions}><SocialStack.Screen name="FriendsList" component={FriendsListScreen} options={{ headerShown: false, title: 'Friends' }} /><SocialStack.Screen name="Suggestions" component={SuggestionsScreen} options={{ headerShown: false, title: 'Suggestions' }} /></SocialStack.Navigator>;
 }
-
 function EventsNavigator(): React.JSX.Element {
-	return (
-		<EventsStack.Navigator screenOptions={stackScreenOpts}>
-			<EventsStack.Screen name="EventDetail" component={EventDetailScreen} />
-			<EventsStack.Screen name="EventCreate" component={EventCreateScreen} />
-		</EventsStack.Navigator>
-	);
+	const screenOptions = useStackScreenOptions();
+	return <EventsStack.Navigator screenOptions={screenOptions}><EventsStack.Screen name="EventDetail" component={EventDetailScreen} /><EventsStack.Screen name="EventCreate" component={EventCreateScreen} /></EventsStack.Navigator>;
 }
 
 function MainTabs(): React.JSX.Element {
 	const { colors: c } = useAppTheme();
-	const chatUnread = useAppSelector((s) =>
-		s.chat.conversations.reduce((sum, conv) => sum + (conv.unreadCount ?? 0), 0),
-	);
+	const chatUnread = useAppSelector((s) => s.chat.conversations.reduce((sum, conv) => sum + (conv.unreadCount ?? 0), 0));
 	const mapNewCount = useAppSelector((s) => s.mapNovelty.newCount);
 	const friendPending = useAppSelector((s) => s.friends.pendingCount);
-	// Interactions hub = chats + friend requests (communication unread lives here, not Pulse)
 	const interactionsBadge = chatUnread + friendPending;
+	const badgeStyle = { backgroundColor: c.danger, color: c.onPrimary, fontSize: 11, fontWeight: '700' as const };
+	const mapBadgeStyle = { backgroundColor: c.primary, color: c.onPrimary, fontSize: 11, fontWeight: '700' as const };
+	return <Tab.Navigator screenOptions={({ route }) => ({ headerShown: false, tabBarStyle: { backgroundColor: c.bg, borderTopColor: c.border, height: 64, paddingTop: 6 }, tabBarActiveTintColor: c.primary, tabBarInactiveTintColor: c.textFaint, tabBarIcon: ({ color, size }) => { if (route.name === 'Create') return null; const icons: Record<string, string> = { Map: 'map-marker-radius', Pulse: 'pulse', Interactions: 'bell-outline', Profile: 'account-circle-outline' }; return <MaterialCommunityIcons name={icons[route.name] ?? 'circle'} size={size ?? 24} color={color} />; } })}>
+		<Tab.Screen name="Map" component={MapScreen} options={mapNewCount > 0 ? { tabBarBadge: mapNewCount > 99 ? '99+' : mapNewCount, tabBarBadgeStyle: mapBadgeStyle } : {}} />
+		<Tab.Screen name="Pulse" component={PulseScreen} />
+		<Tab.Screen name="Create" component={MapScreen} listeners={({ navigation }) => ({ tabPress: (e) => { e.preventDefault(); requestOpenCreateNearby(); navigation.navigate('Map'); } })} options={{ tabBarLabel: () => null, tabBarButton: (props) => <CreateTabButton {...props} /> }} />
+		<Tab.Screen name="Interactions" component={InteractionsScreen} options={{ tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="bell-outline" size={size ?? 24} color={color} />, ...(interactionsBadge > 0 ? { tabBarBadge: interactionsBadge > 99 ? '99+' : interactionsBadge, tabBarBadgeStyle: badgeStyle } : {}) }} />
+		<Tab.Screen name="Profile" component={ProfileScreen} />
+	</Tab.Navigator>;
+}
 
-	const badgeStyle = {
-		backgroundColor: c.danger,
-		color: c.onPrimary,
-		fontSize: 11,
-		fontWeight: '700' as const,
-	};
-	const mapBadgeStyle = {
-		backgroundColor: c.primary,
-		color: c.onPrimary,
-		fontSize: 11,
-		fontWeight: '700' as const,
-	};
-
-	return (
-		<Tab.Navigator
-			screenOptions={({ route }) => ({
-				headerShown: false,
-				tabBarStyle: {
-					backgroundColor: c.bg,
-					borderTopColor: c.border,
-					height: 64,
-					paddingTop: 6,
-				},
-				tabBarActiveTintColor: c.primary,
-				tabBarInactiveTintColor: c.textFaint,
-				tabBarIcon: ({ color, size }) => {
-					if (route.name === 'Create') {
-						return null;
-					}
-					const icons: Record<string, string> = {
-						Map: 'map-marker-radius',
-						Pulse: 'pulse',
-						Interactions: 'bell-outline',
-						Profile: 'account-circle-outline',
-					};
-					const iconName = icons[route.name] ?? 'circle';
-					return (
-						<MaterialCommunityIcons name={iconName} size={size ?? 24} color={color} />
-					);
-				},
-			})}
-		>
-			<Tab.Screen
-				name="Map"
-				component={MapScreen}
-				options={
-					mapNewCount > 0
-						? {
-							tabBarBadge: mapNewCount > 99 ? '99+' : mapNewCount,
-							tabBarBadgeStyle: mapBadgeStyle,
-						}
-						: {}
-				}
-			/>
-			<Tab.Screen name="Pulse" component={PulseScreen} />
-			<Tab.Screen
-				name="Create"
-				component={MapScreen}
-				listeners={({ navigation }) => ({
-					tabPress: (e) => {
-						e.preventDefault();
-						requestOpenCreateNearby();
-						navigation.navigate('Map');
-					},
-				})}
-				options={{
-					tabBarLabel: () => null,
-					tabBarButton: (props) => <CreateTabButton {...props} />,
-				}}
-			/>
-			<Tab.Screen
-				name="Interactions"
-				component={InteractionsScreen}
-				options={{
-					tabBarIcon: ({ color, size }) => (
-						<MaterialCommunityIcons
-							name="bell-outline"
-							size={size ?? 24}
-							color={color}
-						/>
-					),
-					...(interactionsBadge > 0
-						? {
-							tabBarBadge: interactionsBadge > 99 ? '99+' : interactionsBadge,
-							tabBarBadgeStyle: badgeStyle,
-						}
-						: {}),
-				}}
-			/>
-			<Tab.Screen name="Profile" component={ProfileScreen} />
-		</Tab.Navigator>
-	);
+function buildNavigationTheme(colors: ThemeColors, dark: boolean): NavigationTheme {
+	const base = dark ? DarkTheme : DefaultTheme;
+	return { ...base, dark, colors: { ...base.colors, primary: colors.primary, background: colors.bg, card: colors.surface, text: colors.textPrimary, border: colors.border, notification: colors.danger } };
 }
 
 export function AppNavigator(): React.JSX.Element {
-	const { colors: themeColors } = useAppTheme();
+	const { colors: themeColors, scheme } = useAppTheme();
 	const dispatch = useAppDispatch();
-	const user = useAppSelector(s => s.auth.user);
-	const restoring = useAppSelector(s => s.auth.restoring);
-	const profileSetupComplete = useAppSelector(s => s.auth.profileSetupComplete);
+	const user = useAppSelector((s) => s.auth.user);
+	const restoring = useAppSelector((s) => s.auth.restoring);
+	const profileSetupComplete = useAppSelector((s) => s.auth.profileSetupComplete);
 	const prevUserRef = useRef<string | null>(null);
-
-	useEffect(() => {
-		void dispatch(restoreSession());
-	}, [dispatch]);
-
-	useEffect(() => {
-		if (user && prevUserRef.current !== user.id) {
-			prevUserRef.current = user.id;
-			void registerPushToken();
-			void pingGamification();
-			return setupNotificationHandlers((screen, params) => {
-				openViaRef(screen as Parameters<typeof openViaRef>[0], params);
-			});
-		}
-		if (!user) prevUserRef.current = null;
-	}, [user]);
-
-	useEffect(() => {
-		if (!user || restoring) return;
-		let cancelled = false;
-		const t = setTimeout(() => {
-			void (async () => {
-				const phone = await takePendingPhoneVerify();
-				if (cancelled || !phone) return;
-				openViaRef('Verification', { initialPhone: phone });
-			})();
-		}, 700);
-		return () => {
-			cancelled = true;
-			clearTimeout(t);
-		};
-	}, [user, restoring]);
-
-	// Brand-only restore gate — continues native SplashTheme without a second spinner.
-	if (restoring && user === null) {
-		return (
-			<View
-				style={{
-					flex: 1,
-					backgroundColor: themeColors.bg,
-					alignItems: 'center',
-					justifyContent: 'center',
-				}}
-				accessibilityLabel="Loading"
-				accessibilityRole="progressbar"
-			>
-				<BrandLogo size={120} />
-			</View>
-		);
-	}
-
-	return (
-		<NavigationContainer
-			ref={navigationRef}
-			onReady={() => {
-				navigationIntegration.registerNavigationContainer(navigationRef);
-			}}
-		>
-			<BottomSheetModalProvider>
-				<Stack.Navigator screenOptions={{ headerShown: false }}>
-					{user ? (
-						<>
-							{!profileSetupComplete && (
-								<Stack.Screen
-									name="ProfileCreation"
-									component={ProfileCreationScreen}
-								/>
-							)}
-							<Stack.Screen name="Main" component={MainTabs} />
-							<Stack.Screen name="Chat" component={ChatScreen} />
-							<Stack.Screen
-								name="AlertComposer"
-								component={AlertComposerScreen}
-							/>
-							<Stack.Screen name="UserProfile" component={UserProfileScreen} />
-							<Stack.Screen
-								name="MutualFriends"
-								component={MutualFriendsScreen}
-								options={{ headerShown: false }}
-							/>
-							<Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} />
-							<Stack.Screen
-								name="Interactions"
-								component={InteractionsScreen}
-								options={{ headerShown: false }}
-							/>
-							<Stack.Screen
-								name="Gamification"
-								component={GamificationNavigator}
-								options={{ headerShown: false }}
-							/>
-							<Stack.Screen
-								name="Commerce"
-								component={CommerceNavigator}
-								options={{ headerShown: false }}
-							/>
-							<Stack.Screen
-								name="Account"
-								component={AccountNavigator}
-								options={{ headerShown: false }}
-							/>
-							<Stack.Screen
-								name="Social"
-								component={SocialNavigator}
-								options={{ headerShown: false }}
-							/>
-							<Stack.Screen
-								name="Events"
-								component={EventsNavigator}
-								options={{ headerShown: false }}
-							/>
-						</>
-					) : (
-						<Stack.Screen name="Auth" component={AuthScreen} />
-					)}
-				</Stack.Navigator>
-				{user ? <AmbientToastHost /> : null}
-				<AppAlertHost />
-			</BottomSheetModalProvider>
-		</NavigationContainer>
-	);
+	const navigationTheme = useMemo(() => buildNavigationTheme(themeColors, scheme === 'dark'), [themeColors, scheme]);
+	useEffect(() => { void dispatch(restoreSession()); }, [dispatch]);
+	useEffect(() => { if (user && prevUserRef.current !== user.id) { prevUserRef.current = user.id; void registerPushToken(); void pingGamification(); return setupNotificationHandlers((screen, params) => { openViaRef(screen as Parameters<typeof openViaRef>[0], params); }); } if (!user) prevUserRef.current = null; }, [user]);
+	useEffect(() => { if (!user || restoring) return; let cancelled = false; const t = setTimeout(() => { void (async () => { const phone = await takePendingPhoneVerify(); if (cancelled || !phone) return; openViaRef('Verification', { initialPhone: phone }); })(); }, 700); return () => { cancelled = true; clearTimeout(t); }; }, [user, restoring]);
+	if (restoring && user === null) return <View style={{ flex: 1, backgroundColor: themeColors.bg, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Loading" accessibilityRole="progressbar"><BrandLogo size={120} /></View>;
+	return <NavigationContainer ref={navigationRef} theme={navigationTheme} onReady={() => { navigationIntegration.registerNavigationContainer(navigationRef); }}><BottomSheetModalProvider>
+		<Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themeColors.bg } }}>
+			{user ? <>{!profileSetupComplete && <Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} />}<Stack.Screen name="Main" component={MainTabs} /><Stack.Screen name="Chat" component={ChatScreen} /><Stack.Screen name="AlertComposer" component={AlertComposerScreen} /><Stack.Screen name="UserProfile" component={UserProfileScreen} /><Stack.Screen name="MutualFriends" component={MutualFriendsScreen} options={{ headerShown: false }} /><Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} /><Stack.Screen name="Interactions" component={InteractionsScreen} options={{ headerShown: false }} /><Stack.Screen name="Gamification" component={GamificationNavigator} options={{ headerShown: false }} /><Stack.Screen name="Commerce" component={CommerceNavigator} options={{ headerShown: false }} /><Stack.Screen name="Account" component={AccountNavigator} options={{ headerShown: false }} /><Stack.Screen name="Social" component={SocialNavigator} options={{ headerShown: false }} /><Stack.Screen name="Events" component={EventsNavigator} options={{ headerShown: false }} /></> : <Stack.Screen name="Auth" component={AuthScreen} />}
+		</Stack.Navigator>{user ? <AmbientToastHost /> : null}<AppAlertHost />
+	</BottomSheetModalProvider></NavigationContainer>;
 }
