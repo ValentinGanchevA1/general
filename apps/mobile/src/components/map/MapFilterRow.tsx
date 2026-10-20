@@ -1,5 +1,5 @@
-// NEXA map chrome: search nearby, semantic layers, filters and recenter.
-// Map remains the product; controls are compact, spatial and theme-semantic.
+// NEXA primary map chrome: search + locate, semantic layers + advanced filters.
+// Keep high-frequency controls visible without horizontal scrolling or duplicate floating actions.
 
 import React, { useCallback, useMemo, useState } from 'react';
 import {
@@ -17,24 +17,16 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { DiscoveryRankBy, EntityKind, ListingMode } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
-import { fontSize, radius, spacing, useAppTheme } from '@/theme';
-
-import {
-	MAP_LAYER_ROW_HEIGHT,
-	MAP_SEARCH_BAR_HEIGHT,
-} from './mapChromeLayout';
+import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
+import { MAP_LAYER_ROW_HEIGHT, MAP_SEARCH_BAR_HEIGHT } from './mapChromeLayout';
 
 export type ListingModeFilterValue = 'all' | ListingMode;
-
-/** Cold-start layers — People only; Events/Listings are intentional toggles. */
 export const DEFAULT_MAP_LAYERS: EntityKind[] = ['user'];
 
-type LayerOption = {
-	id: EntityKind;
-	label: string;
-	a11y: string;
-	icon: string;
-};
+type LayerOption = { id: EntityKind; label: string; a11y: string; icon: string };
+type Choice<T extends string> = { id: T; label: string };
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Styles = ReturnType<typeof createStyles>;
 
 const LAYER_OPTIONS: LayerOption[] = [
 	{ id: 'user', label: 'People', a11y: 'People layer', icon: 'account-outline' },
@@ -42,23 +34,21 @@ const LAYER_OPTIONS: LayerOption[] = [
 	{ id: 'listing', label: 'Listings', a11y: 'Listings layer', icon: 'tag-outline' },
 ];
 
-const LISTING_OPTIONS: Array<{ id: ListingModeFilterValue; label: string }> = [
+const LISTING_OPTIONS: Choice<ListingModeFilterValue>[] = [
 	{ id: 'all', label: 'All listings' },
 	{ id: 'sell', label: 'For sale' },
 	{ id: 'buy', label: 'Wanted' },
 ];
 
-const SORT_OPTIONS: Array<{ id: DiscoveryRankBy; label: string }> = [
+const SORT_OPTIONS: Choice<DiscoveryRankBy>[] = [
 	{ id: 'relevance', label: 'Relevant' },
 	{ id: 'distance', label: 'Nearest' },
 	{ id: 'newest', label: 'Newest' },
 ];
 
 export interface MapFilterRowProps {
-	/** Search is scoped to the currently loaded viewport entities. */
 	value: string;
 	onChangeText: (text: string) => void;
-	/** Active discovery layers (at least one). */
 	layers: EntityKind[];
 	onLayersChange: (next: EntityKind[]) => void;
 	listingMode: ListingModeFilterValue;
@@ -74,8 +64,6 @@ export interface MapFilterRowProps {
 	top: number;
 	placeholder?: string;
 }
-
-type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function MapFilterRow({
 	value,
@@ -94,7 +82,8 @@ export function MapFilterRow({
 	placeholder = 'Search nearby',
 }: MapFilterRowProps): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
-	const { colors: c } = useAppTheme();
+	const { colors, shadow } = useAppTheme();
+	const styles = useMemo(() => createStyles(colors), [colors]);
 	const [moreOpen, setMoreOpen] = useState(false);
 	const [searchFocused, setSearchFocused] = useState(false);
 	const showPeople = layers.includes('user');
@@ -109,94 +98,83 @@ export function MapFilterRow({
 		return count;
 	}, [datingOnly, friendsOnly, listingMode, rankBy, showListings]);
 
-	const toggleLayer = useCallback(
-		(id: EntityKind) => {
-			if (layers.includes(id)) {
-				if (layers.length <= 1) return;
-				onLayersChange(layers.filter((kind) => kind !== id));
-				return;
-			}
-			onLayersChange([...layers, id]);
-		},
-		[layers, onLayersChange],
-	);
+	const toggleLayer = useCallback((id: EntityKind): void => {
+		if (layers.includes(id)) {
+			if (layers.length === 1) return;
+			onLayersChange(layers.filter((kind) => kind !== id));
+			return;
+		}
+		onLayersChange([...layers, id]);
+	}, [layers, onLayersChange]);
+
+	const recenterMap = useCallback((): void => {
+		navigation.navigate('Main', { screen: 'Map', params: { focusMyPin: true } });
+	}, [navigation]);
 
 	const openAlerts = useCallback((): void => {
 		setMoreOpen(false);
 		navigation.navigate('AlertComposer', { presetCategory: 'general' });
 	}, [navigation]);
 
-	const recenterMap = useCallback((): void => {
-		navigation.navigate('Main', {
-			screen: 'Map',
-			params: { focusMyPin: true },
-		});
-	}, [navigation]);
+	const layerTone = useCallback((id: EntityKind): string => {
+		if (id === 'event') return colors.entityEvent;
+		if (id === 'listing') return colors.entityListing;
+		return colors.entityPerson;
+	}, [colors.entityEvent, colors.entityListing, colors.entityPerson]);
 
-	const layerTone = useCallback(
-		(id: EntityKind): string => {
-			if (id === 'event') return c.entityEvent;
-			if (id === 'listing') return c.entityListing;
-			return c.entityPerson;
-		},
-		[c.entityEvent, c.entityListing, c.entityPerson],
-	);
-
-	const layerFill = useCallback(
-		(id: EntityKind): string => {
-			if (id === 'event') return c.discoverySoft;
-			if (id === 'listing') return c.surfaceSecondary;
-			return c.actionSoft;
-		},
-		[c.actionSoft, c.discoverySoft, c.surfaceSecondary],
-	);
+	const layerFill = useCallback((id: EntityKind): string => {
+		if (id === 'event') return colors.discoverySoft;
+		if (id === 'listing') return colors.surfaceSecondary;
+		return colors.actionSoft;
+	}, [colors.actionSoft, colors.discoverySoft, colors.surfaceSecondary]);
 
 	return (
 		<View style={[styles.wrap, { top }]} pointerEvents="box-none">
-			<View
-				style={[
+			<View style={styles.searchRow}>
+				<View style={[
 					styles.searchShell,
-					{
-						backgroundColor: c.surfacePrimary,
-						borderColor: searchFocused ? c.discovery : c.borderStrong,
-					},
-				]}
-			>
-				<Icon name="magnify" size={20} color={searchFocused ? c.discovery : c.textTertiary} />
-				<TextInput
-					value={value}
-					onChangeText={onChangeText}
-					onFocus={() => setSearchFocused(true)}
-					onBlur={() => setSearchFocused(false)}
-					placeholder={placeholder}
-					placeholderTextColor={c.textTertiary}
-					selectionColor={c.discovery}
-					style={[styles.searchInput, { color: c.textPrimary }]}
-					returnKeyType="search"
-					autoCorrect={false}
-					autoCapitalize="none"
-					accessibilityLabel="Search nearby"
-				/>
-				{value.length > 0 ? (
-					<Pressable
-						onPress={() => onChangeText('')}
-						style={({ pressed }) => [styles.clearButton, pressed && styles.pressed]}
-						accessibilityRole="button"
-						accessibilityLabel="Clear nearby search"
-					>
-						<Icon name="close-circle" size={19} color={c.textTertiary} />
-					</Pressable>
-				) : null}
+					shadow(0.12),
+					{ borderColor: searchFocused ? colors.discovery : colors.borderStrong },
+				]}>
+					<Icon name="magnify" size={20} color={searchFocused ? colors.discovery : colors.textTertiary} />
+					<TextInput
+						value={value}
+						onChangeText={onChangeText}
+						onFocus={() => setSearchFocused(true)}
+						onBlur={() => setSearchFocused(false)}
+						placeholder={placeholder}
+						placeholderTextColor={colors.textTertiary}
+						selectionColor={colors.discovery}
+						style={styles.searchInput}
+						returnKeyType="search"
+						autoCorrect={false}
+						autoCapitalize="none"
+						accessibilityLabel="Search nearby"
+					/>
+					{value.length > 0 ? (
+						<Pressable
+							onPress={() => onChangeText('')}
+							style={({ pressed }) => [styles.clearButton, pressed && styles.pressed]}
+							accessibilityRole="button"
+							accessibilityLabel="Clear nearby search"
+						>
+							<Icon name="close-circle" size={19} color={colors.textTertiary} />
+						</Pressable>
+					) : null}
+				</View>
+
+				<Pressable
+					onPress={recenterMap}
+					style={({ pressed }) => [styles.locateButton, shadow(0.1), pressed && styles.pressed]}
+					accessibilityRole="button"
+					accessibilityLabel="Center map on my location"
+				>
+					<Icon name="crosshairs-gps" size={20} color={colors.discovery} />
+				</Pressable>
 			</View>
 
 			<View style={styles.controlRow}>
-				<ScrollView
-					horizontal
-					style={styles.layerScroll}
-					showsHorizontalScrollIndicator={false}
-					contentContainerStyle={styles.layerContent}
-					keyboardShouldPersistTaps="handled"
-				>
+				<View style={styles.layers}>
 					{LAYER_OPTIONS.map((option) => {
 						const active = layers.includes(option.id);
 						const tone = layerTone(option.id);
@@ -206,394 +184,160 @@ export function MapFilterRow({
 								onPress={() => toggleLayer(option.id)}
 								style={({ pressed }) => [
 									styles.layerChip,
-									{
-										backgroundColor: active ? layerFill(option.id) : c.surfacePrimary,
-										borderColor: active ? tone : c.borderDefault,
-									},
+									{ backgroundColor: active ? layerFill(option.id) : colors.surfacePrimary, borderColor: active ? tone : colors.borderDefault },
 									pressed && styles.pressed,
 								]}
 								accessibilityRole="button"
 								accessibilityState={{ selected: active }}
 								accessibilityLabel={option.a11y}
 							>
-								<Icon name={option.icon} size={17} color={active ? tone : c.textSecondary} />
-								<Text style={[styles.layerText, { color: active ? tone : c.textSecondary }]}>
-									{option.label}
-								</Text>
+								<Icon name={option.icon} size={16} color={active ? tone : colors.textSecondary} />
+								<Text numberOfLines={1} style={[styles.layerText, { color: active ? tone : colors.textSecondary }]}>{option.label}</Text>
 							</Pressable>
 						);
 					})}
-				</ScrollView>
-
-				<View style={styles.fixedControls}>
-					<Pressable
-						onPress={() => setMoreOpen(true)}
-						style={({ pressed }) => [
-							styles.iconButton,
-							{
-								backgroundColor:
-									activeAdvancedFilterCount > 0 ? c.actionSoft : c.surfacePrimary,
-								borderColor:
-									activeAdvancedFilterCount > 0 ? c.actionPrimary : c.borderDefault,
-							},
-							pressed && styles.pressed,
-						]}
-						accessibilityRole="button"
-						accessibilityLabel={
-							activeAdvancedFilterCount > 0
-								? `Map filters, ${activeAdvancedFilterCount} active`
-								: 'Map filters'
-						}
-					>
-						<Icon
-							name="tune-variant"
-							size={19}
-							color={activeAdvancedFilterCount > 0 ? c.actionPrimary : c.textSecondary}
-						/>
-						{activeAdvancedFilterCount > 0 ? (
-							<View style={[styles.filterBadge, { backgroundColor: c.actionPrimary }]}>
-								<Text style={[styles.filterBadgeText, { color: c.onPrimary }]}> 
-									{activeAdvancedFilterCount}
-								</Text>
-							</View>
-						) : null}
-					</Pressable>
-
-					<Pressable
-						onPress={recenterMap}
-						style={({ pressed }) => [
-							styles.iconButton,
-							{
-								backgroundColor: c.discoverySoft,
-								borderColor: c.discoveryBorder,
-							},
-							pressed && styles.pressed,
-						]}
-						accessibilityRole="button"
-						accessibilityLabel="Center map on my location"
-					>
-						<Icon name="crosshairs-gps" size={20} color={c.discovery} />
-					</Pressable>
 				</View>
+
+				<Pressable
+					onPress={() => setMoreOpen(true)}
+					style={({ pressed }) => [
+						styles.filterButton,
+						activeAdvancedFilterCount > 0 && styles.filterButtonActive,
+						pressed && styles.pressed,
+					]}
+					accessibilityRole="button"
+					accessibilityLabel={activeAdvancedFilterCount > 0 ? `Map filters, ${activeAdvancedFilterCount} active` : 'Map filters'}
+				>
+					<Icon name="tune-variant" size={19} color={activeAdvancedFilterCount > 0 ? colors.actionPrimary : colors.textSecondary} />
+					{activeAdvancedFilterCount > 0 ? (
+						<View style={styles.filterBadge}><Text style={styles.filterBadgeText}>{activeAdvancedFilterCount}</Text></View>
+					) : null}
+				</Pressable>
 			</View>
 
-			<Modal
+			<FilterModal
 				visible={moreOpen}
-				transparent
-				animationType="fade"
-				onRequestClose={() => setMoreOpen(false)}
-			>
-				<Pressable
-					style={styles.modalBackdrop}
-					onPress={() => setMoreOpen(false)}
-					accessibilityRole="button"
-					accessibilityLabel="Dismiss filters"
-				>
-					<Pressable
-						style={[
-							styles.modalCard,
-							{ backgroundColor: c.surfacePrimary, borderColor: c.borderStrong },
-						]}
-						onPress={(event) => event.stopPropagation()}
-					>
-						<Text style={[styles.modalTitle, { color: c.textPrimary }]}>Map filters</Text>
-						<Text style={[styles.modalSubtitle, { color: c.textTertiary }]}>
-							Refine what NEXA shows in this area.
-						</Text>
-
-						<Text style={[styles.modalSection, { color: c.textTertiary }]}>Sort</Text>
-						{SORT_OPTIONS.map((option) => {
-							const active = rankBy === option.id;
-							return (
-								<Pressable
-									key={option.id}
-									onPress={() => onRankByChange(option.id)}
-									style={({ pressed }) => [
-										styles.modalRow,
-										{ borderColor: active ? c.actionBorder : c.borderDefault },
-										active && { backgroundColor: c.actionSoft },
-										pressed && styles.pressed,
-									]}
-									accessibilityRole="button"
-									accessibilityState={{ selected: active }}
-								>
-									<Text style={[styles.modalRowText, { color: active ? c.actionPrimary : c.textPrimary }]}>
-										{option.label}
-									</Text>
-									{active ? <Icon name="check" size={18} color={c.actionPrimary} /> : null}
-								</Pressable>
-							);
-						})}
-
-						{showPeople ? (
-							<>
-								<Text style={[styles.modalSection, { color: c.textTertiary }]}>People</Text>
-								<Pressable
-									onPress={() => {
-										onFriendsOnlyChange(!friendsOnly);
-										if (!friendsOnly) onDatingOnlyChange(false);
-									}}
-									style={({ pressed }) => [
-										styles.modalRow,
-										{ borderColor: friendsOnly ? c.entityPerson : c.borderDefault },
-										friendsOnly && { backgroundColor: c.actionSoft },
-										pressed && styles.pressed,
-									]}
-									accessibilityRole="button"
-									accessibilityState={{ selected: friendsOnly }}
-								>
-									<Text style={[styles.modalRowText, { color: friendsOnly ? c.entityPerson : c.textPrimary }]}>
-										Friends only
-									</Text>
-									{friendsOnly ? <Icon name="check" size={18} color={c.entityPerson} /> : null}
-								</Pressable>
-
-								<Pressable
-									onPress={() => {
-										onDatingOnlyChange(!datingOnly);
-										if (!datingOnly) onFriendsOnlyChange(false);
-									}}
-									style={({ pressed }) => [
-										styles.modalRow,
-										{ borderColor: datingOnly ? c.entityPerson : c.borderDefault },
-										datingOnly && { backgroundColor: c.actionSoft },
-										pressed && styles.pressed,
-									]}
-									accessibilityRole="button"
-									accessibilityState={{ selected: datingOnly }}
-								>
-									<Text style={[styles.modalRowText, { color: datingOnly ? c.entityPerson : c.textPrimary }]}>
-										Dating
-									</Text>
-									{datingOnly ? <Icon name="check" size={18} color={c.entityPerson} /> : null}
-								</Pressable>
-							</>
-						) : null}
-
-						{showListings ? (
-							<>
-								<Text style={[styles.modalSection, { color: c.textTertiary }]}>Listings</Text>
-								{LISTING_OPTIONS.map((option) => {
-									const active = listingMode === option.id;
-									return (
-										<Pressable
-											key={option.id}
-											onPress={() => onListingModeChange(option.id)}
-											style={({ pressed }) => [
-												styles.modalRow,
-												{ borderColor: active ? c.entityListing : c.borderDefault },
-												active && { backgroundColor: c.surfaceSecondary },
-												pressed && styles.pressed,
-											]}
-											accessibilityRole="button"
-											accessibilityState={{ selected: active }}
-										>
-											<Text style={[styles.modalRowText, { color: active ? c.entityListing : c.textPrimary }]}>
-												{option.label}
-											</Text>
-											{active ? <Icon name="check" size={18} color={c.entityListing} /> : null}
-										</Pressable>
-									);
-								})}
-							</>
-						) : null}
-
-						<Text style={[styles.modalSection, { color: c.textTertiary }]}>Local</Text>
-						<Pressable
-							onPress={openAlerts}
-							style={({ pressed }) => [
-								styles.modalRow,
-								{ borderColor: c.discoveryBorder },
-								pressed && styles.pressed,
-							]}
-							accessibilityRole="button"
-							accessibilityLabel="Create a local alert"
-						>
-							<View style={styles.modalActionLabel}>
-								<Icon name="bell-outline" size={18} color={c.discovery} />
-								<Text style={[styles.modalRowText, { color: c.textPrimary }]}>Local alerts</Text>
-							</View>
-							<Icon name="chevron-right" size={18} color={c.textTertiary} />
-						</Pressable>
-
-						<Pressable
-							style={({ pressed }) => [
-								styles.modalDone,
-								{ backgroundColor: c.actionPrimary },
-								pressed && styles.pressed,
-							]}
-							onPress={() => setMoreOpen(false)}
-							accessibilityRole="button"
-							accessibilityLabel="Done"
-						>
-							<Text style={[styles.modalDoneText, { color: c.onPrimary }]}>Done</Text>
-						</Pressable>
-					</Pressable>
-				</Pressable>
-			</Modal>
+				onClose={() => setMoreOpen(false)}
+				colors={colors}
+				styles={styles}
+				rankBy={rankBy}
+				onRankByChange={onRankByChange}
+				showPeople={showPeople}
+				friendsOnly={friendsOnly}
+				datingOnly={datingOnly}
+				onFriendsOnlyChange={onFriendsOnlyChange}
+				onDatingOnlyChange={onDatingOnlyChange}
+				showListings={showListings}
+				listingMode={listingMode}
+				onListingModeChange={onListingModeChange}
+				onOpenAlerts={openAlerts}
+			/>
 		</View>
 	);
 }
 
-const styles = StyleSheet.create({
-	wrap: {
-		position: 'absolute',
-		left: spacing.md,
-		right: spacing.md,
-		zIndex: 30,
-		gap: 8,
-	},
-	searchShell: {
-		height: MAP_SEARCH_BAR_HEIGHT,
-		borderRadius: radius.xl,
-		borderWidth: 1,
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingLeft: 14,
-		paddingRight: 8,
-		gap: 9,
-		shadowColor: '#000000',
-		shadowOpacity: 0.18,
-		shadowRadius: 10,
-		shadowOffset: { width: 0, height: 4 },
-		elevation: 5,
-	},
-	searchInput: {
-		flex: 1,
-		height: '100%',
-		fontSize: fontSize.md,
-		fontWeight: '600',
-		paddingVertical: 0,
-	},
-	clearButton: {
-		width: 36,
-		height: 36,
-		alignItems: 'center',
-		justifyContent: 'center',
-		borderRadius: 18,
-	},
-	controlRow: {
-		height: MAP_LAYER_ROW_HEIGHT,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	layerScroll: {
-		flex: 1,
-	},
-	layerContent: {
-		alignItems: 'center',
-		gap: 8,
-		paddingRight: 2,
-	},
-	layerChip: {
-		height: 44,
-		minWidth: 44,
-		paddingHorizontal: 13,
-		borderRadius: radius.pill,
-		borderWidth: 1,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		gap: 7,
-	},
-	layerText: {
-		fontSize: fontSize.sm,
-		fontWeight: '700',
-	},
-	fixedControls: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	iconButton: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		borderWidth: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
-		position: 'relative',
-	},
-	filterBadge: {
-		position: 'absolute',
-		right: -2,
-		top: -2,
-		minWidth: 16,
-		height: 16,
-		paddingHorizontal: 3,
-		borderRadius: 8,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	filterBadgeText: {
-		fontSize: 9,
-		lineHeight: 11,
-		fontWeight: '800',
-		textAlign: 'center',
-	},
-	pressed: {
-		opacity: 0.72,
-		transform: [{ scale: 0.97 }],
-	},
-	modalBackdrop: {
-		flex: 1,
-		backgroundColor: 'rgba(0,0,0,0.68)',
-		justifyContent: 'center',
-		padding: spacing.xl,
-	},
-	modalCard: {
-		borderRadius: radius.xl,
-		borderWidth: 1,
-		padding: spacing.lg,
-		maxHeight: '86%',
-	},
-	modalTitle: {
-		fontSize: fontSize.lg,
-		fontWeight: '800',
-	},
-	modalSubtitle: {
-		fontSize: fontSize.sm,
-		lineHeight: 19,
-		marginTop: 4,
-		marginBottom: spacing.xs,
-	},
-	modalSection: {
-		fontSize: fontSize.xs,
-		fontWeight: '800',
-		textTransform: 'uppercase',
-		letterSpacing: 0.8,
-		marginTop: spacing.md,
-		marginBottom: 6,
-	},
-	modalRow: {
-		minHeight: 44,
-		paddingHorizontal: 12,
-		borderRadius: radius.md,
-		borderWidth: StyleSheet.hairlineWidth,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginBottom: 6,
-	},
-	modalRowText: {
-		fontSize: fontSize.sm,
-		fontWeight: '600',
-	},
-	modalActionLabel: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	modalDone: {
-		marginTop: spacing.lg,
-		minHeight: 44,
-		borderRadius: radius.pill,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	modalDoneText: {
-		fontSize: fontSize.sm,
-		fontWeight: '800',
-	},
-});
+interface FilterModalProps {
+	visible: boolean;
+	onClose: () => void;
+	colors: ThemeColors;
+	styles: Styles;
+	rankBy: DiscoveryRankBy;
+	onRankByChange: (next: DiscoveryRankBy) => void;
+	showPeople: boolean;
+	friendsOnly: boolean;
+	datingOnly: boolean;
+	onFriendsOnlyChange: (next: boolean) => void;
+	onDatingOnlyChange: (next: boolean) => void;
+	showListings: boolean;
+	listingMode: ListingModeFilterValue;
+	onListingModeChange: (next: ListingModeFilterValue) => void;
+	onOpenAlerts: () => void;
+}
+
+function FilterModal(props: FilterModalProps): React.JSX.Element {
+	const { colors, styles } = props;
+	return (
+		<Modal visible={props.visible} transparent animationType="fade" onRequestClose={props.onClose}>
+			<Pressable style={styles.modalBackdrop} onPress={props.onClose} accessibilityRole="button" accessibilityLabel="Dismiss filters">
+				<Pressable style={styles.modalCard} onPress={(event) => event.stopPropagation()}>
+					<Text style={styles.modalTitle}>Map filters</Text>
+					<Text style={styles.modalSubtitle}>Refine what NEXA shows in this area.</Text>
+					<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+						<SectionLabel styles={styles}>Sort</SectionLabel>
+						{SORT_OPTIONS.map((option) => (
+							<ChoiceRow key={option.id} styles={styles} colors={colors} label={option.label} active={props.rankBy === option.id} onPress={() => props.onRankByChange(option.id)} />
+						))}
+
+						{props.showPeople ? <>
+							<SectionLabel styles={styles}>People</SectionLabel>
+							<ChoiceRow styles={styles} colors={colors} label="Friends only" active={props.friendsOnly} onPress={() => { props.onFriendsOnlyChange(!props.friendsOnly); if (!props.friendsOnly) props.onDatingOnlyChange(false); }} />
+							<ChoiceRow styles={styles} colors={colors} label="Dating" active={props.datingOnly} onPress={() => { props.onDatingOnlyChange(!props.datingOnly); if (!props.datingOnly) props.onFriendsOnlyChange(false); }} />
+						</> : null}
+
+						{props.showListings ? <>
+							<SectionLabel styles={styles}>Listings</SectionLabel>
+							{LISTING_OPTIONS.map((option) => (
+								<ChoiceRow key={option.id} styles={styles} colors={colors} label={option.label} active={props.listingMode === option.id} onPress={() => props.onListingModeChange(option.id)} />
+							))}
+						</> : null}
+
+						<SectionLabel styles={styles}>Local</SectionLabel>
+						<Pressable onPress={props.onOpenAlerts} style={({ pressed }) => [styles.modalRow, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Create a local alert">
+							<View style={styles.modalActionLabel}><Icon name="bell-outline" size={18} color={colors.discovery} /><Text style={styles.modalRowText}>Local alerts</Text></View>
+							<Icon name="chevron-right" size={18} color={colors.textTertiary} />
+						</Pressable>
+					</ScrollView>
+					<Pressable style={({ pressed }) => [styles.modalDone, pressed && styles.pressed]} onPress={props.onClose} accessibilityRole="button" accessibilityLabel="Done">
+						<Text style={styles.modalDoneText}>Done</Text>
+					</Pressable>
+				</Pressable>
+			</Pressable>
+		</Modal>
+	);
+}
+
+function SectionLabel({ children, styles }: { children: string; styles: Styles }): React.JSX.Element {
+	return <Text style={styles.modalSection}>{children}</Text>;
+}
+
+function ChoiceRow({ label, active, onPress, colors, styles }: { label: string; active: boolean; onPress: () => void; colors: ThemeColors; styles: Styles }): React.JSX.Element {
+	return (
+		<Pressable onPress={onPress} style={({ pressed }) => [styles.modalRow, active && styles.modalRowActive, pressed && styles.pressed]} accessibilityRole="button" accessibilityState={{ selected: active }}>
+			<Text style={[styles.modalRowText, active && styles.modalRowTextActive]}>{label}</Text>
+			{active ? <Icon name="check" size={18} color={colors.actionPrimary} /> : null}
+		</Pressable>
+	);
+}
+
+function createStyles(colors: ThemeColors) {
+	return StyleSheet.create({
+		wrap: { position: 'absolute', left: spacing.md, right: spacing.md, zIndex: 30, gap: 8 },
+		searchRow: { height: MAP_SEARCH_BAR_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 8 },
+		searchShell: { flex: 1, height: MAP_SEARCH_BAR_HEIGHT, borderRadius: radius.xl, borderWidth: 1, flexDirection: 'row', alignItems: 'center', paddingLeft: 14, paddingRight: 7, gap: 9, backgroundColor: colors.surfacePrimary },
+		searchInput: { flex: 1, height: '100%', color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600', paddingVertical: 0 },
+		clearButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17 },
+		locateButton: { width: MAP_SEARCH_BAR_HEIGHT, height: MAP_SEARCH_BAR_HEIGHT, borderRadius: MAP_SEARCH_BAR_HEIGHT / 2, borderWidth: 1, borderColor: colors.discoveryBorder, backgroundColor: colors.discoverySoft, alignItems: 'center', justifyContent: 'center' },
+		controlRow: { height: MAP_LAYER_ROW_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 8 },
+		layers: { flex: 1, height: MAP_LAYER_ROW_HEIGHT, flexDirection: 'row', gap: 6 },
+		layerChip: { flex: 1, minWidth: 0, height: MAP_LAYER_ROW_HEIGHT, paddingHorizontal: 6, borderRadius: radius.pill, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+		layerText: { flexShrink: 1, fontSize: 12, fontWeight: '700' },
+		filterButton: { width: MAP_LAYER_ROW_HEIGHT, height: MAP_LAYER_ROW_HEIGHT, borderRadius: MAP_LAYER_ROW_HEIGHT / 2, borderWidth: 1, borderColor: colors.borderDefault, backgroundColor: colors.surfacePrimary, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+		filterButtonActive: { borderColor: colors.actionPrimary, backgroundColor: colors.actionSoft },
+		filterBadge: { position: 'absolute', right: -2, top: -2, minWidth: 16, height: 16, paddingHorizontal: 3, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.actionPrimary },
+		filterBadgeText: { color: colors.onPrimary, fontSize: 9, lineHeight: 11, fontWeight: '800', textAlign: 'center' },
+		pressed: { opacity: 0.72, transform: [{ scale: 0.97 }] },
+		modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.68)', justifyContent: 'center', padding: spacing.xl },
+		modalCard: { maxHeight: '86%', borderRadius: radius.xl, borderWidth: 1, borderColor: colors.borderStrong, padding: spacing.lg, backgroundColor: colors.surfacePrimary },
+		modalTitle: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '800' },
+		modalSubtitle: { color: colors.textTertiary, fontSize: fontSize.sm, lineHeight: 19, marginTop: 4 },
+		modalScroll: { paddingBottom: spacing.xs },
+		modalSection: { color: colors.textTertiary, fontSize: fontSize.xs, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: spacing.md, marginBottom: 6 },
+		modalRow: { minHeight: 44, paddingHorizontal: 12, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderDefault, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+		modalRowActive: { borderColor: colors.actionBorder, backgroundColor: colors.actionSoft },
+		modalRowText: { color: colors.textPrimary, fontSize: fontSize.sm, fontWeight: '600' },
+		modalRowTextActive: { color: colors.actionPrimary },
+		modalActionLabel: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+		modalDone: { marginTop: spacing.md, minHeight: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.actionPrimary },
+		modalDoneText: { color: colors.onPrimary, fontSize: fontSize.sm, fontWeight: '800' },
+	});
+}
