@@ -6,11 +6,15 @@ import { useAppTheme } from '@/theme';
 
 import {
   diamondSideForBoundingSize,
+  NEXA_MARKER_TOUCH_SIZE,
   resolveNexaMarkerVisual,
   type NexaEntityType,
   type NexaMarkerDensity,
   type NexaMarkerState,
 } from './nexaEntityMarkerVisuals';
+
+export const NEXA_MARKER_RENDER_HEIGHT = 62;
+export const NEXA_MARKER_ANCHOR_Y = NEXA_MARKER_TOUCH_SIZE / 2 / NEXA_MARKER_RENDER_HEIGHT;
 
 export interface NexaEntityMarkerProps {
   entityType: NexaEntityType;
@@ -108,7 +112,6 @@ export function NexaEntityMarker({
   return (
     <View
       style={[styles.root, { opacity: visual.opacity }]}
-      onLayout={onVisualSettled}
       accessible
       accessibilityRole="image"
       accessibilityLabel={
@@ -116,105 +119,107 @@ export function NexaEntityMarker({
         `${entityType}${caption ? `, ${caption}` : ''}${stateSuffix(state)}`
       }
     >
-      {visual.showSelectedRing ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.ring,
-            styles.selectedRing,
-            {
-              borderColor: colors.actionPrimary,
-              shadowColor: colors.actionPrimary,
-            },
-          ]}
-        />
-      ) : null}
-
-      {visual.showLiveRing ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.ring,
-            styles.liveRing,
-            {
-              borderColor: colors.live,
-              shadowColor: colors.live,
-            },
-          ]}
-        />
-      ) : null}
-
-      {visual.showOwnRing ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.ring,
-            styles.ownRing,
-            { borderColor: colors.actionPrimary },
-          ]}
-        />
-      ) : null}
-
-      <View style={styles.coreStage}>
-        {visual.shape === 'star' ? (
-          <Icon
-            name={ICON_BY_TYPE.opportunity}
-            size={visual.visualSize}
-            color={colors.entityOpportunity}
+      <View style={styles.markerStage} onLayout={onVisualSettled}>
+        {visual.showSelectedRing ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.ring,
+              styles.selectedRing,
+              {
+                borderColor: colors.actionPrimary,
+                shadowColor: colors.actionPrimary,
+              },
+            ]}
           />
-        ) : (
-          <>
-            <View style={[styles.core, coreStyle]} />
-            <View pointerEvents="none" style={styles.iconLayer}>
-              {entityType === 'person' && label ? (
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.initials,
-                    {
-                      color: colors.entityPerson,
-                      fontSize: Math.max(9, Math.round(visual.visualSize * 0.38)),
-                    },
-                  ]}
-                >
-                  {label}
-                </Text>
-              ) : (
-                <Icon name={ICON_BY_TYPE[entityType]} size={iconSize} color={innerColor} />
-              )}
-            </View>
-          </>
-        )}
-      </View>
+        ) : null}
 
-      {visual.showVerifiedBadge ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.verifiedBadge,
-            {
-              backgroundColor: colors.surfacePrimary,
-              borderColor: colors.verified,
-            },
-          ]}
-        >
-          <Icon name="check" size={8} color={colors.verified} />
+        {visual.showLiveRing ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.ring,
+              styles.liveRing,
+              {
+                borderColor: colors.live,
+                shadowColor: colors.live,
+              },
+            ]}
+          />
+        ) : null}
+
+        {visual.showOwnRing ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.ring,
+              styles.ownRing,
+              { borderColor: colors.actionPrimary },
+            ]}
+          />
+        ) : null}
+
+        <View style={styles.coreStage}>
+          {visual.shape === 'star' ? (
+            <Icon
+              name={ICON_BY_TYPE.opportunity}
+              size={visual.visualSize}
+              color={colors.entityOpportunity}
+            />
+          ) : (
+            <>
+              <View style={[styles.core, coreStyle]} />
+              <View pointerEvents="none" style={styles.iconLayer}>
+                {entityType === 'person' && label ? (
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.initials,
+                      {
+                        color: colors.entityPerson,
+                        fontSize: Math.max(9, Math.round(visual.visualSize * 0.38)),
+                      },
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                ) : (
+                  <Icon name={ICON_BY_TYPE[entityType]} size={iconSize} color={innerColor} />
+                )}
+              </View>
+            </>
+          )}
         </View>
-      ) : null}
 
-      {visual.showNewDot ? (
-        <View
-          pointerEvents="none"
-          style={[styles.newDot, { backgroundColor: colors.discovery }]}
-        />
-      ) : null}
+        {visual.showVerifiedBadge ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.verifiedBadge,
+              {
+                backgroundColor: colors.surfacePrimary,
+                borderColor: colors.verified,
+              },
+            ]}
+          >
+            <Icon name="check" size={8} color={colors.verified} />
+          </View>
+        ) : null}
 
-      {visual.showUnavailableSlash ? (
-        <View
-          pointerEvents="none"
-          style={[styles.unavailableSlash, { backgroundColor: colors.textSecondary }]}
-        />
-      ) : null}
+        {visual.showNewDot ? (
+          <View
+            pointerEvents="none"
+            style={[styles.newDot, { backgroundColor: colors.discovery }]}
+          />
+        ) : null}
+
+        {visual.showUnavailableSlash ? (
+          <View
+            pointerEvents="none"
+            style={[styles.unavailableSlash, { backgroundColor: colors.textSecondary }]}
+          />
+        ) : null}
+      </View>
 
       {caption ? (
         <View
@@ -241,12 +246,17 @@ export function NexaEntityMarker({
 
 const styles = StyleSheet.create({
   root: {
-    width: 44,
-    height: 44,
+    width: 88,
+    height: NEXA_MARKER_RENDER_HEIGHT,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  markerStage: {
+    width: NEXA_MARKER_TOUCH_SIZE,
+    height: NEXA_MARKER_TOUCH_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    overflow: 'visible',
   },
   coreStage: {
     width: 36,
@@ -325,8 +335,6 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '-45deg' }],
   },
   caption: {
-    position: 'absolute',
-    top: 43,
     maxWidth: 88,
     minHeight: 17,
     paddingHorizontal: 5,
