@@ -39,7 +39,11 @@ export async function hydrateInboxSeen(userId: string): Promise<void> {
     const stored = await AsyncStorage.getItem(storageKey(userId));
     if (activeUserId !== userId) return;
     const parsed = stored == null ? 0 : Number(stored);
-    seenAtMs = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+    const persistedAtMs = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+    // Preserve an explicit acknowledgement that may occur while storage is hydrating.
+    seenAtMs = Math.max(seenAtMs, persistedAtMs);
+  } catch {
+    // Storage failure must not leave the badge permanently unready or reject a fire-and-forget hydrate.
   } finally {
     if (activeUserId !== userId) return;
     hydrated = true;
@@ -48,13 +52,15 @@ export async function hydrateInboxSeen(userId: string): Promise<void> {
 }
 
 export function markInboxSeen(atMs: number): void {
-  if (!Number.isFinite(atMs) || atMs < seenAtMs) return;
+  if (!Number.isFinite(atMs) || atMs <= seenAtMs) return;
   seenAtMs = atMs;
   notify();
 
   const userId = activeUserId;
   if (userId) {
-    void AsyncStorage.setItem(storageKey(userId), String(atMs));
+    void AsyncStorage.setItem(storageKey(userId), String(atMs)).catch(() => {
+      // Keep the in-memory acknowledgement; a later explicit action can persist again.
+    });
   }
 }
 
