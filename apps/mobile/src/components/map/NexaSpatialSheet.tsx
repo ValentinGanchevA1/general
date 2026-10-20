@@ -48,7 +48,10 @@ export interface NexaSpatialActionButtonProps {
   flex?: boolean;
 }
 
-function entityTone(kind: NexaSpatialSheetKind, colors: ReturnType<typeof useAppTheme>['colors']): string {
+function entityTone(
+  kind: NexaSpatialSheetKind,
+  colors: ReturnType<typeof useAppTheme>['colors'],
+): string {
   switch (kind) {
     case 'person':
       return colors.entityPerson;
@@ -190,7 +193,9 @@ export function NexaSpatialMetaRow({ items }: { items: NexaSpatialMetaItem[] }):
     <View style={styles.metaRow}>
       {items.map((item, index) => (
         <React.Fragment key={item.id}>
-          {index > 0 ? <Text style={[styles.metaDot, { color: colors.textDisabled }]}>·</Text> : null}
+          {index > 0 ? (
+            <Text style={[styles.metaDot, { color: colors.textDisabled }]}>·</Text>
+          ) : null}
           <View style={styles.metaItem}>
             {item.icon ? (
               <Icon
@@ -381,7 +386,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: fontSize.lg,
     lineHeight: 24,
-    fontWeight: '750',
+    fontWeight: '700',
     letterSpacing: -0.2,
   },
   subtitle: {
@@ -433,7 +438,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 14,
-    fontWeight: '750',
+    fontWeight: '700',
   },
   actionPressed: {
     opacity: 0.82,
