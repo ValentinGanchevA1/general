@@ -10,7 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, fontSize, spacing } from '@/theme';
+import { colors, fontSize, spacing, useAppTheme } from '@/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PHOTO_HEIGHT = SCREEN_WIDTH * 1.05;
@@ -56,6 +56,8 @@ export function ProfileHeaderPhoto({
   onPressVisibility,
 }: ProfileHeaderPhotoProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
+  const { colors: themeColors, mode } = useAppTheme();
+  const isProtosNexus = mode === 'protos-nexus';
   const backgroundUri = coverUrl || photoUrl;
   // Compatibility bridge for ProfileView while the legacy score field remains in
   // its view-model contract. The number itself is never rendered.
@@ -66,12 +68,22 @@ export function ProfileHeaderPhoto({
       verificationPercent >= 100);
 
   return (
-    <Pressable onPress={onPressPhoto} style={styles.container}>
+    <Pressable
+      onPress={onPressPhoto}
+      style={[
+        styles.container,
+        { backgroundColor: themeColors.surfaceRaised },
+        isProtosNexus && {
+          borderColor: themeColors.primaryBorder,
+          shadowColor: themeColors.primary,
+        },
+      ]}
+    >
       {backgroundUri ? (
         <Image source={{ uri: backgroundUri }} style={styles.photo} resizeMode="cover" />
       ) : (
-        <View style={[styles.photo, styles.placeholder]}>
-          <Text style={styles.placeholderInitials}>
+        <View style={[styles.photo, styles.placeholder, { backgroundColor: themeColors.surfaceRaised }]}>
+          <Text style={[styles.placeholderInitials, { color: themeColors.actionPrimary }]}>
             {displayName
               .split(' ')
               .map((word) => word[0] ?? '')
@@ -92,13 +104,13 @@ export function ProfileHeaderPhoto({
               accessibilityRole="button"
               accessibilityLabel="Back"
             >
-              <Icon name="arrow-left" size={22} color={colors.textPrimary} />
+              <Icon name="arrow-left" size={22} color={themeColors.textPrimary} />
             </Pressable>
           ) : null}
           {isPaid && tierLabel ? (
-            <View style={styles.tierBadge}>
-              <Icon name="crown" size={13} color={colors.onPrimary} />
-              <Text style={styles.tierBadgeText}>{tierLabel}</Text>
+            <View style={[styles.tierBadge, { backgroundColor: themeColors.premium }]}>
+              <Icon name="crown" size={13} color={themeColors.onPrimary} />
+              <Text style={[styles.tierBadgeText, { color: themeColors.onPrimary }]}>{tierLabel}</Text>
             </View>
           ) : null}
         </View>
@@ -110,7 +122,7 @@ export function ProfileHeaderPhoto({
             accessibilityRole="button"
             accessibilityLabel="Settings"
           >
-            <Icon name="cog" size={20} color={colors.textPrimary} />
+            <Icon name="cog" size={20} color={themeColors.textPrimary} />
           </Pressable>
         ) : null}
       </View>
@@ -123,7 +135,11 @@ export function ProfileHeaderPhoto({
                 key={index}
                 onPress={() => onSelectPhoto?.(index)}
                 hitSlop={6}
-                style={[styles.dot, index === activePhotoIndex && styles.dotActive]}
+                style={[
+                  styles.dot,
+                  index === activePhotoIndex && styles.dotActive,
+                  index === activePhotoIndex && { backgroundColor: themeColors.textPrimary },
+                ]}
               />
             ))}
           </View>
@@ -131,11 +147,30 @@ export function ProfileHeaderPhoto({
 
         <View style={styles.nameRow}>
           <View style={styles.leftInfo}>
-            <Text style={styles.name} numberOfLines={1}>
-              {displayName}
-            </Text>
+            <View style={styles.displayNameRow}>
+              <Text
+                style={[styles.name, { color: isProtosNexus ? themeColors.primary : themeColors.textPrimary }]}
+                numberOfLines={1}
+              >
+                {displayName}
+              </Text>
+              {isProtosNexus ? (
+                <View
+                  style={[
+                    styles.nexusBadge,
+                    {
+                      backgroundColor: themeColors.primarySoft,
+                      borderColor: themeColors.primaryBorderSoft,
+                    },
+                  ]}
+                  accessibilityLabel="PROTOS NEXUS appearance active"
+                >
+                  <Text style={[styles.nexusBadgeText, { color: themeColors.primary }]}>NEXUS ✦</Text>
+                </View>
+              ) : null}
+            </View>
             {handle ? (
-              <Text style={styles.handle} numberOfLines={1}>
+              <Text style={[styles.handle, { color: themeColors.textSecondary }]} numberOfLines={1}>
                 @{handle}
               </Text>
             ) : null}
@@ -149,10 +184,10 @@ export function ProfileHeaderPhoto({
               <View
                 style={[
                   styles.visibilityDot,
-                  { backgroundColor: isVisibleOnMap ? colors.success : colors.textMuted },
+                  { backgroundColor: isVisibleOnMap ? themeColors.success : themeColors.textMuted },
                 ]}
               />
-              <Text style={styles.visibilityText}>
+              <Text style={[styles.visibilityText, { color: themeColors.textPrimary }]}>
                 {isVisibleOnMap ? 'Visible on map' : 'Hidden from map'}
               </Text>
             </Pressable>
@@ -162,7 +197,8 @@ export function ProfileHeaderPhoto({
             onPress={onPressVerificationBadge}
             style={[
               styles.verificationBadge,
-              resolvedIdVerified && styles.verificationBadgeVerified,
+              { borderColor: themeColors.actionBorderSoft },
+              resolvedIdVerified && { borderColor: themeColors.discoveryBorder },
             ]}
             hitSlop={8}
             accessibilityRole="button"
@@ -173,12 +209,12 @@ export function ProfileHeaderPhoto({
             <Icon
               name={resolvedIdVerified ? 'shield-check' : 'shield-outline'}
               size={15}
-              color={resolvedIdVerified ? colors.verified : colors.actionPrimary}
+              color={resolvedIdVerified ? themeColors.verified : themeColors.actionPrimary}
             />
             <Text
               style={[
                 styles.verificationText,
-                { color: resolvedIdVerified ? colors.verified : colors.textPrimary },
+                { color: resolvedIdVerified ? themeColors.verified : themeColors.textPrimary },
               ]}
             >
               {resolvedIdVerified ? 'Verified' : 'Verify'}
@@ -195,6 +231,12 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     height: PHOTO_HEIGHT,
     backgroundColor: colors.surfaceRaised,
+    borderBottomWidth: 1,
+    borderColor: 'transparent',
+    shadowOpacity: 0,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 0,
   },
   photo: { width: '100%', height: '100%' },
   placeholder: {
@@ -279,10 +321,27 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: spacing.md,
   },
+  displayNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   name: {
     color: colors.textPrimary,
     fontSize: fontSize.xl,
     fontWeight: '700',
+    flexShrink: 1,
+  },
+  nexusBadge: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  nexusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   handle: {
     color: colors.textSecondary,
@@ -317,9 +376,6 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     borderWidth: 1,
     borderColor: colors.actionBorderSoft,
-  },
-  verificationBadgeVerified: {
-    borderColor: colors.discoveryBorder,
   },
   verificationText: {
     fontSize: 12,

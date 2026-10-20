@@ -16,7 +16,7 @@ import {
   resolveSentryDist,
   resolveSentryRelease,
 } from '@/lib/sentry';
-import { ThemeProvider, useAppTheme } from '@/theme';
+import { ThemeProvider, useAppTheme, type ProtosNexusEntitlement } from '@/theme';
 import { useAppSelector } from '@/hooks/redux';
 import { NexaLaunchOverlay } from '@/components/Brand/NexaLaunchOverlay';
 
@@ -51,6 +51,21 @@ function AppShell(): React.JSX.Element {
   );
 }
 
+function EntitledThemeProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
+  const initialized = useAppSelector((state) => state.profile.initialized);
+  const tier = useAppSelector((state) => state.profile.profile?.subscriptionTier);
+
+  const canUseProtosNexus: ProtosNexusEntitlement = initialized
+    ? tier === 'premium'
+    : undefined;
+
+  return (
+    <ThemeProvider canUseProtosNexus={canUseProtosNexus}>
+      {children}
+    </ThemeProvider>
+  );
+}
+
 function App(): React.JSX.Element {
   // BottomSheetModalProvider lives inside NavigationContainer (AppNavigator)
   // so portal content keeps navigation context (EntityBottomSheet useNavigation).
@@ -58,9 +73,9 @@ function App(): React.JSX.Element {
     <GestureHandlerRootView style={styles.root}>
       <Provider store={store}>
         <SafeAreaProvider>
-          <ThemeProvider>
+          <EntitledThemeProvider>
             <AppShell />
-          </ThemeProvider>
+          </EntitledThemeProvider>
         </SafeAreaProvider>
       </Provider>
     </GestureHandlerRootView>

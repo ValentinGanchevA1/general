@@ -11,7 +11,7 @@ import MapView, {
 	PROVIDER_GOOGLE,
 	type Region,
 } from 'react-native-maps';
-import { DARK_MAP_STYLE, LIGHT_MAP_STYLE } from '@/components/map/mapStyle';
+import { resolveMapStyle } from '@/components/map/mapStyle';
 import {
 	BottomSheetModal,
 	BottomSheetView,
@@ -107,7 +107,7 @@ const EMPTY_POINTS: DiscoveryPoint[] = [];
 
 export function MapScreen(): React.JSX.Element {
 	const dispatch = useAppDispatch();
-	const { colors, scheme } = useAppTheme();
+	const { colors, scheme, mode } = useAppTheme();
 	const styles = useMemo(() => createStyles(colors), [colors]);
 	const sheetChrome = useSheetChrome();
 	const emailVerified =
@@ -835,7 +835,7 @@ export function MapScreen(): React.JSX.Element {
 				<MapView
 					ref={mapRef}
 					provider={PROVIDER_GOOGLE}
-					customMapStyle={scheme === 'dark' ? DARK_MAP_STYLE : LIGHT_MAP_STYLE}
+					customMapStyle={resolveMapStyle(mode, scheme)}
 					style={StyleSheet.absoluteFill}
 					showsUserLocation
 					showsMyLocationButton={false}

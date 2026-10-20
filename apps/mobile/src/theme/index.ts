@@ -17,7 +17,7 @@
 //   - Existing StyleSheets → static `colors` (dark) until screen is touched
 
 export { nexaBrand, nexaDark, nexaStatus, nexaGradients } from './brand';
-export { darkColors, lightColors, type ThemeColors } from './colors';
+export { darkColors, lightColors, protosNexusColors, type ThemeColors } from './colors';
 export {
   spacing,
   radius,
@@ -35,6 +35,7 @@ export {
   type Theme,
   type ThemeMode,
   type ResolvedScheme,
+  type ProtosNexusEntitlement,
 } from './ThemeProvider';
 
 import { darkColors } from './colors';

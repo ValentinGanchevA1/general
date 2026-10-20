@@ -37,6 +37,7 @@ const THEME_OPTIONS: ReadonlyArray<{ mode: ThemeMode; label: string; description
   { mode: 'system', label: 'System', description: 'Follow your device appearance' },
   { mode: 'light', label: 'Light', description: 'Always use light appearance' },
   { mode: 'dark', label: 'Dark', description: 'Always use dark appearance' },
+  { mode: 'protos-nexus', label: 'PROTOS NEXUS ✦', description: 'Exclusive postmodern neon appearance' },
 ];
 
 function createStyles(colors: ThemeColors) {
@@ -74,7 +75,19 @@ function createStyles(colors: ThemeColors) {
     },
     appearanceCopy: { flex: 1 },
     appearanceLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
+    nexusLabel: { color: colors.premiumTier },
     appearanceDescription: { color: colors.textSecondary, fontSize: fontSize.sm, marginTop: 2 },
+    nexusMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 4 },
+    premiumBadge: {
+      borderWidth: 1,
+      borderColor: colors.premiumBorder,
+      backgroundColor: colors.premiumSoft,
+      borderRadius: radius.sm,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+    },
+    premiumBadgeText: { color: colors.premiumTier, fontSize: 10, fontWeight: '800', letterSpacing: 0.7 },
+    lockedText: { color: colors.textFaint, fontSize: fontSize.xs },
     radioOuter: {
       width: 22,
       height: 22,
@@ -86,6 +99,7 @@ function createStyles(colors: ThemeColors) {
     },
     radioOuterSelected: { borderColor: colors.primary },
     radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
+    nexusLock: { color: colors.premiumTier, fontSize: fontSize.md, fontWeight: '800' },
     rowSpaced: { marginTop: spacing.md },
     standingCard: {
       backgroundColor: colors.surfaceAlt,
@@ -154,7 +168,7 @@ function createStyles(colors: ThemeColors) {
 }
 
 export function SettingsScreen(): React.JSX.Element {
-  const { colors, mode, setMode } = useAppTheme();
+  const { colors, mode, setMode, canUseProtosNexus } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const dispatch = useAppDispatch();
@@ -225,23 +239,46 @@ export function SettingsScreen(): React.JSX.Element {
           <Text style={styles.sectionTitle}>Appearance</Text>
           <View style={styles.appearanceCard} accessibilityRole="radiogroup">
             {THEME_OPTIONS.map((option, index) => {
+              const isNexus = option.mode === 'protos-nexus';
+              const locked = isNexus && canUseProtosNexus === false;
               const selected = mode === option.mode;
+              const handlePress = (): void => {
+                if (locked) {
+                  navigation.navigate('Subscription');
+                  return;
+                }
+                setMode(option.mode);
+              };
+
               return (
                 <TouchableOpacity
                   key={option.mode}
                   style={[styles.appearanceOption, index > 0 ? styles.appearanceDivider : undefined]}
-                  onPress={() => setMode(option.mode)}
+                  onPress={handlePress}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: selected }}
-                  accessibilityLabel={`${option.label} appearance`}
+                  accessibilityLabel={locked ? `${option.label} appearance. Premium membership required.` : `${option.label} appearance`}
+                  accessibilityHint={locked ? 'Opens Premium membership options' : undefined}
                 >
                   <View style={styles.appearanceCopy}>
-                    <Text style={styles.appearanceLabel}>{option.label}</Text>
+                    <Text style={[styles.appearanceLabel, isNexus ? styles.nexusLabel : undefined]}>{option.label}</Text>
                     <Text style={styles.appearanceDescription}>{option.description}</Text>
+                    {isNexus ? (
+                      <View style={styles.nexusMeta}>
+                        <View style={styles.premiumBadge}>
+                          <Text style={styles.premiumBadgeText}>PREMIUM</Text>
+                        </View>
+                        {locked ? <Text style={styles.lockedText}>Tap to unlock</Text> : null}
+                      </View>
+                    ) : null}
                   </View>
-                  <View style={[styles.radioOuter, selected ? styles.radioOuterSelected : undefined]}>
-                    {selected ? <View style={styles.radioInner} /> : null}
-                  </View>
+                  {locked ? (
+                    <Text style={styles.nexusLock} accessibilityElementsHidden importantForAccessibility="no">✦</Text>
+                  ) : (
+                    <View style={[styles.radioOuter, selected ? styles.radioOuterSelected : undefined]}>
+                      {selected ? <View style={styles.radioInner} /> : null}
+                    </View>
+                  )}
                 </TouchableOpacity>
               );
             })}
