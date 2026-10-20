@@ -8,6 +8,7 @@ import type { AccountStackParamList } from '@/navigation/stacks';
 import { APP_VERSION, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { ListRow } from '@/components/ListRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { NexaSymbol } from '@/components/Brand/NexaSymbol';
 import { colors, radius, spacing, useAppTheme } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
@@ -40,17 +41,17 @@ export function AboutScreen(): React.JSX.Element {
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.brand}>
           <View style={styles.logo}>
-            <Icon name="map-marker-radius" size={44} color={colors.primary} />
+            <NexaSymbol size={60} />
           </View>
-          <Text style={styles.appName}>G88</Text>
+          <Text style={styles.appName}>NEXA</Text>
           <Text style={styles.tagline}>
-            Map-first local social — meet people nearby, build trust through real interactions.
+            Live discovery for the world around you.
           </Text>
           <Text style={styles.version}>Version {APP_VERSION}</Text>
         </View>
 
         <Text style={styles.about}>
-          G88 puts people, events, and listings on a live map around you. Wave or message,
+          NEXA puts people, events, and listings on a live map around you. Wave or message,
           post stories, trade locally, and join events — without a global feed. Your exact
           GPS is never stored: positions are coarsened before anything is saved.
         </Text>
@@ -124,7 +125,7 @@ export function AboutScreen(): React.JSX.Element {
         </View>
 
         <Text style={styles.copyright}>
-          © {new Date().getFullYear()} G88. All rights reserved.
+          © {new Date().getFullYear()} NEXA. All rights reserved.
         </Text>
       </ScrollView>
     </View>
@@ -139,18 +140,18 @@ const styles = StyleSheet.create({
     width: 84,
     height: 84,
     borderRadius: 22,
-    backgroundColor: 'rgba(0,212,255,0.08)',
+    backgroundColor: 'rgba(39,211,242,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(0,212,255,0.2)',
+    borderColor: 'rgba(39,211,242,0.18)',
   },
   appName: {
     color: colors.textPrimary,
     fontSize: 28,
     fontWeight: '800',
     marginTop: spacing.lg,
-    letterSpacing: 1,
+    letterSpacing: 6,
   },
   tagline: {
     color: colors.textMuted,
