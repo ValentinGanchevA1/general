@@ -9,26 +9,18 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, radius, spacing } from '@/theme';
+import { radius, spacing, useAppTheme } from '@/theme';
 
 export interface EmptyStateProps {
   title: string;
   body?: string | undefined;
   actionLabel?: string | undefined;
   onAction?: (() => void) | undefined;
-  /** Optional MCI icon name shown above the title. */
   icon?: string | undefined;
-  /**
-   * `card` (default) — bordered panel for map overlays.
-   * `plain` — no card chrome; for full-screen list empties.
-   */
   variant?: 'card' | 'plain' | undefined;
   style?: StyleProp<ViewStyle> | undefined;
 }
 
-/**
- * Shared empty / sparse state for map overlays and list screens.
- */
 export function EmptyState({
   title,
   body,
@@ -38,11 +30,16 @@ export function EmptyState({
   variant = 'card',
   style,
 }: EmptyStateProps): React.JSX.Element {
+  const { colors } = useAppTheme();
   const plain = variant === 'plain';
 
   return (
     <View
-      style={[plain ? styles.plain : styles.card, style]}
+      style={[
+        plain ? styles.plain : styles.card,
+        plain ? undefined : { backgroundColor: colors.surface, borderColor: colors.border },
+        style,
+      ]}
       accessibilityRole="summary"
     >
       {icon ? (
@@ -53,16 +50,16 @@ export function EmptyState({
           style={styles.icon}
         />
       ) : null}
-      <Text style={styles.title}>{title}</Text>
-      {body ? <Text style={styles.body}>{body}</Text> : null}
+      <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
+      {body ? <Text style={[styles.body, { color: colors.textMuted }]}>{body}</Text> : null}
       {actionLabel && onAction ? (
         <TouchableOpacity
-          style={styles.btn}
+          style={[styles.btn, { backgroundColor: colors.primary }]}
           onPress={onAction}
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
         >
-          <Text style={styles.btnText}>{actionLabel}</Text>
+          <Text style={[styles.btnText, { color: colors.onPrimary }]}>{actionLabel}</Text>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -71,10 +68,8 @@ export function EmptyState({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
     padding: spacing.xl,
     alignItems: 'center',
     gap: spacing.sm,
@@ -86,28 +81,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   icon: { marginBottom: spacing.xs },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  body: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
+  title: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  body: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
   btn: {
     marginTop: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm + 2,
     borderRadius: radius.md,
-    backgroundColor: colors.primary,
   },
-  btnText: {
-    color: colors.onPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
+  btnText: { fontSize: 14, fontWeight: '700' },
 });
