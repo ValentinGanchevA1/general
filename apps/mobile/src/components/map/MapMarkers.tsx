@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Marker } from 'react-native-maps';
 import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
 
+import { nexaHaptics } from '@/haptics/nexaHaptics';
 import { useAppSelector } from '@/hooks/redux';
 
 import { ClusterMarker } from './ClusterMarker';
@@ -111,6 +112,7 @@ function MapMarkersImpl({
 
   const handleEntityPress = useCallback(
     (point: EntityPoint) => {
+      nexaHaptics.select();
       if (selectedEntityKey === undefined) {
         setLocalSelectedEntityKey(entityKey(point));
       }
@@ -123,6 +125,7 @@ function MapMarkersImpl({
 
   const handleClusterPress = useCallback(
     (point: ClusterPoint) => {
+      nexaHaptics.discover();
       if (selectedClusterCellId === undefined) {
         setLocalSelectedClusterCellId(point.cellId);
       }

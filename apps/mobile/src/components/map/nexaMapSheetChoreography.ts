@@ -1,6 +1,8 @@
 import type { Region } from 'react-native-maps';
 import type { EntityPoint } from '@g88/shared';
 
+import { NEXA_MOTION_MS, resolveNexaMotionDuration } from '@/motion/nexaMotion';
+
 export const NEXA_ENTITY_SHEET_SNAP_POINTS = ['36%', '62%'] as const;
 export type NexaEntitySheetSnapIndex = 0 | 1;
 
@@ -16,13 +18,13 @@ const CHOREOGRAPHY_BY_SNAP: Record<NexaEntitySheetSnapIndex, NexaMapSheetChoreog
     snapIndex: 0,
     sheetCoverage: 0.36,
     markerScreenY: 0.32,
-    durationMs: 260,
+    durationMs: NEXA_MOTION_MS.sheet,
   },
   1: {
     snapIndex: 1,
     sheetCoverage: 0.62,
     markerScreenY: 0.19,
-    durationMs: 280,
+    durationMs: NEXA_MOTION_MS.map,
   },
 };
 
@@ -58,6 +60,9 @@ export function mapAnimationDuration(
   snapIndex: number,
   reduceMotion: boolean,
 ): number {
-  if (reduceMotion) return 0;
-  return resolveNexaSheetChoreography(snapIndex).durationMs;
+  return resolveNexaMotionDuration(
+    snapIndex >= 1 ? 'map' : 'sheet',
+    reduceMotion,
+    'skip',
+  );
 }
