@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Dimensions,
   Image,
@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, spacing, radius } from '@/theme';
+import { spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
 
 const { width } = Dimensions.get('window');
 /** Self profile uses full width minus 2× xl + gaps; public parent may already pad. */
@@ -34,6 +34,9 @@ export function ProfilePhotosSection({
   onManage,
   padded = true,
 }: Props): React.JSX.Element | null {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   if (photos.length === 0 && !isSelf) return null;
 
   const photoSize = padded ? PHOTO_SIZE_SELF : (width - 40 - 16) / 3;
@@ -103,42 +106,44 @@ export function ProfilePhotosSection({
   );
 }
 
-const styles = StyleSheet.create({
-  section: { marginTop: spacing.lg },
-  padded: { paddingHorizontal: spacing.xl },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
-  sectionAction: { color: colors.primary, fontSize: 13, fontWeight: '600' },
-  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  gridPhoto: {
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  gridPhotoActive: { borderColor: colors.primary },
-  gridPhotoImage: { borderRadius: radius.sm - 2 },
-  /** Secondary visual cue for primary photo (beyond color border — a11y). */
-  activeBadge: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 10,
-    padding: 2,
-  },
-  addPhotoButton: {
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceRaised,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderStyle: 'dashed',
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    section: { marginTop: spacing.lg },
+    padded: { paddingHorizontal: spacing.xl },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    sectionTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
+    sectionAction: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+    photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    gridPhoto: {
+      borderRadius: radius.sm,
+      overflow: 'hidden',
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    gridPhotoActive: { borderColor: colors.primary },
+    gridPhotoImage: { borderRadius: radius.sm - 2 },
+    /** Secondary visual cue for primary photo (beyond color border — a11y). */
+    activeBadge: {
+      position: 'absolute',
+      bottom: 4,
+      right: 4,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      borderRadius: 10,
+      padding: 2,
+    },
+    addPhotoButton: {
+      borderRadius: radius.sm,
+      backgroundColor: colors.surfaceRaised,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      borderStyle: 'dashed',
+    },
+  });
+}
