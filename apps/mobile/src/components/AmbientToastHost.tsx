@@ -1,7 +1,7 @@
 // apps/mobile/src/components/AmbientToastHost.tsx
 // Tokenized gradients (colors.toast*) + shadowInk — see theme/index.ts ownership.
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   AppState,
@@ -39,7 +39,7 @@ import { resolveNexaMotionDuration } from '@/motion/nexaMotion';
 import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
 import { openViaRef } from '@/navigation/openRootScreen';
 import { useSocket } from '@/realtime/useSocket';
-import { colors, radius } from '@/theme';
+import { radius, useAppTheme, type ThemeColors } from '@/theme';
 
 const BELOW_CHALLENGE_EXTRA = 64;
 const DEFAULT_VISIBLE_MS = 4_000;
@@ -64,7 +64,7 @@ type ToastVisual = {
   border: string;
 };
 
-function visualFor(item: ToastItem): ToastVisual {
+function visualFor(item: ToastItem, colors: ThemeColors): ToastVisual {
   switch (item.kind) {
     case 'level':
       return {
@@ -76,8 +76,7 @@ function visualFor(item: ToastItem): ToastVisual {
         border: colors.warning + '99',
       };
     case 'challenge': {
-      const xp =
-        item.data.rewardXp > 0 ? `+${item.data.rewardXp} XP` : undefined;
+      const xp = item.data.rewardXp > 0 ? `+${item.data.rewardXp} XP` : undefined;
       return {
         eyebrow: 'Challenge complete',
         title: item.data.title,
@@ -89,8 +88,7 @@ function visualFor(item: ToastItem): ToastVisual {
       };
     }
     case 'achievement': {
-      const xp =
-        item.data.rewardXp > 0 ? `+${item.data.rewardXp} XP` : undefined;
+      const xp = item.data.rewardXp > 0 ? `+${item.data.rewardXp} XP` : undefined;
       return {
         eyebrow: 'Achievement unlocked',
         title: item.data.title,
@@ -103,8 +101,7 @@ function visualFor(item: ToastItem): ToastVisual {
     }
     case 'rank':
       return {
-        eyebrow:
-          item.data.scope === 'weekly' ? 'Weekly climb' : 'All-time climb',
+        eyebrow: item.data.scope === 'weekly' ? 'Weekly climb' : 'All-time climb',
         title: `#${item.data.previousRank} → #${item.data.rank}`,
         icon: '📈',
         gradient: [colors.toastRank, colors.surface, colors.bg],
@@ -154,6 +151,8 @@ function hapticIntentFor(item: ToastItem): NexaHapticIntent {
 }
 
 export function AmbientToastHost(): React.JSX.Element | null {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { on } = useSocket();
   const insets = useSafeAreaInsets();
   const reduceMotion = useNexaReducedMotion();
@@ -301,15 +300,9 @@ export function AmbientToastHost(): React.JSX.Element | null {
     };
     const sub = AppState.addEventListener('change', onApp);
     const unsubs = [
-      on('level:up', () => {
-        void checkRanks();
-      }),
-      on('challenge:completed', () => {
-        void checkRanks();
-      }),
-      on('achievement:unlocked', () => {
-        void checkRanks();
-      }),
+      on('level:up', () => { void checkRanks(); }),
+      on('challenge:completed', () => { void checkRanks(); }),
+      on('achievement:unlocked', () => { void checkRanks(); }),
     ];
     return () => {
       sub.remove();
@@ -322,30 +315,18 @@ export function AmbientToastHost(): React.JSX.Element | null {
     const item = current;
     dismiss();
     switch (item.kind) {
-      case 'level':
-        openViaRef('Leaderboard');
-        break;
-      case 'challenge':
-        openViaRef('Challenges');
-        break;
-      case 'achievement':
-        openViaRef('Achievements');
-        break;
-      case 'rank':
-        openViaRef('Leaderboard');
-        break;
-      case 'wave':
-        openViaRef('UserProfile', { userId: item.data.fromUser.id });
-        break;
-      case 'gift':
-        openViaRef('GiftsInbox');
-        break;
+      case 'level': openViaRef('Leaderboard'); break;
+      case 'challenge': openViaRef('Challenges'); break;
+      case 'achievement': openViaRef('Achievements'); break;
+      case 'rank': openViaRef('Leaderboard'); break;
+      case 'wave': openViaRef('UserProfile', { userId: item.data.fromUser.id }); break;
+      case 'gift': openViaRef('GiftsInbox'); break;
     }
   }, [current, dismiss]);
 
   if (!current) return null;
 
-  const v = visualFor(current);
+  const v = visualFor(current, colors);
   const translateY = anim.interpolate({
     inputRange: [0, 1],
     outputRange: reduceMotion ? [0, 0] : [-28, 0],
@@ -418,91 +399,93 @@ export function AmbientToastHost(): React.JSX.Element | null {
 /** @deprecated Use AmbientToastHost — kept as alias for any lingering imports. */
 export const AchievementToastHost = AmbientToastHost;
 
-const styles = StyleSheet.create({
-  wrap: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 1000,
-    alignItems: 'center',
-  },
-  touch: {
-    width: '100%',
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    width: '100%',
-    minHeight: 64,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    overflow: 'hidden',
-    shadowColor: colors.shadowInk,
-    shadowOpacity: 0.45,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
-  },
-  glow: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    top: -40,
-    left: -30,
-  },
-  badge: {
-    position: 'relative' as const,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    overflow: 'hidden',
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceRaised,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-  },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconEmoji: {
-    fontSize: 22,
-  },
-  body: {
-    flex: 1,
-    minWidth: 0,
-  },
-  eyebrow: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: 3,
-    lineHeight: 20,
-  },
-  xpChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-  },
-  xpText: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrap: {
+      position: 'absolute',
+      left: 16,
+      right: 16,
+      zIndex: 1000,
+      alignItems: 'center',
+    },
+    touch: {
+      width: '100%',
+    },
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      width: '100%',
+      minHeight: 64,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      overflow: 'hidden',
+      shadowColor: colors.shadowInk,
+      shadowOpacity: 0.45,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 12,
+    },
+    glow: {
+      position: 'absolute',
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      top: -40,
+      left: -30,
+    },
+    badge: {
+      position: 'relative' as const,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      overflow: 'hidden',
+      borderWidth: 1.5,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceRaised,
+    },
+    avatar: {
+      width: 44,
+      height: 44,
+    },
+    iconCircle: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iconEmoji: {
+      fontSize: 22,
+    },
+    body: {
+      flex: 1,
+      minWidth: 0,
+    },
+    eyebrow: {
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+    },
+    title: {
+      color: colors.textPrimary,
+      fontSize: 15,
+      fontWeight: '700',
+      marginTop: 3,
+      lineHeight: 20,
+    },
+    xpChip: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: radius.pill,
+    },
+    xpText: {
+      fontSize: 12,
+      fontWeight: '800',
+      letterSpacing: 0.2,
+    },
+  });
+}
