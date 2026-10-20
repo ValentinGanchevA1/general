@@ -16,7 +16,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { updateProfile } from '@/features/profile/profileSlice';
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
 import { FormField } from '@/components/FormField';
-import { colors, fontSize, spacing, radius, useAppTheme } from '@/theme';
+import { colors, fontSize, spacing, radius } from '@/theme';
 
 const TOTAL_STEPS = 5;
 
@@ -251,7 +251,6 @@ function StepVisibility({
 }
 
 export function ProfileCreationScreen(): React.JSX.Element {
-  const { colors: themeColors } = useAppTheme();
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((s) => s.auth.user);
   const { loading, error } = useAppSelector((s) => s.profile);
@@ -327,7 +326,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
 
   if (step === 0) {
     return (
-      <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
+      <View style={styles.root}>
         <View style={styles.welcomeBody}>
           <Text style={styles.logo}>G88</Text>
           <Text style={styles.welcomeHeading}>Welcome to G88</Text>
@@ -349,7 +348,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: themeColors.bg }]}
+      style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.progressRow}>
@@ -468,88 +467,126 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 3,
     borderRadius: 2,
-    backgroundColor: colors.borderStrong,
+    backgroundColor: colors.surfaceAlt,
   },
   progressSegmentFilled: { backgroundColor: colors.primary },
-  scroll: { flexGrow: 1, paddingHorizontal: spacing.xxl, paddingVertical: spacing.xl },
-  stepBody: { flex: 1, gap: spacing.md },
+  scroll: { padding: spacing.xxl, paddingBottom: spacing.sm, flexGrow: 1 },
+  stepBody: { gap: spacing.md },
   stepHeading: {
     color: colors.textPrimary,
     fontSize: 28,
     fontWeight: '700',
-    lineHeight: 34,
-    marginBottom: spacing.xs,
+    lineHeight: 36,
+    marginBottom: 4,
   },
   stepSub: {
-    color: colors.textSecondary,
-    fontSize: fontSize.md,
-    lineHeight: 21,
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
     marginBottom: spacing.sm,
   },
-  bioInput: { minHeight: 120, textAlignVertical: 'top' },
-  charCount: { color: colors.textFaint, fontSize: fontSize.xs, textAlign: 'right' },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    marginTop: 4,
   },
-  toggleLabel: { color: colors.textSecondary, fontSize: fontSize.md },
-  goalsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  toggleLabel: {
+    color: colors.textPrimary,
+    fontSize: fontSize.md,
+    fontWeight: '500',
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  bioInput: { minHeight: 120 },
+  charCount: {
+    color: colors.textFaint,
+    fontSize: fontSize.xs,
+    textAlign: 'right',
+  },
+  error: { color: colors.danger, fontSize: fontSize.sm, marginTop: 4 },
+  goalsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   goalChip: {
-    width: '48%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.borderStrong,
-    backgroundColor: colors.surface,
   },
-  goalChipActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  goalIcon: { fontSize: 22 },
-  goalLabel: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '600', flex: 1 },
+  goalChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(0,212,255,0.1)',
+  },
+  goalIcon: { fontSize: 18 },
+  goalLabel: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    fontWeight: '500',
+  },
   goalLabelActive: { color: colors.primary },
   visibilityCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.md,
+    gap: 14,
+    padding: 18,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.borderStrong,
-    backgroundColor: colors.surface,
+    marginBottom: spacing.md,
   },
-  visibilityCardActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  visibilityCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(0,212,255,0.06)',
+  },
   visibilityIcon: { fontSize: 28 },
-  visibilityText: { flex: 1, gap: 3 },
-  visibilityTitle: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
-  visibilityTitleActive: { color: colors.primary },
-  visibilitySub: { color: colors.textMuted, fontSize: fontSize.sm },
-  visibilityCheck: { color: colors.primary, fontSize: 20, fontWeight: '700' },
+  visibilityText: { flex: 1, gap: 2 },
+  visibilityTitle: {
+    color: colors.textSecondary,
+    fontSize: fontSize.md + 1,
+    fontWeight: '600',
+  },
+  visibilityTitleActive: { color: colors.textPrimary },
+  visibilitySub: { color: colors.textFaint, fontSize: fontSize.sm },
+  visibilityCheck: { color: colors.primary, fontSize: 18, fontWeight: '700' },
   footer: {
     flexDirection: 'row',
     gap: spacing.md,
-    paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xxl,
+    padding: spacing.xxl,
     paddingTop: spacing.md,
   },
   backBtn: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: 20,
     paddingVertical: 14,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
     justifyContent: 'center',
   },
-  backBtnText: { color: colors.textSecondary, fontSize: fontSize.md, fontWeight: '600' },
+  backBtnText: {
+    color: colors.textSecondary,
+    fontWeight: '600',
+    fontSize: fontSize.md,
+  },
   btn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,
-    paddingVertical: 15,
-    paddingHorizontal: spacing.xl,
+    padding: 14,
     alignItems: 'center',
   },
   btnFlex: { flex: 1 },
   btnDisabled: { opacity: 0.4 },
-  btnText: { color: colors.onPrimary, fontSize: fontSize.md, fontWeight: '700' },
-  error: { color: colors.danger, fontSize: fontSize.sm, marginTop: spacing.sm },
+  btnText: {
+    color: colors.onPrimary,
+    fontWeight: '700',
+    fontSize: fontSize.md,
+  },
 });

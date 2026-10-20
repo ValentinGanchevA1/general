@@ -27,10 +27,11 @@ import { fetchProfile } from '@/features/profile/profileSlice';
 import { extractMessage } from '@/utils/extractMessage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import type { AccountStackParamList } from '@/navigation/stacks';
-import { colors, fontSize, spacing, radius, useAppTheme } from '@/theme';
+import { colors, fontSize, spacing, radius } from '@/theme';
 
 type StepKey = 'selfie' | 'idFront' | 'idBack';
 
+/** A picked image: `uri` for preview, `base64` + `type` for the upload payload. */
 type PickedImage = { uri: string; base64: string; type: string };
 
 const STEPS: { key: StepKey; title: string; optional?: boolean }[] = [
@@ -40,11 +41,12 @@ const STEPS: { key: StepKey; title: string; optional?: boolean }[] = [
 ];
 
 export default function VerificationIdScreen(): React.ReactElement {
-  const { colors: themeColors } = useAppTheme();
   const navigation = useNavigation<NativeStackNavigationProp<AccountStackParamList>>();
   const dispatch = useAppDispatch();
   const status = useAppSelector((s) => s.idVerification.status);
 
+  // Pull the latest status on entry so a returning user sees "under review"
+  // instead of being able to re-submit a pending request.
   useEffect(() => {
     void dispatch(fetchIdVerificationStatus());
   }, [dispatch]);
@@ -68,6 +70,9 @@ export default function VerificationIdScreen(): React.ReactElement {
   }
 
   async function pickForStep(step: StepKey) {
+    // Bound the dimensions so the base64 payload stays well under the API's body
+    // limit even with selfie + ID front + back in one submission.
+    // PhotoQuality is a discrete union (0 | 0.1 | … | 1) — 0.65 is not assignable.
     const options: ImageLibraryOptions = {
       mediaType: 'photo',
       quality: 0.6,
@@ -104,6 +109,9 @@ export default function VerificationIdScreen(): React.ReactElement {
 
     setUploading(true);
     try {
+      // Single base64 submission: the server decodes, uploads to S3 with the right
+      // Content-Type, and generates the keys. This is the same transport the photo
+      // gallery uses — React Native's binary PUT to a presigned URL is unreliable.
       await dispatch(
         submitIdVerification({
           selfie: images.selfie.base64,
@@ -116,6 +124,8 @@ export default function VerificationIdScreen(): React.ReactElement {
         }),
       ).unwrap();
 
+      // Refresh the profile so the ProfileScreen card reflects "Under review"
+      // (the submit flips id_verification_status to 'pending' server-side).
       void dispatch(fetchProfile());
 
       appAlert('Success', 'Verification submitted for review.', [
@@ -152,7 +162,7 @@ export default function VerificationIdScreen(): React.ReactElement {
 
   if (status === 'pending') {
     return (
-      <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
+      <View style={styles.root}>
         <ScreenHeader title="ID verification" bordered onBack={() => navigation.goBack()} />
         <View style={[styles.body, styles.centered]}>
           <Text style={styles.title}>Under review</Text>
@@ -169,7 +179,7 @@ export default function VerificationIdScreen(): React.ReactElement {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
+    <View style={styles.root}>
       <ScreenHeader
         title="ID verification"
         bordered
@@ -246,13 +256,7 @@ export default function VerificationIdScreen(): React.ReactElement {
               </Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity
-              style={styles.primary}
-              onPress={() => {
-                void uploadAll();
-              }}
-              disabled={uploading}
-            >
+            <TouchableOpacity style={styles.primary} onPress={() => { void uploadAll(); }} disabled={uploading}>
               {uploading ? (
                 <ActivityIndicator color={colors.onPrimary} size="small" />
               ) : (
