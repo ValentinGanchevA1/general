@@ -4,7 +4,7 @@
 // caller's wallet balance, a catalog grid with unaffordable items disabled,
 // an optional note, and a send button. Spends XP via POST /gifts/send.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -20,11 +20,8 @@ import { appAlert } from '@/ui/appAlert';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { ApiError, GiftCatalogItem } from '@g88/shared';
-import { colors } from '@/theme';
+import { useAppTheme, type ThemeColors } from '@/theme';
 import { sendGift, useGiftBalance, useGiftCatalog } from './useGifts';
-
-/** XP gold — product accent, not in core theme palette. */
-const XP_GOLD = colors.premium;
 
 interface Props {
   visible: boolean;
@@ -42,6 +39,9 @@ export function SendGiftSheet({
   onClose,
   onSent,
 }: Props): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const xpGold = colors.premium;
   const { catalog } = useGiftCatalog();
   const { spendableXp, refresh } = useGiftBalance();
   const [selected, setSelected] = useState<GiftCatalogItem | null>(null);
@@ -92,8 +92,8 @@ export function SendGiftSheet({
           <View style={styles.header}>
             <Text style={styles.title}>Send a gift</Text>
             <View style={styles.balancePill}>
-              <Icon name="star-four-points" size={13} color={XP_GOLD} />
-              <Text style={styles.balanceText}>{spendableXp.toLocaleString()} XP</Text>
+              <Icon name="star-four-points" size={13} color={xpGold} />
+              <Text style={[styles.balanceText, { color: xpGold }]}>{spendableXp.toLocaleString()} XP</Text>
             </View>
           </View>
           <Text style={styles.subtitle}>To {recipientName}</Text>
@@ -116,7 +116,13 @@ export function SendGiftSheet({
                 >
                   <Text style={styles.giftEmoji}>{item.emoji}</Text>
                   <Text style={styles.giftLabel}>{item.label}</Text>
-                  <Text style={[styles.giftCost, !affordable && styles.giftCostDisabled]}>
+                  <Text
+                    style={[
+                      styles.giftCost,
+                      { color: xpGold },
+                      !affordable && styles.giftCostDisabled,
+                    ]}
+                  >
                     {item.costXp} XP
                   </Text>
                 </TouchableOpacity>
@@ -154,94 +160,96 @@ export function SendGiftSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 32,
-    paddingTop: 10,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.borderStrong,
-    marginBottom: 14,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
-  balancePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.surfaceAlt,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  balanceText: { color: XP_GOLD, fontSize: 13, fontWeight: '700' },
-  subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 4, marginBottom: 16 },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  giftCell: {
-    width: '30%',
-    flexGrow: 1,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  giftCellSelected: {
-    borderColor: colors.primary,
-  },
-  giftCellDisabled: {
-    opacity: 0.4,
-  },
-  giftEmoji: { fontSize: 28 },
-  giftLabel: { color: colors.textPrimary, fontSize: 12, fontWeight: '600', marginTop: 4 },
-  giftCost: { color: XP_GOLD, fontSize: 11, marginTop: 2 },
-  giftCostDisabled: { color: colors.textFaint },
-  note: {
-    marginTop: 14,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    color: colors.textPrimary,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-  },
-  sendBtn: {
-    marginTop: 14,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  sendBtnDisabled: {
-    opacity: 0.45,
-  },
-  sendBtnText: {
-    color: colors.onPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingHorizontal: 20,
+      paddingBottom: 32,
+      paddingTop: 10,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.borderStrong,
+      marginBottom: 14,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
+    balancePill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: colors.surfaceAlt,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    balanceText: { fontSize: 13, fontWeight: '700' },
+    subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 4, marginBottom: 16 },
+    grid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    giftCell: {
+      width: '30%',
+      flexGrow: 1,
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      paddingVertical: 12,
+      alignItems: 'center',
+    },
+    giftCellSelected: {
+      borderColor: colors.primary,
+    },
+    giftCellDisabled: {
+      opacity: 0.4,
+    },
+    giftEmoji: { fontSize: 28 },
+    giftLabel: { color: colors.textPrimary, fontSize: 12, fontWeight: '600', marginTop: 4 },
+    giftCost: { fontSize: 11, marginTop: 2 },
+    giftCostDisabled: { color: colors.textFaint },
+    note: {
+      marginTop: 14,
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      color: colors.textPrimary,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 14,
+    },
+    sendBtn: {
+      marginTop: 14,
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    sendBtnDisabled: {
+      opacity: 0.45,
+    },
+    sendBtnText: {
+      color: colors.onPrimary,
+      fontSize: 15,
+      fontWeight: '700',
+    },
+  });
+}
