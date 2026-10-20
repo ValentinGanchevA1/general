@@ -10,7 +10,7 @@ function item(overrides: Partial<InboxItem> & Pick<InboxItem, 'id' | 'type' | 'c
 }
 
 describe('aggregateInbox', () => {
-  it('treats match as first-class activity and prioritizes it over gift and wave', () => {
+  it('keeps different activity types from the same actor as distinct rows', () => {
     const rows = aggregateInbox([
       item({ id: 'wave:1', type: 'wave', createdAt: '2026-10-20T12:00:00.000Z' }),
       item({
@@ -28,19 +28,26 @@ describe('aggregateInbox', () => {
       }),
     ]);
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.primary.type).toBe('match');
-    expect(rows[0]?.count).toBe(3);
-    expect(rows[0]?.latestAt).toBe('2026-10-20T12:00:00.000Z');
+    expect(rows).toHaveLength(3);
+    expect(rows.map((row) => row.primary.type)).toEqual(['wave', 'gift', 'match']);
+    expect(rows.map((row) => row.latestAt)).toEqual([
+      '2026-10-20T12:00:00.000Z',
+      '2026-10-20T11:00:00.000Z',
+      '2026-10-20T10:00:00.000Z',
+    ]);
+    expect(rows.every((row) => row.count === 1)).toBe(true);
   });
 
-  it('keeps friend request as the highest-priority actionable signal', () => {
+  it('aggregates repeated signals only when actor and type both match', () => {
     const rows = aggregateInbox([
-      item({ id: 'match:1', type: 'match', createdAt: '2026-10-20T12:00:00.000Z' }),
-      item({ id: 'friend:1', type: 'friend_request', createdAt: '2026-10-20T10:00:00.000Z' }),
+      item({ id: 'wave:1', type: 'wave', createdAt: '2026-10-20T10:00:00.000Z' }),
+      item({ id: 'wave:2', type: 'wave', createdAt: '2026-10-20T12:00:00.000Z' }),
     ]);
 
-    expect(rows[0]?.primary.type).toBe('friend_request');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.primary.id).toBe('wave:2');
+    expect(rows[0]?.count).toBe(2);
+    expect(rows[0]?.latestAt).toBe('2026-10-20T12:00:00.000Z');
   });
 
   it('labels matches and gifts explicitly', () => {
@@ -61,7 +68,7 @@ describe('aggregateInbox', () => {
     expect(aggregatedSignalLabel(match, 3)).toBe('matched with you · 3×');
   });
 
-  it('sorts actor groups by their latest activity timestamp', () => {
+  it('sorts groups by their actual latest activity timestamp', () => {
     const rows = aggregateInbox([
       {
         ...item({ id: 'wave:older', type: 'wave', createdAt: '2026-10-20T10:00:00.000Z' }),
