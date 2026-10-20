@@ -11,7 +11,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  Vibration,
   View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -35,6 +34,9 @@ import {
   markRankBaselineReady,
   setLastRank,
 } from '@/features/gamification/rankBaseline';
+import { triggerNexaHaptic, type NexaHapticIntent } from '@/haptics/nexaHaptics';
+import { resolveNexaMotionDuration } from '@/motion/nexaMotion';
+import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
 import { openViaRef } from '@/navigation/openRootScreen';
 import { useSocket } from '@/realtime/useSocket';
 import { colors, radius } from '@/theme';
@@ -138,22 +140,23 @@ function visibleMsFor(item: ToastItem): number {
   return item.kind === 'level' ? LEVEL_VISIBLE_MS : DEFAULT_VISIBLE_MS;
 }
 
-function hapticFor(item: ToastItem): number[] {
+function hapticIntentFor(item: ToastItem): NexaHapticIntent {
   switch (item.kind) {
     case 'level':
-      return [0, 40, 40, 40, 40, 80];
     case 'challenge':
-      return [0, 30, 50, 30];
+    case 'achievement':
     case 'rank':
-      return [0, 25, 40, 25];
-    default:
-      return [0, 30, 60, 30];
+      return 'success';
+    case 'wave':
+    case 'gift':
+      return 'connect';
   }
 }
 
 export function AmbientToastHost(): React.JSX.Element | null {
   const { on } = useSocket();
   const insets = useSafeAreaInsets();
+  const reduceMotion = useNexaReducedMotion();
   const [current, setCurrent] = useState<ToastItem | null>(null);
   const queueRef = useRef<ToastItem[]>([]);
   const showingRef = useRef(false);
@@ -172,20 +175,32 @@ export function AmbientToastHost(): React.JSX.Element | null {
       clearTimeout(hideTimer.current);
       hideTimer.current = null;
     }
+
+    if (reduceMotion) {
+      scale.setValue(1);
+      Animated.timing(anim, {
+        toValue: 0,
+        duration: resolveNexaMotionDuration('standard', true),
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }).start(() => presentNext());
+      return;
+    }
+
     Animated.parallel([
       Animated.timing(anim, {
         toValue: 0,
-        duration: 180,
+        duration: resolveNexaMotionDuration('standard', false),
         easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.timing(scale, {
         toValue: 0.92,
-        duration: 180,
+        duration: resolveNexaMotionDuration('standard', false),
         useNativeDriver: true,
       }),
     ]).start(() => presentNext());
-  }, [anim, scale, presentNext]);
+  }, [anim, scale, presentNext, reduceMotion]);
 
   const enqueue = useCallback(
     (item: ToastItem) => {
@@ -197,32 +212,44 @@ export function AmbientToastHost(): React.JSX.Element | null {
 
   useEffect(() => {
     if (!current) return;
-    try {
-      Vibration.vibrate(hapticFor(current));
-    } catch {
-      /* no-op */
-    }
+
+    triggerNexaHaptic(hapticIntentFor(current));
     anim.setValue(0);
-    scale.setValue(current.kind === 'level' ? 0.86 : 0.94);
-    Animated.parallel([
+
+    if (reduceMotion) {
+      scale.setValue(1);
       Animated.timing(anim, {
         toValue: 1,
-        duration: current.kind === 'level' ? 340 : 260,
-        easing: Easing.out(Easing.cubic),
+        duration: resolveNexaMotionDuration('standard', true),
+        easing: Easing.out(Easing.quad),
         useNativeDriver: true,
-      }),
-      Animated.spring(scale, {
-        toValue: 1,
-        friction: 7,
-        tension: 120,
-        useNativeDriver: true,
-      }),
-    ]).start();
+      }).start();
+    } else {
+      scale.setValue(current.kind === 'level' ? 0.86 : 0.94);
+      Animated.parallel([
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: resolveNexaMotionDuration(
+            current.kind === 'level' ? 'celebration' : 'sheet',
+            false,
+          ),
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(scale, {
+          toValue: 1,
+          friction: 7,
+          tension: 120,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+
     hideTimer.current = setTimeout(dismiss, visibleMsFor(current));
     return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current);
     };
-  }, [current, anim, scale, dismiss]);
+  }, [current, anim, scale, dismiss, reduceMotion]);
 
   useEffect(() => {
     const unsubs = [
@@ -321,7 +348,7 @@ export function AmbientToastHost(): React.JSX.Element | null {
   const v = visualFor(current);
   const translateY = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: [-28, 0],
+    outputRange: reduceMotion ? [0, 0] : [-28, 0],
   });
   const top = insets.top + 8 + BELOW_CHALLENGE_EXTRA;
   const isCelebration =

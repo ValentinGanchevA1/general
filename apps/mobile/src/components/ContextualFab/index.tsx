@@ -12,7 +12,7 @@
 
 import React, { useCallback, useState } from 'react';
 import {
-  Animated, Pressable, StyleSheet, Text, Vibration, View,
+  Animated, Pressable, StyleSheet, Text, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -27,6 +27,9 @@ import { setPendingFilter } from '@/features/pulse/pulseSlice';
 import { track } from '@/lib/analytics';
 import { colors, radius, spacing, fontSize, shadow } from '@/theme';
 import { mapFabBottom } from '@/components/map/mapChromeLayout';
+import { nexaHaptics } from '@/haptics/nexaHaptics';
+import { NEXA_MOTION_SCALE } from '@/motion/nexaMotion';
+import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
 
 import { useFabContext, type FabActionId } from './useFabContext';
 import { FAB_ACTIONS } from './fabActions';
@@ -51,16 +54,24 @@ export function ContextualFab(props: Props): React.JSX.Element {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
+  const reduceMotion = useNexaReducedMotion();
   const fabBottom = mapFabBottom(insets.bottom, bottomOffset);
 
   const [anim] = useState(() => new Animated.Value(0));
   const [expandAt, setExpandAt] = useState(0);
 
   const animateTo = useCallback((toValue: number): void => {
+    if (reduceMotion) {
+      anim.setValue(toValue);
+      return;
+    }
     Animated.spring(anim, {
-      toValue, useNativeDriver: true, friction: 7, tension: 80,
+      toValue,
+      useNativeDriver: true,
+      friction: 7,
+      tension: 80,
     }).start();
-  }, [anim]);
+  }, [anim, reduceMotion]);
 
   const collapse = useCallback((): void => {
     animateTo(0);
@@ -72,7 +83,7 @@ export function ContextualFab(props: Props): React.JSX.Element {
     setOpen(true);
     setExpandAt(Date.now());
     animateTo(1);
-    try { Vibration.vibrate(10); } catch { /* no-op */ }
+    nexaHaptics.select();
     track('fab.expand', { contextKey: ctx.key, primaryActionId: ctx.primary, gesture: 'tap' });
   }, [open, collapse, animateTo, ctx.key, ctx.primary]);
 
@@ -177,7 +188,7 @@ const S = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
     zIndex: 102,
   },
-  pressed: { opacity: 0.9, transform: [{ scale: 0.97 }] },
+  pressed: { opacity: 0.9, transform: [{ scale: NEXA_MOTION_SCALE.press }] },
   fab: {
     width: FAB_SIZE, height: FAB_SIZE, borderRadius: radius.fab,
     backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',
