@@ -8,6 +8,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { nexaDark } from '@/theme';
+
 import { NexaSymbol } from './NexaSymbol';
 
 type BrandLogoProps = {
@@ -62,7 +64,7 @@ const styles = StyleSheet.create({
   },
   wordmark: {
     marginTop: -2,
-    color: '#F7F8FA',
+    color: nexaDark.textPrimary,
     fontWeight: '600',
     textAlign: 'center',
   },
