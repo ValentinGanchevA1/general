@@ -705,7 +705,7 @@ const styles = StyleSheet.create({
   },
   toggleLabel: {
     fontSize: fontSize.md,
-    fontWeight: '650',
+    fontWeight: '600',
   },
   toggleHint: {
     fontSize: fontSize.xs,
@@ -738,7 +738,7 @@ const styles = StyleSheet.create({
   goalIcon: { fontSize: 18 },
   goalLabel: {
     fontSize: fontSize.sm,
-    fontWeight: '650',
+    fontWeight: '600',
   },
   visibilityCard: {
     minHeight: 82,
@@ -762,7 +762,7 @@ const styles = StyleSheet.create({
   },
   visibilityTitle: {
     fontSize: fontSize.md + 1,
-    fontWeight: '750',
+    fontWeight: '700',
   },
   visibilitySub: {
     fontSize: fontSize.sm,
