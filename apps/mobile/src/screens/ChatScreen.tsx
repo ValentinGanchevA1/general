@@ -18,7 +18,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson } from '@/api/client';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { Avatar } from '@/components/Avatar';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, useAppTheme } from '@/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {
@@ -103,6 +103,7 @@ function MessageBubble({
 }
 
 export function ChatScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { params } = useRoute<Route>();
@@ -295,7 +296,7 @@ export function ChatScreen(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={[styles.root, { backgroundColor: themeColors.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
