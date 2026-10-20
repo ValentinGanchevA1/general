@@ -6,7 +6,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 
 /**
- * Side-effects for friend-request lifecycle: FCM + Socket.IO.
+ * Side-effects for friend-request lifecycle: durable Activity + FCM + Socket.IO.
  * Kept separate so FriendsService stays focused on the graph.
  */
 @Injectable()
@@ -52,6 +52,16 @@ export class FriendsNotifyService {
     try {
       const peer = await this.loadUser(addresseeId);
       if (!peer) return;
+
+      await this.db.query(
+        `INSERT INTO personal_activity_notifications
+           (recipient_id, actor_id, kind, source_type, source_id, destination)
+         VALUES ($1, $2, 'friend_accepted', 'friendship', $3,
+                 jsonb_build_object('type', 'profile', 'userId', $2::text))
+         ON CONFLICT (recipient_id, source_type, source_id) DO NOTHING`,
+        [requesterId, peer.id, this.friendshipSourceId(requesterId, peer.id)],
+      );
+
       await this.realtime.emitFriendAccepted(requesterId, {
         peerUserId: peer.id,
         peerDisplayName: peer.displayName,
@@ -75,6 +85,10 @@ export class FriendsNotifyService {
       [userId],
     );
     return Number(row?.n ?? 0);
+  }
+
+  private friendshipSourceId(userA: string, userB: string): string {
+    return [userA, userB].sort().join(':');
   }
 
   private async loadUser(
