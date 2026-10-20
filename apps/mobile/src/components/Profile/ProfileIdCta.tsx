@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { UserProfile } from '@g88/shared';
-import { colors, spacing, radius } from '@/theme';
+import { spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
 
 export function ProfileIdCta({
   status,
@@ -12,12 +12,15 @@ export function ProfileIdCta({
   status: UserProfile['idVerificationStatus'];
   onPress: () => void;
 }): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.sectionPadded}>
       <TouchableOpacity style={styles.idCta} onPress={onPress} activeOpacity={0.85}>
         <View style={styles.idCtaLeft}>
           <Icon name="card-account-details" size={20} color={colors.warning} />
-          <View style={{ flex: 1 }}>
+          <View style={styles.copy}>
             <Text style={styles.idCtaTitle}>
               {status === 'pending'
                 ? 'ID under review'
@@ -38,18 +41,21 @@ export function ProfileIdCta({
   );
 }
 
-const styles = StyleSheet.create({
-  sectionPadded: { paddingHorizontal: spacing.xl, marginTop: spacing.md },
-  idCta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  idCtaLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  idCtaTitle: { color: colors.textPrimary, fontWeight: '700', fontSize: 15 },
-  idCtaSub: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    sectionPadded: { paddingHorizontal: spacing.xl, marginTop: spacing.md },
+    idCta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceRaised,
+      borderRadius: radius.md,
+      padding: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    idCtaLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+    copy: { flex: 1 },
+    idCtaTitle: { color: colors.textPrimary, fontWeight: '700', fontSize: 15 },
+    idCtaSub: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  });
+}
