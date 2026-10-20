@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -11,7 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, fontSize, spacing } from '@/theme';
+import { fontSize, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 const BACK_SIZE = 48;
 
@@ -26,6 +26,49 @@ export interface ScreenHeaderProps {
   transparent?: boolean;
 }
 
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.md,
+      backgroundColor: colors.bg,
+    },
+    transparent: { backgroundColor: 'transparent' },
+    bordered: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.borderStrong,
+    },
+    back: {
+      width: BACK_SIZE,
+      height: BACK_SIZE,
+      alignItems: 'flex-start',
+      justifyContent: 'center',
+    },
+    side: {
+      minWidth: BACK_SIZE,
+      minHeight: BACK_SIZE,
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+    },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: BACK_SIZE,
+    },
+    title: {
+      flex: 1,
+      color: colors.textPrimary,
+      fontSize: fontSize.lg,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+  });
+}
+
 export function ScreenHeader({
   title,
   center,
@@ -38,6 +81,8 @@ export function ScreenHeader({
 }: ScreenHeaderProps): React.JSX.Element {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const handleBack = (): void => {
     if (onBack) {
@@ -55,7 +100,7 @@ export function ScreenHeader({
         styles.header,
         { paddingTop: insets.top + spacing.sm },
         transparent ? styles.transparent : null,
-        bordered && styles.bordered,
+        bordered ? styles.bordered : null,
         style,
       ]}
     >
@@ -85,46 +130,3 @@ export function ScreenHeader({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.bg,
-  },
-  transparent: {
-    backgroundColor: 'transparent',
-  },
-  bordered: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderStrong,
-  },
-  back: {
-    width: BACK_SIZE,
-    height: BACK_SIZE,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  side: {
-    minWidth: BACK_SIZE,
-    minHeight: BACK_SIZE,
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: BACK_SIZE,
-  },
-  title: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-});
