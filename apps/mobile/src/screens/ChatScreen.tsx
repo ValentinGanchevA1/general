@@ -18,7 +18,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson } from '@/api/client';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { Avatar } from '@/components/Avatar';
-import { colors, spacing, useAppTheme } from '@/theme';
+import { spacing, useAppTheme, type ThemeColors } from '@/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {
@@ -57,6 +57,9 @@ function MessageBubble({
   peerAvatarUrl: string | null;
   onOpenPeerProfile: (() => void) | null;
 }): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   if (msg.type === 'location_session') {
     return <LocationSessionBubble msg={msg} isMine={isMine} />;
   }
@@ -79,11 +82,8 @@ function MessageBubble({
     </View>
   );
 
-  if (isMine) {
-    return bubble;
-  }
+  if (isMine) return bubble;
 
-  // Peer row: avatar left of bubble — tap opens UserProfile.
   return (
     <View style={styles.peerRow}>
       <TouchableOpacity
@@ -103,7 +103,8 @@ function MessageBubble({
 }
 
 export function ChatScreen(): React.JSX.Element {
-  const { colors: themeColors } = useAppTheme();
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { params } = useRoute<Route>();
@@ -126,9 +127,7 @@ export function ChatScreen(): React.JSX.Element {
   const pendingIds = useMemo(() => {
     const ids = new Set(outbox.map((e) => e.optimisticId));
     for (const m of messages) {
-      if (m.id.startsWith('opt-') && !failedIds.includes(m.id)) {
-        ids.add(m.id);
-      }
+      if (m.id.startsWith('opt-') && !failedIds.includes(m.id)) ids.add(m.id);
     }
     return ids;
   }, [outbox, messages, failedIds]);
@@ -160,10 +159,7 @@ export function ChatScreen(): React.JSX.Element {
     openInMaps,
   } = useLiveLocationShare(conversationId);
 
-  const otherUserId =
-    paramOtherUserId ??
-    messages.find((m) => m.senderId !== myUserId)?.senderId ??
-    null;
+  const otherUserId = paramOtherUserId ?? messages.find((m) => m.senderId !== myUserId)?.senderId ?? null;
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
@@ -181,12 +177,8 @@ export function ChatScreen(): React.JSX.Element {
           });
         }
       })
-      .catch(() => {
-        /* non-blocking */
-      });
-    return () => {
-      cancelled = true;
-    };
+      .catch(() => { /* non-blocking */ });
+    return () => { cancelled = true; };
   }, [otherUserId]);
 
   const peerBadge = fetchedPeer?.userId === otherUserId ? fetchedPeer : null;
@@ -207,96 +199,77 @@ export function ChatScreen(): React.JSX.Element {
     void joinConversation(conversationId);
   }, [conversationId, dispatch, joinConversation]);
 
-  useEffect(() => {
-    return on('chat:message', (msg) => {
-      dispatch(
-        messageReceived({
-          ...msg,
-          type: msg.type ?? 'text',
-          location: msg.location ?? null,
-          locationSessionId: msg.locationSessionId ?? null,
-        }),
-      );
-    });
-  }, [on, dispatch]);
+  useEffect(() => on('chat:message', (msg) => {
+    dispatch(messageReceived({
+      ...msg,
+      type: msg.type ?? 'text',
+      location: msg.location ?? null,
+      locationSessionId: msg.locationSessionId ?? null,
+    }));
+  }), [on, dispatch]);
 
   const send = useCallback(async (): Promise<void> => {
     const text = body.trim();
     if (!text || sending) return;
     setSending(true);
     setBody('');
-
     const optimisticId = `opt-${Date.now()}`;
-    const optimistic: ChatMessage = {
+    dispatch(messageSentOptimistic({
       id: optimisticId,
       conversationId,
       senderId: myUserId,
       body: text,
       type: 'text',
       createdAt: new Date().toISOString(),
-    };
-    dispatch(messageSentOptimistic(optimistic));
-
+    }));
     const confirmed = await sendMessage(conversationId, text, optimisticId);
     if (confirmed) {
-      dispatch(
-        messageConfirmed({
-          optimisticId,
-          confirmed: {
-            ...confirmed,
-            type: confirmed.type ?? 'text',
-            location: confirmed.location ?? null,
-            locationSessionId: confirmed.locationSessionId ?? null,
-          },
-        }),
-      );
+      dispatch(messageConfirmed({
+        optimisticId,
+        confirmed: {
+          ...confirmed,
+          type: confirmed.type ?? 'text',
+          location: confirmed.location ?? null,
+          locationSessionId: confirmed.locationSessionId ?? null,
+        },
+      }));
     } else {
       dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
     }
     setSending(false);
   }, [body, sending, conversationId, myUserId, dispatch, sendMessage]);
 
-  const retry = useCallback(
-    async (optimisticId: string, text: string): Promise<void> => {
-      dispatch(failedMessageCleared(optimisticId));
+  const retry = useCallback(async (optimisticId: string, text: string): Promise<void> => {
+    dispatch(failedMessageCleared(optimisticId));
+    dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
+    const confirmed = await socketSendMessage(conversationId, text, optimisticId);
+    if (confirmed) {
+      dispatch(messageConfirmed({
+        optimisticId,
+        confirmed: {
+          ...confirmed,
+          type: confirmed.type ?? 'text',
+          location: confirmed.location ?? null,
+          locationSessionId: confirmed.locationSessionId ?? null,
+        },
+      }));
+    } else {
       dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
-      const confirmed = await socketSendMessage(conversationId, text, optimisticId);
-      if (confirmed) {
-        dispatch(
-          messageConfirmed({
-            optimisticId,
-            confirmed: {
-              ...confirmed,
-              type: confirmed.type ?? 'text',
-              location: confirmed.location ?? null,
-              locationSessionId: confirmed.locationSessionId ?? null,
-            },
-          }),
-        );
-      } else {
-        dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
-      }
-    },
-    [conversationId, dispatch],
-  );
+    }
+  }, [conversationId, dispatch]);
 
   const loadMore = (): void => {
-    if (nextCursor && !loading) {
-      void dispatch(fetchMessages({ conversationId, cursor: nextCursor }));
-    }
+    if (nextCursor && !loading) void dispatch(fetchMessages({ conversationId, cursor: nextCursor }));
   };
 
-  const onShareDuration = useCallback(
-    async (duration: '15m' | '60m' | 'until_off') => {
-      await startShare(duration);
-      setShareOpen(false);
-    },
-    [startShare],
-  );
+  const onShareDuration = useCallback(async (duration: '15m' | '60m' | 'until_off') => {
+    await startShare(duration);
+    setShareOpen(false);
+  }, [startShare]);
 
   return (
     <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: themeColors.bg }]}
+      style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
@@ -311,19 +284,9 @@ export function ChatScreen(): React.JSX.Element {
             accessibilityLabel={`Open profile for ${otherUserName || 'user'}`}
             activeOpacity={0.7}
           >
-            <Avatar
-              uri={peerBadge?.avatarUrl ?? null}
-              name={otherUserName || 'Chat'}
-              size={32}
-            />
-            <Text style={styles.headerName} numberOfLines={1}>
-              {otherUserName || 'Chat'}
-            </Text>
-            <VerificationBadge
-              verification={badgeVerification}
-              idVerified={badgeIdVerified}
-              size={18}
-            />
+            <Avatar uri={peerAvatarUrl} name={otherUserName || 'Chat'} size={32} />
+            <Text style={styles.headerName} numberOfLines={1}>{otherUserName || 'Chat'}</Text>
+            <VerificationBadge verification={badgeVerification} idVerified={badgeIdVerified} size={18} />
           </TouchableOpacity>
         }
       />
@@ -349,9 +312,7 @@ export function ChatScreen(): React.JSX.Element {
       ) : null}
 
       {loading && messages.length === 0 ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
+        <View style={styles.centered}><ActivityIndicator color={colors.primary} /></View>
       ) : (
         <FlatList
           ref={listRef}
@@ -385,9 +346,7 @@ export function ChatScreen(): React.JSX.Element {
             accessibilityRole="button"
             accessibilityLabel="Share live location"
             hitSlop={8}
-          >
-            <Text style={styles.locBtnText}>📍</Text>
-          </TouchableOpacity>
+          ><Text style={styles.locBtnText}>📍</Text></TouchableOpacity>
         ) : null}
         {canGift ? (
           <TouchableOpacity
@@ -396,9 +355,7 @@ export function ChatScreen(): React.JSX.Element {
             accessibilityRole="button"
             accessibilityLabel="Send a gift"
             hitSlop={8}
-          >
-            <Text style={styles.giftBtnText}>🎁</Text>
-          </TouchableOpacity>
+          ><Text style={styles.giftBtnText}>🎁</Text></TouchableOpacity>
         ) : null}
         <TextInput
           style={styles.input}
@@ -415,20 +372,13 @@ export function ChatScreen(): React.JSX.Element {
           accessibilityLabel="Message"
         />
         <TouchableOpacity
-          style={[
-            styles.sendBtn,
-            (!body.trim() || sending || requestLocked) && styles.sendBtnDisabled,
-          ]}
+          style={[styles.sendBtn, (!body.trim() || sending || requestLocked) && styles.sendBtnDisabled]}
           onPress={send}
           disabled={!body.trim() || sending || requestLocked}
           accessibilityRole="button"
           accessibilityLabel="Send message"
         >
-          {sending ? (
-            <ActivityIndicator color={colors.onPrimary} size="small" />
-          ) : (
-            <Text style={styles.sendBtnText}>↑</Text>
-          )}
+          {sending ? <ActivityIndicator color={colors.onPrimary} size="small" /> : <Text style={styles.sendBtnText}>↑</Text>}
         </TouchableOpacity>
       </View>
 
@@ -451,96 +401,78 @@ export function ChatScreen(): React.JSX.Element {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  headerTitleTap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    minHeight: 44,
-    maxWidth: '100%',
-  },
-  headerName: { flexShrink: 1, color: colors.textPrimary, fontSize: 17, fontWeight: '600' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  requestBanner: {
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  requestBannerText: { color: colors.action, fontSize: 12, textAlign: 'center' },
-  messageList: { paddingHorizontal: 12, paddingVertical: 8 },
-  peerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: spacing.sm,
-    marginVertical: 3,
-    maxWidth: '90%',
-    alignSelf: 'flex-start',
-  },
-  peerAvatarTap: {
-    marginBottom: 2,
-  },
-  locBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
-  locBtnText: { fontSize: 20 },
-  giftBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6 },
-  giftBtnText: { fontSize: 22 },
-  bubble: { maxWidth: '78%', borderRadius: 16, padding: 10, marginVertical: 3 },
-  bubbleMine: { alignSelf: 'flex-end', backgroundColor: colors.primary },
-  // Peer bubble sits inside peerRow — no outer alignSelf/margin (row owns layout).
-  bubbleTheirs: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.surfaceAlt,
-    maxWidth: '100%',
-    flexShrink: 1,
-    marginVertical: 0,
-  },
-  bubbleText: { fontSize: 15, lineHeight: 20 },
-  bubbleTextMine: { color: colors.onPrimary },
-  bubbleTextTheirs: { color: colors.textPrimary },
-  statusPending: {
-    fontSize: 11,
-    color: 'rgba(10,10,15,0.4)',
-    marginTop: 2,
-    textAlign: 'right',
-  },
-  statusFailed: {
-    fontSize: 11,
-    color: colors.danger,
-    marginTop: 2,
-    textAlign: 'right',
-    fontWeight: '600',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    padding: 10,
-    gap: 8,
-    borderTopWidth: 1,
-    borderTopColor: colors.surfaceAlt,
-    backgroundColor: colors.bg,
-    alignItems: 'flex-end',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: colors.surfaceAlt,
-    color: colors.textPrimary,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-    maxHeight: 120,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendBtnDisabled: { opacity: 0.4 },
-  sendBtnText: { color: colors.onPrimary, fontSize: 18, fontWeight: '700' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bg },
+    headerTitleTap: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, maxWidth: '100%' },
+    headerName: { flexShrink: 1, color: colors.textPrimary, fontSize: 17, fontWeight: '600' },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    requestBanner: {
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    requestBannerText: { color: colors.action, fontSize: 12, textAlign: 'center' },
+    messageList: { paddingHorizontal: 12, paddingVertical: 8 },
+    peerRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: spacing.sm,
+      marginVertical: 3,
+      maxWidth: '90%',
+      alignSelf: 'flex-start',
+    },
+    peerAvatarTap: { marginBottom: 2 },
+    locBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
+    locBtnText: { fontSize: 20 },
+    giftBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6 },
+    giftBtnText: { fontSize: 22 },
+    bubble: { maxWidth: '78%', borderRadius: 16, padding: 10, marginVertical: 3 },
+    bubbleMine: { alignSelf: 'flex-end', backgroundColor: colors.primary },
+    bubbleTheirs: {
+      alignSelf: 'flex-start',
+      backgroundColor: colors.surfaceAlt,
+      maxWidth: '100%',
+      flexShrink: 1,
+      marginVertical: 0,
+    },
+    bubbleText: { fontSize: 15, lineHeight: 20 },
+    bubbleTextMine: { color: colors.onPrimary },
+    bubbleTextTheirs: { color: colors.textPrimary },
+    statusPending: { fontSize: 11, color: colors.textFaint, marginTop: 2, textAlign: 'right' },
+    statusFailed: { fontSize: 11, color: colors.danger, marginTop: 2, textAlign: 'right', fontWeight: '600' },
+    inputRow: {
+      flexDirection: 'row',
+      padding: 10,
+      gap: 8,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      backgroundColor: colors.bg,
+      alignItems: 'flex-end',
+    },
+    input: {
+      flex: 1,
+      backgroundColor: colors.surfaceAlt,
+      color: colors.textPrimary,
+      borderRadius: 20,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      fontSize: 15,
+      maxHeight: 120,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    sendBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    sendBtnDisabled: { opacity: 0.4 },
+    sendBtnText: { color: colors.onPrimary, fontSize: 18, fontWeight: '700' },
+  });
+}
