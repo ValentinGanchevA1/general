@@ -10,7 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, fontSize, spacing, useAppTheme } from '@/theme';
+import { fontSize, spacing, useAppTheme } from '@/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PHOTO_HEIGHT = SCREEN_WIDTH * 1.05;
@@ -230,7 +230,6 @@ const styles = StyleSheet.create({
   container: {
     width: SCREEN_WIDTH,
     height: PHOTO_HEIGHT,
-    backgroundColor: colors.surfaceRaised,
     borderBottomWidth: 1,
     borderColor: 'transparent',
     shadowOpacity: 0,
@@ -240,12 +239,10 @@ const styles = StyleSheet.create({
   },
   photo: { width: '100%', height: '100%' },
   placeholder: {
-    backgroundColor: colors.surfaceRaised,
     justifyContent: 'center',
     alignItems: 'center',
   },
   placeholderInitials: {
-    color: colors.actionPrimary,
     fontSize: 64,
     fontWeight: '700',
   },
@@ -278,11 +275,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 16,
-    backgroundColor: colors.premium,
     gap: 4,
   },
   tierBadgeText: {
-    color: colors.onPrimary,
     fontWeight: '700',
     fontSize: 12,
   },
@@ -310,7 +305,6 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 18,
-    backgroundColor: colors.textPrimary,
   },
   nameRow: {
     flexDirection: 'row',
@@ -327,7 +321,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   name: {
-    color: colors.textPrimary,
     fontSize: fontSize.xl,
     fontWeight: '700',
     flexShrink: 1,
@@ -344,7 +337,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   handle: {
-    color: colors.textSecondary,
     fontSize: fontSize.sm,
     fontWeight: '500',
     marginTop: 2,
@@ -361,7 +353,6 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   visibilityText: {
-    color: colors.textPrimary,
     fontSize: 13,
     fontWeight: '500',
   },
@@ -375,7 +366,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: colors.actionBorderSoft,
   },
   verificationText: {
     fontSize: 12,
