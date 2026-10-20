@@ -3,7 +3,7 @@
 // Activity-feed types shared between backend (aggregator) and mobile (Pulse + FAB).
 // Surface-agnostic: same shape powers REST /feed, the Pulse list, future socket push.
 
-export type ActivityType = 'chat' | 'wave' | 'listing' | 'alert' | 'match';
+export type ActivityType = 'chat' | 'wave' | 'listing' | 'alert' | 'match' | 'event';
 
 export type AreaCategory =
   | 'general'
@@ -46,7 +46,7 @@ export interface FeedResponse {
 }
 
 export const ACTIVITY_TYPES: readonly ActivityType[] = [
-  'chat', 'wave', 'listing', 'alert', 'match',
+  'chat', 'wave', 'listing', 'alert', 'match', 'event',
 ] as const;
 
 export const AREA_CATEGORIES: readonly AreaCategory[] = [
