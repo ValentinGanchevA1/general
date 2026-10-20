@@ -13,12 +13,13 @@ import {
 } from 'react-native';
 
 import { BrandLogo } from '@/components/Brand/BrandLogo';
-import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { login, register, clearError, loginWithGoogle } from '@/features/auth/authSlice';
-import { setPendingPhoneVerify } from '@/services/pendingPhone';
-import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@/constants/app';
+import { NexaDiscoveryHero } from '@/components/Brand/NexaDiscoveryHero';
 import { FormField } from '@/components/FormField';
-import { colors, spacing, fontSize, useAppTheme } from '@/theme';
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@/constants/app';
+import { clearError, login, loginWithGoogle, register } from '@/features/auth/authSlice';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { setPendingPhoneVerify } from '@/services/pendingPhone';
+import { fontSize, radius, spacing, useAppTheme } from '@/theme';
 
 // Linear character classes only — avoids super-linear backtracking on adversarial input.
 const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
@@ -60,8 +61,7 @@ function validate(
 }
 
 export function AuthScreen(): React.JSX.Element {
-  const { colors: themeColors } = useAppTheme();
-
+  const { colors } = useAppTheme();
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((s) => s.auth);
 
@@ -85,7 +85,7 @@ export function AuthScreen(): React.JSX.Element {
     });
   }, []);
 
-  const submit = () => {
+  const submit = (): void => {
     void (async () => {
       dispatch(clearError());
       const nextErrors = validate(mode, email, password, displayName);
@@ -96,6 +96,7 @@ export function AuthScreen(): React.JSX.Element {
         void dispatch(login({ email: email.trim(), password }));
         return;
       }
+
       const action = await dispatch(
         register({ email: email.trim(), password, displayName: displayName.trim() }),
       );
@@ -105,23 +106,25 @@ export function AuthScreen(): React.JSX.Element {
     })();
   };
 
-  const toggleMode = () => {
+  const toggleMode = (): void => {
     dispatch(clearError());
     setFieldErrors({});
     setMode((m) => (m === 'login' ? 'register' : 'login'));
   };
 
-  const openTerms = () => {
+  const openTerms = (): void => {
     void Linking.openURL(TERMS_OF_SERVICE_URL);
   };
 
-  const openPrivacy = () => {
+  const openPrivacy = (): void => {
     void Linking.openURL(PRIVACY_POLICY_URL);
   };
 
+  const isLogin = mode === 'login';
+
   return (
     <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: themeColors.bg }]}
+      style={[styles.root, { backgroundColor: colors.canvas }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
@@ -129,18 +132,44 @@ export function AuthScreen(): React.JSX.Element {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.card}>
-          <BrandLogo size={88} style={styles.logoImage} />
-          <Text style={styles.subtitle}>
-            {mode === 'login' ? 'Sign in to continue' : 'Create your account'}
+        <View style={styles.heroBlock}>
+          <BrandLogo size={62} style={styles.logoImage} />
+          <Text style={[styles.eyebrow, { color: colors.discovery }]}>LOCAL DISCOVERY</Text>
+          <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
+            {isLogin ? 'See what’s happening nearby.' : 'Start discovering around you.'}
           </Text>
+          <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+            People, events and listings — live on the map.
+          </Text>
+          <NexaDiscoveryHero compact />
+        </View>
+
+        <View
+          style={[
+            styles.panel,
+            {
+              backgroundColor: colors.surfacePrimary,
+              borderColor: colors.borderDefault,
+            },
+          ]}
+        >
+          <View style={styles.panelHeading}>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>
+              {isLogin ? 'Welcome back' : 'Create your NEXA account'}
+            </Text>
+            <Text style={[styles.subtitle, { color: colors.textTertiary }]}>
+              {isLogin
+                ? 'Sign in to return to your local map.'
+                : 'One account for discovery, connection and participation.'}
+            </Text>
+          </View>
 
           {mode === 'register' ? (
             <FormField
               placeholder="Display name"
               value={displayName}
-              onChangeText={(t) => {
-                setDisplayName(t);
+              onChangeText={(text) => {
+                setDisplayName(text);
                 clearFieldError('displayName');
               }}
               autoCapitalize="words"
@@ -155,8 +184,8 @@ export function AuthScreen(): React.JSX.Element {
             ref={emailRef}
             placeholder="Email"
             value={email}
-            onChangeText={(t) => {
-              setEmail(t);
+            onChangeText={(text) => {
+              setEmail(text);
               clearFieldError('email');
             }}
             keyboardType="email-address"
@@ -188,8 +217,8 @@ export function AuthScreen(): React.JSX.Element {
             ref={passwordRef}
             placeholder="Password"
             value={password}
-            onChangeText={(t) => {
-              setPassword(t);
+            onChangeText={(text) => {
+              setPassword(text);
               clearFieldError('password');
             }}
             secureTextEntry
@@ -199,59 +228,76 @@ export function AuthScreen(): React.JSX.Element {
             accessibilityLabel="Password"
           />
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
 
           <TouchableOpacity
-            style={styles.btn}
+            style={[styles.primaryButton, { backgroundColor: colors.actionPrimary }]}
             onPress={submit}
             disabled={loading}
+            activeOpacity={0.82}
             accessibilityRole="button"
-            accessibilityLabel={mode === 'login' ? 'Sign in' : 'Create account'}
+            accessibilityLabel={isLogin ? 'Sign in' : 'Join NEXA'}
           >
             {loading ? (
               <ActivityIndicator color={colors.onPrimary} />
             ) : (
-              <Text style={styles.btnText}>
-                {mode === 'login' ? 'Sign in' : 'Create account'}
+              <Text style={[styles.primaryButtonText, { color: colors.onPrimary }]}>
+                {isLogin ? 'Sign in' : 'Join NEXA'}
               </Text>
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={toggleMode} style={styles.toggle}>
-            <Text style={styles.toggleText}>
-              {mode === 'login'
-                ? "Don't have an account? Sign up"
-                : 'Already have an account? Sign in'}
+          <TouchableOpacity
+            onPress={toggleMode}
+            style={styles.toggle}
+            activeOpacity={0.72}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.toggleText, { color: colors.actionPrimary }]}>
+              {isLogin ? 'New to NEXA? Create account' : 'Already on NEXA? Sign in'}
             </Text>
           </TouchableOpacity>
 
           <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
+            <View style={[styles.dividerLine, { backgroundColor: colors.borderDefault }]} />
+            <Text style={[styles.dividerText, { color: colors.textTertiary }]}>or</Text>
+            <View style={[styles.dividerLine, { backgroundColor: colors.borderDefault }]} />
           </View>
 
           <TouchableOpacity
-            style={styles.googleBtn}
+            style={[
+              styles.googleButton,
+              {
+                backgroundColor: colors.surfaceSecondary,
+                borderColor: colors.borderStrong,
+              },
+            ]}
             onPress={() => {
               dispatch(clearError());
               setFieldErrors({});
               void dispatch(loginWithGoogle());
             }}
             disabled={loading}
+            activeOpacity={0.82}
             accessibilityRole="button"
             accessibilityLabel="Continue with Google"
           >
-            <Text style={styles.googleBtnText}>Continue with Google</Text>
+            <Text style={[styles.googleButtonText, { color: colors.textPrimary }]}>
+              Continue with Google
+            </Text>
           </TouchableOpacity>
 
-          <Text style={styles.legal}>
+          <Text style={[styles.privacyNote, { color: colors.textTertiary }]}>
+            You control whether your profile is visible on the map.
+          </Text>
+
+          <Text style={[styles.legal, { color: colors.textTertiary }]}>
             By continuing you agree to our{' '}
-            <Text style={styles.legalLink} onPress={openTerms}>
+            <Text style={[styles.legalLink, { color: colors.discovery }]} onPress={openTerms}>
               Terms of Service
             </Text>
             {' '}and{' '}
-            <Text style={styles.legalLink} onPress={openPrivacy}>
+            <Text style={[styles.legalLink, { color: colors.discovery }]} onPress={openPrivacy}>
               Privacy Policy
             </Text>
             .
@@ -263,58 +309,122 @@ export function AuthScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1 },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: spacing.xxl,
-    paddingVertical: 40,
+    paddingHorizontal: spacing.xl,
+    paddingTop: 28,
+    paddingBottom: 36,
   },
-  card: { gap: spacing.md },
+  heroBlock: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xl,
+  },
   logoImage: {
+    marginBottom: 2,
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.8,
+  },
+  heroTitle: {
+    maxWidth: 360,
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '750',
+    textAlign: 'center',
+    letterSpacing: -0.4,
+  },
+  heroSubtitle: {
+    maxWidth: 340,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    textAlign: 'center',
     marginBottom: spacing.sm,
   },
-  subtitle: {
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
-    textAlign: 'center',
-    marginBottom: spacing.md,
+  panel: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.xl,
   },
-  error: { color: colors.danger, fontSize: fontSize.sm, textAlign: 'center' },
-  btn: {
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    padding: 14,
+  panelHeading: {
+    gap: 4,
+    marginBottom: spacing.xs,
+  },
+  title: {
+    fontSize: fontSize.lg,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: fontSize.sm,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  error: {
+    fontSize: fontSize.sm,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  primaryButton: {
+    minHeight: 50,
+    borderRadius: radius.md,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: spacing.xs,
   },
-  btnText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
-  toggle: { alignItems: 'center', marginTop: spacing.sm },
-  toggleText: { color: colors.primary, fontSize: fontSize.sm },
+  primaryButtonText: {
+    fontWeight: '800',
+    fontSize: fontSize.md,
+  },
+  toggle: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleText: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+  },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: spacing.lg,
+    marginVertical: spacing.xs,
     gap: spacing.sm,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: colors.borderStrong },
-  dividerText: { color: colors.textFaint, fontSize: fontSize.xs },
-  googleBtn: {
-    backgroundColor: colors.textPrimary,
-    borderRadius: 10,
-    padding: 14,
+  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  dividerText: { fontSize: fontSize.xs },
+  googleButton: {
+    minHeight: 50,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  googleBtnText: { color: colors.onPrimary, fontWeight: '600', fontSize: fontSize.md },
+  googleButtonText: {
+    fontWeight: '700',
+    fontSize: fontSize.md,
+  },
+  privacyNote: {
+    fontSize: fontSize.xs,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+  },
   legal: {
-    color: colors.textMuted,
     fontSize: fontSize.xs,
     textAlign: 'center',
     lineHeight: 18,
-    marginTop: spacing.lg,
   },
   legalLink: {
-    color: colors.primary,
     textDecorationLine: 'underline',
+    fontWeight: '600',
   },
 });
