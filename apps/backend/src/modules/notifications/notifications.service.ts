@@ -12,6 +12,7 @@ import {
 } from '@g88/shared';
 
 import { REDIS_CLIENT } from '../../config/redis.provider';
+import { buildNexaPushData, nexaLockScreenCopy } from './notificationIdentity';
 
 // firebase-admin is initialized once on module load if credentials are present.
 // All push calls are no-ops when FIREBASE_CREDENTIALS is absent (local dev).
@@ -121,14 +122,19 @@ export class NotificationsService {
     fromUser: { id: string; displayName: string },
     context: string,
   ): Promise<void> {
+    void context;
     if (!(await this.allowed(toUserId, 'waves'))) return;
     const tokens = await this.getTokens(toUserId);
     if (!tokens.length) return;
 
-    await this.sendMulticast(tokens, {
-      title: `${fromUser.displayName} waved at you`,
-      body: context === 'map' ? 'They saw you on the map' : `From a ${context}`,
-    }, { type: 'wave', fromUserId: fromUser.id });
+    await this.sendMulticast(
+      tokens,
+      nexaLockScreenCopy('interaction.wave'),
+      buildNexaPushData('interaction.wave', {
+        actorUserId: fromUser.id,
+        fromUserId: fromUser.id,
+      }),
+    );
   }
 
   async notifyGift(
@@ -137,14 +143,18 @@ export class NotificationsService {
     emoji: string,
     label: string,
   ): Promise<void> {
+    void fromName;
+    void emoji;
+    void label;
     if (!(await this.allowed(toUserId, 'gifts'))) return;
     const tokens = await this.getTokens(toUserId);
     if (!tokens.length) return;
 
-    await this.sendMulticast(tokens, {
-      title: `${fromName} sent you a gift ${emoji}`,
-      body: `You received a ${label}.`,
-    }, { type: 'gift' });
+    await this.sendMulticast(
+      tokens,
+      nexaLockScreenCopy('interaction.gift'),
+      buildNexaPushData('interaction.gift'),
+    );
   }
 
   async notifyMessage(
@@ -153,14 +163,17 @@ export class NotificationsService {
     preview: string,
     conversationId: string,
   ): Promise<void> {
+    void senderName;
+    void preview;
     if (!(await this.allowed(toUserId, 'messages'))) return;
     const tokens = await this.getTokens(toUserId);
     if (!tokens.length) return;
 
-    await this.sendMulticast(tokens, {
-      title: senderName,
-      body: preview.length > 80 ? preview.slice(0, 77) + '…' : preview,
-    }, { type: 'message', conversationId });
+    await this.sendMulticast(
+      tokens,
+      nexaLockScreenCopy('interaction.message'),
+      buildNexaPushData('interaction.message', { conversationId }),
+    );
   }
 
   async notifyMessageFrom(
@@ -182,19 +195,15 @@ export class NotificationsService {
     decision: 'verified' | 'rejected',
     reason?: string,
   ): Promise<void> {
+    void reason;
     const tokens = await this.getTokens(toUserId);
     if (!tokens.length) return;
 
+    const kind = decision === 'verified' ? 'trust.id-verified' : 'trust.id-rejected';
     await this.sendMulticast(
       tokens,
-      {
-        title: decision === 'verified' ? 'ID Verified ✅' : 'Verification not approved',
-        body:
-          decision === 'verified'
-            ? 'Your identity has been verified.'
-            : `Verification rejected${reason ? `: ${reason}` : '.'} You can resubmit anytime.`,
-      },
-      { type: 'id_verification', decision },
+      nexaLockScreenCopy(kind),
+      buildNexaPushData(kind, { decision }),
     );
   }
 
@@ -208,11 +217,11 @@ export class NotificationsService {
 
     await this.sendMulticast(
       tokens,
-      {
-        title: 'Friend request',
-        body: `${fromUser.displayName} wants to be friends`,
-      },
-      { type: 'friend_request', fromUserId: fromUser.id },
+      nexaLockScreenCopy('interaction.connection-request'),
+      buildNexaPushData('interaction.connection-request', {
+        actorUserId: fromUser.id,
+        fromUserId: fromUser.id,
+      }),
     );
   }
 
@@ -226,11 +235,11 @@ export class NotificationsService {
 
     await this.sendMulticast(
       tokens,
-      {
-        title: 'Friend request accepted',
-        body: `${peer.displayName} accepted your friend request`,
-      },
-      { type: 'friend_accepted', peerUserId: peer.id },
+      nexaLockScreenCopy('interaction.connection-accepted'),
+      buildNexaPushData('interaction.connection-accepted', {
+        actorUserId: peer.id,
+        peerUserId: peer.id,
+      }),
     );
   }
 
@@ -239,7 +248,9 @@ export class NotificationsService {
     const candidateCells = h3.gridDisk(cellH3R7, MAX_RINGS);
 
     const rows = await this.db.query<Array<{
-      user_id: string; center_h3_r7: string; radius_rings: number;
+      user_id: string;
+      center_h3_r7: string;
+      radius_rings: number;
     }>>(
       `SELECT user_id, center_h3_r7, radius_rings
          FROM geofences
@@ -274,13 +285,18 @@ export class NotificationsService {
     category: AreaCategory,
     body: string,
   ): Promise<void> {
+    void category;
+    void body;
     if (!alertCellH3R7) return;
     const recipients = await this.geofenceRecipients(alertCellH3R7, authorId);
     if (!recipients.length) return;
 
-    const title = category === 'general' ? 'New alert nearby' : `New ${category} alert nearby`;
-    const preview = body.length > 80 ? body.slice(0, 77) + '…' : body;
-    await this.fanOut(recipients, 'nearby', { title, body: preview }, { type: 'alert' });
+    await this.fanOut(
+      recipients,
+      'nearby',
+      nexaLockScreenCopy('live.nearby-alert'),
+      buildNexaPushData('live.nearby-alert'),
+    );
   }
 
   async notifyEventNearby(
@@ -289,14 +305,15 @@ export class NotificationsService {
     eventTitle: string,
     eventId: string,
   ): Promise<void> {
+    void eventTitle;
     if (!cellH3R7) return;
     const recipients = await this.geofenceRecipients(cellH3R7, hostId);
     if (!recipients.length) return;
     await this.fanOut(
       recipients,
       'events',
-      { title: 'New event nearby', body: eventTitle },
-      { type: 'event', eventId },
+      nexaLockScreenCopy('event.nearby'),
+      buildNexaPushData('event.nearby', { entityId: eventId, eventId }),
     );
   }
 
@@ -306,14 +323,18 @@ export class NotificationsService {
     listingTitle: string,
     listingId: string,
   ): Promise<void> {
+    void listingTitle;
     if (!cellH3R7) return;
     const recipients = await this.geofenceRecipients(cellH3R7, sellerId);
     if (!recipients.length) return;
     await this.fanOut(
       recipients,
       'listings',
-      { title: 'New item for sale nearby', body: listingTitle },
-      { type: 'listing', listingId },
+      nexaLockScreenCopy('marketplace.nearby-listing'),
+      buildNexaPushData('marketplace.nearby-listing', {
+        entityId: listingId,
+        listingId,
+      }),
     );
   }
 
@@ -343,13 +364,10 @@ export class NotificationsService {
       const tokens = await this.getTokens(row.user_id);
       if (!tokens.length) continue;
 
-      const parts: string[] = [];
-      if (waves) parts.push(`${waves} wave${waves > 1 ? 's' : ''}`);
-      if (gifts) parts.push(`${gifts} gift${gifts > 1 ? 's' : ''}`);
       await this.sendMulticast(
         tokens,
-        { title: 'Your G88 daily digest', body: `You got ${parts.join(' and ')} today.` },
-        { type: 'digest' },
+        nexaLockScreenCopy('discovery.daily-recap'),
+        buildNexaPushData('discovery.daily-recap'),
       );
       sent++;
     }
@@ -385,10 +403,7 @@ export class NotificationsService {
     }
   }
 
-  /**
-   * Drop dead registration tokens so the next send does not burn quota
-   * on devices that uninstalled or rotated tokens.
-   */
+  /** Drop dead registration tokens so later sends do not burn quota. */
   private async pruneInvalidTokens(
     tokens: string[],
     responses: Array<{ success: boolean; error?: { code?: string } }>,
@@ -401,8 +416,8 @@ export class NotificationsService {
     responses.forEach((r, i) => {
       const code = r.error?.code;
       if (!r.success && code && deadCodes.has(code)) {
-        const t = tokens[i];
-        if (t) dead.push(t);
+        const token = tokens[i];
+        if (token) dead.push(token);
       }
     });
     if (dead.length === 0) return;
