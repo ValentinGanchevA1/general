@@ -11,7 +11,7 @@ import MapView, {
 	PROVIDER_GOOGLE,
 	type Region,
 } from 'react-native-maps';
-import { MAP_STYLE } from '@/components/map/mapStyle';
+import { DARK_MAP_STYLE, LIGHT_MAP_STYLE } from '@/components/map/mapStyle';
 import {
 	BottomSheetModal,
 	BottomSheetView,
@@ -49,7 +49,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { postJson } from '@/api/client';
-import { colors } from '@/theme';
+import { useAppTheme, type ThemeColors } from '@/theme';
 import { useReceivedInteractions } from '@/features/interactions/useReceivedInteractions';
 import { MapCoachMarks } from '@/components/map/MapCoachMarks';
 import {
@@ -78,7 +78,7 @@ import {
 } from '@/features/map/mapNovelty';
 import { clearMapNewCount, setMapNewCount } from '@/features/map/mapNoveltySlice';
 import { MapCreateNudgeBanner } from '@/features/map/MapCreateNudgeBanner';
-import { sheetChrome, useSheetBackdrop } from '@/components/sheets';
+import { useSheetChrome, useSheetBackdrop } from '@/components/sheets';
 import {
 	mapFilterRowTop,
 	mapTrendingTop,
@@ -107,6 +107,9 @@ const EMPTY_POINTS: DiscoveryPoint[] = [];
 
 export function MapScreen(): React.JSX.Element {
 	const dispatch = useAppDispatch();
+	const { colors, scheme } = useAppTheme();
+	const styles = useMemo(() => createStyles(colors), [colors]);
+	const sheetChrome = useSheetChrome();
 	const emailVerified =
 		useAppSelector((s) => s.profile.profile?.badges?.email === true);
 	const openToDating =
@@ -492,13 +495,11 @@ export function MapScreen(): React.JSX.Element {
 		};
 	}, [on, activePinId, pinSend]);
 
-	// B/C: surface machine action errors once
 	useEffect(() => {
 		if (pinMachineError == null || pinMachineError === '') return;
 		appAlert('Action failed', pinMachineError);
 	}, [pinMachineError]);
 
-	// C: dating match or social mutual → open chat when we have a thread id
 	useEffect(() => {
 		if (pinLastResult === 'matched' && pinDatingConversationId) {
 			const name = seedDisplayName;
@@ -549,7 +550,6 @@ export function MapScreen(): React.JSX.Element {
 		navigation,
 	]);
 
-	/** C: Message from sheet — prefer pin machine thread ids, else create conversation. */
 	const openSheetMessage = useCallback(async (): Promise<void> => {
 		if (selected == null || selected.kind !== 'user') return;
 		const peerId = selected.id;
@@ -629,7 +629,6 @@ export function MapScreen(): React.JSX.Element {
 		);
 	}, [reduceMotion, region]);
 
-	// B: toast when machine wave succeeds (non-mutual) — defer setState (lint)
 	useEffect(() => {
 		let msg: string | null = null;
 		if (pinLastResult === 'wave_sent' && !pinHasMutualWave) {
@@ -742,7 +741,6 @@ export function MapScreen(): React.JSX.Element {
 		setCreateNearbyOpen(true);
 	}, [setCreateNearbyOpen]);
 
-	// Create tab / external request → open CreateNearbySheet
 	useEffect(() => {
 		const open = () => {
 			if (takePendingOpenCreateNearby()) {
@@ -835,7 +833,7 @@ export function MapScreen(): React.JSX.Element {
 				<MapView
 					ref={mapRef}
 					provider={PROVIDER_GOOGLE}
-					customMapStyle={MAP_STYLE}
+					customMapStyle={scheme === 'dark' ? DARK_MAP_STYLE : LIGHT_MAP_STYLE}
 					style={StyleSheet.absoluteFill}
 					showsUserLocation
 					showsMyLocationButton={false}
@@ -1007,6 +1005,8 @@ export function MapScreen(): React.JSX.Element {
 }
 
 function MapUnavailableFallback(): React.JSX.Element {
+	const { colors } = useAppTheme();
+	const styles = useMemo(() => createStyles(colors), [colors]);
 	return (
 		<View style={styles.unavailable}>
 			<Text style={styles.unavailableEyebrow}>NEXA MAP</Text>
@@ -1036,45 +1036,47 @@ function approxZoomFromRegion(region: Region): number {
 	return Math.round(Math.log2(360 / latDelta));
 }
 
-const styles = StyleSheet.create({
-	root: { flex: 1, backgroundColor: colors.bg },
-	filterRow: { position: 'absolute', left: 0, right: 0, zIndex: 20 },
-	trendingWrap: { position: 'absolute', left: 0, right: 0, zIndex: 19 },
-	toast: {
-		position: 'absolute',
-		alignSelf: 'center',
-		top: '42%',
-		backgroundColor: colors.surface,
-		paddingHorizontal: 16,
-		paddingVertical: 10,
-		borderRadius: 20,
-		zIndex: 50,
-	},
-	toastText: { color: colors.textPrimary, fontWeight: '600' },
-	unavailable: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
-		padding: 24,
-		backgroundColor: colors.canvas,
-	},
-	unavailableEyebrow: {
-		color: colors.discovery,
-		fontSize: 11,
-		fontWeight: '800',
-		letterSpacing: 1.2,
-	},
-	unavailableTitle: {
-		color: colors.textPrimary,
-		fontSize: 19,
-		fontWeight: '800',
-		marginTop: 8,
-	},
-	unavailableBody: {
-		color: colors.textSecondary,
-		marginTop: 8,
-		lineHeight: 20,
-		textAlign: 'center',
-		maxWidth: 320,
-	},
-});
+function createStyles(colors: ThemeColors) {
+	return StyleSheet.create({
+		root: { flex: 1, backgroundColor: colors.bg },
+		filterRow: { position: 'absolute', left: 0, right: 0, zIndex: 20 },
+		trendingWrap: { position: 'absolute', left: 0, right: 0, zIndex: 19 },
+		toast: {
+			position: 'absolute',
+			alignSelf: 'center',
+			top: '42%',
+			backgroundColor: colors.surface,
+			paddingHorizontal: 16,
+			paddingVertical: 10,
+			borderRadius: 20,
+			zIndex: 50,
+		},
+		toastText: { color: colors.textPrimary, fontWeight: '600' },
+		unavailable: {
+			flex: 1,
+			alignItems: 'center',
+			justifyContent: 'center',
+			padding: 24,
+			backgroundColor: colors.canvas,
+		},
+		unavailableEyebrow: {
+			color: colors.discovery,
+			fontSize: 11,
+			fontWeight: '800',
+			letterSpacing: 1.2,
+		},
+		unavailableTitle: {
+			color: colors.textPrimary,
+			fontSize: 19,
+			fontWeight: '800',
+			marginTop: 8,
+		},
+		unavailableBody: {
+			color: colors.textSecondary,
+			marginTop: 8,
+			lineHeight: 20,
+			textAlign: 'center',
+			maxWidth: 320,
+		},
+	});
+}
