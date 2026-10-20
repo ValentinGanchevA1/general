@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -14,7 +14,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SoftErrorBanner } from '@/components/SoftErrorBanner';
 import { SkeletonListRow } from '@/components/Skeleton';
-import { colors, useAppTheme } from '@/theme';
+import { useAppTheme, type ThemeColors } from '@/theme';
 
 function iconForChallenge(id: string): string {
   if (id.startsWith('wave')) return 'hand-wave';
@@ -25,14 +25,17 @@ function iconForChallenge(id: string): string {
 }
 
 function ChallengeRow({ c }: { c: ChallengeToday }): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const pct = c.target > 0 ? Math.min(100, Math.round((c.progress / c.target) * 100)) : 0;
+
   return (
     <View style={[styles.row, c.completed && styles.rowDone]}>
       <View style={[styles.iconWrap, c.completed && styles.iconWrapDone]}>
         <Icon
           name={c.completed ? 'check-bold' : iconForChallenge(c.id)}
           size={22}
-          color={c.completed ? colors.bg : colors.primary}
+          color={c.completed ? colors.onPrimary : colors.primary}
         />
       </View>
       <View style={styles.info}>
@@ -60,14 +63,14 @@ function ChallengeRow({ c }: { c: ChallengeToday }): React.JSX.Element {
 }
 
 export function ChallengesScreen(): React.JSX.Element {
-  const { colors: themeColors } = useAppTheme();
-
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { challenges, loading, error, refresh } = useChallenges();
   const completedCount = challenges.filter((c) => c.completed).length;
   const showErrorEmpty = error != null && challenges.length === 0 && !loading;
 
   return (
-    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
+    <View style={styles.container}>
       <ScreenHeader title="Challenges" />
 
       <ScrollView
@@ -117,45 +120,47 @@ export function ChallengesScreen(): React.JSX.Element {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  flex: { flex: 1 },
-  content: { paddingBottom: 40 },
-  summary: { color: colors.textMuted, fontSize: 14, textAlign: 'center', marginBottom: 16 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 20,
-    marginBottom: 12,
-    padding: 16,
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 14,
-  },
-  rowDone: { borderColor: colors.primaryBorderSoft, backgroundColor: colors.primarySoft },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primaryMutedBg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconWrapDone: { backgroundColor: colors.primary },
-  info: { flex: 1, gap: 4 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  title: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', flexShrink: 1 },
-  rewardPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    backgroundColor: colors.premiumMutedBg,
-    borderRadius: 12,
-  },
-  rewardText: { color: colors.premium, fontSize: 12, fontWeight: '700' },
-  doneText: { color: colors.primary, fontSize: 13, fontWeight: '600', marginTop: 2 },
-  barTrack: { height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden', marginTop: 6 },
-  barFill: { height: 6, backgroundColor: colors.primary, borderRadius: 3 },
-  progressText: { color: colors.textFaint, fontSize: 11, marginTop: 4 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    flex: { flex: 1 },
+    content: { paddingBottom: 40 },
+    summary: { color: colors.textMuted, fontSize: 14, textAlign: 'center', marginBottom: 16 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: 20,
+      marginBottom: 12,
+      padding: 16,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 14,
+    },
+    rowDone: { borderColor: colors.primaryBorderSoft, backgroundColor: colors.primarySoft },
+    iconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.primaryMutedBg,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    iconWrapDone: { backgroundColor: colors.primary },
+    info: { flex: 1, gap: 4 },
+    titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    title: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', flexShrink: 1 },
+    rewardPill: {
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+      backgroundColor: colors.premiumMutedBg,
+      borderRadius: 12,
+    },
+    rewardText: { color: colors.premium, fontSize: 12, fontWeight: '700' },
+    doneText: { color: colors.primary, fontSize: 13, fontWeight: '600', marginTop: 2 },
+    barTrack: { height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden', marginTop: 6 },
+    barFill: { height: 6, backgroundColor: colors.primary, borderRadius: 3 },
+    progressText: { color: colors.textFaint, fontSize: 11, marginTop: 4 },
+  });
+}
