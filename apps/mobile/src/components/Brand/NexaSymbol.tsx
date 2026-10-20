@@ -1,9 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
-const SYMBOL_COLOR = '#F7F8FA';
-const SYMBOL_CORE = '#C8BEFF';
-const SYMBOL_GLOW = '#7C5CFC';
+import { nexaBrand, nexaDark } from '@/theme';
 
 export interface NexaSymbolProps {
   size?: number;
@@ -82,12 +80,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    borderColor: SYMBOL_COLOR,
+    borderColor: nexaDark.textPrimary,
   },
   dot: {
     position: 'absolute',
-    backgroundColor: SYMBOL_CORE,
-    shadowColor: SYMBOL_GLOW,
+    backgroundColor: nexaBrand.symbolCore,
+    shadowColor: nexaBrand.violet,
     shadowOpacity: 0.95,
     shadowOffset: { width: 0, height: 0 },
     elevation: 14,
