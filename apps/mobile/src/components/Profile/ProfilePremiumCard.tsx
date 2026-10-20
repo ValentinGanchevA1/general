@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, spacing, radius } from '@/theme';
+import { spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
 
 interface Props {
   onPress: () => void;
@@ -10,6 +10,9 @@ interface Props {
 
 /** Bottom-of-profile Premium upsell — free users only. */
 export function ProfilePremiumCard({ onPress }: Props): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <TouchableOpacity style={styles.upgradeCard} onPress={onPress} accessibilityRole="button">
       <View style={styles.upgradeContent}>
@@ -24,20 +27,22 @@ export function ProfilePremiumCard({ onPress }: Props): React.JSX.Element {
   );
 }
 
-const styles = StyleSheet.create({
-  upgradeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.xl,
-    marginTop: spacing.lg,
-    padding: spacing.md,
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.premiumBorder,
-  },
-  upgradeContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  upgradeText: { flex: 1 },
-  upgradeTitle: { color: colors.premium, fontWeight: '700', fontSize: 15 },
-  upgradeSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    upgradeCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: spacing.xl,
+      marginTop: spacing.lg,
+      padding: spacing.md,
+      backgroundColor: colors.surfaceRaised,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.premiumBorder,
+    },
+    upgradeContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+    upgradeText: { flex: 1 },
+    upgradeTitle: { color: colors.premium, fontWeight: '700', fontSize: 15 },
+    upgradeSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  });
+}
