@@ -19,7 +19,7 @@ import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
 import { ProfileView } from '@/components/Profile/ProfileView';
 import {
 	ActionSheetList,
-	sheetChrome,
+	useSheetChrome,
 	useSheetBackdrop,
 	type ActionSheetItem,
 } from '@/components/sheets';
@@ -29,7 +29,7 @@ import {
 	mapPublicToViewModel,
 } from '@/features/profile/mapToProfileViewModel';
 import { resolveUserPrimaryCta } from '@/features/social/resolveUserPrimaryCta';
-import { colors, spacing, useAppTheme } from '@/theme';
+import { spacing, useAppTheme, type ThemeColors } from '@/theme';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
@@ -39,7 +39,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
  * Layout lives in ProfileView mode="other" (PR-C).
  */
 export function UserProfileScreen({ route, navigation }: Props): React.JSX.Element {
-	const { colors: themeColors } = useAppTheme();
+	const { colors } = useAppTheme();
+	const styles = useMemo(() => createStyles(colors), [colors]);
+	const sheetChrome = useSheetChrome();
 	const { userId, focus } = route.params;
 	const insets = useSafeAreaInsets();
 	const {
@@ -161,13 +163,13 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 
 	if (loading) {
 		return (
-			<View style={[styles.centered, { backgroundColor: themeColors.bg }]}>
+			<View style={styles.centered}>
 				<ActivityIndicator color={colors.primary} size="large" />
 			</View>
 		);
 	}
 
-	if (!profile) return <View style={[styles.centered, { backgroundColor: themeColors.bg }]} />;
+	if (!profile) return <View style={styles.centered} />;
 
 	const friendLabel = friendLabelFromRel(rel);
 	const viewModel = mapPublicToViewModel(profile, {
@@ -255,48 +257,50 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 	);
 }
 
-const styles = StyleSheet.create({
-	centered: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: colors.bg,
-	},
-	footer: {
-		flexDirection: 'row',
-		gap: 10,
-		paddingHorizontal: spacing.xl,
-		paddingTop: 12,
-		borderTopWidth: StyleSheet.hairlineWidth,
-		borderTopColor: colors.borderStrong,
-		backgroundColor: colors.bg,
-	},
-	footerBtn: {
-		borderRadius: 14,
-		paddingVertical: 14,
-		alignItems: 'center',
-		justifyContent: 'center',
-		minHeight: 50,
-	},
-	menuBtn: {
-		width: 56,
-		backgroundColor: colors.surfaceAlt,
-		borderWidth: 1,
-		borderColor: colors.borderStrong,
-	},
-	footerMenuOnly: {
-		marginLeft: 'auto',
-		flex: 0,
-	},
-	unblockBtn: {
-		flex: 1,
-		borderRadius: 14,
-		padding: 16,
-		alignItems: 'center',
-		backgroundColor: colors.surfaceAlt,
-		borderWidth: 1,
-		borderColor: colors.dangerBorderSoft,
-	},
-	unblockBtnText: { color: colors.dangerMuted, fontWeight: '700', fontSize: 16 },
-	sheetBody: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
-});
+function createStyles(colors: ThemeColors) {
+	return StyleSheet.create({
+		centered: {
+			flex: 1,
+			alignItems: 'center',
+			justifyContent: 'center',
+			backgroundColor: colors.bg,
+		},
+		footer: {
+			flexDirection: 'row',
+			gap: 10,
+			paddingHorizontal: spacing.xl,
+			paddingTop: 12,
+			borderTopWidth: StyleSheet.hairlineWidth,
+			borderTopColor: colors.borderStrong,
+			backgroundColor: colors.bg,
+		},
+		footerBtn: {
+			borderRadius: 14,
+			paddingVertical: 14,
+			alignItems: 'center',
+			justifyContent: 'center',
+			minHeight: 50,
+		},
+		menuBtn: {
+			width: 56,
+			backgroundColor: colors.surfaceAlt,
+			borderWidth: 1,
+			borderColor: colors.borderStrong,
+		},
+		footerMenuOnly: {
+			marginLeft: 'auto',
+			flex: 0,
+		},
+		unblockBtn: {
+			flex: 1,
+			borderRadius: 14,
+			padding: 16,
+			alignItems: 'center',
+			backgroundColor: colors.surfaceAlt,
+			borderWidth: 1,
+			borderColor: colors.dangerBorderSoft,
+		},
+		unblockBtnText: { color: colors.dangerMuted, fontWeight: '700', fontSize: 16 },
+		sheetBody: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+	});
+}
