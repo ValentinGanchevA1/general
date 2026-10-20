@@ -29,7 +29,7 @@ export type AccountStackParamList = {
   About: undefined;
   NotificationSettings: undefined;
   BlockedUsers: undefined;
-  TrustCenter: { focusStep?: 'email' | 'phone' | 'id' } | undefined;
+  TrustCenter: { focusStep?: 'email' | 'phone' | 'id' | 'social' } | undefined;
   Verification: { initialPhone?: string } | undefined;
   EmailVerification: undefined;
   VerificationId: undefined;

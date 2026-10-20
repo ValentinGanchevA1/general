@@ -1,6 +1,7 @@
 import React from 'react';
-import { Text, StyleSheet, Pressable, ScrollView } from 'react-native';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+
+import { fontSize, radius, spacing, useAppTheme } from '@/theme';
 
 export interface TrustChip {
   id: string;
@@ -13,17 +14,9 @@ interface TrustStripProps {
   onChipPress?: (chipId: string) => void;
 }
 
-const statusStyles = {
-  success: { bg: 'rgba(76, 175, 80, 0.15)', text: colors.success },
-  pending: { bg: 'rgba(255, 157, 60, 0.15)', text: colors.warning },
-  error: { bg: 'rgba(255, 68, 68, 0.15)', text: colors.danger },
-  missing: { bg: 'rgba(85, 85, 85, 0.35)', text: colors.textMuted },
-};
+export function TrustStrip({ chips, onChipPress }: TrustStripProps): React.JSX.Element {
+  const { colors } = useAppTheme();
 
-export function TrustStrip({
-  chips,
-  onChipPress,
-}: TrustStripProps): React.JSX.Element {
   return (
     <ScrollView
       horizontal
@@ -31,14 +24,36 @@ export function TrustStrip({
       contentContainerStyle={styles.container}
     >
       {chips.map((chip) => {
-        const s = statusStyles[chip.status];
+        const tone =
+          chip.status === 'success'
+            ? colors.verified
+            : chip.status === 'pending'
+              ? colors.warning
+              : chip.status === 'error'
+                ? colors.danger
+                : colors.textTertiary;
+        const background =
+          chip.status === 'success'
+            ? colors.discoverySoft
+            : chip.status === 'pending'
+              ? colors.surfaceSecondary
+              : chip.status === 'error'
+                ? colors.dangerSurface
+                : colors.surfaceSecondary;
+
         return (
           <Pressable
             key={chip.id}
             onPress={() => onChipPress?.(chip.id)}
-            style={[styles.chip, { backgroundColor: s.bg }]}
+            style={({ pressed }) => [
+              styles.chip,
+              { backgroundColor: background, borderColor: tone },
+              pressed && styles.pressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={chip.label}
           >
-            <Text style={[styles.chipText, { color: s.text }]}>{chip.label}</Text>
+            <Text style={[styles.chipText, { color: tone }]}>{chip.label}</Text>
           </Pressable>
         );
       })}
@@ -53,12 +68,15 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   chip: {
+    minHeight: 36,
+    justifyContent: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 8,
     borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   chipText: {
     fontSize: fontSize.sm,
     fontWeight: '600',
   },
+  pressed: { opacity: 0.78 },
 });
