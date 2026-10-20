@@ -37,11 +37,13 @@ export function NexaLaunchOverlay({
   const nativeHideStartedRef = useRef(false);
   const animationStartedRef = useRef(false);
 
-  const overlayOpacity = useRef(new Animated.Value(1)).current;
-  const wordmarkOpacity = useRef(new Animated.Value(1)).current;
-  const symbolScale = useRef(new Animated.Value(1)).current;
-  const pulseScale = useRef(new Animated.Value(0.55)).current;
-  const pulseOpacity = useRef(new Animated.Value(0)).current;
+  // Animated values are stable component state. Using lazy state initializers avoids
+  // reading ref.current during render, which is forbidden by React 19's refs lint rule.
+  const [overlayOpacity] = useState(() => new Animated.Value(1));
+  const [wordmarkOpacity] = useState(() => new Animated.Value(1));
+  const [symbolScale] = useState(() => new Animated.Value(1));
+  const [pulseScale] = useState(() => new Animated.Value(0.55));
+  const [pulseOpacity] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     let active = true;
