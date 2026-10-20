@@ -1,4 +1,5 @@
-// Top-of-map chrome: challenge, streak/trust nudge, weather/clock + location recovery.
+// Top-of-map supporting chrome: weather/clock, challenge, nudge + location recovery.
+// The primary filter/recenter row is owned by MapScreen and always stays above this stack.
 // Interactions is owned by the canonical bottom tab, so no duplicate floating entry lives here.
 
 import React from 'react';
@@ -26,7 +27,7 @@ interface Props {
 	interactionUnread: number;
 	/** Retained for caller compatibility; Interactions is bottom-tab only. */
 	onPressInteractions: () => void;
-	/** Actual mount state of top cards (from MapScreen). */
+	/** Actual mount state of supporting cards (from MapScreen). */
 	topStack: MapTopStackVisibility;
 	/** Session dismiss for daily challenge (shared with layout math). */
 	onDismissChallenge: () => void;
@@ -39,23 +40,16 @@ export function MapChrome({
 }: Props): React.JSX.Element {
 	const insets = useSafeAreaInsets();
 	const { coords, permissionDenied, requestPermission } = useUserLocation();
+	const weatherTop = mapWeatherTop(insets.top, sheetOpen, topStack);
 	const challengeTop = mapChallengeTop(insets.top);
 	const nudgeTop = mapNudgeTop(insets.top, topStack);
-	const weatherTop = mapWeatherTop(insets.top, sheetOpen, topStack);
 
 	return (
 		<>
 			{permissionDenied ? (
-				<View style={[styles.locationWrap, { top: insets.top + 8 }]} pointerEvents="box-none">
+				<View style={[styles.locationWrap, { top: weatherTop }]} pointerEvents="box-none">
 					<LocationPermissionBanner onRetry={() => void requestPermission()} />
 				</View>
-			) : null}
-
-			{!sheetOpen && !permissionDenied && topStack.challengeVisible ? (
-				<DailyChallengeCard top={challengeTop} onDismiss={onDismissChallenge} />
-			) : null}
-			{!sheetOpen && !permissionDenied && topStack.nudgeVisible ? (
-				<NudgeBanner top={nudgeTop} />
 			) : null}
 
 			{!sheetOpen && !permissionDenied && coords != null ? (
@@ -64,6 +58,13 @@ export function MapChrome({
 					top={weatherTop}
 					right={MAP_CHROME_H_INSET}
 				/>
+			) : null}
+
+			{!sheetOpen && !permissionDenied && topStack.challengeVisible ? (
+				<DailyChallengeCard top={challengeTop} onDismiss={onDismissChallenge} />
+			) : null}
+			{!sheetOpen && !permissionDenied && topStack.nudgeVisible ? (
+				<NudgeBanner top={nudgeTop} />
 			) : null}
 		</>
 	);
