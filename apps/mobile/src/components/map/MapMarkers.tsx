@@ -9,6 +9,7 @@ import { useTracksViewChanges } from './useTracksViewChanges';
 
 interface MapMarkersProps {
   points: DiscoveryPoint[];
+  /** Optional controlled selection. When omitted, MapMarkers tracks the last tapped entity. */
   selectedEntityKey?: string | null;
   onClusterPress: (p: ClusterPoint) => void;
   onEntityPress: (p: EntityPoint) => void;
@@ -24,10 +25,42 @@ function entityKey(point: EntityPoint): string {
  */
 function MapMarkersImpl({
   points,
-  selectedEntityKey = null,
+  selectedEntityKey,
   onClusterPress,
   onEntityPress,
 }: MapMarkersProps): React.JSX.Element {
+  const [localSelectedEntityKey, setLocalSelectedEntityKey] = useState<string | null>(null);
+  const effectiveSelectedKey =
+    selectedEntityKey === undefined ? localSelectedEntityKey : selectedEntityKey;
+
+  useEffect(() => {
+    if (selectedEntityKey !== undefined || localSelectedEntityKey == null) return;
+    const stillVisible = points.some(
+      (point) => point.kind !== 'cluster' && entityKey(point) === localSelectedEntityKey,
+    );
+    if (!stillVisible) setLocalSelectedEntityKey(null);
+  }, [localSelectedEntityKey, points, selectedEntityKey]);
+
+  const handleEntityPress = useCallback(
+    (point: EntityPoint) => {
+      if (selectedEntityKey === undefined) {
+        setLocalSelectedEntityKey(entityKey(point));
+      }
+      onEntityPress(point);
+    },
+    [onEntityPress, selectedEntityKey],
+  );
+
+  const handleClusterPress = useCallback(
+    (point: ClusterPoint) => {
+      if (selectedEntityKey === undefined) {
+        setLocalSelectedEntityKey(null);
+      }
+      onClusterPress(point);
+    },
+    [onClusterPress, selectedEntityKey],
+  );
+
   return (
     <>
       {points.map((point) =>
@@ -35,14 +68,14 @@ function MapMarkersImpl({
           <ClusterMarkerItem
             key={`c:${point.cellId}`}
             point={point}
-            onPress={onClusterPress}
+            onPress={handleClusterPress}
           />
         ) : (
           <EntityMarkerItem
             key={`e:${point.kind}:${point.id}`}
             point={point}
-            selected={entityKey(point) === selectedEntityKey}
-            onPress={onEntityPress}
+            selected={entityKey(point) === effectiveSelectedKey}
+            onPress={handleEntityPress}
           />
         ),
       )}
