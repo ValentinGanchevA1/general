@@ -22,7 +22,7 @@ import type { StoryCard, StoryReactionKind } from '@g88/shared';
 
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 
-import { colors } from '@/theme';
+import { useAppTheme, type ThemeColors } from '@/theme';
 import { useAppDispatch } from '@/hooks/redux';
 import {
   ActionSheetList,
@@ -44,6 +44,8 @@ interface Props {
 /** Full-screen sequential story viewer — progress logic lives in useStoryProgress. */
 export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) {
   const dispatch = useAppDispatch();
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [index, setIndex] = useState(initialIndex);
   const [held, setHeld] = useState(false);
   // Context fallback so unit tests (no SafeAreaProvider) do not throw.
@@ -280,7 +282,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
                       accessibilityRole="button"
                       accessibilityLabel="Skip story"
                     >
-                      <Text style={styles.videoFailedBtnText}>Skip</Text>
+                      <Text style={styles.videoFailedBtnSecondaryText}>Skip</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -363,6 +365,8 @@ function ProgressRow({
   progressAnim: Animated.Value;
   dimmed: boolean;
 }) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={[styles.progressRow, dimmed && styles.chromeDim]}>
       {stories.map((s, i) => (
@@ -390,115 +394,124 @@ function ProgressRow({
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  progressRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 12 },
-  progressTrack: {
-    flex: 1,
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 1,
-    overflow: 'hidden',
-  },
-  progressFill: { height: 2, width: 0, backgroundColor: colors.textPrimary },
-  progressDone: { width: '100%' },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  author: { color: colors.textPrimary, fontWeight: '600', fontSize: 15 },
-  mute: { fontSize: 18 },
-  more: { color: colors.textPrimary, fontSize: 18, letterSpacing: 1 },
-  close: { color: colors.textPrimary, fontSize: 18 },
-  chromeDim: { opacity: 0.35 },
-  mediaWrap: { flex: 1, justifyContent: 'center' },
-  media: { width: SCREEN_W, height: SCREEN_H * 0.65 },
-  videoLoading: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.bg,
-  },
-  videoFailed: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.72)',
-    paddingHorizontal: 24,
-  },
-  videoFailedTitle: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  videoFailedBody: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  videoFailedActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
-  },
-  videoFailedBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-  },
-  videoFailedBtnSecondary: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  videoFailedBtnText: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  tapLeft: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: '30%',
-    zIndex: 2,
-  },
-  tapRight: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: '70%',
-    zIndex: 2,
-  },
-  caption: {
-    color: colors.textPrimary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    fontSize: 14,
-  },
-  reactions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 36,
-    gap: 12,
-  },
-  reactBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  reactActive: { backgroundColor: colors.accent + '66' },
-  reactEmoji: { fontSize: 22 },
-  counts: { color: colors.textSecondary, fontSize: 12, marginLeft: 8 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bg },
+    progressRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 12 },
+    progressTrack: {
+      flex: 1,
+      height: 2,
+      backgroundColor: colors.borderStrong,
+      borderRadius: 1,
+      overflow: 'hidden',
+    },
+    progressFill: { height: 2, width: 0, backgroundColor: colors.textPrimary },
+    progressDone: { width: '100%' },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+    author: { color: colors.textPrimary, fontWeight: '600', fontSize: 15 },
+    mute: { fontSize: 18 },
+    more: { color: colors.textPrimary, fontSize: 18, letterSpacing: 1 },
+    close: { color: colors.textPrimary, fontSize: 18 },
+    chromeDim: { opacity: 0.35 },
+    mediaWrap: { flex: 1, justifyContent: 'center' },
+    media: { width: SCREEN_W, height: SCREEN_H * 0.65 },
+    videoLoading: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.bg,
+    },
+    videoFailed: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceRaised,
+      paddingHorizontal: 24,
+    },
+    videoFailedTitle: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    videoFailedBody: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      marginTop: 8,
+      textAlign: 'center',
+    },
+    videoFailedActions: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 20,
+    },
+    videoFailedBtn: {
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+      borderRadius: 20,
+      backgroundColor: colors.primary,
+    },
+    videoFailedBtnSecondary: {
+      backgroundColor: colors.actionSoft,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.actionBorder,
+    },
+    videoFailedBtnText: {
+      color: colors.onPrimary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    videoFailedBtnSecondaryText: {
+      color: colors.textPrimary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    tapLeft: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: '30%',
+      zIndex: 2,
+    },
+    tapRight: {
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      bottom: 0,
+      width: '70%',
+      zIndex: 2,
+    },
+    caption: {
+      color: colors.textPrimary,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      fontSize: 14,
+    },
+    reactions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingBottom: 36,
+      gap: 12,
+    },
+    reactBtn: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.actionSoft,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    reactActive: { backgroundColor: colors.primarySoft },
+    reactEmoji: { fontSize: 22 },
+    counts: { color: colors.textSecondary, fontSize: 12, marginLeft: 8 },
+  });
+}
