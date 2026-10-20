@@ -2,14 +2,13 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { appAlert } from '@/ui/appAlert';
-import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { ActivityItem, ActivityType, StoryCard, Viewport } from '@g88/shared';
 import { canPostStory, storyGateMessage } from '@g88/shared';
-import type { RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
+import type { PulseFilter, RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchFeed, clearPendingFilter } from './pulseSlice';
@@ -31,10 +30,9 @@ import { useTrendingNearby } from './useTrendingNearby';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type R = RouteProp<TabParamList, 'Pulse'>;
-type DiscoveryFilter = 'for-you' | 'nearby' | 'events' | 'marketplace';
 
 interface FilterDef {
-	key: DiscoveryFilter;
+	key: PulseFilter;
 	label: string;
 	type: ActivityType | null;
 }
@@ -46,11 +44,11 @@ const FILTERS: readonly FilterDef[] = [
 	{ key: 'marketplace', label: 'Marketplace', type: 'listing' },
 ];
 
-const ALLOWED_FILTER_KEYS = new Set<DiscoveryFilter>(FILTERS.map((filter) => filter.key));
+const ALLOWED_FILTER_KEYS = new Set<PulseFilter>(FILTERS.map((filter) => filter.key));
 
-function resolveFilter(raw: unknown): DiscoveryFilter {
-	return typeof raw === 'string' && ALLOWED_FILTER_KEYS.has(raw as DiscoveryFilter)
-		? (raw as DiscoveryFilter)
+function resolveFilter(raw: unknown): PulseFilter {
+	return typeof raw === 'string' && ALLOWED_FILTER_KEYS.has(raw as PulseFilter)
+		? (raw as PulseFilter)
 		: 'for-you';
 }
 
@@ -69,12 +67,10 @@ export function PulseScreen(): React.JSX.Element {
 	const discoveryPoints = useAppSelector((state) => state.discovery.points);
 	const nearbyStories = useAppSelector((state) => state.stories.nearby);
 	const profile = useAppSelector((state) => state.profile.profile);
-	const pendingFriends = useAppSelector((state) => state.friends.pendingCount);
-	const chatUnread = useAppSelector((state) => state.chat.conversations.reduce((sum, conversation) => sum + (conversation.unreadCount ?? 0), 0));
 	const { topics: trendingTopics } = useTrendingNearby();
 	const { coords: myCoords, requestPermission } = useUserLocation();
 	const { on } = useSocket();
-	const [filter, setFilter] = useState<DiscoveryFilter>(() => resolveFilter(route.params?.filter));
+	const [filter, setFilter] = useState<PulseFilter>(() => resolveFilter(route.params?.filter));
 	const [viewerOpen, setViewerOpen] = useState(false);
 	const [viewerIndex, setViewerIndex] = useState(0);
 	const [createOpen, setCreateOpen] = useState(false);
@@ -122,8 +118,6 @@ export function PulseScreen(): React.JSX.Element {
 		}
 		return next;
 	}, [items, filter]);
-
-	const badgeCount = chatUnread + pendingFriends;
 
 	const onTap = useCallback((item: ActivityItem): void => {
 		const { screen, params } = item.deepLink;
@@ -196,10 +190,6 @@ export function PulseScreen(): React.JSX.Element {
 		<View>
 			<View style={[S.headerBar, { paddingTop: Math.max(insets.top, 8) + 8 }]}>
 				<Text style={S.headerTitle}>Pulse</Text>
-				<TouchableOpacity style={S.badgeBtn} onPress={() => navigation.navigate('Interactions')} accessibilityLabel={badgeCount > 0 ? `${badgeCount} notifications` : 'Notifications'} testID="pulse-notifications">
-					<MCI name="bell-outline" size={22} color={colors.textSecondary} />
-					{badgeCount > 0 ? <View style={S.badge}><Text style={S.badgeText}>{badgeCount > 9 ? '9+' : badgeCount}</Text></View> : null}
-				</TouchableOpacity>
 			</View>
 			<PulseStrip onOpenStory={onOpenStory} onCreatePress={onCreatePress} canCreate={storyEligibility.allowed} {...(!storyEligibility.allowed ? { gateReason: storyEligibility.reason } : {})} />
 			<ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.chips} contentContainerStyle={S.chipsContent}>
@@ -225,11 +215,8 @@ export function PulseScreen(): React.JSX.Element {
 
 const S = StyleSheet.create({
 	container: { flex: 1, backgroundColor: colors.bg },
-	headerBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 2 },
+	headerBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 2 },
 	headerTitle: { color: colors.textPrimary, fontSize: 26, fontWeight: '700' },
-	badgeBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-	badge: { position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-	badgeText: { color: colors.textPrimary, fontSize: 10, fontWeight: '700' },
 	chips: { maxHeight: 44 },
 	chipsContent: { paddingHorizontal: 12, paddingVertical: 6, gap: 8 },
 	chip: { marginRight: 0 },
