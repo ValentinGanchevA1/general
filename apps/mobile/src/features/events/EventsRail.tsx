@@ -1,7 +1,7 @@
-// Concept-board “Events Near You” map overlay.
+// Compact “Events Near You” map overlay.
 // The right side intentionally stays clear for MapScreen's GPS recenter control.
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
 	Image,
 	Pressable,
@@ -20,12 +20,13 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { useNearbyEvents } from './useEvents';
 import { formatEventDayShort } from './eventFormat';
-import { fontSize, radius, spacing, useAppTheme } from '@/theme';
+import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+type RailStyles = ReturnType<typeof createStyles>;
 
 /** Panel including section header + event card. */
-export const EVENTS_RAIL_HEIGHT = 126;
+export const EVENTS_RAIL_HEIGHT = 112;
 
 function toRadians(value: number): number {
 	return (value * Math.PI) / 180;
@@ -51,45 +52,37 @@ function formatDistance(meters: number): string {
 
 export function EventsRail({ location }: { location: LatLng | null }): React.JSX.Element | null {
 	const navigation = useNavigation<Nav>();
-	const { colors } = useAppTheme();
+	const { colors, shadow } = useAppTheme();
+	const styles = useMemo(() => createStyles(colors), [colors]);
 	const { events } = useNearbyEvents(location);
 
 	if (!location || events.length === 0) return null;
 
 	return (
-		<View
-			style={[
-				styles.wrap,
-				{
-					borderColor: colors.borderStrong,
-					shadowColor: colors.shadowInk,
-				},
-			]}
-			pointerEvents="box-none"
-		>
+		<View style={[styles.wrap, shadow(0.14)]} pointerEvents="box-none">
 			<View style={styles.header}>
-				<Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Events Near You</Text>
+				<View style={styles.headerLabel}>
+					<Icon name="calendar-blank-outline" size={15} color={colors.entityEvent} />
+					<Text style={styles.headerTitle}>Events Near You</Text>
+				</View>
 				<Pressable
 					onPress={() => navigation.navigate('Main', { screen: 'Pulse', params: { filter: 'events' } })}
 					hitSlop={8}
 					accessibilityRole="button"
 					accessibilityLabel="See all nearby events"
 				>
-					<Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
+					<Text style={styles.seeAll}>See all</Text>
 				</Pressable>
 			</View>
 
-			<ScrollView
-				horizontal
-				showsHorizontalScrollIndicator={false}
-				contentContainerStyle={styles.scroll}
-			>
+			<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 				{events.map((event) => (
 					<EventCard
 						key={event.id}
 						event={event}
 						distanceLabel={formatDistance(distanceMeters(location, event.location))}
 						onPress={() => openRootScreen(navigation, 'EventDetail', { eventId: event.id })}
+						styles={styles}
 					/>
 				))}
 			</ScrollView>
@@ -97,21 +90,18 @@ export function EventsRail({ location }: { location: LatLng | null }): React.JSX
 	);
 }
 
-function EventCard({
-	event,
-	distanceLabel,
-	onPress,
-}: {
+function EventCard({ event, distanceLabel, onPress, styles }: {
 	event: EventSummary;
 	distanceLabel: string;
 	onPress: () => void;
+	styles: RailStyles;
 }): React.JSX.Element {
 	const { colors } = useAppTheme();
 	const attendeeDots = Math.min(3, Math.max(1, event.attendeeCount));
 
 	return (
 		<TouchableOpacity
-			style={[styles.card, { borderColor: colors.border }]}
+			style={styles.card}
 			activeOpacity={0.85}
 			onPress={onPress}
 			accessibilityRole="button"
@@ -120,134 +110,59 @@ function EventCard({
 			{event.coverUrl ? (
 				<Image source={{ uri: event.coverUrl }} style={styles.cover} />
 			) : (
-				<View style={[styles.cover, styles.coverPlaceholder, { backgroundColor: colors.surfaceAlt }]}>
+				<View style={[styles.cover, styles.coverPlaceholder]}>
 					<Icon name="calendar-star" size={22} color={colors.entityEvent} />
 				</View>
 			)}
 
 			<View style={styles.body}>
-				<Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={1}>
-					{event.title}
-				</Text>
-				<Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
-					{formatEventDayShort(event.startsAt)} · {distanceLabel}
-				</Text>
+				<Text style={styles.title} numberOfLines={1}>{event.title}</Text>
+				<Text style={styles.meta} numberOfLines={1}>{formatEventDayShort(event.startsAt)} · {distanceLabel}</Text>
 				<View style={styles.attendanceRow}>
 					<View style={styles.avatarStack}>
 						{Array.from({ length: attendeeDots }, (_, index) => (
-							<View
-								key={`${event.id}-attendee-${index}`}
-								style={[
-									styles.attendeeDot,
-									{
-										backgroundColor: colors.surfaceAlt,
-										borderColor: colors.borderStrong,
-										marginLeft: index === 0 ? 0 : -6,
-									},
-								]}
-							>
+							<View key={`${event.id}-attendee-${index}`} style={[styles.attendeeDot, index > 0 && styles.attendeeOverlap]}>
 								<Icon name="account" size={11} color={colors.textSecondary} />
 							</View>
 						))}
 					</View>
-					<Text style={[styles.going, { color: colors.textSecondary }]}>
-						{event.attendeeCount} going
-					</Text>
+					<Text style={styles.going}>{event.attendeeCount} going</Text>
 				</View>
 			</View>
 		</TouchableOpacity>
 	);
 }
 
-const styles = StyleSheet.create({
-	wrap: {
-		position: 'absolute',
-		left: 12,
-		right: 12,
-		bottom: 16,
-		paddingTop: 10,
-		paddingBottom: 10,
-		borderRadius: radius.xl,
-		backgroundColor: 'rgba(10,10,15,0.90)',
-		borderWidth: 1,
-		zIndex: 17,
-		shadowOpacity: 0.22,
-		shadowRadius: 12,
-		shadowOffset: { width: 0, height: 4 },
-		elevation: 6,
-	},
-	header: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: spacing.md,
-		marginBottom: 8,
-	},
-	headerTitle: {
-		fontSize: fontSize.md,
-		fontWeight: '800',
-	},
-	seeAll: {
-		fontSize: fontSize.sm,
-		fontWeight: '700',
-	},
-	scroll: {
-		paddingLeft: spacing.sm,
-		paddingRight: 76,
-		gap: 10,
-	},
-	card: {
-		width: 264,
-		height: 72,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 10,
-		padding: 7,
-		borderRadius: radius.lg,
-		backgroundColor: 'rgba(18,18,31,0.72)',
-		borderWidth: 1,
-	},
-	cover: {
-		width: 72,
-		height: 58,
-		borderRadius: radius.md,
-	},
-	coverPlaceholder: {
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	body: {
-		flex: 1,
-		minWidth: 0,
-	},
-	title: {
-		fontSize: 13,
-		fontWeight: '800',
-	},
-	meta: {
-		fontSize: 11,
-		marginTop: 3,
-	},
-	attendanceRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginTop: 5,
-	},
-	avatarStack: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginRight: 7,
-	},
-	attendeeDot: {
-		width: 20,
-		height: 20,
-		borderRadius: 10,
-		borderWidth: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	going: {
-		fontSize: 10,
-		fontWeight: '600',
-	},
-});
+function createStyles(colors: ThemeColors) {
+	return StyleSheet.create({
+		wrap: {
+			position: 'absolute', left: 12, right: 12, bottom: 14,
+			paddingTop: 8, paddingBottom: 8, borderRadius: radius.xl,
+			backgroundColor: colors.surfaceRaised, borderWidth: StyleSheet.hairlineWidth,
+			borderColor: colors.borderSubtle, zIndex: 17,
+		},
+		header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, marginBottom: 6 },
+		headerLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+		headerTitle: { color: colors.textPrimary, fontSize: fontSize.sm, fontWeight: '800' },
+		seeAll: { color: colors.primary, fontSize: fontSize.sm, fontWeight: '700' },
+		scroll: { paddingLeft: spacing.sm, paddingRight: 76, gap: 8 },
+		card: {
+			width: 252, height: 66, flexDirection: 'row', alignItems: 'center', gap: 9,
+			padding: 6, borderRadius: radius.lg, backgroundColor: colors.surfacePrimary,
+			borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderSubtle,
+		},
+		cover: { width: 66, height: 54, borderRadius: radius.md },
+		coverPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.discoverySoft },
+		body: { flex: 1, minWidth: 0 },
+		title: { color: colors.textPrimary, fontSize: 13, fontWeight: '800' },
+		meta: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+		attendanceRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+		avatarStack: { flexDirection: 'row', alignItems: 'center', marginRight: 7 },
+		attendeeDot: {
+			width: 19, height: 19, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center',
+			backgroundColor: colors.surfaceAlt, borderColor: colors.borderStrong,
+		},
+		attendeeOverlap: { marginLeft: -6 },
+		going: { color: colors.textSecondary, fontSize: 10, fontWeight: '600' },
+	});
+}
