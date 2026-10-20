@@ -1,4 +1,4 @@
-// Top-of-map chrome: challenge, streak/trust nudge, interactions entry + location recovery.
+// Top-of-map chrome: challenge, streak/trust nudge, weather/clock, interactions entry + location recovery.
 // Owns stack visibility + absolute tops so cards never self-compute offsets.
 // Tops collapse when challenge/nudge are hidden (mapChromeLayout visibility flags).
 
@@ -10,18 +10,23 @@ import { DailyChallengeCard } from '@/features/gamification/DailyChallengeCard';
 import { NudgeBanner } from '@/features/nudges/NudgeBanner';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { LocationPermissionBanner } from '@/features/location/LocationPermissionBanner';
+import { WeatherClockWidget } from '@/features/weather/WeatherClockWidget';
 import { colors } from '@/theme';
 
 import {
 	INTERACTION_BADGE_SIZE,
+	MAP_CHROME_GAP,
+	MAP_CHROME_H_INSET,
+	WEATHER_WIDGET_WIDTH,
 	mapBadgeTop,
 	mapChallengeTop,
 	mapNudgeTop,
+	mapWeatherTop,
 	type MapTopStackVisibility,
 } from './mapChromeLayout';
 
 interface Props {
-	/** Entity bottom sheet open → hide challenge/nudge, lift badge. */
+	/** Entity bottom sheet open → hide challenge/nudge/weather, lift badge. */
 	sheetOpen: boolean;
 	interactionUnread: number;
 	onPressInteractions: () => void;
@@ -39,10 +44,11 @@ export function MapChrome({
 	onDismissChallenge,
 }: Props): React.JSX.Element {
 	const insets = useSafeAreaInsets();
-	const { permissionDenied, requestPermission } = useUserLocation();
+	const { coords, permissionDenied, requestPermission } = useUserLocation();
 	const challengeTop = mapChallengeTop(insets.top);
 	const nudgeTop = mapNudgeTop(insets.top, topStack);
 	const badgeTop = mapBadgeTop(insets.top, sheetOpen, topStack);
+	const weatherTop = mapWeatherTop(insets.top, sheetOpen, topStack);
 
 	return (
 		<>
@@ -57,6 +63,14 @@ export function MapChrome({
 			) : null}
 			{!sheetOpen && !permissionDenied && topStack.nudgeVisible ? (
 				<NudgeBanner top={nudgeTop} />
+			) : null}
+
+			{!sheetOpen && !permissionDenied && coords != null ? (
+				<WeatherClockWidget
+					coords={coords}
+					top={weatherTop}
+					right={MAP_CHROME_H_INSET}
+				/>
 			) : null}
 
 			<TouchableOpacity
@@ -92,7 +106,7 @@ const styles = StyleSheet.create({
 	},
 	interactionBadge: {
 		position: 'absolute',
-		right: 16,
+		right: MAP_CHROME_H_INSET + WEATHER_WIDGET_WIDTH + MAP_CHROME_GAP,
 		width: INTERACTION_BADGE_SIZE,
 		height: INTERACTION_BADGE_SIZE,
 		borderRadius: INTERACTION_BADGE_SIZE / 2,

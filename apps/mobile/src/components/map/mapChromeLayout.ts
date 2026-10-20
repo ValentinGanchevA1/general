@@ -1,5 +1,5 @@
 // Shared layout math for map chrome (top stack + bottom clearance).
-// Stack (closed sheet): challenge → nudge → filter row → interactions badge → trending.
+// Stack (closed sheet): challenge → nudge → filter row → interactions/weather → trending.
 // Tops collapse when challenge/nudge are hidden.
 
 import { CHALLENGE_CARD_HEIGHT } from '@/features/gamification/DailyChallengeCard';
@@ -8,6 +8,8 @@ import { spacing } from '@/theme';
 export const MAP_CHROME_GAP = 8;
 export const NUDGE_CARD_HEIGHT = 56;
 export const INTERACTION_BADGE_SIZE = 44;
+export const WEATHER_WIDGET_WIDTH = 88;
+export const WEATHER_WIDGET_HEIGHT = 64;
 export const MAP_CHROME_H_INSET = spacing.lg;
 export const FAB_BOTTOM = spacing.md;
 export const EVENTS_RAIL_BOTTOM = spacing.lg;
@@ -22,6 +24,8 @@ export const MAP_CHROME = {
 	challengeHeight: CHALLENGE_CARD_HEIGHT,
 	nudgeHeight: NUDGE_CARD_HEIGHT,
 	badgeSize: INTERACTION_BADGE_SIZE,
+	weatherWidth: WEATHER_WIDGET_WIDTH,
+	weatherHeight: WEATHER_WIDGET_HEIGHT,
 	hInset: MAP_CHROME_H_INSET,
 	fabBottom: FAB_BOTTOM,
 	eventsRailBottom: EVENTS_RAIL_BOTTOM,
@@ -80,7 +84,7 @@ export function mapFilterRowTop(
 }
 
 /**
- * Interaction badge under the filter row.
+ * Interaction/weather row under the filter row.
  * Sheet open → under filter (still below safe area via filter top).
  */
 export function mapBadgeTop(
@@ -95,8 +99,16 @@ export function mapBadgeTop(
 	);
 }
 
+export function mapWeatherTop(
+	insetsTop: number,
+	sheetOpen: boolean,
+	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
+): number {
+	return mapBadgeTop(insetsTop, sheetOpen, visibility);
+}
+
 /**
- * Top of TrendingCard under interactions badge.
+ * Top of TrendingCard under the taller item in the interactions/weather row.
  */
 export function mapTrendingTop(
 	insetsTop: number,
@@ -105,7 +117,7 @@ export function mapTrendingTop(
 ): number {
 	return (
 		mapBadgeTop(insetsTop, sheetOpen, visibility) +
-		INTERACTION_BADGE_SIZE +
+		Math.max(INTERACTION_BADGE_SIZE, WEATHER_WIDGET_HEIGHT) +
 		MAP_CHROME_GAP
 	);
 }
@@ -134,6 +146,7 @@ export function mapChromeTops(
 	nudge: number;
 	filterRow: number;
 	badge: number;
+	weather: number;
 	trending: number;
 } {
 	return {
@@ -141,6 +154,7 @@ export function mapChromeTops(
 		nudge: mapNudgeTop(insetsTop, visibility),
 		filterRow: mapFilterRowTop(insetsTop, sheetOpen, visibility),
 		badge: mapBadgeTop(insetsTop, sheetOpen, visibility),
+		weather: mapWeatherTop(insetsTop, sheetOpen, visibility),
 		trending: mapTrendingTop(insetsTop, sheetOpen, visibility),
 	};
 }
