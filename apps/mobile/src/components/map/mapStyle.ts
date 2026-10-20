@@ -1,7 +1,4 @@
-/**
- * Branded Google Maps styles. POI labels/icons stay hidden in both schemes so
- * NEXA entities remain the primary interactive layer.
- */
+/** Branded Google Maps styles. POI labels/icons stay hidden so NEXA entities remain primary. */
 export const DARK_MAP_STYLE = [
   { elementType: 'geometry', stylers: [{ color: '#0a0a0f' }] },
   { elementType: 'labels.text.fill', stylers: [{ color: '#6b6b7b' }] },
@@ -53,5 +50,29 @@ export const LIGHT_MAP_STYLE = [
   { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#668394' }] },
 ];
 
-/** @deprecated Use DARK_MAP_STYLE or LIGHT_MAP_STYLE based on the resolved app scheme. */
+/** Premium PROTOS NEXUS map: near-black graphite with restrained pink/violet/cyan cues. */
+export const PROTOS_NEXUS_MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#07050B' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#A98FA3' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#07050B' }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#2A1630' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#D9C8D5' }] },
+  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#0B0811' }] },
+  { featureType: 'landscape.man_made', elementType: 'geometry', stylers: [{ color: '#100B17' }] },
+  { featureType: 'poi', stylers: [{ visibility: 'off' as const }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#09130F' }, { visibility: 'on' as const }] },
+  { featureType: 'poi.park', elementType: 'labels', stylers: [{ visibility: 'off' as const }] },
+  { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#1A1020' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#0B0710' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#8C7186' }] },
+  { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#211329' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#32163A' }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#5A1D4A' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#16101E' }] },
+  { featureType: 'transit.station', elementType: 'labels', stylers: [{ visibility: 'off' as const }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#07141A' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3D8A99' }] },
+];
+
+/** @deprecated Use a scheme/mode-specific map style. */
 export const MAP_STYLE = DARK_MAP_STYLE;
