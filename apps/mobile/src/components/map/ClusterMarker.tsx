@@ -16,6 +16,7 @@ import { clusterVisualKey } from './markerVisualKeys';
 interface Props {
   point: ClusterPoint;
   selected?: boolean;
+  showComposition?: boolean;
 }
 
 const ROOT_SIZE = 68;
@@ -23,6 +24,7 @@ const ROOT_SIZE = 68;
 function ClusterMarkerImpl({
   point,
   selected = false,
+  showComposition = true,
 }: Props): React.JSX.Element {
   const { colors } = useAppTheme();
   const visual = resolveNexaClusterVisual(point);
@@ -50,6 +52,8 @@ function ClusterMarkerImpl({
     semanticColor,
     fillColor,
   );
+  const showCompositionGlyphs =
+    showComposition && visual.showCompositionGlyphs;
 
   const labelFontSize =
     visual.countLabel.length >= 4
@@ -96,13 +100,13 @@ function ClusterMarkerImpl({
           style={[
             styles.count,
             { color: colors.textPrimary, fontSize: labelFontSize },
-            visual.showCompositionGlyphs && styles.mixedCount,
+            showCompositionGlyphs && styles.mixedCount,
           ]}
         >
           {visual.countLabel}
         </Text>
 
-        {visual.showCompositionGlyphs ? (
+        {showCompositionGlyphs ? (
           <View style={styles.compositionRow}>
             {visual.composition.activeKinds.map((kind) => (
               <CompositionGlyph
@@ -207,6 +211,7 @@ function compositionGlyphStyle(kind: EntityKind, color: string): ViewStyle {
 function clusterMarkerPropsEqual(prev: Props, next: Props): boolean {
   return (
     prev.selected === next.selected &&
+    prev.showComposition === next.showComposition &&
     clusterVisualKey(prev.point) === clusterVisualKey(next.point) &&
     prev.point.lat === next.point.lat &&
     prev.point.lng === next.point.lng

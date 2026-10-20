@@ -6,7 +6,7 @@ import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, fontSize, spacing } from '@/theme';
+import { colors, fontSize } from '@/theme';
 
 import {
 	MAP_CHROME_GAP,

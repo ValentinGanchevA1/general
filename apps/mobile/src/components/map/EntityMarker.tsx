@@ -2,10 +2,13 @@ import React from 'react';
 import type { EntityPoint } from '@g88/shared';
 
 import { NexaEntityMarker } from './NexaEntityMarker';
+import type { NexaMarkerDensity } from './nexaEntityMarkerVisuals';
 import { entityVisualKey } from './markerVisualKeys';
 
 interface Props {
   point: EntityPoint;
+  density?: NexaMarkerDensity;
+  showCaption?: boolean;
   selected?: boolean;
   isNew?: boolean;
   own?: boolean;
@@ -76,6 +79,8 @@ function formatListingBadge(
 
 function EntityMarkerImpl({
   point,
+  density = 'standard',
+  showCaption = true,
   selected = false,
   isNew = false,
   own = false,
@@ -92,8 +97,9 @@ function EntityMarkerImpl({
     return (
       <NexaEntityMarker
         entityType="person"
+        density={density}
         label={initialsFromName(name) || '?'}
-        caption={name.slice(0, 10)}
+        caption={showCaption ? name.slice(0, 10) : undefined}
         state={{ selected, live, verified, isNew, own, dimmed, unavailable }}
         accessibilityLabel={`${name}, person${live ? ', live' : ''}${verified ? ', verified' : ''}`}
         onVisualSettled={onVisualSettled}
@@ -105,7 +111,8 @@ function EntityMarkerImpl({
     return (
       <NexaEntityMarker
         entityType="event"
-        caption={formatEventBadge(point.meta.startsAt)}
+        density={density}
+        caption={showCaption ? formatEventBadge(point.meta.startsAt) : undefined}
         state={{ selected, isNew, own, dimmed, unavailable }}
         accessibilityLabel={`${point.meta.title}, event`}
         onVisualSettled={onVisualSettled}
@@ -116,11 +123,16 @@ function EntityMarkerImpl({
   return (
     <NexaEntityMarker
       entityType="listing"
-      caption={formatListingBadge(
-        point.meta.priceCents,
-        point.meta.currency,
-        point.meta.mode,
-      )}
+      density={density}
+      caption={
+        showCaption
+          ? formatListingBadge(
+              point.meta.priceCents,
+              point.meta.currency,
+              point.meta.mode,
+            )
+          : undefined
+      }
       state={{ selected, isNew, own, dimmed, unavailable }}
       accessibilityLabel={`${point.meta.title}, listing`}
       onVisualSettled={onVisualSettled}
@@ -133,6 +145,8 @@ function entityMarkerPropsEqual(prev: Props, next: Props): boolean {
     entityVisualKey(prev.point) === entityVisualKey(next.point) &&
     prev.point.lat === next.point.lat &&
     prev.point.lng === next.point.lng &&
+    prev.density === next.density &&
+    prev.showCaption === next.showCaption &&
     prev.selected === next.selected &&
     prev.isNew === next.isNew &&
     prev.own === next.own &&

@@ -2,14 +2,23 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Marker } from 'react-native-maps';
 import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
 
+import { useAppSelector } from '@/hooks/redux';
+
 import { ClusterMarker } from './ClusterMarker';
 import { EntityMarker } from './EntityMarker';
 import { NEXA_MARKER_ANCHOR_Y } from './NexaEntityMarker';
+import {
+  limitVisibleMapPoints,
+  resolveNexaMapZoomPolicy,
+  type NexaMapZoomPolicy,
+} from './nexaMapZoomDensity';
 import { clusterVisualKey, entityVisualKey } from './markerVisualKeys';
 import { useTracksViewChanges } from './useTracksViewChanges';
 
 interface MapMarkersProps {
   points: DiscoveryPoint[];
+  /** Optional override for previews/tests. Runtime normally follows discovery.zoom. */
+  zoomPolicy?: NexaMapZoomPolicy;
   /** Optional controlled entity selection. When omitted, the last tapped entity is tracked locally. */
   selectedEntityKey?: string | null;
   /** Optional controlled cluster selection. When omitted, the last tapped cluster is tracked locally. */
@@ -33,6 +42,7 @@ function entityKey(point: EntityPoint): string {
  */
 function MapMarkersImpl({
   points,
+  zoomPolicy,
   selectedEntityKey,
   selectedClusterCellId,
   newEntityKeys,
@@ -42,6 +52,10 @@ function MapMarkersImpl({
   onClusterPress,
   onEntityPress,
 }: MapMarkersProps): React.JSX.Element {
+  const committedDiscoveryZoom = useAppSelector((state) => state.discovery.zoom);
+  const effectiveZoomPolicy =
+    zoomPolicy ?? resolveNexaMapZoomPolicy(committedDiscoveryZoom);
+
   const [localSelectedEntityKey, setLocalSelectedEntityKey] = useState<string | null>(null);
   const [localSelectedClusterCellId, setLocalSelectedClusterCellId] = useState<string | null>(null);
 
@@ -79,6 +93,22 @@ function MapMarkersImpl({
     }
   }, [localSelectedClusterCellId, points, selectedClusterCellId]);
 
+  const visiblePoints = useMemo(
+    () =>
+      limitVisibleMapPoints(points, effectiveZoomPolicy.maxVisiblePoints, {
+        selectedEntityKey: effectiveSelectedEntityKey,
+        selectedClusterCellId: effectiveSelectedClusterCellId,
+        ownEntityKey,
+      }),
+    [
+      points,
+      effectiveZoomPolicy.maxVisiblePoints,
+      effectiveSelectedEntityKey,
+      effectiveSelectedClusterCellId,
+      ownEntityKey,
+    ],
+  );
+
   const handleEntityPress = useCallback(
     (point: EntityPoint) => {
       if (selectedEntityKey === undefined) {
@@ -105,13 +135,14 @@ function MapMarkersImpl({
 
   return (
     <>
-      {points.map((point) => {
+      {visiblePoints.map((point) => {
         if (point.kind === 'cluster') {
           return (
             <ClusterMarkerItem
               key={`c:${point.cellId}`}
               point={point}
               selected={point.cellId === effectiveSelectedClusterCellId}
+              showComposition={effectiveZoomPolicy.showClusterComposition}
               onPress={handleClusterPress}
             />
           );
@@ -119,11 +150,16 @@ function MapMarkersImpl({
 
         const key = entityKey(point);
         const selected = key === effectiveSelectedEntityKey;
+        const showCaption =
+          effectiveZoomPolicy.captionMode === 'all' ||
+          (effectiveZoomPolicy.captionMode === 'selected' && selected);
 
         return (
           <EntityMarkerItem
             key={`e:${key}`}
             point={point}
+            density={effectiveZoomPolicy.markerDensity}
+            showCaption={showCaption}
             selected={selected}
             isNew={newEntityKeys?.has(key) === true}
             own={key === ownEntityKey}
@@ -144,6 +180,7 @@ function MapMarkersImpl({
 function mapMarkersPropsEqual(prev: MapMarkersProps, next: MapMarkersProps): boolean {
   return (
     prev.points === next.points &&
+    prev.zoomPolicy === next.zoomPolicy &&
     prev.selectedEntityKey === next.selectedEntityKey &&
     prev.selectedClusterCellId === next.selectedClusterCellId &&
     prev.newEntityKeys === next.newEntityKeys &&
@@ -157,20 +194,24 @@ function mapMarkersPropsEqual(prev: MapMarkersProps, next: MapMarkersProps): boo
 
 export const MapMarkers = React.memo(MapMarkersImpl, mapMarkersPropsEqual);
 
-// ─── Per-marker wrappers ─────────────────────────────────────────────────
-
 interface ClusterItemProps {
   point: ClusterPoint;
   selected: boolean;
+  showComposition: boolean;
   onPress: (p: ClusterPoint) => void;
 }
 
 function ClusterMarkerItemImpl({
   point,
   selected,
+  showComposition,
   onPress,
 }: ClusterItemProps): React.JSX.Element {
-  const renderKey = `${clusterVisualKey(point)}|${selected ? 'selected' : 'default'}`;
+  const renderKey = [
+    clusterVisualKey(point),
+    selected ? 'selected' : 'default',
+    showComposition ? 'composition' : 'minimal',
+  ].join('|');
   const tracksViewChanges = useTracksViewChanges([renderKey]);
   const coordinate = useMemo(
     () => ({ latitude: point.lat, longitude: point.lng }),
@@ -190,7 +231,11 @@ function ClusterMarkerItemImpl({
       anchor={{ x: 0.5, y: 0.5 }}
       zIndex={selected ? 35 : 5}
     >
-      <ClusterMarker point={point} selected={selected} />
+      <ClusterMarker
+        point={point}
+        selected={selected}
+        showComposition={showComposition}
+      />
     </Marker>
   );
 }
@@ -199,6 +244,7 @@ function clusterItemPropsEqual(prev: ClusterItemProps, next: ClusterItemProps): 
   return (
     prev.onPress === next.onPress &&
     prev.selected === next.selected &&
+    prev.showComposition === next.showComposition &&
     clusterVisualKey(prev.point) === clusterVisualKey(next.point) &&
     prev.point.lat === next.point.lat &&
     prev.point.lng === next.point.lng
@@ -209,6 +255,8 @@ const ClusterMarkerItem = React.memo(ClusterMarkerItemImpl, clusterItemPropsEqua
 
 interface EntityItemProps {
   point: EntityPoint;
+  density: NexaMapZoomPolicy['markerDensity'];
+  showCaption: boolean;
   selected: boolean;
   isNew: boolean;
   own: boolean;
@@ -219,6 +267,8 @@ interface EntityItemProps {
 
 function EntityMarkerItemImpl({
   point,
+  density,
+  showCaption,
   selected,
   isNew,
   own,
@@ -230,6 +280,8 @@ function EntityMarkerItemImpl({
   const baseVisualKey = entityVisualKey(point);
   const renderKey = [
     baseVisualKey,
+    density,
+    showCaption ? 'caption' : 'no-caption',
     selected ? 'selected' : 'default',
     isNew ? 'new' : 'seen',
     own ? 'own' : 'other',
@@ -238,8 +290,6 @@ function EntityMarkerItemImpl({
   ].join('|');
   const tracksFromKey = useTracksViewChanges([renderKey]);
 
-  // react-native-maps snapshots marker children. Re-open tracking whenever a
-  // painted NEXA marker state changes, then freeze again after layout settles.
   useEffect(() => {
     void Promise.resolve().then(() => {
       setVisualSettled(false);
@@ -253,7 +303,7 @@ function EntityMarkerItemImpl({
   );
   const isLive = point.kind === 'user' && point.meta.online === true;
 
-  // Do NOT call e.stopPropagation() — Android Google Maps MarkerPress can native-crash.
+  // Do NOT call e.stopPropagation() — on Android Google Maps MarkerPress can native-crash.
   const handlePress = useCallback(() => {
     onPress(point);
   }, [onPress, point]);
@@ -269,6 +319,8 @@ function EntityMarkerItemImpl({
     >
       <EntityMarker
         point={point}
+        density={density}
+        showCaption={showCaption}
         selected={selected}
         isNew={isNew}
         own={own}
@@ -283,6 +335,8 @@ function EntityMarkerItemImpl({
 function entityItemPropsEqual(prev: EntityItemProps, next: EntityItemProps): boolean {
   return (
     prev.onPress === next.onPress &&
+    prev.density === next.density &&
+    prev.showCaption === next.showCaption &&
     prev.selected === next.selected &&
     prev.isNew === next.isNew &&
     prev.own === next.own &&

@@ -12,6 +12,8 @@ import {
 } from '@g88/shared';
 
 import { postJson } from '@/api/client';
+import { useAppDispatch } from '@/hooks/redux';
+import { setDiscoveryZoom } from '@/features/discovery/discoverySlice';
 
 interface UseDiscoveryArgs {
   zoom: number;
@@ -57,6 +59,7 @@ export function useDiscovery({
   debounceMs = 250,
   enabled = true,
 }: UseDiscoveryArgs): UseDiscoveryResult {
+  const dispatch = useAppDispatch();
   const [data, setData] = useState<DiscoveryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +86,11 @@ export function useDiscovery({
       dating?: boolean,
       rb?: DiscoveryRankBy,
     ) => {
+      // Marker density follows the same debounced zoom that is actually sent to
+      // discovery. Rapid 14↔15 boundary jitter therefore cannot flip visual
+      // modes until the viewport has settled long enough to issue a request.
+      dispatch(setDiscoveryZoom(z));
+
       if (isViewportTooLarge(vp)) {
         setData({
           points: [],
@@ -172,7 +180,7 @@ export function useDiscovery({
         if (!ctrl.signal.aborted) setLoading(false);
       }
     },
-    [],
+    [dispatch],
   );
 
   useEffect(() => {
