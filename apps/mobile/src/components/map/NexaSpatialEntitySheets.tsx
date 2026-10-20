@@ -49,12 +49,12 @@ function EntitySheet({
     <NexaSpatialSheetScaffold
       kind={kind}
       title={title}
-      subtitle={subtitle}
-      meta={meta}
-      header={header}
-      headerTrailing={headerTrailing}
-      accessibilityLabel={accessibilityLabel}
-      testID={testID}
+      meta={meta ?? []}
+      {...(subtitle !== undefined ? { subtitle } : {})}
+      {...(header !== undefined ? { header } : {})}
+      {...(headerTrailing !== undefined ? { headerTrailing } : {})}
+      {...(accessibilityLabel !== undefined ? { accessibilityLabel } : {})}
+      {...(testID !== undefined ? { testID } : {})}
       actions={
         <NexaSpatialActionBar>
           <NexaSpatialActionButton
@@ -62,11 +62,13 @@ function EntitySheet({
             onPress={primaryAction.onPress}
             kind={kind}
             variant={primaryAction.variant ?? 'primary'}
-            icon={primaryAction.icon}
-            disabled={primaryAction.disabled}
-            loading={primaryAction.loading}
-            accessibilityLabel={primaryAction.accessibilityLabel}
+            disabled={primaryAction.disabled ?? false}
+            loading={primaryAction.loading ?? false}
             flex
+            {...(primaryAction.icon !== undefined ? { icon: primaryAction.icon } : {})}
+            {...(primaryAction.accessibilityLabel !== undefined
+              ? { accessibilityLabel: primaryAction.accessibilityLabel }
+              : {})}
           />
           {secondaryActions.map((action) => (
             <NexaSpatialActionButton
@@ -75,10 +77,12 @@ function EntitySheet({
               onPress={action.onPress}
               kind={kind}
               variant={action.variant ?? 'secondary'}
-              icon={action.icon}
-              disabled={action.disabled}
-              loading={action.loading}
-              accessibilityLabel={action.accessibilityLabel}
+              disabled={action.disabled ?? false}
+              loading={action.loading ?? false}
+              {...(action.icon !== undefined ? { icon: action.icon } : {})}
+              {...(action.accessibilityLabel !== undefined
+                ? { accessibilityLabel: action.accessibilityLabel }
+                : {})}
             />
           ))}
         </NexaSpatialActionBar>
