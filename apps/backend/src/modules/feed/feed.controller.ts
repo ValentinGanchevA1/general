@@ -27,6 +27,11 @@ export class FeedController {
       ? requested.filter((type) => pulseTypes.includes(type))
       : pulseTypes;
     const cap = Math.min(Number(limit ?? 50) || 50, 100);
+
+    if (requested.length > 0 && typeList.length === 0) {
+      return { items: [], nextSince: new Date().toISOString() };
+    }
+
     return this.feed.aggregate(userId, sinceDate, typeList, cap);
   }
 }
