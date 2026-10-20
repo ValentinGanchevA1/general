@@ -5,6 +5,8 @@ import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
+import com.swmansion.rnscreens.fragment.restoration.RNScreensFragmentFactory
+import com.zoontek.rnbootsplash.RNBootSplash
 
 class MainActivity : ReactActivity() {
 
@@ -15,11 +17,12 @@ class MainActivity : ReactActivity() {
   override fun getMainComponentName(): String = "G88"
 
   /**
-   * Switch from SplashTheme (native windowBackground with logo) to AppTheme once the
-   * activity is created so the splash bitmap does not persist under the RN root view.
+   * Keep the native NEXA splash visible until the React Native launch overlay has committed.
+   * react-native-screens >= 4.16 also requires its fragment factory before super.onCreate.
    */
   override fun onCreate(savedInstanceState: Bundle?) {
-    setTheme(R.style.AppTheme)
+    supportFragmentManager.fragmentFactory = RNScreensFragmentFactory()
+    RNBootSplash.init(this, R.style.BootTheme)
     super.onCreate(savedInstanceState)
   }
 
