@@ -80,6 +80,8 @@ export function MarketplaceScreen(): React.JSX.Element {
         style={S.card}
         activeOpacity={0.85}
         onPress={() => nav.navigate('ListingDetail', { listingId: item.id })}
+        accessibilityRole="button"
+        accessibilityLabel={item.title}
       >
         {item.thumbnailUrl ? (
           <Image source={{ uri: item.thumbnailUrl }} style={S.thumb} />
@@ -131,6 +133,9 @@ export function MarketplaceScreen(): React.JSX.Element {
             key={t}
             style={[S.tab, tab === t && S.tabActive]}
             onPress={() => setTab(t)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: tab === t }}
+            accessibilityLabel={t === 'browse' ? 'Nearby' : 'Saved'}
           >
             <Text style={[S.tabText, tab === t && S.tabTextActive]}>
               {t === 'browse' ? 'Nearby' : 'Saved'}
@@ -148,6 +153,9 @@ export function MarketplaceScreen(): React.JSX.Element {
                 key={opt.value}
                 style={[S.modeChip, active && S.modeChipActive]}
                 onPress={() => setModeFilter(opt.value)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={opt.label}
               >
                 <Text style={[S.modeChipText, active && S.modeChipTextActive]}>{opt.label}</Text>
               </Pressable>

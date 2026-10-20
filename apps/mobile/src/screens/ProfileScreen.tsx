@@ -155,6 +155,7 @@ export function ProfileScreen(): React.JSX.Element {
 				<Pressable
 					style={[S.settingsBtn, {top: insets.top + 8}]}
 					onPress={openSettings}
+					accessibilityRole="button"
 					accessibilityLabel="Settings"
 					hitSlop={12}
 				>
@@ -198,6 +199,8 @@ export function ProfileScreen(): React.JSX.Element {
 					style={S.editBtn}
 					onPress={() => openRootScreen(navigation, 'ProfileEdit')}
 					testID="profile-edit"
+					accessibilityRole="button"
+					accessibilityLabel="Edit profile"
 				>
 					<Text style={S.editBtnText}>Edit profile</Text>
 				</Pressable>
@@ -207,7 +210,12 @@ export function ProfileScreen(): React.JSX.Element {
 			<View style={S.card}>
 				<View style={S.cardHeader}>
 					<Text style={S.cardLabel}>Trust</Text>
-					<Pressable style={S.trustCenterBtn} onPress={openTrust}>
+					<Pressable
+						style={S.trustCenterBtn}
+						onPress={openTrust}
+						accessibilityRole="button"
+						accessibilityLabel="Trust Center"
+					>
 						<Text style={S.trustCenterText}>Trust Center</Text>
 					</Pressable>
 				</View>
@@ -318,7 +326,12 @@ function ListRow({
 	onPress: () => void;
 }): React.JSX.Element {
 	return (
-		<Pressable style={S.listRow} onPress={onPress}>
+		<Pressable
+			style={S.listRow}
+			onPress={onPress}
+			accessibilityRole="button"
+			accessibilityLabel={title}
+		>
 			<View style={S.listIcon}>
 				<MCI name={icon} size={22} color={colors.primary}/>
 			</View>

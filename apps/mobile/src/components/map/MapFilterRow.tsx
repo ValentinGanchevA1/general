@@ -126,6 +126,7 @@ export function MapFilterRow({
 						autoCorrect={false}
 						autoCapitalize="none"
 						clearButtonMode="while-editing"
+						accessibilityLabel="Search map"
 					/>
 				</View>
 
@@ -180,7 +181,7 @@ export function MapFilterRow({
 				animationType="fade"
 				onRequestClose={() => setMoreOpen(false)}
 			>
-				<Pressable style={styles.modalBackdrop} onPress={() => setMoreOpen(false)}>
+				<Pressable style={styles.modalBackdrop} onPress={() => setMoreOpen(false)} accessibilityRole="button" accessibilityLabel="Dismiss filters">
 					<Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
 						<Text style={styles.modalTitle}>Filters</Text>
 						{showPeople ? (
@@ -193,6 +194,7 @@ export function MapFilterRow({
 									}}
 									style={[styles.modalRow, friendsOnly && styles.modalRowActive]}
 									accessibilityRole="button"
+									accessibilityLabel={friendsOnly ? 'Friends only, selected' : 'Friends only'}
 									accessibilityState={{ selected: friendsOnly }}
 								>
 									<Text
@@ -215,7 +217,7 @@ export function MapFilterRow({
 									style={[styles.modalRow, datingOnly && styles.modalRowActive]}
 									accessibilityRole="button"
 									accessibilityState={{ selected: datingOnly }}
-									accessibilityLabel="Dating only"
+									accessibilityLabel={datingOnly ? 'Dating only, selected' : 'Dating only'}
 								>
 									<Text
 										style={[
@@ -242,6 +244,7 @@ export function MapFilterRow({
 											onPress={() => onListingModeChange(opt.id)}
 											style={[styles.modalRow, active && styles.modalRowActiveListing]}
 											accessibilityRole="button"
+											accessibilityLabel={active ? `${opt.label}, selected` : opt.label}
 											accessibilityState={{ selected: active }}
 										>
 											<Text
@@ -269,6 +272,7 @@ export function MapFilterRow({
 							style={styles.modalDone}
 							onPress={() => setMoreOpen(false)}
 							accessibilityRole="button"
+							accessibilityLabel="Done"
 						>
 							<Text style={styles.modalDoneText}>Done</Text>
 						</Pressable>
