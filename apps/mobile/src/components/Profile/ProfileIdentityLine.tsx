@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { colors, fontSize, spacing } from '@/theme';
+import { fontSize, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 export type ProfileIdentityLineProps = {
   /** Pre-formatted via formatPublicIdentityParts. */
@@ -34,6 +34,8 @@ export function ProfileIdentityLine({
   emptyHint = 'Add gender, nationality · Edit',
   align = 'center',
 }: ProfileIdentityLineProps): React.JSX.Element | null {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const hasContent = Boolean(identityLine || hometownLine);
 
   if (mode === 'self') {
@@ -83,44 +85,46 @@ export function ProfileIdentityLine({
   );
 }
 
-const styles = StyleSheet.create({
-  otherWrap: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  otherWrapStart: {
-    alignItems: 'flex-start',
-  },
-  textStart: {
-    textAlign: 'left',
-  },
-  originLine: { color: colors.textMuted, fontSize: 14 },
-  identityLine: { color: colors.textFaint, fontSize: 13 },
-  selfBox: {
-    marginTop: spacing.sm,
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    gap: 2,
-  },
-  line: {
-    color: colors.textMuted,
-    fontSize: fontSize.sm,
-    fontWeight: '500',
-  },
-  empty: {
-    color: colors.textFaint,
-    fontSize: fontSize.sm,
-  },
-  hint: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    otherWrap: {
+      alignItems: 'center',
+      gap: 2,
+    },
+    otherWrapStart: {
+      alignItems: 'flex-start',
+    },
+    textStart: {
+      textAlign: 'left',
+    },
+    originLine: { color: colors.textMuted, fontSize: 14 },
+    identityLine: { color: colors.textFaint, fontSize: 13 },
+    selfBox: {
+      marginTop: spacing.sm,
+      marginHorizontal: spacing.xl,
+      marginBottom: spacing.md,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: 12,
+      backgroundColor: colors.surface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.borderStrong,
+      gap: 2,
+    },
+    line: {
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      fontWeight: '500',
+    },
+    empty: {
+      color: colors.textFaint,
+      fontSize: fontSize.sm,
+    },
+    hint: {
+      color: colors.primary,
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 4,
+    },
+  });
+}
