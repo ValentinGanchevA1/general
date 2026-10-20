@@ -10,6 +10,7 @@ import type {
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { InteractionsInboxService } from './interactions-inbox.service';
 import { InteractionsService } from './interactions.service';
 
 export class WaveDto implements WaveRequest {
@@ -25,7 +26,10 @@ export class WaveDto implements WaveRequest {
 @Controller('interactions')
 @UseGuards(JwtAuthGuard)
 export class InteractionsController {
-  constructor(private readonly interactions: InteractionsService) {}
+  constructor(
+    private readonly interactions: InteractionsService,
+    private readonly inboxProjection: InteractionsInboxService,
+  ) {}
 
   @Post('wave')
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // 20 waves/min
@@ -52,8 +56,8 @@ export class InteractionsController {
   }
 
   /**
-   * Domain inbox: waves + story reactions + pending friend requests + recent followers.
-   * Friends Requests tab continues to use /friends/requests/pending.
+   * Personal Activity inbox: waves + story reactions + pending friend requests
+   * + recent followers + gifts. Reading this projection has no mark-seen side effect.
    */
   @Get('inbox')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
@@ -62,7 +66,7 @@ export class InteractionsController {
     @Query('limit') limitRaw?: string,
   ): Promise<InboxResponse> {
     const limit = Math.min(Math.max(Number(limitRaw) || 50, 1), 100);
-    const items = await this.interactions.listInbox(userId, limit);
+    const items = await this.inboxProjection.list(userId, limit);
     return { items };
   }
 }
