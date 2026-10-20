@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -14,7 +14,7 @@ import { useGiftBalance, useReceivedGifts, useSentGifts } from '@/features/gifts
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonListRow } from '@/components/Skeleton';
-import { colors, useAppTheme } from '@/theme';
+import { useAppTheme, type ThemeColors } from '@/theme';
 
 type Tab = 'received' | 'sent';
 
@@ -29,6 +29,8 @@ function timeAgo(iso: string): string {
 }
 
 function ReceivedRow({ g }: { g: ReceivedGift }): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.row}>
       <Text style={styles.emoji}>{g.emoji}</Text>
@@ -44,6 +46,8 @@ function ReceivedRow({ g }: { g: ReceivedGift }): React.JSX.Element {
 }
 
 function SentRow({ g }: { g: SentGift }): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.row}>
       <Text style={styles.emoji}>{g.emoji}</Text>
@@ -61,8 +65,8 @@ function SentRow({ g }: { g: SentGift }): React.JSX.Element {
 }
 
 export function GiftsInboxScreen(): React.JSX.Element {
-  const { colors: themeColors } = useAppTheme();
-
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [tab, setTab] = useState<Tab>('received');
   const {
     gifts: received,
@@ -86,7 +90,7 @@ export function GiftsInboxScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
+    <View style={styles.container}>
       <ScreenHeader title="Gifts" />
 
       <ScrollView
@@ -170,53 +174,55 @@ export function GiftsInboxScreen(): React.JSX.Element {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  flex: { flex: 1 },
-  content: { paddingBottom: 40 },
-  balanceCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 20,
-    marginBottom: 12,
-    padding: 16,
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.premiumBorderSoft,
-  },
-  balanceValue: { color: colors.premium, fontSize: 20, fontWeight: '800' },
-  balanceLabel: { color: colors.textMuted, fontSize: 13 },
-  tabs: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 14, gap: 8 },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  tabActive: { backgroundColor: colors.primaryMutedBg, borderColor: colors.primary },
-  tabText: { color: colors.textMuted, fontWeight: '600' },
-  tabTextActive: { color: colors.primary },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 20,
-    marginBottom: 10,
-    padding: 14,
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 14,
-  },
-  emoji: { fontSize: 34 },
-  info: { flex: 1, gap: 3 },
-  rowTitle: { color: colors.textSecondary, fontSize: 15 },
-  peer: { color: colors.textPrimary, fontWeight: '700' },
-  message: { color: colors.textSecondary, fontSize: 13, fontStyle: 'italic' },
-  time: { color: colors.textFaint, fontSize: 11, marginTop: 2 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    flex: { flex: 1 },
+    content: { paddingBottom: 40 },
+    balanceCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginHorizontal: 20,
+      marginBottom: 12,
+      padding: 16,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.premiumBorderSoft,
+    },
+    balanceValue: { color: colors.premium, fontSize: 20, fontWeight: '800' },
+    balanceLabel: { color: colors.textMuted, fontSize: 13 },
+    tabs: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 14, gap: 8 },
+    tab: {
+      flex: 1,
+      paddingVertical: 10,
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    tabActive: { backgroundColor: colors.primaryMutedBg, borderColor: colors.primary },
+    tabText: { color: colors.textMuted, fontWeight: '600' },
+    tabTextActive: { color: colors.primary },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: 20,
+      marginBottom: 10,
+      padding: 14,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 14,
+    },
+    emoji: { fontSize: 34 },
+    info: { flex: 1, gap: 3 },
+    rowTitle: { color: colors.textSecondary, fontSize: 15 },
+    peer: { color: colors.textPrimary, fontWeight: '700' },
+    message: { color: colors.textSecondary, fontSize: 13, fontStyle: 'italic' },
+    time: { color: colors.textFaint, fontSize: 11, marginTop: 2 },
+  });
+}
