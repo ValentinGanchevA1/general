@@ -11,6 +11,7 @@ export const nexaBrand = {
   cyan: '#27D3F2',
   cyanBright: '#62E6FF',
   cyanMuted: '#147E93',
+  symbolCore: '#C8BEFF',
 } as const;
 
 export const nexaDark = {
