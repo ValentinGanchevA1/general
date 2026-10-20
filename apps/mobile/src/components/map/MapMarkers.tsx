@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Marker } from 'react-native-maps';
 import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
 
+import { useAppSelector } from '@/hooks/redux';
+
 import { ClusterMarker } from './ClusterMarker';
 import { EntityMarker } from './EntityMarker';
 import { NEXA_MARKER_ANCHOR_Y } from './NexaEntityMarker';
@@ -15,6 +17,7 @@ import { useTracksViewChanges } from './useTracksViewChanges';
 
 interface MapMarkersProps {
   points: DiscoveryPoint[];
+  /** Optional override for previews/tests. Runtime normally follows discovery.zoom. */
   zoomPolicy?: NexaMapZoomPolicy;
   /** Optional controlled entity selection. When omitted, the last tapped entity is tracked locally. */
   selectedEntityKey?: string | null;
@@ -39,7 +42,7 @@ function entityKey(point: EntityPoint): string {
  */
 function MapMarkersImpl({
   points,
-  zoomPolicy = resolveNexaMapZoomPolicy(15),
+  zoomPolicy,
   selectedEntityKey,
   selectedClusterCellId,
   newEntityKeys,
@@ -49,6 +52,10 @@ function MapMarkersImpl({
   onClusterPress,
   onEntityPress,
 }: MapMarkersProps): React.JSX.Element {
+  const committedDiscoveryZoom = useAppSelector((state) => state.discovery.zoom);
+  const effectiveZoomPolicy =
+    zoomPolicy ?? resolveNexaMapZoomPolicy(committedDiscoveryZoom);
+
   const [localSelectedEntityKey, setLocalSelectedEntityKey] = useState<string | null>(null);
   const [localSelectedClusterCellId, setLocalSelectedClusterCellId] = useState<string | null>(null);
 
@@ -88,14 +95,14 @@ function MapMarkersImpl({
 
   const visiblePoints = useMemo(
     () =>
-      limitVisibleMapPoints(points, zoomPolicy.maxVisiblePoints, {
+      limitVisibleMapPoints(points, effectiveZoomPolicy.maxVisiblePoints, {
         selectedEntityKey: effectiveSelectedEntityKey,
         selectedClusterCellId: effectiveSelectedClusterCellId,
         ownEntityKey,
       }),
     [
       points,
-      zoomPolicy.maxVisiblePoints,
+      effectiveZoomPolicy.maxVisiblePoints,
       effectiveSelectedEntityKey,
       effectiveSelectedClusterCellId,
       ownEntityKey,
@@ -135,7 +142,7 @@ function MapMarkersImpl({
               key={`c:${point.cellId}`}
               point={point}
               selected={point.cellId === effectiveSelectedClusterCellId}
-              showComposition={zoomPolicy.showClusterComposition}
+              showComposition={effectiveZoomPolicy.showClusterComposition}
               onPress={handleClusterPress}
             />
           );
@@ -144,14 +151,14 @@ function MapMarkersImpl({
         const key = entityKey(point);
         const selected = key === effectiveSelectedEntityKey;
         const showCaption =
-          zoomPolicy.captionMode === 'all' ||
-          (zoomPolicy.captionMode === 'selected' && selected);
+          effectiveZoomPolicy.captionMode === 'all' ||
+          (effectiveZoomPolicy.captionMode === 'selected' && selected);
 
         return (
           <EntityMarkerItem
             key={`e:${key}`}
             point={point}
-            density={zoomPolicy.markerDensity}
+            density={effectiveZoomPolicy.markerDensity}
             showCaption={showCaption}
             selected={selected}
             isNew={newEntityKeys?.has(key) === true}
