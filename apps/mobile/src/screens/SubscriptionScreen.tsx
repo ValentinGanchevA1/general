@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -25,13 +25,13 @@ import { fetchProfile } from '@/features/profile/profileSlice';
 import { TIER_COLOR } from '@/features/profile/socialConfig';
 import { extractMessage } from '@/utils/extractMessage';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, fontSize, spacing, radius, useAppTheme } from '@/theme';
+import { fontSize, spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
 
 const TIER_RANK: Record<string, number> = { free: 0, basic: 1, premium: 2 };
 
 export function SubscriptionScreen(): React.JSX.Element {
-  const { colors: themeColors } = useAppTheme();
-
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const dispatch = useAppDispatch();
   const profile = useAppSelector((s) => s.profile.profile);
   const currentTier = profile?.subscriptionTier ?? 'free';
@@ -80,7 +80,7 @@ export function SubscriptionScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
+    <View style={styles.container}>
       <ScreenHeader title="Premium" />
 
       <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
@@ -145,58 +145,60 @@ export function SubscriptionScreen(): React.JSX.Element {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  flex: { flex: 1 },
-  content: { paddingBottom: 40 },
-  intro: {
-    color: colors.textMuted,
-    fontSize: fontSize.md - 1,
-    textAlign: 'center',
-    paddingHorizontal: 24,
-    marginBottom: spacing.lg,
-  },
-  error: {
-    color: colors.danger,
-    fontSize: fontSize.sm,
-    textAlign: 'center',
-    marginBottom: spacing.md,
-    paddingHorizontal: 24,
-  },
-  card: {
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.lg,
-    padding: 18,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 10,
-  },
-  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  planName: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '700' },
-  price: { fontSize: fontSize.md + 1, fontWeight: '700' },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  featureText: { color: colors.textSecondary, fontSize: fontSize.md - 1 },
-  currentPill: {
-    alignSelf: 'flex-start',
-    marginTop: 6,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.lg,
-  },
-  currentText: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: '600' },
-  cta: { marginTop: spacing.sm, paddingVertical: 14, borderRadius: radius.md, alignItems: 'center' },
-  ctaText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
-  manageBtn: { marginHorizontal: spacing.xl, marginTop: 4, padding: 14, alignItems: 'center' },
-  manageText: { color: colors.primary, fontWeight: '600', fontSize: fontSize.md },
-  fine: {
-    color: colors.textFaint,
-    fontSize: fontSize.xs,
-    textAlign: 'center',
-    marginTop: spacing.md,
-    paddingHorizontal: 32,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    flex: { flex: 1 },
+    content: { paddingBottom: 40 },
+    intro: {
+      color: colors.textMuted,
+      fontSize: fontSize.md - 1,
+      textAlign: 'center',
+      paddingHorizontal: 24,
+      marginBottom: spacing.lg,
+    },
+    error: {
+      color: colors.danger,
+      fontSize: fontSize.sm,
+      textAlign: 'center',
+      marginBottom: spacing.md,
+      paddingHorizontal: 24,
+    },
+    card: {
+      marginHorizontal: spacing.xl,
+      marginBottom: spacing.lg,
+      padding: 18,
+      backgroundColor: colors.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 10,
+    },
+    cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    planName: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '700' },
+    price: { fontSize: fontSize.md + 1, fontWeight: '700' },
+    featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    featureText: { color: colors.textSecondary, fontSize: fontSize.md - 1 },
+    currentPill: {
+      alignSelf: 'flex-start',
+      marginTop: 6,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 6,
+      backgroundColor: colors.surfaceRaised,
+      borderRadius: radius.lg,
+    },
+    currentText: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: '600' },
+    cta: { marginTop: spacing.sm, paddingVertical: 14, borderRadius: radius.md, alignItems: 'center' },
+    ctaText: { color: colors.onPrimary, fontWeight: '700', fontSize: fontSize.md },
+    manageBtn: { marginHorizontal: spacing.xl, marginTop: 4, padding: 14, alignItems: 'center' },
+    manageText: { color: colors.primary, fontWeight: '600', fontSize: fontSize.md },
+    fine: {
+      color: colors.textFaint,
+      fontSize: fontSize.xs,
+      textAlign: 'center',
+      marginTop: spacing.md,
+      paddingHorizontal: 32,
+    },
+  });
+}
