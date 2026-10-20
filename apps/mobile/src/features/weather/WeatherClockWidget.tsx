@@ -51,7 +51,7 @@ export function WeatherClockWidget({
 	top,
 	right,
 }: Props): React.JSX.Element {
-	const { colors } = useAppTheme();
+	const { colors, shadow } = useAppTheme();
 	const { weather, loading, refresh } = useCurrentWeather(coords);
 	const [now, setNow] = useState(() => new Date());
 
@@ -81,16 +81,17 @@ export function WeatherClockWidget({
 				{
 					top,
 					right,
-					backgroundColor: colors.surface,
-					borderColor: colors.borderStrong,
+					backgroundColor: colors.surfaceRaised,
+					borderColor: colors.borderSubtle,
 				},
+				shadow(0.12),
 			]}
 		>
 			<View style={styles.weatherRow}>
 				{loading && weather == null ? (
 					<ActivityIndicator size="small" color={colors.primary} />
 				) : (
-					<Icon name={iconName} size={22} color={colors.warning} />
+					<Icon name={iconName} size={19} color={colors.warning} />
 				)}
 				<Text style={[styles.temperature, { color: colors.textPrimary }]}>
 					{temperature}
@@ -98,7 +99,7 @@ export function WeatherClockWidget({
 			</View>
 
 			<View style={styles.clockRow}>
-				<Icon name="clock-outline" size={13} color={colors.info} />
+				<Icon name="clock-outline" size={12} color={colors.info} />
 				<Text style={[styles.clock, { color: colors.textSecondary }]}>{clock}</Text>
 			</View>
 		</Pressable>
@@ -108,10 +109,10 @@ export function WeatherClockWidget({
 const styles = StyleSheet.create({
 	container: {
 		position: 'absolute',
-		width: 88,
-		height: 64,
-		borderRadius: 18,
-		borderWidth: 1,
+		width: 80,
+		height: 56,
+		borderRadius: 16,
+		borderWidth: StyleSheet.hairlineWidth,
 		alignItems: 'center',
 		justifyContent: 'center',
 		zIndex: 22,
@@ -120,21 +121,21 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		gap: 6,
+		gap: 5,
 	},
 	temperature: {
-		fontSize: 18,
+		fontSize: 16,
 		fontWeight: '800',
 	},
 	clockRow: {
-		marginTop: 2,
+		marginTop: 1,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		gap: 4,
+		gap: 3,
 	},
 	clock: {
-		fontSize: 11,
+		fontSize: 10,
 		fontWeight: '700',
 	},
 });
