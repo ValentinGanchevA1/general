@@ -28,7 +28,6 @@ export function useInboxInteractions(): {
   }, []);
 
   const refresh = useCallback(async (): Promise<void> => {
-    // Coalesce concurrent refreshes (focus + socket + Accept can overlap).
     if (inFlightRef.current) {
       await inFlightRef.current;
       return;
@@ -43,14 +42,9 @@ export function useInboxInteractions(): {
         }
       } catch (err) {
         Sentry.captureException(err, { tags: { resource: 'interactions.inbox' } });
-        if (mountedRef.current) {
-          setError(err);
-        }
-        // Keep previous items on transient failure.
+        if (mountedRef.current) setError(err);
       } finally {
-        if (mountedRef.current) {
-          setLoading(false);
-        }
+        if (mountedRef.current) setLoading(false);
       }
     })();
 
@@ -58,28 +52,22 @@ export function useInboxInteractions(): {
     try {
       await run;
     } finally {
-      if (inFlightRef.current === run) {
-        inFlightRef.current = null;
-      }
+      if (inFlightRef.current === run) inFlightRef.current = null;
     }
   }, []);
 
-  // Initial load (screen may not focus-fire on first mount in some navigators).
   useEffect(() => {
     void Promise.resolve().then(() => {
       void refresh();
     });
   }, [refresh]);
 
-  // Re-fetch when Interactions regains focus — covers accept/auto-accept on
-  // UserProfile then navigating back with a still-mounted list.
   useFocusEffect(
     useCallback(() => {
       void refresh();
     }, [refresh]),
   );
 
-  // Heal list after reconnect (events may have been missed while offline).
   useEffect(
     () =>
       onSocketConnected(() => {
@@ -89,22 +77,15 @@ export function useInboxInteractions(): {
   );
 
   useEffect(() => {
-    const unsubWave = on('wave:received', () => {
-      void refresh();
-    });
-    // New inbound request → show Accept/Decline row.
-    const unsubFriendReq = on('friend:request', () => {
-      void refresh();
-    });
-    // Peer accepted *our* outbound request → drop stale pending rows if any.
-    // (Acceptor path is covered by useFocusEffect after profile/Interactions Accept.)
-    const unsubFriendAcc = on('friend:accepted', () => {
-      void refresh();
-    });
+    const unsubs = [
+      on('wave:received', () => void refresh()),
+      on('wave:mutual', () => void refresh()),
+      on('friend:request', () => void refresh()),
+      on('friend:accepted', () => void refresh()),
+      on('gift:received', () => void refresh()),
+    ];
     return () => {
-      unsubWave();
-      unsubFriendReq();
-      unsubFriendAcc();
+      for (const unsub of unsubs) unsub();
     };
   }, [on, refresh]);
 
