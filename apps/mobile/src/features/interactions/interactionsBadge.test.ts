@@ -23,11 +23,13 @@ const activity = (id: string, createdAt: string): InboxItem => ({
 
 const conversation = (id: string, unreadCount: number): ConversationSummary => ({
   id,
-  status: 'accepted',
+  participantIds: [],
   participants: [],
   unreadCount,
   lastMessage: null,
   lastMessageAt: null,
+  status: 'accepted',
+  initiatedBy: null,
   peerOnline: false,
   isFriend: false,
 });

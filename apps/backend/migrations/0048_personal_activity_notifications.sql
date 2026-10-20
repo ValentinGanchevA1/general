@@ -1,4 +1,4 @@
--- 0047_personal_activity_notifications.sql
+-- 0048_personal_activity_notifications.sql
 -- Durable in-app personal activity signals that do not already have a
 -- canonical Interactions domain record (wave, match, gift, friend request).
 -- Push delivery/preferences are intentionally independent from this table.

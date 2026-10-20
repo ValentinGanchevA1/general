@@ -47,6 +47,10 @@ async function run(client) {
   // under the old name (tracked by filename PRIMARY KEY). Idempotent.
   const RENAMES = [
     { from: '0030_profile_origin.sql', to: '0031_profile_origin.sql' },
+    {
+      from: '0047_personal_activity_notifications.sql',
+      to: '0048_personal_activity_notifications.sql',
+    },
   ];
   for (const { from, to } of RENAMES) {
     const renamed = await client.query(
