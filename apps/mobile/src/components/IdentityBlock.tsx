@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -11,7 +11,7 @@ import {
 import type { VerificationLevel } from '@g88/shared';
 import { Avatar, type AvatarRing } from '@/components/Avatar';
 import { VerificationBadge } from '@/components/VerificationBadge';
-import { colors, spacing } from '@/theme';
+import { spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 export interface IdentityBlockProps {
   name: string;
@@ -19,7 +19,7 @@ export interface IdentityBlockProps {
   verification?: VerificationLevel;
   idVerified?: boolean;
   online?: boolean;
-  /** Shown under name when set (e.g. "24 \u00b7 Sofia, BG"). */
+  /** Shown under name when set (e.g. "24 · Sofia, BG"). */
   subtitle?: string | null;
   /** Avatar ring style. Default brand when interactive. */
   ringVariant?: AvatarRing;
@@ -30,10 +30,7 @@ export interface IdentityBlockProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/**
- * Shared identity row: avatar + name + verification + optional subtitle/online.
- * Used by EntityBottomSheet, UserProfile hero, and chat headers to keep one look.
- */
+/** Shared identity row: avatar + name + verification + optional subtitle/online. */
 export function IdentityBlock({
   name,
   avatarUrl,
@@ -47,48 +44,25 @@ export function IdentityBlock({
   accessibilityLabel,
   style,
 }: IdentityBlockProps): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const content = (
     <View style={[styles.row, style]}>
-      <Avatar
-        uri={avatarUrl ?? null}
-        name={name}
-        size={size}
-        ringVariant={ringVariant}
-        online={online === true}
-      />
+      <Avatar uri={avatarUrl ?? null} name={name} size={size} ringVariant={ringVariant} online={online === true} />
       <View style={styles.textCol}>
         <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>
-            {name}
-          </Text>
-          <VerificationBadge
-            verification={verification}
-            idVerified={idVerified}
-            size={16}
-          />
+          <Text style={styles.name} numberOfLines={1}>{name}</Text>
+          <VerificationBadge verification={verification} idVerified={idVerified} size={16} />
         </View>
-        {subtitle ? (
-          <Text style={styles.subtitle} numberOfLines={1}>
-            {subtitle}
-          </Text>
-        ) : null}
-        {online === true ? (
-          <Text style={styles.online}>Online</Text>
-        ) : online === false ? (
-          <Text style={styles.offline}>Offline</Text>
-        ) : null}
+        {subtitle ? <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text> : null}
+        {online === true ? <Text style={styles.online}>Online</Text> : online === false ? <Text style={styles.offline}>Offline</Text> : null}
       </View>
     </View>
   );
 
   if (onPress) {
     return (
-      <TouchableOpacity
-        onPress={onPress}
-        activeOpacity={0.85}
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel ?? `Open profile for ${name}`}
-      >
+      <TouchableOpacity onPress={onPress} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? `Open profile for ${name}`}>
         {content}
       </TouchableOpacity>
     );
@@ -96,37 +70,14 @@ export function IdentityBlock({
   return content;
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  textCol: { flex: 1, minWidth: 0 },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  name: {
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '700',
-    flexShrink: 1,
-  },
-  subtitle: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  online: {
-    color: colors.success,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  offline: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    textCol: { flex: 1, minWidth: 0 },
+    nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    name: { color: colors.textPrimary, fontSize: 18, fontWeight: '700', flexShrink: 1 },
+    subtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+    online: { color: colors.success, fontSize: 12, marginTop: 2 },
+    offline: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  });
+}
