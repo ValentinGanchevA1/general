@@ -6,8 +6,14 @@ import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, fontSize, spacing } from '@/theme';
+import { colors, fontSize } from '@/theme';
 
+import {
+	MAP_CHROME_GAP,
+	MAP_CHROME_H_INSET,
+	WEATHER_WIDGET_HEIGHT,
+	WEATHER_WIDGET_WIDTH,
+} from './mapChromeLayout';
 import {
 	type TrendingItem,
 	formatDistanceM,
@@ -29,7 +35,7 @@ export interface TrendingSummary {
 export interface TrendingCardProps {
 	items: TrendingItem[];
 	onPressItem: (item: TrendingItem) => void;
-	/** Absolute top from safe-area stack (mapChromeLayout.mapTrendingTop). */
+	/** Absolute top from mapChromeLayout; shared with the weather/time row. */
 	top: number;
 	visible: boolean;
 	/** When true, only the header + counters are shown. */
@@ -85,7 +91,7 @@ export function TrendingCard({
 					hitSlop={6}
 				>
 					<View style={styles.headerTextCol}>
-						<Text style={styles.heading}>Trending nearby</Text>
+						<Text style={styles.heading} numberOfLines={1}>Trending nearby</Text>
 						{summaryLine ? (
 							<Text style={styles.summary} numberOfLines={1}>
 								{summaryLine}
@@ -132,17 +138,19 @@ export function TrendingCard({
 const styles = StyleSheet.create({
 	wrap: {
 		position: 'absolute',
-		left: spacing.lg,
-		right: spacing.lg,
-		zIndex: 17,
+		left: MAP_CHROME_H_INSET,
+		right: MAP_CHROME_H_INSET + WEATHER_WIDGET_WIDTH + MAP_CHROME_GAP,
+		zIndex: 23,
 	},
 	card: {
+		minHeight: WEATHER_WIDGET_HEIGHT,
 		backgroundColor: 'rgba(15, 20, 36, 0.94)',
 		borderWidth: 1,
 		borderColor: colors.borderStrong,
 		borderRadius: 16,
 		paddingVertical: 12,
 		paddingHorizontal: 14,
+		justifyContent: 'center',
 	},
 	headerBlock: {
 		flexDirection: 'row',
