@@ -1,11 +1,8 @@
 /**
  * Client-side aggregation for Interactions → Activity.
- * Collapses repeated personal signals from the same actor into a single row.
- * Preserves CTA priority:
- * friend_request > match > gift > wave > story_reaction > follow.
- *
- * Backend still returns discrete events; this is UI-only until a
- * grouped inbox endpoint exists.
+ * Repeated signals collapse only when both actor and signal type match.
+ * This prevents a newer gift/wave from inheriting the label or CTA of an
+ * older match/friend request from the same person.
  */
 
 import type { InboxItem } from '@g88/shared';
@@ -13,54 +10,39 @@ import type { InboxItem } from '@g88/shared';
 export type AggregatedInboxRow = {
   /** Stable FlatList key */
   key: string;
-  /** Highest-priority item that drives CTA + primary label */
+  /** Newest item in this actor + type group; drives CTA + label. */
   primary: InboxItem;
-  /** All raw items for this actor (newest first) */
+  /** Raw items for this actor + type (newest first). */
   items: InboxItem[];
   count: number;
   latestAt: string;
 };
 
-const TYPE_RANK: Record<InboxItem['type'], number> = {
-  friend_request: 0,
-  match: 1,
-  gift: 2,
-  wave: 3,
-  story_reaction: 4,
-  follow: 5,
-};
-
-/**
- * Group by fromUser.id, pick highest-priority type as primary,
- * sort groups by latest activity.
- */
+/** Group by actor + signal type and sort groups by their real latest activity. */
 export function aggregateInbox(items: InboxItem[]): AggregatedInboxRow[] {
-  const byActor = new Map<string, InboxItem[]>();
+  const groups = new Map<string, InboxItem[]>();
 
   for (const item of items) {
-    const id = item.fromUser.id;
-    const list = byActor.get(id) ?? [];
+    const key = `${item.fromUser.id}:${item.type}`;
+    const list = groups.get(key) ?? [];
     list.push(item);
-    byActor.set(id, list);
+    groups.set(key, list);
   }
 
   const rows: AggregatedInboxRow[] = [];
 
-  for (const [actorId, actorItems] of byActor) {
-    const sorted = [...actorItems].sort(
+  for (const [groupKey, groupItems] of groups) {
+    const sorted = [...groupItems].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
-
-    const primary = sorted.reduce((best, cur) =>
-      TYPE_RANK[cur.type] < TYPE_RANK[best.type] ? cur : best,
-    );
+    const primary = sorted[0]!;
 
     rows.push({
-      key: `agg-${actorId}-${primary.type}`,
+      key: `agg-${groupKey}`,
       primary,
       items: sorted,
       count: sorted.length,
-      latestAt: sorted[0]!.createdAt,
+      latestAt: primary.createdAt,
     });
   }
 
