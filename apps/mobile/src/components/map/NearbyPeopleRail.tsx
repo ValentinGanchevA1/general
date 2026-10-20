@@ -1,8 +1,8 @@
-// apps/mobile/src/components/map/NearbyPeopleRail.tsx
-// Concept board: “Nearby People (N)” horizontal avatar rail on map.
-// Gates: people layer on · city-scale · !sheetOpen · ≥1 user in viewport.
+// Concept-board “Nearby People” map overlay.
+// Uses a compact translucent panel so nearby identity remains readable without
+// competing with the map itself.
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
 	Image,
 	Pressable,
@@ -11,13 +11,16 @@ import {
 	Text,
 	View,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { DiscoveryPoint, EntityPoint } from '@g88/shared';
-import { colors, radius, spacing } from '@/theme';
+import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { useUserLocation } from '@/features/location/useUserLocation';
+import { fontSize, radius, spacing, useAppTheme } from '@/theme';
 
-/** Avatar row + header + margins — MapScreen can lift FAB if needed. */
-export const NEARBY_PEOPLE_RAIL_HEIGHT = 96;
+/** Header + avatar row + panel spacing. */
+export const NEARBY_PEOPLE_RAIL_HEIGHT = 124;
 
 export type NearbyPeopleRailProps = {
 	points: readonly DiscoveryPoint[];
@@ -28,86 +31,129 @@ export type NearbyPeopleRailProps = {
 	limit?: number;
 };
 
-function isUserPoint(p: DiscoveryPoint): p is EntityPoint & { kind: 'user' } {
-	return p.kind === 'user';
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+function isUserPoint(point: DiscoveryPoint): point is EntityPoint & { kind: 'user' } {
+	return point.kind === 'user';
+}
+
+function toRadians(value: number): number {
+	return (value * Math.PI) / 180;
+}
+
+function distanceMeters(
+	from: { lat: number; lng: number },
+	to: { lat: number; lng: number },
+): number {
+	const earthRadiusM = 6_371_000;
+	const dLat = toRadians(to.lat - from.lat);
+	const dLng = toRadians(to.lng - from.lng);
+	const lat1 = toRadians(from.lat);
+	const lat2 = toRadians(to.lat);
+	const sinLat = Math.sin(dLat / 2);
+	const sinLng = Math.sin(dLng / 2);
+	const a = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng;
+	return earthRadiusM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatDistance(meters: number | null): string {
+	if (meters == null || !Number.isFinite(meters)) return 'Nearby';
+	if (meters < 1000) return `${Math.max(10, Math.round(meters / 10) * 10)} m`;
+	const km = meters / 1000;
+	return `${km < 10 ? km.toFixed(1) : Math.round(km)} km`;
 }
 
 export function NearbyPeopleRail({
-									 points,
-									 visible,
-									 onPressUser,
-									 limit = 24,
-								 }: NearbyPeopleRailProps): React.JSX.Element | null {
-	const [collapsed, setCollapsed] = useState(false);
+	points,
+	visible,
+	onPressUser,
+	limit = 24,
+}: NearbyPeopleRailProps): React.JSX.Element | null {
+	const navigation = useNavigation<Nav>();
+	const { colors } = useAppTheme();
+	const { coords } = useUserLocation();
 
-	const users = useMemo(() => {
-		const list = points.filter(isUserPoint);
-		return list.slice(0, limit);
-	}, [points, limit]);
+	const users = useMemo(
+		() => points.filter(isUserPoint).slice(0, limit),
+		[points, limit],
+	);
 
 	if (!visible || users.length === 0) return null;
 
-	const count = users.length;
+	const ringColors = [
+		colors.primary,
+		colors.info,
+		colors.accent,
+		colors.entityUser,
+		colors.entityFriend,
+	] as const;
 
 	return (
-		<View style={styles.wrap} pointerEvents="box-none">
-			<Pressable
-				style={styles.header}
-				onPress={() => setCollapsed((c) => !c)}
-				accessibilityRole="button"
-				accessibilityLabel={
-					collapsed
-						? `Expand nearby people, ${count}`
-						: `Collapse nearby people, ${count}`
-				}
-			>
-				<Text style={styles.headerTitle}>Nearby People ({count})</Text>
-				<Icon
-					name={collapsed ? 'chevron-up' : 'chevron-down'}
-					size={18}
-					color={colors.textMuted}
-				/>
-			</Pressable>
-
-			{!collapsed ? (
-				<ScrollView
-					horizontal
-					showsHorizontalScrollIndicator={false}
-					contentContainerStyle={styles.scroll}
+		<View
+			style={[
+				styles.wrap,
+				{
+					borderColor: colors.borderStrong,
+					shadowColor: colors.shadowInk,
+				},
+			]}
+			pointerEvents="box-none"
+		>
+			<View style={styles.header}>
+				<Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Nearby People ({users.length})</Text>
+				<Pressable
+					onPress={() => navigation.navigate('Main', { screen: 'Pulse', params: { filter: 'nearby' } })}
+					hitSlop={8}
+					accessibilityRole="button"
+					accessibilityLabel="See all nearby people"
 				>
-					{users.map((u) => {
-						const name = u.meta.displayName?.trim() || 'User';
-						const initial = (name[0] ?? '?').toUpperCase();
-						const online = u.meta.online === true;
-						return (
-							<Pressable
-								key={u.id}
-								style={styles.item}
-								onPress={() => onPressUser(u)}
-								accessibilityRole="button"
-								accessibilityLabel={name}
-							>
-								<View style={styles.avatarWrap}>
-									{u.meta.avatarUrl ? (
-										<Image
-											source={{ uri: u.meta.avatarUrl }}
-											style={styles.avatar}
-										/>
-									) : (
-										<View style={[styles.avatar, styles.avatarPlaceholder]}>
-											<Text style={styles.initial}>{initial}</Text>
-										</View>
-									)}
-									{online ? <View style={styles.onlineDot} /> : null}
-								</View>
-								<Text style={styles.name} numberOfLines={1}>
-									{name}
-								</Text>
-							</Pressable>
-						);
-					})}
-				</ScrollView>
-			) : null}
+					<Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
+				</Pressable>
+			</View>
+
+			<ScrollView
+				horizontal
+				showsHorizontalScrollIndicator={false}
+				contentContainerStyle={styles.scroll}
+			>
+				{users.map((user, index) => {
+					const name = user.meta.displayName?.trim() || 'User';
+					const initial = (name[0] ?? '?').toUpperCase();
+					const distance = coords == null
+						? null
+						: distanceMeters(coords, { lat: user.lat, lng: user.lng });
+					const ringColor = ringColors[index % ringColors.length] ?? colors.primary;
+
+					return (
+						<Pressable
+							key={user.id}
+							style={styles.item}
+							onPress={() => onPressUser(user)}
+							accessibilityRole="button"
+							accessibilityLabel={`${name}, ${formatDistance(distance)}`}
+						>
+							<View style={[styles.avatarRing, { borderColor: ringColor }]}> 
+								{user.meta.avatarUrl ? (
+									<Image source={{ uri: user.meta.avatarUrl }} style={styles.avatar} />
+								) : (
+									<View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: colors.surfaceAlt }]}>
+										<Text style={[styles.initial, { color: ringColor }]}>{initial}</Text>
+									</View>
+								)}
+								{user.meta.online === true ? (
+									<View style={[styles.onlineDot, { backgroundColor: colors.success, borderColor: colors.bg }]} />
+								) : null}
+							</View>
+							<Text style={[styles.name, { color: colors.textPrimary }]} numberOfLines={1}>
+								{name}
+							</Text>
+							<Text style={[styles.distance, { color: colors.textMuted }]} numberOfLines={1}>
+								{formatDistance(distance)}
+							</Text>
+						</Pressable>
+					);
+				})}
+			</ScrollView>
 		</View>
 	);
 }
@@ -115,76 +161,85 @@ export function NearbyPeopleRail({
 const styles = StyleSheet.create({
 	wrap: {
 		position: 'absolute',
-		left: 0,
-		right: 0,
-		// Above EventsRail (bottom 16 + ~72)
-		bottom: 16 + 72 + 8,
+		left: 12,
+		right: 12,
+		bottom: 142,
+		paddingTop: 12,
+		paddingBottom: 10,
+		borderRadius: radius.xl,
+		backgroundColor: 'rgba(10,10,15,0.90)',
+		borderWidth: 1,
+		zIndex: 18,
+		shadowOpacity: 0.22,
+		shadowRadius: 12,
+		shadowOffset: { width: 0, height: 4 },
+		elevation: 6,
 	},
 	header: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginHorizontal: spacing.lg,
-		marginBottom: 8,
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: radius.md,
-		backgroundColor: 'rgba(18,18,31,0.92)',
-		borderWidth: 1,
-		borderColor: colors.border,
+		paddingHorizontal: spacing.md,
+		marginBottom: 10,
 	},
 	headerTitle: {
-		color: colors.textPrimary,
-		fontSize: 13,
+		fontSize: fontSize.md,
+		fontWeight: '800',
+	},
+	seeAll: {
+		fontSize: fontSize.sm,
 		fontWeight: '700',
 	},
 	scroll: {
-		paddingLeft: 12,
-		paddingRight: 12 + 56 + 16,
+		paddingHorizontal: spacing.sm,
 		gap: 10,
-		paddingBottom: 4,
 	},
 	item: {
 		width: 64,
 		alignItems: 'center',
-		gap: 4,
 	},
-	avatarWrap: {
+	avatarRing: {
+		width: 54,
+		height: 54,
+		borderRadius: 27,
+		borderWidth: 2,
+		padding: 2,
 		position: 'relative',
 	},
 	avatar: {
-		width: 52,
-		height: 52,
-		borderRadius: 26,
-		backgroundColor: colors.surfaceAlt,
-		borderWidth: 2,
-		borderColor: colors.borderStrong,
+		width: 46,
+		height: 46,
+		borderRadius: 23,
 	},
 	avatarPlaceholder: {
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
 	initial: {
-		color: colors.primary,
 		fontSize: 18,
-		fontWeight: '700',
+		fontWeight: '800',
 	},
 	onlineDot: {
 		position: 'absolute',
-		right: 1,
-		bottom: 1,
+		right: -1,
+		bottom: -1,
 		width: 12,
 		height: 12,
 		borderRadius: 6,
-		backgroundColor: colors.success,
 		borderWidth: 2,
-		borderColor: colors.bg,
 	},
 	name: {
-		color: colors.textSecondary,
-		fontSize: 11,
-		fontWeight: '600',
 		maxWidth: 64,
+		marginTop: 5,
+		fontSize: 11,
+		fontWeight: '700',
+		textAlign: 'center',
+	},
+	distance: {
+		maxWidth: 64,
+		marginTop: 1,
+		fontSize: 10,
+		fontWeight: '500',
 		textAlign: 'center',
 	},
 });

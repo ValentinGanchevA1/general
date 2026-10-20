@@ -1,6 +1,6 @@
-// Map chrome: People · Events · Listings + search + sort + create (+) + More.
-// Friends + listing mode live in the More sheet.
-// Cold start default: People only (reduce visual noise).
+// Map chrome: concept-board category chips only.
+// Search and duplicate create controls are intentionally absent from MapScreen;
+// create remains the centered bottom-tab action and advanced filters live in More.
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -9,12 +9,14 @@ import {
 	ScrollView,
 	StyleSheet,
 	Text,
-	TextInput,
 	View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { DiscoveryRankBy, EntityKind, ListingMode } from '@g88/shared';
+import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { colors, fontSize, radius, spacing, useAppTheme } from '@/theme';
 
 import { COMBINED_FILTER_ROW_HEIGHT } from './mapChromeLayout';
@@ -24,10 +26,17 @@ export type ListingModeFilterValue = 'all' | ListingMode;
 /** Cold-start layers — People only; Events/Listings are intentional toggles. */
 export const DEFAULT_MAP_LAYERS: EntityKind[] = ['user'];
 
-const LAYER_OPTIONS: Array<{ id: EntityKind; label: string; a11y: string }> = [
-	{ id: 'user', label: 'People', a11y: 'People layer' },
-	{ id: 'event', label: 'Events', a11y: 'Events layer' },
-	{ id: 'listing', label: 'Listings', a11y: 'Listings layer' },
+type LayerOption = {
+	id: EntityKind;
+	label: string;
+	a11y: string;
+	icon: string;
+};
+
+const LAYER_OPTIONS: LayerOption[] = [
+	{ id: 'user', label: 'People', a11y: 'People layer', icon: 'account-group-outline' },
+	{ id: 'event', label: 'Events', a11y: 'Events layer', icon: 'calendar-month-outline' },
+	{ id: 'listing', label: 'Listings', a11y: 'Listings layer', icon: 'storefront-outline' },
 ];
 
 const LISTING_OPTIONS: Array<{ id: ListingModeFilterValue; label: string }> = [
@@ -36,21 +45,16 @@ const LISTING_OPTIONS: Array<{ id: ListingModeFilterValue; label: string }> = [
 	{ id: 'buy', label: 'Wanted' },
 ];
 
-const RANK_CYCLE: DiscoveryRankBy[] = ['relevance', 'distance', 'newest'];
-
-function rankLabel(r: DiscoveryRankBy): string {
-	if (r === 'distance') return 'Near';
-	if (r === 'newest') return 'New';
-	return 'Relevant';
-}
-
-function nextRank(current: DiscoveryRankBy): DiscoveryRankBy {
-	const i = RANK_CYCLE.indexOf(current);
-	return RANK_CYCLE[(i + 1) % RANK_CYCLE.length]!;
-}
+const SORT_OPTIONS: Array<{ id: DiscoveryRankBy; label: string }> = [
+	{ id: 'relevance', label: 'Relevant' },
+	{ id: 'distance', label: 'Nearest' },
+	{ id: 'newest', label: 'Newest' },
+];
 
 export interface MapFilterRowProps {
+	/** Retained for API compatibility; search is intentionally not rendered on Map. */
 	value: string;
+	/** Retained for API compatibility; search is intentionally not rendered on Map. */
 	onChangeText: (text: string) => void;
 	/** Active discovery layers (at least one). */
 	layers: EntityKind[];
@@ -63,15 +67,15 @@ export interface MapFilterRowProps {
 	onDatingOnlyChange: (next: boolean) => void;
 	rankBy: DiscoveryRankBy;
 	onRankByChange: (next: DiscoveryRankBy) => void;
-	/** Opens create-nearby sheet (sell / wanted / event / alert). */
+	/** Retained for API compatibility; create is owned by the center tab. */
 	onPressCreate: () => void;
 	top: number;
 	placeholder?: string;
 }
 
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+
 export function MapFilterRow({
-	value,
-	onChangeText,
 	layers,
 	onLayersChange,
 	listingMode,
@@ -82,28 +86,42 @@ export function MapFilterRow({
 	onDatingOnlyChange,
 	rankBy,
 	onRankByChange,
-	onPressCreate,
 	top,
-	placeholder = 'Search people, places, events, listings…',
 }: MapFilterRowProps): React.JSX.Element {
+	const navigation = useNavigation<Nav>();
 	const { colors: c } = useAppTheme();
-	const rankActive = rankBy !== 'relevance';
 	const showPeople = layers.includes('user');
 	const showListings = layers.includes('listing');
 	const [moreOpen, setMoreOpen] = useState(false);
 	const moreActive =
-		friendsOnly || datingOnly || (showListings && listingMode !== 'all');
+		friendsOnly ||
+		datingOnly ||
+		rankBy !== 'relevance' ||
+		(showListings && listingMode !== 'all');
 
 	const toggleLayer = useCallback(
 		(id: EntityKind) => {
 			if (layers.includes(id)) {
 				if (layers.length <= 1) return;
-				onLayersChange(layers.filter((k) => k !== id));
-			} else {
-				onLayersChange([...layers, id]);
+				onLayersChange(layers.filter((kind) => kind !== id));
+				return;
 			}
+			onLayersChange([...layers, id]);
 		},
 		[layers, onLayersChange],
+	);
+
+	const openAlerts = useCallback((): void => {
+		navigation.navigate('AlertComposer', { presetCategory: 'general' });
+	}, [navigation]);
+
+	const layerTone = useCallback(
+		(id: EntityKind): string => {
+			if (id === 'event') return c.accent;
+			if (id === 'listing') return c.warning;
+			return c.primary;
+		},
+		[c.accent, c.primary, c.warning],
 	);
 
 	return (
@@ -112,66 +130,62 @@ export function MapFilterRow({
 				horizontal
 				showsHorizontalScrollIndicator={false}
 				contentContainerStyle={styles.row}
-				keyboardShouldPersistTaps="handled"
 			>
-				<View style={[styles.searchBox, { backgroundColor: c.surface, borderColor: c.borderStrong }]}>
-					<Icon name="magnify" size={18} color={c.textMuted} />
-					<TextInput
-						value={value}
-						onChangeText={onChangeText}
-						placeholder={placeholder}
-						placeholderTextColor={c.textFaint}
-						style={[styles.searchInput, { color: c.textPrimary }]}
-						returnKeyType="search"
-						autoCorrect={false}
-						autoCapitalize="none"
-						clearButtonMode="while-editing"
-						accessibilityLabel="Search map"
-					/>
-				</View>
-
-				{LAYER_OPTIONS.map((opt) => {
-					const active = layers.includes(opt.id);
+				{LAYER_OPTIONS.map((option) => {
+					const active = layers.includes(option.id);
+					const tone = layerTone(option.id);
 					return (
 						<Pressable
-							key={opt.id}
-							onPress={() => toggleLayer(opt.id)}
-							style={[styles.chip, active && styles.chipActiveLayer]}
+							key={option.id}
+							onPress={() => toggleLayer(option.id)}
+							style={[
+								styles.chip,
+								{
+									backgroundColor: active ? c.primarySoft : 'rgba(10,10,15,0.88)',
+									borderColor: active ? tone : c.borderStrong,
+								},
+							]}
 							accessibilityRole="button"
 							accessibilityState={{ selected: active }}
-							accessibilityLabel={opt.a11y}
+							accessibilityLabel={option.a11y}
 						>
-							<Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
+							<Icon name={option.icon} size={17} color={tone} />
+							<Text style={[styles.chipText, { color: active ? tone : c.textSecondary }]}>
+								{option.label}
+							</Text>
 						</Pressable>
 					);
 				})}
 
 				<Pressable
-					onPress={() => onRankByChange(nextRank(rankBy))}
-					style={[styles.chip, rankActive && styles.chipActiveRank]}
+					onPress={openAlerts}
+					style={[
+						styles.chip,
+						{
+							backgroundColor: 'rgba(10,10,15,0.88)',
+							borderColor: c.borderStrong,
+						},
+					]}
 					accessibilityRole="button"
-					accessibilityLabel={`Sort ${rankLabel(rankBy)}`}
+					accessibilityLabel="Create a local alert"
 				>
-					<Text style={[styles.chipText, rankActive && styles.chipTextActive]}>{rankLabel(rankBy)}</Text>
-				</Pressable>
-
-				<Pressable
-					onPress={onPressCreate}
-					style={styles.chipCreate}
-					accessibilityRole="button"
-					accessibilityLabel="Create nearby"
-				>
-					<Icon name="plus" size={18} color={colors.onPrimary} />
+					<Icon name="bell-outline" size={17} color={c.dangerMuted} />
+					<Text style={[styles.chipText, { color: c.textSecondary }]}>Alerts</Text>
 				</Pressable>
 
 				<Pressable
 					onPress={() => setMoreOpen(true)}
-					style={[styles.chip, moreActive && styles.chipActiveMore]}
+					style={[
+						styles.moreChip,
+						{
+							backgroundColor: 'rgba(10,10,15,0.88)',
+							borderColor: moreActive ? c.primary : c.borderStrong,
+						},
+					]}
 					accessibilityRole="button"
 					accessibilityLabel="More map filters"
 				>
-					<Icon name="tune-variant" size={16} color={moreActive ? colors.primary : colors.textMuted} />
-					<Text style={[styles.chipText, moreActive && styles.chipTextActive]}>More</Text>
+					<Icon name="tune-variant" size={17} color={moreActive ? c.primary : c.textMuted} />
 				</Pressable>
 			</ScrollView>
 
@@ -181,100 +195,114 @@ export function MapFilterRow({
 				animationType="fade"
 				onRequestClose={() => setMoreOpen(false)}
 			>
-				<Pressable style={styles.modalBackdrop} onPress={() => setMoreOpen(false)} accessibilityRole="button" accessibilityLabel="Dismiss filters">
-					<Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-						<Text style={styles.modalTitle}>Filters</Text>
+				<Pressable
+					style={styles.modalBackdrop}
+					onPress={() => setMoreOpen(false)}
+					accessibilityRole="button"
+					accessibilityLabel="Dismiss filters"
+				>
+					<Pressable
+						style={[styles.modalCard, { backgroundColor: c.surface, borderColor: c.borderStrong }]}
+						onPress={(event) => event.stopPropagation()}
+					>
+						<Text style={[styles.modalTitle, { color: c.textPrimary }]}>Map filters</Text>
+
+						<Text style={[styles.modalSection, { color: c.textMuted }]}>Sort</Text>
+						{SORT_OPTIONS.map((option) => {
+							const active = rankBy === option.id;
+							return (
+								<Pressable
+									key={option.id}
+									onPress={() => onRankByChange(option.id)}
+									style={[
+										styles.modalRow,
+										active && { backgroundColor: c.primarySoft, borderColor: c.primaryBorder },
+									]}
+									accessibilityRole="button"
+									accessibilityState={{ selected: active }}
+								>
+									<Text style={[styles.modalRowText, { color: active ? c.primary : c.textPrimary }]}>
+										{option.label}
+									</Text>
+									{active ? <Icon name="check" size={18} color={c.primary} /> : null}
+								</Pressable>
+							);
+						})}
+
 						{showPeople ? (
 							<>
-								<Text style={styles.modalSection}>People</Text>
+								<Text style={[styles.modalSection, { color: c.textMuted }]}>People</Text>
 								<Pressable
 									onPress={() => {
 										onFriendsOnlyChange(!friendsOnly);
 										if (!friendsOnly) onDatingOnlyChange(false);
 									}}
-									style={[styles.modalRow, friendsOnly && styles.modalRowActive]}
+									style={[
+										styles.modalRow,
+										friendsOnly && { backgroundColor: c.primarySoft, borderColor: c.entityFriend },
+									]}
 									accessibilityRole="button"
-									accessibilityLabel={friendsOnly ? 'Friends only, selected' : 'Friends only'}
 									accessibilityState={{ selected: friendsOnly }}
 								>
-									<Text
-										style={[
-											styles.modalRowText,
-											friendsOnly && styles.modalRowTextActive,
-										]}
-									>
+									<Text style={[styles.modalRowText, { color: friendsOnly ? c.entityFriend : c.textPrimary }]}>
 										Friends only
 									</Text>
-									{friendsOnly ? (
-										<Icon name="check" size={18} color={colors.entityFriend} />
-									) : null}
+									{friendsOnly ? <Icon name="check" size={18} color={c.entityFriend} /> : null}
 								</Pressable>
+
 								<Pressable
 									onPress={() => {
 										onDatingOnlyChange(!datingOnly);
 										if (!datingOnly) onFriendsOnlyChange(false);
 									}}
-									style={[styles.modalRow, datingOnly && styles.modalRowActive]}
+									style={[
+										styles.modalRow,
+										datingOnly && { backgroundColor: c.primarySoft, borderColor: c.entityUser },
+									]}
 									accessibilityRole="button"
 									accessibilityState={{ selected: datingOnly }}
-									accessibilityLabel={datingOnly ? 'Dating only, selected' : 'Dating only'}
 								>
-									<Text
-										style={[
-											styles.modalRowText,
-											datingOnly && styles.modalRowTextActive,
-										]}
-									>
+									<Text style={[styles.modalRowText, { color: datingOnly ? c.entityUser : c.textPrimary }]}>
 										Dating
 									</Text>
-									{datingOnly ? (
-										<Icon name="check" size={18} color={colors.primary} />
-									) : null}
+									{datingOnly ? <Icon name="check" size={18} color={c.entityUser} /> : null}
 								</Pressable>
 							</>
 						) : null}
+
 						{showListings ? (
 							<>
-								<Text style={styles.modalSection}>Listings</Text>
-								{LISTING_OPTIONS.map((opt) => {
-									const active = listingMode === opt.id;
+								<Text style={[styles.modalSection, { color: c.textMuted }]}>Listings</Text>
+								{LISTING_OPTIONS.map((option) => {
+									const active = listingMode === option.id;
 									return (
 										<Pressable
-											key={opt.id}
-											onPress={() => onListingModeChange(opt.id)}
-											style={[styles.modalRow, active && styles.modalRowActiveListing]}
+											key={option.id}
+											onPress={() => onListingModeChange(option.id)}
+											style={[
+												styles.modalRow,
+												active && { backgroundColor: c.primarySoft, borderColor: c.warning },
+											]}
 											accessibilityRole="button"
-											accessibilityLabel={active ? `${opt.label}, selected` : opt.label}
 											accessibilityState={{ selected: active }}
 										>
-											<Text
-												style={[
-													styles.modalRowText,
-													active && styles.modalRowTextActive,
-												]}
-											>
-												{opt.label}
+											<Text style={[styles.modalRowText, { color: active ? c.warning : c.textPrimary }]}>
+												{option.label}
 											</Text>
-											{active ? (
-												<Icon name="check" size={18} color={colors.primary} />
-											) : null}
+											{active ? <Icon name="check" size={18} color={c.warning} /> : null}
 										</Pressable>
 									);
 								})}
 							</>
 						) : null}
-						{!showPeople && !showListings ? (
-							<Text style={styles.modalEmpty}>
-								Turn on People or Listings for more filters.
-							</Text>
-						) : null}
+
 						<Pressable
-							style={styles.modalDone}
+							style={[styles.modalDone, { backgroundColor: c.primary }]}
 							onPress={() => setMoreOpen(false)}
 							accessibilityRole="button"
 							accessibilityLabel="Done"
 						>
-							<Text style={styles.modalDoneText}>Done</Text>
+							<Text style={[styles.modalDoneText, { color: c.onPrimary }]}>Done</Text>
 						</Pressable>
 					</Pressable>
 				</Pressable>
@@ -294,131 +322,78 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		paddingHorizontal: spacing.md,
-		gap: 8,
+		gap: 10,
 		minHeight: COMBINED_FILTER_ROW_HEIGHT,
-	},
-	searchBox: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: colors.surface,
-		borderRadius: radius.md,
-		paddingHorizontal: 10,
-		gap: 6,
-		minWidth: 140,
-		maxWidth: 200,
-		height: 36,
-		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: colors.borderStrong,
-	},
-	searchInput: {
-		flex: 1,
-		color: colors.textPrimary,
-		fontSize: fontSize.sm,
-		paddingVertical: 0,
 	},
 	chip: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 4,
-		paddingHorizontal: 12,
-		height: 36,
+		gap: 7,
+		paddingHorizontal: 14,
+		height: 38,
 		borderRadius: radius.pill,
-		backgroundColor: colors.surface,
-		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: colors.borderStrong,
-	},
-	chipActiveLayer: {
-		borderColor: colors.primary,
-		backgroundColor: colors.primarySoft,
-	},
-	chipActiveRank: {
-		borderColor: colors.primary,
-	},
-	chipActiveMore: {
-		borderColor: colors.primary,
-	},
-	chipCreate: {
-		alignItems: 'center',
-		justifyContent: 'center',
-		width: 36,
-		height: 36,
-		borderRadius: radius.pill,
-		backgroundColor: colors.primary,
+		borderWidth: 1,
 	},
 	chipText: {
-		color: colors.textMuted,
 		fontSize: fontSize.sm,
 		fontWeight: '600',
 	},
-	chipTextActive: {
-		color: colors.primary,
+	moreChip: {
+		width: 38,
+		height: 38,
+		borderRadius: 19,
+		borderWidth: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	modalBackdrop: {
 		flex: 1,
-		backgroundColor: 'rgba(0,0,0,0.55)',
-		justifyContent: 'flex-end',
+		backgroundColor: 'rgba(0,0,0,0.62)',
+		justifyContent: 'center',
+		padding: spacing.xl,
 	},
 	modalCard: {
-		backgroundColor: colors.surface,
-		borderTopLeftRadius: radius.lg,
-		borderTopRightRadius: radius.lg,
+		borderRadius: radius.xl,
+		borderWidth: 1,
 		padding: spacing.lg,
-		paddingBottom: spacing.xl,
-		gap: 8,
 	},
 	modalTitle: {
-		color: colors.textPrimary,
 		fontSize: fontSize.lg,
-		fontWeight: '700',
-		marginBottom: 4,
+		fontWeight: '800',
+		marginBottom: spacing.sm,
 	},
 	modalSection: {
-		color: colors.textMuted,
 		fontSize: fontSize.xs,
-		fontWeight: '700',
-		letterSpacing: 0.6,
-		marginTop: 8,
+		fontWeight: '800',
+		textTransform: 'uppercase',
+		letterSpacing: 0.8,
+		marginTop: spacing.md,
+		marginBottom: 6,
 	},
 	modalRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingVertical: 12,
+		minHeight: 44,
 		paddingHorizontal: 12,
 		borderRadius: radius.md,
 		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: colors.borderStrong,
-		backgroundColor: colors.surfaceAlt,
-	},
-	modalRowActive: {
-		borderColor: colors.entityFriend,
-	},
-	modalRowActiveListing: {
-		borderColor: colors.primary,
+		borderColor: colors.border,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginBottom: 6,
 	},
 	modalRowText: {
-		color: colors.textPrimary,
-		fontSize: fontSize.md,
+		fontSize: fontSize.sm,
 		fontWeight: '600',
 	},
-	modalRowTextActive: {
-		color: colors.primary,
-	},
-	modalEmpty: {
-		color: colors.textMuted,
-		fontSize: fontSize.sm,
-		marginTop: 8,
-	},
 	modalDone: {
-		marginTop: 12,
+		marginTop: spacing.lg,
+		minHeight: 44,
+		borderRadius: radius.pill,
 		alignItems: 'center',
-		paddingVertical: 14,
-		borderRadius: radius.md,
-		backgroundColor: colors.primary,
+		justifyContent: 'center',
 	},
 	modalDoneText: {
-		color: colors.onPrimary,
-		fontSize: fontSize.md,
-		fontWeight: '700',
+		fontSize: fontSize.sm,
+		fontWeight: '800',
 	},
 });
