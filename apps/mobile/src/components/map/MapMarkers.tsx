@@ -10,8 +10,10 @@ import { useTracksViewChanges } from './useTracksViewChanges';
 
 interface MapMarkersProps {
   points: DiscoveryPoint[];
-  /** Optional controlled selection. When omitted, MapMarkers tracks the last tapped entity. */
+  /** Optional controlled entity selection. When omitted, the last tapped entity is tracked locally. */
   selectedEntityKey?: string | null;
+  /** Optional controlled cluster selection. When omitted, the last tapped cluster is tracked locally. */
+  selectedClusterCellId?: string | null;
   /** Optional semantic state inputs for map orchestration without changing marker internals. */
   newEntityKeys?: ReadonlySet<string>;
   ownEntityKey?: string | null;
@@ -32,6 +34,7 @@ function entityKey(point: EntityPoint): string {
 function MapMarkersImpl({
   points,
   selectedEntityKey,
+  selectedClusterCellId,
   newEntityKeys,
   ownEntityKey = null,
   unavailableEntityKeys,
@@ -40,8 +43,14 @@ function MapMarkersImpl({
   onEntityPress,
 }: MapMarkersProps): React.JSX.Element {
   const [localSelectedEntityKey, setLocalSelectedEntityKey] = useState<string | null>(null);
-  const effectiveSelectedKey =
+  const [localSelectedClusterCellId, setLocalSelectedClusterCellId] = useState<string | null>(null);
+
+  const effectiveSelectedEntityKey =
     selectedEntityKey === undefined ? localSelectedEntityKey : selectedEntityKey;
+  const effectiveSelectedClusterCellId =
+    selectedClusterCellId === undefined
+      ? localSelectedClusterCellId
+      : selectedClusterCellId;
 
   useEffect(() => {
     if (selectedEntityKey !== undefined || localSelectedEntityKey == null) return;
@@ -53,24 +62,45 @@ function MapMarkersImpl({
     }
   }, [localSelectedEntityKey, points, selectedEntityKey]);
 
+  useEffect(() => {
+    if (
+      selectedClusterCellId !== undefined ||
+      localSelectedClusterCellId == null
+    ) {
+      return;
+    }
+    const stillVisible = points.some(
+      (point) =>
+        point.kind === 'cluster' &&
+        point.cellId === localSelectedClusterCellId,
+    );
+    if (!stillVisible) {
+      void Promise.resolve().then(() => setLocalSelectedClusterCellId(null));
+    }
+  }, [localSelectedClusterCellId, points, selectedClusterCellId]);
+
   const handleEntityPress = useCallback(
     (point: EntityPoint) => {
       if (selectedEntityKey === undefined) {
         setLocalSelectedEntityKey(entityKey(point));
       }
+      if (selectedClusterCellId === undefined) {
+        setLocalSelectedClusterCellId(null);
+      }
       onEntityPress(point);
-    },
-    [onEntityPress, selectedEntityKey],
+    }, [onEntityPress, selectedClusterCellId, selectedEntityKey],
   );
 
   const handleClusterPress = useCallback(
     (point: ClusterPoint) => {
+      if (selectedClusterCellId === undefined) {
+        setLocalSelectedClusterCellId(point.cellId);
+      }
       if (selectedEntityKey === undefined) {
         setLocalSelectedEntityKey(null);
       }
       onClusterPress(point);
-    },
-    [onClusterPress, selectedEntityKey],
+    }, [onClusterPress, selectedClusterCellId, selectedEntityKey],
   );
 
   return (
@@ -81,13 +111,14 @@ function MapMarkersImpl({
             <ClusterMarkerItem
               key={`c:${point.cellId}`}
               point={point}
+              selected={point.cellId === effectiveSelectedClusterCellId}
               onPress={handleClusterPress}
             />
           );
         }
 
         const key = entityKey(point);
-        const selected = key === effectiveSelectedKey;
+        const selected = key === effectiveSelectedEntityKey;
 
         return (
           <EntityMarkerItem
@@ -97,7 +128,11 @@ function MapMarkersImpl({
             isNew={newEntityKeys?.has(key) === true}
             own={key === ownEntityKey}
             unavailable={unavailableEntityKeys?.has(key) === true}
-            dimmed={dimUnselected && effectiveSelectedKey != null && !selected}
+            dimmed={
+              dimUnselected &&
+              effectiveSelectedEntityKey != null &&
+              !selected
+            }
             onPress={handleEntityPress}
           />
         );
@@ -110,6 +145,7 @@ function mapMarkersPropsEqual(prev: MapMarkersProps, next: MapMarkersProps): boo
   return (
     prev.points === next.points &&
     prev.selectedEntityKey === next.selectedEntityKey &&
+    prev.selectedClusterCellId === next.selectedClusterCellId &&
     prev.newEntityKeys === next.newEntityKeys &&
     prev.ownEntityKey === next.ownEntityKey &&
     prev.unavailableEntityKeys === next.unavailableEntityKeys &&
@@ -125,11 +161,17 @@ export const MapMarkers = React.memo(MapMarkersImpl, mapMarkersPropsEqual);
 
 interface ClusterItemProps {
   point: ClusterPoint;
+  selected: boolean;
   onPress: (p: ClusterPoint) => void;
 }
 
-function ClusterMarkerItemImpl({ point, onPress }: ClusterItemProps): React.JSX.Element {
-  const tracksViewChanges = useTracksViewChanges([clusterVisualKey(point)]);
+function ClusterMarkerItemImpl({
+  point,
+  selected,
+  onPress,
+}: ClusterItemProps): React.JSX.Element {
+  const renderKey = `${clusterVisualKey(point)}|${selected ? 'selected' : 'default'}`;
+  const tracksViewChanges = useTracksViewChanges([renderKey]);
   const coordinate = useMemo(
     () => ({ latitude: point.lat, longitude: point.lng }),
     [point.lat, point.lng],
@@ -146,9 +188,9 @@ function ClusterMarkerItemImpl({ point, onPress }: ClusterItemProps): React.JSX.
       onPress={handlePress}
       tracksViewChanges={tracksViewChanges}
       anchor={{ x: 0.5, y: 0.5 }}
-      zIndex={5}
+      zIndex={selected ? 35 : 5}
     >
-      <ClusterMarker point={point} />
+      <ClusterMarker point={point} selected={selected} />
     </Marker>
   );
 }
@@ -156,6 +198,7 @@ function ClusterMarkerItemImpl({ point, onPress }: ClusterItemProps): React.JSX.
 function clusterItemPropsEqual(prev: ClusterItemProps, next: ClusterItemProps): boolean {
   return (
     prev.onPress === next.onPress &&
+    prev.selected === next.selected &&
     clusterVisualKey(prev.point) === clusterVisualKey(next.point) &&
     prev.point.lat === next.point.lat &&
     prev.point.lng === next.point.lng
