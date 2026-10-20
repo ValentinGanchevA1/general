@@ -29,7 +29,7 @@ import { openRootScreen } from '@/navigation/openRootScreen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
 import { useFieldErrors } from '@/hooks/useFieldErrors';
-import { colors, fontSize, spacing, radius } from '@/theme';
+import { colors, fontSize, spacing, radius, useAppTheme } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 type EditRoute = RouteProp<AccountStackParamList, 'ProfileEdit'>;
@@ -79,6 +79,7 @@ function ChipRow<T extends string>({
 }
 
 export function ProfileEditScreen(): React.JSX.Element {
+	const { colors: themeColors } = useAppTheme();
 	const navigation = useNavigation<Nav>();
 	const dispatch = useAppDispatch();
 	const profile = useAppSelector((s) => s.profile.profile);
@@ -178,7 +179,7 @@ export function ProfileEditScreen(): React.JSX.Element {
 
 	return (
 		<KeyboardAvoidingView
-			style={styles.root}
+			style={[styles.root, { backgroundColor: themeColors.bg }]}
 			behavior={Platform.OS === 'ios' ? 'padding' : undefined}
 		>
 			<ScreenHeader
