@@ -1,9 +1,9 @@
 // apps/mobile/src/features/pulse/components/ActivityCard.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { ActivityItem, ActivityType } from '@g88/shared';
-import { colors, spacing, useAppTheme } from '@/theme';
+import { spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 const ICON_BY_TYPE: Record<ActivityType, string> = {
 	chat: 'message-text-outline',
@@ -14,14 +14,16 @@ const ICON_BY_TYPE: Record<ActivityType, string> = {
 	event: 'calendar-outline',
 };
 
-const ACCENT_BY_TYPE: Record<ActivityType, string> = {
-	chat: colors.actionPrimary,
-	wave: colors.actionPrimary,
-	listing: colors.entityListing,
-	alert: colors.danger,
-	match: colors.entityPerson,
-	event: colors.entityEvent,
-};
+function getAccentByType(colors: ThemeColors): Record<ActivityType, string> {
+	return {
+		chat: colors.actionPrimary,
+		wave: colors.actionPrimary,
+		listing: colors.entityListing,
+		alert: colors.danger,
+		match: colors.entityPerson,
+		event: colors.entityEvent,
+	};
+}
 
 interface Props {
 	item: ActivityItem;
@@ -30,7 +32,9 @@ interface Props {
 }
 
 export function ActivityCard({ item, onPress, onView }: Props): React.JSX.Element {
-	const { colors: themeColors } = useAppTheme();
+	const { colors } = useAppTheme();
+	const styles = useMemo(() => createStyles(colors), [colors]);
+	const accentByType = useMemo(() => getAccentByType(colors), [colors]);
 	const initials = (item.actorName ?? '?')
 		.split(' ')
 		.map((word) => word[0] ?? '')
@@ -43,33 +47,33 @@ export function ActivityCard({ item, onPress, onView }: Props): React.JSX.Elemen
 
 	return (
 		<Pressable
-			style={({ pressed }) => [S.card, { backgroundColor: themeColors.surfaceAlt }, pressed && S.cardPressed]}
+			style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
 			onPress={onPress}
 			testID={`activity-card-${item.id}`}
 		>
-			<View style={S.row}>
-				<View style={[S.avatar, { borderColor: ACCENT_BY_TYPE[item.type] }]}>
+			<View style={styles.row}>
+				<View style={[styles.avatar, { borderColor: accentByType[item.type] }]}>
 					{isDiscoveryItem ? (
-						<MCI name={ICON_BY_TYPE[item.type]} size={19} color={ACCENT_BY_TYPE[item.type]} />
+						<MCI name={ICON_BY_TYPE[item.type]} size={19} color={accentByType[item.type]} />
 					) : (
-						<Text style={S.avatarText}>{initials}</Text>
+						<Text style={styles.avatarText}>{initials}</Text>
 					)}
 				</View>
-				<View style={S.body}>
-					<Text style={[S.title, item.unread && S.titleUnread]} numberOfLines={1}>{item.title}</Text>
-					{!!item.preview && <Text style={S.preview} numberOfLines={2}>{item.preview}</Text>}
-					{!!meta && <Text style={S.meta}>{meta}</Text>}
+				<View style={styles.body}>
+					<Text style={[styles.title, item.unread && styles.titleUnread]} numberOfLines={1}>{item.title}</Text>
+					{!!item.preview && <Text style={styles.preview} numberOfLines={2}>{item.preview}</Text>}
+					{!!meta && <Text style={styles.meta}>{meta}</Text>}
 				</View>
 				{isDiscoveryItem && onView ? (
 					<Pressable
-						style={S.cta}
+						style={styles.cta}
 						onPress={(event) => {
 							event.stopPropagation();
 							onView();
 						}}
 						hitSlop={8}
 					>
-						<Text style={S.ctaText}>View</Text>
+						<Text style={styles.ctaText}>View</Text>
 					</Pressable>
 				) : (
 					<MCI name={ICON_BY_TYPE[item.type]} size={18} color={colors.textMuted} />
@@ -94,17 +98,19 @@ function relTime(iso: string): string {
 	return `${Math.floor(hours / 24)}d`;
 }
 
-const S = StyleSheet.create({
-	card: { backgroundColor: colors.surfaceAlt, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 14, marginHorizontal: spacing.xl, marginBottom: 10 },
-	cardPressed: { opacity: 0.85 },
-	row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-	avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.bg, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-	avatarText: { color: colors.entityPerson, fontWeight: '700', fontSize: 13 },
-	body: { flex: 1, minWidth: 0 },
-	title: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
-	titleUnread: { fontWeight: '700' },
-	preview: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
-	meta: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
-	cta: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, minWidth: 64, alignItems: 'center', backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.borderStrong },
-	ctaText: { color: colors.actionPrimary, fontSize: 13, fontWeight: '700' },
-});
+function createStyles(colors: ThemeColors) {
+	return StyleSheet.create({
+		card: { backgroundColor: colors.surfaceAlt, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 14, marginHorizontal: spacing.xl, marginBottom: 10 },
+		cardPressed: { opacity: 0.85 },
+		row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+		avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.bg, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+		avatarText: { color: colors.entityPerson, fontWeight: '700', fontSize: 13 },
+		body: { flex: 1, minWidth: 0 },
+		title: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
+		titleUnread: { fontWeight: '700' },
+		preview: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
+		meta: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
+		cta: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, minWidth: 64, alignItems: 'center', backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.borderStrong },
+		ctaText: { color: colors.actionPrimary, fontSize: 13, fontWeight: '700' },
+	});
+}
