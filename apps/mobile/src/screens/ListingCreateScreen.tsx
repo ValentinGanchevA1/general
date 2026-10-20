@@ -32,7 +32,7 @@ import { createListing } from '@/features/trading/useTrading';
 import { pickAndUploadListingImage } from '@/features/trading/listingImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
-import { colors } from '@/theme';
+import { colors, useAppTheme } from '@/theme';
 
 type Nav = NativeStackNavigationProp<CommerceStackParamList>;
 type R = RouteProp<CommerceStackParamList, 'ListingCreate'>;
@@ -43,6 +43,8 @@ const CATEGORIES = ['Electronics', 'Furniture', 'Clothing', 'Sports', 'Home', 'B
 const DEFAULT_CURRENCY = 'EUR';
 
 export function ListingCreateScreen(): React.JSX.Element {
+	const { colors: themeColors } = useAppTheme();
+
 	const nav = useNavigation<Nav>();
 	const route = useRoute<R>();
 	const { coords } = useUserLocation();
@@ -157,7 +159,7 @@ export function ListingCreateScreen(): React.JSX.Element {
 	const submitLabel = mode === 'buy' ? 'Post' : 'List';
 
 	return (
-		<KeyboardAvoidingView style={S.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+		<KeyboardAvoidingView style={[S.root, { backgroundColor: themeColors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 			<ScreenHeader
 				title={headerTitle}
 				right={
