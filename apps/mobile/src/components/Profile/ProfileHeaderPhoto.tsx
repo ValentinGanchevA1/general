@@ -41,7 +41,8 @@ export function ProfileHeaderPhoto({
   coverUrl,
   displayName,
   handle,
-  idVerified = false,
+  verificationPercent,
+  idVerified,
   isVisibleOnMap,
   isPaid,
   tierLabel,
@@ -56,6 +57,13 @@ export function ProfileHeaderPhoto({
 }: ProfileHeaderPhotoProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const backgroundUri = coverUrl || photoUrl;
+  // Compatibility bridge for ProfileView while the legacy score field remains in
+  // its view-model contract. The number itself is never rendered.
+  const resolvedIdVerified =
+    idVerified ??
+    (typeof verificationPercent === 'number' &&
+      Number.isFinite(verificationPercent) &&
+      verificationPercent >= 100);
 
   return (
     <Pressable onPress={onPressPhoto} style={styles.container}>
@@ -154,24 +162,26 @@ export function ProfileHeaderPhoto({
             onPress={onPressVerificationBadge}
             style={[
               styles.verificationBadge,
-              idVerified && styles.verificationBadgeVerified,
+              resolvedIdVerified && styles.verificationBadgeVerified,
             ]}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel={idVerified ? 'Identity verified' : 'Open identity verification'}
+            accessibilityLabel={
+              resolvedIdVerified ? 'Identity verified' : 'Open identity verification'
+            }
           >
             <Icon
-              name={idVerified ? 'shield-check' : 'shield-outline'}
+              name={resolvedIdVerified ? 'shield-check' : 'shield-outline'}
               size={15}
-              color={idVerified ? colors.verified : colors.actionPrimary}
+              color={resolvedIdVerified ? colors.verified : colors.actionPrimary}
             />
             <Text
               style={[
                 styles.verificationText,
-                { color: idVerified ? colors.verified : colors.textPrimary },
+                { color: resolvedIdVerified ? colors.verified : colors.textPrimary },
               ]}
             >
-              {idVerified ? 'Verified' : 'Verify'}
+              {resolvedIdVerified ? 'Verified' : 'Verify'}
             </Text>
           </Pressable>
         </View>
