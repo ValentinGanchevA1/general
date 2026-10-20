@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Linking,
   ScrollView,
@@ -17,7 +17,7 @@ import type { AccountStackParamList } from '@/navigation/stacks';
 import { SUPPORT_EMAIL, APP_VERSION, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { track } from '@/lib/analytics';
 import { ListRow } from '@/components/ListRow';
-import { colors, spacing, fontSize, useAppTheme } from '@/theme';
+import { spacing, fontSize, useAppTheme, type ThemeColors } from '@/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
@@ -69,6 +69,9 @@ const FAQS: Faq[] = [
 
 function FaqItem({ q, a }: Faq): React.JSX.Element {
   const [open, setOpen] = useState(false);
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <TouchableOpacity
       style={styles.faqCard}
@@ -89,11 +92,11 @@ function FaqItem({ q, a }: Faq): React.JSX.Element {
 }
 
 export function HelpScreen(): React.JSX.Element {
-  const { colors: themeColors } = useAppTheme();
-
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation<Nav>();
 
-  const emailSupport = async () => {
+  const emailSupport = async (): Promise<void> => {
     track('help.email_support');
     const subject = encodeURIComponent('NEXA support');
     const body = encodeURIComponent(
@@ -113,7 +116,7 @@ export function HelpScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
+    <View style={styles.container}>
       <ScreenHeader title="Help & Support" />
 
       <ScrollView contentContainerStyle={styles.body}>
@@ -148,32 +151,34 @@ export function HelpScreen(): React.JSX.Element {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  body: { padding: spacing.lg, paddingBottom: 48 },
-  sectionTitle: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-    marginBottom: spacing.md,
-  },
-  faqCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  faqHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  faqQ: { flex: 1, color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
-  faqA: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 20, marginTop: spacing.md },
-  rowSpaced: { marginTop: spacing.sm },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    body: { padding: spacing.lg, paddingBottom: 48 },
+    sectionTitle: {
+      color: colors.textMuted,
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+      marginBottom: spacing.md,
+    },
+    faqCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.lg,
+      marginBottom: spacing.sm,
+    },
+    faqHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+    },
+    faqQ: { flex: 1, color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
+    faqA: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 20, marginTop: spacing.md },
+    rowSpaced: { marginTop: spacing.sm },
+  });
+}
