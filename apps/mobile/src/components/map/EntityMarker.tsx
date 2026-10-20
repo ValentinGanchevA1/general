@@ -99,10 +99,10 @@ function EntityMarkerImpl({
         entityType="person"
         density={density}
         label={initialsFromName(name) || '?'}
-        caption={showCaption ? name.slice(0, 10) : undefined}
+        {...(showCaption ? { caption: name.slice(0, 10) } : {})}
         state={{ selected, live, verified, isNew, own, dimmed, unavailable }}
         accessibilityLabel={`${name}, person${live ? ', live' : ''}${verified ? ', verified' : ''}`}
-        onVisualSettled={onVisualSettled}
+        {...(onVisualSettled ? { onVisualSettled } : {})}
       />
     );
   }
@@ -112,10 +112,10 @@ function EntityMarkerImpl({
       <NexaEntityMarker
         entityType="event"
         density={density}
-        caption={showCaption ? formatEventBadge(point.meta.startsAt) : undefined}
+        {...(showCaption ? { caption: formatEventBadge(point.meta.startsAt) } : {})}
         state={{ selected, isNew, own, dimmed, unavailable }}
         accessibilityLabel={`${point.meta.title}, event`}
-        onVisualSettled={onVisualSettled}
+        {...(onVisualSettled ? { onVisualSettled } : {})}
       />
     );
   }
@@ -124,18 +124,18 @@ function EntityMarkerImpl({
     <NexaEntityMarker
       entityType="listing"
       density={density}
-      caption={
-        showCaption
-          ? formatListingBadge(
+      {...(showCaption
+        ? {
+            caption: formatListingBadge(
               point.meta.priceCents,
               point.meta.currency,
               point.meta.mode,
-            )
-          : undefined
-      }
+            ),
+          }
+        : {})}
       state={{ selected, isNew, own, dimmed, unavailable }}
       accessibilityLabel={`${point.meta.title}, listing`}
-      onVisualSettled={onVisualSettled}
+      {...(onVisualSettled ? { onVisualSettled } : {})}
     />
   );
 }
