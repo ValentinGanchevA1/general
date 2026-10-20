@@ -2,7 +2,7 @@
 // Mutual close friends of viewer and a peer (intersection only).
 // Entry: UserProfile → mutual friends line.
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -23,13 +23,13 @@ import { Avatar } from '@/components/Avatar';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonListRow } from '@/components/Skeleton';
-import { colors, spacing, radius, fontSize, useAppTheme } from '@/theme';
+import { spacing, radius, fontSize, useAppTheme, type ThemeColors } from '@/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MutualFriends'>;
 
 export function MutualFriendsScreen({ route, navigation }: Props): React.JSX.Element {
-  const { colors: themeColors } = useAppTheme();
-
+  const { colors } = useAppTheme();
+  const S = useMemo(() => createStyles(colors), [colors]);
   const { peerUserId, peerName } = route.params;
   const [items, setItems] = useState<FriendCard[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -104,11 +104,11 @@ export function MutualFriendsScreen({ route, navigation }: Props): React.JSX.Ele
         </View>
       </TouchableOpacity>
     ),
-    [openProfile],
+    [S, openProfile],
   );
 
   return (
-    <View style={[S.root, { backgroundColor: themeColors.bg }]}>
+    <View style={S.root}>
       <ScreenHeader title={title} />
 
       {loading && items.length === 0 ? (
@@ -135,14 +135,15 @@ export function MutualFriendsScreen({ route, navigation }: Props): React.JSX.Ele
               refreshing={loading && items.length > 0}
               onRefresh={() => void load()}
               tintColor={colors.primary}
+              colors={[colors.primary]}
+              progressBackgroundColor={colors.surface}
             />
           }
           onEndReached={() => {
             if (nextCursor && !loadingMore && !loading) {
               void load(nextCursor);
             }
-          }
-          }
+          }}
           onEndReachedThreshold={0.4}
           ListEmptyComponent={
             <EmptyState
@@ -164,30 +165,32 @@ export function MutualFriendsScreen({ route, navigation }: Props): React.JSX.Ele
   );
 }
 
-const S = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  listContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: 40, gap: 10 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  rowBody: { flex: 1, minWidth: 0 },
-  name: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
-  meta: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
-  metaOnline: { color: colors.success, fontSize: fontSize.xs, marginTop: 2, fontWeight: '600' },
-  errorText: { color: colors.danger, marginBottom: 12, textAlign: 'center' },
-  retry: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: radius.sm,
-  },
-  retryText: { color: colors.onPrimary, fontWeight: '700' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bg },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+    listContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: 40, gap: 10 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: colors.surfaceRaised,
+      borderRadius: radius.md,
+      padding: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    rowBody: { flex: 1, minWidth: 0 },
+    name: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
+    meta: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
+    metaOnline: { color: colors.success, fontSize: fontSize.xs, marginTop: 2, fontWeight: '600' },
+    errorText: { color: colors.danger, marginBottom: 12, textAlign: 'center' },
+    retry: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: radius.sm,
+    },
+    retryText: { color: colors.onPrimary, fontWeight: '700' },
+  });
+}
