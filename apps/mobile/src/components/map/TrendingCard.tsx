@@ -1,12 +1,11 @@
 // Compact "Trending nearby" card from viewport points (client-only).
-// Collapsed: title + activity counters (screenshot contract).
-// Expanded: ranked entity rows.
+// Collapsed: title + activity counters. Expanded: ranked entity rows.
 
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, fontSize } from '@/theme';
+import { fontSize, useAppTheme, type ThemeColors } from '@/theme';
 
 import {
 	MAP_CHROME_GAP,
@@ -14,19 +13,9 @@ import {
 	WEATHER_WIDGET_HEIGHT,
 	WEATHER_WIDGET_WIDTH,
 } from './mapChromeLayout';
-import {
-	type TrendingItem,
-	formatDistanceM,
-} from './buildTrending';
-
-const KIND_DOT: Record<TrendingItem['kind'], string> = {
-	user: colors.entityUser,
-	event: colors.entityEvent,
-	listing: colors.entityListing,
-};
+import { type TrendingItem, formatDistanceM } from './buildTrending';
 
 export interface TrendingSummary {
-	/** People (users) in viewport. */
 	people: number;
 	events: number;
 	listings: number;
@@ -35,13 +24,10 @@ export interface TrendingSummary {
 export interface TrendingCardProps {
 	items: TrendingItem[];
 	onPressItem: (item: TrendingItem) => void;
-	/** Absolute top from mapChromeLayout; shared with the weather/time row. */
 	top: number;
 	visible: boolean;
-	/** When true, only the header + counters are shown. */
 	collapsed?: boolean;
 	onToggleCollapse?: () => void;
-	/** Viewport activity counts shown before expand. */
 	summary?: TrendingSummary;
 }
 
@@ -54,150 +40,76 @@ function formatSummary(summary: TrendingSummary | undefined): string | null {
 	if (people > 0) parts.push(`${people} active`);
 	if (events > 0) parts.push(`${events} event${events === 1 ? '' : 's'}`);
 	if (listings > 0) parts.push(`${listings} listing${listings === 1 ? '' : 's'}`);
-	return parts.length > 0 ? parts.join(' · ') : null;
+	return parts.join(' · ');
 }
 
-export function TrendingCard({
-	items,
-	onPressItem,
-	top,
-	visible,
-	collapsed = true,
-	onToggleCollapse,
-	summary,
-}: TrendingCardProps): React.JSX.Element | null {
+export function TrendingCard({ items, onPressItem, top, visible, collapsed = true, onToggleCollapse, summary }: TrendingCardProps): React.JSX.Element | null {
+	const { colors, shadow } = useAppTheme();
+	const styles = useMemo(() => createStyles(colors), [colors]);
 	const summaryLine = useMemo(() => formatSummary(summary), [summary]);
 	const hasBody = items.length > 0;
-	if (!visible) return null;
-	if (!hasBody && summaryLine == null) return null;
+	if (!visible || (!hasBody && summaryLine == null)) return null;
 
 	const canToggle = typeof onToggleCollapse === 'function' && hasBody;
+	const kindDot = (kind: TrendingItem['kind']): string => {
+		if (kind === 'event') return colors.entityEvent;
+		if (kind === 'listing') return colors.entityListing;
+		return colors.entityUser;
+	};
 
 	return (
 		<View style={[styles.wrap, { top }]} pointerEvents="box-none">
-			<View style={styles.card}>
+			<View style={[styles.card, shadow(0.12)]}>
 				<Pressable
 					onPress={canToggle ? onToggleCollapse : undefined}
-					style={styles.headerBlock}
+					style={({ pressed }) => [styles.headerBlock, pressed && canToggle && styles.pressed]}
 					accessibilityRole={canToggle ? 'button' : undefined}
-					accessibilityLabel={
-						canToggle
-							? collapsed
-								? `Expand trending nearby. ${summaryLine ?? ''}`
-								: 'Collapse trending nearby'
-							: `Trending nearby. ${summaryLine ?? ''}`
-					}
+					accessibilityLabel={canToggle ? (collapsed ? `Expand trending nearby. ${summaryLine ?? ''}` : 'Collapse trending nearby') : `Trending nearby. ${summaryLine ?? ''}`}
 					accessibilityState={canToggle ? { expanded: !collapsed } : undefined}
 					hitSlop={6}
 				>
 					<View style={styles.headerTextCol}>
-						<Text style={styles.heading} numberOfLines={1}>Trending nearby</Text>
-						{summaryLine ? (
-							<Text style={styles.summary} numberOfLines={1}>
-								{summaryLine}
-							</Text>
-						) : null}
+						<View style={styles.headingRow}>
+							<Icon name="trending-up" size={15} color={colors.discovery} />
+							<Text style={styles.heading} numberOfLines={1}>Trending nearby</Text>
+						</View>
+						{summaryLine ? <Text style={styles.summary} numberOfLines={1}>{summaryLine}</Text> : null}
 					</View>
-					{canToggle ? (
-						<Icon
-							name={collapsed ? 'chevron-down' : 'chevron-up'}
-							size={20}
-							color={colors.textMuted}
-						/>
-					) : null}
+					{canToggle ? <Icon name={collapsed ? 'chevron-down' : 'chevron-up'} size={18} color={colors.textMuted} /> : null}
 				</Pressable>
 
-				{!collapsed && hasBody
-					? items.map((item, index) => (
-							<Pressable
-								key={`${item.kind}:${item.id}`}
-								onPress={() => onPressItem(item)}
-								style={[styles.row, index > 0 && styles.rowBorder]}
-								accessibilityRole="button"
-								accessibilityLabel={`${item.title}, ${formatDistanceM(item.distanceM) || 'nearby'}`}
-							>
-								<View
-									style={[styles.dot, { backgroundColor: KIND_DOT[item.kind] }]}
-								/>
-								<Text style={styles.title} numberOfLines={1}>
-									{item.title}
-								</Text>
-								{item.distanceM != null ? (
-									<Text style={styles.distance}>
-										{formatDistanceM(item.distanceM)}
-									</Text>
-								) : null}
-							</Pressable>
-						))
-					: null}
+				{!collapsed && hasBody ? items.map((item, index) => (
+					<Pressable
+						key={`${item.kind}:${item.id}`}
+						onPress={() => onPressItem(item)}
+						style={({ pressed }) => [styles.row, index > 0 && styles.rowBorder, pressed && styles.pressed]}
+						accessibilityRole="button"
+						accessibilityLabel={`${item.title}, ${formatDistanceM(item.distanceM) || 'nearby'}`}
+					>
+						<View style={[styles.dot, { backgroundColor: kindDot(item.kind) }]} />
+						<Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+						{item.distanceM != null ? <Text style={styles.distance}>{formatDistanceM(item.distanceM)}</Text> : null}
+					</Pressable>
+				)) : null}
 			</View>
 		</View>
 	);
 }
 
-const styles = StyleSheet.create({
-	wrap: {
-		position: 'absolute',
-		left: MAP_CHROME_H_INSET,
-		right: MAP_CHROME_H_INSET + WEATHER_WIDGET_WIDTH + MAP_CHROME_GAP,
-		zIndex: 23,
-	},
-	card: {
-		minHeight: WEATHER_WIDGET_HEIGHT,
-		backgroundColor: 'rgba(15, 20, 36, 0.94)',
-		borderWidth: 1,
-		borderColor: colors.borderStrong,
-		borderRadius: 16,
-		paddingVertical: 12,
-		paddingHorizontal: 14,
-		justifyContent: 'center',
-	},
-	headerBlock: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		gap: 10,
-		minHeight: 36,
-	},
-	headerTextCol: {
-		flex: 1,
-		minWidth: 0,
-		gap: 2,
-	},
-	heading: {
-		color: colors.primary,
-		fontSize: 15,
-		fontWeight: '700',
-	},
-	summary: {
-		color: colors.textMuted,
-		fontSize: 13,
-		fontWeight: '500',
-	},
-	row: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingVertical: 8,
-		gap: 8,
-	},
-	rowBorder: {
-		borderTopWidth: StyleSheet.hairlineWidth,
-		borderTopColor: colors.border,
-	},
-	dot: {
-		width: 8,
-		height: 8,
-		borderRadius: 4,
-	},
-	title: {
-		flex: 1,
-		color: colors.textPrimary,
-		fontSize: fontSize.sm,
-		fontWeight: '600',
-	},
-	distance: {
-		color: colors.textMuted,
-		fontSize: fontSize.xs,
-		fontWeight: '600',
-	},
-});
+function createStyles(colors: ThemeColors) {
+	return StyleSheet.create({
+		wrap: { position: 'absolute', left: MAP_CHROME_H_INSET, right: MAP_CHROME_H_INSET + WEATHER_WIDGET_WIDTH + MAP_CHROME_GAP, zIndex: 23 },
+		card: { minHeight: WEATHER_WIDGET_HEIGHT, backgroundColor: colors.surfaceRaised, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderSubtle, borderRadius: 16, paddingVertical: 8, paddingHorizontal: 12, justifyContent: 'center' },
+		headerBlock: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 38 },
+		headerTextCol: { flex: 1, minWidth: 0, gap: 2 },
+		headingRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+		heading: { color: colors.textPrimary, fontSize: 13, fontWeight: '800' },
+		summary: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
+		row: { flexDirection: 'row', alignItems: 'center', minHeight: 42, paddingVertical: 7, gap: 8 },
+		rowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderSubtle },
+		dot: { width: 8, height: 8, borderRadius: 4 },
+		title: { flex: 1, color: colors.textPrimary, fontSize: fontSize.sm, fontWeight: '600' },
+		distance: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: '600' },
+		pressed: { opacity: 0.72 },
+	});
+}
