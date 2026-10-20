@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -15,7 +15,7 @@ import type { ApiError, SuggestionCard } from '@g88/shared';
 import { getJson, postJson } from '@/api/client';
 import { Avatar } from '@/components/Avatar';
 import { MutualPreviewStack } from '@/features/friends/MutualPreviewStack';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 import { focusUserOnMap } from '@/navigation/focusUserOnMap';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -68,6 +68,8 @@ export function FriendsSuggestionsRail({
   onOpenProfile,
   hideWhenEmpty = true,
 }: Props): React.JSX.Element | null {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [items, setItems] = useState<SuggestionCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -317,109 +319,111 @@ export function FriendsSuggestionsRail({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-  },
-  seeAll: {
-    color: colors.primary,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-  },
-  feedback: {
-    color: colors.textMuted,
-    fontSize: 12,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.xs,
-  },
-  loadingRow: {
-    height: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  list: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.sm,
-  },
-  card: {
-    width: 112,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  dismissBtn: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    zIndex: 2,
-    padding: 2,
-  },
-  cardTap: { alignItems: 'center', width: '100%' },
-  avatarWrap: { marginBottom: 6 },
-  verifiedPip: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: 8,
-  },
-  name: {
-    color: colors.textPrimary,
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    textAlign: 'center',
-    maxWidth: 96,
-  },
-  reason: {
-    color: colors.textMuted,
-    fontSize: 10,
-    marginTop: 2,
-    textAlign: 'center',
-    maxWidth: 96,
-  },
-  previewWrap: {
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 6,
-  },
-  mapBtn: {
-    padding: 6,
-  },
-  addBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: colors.action,
-  },
-  addText: { color: colors.textPrimary, fontWeight: '700', fontSize: 11 },
-  ghostBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  ghostText: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrap: {
+      paddingTop: spacing.md,
+      paddingBottom: spacing.sm,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.sm,
+    },
+    title: {
+      color: colors.textPrimary,
+      fontSize: fontSize.sm,
+      fontWeight: '700',
+    },
+    seeAll: {
+      color: colors.primary,
+      fontSize: fontSize.sm,
+      fontWeight: '600',
+    },
+    feedback: {
+      color: colors.textMuted,
+      fontSize: 12,
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.xs,
+    },
+    loadingRow: {
+      height: 120,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    list: {
+      paddingHorizontal: spacing.lg,
+      gap: spacing.sm,
+    },
+    card: {
+      width: 112,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.sm,
+      paddingHorizontal: spacing.sm,
+      borderRadius: radius.md,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      alignItems: 'center',
+    },
+    dismissBtn: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      zIndex: 2,
+      padding: 2,
+    },
+    cardTap: { alignItems: 'center', width: '100%' },
+    avatarWrap: { marginBottom: 6 },
+    verifiedPip: {
+      position: 'absolute',
+      right: -2,
+      bottom: -2,
+      backgroundColor: colors.surfaceRaised,
+      borderRadius: 8,
+    },
+    name: {
+      color: colors.textPrimary,
+      fontSize: fontSize.xs,
+      fontWeight: '700',
+      textAlign: 'center',
+      maxWidth: 96,
+    },
+    reason: {
+      color: colors.textMuted,
+      fontSize: 10,
+      marginTop: 2,
+      textAlign: 'center',
+      maxWidth: 96,
+    },
+    previewWrap: {
+      marginTop: 4,
+      marginBottom: 4,
+    },
+    actionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 6,
+    },
+    mapBtn: {
+      padding: 6,
+    },
+    addBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+      backgroundColor: colors.action,
+    },
+    addText: { color: colors.onPrimary, fontWeight: '700', fontSize: 11 },
+    ghostBtn: {
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+    },
+    ghostText: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
+  });
+}
