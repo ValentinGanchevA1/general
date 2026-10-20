@@ -5,12 +5,12 @@ import type { FeedResponse, ActivityType } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { FeedService } from './feed.service';
+import { PulseDiscoveryFeedService } from './pulse-discovery-feed.service';
 
 @Controller('feed')
 @UseGuards(JwtAuthGuard)
 export class FeedController {
-  constructor(private readonly feed: FeedService) {}
+  constructor(private readonly feed: PulseDiscoveryFeedService) {}
 
   @Get()
   async list(
@@ -19,10 +19,19 @@ export class FeedController {
     @Query('types') types?: string,
     @Query('limit') limit?: string,
   ): Promise<FeedResponse> {
-    // 90d default so older chats/matches still surface in Pulse.
-    const sinceDate = since ? new Date(since) : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-    const typeList = (types ? types.split(',').filter(Boolean) : []) as ActivityType[];
+    // Pulse is a local-discovery surface. Personal activity belongs in Interactions.
+    const sinceDate = since ? new Date(since) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const requested = (types ? types.split(',').filter(Boolean) : []) as ActivityType[];
+    const pulseTypes: ActivityType[] = ['alert', 'listing', 'event'];
+    const typeList = requested.length > 0
+      ? requested.filter((type) => pulseTypes.includes(type))
+      : pulseTypes;
     const cap = Math.min(Number(limit ?? 50) || 50, 100);
+
+    if (requested.length > 0 && typeList.length === 0) {
+      return { items: [], nextSince: new Date().toISOString() };
+    }
+
     return this.feed.aggregate(userId, sinceDate, typeList, cap);
   }
 }
