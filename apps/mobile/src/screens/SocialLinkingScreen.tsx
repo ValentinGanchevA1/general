@@ -21,11 +21,13 @@ import { fetchProfile } from '@/features/profile/profileSlice';
 import { SOCIAL_PROVIDER_CONFIG } from '@/features/profile/socialConfig';
 import { extractMessage } from '@/utils/extractMessage';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { colors, fontSize, spacing, radius } from '@/theme';
+import { colors, fontSize, spacing, radius, useAppTheme } from '@/theme';
 
 const PROVIDERS = Object.keys(SOCIAL_PROVIDER_CONFIG) as SocialProvider[];
 
 export function SocialLinkingScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const dispatch = useAppDispatch();
   const links = useAppSelector((s) => s.profile.profile?.socialLinks ?? []);
   const [busy, setBusy] = useState<SocialProvider | null>(null);
@@ -77,7 +79,7 @@ export function SocialLinkingScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="Connected Accounts" />
 
       <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
