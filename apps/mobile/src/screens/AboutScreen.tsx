@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,11 +9,13 @@ import { APP_VERSION, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { ListRow } from '@/components/ListRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { NexaSymbol } from '@/components/Brand/NexaSymbol';
-import { colors, radius, spacing, useAppTheme } from '@/theme';
+import { radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
-function Feature({ icon, title, body }: { icon: string; title: string; body: string }): React.JSX.Element {
+type Styles = ReturnType<typeof createStyles>;
+
+function Feature({ icon, title, body, styles, colors }: { icon: string; title: string; body: string; styles: Styles; colors: ThemeColors }): React.JSX.Element {
   return (
     <View style={styles.feature}>
       <Icon name={icon} size={20} color={colors.primary} style={styles.featureIcon} />
@@ -26,8 +28,8 @@ function Feature({ icon, title, body }: { icon: string; title: string; body: str
 }
 
 export function AboutScreen(): React.JSX.Element {
-  const { colors: themeColors } = useAppTheme();
-
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation<Nav>();
 
   const openTerms = (): void => {
@@ -35,18 +37,13 @@ export function AboutScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
+    <View style={styles.container}>
       <ScreenHeader title="About" />
-
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.brand}>
-          <View style={styles.logo}>
-            <NexaSymbol size={60} />
-          </View>
+          <View style={styles.logo}><NexaSymbol size={60} /></View>
           <Text style={styles.appName}>NEXA</Text>
-          <Text style={styles.tagline}>
-            Live discovery for the world around you.
-          </Text>
+          <Text style={styles.tagline}>Live discovery for the world around you.</Text>
           <Text style={styles.version}>Version {APP_VERSION}</Text>
         </View>
 
@@ -58,146 +55,56 @@ export function AboutScreen(): React.JSX.Element {
 
         <Text style={styles.sectionTitle}>What you can do</Text>
         <View style={styles.featureGroup}>
-          <Feature
-            icon="map"
-            title="Map & discovery"
-            body="Live map of people, events, listings, and dating prefs. Filters, clusters, search, and presence while the app is open."
-          />
-          <Feature
-            icon="pulse"
-            title="Pulse"
-            body="Local activity hub: story rings plus waves, chats, and matches. Filter the feed and act from each card (Wave back, Message, View)."
-          />
-          <Feature
-            icon="circle-outline"
-            title="Stories"
-            body="24-hour posts for people nearby. Photo or short video. Reactions count toward mutual interest."
-          />
-          <Feature
-            icon="hand-wave"
-            title="Waves, chat & dating"
-            body="Lightweight signals first. Chat unlocks when interest is mutual. Dating likes and matches appear on Pulse and the map pin ladder."
-          />
-          <Feature
-            icon="account-group"
-            title="Friends"
-            body="Requests, suggestions, mutual friends, and optional online status for friends only. Unfriending keeps mutual follows unless you unfollow."
-          />
-          <Feature
-            icon="calendar-star"
-            title="Events"
-            body="Create and discover local events from the map. Message the host when listed."
-          />
-          <Feature
-            icon="storefront-outline"
-            title="Local trade"
-            body="Listings, wanted posts, offers and counters. Settlement stays offline — no in-app payments required."
-          />
-          <Feature
-            icon="shield-check"
-            title="Trust ladder"
-            body="Email → phone → ID review builds verification. Soft gates protect higher-stakes actions."
-          />
+          <Feature styles={styles} colors={colors} icon="map" title="Map & discovery" body="Live map of people, events, listings, and dating prefs. Filters, clusters, search, and presence while the app is open." />
+          <Feature styles={styles} colors={colors} icon="pulse" title="Pulse" body="Local activity hub: story rings plus waves, chats, and matches. Filter the feed and act from each card (Wave back, Message, View)." />
+          <Feature styles={styles} colors={colors} icon="circle-outline" title="Stories" body="24-hour posts for people nearby. Photo or short video. Reactions count toward mutual interest." />
+          <Feature styles={styles} colors={colors} icon="hand-wave" title="Waves, chat & dating" body="Lightweight signals first. Chat unlocks when interest is mutual. Dating likes and matches appear on Pulse and the map pin ladder." />
+          <Feature styles={styles} colors={colors} icon="account-group" title="Friends" body="Requests, suggestions, mutual friends, and optional online status for friends only. Unfriending keeps mutual follows unless you unfollow." />
+          <Feature styles={styles} colors={colors} icon="calendar-star" title="Events" body="Create and discover local events from the map. Message the host when listed." />
+          <Feature styles={styles} colors={colors} icon="storefront-outline" title="Local trade" body="Listings, wanted posts, offers and counters. Settlement stays offline — no in-app payments required." />
+          <Feature styles={styles} colors={colors} icon="shield-check" title="Trust ladder" body="Email → phone → ID review builds verification. Soft gates protect higher-stakes actions." />
         </View>
 
         <Text style={styles.sectionTitle}>Legal</Text>
         <View style={styles.group}>
-          <ListRow
-            variant="inset"
-            icon="file-document-outline"
-            title="Terms of Service"
-            onPress={openTerms}
-            trailing={<Icon name="open-in-new" size={18} color={colors.textFaint} />}
-          />
-          <ListRow
-            variant="inset"
-            icon="shield-lock"
-            title="Privacy"
-            onPress={() => navigation.navigate('Privacy')}
-          />
-          <ListRow
-            variant="inset"
-            last
-            icon="help-circle"
-            title="Help & Support"
-            onPress={() => navigation.navigate('Help')}
-          />
+          <ListRow variant="inset" icon="file-document-outline" title="Terms of Service" onPress={openTerms} trailing={<Icon name="open-in-new" size={18} color={colors.textFaint} />} />
+          <ListRow variant="inset" icon="shield-lock" title="Privacy" onPress={() => navigation.navigate('Privacy')} />
+          <ListRow variant="inset" last icon="help-circle" title="Help & Support" onPress={() => navigation.navigate('Help')} />
         </View>
 
-        <Text style={styles.copyright}>
-          © {new Date().getFullYear()} NEXA. All rights reserved.
-        </Text>
+        <Text style={styles.copyright}>© {new Date().getFullYear()} NEXA. All rights reserved.</Text>
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  body: { padding: spacing.xxl, paddingBottom: 48 },
-  brand: { alignItems: 'center', marginTop: spacing.md, marginBottom: 28 },
-  logo: {
-    width: 84,
-    height: 84,
-    borderRadius: 22,
-    backgroundColor: 'rgba(39,211,242,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(39,211,242,0.18)',
-  },
-  appName: {
-    color: colors.textPrimary,
-    fontSize: 28,
-    fontWeight: '800',
-    marginTop: spacing.lg,
-    letterSpacing: 6,
-  },
-  tagline: {
-    color: colors.textMuted,
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 6,
-    maxWidth: 280,
-    lineHeight: 20,
-  },
-  version: { color: colors.textFaint, fontSize: 12, marginTop: 10 },
-  about: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 21,
-    marginBottom: spacing.xxl,
-  },
-  sectionTitle: {
-    color: colors.textFaint,
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: spacing.md,
-  },
-  featureGroup: { marginBottom: 28 },
-  feature: { flexDirection: 'row', marginBottom: spacing.lg },
-  featureIcon: { marginTop: 2, width: 28 },
-  featureText: { flex: 1 },
-  featureTitle: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  featureBody: { color: colors.textMuted, fontSize: 13, lineHeight: 18 },
-  group: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    overflow: 'hidden',
-  },
-  copyright: {
-    color: colors.textFaint,
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: spacing.xxl,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    body: { padding: spacing.xxl, paddingBottom: 48 },
+    brand: { alignItems: 'center', marginTop: spacing.md, marginBottom: 28 },
+    logo: {
+      width: 84,
+      height: 84,
+      borderRadius: 22,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    appName: { color: colors.textPrimary, fontSize: 28, fontWeight: '800', marginTop: spacing.lg, letterSpacing: 6 },
+    tagline: { color: colors.textMuted, fontSize: 14, textAlign: 'center', marginTop: 6, maxWidth: 280, lineHeight: 20 },
+    version: { color: colors.textFaint, fontSize: 12, marginTop: 10 },
+    about: { color: colors.textSecondary, fontSize: 14, lineHeight: 21, marginBottom: spacing.xxl },
+    sectionTitle: { color: colors.textFaint, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.md },
+    featureGroup: { marginBottom: 28 },
+    feature: { flexDirection: 'row', marginBottom: spacing.lg },
+    featureIcon: { marginTop: 2, width: 28 },
+    featureText: { flex: 1 },
+    featureTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '600', marginBottom: 2 },
+    featureBody: { color: colors.textMuted, fontSize: 13, lineHeight: 18 },
+    group: { backgroundColor: colors.surfaceAlt, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderStrong, overflow: 'hidden' },
+    copyright: { color: colors.textFaint, fontSize: 12, textAlign: 'center', marginTop: spacing.xxl },
+  });
+}
