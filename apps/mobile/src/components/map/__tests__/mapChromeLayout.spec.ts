@@ -39,7 +39,15 @@ describe('mapChromeLayout', () => {
     expect(mapBadgeTop(insetsTop, false, BOTH)).toBe(weather);
   });
 
-  it('places challenge below the weather row', () => {
+  it('docks trending on the same row as weather regardless of optional cards', () => {
+    const weather = mapWeatherTop(insetsTop, false, BOTH);
+    expect(mapTrendingTop(insetsTop, false, NONE)).toBe(weather);
+    expect(mapTrendingTop(insetsTop, false, CHALLENGE_ONLY)).toBe(weather);
+    expect(mapTrendingTop(insetsTop, false, NUDGE_ONLY)).toBe(weather);
+    expect(mapTrendingTop(insetsTop, false, BOTH)).toBe(weather);
+  });
+
+  it('places challenge below the shared trending/weather row', () => {
     const weather = mapWeatherTop(insetsTop, false, BOTH);
     expect(mapChallengeTop(insetsTop)).toBe(
       weather + WEATHER_WIDGET_HEIGHT + MAP_CHROME_GAP,
@@ -54,30 +62,12 @@ describe('mapChromeLayout', () => {
     expect(mapNudgeTop(insetsTop, NUDGE_ONLY)).toBe(challenge);
   });
 
-  it('places trending after visible supporting cards', () => {
-    const base = mapChallengeTop(insetsTop);
-    expect(mapTrendingTop(insetsTop, false, NONE)).toBe(base);
-    expect(mapTrendingTop(insetsTop, false, CHALLENGE_ONLY)).toBe(
-      base + CHALLENGE_CARD_HEIGHT + MAP_CHROME_GAP,
-    );
-    expect(mapTrendingTop(insetsTop, false, NUDGE_ONLY)).toBe(
-      base + NUDGE_CARD_HEIGHT + MAP_CHROME_GAP,
-    );
-    expect(mapTrendingTop(insetsTop, false, BOTH)).toBe(
-      base +
-        CHALLENGE_CARD_HEIGHT +
-        MAP_CHROME_GAP +
-        NUDGE_CARD_HEIGHT +
-        MAP_CHROME_GAP,
-    );
-  });
-
-  it('mapChromeTops keeps primary controls ahead of supporting chrome', () => {
+  it('mapChromeTops exposes trending and weather as horizontal peers', () => {
     const tops = mapChromeTops(insetsTop, false, BOTH);
     expect(tops.filterRow).toBeLessThan(tops.weather);
+    expect(tops.trending).toBe(tops.weather);
     expect(tops.weather).toBeLessThan(tops.challenge);
     expect(tops.challenge).toBeLessThan(tops.nudge);
-    expect(tops.nudge).toBeLessThan(tops.trending);
   });
 
   it('mapFabBottom adds safe area and optional offset', () => {
