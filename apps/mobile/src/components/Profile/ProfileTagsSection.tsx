@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
-import { colors, spacing, radius } from '@/theme';
+import { spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
 
 interface Props {
   interests?: string[];
@@ -19,6 +19,9 @@ export function ProfileTagsSection({
   goalsTitle = 'Looking for',
   padded = true,
 }: Props): React.JSX.Element | null {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   if (interests.length === 0 && goals.length === 0) return null;
   return (
     <>
@@ -54,32 +57,34 @@ export function ProfileTagsSection({
   );
 }
 
-const styles = StyleSheet.create({
-  section: { marginTop: spacing.lg },
-  padded: { paddingHorizontal: spacing.xl },
-  sectionTitle: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: spacing.sm,
-  },
-  tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: {
-    backgroundColor: colors.surfaceRaised,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-  },
-  tagText: { color: colors.textPrimary, fontSize: 14 },
-  goalTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceRaised,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: radius.pill,
-    gap: 8,
-  },
-  goalIcon: { fontSize: 16 },
-  goalText: { color: colors.textPrimary, fontSize: 14, fontWeight: '500' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    section: { marginTop: spacing.lg },
+    padded: { paddingHorizontal: spacing.xl },
+    sectionTitle: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '700',
+      marginBottom: spacing.sm,
+    },
+    tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    tag: {
+      backgroundColor: colors.surfaceRaised,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: radius.pill,
+    },
+    tagText: { color: colors.textPrimary, fontSize: 14 },
+    goalTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceRaised,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: radius.pill,
+      gap: 8,
+    },
+    goalIcon: { fontSize: 16 },
+    goalText: { color: colors.textPrimary, fontSize: 14, fontWeight: '500' },
+  });
+}
