@@ -1,4 +1,4 @@
-// Top-of-map supporting chrome: weather/clock, challenge, nudge + location recovery.
+// Top-of-map supporting chrome: weather/clock + one prioritized secondary prompt.
 // The primary filter/recenter row is owned by MapScreen and always stays above this stack.
 // Interactions is owned by the canonical bottom tab, so no duplicate floating entry lives here.
 
@@ -15,7 +15,6 @@ import { WeatherClockWidget } from '@/features/weather/WeatherClockWidget';
 import {
 	MAP_CHROME_H_INSET,
 	mapChallengeTop,
-	mapNudgeTop,
 	mapWeatherTop,
 	type MapTopStackVisibility,
 } from './mapChromeLayout';
@@ -27,7 +26,7 @@ interface Props {
 	interactionUnread: number;
 	/** Retained for caller compatibility; Interactions is bottom-tab only. */
 	onPressInteractions: () => void;
-	/** Actual mount state of supporting cards (from MapScreen). */
+	/** Available supporting prompts. Nudge has priority over challenge. */
 	topStack: MapTopStackVisibility;
 	/** Session dismiss for daily challenge (shared with layout math). */
 	onDismissChallenge: () => void;
@@ -41,8 +40,9 @@ export function MapChrome({
 	const insets = useSafeAreaInsets();
 	const { coords, permissionDenied, requestPermission } = useUserLocation();
 	const weatherTop = mapWeatherTop(insets.top, sheetOpen, topStack);
-	const challengeTop = mapChallengeTop(insets.top);
-	const nudgeTop = mapNudgeTop(insets.top, topStack);
+	const secondaryTop = mapChallengeTop(insets.top);
+	const showNudge = topStack.nudgeVisible;
+	const showChallenge = !showNudge && topStack.challengeVisible;
 
 	return (
 		<>
@@ -60,11 +60,11 @@ export function MapChrome({
 				/>
 			) : null}
 
-			{!sheetOpen && !permissionDenied && topStack.challengeVisible ? (
-				<DailyChallengeCard top={challengeTop} onDismiss={onDismissChallenge} />
+			{!sheetOpen && !permissionDenied && showNudge ? (
+				<NudgeBanner top={secondaryTop} />
 			) : null}
-			{!sheetOpen && !permissionDenied && topStack.nudgeVisible ? (
-				<NudgeBanner top={nudgeTop} />
+			{!sheetOpen && !permissionDenied && showChallenge ? (
+				<DailyChallengeCard top={secondaryTop} onDismiss={onDismissChallenge} />
 			) : null}
 		</>
 	);
