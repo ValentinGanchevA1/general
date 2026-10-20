@@ -65,6 +65,14 @@ export function aggregatedSignalLabel(primary: InboxItem, count: number): string
   } else if (primary.type === 'gift') {
     const gift = primary.gift;
     base = gift ? `sent you ${gift.emoji} ${gift.label}` : 'sent you a gift';
+  } else if (primary.type === 'notification') {
+    if (primary.notification?.kind === 'friend_accepted') {
+      base = 'accepted your friend request';
+    } else if (primary.notification?.kind === 'mention') {
+      base = 'mentioned you';
+    } else {
+      base = 'sent you an update';
+    }
   } else if (primary.reactionKind === 'heart') {
     base = '❤️ reacted to your story';
   } else if (primary.reactionKind === 'wave') {
