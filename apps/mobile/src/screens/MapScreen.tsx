@@ -2,12 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
 	InteractionManager,
-	Pressable,
 	StyleSheet,
 	Text,
 	View,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { appAlert } from '@/ui/appAlert';
 import MapView, {
@@ -84,7 +82,6 @@ import { clearMapNewCount, setMapNewCount } from '@/features/map/mapNoveltySlice
 import { MapCreateNudgeBanner } from '@/features/map/MapCreateNudgeBanner';
 import { sheetChrome, useSheetBackdrop } from '@/components/sheets';
 import {
-	mapFabBottom,
 	mapFilterRowTop,
 	mapTrendingTop,
 	type MapTopStackVisibility,
@@ -663,21 +660,6 @@ export function MapScreen(): React.JSX.Element {
 		[challengeDismissed],
 	);
 
-	const onRecenter = useCallback(() => {
-		if (myCoords == null || mapRef.current == null) return;
-		const latitudeDelta = region?.latitudeDelta ?? 0.04;
-		const longitudeDelta = region?.longitudeDelta ?? 0.04;
-		mapRef.current.animateToRegion(
-			{
-				latitude: myCoords.lat,
-				longitude: myCoords.lng,
-				latitudeDelta,
-				longitudeDelta,
-			},
-			350,
-		);
-	}, [myCoords, region?.latitudeDelta, region?.longitudeDelta]);
-
 	const topStack = useMemo<MapTopStackVisibility>(
 		() => ({
 			challengeVisible:
@@ -941,17 +923,6 @@ export function MapScreen(): React.JSX.Element {
 				onSelect={onCreateNearbySelect}
 			/>
 
-			{myCoords ? (
-				<Pressable
-					style={[styles.recenterFab, { bottom: mapFabBottom(insets.bottom, sheetOpen ? 80 : 0) }]}
-					onPress={onRecenter}
-					accessibilityRole="button"
-					accessibilityLabel="Recenter map on my location"
-				>
-					<Icon name="crosshairs-gps" size={22} color={colors.textPrimary} />
-				</Pressable>
-			) : null}
-
 			<NearbyPeopleRail
 				points={filteredPoints}
 				visible={showNearbyPeopleRail}
@@ -1017,22 +988,6 @@ const styles = StyleSheet.create({
 		zIndex: 50,
 	},
 	toastText: { color: colors.textPrimary, fontWeight: '600' },
-	recenterFab: {
-		position: 'absolute',
-		right: 16,
-		width: 48,
-		height: 48,
-		borderRadius: 24,
-		backgroundColor: colors.surface,
-		alignItems: 'center',
-		justifyContent: 'center',
-		zIndex: 25,
-		shadowColor: colors.shadowInk,
-		shadowOpacity: 0.2,
-		shadowRadius: 6,
-		shadowOffset: { width: 0, height: 2 },
-		elevation: 4,
-	},
 	unavailable: {
 		flex: 1,
 		alignItems: 'center',
