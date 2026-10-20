@@ -15,7 +15,7 @@ import { resolveTrustNextStep } from '@g88/shared';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { useGamification } from '@/features/gamification/useGamification';
-import { colors } from '@/theme';
+import { darkColors, useAppTheme, type ThemeColors } from '@/theme';
 
 import {
   clearPostSocialActivation,
@@ -50,6 +50,8 @@ const VERIFY_PHONE_MIN_AGE_MS = 2 * DAY_MS;
 const VERIFY_ID_MIN_AGE_MS = 2 * DAY_MS;
 const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100, 180, 365];
 
+type NudgeColors = Pick<ThemeColors, 'primary' | 'entityEvent' | 'warning'>;
+
 function streakTitle(streak: number): string {
   if (streak >= 100) return `🔥 ${streak}-day streak — legendary!`;
   if (streak >= 30) return `🔥 ${streak}-day streak — incredible!`;
@@ -77,16 +79,19 @@ function accountAgeMs(createdAt: string | undefined, now: number): number {
   return Math.max(0, now - t);
 }
 
-export function selectNudge({
-  emailVerified,
-  phoneVerified,
-  idVerificationStatus: idStatus,
-  createdAt,
-  currentStreak,
-  dismissed,
-  now,
-  postSocial = null,
-}: NudgeInputs): Nudge | null {
+export function selectNudge(
+  {
+    emailVerified,
+    phoneVerified,
+    idVerificationStatus: idStatus,
+    createdAt,
+    currentStreak,
+    dismissed,
+    now,
+    postSocial = null,
+  }: NudgeInputs,
+  palette: NudgeColors = darkColors,
+): Nudge | null {
   const candidates: Nudge[] = [];
   const age = accountAgeMs(createdAt, now);
   const socialBoost = isPostSocialActive(postSocial, now);
@@ -111,7 +116,7 @@ export function selectNudge({
       return {
         id: 'verify-email',
         icon: 'email-check-outline',
-        accent: colors.primary,
+        accent: palette.primary,
         label: 'Trust',
         title: 'Verify your email to unlock stories and more reach',
         cta: 'Verify',
@@ -124,7 +129,7 @@ export function selectNudge({
       return {
         id: 'verify-phone',
         icon: 'cellphone-check',
-        accent: colors.primary,
+        accent: palette.primary,
         label: 'Trust',
         title: 'Add a verified phone for stronger identity on the map',
         cta: 'Add phone',
@@ -137,7 +142,7 @@ export function selectNudge({
     return {
       id: 'verify-id',
       icon: 'shield-alert',
-      accent: colors.entityEvent,
+      accent: palette.entityEvent,
       label: 'Verification',
       title: rejected
         ? 'Your ID was rejected — resubmit to get verified'
@@ -194,7 +199,7 @@ export function selectNudge({
     candidates.push({
       id: 'streak-milestone',
       icon: 'fire',
-      accent: colors.warning,
+      accent: palette.warning,
       label: 'Streak',
       title: streakTitle(currentStreak),
       cta: 'View',
@@ -226,6 +231,7 @@ interface UseNudgesResult {
 
 export function useNudges(): UseNudgesResult {
   const dispatch = useAppDispatch();
+  const { colors } = useAppTheme();
   const profile = useAppSelector((s) => s.profile.profile);
   const initialized = useAppSelector((s) => s.profile.initialized);
   const { summary } = useGamification();
@@ -283,16 +289,19 @@ export function useNudges(): UseNudgesResult {
     () =>
       now === 0
         ? null
-        : selectNudge({
-            emailVerified,
-            phoneVerified,
-            idVerificationStatus: idStatus,
-            createdAt,
-            currentStreak: summary?.currentStreak ?? 0,
-            dismissed,
-            now,
-            postSocial,
-          }),
+        : selectNudge(
+            {
+              emailVerified,
+              phoneVerified,
+              idVerificationStatus: idStatus,
+              createdAt,
+              currentStreak: summary?.currentStreak ?? 0,
+              dismissed,
+              now,
+              postSocial,
+            },
+            colors,
+          ),
     [
       emailVerified,
       phoneVerified,
@@ -302,6 +311,7 @@ export function useNudges(): UseNudgesResult {
       dismissed,
       now,
       postSocial,
+      colors,
     ],
   );
 
