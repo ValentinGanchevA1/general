@@ -42,7 +42,7 @@ function createStyles(colors: ThemeColors) {
     tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
     mainTag: { backgroundColor: colors.primary },
     mainTagText: { color: colors.onPrimary, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-    coverTag: { backgroundColor: colors.purple },
+    coverTag: { backgroundColor: colors.premiumTier },
     coverTagText: { color: colors.onPrimary, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
     addTile: { justifyContent: 'center', alignItems: 'center', gap: 6, borderWidth: 2, borderColor: colors.border, borderStyle: 'dashed' },
     addText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
