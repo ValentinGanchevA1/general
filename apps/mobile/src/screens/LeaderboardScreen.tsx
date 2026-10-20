@@ -15,7 +15,7 @@ import { WeeklyRibbon } from '@/features/gamification/WeeklyRibbon';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonListRow } from '@/components/Skeleton';
-import { colors } from '@/theme';
+import { colors, useAppTheme } from '@/theme';
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
@@ -52,6 +52,8 @@ function Row({ entry }: { entry: LeaderboardEntry }): React.JSX.Element {
 }
 
 export function LeaderboardScreen(): React.JSX.Element {
+  const { colors: themeColors } = useAppTheme();
+
   const [scope, setScope] = useState<LeaderboardScope>('weekly');
   const { page, loading, error, refresh } = useLeaderboard(scope);
 
@@ -60,7 +62,7 @@ export function LeaderboardScreen(): React.JSX.Element {
   const showErrorEmpty = error != null && page == null && !loading;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
       <ScreenHeader title="Leaderboard" />
 
       <View style={styles.tabs}>
