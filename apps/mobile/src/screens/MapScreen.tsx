@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+	AccessibilityInfo,
 	ActivityIndicator,
 	InteractionManager,
 	StyleSheet,
@@ -94,6 +95,12 @@ import {
 	subscribePendingOpenCreateNearby,
 } from '@/features/map/pendingCreateNearby';
 import { PinInteractionHost } from '@/components/map/PinInteractionHost';
+import {
+	NEXA_ENTITY_SHEET_SNAP_POINTS,
+	mapAnimationDuration,
+	nexaEntitySelectionKey,
+	regionForSelectedEntity,
+} from '@/components/map/nexaMapSheetChoreography';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
@@ -109,10 +116,13 @@ export function MapScreen(): React.JSX.Element {
 	const [region, setRegion] = useState<Region | null>(null);
 	const [selected, setSelected] = useState<EntityPoint | null>(null);
 	const [waveToast, setWaveToast] = useState<string | null>(null);
+	const [reduceMotion, setReduceMotion] = useState(false);
 	const mapRef = useRef<MapView>(null);
 	const entitySheetRef = useRef<BottomSheetModal>(null);
 	const presentedIdRef = useRef<string | null>(null);
-	const entitySnapPoints = useMemo(() => ['36%', '62%'], []);
+	const selectedPointRef = useRef<EntityPoint | null>(null);
+	const preSheetRegionRef = useRef<Region | null>(null);
+	const entitySnapPoints = useMemo(() => [...NEXA_ENTITY_SHEET_SNAP_POINTS], []);
 	const renderBackdrop = useSheetBackdrop(0.5);
 	const { unreadCount: interactionUnread } = useReceivedInteractions();
 
@@ -125,6 +135,21 @@ export function MapScreen(): React.JSX.Element {
 	const [searchQuery, setSearchQuery] = useState('');
 	const [trendingCollapsed, setTrendingCollapsed] = useState(true);
 	const insets = useSafeAreaInsets();
+
+	useEffect(() => {
+		let active = true;
+		void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+			if (active) setReduceMotion(enabled);
+		});
+		const subscription = AccessibilityInfo.addEventListener(
+			'reduceMotionChanged',
+			(enabled) => setReduceMotion(enabled),
+		);
+		return () => {
+			active = false;
+			subscription.remove();
+		};
+	}, []);
 
 	const viewerMode = datingOnly ? 'dating' : 'social';
 	const {
@@ -218,22 +243,27 @@ export function MapScreen(): React.JSX.Element {
 			focusMyPin: route.params?.focusMyPin === true,
 			...(route.params?.focusUserId != null ? { focusUserId: route.params.focusUserId } : {}),
 			...(route.params?.focusListingId != null
-				? { focusListingId: route.params.focusListingId }
-				: {}),
+				? { focusListingId: route.params.focusListingId } : {}),
 			...(route.params?.focusLat != null ? { focusLat: route.params.focusLat } : {}),
 			...(route.params?.focusLng != null ? { focusLng: route.params.focusLng } : {}),
 		},
 	});
 
 	const onSheetDismiss = useCallback(() => {
+		const restoreRegion = preSheetRegionRef.current;
 		presentedIdRef.current = null;
+		selectedPointRef.current = null;
 		setSelected(null);
 		if (suppressPinDismissRef.current) {
 			suppressPinDismissRef.current = false;
 			return;
 		}
+		preSheetRegionRef.current = null;
+		if (restoreRegion != null) {
+			mapRef.current?.animateToRegion(restoreRegion, reduceMotion ? 0 : 220);
+		}
 		dismissPinPreview();
-	}, [dismissPinPreview]);
+	}, [dismissPinPreview, reduceMotion]);
 
 	const closeSheet = useCallback(() => {
 		entitySheetRef.current?.dismiss();
@@ -241,6 +271,10 @@ export function MapScreen(): React.JSX.Element {
 
 	const presentEntitySheet = useCallback((point: EntityPoint) => {
 		const id = `${point.kind}:${point.id}`;
+		if (preSheetRegionRef.current == null && region != null) {
+			preSheetRegionRef.current = region;
+		}
+		selectedPointRef.current = point;
 		if (presentedIdRef.current !== id) {
 			presentedIdRef.current = null;
 		}
@@ -254,7 +288,21 @@ export function MapScreen(): React.JSX.Element {
 				presentedIdRef.current = null;
 			}
 		});
-	}, []);
+	}, [region]);
+
+	const onSheetChange = useCallback(
+		(index: number) => {
+			if (index < 0 || region == null) return;
+			const point = selectedPointRef.current;
+			if (point == null) return;
+			const target = regionForSelectedEntity(region, point, index);
+			mapRef.current?.animateToRegion(
+				target,
+				mapAnimationDuration(index, reduceMotion),
+			);
+		},
+		[region, reduceMotion],
+	);
 
 	const onSheetOpenFull = useCallback(
 		(focus?: 'trust' | 'stats' | 'storyline' | 'photos' | 'bio' | 'mutual') => {
@@ -365,9 +413,13 @@ export function MapScreen(): React.JSX.Element {
 	]);
 
 	useEffect(() => {
+		selectedPointRef.current = selected;
 		if (!selected) {
 			presentedIdRef.current = null;
 			return;
+		}
+		if (preSheetRegionRef.current == null && region != null) {
+			preSheetRegionRef.current = region;
 		}
 		const id = `${selected.kind}:${selected.id}`;
 		if (presentedIdRef.current === id) return;
@@ -381,7 +433,7 @@ export function MapScreen(): React.JSX.Element {
 			}
 		});
 		return () => task.cancel();
-	}, [selected]);
+	}, [selected, region]);
 
 	useEffect(() => {
 		dispatch(setPoints(points));
@@ -595,6 +647,11 @@ export function MapScreen(): React.JSX.Element {
 	}, [waveToast]);
 
 	const sheetOpen = selected != null || showPreview;
+	const selectedMarkerKey = useMemo(() => {
+		if (selected != null) return nexaEntitySelectionKey(selected);
+		if (showPreview && activePinId != null) return `user:${activePinId}`;
+		return null;
+	}, [selected, showPreview, activePinId]);
 	const isCityScale =
 		region != null &&
 		region.latitudeDelta > 0 &&
@@ -760,6 +817,8 @@ export function MapScreen(): React.JSX.Element {
 				>
 					<MapMarkers
 						points={filteredPoints}
+						selectedEntityKey={selectedMarkerKey}
+						dimUnselected={selected != null}
 						onEntityPress={onEntityPress}
 						onClusterPress={onClusterPress}
 					/>
@@ -851,7 +910,10 @@ export function MapScreen(): React.JSX.Element {
 				ref={entitySheetRef}
 				index={0}
 				snapPoints={entitySnapPoints}
+				enableDynamicSizing={false}
 				enablePanDownToClose
+				animateOnMount={!reduceMotion}
+				onChange={onSheetChange}
 				onDismiss={onSheetDismiss}
 				backdropComponent={renderBackdrop}
 				backgroundStyle={sheetChrome.background}
