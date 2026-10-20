@@ -11,7 +11,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { VerificationLevel } from '@g88/shared';
-import { colors } from '@/theme';
+import { useAppTheme } from '@/theme';
 
 interface Props {
   verification: VerificationLevel;
@@ -26,6 +26,8 @@ export function VerificationBadge({
   idVerified = false,
   size = 16,
 }: Props): React.JSX.Element | null {
+  const { colors } = useAppTheme();
+
   if (idVerified) {
     return (
       <Icon
@@ -51,7 +53,7 @@ export function VerificationBadge({
         ]}
         accessibilityLabel="Verified"
       >
-        <Text style={[styles.partialText, { fontSize: dim * 0.62 }]}>✓</Text>
+        <Text style={[styles.partialText, { color: colors.onPrimary, fontSize: dim * 0.62 }]}>✓</Text>
       </View>
     );
   }
@@ -60,5 +62,5 @@ export function VerificationBadge({
 
 const styles = StyleSheet.create({
   partial: { alignItems: 'center', justifyContent: 'center' },
-  partialText: { color: colors.onPrimary, fontWeight: '700' },
+  partialText: { fontWeight: '700' },
 });
