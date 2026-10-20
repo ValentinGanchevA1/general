@@ -74,5 +74,13 @@ export const PROTOS_NEXUS_MAP_STYLE = [
   { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3D8A99' }] },
 ];
 
-/** @deprecated Use a scheme/mode-specific map style. */
+export type MapAppearanceMode = 'light' | 'dark' | 'system' | 'protos-nexus';
+export type MapResolvedScheme = 'light' | 'dark';
+
+export function resolveMapStyle(mode: MapAppearanceMode, scheme: MapResolvedScheme) {
+  if (mode === 'protos-nexus') return PROTOS_NEXUS_MAP_STYLE;
+  return scheme === 'dark' ? DARK_MAP_STYLE : LIGHT_MAP_STYLE;
+}
+
+/** @deprecated Use resolveMapStyle for mode-aware map rendering. */
 export const MAP_STYLE = DARK_MAP_STYLE;
