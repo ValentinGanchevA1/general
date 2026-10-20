@@ -1,5 +1,5 @@
 // Shared layout math for map chrome (top controls + supporting cards).
-// Stack: filter row → weather/location → challenge → nudge → trending.
+// Stack: filter row → trending/weather row → challenge → nudge.
 // Primary map controls stay pinned directly under the safe area and are never
 // pushed down by optional challenge/nudge content.
 
@@ -81,7 +81,16 @@ export function mapBadgeTop(
 	return mapWeatherTop(insetsTop, sheetOpen, visibility);
 }
 
-/** Optional challenge content starts below the weather/location row. */
+/** Trending shares the same horizontal row as the weather/time widget. */
+export function mapTrendingTop(
+	insetsTop: number,
+	sheetOpen: boolean,
+	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
+): number {
+	return mapWeatherTop(insetsTop, sheetOpen, visibility);
+}
+
+/** Optional challenge content starts below the shared trending/weather row. */
 export function mapChallengeTop(insetsTop: number): number {
 	return (
 		mapFilterRowTop(insetsTop, false) +
@@ -103,22 +112,6 @@ export function mapNudgeTop(
 	return mapChallengeTop(insetsTop);
 }
 
-/** Trending follows the optional supporting-card stack. */
-export function mapTrendingTop(
-	insetsTop: number,
-	_sheetOpen: boolean,
-	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
-): number {
-	let y = mapChallengeTop(insetsTop);
-	if (visibility.challengeVisible) {
-		y += CHALLENGE_CARD_HEIGHT + MAP_CHROME_GAP;
-	}
-	if (visibility.nudgeVisible) {
-		y += NUDGE_CARD_HEIGHT + MAP_CHROME_GAP;
-	}
-	return y;
-}
-
 /** @deprecated Use mapFilterRowTop(insetsTop, sheetOpen, visibility). */
 export function mapSearchBarTop(insetsTop: number): number {
 	return mapFilterRowTop(insetsTop, false);
@@ -131,7 +124,7 @@ export function mapListingModeFilterTop(insetsTop: number): number {
 
 /** @deprecated Use mapTrendingTop(insetsTop, sheetOpen, visibility). */
 export function mapTrendingCardTop(insetsTop: number): number {
-	return mapListingModeFilterTop(insetsTop) + LISTING_MODE_FILTER_HEIGHT + MAP_CHROME_GAP;
+	return mapTrendingTop(insetsTop, false);
 }
 
 export function mapChromeTops(
