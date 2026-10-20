@@ -1,22 +1,10 @@
 // apps/mobile/src/screens/ListingCreateScreen.tsx
-//
-// P3.7 listing creation. Dependency-free inputs + a draggable map pin for the
-// item location (react-native-maps, already a dep). No payment fields — price is
-// just a number; settlement is offline (offer-based v1).
-// Supports mode: 'sell' | 'buy' from route params (Create nearby sheet).
+// P3.7 listing creation. Supports mode: 'sell' | 'buy' from route params.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-	ActivityIndicator,
-	Image,
-	KeyboardAvoidingView,
-	Platform,
-	ScrollView,
-	StyleSheet,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	View,
+  ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
+  Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, type LatLng as RNLatLng } from 'react-native-maps';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -32,309 +20,155 @@ import { createListing } from '@/features/trading/useTrading';
 import { pickAndUploadListingImage } from '@/features/trading/listingImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
-import { colors, useAppTheme } from '@/theme';
+import { useAppTheme, type ThemeColors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<CommerceStackParamList>;
 type R = RouteProp<CommerceStackParamList, 'ListingCreate'>;
+type Styles = ReturnType<typeof createStyles>;
 
 const FALLBACK: LatLng = { lat: 43.21, lng: 27.92 };
 const CATEGORIES = ['Electronics', 'Furniture', 'Clothing', 'Sports', 'Home', 'Books', 'Other'] as const;
-/** Local marketplace (Varna): EUR only. */
 const DEFAULT_CURRENCY = 'EUR';
 
 export function ListingCreateScreen(): React.JSX.Element {
-	const { colors: themeColors } = useAppTheme();
+  const { colors } = useAppTheme();
+  const S = useMemo(() => createStyles(colors), [colors]);
+  const nav = useNavigation<Nav>();
+  const route = useRoute<R>();
+  const { coords } = useUserLocation();
+  const mapRef = useRef<MapView>(null);
+  const hasCentered = useRef(false);
+  const priceRef = useRef<TextInput>(null);
+  const descriptionRef = useRef<TextInput>(null);
+  const mode = route.params?.mode === 'buy' ? 'buy' : 'sell';
+  const initialLocation = route.params?.initialLocation;
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [price, setPrice] = useState('');
+  const [currency] = useState<string>(DEFAULT_CURRENCY);
+  const [category, setCategory] = useState<string>(mode === 'buy' ? 'Other' : 'Electronics');
+  const [pin, setPin] = useState<LatLng | null>(initialLocation ?? null);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-	const nav = useNavigation<Nav>();
-	const route = useRoute<R>();
-	const { coords } = useUserLocation();
-	const mapRef = useRef<MapView>(null);
-	const hasCentered = useRef(false);
-	const priceRef = useRef<TextInput>(null);
-	const descriptionRef = useRef<TextInput>(null);
+  const venue = pin ?? coords ?? FALLBACK;
+  const priceCents = useMemo(() => {
+    const n = parseFloat(price);
+    return Number.isNaN(n) ? NaN : Math.round(n * 100);
+  }, [price]);
+  const canSubmit = title.trim().length > 0 && !Number.isNaN(priceCents) && priceCents >= 0 && !submitting && !uploading;
 
-	const mode = route.params?.mode === 'buy' ? 'buy' : 'sell';
-	const initialLocation = route.params?.initialLocation;
+  const onPickPhoto = useCallback(async () => {
+    setUploading(true); setError(null);
+    try { const url = await pickAndUploadListingImage(); if (url) setThumbnailUrl(url); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Could not upload that photo. Please try again.'); }
+    finally { setUploading(false); }
+  }, []);
 
-	const [title, setTitle] = useState('');
-	const [description, setDescription] = useState('');
-	const [price, setPrice] = useState('');
-	const [currency] = useState<string>(DEFAULT_CURRENCY);
-	const [category, setCategory] = useState<string>(mode === 'buy' ? 'Other' : 'Electronics');
-	const [pin, setPin] = useState<LatLng | null>(initialLocation ?? null);
-	const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-	const [uploading, setUploading] = useState(false);
-	const [submitting, setSubmitting] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+  const onSubmit = useCallback(async () => {
+    if (!canSubmit) return;
+    setSubmitting(true); setError(null);
+    try {
+      const req: CreateListingRequest = {
+        title: title.trim(), priceCents, currency, category, location: venue, mode,
+        ...(description.trim() ? { description: description.trim() } : {}),
+        ...(thumbnailUrl ? { thumbnailUrl } : {}),
+      };
+      const created = await createListing(req);
+      setPendingMapFocus({
+        listingId: created.id, lat: created.location.lat, lng: created.location.lng, title: created.title,
+        mode: created.mode, priceCents: created.priceCents, currency: created.currency,
+        category: created.category, thumbnailUrl: created.thumbnailUrl,
+      });
+      const root = nav.getParent();
+      if (root) {
+        root.navigate({ name: 'Main', params: { screen: 'Map', params: {
+          focusListingId: created.id, focusLat: created.location.lat, focusLng: created.location.lng,
+        }, merge: true }, merge: true } as never);
+      } else nav.replace('ListingDetail', { listingId: created.id });
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not create the listing. Please try again.'); }
+    finally { setSubmitting(false); }
+  }, [canSubmit, title, priceCents, currency, category, venue, mode, description, thumbnailUrl, nav]);
 
-	const venue = pin ?? coords ?? FALLBACK;
-	const priceCents = useMemo(() => {
-		const n = parseFloat(price);
-		return Number.isNaN(n) ? NaN : Math.round(n * 100);
-	}, [price]);
+  const onDragEnd = useCallback((c: RNLatLng) => setPin({ lat: c.latitude, lng: c.longitude }), []);
+  useEffect(() => {
+    const target = initialLocation ?? coords;
+    if (target && !hasCentered.current) {
+      hasCentered.current = true;
+      mapRef.current?.animateToRegion({ latitude: target.lat, longitude: target.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 400);
+    }
+  }, [coords, initialLocation]);
 
-	const canSubmit =
-		title.trim().length > 0 && !Number.isNaN(priceCents) && priceCents >= 0 && !submitting && !uploading;
+  const headerTitle = mode === 'buy' ? 'Looking to buy' : 'Sell an item';
+  const titlePlaceholder = mode === 'buy' ? 'What are you looking for?' : 'What are you selling?';
+  const submitLabel = mode === 'buy' ? 'Post' : 'List';
 
-	const onPickPhoto = useCallback(async () => {
-		setUploading(true);
-		setError(null);
-		try {
-			const url = await pickAndUploadListingImage();
-			if (url) setThumbnailUrl(url);
-		} catch (err) {
-			setError(err instanceof Error ? err.message : 'Could not upload that photo. Please try again.');
-		} finally {
-			setUploading(false);
-		}
-	}, []);
+  return (
+    <KeyboardAvoidingView style={S.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScreenHeader title={headerTitle} bordered right={
+        <TouchableOpacity onPress={() => void onSubmit()} disabled={!canSubmit} hitSlop={8} accessibilityRole="button" accessibilityLabel={submitLabel}>
+          {submitting ? <ActivityIndicator size="small" color={colors.primary} /> : <Text style={[S.create, !canSubmit && S.createDisabled]}>{submitLabel}</Text>}
+        </TouchableOpacity>
+      } />
+      <ScrollView style={S.scroll} contentContainerStyle={S.content} keyboardShouldPersistTaps="handled">
+        <Text style={S.label}>Photo <Text style={S.optional}>(optional)</Text></Text>
+        <TouchableOpacity style={S.photoWrap} onPress={() => void onPickPhoto()} disabled={uploading} activeOpacity={0.8}>
+          {thumbnailUrl ? <>
+            <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            {!uploading ? <View style={S.photoEditBadge}><Icon name="camera" size={14} color="#FFFFFF" /><Text style={S.photoEditText}>Change</Text></View> : null}
+          </> : !uploading ? <View style={S.photoEmpty}><Icon name="camera-plus-outline" size={28} color={colors.primary} /><Text style={S.photoEmptyText}>Add a photo</Text></View> : null}
+          {uploading ? <View style={S.photoUploading}><ActivityIndicator color="#FFFFFF" /><Text style={S.photoOverlayText}>Uploading…</Text></View> : null}
+        </TouchableOpacity>
 
-	const onSubmit = useCallback(async () => {
-		if (!canSubmit) return;
-		setSubmitting(true);
-		setError(null);
-		try {
-			const req: CreateListingRequest = {
-				title: title.trim(),
-				priceCents,
-				currency,
-				category,
-				location: venue,
-				mode,
-				...(description.trim() ? { description: description.trim() } : {}),
-				...(thumbnailUrl ? { thumbnailUrl } : {}),
-			};
-			const created = await createListing(req);
-			setPendingMapFocus({
-				listingId: created.id,
-				lat: created.location.lat,
-				lng: created.location.lng,
-				title: created.title,
-				mode: created.mode,
-				priceCents: created.priceCents,
-				currency: created.currency,
-				category: created.category,
-				thumbnailUrl: created.thumbnailUrl,
-			});
-			const root = nav.getParent();
-			if (root) {
-				root.navigate({
-					name: 'Main',
-					params: {
-						screen: 'Map',
-						params: {
-							focusListingId: created.id,
-							focusLat: created.location.lat,
-							focusLng: created.location.lng,
-						},
-						merge: true,
-					},
-					merge: true,
-				} as never);
-			} else {
-				nav.replace('ListingDetail', { listingId: created.id });
-			}
-		} catch (err) {
-			setError(err instanceof Error ? err.message : 'Could not create the listing. Please try again.');
-		} finally {
-			setSubmitting(false);
-		}
-	}, [canSubmit, title, priceCents, currency, category, venue, description, thumbnailUrl, nav, mode]);
-
-	const onDragEnd = useCallback((c: RNLatLng) => setPin({ lat: c.latitude, lng: c.longitude }), []);
-
-	useEffect(() => {
-		const target = initialLocation ?? coords;
-		if (target && !hasCentered.current) {
-			hasCentered.current = true;
-			mapRef.current?.animateToRegion(
-				{ latitude: target.lat, longitude: target.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
-				400,
-			);
-		}
-	}, [coords, initialLocation]);
-
-	const headerTitle = mode === 'buy' ? 'Looking to buy' : 'Sell an item';
-	const titlePlaceholder = mode === 'buy' ? 'What are you looking for?' : 'What are you selling?';
-	const submitLabel = mode === 'buy' ? 'Post' : 'List';
-
-	return (
-		<KeyboardAvoidingView style={[S.root, { backgroundColor: themeColors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-			<ScreenHeader
-				title={headerTitle}
-				right={
-					<TouchableOpacity onPress={() => void onSubmit()} disabled={!canSubmit} hitSlop={8} accessibilityRole="button" accessibilityLabel={submitLabel}>
-						{submitting ? (
-							<ActivityIndicator size="small" color={colors.primary} />
-						) : (
-							<Text style={[S.create, !canSubmit && S.createDisabled]}>{submitLabel}</Text>
-						)}
-					</TouchableOpacity>
-				}
-				bordered
-			/>
-
-			<ScrollView style={S.scroll} contentContainerStyle={S.content} keyboardShouldPersistTaps="handled">
-				<Text style={S.label}>Photo <Text style={S.optional}>(optional)</Text></Text>
-				<TouchableOpacity style={S.photoWrap} onPress={() => void onPickPhoto()} disabled={uploading} activeOpacity={0.8}>
-					{thumbnailUrl ? (
-						<>
-							<Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-							{!uploading ? (
-								<View style={S.photoEditBadge}>
-									<Icon name="camera" size={14} color={colors.textPrimary} />
-									<Text style={S.photoEditText}>Change</Text>
-								</View>
-							) : null}
-						</>
-					) : (
-						!uploading && (
-							<View style={S.photoEmpty}>
-								<Icon name="camera-plus-outline" size={28} color={colors.primary} />
-								<Text style={S.photoEmptyText}>Add a photo</Text>
-							</View>
-						)
-					)}
-					{uploading ? (
-						<View style={S.photoUploading}>
-							<ActivityIndicator color={colors.primary} />
-							<Text style={S.photoEmptyText}>Uploading…</Text>
-						</View>
-					) : null}
-				</TouchableOpacity>
-
-				<FormField
-					label="Title"
-					placeholder={titlePlaceholder}
-					value={title}
-					onChangeText={setTitle}
-					maxLength={LISTING_LIMITS.titleMax}
-					autoFocus
-					returnKeyType="next"
-					onSubmitEditing={() => priceRef.current?.focus()}
-					testID="listing-create-title"
-				/>
-
-				<Text style={S.label}>{mode === 'buy' ? 'Budget' : 'Price'}</Text>
-				<View style={S.priceRow}>
-					<TextInput
-						ref={priceRef}
-						style={[S.input, { flex: 1 }]}
-						placeholder="0.00"
-						placeholderTextColor={colors.textFaint}
-						value={price}
-						onChangeText={(t) => setPrice(t.replace(/[^0-9.]/g, ''))}
-						keyboardType="decimal-pad"
-						returnKeyType="next"
-						onSubmitEditing={() => descriptionRef.current?.focus()}
-						testID="listing-create-price"
-					/>
-					<View style={S.currencyBadge}>
-						<Text style={S.currencyBadgeText}>{currency}</Text>
-					</View>
-				</View>
-
-				<Text style={S.label}>Category</Text>
-				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.chips}>
-					{CATEGORIES.map((c) => (
-						<Chip key={c} active={c === category} label={c} onPress={() => setCategory(c)} />
-					))}
-				</ScrollView>
-
-				<FormField
-					ref={descriptionRef}
-					label="Description (optional)"
-					placeholder={mode === 'buy' ? 'Condition, preferred pickup, details…' : 'Condition, details, pickup notes…'}
-					value={description}
-					onChangeText={setDescription}
-					maxLength={LISTING_LIMITS.descriptionMax}
-					multiline
-					textAlignVertical="top"
-					style={S.multiline}
-					testID="listing-create-description"
-				/>
-
-				<Text style={S.label}>Location <Text style={S.optional}>(drag the pin)</Text></Text>
-				<View style={S.mapWrap}>
-					<MapView ref={mapRef} provider={PROVIDER_GOOGLE} style={StyleSheet.absoluteFill} initialRegion={{ latitude: venue.lat, longitude: venue.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 }}>
-						<Marker draggable coordinate={{ latitude: venue.lat, longitude: venue.lng }} onDragEnd={(e) => onDragEnd(e.nativeEvent.coordinate)} />
-					</MapView>
-				</View>
-
-				{error ? (
-					<View style={S.errorBox}>
-						<Icon name="alert-circle-outline" size={16} color={colors.danger} style={{ marginRight: 8 }} />
-						<Text style={S.errorText}>{error}</Text>
-					</View>
-				) : null}
-			</ScrollView>
-		</KeyboardAvoidingView>
-	);
+        <FormField label="Title" placeholder={titlePlaceholder} value={title} onChangeText={setTitle} maxLength={LISTING_LIMITS.titleMax} autoFocus returnKeyType="next" onSubmitEditing={() => priceRef.current?.focus()} testID="listing-create-title" />
+        <Text style={S.label}>{mode === 'buy' ? 'Budget' : 'Price'}</Text>
+        <View style={S.priceRow}>
+          <TextInput ref={priceRef} style={[S.input, { flex: 1 }]} placeholder="0.00" placeholderTextColor={colors.textFaint} value={price} onChangeText={(t) => setPrice(t.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" returnKeyType="next" onSubmitEditing={() => descriptionRef.current?.focus()} testID="listing-create-price" />
+          <View style={S.currencyBadge}><Text style={S.currencyBadgeText}>{currency}</Text></View>
+        </View>
+        <Text style={S.label}>Category</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.chips}>
+          {CATEGORIES.map((c) => <Chip key={c} active={c === category} label={c} onPress={() => setCategory(c)} styles={S} />)}
+        </ScrollView>
+        <FormField ref={descriptionRef} label="Description (optional)" placeholder={mode === 'buy' ? 'Condition, preferred pickup, details…' : 'Condition, details, pickup notes…'} value={description} onChangeText={setDescription} maxLength={LISTING_LIMITS.descriptionMax} multiline textAlignVertical="top" style={S.multiline} testID="listing-create-description" />
+        <Text style={S.label}>Location <Text style={S.optional}>(drag the pin)</Text></Text>
+        <View style={S.mapWrap}>
+          <MapView ref={mapRef} provider={PROVIDER_GOOGLE} style={StyleSheet.absoluteFill} initialRegion={{ latitude: venue.lat, longitude: venue.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 }}>
+            <Marker draggable coordinate={{ latitude: venue.lat, longitude: venue.lng }} onDragEnd={(e) => onDragEnd(e.nativeEvent.coordinate)} />
+          </MapView>
+        </View>
+        {error ? <View style={S.errorBox}><Icon name="alert-circle-outline" size={16} color={colors.danger} style={{ marginRight: 8 }} /><Text style={S.errorText}>{error}</Text></View> : null}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
 }
 
-function Chip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }): React.JSX.Element {
-	return (
-		<TouchableOpacity style={[S.chip, active && S.chipActive]} onPress={onPress}>
-			<Text style={[S.chipText, active && S.chipTextActive]}>{label}</Text>
-		</TouchableOpacity>
-	);
+function Chip({ active, label, onPress, styles }: { active: boolean; label: string; onPress: () => void; styles: Styles }): React.JSX.Element {
+  return <TouchableOpacity style={[styles.chip, active && styles.chipActive]} onPress={onPress}><Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text></TouchableOpacity>;
 }
 
-const S = StyleSheet.create({
-	root: { flex: 1, backgroundColor: colors.bg },
-	create: { color: colors.primary, fontSize: 16, fontWeight: '700' },
-	createDisabled: { color: colors.borderStrong },
-	scroll: { flex: 1 },
-	content: { padding: 16, paddingBottom: 48 },
-	label: { color: colors.textSecondary, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 18, marginBottom: 8 },
-	optional: { color: colors.textFaint, textTransform: 'none', fontWeight: '400' },
-	input: {
-		backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-		borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: colors.textPrimary, fontSize: 16,
-	},
-	multiline: { minHeight: 90 },
-	photoWrap: {
-		height: 160, borderRadius: 12, overflow: 'hidden',
-		backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-		alignItems: 'center', justifyContent: 'center',
-	},
-	photoEmpty: { alignItems: 'center', gap: 8 },
-	photoEmptyText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
-	photoUploading: {
-		...StyleSheet.absoluteFillObject,
-		alignItems: 'center', justifyContent: 'center', gap: 8,
-		backgroundColor: 'rgba(10,10,15,0.55)',
-	},
-	photoEditBadge: {
-		position: 'absolute', right: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 6,
-		backgroundColor: 'rgba(10,10,15,0.7)', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7,
-	},
-	photoEditText: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
-	priceRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-	currencyBadge: {
-		paddingHorizontal: 14,
-		paddingVertical: 12,
-		borderRadius: 12,
-		backgroundColor: colors.surface,
-		borderWidth: 1,
-		borderColor: colors.borderStrong,
-		minWidth: 56,
-		alignItems: 'center',
-	},
-	currencyBadgeText: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
-	chips: { gap: 8, paddingRight: 8 },
-	chip: {
-		paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20,
-		backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderStrong,
-	},
-	chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-	chipText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
-	chipTextActive: { color: colors.onPrimary },
-	mapWrap: { height: 180, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
-	errorBox: {
-		flexDirection: 'row', alignItems: 'center',
-		backgroundColor: 'rgba(255,107,107,0.1)', borderWidth: 1, borderColor: 'rgba(255,107,107,0.3)',
-		borderRadius: 10, padding: 12, marginTop: 16,
-	},
-	errorText: { color: colors.danger, fontSize: 14, flex: 1 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bg }, create: { color: colors.primary, fontSize: 16, fontWeight: '700' }, createDisabled: { color: colors.borderStrong },
+    scroll: { flex: 1 }, content: { padding: 16, paddingBottom: 48 },
+    label: { color: colors.textSecondary, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 18, marginBottom: 8 },
+    optional: { color: colors.textFaint, textTransform: 'none', fontWeight: '400' },
+    input: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: colors.textPrimary, fontSize: 16 },
+    multiline: { minHeight: 90 },
+    photoWrap: { height: 160, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+    photoEmpty: { alignItems: 'center', gap: 8 }, photoEmptyText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+    photoUploading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(10,10,15,0.55)' },
+    photoEditBadge: { position: 'absolute', right: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(10,10,15,0.7)', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7 },
+    photoEditText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' }, photoOverlayText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+    priceRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    currencyBadge: { paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderStrong, minWidth: 56, alignItems: 'center' },
+    currencyBadgeText: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' }, chips: { gap: 8, paddingRight: 8 },
+    chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderStrong },
+    chipActive: { backgroundColor: colors.primary, borderColor: colors.primary }, chipText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' }, chipTextActive: { color: colors.onPrimary },
+    mapWrap: { height: 180, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
+    errorBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.dangerSurface, borderWidth: 1, borderColor: colors.dangerBorder, borderRadius: 10, padding: 12, marginTop: 16 },
+    errorText: { color: colors.danger, fontSize: 14, flex: 1 },
+  });
+}
