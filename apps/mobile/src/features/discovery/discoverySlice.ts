@@ -5,9 +5,14 @@ import { logout } from '@/features/auth/authSlice';
 
 interface DiscoveryState {
   points: DiscoveryPoint[];
+  /** Last debounced zoom actually committed to a discovery request. */
+  zoom: number;
 }
 
-const initialState: DiscoveryState = { points: [] };
+const initialState: DiscoveryState = {
+  points: [],
+  zoom: 12,
+};
 
 const discoverySlice = createSlice({
   name: 'discovery',
@@ -15,6 +20,9 @@ const discoverySlice = createSlice({
   reducers: {
     setPoints(state, action: PayloadAction<DiscoveryPoint[]>) {
       state.points = action.payload;
+    },
+    setDiscoveryZoom(state, action: PayloadAction<number>) {
+      state.zoom = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -24,5 +32,5 @@ const discoverySlice = createSlice({
   },
 });
 
-export const { setPoints } = discoverySlice.actions;
+export const { setPoints, setDiscoveryZoom } = discoverySlice.actions;
 export default discoverySlice.reducer;
