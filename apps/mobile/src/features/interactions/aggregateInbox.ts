@@ -2,7 +2,7 @@
  * Client-side aggregation for Interactions → Activity.
  * Collapses repeated personal signals from the same actor into a single row.
  * Preserves CTA priority:
- * friend_request > gift > wave > story_reaction > follow.
+ * friend_request > match > gift > wave > story_reaction > follow.
  *
  * Backend still returns discrete events; this is UI-only until a
  * grouped inbox endpoint exists.
@@ -23,10 +23,11 @@ export type AggregatedInboxRow = {
 
 const TYPE_RANK: Record<InboxItem['type'], number> = {
   friend_request: 0,
-  gift: 1,
-  wave: 2,
-  story_reaction: 3,
-  follow: 4,
+  match: 1,
+  gift: 2,
+  wave: 3,
+  story_reaction: 4,
+  follow: 5,
 };
 
 /**
@@ -71,7 +72,9 @@ export function aggregateInbox(items: InboxItem[]): AggregatedInboxRow[] {
 /** Human label for an aggregated personal-activity row. */
 export function aggregatedSignalLabel(primary: InboxItem, count: number): string {
   let base: string;
-  if (primary.type === 'wave') {
+  if (primary.type === 'match') {
+    base = 'matched with you';
+  } else if (primary.type === 'wave') {
     base = 'waved at you';
   } else if (primary.type === 'friend_request') {
     base = 'sent you a friend request';
