@@ -21,7 +21,15 @@ export class InteractionsInboxService {
       this.listGifts(userId, take),
     ]);
 
-    return [...social, ...matches, ...gifts]
+    // A reciprocal wave that already produced a first-class match is the same
+    // user event represented twice. Keep the match because it carries the
+    // canonical conversationId used to open the chat.
+    const matchedPeerIds = new Set(matches.map((item) => item.fromUser.id));
+    const dedupedSocial = social.filter(
+      (item) => !(item.type === 'wave' && item.isMutual === true && matchedPeerIds.has(item.fromUser.id)),
+    );
+
+    return [...dedupedSocial, ...matches, ...gifts]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, take);
   }
