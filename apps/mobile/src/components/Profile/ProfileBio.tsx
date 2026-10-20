@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, spacing } from '@/theme';
+import { spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 interface Props {
   bio: string;
@@ -17,6 +17,9 @@ export function ProfileBio({
   showTitle = false,
   padded = true,
 }: Props): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={[styles.section, padded && styles.padded]}>
       {showTitle ? <Text style={styles.title}>About</Text> : null}
@@ -25,14 +28,16 @@ export function ProfileBio({
   );
 }
 
-const styles = StyleSheet.create({
-  section: { marginTop: spacing.md },
-  padded: { paddingHorizontal: spacing.xl },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: spacing.sm,
-  },
-  bio: { color: colors.textSecondary, fontSize: 15, lineHeight: 22 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    section: { marginTop: spacing.md },
+    padded: { paddingHorizontal: spacing.xl },
+    title: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '700',
+      marginBottom: spacing.sm,
+    },
+    bio: { color: colors.textSecondary, fontSize: 15, lineHeight: 22 },
+  });
+}
