@@ -1,14 +1,21 @@
 import { StyleSheet } from 'react-native';
 import { colors, spacing } from '@/theme';
 
-/** Shared Gorhom sheet chrome. */
+/** Shared Gorhom sheet chrome. NEXA sheets use a distinct elevated spatial surface. */
 export const sheetChrome = StyleSheet.create({
   background: {
     backgroundColor: colors.surfaceRaised,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
+    overflow: 'hidden',
   },
   handle: {
-    backgroundColor: colors.textMuted,
-    width: 40,
+    backgroundColor: colors.textTertiary,
+    width: 36,
+    height: 4,
+    borderRadius: 2,
   },
   content: {
     paddingBottom: spacing.xl,
