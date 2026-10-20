@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { InteractionsService } from './interactions.service';
+import { InteractionsInboxService } from './interactions-inbox.service';
 import { InteractionsController } from './interactions.controller';
 import { RealtimeModule } from '../../realtime/realtime.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -17,7 +18,7 @@ import { BlocksModule } from '../blocks/blocks.module';
     AchievementsModule,
     BlocksModule,
   ],
-  providers: [InteractionsService],
+  providers: [InteractionsService, InteractionsInboxService],
   controllers: [InteractionsController],
 })
 export class InteractionsModule {}
