@@ -79,13 +79,26 @@ export function PulseScreen(): React.JSX.Element {
 
 	useEffect(() => {
 		if (route.params?.filter == null) return;
-		setFilter(resolveFilter(route.params.filter));
+		let active = true;
+		void Promise.resolve().then(() => {
+			if (active) setFilter(resolveFilter(route.params?.filter));
+		});
+		return () => {
+			active = false;
+		};
 	}, [route.params?.filter]);
 
 	useEffect(() => {
 		if (!pendingFilter) return;
-		setFilter(resolveFilter(pendingFilter));
-		dispatch(clearPendingFilter());
+		let active = true;
+		void Promise.resolve().then(() => {
+			if (!active) return;
+			setFilter(resolveFilter(pendingFilter));
+			dispatch(clearPendingFilter());
+		});
+		return () => {
+			active = false;
+		};
 	}, [pendingFilter, dispatch]);
 
 	const load = useCallback(() => {
