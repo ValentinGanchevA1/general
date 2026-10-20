@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 
 import type { UserPrimaryCta } from '@/features/social/resolveUserPrimaryCta';
-import { colors, radius, spacing } from '@/theme';
+import { radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 export type ProfilePrimaryCtaRowProps = {
   primaryCta: UserPrimaryCta;
@@ -27,6 +27,9 @@ export function ProfilePrimaryCtaRow({
   waving = false,
   messaging = false,
 }: ProfilePrimaryCtaRowProps): React.JSX.Element | null {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   if (primaryCta.kind === 'message') {
     return (
       <View style={styles.primaryCtaRow}>
@@ -70,28 +73,30 @@ export function ProfilePrimaryCtaRow({
   return null;
 }
 
-const styles = StyleSheet.create({
-  primaryCtaRow: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: spacing.xl,
-    marginBottom: 10,
-  },
-  primaryCta: {
-    flex: 1,
-    borderRadius: radius.md,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  wavePrimary: {
-    backgroundColor: colors.primary,
-  },
-  messagePrimaryFill: {
-    backgroundColor: colors.action,
-    borderColor: colors.action,
-  },
-  primaryCtaText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
-  btnDisabled: { opacity: 0.55 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    primaryCtaRow: {
+      flexDirection: 'row',
+      gap: 10,
+      paddingHorizontal: spacing.xl,
+      marginBottom: 10,
+    },
+    primaryCta: {
+      flex: 1,
+      borderRadius: radius.md,
+      paddingVertical: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 48,
+    },
+    wavePrimary: {
+      backgroundColor: colors.primary,
+    },
+    messagePrimaryFill: {
+      backgroundColor: colors.action,
+      borderColor: colors.action,
+    },
+    primaryCtaText: { color: colors.onPrimary, fontWeight: '700', fontSize: 15 },
+    btnDisabled: { opacity: 0.55 },
+  });
+}
