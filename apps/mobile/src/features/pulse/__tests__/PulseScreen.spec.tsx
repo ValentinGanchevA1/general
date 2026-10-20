@@ -5,8 +5,6 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { NavigationContainer } from '@react-navigation/native';
 
-// Native modules are not linked under Jest. Mock before any import that pulls them in.
-// jest.mock is hoisted, so these run before the PulseScreen import below.
 jest.mock('@react-native-community/geolocation', () => ({
   __esModule: true,
   default: {
@@ -28,10 +26,7 @@ jest.mock('@/features/location/useUserLocation', () => ({
 
 jest.mock('@/realtime/useSocket', () => ({
   __esModule: true,
-  useSocket: () => ({
-    on: () => () => undefined,
-    sendPresence: jest.fn(),
-  }),
+  useSocket: () => ({ on: () => () => undefined, sendPresence: jest.fn() }),
 }));
 
 jest.mock('@/features/stories/storyMedia', () => ({
@@ -39,15 +34,8 @@ jest.mock('@/features/stories/storyMedia', () => ({
   pickAndUploadStoryMedia: jest.fn(),
 }));
 
-jest.mock('@/lib/analytics', () => ({
-  __esModule: true,
-  track: jest.fn(),
-}));
+jest.mock('@/lib/analytics', () => ({ __esModule: true, track: jest.fn() }));
 
-// Keep thunks as no-ops; use the real reducer so initial state stays accurate.
-// __esModule: true is required — it is non-enumerable on the real module so the
-// spread drops it, and without it babel interop treats the whole mock object as
-// the default export, breaking `import pulseReducer from './pulseSlice'`.
 jest.mock('../pulseSlice', () => ({
   __esModule: true,
   ...jest.requireActual('../pulseSlice'),
@@ -61,9 +49,6 @@ jest.mock('@/features/stories/storiesSlice', () => ({
   fetchNearbyStories: jest.fn(() => ({ type: 'stories/nearby/pending' })),
 }));
 
-// PulseScreen reads navigation hooks (useNavigation/useRoute/useFocusEffect).
-// Outside a real navigator, useRoute throws "Couldn't find a route object", so
-// stub the hooks while keeping the rest of @react-navigation/native real.
 jest.mock('@react-navigation/native', () => ({
   __esModule: true,
   ...jest.requireActual('@react-navigation/native'),
@@ -72,8 +57,6 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));
 
-// The trending strip fetches from the API via location; supply fixed topics so
-// the "renders trending strip" assertion is deterministic.
 jest.mock('../useTrendingNearby', () => ({
   __esModule: true,
   useTrendingNearby: () => ({ topics: ['#coffee', '#nightlife', '#sale'], loading: false }),
@@ -100,34 +83,28 @@ function wrap(children: React.ReactElement) {
       friends: friendsReducer,
     },
   });
-  return (
-    <Provider store={store}>
-      <NavigationContainer>{children}</NavigationContainer>
-    </Provider>
-  );
+  return <Provider store={store}><NavigationContainer>{children}</NavigationContainer></Provider>;
 }
 
-describe('PulseScreen v2', () => {
-  it('renders story strip and filter chips (no Share CTA)', () => {
-    const { queryByTestId, getByLabelText } = render(wrap(<PulseScreen />));
+describe('PulseScreen discovery feed', () => {
+  it('renders stories and the local discovery filters', () => {
+    const { queryByLabelText, queryByTestId, getByLabelText } = render(wrap(<PulseScreen />));
     expect(queryByTestId('share-cta')).toBeNull();
-    // No profile in the test store → soft gate locks create; strip still mounts.
     expect(getByLabelText(/Create your story|Story posting locked/)).toBeTruthy();
-    // Screenshot contract 2026-10-12: All | Waves | Chats | Matches (social re-merged).
-    // AppChip uses accessibilityLabel `Filter ${label}` (testIDs optional).
-    expect(getByLabelText('Filter All')).toBeTruthy();
-    expect(getByLabelText('Filter Waves')).toBeTruthy();
-    expect(getByLabelText('Filter Chats')).toBeTruthy();
-    expect(getByLabelText('Filter Matches')).toBeTruthy();
-    expect(queryByTestId('pulse-filter-listings')).toBeNull();
-    expect(queryByTestId('pulse-filter-alerts')).toBeNull();
+    expect(getByLabelText('Filter For You')).toBeTruthy();
+    expect(getByLabelText('Filter Nearby')).toBeTruthy();
+    expect(getByLabelText('Filter Events')).toBeTruthy();
+    expect(getByLabelText('Filter Marketplace')).toBeTruthy();
+    expect(queryByLabelText('Filter Waves')).toBeNull();
+    expect(queryByLabelText('Filter Chats')).toBeNull();
+    expect(queryByLabelText('Filter Matches')).toBeNull();
   });
 
-  it('switches filter when a chip is tapped', () => {
-    const { getByLabelText } = render(wrap(<PulseScreen />));
-    fireEvent.press(getByLabelText('Filter Waves'));
-    // The chip should remain rendered after press — no crash, basic interaction works.
-    expect(getByLabelText('Filter Waves')).toBeTruthy();
+  it('switches discovery filter without restoring interaction filters', () => {
+    const { getByLabelText, queryByLabelText } = render(wrap(<PulseScreen />));
+    fireEvent.press(getByLabelText('Filter Events'));
+    expect(getByLabelText('Filter Events')).toBeTruthy();
+    expect(queryByLabelText('Filter Waves')).toBeNull();
   });
 
   it('renders the trending strip with mock topics', () => {
