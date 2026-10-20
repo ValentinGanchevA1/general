@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, spacing, radius } from '@/theme';
+import { spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
 
 interface Props {
   email: string;
@@ -19,6 +19,9 @@ export function ProfileAccountSection({
   phoneVerified,
   onAddPhone,
 }: Props): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Account</Text>
@@ -61,24 +64,26 @@ export function ProfileAccountSection({
   );
 }
 
-const styles = StyleSheet.create({
-  section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl },
-  sectionTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginBottom: spacing.sm },
-  sectionAction: { color: colors.primary, fontSize: 13, fontWeight: '600' },
-  infoCard: {
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderStrong,
-    gap: 10,
-  },
-  infoRowLast: { borderBottomWidth: 0 },
-  infoText: { flex: 1, color: colors.textPrimary, fontSize: 14 },
-  infoTextMuted: { color: colors.textMuted },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    section: { marginTop: spacing.lg, paddingHorizontal: spacing.xl },
+    sectionTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginBottom: spacing.sm },
+    sectionAction: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+    infoCard: {
+      backgroundColor: colors.surfaceRaised,
+      borderRadius: radius.md,
+      overflow: 'hidden',
+    },
+    infoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: spacing.md,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.borderStrong,
+      gap: 10,
+    },
+    infoRowLast: { borderBottomWidth: 0 },
+    infoText: { flex: 1, color: colors.textPrimary, fontSize: 14 },
+    infoTextMuted: { color: colors.textMuted },
+  });
+}
