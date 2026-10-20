@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, spacing, radius } from '@/theme';
+import { spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
 
 interface Props {
   email: string;
@@ -21,6 +21,9 @@ export function ProfileContactLine({
   emailVerified,
   phoneVerified,
 }: Props): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
@@ -51,24 +54,26 @@ export function ProfileContactLine({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    marginTop: spacing.md,
-    marginHorizontal: spacing.xl,
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderStrong,
-    gap: 8,
-  },
-  rowLast: { borderBottomWidth: 0 },
-  text: { flex: 1, color: colors.textPrimary, fontSize: 13 },
-  muted: { color: colors.textMuted },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrap: {
+      marginTop: spacing.md,
+      marginHorizontal: spacing.xl,
+      backgroundColor: colors.surfaceRaised,
+      borderRadius: radius.md,
+      overflow: 'hidden',
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.borderStrong,
+      gap: 8,
+    },
+    rowLast: { borderBottomWidth: 0 },
+    text: { flex: 1, color: colors.textPrimary, fontSize: 13 },
+    muted: { color: colors.textMuted },
+  });
+}
