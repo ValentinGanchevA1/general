@@ -1,8 +1,7 @@
 // apps/mobile/src/components/map/CreateNearbySheet.tsx
 //
 // Themed action sheet for map long-press "Create nearby".
-// Same visual family as StoryCreateSheet / ActionSheetList:
-// dark surface, handle, MCI icons, radius.md, subtle borders.
+// Same visual family as StoryCreateSheet / ActionSheetList.
 
 import React, { useCallback, useMemo } from 'react';
 import {
@@ -16,7 +15,7 @@ import {
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, radius, spacing } from '@/theme';
+import { radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 export type CreateNearbyAction =
   | 'listing_sell'
@@ -29,7 +28,6 @@ interface Option {
   icon: string;
   title: string;
   hint: string;
-  accent?: string;
 }
 
 const OPTIONS: Option[] = [
@@ -70,6 +68,8 @@ export function CreateNearbySheet({
   onClose,
   onSelect,
 }: CreateNearbySheetProps): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const S = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
 
   const handleSelect = useCallback(
@@ -142,87 +142,89 @@ export function CreateNearbySheet({
   );
 }
 
-const S = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    paddingHorizontal: spacing.md,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.borderStrong,
-    marginBottom: 14,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  subtitle: {
-    color: colors.textMuted,
-    fontSize: 13,
-    marginBottom: 16,
-  },
-  list: {
-    gap: 8,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-  },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,212,255,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  rowText: {
-    flex: 1,
-  },
-  rowTitle: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  rowHint: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  cancel: {
-    marginTop: 14,
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-  },
-  cancelText: {
-    color: colors.textSecondary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: radius.lg,
+      borderTopRightRadius: radius.lg,
+      paddingHorizontal: spacing.md,
+      paddingTop: 10,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.borderStrong,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.borderStrong,
+      marginBottom: 14,
+    },
+    title: {
+      color: colors.textPrimary,
+      fontSize: 18,
+      fontWeight: '700',
+      marginBottom: 4,
+    },
+    subtitle: {
+      color: colors.textMuted,
+      fontSize: 13,
+      marginBottom: 16,
+    },
+    list: {
+      gap: 8,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: radius.md,
+      paddingVertical: 14,
+      paddingHorizontal: 14,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.borderStrong,
+    },
+    iconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: colors.actionGhost,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    rowText: {
+      flex: 1,
+    },
+    rowTitle: {
+      color: colors.textPrimary,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    rowHint: {
+      color: colors.textMuted,
+      fontSize: 12,
+      marginTop: 2,
+    },
+    cancel: {
+      marginTop: 14,
+      alignItems: 'center',
+      paddingVertical: 14,
+      borderRadius: radius.md,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.borderStrong,
+    },
+    cancelText: {
+      color: colors.textSecondary,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+  });
+}
