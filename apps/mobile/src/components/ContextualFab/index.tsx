@@ -10,7 +10,7 @@
 // - Single tap → toggle menu; backdrop → collapse.
 // - bottomOffset via mapFabBottom (tab-bar clearance).
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Animated, Pressable, StyleSheet, Text, View,
 } from 'react-native';
@@ -25,7 +25,7 @@ import { openRootScreen } from '@/navigation/openRootScreen';
 import { useAppDispatch } from '@/hooks/redux';
 import { setPendingFilter } from '@/features/pulse/pulseSlice';
 import { track } from '@/lib/analytics';
-import { colors, radius, spacing, fontSize, shadow } from '@/theme';
+import { radius, spacing, fontSize, useAppTheme, type ThemeColors } from '@/theme';
 import { mapFabBottom } from '@/components/map/mapChromeLayout';
 import { nexaHaptics } from '@/haptics/nexaHaptics';
 import { NEXA_MOTION_SCALE } from '@/motion/nexaMotion';
@@ -48,6 +48,8 @@ const ITEM_GAP = 14;
 
 export function ContextualFab(props: Props): React.JSX.Element {
   const { zoom, points, nearestUserId, onAction, bottomOffset = 0 } = props;
+  const { colors, shadow } = useAppTheme();
+  const S = useMemo(() => createStyles(colors, shadow.fab), [colors, shadow]);
   const ctx = useFabContext({ zoom, points, nearestUserId });
 
   const [open, setOpen] = useState(false);
@@ -176,47 +178,52 @@ export function ContextualFab(props: Props): React.JSX.Element {
   );
 }
 
-const S = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    zIndex: 90,
-  },
+function createStyles(
+  colors: ThemeColors,
+  fabShadow: ReturnType<typeof useAppTheme>['shadow'] extends (...args: never[]) => infer R ? R : never,
+) {
+  return StyleSheet.create({
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      zIndex: 90,
+    },
 
-  fabRow: {
-    position: 'absolute', right: spacing.lg,
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    zIndex: 102,
-  },
-  pressed: { opacity: 0.9, transform: [{ scale: NEXA_MOTION_SCALE.press }] },
-  fab: {
-    width: FAB_SIZE, height: FAB_SIZE, borderRadius: radius.fab,
-    backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',
-    ...shadow.fab,
-  },
-  fabLabel: {
-    color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '700',
-    backgroundColor: colors.surfaceAlt,
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    borderRadius: radius.pill, overflow: 'hidden',
-  },
+    fabRow: {
+      position: 'absolute', right: spacing.lg,
+      flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+      zIndex: 102,
+    },
+    pressed: { opacity: 0.9, transform: [{ scale: NEXA_MOTION_SCALE.press }] },
+    fab: {
+      width: FAB_SIZE, height: FAB_SIZE, borderRadius: radius.fab,
+      backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',
+      ...fabShadow,
+    },
+    fabLabel: {
+      color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '700',
+      backgroundColor: colors.surfaceAlt,
+      paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+      borderRadius: radius.pill, overflow: 'hidden',
+    },
 
-  itemRow: {
-    position: 'absolute', right: spacing.lg,
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    zIndex: 101,
-  },
-  item: {
-    width: ITEM_SIZE, height: ITEM_SIZE, borderRadius: ITEM_SIZE / 2,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1, borderColor: colors.borderStrong,
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: colors.shadowInk, shadowOpacity: 0.4, shadowRadius: 6, elevation: 6,
-  },
-  itemLabel: {
-    color: colors.textPrimary, fontSize: fontSize.sm, fontWeight: '500',
-    backgroundColor: 'rgba(26,26,46,0.9)',
-    paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
-    borderRadius: radius.md, overflow: 'hidden',
-  },
-});
+    itemRow: {
+      position: 'absolute', right: spacing.lg,
+      flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+      zIndex: 101,
+    },
+    item: {
+      width: ITEM_SIZE, height: ITEM_SIZE, borderRadius: ITEM_SIZE / 2,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1, borderColor: colors.borderStrong,
+      justifyContent: 'center', alignItems: 'center',
+      shadowColor: colors.shadowInk, shadowOpacity: 0.4, shadowRadius: 6, elevation: 6,
+    },
+    itemLabel: {
+      color: colors.textPrimary, fontSize: fontSize.sm, fontWeight: '500',
+      backgroundColor: colors.surfaceRaised,
+      paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+      borderRadius: radius.md, overflow: 'hidden',
+    },
+  });
+}
