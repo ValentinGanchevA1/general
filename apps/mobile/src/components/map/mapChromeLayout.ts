@@ -1,5 +1,5 @@
-// Shared layout math for map chrome (top controls + supporting cards).
-// Stack: filter row → trending/weather row → challenge → nudge.
+// Shared layout math for NEXA map chrome (primary controls + supporting cards).
+// Stack: search/layers → trending/weather row → challenge → nudge.
 // Primary map controls stay pinned directly under the safe area and are never
 // pushed down by optional challenge/nudge content.
 
@@ -15,11 +15,15 @@ export const WEATHER_WIDGET_HEIGHT = 64;
 export const MAP_CHROME_H_INSET = spacing.lg;
 export const FAB_BOTTOM = spacing.md;
 export const EVENTS_RAIL_BOTTOM = spacing.lg;
-/** @deprecated Prefer COMBINED_FILTER_ROW_HEIGHT — kept for residual callers. */
+/** @deprecated Kept for residual callers. */
 export const LISTING_MODE_FILTER_HEIGHT = 40;
-export const MAP_SEARCH_BAR_HEIGHT = 44;
-/** Single row: layer chips + fixed recenter control. */
-export const COMBINED_FILTER_ROW_HEIGHT = 44;
+/** Search is the primary discovery control. */
+export const MAP_SEARCH_BAR_HEIGHT = 48;
+/** Semantic layer chips + filters + locate all retain >=44dp hit targets. */
+export const MAP_LAYER_ROW_HEIGHT = 44;
+/** Two-row primary chrome: search + 8dp gap + semantic layer controls. */
+export const COMBINED_FILTER_ROW_HEIGHT =
+	MAP_SEARCH_BAR_HEIGHT + MAP_CHROME_GAP + MAP_LAYER_ROW_HEIGHT;
 
 export const MAP_CHROME = {
 	gap: MAP_CHROME_GAP,
@@ -32,6 +36,7 @@ export const MAP_CHROME = {
 	fabBottom: FAB_BOTTOM,
 	eventsRailBottom: EVENTS_RAIL_BOTTOM,
 	searchBarHeight: MAP_SEARCH_BAR_HEIGHT,
+	layerRowHeight: MAP_LAYER_ROW_HEIGHT,
 	combinedFilterRowHeight: COMBINED_FILTER_ROW_HEIGHT,
 } as const;
 
@@ -48,7 +53,7 @@ export const MAP_TOP_STACK_BOTH: MapTopStackVisibility = {
 };
 
 /**
- * Primary controls are always the first map-owned row below the status/safe area.
+ * Primary controls are always the first map-owned stack below the status/safe area.
  * `sheetOpen` and optional-card visibility are intentionally ignored.
  */
 export function mapFilterRowTop(
@@ -59,7 +64,7 @@ export function mapFilterRowTop(
 	return insetsTop + MAP_CHROME_GAP;
 }
 
-/** Weather/location recovery starts immediately below the primary control row. */
+/** Weather/location recovery starts immediately below the primary control stack. */
 export function mapWeatherTop(
 	insetsTop: number,
 	sheetOpen: boolean,
