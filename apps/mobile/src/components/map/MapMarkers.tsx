@@ -4,6 +4,7 @@ import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
 
 import { ClusterMarker } from './ClusterMarker';
 import { EntityMarker } from './EntityMarker';
+import { NEXA_MARKER_ANCHOR_Y } from './NexaEntityMarker';
 import { clusterVisualKey, entityVisualKey } from './markerVisualKeys';
 import { useTracksViewChanges } from './useTracksViewChanges';
 
@@ -11,6 +12,11 @@ interface MapMarkersProps {
   points: DiscoveryPoint[];
   /** Optional controlled selection. When omitted, MapMarkers tracks the last tapped entity. */
   selectedEntityKey?: string | null;
+  /** Optional semantic state inputs for map orchestration without changing marker internals. */
+  newEntityKeys?: ReadonlySet<string>;
+  ownEntityKey?: string | null;
+  unavailableEntityKeys?: ReadonlySet<string>;
+  dimUnselected?: boolean;
   onClusterPress: (p: ClusterPoint) => void;
   onEntityPress: (p: EntityPoint) => void;
 }
@@ -26,6 +32,10 @@ function entityKey(point: EntityPoint): string {
 function MapMarkersImpl({
   points,
   selectedEntityKey,
+  newEntityKeys,
+  ownEntityKey = null,
+  unavailableEntityKeys,
+  dimUnselected = false,
   onClusterPress,
   onEntityPress,
 }: MapMarkersProps): React.JSX.Element {
@@ -38,7 +48,9 @@ function MapMarkersImpl({
     const stillVisible = points.some(
       (point) => point.kind !== 'cluster' && entityKey(point) === localSelectedEntityKey,
     );
-    if (!stillVisible) setLocalSelectedEntityKey(null);
+    if (!stillVisible) {
+      void Promise.resolve().then(() => setLocalSelectedEntityKey(null));
+    }
   }, [localSelectedEntityKey, points, selectedEntityKey]);
 
   const handleEntityPress = useCallback(
@@ -63,22 +75,33 @@ function MapMarkersImpl({
 
   return (
     <>
-      {points.map((point) =>
-        point.kind === 'cluster' ? (
-          <ClusterMarkerItem
-            key={`c:${point.cellId}`}
-            point={point}
-            onPress={handleClusterPress}
-          />
-        ) : (
+      {points.map((point) => {
+        if (point.kind === 'cluster') {
+          return (
+            <ClusterMarkerItem
+              key={`c:${point.cellId}`}
+              point={point}
+              onPress={handleClusterPress}
+            />
+          );
+        }
+
+        const key = entityKey(point);
+        const selected = key === effectiveSelectedKey;
+
+        return (
           <EntityMarkerItem
-            key={`e:${point.kind}:${point.id}`}
+            key={`e:${key}`}
             point={point}
-            selected={entityKey(point) === effectiveSelectedKey}
+            selected={selected}
+            isNew={newEntityKeys?.has(key) === true}
+            own={key === ownEntityKey}
+            unavailable={unavailableEntityKeys?.has(key) === true}
+            dimmed={dimUnselected && effectiveSelectedKey != null && !selected}
             onPress={handleEntityPress}
           />
-        ),
-      )}
+        );
+      })}
     </>
   );
 }
@@ -87,6 +110,10 @@ function mapMarkersPropsEqual(prev: MapMarkersProps, next: MapMarkersProps): boo
   return (
     prev.points === next.points &&
     prev.selectedEntityKey === next.selectedEntityKey &&
+    prev.newEntityKeys === next.newEntityKeys &&
+    prev.ownEntityKey === next.ownEntityKey &&
+    prev.unavailableEntityKeys === next.unavailableEntityKeys &&
+    prev.dimUnselected === next.dimUnselected &&
     prev.onClusterPress === next.onClusterPress &&
     prev.onEntityPress === next.onEntityPress
   );
@@ -140,17 +167,32 @@ const ClusterMarkerItem = React.memo(ClusterMarkerItemImpl, clusterItemPropsEqua
 interface EntityItemProps {
   point: EntityPoint;
   selected: boolean;
+  isNew: boolean;
+  own: boolean;
+  dimmed: boolean;
+  unavailable: boolean;
   onPress: (p: EntityPoint) => void;
 }
 
 function EntityMarkerItemImpl({
   point,
   selected,
+  isNew,
+  own,
+  dimmed,
+  unavailable,
   onPress,
 }: EntityItemProps): React.JSX.Element {
   const [visualSettled, setVisualSettled] = useState(false);
   const baseVisualKey = entityVisualKey(point);
-  const renderKey = `${baseVisualKey}|${selected ? 'selected' : 'default'}`;
+  const renderKey = [
+    baseVisualKey,
+    selected ? 'selected' : 'default',
+    isNew ? 'new' : 'seen',
+    own ? 'own' : 'other',
+    dimmed ? 'dim' : 'normal',
+    unavailable ? 'unavailable' : 'available',
+  ].join('|');
   const tracksFromKey = useTracksViewChanges([renderKey]);
 
   // react-native-maps snapshots marker children. Re-open tracking whenever a
@@ -179,12 +221,16 @@ function EntityMarkerItemImpl({
       coordinate={coordinate}
       onPress={handlePress}
       tracksViewChanges={tracksViewChanges}
-      anchor={{ x: 0.5, y: 0.5 }}
-      zIndex={selected ? 40 : isLive ? 20 : 10}
+      anchor={{ x: 0.5, y: NEXA_MARKER_ANCHOR_Y }}
+      zIndex={selected ? 40 : own ? 30 : isLive ? 20 : isNew ? 15 : 10}
     >
       <EntityMarker
         point={point}
         selected={selected}
+        isNew={isNew}
+        own={own}
+        dimmed={dimmed}
+        unavailable={unavailable}
         onVisualSettled={onVisualSettled}
       />
     </Marker>
@@ -195,6 +241,10 @@ function entityItemPropsEqual(prev: EntityItemProps, next: EntityItemProps): boo
   return (
     prev.onPress === next.onPress &&
     prev.selected === next.selected &&
+    prev.isNew === next.isNew &&
+    prev.own === next.own &&
+    prev.dimmed === next.dimmed &&
+    prev.unavailable === next.unavailable &&
     entityVisualKey(prev.point) === entityVisualKey(next.point) &&
     prev.point.lat === next.point.lat &&
     prev.point.lng === next.point.lng
