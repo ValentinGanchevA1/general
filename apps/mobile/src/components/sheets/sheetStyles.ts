@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 
-import { darkColors, spacing, useAppTheme, type ThemeColors } from '@/theme';
+import { spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 /** Shared Gorhom sheet chrome. NEXA sheets use a distinct elevated spatial surface. */
 export function useSheetChrome() {
@@ -44,6 +44,3 @@ function createSheetChrome(colors: ThemeColors) {
     },
   });
 }
-
-/** @deprecated Temporary compatibility export. Migrate consumers to useSheetChrome(). */
-export const sheetChrome = createSheetChrome(darkColors);
