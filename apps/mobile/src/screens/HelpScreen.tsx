@@ -26,7 +26,7 @@ type Faq = { q: string; a: string };
 
 const FAQS: Faq[] = [
   {
-    q: 'How does G88 know who is nearby?',
+    q: 'How does NEXA know who is nearby?',
     a: 'While the app is open, your device shares an approximate location (coarsened to about a 120-meter area). We use it for the map, Pulse stories, and nearby activity. Your exact position is never stored.',
   },
   {
@@ -59,7 +59,7 @@ const FAQS: Faq[] = [
   },
   {
     q: 'How does local trade work?',
-    a: 'Create a listing (for sale or wanted) from the map or Marketplace. Nearby people can message the seller, wave, or make an offer and counter. Meet in public places; G88 does not process payments.',
+    a: 'Create a listing (for sale or wanted) from the map or Marketplace. Nearby people can message the seller, wave, or make an offer and counter. Meet in public places; NEXA does not process payments.',
   },
   {
     q: 'I found a bug or something feels wrong.',
@@ -95,7 +95,7 @@ export function HelpScreen(): React.JSX.Element {
 
   const emailSupport = async () => {
     track('help.email_support');
-    const subject = encodeURIComponent('G88 support');
+    const subject = encodeURIComponent('NEXA support');
     const body = encodeURIComponent(
       `App version: ${APP_VERSION}\n\nPlease describe what happened above this line.`,
     );
@@ -140,7 +140,7 @@ export function HelpScreen(): React.JSX.Element {
           style={styles.rowSpaced}
           icon="file-document-outline"
           title="Terms of Service"
-          subtitle="Rules for using G88"
+          subtitle="Rules for using NEXA"
           onPress={openTerms}
         />
       </ScrollView>
