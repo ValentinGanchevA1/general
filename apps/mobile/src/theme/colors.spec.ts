@@ -34,6 +34,29 @@ describe('NEXA color semantics', () => {
     expect(darkColors.primarySoft).toBe(darkColors.actionSoft);
   });
 
+  it('maps legacy light aliases onto the active light semantics', () => {
+    expect(lightColors.bg).toBe(lightColors.canvas);
+    expect(lightColors.surface).toBe(lightColors.surfacePrimary);
+    expect(lightColors.primary).toBe(lightColors.actionPrimary);
+    expect(lightColors.accent).toBe(lightColors.discovery);
+    expect(lightColors.action).toBe(lightColors.actionPrimary);
+    expect(lightColors.primarySoft).toBe(lightColors.actionSoft);
+  });
+
+  it('keeps light surfaces and text distinct from the dark palette', () => {
+    expect(lightColors.canvas).not.toBe(darkColors.canvas);
+    expect(lightColors.surfacePrimary).not.toBe(darkColors.surfacePrimary);
+    expect(lightColors.textPrimary).not.toBe(darkColors.textPrimary);
+    expect(lightColors.shadowInk).not.toBe(lightColors.canvas);
+  });
+
+  it('keeps semantic foregrounds available for branded actions', () => {
+    expect(lightColors.onPrimary).toBeTruthy();
+    expect(darkColors.onPrimary).toBeTruthy();
+    expect(lightColors.textInverse).toBeTruthy();
+    expect(darkColors.textInverse).toBeTruthy();
+  });
+
   it('preserves entity identity across light and dark modes', () => {
     expect(lightColors.entityPerson).toBe(darkColors.entityPerson);
     expect(lightColors.entityEvent).toBe(darkColors.entityEvent);

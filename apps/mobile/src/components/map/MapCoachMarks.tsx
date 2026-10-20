@@ -2,7 +2,7 @@
 // Four steps: pin → create (+ / long-press) → wave → pulse. v2 key re-shows for users who finished v1.
 // Skip always available — never block power users.
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -13,7 +13,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 import { track } from '@/lib/analytics';
 
 /** Persist key — v2 re-shows coach so users who finished v1 see create (+ / long-press). */
@@ -59,6 +59,8 @@ interface Props {
 }
 
 export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
@@ -168,82 +170,84 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
-    paddingHorizontal: spacing.lg,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    padding: spacing.xl,
-  },
-  progress: {
-    color: colors.textFaint,
-    fontSize: fontSize.xs,
-    fontWeight: '600',
-    letterSpacing: 0.4,
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-  },
-  emoji: {
-    fontSize: 28,
-    marginBottom: spacing.sm,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    marginBottom: spacing.sm,
-  },
-  body: {
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
-    lineHeight: 20,
-    marginBottom: spacing.lg,
-  },
-  dots: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.borderStrong,
-  },
-  dotActive: {
-    backgroundColor: colors.primary,
-    width: 20,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  skip: {
-    color: colors.textMuted,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-  },
-  nextBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xxl,
-    borderRadius: radius.pill,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  nextLabel: {
-    color: colors.onPrimary,
-    fontSize: fontSize.md,
-    fontWeight: '700',
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      justifyContent: 'flex-end',
+      paddingHorizontal: spacing.lg,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      padding: spacing.xl,
+    },
+    progress: {
+      color: colors.textFaint,
+      fontSize: fontSize.xs,
+      fontWeight: '600',
+      letterSpacing: 0.4,
+      marginBottom: spacing.sm,
+      textTransform: 'uppercase',
+    },
+    emoji: {
+      fontSize: 28,
+      marginBottom: spacing.sm,
+    },
+    title: {
+      color: colors.textPrimary,
+      fontSize: fontSize.lg,
+      fontWeight: '700',
+      marginBottom: spacing.sm,
+    },
+    body: {
+      color: colors.textSecondary,
+      fontSize: fontSize.sm,
+      lineHeight: 20,
+      marginBottom: spacing.lg,
+    },
+    dots: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginBottom: spacing.lg,
+    },
+    dot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.borderStrong,
+    },
+    dotActive: {
+      backgroundColor: colors.primary,
+      width: 20,
+    },
+    actions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    skip: {
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      fontWeight: '600',
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.sm,
+    },
+    nextBtn: {
+      backgroundColor: colors.primary,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.xxl,
+      borderRadius: radius.pill,
+      minHeight: 44,
+      justifyContent: 'center',
+    },
+    nextLabel: {
+      color: colors.onPrimary,
+      fontSize: fontSize.md,
+      fontWeight: '700',
+    },
+  });
+}

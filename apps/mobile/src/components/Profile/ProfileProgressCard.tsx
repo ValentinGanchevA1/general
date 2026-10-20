@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { GamificationSummary } from '@g88/shared';
-import { colors, spacing, radius, fontSize } from '@/theme';
+import { spacing, radius, fontSize, useAppTheme, type ThemeColors } from '@/theme';
 
 export function ProfileProgressCard({
   summary,
 }: {
   summary: GamificationSummary;
 }): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const pct =
     summary.xpForNextLevel > 0
       ? Math.min(100, Math.round((summary.xpIntoLevel / summary.xpForNextLevel) * 100))
@@ -34,23 +36,25 @@ export function ProfileProgressCard({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    gap: 8,
-  },
-  progressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  levelText: { color: colors.textPrimary, fontWeight: '700', fontSize: fontSize.md },
-  xpText: { color: colors.textMuted, fontSize: fontSize.sm },
-  barTrack: {
-    height: 8,
-    backgroundColor: colors.borderStrong,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  barFill: { height: '100%', backgroundColor: colors.primary, borderRadius: 4 },
-  subText: { color: colors.textMuted, fontSize: fontSize.xs },
-  streakText: { color: colors.warning, fontSize: fontSize.xs, fontWeight: '600' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    card: {
+      backgroundColor: colors.surfaceRaised,
+      borderRadius: radius.md,
+      padding: spacing.md,
+      gap: 8,
+    },
+    progressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    levelText: { color: colors.textPrimary, fontWeight: '700', fontSize: fontSize.md },
+    xpText: { color: colors.textMuted, fontSize: fontSize.sm },
+    barTrack: {
+      height: 8,
+      backgroundColor: colors.borderStrong,
+      borderRadius: 4,
+      overflow: 'hidden',
+    },
+    barFill: { height: '100%', backgroundColor: colors.primary, borderRadius: 4 },
+    subText: { color: colors.textMuted, fontSize: fontSize.xs },
+    streakText: { color: colors.warning, fontSize: fontSize.xs, fontWeight: '600' },
+  });
+}
