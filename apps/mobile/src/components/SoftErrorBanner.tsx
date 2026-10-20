@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, radius, spacing, fontSize } from '@/theme';
+import { radius, spacing, fontSize, useAppTheme, type ThemeColors } from '@/theme';
 
 export interface SoftErrorBannerProps {
   /** Short status line (default: couldn't refresh). */
@@ -27,6 +27,9 @@ export function SoftErrorBanner({
   onRetry,
   style,
 }: SoftErrorBannerProps): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View
       style={[styles.bar, style]}
@@ -50,33 +53,35 @@ export function SoftErrorBanner({
   );
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  text: {
-    flex: 1,
-    color: colors.textMuted,
-    fontSize: fontSize.sm,
-    lineHeight: 18,
-  },
-  btn: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-  },
-  btnText: {
-    color: colors.primary,
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    bar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + 2,
+      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    text: {
+      flex: 1,
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      lineHeight: 18,
+    },
+    btn: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+    },
+    btnText: {
+      color: colors.primary,
+      fontSize: fontSize.sm,
+      fontWeight: '700',
+    },
+  });
+}
