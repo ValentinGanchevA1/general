@@ -18,7 +18,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson } from '@/api/client';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { Avatar } from '@/components/Avatar';
-import { colors, spacing, useAppTheme } from '@/theme';
+import { colors, spacing } from '@/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {
@@ -55,218 +55,396 @@ function MessageBubble({
   onRetry: () => void;
   peerName: string;
   peerAvatarUrl: string | null;
-  onOpenPeerProfile: () => void;
+  onOpenPeerProfile: (() => void) | null;
 }): React.JSX.Element {
-  return (
-    <View style={[styles.row, isMine ? styles.rowMine : styles.rowPeer]}>
-      {!isMine ? (
-        <TouchableOpacity onPress={onOpenPeerProfile} accessibilityRole="button" accessibilityLabel={`Open ${peerName} profile`}>
-          <Avatar uri={peerAvatarUrl} name={peerName} size={32} />
+  if (msg.type === 'location_session') {
+    return <LocationSessionBubble msg={msg} isMine={isMine} />;
+  }
+
+  const bubble = (
+    <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
+      <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
+        {msg.body}
+      </Text>
+      {isPending ? <Text style={styles.statusPending}>⏱</Text> : null}
+      {isFailed ? (
+        <TouchableOpacity
+          onPress={onRetry}
+          accessibilityRole="button"
+          accessibilityLabel="Retry sending message"
+        >
+          <Text style={styles.statusFailed}>! Tap to retry</Text>
         </TouchableOpacity>
       ) : null}
-      <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubblePeer, isFailed && styles.bubbleFailed]}>
-        <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextPeer]}>{msg.body}</Text>
-        {isPending ? <Text style={styles.meta}>Sending…</Text> : null}
-        {isFailed ? (
-          <TouchableOpacity onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry send">
-            <Text style={styles.retry}>Failed · tap to retry</Text>
-          </TouchableOpacity>
-        ) : null}
-      </View>
+    </View>
+  );
+
+  if (isMine) {
+    return bubble;
+  }
+
+  // Peer row: avatar left of bubble — tap opens UserProfile.
+  return (
+    <View style={styles.peerRow}>
+      <TouchableOpacity
+        onPress={onOpenPeerProfile ?? undefined}
+        disabled={!onOpenPeerProfile}
+        accessibilityRole="button"
+        accessibilityLabel={`Open profile for ${peerName}`}
+        hitSlop={6}
+        activeOpacity={0.7}
+        style={styles.peerAvatarTap}
+      >
+        <Avatar uri={peerAvatarUrl} name={peerName} size={28} />
+      </TouchableOpacity>
+      {bubble}
     </View>
   );
 }
 
 export function ChatScreen(): React.JSX.Element {
-	const { colors: themeColors } = useAppTheme();
-
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { params } = useRoute<Route>();
-  const conversationId = params.conversationId;
-  const peerUserId = params.peerUserId;
+  const {
+    conversationId,
+    requestPending,
+    otherUserName,
+    otherUserVerification,
+    otherUserIdVerified,
+    otherUserId: paramOtherUserId,
+  } = params;
 
-  const messages = useAppSelector((s) => s.chat.messagesByConversation[conversationId] ?? []);
-  const loading = useAppSelector((s) => s.chat.loadingByConversation[conversationId] ?? false);
-  const failedIds = useAppSelector((s) => s.chat.failedMessageIds ?? []);
-  const pendingIds = useAppSelector((s) => s.chat.pendingMessageIds ?? []);
-  const myUserId = useAppSelector((s) => s.auth.user?.id);
+  const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
+  const messages = useAppSelector((s) => s.chat.messages[conversationId] ?? []);
+  const nextCursor = useAppSelector((s) => s.chat.nextCursor[conversationId] ?? null);
+  const loading = useAppSelector((s) => s.chat.messagesLoading[conversationId] ?? false);
+  const outbox = useAppSelector((s) => s.chat.outbox);
+  const failedIds = useAppSelector((s) => s.chat.failedIds);
 
-  const [text, setText] = useState('');
-  const [peer, setPeer] = useState<PublicUserProfile | null>(null);
+  const pendingIds = useMemo(() => {
+    const ids = new Set(outbox.map((e) => e.optimisticId));
+    for (const m of messages) {
+      if (m.id.startsWith('opt-') && !failedIds.includes(m.id)) {
+        ids.add(m.id);
+      }
+    }
+    return ids;
+  }, [outbox, messages, failedIds]);
+
+  const theyReplied = messages.some((m) => m.senderId !== myUserId);
+  const iSent = messages.some((m) => m.senderId === myUserId);
+  const showRequestBanner = !!requestPending && !theyReplied;
+  const requestLocked = showRequestBanner && iSent;
+
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
-  const [locationOpen, setLocationOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [fetchedPeer, setFetchedPeer] = useState<{
+    userId: string;
+    verification: VerificationLevel;
+    idVerified: boolean;
+    blockedByViewer: boolean;
+    avatarUrl: string | null;
+  } | null>(null);
+  const { on, joinConversation, sendMessage } = useSocket();
+
+  const {
+    session: liveSession,
+    starting: shareStarting,
+    isSharer,
+    start: startShare,
+    stop: stopShare,
+    openInMaps,
+  } = useLiveLocationShare(conversationId);
+
+  const otherUserId =
+    paramOtherUserId ??
+    messages.find((m) => m.senderId !== myUserId)?.senderId ??
+    null;
   const listRef = useRef<FlatList<ChatMessage>>(null);
-  const { connected } = useSocket();
-
-  const location = useLiveLocationShare(conversationId);
 
   useEffect(() => {
-    void dispatch(fetchMessages(conversationId));
-  }, [conversationId, dispatch]);
-
-  useEffect(() => {
-    let active = true;
-    getJson<PublicUserProfile>(`/users/${peerUserId}/public`)
+    if (!otherUserId) return;
+    let cancelled = false;
+    getJson<PublicUserProfile>(`/users/${otherUserId}`)
       .then((p) => {
-        if (active) setPeer(p);
+        if (!cancelled) {
+          setFetchedPeer({
+            userId: otherUserId,
+            verification: p.verification,
+            idVerified: p.idVerified,
+            blockedByViewer: p.blockedByViewer ?? false,
+            avatarUrl: p.avatarUrl ?? p.photoUrls?.[0] ?? null,
+          });
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        /* non-blocking */
+      });
     return () => {
-      active = false;
+      cancelled = true;
     };
-  }, [peerUserId]);
+  }, [otherUserId]);
 
-  const sorted = useMemo(() => {
-    return [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [messages]);
+  const peerBadge = fetchedPeer?.userId === otherUserId ? fetchedPeer : null;
+  const badgeVerification = otherUserVerification ?? peerBadge?.verification ?? 'none';
+  const badgeIdVerified = otherUserIdVerified ?? peerBadge?.idVerified;
+  const canGift = !!otherUserId && peerBadge != null && !peerBadge.blockedByViewer;
+  const canShareLocation = !requestLocked;
+  const peerDisplayName = otherUserName || 'User';
+  const peerAvatarUrl = peerBadge?.avatarUrl ?? null;
 
-  const send = useCallback(() => {
-    const body = text.trim();
-    if (!body || !myUserId) return;
-    setText('');
-    const clientId = `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    dispatch(
-      messageSentOptimistic({
-        conversationId,
-        message: {
-          id: clientId,
-          conversationId,
-          senderId: myUserId,
-          body,
-          createdAt: new Date().toISOString(),
-          clientId,
-        },
-      }),
-    );
-    socketSendMessage({ conversationId, body, clientId });
-  }, [text, myUserId, conversationId, dispatch]);
+  const openPeerProfile = useCallback(() => {
+    if (!otherUserId) return;
+    navigation.navigate('UserProfile', { userId: otherUserId });
+  }, [navigation, otherUserId]);
 
-  const onRetry = useCallback(
-    (msg: ChatMessage) => {
-      if (!myUserId) return;
-      dispatch(failedMessageCleared(msg.id));
-      const clientId = msg.clientId ?? msg.id;
+  useEffect(() => {
+    void dispatch(fetchMessages({ conversationId }));
+    void joinConversation(conversationId);
+  }, [conversationId, dispatch, joinConversation]);
+
+  useEffect(() => {
+    return on('chat:message', (msg) => {
       dispatch(
-        messageQueued({
-          conversationId,
-          message: { ...msg, id: clientId, clientId },
+        messageReceived({
+          ...msg,
+          type: msg.type ?? 'text',
+          location: msg.location ?? null,
+          locationSessionId: msg.locationSessionId ?? null,
         }),
       );
-      socketSendMessage({ conversationId, body: msg.body, clientId });
+    });
+  }, [on, dispatch]);
+
+  const send = useCallback(async (): Promise<void> => {
+    const text = body.trim();
+    if (!text || sending) return;
+    setSending(true);
+    setBody('');
+
+    const optimisticId = `opt-${Date.now()}`;
+    const optimistic: ChatMessage = {
+      id: optimisticId,
+      conversationId,
+      senderId: myUserId,
+      body: text,
+      type: 'text',
+      createdAt: new Date().toISOString(),
+    };
+    dispatch(messageSentOptimistic(optimistic));
+
+    const confirmed = await sendMessage(conversationId, text, optimisticId);
+    if (confirmed) {
+      dispatch(
+        messageConfirmed({
+          optimisticId,
+          confirmed: {
+            ...confirmed,
+            type: confirmed.type ?? 'text',
+            location: confirmed.location ?? null,
+            locationSessionId: confirmed.locationSessionId ?? null,
+          },
+        }),
+      );
+    } else {
+      dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
+    }
+    setSending(false);
+  }, [body, sending, conversationId, myUserId, dispatch, sendMessage]);
+
+  const retry = useCallback(
+    async (optimisticId: string, text: string): Promise<void> => {
+      dispatch(failedMessageCleared(optimisticId));
+      dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
+      const confirmed = await socketSendMessage(conversationId, text, optimisticId);
+      if (confirmed) {
+        dispatch(
+          messageConfirmed({
+            optimisticId,
+            confirmed: {
+              ...confirmed,
+              type: confirmed.type ?? 'text',
+              location: confirmed.location ?? null,
+              locationSessionId: confirmed.locationSessionId ?? null,
+            },
+          }),
+        );
+      } else {
+        dispatch(messageQueued({ optimisticId, conversationId, body: text, retries: 0 }));
+      }
     },
-    [conversationId, dispatch, myUserId],
+    [conversationId, dispatch],
   );
 
-  const openPeer = useCallback(() => {
-    navigation.navigate('UserProfile', { userId: peerUserId });
-  }, [navigation, peerUserId]);
+  const loadMore = (): void => {
+    if (nextCursor && !loading) {
+      void dispatch(fetchMessages({ conversationId, cursor: nextCursor }));
+    }
+  };
 
-  const title = peer?.displayName ?? 'Chat';
+  const onShareDuration = useCallback(
+    async (duration: '15m' | '60m' | 'until_off') => {
+      await startShare(duration);
+      setShareOpen(false);
+    },
+    [startShare],
+  );
 
   return (
     <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: themeColors.bg }]}
+      style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <ScreenHeader
-        title={title}
-        onTitlePress={openPeer}
-        right={
-          peer?.verification ? (
-            <VerificationBadge level={peer.verification as VerificationLevel} size="sm" />
-          ) : undefined
+        bordered
+        center={
+          <TouchableOpacity
+            style={styles.headerTitleTap}
+            onPress={openPeerProfile}
+            disabled={!otherUserId}
+            accessibilityRole="button"
+            accessibilityLabel={`Open profile for ${otherUserName || 'user'}`}
+            activeOpacity={0.7}
+          >
+            <Avatar
+              uri={peerBadge?.avatarUrl ?? null}
+              name={otherUserName || 'Chat'}
+              size={32}
+            />
+            <Text style={styles.headerName} numberOfLines={1}>
+              {otherUserName || 'Chat'}
+            </Text>
+            <VerificationBadge
+              verification={badgeVerification}
+              idVerified={badgeIdVerified}
+              size={18}
+            />
+          </TouchableOpacity>
         }
       />
 
-      {location.active ? (
-        <LocationSessionBanner session={location.session} onStop={location.stop} />
+      {showRequestBanner ? (
+        <View style={styles.requestBanner}>
+          <Text style={styles.requestBannerText}>
+            {requestLocked
+              ? 'Request sent — you can send another message once they reply.'
+              : "Message request — they'll see one message until they reply."}
+          </Text>
+        </View>
       ) : null}
 
-      {loading && sorted.length === 0 ? (
-        <ActivityIndicator style={{ flex: 1 }} color={colors.primary} />
+      {liveSession ? (
+        <LocationSessionBanner
+          session={liveSession}
+          isSharer={isSharer}
+          peerName={otherUserName}
+          onStop={() => void stopShare()}
+          onOpenMap={openInMaps}
+        />
+      ) : null}
+
+      {loading && messages.length === 0 ? (
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
       ) : (
         <FlatList
           ref={listRef}
-          data={sorted}
+          data={messages}
           keyExtractor={(m) => m.id}
-          contentContainerStyle={styles.list}
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-          renderItem={({ item }) => {
-            const isMine = item.senderId === myUserId;
-            const isPending = pendingIds.includes(item.id) || pendingIds.includes(item.clientId ?? '');
-            const isFailed = failedIds.includes(item.id) || failedIds.includes(item.clientId ?? '');
-            return (
-              <MessageBubble
-                msg={item}
-                isMine={isMine}
-                isPending={isPending}
-                isFailed={isFailed}
-                onRetry={() => onRetry(item)}
-                peerName={peer?.displayName ?? 'Peer'}
-                peerAvatarUrl={peer?.avatarUrl ?? null}
-                onOpenPeerProfile={openPeer}
-              />
-            );
-          }}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={styles.emptyText}>Say hello</Text>
-            </View>
-          }
+          renderItem={({ item }) => (
+            <MessageBubble
+              msg={item}
+              isMine={item.senderId === myUserId}
+              isPending={pendingIds.has(item.id)}
+              isFailed={failedIds.includes(item.id)}
+              onRetry={() => void retry(item.id, item.body)}
+              peerName={peerDisplayName}
+              peerAvatarUrl={peerAvatarUrl}
+              onOpenPeerProfile={otherUserId ? openPeerProfile : null}
+            />
+          )}
+          inverted
+          contentContainerStyle={styles.messageList}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.3}
         />
       )}
 
-      <View style={styles.composer}>
-        <TouchableOpacity
-          style={styles.iconBtn}
-          onPress={() => setGiftOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Send gift"
-        >
-          <Text style={styles.iconBtnText}>🎁</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.iconBtn}
-          onPress={() => setLocationOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Share location"
-        >
-          <Text style={styles.iconBtnText}>📍</Text>
-        </TouchableOpacity>
+      <View style={styles.inputRow}>
+        {canShareLocation ? (
+          <TouchableOpacity
+            style={styles.locBtn}
+            onPress={() => setShareOpen(true)}
+            disabled={shareStarting}
+            accessibilityRole="button"
+            accessibilityLabel="Share live location"
+            hitSlop={8}
+          >
+            <Text style={styles.locBtnText}>📍</Text>
+          </TouchableOpacity>
+        ) : null}
+        {canGift ? (
+          <TouchableOpacity
+            style={styles.giftBtn}
+            onPress={() => setGiftOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Send a gift"
+            hitSlop={8}
+          >
+            <Text style={styles.giftBtnText}>🎁</Text>
+          </TouchableOpacity>
+        ) : null}
         <TextInput
           style={styles.input}
-          value={text}
-          onChangeText={setText}
-          placeholder={connected ? 'Message' : 'Connecting…'}
+          value={body}
+          onChangeText={setBody}
+          placeholder={requestLocked ? 'Waiting for a reply…' : 'Message…'}
           placeholderTextColor={colors.textFaint}
+          editable={!requestLocked}
           multiline
           maxLength={2000}
-          editable={connected}
+          returnKeyType="send"
+          onSubmitEditing={send}
+          blurOnSubmit={false}
+          accessibilityLabel="Message"
         />
         <TouchableOpacity
-          style={[styles.sendBtn, (!text.trim() || !connected) && styles.sendDisabled]}
+          style={[
+            styles.sendBtn,
+            (!body.trim() || sending || requestLocked) && styles.sendBtnDisabled,
+          ]}
           onPress={send}
-          disabled={!text.trim() || !connected}
+          disabled={!body.trim() || sending || requestLocked}
           accessibilityRole="button"
           accessibilityLabel="Send message"
         >
-          <Text style={styles.sendText}>Send</Text>
+          {sending ? (
+            <ActivityIndicator color={colors.onPrimary} size="small" />
+          ) : (
+            <Text style={styles.sendBtnText}>↑</Text>
+          )}
         </TouchableOpacity>
       </View>
 
-      <SendGiftSheet
-        visible={giftOpen}
-        onClose={() => setGiftOpen(false)}
-        peerUserId={peerUserId}
-        conversationId={conversationId}
-      />
+      {canGift && otherUserId ? (
+        <SendGiftSheet
+          visible={giftOpen}
+          recipientId={otherUserId}
+          recipientName={otherUserName}
+          onClose={() => setGiftOpen(false)}
+        />
+      ) : null}
+
       <LocationShareSheet
-        visible={locationOpen}
-        onClose={() => setLocationOpen(false)}
-        conversationId={conversationId}
-        onStart={location.start}
+        visible={shareOpen}
+        starting={shareStarting}
+        onClose={() => setShareOpen(false)}
+        onShare={(d) => void onShareDuration(d)}
       />
     </KeyboardAvoidingView>
   );
@@ -274,50 +452,94 @@ export function ChatScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  list: { padding: spacing.md, paddingBottom: spacing.lg, flexGrow: 1 },
-  row: { flexDirection: 'row', marginBottom: spacing.sm, alignItems: 'flex-end', gap: 8 },
-  rowMine: { justifyContent: 'flex-end' },
-  rowPeer: { justifyContent: 'flex-start' },
-  bubble: { maxWidth: '72%', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
-  bubbleMine: { backgroundColor: colors.primary },
-  bubblePeer: { backgroundColor: colors.surfaceRaised, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-  bubbleFailed: { opacity: 0.85 },
-  bubbleText: { fontSize: 15, lineHeight: 20 },
-  bubbleTextMine: { color: colors.onPrimary },
-  bubbleTextPeer: { color: colors.textPrimary },
-  meta: { color: colors.onPrimary, opacity: 0.7, fontSize: 11, marginTop: 2 },
-  retry: { color: colors.danger, fontSize: 12, marginTop: 4, fontWeight: '600' },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-  emptyText: { color: colors.textMuted },
-  composer: {
+  headerTitleTap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 44,
+    maxWidth: '100%',
+  },
+  headerName: { flexShrink: 1, color: colors.textPrimary, fontSize: 17, fontWeight: '600' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  requestBanner: {
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  requestBannerText: { color: colors.action, fontSize: 12, textAlign: 'center' },
+  messageList: { paddingHorizontal: 12, paddingVertical: 8 },
+  peerRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 8,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    backgroundColor: colors.surface,
+    gap: spacing.sm,
+    marginVertical: 3,
+    maxWidth: '90%',
+    alignSelf: 'flex-start',
   },
-  iconBtn: { padding: 8 },
-  iconBtnText: { fontSize: 18 },
+  peerAvatarTap: {
+    marginBottom: 2,
+  },
+  locBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
+  locBtnText: { fontSize: 20 },
+  giftBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6 },
+  giftBtnText: { fontSize: 22 },
+  bubble: { maxWidth: '78%', borderRadius: 16, padding: 10, marginVertical: 3 },
+  bubbleMine: { alignSelf: 'flex-end', backgroundColor: colors.primary },
+  // Peer bubble sits inside peerRow — no outer alignSelf/margin (row owns layout).
+  bubbleTheirs: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.surfaceAlt,
+    maxWidth: '100%',
+    flexShrink: 1,
+    marginVertical: 0,
+  },
+  bubbleText: { fontSize: 15, lineHeight: 20 },
+  bubbleTextMine: { color: colors.onPrimary },
+  bubbleTextTheirs: { color: colors.textPrimary },
+  statusPending: {
+    fontSize: 11,
+    color: 'rgba(10,10,15,0.4)',
+    marginTop: 2,
+    textAlign: 'right',
+  },
+  statusFailed: {
+    fontSize: 11,
+    color: colors.danger,
+    marginTop: 2,
+    textAlign: 'right',
+    fontWeight: '600',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    padding: 10,
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.surfaceAlt,
+    backgroundColor: colors.bg,
+    alignItems: 'flex-end',
+  },
   input: {
     flex: 1,
-    maxHeight: 120,
-    minHeight: 40,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 20,
     backgroundColor: colors.surfaceAlt,
     color: colors.textPrimary,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     fontSize: 15,
+    maxHeight: 120,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
   },
   sendBtn: {
-    backgroundColor: colors.primary,
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  sendDisabled: { opacity: 0.4 },
-  sendText: { color: colors.onPrimary, fontWeight: '700', fontSize: 14 },
+  sendBtnDisabled: { opacity: 0.4 },
+  sendBtnText: { color: colors.onPrimary, fontSize: 18, fontWeight: '700' },
 });
