@@ -39,4 +39,46 @@ describe('inboxDestination', () => {
       userId: 'peer-1',
     });
   });
+
+  it('opens friend-accepted notification on its typed profile destination', () => {
+    expect(inboxDestination(item({
+      type: 'notification',
+      notification: {
+        kind: 'friend_accepted',
+        destination: { type: 'profile', userId: 'peer-2' },
+      },
+    }))).toEqual({ kind: 'profile', userId: 'peer-2' });
+  });
+
+  it('supports event, listing, and chat notification destinations', () => {
+    expect(inboxDestination(item({
+      type: 'notification',
+      notification: { kind: 'mention', destination: { type: 'event', eventId: 'event-1' } },
+    }))).toEqual({ kind: 'event', eventId: 'event-1' });
+
+    expect(inboxDestination(item({
+      type: 'notification',
+      notification: { kind: 'mention', destination: { type: 'listing', listingId: 'listing-1' } },
+    }))).toEqual({ kind: 'listing', listingId: 'listing-1' });
+
+    expect(inboxDestination(item({
+      type: 'notification',
+      notification: { kind: 'mention', destination: { type: 'chat', conversationId: 'chat-1' } },
+    }))).toEqual({
+      kind: 'chat',
+      conversationId: 'chat-1',
+      otherUserId: 'peer-1',
+      otherUserName: 'Peer',
+    });
+  });
+
+  it('falls back to the actor profile for an unusable notification destination', () => {
+    expect(inboxDestination(item({
+      type: 'notification',
+      notification: {
+        kind: 'mention',
+        destination: { type: 'event', eventId: '   ' },
+      },
+    }))).toEqual({ kind: 'profile', userId: 'peer-1' });
+  });
 });
