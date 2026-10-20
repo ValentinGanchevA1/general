@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-	AccessibilityInfo,
-	ActivityIndicator,
 	InteractionManager,
 	StyleSheet,
 	Text,
@@ -59,7 +57,6 @@ import {
 	DEFAULT_MAP_LAYERS,
 	type ListingModeFilterValue,
 } from '@/components/map/MapFilterRow';
-import { EmptyState } from '@/components/EmptyState';
 import { mapEmptyCopy } from '@/components/map/mapEmptyCopy';
 import { MapChrome } from '@/components/map/MapChrome';
 import { TrendingCard } from '@/components/map/TrendingCard';
@@ -101,6 +98,10 @@ import {
 	nexaEntitySelectionKey,
 	regionForSelectedEntity,
 } from '@/components/map/nexaMapSheetChoreography';
+import { NexaMapSpatialStatus } from '@/components/map/NexaMapSpatialStatus';
+import { resolveNexaMapSpatialState } from '@/components/map/nexaMapSpatialStates';
+import { NEXA_MOTION_MS } from '@/motion/nexaMotion';
+import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
@@ -116,7 +117,7 @@ export function MapScreen(): React.JSX.Element {
 	const [region, setRegion] = useState<Region | null>(null);
 	const [selected, setSelected] = useState<EntityPoint | null>(null);
 	const [waveToast, setWaveToast] = useState<string | null>(null);
-	const [reduceMotion, setReduceMotion] = useState(false);
+	const reduceMotion = useNexaReducedMotion();
 	const mapRef = useRef<MapView>(null);
 	const entitySheetRef = useRef<BottomSheetModal>(null);
 	const presentedIdRef = useRef<string | null>(null);
@@ -135,21 +136,6 @@ export function MapScreen(): React.JSX.Element {
 	const [searchQuery, setSearchQuery] = useState('');
 	const [trendingCollapsed, setTrendingCollapsed] = useState(true);
 	const insets = useSafeAreaInsets();
-
-	useEffect(() => {
-		let active = true;
-		void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-			if (active) setReduceMotion(enabled);
-		});
-		const subscription = AccessibilityInfo.addEventListener(
-			'reduceMotionChanged',
-			(enabled) => setReduceMotion(enabled),
-		);
-		return () => {
-			active = false;
-			subscription.remove();
-		};
-	}, []);
 
 	const viewerMode = datingOnly ? 'dating' : 'social';
 	const {
@@ -192,7 +178,12 @@ export function MapScreen(): React.JSX.Element {
 	const peopleLayer = kinds.includes('user');
 	const listingsLayer = kinds.includes('listing');
 
-	const { data, loading, refresh: refreshDiscovery } = useDiscovery({
+	const {
+		data,
+		loading,
+		error,
+		refresh: refreshDiscovery,
+	} = useDiscovery({
 		viewport,
 		zoom,
 		kinds,
@@ -501,7 +492,6 @@ export function MapScreen(): React.JSX.Element {
 		};
 	}, [on, activePinId, pinSend]);
 
-
 	// B/C: surface machine action errors once
 	useEffect(() => {
 		if (pinMachineError == null || pinMachineError === '') return;
@@ -627,6 +617,18 @@ export function MapScreen(): React.JSX.Element {
 		[region?.latitudeDelta, region?.longitudeDelta],
 	);
 
+	const zoomInForDiscovery = useCallback(() => {
+		if (region == null) return;
+		mapRef.current?.animateToRegion(
+			{
+				...region,
+				latitudeDelta: Math.max(0.005, region.latitudeDelta / 2.5),
+				longitudeDelta: Math.max(0.005, region.longitudeDelta / 2.5),
+			},
+			reduceMotion ? 0 : NEXA_MOTION_MS.map,
+		);
+	}, [reduceMotion, region]);
+
 	// B: toast when machine wave succeeds (non-mutual) — defer setState (lint)
 	useEffect(() => {
 		let msg: string | null = null;
@@ -658,7 +660,15 @@ export function MapScreen(): React.JSX.Element {
 		region.latitudeDelta <= 0.25 &&
 		region.longitudeDelta > 0 &&
 		region.longitudeDelta <= 0.25;
-	const isEmpty = !loading && points.length === 0 && isCityScale;
+	const spatialState = resolveNexaMapSpatialState({
+		hasRegion: region != null,
+		loading,
+		hasError: error != null,
+		pointCount: points.length,
+		viewportHash: data?.viewportHash ?? null,
+		isCityScale,
+	});
+	const isEmpty = spatialState === 'empty';
 
 	const peopleLayerOn = layers.includes('user');
 	const showNearbyPeopleRail =
@@ -762,6 +772,25 @@ export function MapScreen(): React.JSX.Element {
 		emailVerified,
 	});
 
+	const onSpatialEmptyAction = useCallback(() => {
+		switch (emptyCopy.actionKind) {
+			case 'show_everyone':
+				setFriendsOnly(false);
+				return;
+			case 'clear_dating':
+				setDatingOnly(false);
+				return;
+			case 'dating_prefs':
+				openRootScreen(navigation, 'ProfileEdit', { focus: 'dating' });
+				return;
+			case 'verify_email':
+				openRootScreen(navigation, 'TrustCenter', { focusStep: 'email' });
+				return;
+			case 'create':
+				openCreateNearby();
+		}
+	}, [emptyCopy.actionKind, navigation, openCreateNearby]);
+
 	useEffect(() => {
 		let cancelled = false;
 		void (async () => {
@@ -857,7 +886,7 @@ export function MapScreen(): React.JSX.Element {
 				visible={
 					isCityScale &&
 					!sheetOpen &&
-					!isEmpty &&
+					points.length > 0 &&
 					searchQuery.trim() === ''
 				}
 				collapsed={trendingCollapsed}
@@ -872,37 +901,18 @@ export function MapScreen(): React.JSX.Element {
 				/>
 			) : null}
 
-			{isEmpty && !createNudgeVisible && nudge == null ? (
-				<View style={styles.emptyWrap} pointerEvents="box-none">
-					<EmptyState
-						variant="card"
-						icon={emptyCopy.icon}
-						title={emptyCopy.title}
-						body={emptyCopy.body}
-						actionLabel={emptyCopy.actionLabel}
-						onAction={
-							emptyCopy.actionKind === 'show_everyone'
-								? () => setFriendsOnly(false)
-								: emptyCopy.actionKind === 'clear_dating'
-									? () => setDatingOnly(false)
-									: emptyCopy.actionKind === 'dating_prefs'
-										? () =>
-											openRootScreen(navigation, 'ProfileEdit', {
-												focus: 'dating',
-											})
-										: emptyCopy.actionKind === 'verify_email'
-											? () => openRootScreen(navigation, 'TrustCenter', { focusStep: 'email' })
-											: openCreateNearby
-						}
-					/>
-				</View>
-			) : null}
-
-			{loading && points.length === 0 ? (
-				<View style={styles.loading} pointerEvents="none">
-					<ActivityIndicator color={colors.primary} />
-				</View>
-			) : null}
+			<NexaMapSpatialStatus
+				state={spatialState}
+				emptyCopy={emptyCopy}
+				hidden={
+					sheetOpen ||
+					createNearbyOpen ||
+					(spatialState === 'empty' && (createNudgeVisible || nudge != null))
+				}
+				onEmptyAction={onSpatialEmptyAction}
+				onRetry={refreshDiscovery}
+				onZoomIn={zoomInForDiscovery}
+			/>
 
 			<MapCoachMarks mapReady={region != null} />
 
@@ -999,8 +1009,11 @@ export function MapScreen(): React.JSX.Element {
 function MapUnavailableFallback(): React.JSX.Element {
 	return (
 		<View style={styles.unavailable}>
-			<Text style={styles.unavailableTitle}>Map unavailable</Text>
-			<Text style={styles.unavailableBody}>Pull to refresh or restart the app.</Text>
+			<Text style={styles.unavailableEyebrow}>NEXA MAP</Text>
+			<Text style={styles.unavailableTitle}>Map view interrupted</Text>
+			<Text style={styles.unavailableBody}>
+				NEXA could not render the map surface. Reopen this screen or restart the app.
+			</Text>
 		</View>
 	);
 }
@@ -1027,18 +1040,6 @@ const styles = StyleSheet.create({
 	root: { flex: 1, backgroundColor: colors.bg },
 	filterRow: { position: 'absolute', left: 0, right: 0, zIndex: 20 },
 	trendingWrap: { position: 'absolute', left: 0, right: 0, zIndex: 19 },
-	emptyWrap: {
-		...StyleSheet.absoluteFillObject,
-		justifyContent: 'center',
-		paddingHorizontal: 24,
-		zIndex: 15,
-	},
-	loading: {
-		...StyleSheet.absoluteFillObject,
-		justifyContent: 'center',
-		alignItems: 'center',
-		zIndex: 10,
-	},
 	toast: {
 		position: 'absolute',
 		alignSelf: 'center',
@@ -1055,8 +1056,25 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		padding: 24,
-		backgroundColor: colors.bg,
+		backgroundColor: colors.canvas,
 	},
-	unavailableTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '700' },
-	unavailableBody: { color: colors.textMuted, marginTop: 8, textAlign: 'center' },
+	unavailableEyebrow: {
+		color: colors.discovery,
+		fontSize: 11,
+		fontWeight: '800',
+		letterSpacing: 1.2,
+	},
+	unavailableTitle: {
+		color: colors.textPrimary,
+		fontSize: 19,
+		fontWeight: '800',
+		marginTop: 8,
+	},
+	unavailableBody: {
+		color: colors.textSecondary,
+		marginTop: 8,
+		lineHeight: 20,
+		textAlign: 'center',
+		maxWidth: 320,
+	},
 });
