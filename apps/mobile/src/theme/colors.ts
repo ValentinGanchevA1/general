@@ -1,27 +1,62 @@
-// Semantic color tokens — light + dark.
-// Brand concepts retained: cyan primary, purple accent, green action,
-// entity marker colors, premium gold, destructive red.
-// No inline hex in screens; consume via useAppTheme() or legacy `colors`.
+import { nexaBrand, nexaDark, nexaStatus } from './brand';
+
+// NEXA semantic color tokens — dark-first, light accessible alternative.
+//
+// Canonical rules:
+// - violet = action / people
+// - cyan = discovery / live / verification / events
+// - listings = neutral
+// - opportunity = violet -> cyan gradient (flat fallback is violet)
+//
+// Existing flat token names remain as compatibility aliases so feature migration
+// can be incremental instead of a high-risk repository-wide rewrite.
 
 export type ThemeColors = {
-  // Surfaces
+  // Canonical surfaces
+  canvas: string;
+  mapBase: string;
+  surfacePrimary: string;
+  surfaceSecondary: string;
+  surfaceTertiary: string;
+  surfaceHover: string;
+  borderSubtle: string;
+  borderDefault: string;
+  borderStrong: string;
+
+  // Legacy surface aliases
   bg: string;
   surface: string;
   surfaceRaised: string;
   surfaceAlt: string;
   border: string;
-  borderStrong: string;
 
-  // Brand
+  // Canonical brand semantics
+  brandViolet: string;
+  brandVioletBright: string;
+  brandVioletMuted: string;
+  brandCyan: string;
+  brandCyanBright: string;
+  brandCyanMuted: string;
+  actionPrimary: string;
+  discovery: string;
+  live: string;
+  verified: string;
+  onPrimary: string;
+
+  // Legacy brand aliases
   primary: string;
   accent: string;
   info: string;
   action: string;
-  onPrimary: string;
 
   // Text
   textPrimary: string;
   textSecondary: string;
+  textTertiary: string;
+  textDisabled: string;
+  textInverse: string;
+
+  // Legacy text aliases
   textMuted: string;
   textFaint: string;
 
@@ -35,14 +70,18 @@ export type ThemeColors = {
   warning: string;
   success: string;
 
-  // Entity markers (shared across modes — identity on map)
-  entityUser: string;
+  // Canonical entity semantics
+  entityPerson: string;
   entityEvent: string;
   entityListing: string;
+  entityOpportunity: string;
+
+  // Legacy entity aliases / relation modifiers
+  entityUser: string;
   entityFriend: string;
   entityWanted: string;
 
-  // Premium
+  // Premium / gamification accents retained as product semantics
   premium: string;
   premiumBorder: string;
   premiumTier: string;
@@ -57,12 +96,27 @@ export type ThemeColors = {
 
   shadowInk: string;
 
-  // Tints
+  // Action tints
+  actionSoft: string;
+  actionMutedBg: string;
+  actionGhost: string;
+  actionBorderSoft: string;
+  actionBorder: string;
+
+  // Discovery tints
+  discoverySoft: string;
+  discoveryMutedBg: string;
+  discoveryGhost: string;
+  discoveryBorderSoft: string;
+  discoveryBorder: string;
+
+  // Legacy tint aliases
   primarySoft: string;
   primaryMutedBg: string;
   primaryGhost: string;
   primaryBorderSoft: string;
   primaryBorder: string;
+
   premiumSoft: string;
   premiumMutedBg: string;
   premiumBorderSoft: string;
@@ -70,105 +124,169 @@ export type ThemeColors = {
   dangerBorderSoft: string;
 };
 
-/** Current production dark palette (source of truth for dark mode). */
+/** Primary NEXA brand experience. */
 export const darkColors: ThemeColors = {
-  bg: '#0a0a0f',
-  surface: '#12121f',
-  surfaceRaised: '#1a1a24',
-  surfaceAlt: '#1a1a2e',
-  border: '#1f1f33',
-  borderStrong: '#2a2a4a',
+  canvas: nexaDark.canvas,
+  mapBase: nexaDark.mapBase,
+  surfacePrimary: nexaDark.surfacePrimary,
+  surfaceSecondary: nexaDark.surfaceSecondary,
+  surfaceTertiary: nexaDark.surfaceTertiary,
+  surfaceHover: nexaDark.surfaceHover,
+  borderSubtle: nexaDark.borderSubtle,
+  borderDefault: nexaDark.borderDefault,
+  borderStrong: nexaDark.borderStrong,
 
-  primary: '#00d4ff',
-  accent: '#7C5CFF',
-  info: '#7ad7ff',
-  action: '#34e0a1',
-  onPrimary: '#0a0a0f',
+  bg: nexaDark.canvas,
+  surface: nexaDark.surfacePrimary,
+  surfaceRaised: nexaDark.surfaceSecondary,
+  surfaceAlt: nexaDark.surfaceTertiary,
+  border: nexaDark.borderSubtle,
 
-  textPrimary: '#ffffff',
-  textSecondary: '#aaaaaa',
-  textMuted: '#A0A0A0',
-  textFaint: '#777777',
+  brandViolet: nexaBrand.violet,
+  brandVioletBright: nexaBrand.violetBright,
+  brandVioletMuted: nexaBrand.violetMuted,
+  brandCyan: nexaBrand.cyan,
+  brandCyanBright: nexaBrand.cyanBright,
+  brandCyanMuted: nexaBrand.cyanMuted,
+  actionPrimary: nexaBrand.violet,
+  discovery: nexaBrand.cyan,
+  live: nexaBrand.cyan,
+  verified: nexaBrand.cyan,
+  onPrimary: nexaDark.textPrimary,
 
-  danger: '#ff4444',
-  dangerMuted: '#ff6b6b',
-  dangerSurface: '#3a1a1a',
-  dangerBorder: '#5a1a1a',
-  dangerSolid: '#c0392b',
-  primaryTrack: '#0095b3',
-  warning: '#ff9d3c',
-  success: '#4caf50',
+  // Compatibility: old primary/action now mean NEXA action; accent/info mean discovery.
+  primary: nexaBrand.violet,
+  accent: nexaBrand.cyan,
+  info: nexaBrand.cyan,
+  action: nexaBrand.violet,
 
-  entityUser: '#FF69B4',
-  entityEvent: '#FF9800',
-  entityListing: '#4CAF50',
-  entityFriend: '#2EE6C5',
-  entityWanted: '#C084FC',
+  textPrimary: nexaDark.textPrimary,
+  textSecondary: nexaDark.textSecondary,
+  textTertiary: nexaDark.textTertiary,
+  textDisabled: nexaDark.textDisabled,
+  textInverse: nexaDark.textInverse,
+  textMuted: nexaDark.textTertiary,
+  textFaint: nexaDark.textDisabled,
 
-  premium: '#FFD700',
-  premiumBorder: '#FFD70040',
-  premiumTier: '#9C27B0',
+  danger: nexaStatus.error,
+  dangerMuted: '#FF8295',
+  dangerSurface: 'rgba(255, 100, 124, 0.10)',
+  dangerBorder: 'rgba(255, 100, 124, 0.28)',
+  dangerSolid: '#D84C65',
+  primaryTrack: nexaBrand.violetMuted,
+  warning: nexaStatus.warning,
+  success: nexaStatus.success,
 
-  toastXp: '#2a1a08',
-  toastSuccess: '#0d2818',
-  toastAchievement: '#1a1030',
-  toastRank: '#0a2030',
-  toastWave: '#0a2430',
-  toastGift: '#2a1030',
+  entityPerson: nexaBrand.violet,
+  entityEvent: nexaBrand.cyan,
+  entityListing: nexaDark.textPrimary,
+  entityOpportunity: nexaBrand.violet,
+  entityUser: nexaBrand.violet,
+  entityFriend: nexaBrand.cyanBright,
+  entityWanted: nexaBrand.violetBright,
+
+  premium: '#FFD166',
+  premiumBorder: 'rgba(255, 209, 102, 0.32)',
+  premiumTier: nexaBrand.violetBright,
+
+  toastXp: '#241C0E',
+  toastSuccess: '#0D241A',
+  toastAchievement: '#1A1530',
+  toastRank: '#0C2028',
+  toastWave: '#0B2229',
+  toastGift: '#21142C',
 
   shadowInk: '#000000',
 
-  primarySoft: 'rgba(0, 212, 255, 0.07)',
-  primaryMutedBg: 'rgba(0, 212, 255, 0.09)',
-  primaryGhost: 'rgba(0, 212, 255, 0.125)',
-  primaryBorderSoft: 'rgba(0, 212, 255, 0.25)',
-  primaryBorder: 'rgba(0, 212, 255, 0.4)',
-  premiumSoft: 'rgba(255, 215, 0, 0.07)',
-  premiumMutedBg: 'rgba(255, 215, 0, 0.09)',
-  premiumBorderSoft: 'rgba(255, 215, 0, 0.2)',
-  premiumBorderMid: 'rgba(255, 215, 0, 0.4)',
-  dangerBorderSoft: 'rgba(255, 107, 107, 0.4)',
+  actionSoft: 'rgba(124, 92, 252, 0.07)',
+  actionMutedBg: 'rgba(124, 92, 252, 0.10)',
+  actionGhost: 'rgba(124, 92, 252, 0.14)',
+  actionBorderSoft: 'rgba(124, 92, 252, 0.25)',
+  actionBorder: 'rgba(124, 92, 252, 0.40)',
+
+  discoverySoft: 'rgba(39, 211, 242, 0.07)',
+  discoveryMutedBg: 'rgba(39, 211, 242, 0.10)',
+  discoveryGhost: 'rgba(39, 211, 242, 0.14)',
+  discoveryBorderSoft: 'rgba(39, 211, 242, 0.24)',
+  discoveryBorder: 'rgba(39, 211, 242, 0.38)',
+
+  primarySoft: 'rgba(124, 92, 252, 0.07)',
+  primaryMutedBg: 'rgba(124, 92, 252, 0.10)',
+  primaryGhost: 'rgba(124, 92, 252, 0.14)',
+  primaryBorderSoft: 'rgba(124, 92, 252, 0.25)',
+  primaryBorder: 'rgba(124, 92, 252, 0.40)',
+
+  premiumSoft: 'rgba(255, 209, 102, 0.07)',
+  premiumMutedBg: 'rgba(255, 209, 102, 0.10)',
+  premiumBorderSoft: 'rgba(255, 209, 102, 0.20)',
+  premiumBorderMid: 'rgba(255, 209, 102, 0.40)',
+  dangerBorderSoft: 'rgba(255, 100, 124, 0.40)',
 };
 
-/** Light palette — same semantic keys; soft neutrals, retained brand hues. */
+/** Secondary accessibility mode. Brand semantics remain identical. */
 export const lightColors: ThemeColors = {
-  bg: '#F4F5F8',
-  surface: '#FFFFFF',
-  surfaceRaised: '#F0F1F5',
-  surfaceAlt: '#E8EAF0',
-  border: '#E2E4EA',
-  borderStrong: '#C8CAD4',
+  canvas: '#F6F7FA',
+  mapBase: '#EEF1F5',
+  surfacePrimary: '#FFFFFF',
+  surfaceSecondary: '#F0F2F7',
+  surfaceTertiary: '#E7EAF0',
+  surfaceHover: '#DFE3EA',
+  borderSubtle: 'rgba(9, 10, 14, 0.08)',
+  borderDefault: 'rgba(9, 10, 14, 0.13)',
+  borderStrong: 'rgba(9, 10, 14, 0.22)',
 
-  primary: '#0099CC',
-  accent: '#6B4FE0',
-  info: '#0A8AB8',
-  action: '#12B886',
+  bg: '#F6F7FA',
+  surface: '#FFFFFF',
+  surfaceRaised: '#F0F2F7',
+  surfaceAlt: '#E7EAF0',
+  border: 'rgba(9, 10, 14, 0.08)',
+
+  brandViolet: nexaBrand.violet,
+  brandVioletBright: nexaBrand.violetBright,
+  brandVioletMuted: nexaBrand.violetMuted,
+  brandCyan: nexaBrand.cyan,
+  brandCyanBright: nexaBrand.cyanBright,
+  brandCyanMuted: nexaBrand.cyanMuted,
+  actionPrimary: '#6849DF',
+  discovery: nexaBrand.cyanMuted,
+  live: nexaBrand.cyanMuted,
+  verified: nexaBrand.cyanMuted,
   onPrimary: '#FFFFFF',
 
-  textPrimary: '#111118',
-  textSecondary: '#4A4A55',
-  textMuted: '#6B6B78',
-  textFaint: '#9A9AA8',
+  primary: '#6849DF',
+  accent: nexaBrand.cyanMuted,
+  info: nexaBrand.cyanMuted,
+  action: '#6849DF',
 
-  danger: '#E03131',
-  dangerMuted: '#C92A2A',
-  dangerSurface: '#FFF0F0',
-  dangerBorder: '#FFC9C9',
-  dangerSolid: '#C0392b',
-  primaryTrack: '#66C2E0',
-  warning: '#E67700',
-  success: '#2F9E44',
+  textPrimary: '#111318',
+  textSecondary: '#4B515D',
+  textTertiary: '#6E7582',
+  textDisabled: '#9AA0AB',
+  textInverse: nexaDark.textPrimary,
+  textMuted: '#6E7582',
+  textFaint: '#9AA0AB',
 
-  // Entity markers stay vivid on both modes (map identity)
-  entityUser: '#FF69B4',
-  entityEvent: '#FF9800',
-  entityListing: '#4CAF50',
-  entityFriend: '#12B886',
-  entityWanted: '#9B59B6',
+  danger: '#C93650',
+  dangerMuted: '#B52E46',
+  dangerSurface: '#FFF0F3',
+  dangerBorder: '#F2BEC8',
+  dangerSolid: '#AE2B42',
+  primaryTrack: '#9A87ED',
+  warning: '#8A6500',
+  success: '#147A4D',
 
-  premium: '#C9A227',
-  premiumBorder: '#C9A22740',
-  premiumTier: '#7B1FA2',
+  // Entity identity stays vivid and mode-independent; geometry is the second channel.
+  entityPerson: nexaBrand.violet,
+  entityEvent: nexaBrand.cyan,
+  entityListing: '#20242B',
+  entityOpportunity: nexaBrand.violet,
+  entityUser: nexaBrand.violet,
+  entityFriend: nexaBrand.cyanMuted,
+  entityWanted: nexaBrand.violetBright,
+
+  premium: '#9A7412',
+  premiumBorder: 'rgba(154, 116, 18, 0.30)',
+  premiumTier: '#6E52E8',
 
   toastXp: '#FFF4E0',
   toastSuccess: '#E6F6EC',
@@ -179,14 +297,27 @@ export const lightColors: ThemeColors = {
 
   shadowInk: '#000000',
 
-  primarySoft: 'rgba(0, 153, 204, 0.08)',
-  primaryMutedBg: 'rgba(0, 153, 204, 0.1)',
-  primaryGhost: 'rgba(0, 153, 204, 0.14)',
-  primaryBorderSoft: 'rgba(0, 153, 204, 0.22)',
-  primaryBorder: 'rgba(0, 153, 204, 0.35)',
-  premiumSoft: 'rgba(201, 162, 39, 0.08)',
-  premiumMutedBg: 'rgba(201, 162, 39, 0.1)',
-  premiumBorderSoft: 'rgba(201, 162, 39, 0.2)',
-  premiumBorderMid: 'rgba(201, 162, 39, 0.35)',
-  dangerBorderSoft: 'rgba(224, 49, 49, 0.35)',
+  actionSoft: 'rgba(104, 73, 223, 0.07)',
+  actionMutedBg: 'rgba(104, 73, 223, 0.10)',
+  actionGhost: 'rgba(104, 73, 223, 0.14)',
+  actionBorderSoft: 'rgba(104, 73, 223, 0.23)',
+  actionBorder: 'rgba(104, 73, 223, 0.38)',
+
+  discoverySoft: 'rgba(20, 126, 147, 0.07)',
+  discoveryMutedBg: 'rgba(20, 126, 147, 0.10)',
+  discoveryGhost: 'rgba(20, 126, 147, 0.14)',
+  discoveryBorderSoft: 'rgba(20, 126, 147, 0.23)',
+  discoveryBorder: 'rgba(20, 126, 147, 0.38)',
+
+  primarySoft: 'rgba(104, 73, 223, 0.07)',
+  primaryMutedBg: 'rgba(104, 73, 223, 0.10)',
+  primaryGhost: 'rgba(104, 73, 223, 0.14)',
+  primaryBorderSoft: 'rgba(104, 73, 223, 0.23)',
+  primaryBorder: 'rgba(104, 73, 223, 0.38)',
+
+  premiumSoft: 'rgba(154, 116, 18, 0.07)',
+  premiumMutedBg: 'rgba(154, 116, 18, 0.10)',
+  premiumBorderSoft: 'rgba(154, 116, 18, 0.20)',
+  premiumBorderMid: 'rgba(154, 116, 18, 0.35)',
+  dangerBorderSoft: 'rgba(201, 54, 80, 0.35)',
 };

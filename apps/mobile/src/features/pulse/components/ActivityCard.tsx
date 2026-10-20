@@ -15,12 +15,12 @@ const ICON_BY_TYPE: Record<ActivityType, string> = {
 };
 
 const ACCENT_BY_TYPE: Record<ActivityType, string> = {
-	chat: colors.primary,
-	wave: colors.primary,
-	listing: colors.action,
+	chat: colors.actionPrimary,
+	wave: colors.actionPrimary,
+	listing: colors.entityListing,
 	alert: colors.danger,
-	match: colors.danger,
-	event: colors.primary,
+	match: colors.entityPerson,
+	event: colors.entityEvent,
 };
 
 interface Props {
@@ -99,12 +99,12 @@ const S = StyleSheet.create({
 	cardPressed: { opacity: 0.85 },
 	row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 	avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.bg, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-	avatarText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+	avatarText: { color: colors.entityPerson, fontWeight: '700', fontSize: 13 },
 	body: { flex: 1, minWidth: 0 },
 	title: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
 	titleUnread: { fontWeight: '700' },
 	preview: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
 	meta: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
 	cta: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, minWidth: 64, alignItems: 'center', backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.borderStrong },
-	ctaText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+	ctaText: { color: colors.actionPrimary, fontSize: 13, fontWeight: '700' },
 });

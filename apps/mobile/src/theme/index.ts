@@ -1,6 +1,6 @@
 // apps/mobile/src/theme/index.ts
 //
-// Semantic light/dark design system.
+// NEXA semantic light/dark design system.
 // Ownership: sole mobile UI token source of truth.
 // packages/shared carries DTOs/socket contracts only — no brand palette.
 // Admin (Vite) keeps its own shadcn tokens.
@@ -8,12 +8,15 @@
 // Intentional remaining hex outside this tree:
 //   - mapStyle.ts (Google Maps JSON style array)
 //   - socialConfig.ts (third-party brand colours)
-// Prefer tokens for all app UI. No new #hex in screens.
+//   - native platform resources that cannot import TypeScript tokens
+// Prefer tokens for all React Native UI. No new feature-owned brand hex.
 //
 // Migration:
-//   - New / refactored UI → useAppTheme().colors
+//   - New / refactored UI → useAppTheme().colors semantic tokens
+//   - Brand components → nexaBrand / nexaDark / nexaGradients
 //   - Existing StyleSheets → static `colors` (dark) until screen is touched
 
+export { nexaBrand, nexaDark, nexaStatus, nexaGradients } from './brand';
 export { darkColors, lightColors, type ThemeColors } from './colors';
 export {
   spacing,
@@ -46,8 +49,8 @@ export const colors = darkColors;
 /** @deprecated Prefer useAppTheme().shadow() */
 export const shadow = {
   fab: {
-    shadowColor: darkColors.primary,
-    shadowOpacity: 0.5,
+    shadowColor: darkColors.actionPrimary,
+    shadowOpacity: 0.38,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
