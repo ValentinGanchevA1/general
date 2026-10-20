@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, spacing, radius } from '@/theme';
+import { spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
 
 interface Props {
   onPress: () => void;
@@ -17,7 +17,10 @@ export function ProfileFriendsCard({
   onPressSuggestions,
   pendingCount = 0,
 }: Props): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const showBadge = pendingCount > 0;
+
   return (
     <View style={styles.wrap}>
       <TouchableOpacity
@@ -58,46 +61,48 @@ export function ProfileFriendsCard({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    marginHorizontal: spacing.xl,
-    marginTop: spacing.md,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceRaised,
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    gap: 12,
-  },
-  body: { flex: 1 },
-  title: { color: colors.textPrimary, fontWeight: '700', fontSize: 15 },
-  subtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-  badge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-  },
-  badgeText: { color: colors.onPrimary, fontSize: 11, fontWeight: '800' },
-  suggestRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  suggestText: {
-    flex: 1,
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrap: {
+      marginHorizontal: spacing.xl,
+      marginTop: spacing.md,
+      borderRadius: radius.md,
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceRaised,
+    },
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: spacing.md,
+      gap: 12,
+    },
+    body: { flex: 1 },
+    title: { color: colors.textPrimary, fontWeight: '700', fontSize: 15 },
+    subtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+    badge: {
+      minWidth: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: colors.danger,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 6,
+    },
+    badgeText: { color: colors.onPrimary, fontSize: 11, fontWeight: '800' },
+    suggestRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+    },
+    suggestText: {
+      flex: 1,
+      color: colors.primary,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+  });
+}
