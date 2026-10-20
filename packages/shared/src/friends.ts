@@ -138,7 +138,7 @@ export interface RecentFollowersResponse {
  * Backend: GET /interactions/inbox (domain projection).
  * Friends Requests tab still uses /friends/requests/pending.
  */
-export type InboxItemType = 'wave' | 'friend_request' | 'follow' | 'story_reaction';
+export type InboxItemType = 'wave' | 'friend_request' | 'follow' | 'story_reaction' | 'gift';
 
 export interface InboxItem {
   id: string;
@@ -148,7 +148,7 @@ export interface InboxItem {
     id: string;
     displayName: string;
     avatarUrl: string | null;
-    /** Present for waves/reactions; optional for friend_request / follow cards. */
+    /** Present for waves/reactions; optional for friend_request / follow / gift cards. */
     verification?: VerificationLevel | null;
   };
   isMutual?: boolean;
@@ -156,6 +156,12 @@ export interface InboxItem {
   isFollowingBack?: boolean;
   /** Story reaction only; omit (do not set undefined) under exactOptionalPropertyTypes. */
   reactionKind?: 'heart' | 'wave';
+  /** Gift metadata when type === 'gift'. */
+  gift?: {
+    emoji: string;
+    label: string;
+    message: string | null;
+  };
 }
 
 export interface InboxResponse {
