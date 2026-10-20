@@ -33,7 +33,7 @@ function Point({
 }
 
 /**
- * Native summary of G88 privacy posture. Legal text of record remains the
+ * Native summary of NEXA privacy posture. Legal text of record remains the
  * hosted policy (PRIVACY_POLICY_URL) — this screen is product-aligned explainer only.
  */
 export function PrivacyScreen(): React.JSX.Element {
@@ -51,7 +51,7 @@ export function PrivacyScreen(): React.JSX.Element {
 
       <ScrollView contentContainerStyle={styles.body}>
         <Text style={styles.intro}>
-          Privacy is a core design constraint of G88. Here is what that means with
+          Privacy is a core design constraint of NEXA. Here is what that means with
           the features we ship today.
         </Text>
 
@@ -63,17 +63,17 @@ export function PrivacyScreen(): React.JSX.Element {
         <Point
           icon="map-clock"
           title="Foreground only"
-          body="Location is used only while the app is open (map, Pulse stories, nearby feed). G88 does not track you in the background."
+          body="Location is used only while the app is open (map, Pulse stories, nearby feed). NEXA does not track you in the background."
         />
         <Point
           icon="eye-off"
           title="You control who sees you"
-          body="Hide from discovery any time in Settings → Appear on map. Friends’ online status is a separate toggle (Settings → Friends can see when I’m online). You can also revoke OS location permission in device settings."
+          body="Hide from discovery any time in Settings → Appear on map. You stay logged in and can still browse; others will not see you in discovery."
         />
         <Point
           icon="account-group"
           title="Friends stay intentional"
-          body="Friend requests are explicit. Online presence is shared only with friends who also allow it. Your friends list is not sold or used for ads. Unfriending does not automatically tear down public follows."
+          body="Friend requests are explicit. Online presence is shown only to friends, and only if you allow it in Settings → Friends can see when I’m online. Your friends list is not sold or used for ads. Unfriending does not automatically tear down public follows."
         />
         <Point
           icon="circle-outline"
