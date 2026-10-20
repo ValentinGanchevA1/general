@@ -1,87 +1,122 @@
-import type { VerificationLevel } from './users';
+// packages/shared/src/friends.ts
+// Two-tier social graph contracts (follows + close friends).
+//
+// Product rules (2026-08-17):
+// - Unfriend keeps mutual follows (friendship row only is deleted).
+// - Follow is independent of friendship: you can unfollow while still friends.
 
-export interface FriendRequest {
-  id: string;
-  requesterId: string;
-  addresseeId: string;
-  status: 'pending' | 'accepted' | 'declined';
-  createdAt: string;
-}
+import type { VerificationLevel } from './api';
 
-export interface FriendRequestUser {
-  id: string;
+export type FriendRequestStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
+
+/** Close friend or follow edge as shown in list UIs. */
+export interface FriendCard {
+  userId: string;
   displayName: string;
   avatarUrl: string | null;
-  verification?: VerificationLevel | null;
-}
-
-export interface PendingFriendRequest {
-  id: string;
-  requester: FriendRequestUser;
+  /** null when the friend's privacy hides online status from friends. */
+  online: boolean | null;
   createdAt: string;
 }
 
-export interface PendingFriendRequestsResponse {
-  items: PendingFriendRequest[];
+export interface FriendRequestCard {
+  id: string;
+  fromUserId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  createdAt: string;
 }
 
-export interface FriendRequestActionResponse {
-  success: true;
-}
+/** Relationship of the viewer toward a public profile target. */
+export type RelationshipState =
+  | 'none'
+  | 'following'
+  | 'followed_by'
+  | 'mutual_follow'
+  | 'friends'
+  | 'request_outgoing'
+  | 'request_incoming';
 
-export interface FriendRequestCreateResponse {
-  request: FriendRequest;
-}
-
-export interface FriendRequestCreateRequest {
-  userId: string;
+export interface RelationshipSummary {
+  state: RelationshipState;
+  /** Pending request id when state is request_outgoing or request_incoming. */
+  requestId?: string;
+  /** Mutual friends count (friends of both viewer and target). */
+  mutualFriendsCount: number;
+  /** Viewer follows target (independent of friendship). */
+  isFollowing: boolean;
+  /** Target follows viewer (independent of friendship). */
+  isFollowedBy: boolean;
 }
 
 export interface FollowRequest {
   userId: string;
 }
 
-export interface FollowResponse {
-  following: true;
+export interface CreateFriendRequestBody {
+  userId: string;
 }
 
-export interface FriendStatusResponse {
-  status: 'none' | 'pending_outgoing' | 'pending_incoming' | 'friends';
-  requestId?: string;
+export interface FriendsPage {
+  items: FriendCard[];
+  nextCursor: string | null;
 }
 
-export interface FriendCard {
-  id: string;
+export interface FriendRequestsPage {
+  items: FriendRequestCard[];
+  nextCursor: string | null;
+}
+
+/** Why a user appears in friend suggestions. */
+export type SuggestionReason =
+  | 'mutual_friends'
+  | 'recent_wave'
+  | 'recent_chat'
+  | 'nearby'
+  | 'shared_interests';
+
+/** Compact mutual friend for density preview on a suggestion card. */
+export interface MutualPreviewFace {
+  userId: string;
   displayName: string;
   avatarUrl: string | null;
-  verification?: VerificationLevel | null;
 }
 
-export interface FriendsResponse {
-  items: FriendCard[];
-}
-
-export interface FriendRequestReceivedEvent {
-  requestId: string;
-  fromUser: FriendRequestUser;
-  createdAt: string;
-}
-
-export interface FriendRequestAcceptedEvent {
-  requestId: string;
-  user: FriendRequestUser;
-  acceptedAt: string;
-}
-
-export interface FriendRequestDeclinedEvent {
-  requestId: string;
+/** Ranked "people you may know" card. */
+export interface SuggestionCard {
   userId: string;
-  declinedAt: string;
+  displayName: string;
+  avatarUrl: string | null;
+  mutualFriendsCount: number;
+  /** Up to 3 mutual friends for avatar stack (density). */
+  mutualPreview?: MutualPreviewFace[];
+  reason: SuggestionReason;
+  /** Fuzzed distance meters when both sides have a map pin. */
+  distanceMeters?: number | null;
+  verification?: VerificationLevel;
+  /** Overlap count on interests[] (0 when none). */
+  sharedInterestsCount?: number;
+  /** Server rank score (debug / stable sort); clients may ignore. */
+  rankScore?: number;
+  /** Viewer already follows this user. */
+  isFollowing: boolean;
+  /** Outgoing pending friend request exists. */
+  hasPendingOutgoing: boolean;
+  /** Incoming pending friend request exists. */
+  hasPendingIncoming: boolean;
 }
 
-export interface FriendRemovedEvent {
-  userId: string;
-  removedAt: string;
+/** POST /friends/suggestions/:userId/dismiss body. */
+export interface DismissSuggestionBody {
+  /** When set, hide until that ISO time. Omit/null = permanent dismiss. */
+  snoozeUntil?: string | null;
+  /** Convenience: snooze days from now (1–30). Ignored if snoozeUntil set. */
+  snoozeDays?: number;
+}
+
+/** Pending incoming friend-request count (badge). */
+export interface FriendPendingCount {
+  count: number;
 }
 
 /** Lightweight recent follower for the Interactions inbox. */
@@ -119,11 +154,13 @@ export interface InboxItem {
     id: string;
     displayName: string;
     avatarUrl: string | null;
+    /** Present for personal activity cards when verification is available. */
     verification?: VerificationLevel | null;
   };
   isMutual?: boolean;
   requestId?: string;
   isFollowingBack?: boolean;
+  /** Story reaction only; omit (do not set undefined) under exactOptionalPropertyTypes. */
   reactionKind?: 'heart' | 'wave';
   /** Match metadata when type === 'match'. */
   match?: {
