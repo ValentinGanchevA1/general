@@ -1,12 +1,14 @@
-// Shared layout math for map chrome (top stack + bottom clearance).
-// Stack (closed sheet): challenge → nudge → filter row → interactions/weather → trending.
-// Tops collapse when challenge/nudge are hidden.
+// Shared layout math for map chrome (top controls + supporting cards).
+// Stack: filter row → weather/location → challenge → nudge → trending.
+// Primary map controls stay pinned directly under the safe area and are never
+// pushed down by optional challenge/nudge content.
 
 import { CHALLENGE_CARD_HEIGHT } from '@/features/gamification/DailyChallengeCard';
 import { spacing } from '@/theme';
 
 export const MAP_CHROME_GAP = 8;
 export const NUDGE_CARD_HEIGHT = 56;
+/** @deprecated Interactions is bottom-tab only; retained for compatibility/tests. */
 export const INTERACTION_BADGE_SIZE = 44;
 export const WEATHER_WIDGET_WIDTH = 88;
 export const WEATHER_WIDGET_HEIGHT = 64;
@@ -16,7 +18,7 @@ export const EVENTS_RAIL_BOTTOM = spacing.lg;
 /** @deprecated Prefer COMBINED_FILTER_ROW_HEIGHT — kept for residual callers. */
 export const LISTING_MODE_FILTER_HEIGHT = 40;
 export const MAP_SEARCH_BAR_HEIGHT = 44;
-/** Single row: layer chips + search + sort. */
+/** Single row: layer chips + fixed recenter control. */
 export const COMBINED_FILTER_ROW_HEIGHT = 44;
 
 export const MAP_CHROME = {
@@ -33,61 +35,32 @@ export const MAP_CHROME = {
 	combinedFilterRowHeight: COMBINED_FILTER_ROW_HEIGHT,
 } as const;
 
-/** Which top-stack cards are actually mounted (not dismissed / not applicable). */
+/** Which optional top-stack cards are actually mounted. */
 export interface MapTopStackVisibility {
 	challengeVisible: boolean;
 	nudgeVisible: boolean;
 }
 
-/** Default: reserve both slots (legacy callers / worst-case height). */
+/** Default: reserve both optional card slots for legacy callers. */
 export const MAP_TOP_STACK_BOTH: MapTopStackVisibility = {
 	challengeVisible: true,
 	nudgeVisible: true,
 };
 
-export function mapChallengeTop(insetsTop: number): number {
-	return insetsTop + MAP_CHROME_GAP;
-}
-
 /**
- * Nudge sits under challenge when challenge is visible; otherwise shares challenge top.
- */
-export function mapNudgeTop(
-	insetsTop: number,
-	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
-): number {
-	if (visibility.challengeVisible) {
-		return mapChallengeTop(insetsTop) + CHALLENGE_CARD_HEIGHT + MAP_CHROME_GAP;
-	}
-	return mapChallengeTop(insetsTop);
-}
-
-/**
- * Top of the combined layer + search + sort row.
- * Under last visible challenge/nudge (not under interactions badge).
- * Sheet open → pinned under safe area.
+ * Primary controls are always the first map-owned row below the status/safe area.
+ * `sheetOpen` and optional-card visibility are intentionally ignored.
  */
 export function mapFilterRowTop(
 	insetsTop: number,
-	sheetOpen: boolean,
-	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
+	_sheetOpen: boolean,
+	_visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
 ): number {
-	if (sheetOpen) return insetsTop + MAP_CHROME_GAP;
-	let y = insetsTop + MAP_CHROME_GAP;
-	if (visibility.challengeVisible) {
-		y += CHALLENGE_CARD_HEIGHT + MAP_CHROME_GAP;
-	}
-	if (visibility.nudgeVisible) {
-		y += NUDGE_CARD_HEIGHT + MAP_CHROME_GAP;
-	}
-	return y;
+	return insetsTop + MAP_CHROME_GAP;
 }
 
-/**
- * Interaction/weather row under the filter row.
- * Sheet open → under filter (still below safe area via filter top).
- */
-export function mapBadgeTop(
+/** Weather/location recovery starts immediately below the primary control row. */
+export function mapWeatherTop(
 	insetsTop: number,
 	sheetOpen: boolean,
 	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
@@ -99,27 +72,51 @@ export function mapBadgeTop(
 	);
 }
 
-export function mapWeatherTop(
+/** @deprecated No floating interactions badge remains; shares the weather slot. */
+export function mapBadgeTop(
 	insetsTop: number,
 	sheetOpen: boolean,
 	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
 ): number {
-	return mapBadgeTop(insetsTop, sheetOpen, visibility);
+	return mapWeatherTop(insetsTop, sheetOpen, visibility);
 }
 
-/**
- * Top of TrendingCard under the taller item in the interactions/weather row.
- */
-export function mapTrendingTop(
-	insetsTop: number,
-	sheetOpen: boolean,
-	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
-): number {
+/** Optional challenge content starts below the weather/location row. */
+export function mapChallengeTop(insetsTop: number): number {
 	return (
-		mapBadgeTop(insetsTop, sheetOpen, visibility) +
-		Math.max(INTERACTION_BADGE_SIZE, WEATHER_WIDGET_HEIGHT) +
+		mapFilterRowTop(insetsTop, false) +
+		COMBINED_FILTER_ROW_HEIGHT +
+		MAP_CHROME_GAP +
+		WEATHER_WIDGET_HEIGHT +
 		MAP_CHROME_GAP
 	);
+}
+
+/** Nudge follows challenge when present, otherwise uses the challenge slot. */
+export function mapNudgeTop(
+	insetsTop: number,
+	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
+): number {
+	if (visibility.challengeVisible) {
+		return mapChallengeTop(insetsTop) + CHALLENGE_CARD_HEIGHT + MAP_CHROME_GAP;
+	}
+	return mapChallengeTop(insetsTop);
+}
+
+/** Trending follows the optional supporting-card stack. */
+export function mapTrendingTop(
+	insetsTop: number,
+	_sheetOpen: boolean,
+	visibility: MapTopStackVisibility = MAP_TOP_STACK_BOTH,
+): number {
+	let y = mapChallengeTop(insetsTop);
+	if (visibility.challengeVisible) {
+		y += CHALLENGE_CARD_HEIGHT + MAP_CHROME_GAP;
+	}
+	if (visibility.nudgeVisible) {
+		y += NUDGE_CARD_HEIGHT + MAP_CHROME_GAP;
+	}
+	return y;
 }
 
 /** @deprecated Use mapFilterRowTop(insetsTop, sheetOpen, visibility). */
