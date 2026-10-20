@@ -7,6 +7,7 @@ import {
   INTERACTION_BADGE_SIZE,
   MAP_CHROME_GAP,
   NUDGE_CARD_HEIGHT,
+  WEATHER_WIDGET_HEIGHT,
   mapBadgeTop,
   mapChallengeTop,
   mapChromeTops,
@@ -69,10 +70,12 @@ describe('mapChromeLayout', () => {
     );
   });
 
-  it('mapTrendingTop sits under badge and is sheet + visibility aware', () => {
+  it('mapTrendingTop sits under the taller badge/weather row and is sheet + visibility aware', () => {
     const closedBoth = mapTrendingTop(insetsTop, false, BOTH);
     expect(closedBoth).toBe(
-      mapBadgeTop(insetsTop, false, BOTH) + INTERACTION_BADGE_SIZE + MAP_CHROME_GAP,
+      mapBadgeTop(insetsTop, false, BOTH) +
+        Math.max(INTERACTION_BADGE_SIZE, WEATHER_WIDGET_HEIGHT) +
+        MAP_CHROME_GAP,
     );
     const closedNone = mapTrendingTop(insetsTop, false, NONE);
     expect(closedNone).toBeLessThan(closedBoth);
