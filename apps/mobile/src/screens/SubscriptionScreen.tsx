@@ -22,7 +22,7 @@ import { SUBSCRIPTION_PLANS } from '@g88/shared';
 import { postJson } from '@/api/client';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
-import { TIER_COLOR } from '@/features/profile/socialConfig';
+import { getTierColor } from '@/features/profile/socialConfig';
 import { extractMessage } from '@/utils/extractMessage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { fontSize, spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
@@ -90,7 +90,7 @@ export function SubscriptionScreen(): React.JSX.Element {
         {SUBSCRIPTION_PLANS.map((plan) => {
           const isCurrent = plan.tier === currentTier;
           const isUpgrade = TIER_RANK[plan.tier]! > TIER_RANK[currentTier]!;
-          const color = TIER_COLOR[plan.tier];
+          const color = getTierColor(colors, plan.tier);
           return (
             <View key={plan.tier} style={[styles.card, isCurrent && { borderColor: color }]}>
               <View style={styles.cardHead}>
