@@ -2,7 +2,7 @@ import type { UserProfile } from '@g88/shared';
 
 import type { TrustChip } from './TrustStrip';
 
-/** Derive TrustStrip chips from a profile (self or public). */
+/** Derive explicit identity-signal chips from a profile (self or public). */
 export function buildTrustChips(profile: UserProfile | null | undefined): TrustChip[] {
   if (!profile) return [];
 
@@ -15,17 +15,16 @@ export function buildTrustChips(profile: UserProfile | null | undefined): TrustC
     premium: false,
     verified: false,
   };
-  const verificationScore = profile.verificationScore ?? 0;
 
   const chips: TrustChip[] = [
     {
       id: 'email',
-      label: badges.email ? 'Email ✓' : 'Email',
+      label: badges.email ? 'Email verified' : 'Email',
       status: badges.email ? 'success' : 'missing',
     },
     {
       id: 'phone',
-      label: badges.phone ? 'Phone ✓' : 'Phone',
+      label: badges.phone ? 'Phone verified' : 'Phone',
       status: badges.phone ? 'success' : 'missing',
     },
   ];
@@ -41,19 +40,19 @@ export function buildTrustChips(profile: UserProfile | null | undefined): TrustC
 
   const idLabel =
     profile.idVerificationStatus === 'verified'
-      ? 'ID Verified ✓'
+      ? 'ID verified'
       : profile.idVerificationStatus === 'pending'
-        ? 'ID Under review'
+        ? 'ID under review'
         : profile.idVerificationStatus === 'rejected'
-          ? 'ID Rejected'
-          : 'ID Verification';
+          ? 'ID needs attention'
+          : 'ID verification';
 
   chips.push({ id: 'id', label: idLabel, status: idStatus });
-  chips.push({
-    id: 'percent',
-    label: `${verificationScore}% Verified`,
-    status: verificationScore >= 100 ? 'success' : verificationScore > 0 ? 'pending' : 'missing',
-  });
+
+  const socialConnected = badges.social === true || (profile.socialLinks?.length ?? 0) > 0;
+  if (socialConnected) {
+    chips.push({ id: 'social', label: 'Profile connected', status: 'success' });
+  }
 
   return chips;
 }
