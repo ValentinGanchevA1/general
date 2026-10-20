@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
-import type { InboxItem } from '@g88/shared';
+import type { InboxItem, PersonalNotificationDestination, PersonalNotificationKind } from '@g88/shared';
 
 import { InteractionsService } from './interactions.service';
 
@@ -15,23 +15,72 @@ export class InteractionsInboxService {
 
   async list(userId: string, limit = 50): Promise<InboxItem[]> {
     const take = Math.min(Math.max(limit, 1), 100);
-    const [social, matches, gifts] = await Promise.all([
+    const [social, matches, gifts, notifications] = await Promise.all([
       this.interactions.listInbox(userId, take),
       this.listMatches(userId, take),
       this.listGifts(userId, take),
+      this.listNotifications(userId, take),
     ]);
 
-    // A reciprocal wave that already produced a first-class match is the same
-    // user event represented twice. Keep the match because it carries the
-    // canonical conversationId used to open the chat.
     const matchedPeerIds = new Set(matches.map((item) => item.fromUser.id));
     const dedupedSocial = social.filter(
       (item) => !(item.type === 'wave' && item.isMutual === true && matchedPeerIds.has(item.fromUser.id)),
     );
 
-    return [...dedupedSocial, ...matches, ...gifts]
+    return [...dedupedSocial, ...matches, ...gifts, ...notifications]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, take);
+  }
+
+  private async listNotifications(userId: string, limit: number): Promise<InboxItem[]> {
+    const rows = await this.db.query<Array<{
+      id: string;
+      kind: PersonalNotificationKind;
+      destination: PersonalNotificationDestination;
+      created_at: Date;
+      actor_id: string;
+      display_name: string;
+      avatar_url: string | null;
+      verification_level: string | null;
+    }>>(
+      `WITH blocked AS (
+         SELECT blocked_id AS uid FROM user_blocks WHERE blocker_id = $1
+         UNION
+         SELECT blocker_id AS uid FROM user_blocks WHERE blocked_id = $1
+       )
+       SELECT n.id,
+              n.kind,
+              n.destination,
+              n.created_at,
+              u.id AS actor_id,
+              u.display_name,
+              u.avatar_url,
+              u.verification_level
+         FROM personal_activity_notifications n
+         JOIN users u ON u.id = n.actor_id AND u.deleted_at IS NULL
+        WHERE n.recipient_id = $1
+          AND n.created_at >= NOW() - INTERVAL '90 days'
+          AND n.actor_id NOT IN (SELECT uid FROM blocked)
+        ORDER BY n.created_at DESC
+        LIMIT $2`,
+      [userId, limit],
+    );
+
+    return rows.map((row): InboxItem => ({
+      id: `notification:${row.id}`,
+      type: 'notification',
+      createdAt: row.created_at.toISOString(),
+      fromUser: {
+        id: row.actor_id,
+        displayName: row.display_name,
+        avatarUrl: row.avatar_url,
+        verification: row.verification_level as InboxItem['fromUser']['verification'],
+      },
+      notification: {
+        kind: row.kind,
+        destination: row.destination,
+      },
+    }));
   }
 
   /**
