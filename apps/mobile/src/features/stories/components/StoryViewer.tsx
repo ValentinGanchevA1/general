@@ -26,7 +26,7 @@ import { colors } from '@/theme';
 import { useAppDispatch } from '@/hooks/redux';
 import {
   ActionSheetList,
-  sheetChrome,
+  useSheetChrome,
   useSheetBackdrop,
 } from '@/components/sheets';
 import { reactToStory, recordStoryView } from '../storiesSlice';
@@ -65,6 +65,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   const optionsRef = useRef<BottomSheetModal>(null);
   const optionsSnap = useMemo(() => ['22%'], []);
   const renderBackdrop = useSheetBackdrop(0.45);
+  const sheetChrome = useSheetChrome();
 
   const current = stories[index];
   const storyId = current?.id;
