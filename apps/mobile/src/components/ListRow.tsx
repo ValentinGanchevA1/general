@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { fontSize, radius, spacing, useAppTheme } from '@/theme';
 
 export interface ListRowProps {
   title: string;
@@ -35,10 +35,7 @@ export interface ListRowProps {
   style?: StyleProp<ViewStyle> | undefined;
 }
 
-/**
- * Shared list / settings row: title + optional subtitle + optional icon + trailing.
- * Min height 44 for touch targets.
- */
+/** Shared list / settings row. Theme colors are resolved at render time. */
 export function ListRow({
   title,
   subtitle,
@@ -52,12 +49,8 @@ export function ListRow({
   last = false,
   style,
 }: ListRowProps): React.JSX.Element {
-  const resolvedTrailing =
-    trailing === undefined
-      ? onPress
-        ? 'chevron'
-        : null
-      : trailing;
+  const { colors } = useAppTheme();
+  const resolvedTrailing = trailing === undefined ? (onPress ? 'chevron' : null) : trailing;
 
   const body = (
     <>
@@ -71,13 +64,17 @@ export function ListRow({
       ) : null}
       <View style={styles.content}>
         <Text
-          style={[styles.title, destructive ? styles.titleDestructive : undefined]}
+          style={[
+            styles.title,
+            { color: destructive ? colors.danger : colors.textPrimary },
+            destructive ? styles.titleDestructive : undefined,
+          ]}
           numberOfLines={2}
         >
           {title}
         </Text>
         {subtitle ? (
-          <Text style={styles.subtitle} numberOfLines={3}>
+          <Text style={[styles.subtitle, { color: colors.textFaint }]} numberOfLines={3}>
             {subtitle}
           </Text>
         ) : null}
@@ -90,8 +87,11 @@ export function ListRow({
     </>
   );
 
-  const rowStyle = [
+  const rowStyle: StyleProp<ViewStyle> = [
     variant === 'inset' ? styles.inset : styles.standalone,
+    variant === 'standalone'
+      ? { backgroundColor: colors.surfaceAlt, borderColor: colors.borderStrong }
+      : { borderBottomColor: colors.borderStrong },
     variant === 'inset' && last ? styles.insetLast : undefined,
     disabled ? styles.disabled : undefined,
     style,
@@ -114,10 +114,7 @@ export function ListRow({
   }
 
   return (
-    <View
-      style={rowStyle}
-      accessibilityLabel={accessibilityLabel ?? title}
-    >
+    <View style={rowStyle} accessibilityLabel={accessibilityLabel ?? title}>
       {body}
     </View>
   );
@@ -128,11 +125,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 44,
-    backgroundColor: colors.surfaceAlt,
     borderRadius: radius.md,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
     gap: spacing.sm,
   },
   inset: {
@@ -141,35 +136,13 @@ const styles = StyleSheet.create({
     minHeight: 44,
     padding: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderStrong,
     gap: spacing.sm,
   },
-  insetLast: {
-    borderBottomWidth: 0,
-  },
-  disabled: {
-    opacity: 0.45,
-  },
-  icon: {
-    marginRight: 4,
-  },
-  content: {
-    flex: 1,
-    minWidth: 0,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: fontSize.md,
-    fontWeight: '500',
-  },
-  titleDestructive: {
-    color: colors.danger,
-    fontWeight: '600',
-  },
-  subtitle: {
-    color: colors.textFaint,
-    fontSize: fontSize.xs,
-    marginTop: 2,
-    lineHeight: 16,
-  },
+  insetLast: { borderBottomWidth: 0 },
+  disabled: { opacity: 0.45 },
+  icon: { marginRight: 4 },
+  content: { flex: 1, minWidth: 0 },
+  title: { fontSize: fontSize.md, fontWeight: '500' },
+  titleDestructive: { fontWeight: '600' },
+  subtitle: { fontSize: fontSize.xs, marginTop: 2, lineHeight: 16 },
 });
