@@ -10,8 +10,8 @@ export const MAP_CHROME_GAP = 8;
 export const NUDGE_CARD_HEIGHT = 56;
 /** @deprecated Interactions is bottom-tab only; retained for compatibility/tests. */
 export const INTERACTION_BADGE_SIZE = 44;
-export const WEATHER_WIDGET_WIDTH = 88;
-export const WEATHER_WIDGET_HEIGHT = 64;
+export const WEATHER_WIDGET_WIDTH = 80;
+export const WEATHER_WIDGET_HEIGHT = 56;
 export const MAP_CHROME_H_INSET = spacing.lg;
 export const FAB_BOTTOM = spacing.md;
 export const EVENTS_RAIL_BOTTOM = spacing.lg;
