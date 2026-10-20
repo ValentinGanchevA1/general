@@ -1,35 +1,38 @@
 /**
- * Push notification setup — Firebase Cloud Messaging.
+ * NEXA push notifications — Firebase Cloud Messaging.
  *
- * Prerequisites (one-time, per platform):
- *   Android: place google-services.json in apps/mobile/android/app/
- *   iOS:     place GoogleService-Info.plist in apps/mobile/ios/G88/
- *            + add Push Notifications capability in Xcode
+ * Re-entry rules are allow-listed and map-first. Push payloads are treated as
+ * untrusted input: they may identify an entity, but can never select an
+ * arbitrary React Navigation route or carry coordinates.
  *
- * Without those native config files the DEFAULT Firebase app is never created
- * and getMessaging() throws. All public entry points soft-fail in that case
- * so the rest of the app still boots (dev / CI without FCM credentials).
+ * Native prerequisites:
+ *   Android: apps/mobile/android/app/google-services.json
+ *   iOS:     GoogleService-Info.plist + Push Notifications capability
  *
- * Call registerPushToken() after every successful login/session restore.
- * Call unregisterPushToken() on logout / deleteAccount (best-effort).
- * Call setupNotificationHandlers(navigate) once at app boot after login.
+ * All public entry points soft-fail when Firebase is not configured so dev/CI
+ * builds continue to boot normally.
  */
-import { Platform, PermissionsAndroid } from 'react-native';
+import { PermissionsAndroid, Platform } from 'react-native';
 import { getApps } from '@react-native-firebase/app';
 import {
+  AuthorizationStatus,
+  getInitialNotification,
   getMessaging,
   getToken,
   onMessage,
   onNotificationOpenedApp,
-  getInitialNotification,
   requestPermission as firebaseRequestPermission,
-  AuthorizationStatus,
 } from '@react-native-firebase/messaging';
 
 import { api } from '@/api/client';
 import { focusUserOnMapViaRef } from '@/navigation/focusUserOnMap';
+import { navigationRef } from '@/navigation/navigationRef';
+import {
+  resolveNexaNotificationReentry,
+  type NexaNotificationReentry,
+} from '@/lib/nexaNotificationReentry';
 
-/** True only when native Firebase DEFAULT app exists (google-services / plist present). */
+/** True only when native Firebase DEFAULT app exists. */
 function isFirebaseReady(): boolean {
   try {
     return getApps().length > 0;
@@ -61,17 +64,17 @@ async function requestPermission(): Promise<boolean> {
     );
     return granted === PermissionsAndroid.RESULTS.GRANTED;
   }
-  return true; // Android < 13 — no runtime permission needed
+  return true;
 }
 
-// ─── Token registration ──────────────────────────────────────────────────────
+// ─── Token registration ─────────────────────────────────────────────────────
 
 export async function registerPushToken(): Promise<void> {
   if (!isFirebaseReady()) {
     if (__DEV__) {
       console.warn(
         '[push] Firebase not initialized — skip registerPushToken. ' +
-          'Add android/app/google-services.json and/or ios GoogleService-Info.plist, then rebuild.',
+          'Add native Firebase config, then rebuild.',
       );
     }
     return;
@@ -84,7 +87,9 @@ export async function registerPushToken(): Promise<void> {
     const token = await getToken(messaging());
     if (!token) return;
 
-    if (__DEV__) console.log('[push] FCM token acquired:', token.slice(0, 20) + '...');
+    if (__DEV__) {
+      console.log('[push] FCM token acquired:', token.slice(0, 20) + '...');
+    }
 
     const platform = Platform.OS === 'ios' ? 'ios' : 'android';
     await api.post('/notifications/device-token', { token, platform });
@@ -95,9 +100,8 @@ export async function registerPushToken(): Promise<void> {
 }
 
 /**
- * Best-effort: remove this device token from the current user's rows so the next
- * account on the same device does not receive the previous user's pushes.
- * Must run while the access token is still valid (before tokenStore.clear).
+ * Remove this device token while the current access token is still valid so a
+ * later account on the same device cannot receive the previous account's push.
  */
 export async function unregisterPushToken(): Promise<void> {
   if (!isFirebaseReady()) {
@@ -117,40 +121,145 @@ export async function unregisterPushToken(): Promise<void> {
   }
 }
 
-// ─── Deep-link navigation from notification tap ──────────────────────────────
+// ─── Re-entry ────────────────────────────────────────────────────────────────
 
 type NavigateFn = (screen: string, params?: Record<string, unknown>) => void;
+type PushData = Record<string, string> | undefined;
 
-function handleNotificationTap(
-  data: Record<string, string> | undefined,
-  navigate: NavigateFn,
-): void {
-  if (!data) return;
-  if (data['type'] === 'message' && data['conversationId']) {
-    navigate('Chat', { conversationId: data['conversationId'], otherUserName: '' });
-  } else if (data['type'] === 'wave' && data['fromUserId']) {
-    // Core loop: inbound wave → peer pin on map (fallback: Interactions).
-    void focusUserOnMapViaRef({ userId: data['fromUserId'] }).then((result) => {
-      if (result === 'error') {
-        navigate('Interactions');
-      }
+const RECENT_TAP_TTL_MS = 30_000;
+const MAX_PENDING_REENTRY_ATTEMPTS = 16;
+const REENTRY_RETRY_MS = 180;
+const recentTapIds = new Map<string, number>();
+
+interface PendingReentry {
+  destination: NexaNotificationReentry;
+  navigate: NavigateFn;
+  attempts: number;
+}
+
+let pendingReentry: PendingReentry | null = null;
+let pendingTimer: ReturnType<typeof setTimeout> | null = null;
+
+function shouldHandleTap(messageId: string | undefined): boolean {
+  if (!messageId) return true;
+
+  const now = Date.now();
+  for (const [id, seenAt] of recentTapIds) {
+    if (now - seenAt > RECENT_TAP_TTL_MS) recentTapIds.delete(id);
+  }
+
+  if (recentTapIds.has(messageId)) return false;
+  recentTapIds.set(messageId, now);
+  return true;
+}
+
+function navigateMainTab(tab: 'Map' | 'Pulse'): boolean {
+  if (!navigationRef.isReady()) return false;
+
+  if (tab === 'Pulse') {
+    (navigationRef.navigate as (name: 'Main', params: object) => void)('Main', {
+      screen: 'Pulse',
+      params: { filter: 'nearby' },
     });
-  } else if (data['type'] === 'alert') {
-    // Open the Pulse tab pre-filtered to alerts.
-    navigate('Main', { screen: 'Pulse', params: { filter: 'alerts' } });
-  } else if (data['type'] === 'gift') {
-    navigate('GiftsInbox');
+    return true;
+  }
+
+  (navigationRef.navigate as (name: 'Main', params: object) => void)('Main', {
+    screen: 'Map',
+  });
+  return true;
+}
+
+function executeReentry(
+  destination: NexaNotificationReentry,
+  navigate: NavigateFn,
+): boolean {
+  if (!navigationRef.isReady()) return false;
+
+  switch (destination.type) {
+    case 'map':
+      if (!destination.focusUserId) return navigateMainTab('Map');
+      void focusUserOnMapViaRef({ userId: destination.focusUserId }).then((result) => {
+        if (result === 'error') navigate('Interactions');
+      });
+      return true;
+    case 'chat':
+      navigate('Chat', {
+        conversationId: destination.conversationId,
+        otherUserName: '',
+      });
+      return true;
+    case 'interactions':
+      navigate('Interactions');
+      return true;
+    case 'gifts':
+      navigate('GiftsInbox');
+      return true;
+    case 'pulse-nearby':
+      return navigateMainTab('Pulse');
+    case 'event-detail':
+      navigate('EventDetail', { eventId: destination.eventId });
+      return true;
+    case 'listing-detail':
+      navigate('ListingDetail', { listingId: destination.listingId });
+      return true;
+    case 'trust-center':
+      navigate('TrustCenter', { focusStep: 'id' });
+      return true;
   }
 }
 
-// ─── Handler setup (call once after login) ───────────────────────────────────
+function schedulePendingReentry(): void {
+  if (pendingTimer) return;
+  pendingTimer = setTimeout(() => {
+    pendingTimer = null;
+    flushPendingNotificationReentry();
+  }, REENTRY_RETRY_MS);
+}
 
+/**
+ * Flush a cold-start push after NavigationContainer becomes ready. The queue is
+ * intentionally one-deep: the most recent user tap wins.
+ */
+export function flushPendingNotificationReentry(): void {
+  if (!pendingReentry) return;
+
+  if (executeReentry(pendingReentry.destination, pendingReentry.navigate)) {
+    pendingReentry = null;
+    return;
+  }
+
+  pendingReentry.attempts += 1;
+  if (pendingReentry.attempts >= MAX_PENDING_REENTRY_ATTEMPTS) {
+    pendingReentry = null;
+    return;
+  }
+  schedulePendingReentry();
+}
+
+function handleNotificationTap(
+  data: PushData,
+  navigate: NavigateFn,
+  messageId?: string,
+): void {
+  if (!shouldHandleTap(messageId)) return;
+
+  const destination = resolveNexaNotificationReentry(data);
+  if (executeReentry(destination, navigate)) return;
+
+  pendingReentry = { destination, navigate, attempts: 0 };
+  schedulePendingReentry();
+}
+
+// ─── Handler setup ───────────────────────────────────────────────────────────
+
+/** Call once after login/session restore. */
 export function setupNotificationHandlers(navigate: NavigateFn): () => void {
   if (!isFirebaseReady()) {
     if (__DEV__) {
       console.warn(
         '[push] Firebase not initialized — skip setupNotificationHandlers. ' +
-          'Add android/app/google-services.json and/or ios GoogleService-Info.plist, then rebuild.',
+          'Add native Firebase config, then rebuild.',
       );
     }
     return () => undefined;
@@ -158,24 +267,37 @@ export function setupNotificationHandlers(navigate: NavigateFn): () => void {
 
   try {
     const unsubForeground = onMessage(messaging(), async () => {
-      // No-op: socket delivers the message live.
+      // Socket.IO owns foreground interaction delivery to avoid duplicate UI.
     });
 
-    const unsubBackgroundTap = onNotificationOpenedApp(messaging(), (remoteMessage) => {
-      handleNotificationTap(remoteMessage.data as Record<string, string>, navigate);
-    });
+    const unsubBackgroundTap = onNotificationOpenedApp(
+      messaging(),
+      (remoteMessage) => {
+        handleNotificationTap(
+          remoteMessage.data as PushData,
+          navigate,
+          remoteMessage.messageId,
+        );
+      },
+    );
 
     void getInitialNotification(messaging()).then((remoteMessage) => {
-      if (remoteMessage) {
-        setTimeout(() => {
-          handleNotificationTap(remoteMessage.data as Record<string, string>, navigate);
-        }, 300);
-      }
+      if (!remoteMessage) return;
+      handleNotificationTap(
+        remoteMessage.data as PushData,
+        navigate,
+        remoteMessage.messageId,
+      );
     });
 
     return () => {
       unsubForeground();
       unsubBackgroundTap();
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        pendingTimer = null;
+      }
+      pendingReentry = null;
     };
   } catch (err) {
     if (__DEV__) console.warn('[push] setupNotificationHandlers failed:', err);
