@@ -1,6 +1,6 @@
 // apps/mobile/src/screens/AlertComposerScreen.tsx
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -27,7 +27,7 @@ import { challengeEvents } from '@/features/gamification/challengeEvents';
 import { postJson } from '@/api/client';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
-import { colors, fontSize, spacing, radius, useAppTheme } from '@/theme';
+import { fontSize, spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type R = RouteProp<RootStackParamList, 'AlertComposer'>;
@@ -45,7 +45,8 @@ const CATEGORY_META: Record<AreaCategory, { label: string; icon: string }> = {
 };
 
 export function AlertComposerScreen(): React.JSX.Element {
-  const { colors: themeColors } = useAppTheme();
+  const { colors } = useAppTheme();
+  const S = useMemo(() => createStyles(colors), [colors]);
 
   const nav = useNavigation<Nav>();
   const route = useRoute<R>();
@@ -86,7 +87,7 @@ export function AlertComposerScreen(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView
-      style={[S.root, { backgroundColor: themeColors.bg }]}
+      style={S.root}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScreenHeader
@@ -193,54 +194,56 @@ export function AlertComposerScreen(): React.JSX.Element {
   );
 }
 
-const S = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bg },
 
-  postBtn: { color: colors.primary, fontSize: fontSize.md + 1, fontWeight: '700' },
-  postBtnDisabled: { color: colors.textFaint },
+    postBtn: { color: colors.primary, fontSize: fontSize.md + 1, fontWeight: '700' },
+    postBtnDisabled: { color: colors.textFaint },
 
-  scroll: { flex: 1 },
-  scrollContent: { padding: spacing.lg, gap: spacing.sm },
+    scroll: { flex: 1 },
+    scrollContent: { padding: spacing.lg, gap: spacing.sm },
 
-  sectionLabel: {
-    color: colors.textSecondary,
-    fontSize: fontSize.xs,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginTop: spacing.md,
-    marginBottom: 4,
-  },
-  optional: { color: colors.textFaint, textTransform: 'none', fontWeight: '400' },
+    sectionLabel: {
+      color: colors.textSecondary,
+      fontSize: fontSize.xs,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      marginTop: spacing.md,
+      marginBottom: 4,
+    },
+    optional: { color: colors.textFaint, textTransform: 'none', fontWeight: '400' },
 
-  chips: { paddingBottom: 4, gap: spacing.sm },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '600' },
-  chipTextActive: { color: colors.onPrimary },
+    chips: { paddingBottom: 4, gap: spacing.sm },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: radius.pill,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    chipText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '600' },
+    chipTextActive: { color: colors.onPrimary },
 
-  bodyInput: { minHeight: 120, lineHeight: 22 },
-  charCount: { color: colors.textFaint, fontSize: fontSize.xs, textAlign: 'right', marginTop: 4 },
-  charCountWarn: { color: colors.warning },
+    bodyInput: { minHeight: 120, lineHeight: 22 },
+    charCount: { color: colors.textFaint, fontSize: fontSize.xs, textAlign: 'right', marginTop: 4 },
+    charCountWarn: { color: colors.warning },
 
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,107,107,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,107,107,0.3)',
-    borderRadius: radius.sm + 2,
-    padding: spacing.md,
-    marginTop: spacing.sm,
-  },
-  errorText: { color: colors.danger, fontSize: fontSize.md - 1, flex: 1 },
-});
+    errorBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.dangerSurface,
+      borderWidth: 1,
+      borderColor: colors.dangerBorder,
+      borderRadius: radius.sm + 2,
+      padding: spacing.md,
+      marginTop: spacing.sm,
+    },
+    errorText: { color: colors.danger, fontSize: fontSize.md - 1, flex: 1 },
+  });
+}
