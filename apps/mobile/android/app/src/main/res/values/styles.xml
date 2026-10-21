@@ -8,10 +8,14 @@
         <item name="android:windowBackground">@color/splash_background</item>
     </style>
 
-    <!-- Android 12+ compatible native launch surface managed by react-native-bootsplash. -->
+    <!--
+      Keep the OS/native launch frame as a clean dark canvas. The RN overlay
+      starts from the exact same #08090D background and builds the NEXA mark
+      from light, avoiding the previous fully-formed-logo flash before motion.
+    -->
     <style name="BootTheme" parent="Theme.BootSplash">
         <item name="bootSplashBackground">@color/splash_background</item>
-        <item name="bootSplashLogo">@drawable/bootsplash_logo</item>
+        <item name="bootSplashLogo">@drawable/bootsplash_blank</item>
         <item name="postBootSplashTheme">@style/AppTheme</item>
         <item name="darkContentBarsStyle">false</item>
     </style>
