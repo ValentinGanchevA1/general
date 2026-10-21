@@ -19,55 +19,11 @@ import { track } from '@/lib/analytics';
 import { ListRow } from '@/components/ListRow';
 import { spacing, fontSize, useAppTheme, type ThemeColors } from '@/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { NEXA_HELP_FAQS, type HelpFaq } from './helpFaqs';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 
-type Faq = { q: string; a: string };
-
-const FAQS: Faq[] = [
-  {
-    q: 'How does NEXA know who is nearby?',
-    a: 'While the app is open, your device shares an approximate location (coarsened to about a 120-meter area). We use it for the map, Pulse stories, and nearby activity. Your exact position is never stored.',
-  },
-  {
-    q: 'How do I hide myself from the map?',
-    a: 'Settings → Appear on map → turn it off. You stay logged in and can still browse; others will not see you in discovery.',
-  },
-  {
-    q: 'What is Pulse?',
-    a: 'Pulse is your local activity hub: nearby story rings plus waves, chats, and matches. Use the filter chips (All / Waves / Chats / Matches) and act from each card — Wave back, Message, or View. Trades and alerts still surface when they appear in your feed.',
-  },
-  {
-    q: 'How do stories work?',
-    a: 'Stories are visible to people nearby and disappear after 24 hours. You can post a photo or a short video. Posting needs a verified email and an account at least 24 hours old (phone-verified accounts can post sooner). Reactions on stories count like waves toward mutual interest.',
-  },
-  {
-    q: 'What is the Interactions screen?',
-    a: 'Interactions is a focused inbox for pending friend requests, recent followers, and related social notifications. Waves, chats, and matches also live on Pulse. Your Friends → Requests tab stays available for requests only.',
-  },
-  {
-    q: 'How do friends and online status work?',
-    a: 'Send or accept a friend request from a profile. Friends can appear with a distinct map style. Online status is shown only to friends, and only if you allow it in Settings → Friends can see when I’m online. Unfriending does not remove mutual follows.',
-  },
-  {
-    q: 'How do I find someone on the map?',
-    a: 'From a profile use View on map when they have a public pin. From a wave or match, open their profile or use View on map when available. The map centers on their coarsened pin and opens their card when available.',
-  },
-  {
-    q: 'What do the verification badges mean?',
-    a: 'They show progress on the trust ladder: email → phone → ID review. Optional, but they raise trust. Email verification unlocks story posting. Start from Settings → Trust or Trust Center. ID review is assisted by automated face checks and always finished by a human.',
-  },
-  {
-    q: 'How does local trade work?',
-    a: 'Create a listing (for sale or wanted) from the map or Marketplace. Nearby people can message the seller, wave, or make an offer and counter. Meet in public places; NEXA does not process payments.',
-  },
-  {
-    q: 'I found a bug or something feels wrong.',
-    a: 'Use Email support below with what you were doing and a screenshot if you can. We read every report.',
-  },
-];
-
-function FaqItem({ q, a }: Faq): React.JSX.Element {
+function FaqItem({ q, a }: HelpFaq): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -121,7 +77,7 @@ export function HelpScreen(): React.JSX.Element {
 
       <ScrollView contentContainerStyle={styles.body}>
         <Text style={styles.sectionTitle}>Frequently asked</Text>
-        {FAQS.map((f) => (
+        {NEXA_HELP_FAQS.map((f) => (
           <FaqItem key={f.q} {...f} />
         ))}
 
