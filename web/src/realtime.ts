@@ -1,3 +1,4 @@
+import { io as createSocket } from 'socket.io-client';
 import type {
   AckResult,
   ChatMessageEvent,
@@ -37,12 +38,6 @@ type IoFactory = (
   },
 ) => SocketIoClient;
 
-declare global {
-  interface Window {
-    io?: IoFactory;
-  }
-}
-
 export interface WebRealtimeHandlers {
   onConnectionChange(connected: boolean): void;
   onChatMessage(event: ChatMessageEvent): void;
@@ -61,14 +56,14 @@ const SOCKET_ORIGIN = window.location.origin === 'http://127.0.0.1:4174'
     ? 'http://localhost:3001'
     : window.location.origin;
 
-let clientScriptPromise: Promise<IoFactory> | null = null;
+const io = createSocket as unknown as IoFactory;
 
 export class WebRealtimeClient {
   private socket: SocketIoClient | null = null;
   private token = '';
   private handlers: WebRealtimeHandlers | null = null;
 
-  async connect(token: string, handlers: WebRealtimeHandlers): Promise<void> {
+  connect(token: string, handlers: WebRealtimeHandlers): void {
     this.token = token;
     this.handlers = handlers;
 
@@ -77,9 +72,6 @@ export class WebRealtimeClient {
       if (!this.socket.connected) this.socket.connect();
       return;
     }
-
-    const io = await loadSocketIoClient();
-    if (this.socket) return;
 
     const socket = io(`${SOCKET_ORIGIN}/realtime`, {
       auth: { token },
@@ -160,29 +152,6 @@ export class WebRealtimeClient {
     socket.on('conversation:opened', (event) => this.handlers?.onConversationOpened(event));
     socket.on('error:event', (event) => this.handlers?.onError(event.message));
   }
-}
-
-async function loadSocketIoClient(): Promise<IoFactory> {
-  if (window.io) return window.io;
-  if (clientScriptPromise) return clientScriptPromise;
-
-  clientScriptPromise = new Promise<IoFactory>((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = `${SOCKET_ORIGIN}/socket.io/socket.io.js`;
-    script.async = true;
-    script.referrerPolicy = 'strict-origin-when-cross-origin';
-    script.onload = () => {
-      if (window.io) resolve(window.io);
-      else reject(new Error('Socket.IO client did not initialize'));
-    };
-    script.onerror = () => reject(new Error('Failed to load Socket.IO client from backend'));
-    document.head.append(script);
-  }).catch((error: unknown) => {
-    clientScriptPromise = null;
-    throw error;
-  });
-
-  return clientScriptPromise;
 }
 
 function withAckTimeout<T>(
