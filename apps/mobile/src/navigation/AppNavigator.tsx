@@ -12,11 +12,11 @@ import {
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { useAppTheme, type ThemeColors } from '@/theme';
 
 import { MapScreen } from '@/screens/MapScreen';
+import { DiscoverScreen } from '@/screens/DiscoverScreen';
 import { PulseScreen } from '@/features/pulse/PulseScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { UserProfileScreen } from '@/screens/UserProfileScreen';
@@ -62,17 +62,17 @@ import { navigationIntegration } from '@/lib/sentry';
 import { navigationRef } from './navigationRef';
 import { openViaRef } from './openRootScreen';
 import { takePendingPhoneVerify } from '@/services/pendingPhone';
-import { CreateTabButton } from '@/navigation/CreateTabButton';
-import { requestOpenCreateNearby } from '@/features/map/pendingCreateNearby';
+import { NexaTabIcon } from './NexaTabIcon';
+import { NEXA_TAB_VISUALS, resolveConnectionsTabBadge } from './nexaTabIdentity';
 import type { AccountStackParamList, CommerceStackParamList, EventsStackParamList, GamificationStackParamList, SocialStackParamList } from './stacks';
 
 export type PulseFilter = 'for-you' | 'nearby' | 'events' | 'marketplace';
 export type TabParamList = {
 	Map: { focusMyPin?: boolean; focusUserId?: string; focusListingId?: string; focusLat?: number; focusLng?: number; openCreate?: boolean } | undefined;
+	Discover: undefined;
 	Pulse: { filter?: PulseFilter } | undefined;
-	Create: undefined;
-	Interactions: undefined;
-	Profile: undefined;
+	Connections: undefined;
+	You: undefined;
 };
 export type RootStackParamList = {
 	Auth: undefined;
@@ -83,6 +83,7 @@ export type RootStackParamList = {
 	MutualFriends: { peerUserId: string; peerName?: string };
 	AlertComposer: { presetCategory?: AreaCategory; presetTag?: string };
 	GiftsInbox: undefined;
+	/** Compatibility fallback. New re-entry routes to Main → Connections. */
 	Interactions: undefined;
 	Gamification: NavigatorScreenParams<GamificationStackParamList>;
 	Commerce: NavigatorScreenParams<CommerceStackParamList>;
@@ -137,17 +138,42 @@ function EventsNavigator(): React.JSX.Element {
 function MainTabs(): React.JSX.Element {
 	const { colors: c } = useAppTheme();
 	const chatUnread = useAppSelector((s) => s.chat.conversations.reduce((sum, conv) => sum + (conv.unreadCount ?? 0), 0));
-	const mapNewCount = useAppSelector((s) => s.mapNovelty.newCount);
 	const friendPending = useAppSelector((s) => s.friends.pendingCount);
-	const interactionsBadge = chatUnread + friendPending;
-	const badgeStyle = { backgroundColor: c.danger, color: c.onPrimary, fontSize: 11, fontWeight: '700' as const };
-	const mapBadgeStyle = { backgroundColor: c.primary, color: c.onPrimary, fontSize: 11, fontWeight: '700' as const };
-	return <Tab.Navigator screenOptions={({ route }) => ({ headerShown: false, tabBarStyle: { backgroundColor: c.bg, borderTopColor: c.border, height: 64, paddingTop: 6 }, tabBarActiveTintColor: c.primary, tabBarInactiveTintColor: c.textFaint, tabBarIcon: ({ color, size }) => { if (route.name === 'Create') return null; const icons: Record<string, string> = { Map: 'map-marker-radius', Pulse: 'pulse', Interactions: 'bell-outline', Profile: 'account-circle-outline' }; return <MaterialCommunityIcons name={icons[route.name] ?? 'circle'} size={size ?? 24} color={color} />; } })}>
-		<Tab.Screen name="Map" component={MapScreen} options={mapNewCount > 0 ? { tabBarBadge: mapNewCount > 99 ? '99+' : mapNewCount, tabBarBadgeStyle: mapBadgeStyle } : {}} />
+	const connectionsBadge = resolveConnectionsTabBadge(chatUnread, friendPending);
+	const badgeStyle = { backgroundColor: c.actionPrimary, color: c.onPrimary, fontSize: 10, fontWeight: '800' as const, minWidth: 18, height: 18, lineHeight: 18 };
+
+	return <Tab.Navigator
+		screenOptions={({ route }) => {
+			const visual = NEXA_TAB_VISUALS[route.name];
+			const active = visual.tone === 'discovery' ? c.discovery : c.actionPrimary;
+			return {
+				headerShown: false,
+				tabBarHideOnKeyboard: true,
+				tabBarStyle: {
+					backgroundColor: c.canvas,
+					borderTopColor: c.borderSubtle,
+					minHeight: 64,
+					paddingTop: 4,
+					paddingBottom: 4,
+				},
+				tabBarItemStyle: { minWidth: 44 },
+				tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+				tabBarActiveTintColor: active,
+				tabBarInactiveTintColor: c.textTertiary,
+				tabBarAccessibilityLabel: visual.accessibilityLabel,
+				tabBarIcon: ({ focused }) => <NexaTabIcon tab={route.name} focused={focused} />,
+			};
+		}}
+	>
+		<Tab.Screen name="Map" component={MapScreen} />
+		<Tab.Screen name="Discover" component={DiscoverScreen} />
 		<Tab.Screen name="Pulse" component={PulseScreen} />
-		<Tab.Screen name="Create" component={MapScreen} listeners={({ navigation }) => ({ tabPress: (e) => { e.preventDefault(); requestOpenCreateNearby(); navigation.navigate('Map'); } })} options={{ tabBarLabel: () => null, tabBarButton: (props) => <CreateTabButton {...props} /> }} />
-		<Tab.Screen name="Interactions" component={InteractionsScreen} options={{ tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="bell-outline" size={size ?? 24} color={color} />, ...(interactionsBadge > 0 ? { tabBarBadge: interactionsBadge > 99 ? '99+' : interactionsBadge, tabBarBadgeStyle: badgeStyle } : {}) }} />
-		<Tab.Screen name="Profile" component={ProfileScreen} />
+		<Tab.Screen
+			name="Connections"
+			component={InteractionsScreen}
+			options={connectionsBadge != null ? { tabBarBadge: connectionsBadge, tabBarBadgeStyle: badgeStyle } : {}}
+		/>
+		<Tab.Screen name="You" component={ProfileScreen} />
 	</Tab.Navigator>;
 }
 
