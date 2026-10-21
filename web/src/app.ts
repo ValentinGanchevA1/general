@@ -8,6 +8,13 @@ import type { ActivityItem, FeedResponse } from '../../packages/shared/src/activ
 
 type Tab = 'map' | 'discover' | 'pulse' | 'connections' | 'you';
 type ThemePreference = 'system' | 'dark' | 'light';
+type ApiPath =
+  | '/auth/web/login'
+  | '/auth/web/refresh'
+  | '/auth/web/logout'
+  | '/auth/me'
+  | '/discovery/nearby'
+  | '/feed?limit=24';
 
 interface State {
   tab: Tab;
@@ -18,7 +25,6 @@ interface State {
   kinds: Set<EntityKind>;
   authOpen: boolean;
   notice: string | null;
-  apiBase: string;
 }
 
 interface WebAccessTokenResponse {
@@ -41,6 +47,23 @@ const VIEWPORT = {
   ne: { lat: 43.245, lng: 27.985 },
   sw: { lat: 43.17, lng: 27.845 },
 };
+
+const API_BASE = window.location.origin === 'http://127.0.0.1:4174'
+  ? 'http://127.0.0.1:3001/api/v1'
+  : window.location.origin === 'http://localhost:4174'
+    ? 'http://localhost:3001/api/v1'
+    : '/api/v1';
+
+const SAFE_TAGS = new Set([
+  'ARTICLE', 'ASIDE', 'B', 'BUTTON', 'DIALOG', 'DIV', 'FOOTER', 'FORM',
+  'H1', 'H2', 'H3', 'HEADER', 'I', 'INPUT', 'LABEL', 'MAIN', 'NAV', 'P',
+  'SECTION', 'SMALL', 'SPAN', 'STRONG',
+]);
+const SAFE_ATTRIBUTES = new Set([
+  'autocomplete', 'class', 'data-kind', 'data-tab', 'data-target', 'data-tone',
+  'id', 'minlength', 'open', 'required', 'type',
+]);
+const PIN_STYLE = /^left:(?:\d+(?:\.\d+)?);?%;top:(?:\d+(?:\.\d+)?);?%$/;
 
 const demoPoints: DiscoveryPoint[] = [
   { kind: 'user', id: 'maria', lat: 43.2122, lng: 27.9248, meta: { displayName: 'Maria', avatarUrl: null, verification: 'phone', online: true, lastSeenAt: new Date().toISOString(), verifiedBadge: true } },
@@ -65,7 +88,6 @@ const state: State = {
   kinds: new Set<EntityKind>(['user', 'event', 'listing']),
   authOpen: false,
   notice: null,
-  apiBase: normalizeBase(localStorage.getItem('nexa.web.apiBase') ?? 'http://127.0.0.1:3001/api/v1'),
 };
 
 let accessToken: string | null = null;
@@ -75,7 +97,6 @@ const appRoot = document.querySelector<HTMLDivElement>('#app');
 if (!appRoot) throw new Error('Missing #app root');
 const root: HTMLDivElement = appRoot;
 
-function normalizeBase(value: string): string { return value.trim().replace(/\/+$/, ''); }
 function token(): string | null { return accessToken; }
 function readTheme(): ThemePreference {
   const saved = localStorage.getItem('nexa.web.theme');
@@ -94,15 +115,16 @@ function cycleTheme(): void {
 function escapeHtml(value: string): string {
   return value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char] ?? char);
 }
+function apiUrl(path: ApiPath): string { return `${API_BASE}${path}`; }
 async function readApiResponse<T>(response: Response): Promise<T> {
   if (!response.ok) throw new ApiError(`${response.status} ${response.statusText}`, response.status);
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
 }
-async function webSessionApi<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function webSessionApi<T>(path: ApiPath, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');
   headers.set('X-Nexa-Web-Session', '1');
-  const response = await fetch(`${state.apiBase}${path}`, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     headers,
     credentials: 'include',
@@ -130,11 +152,11 @@ async function refreshAccessToken(): Promise<boolean> {
     if (refreshInFlight === pending) refreshInFlight = null;
   }
 }
-async function api<T>(path: string, init: RequestInit = {}, retryAuth = true): Promise<T> {
+async function api<T>(path: ApiPath, init: RequestInit = {}, retryAuth = true): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');
   if (token()) headers.set('Authorization', `Bearer ${token()}`);
-  const response = await fetch(`${state.apiBase}${path}`, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     headers,
     credentials: 'include',
@@ -202,7 +224,7 @@ function nav(tab: Tab, icon: string, tone: 'discovery' | 'action'): string {
   return `<button class="nav ${state.tab === tab ? 'active' : ''}" data-tab="${tab}" data-tone="${tone}"><span>${icon}</span><small>${tab[0]?.toUpperCase()}${tab.slice(1)}</small></button>`;
 }
 function shell(): string {
-  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXA</b></button><nav>${nav('map','⌖','discovery')}${nav('discover','◇','discovery')}${nav('pulse','≋','discovery')}${nav('connections','◎','action')}${nav('you','◉','action')}</nav><div class="rail-foot"><button id="theme">${state.theme === 'light' ? '☀' : state.theme === 'dark' ? '☾' : '◐'}</button>${state.user ? `<button class="avatar" data-tab="you">${initials(state.user.displayName)}</button>` : '<button id="auth">Sign in</button>'}</div></aside><main><header>${topbar()}</header><section class="content">${view()}</section></main><nav class="mobile-nav">${nav('map','⌖','discovery')}${nav('discover','◇','discovery')}${nav('pulse','≋','discovery')}${nav('connections','◎','action')}${nav('you','◉','action')}</nav>${state.notice ? `<div class="toast">${escapeHtml(state.notice)}</div>` : ''}${authPanel()}</div>`;
+  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXA</b></button><nav>${nav('map','⌖','discovery')}${nav('discover','◇','discovery')}${nav('pulse','≋','discovery')}${nav('connections','◎','action')}${nav('you','◉','action')}</nav><div class="rail-foot"><button id="theme">${state.theme === 'light' ? '☀' : state.theme === 'dark' ? '☾' : '◐'}</button>${state.user ? `<button class="avatar" data-tab="you">${escapeHtml(initials(state.user.displayName))}</button>` : '<button id="auth">Sign in</button>'}</div></aside><main><header>${topbar()}</header><section class="content">${view()}</section></main><nav class="mobile-nav">${nav('map','⌖','discovery')}${nav('discover','◇','discovery')}${nav('pulse','≋','discovery')}${nav('connections','◎','action')}${nav('you','◉','action')}</nav>${state.notice ? `<div class="toast">${escapeHtml(state.notice)}</div>` : ''}${authPanel()}</div>`;
 }
 function topbar(): string {
   const copy: Record<Tab, [string,string]> = { map:['Map','What is happening around you right now.'], discover:['Discover','Focused entry points into local life.'], pulse:['Pulse','Useful local activity, not an endless feed.'], connections:['Connections','Chats and relationship actions.'], you:['You','Identity, verification, presence and account controls.'] };
@@ -217,15 +239,35 @@ function mapView(): string {
 function chip(kind: EntityKind, label: string): string { return `<button class="chip ${state.kinds.has(kind) ? 'selected' : ''}" data-kind="${kind}">${label}</button>`; }
 function pos(point: DiscoveryPoint): [number,number] { const left = ((point.lng - VIEWPORT.sw.lng) / (VIEWPORT.ne.lng - VIEWPORT.sw.lng)) * 100; const top = (1 - (point.lat - VIEWPORT.sw.lat) / (VIEWPORT.ne.lat - VIEWPORT.sw.lat)) * 100; return [Math.min(94,Math.max(6,left)),Math.min(90,Math.max(8,top))]; }
 function pin(point: DiscoveryPoint): string { const [left,top] = pos(point); if (point.kind === 'cluster') return `<button class="pin cluster" style="left:${left}%;top:${top}%">${point.count}</button>`; const label = point.kind === 'user' ? initials(point.meta.displayName) : point.kind === 'event' ? '◆' : '▣'; return `<button class="pin ${point.kind}" style="left:${left}%;top:${top}%">${escapeHtml(label)}</button>`; }
-function row(point: DiscoveryPoint): string { if (point.kind === 'cluster') return `<article class="row"><b class="entity cluster">${point.count}</b><div><strong>Busy area</strong><p>${point.count} signals</p></div></article>`; if (point.kind === 'user') return `<article class="row"><b class="entity user">${initials(point.meta.displayName)}</b><div><strong>${escapeHtml(point.meta.displayName)}${point.meta.verifiedBadge ? ' ✓' : ''}</strong><p>${point.meta.online ? 'Online now' : 'Nearby'} · ${point.meta.verification}</p></div></article>`; if (point.kind === 'event') return `<article class="row"><b class="entity event">◆</b><div><strong>${escapeHtml(point.meta.title)}</strong><p>${point.meta.attendeeCount} going</p></div></article>`; return `<article class="row"><b class="entity listing">▣</b><div><strong>${escapeHtml(point.meta.title)}</strong><p>${escapeHtml(point.meta.currency)} ${(point.meta.priceCents / 100).toFixed(0)} · ${escapeHtml(point.meta.category)}</p></div></article>`; }
+function row(point: DiscoveryPoint): string { if (point.kind === 'cluster') return `<article class="row"><b class="entity cluster">${point.count}</b><div><strong>Busy area</strong><p>${point.count} signals</p></div></article>`; if (point.kind === 'user') return `<article class="row"><b class="entity user">${escapeHtml(initials(point.meta.displayName))}</b><div><strong>${escapeHtml(point.meta.displayName)}${point.meta.verifiedBadge ? ' ✓' : ''}</strong><p>${point.meta.online ? 'Online now' : 'Nearby'} · ${point.meta.verification}</p></div></article>`; if (point.kind === 'event') return `<article class="row"><b class="entity event">◆</b><div><strong>${escapeHtml(point.meta.title)}</strong><p>${point.meta.attendeeCount} going</p></div></article>`; return `<article class="row"><b class="entity listing">▣</b><div><strong>${escapeHtml(point.meta.title)}</strong><p>${escapeHtml(point.meta.currency)} ${(point.meta.priceCents / 100).toFixed(0)} · ${escapeHtml(point.meta.category)}</p></div></article>`; }
 function discoverView(): string { return `<div class="discover">${discoverCard('Nearby people','Map → People','map','discovery')}${discoverCard('Local events','Pulse → Events','pulse','discovery')}${discoverCard('Marketplace','Map → Listings','map','action')}${discoverCard('People you may know','Connections','connections','action')}<article class="principle wide"><p class="eyebrow">DISCOVERY CONTRACT</p><h2>One city. Multiple lenses.</h2><p>Discover is a routing surface, not another ranked social feed. Spatial relevance remains authoritative on Map.</p></article></div>`; }
 function discoverCard(title: string, cta: string, target: Tab, tone: 'discovery'|'action'): string { return `<button class="discover-card ${tone}" data-target="${target}"><i></i><h2>${title}</h2><p>Open a focused NEXA surface without duplicating ranking or location requests.</p><strong>${cta} →</strong></button>`; }
 function pulseView(): string { return `<div class="pulse-layout"><section class="stream"><div class="chips"><button class="chip selected">For you</button><button class="chip">Nearby</button><button class="chip">Events</button><button class="chip">Marketplace</button></div>${state.feed.map(activity).join('') || '<p class="empty">No local activity yet.</p>'}</section><aside><article class="signal"><p class="eyebrow">CITY SIGNAL</p><b>${state.points.length}</b><span>nearby map signals</span><div class="bars"><i></i><i></i><i></i><i></i><i></i></div></article><article class="principle"><p class="eyebrow">PULSE IS NOT</p><h3>An infinite popularity feed.</h3><p>It prioritizes useful local events, alerts and listings.</p></article></aside></div>`; }
 function activity(item: ActivityItem): string { return `<article class="activity"><div><span>${item.type.toUpperCase()}</span><span>${ago(item.createdAt)}</span></div><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.preview)}</p><footer><span>${distance(item.distanceM)}</span><span>${item.actorName ? escapeHtml(item.actorName) : 'NEXA local signal'}</span>${item.unread ? '<i></i>' : ''}</footer></article>`; }
 function connectionsView(): string { return `<div class="connections"><section class="connection-card"><div class="section-head"><div><p class="eyebrow">ACTIONABLE</p><h2>Needs your attention</h2></div><b class="badge">3</b></div>${connection('≈','Maria waved at you','Wave back')}${connection('＋','Alex sent a connection request','Accept')}${connection('◌','Niko: “Are you joining tonight?”','Reply')}</section><section class="connection-card"><p class="eyebrow">RECENT</p><h2>Conversations</h2>${connection('◌','Elena','Open')}${connection('◌','Ivan','Open')}</section></div>`; }
 function connection(icon: string, title: string, action: string): string { return `<article class="connection"><b>${icon}</b><strong>${escapeHtml(title)}</strong><button>${action}</button></article>`; }
-function youView(): string { if (!state.user) return `<div class="you-empty"><div class="identity"></div><p class="eyebrow">YOUR NEXA IDENTITY</p><h2>Connect the live backend to open your identity surface.</h2><p>Map presence, verification and privacy belong here—not in a vanity feed.</p><button class="primary" id="auth-you">Sign in</button></div>`; const verification = verificationLabel(state.user.verification); return `<div class="you"><section class="identity-card"><div class="profile">${initials(state.user.displayName)}</div><div><p class="eyebrow">SIGNED IN</p><h2>${escapeHtml(state.user.displayName)}</h2><p>${escapeHtml(state.user.email)}</p></div><span>${escapeHtml(verification)}</span></section><section class="trust"><div><p class="eyebrow">VERIFICATION SIGNAL</p><h2>${escapeHtml(verification)}</h2><p>Web v1 renders the factual verification level returned by the backend. It does not calculate or expose a public numeric trust score.</p></div></section><button class="danger" id="logout">Sign out of web preview</button></div>`; }
-function authPanel(): string { return `<dialog class="auth-dialog" ${state.authOpen ? 'open' : ''}><form id="login"><button type="button" id="close">×</button><div class="logo auth-logo"><i></i><b>NEXA</b></div><p class="eyebrow">LIVE BACKEND</p><h2>Sign in to NEXA</h2><p>The access token stays in memory. The refresh credential is held by the backend in an HttpOnly SameSite cookie and is never exposed to browser JavaScript.</p><label>Email<input id="email" type="email" required autocomplete="email"></label><label>Password<input id="password" type="password" minlength="8" required autocomplete="current-password"></label><label>Developer API base<input id="api-base" type="url" value="${escapeHtml(state.apiBase)}" required></label><button class="primary" type="submit">Connect live backend</button><small>Production requires an explicit HTTPS CORS allowlist. The editable API base remains a non-public preview control.</small></form></dialog>`; }
+function youView(): string { if (!state.user) return `<div class="you-empty"><div class="identity"></div><p class="eyebrow">YOUR NEXA IDENTITY</p><h2>Connect the live backend to open your identity surface.</h2><p>Map presence, verification and privacy belong here—not in a vanity feed.</p><button class="primary" id="auth-you">Sign in</button></div>`; const verification = verificationLabel(state.user.verification); return `<div class="you"><section class="identity-card"><div class="profile">${escapeHtml(initials(state.user.displayName))}</div><div><p class="eyebrow">SIGNED IN</p><h2>${escapeHtml(state.user.displayName)}</h2><p>${escapeHtml(state.user.email)}</p></div><span>${escapeHtml(verification)}</span></section><section class="trust"><div><p class="eyebrow">VERIFICATION SIGNAL</p><h2>${escapeHtml(verification)}</h2><p>Web v1 renders the factual verification level returned by the backend. It does not calculate or expose a public numeric trust score.</p></div></section><button class="danger" id="logout">Sign out of web preview</button></div>`; }
+function authPanel(): string { return `<dialog class="auth-dialog" ${state.authOpen ? 'open' : ''}><form id="login"><button type="button" id="close">×</button><div class="logo auth-logo"><i></i><b>NEXA</b></div><p class="eyebrow">LIVE BACKEND</p><h2>Sign in to NEXA</h2><p>The access token stays in memory. The refresh credential is held by the backend in an HttpOnly SameSite cookie and is never exposed to browser JavaScript.</p><label>Email<input id="email" type="email" required autocomplete="email"></label><label>Password<input id="password" type="password" minlength="8" required autocomplete="current-password"></label><button class="primary" type="submit">Connect live backend</button><small>Local preview targets backend port 3001. Production uses a same-origin <code>/api/v1</code> edge proxy; users cannot select an arbitrary request host.</small></form></dialog>`; }
+
+function safeFragment(html: string): DocumentFragment {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  for (const element of [...parsed.body.querySelectorAll('*')]) {
+    if (!SAFE_TAGS.has(element.tagName)) {
+      element.remove();
+      continue;
+    }
+
+    for (const attribute of [...element.attributes]) {
+      if (SAFE_ATTRIBUTES.has(attribute.name)) continue;
+      if (attribute.name === 'style' && element.matches('button.pin') && PIN_STYLE.test(attribute.value)) continue;
+      element.removeAttribute(attribute.name);
+    }
+  }
+
+  const fragment = document.createDocumentFragment();
+  for (const child of [...parsed.body.childNodes]) fragment.append(document.importNode(child, true));
+  return fragment;
+}
 
 function bind(): void {
   document.querySelectorAll<HTMLElement>('[data-tab]').forEach((el) => el.addEventListener('click', () => { const tab = el.dataset.tab as Tab | undefined; if (tab) { state.tab = tab; render(); } }));
@@ -237,9 +279,9 @@ function bind(): void {
   document.querySelector('#logout')?.addEventListener('click', () => { void logout().catch((error: unknown) => notice(error instanceof Error ? `Sign out failed: ${error.message}` : 'Sign out failed. Retry while connected.')); });
   ['#auth','#auth-top','#auth-you'].forEach((selector) => document.querySelector(selector)?.addEventListener('click', () => { state.authOpen = true; render(); }));
   document.querySelector('#close')?.addEventListener('click', () => { state.authOpen = false; render(); });
-  document.querySelector<HTMLFormElement>('#login')?.addEventListener('submit', (event) => { event.preventDefault(); const email = document.querySelector<HTMLInputElement>('#email')?.value.trim() ?? ''; const password = document.querySelector<HTMLInputElement>('#password')?.value ?? ''; const base = document.querySelector<HTMLInputElement>('#api-base')?.value ?? state.apiBase; state.apiBase = normalizeBase(base); localStorage.setItem('nexa.web.apiBase', state.apiBase); void login(email,password).catch((error: unknown) => notice(error instanceof Error ? error.message : 'Sign in failed.')); });
+  document.querySelector<HTMLFormElement>('#login')?.addEventListener('submit', (event) => { event.preventDefault(); const email = document.querySelector<HTMLInputElement>('#email')?.value.trim() ?? ''; const password = document.querySelector<HTMLInputElement>('#password')?.value ?? ''; void login(email,password).catch((error: unknown) => notice(error instanceof Error ? error.message : 'Sign in failed.')); });
 }
-function render(): void { root.innerHTML = shell(); bind(); }
+function render(): void { root.replaceChildren(safeFragment(shell())); bind(); }
 
 matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (state.theme === 'system') { applyTheme(); render(); } });
 applyTheme(); render(); void restoreSession();
