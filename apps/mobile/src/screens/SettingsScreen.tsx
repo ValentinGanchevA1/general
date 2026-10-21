@@ -23,6 +23,7 @@ import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
 import { ListRow } from '@/components/ListRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { APP_VERSION, TERMS_OF_SERVICE_URL } from '@/constants/app';
+import { resolveNexaTrustActionLabel } from '@/product/nexaActionLanguage';
 import {
   spacing,
   fontSize,
@@ -193,6 +194,10 @@ export function SettingsScreen(): React.JSX.Element {
     phoneVerified: profile?.badges?.phone === true,
     ...(profile?.idVerificationStatus != null ? { idStatus: profile.idVerificationStatus } : {}),
   });
+  const trustActionLabel = resolveNexaTrustActionLabel(
+    trustNext,
+    profile?.idVerificationStatus,
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -320,9 +325,9 @@ export function SettingsScreen(): React.JSX.Element {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Trust & posting</Text>
-          <ListRow title="Trust" subtitle={trustNext.kind === 'done' ? 'Fully verified · Email · Phone · ID' : trustNext.kind === 'pending' ? trustNext.detail : `Next: ${trustNext.title} · ${trustNext.detail}`} onPress={() => navigation.navigate('TrustCenter')} />
-          {trustNext.kind === 'actionable' && trustNext.nav ? (
-            <ListRow style={styles.rowSpaced} title={trustNext.ctaLabel ?? trustNext.title} subtitle={trustNext.detail} onPress={() => {
+          <ListRow title="Trust" subtitle={trustNext.kind === 'done' ? 'Identity verified · Email · Phone · ID' : trustNext.kind === 'pending' ? trustNext.detail : `Next: ${trustNext.title} · ${trustNext.detail}`} onPress={() => navigation.navigate('TrustCenter')} />
+          {trustNext.kind === 'actionable' && trustNext.nav && trustActionLabel ? (
+            <ListRow style={styles.rowSpaced} title={trustActionLabel} subtitle={trustNext.detail} onPress={() => {
               if (trustNext.nav === 'EmailVerification') navigation.navigate('EmailVerification');
               else if (trustNext.nav === 'VerificationId') navigation.navigate('VerificationId');
               else navigation.navigate('Verification');
@@ -332,7 +337,7 @@ export function SettingsScreen(): React.JSX.Element {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Connected accounts</Text>
-          <ListRow title="Social accounts" subtitle="Link Instagram, X, TikTok and more — boosts trust" onPress={() => navigation.navigate('SocialLinking')} />
+          <ListRow title="Social accounts" subtitle="Optional supporting identity signals — not a substitute for ID verification" onPress={() => navigation.navigate('SocialLinking')} />
         </View>
 
         <View style={styles.section}>
@@ -349,7 +354,7 @@ export function SettingsScreen(): React.JSX.Element {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           <ListRow title="Privacy" subtitle="Policy and how we handle your data" onPress={() => navigation.navigate('Privacy')} />
-          <ListRow style={styles.rowSpaced} title="Terms of Service" subtitle="Rules for using G88" onPress={() => void Linking.openURL(TERMS_OF_SERVICE_URL)} />
+          <ListRow style={styles.rowSpaced} title="Terms of Service" subtitle="Rules for using NEXA" onPress={() => void Linking.openURL(TERMS_OF_SERVICE_URL)} />
           <ListRow style={styles.rowSpaced} title="Help & Support" subtitle="FAQ and contact" onPress={() => navigation.navigate('Help')} />
           <ListRow style={styles.rowSpaced} title="About" subtitle="Version and product overview" onPress={() => navigation.navigate('About')} />
 

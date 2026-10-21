@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { UserProfile } from '@g88/shared';
+import { resolveNexaVerifyActionLabel } from '@/product/nexaActionLanguage';
 import { spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
 
 export function ProfileIdCta({
@@ -14,25 +15,32 @@ export function ProfileIdCta({
 }): React.JSX.Element {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const actionLabel = resolveNexaVerifyActionLabel(
+    'id',
+    status === 'rejected' ? 'retry' : 'start',
+  );
+  const title = status === 'pending' ? 'Identity under review' : actionLabel;
+  const detail =
+    status === 'pending'
+      ? "We'll notify you when the review is complete"
+      : status === 'rejected'
+        ? 'Try again with clearer photos'
+        : 'Complete government ID verification';
 
   return (
     <View style={styles.sectionPadded}>
-      <TouchableOpacity style={styles.idCta} onPress={onPress} activeOpacity={0.85}>
+      <TouchableOpacity
+        style={styles.idCta}
+        onPress={onPress}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={title}
+      >
         <View style={styles.idCtaLeft}>
           <Icon name="card-account-details" size={20} color={colors.warning} />
           <View style={styles.copy}>
-            <Text style={styles.idCtaTitle}>
-              {status === 'pending'
-                ? 'ID under review'
-                : status === 'rejected'
-                  ? 'ID rejected — resubmit'
-                  : 'Verify your ID'}
-            </Text>
-            <Text style={styles.idCtaSub}>
-              {status === 'pending'
-                ? "We'll notify you when it's done"
-                : 'Boost trust and unlock more reach'}
-            </Text>
+            <Text style={styles.idCtaTitle}>{title}</Text>
+            <Text style={styles.idCtaSub}>{detail}</Text>
           </View>
         </View>
         <Icon name="chevron-right" size={22} color={colors.textFaint} />

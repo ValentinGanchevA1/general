@@ -17,6 +17,11 @@ import {bumpListing, counterOffer, makeOffer, respondToOffer, toggleFavorite, up
 import {formatListingExpiry, formatPrice} from '@/features/trading/formatPrice';
 import {openRootScreen} from '@/navigation/openRootScreen';
 import {signalPostSocialActivation} from '@/features/nudges/postSocialActivation';
+import {
+	resolveNexaConnectActionLabel,
+	resolveNexaOfferActionLabel,
+	resolveNexaRetryActionLabel,
+} from '@/product/nexaActionLanguage';
 
 type R = RouteProp<CommerceStackParamList, 'ListingDetail'>;
 
@@ -45,7 +50,7 @@ export function ListingDetailScreen(): React.JSX.Element {
 			<ScreenHeader title="Listing"/>
 			<View style={[S.container, S.center]}>
 				{loading ? <ActivityIndicator color={colors.primary}/> : error != null ?
-					<EmptyState variant="plain" icon="alert-circle-outline" title="Couldn't load listing" body="Check your connection and try again." actionLabel="Retry" onAction={refresh}/> :
+					<EmptyState variant="plain" icon="alert-circle-outline" title="Couldn't load listing" body="Check your connection and try again." actionLabel={resolveNexaRetryActionLabel('listing')} onAction={refresh}/> :
 					<EmptyState variant="plain" icon="tag-off-outline" title="Listing not found" body="This listing may have been removed or the link is invalid."/>}
 			</View>
 		</View>;
@@ -84,6 +89,8 @@ function SellerContactButtons({sellerId, sellerName}: {sellerId: string; sellerN
 	const navigation = useNavigation<NativeStackNavigationProp<CommerceStackParamList>>();
 	const [waving, setWaving] = useState(false);
 	const [messaging, setMessaging] = useState(false);
+	const messageLabel = resolveNexaConnectActionLabel('message');
+	const waveLabel = resolveNexaConnectActionLabel('wave');
 	const onMessage = useCallback(async () => {
 		if (messaging) return;
 		setMessaging(true);
@@ -100,10 +107,10 @@ function SellerContactButtons({sellerId, sellerName}: {sellerId: string; sellerN
 		finally { setWaving(false); }
 	}, [sellerId]);
 	return <View style={S.contactRow}>
-		<TouchableOpacity style={S.messageBtn} onPress={() => void onMessage()} disabled={messaging} accessibilityRole="button" accessibilityLabel="Message seller">
-			{messaging ? <ActivityIndicator size="small" color={colors.onPrimary}/> : <Icon name="message-text-outline" size={16} color={colors.onPrimary}/>}<Text style={S.waveText}>{messaging ? '…' : 'Message'}</Text>
+		<TouchableOpacity style={S.messageBtn} onPress={() => void onMessage()} disabled={messaging} accessibilityRole="button" accessibilityLabel={`${messageLabel} seller`}>
+			{messaging ? <ActivityIndicator size="small" color={colors.onPrimary}/> : <Icon name="message-text-outline" size={16} color={colors.onPrimary}/>}<Text style={S.waveText}>{messaging ? '…' : messageLabel}</Text>
 		</TouchableOpacity>
-		<TouchableOpacity style={S.waveBtn} onPress={() => void onWave()} disabled={waving}>{waving ? <ActivityIndicator size="small" color={colors.onPrimary}/> : <Icon name="hand-wave" size={16} color={colors.onPrimary}/>}<Text style={S.waveText}>Wave</Text></TouchableOpacity>
+		<TouchableOpacity style={S.waveBtn} onPress={() => void onWave()} disabled={waving} accessibilityRole="button" accessibilityLabel={`${waveLabel} to seller`}>{waving ? <ActivityIndicator size="small" color={colors.onPrimary}/> : <Icon name="hand-wave" size={16} color={colors.onPrimary}/>}<Text style={S.waveText}>{waveLabel}</Text></TouchableOpacity>
 	</View>;
 }
 
@@ -127,9 +134,9 @@ function BuyerOffer({listingId, disabled, myOffer, askingCents, currency, onChan
 		const onAcceptCounter = async () => { setBusy(true); try { await respondToOffer(myOffer.id, 'accepted'); onChanged(); } catch (e) { appAlert('Could not accept', (e as ApiError).message || 'Try again.'); } finally { setBusy(false); } };
 		const onDeclineCounter = async () => { setBusy(true); try { await respondToOffer(myOffer.id, 'declined'); onChanged(); } catch (e) { appAlert('Could not decline', (e as ApiError).message || 'Try again.'); } finally { setBusy(false); } };
 		if (isSellerCounter && reofferOpen) return <View style={S.card}>
-			<Text style={S.cardTitle}>Counter back</Text><Text style={S.counterHint}>Seller offered {myOffer.offerCents != null ? formatPrice(myOffer.offerCents, currency) : 'asking'}. Send a new amount.</Text>
+			<Text style={S.cardTitle}>Counter offer</Text><Text style={S.counterHint}>Seller offered {myOffer.offerCents != null ? formatPrice(myOffer.offerCents, currency) : 'asking'}. Send a new amount.</Text>
 			<OfferInputs amount={amount} message={message} askingCents={askingCents} currency={currency} onAmount={setAmount} onMessage={setMessage}/>
-			<TouchableOpacity style={[S.primaryBtn, busy && S.btnDisabled]} disabled={busy} onPress={() => void submit()}>{busy ? <ActivityIndicator size="small" color={colors.onPrimary}/> : <Text style={S.primaryBtnText}>Send counter</Text>}</TouchableOpacity>
+			<TouchableOpacity style={[S.primaryBtn, busy && S.btnDisabled]} disabled={busy} onPress={() => void submit()} accessibilityRole="button" accessibilityLabel={resolveNexaOfferActionLabel('counter')}>{busy ? <ActivityIndicator size="small" color={colors.onPrimary}/> : <Text style={S.primaryBtnText}>{resolveNexaOfferActionLabel('counter')}</Text>}</TouchableOpacity>
 			<TouchableOpacity style={[S.secondaryBtn, S.topGap]} disabled={busy} onPress={() => setReofferOpen(false)}><Text style={S.secondaryBtnText}>Cancel</Text></TouchableOpacity>
 		</View>;
 		return <View style={S.card}>
@@ -138,13 +145,13 @@ function BuyerOffer({listingId, disabled, myOffer, askingCents, currency, onChan
 			{myOffer.message ? <Text style={S.offerMsg}>{myOffer.message}</Text> : null}
 			{myOffer.status === 'pending' ? isSellerCounter ? <View style={S.counterStack}>
 				<TouchableOpacity style={[S.primaryBtn, busy && S.btnDisabled]} disabled={busy} onPress={() => void onAcceptCounter()} accessibilityLabel="Accept counter offer">{busy ? <ActivityIndicator size="small" color={colors.onPrimary}/> : <Text style={S.primaryBtnText}>Accept counter</Text>}</TouchableOpacity>
-				<TouchableOpacity style={[S.secondaryBtn, busy && S.btnDisabled]} disabled={busy} onPress={() => {setAmount(myOffer.offerCents != null ? String(myOffer.offerCents / 100) : ''); setMessage(''); setReofferOpen(true);}}><Text style={S.secondaryBtnText}>Counter back</Text></TouchableOpacity>
+				<TouchableOpacity style={[S.secondaryBtn, busy && S.btnDisabled]} disabled={busy} onPress={() => {setAmount(myOffer.offerCents != null ? String(myOffer.offerCents / 100) : ''); setMessage(''); setReofferOpen(true);}}><Text style={S.secondaryBtnText}>Counter</Text></TouchableOpacity>
 				<TouchableOpacity style={[S.secondaryBtn, busy && S.btnDisabled]} disabled={busy} onPress={() => void onDeclineCounter()}><Text style={S.secondaryBtnText}>Decline</Text></TouchableOpacity>
-			</View> : <TouchableOpacity style={[S.secondaryBtn, S.topGap]} disabled={busy} onPress={() => void onWithdraw()}><Text style={S.secondaryBtnText}>Withdraw offer</Text></TouchableOpacity> : null}
+			</View> : <TouchableOpacity style={[S.secondaryBtn, S.topGap]} disabled={busy} onPress={() => void onWithdraw()}><Text style={S.secondaryBtnText}>{resolveNexaOfferActionLabel('withdraw')}</Text></TouchableOpacity> : null}
 		</View>;
 	}
 	if (disabled) return <View style={S.card}><Text style={S.emptyHint}>This listing is no longer accepting offers.</Text></View>;
-	return <View style={S.card}><Text style={S.cardTitle}>Make an offer</Text><OfferInputs amount={amount} message={message} askingCents={askingCents} currency={currency} onAmount={setAmount} onMessage={setMessage}/><TouchableOpacity style={[S.primaryBtn, busy && S.btnDisabled]} disabled={busy} onPress={() => void submit()}>{busy ? <ActivityIndicator size="small" color={colors.onPrimary}/> : <Text style={S.primaryBtnText}>Send offer</Text>}</TouchableOpacity></View>;
+	return <View style={S.card}><Text style={S.cardTitle}>{resolveNexaOfferActionLabel('start')}</Text><OfferInputs amount={amount} message={message} askingCents={askingCents} currency={currency} onAmount={setAmount} onMessage={setMessage}/><TouchableOpacity style={[S.primaryBtn, busy && S.btnDisabled]} disabled={busy} onPress={() => void submit()} accessibilityRole="button" accessibilityLabel={resolveNexaOfferActionLabel('submit')}>{busy ? <ActivityIndicator size="small" color={colors.onPrimary}/> : <Text style={S.primaryBtnText}>{resolveNexaOfferActionLabel('submit')}</Text>}</TouchableOpacity></View>;
 }
 
 function OfferInputs({amount, message, askingCents, currency, onAmount, onMessage}: {amount: string; message: string; askingCents: number; currency: string; onAmount: (value: string) => void; onMessage: (value: string) => void}): React.JSX.Element {
@@ -172,7 +179,7 @@ function SellerControls({listingId, status, offers, currency, onChanged}: {listi
 		<Text style={S.sectionTitle}>Offers ({pending.length} pending)</Text>
 		{offers.length === 0 ? <Text style={S.emptyHint}>No offers yet.</Text> : offers.map((o) => <View key={o.id} style={S.card}>
 			<Text style={S.offerLine}>{o.offerCents != null ? formatPrice(o.offerCents, currency) : 'At asking'}{'  ·  '}<Text style={S.offerStatus}>{o.status}{o.lastActor === 'seller' ? ' (you countered)' : ''}</Text></Text>{o.message ? <Text style={S.offerMsg}>{o.message}</Text> : null}
-			{o.status === 'pending' && o.lastActor !== 'seller' ? counterFor === o.id ? <View style={S.counterEditor}><TextInput style={S.input} placeholder="Counter amount" placeholderTextColor={colors.textFaint} value={counterAmount} onChangeText={(t) => setCounterAmount(t.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad"/><TextInput style={[S.input, S.multiline]} placeholder="Message (optional)" placeholderTextColor={colors.textFaint} value={counterMsg} onChangeText={setCounterMsg} multiline/><View style={S.offerActions}><TouchableOpacity style={S.acceptBtn} disabled={counterBusy} onPress={() => void submitCounter(o.id)}>{counterBusy ? <ActivityIndicator size="small" color={colors.onPrimary}/> : <Icon name="check" size={18} color={colors.onPrimary}/>}</TouchableOpacity><TouchableOpacity style={S.declineBtn} disabled={counterBusy} onPress={() => setCounterFor(null)}><Icon name="close" size={18} color={colors.textPrimary}/></TouchableOpacity></View></View> : <View style={[S.offerActions, S.topGap]}><TouchableOpacity style={S.acceptBtn} onPress={() => void respond(o.id, 'accepted')} accessibilityLabel="Accept offer"><Icon name="check" size={18} color={colors.onPrimary}/></TouchableOpacity><TouchableOpacity style={S.counterBtn} onPress={() => {setCounterFor(o.id); setCounterAmount(o.offerCents != null ? String(o.offerCents / 100) : ''); setCounterMsg('');}}><Text style={S.counterBtnText}>Counter</Text></TouchableOpacity><TouchableOpacity style={S.declineBtn} onPress={() => void respond(o.id, 'declined')} accessibilityLabel="Decline offer"><Icon name="close" size={18} color={colors.textPrimary}/></TouchableOpacity></View> : null}
+			{o.status === 'pending' && o.lastActor !== 'seller' ? counterFor === o.id ? <View style={S.counterEditor}><TextInput style={S.input} placeholder="Counter amount" placeholderTextColor={colors.textFaint} value={counterAmount} onChangeText={(t) => setCounterAmount(t.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad"/><TextInput style={[S.input, S.multiline]} placeholder="Message (optional)" placeholderTextColor={colors.textFaint} value={counterMsg} onChangeText={setCounterMsg} multiline/><View style={S.offerActions}><TouchableOpacity style={S.acceptBtn} disabled={counterBusy} onPress={() => void submitCounter(o.id)} accessibilityLabel={resolveNexaOfferActionLabel('counter')}>{counterBusy ? <ActivityIndicator size="small" color={colors.onPrimary}/> : <Icon name="check" size={18} color={colors.onPrimary}/>}</TouchableOpacity><TouchableOpacity style={S.declineBtn} disabled={counterBusy} onPress={() => setCounterFor(null)}><Icon name="close" size={18} color={colors.textPrimary}/></TouchableOpacity></View></View> : <View style={[S.offerActions, S.topGap]}><TouchableOpacity style={S.acceptBtn} onPress={() => void respond(o.id, 'accepted')} accessibilityLabel={resolveNexaOfferActionLabel('accept')}><Icon name="check" size={18} color={colors.onPrimary}/></TouchableOpacity><TouchableOpacity style={S.counterBtn} onPress={() => {setCounterFor(o.id); setCounterAmount(o.offerCents != null ? String(o.offerCents / 100) : ''); setCounterMsg('');}}><Text style={S.counterBtnText}>Counter</Text></TouchableOpacity><TouchableOpacity style={S.declineBtn} onPress={() => void respond(o.id, 'declined')} accessibilityLabel={resolveNexaOfferActionLabel('decline')}><Icon name="close" size={18} color={colors.textPrimary}/></TouchableOpacity></View> : null}
 		</View>)}
 	</View>;
 }

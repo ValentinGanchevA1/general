@@ -29,6 +29,10 @@ import { fetchProfile } from '@/features/profile/profileSlice';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { fontSize, radius, spacing, useAppTheme } from '@/theme';
+import {
+  resolveNexaConnectActionLabel,
+  resolveNexaTrustActionLabel,
+} from '@/product/nexaActionLanguage';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 type Route = RouteProp<AccountStackParamList, 'TrustCenter'>;
@@ -99,14 +103,15 @@ export function TrustCenterScreen(): React.JSX.Element {
   );
 
   const primaryAction = useMemo<PrimaryAction | null>(() => {
-    if (coreNext.kind === 'actionable' && coreNext.step != null && coreNext.ctaLabel) {
-      return { id: coreNext.step, label: coreNext.ctaLabel };
+    if (coreNext.kind === 'actionable' && coreNext.step != null) {
+      const label = resolveNexaTrustActionLabel(coreNext, profile?.idVerificationStatus);
+      if (label != null) return { id: coreNext.step, label };
     }
     if (coreNext.kind === 'done' && !trust.socialConnected) {
-      return { id: 'social', label: 'Connect a profile' };
+      return { id: 'social', label: resolveNexaConnectActionLabel('profile') };
     }
     return null;
-  }, [coreNext, trust.socialConnected]);
+  }, [coreNext, profile?.idVerificationStatus, trust.socialConnected]);
 
   const statusColor: Record<VerificationItem['status'], string> = {
     success: colors.verified,

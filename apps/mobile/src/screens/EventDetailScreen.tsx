@@ -35,14 +35,18 @@ import {
 } from '@/features/events/useEvents';
 import { formatEventWhen } from '@/features/events/eventFormat';
 import { openRootScreen, openViaRef } from '@/navigation/openRootScreen';
+import {
+  resolveNexaRetryActionLabel,
+  resolveNexaRsvpActionLabel,
+} from '@/product/nexaActionLanguage';
 
 type R = RouteProp<EventsStackParamList, 'EventDetail'>;
 type Styles = ReturnType<typeof createStyles>;
 
-const RSVP_META: Record<RsvpStatus, { label: string; icon: string }> = {
-  going: { label: 'Going', icon: 'check-circle' },
-  maybe: { label: 'Maybe', icon: 'help-circle' },
-  declined: { label: "Can't go", icon: 'close-circle' },
+const RSVP_META: Record<RsvpStatus, { icon: string }> = {
+  going: { icon: 'check-circle' },
+  maybe: { icon: 'help-circle' },
+  declined: { icon: 'close-circle' },
 };
 
 function useEventDetailTheme(): { colors: ThemeColors; styles: Styles } {
@@ -78,7 +82,7 @@ export function EventDetailScreen(): React.JSX.Element {
         <ScreenHeader title="Event" />
         <View style={[styles.container, styles.center]}>
           {loading ? <ActivityIndicator color={colors.primary} /> : error != null ? (
-            <EmptyState variant="plain" icon="alert-circle-outline" title="Couldn't load event" body="Check your connection and try again." actionLabel="Retry" onAction={refresh} />
+            <EmptyState variant="plain" icon="alert-circle-outline" title="Couldn't load event" body="Check your connection and try again." actionLabel={resolveNexaRetryActionLabel('event')} onAction={refresh} />
           ) : (
             <EmptyState variant="plain" icon="calendar-remove" title="Event not found" body="This event may have been removed or the link is invalid." />
           )}
@@ -114,10 +118,19 @@ export function EventDetailScreen(): React.JSX.Element {
           const active = event.myRsvp === status;
           const disabled = rsvpBusy || (status === 'going' && full && !active);
           const meta = RSVP_META[status];
+          const label = resolveNexaRsvpActionLabel(status, active);
           return (
-            <TouchableOpacity key={status} style={[styles.rsvpBtn, active && styles.rsvpBtnActive, disabled && styles.rsvpBtnDisabled]} disabled={disabled} onPress={() => void onRsvp(status)}>
+            <TouchableOpacity
+              key={status}
+              style={[styles.rsvpBtn, active && styles.rsvpBtnActive, disabled && styles.rsvpBtnDisabled]}
+              disabled={disabled}
+              onPress={() => void onRsvp(status)}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              accessibilityState={{ selected: active, disabled }}
+            >
               <Icon name={meta.icon} size={18} color={active ? colors.onPrimary : colors.textSecondary} />
-              <Text style={[styles.rsvpText, active && styles.rsvpTextActive]}>{meta.label}</Text>
+              <Text style={[styles.rsvpText, active && styles.rsvpTextActive]}>{label}</Text>
             </TouchableOpacity>
           );
         })}

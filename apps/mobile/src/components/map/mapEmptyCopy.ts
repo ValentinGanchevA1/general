@@ -1,4 +1,5 @@
 import type { ListingModeFilterValue } from '@/components/map/MapFilterRow';
+import { resolveNexaVerifyActionLabel } from '@/product/nexaActionLanguage';
 
 export type MapEmptyActionKind =
   | 'show_everyone'
@@ -28,8 +29,8 @@ export function mapEmptyCopy(opts: {
       icon: 'account-group-outline',
       eyebrow: 'People layer',
       title: 'No friends in this view',
-      body: 'Move the map to another area or show everyone nearby.',
-      actionLabel: 'Show everyone',
+      body: 'Move the map to another area or discover everyone nearby.',
+      actionLabel: 'Discover everyone',
       actionKind: 'show_everyone',
     };
   }
@@ -40,7 +41,7 @@ export function mapEmptyCopy(opts: {
         eyebrow: 'Dating layer',
         title: 'Dating discovery is off',
         body: 'Turn on Open to dating and choose who you want to discover. Only opted-in people can appear here.',
-        actionLabel: 'Dating preferences',
+        actionLabel: 'Adjust dating',
         actionKind: 'dating_prefs',
       };
     }
@@ -49,7 +50,7 @@ export function mapEmptyCopy(opts: {
       eyebrow: 'Dating layer',
       title: 'No matches in this view',
       body: 'Move the map, adjust your preferences, or clear the Dating filter to discover more nearby.',
-      actionLabel: 'Clear Dating filter',
+      actionLabel: 'Show nearby',
       actionKind: 'clear_dating',
     };
   }
@@ -59,7 +60,7 @@ export function mapEmptyCopy(opts: {
       eyebrow: 'Marketplace layer',
       title: 'No for-sale listings here yet',
       body: 'Create the first local listing in this view or switch the marketplace filter to All.',
-      actionLabel: 'Create here',
+      actionLabel: 'Create listing',
       actionKind: 'create',
     };
   }
@@ -69,7 +70,7 @@ export function mapEmptyCopy(opts: {
       eyebrow: 'Marketplace layer',
       title: 'No wanted posts here yet',
       body: 'Create the first wanted post in this view or switch the marketplace filter to All.',
-      actionLabel: 'Create here',
+      actionLabel: 'Create wanted post',
       actionKind: 'create',
     };
   }
@@ -79,7 +80,7 @@ export function mapEmptyCopy(opts: {
       eyebrow: 'Trust required',
       title: 'Verify email to participate nearby',
       body: 'Confirm your email, then create the first event, listing, wanted post, or local alert in this view.',
-      actionLabel: 'Verify email',
+      actionLabel: resolveNexaVerifyActionLabel('email'),
       actionKind: 'verify_email',
     };
   }
@@ -88,7 +89,7 @@ export function mapEmptyCopy(opts: {
     eyebrow: 'Quiet area',
     title: 'Nothing has surfaced here yet',
     body: 'Create the first local signal: an event, listing, wanted post, or alert. You can also move the map to keep discovering.',
-    actionLabel: 'Create here',
+    actionLabel: 'Create nearby',
     actionKind: 'create',
   };
 }

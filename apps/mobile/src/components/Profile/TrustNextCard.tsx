@@ -5,6 +5,10 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { UserProfile } from '@g88/shared';
 import { resolveTrustNextStep } from '@g88/shared';
 import { fontSize, radius, spacing, useAppTheme } from '@/theme';
+import {
+  resolveNexaConnectActionLabel,
+  resolveNexaTrustActionLabel,
+} from '@/product/nexaActionLanguage';
 
 import { resolveNexaTrustVisualFromProfile } from './nexaTrustVisuals';
 import type { VerificationItemId } from './VerificationStatusSheet';
@@ -33,9 +37,14 @@ export function TrustNextCard({
     [profile.badges?.email, profile.badges?.phone, profile.idVerificationStatus],
   );
   const trust = useMemo(() => resolveNexaTrustVisualFromProfile(profile), [profile]);
+  const actionLabel = useMemo(
+    () => resolveNexaTrustActionLabel(next, profile.idVerificationStatus),
+    [next, profile.idVerificationStatus],
+  );
 
   if (next.kind === 'done') {
     const needsSupportingProfile = !trust.socialConnected;
+    const connectProfileLabel = resolveNexaConnectActionLabel('profile');
     return (
       <View style={styles.wrap} accessibilityRole="summary">
         <View
@@ -66,9 +75,9 @@ export function TrustNextCard({
               ]}
               onPress={() => onContinue('social')}
               accessibilityRole="button"
-              accessibilityLabel="Connect a supporting profile"
+              accessibilityLabel={connectProfileLabel}
             >
-              <Text style={[styles.ctaText, { color: colors.onPrimary }]}>Add</Text>
+              <Text style={[styles.ctaText, { color: colors.onPrimary }]}>{connectProfileLabel}</Text>
             </Pressable>
           ) : onOpenDetails ? (
             <Pressable
@@ -86,7 +95,7 @@ export function TrustNextCard({
   }
 
   const isPending = next.kind === 'pending';
-  const isResubmit = next.step === 'id' && next.ctaLabel === 'Resubmit';
+  const isResubmit = next.step === 'id' && profile.idVerificationStatus === 'rejected';
   const accent = isPending
     ? colors.warning
     : isResubmit
@@ -138,10 +147,10 @@ export function TrustNextCard({
             ]}
             onPress={() => onContinue(next.step!)}
             accessibilityRole="button"
-            accessibilityLabel={next.ctaLabel ?? 'Continue'}
+            accessibilityLabel={actionLabel ?? 'Continue'}
           >
             <Text style={[styles.ctaText, { color: colors.onPrimary }]}>
-              {next.ctaLabel ?? 'Continue'}
+              {actionLabel ?? 'Continue'}
             </Text>
           </Pressable>
         ) : null}

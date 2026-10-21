@@ -27,6 +27,7 @@ import { fetchProfile } from '@/features/profile/profileSlice';
 import { extractMessage } from '@/utils/extractMessage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { fontSize, spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
+import { resolveNexaVerifyActionLabel } from '@/product/nexaActionLanguage';
 
 type Step = 'phone' | 'code';
 
@@ -42,6 +43,7 @@ export function VerificationScreen(): React.JSX.Element {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [devHint, setDevHint] = useState(false);
+  const verifyPhoneLabel = resolveNexaVerifyActionLabel('phone');
 
   const start = async (): Promise<void> => {
     setBusy(true);
@@ -79,17 +81,23 @@ export function VerificationScreen(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScreenHeader title="Verify phone" />
+      <ScreenHeader title={verifyPhoneLabel} />
       <View style={styles.body}>
         <Icon name="cellphone-check" size={48} color={colors.primary} />
         {step === 'phone' ? (
           <>
-            <Text style={styles.title}>Add your phone</Text>
-            <Text style={styles.blurb}>We'll text you a code to confirm it's really you. Use international format, e.g. +359888123456.</Text>
+            <Text style={styles.title}>{verifyPhoneLabel}</Text>
+            <Text style={styles.blurb}>We'll text you a code to confirm the number belongs to you. Use international format, e.g. +359888123456.</Text>
             <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="+359888123456" placeholderTextColor={colors.textFaint} keyboardType="phone-pad" autoFocus editable={!busy} />
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <TouchableOpacity style={[styles.button, (busy || phone.trim().length < 8) && styles.buttonDisabled]} onPress={() => void start()} disabled={busy || phone.trim().length < 8}>
-              {busy ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.buttonText}>Send code</Text>}
+            <TouchableOpacity
+              style={[styles.button, (busy || phone.trim().length < 8) && styles.buttonDisabled]}
+              onPress={() => void start()}
+              disabled={busy || phone.trim().length < 8}
+              accessibilityRole="button"
+              accessibilityLabel="Send verification code"
+            >
+              {busy ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.buttonText}>Send verification code</Text>}
             </TouchableOpacity>
           </>
         ) : (
@@ -99,10 +107,16 @@ export function VerificationScreen(): React.JSX.Element {
             {devHint ? <Text style={styles.devHint}>Dev mode: use 000000</Text> : null}
             <TextInput style={[styles.input, styles.codeInput]} value={code} onChangeText={setCode} placeholder="000000" placeholderTextColor={colors.textFaint} keyboardType="number-pad" maxLength={10} autoFocus editable={!busy} />
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <TouchableOpacity style={[styles.button, (busy || code.trim().length < 4) && styles.buttonDisabled]} onPress={() => void check()} disabled={busy || code.trim().length < 4}>
-              {busy ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.buttonText}>Verify</Text>}
+            <TouchableOpacity
+              style={[styles.button, (busy || code.trim().length < 4) && styles.buttonDisabled]}
+              onPress={() => void check()}
+              disabled={busy || code.trim().length < 4}
+              accessibilityRole="button"
+              accessibilityLabel={verifyPhoneLabel}
+            >
+              {busy ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.buttonText}>{verifyPhoneLabel}</Text>}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => void start()} disabled={busy} style={styles.resend}><Text style={styles.link}>Resend code</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => void start()} disabled={busy} style={styles.resend} accessibilityRole="button" accessibilityLabel="Resend verification code"><Text style={styles.link}>Resend code</Text></TouchableOpacity>
           </>
         )}
       </View>
