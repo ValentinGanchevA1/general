@@ -15,13 +15,9 @@ import { NexaSymbol } from './NexaSymbol';
 
 const SPLASH_BACKGROUND = '#08090D';
 const WORDMARK = '#F7F8FA';
-const VIOLET = '#7C5CFC';
 const VIOLET_BRIGHT = '#9278FF';
 const SYMBOL_CORE = '#C8BEFF';
-const CYAN = '#27D3F2';
 const CYAN_BRIGHT = '#62E6FF';
-
-const ENTER_DURATION_MS = 1180;
 const EXIT_DURATION_MS = 520;
 
 export interface NexaLaunchOverlayProps {
@@ -35,7 +31,7 @@ export interface NexaLaunchOverlayProps {
  * Native launch is intentionally only the dark canvas. Once RN has mounted,
  * the eye core ignites, the entity orbit refills with light, NEXA's entity
  * glyphs resolve on the orbit, and the wordmark fades in. When boot-time auth
- * restoration is complete, the whole system dissolves into the live app.
+ * restoration is complete, the system dissolves into the already-mounted app.
  */
 export function NexaLaunchOverlay({
   ready,
@@ -116,8 +112,26 @@ export function NexaLaunchOverlay({
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }),
+      Animated.timing(brandScale, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(brandTranslateY, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
       Animated.timing(wordmarkOpacity, {
         toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(wordmarkTranslateY, {
+        toValue: 0,
         duration: 180,
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
@@ -128,7 +142,19 @@ export function NexaLaunchOverlay({
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }),
+      Animated.timing(orbitScale, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
       Animated.timing(entitiesOpacity, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(entitiesScale, {
         toValue: 1,
         duration: 180,
         easing: Easing.out(Easing.quad),
@@ -473,14 +499,17 @@ export function NexaLaunchOverlay({
         pointerEvents="none"
         style={[
           styles.rayStage,
-          {
-            opacity: rayOpacity,
-            transform: [{ scaleX: rayScale }],
-          },
+          { opacity: rayOpacity, transform: [{ scaleX: rayScale }] },
         ]}
       >
         <LinearGradient
-          colors={['transparent', 'rgba(124,92,252,0.70)', 'rgba(247,248,250,0.98)', 'rgba(39,211,242,0.64)', 'transparent']}
+          colors={[
+            'transparent',
+            'rgba(124,92,252,0.70)',
+            'rgba(247,248,250,0.98)',
+            'rgba(39,211,242,0.64)',
+            'transparent',
+          ]}
           locations={[0, 0.28, 0.5, 0.72, 1]}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
@@ -488,7 +517,12 @@ export function NexaLaunchOverlay({
         />
         <View style={[styles.rayDiagonalWrap, styles.rayDiagonalLeft]}>
           <LinearGradient
-            colors={['transparent', 'rgba(146,120,255,0.74)', 'rgba(247,248,250,0.96)', 'transparent']}
+            colors={[
+              'transparent',
+              'rgba(146,120,255,0.74)',
+              'rgba(247,248,250,0.96)',
+              'transparent',
+            ]}
             locations={[0, 0.34, 0.55, 1]}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
@@ -497,7 +531,12 @@ export function NexaLaunchOverlay({
         </View>
         <View style={[styles.rayDiagonalWrap, styles.rayDiagonalRight]}>
           <LinearGradient
-            colors={['transparent', 'rgba(98,230,255,0.64)', 'rgba(247,248,250,0.94)', 'transparent']}
+            colors={[
+              'transparent',
+              'rgba(98,230,255,0.64)',
+              'rgba(247,248,250,0.94)',
+              'transparent',
+            ]}
             locations={[0, 0.38, 0.56, 1]}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
@@ -593,7 +632,13 @@ export function NexaLaunchOverlay({
               ]}
             >
               <LinearGradient
-                colors={['transparent', VIOLET_BRIGHT, '#FFFFFF', CYAN_BRIGHT, 'transparent']}
+                colors={[
+                  'transparent',
+                  VIOLET_BRIGHT,
+                  '#FFFFFF',
+                  CYAN_BRIGHT,
+                  'transparent',
+                ]}
                 locations={[0, 0.28, 0.52, 0.72, 1]}
                 start={{ x: 0, y: 0.5 }}
                 end={{ x: 1, y: 0.5 }}
@@ -706,6 +751,10 @@ const styles = StyleSheet.create({
     borderWidth: 1.1,
     borderColor: 'rgba(98, 230, 255, 0.40)',
     transform: [{ rotateZ: '8deg' }],
+    shadowColor: CYAN_BRIGHT,
+    shadowOpacity: 0.24,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
   },
   entityLayer: {
     position: 'absolute',
@@ -901,5 +950,3 @@ const styles = StyleSheet.create({
     textShadowRadius: 10,
   },
 });
-
-void ENTER_DURATION_MS;
