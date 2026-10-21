@@ -87,7 +87,7 @@ describe('mapChromeLayout', () => {
   });
 
   it('uses matching supporting card heights so stack math stays consistent', () => {
-    expect(CHALLENGE_CARD_HEIGHT).toBe(56);
-    expect(NUDGE_CARD_HEIGHT).toBe(56);
+    expect(CHALLENGE_CARD_HEIGHT).toBe(52);
+    expect(NUDGE_CARD_HEIGHT).toBe(52);
   });
 });
