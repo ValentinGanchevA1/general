@@ -45,16 +45,30 @@ No backend schema, PostGIS query or persistence change is introduced.
 - Origins are normalized as bare origins only. Paths, query strings, fragments and non-HTTP(S) schemes are rejected.
 - REST and Socket.IO use the same origin source.
 
+## Map / viewport contract
+
+- Web v1 now renders a real interactive slippy map with Web Mercator raster tiles; no third-party JavaScript map SDK or workspace dependency is introduced in this draft.
+- Default camera opens on Varna as product context only. The map does **not** request device geolocation and does not label viewport center as the user.
+- Pan, wheel zoom, zoom controls and keyboard navigation update the in-memory camera.
+- After 220 ms of settled interaction, the current NE/SW bounds + integer zoom become authoritative for `POST /discovery/nearby`.
+- An in-flight discovery request is aborted when a newer viewport query supersedes it, preventing stale responses from winning a fast pan/zoom race.
+- Entity-kind filters reuse the current viewport and trigger a fresh nearby query only for authenticated sessions.
+- Demo mode keeps the interactive map but does not issue discovery API requests.
+- Preview tiles are requested only for the visible viewport from `https://tile.openstreetmap.org/{z}/{x}/{y}.png`; no prefetch, offline download or background tile crawl is implemented.
+- OpenStreetMap attribution remains visible on the map and tile requests retain normal browser referrer behavior.
+- The standard OSM tile service is a **preview-only** provider. Public/paid NEXA release must use a production tile provider or self-hosted/vector-tile stack with explicit SLA, privacy, caching and usage terms.
+
 ## DOM / request security
 
 - Production API routing is fixed to same-origin `/api/v1`; arbitrary client-side request destinations are not configurable.
 - Backend/user strings are escaped before template composition.
-- Rendered markup is parsed inertly and passed through an allowlist sanitizer before nodes are inserted with `replaceChildren`; event-handler, URL-bearing and unknown attributes/tags are rejected.
-- Inline styles are accepted only for validated numeric map-pin `left/top` positioning.
+- Rendered app-shell markup is parsed inertly and passed through an allowlist sanitizer before nodes are inserted with `replaceChildren`; event-handler, URL-bearing and unknown attributes/tags are rejected.
+- Map tiles, controls, attribution and markers are created through DOM APIs (`createElement`, `textContent`) rather than HTML string insertion.
 
 ## Security / privacy
 
-- Keep map coordinates under the server's existing privacy/fuzzing policy; the web client must not infer or persist higher precision.
+- Keep discovery coordinates under the server's existing privacy/fuzzing policy; the web client must not infer or persist higher precision.
+- Map interaction is not equivalent to device location permission.
 - Discover must not request fresh device location on its own.
 - No vanity badges/counts in primary navigation.
 - `You` must render factual verification state from the backend and must not calculate a public numeric trust score.
@@ -63,13 +77,18 @@ No backend schema, PostGIS query or persistence change is introduced.
 
 - Primary navigation is exactly `Map / Discover / Pulse / Connections / You`.
 - Demo mode works without backend connectivity and identifies itself as demo.
+- Map supports pan, zoom controls, wheel zoom and keyboard navigation.
+- Settled viewport bounds + zoom drive authenticated nearby discovery queries.
+- Superseded discovery requests are aborted.
+- No implicit geolocation request occurs when Map or Discover opens.
+- OSM attribution is visible in the preview and no tile prefetch/offline path exists.
 - Authenticated mode uses the browser session adapter plus the existing discovery and Pulse endpoints.
 - Neither access nor refresh tokens are persisted in Web Storage.
 - Refresh token is unavailable to browser JavaScript.
 - Production refuses to start without an explicit HTTPS CORS allowlist.
 - Production browser requests use same-origin `/api/v1` through a controlled edge/reverse proxy.
 - No user-editable API host exists.
-- Dynamic DOM insertion passes through the allowlist sanitizer; no direct `innerHTML` render sink is used.
+- Dynamic app-shell DOM insertion passes through the allowlist sanitizer; map dynamic nodes use safe DOM APIs.
 - `You` exposes no synthetic trust score.
 - Theme follows system by default and supports explicit dark/light overrides.
 - At <=760px the desktop rail becomes a five-item bottom navigation.
@@ -79,6 +98,6 @@ No backend schema, PostGIS query or persistence change is introduced.
 
 1. Select the production web hostname, configure its same-origin `/api/v1` reverse proxy, and put that HTTPS web origin in `CORS_ORIGINS`.
 2. Add multi-tab refresh/replay E2E coverage.
-3. Replace the geometry preview with the selected real map renderer/provider and document tile/privacy policy.
+3. Select the production map/tile provider or self-hosted vector-tile stack and document SLA, attribution, caching, CSP and privacy policy.
 4. Wire Connections to the existing chat/friend/wave APIs and Socket.IO.
-5. Add browser E2E coverage and a non-public preview deployment.
+5. Add browser E2E coverage for auth + map viewport races and a non-public preview deployment.
