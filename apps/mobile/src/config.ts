@@ -38,6 +38,9 @@ export const Config = {
   API_BASE_URL: __DEV__
     ? DEV_API_URL
     : 'https://g88-api.onrender.com',
+  // DEV-only visual entitlement override. Production builds always ignore it.
+  FORCE_PROTOS_NEXUS:
+    __DEV__ && process.env.FORCE_PROTOS_NEXUS === 'true',
   // OAuth 2.0 Web Client ID from Google Cloud Console (same value used by backend GOOGLE_CLIENT_ID)
   GOOGLE_WEB_CLIENT_ID:
     (process.env.GOOGLE_WEB_CLIENT_ID as string | undefined) ?? '',
