@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useColorScheme } from 'react-native';
+import useColorScheme from 'react-native/Libraries/Utilities/useColorScheme';
 
 import { darkColors, lightColors } from './colors';
 import { ThemeProvider, useAppTheme } from './ThemeProvider';
