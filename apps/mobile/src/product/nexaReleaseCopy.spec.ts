@@ -1,29 +1,25 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-const readMobileSource = (...segments: string[]): string =>
-  readFileSync(join(__dirname, '..', ...segments), 'utf8');
+import { NEXA_LOCATION_PERMISSION_COPY } from '@/features/location/locationPermissionCopy';
+import { NEXA_HELP_FAQS } from '@/screens/helpFaqs';
 
 describe('NEXA release-visible copy guard', () => {
-  const locationSource = readMobileSource('features', 'location', 'useUserLocation.ts');
-  const helpSource = readMobileSource('screens', 'HelpScreen.tsx');
+  const helpCopy = NEXA_HELP_FAQS.flatMap(({ q, a }) => [q, a]).join('\n');
 
   it('keeps the Android location rationale on the NEXA brand', () => {
-    expect(locationSource).toContain('NEXA uses your location');
-    expect(locationSource).not.toContain('G88 needs your location');
+    expect(NEXA_LOCATION_PERMISSION_COPY.message).toContain('NEXA uses your location');
+    expect(NEXA_LOCATION_PERMISSION_COPY.message).not.toContain('G88');
   });
 
   it('keeps Help aligned with the canonical Connections surface', () => {
-    expect(helpSource).toContain('What is Connections?');
-    expect(helpSource).not.toContain('What is the Interactions screen?');
-    expect(helpSource).not.toContain('Interactions is a focused inbox');
+    expect(helpCopy).toContain('What is Connections?');
+    expect(helpCopy).not.toContain('What is the Interactions screen?');
+    expect(helpCopy).not.toContain('Interactions is a focused inbox');
   });
 
   it('keeps verification factual and score-free', () => {
-    expect(helpSource).toContain(
+    expect(helpCopy).toContain(
       'They do not create a public trust or popularity score.',
     );
-    expect(helpSource).not.toContain('raise trust');
-    expect(helpSource).not.toContain('trust booster');
+    expect(helpCopy).not.toContain('raise trust');
+    expect(helpCopy).not.toContain('trust booster');
   });
 });
