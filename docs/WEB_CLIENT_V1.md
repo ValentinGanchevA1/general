@@ -34,7 +34,11 @@ No backend schema, PostGIS query or persistence change is introduced.
 - Local preview has two fixed mappings only: `127.0.0.1:4174 → 127.0.0.1:3001` and `localhost:4174 → localhost:3001`.
 - Browser auth mutations require both an allowlisted `Origin` and `X-Nexa-Web-Session: 1`.
 - A single tab deduplicates refresh requests so one expired access token does not rotate the refresh family multiple times concurrently.
-- Multi-tab refresh coordination is still a required E2E/security case before public deployment because the backend intentionally revokes a refresh-token family on replay.
+- Login, refresh and logout are serialized across same-origin tabs with one Web Locks API lock. This prevents two tabs from concurrently consuming the same rotating refresh cookie and triggering replay-family revocation.
+- BroadcastChannel communicates only a `session-changed` control signal. Access and refresh tokens are never broadcast between tabs.
+- Login, logout or terminal refresh rejection causes other tabs to reload and recover from the current HttpOnly-cookie state, preventing a replaced account/session from leaving a stale access token active in another tab.
+- A short-lived `sessionStorage` marker suppresses cross-tab reload-signal loops. It contains no credential or account data.
+- Public deployment requires HTTPS/current browsers with Web Locks. The fallback path preserves browser functionality when Web Locks are unavailable but cannot guarantee cross-tab refresh serialization; supported-browser E2E must verify this boundary.
 
 ## CORS / edge contract
 
@@ -69,6 +73,7 @@ No backend schema, PostGIS query or persistence change is introduced.
 - The preview bundles `socket.io-client` at build time from the already locked `apps/admin` workspace dependency. There is no runtime CDN/backend script inclusion and no new web lockfile importer.
 - When the access token rotates, the socket reconnects with the new handshake token because guarded gateway events re-verify `handshake.auth.token`. Any active conversation is then rejoined.
 - Location/location-session chat messages display a generic sharing label in the list; raw coordinates are not rendered by this Connections slice.
+- Realtime/backend error details are not surfaced verbatim in the Connections UI; user-visible failures are generic while server-side diagnostics remain authoritative.
 
 ## DOM / request security
 
@@ -77,6 +82,8 @@ No backend schema, PostGIS query or persistence change is introduced.
 - Rendered app-shell markup is parsed inertly and passed through an allowlist sanitizer before insertion with `replaceChildren`.
 - Map tiles, controls, attribution and markers are created through DOM APIs (`createElement`, `textContent`).
 - Dynamic REST path IDs are UUID-validated before interpolation.
+- The local preview server applies a restrictive CSP, `nosniff`, frame denial, same-origin opener isolation and strict referrer policy.
+- Preview `Permissions-Policy` explicitly disables geolocation, camera and microphone.
 
 ## Security / privacy
 
@@ -97,6 +104,7 @@ No backend schema, PostGIS query or persistence change is introduced.
 - Connections loads the authenticated inbox + conversations and supports friend-request actions, wave-back and realtime 1:1 chat.
 - Conversation sending is blocked until room join succeeds and survives access-token rotation via socket reconnect + room rejoin.
 - Neither access nor refresh tokens are persisted in Web Storage; refresh token remains unavailable to browser JavaScript.
+- Same-origin tabs serialize browser auth cookie mutations; session-change signaling never includes credentials.
 - Production refuses to start without an explicit HTTPS CORS allowlist.
 - Production browser requests use same-origin `/api/v1`, and realtime uses same-origin `/socket.io` through a controlled edge/reverse proxy.
 - No user-editable API/socket host exists.
@@ -110,7 +118,7 @@ No backend schema, PostGIS query or persistence change is introduced.
 ## Remaining release blockers
 
 1. Select the production web hostname, configure same-origin `/api/v1` + `/socket.io` reverse proxies, and put the HTTPS web origin in `CORS_ORIGINS`.
-2. Add multi-tab refresh/replay E2E coverage.
+2. Validate Web Locks refresh serialization, account switching and logout propagation with multi-tab E2E across the supported browser matrix.
 3. Select the production map/tile provider or self-hosted vector-tile stack and document SLA, attribution, caching, CSP and privacy policy.
 4. Add browser E2E coverage for auth rotation, Socket.IO reconnect/room rejoin, friend actions, chat send/receive and map viewport races.
 5. Deploy a non-public preview and validate browser cookie/proxy behavior end to end.
