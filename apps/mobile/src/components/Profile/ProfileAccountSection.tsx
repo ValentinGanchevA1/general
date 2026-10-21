@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import { resolveNexaVerifyActionLabel } from '@/product/nexaActionLanguage';
 import { spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
 
 interface Props {
@@ -21,6 +22,7 @@ export function ProfileAccountSection({
 }: Props): React.JSX.Element {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const verifyPhoneLabel = resolveNexaVerifyActionLabel('phone');
 
   return (
     <View style={styles.section}>
@@ -47,15 +49,15 @@ export function ProfileAccountSection({
                 size={18}
                 color={phoneVerified ? colors.success : colors.borderStrong}
               />
-              <TouchableOpacity onPress={onAddPhone}>
+              <TouchableOpacity onPress={onAddPhone} accessibilityRole="button" accessibilityLabel={phoneVerified ? 'Change phone' : verifyPhoneLabel}>
                 <Text style={styles.sectionAction}>
-                  {phoneVerified ? 'Change' : 'Verify'}
+                  {phoneVerified ? 'Change' : verifyPhoneLabel}
                 </Text>
               </TouchableOpacity>
             </>
           ) : (
-            <TouchableOpacity onPress={onAddPhone}>
-              <Text style={styles.sectionAction}>Add</Text>
+            <TouchableOpacity onPress={onAddPhone} accessibilityRole="button" accessibilityLabel={verifyPhoneLabel}>
+              <Text style={styles.sectionAction}>{verifyPhoneLabel}</Text>
             </TouchableOpacity>
           )}
         </View>

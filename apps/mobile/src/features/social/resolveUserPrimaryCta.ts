@@ -1,5 +1,7 @@
 import type { MessagePermission } from '@g88/shared';
 
+import { resolveNexaConnectActionLabel } from '@/product/nexaActionLanguage';
+
 export type UserPrimaryCtaKind = 'loading' | 'none' | 'message' | 'wave';
 
 export type UserPrimaryCta = {
@@ -43,10 +45,10 @@ export function resolveUserPrimaryCta(
 
   const messageAllowed = canMessage != null && canMessage !== 'none';
   if ((canMessage === 'chat' || matched) && messageAllowed) {
-    return { kind: 'message', label: 'Message' };
+    return { kind: 'message', label: resolveNexaConnectActionLabel('message') };
   }
   if (waveAvailable) {
-    return { kind: 'wave', label: 'Wave' };
+    return { kind: 'wave', label: resolveNexaConnectActionLabel('wave') };
   }
   return { kind: 'none', label: '' };
 }

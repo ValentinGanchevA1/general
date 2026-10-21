@@ -16,6 +16,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchProfile } from '@/features/profile/profileSlice';
 import { useGamification } from '@/features/gamification/useGamification';
 import { darkColors, useAppTheme, type ThemeColors } from '@/theme';
+import { resolveNexaVerifyActionLabel } from '@/product/nexaActionLanguage';
 
 import {
   clearPostSocialActivation,
@@ -118,8 +119,8 @@ export function selectNudge(
         icon: 'email-check-outline',
         accent: palette.primary,
         label: 'Trust',
-        title: 'Verify your email to unlock stories and more reach',
-        cta: 'Verify',
+        title: 'Verify your email to participate with a confirmed account',
+        cta: resolveNexaVerifyActionLabel('email'),
         target: 'TrustCenter',
         focusStep: 'email',
         cooldownDays: 2,
@@ -131,8 +132,8 @@ export function selectNudge(
         icon: 'cellphone-check',
         accent: palette.primary,
         label: 'Trust',
-        title: 'Add a verified phone for stronger identity on the map',
-        cta: 'Add phone',
+        title: 'Verify a phone number for stronger identity',
+        cta: resolveNexaVerifyActionLabel('phone'),
         target: 'TrustCenter',
         focusStep: 'phone',
         cooldownDays: 3,
@@ -145,9 +146,9 @@ export function selectNudge(
       accent: palette.entityEvent,
       label: 'Verification',
       title: rejected
-        ? 'Your ID was rejected — resubmit to get verified'
-        : 'Get ID-verified to build trust on the map',
-      cta: rejected ? 'Resubmit' : 'Verify',
+        ? 'Identity verification needs clearer photos'
+        : 'Verify your identity with a government ID',
+      cta: resolveNexaVerifyActionLabel('id', rejected ? 'retry' : 'start'),
       target: 'TrustCenter',
       focusStep: 'id',
       cooldownDays: 3,
@@ -160,20 +161,20 @@ export function selectNudge(
       if (base.id === 'verify-email') {
         candidates.push({
           ...base,
-          title: `You just ${verb} — verify email so people can trust you`,
+          title: `You just ${verb} — verify your email to confirm your account`,
         });
       } else if (base.id === 'verify-phone') {
         candidates.push({
           ...base,
-          title: `You just ${verb} — add a phone for stronger identity`,
+          title: `You just ${verb} — verify a phone number for stronger identity`,
         });
       } else {
         candidates.push({
           ...base,
           title:
             idStatus === 'rejected'
-              ? 'Your ID was rejected — resubmit to get verified'
-              : `You're active nearby — get ID-verified for the trust badge`,
+              ? 'Identity verification needs clearer photos'
+              : `You're active nearby — verify your identity when you're ready`,
         });
       }
     }

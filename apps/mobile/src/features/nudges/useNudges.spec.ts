@@ -29,6 +29,7 @@ describe('selectNudge — activation ladder', () => {
     expect(n?.id).toBe('verify-email');
     expect(n?.target).toBe('TrustCenter');
     expect(n?.focusStep).toBe('email');
+    expect(n?.cta).toBe('Verify email');
   });
 
   it('holds email nudge until account is ~1 day old', () => {
@@ -52,6 +53,7 @@ describe('selectNudge — activation ladder', () => {
     expect(n?.id).toBe('verify-phone');
     expect(n?.target).toBe('TrustCenter');
     expect(n?.focusStep).toBe('phone');
+    expect(n?.cta).toBe('Verify phone');
   });
 
   it('does not phone-nudge while email still open', () => {
@@ -76,6 +78,7 @@ describe('selectNudge — activation ladder', () => {
     expect(n?.id).toBe('verify-id');
     expect(n?.target).toBe('TrustCenter');
     expect(n?.focusStep).toBe('id');
+    expect(n?.cta).toBe('Verify identity');
   });
 
   it('holds ID nudge until account is ~2 days old', () => {
@@ -100,7 +103,7 @@ describe('selectNudge — activation ladder', () => {
       }),
     );
     expect(n?.id).toBe('verify-id');
-    expect(n?.cta).toBe('Resubmit');
+    expect(n?.cta).toBe('Try identity verification again');
   });
 
   it('skips pending ID (no nag while under review)', () => {

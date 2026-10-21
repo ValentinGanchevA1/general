@@ -67,7 +67,7 @@ export function resolveTrustNextStep(input: {
       step: 'email',
       kind: 'actionable',
       title: 'Verify email',
-      detail: 'Unlock stories and raise trust',
+      detail: 'Confirm your email for participation and account recovery',
       ctaLabel: 'Verify email',
       nav: 'EmailVerification',
     };
@@ -76,9 +76,9 @@ export function resolveTrustNextStep(input: {
     return {
       step: 'phone',
       kind: 'actionable',
-      title: 'Add phone',
-      detail: 'Stronger identity for higher-stakes actions',
-      ctaLabel: 'Add phone',
+      title: 'Verify phone',
+      detail: 'Confirm a phone number for stronger identity',
+      ctaLabel: 'Verify phone',
       nav: 'Verification',
     };
   }
@@ -88,7 +88,7 @@ export function resolveTrustNextStep(input: {
     return {
       step: null,
       kind: 'done',
-      title: 'Fully verified',
+      title: 'Identity verified',
       detail: 'Email · Phone · ID complete',
       ctaLabel: null,
       nav: null,
@@ -98,8 +98,8 @@ export function resolveTrustNextStep(input: {
     return {
       step: null,
       kind: 'pending',
-      title: 'ID under review',
-      detail: 'Usually finishes within 24h',
+      title: 'Identity under review',
+      detail: 'Your ID submission is being reviewed',
       ctaLabel: null,
       nav: null,
     };
@@ -108,18 +108,18 @@ export function resolveTrustNextStep(input: {
     return {
       step: 'id',
       kind: 'actionable',
-      title: 'Resubmit ID',
-      detail: 'Previous submission was rejected',
-      ctaLabel: 'Resubmit',
+      title: 'Identity verification needs attention',
+      detail: 'Try again with clearer photos',
+      ctaLabel: 'Try identity verification again',
       nav: 'VerificationId',
     };
   }
   return {
     step: 'id',
     kind: 'actionable',
-    title: 'Verify ID',
-    detail: 'Unlock the full trust badge',
-    ctaLabel: 'Verify ID',
+    title: 'Verify identity',
+    detail: 'Complete government ID verification',
+    ctaLabel: 'Verify identity',
     nav: 'VerificationId',
   };
 }

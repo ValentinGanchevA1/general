@@ -15,6 +15,7 @@ import {
   resolveNexaMotionDuration,
 } from '@/motion/nexaMotion';
 import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
+import { resolveNexaRetryActionLabel } from '@/product/nexaActionLanguage';
 
 import type { MapEmptyCopy } from './mapEmptyCopy';
 import type { NexaMapSpatialState } from './nexaMapSpatialStates';
@@ -161,8 +162,8 @@ function presentationFor(state: NexaMapSpatialState, emptyCopy: MapEmptyCopy): S
     case 'loading': return { eyebrow: 'Nearby discovery', title: 'Reading nearby activity', body: 'People, events and listings will surface directly on the map.', icon: null, actionLabel: null, action: 'none', tone: 'discovery', compact: false };
     case 'refreshing': return { eyebrow: 'Nearby discovery', title: 'Refreshing this view', body: '', icon: 'sync', actionLabel: null, action: 'none', tone: 'discovery', compact: true };
     case 'empty': return { eyebrow: emptyCopy.eyebrow, title: emptyCopy.title, body: emptyCopy.body, icon: emptyCopy.icon, actionLabel: emptyCopy.actionLabel, action: 'empty', tone: 'action', compact: false };
-    case 'error': return { eyebrow: 'Nearby signal interrupted', title: 'Discovery did not load', body: 'The map is still available. Try this view again without changing your filters.', icon: 'cloud-refresh-outline', actionLabel: 'Try this view again', action: 'retry', tone: 'warning', compact: false };
-    case 'stale-error': return { eyebrow: 'Nearby signal interrupted', title: 'Showing the last nearby view', body: '', icon: 'cloud-alert-outline', actionLabel: 'Retry', action: 'retry', tone: 'warning', compact: true };
+    case 'error': return { eyebrow: 'Nearby signal interrupted', title: 'Discovery did not load', body: 'The map is still available. Retry nearby discovery without changing your filters.', icon: 'cloud-refresh-outline', actionLabel: resolveNexaRetryActionLabel('discovery'), action: 'retry', tone: 'warning', compact: false };
+    case 'stale-error': return { eyebrow: 'Nearby signal interrupted', title: 'Showing the last nearby view', body: '', icon: 'cloud-alert-outline', actionLabel: resolveNexaRetryActionLabel('discovery'), action: 'retry', tone: 'warning', compact: true };
     case 'zoom-in': return { eyebrow: 'Discovery range', title: 'Move closer to discover', body: 'Zoom in to reveal local people, events and listings with useful nearby context.', icon: 'magnify-plus-outline', actionLabel: 'Zoom in', action: 'zoom', tone: 'discovery', compact: false };
     case 'ready': return { eyebrow: '', title: '', body: '', icon: null, actionLabel: null, action: 'none', tone: 'discovery', compact: false };
   }
