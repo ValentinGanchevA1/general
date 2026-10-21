@@ -3,7 +3,6 @@ import type {
   DiscoveryPoint,
   DiscoveryResponse,
   EntityKind,
-  LoginResponse,
 } from '../../packages/shared/src/api';
 import type { ActivityItem, FeedResponse } from '../../packages/shared/src/activity';
 
@@ -20,6 +19,15 @@ interface State {
   authOpen: boolean;
   notice: string | null;
   apiBase: string;
+}
+
+interface WebAccessTokenResponse {
+  accessToken: string;
+  expiresAt: string;
+}
+
+interface WebLoginResponse extends WebAccessTokenResponse {
+  user: AuthenticatedUser;
 }
 
 class ApiError extends Error {
@@ -60,12 +68,15 @@ const state: State = {
   apiBase: normalizeBase(localStorage.getItem('nexa.web.apiBase') ?? 'http://127.0.0.1:3001/api/v1'),
 };
 
+let accessToken: string | null = null;
+let refreshInFlight: Promise<boolean> | null = null;
+
 const appRoot = document.querySelector<HTMLDivElement>('#app');
 if (!appRoot) throw new Error('Missing #app root');
 const root: HTMLDivElement = appRoot;
 
 function normalizeBase(value: string): string { return value.trim().replace(/\/+$/, ''); }
-function token(): string | null { return sessionStorage.getItem('nexa.web.accessToken'); }
+function token(): string | null { return accessToken; }
 function readTheme(): ThemePreference {
   const saved = localStorage.getItem('nexa.web.theme');
   return saved === 'dark' || saved === 'light' || saved === 'system' ? saved : 'system';
@@ -83,24 +94,83 @@ function cycleTheme(): void {
 function escapeHtml(value: string): string {
   return value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char] ?? char);
 }
-async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = new Headers(init.headers);
-  headers.set('Content-Type', 'application/json');
-  if (token()) headers.set('Authorization', `Bearer ${token()}`);
-  const response = await fetch(`${state.apiBase}${path}`, { ...init, headers });
+async function readApiResponse<T>(response: Response): Promise<T> {
   if (!response.ok) throw new ApiError(`${response.status} ${response.statusText}`, response.status);
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
 }
+async function webSessionApi<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.set('Content-Type', 'application/json');
+  headers.set('X-Nexa-Web-Session', '1');
+  const response = await fetch(`${state.apiBase}${path}`, {
+    ...init,
+    headers,
+    credentials: 'include',
+  });
+  return readApiResponse<T>(response);
+}
+async function refreshAccessToken(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+
+  const pending = (async (): Promise<boolean> => {
+    try {
+      const result = await webSessionApi<WebAccessTokenResponse>('/auth/web/refresh', { method: 'POST' });
+      accessToken = result.accessToken;
+      return true;
+    } catch {
+      accessToken = null;
+      return false;
+    }
+  })();
+
+  refreshInFlight = pending;
+  try {
+    return await pending;
+  } finally {
+    if (refreshInFlight === pending) refreshInFlight = null;
+  }
+}
+async function api<T>(path: string, init: RequestInit = {}, retryAuth = true): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.set('Content-Type', 'application/json');
+  if (token()) headers.set('Authorization', `Bearer ${token()}`);
+  const response = await fetch(`${state.apiBase}${path}`, {
+    ...init,
+    headers,
+    credentials: 'include',
+  });
+
+  if (response.status === 401 && retryAuth && token() && await refreshAccessToken()) {
+    return api<T>(path, init, false);
+  }
+
+  return readApiResponse<T>(response);
+}
 async function login(email: string, password: string): Promise<void> {
-  const result = await api<LoginResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-  sessionStorage.setItem('nexa.web.accessToken', result.tokens.accessToken);
-  state.user = result.user; state.authOpen = false; notice(`Welcome, ${result.user.displayName}.`);
+  const result = await webSessionApi<WebLoginResponse>('/auth/web/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+  accessToken = result.accessToken;
+  state.user = result.user;
+  state.authOpen = false;
+  notice(`Welcome, ${result.user.displayName}.`);
   await Promise.all([loadDiscovery(), loadFeed()]);
 }
+async function logout(): Promise<void> {
+  await webSessionApi<void>('/auth/web/logout', { method: 'POST' });
+  accessToken = null;
+  state.user = null;
+  state.points = demoPoints;
+  state.feed = demoFeed;
+  notice('Signed out. Demo mode active.');
+}
 async function restoreSession(): Promise<void> {
-  if (!token()) return;
-  try { state.user = await api<AuthenticatedUser>('/auth/me'); await Promise.all([loadDiscovery(), loadFeed()]); }
-  catch (error: unknown) { if (error instanceof ApiError && error.status === 401) sessionStorage.removeItem('nexa.web.accessToken'); }
+  if (!await refreshAccessToken()) { render(); return; }
+  try {
+    state.user = await api<AuthenticatedUser>('/auth/me');
+    await Promise.all([loadDiscovery(), loadFeed()]);
+  } catch {
+    accessToken = null;
+    state.user = null;
+  }
   render();
 }
 async function loadDiscovery(): Promise<void> {
@@ -124,6 +194,9 @@ function notice(message: string): void {
 function initials(name: string): string { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('') || 'N'; }
 function distance(value: number | null): string { return value == null ? 'Nearby' : value < 1000 ? `${Math.round(value)} m` : `${(value / 1000).toFixed(1)} km`; }
 function ago(iso: string): string { const mins = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60_000)); return mins < 60 ? `${mins}m` : mins < 1440 ? `${Math.round(mins / 60)}h` : `${Math.round(mins / 1440)}d`; }
+function verificationLabel(value: AuthenticatedUser['verification']): string {
+  return value === 'none' ? 'Not verified' : `${value[0]?.toUpperCase() ?? ''}${value.slice(1)} verified`;
+}
 
 function nav(tab: Tab, icon: string, tone: 'discovery' | 'action'): string {
   return `<button class="nav ${state.tab === tab ? 'active' : ''}" data-tab="${tab}" data-tone="${tone}"><span>${icon}</span><small>${tab[0]?.toUpperCase()}${tab.slice(1)}</small></button>`;
@@ -132,7 +205,7 @@ function shell(): string {
   return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXA</b></button><nav>${nav('map','⌖','discovery')}${nav('discover','◇','discovery')}${nav('pulse','≋','discovery')}${nav('connections','◎','action')}${nav('you','◉','action')}</nav><div class="rail-foot"><button id="theme">${state.theme === 'light' ? '☀' : state.theme === 'dark' ? '☾' : '◐'}</button>${state.user ? `<button class="avatar" data-tab="you">${initials(state.user.displayName)}</button>` : '<button id="auth">Sign in</button>'}</div></aside><main><header>${topbar()}</header><section class="content">${view()}</section></main><nav class="mobile-nav">${nav('map','⌖','discovery')}${nav('discover','◇','discovery')}${nav('pulse','≋','discovery')}${nav('connections','◎','action')}${nav('you','◉','action')}</nav>${state.notice ? `<div class="toast">${escapeHtml(state.notice)}</div>` : ''}${authPanel()}</div>`;
 }
 function topbar(): string {
-  const copy: Record<Tab, [string,string]> = { map:['Map','What is happening around you right now.'], discover:['Discover','Focused entry points into local life.'], pulse:['Pulse','Useful local activity, not an endless feed.'], connections:['Connections','Chats and relationship actions.'], you:['You','Identity, trust, presence and account controls.'] };
+  const copy: Record<Tab, [string,string]> = { map:['Map','What is happening around you right now.'], discover:['Discover','Focused entry points into local life.'], pulse:['Pulse','Useful local activity, not an endless feed.'], connections:['Connections','Chats and relationship actions.'], you:['You','Identity, verification, presence and account controls.'] };
   const [title, subtitle] = copy[state.tab];
   return `<div><p class="eyebrow">NEXA / ${title.toUpperCase()}</p><h1>${title}</h1><p>${subtitle}</p></div><div class="header-actions"><span class="mode"><i></i>${state.user ? 'Live backend' : 'Demo mode'}</span>${state.user ? '<button id="refresh">Refresh</button>' : '<button class="primary" id="auth-top">Connect backend</button>'}</div>`;
 }
@@ -151,8 +224,8 @@ function pulseView(): string { return `<div class="pulse-layout"><section class=
 function activity(item: ActivityItem): string { return `<article class="activity"><div><span>${item.type.toUpperCase()}</span><span>${ago(item.createdAt)}</span></div><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.preview)}</p><footer><span>${distance(item.distanceM)}</span><span>${item.actorName ? escapeHtml(item.actorName) : 'NEXA local signal'}</span>${item.unread ? '<i></i>' : ''}</footer></article>`; }
 function connectionsView(): string { return `<div class="connections"><section class="connection-card"><div class="section-head"><div><p class="eyebrow">ACTIONABLE</p><h2>Needs your attention</h2></div><b class="badge">3</b></div>${connection('≈','Maria waved at you','Wave back')}${connection('＋','Alex sent a connection request','Accept')}${connection('◌','Niko: “Are you joining tonight?”','Reply')}</section><section class="connection-card"><p class="eyebrow">RECENT</p><h2>Conversations</h2>${connection('◌','Elena','Open')}${connection('◌','Ivan','Open')}</section></div>`; }
 function connection(icon: string, title: string, action: string): string { return `<article class="connection"><b>${icon}</b><strong>${escapeHtml(title)}</strong><button>${action}</button></article>`; }
-function youView(): string { if (!state.user) return `<div class="you-empty"><div class="identity"></div><p class="eyebrow">YOUR NEXA IDENTITY</p><h2>Connect the live backend to open your identity surface.</h2><p>Map presence, verification, trust and privacy belong here—not in a vanity feed.</p><button class="primary" id="auth-you">Sign in</button></div>`; return `<div class="you"><section class="identity-card"><div class="profile">${initials(state.user.displayName)}</div><div><p class="eyebrow">SIGNED IN</p><h2>${escapeHtml(state.user.displayName)}</h2><p>${escapeHtml(state.user.email)}</p></div><span>${escapeHtml(state.user.verification)} verified</span></section><section class="trust"><div><p class="eyebrow">TRUST & VERIFICATION</p><h2>${state.user.verification === 'id' ? 95 : state.user.verification === 'selfie' ? 75 : state.user.verification === 'phone' ? 55 : 35}<small>/100</small></h2><p>Trust-sensitive interactions use server-side verification without exposing private documents.</p></div></section><button class="danger" id="logout">Sign out of web preview</button></div>`; }
-function authPanel(): string { return `<dialog class="auth-dialog" ${state.authOpen ? 'open' : ''}><form id="login"><button type="button" id="close">×</button><div class="logo auth-logo"><i></i><b>NEXA</b></div><p class="eyebrow">LIVE BACKEND</p><h2>Sign in to NEXA</h2><p>Only the short-lived access token is kept in sessionStorage. Refresh tokens are intentionally not persisted in this prototype.</p><label>Email<input id="email" type="email" required autocomplete="email"></label><label>Password<input id="password" type="password" minlength="8" required autocomplete="current-password"></label><label>API base<input id="api-base" type="url" value="${escapeHtml(state.apiBase)}" required></label><button class="primary" type="submit">Connect live backend</button><small>Production web auth must move to Secure + HttpOnly + SameSite cookies or a BFF/session layer.</small></form></dialog>`; }
+function youView(): string { if (!state.user) return `<div class="you-empty"><div class="identity"></div><p class="eyebrow">YOUR NEXA IDENTITY</p><h2>Connect the live backend to open your identity surface.</h2><p>Map presence, verification and privacy belong here—not in a vanity feed.</p><button class="primary" id="auth-you">Sign in</button></div>`; const verification = verificationLabel(state.user.verification); return `<div class="you"><section class="identity-card"><div class="profile">${initials(state.user.displayName)}</div><div><p class="eyebrow">SIGNED IN</p><h2>${escapeHtml(state.user.displayName)}</h2><p>${escapeHtml(state.user.email)}</p></div><span>${escapeHtml(verification)}</span></section><section class="trust"><div><p class="eyebrow">VERIFICATION SIGNAL</p><h2>${escapeHtml(verification)}</h2><p>Web v1 renders the factual verification level returned by the backend. It does not calculate or expose a public numeric trust score.</p></div></section><button class="danger" id="logout">Sign out of web preview</button></div>`; }
+function authPanel(): string { return `<dialog class="auth-dialog" ${state.authOpen ? 'open' : ''}><form id="login"><button type="button" id="close">×</button><div class="logo auth-logo"><i></i><b>NEXA</b></div><p class="eyebrow">LIVE BACKEND</p><h2>Sign in to NEXA</h2><p>The access token stays in memory. The refresh credential is held by the backend in an HttpOnly SameSite cookie and is never exposed to browser JavaScript.</p><label>Email<input id="email" type="email" required autocomplete="email"></label><label>Password<input id="password" type="password" minlength="8" required autocomplete="current-password"></label><label>Developer API base<input id="api-base" type="url" value="${escapeHtml(state.apiBase)}" required></label><button class="primary" type="submit">Connect live backend</button><small>Production requires an explicit HTTPS CORS allowlist. The editable API base remains a non-public preview control.</small></form></dialog>`; }
 
 function bind(): void {
   document.querySelectorAll<HTMLElement>('[data-tab]').forEach((el) => el.addEventListener('click', () => { const tab = el.dataset.tab as Tab | undefined; if (tab) { state.tab = tab; render(); } }));
@@ -161,7 +234,7 @@ function bind(): void {
   document.querySelector('#theme')?.addEventListener('click', cycleTheme);
   document.querySelector('#refresh')?.addEventListener('click', () => void Promise.all([loadDiscovery(), loadFeed()]));
   document.querySelector('#refresh-map')?.addEventListener('click', () => void loadDiscovery());
-  document.querySelector('#logout')?.addEventListener('click', () => { sessionStorage.removeItem('nexa.web.accessToken'); state.user = null; state.points = demoPoints; state.feed = demoFeed; notice('Signed out. Demo mode active.'); });
+  document.querySelector('#logout')?.addEventListener('click', () => { void logout().catch((error: unknown) => notice(error instanceof Error ? `Sign out failed: ${error.message}` : 'Sign out failed. Retry while connected.')); });
   ['#auth','#auth-top','#auth-you'].forEach((selector) => document.querySelector(selector)?.addEventListener('click', () => { state.authOpen = true; render(); }));
   document.querySelector('#close')?.addEventListener('click', () => { state.authOpen = false; render(); });
   document.querySelector<HTMLFormElement>('#login')?.addEventListener('submit', (event) => { event.preventDefault(); const email = document.querySelector<HTMLInputElement>('#email')?.value.trim() ?? ''; const password = document.querySelector<HTMLInputElement>('#password')?.value ?? ''; const base = document.querySelector<HTMLInputElement>('#api-base')?.value ?? state.apiBase; state.apiBase = normalizeBase(base); localStorage.setItem('nexa.web.apiBase', state.apiBase); void login(email,password).catch((error: unknown) => notice(error instanceof Error ? error.message : 'Sign in failed.')); });
