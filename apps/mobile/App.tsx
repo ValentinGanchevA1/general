@@ -55,9 +55,11 @@ function EntitledThemeProvider({ children }: { children: React.ReactNode }): Rea
   const initialized = useAppSelector((state) => state.profile.initialized);
   const tier = useAppSelector((state) => state.profile.profile?.subscriptionTier);
 
-  const canUseProtosNexus: ProtosNexusEntitlement = initialized
-    ? tier === 'premium'
-    : undefined;
+  const canUseProtosNexus: ProtosNexusEntitlement = Config.FORCE_PROTOS_NEXUS
+    ? true
+    : initialized
+      ? tier === 'premium'
+      : undefined;
 
   return (
     <ThemeProvider canUseProtosNexus={canUseProtosNexus}>
