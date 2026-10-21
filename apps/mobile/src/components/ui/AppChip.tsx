@@ -1,13 +1,8 @@
 import React from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useAppTheme } from '@/theme';
+import { nexusVisual } from '@/theme/nexusVisual';
 
 export interface AppChipProps {
   label: string;
@@ -18,16 +13,9 @@ export interface AppChipProps {
   testID?: string;
 }
 
-/** Filter / interest chip with selected state (not color-only — weight + border). */
-export function AppChip({
-  label,
-  selected = false,
-  onPress,
-  style,
-  accessibilityLabel,
-  testID,
-}: AppChipProps): React.JSX.Element {
-  const { colors, radius, fontSize, spacing } = useAppTheme();
+export function AppChip({ label, selected = false, onPress, style, accessibilityLabel, testID }: AppChipProps): React.JSX.Element {
+  const { colors, radius, fontSize, spacing, mode, shadow } = useAppTheme();
+  const isNexus = mode === 'protos-nexus';
 
   return (
     <Pressable
@@ -40,24 +28,19 @@ export function AppChip({
       style={({ pressed }) => [
         styles.chip,
         {
-          borderRadius: radius.pill,
+          borderRadius: isNexus ? nexusVisual.radius.pill : radius.pill,
           paddingHorizontal: spacing.md,
           paddingVertical: spacing.sm,
           backgroundColor: selected ? colors.primaryMutedBg : colors.surfaceRaised,
           borderColor: selected ? colors.primaryBorder : colors.border,
+          borderWidth: isNexus ? nexusVisual.borderWidth : 1,
           opacity: pressed ? 0.85 : 1,
         },
+        isNexus && selected ? shadow(0.14) : null,
         style,
       ]}
     >
-      <Text
-        style={{
-          color: selected ? colors.primary : colors.textSecondary,
-          fontSize: fontSize.sm,
-          fontWeight: selected ? '700' : '500',
-        }}
-        numberOfLines={1}
-      >
+      <Text style={{ color: selected ? colors.primary : colors.textSecondary, fontSize: fontSize.sm, fontWeight: selected ? '700' : '500' }} numberOfLines={1}>
         {label}
       </Text>
     </Pressable>
@@ -65,8 +48,5 @@ export function AppChip({
 }
 
 const styles = StyleSheet.create({
-  chip: {
-    borderWidth: 1,
-    alignSelf: 'flex-start',
-  },
+  chip: { alignSelf: 'flex-start' },
 });
