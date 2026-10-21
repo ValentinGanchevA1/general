@@ -26,7 +26,7 @@ describe('mapEmptyCopy', () => {
       openToDating: false,
     });
     expect(r.actionKind).toBe('dating_prefs');
-    expect(r.actionLabel).toBe('Dating preferences');
+    expect(r.actionLabel).toBe('Adjust dating');
   });
 
   it('datingOnly + openToDating → clear_dating', () => {
@@ -36,7 +36,7 @@ describe('mapEmptyCopy', () => {
       openToDating: true,
     });
     expect(r.actionKind).toBe('clear_dating');
-    expect(r.actionLabel).toBe('Clear Dating filter');
+    expect(r.actionLabel).toBe('Show nearby');
   });
 
   it('default create when email verified', () => {
