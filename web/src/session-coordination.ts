@@ -1,5 +1,6 @@
 const AUTH_MUTATION_LOCK_NAME = 'nexa.web.auth.mutation';
 const SESSION_CHANNEL_NAME = 'nexa.web.auth.session';
+const REMOTE_RELOAD_MARKER = 'nexa.web.auth.remote-reload';
 const sourceId = crypto.randomUUID();
 
 interface SessionChangedSignal {
@@ -13,6 +14,14 @@ const channel = typeof BroadcastChannel === 'function'
   ? new BroadcastChannel(SESSION_CHANNEL_NAME)
   : null;
 
+let suppressNextBroadcast = sessionStorage.getItem(REMOTE_RELOAD_MARKER) === '1';
+sessionStorage.removeItem(REMOTE_RELOAD_MARKER);
+if (suppressNextBroadcast) {
+  window.setTimeout(() => {
+    suppressNextBroadcast = false;
+  }, 5_000);
+}
+
 export async function withCrossTabAuthLock<T>(task: () => Promise<T>): Promise<T> {
   if ('locks' in navigator && navigator.locks) {
     return navigator.locks.request(AUTH_MUTATION_LOCK_NAME, { mode: 'exclusive' }, task);
@@ -25,6 +34,11 @@ export async function withCrossTabAuthLock<T>(task: () => Promise<T>): Promise<T
 }
 
 export function broadcastSessionChanged(): void {
+  if (suppressNextBroadcast) {
+    suppressNextBroadcast = false;
+    return;
+  }
+
   const signal: SessionChangedSignal = { type: 'session-changed', sourceId };
   channel?.postMessage(signal);
 }
@@ -35,6 +49,7 @@ export function onRemoteSessionChanged(handler: () => void): () => void {
   const listener = (event: MessageEvent<unknown>): void => {
     if (!isSessionSignal(event.data)) return;
     if (event.data.sourceId === sourceId) return;
+    sessionStorage.setItem(REMOTE_RELOAD_MARKER, '1');
     handler();
   };
 
