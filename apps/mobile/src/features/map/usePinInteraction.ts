@@ -1,7 +1,8 @@
-import {useCallback, useEffect, useMemo} from 'react';
+import {useCallback, useEffect, useMemo, useRef} from 'react';
 import {useMachine} from '@xstate/react';
 
 import type {EntityPoint, VerificationLevel} from '@g88/shared';
+import {nexaHaptics} from '@/haptics/nexaHaptics';
 import {pinInteractionMachine} from './pinInteraction.machine';
 import type {ViewerMode} from './pinInteraction.types';
 
@@ -27,6 +28,7 @@ export interface UsePinInteractionOptions {
 
 export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
   const [state, send] = useMachine(pinInteractionMachine);
+  const lastHapticErrorRef = useRef<string | null>(null);
 
   // Layer switch must reset open preview / sheet context
   useEffect(() => {
@@ -66,23 +68,28 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
   }, [send]);
 
   const quickWave = useCallback(() => {
+    nexaHaptics.connect();
     send({type: 'QUICK_WAVE'});
   }, [send]);
 
   const quickLike = useCallback(() => {
+    nexaHaptics.connect();
     send({type: 'QUICK_LIKE'});
   }, [send]);
 
   /** Sheet / full: machine-owned CTAs (no parallel API in EntityBottomSheet). */
   const sendWave = useCallback(() => {
+    nexaHaptics.connect();
     send({type: 'SEND_WAVE'});
   }, [send]);
 
   const sendLike = useCallback(() => {
+    nexaHaptics.connect();
     send({type: 'SEND_LIKE'});
   }, [send]);
 
   const sendPass = useCallback(() => {
+    nexaHaptics.commit();
     send({type: 'PASS'});
   }, [send]);
 
@@ -96,6 +103,18 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     state.matches({dating: 'likePending'});
 
   const ctx = state.context;
+
+  useEffect(() => {
+    const message = ctx.error?.trim();
+    if (!message) {
+      lastHapticErrorRef.current = null;
+      return;
+    }
+    if (lastHapticErrorRef.current === message) return;
+    lastHapticErrorRef.current = message;
+    nexaHaptics.error();
+  }, [ctx.error]);
+
   const isFull = state.matches('fullProfile');
   // detail stage: keep sheet mounted through pending / sent / matched
   const isDetail =
