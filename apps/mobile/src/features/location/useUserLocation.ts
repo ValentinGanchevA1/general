@@ -61,8 +61,9 @@ export function useUserLocation(): UseUserLocationResult {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         {
-          title: 'Location Permission',
-          message: 'G88 needs your location to show nearby people and places.',
+          title: 'Use your location',
+          message:
+            'NEXA uses your location while the app is open to power nearby discovery. Your map presence is privacy-coarsened.',
           buttonPositive: 'Allow',
         },
       );
