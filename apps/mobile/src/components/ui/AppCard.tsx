@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 
 import { useAppTheme } from '@/theme';
+import { nexusVisual } from '@/theme/nexusVisual';
 
 export interface AppCardProps {
   children: React.ReactNode;
@@ -25,17 +26,24 @@ export function AppCard({
   elevated = true,
   accessibilityLabel,
 }: AppCardProps): React.JSX.Element {
-  const { colors, radius, layout, shadow } = useAppTheme();
+  const { colors, radius, layout, shadow, mode } = useAppTheme();
+  const isNexus = mode === 'protos-nexus';
 
   const baseStyle: StyleProp<ViewStyle> = [
     {
       backgroundColor: elevated ? colors.surface : colors.surfaceRaised,
-      borderRadius: radius.card ?? layout.cardRadius,
-      borderWidth: StyleSheet.hairlineWidth,
+      borderRadius: isNexus
+        ? nexusVisual.radius.card
+        : (radius.card ?? layout.cardRadius),
+      borderWidth: isNexus ? nexusVisual.borderWidth : StyleSheet.hairlineWidth,
       borderColor: colors.border,
       overflow: 'hidden',
     },
-    elevated ? shadow(0.12) : null,
+    elevated
+      ? isNexus
+        ? [shadow(nexusVisual.glow.shadowOpacity), { elevation: nexusVisual.glow.elevation }]
+        : shadow(0.12)
+      : null,
   ];
 
   if (onPress) {
