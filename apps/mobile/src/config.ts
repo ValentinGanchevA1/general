@@ -13,15 +13,11 @@ const DEV_HOST: string =
   (process.env.API_HOST as string | undefined) ??
   (Platform.OS === 'android' ? '10.0.2.2' : 'localhost');
 
-// Allow API_HOST to be a full https hostname (e.g. prod on Render) or a bare
-// IP/hostname for local dev. Port 3001 and http:// only apply to local hosts.
-// Do NOT treat dotted private/loopback addresses as remote (127.0.0.1, 10.x, 192.168.x, 172.16–31.x).
 function isLocalDevHost(host: string): boolean {
   if (host === 'localhost' || host === '10.0.2.2') return true;
   if (host === '127.0.0.1' || host.startsWith('127.')) return true;
   if (host.startsWith('192.168.')) return true;
   if (host.startsWith('10.')) return true;
-  // RFC1918 172.16.0.0/12
   const m = /^172\.(\d+)\./.exec(host);
   if (m) {
     const second = Number(m[1]);
@@ -38,12 +34,10 @@ export const Config = {
   API_BASE_URL: __DEV__
     ? DEV_API_URL
     : 'https://g88-api.onrender.com',
-  // DEV-only visual entitlement override. Production builds always ignore it.
-  FORCE_PROTOS_NEXUS:
-    __DEV__ && process.env.FORCE_PROTOS_NEXUS === 'true',
-  // OAuth 2.0 Web Client ID from Google Cloud Console (same value used by backend GOOGLE_CLIENT_ID)
+  // TEST APK ONLY: this branch is dedicated to the sideload visual build.
+  // Server-side premium authorization remains unchanged.
+  FORCE_PROTOS_NEXUS: true,
   GOOGLE_WEB_CLIENT_ID:
     (process.env.GOOGLE_WEB_CLIENT_ID as string | undefined) ?? '',
-  // Public Sentry DSN — leave empty to disable Sentry in dev builds
   SENTRY_DSN: (process.env.SENTRY_DSN as string | undefined) ?? '',
 } as const;
