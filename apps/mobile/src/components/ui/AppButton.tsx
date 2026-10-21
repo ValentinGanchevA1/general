@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { useAppTheme } from '@/theme';
+import { nexusVisual } from '@/theme/nexusVisual';
 
 export type AppButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'action';
 
@@ -25,10 +26,6 @@ export interface AppButtonProps {
   testID?: string;
 }
 
-/**
- * Themed button — height ~50, min touch 44.
- * Variants map to brand tokens (primary cyan, action green, danger).
- */
 export function AppButton({
   label,
   onPress,
@@ -40,31 +37,14 @@ export function AppButton({
   accessibilityLabel,
   testID,
 }: AppButtonProps): React.JSX.Element {
-  const { colors, radius, fontSize, layout } = useAppTheme();
+  const { colors, radius, fontSize, layout, mode, shadow } = useAppTheme();
   const isDisabled = disabled || loading;
+  const isNexus = mode === 'protos-nexus';
+  const isEmphasized = variant === 'primary' || variant === 'action';
 
-  const bg =
-    variant === 'primary'
-      ? colors.primary
-      : variant === 'action'
-        ? colors.action
-        : variant === 'danger'
-          ? colors.dangerSolid
-          : variant === 'secondary'
-            ? colors.surfaceRaised
-            : 'transparent';
-
-  const fg =
-    variant === 'primary' || variant === 'action' || variant === 'danger'
-      ? colors.onPrimary
-      : variant === 'secondary'
-        ? colors.textPrimary
-        : colors.primary;
-
-  const border =
-    variant === 'ghost' || variant === 'secondary'
-      ? { borderWidth: 1, borderColor: colors.borderStrong }
-      : undefined;
+  const bg = variant === 'primary' ? colors.primary : variant === 'action' ? colors.action : variant === 'danger' ? colors.dangerSolid : variant === 'secondary' ? colors.surfaceRaised : 'transparent';
+  const fg = variant === 'primary' || variant === 'action' || variant === 'danger' ? colors.onPrimary : variant === 'secondary' ? colors.textPrimary : colors.primary;
+  const hasBorder = variant === 'ghost' || variant === 'secondary';
 
   return (
     <Pressable
@@ -78,21 +58,17 @@ export function AppButton({
         styles.base,
         {
           minHeight: layout.buttonHeight,
-          borderRadius: radius.md,
+          borderRadius: isNexus ? nexusVisual.radius.control : radius.md,
           backgroundColor: bg,
           opacity: isDisabled ? 0.45 : pressed ? 0.88 : 1,
+          borderWidth: hasBorder ? (isNexus ? nexusVisual.borderWidth : 1) : 0,
+          borderColor: hasBorder ? colors.borderStrong : 'transparent',
         },
-        border,
+        isNexus && isEmphasized && !isDisabled ? shadow(0.2) : null,
         style,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator color={fg} />
-      ) : (
-        <Text style={[{ color: fg, fontSize: fontSize.md, fontWeight: '700' }, textStyle]}>
-          {label}
-        </Text>
-      )}
+      {loading ? <ActivityIndicator color={fg} /> : <Text style={[{ color: fg, fontSize: fontSize.md, fontWeight: '700' }, textStyle]}>{label}</Text>}
     </Pressable>
   );
 }
