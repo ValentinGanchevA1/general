@@ -5,9 +5,12 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import type { Request, Response } from 'express';
 
 import type { LoginResponse, AuthTokens, AuthenticatedUser } from '@g88/shared';
 
@@ -15,6 +18,16 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { GoogleOAuthDto, LoginDto, LogoutDto, RefreshDto, RegisterDto } from './dto';
+import {
+  assertTrustedWebAuthRequest,
+  clearWebRefreshCookie,
+  optionalWebRefreshToken,
+  requireWebRefreshToken,
+  setWebRefreshCookie,
+  toWebAccessToken,
+  type WebAccessTokenResponse,
+  type WebLoginResponse,
+} from './web-auth';
 
 @Controller('auth')
 export class AuthController {
@@ -45,6 +58,56 @@ export class AuthController {
   @SkipThrottle()
   async logout(@Body() dto: LogoutDto): Promise<void> {
     return this.auth.logout(dto.refreshToken);
+  }
+
+  @Post('web/login')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async webLogin(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+    @Body() dto: LoginDto,
+  ): Promise<WebLoginResponse> {
+    assertTrustedWebAuthRequest(request);
+    const result = await this.auth.login(dto.email, dto.password);
+    setWebRefreshCookie(response, result.tokens.refreshToken);
+    return {
+      user: result.user,
+      ...toWebAccessToken(result.tokens),
+    };
+  }
+
+  @Post('web/refresh')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async webRefresh(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<WebAccessTokenResponse> {
+    assertTrustedWebAuthRequest(request);
+    const refreshToken = requireWebRefreshToken(request);
+
+    try {
+      const tokens = await this.auth.refresh(refreshToken);
+      setWebRefreshCookie(response, tokens.refreshToken);
+      return toWebAccessToken(tokens);
+    } catch (error: unknown) {
+      clearWebRefreshCookie(response);
+      throw error;
+    }
+  }
+
+  @Post('web/logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @SkipThrottle()
+  async webLogout(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    assertTrustedWebAuthRequest(request);
+    const refreshToken = optionalWebRefreshToken(request);
+    if (refreshToken) await this.auth.logout(refreshToken);
+    clearWebRefreshCookie(response);
   }
 
   @Post('oauth/google')
