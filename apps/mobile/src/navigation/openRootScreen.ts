@@ -72,6 +72,15 @@ export function openRootScreen(
   name: Leaf,
   params?: object,
 ): void {
+  // Keep legacy interaction destinations working while making Connections the
+  // canonical re-entry surface. Pushes, toasts and map chrome all flow here.
+  if (name === 'Interactions') {
+    (navigation.navigate as (a: string, b: object) => void)('Main', {
+      screen: 'Connections',
+    });
+    return;
+  }
+
   const nested = NEST[name];
   if (nested) {
     if (params != null) {
