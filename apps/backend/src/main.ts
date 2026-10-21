@@ -8,12 +8,11 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import { scrubSentryPayload } from '@g88/shared';
-import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
-import { corsOrigins } from './common/cors-origins';
-
+import { assertProductionCorsOrigins, corsOrigins } from './common/cors-origins';
 
 loadEnv({ path: join(process.cwd(), '../../.env') });
+assertProductionCorsOrigins();
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
@@ -41,6 +40,9 @@ if (process.env.NODE_ENV === 'production') {
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
+  // Import after dotenv + CORS validation so gateway decorators receive the same
+  // configured allowlist as REST when CORS_ORIGINS comes from the repo .env.
+  const { AppModule } = await import('./app.module');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
   // Story video base64 (15s) + photos
