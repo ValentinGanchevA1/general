@@ -10,6 +10,16 @@ interface SessionChangedSignal {
 
 type SessionSignal = SessionChangedSignal;
 
+interface LockManagerLike {
+  request<T>(
+    name: string,
+    options: { mode: 'exclusive' },
+    callback: () => Promise<T>,
+  ): Promise<T>;
+}
+
+type NavigatorWithLocks = Navigator & { locks?: LockManagerLike };
+
 const channel = typeof BroadcastChannel === 'function'
   ? new BroadcastChannel(SESSION_CHANNEL_NAME)
   : null;
@@ -23,13 +33,15 @@ if (suppressNextBroadcast) {
 }
 
 export async function withCrossTabAuthLock<T>(task: () => Promise<T>): Promise<T> {
-  if ('locks' in navigator && navigator.locks) {
-    return navigator.locks.request(AUTH_MUTATION_LOCK_NAME, { mode: 'exclusive' }, task);
+  const locks = (navigator as NavigatorWithLocks).locks;
+  if (locks) {
+    return locks.request(AUTH_MUTATION_LOCK_NAME, { mode: 'exclusive' }, task);
   }
 
   // Legacy/insecure-context fallback. Public deployment requires HTTPS and
-  // current browsers with Web Locks; this path preserves preview usability
-  // without persisting credentials or lock metadata in Web Storage.
+  // current browsers with Web Locks; this path preserves preview usability.
+  // No credential is ever written to Web Storage; the only sessionStorage
+  // value used by this module is a short-lived reload-loop marker.
   return task();
 }
 
