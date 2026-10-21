@@ -109,7 +109,11 @@ export class WebRealtimeClient {
     if (!socket?.connected) {
       return { ok: false, code: 'socket.offline', message: 'Realtime connection is offline' };
     }
-    return emitWithAck(socket, 'conversation:join', { conversationId });
+    return new Promise((resolve) => {
+      withAckTimeout(resolve, (ack) => {
+        socket.emit('conversation:join', { conversationId }, ack);
+      });
+    });
   }
 
   async sendMessage(conversationId: string, body: string): Promise<AckResult<ChatMessageEvent>> {
@@ -117,10 +121,14 @@ export class WebRealtimeClient {
     if (!socket?.connected) {
       return { ok: false, code: 'socket.offline', message: 'Realtime connection is offline' };
     }
-    return emitWithAck(socket, 'chat:send', {
-      conversationId,
-      body,
-      clientMessageId: crypto.randomUUID(),
+    return new Promise((resolve) => {
+      withAckTimeout(resolve, (ack) => {
+        socket.emit('chat:send', {
+          conversationId,
+          body,
+          clientMessageId: crypto.randomUUID(),
+        }, ack);
+      });
     });
   }
 
@@ -168,33 +176,21 @@ async function loadSocketIoClient(): Promise<IoFactory> {
   return clientScriptPromise;
 }
 
-function emitWithAck<K extends keyof ClientToServerEvents>(
-  socket: SocketIoClient,
-  event: K,
-  payload: Parameters<ClientToServerEvents[K]>[0],
-): Promise<AckFromClientEvent<ClientToServerEvents[K]>> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const timer = window.setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      resolve({ ok: false, code: 'socket.timeout', message: 'Realtime request timed out' } as AckFromClientEvent<ClientToServerEvents[K]>);
-    }, 8_000);
+function withAckTimeout<T>(
+  resolve: (result: AckResult<T>) => void,
+  emit: (ack: (result: AckResult<T>) => void) => void,
+): void {
+  let settled = false;
+  const timer = window.setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    resolve({ ok: false, code: 'socket.timeout', message: 'Realtime request timed out' });
+  }, 8_000);
 
-    const ack = (result: AckFromClientEvent<ClientToServerEvents[K]>): void => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timer);
-      resolve(result);
-    };
-
-    socket.emit(event, payload, ack as Parameters<ClientToServerEvents[K]>[1]);
+  emit((result) => {
+    if (settled) return;
+    settled = true;
+    window.clearTimeout(timer);
+    resolve(result);
   });
 }
-
-type AckFromClientEvent<T> = T extends (
-  payload: infer _Payload,
-  ack: (result: infer Result) => void,
-) => void
-  ? Result
-  : AckResult<never>;
