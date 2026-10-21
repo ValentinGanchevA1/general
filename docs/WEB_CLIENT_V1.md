@@ -42,7 +42,7 @@ No backend schema, PostGIS query or persistence change is introduced.
 - Production has no implicit localhost fallback and must provide at least one explicit HTTPS `CORS_ORIGINS` entry.
 - Origins are normalized as bare HTTP(S) origins only.
 - REST and Socket.IO use the same configured origin source.
-- Production edge routing must expose both `/api/v1` and `/socket.io` on the web origin. The latter serves the backend-matched Socket.IO browser client and transports the `/realtime` namespace.
+- Production edge routing must expose both `/api/v1` and `/socket.io` on the web origin. `/socket.io` transports the bundled browser client's `/realtime` namespace; no runtime script is loaded from the backend.
 
 ## Map / viewport contract
 
@@ -66,7 +66,7 @@ No backend schema, PostGIS query or persistence change is introduced.
 - Incoming `chat:message` events are deduplicated by message id; background conversation events coalesce into a short delayed Connections refresh rather than triggering a request storm.
 - Friend presence updates only the existing privacy-gated `peerOnline` field returned for friend conversations.
 - Browser Connections does **not** emit `presence:update` or request device location. Realtime use here is limited to user-room, friend, wave and chat events.
-- The Socket.IO browser client is served by the same backend at `/socket.io/socket.io.js`; no separate CDN or npm client version is introduced in this preview.
+- The preview bundles `socket.io-client` at build time from the already locked `apps/admin` workspace dependency. There is no runtime CDN/backend script inclusion and no new web lockfile importer.
 - When the access token rotates, the socket reconnects with the new handshake token because guarded gateway events re-verify `handshake.auth.token`. Any active conversation is then rejoined.
 - Location/location-session chat messages display a generic sharing label in the list; raw coordinates are not rendered by this Connections slice.
 
@@ -100,6 +100,7 @@ No backend schema, PostGIS query or persistence change is introduced.
 - Production refuses to start without an explicit HTTPS CORS allowlist.
 - Production browser requests use same-origin `/api/v1`, and realtime uses same-origin `/socket.io` through a controlled edge/reverse proxy.
 - No user-editable API/socket host exists.
+- No runtime executable script is fetched from an HTTP backend/CDN; the realtime client is part of the built web bundle.
 - Dynamic app-shell DOM insertion passes through the allowlist sanitizer; map dynamic nodes use safe DOM APIs.
 - `You` exposes no synthetic trust score.
 - Theme follows system by default and supports explicit dark/light overrides.
