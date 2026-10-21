@@ -12,6 +12,11 @@ import type { InboxItem, InboxResponse } from '../../packages/shared/src/friends
 import type { ChatMessageEvent, FriendPresenceEvent } from '../../packages/shared/src/events';
 import { mountNexaMap, type MapCamera, type MapViewport } from './map';
 import { WebRealtimeClient } from './realtime';
+import {
+  broadcastSessionChanged,
+  onRemoteSessionChanged,
+  withCrossTabAuthLock,
+} from './session-coordination';
 
 type Tab = 'map' | 'discover' | 'pulse' | 'connections' | 'you';
 type ThemePreference = 'system' | 'dark' | 'light';
@@ -185,18 +190,21 @@ async function webSessionApi<T>(path: ApiPath, init: RequestInit = {}): Promise<
 async function refreshAccessToken(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
 
-  const pending = (async (): Promise<boolean> => {
+  const pending = withCrossTabAuthLock(async (): Promise<boolean> => {
     try {
       const result = await webSessionApi<WebAccessTokenResponse>('/auth/web/refresh', { method: 'POST' });
       accessToken = result.accessToken;
       realtime.setToken(result.accessToken);
       return true;
-    } catch {
+    } catch (error: unknown) {
       accessToken = null;
       realtime.disconnect();
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        broadcastSessionChanged();
+      }
       return false;
     }
-  })();
+  });
 
   refreshInFlight = pending;
   try {
@@ -218,16 +226,25 @@ async function api<T>(path: ApiPath, init: RequestInit = {}, retryAuth = true): 
   return readApiResponse<T>(response);
 }
 async function login(email: string, password: string): Promise<void> {
-  const result = await webSessionApi<WebLoginResponse>('/auth/web/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+  const result = await withCrossTabAuthLock(() => webSessionApi<WebLoginResponse>('/auth/web/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  }));
   accessToken = result.accessToken;
   state.user = result.user;
   state.authOpen = false;
+  broadcastSessionChanged();
   await connectRealtime();
   notice(`Welcome, ${result.user.displayName}.`);
   await Promise.all([loadDiscovery(), loadFeed(), loadConnections()]);
 }
 async function logout(): Promise<void> {
-  await webSessionApi<void>('/auth/web/logout', { method: 'POST' });
+  await withCrossTabAuthLock(() => webSessionApi<void>('/auth/web/logout', { method: 'POST' }));
+  broadcastSessionChanged();
+  clearLocalSessionState();
+  notice('Signed out. Demo mode active.');
+}
+function clearLocalSessionState(): void {
   discoveryController?.abort();
   if (connectionsRefreshTimer !== null) window.clearTimeout(connectionsRefreshTimer);
   realtime.disconnect();
@@ -239,9 +256,9 @@ async function logout(): Promise<void> {
   state.conversations = [];
   state.activeConversationId = null;
   state.messages = [];
+  state.connectionsLoading = false;
   state.realtimeConnected = false;
   state.conversationJoined = false;
-  notice('Signed out. Demo mode active.');
 }
 async function restoreSession(): Promise<void> {
   if (!await refreshAccessToken()) {
@@ -263,7 +280,7 @@ async function connectRealtime(): Promise<void> {
   const currentToken = token();
   if (!currentToken) return;
   try {
-    await realtime.connect(currentToken, {
+    realtime.connect(currentToken, {
       onConnectionChange: (connected) => {
         state.realtimeConnected = connected;
         state.conversationJoined = false;
@@ -277,14 +294,14 @@ async function connectRealtime(): Promise<void> {
       onWaveReceived: () => scheduleConnectionsRefresh(),
       onWaveMutual: () => scheduleConnectionsRefresh(),
       onConversationOpened: () => scheduleConnectionsRefresh(),
-      onError: (message) => {
-        if (state.tab === 'connections') notice(`Realtime: ${message}`);
+      onError: () => {
+        if (state.tab === 'connections') notice('Realtime connection issue. Retrying.');
       },
     });
-  } catch (error: unknown) {
+  } catch {
     state.realtimeConnected = false;
     if (state.tab === 'connections') {
-      notice(error instanceof Error ? error.message : 'Realtime connection unavailable.');
+      notice('Realtime connection unavailable.');
     }
   }
 }
@@ -391,7 +408,7 @@ async function joinActiveConversation(): Promise<void> {
   if (!id || !state.realtimeConnected) return;
   const result = await realtime.joinConversation(assertUuid(id));
   state.conversationJoined = result.ok;
-  if (!result.ok) notice(result.message);
+  if (!result.ok) notice('Could not join the realtime chat room.');
   if (state.tab === 'connections') render();
 }
 async function sendActiveMessage(body: string): Promise<void> {
@@ -402,7 +419,7 @@ async function sendActiveMessage(body: string): Promise<void> {
   if (!state.conversationJoined) throw new Error('Realtime chat is reconnecting.');
 
   const result = await realtime.sendMessage(assertUuid(id), message);
-  if (!result.ok) throw new Error(result.message);
+  if (!result.ok) throw new Error('Message could not be sent.');
   appendMessage(result.data);
   scheduleConnectionsRefresh();
   render();
@@ -635,18 +652,18 @@ function bind(): void {
   document.querySelectorAll<HTMLElement>('[data-action="open-chat"]').forEach((element) => element.addEventListener('click', () => {
     const id = element.dataset.conversationId;
     if (!id) return;
-    void openConversation(id).catch((error: unknown) => notice(error instanceof Error ? error.message : 'Could not open conversation.'));
+    void openConversation(id).catch(() => notice('Could not open conversation.'));
   }));
   document.querySelectorAll<HTMLElement>('[data-action="accept-friend"],[data-action="decline-friend"]').forEach((element) => element.addEventListener('click', () => {
     const id = element.dataset.requestId;
     if (!id) return;
     const action = element.dataset.action === 'accept-friend' ? 'accept' : 'decline';
-    void respondToFriendRequest(id, action).catch((error: unknown) => notice(error instanceof Error ? error.message : 'Friend request action failed.'));
+    void respondToFriendRequest(id, action).catch(() => notice('Friend request action failed.'));
   }));
   document.querySelectorAll<HTMLElement>('[data-action="wave-back"]').forEach((element) => element.addEventListener('click', () => {
     const userId = element.dataset.waveUserId;
     if (!userId) return;
-    void waveBack(userId).catch((error: unknown) => notice(error instanceof Error ? error.message : 'Wave failed.'));
+    void waveBack(userId).catch(() => notice('Wave failed.'));
   }));
   document.querySelector('#theme')?.addEventListener('click', cycleTheme);
   document.querySelector('#refresh')?.addEventListener('click', () => {
@@ -656,7 +673,7 @@ function bind(): void {
   });
   document.querySelector('#refresh-map')?.addEventListener('click', () => void loadDiscovery());
   document.querySelector('#logout')?.addEventListener('click', () => {
-    void logout().catch((error: unknown) => notice(error instanceof Error ? `Sign out failed: ${error.message}` : 'Sign out failed. Retry while connected.'));
+    void logout().catch(() => notice('Sign out failed. Retry while connected.'));
   });
   ['#auth','#auth-top','#auth-you','#auth-connections'].forEach((selector) => document.querySelector(selector)?.addEventListener('click', () => {
     state.authOpen = true;
@@ -670,7 +687,7 @@ function bind(): void {
     event.preventDefault();
     const email = document.querySelector<HTMLInputElement>('#email')?.value.trim() ?? '';
     const password = document.querySelector<HTMLInputElement>('#password')?.value ?? '';
-    void login(email, password).catch((error: unknown) => notice(error instanceof Error ? error.message : 'Sign in failed.'));
+    void login(email, password).catch(() => notice('Sign in failed.'));
   });
   document.querySelector<HTMLFormElement>('#chat-composer')?.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -702,6 +719,9 @@ function render(): void {
   bind();
 }
 
+onRemoteSessionChanged(() => {
+  window.location.reload();
+});
 matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
   if (state.theme === 'system') {
     applyTheme();
