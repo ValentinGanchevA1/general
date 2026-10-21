@@ -3,6 +3,8 @@ import { PermissionsAndroid, Platform } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import type { LatLng } from '@g88/shared';
 
+import { NEXA_LOCATION_PERMISSION_COPY } from './locationPermissionCopy';
+
 // Real GPS comes from @react-native-community/geolocation (a native module).
 // RN 0.83 no longer ships the legacy `navigator.geolocation` polyfill, so the
 // device never produced a fix and no user was ever written to the discovery
@@ -60,12 +62,7 @@ export function useUserLocation(): UseUserLocationResult {
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: 'Use your location',
-          message:
-            'NEXA uses your location while the app is open to power nearby discovery. Your map presence is privacy-coarsened.',
-          buttonPositive: 'Allow',
-        },
+        NEXA_LOCATION_PERMISSION_COPY,
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
         setPermissionStatus('denied');
