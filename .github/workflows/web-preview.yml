@@ -1,0 +1,52 @@
+name: Web Preview CI
+
+on:
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'packages/shared/**'
+      - '.github/workflows/web-preview.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'web/**'
+      - 'packages/shared/**'
+      - '.github/workflows/web-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  web-preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.3
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: pnpm
+
+      - name: Install workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck web preview
+        run: pnpm exec tsc -p web/tsconfig.json
+
+      - name: Build web preview
+        run: node web/build.mjs
+
+      - name: Verify browser bundle
+        run: |
+          test -s web/dist/app.js
+          node --check web/dist/app.js
