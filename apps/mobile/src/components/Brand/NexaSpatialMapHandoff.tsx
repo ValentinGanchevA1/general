@@ -140,6 +140,17 @@ export function NexaSpatialMapHandoff({
     violetScale,
   ]);
 
+  if (reduceMotion !== false) {
+    return (
+      <View
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={styles.container}
+      />
+    );
+  }
+
   return (
     <View
       pointerEvents="none"
