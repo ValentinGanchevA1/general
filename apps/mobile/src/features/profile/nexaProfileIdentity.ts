@@ -1,7 +1,7 @@
 export interface NexaProfileIdentitySource {
-  hometownCity?: string | null;
-  hometownCountry?: string | null;
-  interests?: readonly string[] | null;
+  hometownCity?: string | null | undefined;
+  hometownCountry?: string | null | undefined;
+  interests?: readonly string[] | null | undefined;
 }
 
 export interface NexaProfileTrustState {
@@ -11,8 +11,8 @@ export interface NexaProfileTrustState {
 }
 
 export interface NexaProfileActivityState {
-  level?: number | null;
-  currentStreak?: number | null;
+  level?: number | null | undefined;
+  currentStreak?: number | null | undefined;
 }
 
 export type NexaProfileSectionKey = 'identity' | 'presence' | 'activity' | 'account';
