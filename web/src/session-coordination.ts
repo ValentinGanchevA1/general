@@ -1,21 +1,21 @@
-const REFRESH_LOCK_NAME = 'nexa.web.auth.refresh';
+const AUTH_MUTATION_LOCK_NAME = 'nexa.web.auth.mutation';
 const SESSION_CHANNEL_NAME = 'nexa.web.auth.session';
 const sourceId = crypto.randomUUID();
 
-interface SessionEndedSignal {
-  type: 'session-ended';
+interface SessionChangedSignal {
+  type: 'session-changed';
   sourceId: string;
 }
 
-type SessionSignal = SessionEndedSignal;
+type SessionSignal = SessionChangedSignal;
 
 const channel = typeof BroadcastChannel === 'function'
   ? new BroadcastChannel(SESSION_CHANNEL_NAME)
   : null;
 
-export async function withCrossTabRefreshLock<T>(task: () => Promise<T>): Promise<T> {
+export async function withCrossTabAuthLock<T>(task: () => Promise<T>): Promise<T> {
   if ('locks' in navigator && navigator.locks) {
-    return navigator.locks.request(REFRESH_LOCK_NAME, { mode: 'exclusive' }, task);
+    return navigator.locks.request(AUTH_MUTATION_LOCK_NAME, { mode: 'exclusive' }, task);
   }
 
   // Legacy/insecure-context fallback. Public deployment requires HTTPS and
@@ -24,18 +24,18 @@ export async function withCrossTabRefreshLock<T>(task: () => Promise<T>): Promis
   return task();
 }
 
-export function broadcastSessionEnded(): void {
-  const signal: SessionEndedSignal = { type: 'session-ended', sourceId };
+export function broadcastSessionChanged(): void {
+  const signal: SessionChangedSignal = { type: 'session-changed', sourceId };
   channel?.postMessage(signal);
 }
 
-export function onRemoteSessionEnded(handler: () => void): () => void {
+export function onRemoteSessionChanged(handler: () => void): () => void {
   if (!channel) return () => undefined;
 
   const listener = (event: MessageEvent<unknown>): void => {
     if (!isSessionSignal(event.data)) return;
     if (event.data.sourceId === sourceId) return;
-    if (event.data.type === 'session-ended') handler();
+    handler();
   };
 
   channel.addEventListener('message', listener);
@@ -45,5 +45,5 @@ export function onRemoteSessionEnded(handler: () => void): () => void {
 function isSessionSignal(value: unknown): value is SessionSignal {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<SessionSignal>;
-  return candidate.type === 'session-ended' && typeof candidate.sourceId === 'string';
+  return candidate.type === 'session-changed' && typeof candidate.sourceId === 'string';
 }
