@@ -94,7 +94,16 @@ export class WebRealtimeClient {
 
   setToken(token: string): void {
     this.token = token;
-    if (this.socket) this.socket.auth = { token };
+    const socket = this.socket;
+    if (!socket) return;
+
+    socket.auth = { token };
+    if (socket.connected) {
+      // The Nest gateway re-verifies client.handshake.auth.token for guarded
+      // events. Reconnect so the server-side handshake receives the rotated
+      // access token, then the app can rejoin its active conversation room.
+      socket.disconnect().connect();
+    }
   }
 
   disconnect(): void {
