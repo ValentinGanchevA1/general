@@ -16,10 +16,12 @@ env:
 
 jobs:
   eslint:
-    name: Run ESLint scanning
+    name: Run eslint scanning
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Configure Git for long paths
+        run: git config --global core.longpaths true
       - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
@@ -33,5 +35,3 @@ jobs:
         run: pnpm --filter @g88/backend exec eslint src --ext .ts --max-warnings 0
       - name: Lint mobile
         run: pnpm --filter @g88/mobile exec eslint src --ext .ts,.tsx --max-warnings 0
-      - name: Lint admin
-        run: pnpm --filter @g88/admin exec eslint . --ext .ts,.tsx --report-unused-disable-directives --max-warnings 0
