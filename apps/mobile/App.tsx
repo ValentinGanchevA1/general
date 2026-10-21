@@ -19,6 +19,7 @@ import {
 import { ThemeProvider, useAppTheme, type ProtosNexusEntitlement } from '@/theme';
 import { useAppSelector } from '@/hooks/redux';
 import { NexaLaunchOverlay } from '@/components/Brand/NexaLaunchOverlay';
+import { NexaSpatialMapHandoff } from '@/components/Brand/NexaSpatialMapHandoff';
 
 Sentry.init({
   dsn: Config.SENTRY_DSN,
@@ -38,6 +39,15 @@ GoogleSignin.configure({ webClientId: Config.GOOGLE_WEB_CLIENT_ID });
 function AppShell(): React.JSX.Element {
   const restoring = useAppSelector((state) => state.auth.restoring);
   const { colors, scheme } = useAppTheme();
+  const [showSpatialHandoff, setShowSpatialHandoff] = React.useState(false);
+
+  const handleLaunchHidden = React.useCallback((): void => {
+    setShowSpatialHandoff(true);
+  }, []);
+
+  const handleSpatialHandoffComplete = React.useCallback((): void => {
+    setShowSpatialHandoff(false);
+  }, []);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.bg }]}>
@@ -46,7 +56,10 @@ function AppShell(): React.JSX.Element {
         backgroundColor={colors.bg}
       />
       <AppNavigator />
-      <NexaLaunchOverlay ready={!restoring} />
+      <NexaLaunchOverlay ready={!restoring} onHidden={handleLaunchHidden} />
+      {showSpatialHandoff ? (
+        <NexaSpatialMapHandoff onComplete={handleSpatialHandoffComplete} />
+      ) : null}
     </View>
   );
 }
