@@ -13,6 +13,7 @@ import type {
 
 import { appAlert } from '@/ui/appAlert';
 import { deleteJson, getJson, postJson } from '@/api/client';
+import { withNexaMutationFeedback } from '@/haptics/nexaInteractionFeedback';
 import { setPendingMapFocus } from '@/navigation/pendingMapFocus';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 
@@ -105,10 +106,14 @@ export function useUserProfileScreenData(userId: string, navigation: Nav) {
   const sendWave = useCallback(async (): Promise<void> => {
     setWaving(true);
     try {
-      await postJson<WaveRequest, WaveResponse>('/interactions/wave', {
-        toUserId: userId,
-        context: 'profile',
-      });
+      await withNexaMutationFeedback(
+        () =>
+          postJson<WaveRequest, WaveResponse>('/interactions/wave', {
+            toUserId: userId,
+            context: 'profile',
+          }),
+        'connect',
+      );
       appAlert('Wave sent', `You waved at ${profile?.displayName ?? 'them'}.`);
     } catch (e) {
       appAlert('Wave failed', errMessage(e, 'Could not send wave'));
@@ -188,7 +193,10 @@ export function useUserProfileScreenData(userId: string, navigation: Nav) {
   const block = useCallback(async (): Promise<void> => {
     setBlocking(true);
     try {
-      await postJson<undefined, { blocked: boolean }>(`/blocks/${userId}`, undefined);
+      await withNexaMutationFeedback(
+        () => postJson<undefined, { blocked: boolean }>(`/blocks/${userId}`, undefined),
+        'commit',
+      );
       appAlert(
         'Blocked',
         `You won't see ${profile?.displayName ?? 'this user'} or hear from them.`,
@@ -205,7 +213,10 @@ export function useUserProfileScreenData(userId: string, navigation: Nav) {
   const unblock = useCallback(async (): Promise<void> => {
     setBlocking(true);
     try {
-      await deleteJson<{ blocked: boolean }>(`/blocks/${userId}`);
+      await withNexaMutationFeedback(
+        () => deleteJson<{ blocked: boolean }>(`/blocks/${userId}`),
+        'commit',
+      );
       setProfile((p) => (p ? { ...p, blockedByViewer: false } : p));
       await loadRelationship();
     } catch {
@@ -230,7 +241,7 @@ export function useUserProfileScreenData(userId: string, navigation: Nav) {
     async (fn: () => Promise<void>, setBusy: (v: boolean) => void): Promise<void> => {
       setBusy(true);
       try {
-        await fn();
+        await withNexaMutationFeedback(fn, 'commit');
       } catch (e) {
         appAlert('Could not update', errMessage(e, 'Try again in a moment.'));
       } finally {

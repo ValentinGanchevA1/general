@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { api } from '@/api/client';
 import type { IdVerificationStatus } from '@g88/shared';
+import { withNexaMutationFeedback } from '@/haptics/nexaInteractionFeedback';
 
 export const startIdVerification = createAsyncThunk('verification/start', async () => {
   const { data } = await api.post('/verification/id/start');
@@ -16,14 +17,15 @@ export const submitIdVerification = createAsyncThunk(
     idFrontContentType: string;
     idBack?: string;
     idBackContentType?: string;
-  }) => {
-    // Default client timeout is 15s — too low for selfie+ID base64 + server S3 PUTs
-    // (emulator/host saw BadRequestError: request aborted from raw-body).
-    const { data } = await api.post('/verification/id/submit', payload, {
-      timeout: 90_000,
-    });
-    return data;
-  },
+  }) =>
+    withNexaMutationFeedback(async () => {
+      // Default client timeout is 15s — too low for selfie+ID base64 + server S3 PUTs
+      // (emulator/host saw BadRequestError: request aborted from raw-body).
+      const { data } = await api.post('/verification/id/submit', payload, {
+        timeout: 90_000,
+      });
+      return data;
+    }, 'commit'),
 );
 
 export const fetchIdVerificationStatus = createAsyncThunk('verification/status', async () => {

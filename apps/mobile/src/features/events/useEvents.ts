@@ -21,6 +21,7 @@ import type {
 } from '@g88/shared';
 import { getJson, postJson, putJson } from '@/api/client';
 import { useSocket } from '@/realtime/useSocket';
+import { withNexaMutationFeedback } from '@/haptics/nexaInteractionFeedback';
 import { applyQuestionUpvote, mergePoll, mergeQuestion } from './eventMerge';
 
 // ─── Nearby ("events near you") ──────────────────────────────────────────────
@@ -161,8 +162,15 @@ export function createEvent(req: CreateEventRequest): Promise<EventSummary> {
   return postJson<CreateEventRequest, EventSummary>('/events', req);
 }
 
+/**
+ * RSVP is a direct commitment, so feedback fires only after the server accepts
+ * the new state. Both map-sheet and full-detail RSVP entry points share this.
+ */
 export function rsvpToEvent(eventId: string, status: RsvpStatus): Promise<RsvpResponse> {
-  return putJson<{ status: RsvpStatus }, RsvpResponse>(`/events/${eventId}/rsvp`, { status });
+  return withNexaMutationFeedback(
+    () => putJson<{ status: RsvpStatus }, RsvpResponse>(`/events/${eventId}/rsvp`, { status }),
+    'commit',
+  );
 }
 
 export function createPoll(eventId: string, req: CreatePollRequest): Promise<PollResult> {

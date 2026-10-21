@@ -14,6 +14,7 @@ import type {
 } from '@g88/shared';
 import { getJson, postJson } from '@/api/client';
 import { useAsyncResource } from '@/features/common/useAsyncResource';
+import { withNexaMutationFeedback } from '@/haptics/nexaInteractionFeedback';
 
 /** The active gift catalog (static-ish — fetched once). */
 export function useGiftCatalog(): {
@@ -100,7 +101,14 @@ export function useSentGifts(): {
   return { gifts: data, loading, error, refresh };
 }
 
-/** Spend XP to send a gift. Throws ApiError (e.g. code 'gift.insufficient_xp'). */
+/**
+ * Spend XP to send a gift. Throws ApiError (e.g. code 'gift.insufficient_xp').
+ * Tactile feedback is emitted only after the server truthfully accepts/rejects
+ * the direct send action; inbound gift Socket.IO events remain tactile-silent.
+ */
 export function sendGift(req: SendGiftRequest): Promise<GiftSentResult> {
-  return postJson<SendGiftRequest, GiftSentResult>('/gifts/send', req);
+  return withNexaMutationFeedback(
+    () => postJson<SendGiftRequest, GiftSentResult>('/gifts/send', req),
+    'connect',
+  );
 }
