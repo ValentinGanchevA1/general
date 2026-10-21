@@ -132,7 +132,7 @@ function createStyles(colors: ThemeColors) {
       marginTop: spacing.md,
     },
     nameRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-    name: { color: colors.textPrimary, fontSize: 23, fontWeight: '850' },
+    name: { color: colors.textPrimary, fontSize: 23, fontWeight: '800' },
     subtitle: {
       color: colors.textSecondary,
       fontSize: 14,
@@ -167,7 +167,7 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 8,
     },
     summaryDivider: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.borderStrong },
-    summaryValue: { color: colors.textPrimary, fontSize: 18, fontWeight: '850' },
+    summaryValue: { color: colors.textPrimary, fontSize: 18, fontWeight: '800' },
     summaryLabel: { color: colors.textTertiary, fontSize: 11, fontWeight: '700', marginTop: 3 },
     verificationCard: {
       marginTop: spacing.md,
