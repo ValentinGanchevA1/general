@@ -1,17 +1,21 @@
 # NEXA web preview v1
 
-Dependency-neutral browser slice for the NEXA web/desktop client. It intentionally lives outside the pnpm workspace while browser auth, CORS, discovery behavior and product scope are validated. This avoids adding a new lockfile importer to the existing frozen-install monorepo.
+Browser validation slice for the NEXA web/desktop client. It intentionally remains outside the pnpm workspace while browser auth, CORS, map behavior and realtime lifecycle are validated, avoiding a new lockfile importer in the frozen-install monorepo.
 
 ## Implemented
 
 - Canonical **Map / Discover / Pulse / Connections / You** navigation.
 - Responsive desktop rail + mobile bottom navigation.
 - NEXA dark/light/system semantics: cyan for discovery/live and violet for action/identity.
-- Live `POST /api/v1/discovery/nearby` map signals after sign-in.
-- Live `GET /api/v1/feed` Pulse activity after sign-in.
-- Existing `POST /api/v1/auth/login` + `GET /api/v1/auth/me` contracts.
-- Strict TypeScript with shared API/activity types imported type-only.
-- Demo fallback for frontend work without a backend session.
+- Interactive Web Mercator map preview with pan/zoom, visible OSM raster tiles and required attribution.
+- Settled map bounds + zoom drive `POST /api/v1/discovery/nearby`; superseded requests are aborted.
+- Live `GET /api/v1/feed` Pulse activity.
+- Live Connections using the existing interactions, friends, conversations and `/realtime` Socket.IO contracts.
+- Browser-specific `/api/v1/auth/web/login|refresh|logout` adapter over the existing auth service.
+- Memory-only access token + HttpOnly SameSite refresh cookie; no auth token in Web Storage.
+- Production fail-closed HTTPS CORS policy and same-origin API/realtime topology.
+- Strict TypeScript with shared API/event types.
+- Demo map/Pulse fallback without fabricated private Connections data.
 
 ## Run
 
@@ -23,18 +27,33 @@ node web/build.mjs
 node web/serve.mjs
 ```
 
-Open `http://127.0.0.1:4174`.
+Open `http://127.0.0.1:4174` with the backend on `http://127.0.0.1:3001`.
 
-The default API base is `http://127.0.0.1:3001/api/v1`; it can be changed in the sign-in panel.
+Local preview uses fixed loopback mappings only. Production uses same-origin `/api/v1` and `/socket.io`; there is no user-editable backend/socket host.
 
 ## Browser auth boundary
 
-The preview stores only the access token in `sessionStorage`. Refresh tokens are deliberately not persisted. Before public web launch, move browser auth to **Secure + HttpOnly + SameSite cookies** or a BFF/session layer.
+- Access token exists only in browser memory.
+- Refresh token is an HttpOnly SameSite=Lax cookie scoped to `/api/v1/auth/web` and `Secure` in production.
+- Refresh rotation reuses the backend token-family replay protection.
+- Browser auth mutations require an allowlisted `Origin` plus `X-Nexa-Web-Session: 1`.
+- Access-token rotation reconnects Socket.IO with the new handshake token and rejoins the active chat room.
+- Multi-tab refresh coordination remains an E2E blocker before public deployment.
 
-## Next slice
+## Map preview boundary
 
-1. Confirm backend CORS origin policy for the selected preview host.
-2. Add production browser session/cookie contract.
-3. Replace the geometry preview with a real map renderer after selecting map provider + tile/privacy policy.
-4. Wire Connections to existing chat/friend/wave APIs and Socket.IO.
-5. Add browser E2E coverage and a non-public preview deployment.
+The draft uses the standard OpenStreetMap raster tile service only for visible preview tiles, with attribution and no offline/prefetch path. Public NEXA must select a production tile provider or self-hosted/vector-tile stack with explicit SLA, privacy, caching and usage terms.
+
+Opening Map, Discover or Connections does **not** request browser/device geolocation. The Varna default camera is product context, not the user's asserted position.
+
+## Realtime build boundary
+
+The web bundle imports `socket.io-client` at build time from the already locked `apps/admin` workspace dependency. This avoids a runtime CDN/backend script inclusion and avoids a new web workspace importer. A dedicated web package/importer is the cleaner long-term architecture once the browser slice graduates from preview.
+
+## Remaining release blockers
+
+1. Configure production same-origin reverse proxies for `/api/v1` and `/socket.io`, then set exact HTTPS `CORS_ORIGINS`.
+2. Add multi-tab auth replay/coordination E2E coverage.
+3. Select the production map/tile stack.
+4. Add browser E2E for auth rotation, realtime reconnect/room rejoin, friend actions, chat send/receive and viewport races.
+5. Deploy a non-public preview and validate cookie/proxy behavior end to end.
