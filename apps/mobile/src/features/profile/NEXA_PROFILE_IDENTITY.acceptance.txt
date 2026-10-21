@@ -1,5 +1,0 @@
-You identity hub
-Verification state is factual and score-free
-Map presence is first-class
-Identity, Presence, Activity and Account are grouped
-No backend or realtime contract changes
