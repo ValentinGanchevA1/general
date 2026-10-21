@@ -1,27 +1,17 @@
 import React from 'react';
-import {
-  StyleSheet,
-  TextInput,
-  View,
-  type StyleProp,
-  type TextInputProps,
-  type ViewStyle,
-} from 'react-native';
+import { StyleSheet, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { useAppTheme } from '@/theme';
+import { nexusVisual } from '@/theme/nexusVisual';
 
 export interface SearchFieldProps extends Omit<TextInputProps, 'style'> {
   containerStyle?: StyleProp<ViewStyle>;
 }
 
-/** Map / list search control — themed, 44dp min height. */
-export function SearchField({
-  containerStyle,
-  placeholder = 'Search…',
-  ...rest
-}: SearchFieldProps): React.JSX.Element {
-  const { colors, radius, fontSize, spacing, layout } = useAppTheme();
+export function SearchField({ containerStyle, placeholder = 'Search…', ...rest }: SearchFieldProps): React.JSX.Element {
+  const { colors, radius, fontSize, spacing, layout, mode, shadow } = useAppTheme();
+  const isNexus = mode === 'protos-nexus';
 
   return (
     <View
@@ -30,24 +20,20 @@ export function SearchField({
         {
           minHeight: layout.minTouch,
           backgroundColor: colors.surfaceRaised,
-          borderRadius: radius.pill,
-          borderColor: colors.border,
+          borderRadius: isNexus ? nexusVisual.radius.pill : radius.pill,
+          borderColor: isNexus ? colors.borderStrong : colors.border,
+          borderWidth: isNexus ? nexusVisual.borderWidth : StyleSheet.hairlineWidth,
           paddingHorizontal: spacing.md,
         },
+        isNexus ? shadow(0.12) : null,
         containerStyle,
       ]}
     >
-      <Icon name="magnify" size={20} color={colors.textMuted} accessibilityElementsHidden />
+      <Icon name="magnify" size={20} color={isNexus ? colors.primary : colors.textMuted} accessibilityElementsHidden />
       <TextInput
         placeholder={placeholder}
         placeholderTextColor={colors.textFaint}
-        style={{
-          flex: 1,
-          marginLeft: spacing.sm,
-          color: colors.textPrimary,
-          fontSize: fontSize.md,
-          paddingVertical: spacing.sm,
-        }}
+        style={{ flex: 1, marginLeft: spacing.sm, color: colors.textPrimary, fontSize: fontSize.md, paddingVertical: spacing.sm }}
         accessibilityLabel={rest.accessibilityLabel ?? placeholder}
         {...rest}
       />
@@ -56,9 +42,5 @@ export function SearchField({
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
+  wrap: { flexDirection: 'row', alignItems: 'center' },
 });
