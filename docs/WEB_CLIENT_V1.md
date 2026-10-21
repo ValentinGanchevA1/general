@@ -30,6 +30,7 @@ No backend schema, PostGIS query or persistence change is introduced.
 - Access token is memory-only. It is not written to `localStorage` or `sessionStorage`.
 - Refresh token is never exposed to browser JavaScript and is stored in an HttpOnly, SameSite=Lax cookie scoped to `/api/v1/auth/web`.
 - The refresh cookie is `Secure` in production; local HTTP preview keeps `Secure=false` so `127.0.0.1:4174` can exercise the flow.
+- Production web and API must be same-site (for example `app.nexa.example` + `api.nexa.example`) so the SameSite=Lax refresh cookie works without weakening the browser boundary. A cross-site preview host such as one vendor domain talking to an unrelated API vendor domain is not a valid production topology for this contract.
 - Browser auth mutations require both an allowlisted `Origin` and `X-Nexa-Web-Session: 1`, preventing form-based CSRF and disallowed cross-origin callers from using the cookie endpoints.
 - A single tab deduplicates refresh requests so one expired access token does not rotate the refresh family multiple times concurrently.
 - Multi-tab refresh coordination is still a required E2E/security case before public deployment because the backend intentionally revokes a refresh-token family on replay.
@@ -59,6 +60,7 @@ No backend schema, PostGIS query or persistence change is introduced.
 - Neither access nor refresh tokens are persisted in Web Storage.
 - Refresh token is unavailable to browser JavaScript.
 - Production refuses to start without an explicit HTTPS CORS allowlist.
+- Production browser auth is deployed on a same-site web/API topology compatible with SameSite=Lax.
 - Backend/user strings rendered into HTML are escaped.
 - `You` exposes no synthetic trust score.
 - Theme follows system by default and supports explicit dark/light overrides.
@@ -67,7 +69,7 @@ No backend schema, PostGIS query or persistence change is introduced.
 
 ## Remaining release blockers
 
-1. Select the production preview host and set its exact `CORS_ORIGINS` value.
+1. Select same-site production web/API hostnames and set the web origin in `CORS_ORIGINS`.
 2. Add multi-tab refresh/replay E2E coverage.
 3. Replace the geometry preview with the selected real map renderer/provider and document tile/privacy policy.
 4. Wire Connections to the existing chat/friend/wave APIs and Socket.IO.
