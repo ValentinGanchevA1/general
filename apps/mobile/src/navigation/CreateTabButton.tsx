@@ -12,26 +12,21 @@ import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { useAppTheme } from '@/theme';
+import { nexusVisual } from '@/theme/nexusVisual';
 import { requestOpenCreateNearby } from '@/features/map/pendingCreateNearby';
 
-/**
- * Center “Create” tab control. Does not navigate to a Create screen;
- * signals MapScreen to present CreateNearbySheet.
- *
- * Do not spread BottomTabBarButtonProps onto TouchableOpacity — RN types reject
- * `delayLongPress: null` from the tab-bar props (TS2322).
- */
+/** Center “Create” tab control. */
 export function CreateTabButton({
 	accessibilityState,
 	onPress,
 	testID,
 }: BottomTabBarButtonProps): React.JSX.Element {
-	const { colors, shadow } = useAppTheme();
+	const { colors, mode, shadow } = useAppTheme();
 	const focused = accessibilityState?.selected === true;
+	const isNexus = mode === 'protos-nexus';
 
 	const handlePress = (e: GestureResponderEvent): void => {
 		requestOpenCreateNearby();
-		// Tab listeners already preventDefault + navigate Map; onPress is optional.
 		onPress?.(e);
 	};
 
@@ -48,8 +43,13 @@ export function CreateTabButton({
 			<View
 				style={[
 					styles.fab,
-					{ backgroundColor: colors.primary },
-					shadow(0.3),
+					{
+						backgroundColor: colors.primary,
+						borderWidth: isNexus ? nexusVisual.borderWidth : 0,
+						borderColor: isNexus ? colors.primaryBorder : 'transparent',
+					},
+					shadow(isNexus ? nexusVisual.glow.shadowOpacity : 0.3),
+					isNexus ? { elevation: nexusVisual.glow.elevation } : null,
 					focused && styles.fabFocused,
 				]}
 			>
