@@ -1,11 +1,17 @@
 import type {
   AuthenticatedUser,
+  ChatMessage,
+  ConversationSummary,
   DiscoveryPoint,
   DiscoveryResponse,
   EntityKind,
+  MessagePage,
 } from '../../packages/shared/src/api';
 import type { ActivityItem, FeedResponse } from '../../packages/shared/src/activity';
+import type { InboxItem, InboxResponse } from '../../packages/shared/src/friends';
+import type { ChatMessageEvent, FriendPresenceEvent } from '../../packages/shared/src/events';
 import { mountNexaMap, type MapCamera, type MapViewport } from './map';
+import { WebRealtimeClient } from './realtime';
 
 type Tab = 'map' | 'discover' | 'pulse' | 'connections' | 'you';
 type ThemePreference = 'system' | 'dark' | 'light';
@@ -15,7 +21,14 @@ type ApiPath =
   | '/auth/web/logout'
   | '/auth/me'
   | '/discovery/nearby'
-  | '/feed?limit=24';
+  | '/feed?limit=24'
+  | '/interactions/inbox?limit=24'
+  | '/conversations'
+  | '/interactions/wave'
+  | `/conversations/${string}/messages?limit=50`
+  | `/conversations/${string}/read`
+  | `/friends/requests/${string}/accept`
+  | `/friends/requests/${string}/decline`;
 
 interface State {
   tab: Tab;
@@ -28,6 +41,13 @@ interface State {
   notice: string | null;
   mapCamera: MapCamera;
   mapViewport: MapViewport;
+  inbox: InboxItem[];
+  conversations: ConversationSummary[];
+  activeConversationId: string | null;
+  messages: ChatMessage[];
+  connectionsLoading: boolean;
+  realtimeConnected: boolean;
+  conversationJoined: boolean;
 }
 
 interface WebAccessTokenResponse {
@@ -62,14 +82,16 @@ const API_BASE = window.location.origin === 'http://127.0.0.1:4174'
     ? 'http://localhost:3001/api/v1'
     : '/api/v1';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SAFE_TAGS = new Set([
   'ARTICLE', 'ASIDE', 'B', 'BUTTON', 'CODE', 'DIALOG', 'DIV', 'FOOTER', 'FORM',
   'H1', 'H2', 'H3', 'HEADER', 'I', 'INPUT', 'LABEL', 'MAIN', 'NAV', 'P',
   'SECTION', 'SMALL', 'SPAN', 'STRONG',
 ]);
 const SAFE_ATTRIBUTES = new Set([
-  'autocomplete', 'class', 'data-kind', 'data-tab', 'data-target', 'data-tone',
-  'id', 'minlength', 'open', 'required', 'type',
+  'autocomplete', 'class', 'data-action', 'data-conversation-id', 'data-kind',
+  'data-request-id', 'data-tab', 'data-target', 'data-tone', 'data-wave-user-id',
+  'disabled', 'id', 'maxlength', 'minlength', 'open', 'placeholder', 'required', 'type',
 ]);
 
 const demoPoints: DiscoveryPoint[] = [
@@ -97,11 +119,20 @@ const state: State = {
   notice: null,
   mapCamera: DEFAULT_CAMERA,
   mapViewport: DEFAULT_VIEWPORT,
+  inbox: [],
+  conversations: [],
+  activeConversationId: null,
+  messages: [],
+  connectionsLoading: false,
+  realtimeConnected: false,
+  conversationJoined: false,
 };
 
+const realtime = new WebRealtimeClient();
 let accessToken: string | null = null;
 let refreshInFlight: Promise<boolean> | null = null;
 let discoveryController: AbortController | null = null;
+let connectionsRefreshTimer: number | null = null;
 
 const appRoot = document.querySelector<HTMLDivElement>('#app');
 if (!appRoot) throw new Error('Missing #app root');
@@ -126,7 +157,20 @@ function cycleTheme(): void {
 function escapeHtml(value: string): string {
   return value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char] ?? char);
 }
+function assertUuid(value: string): string {
+  if (!UUID_RE.test(value)) throw new Error('Invalid resource identifier');
+  return value;
+}
 function apiUrl(path: ApiPath): string { return `${API_BASE}${path}`; }
+function conversationMessagesPath(id: string): ApiPath {
+  return `/conversations/${assertUuid(id)}/messages?limit=50`;
+}
+function conversationReadPath(id: string): ApiPath {
+  return `/conversations/${assertUuid(id)}/read`;
+}
+function friendRequestPath(id: string, action: 'accept' | 'decline'): ApiPath {
+  return `/friends/requests/${assertUuid(id)}/${action}`;
+}
 async function readApiResponse<T>(response: Response): Promise<T> {
   if (!response.ok) throw new ApiError(`${response.status} ${response.statusText}`, response.status);
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
@@ -145,9 +189,11 @@ async function refreshAccessToken(): Promise<boolean> {
     try {
       const result = await webSessionApi<WebAccessTokenResponse>('/auth/web/refresh', { method: 'POST' });
       accessToken = result.accessToken;
+      realtime.setToken(result.accessToken);
       return true;
     } catch {
       accessToken = null;
+      realtime.disconnect();
       return false;
     }
   })();
@@ -176,16 +222,25 @@ async function login(email: string, password: string): Promise<void> {
   accessToken = result.accessToken;
   state.user = result.user;
   state.authOpen = false;
+  await connectRealtime();
   notice(`Welcome, ${result.user.displayName}.`);
-  await Promise.all([loadDiscovery(), loadFeed()]);
+  await Promise.all([loadDiscovery(), loadFeed(), loadConnections()]);
 }
 async function logout(): Promise<void> {
   await webSessionApi<void>('/auth/web/logout', { method: 'POST' });
   discoveryController?.abort();
+  if (connectionsRefreshTimer !== null) window.clearTimeout(connectionsRefreshTimer);
+  realtime.disconnect();
   accessToken = null;
   state.user = null;
   state.points = demoPoints;
   state.feed = demoFeed;
+  state.inbox = [];
+  state.conversations = [];
+  state.activeConversationId = null;
+  state.messages = [];
+  state.realtimeConnected = false;
+  state.conversationJoined = false;
   notice('Signed out. Demo mode active.');
 }
 async function restoreSession(): Promise<void> {
@@ -195,12 +250,43 @@ async function restoreSession(): Promise<void> {
   }
   try {
     state.user = await api<AuthenticatedUser>('/auth/me');
-    await Promise.all([loadDiscovery(), loadFeed()]);
+    await connectRealtime();
+    await Promise.all([loadDiscovery(), loadFeed(), loadConnections()]);
   } catch {
     accessToken = null;
     state.user = null;
+    realtime.disconnect();
   }
   render();
+}
+async function connectRealtime(): Promise<void> {
+  const currentToken = token();
+  if (!currentToken) return;
+  try {
+    await realtime.connect(currentToken, {
+      onConnectionChange: (connected) => {
+        state.realtimeConnected = connected;
+        state.conversationJoined = false;
+        if (connected && state.activeConversationId) void joinActiveConversation();
+        if (state.tab === 'connections') render();
+      },
+      onChatMessage: handleChatMessage,
+      onFriendRequest: () => scheduleConnectionsRefresh(),
+      onFriendAccepted: () => scheduleConnectionsRefresh(),
+      onFriendPresence: handleFriendPresence,
+      onWaveReceived: () => scheduleConnectionsRefresh(),
+      onWaveMutual: () => scheduleConnectionsRefresh(),
+      onConversationOpened: () => scheduleConnectionsRefresh(),
+      onError: (message) => {
+        if (state.tab === 'connections') notice(`Realtime: ${message}`);
+      },
+    });
+  } catch (error: unknown) {
+    state.realtimeConnected = false;
+    if (state.tab === 'connections') {
+      notice(error instanceof Error ? error.message : 'Realtime connection unavailable.');
+    }
+  }
 }
 async function loadDiscovery(): Promise<void> {
   if (!token()) {
@@ -247,6 +333,110 @@ async function loadFeed(): Promise<void> {
   }
   render();
 }
+async function loadConnections(): Promise<void> {
+  if (!token()) {
+    state.inbox = [];
+    state.conversations = [];
+    state.connectionsLoading = false;
+    return;
+  }
+
+  state.connectionsLoading = true;
+  if (state.tab === 'connections') render();
+  try {
+    const [inbox, conversations] = await Promise.all([
+      api<InboxResponse>('/interactions/inbox?limit=24'),
+      api<ConversationSummary[]>('/conversations'),
+    ]);
+    state.inbox = inbox.items;
+    state.conversations = conversations;
+    if (
+      state.activeConversationId &&
+      !conversations.some((conversation) => conversation.id === state.activeConversationId)
+    ) {
+      state.activeConversationId = null;
+      state.messages = [];
+      state.conversationJoined = false;
+    }
+  } catch (error: unknown) {
+    notice(error instanceof Error ? `Connections unavailable: ${error.message}` : 'Connections unavailable.');
+  } finally {
+    state.connectionsLoading = false;
+    if (state.tab === 'connections') render();
+  }
+}
+function scheduleConnectionsRefresh(): void {
+  if (!token()) return;
+  if (connectionsRefreshTimer !== null) window.clearTimeout(connectionsRefreshTimer);
+  connectionsRefreshTimer = window.setTimeout(() => {
+    connectionsRefreshTimer = null;
+    void loadConnections();
+  }, 180);
+}
+async function openConversation(conversationId: string): Promise<void> {
+  const id = assertUuid(conversationId);
+  const page = await api<MessagePage>(conversationMessagesPath(id));
+  state.activeConversationId = id;
+  state.messages = [...page.messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  state.conversationJoined = false;
+  state.conversations = state.conversations.map((conversation) => (
+    conversation.id === id ? { ...conversation, unreadCount: 0 } : conversation
+  ));
+  render();
+  await api<void>(conversationReadPath(id), { method: 'POST' }).catch(() => undefined);
+  await joinActiveConversation();
+}
+async function joinActiveConversation(): Promise<void> {
+  const id = state.activeConversationId;
+  if (!id || !state.realtimeConnected) return;
+  const result = await realtime.joinConversation(assertUuid(id));
+  state.conversationJoined = result.ok;
+  if (!result.ok) notice(result.message);
+  if (state.tab === 'connections') render();
+}
+async function sendActiveMessage(body: string): Promise<void> {
+  const id = state.activeConversationId;
+  const message = body.trim();
+  if (!id || !message) return;
+  if (message.length > 2000) throw new Error('Message is limited to 2000 characters.');
+  if (!state.conversationJoined) throw new Error('Realtime chat is reconnecting.');
+
+  const result = await realtime.sendMessage(assertUuid(id), message);
+  if (!result.ok) throw new Error(result.message);
+  appendMessage(result.data);
+  scheduleConnectionsRefresh();
+  render();
+}
+async function respondToFriendRequest(requestId: string, action: 'accept' | 'decline'): Promise<void> {
+  await api<Record<string, boolean>>(friendRequestPath(requestId, action), { method: 'POST' });
+  notice(action === 'accept' ? 'Friend request accepted.' : 'Friend request declined.');
+  await loadConnections();
+}
+async function waveBack(userId: string): Promise<void> {
+  const id = assertUuid(userId);
+  await api<Record<string, unknown>>('/interactions/wave', {
+    method: 'POST',
+    body: JSON.stringify({ toUserId: id, context: 'profile' }),
+  });
+  notice('Wave sent.');
+  await loadConnections();
+}
+function handleChatMessage(event: ChatMessageEvent): void {
+  if (event.conversationId === state.activeConversationId) appendMessage(event);
+  scheduleConnectionsRefresh();
+  if (state.tab === 'connections') render();
+}
+function appendMessage(event: ChatMessageEvent): void {
+  if (state.messages.some((message) => message.id === event.id)) return;
+  state.messages = [...state.messages, event].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+function handleFriendPresence(event: FriendPresenceEvent): void {
+  state.conversations = state.conversations.map((conversation) => {
+    const peerId = peerForConversation(conversation)?.id;
+    return peerId === event.userId ? { ...conversation, peerOnline: event.online } : conversation;
+  });
+  if (state.tab === 'connections') render();
+}
 function onMapViewportSettled(camera: MapCamera, viewport: MapViewport): void {
   state.mapCamera = camera;
   state.mapViewport = viewport;
@@ -278,6 +468,13 @@ function ago(iso: string): string {
 function verificationLabel(value: AuthenticatedUser['verification']): string {
   return value === 'none' ? 'Not verified' : `${value[0]?.toUpperCase() ?? ''}${value.slice(1)} verified`;
 }
+function peerForConversation(conversation: ConversationSummary): ConversationSummary['participants'][number] | null {
+  const userId = state.user?.id;
+  return conversation.participants.find((participant) => participant.id !== userId) ?? conversation.participants[0] ?? null;
+}
+function truncate(value: string, length = 78): string {
+  return value.length <= length ? value : `${value.slice(0, length - 1)}…`;
+}
 
 function nav(tab: Tab, icon: string, tone: 'discovery' | 'action'): string {
   return `<button class="nav ${state.tab === tab ? 'active' : ''}" data-tab="${tab}" data-tone="${tone}"><span>${icon}</span><small>${tab[0]?.toUpperCase()}${tab.slice(1)}</small></button>`;
@@ -294,7 +491,10 @@ function topbar(): string {
     you: ['You','Identity, verification, presence and account controls.'],
   };
   const [title, subtitle] = copy[state.tab];
-  return `<div><p class="eyebrow">NEXA / ${title.toUpperCase()}</p><h1>${title}</h1><p>${subtitle}</p></div><div class="header-actions"><span class="mode"><i></i>${state.user ? 'Live backend' : 'Demo mode'}</span>${state.user ? '<button id="refresh">Refresh</button>' : '<button class="primary" id="auth-top">Connect backend</button>'}</div>`;
+  const liveLabel = state.tab === 'connections' && state.user
+    ? (state.realtimeConnected ? 'Realtime live' : 'Realtime offline')
+    : (state.user ? 'Live backend' : 'Demo mode');
+  return `<div><p class="eyebrow">NEXA / ${title.toUpperCase()}</p><h1>${title}</h1><p>${subtitle}</p></div><div class="header-actions"><span class="mode"><i></i>${liveLabel}</span>${state.user ? '<button id="refresh">Refresh</button>' : '<button class="primary" id="auth-top">Connect backend</button>'}</div>`;
 }
 function view(): string {
   return state.tab === 'map' ? mapView() : state.tab === 'discover' ? discoverView() : state.tab === 'pulse' ? pulseView() : state.tab === 'connections' ? connectionsView() : youView();
@@ -325,10 +525,62 @@ function activity(item: ActivityItem): string {
   return `<article class="activity"><div><span>${item.type.toUpperCase()}</span><span>${ago(item.createdAt)}</span></div><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.preview)}</p><footer><span>${distance(item.distanceM)}</span><span>${item.actorName ? escapeHtml(item.actorName) : 'NEXA local signal'}</span>${item.unread ? '<i></i>' : ''}</footer></article>`;
 }
 function connectionsView(): string {
-  return `<div class="connections"><section class="connection-card"><div class="section-head"><div><p class="eyebrow">ACTIONABLE</p><h2>Needs your attention</h2></div><b class="badge">3</b></div>${connection('≈','Maria waved at you','Wave back')}${connection('＋','Alex sent a connection request','Accept')}${connection('◌','Niko: “Are you joining tonight?”','Reply')}</section><section class="connection-card"><p class="eyebrow">RECENT</p><h2>Conversations</h2>${connection('◌','Elena','Open')}${connection('◌','Ivan','Open')}</section></div>`;
+  if (!state.user) {
+    return `<div class="you-empty"><div class="identity"></div><p class="eyebrow">LIVE CONNECTIONS</p><h2>Sign in to open your private interaction inbox and chats.</h2><p>Waves, requests and conversations are loaded only for your authenticated account.</p><button class="primary" id="auth-connections">Sign in</button></div>`;
+  }
+
+  const actionable = state.inbox.filter((item) => item.type === 'wave' || item.type === 'friend_request' || item.type === 'match');
+  const status = state.realtimeConnected ? 'Live' : 'Reconnecting';
+  return `<div class="connections-live"><section class="connection-card inbox-card"><div class="section-head"><div><p class="eyebrow">ACTIONABLE</p><h2>Needs your attention</h2></div><b class="badge">${actionable.length}</b></div>${state.connectionsLoading && state.inbox.length === 0 ? '<p class="empty">Loading interactions…</p>' : state.inbox.slice(0, 12).map(inboxRow).join('') || '<p class="empty">Nothing needs your attention.</p>'}</section><section class="connection-card conversations-card"><div class="section-head"><div><p class="eyebrow">CONVERSATIONS</p><h2>Recent chats</h2></div><span class="socket-state">${status}</span></div>${state.connectionsLoading && state.conversations.length === 0 ? '<p class="empty">Loading conversations…</p>' : state.conversations.slice(0, 20).map(conversationRow).join('') || '<p class="empty">No conversations yet.</p>'}</section>${activeChatView()}</div>`;
 }
-function connection(icon: string, title: string, action: string): string {
-  return `<article class="connection"><b>${icon}</b><strong>${escapeHtml(title)}</strong><button>${action}</button></article>`;
+function inboxRow(item: InboxItem): string {
+  const actor = escapeHtml(item.fromUser.displayName);
+  const face = escapeHtml(initials(item.fromUser.displayName));
+  if (item.type === 'friend_request' && item.requestId && UUID_RE.test(item.requestId)) {
+    const requestId = escapeHtml(item.requestId);
+    return `<article class="interaction-row"><b class="connection-face">${face}</b><div><strong>${actor}</strong><p>Sent you a friend request · ${ago(item.createdAt)}</p></div><div class="row-actions"><button data-action="accept-friend" data-request-id="${requestId}">Accept</button><button data-action="decline-friend" data-request-id="${requestId}">Decline</button></div></article>`;
+  }
+  if (item.type === 'wave' && UUID_RE.test(item.fromUser.id)) {
+    return `<article class="interaction-row"><b class="connection-face wave">≈</b><div><strong>${actor} waved at you</strong><p>${ago(item.createdAt)}${item.isMutual ? ' · mutual' : ''}</p></div><button data-action="wave-back" data-wave-user-id="${escapeHtml(item.fromUser.id)}">Wave back</button></article>`;
+  }
+  if (item.type === 'match' && item.match?.conversationId && UUID_RE.test(item.match.conversationId)) {
+    return `<article class="interaction-row"><b class="connection-face">${face}</b><div><strong>New match with ${actor}</strong><p>${ago(item.createdAt)}</p></div><button data-action="open-chat" data-conversation-id="${escapeHtml(item.match.conversationId)}">Open chat</button></article>`;
+  }
+
+  const detail = item.type === 'gift' && item.gift
+    ? `${item.gift.emoji} ${item.gift.label}`
+    : item.type === 'follow'
+      ? 'Started following you'
+      : item.type === 'story_reaction'
+        ? `Reacted to your story${item.reactionKind ? ` · ${item.reactionKind}` : ''}`
+        : item.type === 'notification'
+          ? 'New activity'
+          : item.type.replace('_', ' ');
+  return `<article class="interaction-row passive"><b class="connection-face">${face}</b><div><strong>${actor}</strong><p>${escapeHtml(detail)} · ${ago(item.createdAt)}</p></div></article>`;
+}
+function conversationRow(conversation: ConversationSummary): string {
+  const peer = peerForConversation(conversation);
+  const name = peer?.displayName ?? 'Conversation';
+  const unread = conversation.unreadCount ?? 0;
+  const last = conversation.lastMessage?.body ? truncate(conversation.lastMessage.body) : 'No messages yet';
+  const online = conversation.peerOnline === true ? '<i class="online-dot"></i>' : '';
+  const active = conversation.id === state.activeConversationId ? ' active' : '';
+  const id = UUID_RE.test(conversation.id) ? escapeHtml(conversation.id) : '';
+  return `<button class="conversation-row${active}" data-action="open-chat" data-conversation-id="${id}" ${id ? '' : 'disabled'}><b class="connection-face">${escapeHtml(initials(name))}</b><div><strong>${escapeHtml(name)} ${online}</strong><p>${escapeHtml(last)}</p></div><span>${unread > 0 ? `<b class="unread-count">${Math.min(unread, 99)}</b>` : (conversation.lastMessageAt ? ago(conversation.lastMessageAt) : '')}</span></button>`;
+}
+function activeChatView(): string {
+  const id = state.activeConversationId;
+  if (!id) return `<section class="chat-panel"><div class="chat-placeholder"><p class="eyebrow">PRIVATE CHAT</p><h2>Select a conversation</h2><p>Messages stay scoped to conversations you participate in. Realtime sending becomes available after the room join is acknowledged.</p></div></section>`;
+  const conversation = state.conversations.find((item) => item.id === id);
+  const peer = conversation ? peerForConversation(conversation) : null;
+  const name = peer?.displayName ?? 'Conversation';
+  const roomState = state.conversationJoined ? 'Room joined' : (state.realtimeConnected ? 'Joining room…' : 'Realtime offline');
+  return `<section class="chat-panel"><header class="chat-head"><div><p class="eyebrow">PRIVATE CHAT</p><h2>${escapeHtml(name)}</h2><p>${roomState}</p></div><span>${conversation?.peerOnline === true ? 'Online' : 'Private 1:1'}</span></header><div class="message-list" id="message-list">${state.messages.map(messageRow).join('') || '<p class="empty">No messages yet. Start the conversation.</p>'}</div><form class="chat-composer" id="chat-composer"><input id="chat-input" type="text" maxlength="2000" autocomplete="off" placeholder="Message…" ${state.conversationJoined ? '' : 'disabled'}><button class="primary" type="submit" ${state.conversationJoined ? '' : 'disabled'}>Send</button></form></section>`;
+}
+function messageRow(message: ChatMessage): string {
+  const mine = message.senderId === state.user?.id;
+  const body = message.type === 'text' ? message.body : message.type === 'location' ? 'Shared a location' : 'Shared live location';
+  return `<article class="message ${mine ? 'mine' : 'peer'}"><p>${escapeHtml(body)}</p><small>${mine ? 'You' : 'Peer'} · ${ago(message.createdAt)}</small></article>`;
 }
 function youView(): string {
   if (!state.user) return `<div class="you-empty"><div class="identity"></div><p class="eyebrow">YOUR NEXA IDENTITY</p><h2>Connect the live backend to open your identity surface.</h2><p>Map presence, verification and privacy belong here—not in a vanity feed.</p><button class="primary" id="auth-you">Sign in</button></div>`;
@@ -336,7 +588,7 @@ function youView(): string {
   return `<div class="you"><section class="identity-card"><div class="profile">${escapeHtml(initials(state.user.displayName))}</div><div><p class="eyebrow">SIGNED IN</p><h2>${escapeHtml(state.user.displayName)}</h2><p>${escapeHtml(state.user.email)}</p></div><span>${escapeHtml(verification)}</span></section><section class="trust"><div><p class="eyebrow">VERIFICATION SIGNAL</p><h2>${escapeHtml(verification)}</h2><p>Web v1 renders the factual verification level returned by the backend. It does not calculate or expose a public numeric trust score.</p></div></section><button class="danger" id="logout">Sign out of web preview</button></div>`;
 }
 function authPanel(): string {
-  return `<dialog class="auth-dialog" ${state.authOpen ? 'open' : ''}><form id="login"><button type="button" id="close">×</button><div class="logo auth-logo"><i></i><b>NEXA</b></div><p class="eyebrow">LIVE BACKEND</p><h2>Sign in to NEXA</h2><p>The access token stays in memory. The refresh credential is held by the backend in an HttpOnly SameSite cookie and is never exposed to browser JavaScript.</p><label>Email<input id="email" type="email" required autocomplete="email"></label><label>Password<input id="password" type="password" minlength="8" required autocomplete="current-password"></label><button class="primary" type="submit">Connect live backend</button><small>Local preview targets backend port 3001. Production uses a same-origin <code>/api/v1</code> edge proxy; users cannot select an arbitrary request host.</small></form></dialog>`;
+  return `<dialog class="auth-dialog" ${state.authOpen ? 'open' : ''}><form id="login"><button type="button" id="close">×</button><div class="logo auth-logo"><i></i><b>NEXA</b></div><p class="eyebrow">LIVE BACKEND</p><h2>Sign in to NEXA</h2><p>The access token stays in memory. The refresh credential is held by the backend in an HttpOnly SameSite cookie and is never exposed to browser JavaScript.</p><label>Email<input id="email" type="email" required autocomplete="email"></label><label>Password<input id="password" type="password" minlength="8" required autocomplete="current-password"></label><button class="primary" type="submit">Connect live backend</button><small>Local preview targets backend port 3001. Production uses same-origin <code>/api/v1</code> and <code>/socket.io</code> edge routes.</small></form></dialog>`;
 }
 
 function safeFragment(html: string): DocumentFragment {
@@ -380,13 +632,33 @@ function bind(): void {
     render();
     if (token()) void loadDiscovery();
   }));
+  document.querySelectorAll<HTMLElement>('[data-action="open-chat"]').forEach((element) => element.addEventListener('click', () => {
+    const id = element.dataset.conversationId;
+    if (!id) return;
+    void openConversation(id).catch((error: unknown) => notice(error instanceof Error ? error.message : 'Could not open conversation.'));
+  }));
+  document.querySelectorAll<HTMLElement>('[data-action="accept-friend"],[data-action="decline-friend"]').forEach((element) => element.addEventListener('click', () => {
+    const id = element.dataset.requestId;
+    if (!id) return;
+    const action = element.dataset.action === 'accept-friend' ? 'accept' : 'decline';
+    void respondToFriendRequest(id, action).catch((error: unknown) => notice(error instanceof Error ? error.message : 'Friend request action failed.'));
+  }));
+  document.querySelectorAll<HTMLElement>('[data-action="wave-back"]').forEach((element) => element.addEventListener('click', () => {
+    const userId = element.dataset.waveUserId;
+    if (!userId) return;
+    void waveBack(userId).catch((error: unknown) => notice(error instanceof Error ? error.message : 'Wave failed.'));
+  }));
   document.querySelector('#theme')?.addEventListener('click', cycleTheme);
-  document.querySelector('#refresh')?.addEventListener('click', () => void Promise.all([loadDiscovery(), loadFeed()]));
+  document.querySelector('#refresh')?.addEventListener('click', () => {
+    if (state.tab === 'connections') void loadConnections();
+    else if (state.tab === 'pulse') void loadFeed();
+    else void loadDiscovery();
+  });
   document.querySelector('#refresh-map')?.addEventListener('click', () => void loadDiscovery());
   document.querySelector('#logout')?.addEventListener('click', () => {
     void logout().catch((error: unknown) => notice(error instanceof Error ? `Sign out failed: ${error.message}` : 'Sign out failed. Retry while connected.'));
   });
-  ['#auth','#auth-top','#auth-you'].forEach((selector) => document.querySelector(selector)?.addEventListener('click', () => {
+  ['#auth','#auth-top','#auth-you','#auth-connections'].forEach((selector) => document.querySelector(selector)?.addEventListener('click', () => {
     state.authOpen = true;
     render();
   }));
@@ -400,6 +672,16 @@ function bind(): void {
     const password = document.querySelector<HTMLInputElement>('#password')?.value ?? '';
     void login(email, password).catch((error: unknown) => notice(error instanceof Error ? error.message : 'Sign in failed.'));
   });
+  document.querySelector<HTMLFormElement>('#chat-composer')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const input = document.querySelector<HTMLInputElement>('#chat-input');
+    const body = input?.value ?? '';
+    if (input) input.disabled = true;
+    void sendActiveMessage(body)
+      .then(() => { if (input) input.value = ''; })
+      .catch((error: unknown) => notice(error instanceof Error ? error.message : 'Message failed.'))
+      .finally(() => { if (input && state.conversationJoined) input.disabled = false; });
+  });
 
   const map = document.querySelector<HTMLElement>('#nexa-map');
   if (map) {
@@ -411,6 +693,9 @@ function bind(): void {
       onViewportSettled: onMapViewportSettled,
     });
   }
+
+  const messageList = document.querySelector<HTMLElement>('#message-list');
+  if (messageList) messageList.scrollTop = messageList.scrollHeight;
 }
 function render(): void {
   root.replaceChildren(safeFragment(shell()));
