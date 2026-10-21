@@ -31,19 +31,19 @@ const FAQS: Faq[] = [
   },
   {
     q: 'How do I hide myself from the map?',
-    a: 'Settings → Appear on map → turn it off. You stay logged in and can still browse; others will not see you in discovery.',
+    a: 'Open You → My map presence and turn map presence off. You stay logged in and can still browse; others will not see you in nearby discovery.',
   },
   {
     q: 'What is Pulse?',
-    a: 'Pulse is your local activity hub: nearby story rings plus waves, chats, and matches. Use the filter chips (All / Waves / Chats / Matches) and act from each card — Wave back, Message, or View. Trades and alerts still surface when they appear in your feed.',
+    a: 'Pulse shows live local activity around you. Use it to scan nearby stories, events, and other local signals; relationship activity and chats live in Connections.',
   },
   {
     q: 'How do stories work?',
     a: 'Stories are visible to people nearby and disappear after 24 hours. You can post a photo or a short video. Posting needs a verified email and an account at least 24 hours old (phone-verified accounts can post sooner). Reactions on stories count like waves toward mutual interest.',
   },
   {
-    q: 'What is the Interactions screen?',
-    a: 'Interactions is a focused inbox for pending friend requests, recent followers, and related social notifications. Waves, chats, and matches also live on Pulse. Your Friends → Requests tab stays available for requests only.',
+    q: 'What is Connections?',
+    a: 'Connections is where relationship activity and chats return. Activity surfaces items that need your attention, while Chats keeps your conversations and authoritative unread state together. Use the Map for spatial discovery.',
   },
   {
     q: 'How do friends and online status work?',
@@ -55,7 +55,7 @@ const FAQS: Faq[] = [
   },
   {
     q: 'What do the verification badges mean?',
-    a: 'They show progress on the trust ladder: email → phone → ID review. Optional, but they raise trust. Email verification unlocks story posting. Start from Settings → Trust or Trust Center. ID review is assisted by automated face checks and always finished by a human.',
+    a: 'They show completed verification signals such as email, phone, or government ID. They do not create a public trust or popularity score. Manage verification in Trust Center. Email verification unlocks story posting. ID review is assisted by automated face checks and always finished by a human.',
   },
   {
     q: 'How does local trade work?',
