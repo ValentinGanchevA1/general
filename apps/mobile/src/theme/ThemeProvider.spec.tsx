@@ -6,7 +6,10 @@ import { useColorScheme } from 'react-native';
 import { darkColors, lightColors } from './colors';
 import { ThemeProvider, useAppTheme } from './ThemeProvider';
 
-jest.mock('react-native/Libraries/Utilities/useColorScheme', () => jest.fn());
+jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
+  __esModule: true,
+  default: jest.fn(),
+}));
 
 const storage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
 const mockUseColorScheme = useColorScheme as jest.MockedFunction<typeof useColorScheme>;

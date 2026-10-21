@@ -102,7 +102,7 @@ export function AchievementsScreen(): React.JSX.Element {
   );
 }
 
-function createStyles(colors: ThemeColors): Styles {
+function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
     flex: { flex: 1 },
