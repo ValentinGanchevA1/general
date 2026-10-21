@@ -34,11 +34,13 @@ export function Skeleton({
           toValue: 0.75,
           duration: 700,
           useNativeDriver: true,
+          isInteraction: false,
         }),
         Animated.timing(opacity, {
           toValue: 0.35,
           duration: 700,
           useNativeDriver: true,
+          isInteraction: false,
         }),
       ]),
     );

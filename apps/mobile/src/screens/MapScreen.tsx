@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-	InteractionManager,
 	StyleSheet,
 	Text,
 	View,
@@ -264,24 +263,12 @@ export function MapScreen(): React.JSX.Element {
 	}, []);
 
 	const presentEntitySheet = useCallback((point: EntityPoint) => {
-		const id = `${point.kind}:${point.id}`;
 		if (preSheetRegionRef.current == null && region != null) {
 			preSheetRegionRef.current = region;
 		}
 		selectedPointRef.current = point;
-		if (presentedIdRef.current !== id) {
-			presentedIdRef.current = null;
-		}
+		presentedIdRef.current = null;
 		setSelected(point);
-		InteractionManager.runAfterInteractions(() => {
-			try {
-				entitySheetRef.current?.present();
-				presentedIdRef.current = id;
-			} catch (e) {
-				if (__DEV__) console.warn('entity sheet present failed', e);
-				presentedIdRef.current = null;
-			}
-		});
 	}, [region]);
 
 	const onSheetChange = useCallback(
@@ -412,22 +399,26 @@ export function MapScreen(): React.JSX.Element {
 			presentedIdRef.current = null;
 			return;
 		}
-		if (preSheetRegionRef.current == null && region != null) {
-			preSheetRegionRef.current = region;
-		}
 		const id = `${selected.kind}:${selected.id}`;
 		if (presentedIdRef.current === id) return;
-		const task = InteractionManager.runAfterInteractions(() => {
+
+		const frame = requestAnimationFrame(() => {
+			const sheet = entitySheetRef.current;
+			if (sheet == null) {
+				if (__DEV__) console.warn('entity sheet ref unavailable', id);
+				presentedIdRef.current = null;
+				return;
+			}
 			try {
-				entitySheetRef.current?.present();
+				sheet.present();
 				presentedIdRef.current = id;
 			} catch (e) {
 				if (__DEV__) console.warn('entity sheet present failed', e);
 				presentedIdRef.current = null;
 			}
 		});
-		return () => task.cancel();
-	}, [selected, region]);
+		return () => cancelAnimationFrame(frame);
+	}, [selected]);
 
 	useEffect(() => {
 		dispatch(setPoints(points));
