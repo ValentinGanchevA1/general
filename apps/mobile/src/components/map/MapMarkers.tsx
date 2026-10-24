@@ -12,12 +12,14 @@ import { NEXA_MARKER_ANCHOR_Y } from './NexaEntityMarker';
 import {
   limitVisibleMapPoints,
   resolveNexaMapZoomPolicy,
+  type NexaMapZoomBand,
   type NexaMapZoomPolicy,
 } from './nexaMapZoomDensity';
 import {
   NEXA_INITIAL_MARKER_REVEAL_COUNT,
   NEXA_MARKER_REVEAL_INTERVAL_MS,
   nextNexaMarkerRevealCount,
+  resolveNexaMarkerRevealCountForBand,
 } from './nexaProgressiveReveal';
 import { clusterVisualKey, entityVisualKey } from './markerVisualKeys';
 import { useTracksViewChanges } from './useTracksViewChanges';
@@ -37,6 +39,11 @@ interface MapMarkersProps {
   dimUnselected?: boolean;
   onClusterPress: (p: ClusterPoint) => void;
   onEntityPress: (p: EntityPoint) => void;
+}
+
+interface RevealState {
+  band: NexaMapZoomBand;
+  count: number;
 }
 
 function entityKey(point: EntityPoint): string {
@@ -66,7 +73,15 @@ function MapMarkersImpl({
 
   const [localSelectedEntityKey, setLocalSelectedEntityKey] = useState<string | null>(null);
   const [localSelectedClusterCellId, setLocalSelectedClusterCellId] = useState<string | null>(null);
-  const [revealCount, setRevealCount] = useState(NEXA_INITIAL_MARKER_REVEAL_COUNT);
+  const [revealState, setRevealState] = useState<RevealState>(() => ({
+    band: effectiveZoomPolicy.band,
+    count: NEXA_INITIAL_MARKER_REVEAL_COUNT,
+  }));
+  const revealCount = resolveNexaMarkerRevealCountForBand(
+    revealState.band,
+    effectiveZoomPolicy.band,
+    revealState.count,
+  );
 
   const effectiveSelectedEntityKey =
     selectedEntityKey === undefined ? localSelectedEntityKey : selectedEntityKey;
@@ -119,14 +134,43 @@ function MapMarkersImpl({
   );
 
   useEffect(() => {
+    if (revealState.band === effectiveZoomPolicy.band) return;
+    const nextBand = effectiveZoomPolicy.band;
+    void Promise.resolve().then(() => {
+      setRevealState({
+        band: nextBand,
+        count: NEXA_INITIAL_MARKER_REVEAL_COUNT,
+      });
+    });
+  }, [effectiveZoomPolicy.band, revealState.band]);
+
+  useEffect(() => {
     if (reduceMotion || visiblePoints.length <= revealCount) return;
+    const activeBand = effectiveZoomPolicy.band;
     const timer = setTimeout(() => {
-      setRevealCount((current) =>
-        nextNexaMarkerRevealCount(current, visiblePoints.length, false),
-      );
+      setRevealState((current) => {
+        const currentCount = resolveNexaMarkerRevealCountForBand(
+          current.band,
+          activeBand,
+          current.count,
+        );
+        return {
+          band: activeBand,
+          count: nextNexaMarkerRevealCount(
+            currentCount,
+            visiblePoints.length,
+            false,
+          ),
+        };
+      });
     }, NEXA_MARKER_REVEAL_INTERVAL_MS);
     return () => clearTimeout(timer);
-  }, [reduceMotion, revealCount, visiblePoints.length]);
+  }, [
+    effectiveZoomPolicy.band,
+    reduceMotion,
+    revealCount,
+    visiblePoints.length,
+  ]);
 
   const revealedPoints = useMemo(() => {
     if (reduceMotion || visiblePoints.length <= revealCount) return visiblePoints;
