@@ -10,8 +10,8 @@ export type TrustChip = { label: string; strong?: boolean };
 export type ProfileTrustBlockProps = {
   verification: VerificationLevel;
   idVerified: boolean;
-  /** @deprecated Retained for compatibility; public numeric trust is not rendered. */
-  verificationScore: number | null | undefined;
+  /** @deprecated Retained for compatibility only; public numeric trust is never rendered. */
+  verificationScore?: number | null;
   onLayout?: (e: { nativeEvent: { layout: { y: number } } }) => void;
 };
 
