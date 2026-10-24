@@ -1,6 +1,6 @@
-# G88 — Play Console beta launch checklist
+# NEXA — Play Console beta launch checklist
 
-> **Scope:** the owner-side Google Play Console steps to get G88 into **closed testing**.
+> **Scope:** the owner-side Google Play Console steps to get NEXA into **closed testing**.
 > All engineering prep is done (signed AAB, CI secrets, privacy policy, store copy,
 > account deletion). This is the click-by-click for the parts only the account owner can do.
 > Background + rationale: `DEPLOY.md` → "Mobile release". Paste-ready copy:
@@ -27,7 +27,7 @@ Work top to bottom. Est. ~1 hour (+ a few hours for the first review).
 
 ## 2. Create the app
 - [ ] Play Console → **Create app**.
-  - App name: **G88** (or your store name from `play-store-listing.md`).
+  - App name: **NEXA** (or your store name from `play-store-listing.md`).
   - Default language, **App**, **Free**.
   - Accept declarations → **Create app**.
 - [ ] Confirm the package will be **`com.g88`** (it's set when you upload the AAB in step 5;
@@ -43,7 +43,7 @@ Work top to bottom. Est. ~1 hour (+ a few hours for the first review).
 Play **re-signs** every download with Google's **App signing key**, so the cert testers run is
 *not* your upload key or debug key. The Maps release key must allow that App-signing SHA-1.
 
-- [ ] **Get the SHA-1:** Play Console → app **G88** → **Test and release → Setup → App
+- [ ] **Get the SHA-1:** Play Console → app **NEXA** → **Test and release → Setup → App
       integrity → App signing** → copy the **App signing key certificate → SHA-1**.
       *(Also copy the **Upload key certificate** SHA-1 while you're here — used below.)*
 - [ ] **Apply it:** Google Cloud Console → **APIs & Services → Credentials** → open the key
