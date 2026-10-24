@@ -206,6 +206,7 @@ function MapMarkersImpl({
               effectiveSelectedEntityKey != null &&
               !selected
             }
+            reduceMotion={reduceMotion}
             onPress={handleEntityPress}
           />
         );
@@ -299,6 +300,7 @@ interface EntityItemProps {
   own: boolean;
   dimmed: boolean;
   unavailable: boolean;
+  reduceMotion: boolean;
   onPress: (p: EntityPoint) => void;
 }
 
@@ -311,6 +313,7 @@ function EntityMarkerItemImpl({
   own,
   dimmed,
   unavailable,
+  reduceMotion,
   onPress,
 }: EntityItemProps): React.JSX.Element {
   const [visualSettled, setVisualSettled] = useState(false);
@@ -363,6 +366,7 @@ function EntityMarkerItemImpl({
         own={own}
         dimmed={dimmed}
         unavailable={unavailable}
+        reduceMotion={reduceMotion}
         onVisualSettled={onVisualSettled}
       />
     </Marker>
@@ -379,6 +383,7 @@ function entityItemPropsEqual(prev: EntityItemProps, next: EntityItemProps): boo
     prev.own === next.own &&
     prev.dimmed === next.dimmed &&
     prev.unavailable === next.unavailable &&
+    prev.reduceMotion === next.reduceMotion &&
     entityVisualKey(prev.point) === entityVisualKey(next.point) &&
     prev.point.lat === next.point.lat &&
     prev.point.lng === next.point.lng
