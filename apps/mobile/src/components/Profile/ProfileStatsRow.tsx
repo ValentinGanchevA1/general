@@ -5,44 +5,58 @@ import { radius, useAppTheme, type ThemeColors } from '@/theme';
 
 export type ProfileStatsRowProps = {
   level?: number | null;
+  /** @deprecated Retained for DTO/call-site compatibility; public rank is not rendered. */
   allTimeRank?: number | null;
   achievementIcons?: string[] | null;
   onLayout?: (e: LayoutChangeEvent) => void;
 };
 
+export type PublicProfileActivity = {
+  level: number | null;
+  achievementIcons: string[];
+};
+
 /**
- * Level / rank / achievement icons row (Activity).
- * Returns null when nothing to show.
+ * Visitor-safe activity presentation.
+ *
+ * Leaderboard rank is intentionally excluded: NEXA may use rank inside explicit
+ * leaderboard/gamification surfaces, but public identity/profile surfaces must
+ * not turn it into a popularity signal.
  */
+export function buildPublicProfileActivity(
+  level: number | null | undefined,
+  achievementIcons: string[] | null | undefined,
+): PublicProfileActivity {
+  return {
+    level: level ?? null,
+    achievementIcons: achievementIcons?.slice(0, 3) ?? [],
+  };
+}
+
+/** Public activity row: level + earned achievements, never leaderboard rank. */
 export function ProfileStatsRow({
   level,
-  allTimeRank,
   achievementIcons,
   onLayout,
 }: ProfileStatsRowProps): React.JSX.Element | null {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const icons = achievementIcons?.slice(0, 3) ?? [];
-  const has = level != null || allTimeRank != null || icons.length > 0;
+  const activity = buildPublicProfileActivity(level, achievementIcons);
+  const has = activity.level != null || activity.achievementIcons.length > 0;
   if (!has) return null;
 
   return (
     <View style={styles.statsBlock} onLayout={onLayout}>
       <Text style={styles.sectionLabel}>Activity</Text>
       <View style={styles.statsRow}>
-        {level != null ? (
+        {activity.level != null ? (
           <View style={styles.statPill}>
-            <Text style={styles.statPillValue}>Lv {level}</Text>
+            <Text style={styles.statPillValue}>Lv {activity.level}</Text>
           </View>
         ) : null}
-        {allTimeRank != null ? (
-          <View style={styles.statPill}>
-            <Text style={styles.statPillValue}>#{allTimeRank}</Text>
-          </View>
-        ) : null}
-        {icons.length > 0 ? (
+        {activity.achievementIcons.length > 0 ? (
           <View style={styles.achievementIcons}>
-            {icons.map((icon, i) => (
+            {activity.achievementIcons.map((icon, i) => (
               <Text key={`${icon}-${i}`} style={styles.achievementIcon}>
                 {icon}
               </Text>
