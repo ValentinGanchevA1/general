@@ -5,7 +5,7 @@ import { extname, resolve, sep } from 'node:path';
 import { connect as tlsConnect } from 'node:tls';
 import { fileURLToPath } from 'node:url';
 
-const root = fileURLToPath(new URL('.', import.meta.url));
+const root = resolve(fileURLToPath(new URL('.', import.meta.url)));
 const port = Number(process.env.PORT ?? 4174);
 const backend = parseBackendOrigin(process.env.BACKEND_ORIGIN);
 const types = new Map([
