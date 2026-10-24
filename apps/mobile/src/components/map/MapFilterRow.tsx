@@ -16,6 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { DiscoveryRankBy, EntityKind, ListingMode } from '@g88/shared';
+import { NexaEntityGlyph } from '@/components/Brand/NexaEntityGlyph';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 import { MAP_LAYER_ROW_HEIGHT, MAP_SEARCH_BAR_HEIGHT } from './mapChromeLayout';
@@ -23,15 +24,15 @@ import { MAP_LAYER_ROW_HEIGHT, MAP_SEARCH_BAR_HEIGHT } from './mapChromeLayout';
 export type ListingModeFilterValue = 'all' | ListingMode;
 export const DEFAULT_MAP_LAYERS: EntityKind[] = ['user'];
 
-type LayerOption = { id: EntityKind; label: string; a11y: string; icon: string };
+type LayerOption = { id: EntityKind; label: string; a11y: string };
 type Choice<T extends string> = { id: T; label: string };
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Styles = ReturnType<typeof createStyles>;
 
 const LAYER_OPTIONS: LayerOption[] = [
-	{ id: 'user', label: 'People', a11y: 'People layer', icon: 'account-outline' },
-	{ id: 'event', label: 'Events', a11y: 'Events layer', icon: 'calendar-blank-outline' },
-	{ id: 'listing', label: 'Listings', a11y: 'Listings layer', icon: 'tag-outline' },
+	{ id: 'user', label: 'People', a11y: 'People layer' },
+	{ id: 'event', label: 'Events', a11y: 'Events layer' },
+	{ id: 'listing', label: 'Listings', a11y: 'Listings layer' },
 ];
 
 const LISTING_OPTIONS: Choice<ListingModeFilterValue>[] = [
@@ -178,20 +179,27 @@ export function MapFilterRow({
 					{LAYER_OPTIONS.map((option) => {
 						const active = layers.includes(option.id);
 						const tone = layerTone(option.id);
+						const fill = layerFill(option.id);
 						return (
 							<Pressable
 								key={option.id}
 								onPress={() => toggleLayer(option.id)}
 								style={({ pressed }) => [
 									styles.layerChip,
-									{ backgroundColor: active ? layerFill(option.id) : colors.surfacePrimary, borderColor: active ? tone : colors.borderDefault },
+									{ backgroundColor: active ? fill : colors.surfacePrimary, borderColor: active ? tone : colors.borderDefault },
 									pressed && styles.pressed,
 								]}
 								accessibilityRole="button"
 								accessibilityState={{ selected: active }}
 								accessibilityLabel={option.a11y}
 							>
-								<Icon name={option.icon} size={16} color={active ? tone : colors.textSecondary} />
+								<NexaEntityGlyph
+									kind={option.id === 'user' ? 'person' : option.id}
+									size={16}
+									color={active ? tone : colors.textSecondary}
+									fillColor={active ? fill : 'transparent'}
+									strokeWidth={1.6}
+								/>
 								<Text numberOfLines={1} style={[styles.layerText, { color: active ? tone : colors.textSecondary }]}>{option.label}</Text>
 							</Pressable>
 						);
