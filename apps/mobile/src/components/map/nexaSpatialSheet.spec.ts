@@ -8,9 +8,9 @@ import {
 describe('NEXA spatial sheet identity', () => {
   it('keeps canonical geometry for every entity family', () => {
     expect(resolveNexaSpatialSheetVisual('person').shape).toBe('circle');
-    expect(resolveNexaSpatialSheetVisual('event').shape).toBe('diamond');
+    expect(resolveNexaSpatialSheetVisual('event').shape).toBe('star');
     expect(resolveNexaSpatialSheetVisual('listing').shape).toBe('square');
-    expect(resolveNexaSpatialSheetVisual('opportunity').shape).toBe('star');
+    expect(resolveNexaSpatialSheetVisual('opportunity').shape).toBe('diamond');
   });
 
   it('maps the current shared discovery contract without inventing opportunity DTOs', () => {
