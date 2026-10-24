@@ -1,5 +1,12 @@
-import React from 'react';
-import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  Text,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { useAppTheme } from '@/theme';
@@ -12,6 +19,11 @@ import {
   type NexaMarkerDensity,
   type NexaMarkerState,
 } from './nexaEntityMarkerVisuals';
+import {
+  NEXA_MARKER_SELECTION_PULSE_IN_MS,
+  NEXA_MARKER_SELECTION_PULSE_OUT_MS,
+  shouldAnimateNexaMarkerSelection,
+} from './nexaMarkerMotion';
 
 export const NEXA_MARKER_RENDER_HEIGHT = 62;
 export const NEXA_MARKER_ANCHOR_Y = NEXA_MARKER_TOUCH_SIZE / 2 / NEXA_MARKER_RENDER_HEIGHT;
@@ -23,6 +35,7 @@ export interface NexaEntityMarkerProps {
   label?: string;
   caption?: string;
   accessibilityLabel?: string;
+  reduceMotion?: boolean;
   onVisualSettled?: () => void;
 }
 
@@ -44,10 +57,41 @@ export function NexaEntityMarker({
   label,
   caption,
   accessibilityLabel,
+  reduceMotion = true,
   onVisualSettled,
 }: NexaEntityMarkerProps): React.JSX.Element {
   const { colors } = useAppTheme();
   const visual = resolveNexaMarkerVisual(entityType, density, state);
+  const selectionPulse = useRef(new Animated.Value(0)).current;
+  const animateSelection = shouldAnimateNexaMarkerSelection(
+    visual.showSelectedRing,
+    reduceMotion,
+  );
+
+  useEffect(() => {
+    selectionPulse.stopAnimation();
+    selectionPulse.setValue(0);
+
+    if (!animateSelection) return undefined;
+
+    const animation = Animated.sequence([
+      Animated.timing(selectionPulse, {
+        toValue: 1,
+        duration: NEXA_MARKER_SELECTION_PULSE_IN_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(selectionPulse, {
+        toValue: 0,
+        duration: NEXA_MARKER_SELECTION_PULSE_OUT_MS,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]);
+
+    animation.start();
+    return () => animation.stop();
+  }, [animateSelection, selectionPulse]);
 
   const entityColor =
     entityType === 'person'
@@ -102,6 +146,14 @@ export function NexaEntityMarker({
             };
 
   const iconSize = Math.max(10, Math.round(visual.visualSize * 0.48));
+  const pulseOpacity = selectionPulse.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0, 0.5, 0],
+  });
+  const pulseScale = selectionPulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.82, 1.22],
+  });
 
   return (
     <View
@@ -114,6 +166,22 @@ export function NexaEntityMarker({
       }
     >
       <View style={styles.markerStage} onLayout={onVisualSettled}>
+        {animateSelection ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.ring,
+              styles.selectionPulse,
+              {
+                borderColor: entityColor,
+                shadowColor: entityColor,
+                opacity: pulseOpacity,
+                transform: [{ scale: pulseScale }],
+              },
+            ]}
+          />
+        ) : null}
+
         {visual.showSelectedRing ? (
           <View
             pointerEvents="none"
@@ -278,6 +346,15 @@ const styles = StyleSheet.create({
   ring: {
     position: 'absolute',
     borderRadius: 999,
+  },
+  selectionPulse: {
+    width: 42,
+    height: 42,
+    borderWidth: 1,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 6,
   },
   selectedRing: {
     width: 42,
