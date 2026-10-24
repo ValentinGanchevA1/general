@@ -101,6 +101,7 @@ import { NexaMapSpatialStatus } from '@/components/map/NexaMapSpatialStatus';
 import { resolveNexaMapSpatialState } from '@/components/map/nexaMapSpatialStates';
 import { NEXA_MOTION_MS } from '@/motion/nexaMotion';
 import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
+import { useNexaMapSurfaceReady } from '@/components/Brand/NexaLaunchSurfaceContext';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 
@@ -120,6 +121,7 @@ export function MapScreen(): React.JSX.Element {
 	const [selected, setSelected] = useState<EntityPoint | null>(null);
 	const [waveToast, setWaveToast] = useState<string | null>(null);
 	const reduceMotion = useNexaReducedMotion();
+	const markMapSurfaceReady = useNexaMapSurfaceReady();
 	const mapRef = useRef<MapView>(null);
 	const entitySheetRef = useRef<BottomSheetModal>(null);
 	const presentedIdRef = useRef<string | null>(null);
@@ -832,6 +834,7 @@ export function MapScreen(): React.JSX.Element {
 					showsMyLocationButton={false}
 					showsCompass={false}
 					toolbarEnabled={false}
+					onMapReady={markMapSurfaceReady}
 					onRegionChangeComplete={onRegionChangeComplete}
 					onLongPress={onMapLongPress}
 				>
