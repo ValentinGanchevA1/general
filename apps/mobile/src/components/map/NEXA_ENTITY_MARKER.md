@@ -1,4 +1,4 @@
-# NEXA Entity Marker v2
+# NEXA Entity Marker v3
 
 Canonical mobile map marker contract.
 
@@ -7,9 +7,11 @@ Canonical mobile map marker contract.
 | Entity | Shape | Semantic color |
 | --- | --- | --- |
 | Person | Circle | Violet / action |
-| Event | Diamond | Cyan / discovery |
+| Event | Four-point star | Cyan / discovery |
 | Listing | Square | Neutral |
-| Opportunity | Four-point star | Violet fallback; violet→cyan gradient when a masked-gradient renderer is introduced |
+| Opportunity / other | Diamond | Violet / opportunity |
+
+This is the same circle / star / square / diamond vocabulary used by the NEXA launch and hero compositions.
 
 Visual bounding sizes are 18dp compact, 24dp standard, and 32dp selected. The marker interaction stage is never smaller than 44×44dp.
 
@@ -37,7 +39,7 @@ States are composable rather than separate marker implementations:
 - `event` → `event`
 - `listing` → `listing`
 
-`MapMarkers.tsx` owns native `react-native-maps` snapshot lifecycle and re-enables `tracksViewChanges` only when painted visual state changes. Media URLs are intentionally excluded from marker visual keys because v2 markers are geometry-first and do not paint avatar/cover/thumbnail images.
+`MapMarkers.tsx` owns native `react-native-maps` snapshot lifecycle and re-enables `tracksViewChanges` only when painted visual state changes. Media URLs are intentionally excluded from marker visual keys because v3 markers are geometry-first and do not paint avatar/cover/thumbnail images.
 
 `MapMarkers` supports both controlled selection (`selectedEntityKey`) and a local last-tapped fallback. It also exposes `newEntityKeys`, `ownEntityKey`, `unavailableEntityKeys`, and `dimUnselected` for map orchestration.
 
