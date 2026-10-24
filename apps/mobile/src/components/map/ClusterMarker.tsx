@@ -1,10 +1,10 @@
 import React from 'react';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import type { ClusterPoint, EntityKind } from '@g88/shared';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { useAppTheme } from '@/theme';
 
-import { diamondSideForBoundingSize } from './nexaEntityMarkerVisuals';
 import {
   clusterAccessibilityLabel,
   resolveNexaClusterVisual,
@@ -86,7 +86,27 @@ function ClusterMarkerImpl({
       ) : null}
 
       <View style={styles.shapeStage} pointerEvents="none">
-        <View style={[styles.shape, shapeStyle]} />
+        {visual.shape === 'star' ? (
+          <View
+            style={[
+              styles.starGlow,
+              {
+                width: visual.size,
+                height: visual.size,
+                borderRadius: visual.size / 2,
+                backgroundColor: fillColor,
+              },
+            ]}
+          >
+            <Icon
+              name="star-four-points"
+              size={visual.size}
+              color={semanticColor}
+            />
+          </View>
+        ) : (
+          <View style={[styles.shape, shapeStyle]} />
+        )}
       </View>
 
       <View
@@ -137,18 +157,6 @@ function clusterShapeStyle(
   borderColor: string,
   backgroundColor: string,
 ): ViewStyle {
-  if (shape === 'diamond') {
-    const side = diamondSideForBoundingSize(size);
-    return {
-      width: side,
-      height: side,
-      borderRadius: Math.max(5, side * 0.16),
-      borderColor,
-      backgroundColor,
-      transform: [{ rotate: '45deg' }],
-    };
-  }
-
   if (shape === 'square') {
     const side = size * 0.88;
     return {
@@ -176,21 +184,15 @@ function CompositionGlyph({
   kind: EntityKind;
   color: string;
 }): React.JSX.Element {
+  if (kind === 'event') {
+    return <Icon name="star-four-points" size={7} color={color} />;
+  }
+
   const style = compositionGlyphStyle(kind, color);
   return <View style={[styles.compositionGlyph, style]} />;
 }
 
 function compositionGlyphStyle(kind: EntityKind, color: string): ViewStyle {
-  if (kind === 'event') {
-    return {
-      width: 5.5,
-      height: 5.5,
-      borderRadius: 1,
-      backgroundColor: color,
-      transform: [{ rotate: '45deg' }],
-    };
-  }
-
   if (kind === 'listing') {
     return {
       width: 6,
@@ -249,6 +251,10 @@ const styles = StyleSheet.create({
   shape: {
     position: 'absolute',
     borderWidth: 2.25,
+  },
+  starGlow: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   contentStage: {
     alignItems: 'center',
