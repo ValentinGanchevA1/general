@@ -14,7 +14,7 @@ export function createEntityBottomSheetStyles(colors: ThemeColors) {
     interestChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     interestChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.discoverySoft, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.discoveryBorderSoft },
     interestChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
-    mutualRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, alignSelf: 'flex-start' },
+    mutualRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, alignSelf: 'flex-start' },
     mutualAvatars: { flexDirection: 'row', alignItems: 'center' },
     mutualAvatarWrap: { borderWidth: 2, borderColor: colors.surfaceRaised, borderRadius: 12 },
     mutualAvatarOverlap: { marginLeft: -8 },
