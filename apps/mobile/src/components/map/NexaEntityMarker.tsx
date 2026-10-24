@@ -26,13 +26,6 @@ export interface NexaEntityMarkerProps {
   onVisualSettled?: () => void;
 }
 
-const ICON_BY_TYPE: Record<NexaEntityType, string> = {
-  person: 'account',
-  event: 'calendar-blank-outline',
-  listing: 'tag-outline',
-  opportunity: 'star-four-points',
-};
-
 function stateSuffix(state: NexaMarkerState): string {
   const parts: string[] = [];
   if (state.selected) parts.push('selected');
@@ -70,7 +63,9 @@ export function NexaEntityMarker({
       ? colors.actionSoft
       : entityType === 'event'
         ? colors.discoverySoft
-        : colors.surfacePrimary;
+        : entityType === 'opportunity'
+          ? colors.actionSoft
+          : colors.surfacePrimary;
 
   const diamondSide = diamondSideForBoundingSize(visual.visualSize);
   const coreStyle: ViewStyle =
@@ -107,7 +102,6 @@ export function NexaEntityMarker({
             };
 
   const iconSize = Math.max(10, Math.round(visual.visualSize * 0.48));
-  const innerColor = entityType === 'listing' ? colors.entityListing : entityColor;
 
   return (
     <View
@@ -162,9 +156,9 @@ export function NexaEntityMarker({
         <View style={styles.coreStage}>
           {visual.shape === 'star' ? (
             <Icon
-              name={ICON_BY_TYPE.opportunity}
+              name="star-four-points"
               size={visual.visualSize}
-              color={colors.entityOpportunity}
+              color={entityColor}
             />
           ) : (
             <>
@@ -183,9 +177,9 @@ export function NexaEntityMarker({
                   >
                     {label}
                   </Text>
-                ) : (
-                  <Icon name={ICON_BY_TYPE[entityType]} size={iconSize} color={innerColor} />
-                )}
+                ) : entityType === 'listing' ? (
+                  <Icon name="tag-outline" size={iconSize} color={colors.entityListing} />
+                ) : null}
               </View>
             </>
           )}
