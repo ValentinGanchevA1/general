@@ -122,7 +122,8 @@ android {
         // versionCode auto-bumps in CI via -PversionCodeOverride=<run number>;
         // Play rejects duplicate versionCodes across uploads. Defaults to 1 locally.
         versionCode (project.hasProperty('versionCodeOverride') ? project.versionCodeOverride.toInteger() : 1)
-        versionName "1.0"
+        // Keep Play/APK metadata aligned with the public version shown in About/Help.
+        versionName "1.0.0"
         buildConfigField "String", "GOOGLE_MAPS_API_KEY_DEBUG", "\"${localProperties.getProperty('GOOGLE_MAPS_API_KEY_DEBUG', '')}\""
     }
     signingConfigs {
