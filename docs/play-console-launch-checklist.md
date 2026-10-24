@@ -1,112 +1,150 @@
-# G88 — Play Console beta launch checklist
+# NEXA — Play Console closed-testing and production checklist
 
-> **Scope:** the owner-side Google Play Console steps to get G88 into **closed testing**.
-> All engineering prep is done (signed AAB, CI secrets, privacy policy, store copy,
-> account deletion). This is the click-by-click for the parts only the account owner can do.
-> Background + rationale: `DEPLOY.md` → "Mobile release". Paste-ready copy:
+> **Scope:** owner-side Google Play Console steps for shipping **NEXA** while preserving the existing Android package `com.g88` for compatibility.
+> Core build/release automation is in place, but physical-device QA and the dedicated Terms requirement in #592 remain release gates.
+> Background + rationale: `DEPLOY.md` → "Mobile release". Paste-ready store copy:
 > `docs/play-store-listing.md` and `docs/play-release-notes.md`.
 
-Work top to bottom. Est. ~1 hour (+ a few hours for the first review).
+Work top to bottom. Do not treat a successful CI build as device or production sign-off.
 
 ---
 
 ## 0. Before you start — have these open
-- [ ] Google account you'll use as the **Play developer** (personal or org).
-- [ ] **Google Cloud Console** project that owns `GOOGLE_MAPS_API_KEY_RELEASE` (for step 4).
-- [ ] `docs/play-store-listing.md` (name, short/full description, Data-Safety answers).
-- [ ] `docs/play-release-notes.md` (release notes).
-- [ ] Privacy policy URL: `https://g88-legal.onrender.com/privacy` (verify it loads).
-- [ ] Tester email addresses (a Google Group or a plain list of Gmail accounts).
+
+- [ ] Google account used as the **Play developer** (personal or organization).
+- [ ] **Google Cloud Console** project that owns `GOOGLE_MAPS_API_KEY_RELEASE`.
+- [ ] `docs/play-store-listing.md` (NEXA name, short/full description, Data Safety notes).
+- [ ] `docs/play-release-notes.md` (tester-facing release notes).
+- [ ] Privacy policy URL: `https://g88-legal.onrender.com/privacy` — verify it loads and visibly says **NEXA**.
+- [ ] Issue #592 — dedicated NEXA Terms of Service. Closed testing may continue while reviewed, but production is **NO-GO** until a real `/terms` document is live and the app no longer routes Terms to Privacy.
+- [ ] Issue #580 — physical-device NEXA release audit.
+- [ ] Tester email addresses (Google Group or explicit list).
 
 ---
 
-## 1. Register the developer account ($25)
-- [ ] Go to https://play.google.com/console → **Create account** → choose **Personal** (or Org).
-- [ ] Pay the **$25** one-time fee. (Personal accounts created recently may require the
-      "20 testers for 14 days" closed-test step before production — fine for beta.)
+## 1. Register / verify the developer account
 
-## 2. Create the app
-- [ ] Play Console → **Create app**.
-  - App name: **G88** (or your store name from `play-store-listing.md`).
-  - Default language, **App**, **Free**.
-  - Accept declarations → **Create app**.
-- [ ] Confirm the package will be **`com.g88`** (it's set when you upload the AAB in step 5;
-      nothing to type here, but don't create a different package).
+- [ ] Play Console → create or verify the developer account using the ownership model you intend to keep.
+- [ ] Complete any identity/contact requirements shown by Play Console.
+- [ ] Keep ownership/recovery access separate from release automation credentials.
 
-## 3. Turn on Play App Signing + create the closed track
-- [ ] **Test and release → Testing → Closed testing → Create track** (name e.g. `beta`).
-- [ ] **Testers** tab → add your Google Group or email list → **Save**.
-- [ ] Play App Signing is **on by default** for new apps (Google holds the signing key; our
-      `upload.keystore` is only the *upload* key). You'll confirm the signing cert in step 4.
+## 2. Create or verify the Play app identity
 
-## 4. ⚠️ Maps SHA-1 — do this or testers get a BLANK/GREY MAP
-Play **re-signs** every download with Google's **App signing key**, so the cert testers run is
-*not* your upload key or debug key. The Maps release key must allow that App-signing SHA-1.
+- [ ] Play Console → **Create app** if the app does not already exist.
+  - App name: **NEXA**.
+  - Default language: choose the launch-market default.
+  - App type: **App**.
+  - Pricing: according to the actual launch model.
+- [ ] Preserve package/application id **`com.g88`**. It is a compatibility identifier, not the public product name.
+- [ ] Do **not** create a second package only to rename the technical namespace.
 
-- [ ] **Get the SHA-1:** Play Console → app **G88** → **Test and release → Setup → App
-      integrity → App signing** → copy the **App signing key certificate → SHA-1**.
-      *(Also copy the **Upload key certificate** SHA-1 while you're here — used below.)*
-- [ ] **Apply it:** Google Cloud Console → **APIs & Services → Credentials** → open the key
-      behind `GOOGLE_MAPS_API_KEY_RELEASE`:
-  - **Application restrictions** = **Android apps**
-  - **API restrictions** = **Maps SDK for Android**
-  - **Add** row: package name `com.g88` + the **App signing** SHA-1.
-  - **Add a second** row: package `com.g88` + the **Upload key** SHA-1 (so a sideloaded
-    upload-signed AAB also renders the map).
-  - **Save** (can take a few minutes to propagate).
-- [ ] Leave `GOOGLE_MAPS_API_KEY_DEBUG` alone — it's the separate local/emulator key.
+## 3. Configure Play App Signing + closed testing
 
-## 5. Upload the first AAB (must be manual)
-The signed AAB is already built by CI; the Play API can't create the app or seed an empty
-track, so the **first** release is by hand.
-- [ ] **GitHub → Actions → "Android Release (AAB)" → Run workflow** to produce a fresh build
-      (or reuse an existing run). Download the **`g88-release-aab`** artifact.
-- [ ] Play Console → **Closed testing → your track → Create new release**.
-- [ ] **Upload** the `.aab`.
-- [ ] **Release notes:** paste from `docs/play-release-notes.md`.
-- [ ] **Save → Review release → Start rollout to Closed testing.**
+- [ ] **Test and release → Testing → Closed testing → Create track** (for example `beta`).
+- [ ] **Testers** → add the approved Google Group or email list → save.
+- [ ] Confirm **Play App Signing** is enabled.
+- [ ] Record both certificates shown under **App integrity**:
+  - App signing key certificate.
+  - Upload key certificate.
 
-## 6. Complete the store listing + Data Safety (required to go live)
-From `docs/play-store-listing.md`:
-- [ ] **Store presence → Main store listing:** app name, **short description**, **full
-      description**, **app icon**, **feature graphic**, phone **screenshots**.
-- [ ] **Policy → App content → Privacy policy:** paste `https://g88-legal.onrender.com/privacy`.
-- [ ] **Policy → App content → Data safety:** answer per `play-store-listing.md`. Key points:
-  - Collects **Location (approximate)** — note: fuzzed to ~120 m server-side (`ARCHITECTURE.md §3.3`).
-  - Collects **account info** (email/name).
-  - Data **encrypted in transit**: Yes.
-  - **Users can request deletion:** **Yes — in-app** (Settings → Delete account, `DELETE /users/me`).
-- [ ] Finish the rest of **App content** (ads = No, content rating questionnaire, target
-      audience, news = No, data safety **Submit**).
+## 4. Maps SHA-1 — required for real Play installs
 
-## 7. Ship to testers
-- [ ] Once the release is reviewed/approved, copy the **closed-testing opt-in URL**
-      (Closed testing track → Testers → "Copy link") and send it to testers.
-- [ ] **Smoke test on a real device:** install from the link, sign in, open the **map**
-      (confirms step 4), send a wave, open Marketplace.
+Play re-signs distributed builds with the **App signing key**, so the certificate on a tester device is not the upload/debug certificate.
+
+- [ ] Play Console → NEXA → **Test and release → Setup → App integrity → App signing** → copy the **App signing SHA-1**.
+- [ ] Also copy the **Upload key SHA-1** for sideload/release-build diagnostics.
+- [ ] Google Cloud Console → **APIs & Services → Credentials** → `GOOGLE_MAPS_API_KEY_RELEASE`:
+  - Application restrictions = **Android apps**.
+  - API restrictions = **Maps SDK for Android**.
+  - Add package `com.g88` + **App signing SHA-1**.
+  - Add package `com.g88` + **Upload key SHA-1** when sideloaded release builds also need Maps.
+- [ ] Keep the debug key separate.
+
+A grey/blank map on Play-installed builds is a release blocker until this restriction is correct.
+
+## 5. Build and upload the first AAB
+
+- [ ] GitHub Actions → **Android Release (AAB)** → produce a fresh release candidate.
+- [ ] Download the `g88-release-aab` artifact. The artifact name is a technical compatibility name; the public app remains NEXA.
+- [ ] Play Console → **Closed testing → track → Create new release**.
+- [ ] Upload the `.aab`.
+- [ ] Paste release notes from `docs/play-release-notes.md`.
+- [ ] Review the resolved package/version/signing details before rollout.
+- [ ] Roll out only to the intended closed-testing track.
+
+## 6. Store listing + policy declarations
+
+- [ ] **Main store listing** uses **NEXA** everywhere: app name, descriptions, icon, feature graphic and screenshots.
+- [ ] Screenshots show the current Map / Discover / Pulse / Connections / You UI and final NEXA entity grammar.
+- [ ] **Privacy policy** points to `https://g88-legal.onrender.com/privacy`; public page content must be NEXA-branded even though the infrastructure hostname is legacy.
+- [ ] Complete **Data Safety** from the release build and actual architecture, not from branding assumptions. Confirm at minimum the real handling of:
+  - location;
+  - account/profile information;
+  - photos/video and verification uploads where enabled;
+  - messages/interactions;
+  - diagnostics/analytics;
+  - deletion behavior.
+- [ ] Confirm data-in-transit encryption declarations against production configuration.
+- [ ] Confirm account deletion is described consistently with the in-app delete flow.
+- [ ] Complete content rating, target audience, app access and any other Play declarations truthfully.
+
+## 7. NEXA legal gate — production only
+
+Closed testing may proceed while Terms are under review, but production must remain **NO-GO** until all items below pass:
+
+- [ ] #592 is resolved with legal-reviewed Terms content for the actual NEXA feature set.
+- [ ] Dedicated public Terms URL is live (preferred compatibility path: `https://g88-legal.onrender.com/terms`).
+- [ ] Terms page title/header/footer visibly use **NEXA**.
+- [ ] `TERMS_OF_SERVICE_URL` resolves to `/terms`, not `/privacy`.
+- [ ] Auth, Settings, Help and About open the dedicated Terms page.
+- [ ] Privacy and Terms are separate documents.
+- [ ] A non-authenticated browser can load both public URLs.
+
+Do not ship production with a control labeled **Terms of Service** that opens Privacy Policy content.
+
+## 8. Ship to closed testers
+
+- [ ] Copy the closed-testing opt-in URL from the configured track.
+- [ ] Install from Play on a real Android device.
+- [ ] Confirm Maps renders with the Play app-signing certificate.
+- [ ] Run the exact release candidate through issue #580.
+- [ ] Smoke-test sign-in, map discovery, entity sheets, Connections, Marketplace and account settings.
+- [ ] Record device/Android version and the exact release versionCode used for sign-off.
+
+## 9. Physical-device NEXA sign-off
+
+The exact candidate must verify:
+
+- native dark launch → NEXA launch animation → spatial handoff with no white flash or stale artwork;
+- logged-out and incomplete-profile launch paths do **not** show the map halo;
+- Reduced Motion behavior;
+- final entity identity: person=circle, event=four-point star, listing=square, opportunity/other=diamond;
+- Map / Discover / Pulse / Connections / You navigation;
+- light / dark / system / PROTOS NEXUS theme behavior;
+- no visible legacy `G88` product branding;
+- no public numeric trust/popularity score or trust-booster language;
+- privacy-safe map presence and no exact-coordinate exposure;
+- TalkBack, larger text and 44dp interaction targets.
+
+## 10. Optional automation after the first manual release
+
+If Play/API publishing is enabled later:
+
+- [ ] Create a dedicated Play publishing service account with minimum required access.
+- [ ] Grant only the target app/release permissions needed for the chosen workflow.
+- [ ] Store the service-account credential in the configured GitHub secret.
+- [ ] Validate automation first against a testing track; do not grant broader production rights than needed.
 
 ---
 
-## After first upload — enable auto-publish (optional)
-Lets future `android-release.yml` runs push to Play automatically.
-- [ ] Google Cloud Console (Play-linked project) → create a **service account** (no GCP roles) → **JSON key**.
-- [ ] Play Console → **Users and permissions → Invite new user** → add the service-account
-      email → grant app access to `com.g88` with **Release → Manage testing track releases**.
-- [ ] `gh secret set PLAY_SERVICE_ACCOUNT_JSON < service-account.json` — the publish step then
-      activates automatically on the next run.
+## Production go / no-go
 
----
+Production is **GO** only when all of the following are true:
 
-## Non-blocking (do later, not gating beta)
-- [ ] On-device check of the **P3.7 Marketplace listing thumbnail** (couldn't capture on the
-      emulator — verify on a real device; feature is API-verified).
-- [ ] Live-verify **Twilio OTP** and **Stripe** checkout→webhook (still test mode).
-- [ ] iOS/TestFlight — deferred (no `ios/` native project; needs macOS).
+- [ ] exact release candidate passes #580 on a physical Android device;
+- [ ] #592 dedicated Terms requirement is resolved;
+- [ ] Privacy/Terms/Data Safety/store copy match actual production behavior;
+- [ ] Play App Signing + Maps restrictions are verified on a Play-installed build;
+- [ ] no P0/P1 product, privacy, trust, abuse-prevention or release regressions remain.
 
-## Common gotchas
-- **Grey map for testers** → step 4 SHA-1 missing/wrong, or not propagated. `adb logcat | grep -i Authorization`
-  on the device echoes the SHA-1 + `com.g88` it presented — compare to the key's restriction.
-- **"Upload key" vs "App signing key"** — the upload key (our keystore) is what *you* sign with;
-  Google's App signing key is what *ships*. Maps must trust the App signing SHA-1 above all.
-- **Lost upload key** → recoverable via Play upload-key reset; **never** lose access to the
-  Play account itself.
+Technical identifiers such as `com.g88`, `@g88/*`, storage keys, signing certificate OU and the `g88-legal` hostname are compatibility/infrastructure identifiers. They must not be mechanically renamed as part of the NEXA visual/release migration.
