@@ -11,6 +11,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import BootSplash from 'react-native-bootsplash';
 
 import { NexaSymbol } from './NexaSymbol';
+import { NEXA_LAUNCH_TIMING_MS } from './nexaLaunchTiming';
 import { resolveLaunchReduceMotion } from './resolveLaunchReduceMotion';
 
 const SPLASH_BACKGROUND = '#08090D';
@@ -26,12 +27,12 @@ export interface NexaLaunchOverlayProps {
 }
 
 /**
- * NEXA v3 launch sequence.
+ * NEXA v4 launch sequence.
  *
  * Native launch is intentionally only the dark canvas. Once RN has mounted,
- * the eye core ignites, the entity orbit refills with light, NEXA's entity
- * glyphs resolve on the orbit, and the wordmark fades in. When boot-time auth
- * restoration is complete, the system dissolves into the already-mounted app.
+ * three rays ignite first, the eye core materializes through that light, the
+ * entity orbit refills, and the wordmark resolves last. Boot-time auth restore
+ * controls only the final dissolve into the already-mounted application.
  */
 export function NexaLaunchOverlay({
   ready,
@@ -48,23 +49,23 @@ export function NexaLaunchOverlay({
 
   const [backdropOpacity] = useState(() => new Animated.Value(1));
   const [brandOpacity] = useState(() => new Animated.Value(0));
-  const [brandScale] = useState(() => new Animated.Value(0.82));
-  const [brandTranslateY] = useState(() => new Animated.Value(8));
+  const [brandScale] = useState(() => new Animated.Value(0.9));
+  const [brandTranslateY] = useState(() => new Animated.Value(4));
   const [wordmarkOpacity] = useState(() => new Animated.Value(0));
-  const [wordmarkTranslateY] = useState(() => new Animated.Value(8));
+  const [wordmarkTranslateY] = useState(() => new Animated.Value(4));
 
   const [orbitOpacity] = useState(() => new Animated.Value(0));
-  const [orbitScale] = useState(() => new Animated.Value(0.72));
+  const [orbitScale] = useState(() => new Animated.Value(0.78));
   const [orbitRotation] = useState(() => new Animated.Value(0));
   const [entitiesOpacity] = useState(() => new Animated.Value(0));
-  const [entitiesScale] = useState(() => new Animated.Value(0.68));
+  const [entitiesScale] = useState(() => new Animated.Value(0.78));
 
   const [rayOpacity] = useState(() => new Animated.Value(0));
-  const [rayScale] = useState(() => new Animated.Value(0.12));
+  const [rayScale] = useState(() => new Animated.Value(0.02));
   const [streakOpacity] = useState(() => new Animated.Value(0));
   const [streakSweep] = useState(() => new Animated.Value(0));
   const [flashOpacity] = useState(() => new Animated.Value(0));
-  const [flashScale] = useState(() => new Animated.Value(0.72));
+  const [flashScale] = useState(() => new Animated.Value(0.78));
 
   useEffect(() => {
     let active = true;
@@ -157,106 +158,115 @@ export function NexaLaunchOverlay({
     ]);
 
     const fullMotionAnimation = Animated.parallel([
-      Animated.timing(brandOpacity, {
-        toValue: 1,
-        duration: 340,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(brandScale, {
-        toValue: 1,
-        duration: 720,
-        easing: Easing.out(Easing.back(1.1)),
-        useNativeDriver: true,
-      }),
-      Animated.timing(brandTranslateY, {
-        toValue: 0,
-        duration: 620,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
       Animated.sequence([
-        Animated.delay(110),
+        Animated.delay(NEXA_LAUNCH_TIMING_MS.eyeRevealDelay),
+        Animated.timing(brandOpacity, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.sequence([
+        Animated.delay(NEXA_LAUNCH_TIMING_MS.eyeRevealDelay),
+        Animated.timing(brandScale, {
+          toValue: 1,
+          duration: 520,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.sequence([
+        Animated.delay(NEXA_LAUNCH_TIMING_MS.eyeRevealDelay),
+        Animated.timing(brandTranslateY, {
+          toValue: 0,
+          duration: 480,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.sequence([
+        Animated.delay(NEXA_LAUNCH_TIMING_MS.orbitRevealDelay),
         Animated.parallel([
           Animated.timing(orbitOpacity, {
             toValue: 0.88,
-            duration: 440,
+            duration: 420,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
           }),
           Animated.timing(orbitScale, {
             toValue: 1,
-            duration: 640,
-            easing: Easing.out(Easing.back(1.04)),
+            duration: 600,
+            easing: Easing.out(Easing.back(1.02)),
             useNativeDriver: true,
           }),
           Animated.timing(orbitRotation, {
             toValue: 1,
-            duration: 880,
+            duration: 820,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
           }),
         ]),
       ]),
       Animated.sequence([
-        Animated.delay(250),
+        Animated.delay(NEXA_LAUNCH_TIMING_MS.entityRevealDelay),
         Animated.parallel([
           Animated.timing(entitiesOpacity, {
             toValue: 1,
-            duration: 290,
+            duration: 260,
             easing: Easing.out(Easing.quad),
             useNativeDriver: true,
           }),
           Animated.timing(entitiesScale, {
             toValue: 1,
-            duration: 420,
-            easing: Easing.out(Easing.back(1.35)),
+            duration: 360,
+            easing: Easing.out(Easing.back(1.18)),
             useNativeDriver: true,
           }),
         ]),
       ]),
       Animated.sequence([
-        Animated.delay(70),
+        Animated.delay(NEXA_LAUNCH_TIMING_MS.rayIgnitionDelay),
         Animated.parallel([
           Animated.timing(rayOpacity, {
-            toValue: 0.9,
-            duration: 90,
+            toValue: 1,
+            duration: 60,
             easing: Easing.out(Easing.quad),
             useNativeDriver: true,
           }),
           Animated.timing(rayScale, {
             toValue: 1,
-            duration: 420,
+            duration: 330,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
           }),
         ]),
         Animated.timing(rayOpacity, {
           toValue: 0,
-          duration: 430,
+          duration: 320,
           easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
       ]),
       Animated.sequence([
-        Animated.delay(120),
+        Animated.delay(NEXA_LAUNCH_TIMING_MS.streakRevealDelay),
         Animated.timing(streakOpacity, {
           toValue: 1,
-          duration: 70,
+          duration: 50,
           useNativeDriver: true,
         }),
         Animated.parallel([
           Animated.timing(streakSweep, {
             toValue: 1,
-            duration: 660,
+            duration: 540,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
           }),
           Animated.sequence([
-            Animated.delay(430),
+            Animated.delay(340),
             Animated.timing(streakOpacity, {
               toValue: 0,
-              duration: 220,
+              duration: 180,
               easing: Easing.out(Easing.quad),
               useNativeDriver: true,
             }),
@@ -264,40 +274,40 @@ export function NexaLaunchOverlay({
         ]),
       ]),
       Animated.sequence([
-        Animated.delay(210),
+        Animated.delay(NEXA_LAUNCH_TIMING_MS.flashRevealDelay),
         Animated.parallel([
           Animated.timing(flashOpacity, {
-            toValue: 0.62,
-            duration: 120,
+            toValue: 0.68,
+            duration: 110,
             easing: Easing.out(Easing.quad),
             useNativeDriver: true,
           }),
           Animated.timing(flashScale, {
-            toValue: 1.08,
-            duration: 260,
+            toValue: 1.06,
+            duration: 240,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
           }),
         ]),
         Animated.timing(flashOpacity, {
           toValue: 0,
-          duration: 420,
+          duration: 360,
           easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
       ]),
       Animated.sequence([
-        Animated.delay(610),
+        Animated.delay(NEXA_LAUNCH_TIMING_MS.wordmarkRevealDelay),
         Animated.parallel([
           Animated.timing(wordmarkOpacity, {
             toValue: 1,
-            duration: 360,
+            duration: 320,
             easing: Easing.out(Easing.quad),
             useNativeDriver: true,
           }),
           Animated.timing(wordmarkTranslateY, {
             toValue: 0,
-            duration: 360,
+            duration: 320,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
           }),
