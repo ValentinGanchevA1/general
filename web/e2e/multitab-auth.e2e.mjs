@@ -1,12 +1,57 @@
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { mkdtemp, rm } from 'node:fs/promises';
 import { build } from 'esbuild';
+
+class CdpClient {
+  constructor(socket) {
+    this.socket = socket;
+    this.nextId = 0;
+    this.pending = new Map();
+
+    socket.addEventListener('message', (event) => {
+      const message = JSON.parse(String(event.data));
+      if (typeof message.id !== 'number') return;
+      const pending = this.pending.get(message.id);
+      if (!pending) return;
+      this.pending.delete(message.id);
+      if (message.error) pending.reject(new Error(message.error.message ?? 'CDP command failed'));
+      else pending.resolve(message.result ?? {});
+    });
+
+    socket.addEventListener('close', () => {
+      for (const pending of this.pending.values()) pending.reject(new Error('CDP socket closed'));
+      this.pending.clear();
+    });
+  }
+
+  static async connect(url) {
+    const socket = new WebSocket(url);
+    await new Promise((resolve, reject) => {
+      socket.addEventListener('open', resolve, { once: true });
+      socket.addEventListener('error', reject, { once: true });
+    });
+    return new CdpClient(socket);
+  }
+
+  send(method, params = {}, sessionId) {
+    const id = ++this.nextId;
+    const message = { id, method, params };
+    if (sessionId) message.sessionId = sessionId;
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve, reject });
+      this.socket.send(JSON.stringify(message));
+    });
+  }
+
+  close() {
+    this.socket.close();
+  }
+}
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const fixtureHtml = await readFile(join(here, 'session-fixture.html'), 'utf8');
@@ -98,7 +143,10 @@ try {
     evaluate(cdp, tabB, 'window.nexaE2E.rotateUnlocked()'),
   ]);
   const unlockedStatuses = unlocked.map((item) => item.status).sort((a, b) => a - b);
-  assert(JSON.stringify(unlockedStatuses) === JSON.stringify([200, 409]), `unlocked control did not reproduce replay race: ${JSON.stringify(unlocked)}`);
+  assert(
+    JSON.stringify(unlockedStatuses) === JSON.stringify([200, 409]),
+    `unlocked control did not reproduce replay race: ${JSON.stringify(unlocked)}`,
+  );
   const unlockedStats = await readStats();
   assert(unlockedStats.replayCount === 1, `expected one replay in control, got ${unlockedStats.replayCount}`);
 
@@ -130,9 +178,15 @@ try {
 
   await cdp.send('Page.reload', { ignoreCache: true }, tabB);
   await waitFor(
-    async () => (await evaluate(cdp, tabB, 'typeof window.nexaE2E === \'object\'')) === true,
+    async () => (
+      await evaluate(
+        cdp,
+        tabB,
+        "typeof window.nexaE2E === 'object' && sessionStorage.getItem('nexa.web.auth.remote-reload') === null",
+      )
+    ) === true,
     3_000,
-    'tab B reload',
+    'tab B reload and marker consumption',
   );
 
   await evaluate(cdp, tabB, 'window.nexaE2E.broadcast()');
@@ -150,9 +204,7 @@ try {
 
   console.log('NEXA multitab auth E2E passed: replay control, Web Lock serialization, HttpOnly cookie, BroadcastChannel propagation.');
 } catch (error) {
-  if (chrome.exitCode != null && chromeErrors) {
-    console.error(chromeErrors);
-  }
+  if (chrome.exitCode != null && chromeErrors) console.error(chromeErrors);
   throw error;
 } finally {
   cdp?.close();
@@ -268,7 +320,7 @@ async function createTab(cdpClient, url) {
   await cdpClient.send('Runtime.enable', {}, sessionId);
   await cdpClient.send('Page.enable', {}, sessionId);
   await waitFor(
-    async () => (await evaluate(cdpClient, sessionId, 'typeof window.nexaE2E === \'object\'')) === true,
+    async () => (await evaluate(cdpClient, sessionId, "typeof window.nexaE2E === 'object'")) === true,
     3_000,
     'fixture initialization',
   );
@@ -286,50 +338,6 @@ async function evaluate(cdpClient, sessionId, expression) {
     throw new Error(`browser evaluation failed: ${description}`);
   }
   return response.result?.value;
-}
-
-class CdpClient {
-  constructor(socket) {
-    this.socket = socket;
-    this.nextId = 0;
-    this.pending = new Map();
-    socket.addEventListener('message', (event) => {
-      const message = JSON.parse(String(event.data));
-      if (typeof message.id !== 'number') return;
-      const pending = this.pending.get(message.id);
-      if (!pending) return;
-      this.pending.delete(message.id);
-      if (message.error) pending.reject(new Error(message.error.message ?? 'CDP command failed'));
-      else pending.resolve(message.result ?? {});
-    });
-    socket.addEventListener('close', () => {
-      for (const pending of this.pending.values()) pending.reject(new Error('CDP socket closed'));
-      this.pending.clear();
-    });
-  }
-
-  static async connect(url) {
-    const socket = new WebSocket(url);
-    await new Promise((resolve, reject) => {
-      socket.addEventListener('open', resolve, { once: true });
-      socket.addEventListener('error', reject, { once: true });
-    });
-    return new CdpClient(socket);
-  }
-
-  send(method, params = {}, sessionId) {
-    const id = ++this.nextId;
-    const message = { id, method, params };
-    if (sessionId) message.sessionId = sessionId;
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.socket.send(JSON.stringify(message));
-    });
-  }
-
-  close() {
-    this.socket.close();
-  }
 }
 
 async function waitFor(task, timeoutMs, label) {
