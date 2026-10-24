@@ -1,4 +1,4 @@
-# NEXA Map Chrome v2
+# NEXA Map Chrome v3
 
 ## Purpose
 
@@ -21,8 +21,9 @@ Supporting weather/trending/challenge/nudge content starts below this stack thro
 - Search / location recovery → **Discovery cyan**
 - Filters / ranking / people actions → **Action violet**
 - People layer → **Violet circle semantics**
-- Events layer → **Cyan diamond semantics**
-- Listings layer → **Neutral semantics**
+- Events layer → **Cyan four-point star semantics**
+- Listings layer → **Neutral square semantics**
+- Opportunity / other → **Violet diamond semantics** when that entity family enters the shared discovery contract
 
 No legacy pink/orange/green category colors should be introduced into map chrome.
 
@@ -68,6 +69,5 @@ This iteration does not:
 - change discovery API DTOs
 - change PostGIS/H3 clustering
 - add server-side text search
-- change map marker geometry
 - add new navigation destinations
 - request location permission from the chrome itself beyond the existing recovery flow
