@@ -20,7 +20,12 @@ import { ThemeProvider, useAppTheme, type ProtosNexusEntitlement } from '@/theme
 import { useAppSelector } from '@/hooks/redux';
 import { NexaLaunchOverlay } from '@/components/Brand/NexaLaunchOverlay';
 import { NexaSpatialMapHandoff } from '@/components/Brand/NexaSpatialMapHandoff';
+import { NexaLaunchSurfaceProvider } from '@/components/Brand/NexaLaunchSurfaceContext';
 import { shouldRunNexaSpatialHandoff } from '@/components/Brand/nexaLaunchDestination';
+import {
+  NEXA_MAP_SURFACE_READY_FAIL_OPEN_MS,
+  resolveNexaLaunchReady,
+} from '@/components/Brand/nexaLaunchReadiness';
 
 Sentry.init({
   dsn: Config.SENTRY_DSN,
@@ -45,15 +50,41 @@ function AppShell(): React.JSX.Element {
   );
   const { colors, scheme } = useAppTheme();
   const [showSpatialHandoff, setShowSpatialHandoff] = React.useState(false);
+  const [mapSurfaceReady, setMapSurfaceReady] = React.useState(false);
+  const [mapSurfaceWaitExpired, setMapSurfaceWaitExpired] = React.useState(false);
 
-  const handleLaunchHidden = React.useCallback((): void => {
-    setShowSpatialHandoff(
+  const requiresMapSurface = React.useMemo(
+    () =>
       shouldRunNexaSpatialHandoff({
         authenticated: user != null,
         profileSetupComplete,
       }),
+    [profileSetupComplete, user],
+  );
+
+  React.useEffect(() => {
+    if (restoring || !requiresMapSurface || mapSurfaceReady) return;
+    const timer = setTimeout(
+      () => setMapSurfaceWaitExpired(true),
+      NEXA_MAP_SURFACE_READY_FAIL_OPEN_MS,
     );
-  }, [profileSetupComplete, user]);
+    return () => clearTimeout(timer);
+  }, [mapSurfaceReady, requiresMapSurface, restoring]);
+
+  const launchReady = resolveNexaLaunchReady({
+    restoring,
+    requiresMapSurface,
+    mapSurfaceReady,
+    mapSurfaceWaitExpired,
+  });
+
+  const handleMapSurfaceReady = React.useCallback((): void => {
+    setMapSurfaceReady(true);
+  }, []);
+
+  const handleLaunchHidden = React.useCallback((): void => {
+    setShowSpatialHandoff(requiresMapSurface);
+  }, [requiresMapSurface]);
 
   const handleSpatialHandoffComplete = React.useCallback((): void => {
     setShowSpatialHandoff(false);
@@ -65,8 +96,10 @@ function AppShell(): React.JSX.Element {
         barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={colors.bg}
       />
-      <AppNavigator />
-      <NexaLaunchOverlay ready={!restoring} onHidden={handleLaunchHidden} />
+      <NexaLaunchSurfaceProvider onMapSurfaceReady={handleMapSurfaceReady}>
+        <AppNavigator />
+      </NexaLaunchSurfaceProvider>
+      <NexaLaunchOverlay ready={launchReady} onHidden={handleLaunchHidden} />
       {showSpatialHandoff ? (
         <NexaSpatialMapHandoff onComplete={handleSpatialHandoffComplete} />
       ) : null}
