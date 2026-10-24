@@ -1,7 +1,7 @@
 import type { ClusterPoint, EntityKind } from '@g88/shared';
 
 export type NexaClusterMode = EntityKind | 'mixed';
-export type NexaClusterShape = 'circle' | 'diamond' | 'square';
+export type NexaClusterShape = 'circle' | 'star' | 'square';
 
 export interface NexaClusterComposition {
   mode: NexaClusterMode;
@@ -94,7 +94,7 @@ export function resolveNexaClusterVisual(point: ClusterPoint): NexaClusterVisual
   const composition = resolveNexaClusterComposition(point.by);
   const shape: NexaClusterShape =
     composition.mode === 'event'
-      ? 'diamond'
+      ? 'star'
       : composition.mode === 'listing'
         ? 'square'
         : 'circle';

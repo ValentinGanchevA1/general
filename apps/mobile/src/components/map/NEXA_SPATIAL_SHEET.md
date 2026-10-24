@@ -1,4 +1,4 @@
-# NEXA Bottom Sheet Identity v2
+# NEXA Bottom Sheet Identity v3
 
 The map is the product. Entity sheets are the spatial continuation of a selected map marker, not generic modal cards.
 
@@ -7,11 +7,11 @@ The map is the product. Entity sheets are the spatial continuation of a selected
 | Entity | Geometry | Semantic color | Primary intent |
 | --- | --- | --- | --- |
 | Person | Circle | Violet | Connect / interact |
-| Event | Diamond | Cyan | Join / participate |
+| Event | Four-point star | Cyan | Join / participate |
 | Listing | Square | Neutral | View / negotiate |
-| Opportunity | Four-point star | Violet with cyan discovery edge | Explore / act |
+| Opportunity / other | Diamond | Violet / opportunity | Explore / act |
 
-The same geometry must remain recognizable across Map, Discover, Pulse, Search, notifications, and sheets.
+The same geometry must remain recognizable across splash, Map, Discover, Pulse, Search, notifications, and sheets.
 
 ## Sheet anatomy
 

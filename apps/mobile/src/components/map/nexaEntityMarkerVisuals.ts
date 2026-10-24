@@ -17,7 +17,7 @@ export const NEXA_ENTITY_TYPES = [
 
 export type NexaEntityType = (typeof NEXA_ENTITY_TYPES)[number];
 
-export type NexaEntityShape = 'circle' | 'diamond' | 'square' | 'star';
+export type NexaEntityShape = 'circle' | 'star' | 'square' | 'diamond';
 
 export interface NexaMarkerState {
   selected?: boolean;
@@ -45,9 +45,9 @@ export interface NexaMarkerVisualContract {
 
 const SHAPE_BY_TYPE: Record<NexaEntityType, NexaEntityShape> = {
   person: 'circle',
-  event: 'diamond',
+  event: 'star',
   listing: 'square',
-  opportunity: 'star',
+  opportunity: 'diamond',
 };
 
 export function resolveNexaMarkerVisual(

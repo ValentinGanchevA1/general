@@ -105,15 +105,11 @@ export function NexaSpatialSheetGlyph({
               height: diamondSide,
               borderRadius: Math.max(3, Math.round(diamondSide * 0.15)),
               borderColor: tone,
-              backgroundColor: colors.discoverySoft,
+              backgroundColor: colors.actionSoft,
               transform: [{ rotate: '45deg' }],
             },
           ]}
-        >
-          <View style={styles.diamondIcon}>
-            <Icon name="calendar-blank-outline" size={14} color={tone} />
-          </View>
-        </View>
+        />
       </View>
     );
   }
@@ -371,9 +367,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  diamondIcon: {
-    transform: [{ rotate: '-45deg' }],
   },
   starInner: {
     position: 'absolute',

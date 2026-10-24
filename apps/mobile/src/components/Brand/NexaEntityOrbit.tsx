@@ -15,7 +15,7 @@ export interface NexaEntityOrbitProps {
  *
  * The compact identity remains NexaSymbol. This composition adds the canonical
  * entity vocabulary around it: person (circle), event (star), listing (square)
- * and place/local signal (pin). Keep this out of tiny placements where the
+ * and opportunity/other (diamond). Keep this out of tiny placements where the
  * orbit would lose legibility.
  */
 export function NexaEntityOrbit({ size = 180 }: NexaEntityOrbitProps): React.JSX.Element {
@@ -24,6 +24,7 @@ export function NexaEntityOrbit({ size = 180 }: NexaEntityOrbitProps): React.JSX
   const markerBox = Math.max(24, Math.round(size * 0.16));
   const personSize = Math.max(13, Math.round(size * 0.09));
   const squareSize = Math.max(14, Math.round(size * 0.095));
+  const diamondSize = Math.max(13, Math.round(size * 0.088));
   const iconSize = Math.max(16, Math.round(size * 0.12));
   const symbolSize = Math.round(size * 0.36);
 
@@ -145,7 +146,17 @@ export function NexaEntityOrbit({ size = 180 }: NexaEntityOrbitProps): React.JSX
           },
         ]}
       >
-        <Icon name="map-marker-outline" size={iconSize + 2} color={colors.entityOpportunity} />
+        <View
+          style={[
+            styles.diamond,
+            {
+              width: diamondSize,
+              height: diamondSize,
+              borderColor: colors.entityOpportunity,
+              backgroundColor: colors.actionSoft,
+            },
+          ]}
+        />
       </View>
     </View>
   );
@@ -177,5 +188,10 @@ const styles = StyleSheet.create({
   listing: {
     borderWidth: 2,
     borderRadius: 3,
+  },
+  diamond: {
+    borderWidth: 2,
+    borderRadius: 3,
+    transform: [{ rotate: '45deg' }],
   },
 });

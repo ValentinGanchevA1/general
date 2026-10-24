@@ -2,7 +2,7 @@ import type { EntityKind } from '@g88/shared';
 
 export type NexaSpatialSheetKind = 'person' | 'event' | 'listing' | 'opportunity';
 
-export type NexaSpatialSheetShape = 'circle' | 'diamond' | 'square' | 'star';
+export type NexaSpatialSheetShape = 'circle' | 'star' | 'square' | 'diamond';
 
 export interface NexaSpatialSheetVisual {
   kind: NexaSpatialSheetKind;
@@ -23,7 +23,7 @@ const VISUALS: Record<NexaSpatialSheetKind, NexaSpatialSheetVisual> = {
   event: {
     kind: 'event',
     label: 'Event',
-    shape: 'diamond',
+    shape: 'star',
     tone: 'discovery',
     defaultPrimaryLabel: 'Join',
   },
@@ -37,7 +37,7 @@ const VISUALS: Record<NexaSpatialSheetKind, NexaSpatialSheetVisual> = {
   opportunity: {
     kind: 'opportunity',
     label: 'Opportunity',
-    shape: 'star',
+    shape: 'diamond',
     tone: 'opportunity',
     defaultPrimaryLabel: 'Explore',
   },

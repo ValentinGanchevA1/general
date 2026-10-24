@@ -41,7 +41,7 @@ describe('NEXA cluster visual grammar', () => {
     );
 
     expect(visual.mode).toBe('event');
-    expect(visual.shape).toBe('diamond');
+    expect(visual.shape).toBe('star');
   });
 
   it('uses listing geometry when listings are clearly dominant', () => {
