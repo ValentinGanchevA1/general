@@ -75,3 +75,8 @@ jobs:
           curl --fail --silent http://127.0.0.1:4180/healthz | grep '"ok":true'
           curl --fail --silent http://127.0.0.1:4180/ | grep 'NEXA'
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' --request-target 'https://evil.example/api/v1/auth/me' http://127.0.0.1:4180/)" = '400'
+
+      - name: E2E multitab auth coordination
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: node web/e2e/multitab-auth.e2e.mjs
