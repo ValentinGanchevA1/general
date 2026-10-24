@@ -10,11 +10,11 @@ describe('NEXA entity marker visual contract', () => {
     expect(NEXA_MARKER_TOUCH_SIZE).toBe(44);
   });
 
-  it('maps entity types to canonical geometry', () => {
+  it('maps entity types to the final canonical geometry', () => {
     expect(resolveNexaMarkerVisual('person').shape).toBe('circle');
-    expect(resolveNexaMarkerVisual('event').shape).toBe('diamond');
+    expect(resolveNexaMarkerVisual('event').shape).toBe('star');
     expect(resolveNexaMarkerVisual('listing').shape).toBe('square');
-    expect(resolveNexaMarkerVisual('opportunity').shape).toBe('star');
+    expect(resolveNexaMarkerVisual('opportunity').shape).toBe('diamond');
   });
 
   it('uses 18/24/32dp visual sizes and selected overrides density', () => {
