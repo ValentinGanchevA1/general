@@ -12,7 +12,10 @@ export const SUPPORT_EMAIL = 'vganchev6@gmail.com';
  *  used by the Play store listing + Data Safety form. */
 export const PRIVACY_POLICY_URL = 'https://g88-legal.onrender.com/privacy';
 
-/** Terms of Service. Dedicated /terms page not published yet — reuse privacy
- *  host until a real ToS document is live. AuthScreen still labels the link
- *  "Terms of Service" for store-compliance wording. */
+/**
+ * Temporary closed-testing compatibility only: no dedicated Terms document is
+ * published yet, so this still resolves to Privacy. Production is NO-GO until
+ * issue #592 publishes reviewed NEXA Terms at a separate URL and this constant
+ * is updated to that document.
+ */
 export const TERMS_OF_SERVICE_URL = 'https://g88-legal.onrender.com/privacy';
