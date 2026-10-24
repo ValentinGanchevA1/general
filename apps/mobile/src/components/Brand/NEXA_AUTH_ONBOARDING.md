@@ -1,4 +1,4 @@
-# NEXA Auth + Onboarding v2
+# NEXA Auth + Onboarding v3
 
 ## Product intent
 
@@ -28,13 +28,17 @@ The sequence communicates:
 
 `NexaDiscoveryHero` is decorative and contains no real user/location data.
 
-It reuses the NEXA visual grammar:
+It renders the reusable `NexaEntityOrbit`, which is the expanded NEXA ecosystem mark for hero-sized surfaces. The compact app identity remains `NexaSymbol`.
 
-- person: violet circle
-- event: cyan diamond
-- listing: neutral square
-- opportunity: four-point star
-- cyan discovery ring + violet action ring
+Canonical entity vocabulary:
+
+- person: circle
+- event: four-point star
+- listing: square
+- place / local signal: map pin
+- two elliptical discovery/action orbit paths around the final eye core
+
+The same circle / star / square / pin vocabulary is used by the animated launch composition so first-run product identity does not switch visual languages after splash.
 
 The component is intentionally non-interactive and hidden from the accessibility tree.
 
@@ -71,6 +75,12 @@ The UI does not expose a public numeric trust score and does not imply precise c
 Touched auth/onboarding UI uses `useAppTheme().colors` semantic tokens.
 
 `FormField` is theme-aware so auth/onboarding fields remain consistent in dark and light modes.
+
+## Brand surface contract
+
+- `NexaSymbol`: compact eye/discovery core for launcher, notification, small navigation/system surfaces.
+- `BrandLogo`: canonical eye + NEXA wordmark lockup.
+- `NexaEntityOrbit`: expanded ecosystem composition for splash and large hero surfaces only.
 
 ## Non-goals
 
