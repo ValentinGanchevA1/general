@@ -605,12 +605,9 @@ export function NexaLaunchOverlay({
                   <View style={styles.entitySquare} />
                 </View>
 
-                <View style={[styles.entitySlot, styles.entityPinSlot]}>
-                  <View style={styles.pinGlow} />
-                  <View style={styles.pinHead}>
-                    <View style={styles.pinHole} />
-                  </View>
-                  <View style={styles.pinTail} />
+                <View style={[styles.entitySlot, styles.entityDiamondSlot]}>
+                  <View style={styles.entityDiamondGlow} />
+                  <View style={styles.entityDiamond} />
                 </View>
               </Animated.View>
             </Animated.View>
@@ -774,7 +771,7 @@ const styles = StyleSheet.create({
     right: 56,
     bottom: 26,
   },
-  entityPinSlot: {
+  entityDiamondSlot: {
     left: 34,
     bottom: 22,
   },
@@ -842,47 +839,27 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     elevation: 7,
   },
-  pinGlow: {
+  entityDiamondGlow: {
     position: 'absolute',
-    width: 28,
-    height: 34,
-    borderRadius: 14,
-    backgroundColor: 'rgba(124, 92, 252, 0.11)',
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: 'rgba(124, 92, 252, 0.12)',
+    transform: [{ rotateZ: '45deg' }],
   },
-  pinHead: {
-    position: 'absolute',
-    top: 3,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+  entityDiamond: {
+    width: 18,
+    height: 18,
+    borderRadius: 3,
     borderWidth: 2,
     borderColor: SYMBOL_CORE,
     backgroundColor: 'rgba(8, 9, 13, 0.88)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    transform: [{ rotateZ: '45deg' }],
     shadowColor: VIOLET_BRIGHT,
-    shadowOpacity: 0.92,
+    shadowOpacity: 0.96,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 0 },
     elevation: 7,
-  },
-  pinHole: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: SYMBOL_CORE,
-  },
-  pinTail: {
-    position: 'absolute',
-    top: 22,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 10,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: SYMBOL_CORE,
   },
   streakRotor: {
     position: 'absolute',
