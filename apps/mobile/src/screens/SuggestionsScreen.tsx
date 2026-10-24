@@ -11,6 +11,7 @@ import type { SocialStackParamList } from '@/navigation/stacks';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson, postJson } from '@/api/client';
 import { Avatar } from '@/components/Avatar';
+import { formatNexaSpatialDistance } from '@/components/map/nexaSpatialSheet';
 import { MutualPreviewStack } from '@/features/friends/MutualPreviewStack';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
@@ -20,8 +21,8 @@ import { spacing, fontSize, useAppTheme, type ThemeColors } from '@/theme';
 import { focusUserOnMap } from '@/navigation/focusUserOnMap';
 
 type Nav = NativeStackNavigationProp<SocialStackParamList & RootStackParamList>;
-function formatDistance(meters: number | null | undefined): string | null { if (meters == null || !Number.isFinite(meters)) return null; if (meters < 1000) return `${Math.max(1, Math.round(meters))} m away`; const km = meters / 1000; return `${km.toFixed(meters < 10_000 ? 1 : 0)} km away`; }
-function reasonLabel(item: SuggestionCard): string { const n = item.mutualFriendsCount ?? 0; switch (item.reason) { case 'mutual_friends': return n === 1 ? '1 mutual friend' : `${n} mutual friends`; case 'recent_wave': return n > 0 ? `Recent wave · ${n} mutual` : 'Recent wave'; case 'recent_chat': return n > 0 ? `Recent chat · ${n} mutual` : 'Recent chat'; case 'nearby': { const d = formatDistance(item.distanceMeters); return d ? `Nearby · ${d}` : 'Nearby'; } case 'shared_interests': { const c = item.sharedInterestsCount ?? 0; return c <= 0 ? 'Shared interests' : `${c} shared ${c === 1 ? 'interest' : 'interests'}`; } default: return 'Suggested for you'; } }
+function formatDistance(meters: number | null | undefined): string | null { const distance = formatNexaSpatialDistance(meters); if (distance == null) return null; return distance === 'Nearby' ? distance : `${distance} away`; }
+function reasonLabel(item: SuggestionCard): string { const n = item.mutualFriendsCount ?? 0; switch (item.reason) { case 'mutual_friends': return n === 1 ? '1 mutual friend' : `${n} mutual friends`; case 'recent_wave': return n > 0 ? `Recent wave · ${n} mutual` : 'Recent wave'; case 'recent_chat': return n > 0 ? `Recent chat · ${n} mutual` : 'Recent chat'; case 'nearby': { const d = formatDistance(item.distanceMeters); return d && d !== 'Nearby' ? `Nearby · ${d}` : 'Nearby'; } case 'shared_interests': { const c = item.sharedInterestsCount ?? 0; return c <= 0 ? 'Shared interests' : `${c} shared ${c === 1 ? 'interest' : 'interests'}`; } default: return 'Suggested for you'; } }
 function isApiError(e: unknown): e is ApiError { return typeof e === 'object' && e !== null && 'code' in e && typeof (e as { code: unknown }).code === 'string'; }
 
 export function SuggestionsScreen(): React.JSX.Element {
