@@ -43,6 +43,8 @@ import {
 	resolveNexaRetryActionLabel,
 	resolveNexaRsvpActionLabel,
 } from '@/product/nexaActionLanguage';
+import {NexaSpatialKindHeader} from './NexaSpatialSheet';
+import {formatNexaSpatialDistance} from './nexaSpatialSheet';
 import {createEntityBottomSheetStyles} from './EntityBottomSheet.styles';
 
 const PROFILE_CACHE_TTL_MS = 45_000;
@@ -88,11 +90,6 @@ function formatPrice(cents: number, currency: string): string {
 	} catch {
 		return `${(currency || 'USD').toUpperCase()} ${amount.toFixed(2)}`;
 	}
-}
-
-function formatDistanceMeters(meters: number): string {
-	if (meters < 1000) return `${Math.round(meters)} m`;
-	return `${(meters / 1000).toFixed(meters < 10_000 ? 1 : 0)} km`;
 }
 
 function usePinDistanceMeters(lat: number, lng: number): number | null {
@@ -198,7 +195,8 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull, onLik
 		if (profile == null) return null;
 		const parts: string[] = [];
 		if (profile.age != null) parts.push(`${profile.age}`);
-		if (distanceMeters != null && distanceMeters >= 0) parts.push(formatDistanceMeters(distanceMeters));
+		const distanceLabel = formatNexaSpatialDistance(distanceMeters);
+		if (distanceLabel != null) parts.push(distanceLabel);
 		return parts.length > 0 ? parts.join(' · ') : null;
 	})();
 	const relationshipKnown = profile != null;
@@ -275,8 +273,11 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull, onLik
 	else if (messageAllowed) actionOrder = [messageButton, profileButton];
 	else actionOrder = [profileButton];
 
+	const overflowAction = <TouchableOpacity style={styles.overflowBtn} onPress={onOverflow} disabled={blocking || (fetching && profile == null)} accessibilityRole="button" accessibilityLabel="More actions" hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}><Text style={styles.overflowBtnText}>···</Text></TouchableOpacity>;
+
 	return <View style={styles.sheet}>
-		<View style={styles.userHeader}><View style={styles.userHeaderMain}><IdentityBlock name={displayName} avatarUrl={meta.avatarUrl ?? null} verification={meta.verification ?? profile?.verification ?? 'none'} idVerified={idVerified} online={meta.online} subtitle={subtitle} ringVariant={ringVariant} size={56} onPress={handleOpenProfile} /></View><TouchableOpacity style={styles.overflowBtn} onPress={onOverflow} disabled={blocking || (fetching && profile == null)} accessibilityRole="button" accessibilityLabel="More actions" hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}><Text style={styles.overflowBtnText}>···</Text></TouchableOpacity></View>
+		<NexaSpatialKindHeader kind="person" arrivalKey={point.id} trailing={overflowAction} />
+		<View style={styles.userHeader}><View style={styles.userHeaderMain}><IdentityBlock name={displayName} avatarUrl={meta.avatarUrl ?? null} verification={meta.verification ?? profile?.verification ?? 'none'} idVerified={idVerified} online={meta.online} subtitle={subtitle} ringVariant={ringVariant} size={56} onPress={handleOpenProfile} /></View></View>
 		{!fetching && profile != null ? <View style={styles.identityLineWrap}><ProfileIdentityLine mode="other" align="start" identityLine={identityLine} hometownLine={hometownLine} /></View> : null}
 		{!fetching && profile != null ? (() => { const shared = profile.relationship?.sharedInterests ?? []; const compat = softCompatibilityPercent(shared); if (compat == null && shared.length < 1 && mutualCount < 1) return null; return <View style={styles.compatRow}>{compat != null ? <View style={styles.compatStat}><Text style={styles.compatValue}>{compat}%</Text><Text style={styles.compatLabel}>Compatibility</Text></View> : null}{shared.length > 0 ? <View style={styles.compatStat}><Text style={styles.compatValue}>{shared.length}</Text><Text style={styles.compatLabel}>Mutual interests</Text></View> : null}{mutualCount > 0 ? <View style={styles.compatStat}><Text style={styles.compatValue}>{mutualCount}</Text><Text style={styles.compatLabel}>Mutual friends</Text></View> : null}</View>; })() : null}
 		{!fetching && (profile?.relationship?.sharedInterests?.length ?? 0) > 0 ? <View style={styles.interestChips}>{(profile?.relationship?.sharedInterests ?? []).slice(0, 6).map((tag) => <View key={tag} style={styles.interestChip}><Text style={styles.interestChipText}>{tag}</Text></View>)}</View> : null}
@@ -295,6 +296,7 @@ function EventCard({point, onClose}: { point: EventEntityPoint; onClose: () => v
 	const styles = useMemo(() => createEntityBottomSheetStyles(colors), [colors]);
 	const meta = point.meta;
 	const distanceM = usePinDistanceMeters(point.lat, point.lng);
+	const distanceLabel = formatNexaSpatialDistance(distanceM);
 	const [rsvpBusy, setRsvpBusy] = useState(false);
 	const [myRsvp, setMyRsvp] = useState<RsvpStatus | null>(null);
 	const capacityLine = (() => { const parts: string[] = []; if (meta.attendeeCount > 0) parts.push(`${meta.attendeeCount} going`); if (meta.capacity != null) parts.push(`${meta.capacity} cap`); return parts.length > 0 ? parts.join(' · ') : null; })();
@@ -302,7 +304,7 @@ function EventCard({point, onClose}: { point: EventEntityPoint; onClose: () => v
 	const openDetail = (): void => { onClose(); openRootScreen(navigation, 'EventDetail', {eventId: point.id}); };
 	const going = myRsvp === 'going';
 	const joinLabel = resolveNexaRsvpActionLabel('going', going);
-	return <View style={styles.sheet}><View style={styles.kindHeader}><View style={[styles.kindDot, styles.kindDotEvent]} /><Text style={styles.kindLabel}>Event</Text></View><Text style={styles.entityTitle}>{meta.title}</Text><View style={styles.metaRow}><Text style={styles.metaText}>{formatStartsAt(meta.startsAt)}</Text>{distanceM != null ? <><Text style={styles.metaDot}>·</Text><Text style={styles.metaText}>{formatDistanceMeters(distanceM)}</Text></> : null}</View>{capacityLine ? <Text style={styles.metaText}>{capacityLine}</Text> : null}<View style={styles.actions}><TouchableOpacity style={[styles.primaryBtn, styles.eventPrimaryBtn, styles.ctaFlex, rsvpBusy || going ? styles.btnDisabled : undefined]} onPress={() => void onRsvpGoing()} disabled={rsvpBusy || going} accessibilityRole="button" accessibilityLabel={joinLabel}><Text style={styles.primaryBtnText}>{rsvpBusy ? '…' : joinLabel}</Text></TouchableOpacity><TouchableOpacity style={[styles.profileBtn, styles.ctaFlexShrink]} onPress={openDetail} accessibilityRole="button" accessibilityLabel="View event details"><Text style={styles.profileBtnText}>Details</Text></TouchableOpacity></View></View>;
+	return <View style={styles.sheet}><NexaSpatialKindHeader kind="event" arrivalKey={point.id} /><Text style={styles.entityTitle}>{meta.title}</Text><View style={styles.metaRow}><Text style={styles.metaText}>{formatStartsAt(meta.startsAt)}</Text>{distanceLabel != null ? <><Text style={styles.metaDot}>·</Text><Text style={styles.metaText}>{distanceLabel}</Text></> : null}</View>{capacityLine ? <Text style={styles.metaText}>{capacityLine}</Text> : null}<View style={styles.actions}><TouchableOpacity style={[styles.primaryBtn, styles.eventPrimaryBtn, styles.ctaFlex, rsvpBusy || going ? styles.btnDisabled : undefined]} onPress={() => void onRsvpGoing()} disabled={rsvpBusy || going} accessibilityRole="button" accessibilityLabel={joinLabel}><Text style={styles.primaryBtnText}>{rsvpBusy ? '…' : joinLabel}</Text></TouchableOpacity><TouchableOpacity style={[styles.profileBtn, styles.ctaFlexShrink]} onPress={openDetail} accessibilityRole="button" accessibilityLabel="View event details"><Text style={styles.profileBtnText}>Details</Text></TouchableOpacity></View></View>;
 }
 
 function ListingCard({point, onClose}: { point: ListingEntityPoint; onClose: () => void }): React.JSX.Element {
@@ -311,6 +313,7 @@ function ListingCard({point, onClose}: { point: ListingEntityPoint; onClose: () 
 	const styles = useMemo(() => createEntityBottomSheetStyles(colors), [colors]);
 	const meta = point.meta;
 	const distanceM = usePinDistanceMeters(point.lat, point.lng);
+	const distanceLabel = formatNexaSpatialDistance(distanceM);
 	const isWanted = meta.mode === 'buy';
 	const sellerId = meta.sellerId;
 	const sellerName = meta.sellerDisplayName?.trim() || 'Seller';
@@ -326,7 +329,7 @@ function ListingCard({point, onClose}: { point: ListingEntityPoint; onClose: () 
 		finally { setMessaging(false); }
 	};
 	const hasSeller = sellerId != null && sellerId !== '';
-	return <View style={styles.sheet}><View style={styles.kindHeader}><View style={[styles.kindDot, isWanted ? styles.kindDotWanted : styles.kindDotListing]} /><Text style={styles.kindLabel}>{isWanted ? 'Wanted' : 'Listing'}</Text></View><Text style={styles.entityTitle}>{meta.title}</Text><View style={styles.metaRow}><Text style={styles.metaText}>{formatPrice(meta.priceCents, meta.currency)}</Text>{distanceM != null ? <><Text style={styles.metaDot}>·</Text><Text style={styles.metaText}>{formatDistanceMeters(distanceM)}</Text></> : null}{meta.category ? <><Text style={styles.metaDot}>·</Text><Text style={styles.metaText}>{meta.category}</Text></> : null}</View>{hasSeller && meta.sellerDisplayName ? <Text style={styles.metaText}>Seller · {meta.sellerDisplayName}</Text> : null}<View style={styles.actions}>{hasSeller ? <><TouchableOpacity style={[styles.primaryBtn, styles.ctaFlex, messaging ? styles.btnDisabled : undefined]} onPress={() => void onMessageSeller()} disabled={messaging} accessibilityRole="button" accessibilityLabel={`${messageLabel} seller`}><Text style={styles.primaryBtnText}>{messaging ? '…' : `${messageLabel} seller`}</Text></TouchableOpacity><TouchableOpacity style={[styles.profileBtn, styles.ctaFlexShrink]} onPress={openDetail} accessibilityRole="button" accessibilityLabel={offerLabel}><Text style={styles.profileBtnText}>{offerLabel}</Text></TouchableOpacity></> : <TouchableOpacity style={[styles.primaryBtn, styles.entityPrimaryBtn, styles.ctaFlex]} onPress={openDetail} accessibilityRole="button" accessibilityLabel="View listing"><Text style={styles.primaryBtnText}>View</Text></TouchableOpacity>}</View></View>;
+	return <View style={styles.sheet}><NexaSpatialKindHeader kind="listing" arrivalKey={point.id} /><Text style={styles.entityTitle}>{meta.title}</Text><View style={styles.metaRow}>{isWanted ? <><Text style={styles.metaText}>Wanted</Text><Text style={styles.metaDot}>·</Text></> : null}<Text style={styles.metaText}>{formatPrice(meta.priceCents, meta.currency)}</Text>{distanceLabel != null ? <><Text style={styles.metaDot}>·</Text><Text style={styles.metaText}>{distanceLabel}</Text></> : null}{meta.category ? <><Text style={styles.metaDot}>·</Text><Text style={styles.metaText}>{meta.category}</Text></> : null}</View>{hasSeller && meta.sellerDisplayName ? <Text style={styles.metaText}>Seller · {meta.sellerDisplayName}</Text> : null}<View style={styles.actions}>{hasSeller ? <><TouchableOpacity style={[styles.primaryBtn, styles.ctaFlex, messaging ? styles.btnDisabled : undefined]} onPress={() => void onMessageSeller()} disabled={messaging} accessibilityRole="button" accessibilityLabel={`${messageLabel} seller`}><Text style={styles.primaryBtnText}>{messaging ? '…' : `${messageLabel} seller`}</Text></TouchableOpacity><TouchableOpacity style={[styles.profileBtn, styles.ctaFlexShrink]} onPress={openDetail} accessibilityRole="button" accessibilityLabel={offerLabel}><Text style={styles.profileBtnText}>{offerLabel}</Text></TouchableOpacity></> : <TouchableOpacity style={[styles.primaryBtn, styles.entityPrimaryBtn, styles.ctaFlex]} onPress={openDetail} accessibilityRole="button" accessibilityLabel="View listing"><Text style={styles.primaryBtnText}>View</Text></TouchableOpacity>}</View></View>;
 }
 
 export function EntityBottomSheet({point, waving, onClose, onWave, viewerMode = 'social', onOpenFull, onLike, onPass, onMessage, likeSent, isMatch, actionPending}: Props): React.JSX.Element {
