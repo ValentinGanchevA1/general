@@ -7,18 +7,49 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { APP_VERSION, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { BrandLogo } from '@/components/Brand/BrandLogo';
+import {
+  NexaEntityGlyph,
+  type NexaEntityGlyphKind,
+} from '@/components/Brand/NexaEntityGlyph';
 import { ListRow } from '@/components/ListRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
-
 type Styles = ReturnType<typeof createStyles>;
 
-function Feature({ icon, title, body, styles, colors }: { icon: string; title: string; body: string; styles: Styles; colors: ThemeColors }): React.JSX.Element {
+type FeatureVisual =
+  | { icon: string; entityGlyph?: never }
+  | { icon?: never; entityGlyph: NexaEntityGlyphKind };
+
+type FeatureProps = FeatureVisual & {
+  title: string;
+  body: string;
+  styles: Styles;
+  colors: ThemeColors;
+};
+
+function featureGlyphColor(kind: NexaEntityGlyphKind, colors: ThemeColors): string {
+  if (kind === 'event') return colors.entityEvent;
+  if (kind === 'listing') return colors.entityListing;
+  if (kind === 'person') return colors.entityPerson;
+  return colors.actionPrimary;
+}
+
+function Feature({ icon, entityGlyph, title, body, styles, colors }: FeatureProps): React.JSX.Element {
   return (
     <View style={styles.feature}>
-      <Icon name={icon} size={20} color={colors.primary} style={styles.featureIcon} />
+      <View style={styles.featureIconSlot}>
+        {entityGlyph ? (
+          <NexaEntityGlyph
+            kind={entityGlyph}
+            size={20}
+            color={featureGlyphColor(entityGlyph, colors)}
+          />
+        ) : icon ? (
+          <Icon name={icon} size={20} color={colors.primary} />
+        ) : null}
+      </View>
       <View style={styles.featureText}>
         <Text style={styles.featureTitle}>{title}</Text>
         <Text style={styles.featureBody}>{body}</Text>
@@ -57,10 +88,10 @@ export function AboutScreen(): React.JSX.Element {
           <Feature styles={styles} colors={colors} icon="map" title="Map & discovery" body="Live map of people, events, listings, and dating prefs. Filters, clusters, search, and presence while the app is open." />
           <Feature styles={styles} colors={colors} icon="pulse" title="Pulse" body="Local activity hub: story rings plus waves, chats, and matches. Filter the feed and act from each card (Wave back, Message, View)." />
           <Feature styles={styles} colors={colors} icon="circle-outline" title="Stories" body="24-hour posts for people nearby. Photo or short video. Reactions count toward mutual interest." />
-          <Feature styles={styles} colors={colors} icon="hand-wave" title="Waves, chat & dating" body="Lightweight signals first. Chat unlocks when interest is mutual. Dating likes and matches appear on Pulse and the map pin ladder." />
+          <Feature styles={styles} colors={colors} icon="hand-wave" title="Waves, chat & dating" body="Lightweight signals first. Chat unlocks when interest is mutual. Dating likes and matches appear on Pulse and the map marker ladder." />
           <Feature styles={styles} colors={colors} icon="account-group" title="Friends" body="Requests, suggestions, mutual friends, and optional online status for friends only. Unfriending keeps mutual follows unless you unfollow." />
-          <Feature styles={styles} colors={colors} icon="calendar-star" title="Events" body="Create and discover local events from the map. Message the host when listed." />
-          <Feature styles={styles} colors={colors} icon="storefront-outline" title="Local trade" body="Listings, wanted posts, offers and counters. Settlement stays offline — no in-app payments required." />
+          <Feature styles={styles} colors={colors} entityGlyph="event" title="Events" body="Create and discover local events from the map. Message the host when listed." />
+          <Feature styles={styles} colors={colors} entityGlyph="listing" title="Local trade" body="Listings, wanted posts, offers and counters. Settlement stays offline — no in-app payments required." />
           <Feature styles={styles} colors={colors} icon="shield-check" title="Trust ladder" body="Email → phone → ID review builds verification. Soft gates protect higher-stakes actions." />
         </View>
 
@@ -88,7 +119,7 @@ function createStyles(colors: ThemeColors) {
     sectionTitle: { color: colors.textFaint, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.md },
     featureGroup: { marginBottom: 28 },
     feature: { flexDirection: 'row', marginBottom: spacing.lg },
-    featureIcon: { marginTop: 2, width: 28 },
+    featureIconSlot: { marginTop: 2, width: 28, alignItems: 'flex-start' },
     featureText: { flex: 1 },
     featureTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '600', marginBottom: 2 },
     featureBody: { color: colors.textMuted, fontSize: 13, lineHeight: 18 },
