@@ -16,6 +16,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { EventSummary, LatLng } from '@g88/shared';
+import { NexaEntityGlyph } from '@/components/Brand/NexaEntityGlyph';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { useNearbyEvents } from './useEvents';
@@ -62,7 +63,7 @@ export function EventsRail({ location }: { location: LatLng | null }): React.JSX
 		<View style={[styles.wrap, shadow(0.14)]} pointerEvents="box-none">
 			<View style={styles.header}>
 				<View style={styles.headerLabel}>
-					<Icon name="calendar-blank-outline" size={15} color={colors.entityEvent} />
+					<NexaEntityGlyph kind="event" size={15} color={colors.entityEvent} />
 					<Text style={styles.headerTitle}>Events Near You</Text>
 				</View>
 				<Pressable
@@ -111,7 +112,7 @@ function EventCard({ event, distanceLabel, onPress, styles }: {
 				<Image source={{ uri: event.coverUrl }} style={styles.cover} />
 			) : (
 				<View style={[styles.cover, styles.coverPlaceholder]}>
-					<Icon name="calendar-star" size={22} color={colors.entityEvent} />
+					<NexaEntityGlyph kind="event" size={24} color={colors.entityEvent} />
 				</View>
 			)}
 
