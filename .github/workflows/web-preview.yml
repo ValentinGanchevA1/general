@@ -57,6 +57,8 @@ jobs:
           test -s web/dist/app.js
           node --check web/dist/app.js
           node --check web/edge.mjs
+          node --check web/e2e/chrome-cdp.mjs
+          node --check web/e2e/realtime-reconnect.e2e.mjs
 
       - name: Smoke test web edge
         run: |
@@ -80,3 +82,8 @@ jobs:
         env:
           CHROME_PATH: /usr/bin/google-chrome
         run: node web/e2e/multitab-auth.e2e.mjs
+
+      - name: E2E realtime reconnect and room rejoin
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: node web/e2e/realtime-reconnect.e2e.mjs
