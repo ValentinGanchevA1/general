@@ -208,9 +208,14 @@ try {
   throw error;
 } finally {
   cdp?.close();
-  chrome.kill('SIGTERM');
-  server.close();
-  await rm(profileDir, { recursive: true, force: true });
+  await stopChrome(chrome);
+  await closeServer(server);
+  await rm(profileDir, {
+    recursive: true,
+    force: true,
+    maxRetries: 5,
+    retryDelay: 100,
+  });
 }
 
 async function handleRequest(request, response) {
@@ -338,6 +343,33 @@ async function evaluate(cdpClient, sessionId, expression) {
     throw new Error(`browser evaluation failed: ${description}`);
   }
   return response.result?.value;
+}
+
+async function stopChrome(child) {
+  if (child.exitCode != null || child.signalCode != null) return;
+
+  const waitForExit = () => new Promise((resolve) => child.once('exit', resolve));
+  const gracefulExit = waitForExit();
+  child.kill('SIGTERM');
+  const exited = await Promise.race([
+    gracefulExit.then(() => true),
+    delay(1_500).then(() => false),
+  ]);
+  if (exited || child.exitCode != null || child.signalCode != null) return;
+
+  const forcedExit = waitForExit();
+  child.kill('SIGKILL');
+  await forcedExit;
+}
+
+async function closeServer(httpServer) {
+  if (!httpServer.listening) return;
+  await new Promise((resolve, reject) => {
+    httpServer.close((error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
 }
 
 async function waitFor(task, timeoutMs, label) {
