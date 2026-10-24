@@ -180,6 +180,7 @@ function MapMarkersImpl({
               point={point}
               selected={point.cellId === effectiveSelectedClusterCellId}
               showComposition={effectiveZoomPolicy.showClusterComposition}
+              reduceMotion={reduceMotion}
               onPress={handleClusterPress}
             />
           );
@@ -236,6 +237,7 @@ interface ClusterItemProps {
   point: ClusterPoint;
   selected: boolean;
   showComposition: boolean;
+  reduceMotion: boolean;
   onPress: (p: ClusterPoint) => void;
 }
 
@@ -243,6 +245,7 @@ function ClusterMarkerItemImpl({
   point,
   selected,
   showComposition,
+  reduceMotion,
   onPress,
 }: ClusterItemProps): React.JSX.Element {
   const renderKey = [
@@ -273,6 +276,7 @@ function ClusterMarkerItemImpl({
         point={point}
         selected={selected}
         showComposition={showComposition}
+        reduceMotion={reduceMotion}
       />
     </Marker>
   );
@@ -283,6 +287,7 @@ function clusterItemPropsEqual(prev: ClusterItemProps, next: ClusterItemProps): 
     prev.onPress === next.onPress &&
     prev.selected === next.selected &&
     prev.showComposition === next.showComposition &&
+    prev.reduceMotion === next.reduceMotion &&
     clusterVisualKey(prev.point) === clusterVisualKey(next.point) &&
     prev.point.lat === next.point.lat &&
     prev.point.lng === next.point.lng
