@@ -17,9 +17,11 @@ These Terms govern access to and use of NEXA mobile and related services. By cre
 
 ## 2. Eligibility
 
-Users must meet the minimum age and legal-capacity requirements applicable to NEXA in their country and must be legally able to enter into these Terms.
+Current NEXA product behavior is **18+**. Mobile onboarding requires a date of birth and blocks profiles that do not meet the 18-year minimum; backend profile validation independently enforces the same minimum. The current NEXA Privacy Policy is aligned to that existing runtime contract.
 
-**LEGAL REVIEW REQUIRED — release blocker:** the current Privacy Policy says 13 (or the local digital-consent age if higher). Because NEXA combines map-based discovery, social interaction, messaging, marketplace activity, and optional identity verification, confirm whether the production minimum age should instead be 16 or 18, whether any features require a higher age, and whether age-assurance controls are required.
+Users must also meet any other legal-capacity requirements applicable in their country and must be legally able to enter into these Terms.
+
+**LEGAL REVIEW REQUIRED — release blocker:** confirm that 18+ is the intended production eligibility policy, whether any specific features require additional age restrictions, and whether additional age-assurance controls are required in launch markets. If legal review chooses a different minimum age, mobile onboarding, backend enforcement, Privacy, Terms, Play declarations, and age-assurance controls must be changed together before release.
 
 ## 3. Accounts and security
 
@@ -126,7 +128,7 @@ Where these Terms discuss location, verification, messages, diagnostics, retenti
 
 ## 15. Account deletion and termination
 
-Users may delete their account through the in-app account-deletion flow or other supported request mechanism described in the Privacy Policy. Deletion is intended to be irreversible, subject to limited retention required by law, security, dispute handling, or backup lifecycle.
+Users may delete their account through the in-app account-deletion flow or other supported request mechanism described in the Privacy Policy. Deletion is intended to be irreversible, subject to limited retention required by law, security, dispute handling, asynchronous storage cleanup, or backup lifecycle.
 
 NEXA may suspend or terminate access for material or repeated violations, abuse, fraud, security risk, legal requirements, or risk to other users.
 
@@ -183,7 +185,7 @@ Questions about the approved Terms can be sent to:
 The following items must be resolved before this draft is converted into `docs/legal/terms/index.html` or linked from the app:
 
 - [ ] Confirm legal entity/operator naming and required business-registration details.
-- [ ] Decide production minimum age and feature-specific age restrictions.
+- [ ] Confirm the production 18+ eligibility policy, or define the coordinated product/legal changes required for a different minimum age and any feature-specific restrictions.
 - [ ] Confirm launch countries and governing-law/dispute provisions.
 - [ ] Verify marketplace prohibited-items, transaction, payment, tax, refund, and dispute model.
 - [ ] Verify events organizer/ticket/refund model.
