@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import { NexaEntityGlyph, type NexaEntityGlyphKind } from '@/components/Brand/NexaEntityGlyph';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
@@ -17,7 +18,8 @@ interface DiscoverLane {
   title: string;
   detail: string;
   action: string;
-  icon: string;
+  entityGlyph?: NexaEntityGlyphKind;
+  icon?: string;
   tone: DiscoverTone;
 }
 
@@ -27,7 +29,7 @@ const LANES: readonly DiscoverLane[] = [
     title: 'Nearby people',
     detail: 'Return to the map and discover people in the current area.',
     action: 'Open map',
-    icon: 'account-group-outline',
+    entityGlyph: 'person',
     tone: 'action',
   },
   {
@@ -35,7 +37,7 @@ const LANES: readonly DiscoverLane[] = [
     title: 'Local events',
     detail: 'See event signals and activity without leaving local context.',
     action: 'Explore events',
-    icon: 'calendar-star',
+    entityGlyph: 'event',
     tone: 'discovery',
   },
   {
@@ -43,7 +45,7 @@ const LANES: readonly DiscoverLane[] = [
     title: 'Marketplace',
     detail: 'Browse nearby listings and wanted posts.',
     action: 'Browse listings',
-    icon: 'tag-outline',
+    entityGlyph: 'listing',
     tone: 'neutral',
   },
   {
@@ -126,7 +128,16 @@ export function DiscoverScreen(): React.JSX.Element {
                 ]}
               >
                 <View style={[styles.cardGlyph, { backgroundColor: surface, borderColor: border }]}>
-                  <MaterialCommunityIcons name={lane.icon} size={22} color={accent} />
+                  {lane.entityGlyph ? (
+                    <NexaEntityGlyph
+                      kind={lane.entityGlyph}
+                      size={22}
+                      color={accent}
+                      fillColor={surface}
+                    />
+                  ) : lane.icon ? (
+                    <MaterialCommunityIcons name={lane.icon} size={22} color={accent} />
+                  ) : null}
                 </View>
                 <Text style={styles.cardTitle}>{lane.title}</Text>
                 <Text style={styles.cardBody}>{lane.detail}</Text>
