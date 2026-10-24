@@ -34,7 +34,7 @@
 <body>
   <h1>NEXA Privacy Policy</h1>
   <p class="meta">
-    Last updated: <strong>24 October 2026</strong> &middot;
+    Last updated: <strong>25 October 2026</strong> &middot;
     Operated by <strong>Valentin Ganchev</strong>
     (&ldquo;NEXA&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;).
   </p>
@@ -51,9 +51,9 @@
   <h2>1. Who this applies to</h2>
   <p>
     This policy covers the NEXA mobile application and its backend services. By creating an
-    account or using NEXA you agree to it. NEXA is not directed to children; you must be at
-    least <strong>13</strong> (or the minimum digital-consent age in your country, if higher)
-    to use it.
+    account or using NEXA you agree to it. NEXA is for adults; you must be at least
+    <strong>18 years old</strong> to use it. The onboarding flow requires a date of birth and
+    the service rejects profiles that do not meet this minimum age.
   </p>
 
   <h2>2. Data we collect</h2>
@@ -61,7 +61,7 @@
     <thead><tr><th>Category</th><th>Examples</th><th>Why</th></tr></thead>
     <tbody>
       <tr><td>Account</td><td>Email address, password (stored only as a salted hash), or Google sign-in identifier; display name</td><td>Create and secure your account, authentication</td></tr>
-      <tr><td>Profile</td><td>Photos, bio, interests/goals, optional date of birth, social links you add</td><td>Build the profile other users see</td></tr>
+      <tr><td>Profile</td><td>Photos, bio, interests/goals, date of birth, optional hometown and social links you add</td><td>Build your profile, confirm 18+ eligibility, and provide discovery context</td></tr>
       <tr><td>Approximate location</td><td>A privacy-coarsened location (~120&nbsp;m) of where you are</td><td>Show nearby people, presence, and local content on the map</td></tr>
       <tr><td>Messages &amp; interactions</td><td>Chat messages, waves, RSVPs, listings, gifts, challenges</td><td>Deliver the core social features</td></tr>
       <tr><td>Verification (optional)</td><td>Phone number; selfie + ID document if you request ID verification</td><td>Provide identity-verification signals and support trust &amp; safety</td></tr>
@@ -92,6 +92,7 @@
   <ul>
     <li>Operate core features: discovery, presence, waves, chat, events, listings, gifts, challenges.</li>
     <li>Authenticate you and keep your account secure.</li>
+    <li>Confirm that the profile meets NEXA&rsquo;s 18+ eligibility requirement.</li>
     <li>Send notifications you have not opted out of (you control these per-channel in Settings).</li>
     <li>Maintain reliability and diagnose crashes and errors.</li>
     <li>Understand aggregate product usage to improve NEXA.</li>
@@ -102,7 +103,8 @@
   <h2>5. Who we share with</h2>
   <p><strong>Other users</strong> see your display name, avatar/photos, bio, interests, verification
   signals, and your coarsened (~120&nbsp;m) location when map presence is enabled &mdash; not your
-  email, phone, or precise location.</p>
+  email, phone, date of birth, or precise location. Your age is shown only when your profile
+  visibility setting for age is enabled.</p>
   <p><strong>Service providers</strong> process data on our behalf, under contract, only to run NEXA:</p>
   <table>
     <thead><tr><th>Provider</th><th>Purpose</th></tr></thead>
@@ -132,17 +134,19 @@
   <h2>7. Deleting your account and data</h2>
   <p>You can permanently delete your account and associated data at any time:</p>
   <ul>
-    <li><strong>In the app:</strong> <em>Settings &rarr; Delete account</em>. This is immediate
-      and irreversible.</li>
+    <li><strong>In the app:</strong> <em>Settings &rarr; Delete account</em>. Account deletion
+      takes effect immediately and cannot be undone. Associated storage cleanup may continue
+      asynchronously if a storage provider is temporarily unavailable.</li>
     <li><strong>By web/email request:</strong> email
       <a href="mailto:vganchev6@gmail.com">vganchev6@gmail.com</a>
       from your account email with the subject &ldquo;Delete my account&rdquo; and we will
       complete the deletion.</li>
   </ul>
   <p>
-    Deletion permanently removes your profile, photos and uploaded documents, messages, waves,
-    listings, events, gifts, gamification progress, verification records, and authentication
-    sessions. Some records may persist briefly in encrypted backups before being overwritten,
+    Deletion removes your profile, photos and uploaded documents, messages, waves, listings,
+    events, gifts, gamification progress, verification records, and authentication sessions
+    from active application systems. Some storage objects may remain briefly while retry cleanup
+    completes, some records may persist briefly in encrypted backups before being overwritten,
     and we may retain the minimum needed to comply with legal obligations.
   </p>
 
