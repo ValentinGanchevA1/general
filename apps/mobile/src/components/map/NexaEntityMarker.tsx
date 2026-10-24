@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -62,7 +62,7 @@ export function NexaEntityMarker({
 }: NexaEntityMarkerProps): React.JSX.Element {
   const { colors } = useAppTheme();
   const visual = resolveNexaMarkerVisual(entityType, density, state);
-  const selectionPulse = useRef(new Animated.Value(0)).current;
+  const [selectionPulse] = useState(() => new Animated.Value(0));
   const animateSelection = shouldAnimateNexaMarkerSelection(
     visual.showSelectedRing,
     reduceMotion,
