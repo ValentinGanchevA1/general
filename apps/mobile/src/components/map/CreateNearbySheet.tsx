@@ -15,6 +15,7 @@ import {
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { NexaEntityGlyph } from '@/components/Brand/NexaEntityGlyph';
 import { radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 export type CreateNearbyAction =
@@ -25,7 +26,8 @@ export type CreateNearbyAction =
 
 interface Option {
   key: CreateNearbyAction;
-  icon: string;
+  icon?: string;
+  entityGlyph?: 'event';
   title: string;
   hint: string;
 }
@@ -45,7 +47,7 @@ const OPTIONS: Option[] = [
   },
   {
     key: 'event',
-    icon: 'calendar-star',
+    entityGlyph: 'event',
     title: 'Create event',
     hint: 'Meetup, hangout, or gathering',
   },
@@ -115,7 +117,15 @@ export function CreateNearbySheet({
                 accessibilityHint={opt.hint}
               >
                 <View style={S.iconWrap}>
-                  <MCI name={opt.icon} size={22} color={colors.primary} />
+                  {opt.entityGlyph ? (
+                    <NexaEntityGlyph
+                      kind={opt.entityGlyph}
+                      size={22}
+                      color={colors.entityEvent}
+                    />
+                  ) : opt.icon ? (
+                    <MCI name={opt.icon} size={22} color={colors.primary} />
+                  ) : null}
                 </View>
                 <View style={S.rowText}>
                   <Text style={S.rowTitle}>{opt.title}</Text>
