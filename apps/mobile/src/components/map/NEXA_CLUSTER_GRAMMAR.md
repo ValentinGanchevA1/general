@@ -1,4 +1,4 @@
-# NEXA Cluster Visual Grammar v2
+# NEXA Cluster Visual Grammar v3
 
 Clusters are spatial summaries, not a fourth entity type. Their visual language must preserve the semantic geometry of the entities they contain without turning the map into a pie chart.
 
@@ -9,7 +9,7 @@ A cluster inherits an entity geometry only when one category represents at least
 | Composition | Cluster geometry | Semantic color |
 | --- | --- | --- |
 | People-dominant | Circle | `entityPerson` / violet |
-| Event-dominant | Diamond | `entityEvent` / cyan |
+| Event-dominant | Four-point star | `entityEvent` / cyan |
 | Listing-dominant | Square | `entityListing` / neutral |
 | No category >= 65% | Neutral circle | neutral border + micro geometry |
 
@@ -20,7 +20,7 @@ A single-category cluster is always treated as dominant.
 Mixed clusters do not invent a new brand color. The outer container is neutral and a small geometry row communicates which entity types are present:
 
 - person → small violet circle
-- event → small cyan diamond
+- event → small cyan four-point star
 - listing → small neutral square
 
 The center count remains the primary information.
@@ -51,7 +51,7 @@ This creates spatial continuity without running per-marker animation loops.
 
 ## Performance
 
-- Cluster visuals are pure React Native geometry.
+- Cluster visuals are pure React Native geometry/vector icons.
 - No SVG or masked gradient is required.
 - `clusterVisualKey()` controls native snapshot invalidation.
 - `tracksViewChanges` re-opens only when cluster composition or selected state changes.
