@@ -39,7 +39,6 @@ export interface NexaEntityMarkerProps {
 
 function stateSuffix(state: NexaMarkerState): string {
   const parts: string[] = [];
-  if (state.selected) parts.push('selected');
   if (state.live) parts.push('live');
   if (state.verified) parts.push('verified');
   if (state.isNew) parts.push('new');
@@ -148,11 +147,13 @@ export function NexaEntityMarker({
     <View
       style={[styles.root, { opacity: visual.opacity }]}
       accessible
-      accessibilityRole="image"
+      accessibilityRole="button"
+      accessibilityState={{ selected: state.selected === true }}
       accessibilityLabel={
         accessibilityLabel ??
         `${entityType}${caption ? `, ${caption}` : ''}${stateSuffix(state)}`
       }
+      accessibilityHint="Shows details for this map item"
     >
       <View style={styles.markerStage}>
         {animateSelection ? (
