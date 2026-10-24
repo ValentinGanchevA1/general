@@ -5,6 +5,7 @@ import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
 import { nexaHaptics } from '@/haptics/nexaHaptics';
 import { useAppSelector } from '@/hooks/redux';
 import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
+import { useAppTheme } from '@/theme';
 
 import { ClusterMarker } from './ClusterMarker';
 import { EntityMarker } from './EntityMarker';
@@ -68,6 +69,8 @@ function MapMarkersImpl({
 }: MapMarkersProps): React.JSX.Element {
   const committedDiscoveryZoom = useAppSelector((state) => state.discovery.zoom);
   const reduceMotion = useNexaReducedMotion();
+  const { scheme, mode } = useAppTheme();
+  const markerThemeKey = mode === 'protos-nexus' ? mode : scheme;
   const effectiveZoomPolicy =
     zoomPolicy ?? resolveNexaMapZoomPolicy(committedDiscoveryZoom);
 
@@ -225,6 +228,7 @@ function MapMarkersImpl({
               selected={point.cellId === effectiveSelectedClusterCellId}
               showComposition={effectiveZoomPolicy.showClusterComposition}
               reduceMotion={reduceMotion}
+              themeVisualKey={markerThemeKey}
               onPress={handleClusterPress}
             />
           );
@@ -252,6 +256,7 @@ function MapMarkersImpl({
               !selected
             }
             reduceMotion={reduceMotion}
+            themeVisualKey={markerThemeKey}
             onPress={handleEntityPress}
           />
         );
@@ -282,6 +287,7 @@ interface ClusterItemProps {
   selected: boolean;
   showComposition: boolean;
   reduceMotion: boolean;
+  themeVisualKey: string;
   onPress: (p: ClusterPoint) => void;
 }
 
@@ -290,12 +296,14 @@ function ClusterMarkerItemImpl({
   selected,
   showComposition,
   reduceMotion,
+  themeVisualKey,
   onPress,
 }: ClusterItemProps): React.JSX.Element {
   const renderKey = [
     clusterVisualKey(point),
     selected ? 'selected' : 'default',
     showComposition ? 'composition' : 'minimal',
+    themeVisualKey,
   ].join('|');
   const tracksViewChanges = useTracksViewChanges([renderKey]);
   const coordinate = useMemo(
@@ -332,6 +340,7 @@ function clusterItemPropsEqual(prev: ClusterItemProps, next: ClusterItemProps): 
     prev.selected === next.selected &&
     prev.showComposition === next.showComposition &&
     prev.reduceMotion === next.reduceMotion &&
+    prev.themeVisualKey === next.themeVisualKey &&
     clusterVisualKey(prev.point) === clusterVisualKey(next.point) &&
     prev.point.lat === next.point.lat &&
     prev.point.lng === next.point.lng
@@ -350,6 +359,7 @@ interface EntityItemProps {
   dimmed: boolean;
   unavailable: boolean;
   reduceMotion: boolean;
+  themeVisualKey: string;
   onPress: (p: EntityPoint) => void;
 }
 
@@ -363,6 +373,7 @@ function EntityMarkerItemImpl({
   dimmed,
   unavailable,
   reduceMotion,
+  themeVisualKey,
   onPress,
 }: EntityItemProps): React.JSX.Element {
   const baseVisualKey = entityVisualKey(point);
@@ -375,6 +386,7 @@ function EntityMarkerItemImpl({
     own ? 'own' : 'other',
     dimmed ? 'dim' : 'normal',
     unavailable ? 'unavailable' : 'available',
+    themeVisualKey,
   ].join('|');
   const tracksViewChanges = useTracksViewChanges([renderKey]);
   const coordinate = useMemo(
@@ -422,6 +434,7 @@ function entityItemPropsEqual(prev: EntityItemProps, next: EntityItemProps): boo
     prev.dimmed === next.dimmed &&
     prev.unavailable === next.unavailable &&
     prev.reduceMotion === next.reduceMotion &&
+    prev.themeVisualKey === next.themeVisualKey &&
     entityVisualKey(prev.point) === entityVisualKey(next.point) &&
     prev.point.lat === next.point.lat &&
     prev.point.lng === next.point.lng
