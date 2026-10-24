@@ -18,6 +18,7 @@ import type { DiscoveryPoint, EntityPoint } from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { fontSize, radius, spacing, useAppTheme } from '@/theme';
+import { formatNexaSpatialDistance } from './nexaSpatialSheet';
 
 /** Header + avatar row + panel spacing. */
 export const NEARBY_PEOPLE_RAIL_HEIGHT = 124;
@@ -54,13 +55,6 @@ function distanceMeters(
 	const sinLng = Math.sin(dLng / 2);
 	const a = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng;
 	return earthRadiusM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function formatDistance(meters: number | null): string {
-	if (meters == null || !Number.isFinite(meters)) return 'Nearby';
-	if (meters < 1000) return `${Math.max(10, Math.round(meters / 10) * 10)} m`;
-	const km = meters / 1000;
-	return `${km < 10 ? km.toFixed(1) : Math.round(km)} km`;
 }
 
 export function NearbyPeopleRail({
@@ -122,6 +116,7 @@ export function NearbyPeopleRail({
 					const distance = coords == null
 						? null
 						: distanceMeters(coords, { lat: user.lat, lng: user.lng });
+					const distanceLabel = formatNexaSpatialDistance(distance) ?? 'Nearby';
 					const ringColor = ringColors[index % ringColors.length] ?? colors.primary;
 
 					return (
@@ -130,7 +125,7 @@ export function NearbyPeopleRail({
 							style={styles.item}
 							onPress={() => onPressUser(user)}
 							accessibilityRole="button"
-							accessibilityLabel={`${name}, ${formatDistance(distance)}`}
+							accessibilityLabel={`${name}, ${distanceLabel}`}
 						>
 							<View style={[styles.avatarRing, { borderColor: ringColor }]}> 
 								{user.meta.avatarUrl ? (
@@ -148,7 +143,7 @@ export function NearbyPeopleRail({
 								{name}
 							</Text>
 							<Text style={[styles.distance, { color: colors.textMuted }]} numberOfLines={1}>
-								{formatDistance(distance)}
+								{distanceLabel}
 							</Text>
 						</Pressable>
 					);
