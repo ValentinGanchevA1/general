@@ -35,10 +35,10 @@ Canonical entity vocabulary:
 - person: circle
 - event: four-point star
 - listing: square
-- place / local signal: map pin
+- opportunity / other: diamond
 - two elliptical discovery/action orbit paths around the final eye core
 
-The same circle / star / square / pin vocabulary is used by the animated launch composition so first-run product identity does not switch visual languages after splash.
+The same circle / star / square / diamond vocabulary is used by the animated launch composition and map marker system so first-run product identity does not switch visual languages after splash.
 
 The component is intentionally non-interactive and hidden from the accessibility tree.
 
