@@ -2,7 +2,12 @@ import React from 'react';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-export type NexaEntityGlyphKind = 'person' | 'event' | 'listing' | 'opportunity';
+import {
+  resolveNexaEntityIdentity,
+  type NexaEntityIdentityKind,
+} from '@/product/nexaEntityIdentity';
+
+export type NexaEntityGlyphKind = NexaEntityIdentityKind;
 
 export interface NexaEntityGlyphProps {
   kind: NexaEntityGlyphKind;
@@ -13,15 +18,9 @@ export interface NexaEntityGlyphProps {
 }
 
 /**
- * Canonical compact NEXA entity geometry for non-map identity surfaces.
- *
- * person = circle
- * event = four-point star
- * listing = square
- * opportunity / other = diamond
- *
- * Map markers keep their own state rings/captions; this component is only the
- * reusable semantic core for filters, rails, headers and similar small UI.
+ * Compact renderer for the canonical NEXA entity identity contract.
+ * Map markers keep their own state rings/captions; this component renders only
+ * the semantic core for filters, rails, headers and similar small UI.
  */
 export function NexaEntityGlyph({
   kind,
@@ -30,6 +29,7 @@ export function NexaEntityGlyph({
   fillColor = 'transparent',
   strokeWidth = 1.8,
 }: NexaEntityGlyphProps): React.JSX.Element {
+  const { shape } = resolveNexaEntityIdentity(kind);
   const stage: ViewStyle = {
     width: size,
     height: size,
@@ -37,7 +37,7 @@ export function NexaEntityGlyph({
     justifyContent: 'center',
   };
 
-  if (kind === 'event') {
+  if (shape === 'star') {
     return (
       <View style={stage} accessible={false} pointerEvents="none">
         <Icon name="star-four-points" size={size} color={color} />
@@ -46,8 +46,7 @@ export function NexaEntityGlyph({
   }
 
   const boundingSize = size * 0.72;
-  const shapeSide =
-    kind === 'opportunity' ? boundingSize / Math.SQRT2 : boundingSize;
+  const shapeSide = shape === 'diamond' ? boundingSize / Math.SQRT2 : boundingSize;
 
   const shapeStyle: ViewStyle = {
     width: shapeSide,
@@ -57,9 +56,9 @@ export function NexaEntityGlyph({
     backgroundColor: fillColor,
   };
 
-  if (kind === 'person') {
+  if (shape === 'circle') {
     shapeStyle.borderRadius = shapeSide / 2;
-  } else if (kind === 'listing') {
+  } else if (shape === 'square') {
     shapeStyle.borderRadius = Math.max(2, shapeSide * 0.16);
   } else {
     shapeStyle.borderRadius = Math.max(2, shapeSide * 0.14);

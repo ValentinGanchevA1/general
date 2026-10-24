@@ -1,46 +1,29 @@
 import type { EntityKind } from '@g88/shared';
 
-export type NexaSpatialSheetKind = 'person' | 'event' | 'listing' | 'opportunity';
+import {
+  nexaEntityIdentityKindFromEntityKind,
+  resolveNexaEntityIdentity,
+  type NexaEntityIdentityKind,
+  type NexaEntityShape,
+  type NexaEntityTone,
+} from '@/product/nexaEntityIdentity';
 
-export type NexaSpatialSheetShape = 'circle' | 'star' | 'square' | 'diamond';
+export type NexaSpatialSheetKind = NexaEntityIdentityKind;
+export type NexaSpatialSheetShape = NexaEntityShape;
 
 export interface NexaSpatialSheetVisual {
   kind: NexaSpatialSheetKind;
   label: string;
   shape: NexaSpatialSheetShape;
-  tone: 'action' | 'discovery' | 'neutral' | 'opportunity';
+  tone: NexaEntityTone;
   defaultPrimaryLabel: string;
 }
 
-const VISUALS: Record<NexaSpatialSheetKind, NexaSpatialSheetVisual> = {
-  person: {
-    kind: 'person',
-    label: 'Person',
-    shape: 'circle',
-    tone: 'action',
-    defaultPrimaryLabel: 'Connect',
-  },
-  event: {
-    kind: 'event',
-    label: 'Event',
-    shape: 'star',
-    tone: 'discovery',
-    defaultPrimaryLabel: 'Join',
-  },
-  listing: {
-    kind: 'listing',
-    label: 'Listing',
-    shape: 'square',
-    tone: 'neutral',
-    defaultPrimaryLabel: 'View',
-  },
-  opportunity: {
-    kind: 'opportunity',
-    label: 'Opportunity',
-    shape: 'diamond',
-    tone: 'opportunity',
-    defaultPrimaryLabel: 'Explore',
-  },
+const PRIMARY_LABEL_BY_KIND: Record<NexaSpatialSheetKind, string> = {
+  person: 'Connect',
+  event: 'Join',
+  listing: 'View',
+  opportunity: 'Explore',
 };
 
 export const NEXA_SPATIAL_SHEET_SNAP_POINTS = ['38%', '68%'] as const;
@@ -48,22 +31,24 @@ export const NEXA_SPATIAL_SHEET_SNAP_POINTS = ['38%', '68%'] as const;
 export function resolveNexaSpatialSheetVisual(
   kind: NexaSpatialSheetKind,
 ): NexaSpatialSheetVisual {
-  return VISUALS[kind];
+  const identity = resolveNexaEntityIdentity(kind);
+  return {
+    kind,
+    label: identity.label,
+    shape: identity.shape,
+    tone: identity.tone,
+    defaultPrimaryLabel: PRIMARY_LABEL_BY_KIND[kind],
+  };
 }
 
 /**
  * Current discovery contract has user/event/listing only.
  * Opportunity stays presentational until it is introduced in @g88/shared.
  */
-export function spatialSheetKindFromEntityKind(kind: EntityKind): Exclude<NexaSpatialSheetKind, 'opportunity'> {
-  switch (kind) {
-    case 'user':
-      return 'person';
-    case 'event':
-      return 'event';
-    case 'listing':
-      return 'listing';
-  }
+export function spatialSheetKindFromEntityKind(
+  kind: EntityKind,
+): Exclude<NexaSpatialSheetKind, 'opportunity'> {
+  return nexaEntityIdentityKindFromEntityKind(kind);
 }
 
 /**

@@ -1,3 +1,10 @@
+import {
+  NEXA_ENTITY_IDENTITY_KINDS,
+  resolveNexaEntityIdentity,
+  type NexaEntityIdentityKind,
+  type NexaEntityShape as NexaIdentityShape,
+} from '@/product/nexaEntityIdentity';
+
 export const NEXA_MARKER_TOUCH_SIZE = 44;
 
 export const NEXA_MARKER_VISUAL_SIZE = {
@@ -8,16 +15,9 @@ export const NEXA_MARKER_VISUAL_SIZE = {
 
 export type NexaMarkerDensity = keyof typeof NEXA_MARKER_VISUAL_SIZE;
 
-export const NEXA_ENTITY_TYPES = [
-  'person',
-  'event',
-  'listing',
-  'opportunity',
-] as const;
-
-export type NexaEntityType = (typeof NEXA_ENTITY_TYPES)[number];
-
-export type NexaEntityShape = 'circle' | 'star' | 'square' | 'diamond';
+export const NEXA_ENTITY_TYPES = NEXA_ENTITY_IDENTITY_KINDS;
+export type NexaEntityType = NexaEntityIdentityKind;
+export type NexaEntityShape = NexaIdentityShape;
 
 export interface NexaMarkerState {
   selected?: boolean;
@@ -43,13 +43,6 @@ export interface NexaMarkerVisualContract {
   showUnavailableSlash: boolean;
 }
 
-const SHAPE_BY_TYPE: Record<NexaEntityType, NexaEntityShape> = {
-  person: 'circle',
-  event: 'star',
-  listing: 'square',
-  opportunity: 'diamond',
-};
-
 export function resolveNexaMarkerVisual(
   entityType: NexaEntityType,
   density: NexaMarkerDensity = 'standard',
@@ -63,7 +56,7 @@ export function resolveNexaMarkerVisual(
 
   return {
     entityType,
-    shape: SHAPE_BY_TYPE[entityType],
+    shape: resolveNexaEntityIdentity(entityType).shape,
     visualSize,
     touchSize: NEXA_MARKER_TOUCH_SIZE,
     opacity,
