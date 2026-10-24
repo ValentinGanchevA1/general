@@ -9,6 +9,8 @@ import {
 import type { Request, Response } from 'express';
 import * as Sentry from '@sentry/nestjs';
 
+import { normalizePublicErrorMessage } from './public-error-copy';
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -59,7 +61,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     res.status(statusCode).json({
       statusCode,
       code,
-      message,
+      message: normalizePublicErrorMessage(message),
       ...(details ? { details } : {}),
     });
   }
