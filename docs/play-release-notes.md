@@ -1,77 +1,91 @@
-# G88 — Closed Testing Release Notes (first build)
+# NEXA — Closed Testing Release Notes
 
-> For the first Closed testing release of `com.g88`. Paste section 1 into the
-> Play Console "Release notes" field. Use section 2 in the tester opt-in email.
-> Play limit: release notes ≤ 500 chars per language.
+> For the Closed testing release of `com.g88`. The package/application ID is
+> intentionally retained for Android update continuity; the public product name
+> is **NEXA**. Paste section 1 into Play Console release notes and use section 2
+> for tester onboarding.
 
 ---
 
 ## 1. Play Console release notes (`<en-US>`, ≤ 500 chars)
 
 ```
-Welcome to the G88 closed beta! This is our first test build.
+Welcome to the NEXA closed beta.
 
-• Live map — see who's nearby in real time
-• Wave & chat — say hi and start a conversation
-• Profiles, events, listings, gifts & challenges
+• Map-first nearby discovery
+• Waves, Connections and 1:1 chat
+• Local events and marketplace listings
+• Identity verification and privacy-aware map presence
 
-Your exact location is never shared — we coarsen it to ~120m before anyone sees you.
+Your exact location is never shown to other users; NEXA coarsens map presence before it is stored or displayed.
 
-Please report bugs, crashes, and anything confusing. Thanks for testing!
+Please report bugs, crashes, confusing flows, or visual issues. Thanks for testing!
 ```
-*(~360 chars — within limit.)*
 
-### Shorter variant (if you prefer one-liners)
+### Shorter variant
+
 ```
-First G88 closed beta. Live nearby-people map, waves, chat, profiles, events & more. Location is coarsened to ~120m for privacy. Please report any bugs or crashes — thanks for testing!
+NEXA closed beta: map-first nearby discovery, waves, Connections, chat, events and marketplace. Map presence is privacy-coarsened and exact location is never shown to other users. Please report bugs or confusing flows — thanks for testing!
 ```
 
 ---
 
-## 2. Tester opt-in email / onboarding (longer — not for the notes field)
+## 2. Tester opt-in email / onboarding
 
 ```
-You're in the G88 closed beta — thanks for helping us test!
+You're in the NEXA closed beta — thanks for helping us test.
 
-WHAT G88 IS
-A map-first way to see who's around you. Open the app and nearby people appear
-as live avatars. Wave, chat, and discover local events and listings.
+WHAT NEXA IS
+NEXA is a map-first way to discover people, local activity, events and listings
+around you. Open the app, explore nearby activity, wave, connect and chat.
 
 HOW TO JOIN
-1. Tap the opt-in link we sent (use the same Google account you gave us).
-2. Accept the test, then install/update G88 from the Play Store.
-3. Open the app, create your profile, and allow location when asked.
+1. Open the Play testing opt-in link with the Google account registered as a tester.
+2. Accept the test, then install/update NEXA from the Play Store.
+3. Open NEXA, create your profile, and allow location only when prompted for nearby discovery.
 
 WHAT TO TRY
-• Let the map load and check nearby people show up
-• Send a wave, then start a chat
-• Set up your profile + a photo
-• Browse events / listings / challenges
+• Launch flow: native splash → NEXA animation → live app
+• Map discovery, marker selection and entity sheets
+• Discover and Pulse
+• Connections → Activity / Chats
+• Profile / You and Trust Center
+• Events and marketplace listings
+• Light, dark, system and PROTOS NEXUS themes when available
+• Reduced Motion and larger text if your device supports them
 
 PRIVACY
-Your precise GPS never leaves your control in a usable form — we coarsen every
-location to about a 120-meter area before anyone else can see it.
+Other users never receive your exact location. NEXA uses your location for
+nearby discovery and stores/displays privacy-coarsened map presence rather than
+your precise position.
 
-KNOWN LIMITATIONS (this build)
+KNOWN LIMITATIONS
 • Beta data may be reset between builds
-• Some P3 features are still being polished
-• Account self-deletion isn't in the app yet — email us to delete your data
+• Some non-core features are still being polished
+• Closed-testing UX and visual QA is still in progress
+
+ACCOUNT CONTROL
+Account deletion is available in-app from Settings → Delete account.
 
 HOW TO REPORT ISSUES
-Reply to this email (or ⟨bug-report channel/link⟩) with: what you did, what
-happened, what you expected, and a screenshot if you can. Crashes are captured
-automatically, but your notes help a lot.
+Reply to this email (or ⟨bug-report channel/link⟩) with what you did, what
+happened, what you expected, device model / Android version, and a screenshot or
+screen recording when useful. Crashes are captured automatically, but tester
+context is still valuable.
 
 Thanks for testing,
-The G88 team
+The NEXA team
 ```
 
 ---
 
 ## 3. Notes
-- Keep release notes truthful per build — update the "KNOWN LIMITATIONS" list as
+
+- Keep release notes truthful per build; update the known-limitations section as
   fixes land.
-- If you localize later, add `<xx-XX>` blocks; en-US is required.
-- The privacy line mirrors `ARCHITECTURE.md §3.3` (H3 r10 ~120m fuzzing) — keep
-  it consistent with the store listing + Data Safety copy in
-  `docs/play-store-listing.md`.
+- If localization is added later, create explicit `<xx-XX>` blocks; en-US remains
+  the baseline.
+- Keep privacy wording aligned with `ARCHITECTURE.md §3.3`, the hosted privacy
+  policy, and `docs/play-store-listing.md`.
+- Do not rename `com.g88` as part of store-copy cleanup; native package migration
+  is a separate compatibility project.
