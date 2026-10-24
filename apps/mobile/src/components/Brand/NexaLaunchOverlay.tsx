@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AccessibilityInfo,
   Animated,
   Easing,
   StatusBar,
@@ -12,6 +11,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import BootSplash from 'react-native-bootsplash';
 
 import { NexaSymbol } from './NexaSymbol';
+import { resolveLaunchReduceMotion } from './resolveLaunchReduceMotion';
 
 const SPLASH_BACKGROUND = '#08090D';
 const WORDMARK = '#F7F8FA';
@@ -69,18 +69,12 @@ export function NexaLaunchOverlay({
   useEffect(() => {
     let active = true;
 
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+    void resolveLaunchReduceMotion().then((enabled) => {
       if (active) setReduceMotion(enabled);
     });
 
-    const subscription = AccessibilityInfo.addEventListener(
-      'reduceMotionChanged',
-      (enabled) => setReduceMotion(enabled),
-    );
-
     return () => {
       active = false;
-      subscription.remove();
     };
   }, []);
 
