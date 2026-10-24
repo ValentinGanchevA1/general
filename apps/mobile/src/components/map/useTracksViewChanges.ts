@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import { NEXA_MARKER_TRACKING_WINDOW_MS } from './nexaMarkerMotion';
+
 export function useTracksViewChanges(deps: React.DependencyList): boolean {
   const [tracks, setTracks] = useState(true);
 
@@ -8,7 +10,7 @@ export function useTracksViewChanges(deps: React.DependencyList): boolean {
     // Promise.resolve().then — queueMicrotask is not in RN tsconfig lib (TS2304 on CI).
     void Promise.resolve().then(() => setTracks(true));
 
-    const t = setTimeout(() => setTracks(false), 250);
+    const t = setTimeout(() => setTracks(false), NEXA_MARKER_TRACKING_WINDOW_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
