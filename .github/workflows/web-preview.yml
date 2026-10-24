@@ -1,0 +1,77 @@
+name: Web Preview CI
+
+on:
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'packages/shared/**'
+      - 'apps/backend/src/common/cors-origins.ts'
+      - 'apps/backend/src/common/cors-origins.spec.ts'
+      - '.github/workflows/web-preview.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'web/**'
+      - 'packages/shared/**'
+      - 'apps/backend/src/common/cors-origins.ts'
+      - 'apps/backend/src/common/cors-origins.spec.ts'
+      - '.github/workflows/web-preview.yml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  web-preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - name: Install workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck web preview
+        run: pnpm exec tsc -p web/tsconfig.json
+
+      - name: Build web preview
+        run: node web/build.mjs
+
+      - name: Verify browser bundle
+        run: |
+          test -s web/dist/app.js
+          node --check web/dist/app.js
+          node --check web/edge.mjs
+
+      - name: Smoke test web edge
+        run: |
+          if BACKEND_ORIGIN=https://example.com PORT=4181 node web/edge.mjs >/tmp/nexa-edge-reject.log 2>&1; then
+            echo 'edge accepted an unapproved backend origin'
+            exit 1
+          fi
+
+          BACKEND_ORIGIN=https://g88-api-pr-578.onrender.com PORT=4180 node web/edge.mjs >/tmp/nexa-edge.log 2>&1 &
+          EDGE_PID=$!
+          trap 'kill "$EDGE_PID" 2>/dev/null || true' EXIT
+          for attempt in 1 2 3 4 5; do
+            if curl --fail --silent http://127.0.0.1:4180/healthz >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:4180/healthz | grep '"ok":true'
+          curl --fail --silent http://127.0.0.1:4180/ | grep 'NEXA'
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' --request-target 'https://evil.example/api/v1/auth/me' http://127.0.0.1:4180/)" = '400'
