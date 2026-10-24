@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Marker } from 'react-native-maps';
 import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
 
@@ -20,6 +20,7 @@ import {
   NEXA_MARKER_REVEAL_INTERVAL_MS,
   nextNexaMarkerRevealCount,
   resolveNexaMarkerRevealCountForBand,
+  shouldResetNexaRevealForReplacement,
 } from './nexaProgressiveReveal';
 import { clusterVisualKey, entityVisualKey } from './markerVisualKeys';
 import { useTracksViewChanges } from './useTracksViewChanges';
@@ -50,6 +51,12 @@ function entityKey(point: EntityPoint): string {
   return `${point.kind}:${point.id}`;
 }
 
+function discoveryPointRevealKey(point: DiscoveryPoint): string {
+  return point.kind === 'cluster'
+    ? `cluster:${point.cellId}`
+    : entityKey(point);
+}
+
 /**
  * Isolated marker layer so MapScreen chrome state (sheet, FAB, loading)
  * does not re-reconcile every Marker when points/handlers are unchanged.
@@ -77,11 +84,23 @@ function MapMarkersImpl({
     band: effectiveZoomPolicy.band,
     count: NEXA_INITIAL_MARKER_REVEAL_COUNT,
   }));
-  const revealCount = resolveNexaMarkerRevealCountForBand(
+  const previousPointKeysRef = useRef<readonly string[]>([]);
+  const pointKeys = useMemo(
+    () => points.map(discoveryPointRevealKey),
+    [points],
+  );
+  const replacementReset = shouldResetNexaRevealForReplacement(
+    previousPointKeysRef.current,
+    pointKeys,
+  );
+  const bandRevealCount = resolveNexaMarkerRevealCountForBand(
     revealState.band,
     effectiveZoomPolicy.band,
     revealState.count,
   );
+  const revealCount = replacementReset
+    ? NEXA_INITIAL_MARKER_REVEAL_COUNT
+    : bandRevealCount;
 
   const effectiveSelectedEntityKey =
     selectedEntityKey === undefined ? localSelectedEntityKey : selectedEntityKey;
@@ -134,7 +153,10 @@ function MapMarkersImpl({
   );
 
   useEffect(() => {
-    if (revealState.band === effectiveZoomPolicy.band) return;
+    const bandChanged = revealState.band !== effectiveZoomPolicy.band;
+    previousPointKeysRef.current = pointKeys;
+    if (!bandChanged && !replacementReset) return;
+
     const nextBand = effectiveZoomPolicy.band;
     void Promise.resolve().then(() => {
       setRevealState({
@@ -142,18 +164,25 @@ function MapMarkersImpl({
         count: NEXA_INITIAL_MARKER_REVEAL_COUNT,
       });
     });
-  }, [effectiveZoomPolicy.band, revealState.band]);
+  }, [
+    effectiveZoomPolicy.band,
+    pointKeys,
+    replacementReset,
+    revealState.band,
+  ]);
 
   useEffect(() => {
     if (reduceMotion || visiblePoints.length <= revealCount) return;
     const activeBand = effectiveZoomPolicy.band;
     const timer = setTimeout(() => {
       setRevealState((current) => {
-        const currentCount = resolveNexaMarkerRevealCountForBand(
-          current.band,
-          activeBand,
-          current.count,
-        );
+        const currentCount = replacementReset
+          ? NEXA_INITIAL_MARKER_REVEAL_COUNT
+          : resolveNexaMarkerRevealCountForBand(
+              current.band,
+              activeBand,
+              current.count,
+            );
         return {
           band: activeBand,
           count: nextNexaMarkerRevealCount(
@@ -168,6 +197,7 @@ function MapMarkersImpl({
   }, [
     effectiveZoomPolicy.band,
     reduceMotion,
+    replacementReset,
     revealCount,
     visiblePoints.length,
   ]);
