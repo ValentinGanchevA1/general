@@ -14,6 +14,7 @@ interface Props {
   own?: boolean;
   dimmed?: boolean;
   unavailable?: boolean;
+  reduceMotion?: boolean;
   onVisualSettled?: () => void;
 }
 
@@ -86,6 +87,7 @@ function EntityMarkerImpl({
   own = false,
   dimmed = false,
   unavailable = false,
+  reduceMotion = true,
   onVisualSettled,
 }: Props): React.JSX.Element {
   if (point.kind === 'user') {
@@ -102,6 +104,7 @@ function EntityMarkerImpl({
         {...(showCaption ? { caption: name.slice(0, 10) } : {})}
         state={{ selected, live, verified, isNew, own, dimmed, unavailable }}
         accessibilityLabel={`${name}, person${live ? ', live' : ''}${verified ? ', verified' : ''}`}
+        reduceMotion={reduceMotion}
         {...(onVisualSettled ? { onVisualSettled } : {})}
       />
     );
@@ -115,6 +118,7 @@ function EntityMarkerImpl({
         {...(showCaption ? { caption: formatEventBadge(point.meta.startsAt) } : {})}
         state={{ selected, isNew, own, dimmed, unavailable }}
         accessibilityLabel={`${point.meta.title}, event`}
+        reduceMotion={reduceMotion}
         {...(onVisualSettled ? { onVisualSettled } : {})}
       />
     );
@@ -135,6 +139,7 @@ function EntityMarkerImpl({
         : {})}
       state={{ selected, isNew, own, dimmed, unavailable }}
       accessibilityLabel={`${point.meta.title}, listing`}
+      reduceMotion={reduceMotion}
       {...(onVisualSettled ? { onVisualSettled } : {})}
     />
   );
@@ -152,6 +157,7 @@ function entityMarkerPropsEqual(prev: Props, next: Props): boolean {
     prev.own === next.own &&
     prev.dimmed === next.dimmed &&
     prev.unavailable === next.unavailable &&
+    prev.reduceMotion === next.reduceMotion &&
     prev.onVisualSettled === next.onVisualSettled
   );
 }
