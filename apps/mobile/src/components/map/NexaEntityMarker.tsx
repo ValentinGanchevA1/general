@@ -20,8 +20,7 @@ import {
   type NexaMarkerState,
 } from './nexaEntityMarkerVisuals';
 import {
-  NEXA_MARKER_SELECTION_PULSE_IN_MS,
-  NEXA_MARKER_SELECTION_PULSE_OUT_MS,
+  NEXA_MARKER_SELECTION_PULSE_TOTAL_MS,
   shouldAnimateNexaMarkerSelection,
 } from './nexaMarkerMotion';
 
@@ -74,20 +73,12 @@ export function NexaEntityMarker({
 
     if (!animateSelection) return undefined;
 
-    const animation = Animated.sequence([
-      Animated.timing(selectionPulse, {
-        toValue: 1,
-        duration: NEXA_MARKER_SELECTION_PULSE_IN_MS,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(selectionPulse, {
-        toValue: 0,
-        duration: NEXA_MARKER_SELECTION_PULSE_OUT_MS,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: true,
-      }),
-    ]);
+    const animation = Animated.timing(selectionPulse, {
+      toValue: 1,
+      duration: NEXA_MARKER_SELECTION_PULSE_TOTAL_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
 
     animation.start();
     return () => animation.stop();
@@ -147,12 +138,12 @@ export function NexaEntityMarker({
 
   const iconSize = Math.max(10, Math.round(visual.visualSize * 0.48));
   const pulseOpacity = selectionPulse.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0, 0.5, 0],
+    inputRange: [0, 0.3, 1],
+    outputRange: [0, 0.52, 0],
   });
   const pulseScale = selectionPulse.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.82, 1.22],
+    outputRange: [0.84, 1.22],
   });
 
   return (
