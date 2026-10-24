@@ -5,6 +5,8 @@ on:
     paths:
       - 'web/**'
       - 'packages/shared/**'
+      - 'apps/backend/src/common/cors-origins.ts'
+      - 'apps/backend/src/common/cors-origins.spec.ts'
       - '.github/workflows/web-preview.yml'
   push:
     branches:
@@ -12,6 +14,8 @@ on:
     paths:
       - 'web/**'
       - 'packages/shared/**'
+      - 'apps/backend/src/common/cors-origins.ts'
+      - 'apps/backend/src/common/cors-origins.spec.ts'
       - '.github/workflows/web-preview.yml'
 
 permissions:
@@ -52,3 +56,16 @@ jobs:
         run: |
           test -s web/dist/app.js
           node --check web/dist/app.js
+          node --check web/edge.mjs
+
+      - name: Smoke test web edge
+        run: |
+          BACKEND_ORIGIN=https://example.com PORT=4180 node web/edge.mjs >/tmp/nexa-edge.log 2>&1 &
+          EDGE_PID=$!
+          trap 'kill "$EDGE_PID" 2>/dev/null || true' EXIT
+          for attempt in 1 2 3 4 5; do
+            if curl --fail --silent http://127.0.0.1:4180/healthz >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:4180/healthz | grep '"ok":true'
+          curl --fail --silent http://127.0.0.1:4180/ | grep 'NEXA'
