@@ -16,6 +16,7 @@ import {
   buildPeerRegionFocus,
 } from '@/components/map/focusPeerOnMap';
 import type { ListingModeFilterValue } from '@/components/map/ListingModeFilter';
+import { useNexaMapSurfaceReady } from '@/components/Brand/NexaLaunchSurfaceContext';
 
 export type MapFocusParams = {
   focusMyPin?: boolean;
@@ -66,6 +67,8 @@ function isWorldScale(r: Region | null): boolean {
 
 const COLD_START_DELTA = 0.02;
 const COLD_START_MAX_ATTEMPTS = 6;
+const MAP_SURFACE_PROBE_MAX_ATTEMPTS = 5;
+const MAP_SURFACE_PROBE_RETRY_MS = 80;
 
 /**
  * Orchestrates "View on map" / post-create pin focus:
@@ -96,6 +99,42 @@ export function useMapFocus({
   /** True only after camera is known city-scale (or focusMyPin applied). */
   const hasCenteredOnUserRef = useRef(false);
   const coldStartAttemptsRef = useRef(0);
+  const markLaunchMapSurfaceReady = useNexaMapSurfaceReady();
+
+  useEffect(() => {
+    let cancelled = false;
+    let attempts = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const probeNativeMap = (): void => {
+      if (cancelled || attempts >= MAP_SURFACE_PROBE_MAX_ATTEMPTS) return;
+      attempts += 1;
+
+      const map = mapRef.current;
+      if (map == null) {
+        retryTimer = setTimeout(probeNativeMap, MAP_SURFACE_PROBE_RETRY_MS);
+        return;
+      }
+
+      void map
+        .getCamera()
+        .then(() => {
+          if (!cancelled) markLaunchMapSurfaceReady();
+        })
+        .catch(() => {
+          if (!cancelled && attempts < MAP_SURFACE_PROBE_MAX_ATTEMPTS) {
+            retryTimer = setTimeout(probeNativeMap, MAP_SURFACE_PROBE_RETRY_MS);
+          }
+        });
+    };
+
+    const task = InteractionManager.runAfterInteractions(probeNativeMap);
+    return () => {
+      cancelled = true;
+      task.cancel();
+      if (retryTimer != null) clearTimeout(retryTimer);
+    };
+  }, [mapRef, markLaunchMapSurfaceReady]);
 
   const clearFocusParams = useCallback(() => {
     navigation.setParams({
