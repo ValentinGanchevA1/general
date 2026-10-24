@@ -365,7 +365,6 @@ function EntityMarkerItemImpl({
   reduceMotion,
   onPress,
 }: EntityItemProps): React.JSX.Element {
-  const [visualSettled, setVisualSettled] = useState(false);
   const baseVisualKey = entityVisualKey(point);
   const renderKey = [
     baseVisualKey,
@@ -377,15 +376,7 @@ function EntityMarkerItemImpl({
     dimmed ? 'dim' : 'normal',
     unavailable ? 'unavailable' : 'available',
   ].join('|');
-  const tracksFromKey = useTracksViewChanges([renderKey]);
-
-  useEffect(() => {
-    void Promise.resolve().then(() => {
-      setVisualSettled(false);
-    });
-  }, [renderKey]);
-
-  const tracksViewChanges = tracksFromKey || !visualSettled;
+  const tracksViewChanges = useTracksViewChanges([renderKey]);
   const coordinate = useMemo(
     () => ({ latitude: point.lat, longitude: point.lng }),
     [point.lat, point.lng],
@@ -396,7 +387,6 @@ function EntityMarkerItemImpl({
   const handlePress = useCallback(() => {
     onPress(point);
   }, [onPress, point]);
-  const onVisualSettled = useCallback(() => setVisualSettled(true), []);
 
   return (
     <Marker
@@ -416,7 +406,6 @@ function EntityMarkerItemImpl({
         dimmed={dimmed}
         unavailable={unavailable}
         reduceMotion={reduceMotion}
-        onVisualSettled={onVisualSettled}
       />
     </Marker>
   );
