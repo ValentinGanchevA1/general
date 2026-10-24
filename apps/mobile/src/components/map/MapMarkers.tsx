@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Marker } from 'react-native-maps';
 import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
 
@@ -45,6 +45,7 @@ interface MapMarkersProps {
 interface RevealState {
   band: NexaMapZoomBand;
   count: number;
+  pointKeys: readonly string[];
 }
 
 function entityKey(point: EntityPoint): string {
@@ -77,20 +78,20 @@ function MapMarkersImpl({
   const reduceMotion = useNexaReducedMotion();
   const effectiveZoomPolicy =
     zoomPolicy ?? resolveNexaMapZoomPolicy(committedDiscoveryZoom);
+  const pointKeys = useMemo(
+    () => points.map(discoveryPointRevealKey),
+    [points],
+  );
 
   const [localSelectedEntityKey, setLocalSelectedEntityKey] = useState<string | null>(null);
   const [localSelectedClusterCellId, setLocalSelectedClusterCellId] = useState<string | null>(null);
   const [revealState, setRevealState] = useState<RevealState>(() => ({
     band: effectiveZoomPolicy.band,
     count: NEXA_INITIAL_MARKER_REVEAL_COUNT,
+    pointKeys,
   }));
-  const previousPointKeysRef = useRef<readonly string[]>([]);
-  const pointKeys = useMemo(
-    () => points.map(discoveryPointRevealKey),
-    [points],
-  );
   const replacementReset = shouldResetNexaRevealForReplacement(
-    previousPointKeysRef.current,
+    revealState.pointKeys,
     pointKeys,
   );
   const bandRevealCount = resolveNexaMarkerRevealCountForBand(
@@ -154,29 +155,35 @@ function MapMarkersImpl({
 
   useEffect(() => {
     const bandChanged = revealState.band !== effectiveZoomPolicy.band;
-    previousPointKeysRef.current = pointKeys;
-    if (!bandChanged && !replacementReset) return;
+    const identitiesChanged = revealState.pointKeys !== pointKeys;
+    if (!bandChanged && !identitiesChanged) return;
 
     const nextBand = effectiveZoomPolicy.band;
     void Promise.resolve().then(() => {
-      setRevealState({
-        band: nextBand,
-        count: NEXA_INITIAL_MARKER_REVEAL_COUNT,
+      setRevealState((current) => {
+        const shouldReset =
+          current.band !== nextBand ||
+          shouldResetNexaRevealForReplacement(current.pointKeys, pointKeys);
+        return {
+          band: nextBand,
+          count: shouldReset
+            ? NEXA_INITIAL_MARKER_REVEAL_COUNT
+            : current.count,
+          pointKeys,
+        };
       });
     });
-  }, [
-    effectiveZoomPolicy.band,
-    pointKeys,
-    replacementReset,
-    revealState.band,
-  ]);
+  }, [effectiveZoomPolicy.band, pointKeys, revealState.band, revealState.pointKeys]);
 
   useEffect(() => {
     if (reduceMotion || visiblePoints.length <= revealCount) return;
     const activeBand = effectiveZoomPolicy.band;
     const timer = setTimeout(() => {
       setRevealState((current) => {
-        const currentCount = replacementReset
+        const shouldReset =
+          current.band !== activeBand ||
+          shouldResetNexaRevealForReplacement(current.pointKeys, pointKeys);
+        const currentCount = shouldReset
           ? NEXA_INITIAL_MARKER_REVEAL_COUNT
           : resolveNexaMarkerRevealCountForBand(
               current.band,
@@ -190,14 +197,15 @@ function MapMarkersImpl({
             visiblePoints.length,
             false,
           ),
+          pointKeys,
         };
       });
     }, NEXA_MARKER_REVEAL_INTERVAL_MS);
     return () => clearTimeout(timer);
   }, [
     effectiveZoomPolicy.band,
+    pointKeys,
     reduceMotion,
-    replacementReset,
     revealCount,
     visiblePoints.length,
   ]);
