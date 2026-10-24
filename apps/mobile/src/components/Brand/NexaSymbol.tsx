@@ -10,21 +10,29 @@ export interface NexaSymbolProps {
 /**
  * Final NEXA eye / discovery core.
  *
- * The upper horizon remains the primary silhouette, while the iris ring and
- * luminous focal point make the mark read as an eye rather than an antenna or
- * broadcast glyph. The splash can surround this core with the NEXA entity
- * orbit without changing the reusable brand primitive.
+ * The upper lid is intentionally shallow rather than a full semicircle, the
+ * iris and luminous pupil share one optical center, and a restrained lower lid
+ * closes the silhouette just enough to read as an eye without turning the mark
+ * into a literal illustration. The splash can surround this core with the NEXA
+ * entity orbit without changing the reusable brand primitive.
  */
 export function NexaSymbol({ size = 96 }: NexaSymbolProps): React.JSX.Element {
-  const arcWidth = size * 0.86;
-  const arcStroke = Math.max(5, size * 0.07);
-  const arcTop = size * 0.09;
-  const arcClipHeight = arcWidth / 2;
+  const lidWidth = size * 0.9;
+  const lidHeight = size * 0.48;
+  const lidStroke = Math.max(4, size * 0.058);
+  const lidTop = size * 0.13;
+  const lidClipHeight = size * 0.31;
 
-  const irisSize = size * 0.48;
-  const irisTop = size * 0.39;
-  const dotSize = size * 0.265;
-  const dotTop = size * 0.535;
+  const opticalCenterY = size * 0.54;
+  const irisSize = size * 0.43;
+  const irisTop = opticalCenterY - irisSize / 2;
+  const dotSize = size * 0.22;
+  const dotTop = opticalCenterY - dotSize / 2;
+
+  const lowerLidWidth = size * 0.31;
+  const lowerLidStroke = Math.max(2, size * 0.022);
+  const lowerLidTop = size * 0.7;
+  const lowerLidInset = size * 0.2;
 
   return (
     <View
@@ -38,11 +46,11 @@ export function NexaSymbol({ size = 96 }: NexaSymbolProps): React.JSX.Element {
         style={[
           styles.irisGlow,
           {
-            width: irisSize * 1.14,
-            height: irisSize * 1.14,
-            borderRadius: (irisSize * 1.14) / 2,
-            left: (size - irisSize * 1.14) / 2,
-            top: irisTop - irisSize * 0.07,
+            width: irisSize * 1.18,
+            height: irisSize * 1.18,
+            borderRadius: (irisSize * 1.18) / 2,
+            left: (size - irisSize * 1.18) / 2,
+            top: opticalCenterY - (irisSize * 1.18) / 2,
           },
         ]}
       />
@@ -64,51 +72,108 @@ export function NexaSymbol({ size = 96 }: NexaSymbolProps): React.JSX.Element {
 
       <View
         style={[
-          styles.arcClip,
+          styles.lidClip,
           {
-            width: arcWidth,
-            height: arcClipHeight + arcStroke,
-            left: (size - arcWidth) / 2,
-            top: arcTop,
+            width: lidWidth,
+            height: lidClipHeight,
+            left: (size - lidWidth) / 2,
+            top: lidTop,
           },
         ]}
       >
         <View
           pointerEvents="none"
           style={[
-            styles.arcGlowOuter,
+            styles.lidGlowOuter,
             {
-              width: arcWidth,
-              height: arcWidth,
-              borderRadius: arcWidth / 2,
-              borderWidth: arcStroke * 1.9,
+              width: lidWidth,
+              height: lidHeight,
+              borderRadius: 999,
+              borderWidth: lidStroke * 1.85,
             },
           ]}
         />
         <View
           pointerEvents="none"
           style={[
-            styles.arcGlowInner,
+            styles.lidGlowInner,
             {
-              width: arcWidth,
-              height: arcWidth,
-              borderRadius: arcWidth / 2,
-              borderWidth: arcStroke * 1.35,
+              width: lidWidth,
+              height: lidHeight,
+              borderRadius: 999,
+              borderWidth: lidStroke * 1.3,
             },
           ]}
         />
         <View
           style={[
-            styles.arc,
+            styles.lid,
             {
-              width: arcWidth,
-              height: arcWidth,
-              borderRadius: arcWidth / 2,
-              borderWidth: arcStroke,
+              width: lidWidth,
+              height: lidHeight,
+              borderRadius: 999,
+              borderWidth: lidStroke,
             },
           ]}
         />
       </View>
+
+      <View
+        pointerEvents="none"
+        style={[
+          styles.lowerLidGlow,
+          {
+            width: lowerLidWidth,
+            height: lowerLidStroke * 2.4,
+            left: lowerLidInset,
+            top: lowerLidTop,
+            borderRadius: lowerLidStroke * 1.2,
+            transform: [{ rotateZ: '10deg' }],
+          },
+        ]}
+      />
+      <View
+        pointerEvents="none"
+        style={[
+          styles.lowerLidGlow,
+          {
+            width: lowerLidWidth,
+            height: lowerLidStroke * 2.4,
+            right: lowerLidInset,
+            top: lowerLidTop,
+            borderRadius: lowerLidStroke * 1.2,
+            transform: [{ rotateZ: '-10deg' }],
+          },
+        ]}
+      />
+      <View
+        pointerEvents="none"
+        style={[
+          styles.lowerLid,
+          {
+            width: lowerLidWidth,
+            height: lowerLidStroke,
+            left: lowerLidInset,
+            top: lowerLidTop,
+            borderRadius: lowerLidStroke / 2,
+            transform: [{ rotateZ: '10deg' }],
+          },
+        ]}
+      />
+      <View
+        pointerEvents="none"
+        style={[
+          styles.lowerLid,
+          {
+            width: lowerLidWidth,
+            height: lowerLidStroke,
+            right: lowerLidInset,
+            top: lowerLidTop,
+            borderRadius: lowerLidStroke / 2,
+            transform: [{ rotateZ: '-10deg' }],
+          },
+        ]}
+      />
 
       <View
         pointerEvents="none"
@@ -119,7 +184,7 @@ export function NexaSymbol({ size = 96 }: NexaSymbolProps): React.JSX.Element {
             height: dotSize * 2.05,
             borderRadius: dotSize * 1.025,
             left: (size - dotSize * 2.05) / 2,
-            top: dotTop - dotSize * 0.525,
+            top: opticalCenterY - (dotSize * 2.05) / 2,
           },
         ]}
       />
@@ -128,11 +193,11 @@ export function NexaSymbol({ size = 96 }: NexaSymbolProps): React.JSX.Element {
         style={[
           styles.dotHaloInner,
           {
-            width: dotSize * 1.48,
-            height: dotSize * 1.48,
-            borderRadius: dotSize * 0.74,
-            left: (size - dotSize * 1.48) / 2,
-            top: dotTop - dotSize * 0.24,
+            width: dotSize * 1.5,
+            height: dotSize * 1.5,
+            borderRadius: dotSize * 0.75,
+            left: (size - dotSize * 1.5) / 2,
+            top: opticalCenterY - (dotSize * 1.5) / 2,
           },
         ]}
       />
@@ -157,51 +222,63 @@ const styles = StyleSheet.create({
   root: {
     position: 'relative',
   },
-  arcClip: {
+  lidClip: {
     position: 'absolute',
     overflow: 'hidden',
   },
-  arcGlowOuter: {
+  lidGlowOuter: {
     position: 'absolute',
     top: 0,
     left: 0,
     borderColor: 'rgba(124, 92, 252, 0.14)',
   },
-  arcGlowInner: {
+  lidGlowInner: {
     position: 'absolute',
     top: 0,
     left: 0,
     borderColor: 'rgba(98, 230, 255, 0.18)',
   },
-  arc: {
+  lid: {
     position: 'absolute',
     top: 0,
     left: 0,
     borderColor: nexaDark.textPrimary,
   },
+  lowerLidGlow: {
+    position: 'absolute',
+    backgroundColor: 'rgba(124, 92, 252, 0.18)',
+  },
+  lowerLid: {
+    position: 'absolute',
+    backgroundColor: 'rgba(200, 190, 255, 0.72)',
+    shadowColor: nexaBrand.violetBright,
+    shadowOpacity: 0.42,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 0 },
+  },
   irisGlow: {
     position: 'absolute',
     borderWidth: 1,
-    borderColor: 'rgba(124, 92, 252, 0.18)',
+    borderColor: 'rgba(124, 92, 252, 0.2)',
   },
   iris: {
     position: 'absolute',
-    borderColor: 'rgba(200, 190, 255, 0.68)',
-    backgroundColor: 'rgba(8, 9, 13, 0.52)',
+    borderColor: 'rgba(200, 190, 255, 0.72)',
+    backgroundColor: 'rgba(8, 9, 13, 0.48)',
   },
   dotHaloOuter: {
     position: 'absolute',
-    backgroundColor: 'rgba(124, 92, 252, 0.10)',
+    backgroundColor: 'rgba(124, 92, 252, 0.11)',
   },
   dotHaloInner: {
     position: 'absolute',
-    backgroundColor: 'rgba(200, 190, 255, 0.14)',
+    backgroundColor: 'rgba(200, 190, 255, 0.16)',
   },
   dot: {
     position: 'absolute',
     backgroundColor: nexaBrand.symbolCore,
     borderWidth: 1,
-    borderColor: 'rgba(247, 248, 250, 0.78)',
+    borderColor: 'rgba(247, 248, 250, 0.84)',
     shadowColor: nexaBrand.violetBright,
     shadowOpacity: 0.98,
     shadowOffset: { width: 0, height: 0 },
