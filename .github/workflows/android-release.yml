@@ -64,6 +64,11 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: .
 
+      - name: Guard production legal URLs
+        env:
+          NEXA_PLAY_TRACK: ${{ inputs.track || 'alpha' }}
+        run: node scripts/check-production-legal-urls.mjs
+
       - name: Inject Maps keys
         env:
           GOOGLE_MAPS_API_KEY_DEBUG: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG }}
