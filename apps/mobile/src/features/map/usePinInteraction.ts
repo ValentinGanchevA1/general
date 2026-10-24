@@ -2,6 +2,7 @@ import {useCallback, useEffect, useMemo, useRef} from 'react';
 import {useMachine} from '@xstate/react';
 
 import type {EntityPoint, VerificationLevel} from '@g88/shared';
+import {formatNexaSpatialDistance} from '@/components/map/nexaSpatialSheet';
 import {nexaHaptics} from '@/haptics/nexaHaptics';
 import {pinInteractionMachine} from './pinInteraction.machine';
 import type {ViewerMode} from './pinInteraction.types';
@@ -138,12 +139,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
       profile && 'displayName' in profile && typeof profile.displayName === 'string'
         ? profile.displayName
         : 'User';
-    const distanceLabel =
-      ctx.distanceMeters != null
-        ? ctx.distanceMeters < 1000
-          ? `${Math.round(ctx.distanceMeters)} m`
-          : `${(ctx.distanceMeters / 1000).toFixed(1)} km`
-        : null;
+    const distanceLabel = formatNexaSpatialDistance(ctx.distanceMeters);
     const peerAllowsDating =
       ctx.peerMode === 'dating' || ctx.peerMode === 'both';
 
