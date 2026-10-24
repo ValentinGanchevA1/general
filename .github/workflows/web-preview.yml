@@ -60,7 +60,12 @@ jobs:
 
       - name: Smoke test web edge
         run: |
-          BACKEND_ORIGIN=https://example.com PORT=4180 node web/edge.mjs >/tmp/nexa-edge.log 2>&1 &
+          if BACKEND_ORIGIN=https://example.com PORT=4181 node web/edge.mjs >/tmp/nexa-edge-reject.log 2>&1; then
+            echo 'edge accepted an unapproved backend origin'
+            exit 1
+          fi
+
+          BACKEND_ORIGIN=https://g88-api-pr-578.onrender.com PORT=4180 node web/edge.mjs >/tmp/nexa-edge.log 2>&1 &
           EDGE_PID=$!
           trap 'kill "$EDGE_PID" 2>/dev/null || true' EXIT
           for attempt in 1 2 3 4 5; do
@@ -69,3 +74,4 @@ jobs:
           done
           curl --fail --silent http://127.0.0.1:4180/healthz | grep '"ok":true'
           curl --fail --silent http://127.0.0.1:4180/ | grep 'NEXA'
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' --request-target 'https://evil.example/api/v1/auth/me' http://127.0.0.1:4180/)" = '400'
