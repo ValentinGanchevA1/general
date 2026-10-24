@@ -6,9 +6,9 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { AccountStackParamList } from '@/navigation/stacks';
 import { APP_VERSION, TERMS_OF_SERVICE_URL } from '@/constants/app';
+import { BrandLogo } from '@/components/Brand/BrandLogo';
 import { ListRow } from '@/components/ListRow';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { NexaSymbol } from '@/components/Brand/NexaSymbol';
 import { radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
@@ -41,8 +41,7 @@ export function AboutScreen(): React.JSX.Element {
       <ScreenHeader title="About" />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.brand}>
-          <View style={styles.logo}><NexaSymbol size={60} /></View>
-          <Text style={styles.appName}>NEXA</Text>
+          <BrandLogo size={72} />
           <Text style={styles.tagline}>Live discovery for the world around you.</Text>
           <Text style={styles.version}>Version {APP_VERSION}</Text>
         </View>
@@ -83,18 +82,7 @@ function createStyles(colors: ThemeColors) {
     container: { flex: 1, backgroundColor: colors.bg },
     body: { padding: spacing.xxl, paddingBottom: 48 },
     brand: { alignItems: 'center', marginTop: spacing.md, marginBottom: 28 },
-    logo: {
-      width: 84,
-      height: 84,
-      borderRadius: 22,
-      backgroundColor: colors.surfaceAlt,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: colors.borderStrong,
-    },
-    appName: { color: colors.textPrimary, fontSize: 28, fontWeight: '800', marginTop: spacing.lg, letterSpacing: 6 },
-    tagline: { color: colors.textMuted, fontSize: 14, textAlign: 'center', marginTop: 6, maxWidth: 280, lineHeight: 20 },
+    tagline: { color: colors.textMuted, fontSize: 14, textAlign: 'center', marginTop: spacing.md, maxWidth: 280, lineHeight: 20 },
     version: { color: colors.textFaint, fontSize: 12, marginTop: 10 },
     about: { color: colors.textSecondary, fontSize: 14, lineHeight: 21, marginBottom: spacing.xxl },
     sectionTitle: { color: colors.textFaint, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.md },
