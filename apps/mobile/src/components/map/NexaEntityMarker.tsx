@@ -35,7 +35,6 @@ export interface NexaEntityMarkerProps {
   caption?: string;
   accessibilityLabel?: string;
   reduceMotion?: boolean;
-  onVisualSettled?: () => void;
 }
 
 function stateSuffix(state: NexaMarkerState): string {
@@ -57,7 +56,6 @@ export function NexaEntityMarker({
   caption,
   accessibilityLabel,
   reduceMotion = true,
-  onVisualSettled,
 }: NexaEntityMarkerProps): React.JSX.Element {
   const { colors } = useAppTheme();
   const visual = resolveNexaMarkerVisual(entityType, density, state);
@@ -156,7 +154,7 @@ export function NexaEntityMarker({
         `${entityType}${caption ? `, ${caption}` : ''}${stateSuffix(state)}`
       }
     >
-      <View style={styles.markerStage} onLayout={onVisualSettled}>
+      <View style={styles.markerStage}>
         {animateSelection ? (
           <Animated.View
             pointerEvents="none"
