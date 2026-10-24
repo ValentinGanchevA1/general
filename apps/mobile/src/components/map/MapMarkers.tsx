@@ -343,7 +343,7 @@ function ClusterMarkerItemImpl({
     showComposition ? 'composition' : 'minimal',
     themeVisualKey,
   ].join('|');
-  const tracksViewChanges = useTracksViewChanges([renderKey]);
+  const tracksViewChanges = useTracksViewChanges([renderKey], selected);
   const coordinate = useMemo(
     () => ({ latitude: point.lat, longitude: point.lng }),
     [point.lat, point.lng],
@@ -426,7 +426,7 @@ function EntityMarkerItemImpl({
     unavailable ? 'unavailable' : 'available',
     themeVisualKey,
   ].join('|');
-  const tracksViewChanges = useTracksViewChanges([renderKey]);
+  const tracksViewChanges = useTracksViewChanges([renderKey], selected);
   const coordinate = useMemo(
     () => ({ latitude: point.lat, longitude: point.lng }),
     [point.lat, point.lng],
