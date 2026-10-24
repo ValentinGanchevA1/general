@@ -1,5 +1,12 @@
-import React from 'react';
-import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  Text,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import type { ClusterPoint, EntityKind } from '@g88/shared';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -11,12 +18,17 @@ import {
   type NexaClusterMode,
   type NexaClusterShape,
 } from './nexaClusterVisuals';
+import {
+  NEXA_MARKER_SELECTION_PULSE_TOTAL_MS,
+  shouldAnimateNexaMarkerSelection,
+} from './nexaMarkerMotion';
 import { clusterVisualKey } from './markerVisualKeys';
 
 interface Props {
   point: ClusterPoint;
   selected?: boolean;
   showComposition?: boolean;
+  reduceMotion?: boolean;
 }
 
 const ROOT_SIZE = 68;
@@ -25,9 +37,12 @@ function ClusterMarkerImpl({
   point,
   selected = false,
   showComposition = true,
+  reduceMotion = true,
 }: Props): React.JSX.Element {
   const { colors } = useAppTheme();
   const visual = resolveNexaClusterVisual(point);
+  const [selectionPulse] = useState(() => new Animated.Value(0));
+  const animateSelection = shouldAnimateNexaMarkerSelection(selected, reduceMotion);
   const semanticColor =
     visual.mode === 'user'
       ? colors.entityPerson
@@ -36,6 +51,24 @@ function ClusterMarkerImpl({
         : visual.mode === 'listing'
           ? colors.entityListing
           : colors.borderStrong;
+  const pulseColor = visual.mode === 'mixed' ? colors.actionPrimary : semanticColor;
+
+  useEffect(() => {
+    selectionPulse.stopAnimation();
+    selectionPulse.setValue(0);
+
+    if (!animateSelection) return undefined;
+
+    const animation = Animated.timing(selectionPulse, {
+      toValue: 1,
+      duration: NEXA_MARKER_SELECTION_PULSE_TOTAL_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+
+    animation.start();
+    return () => animation.stop();
+  }, [animateSelection, selectionPulse]);
 
   const fillColor =
     visual.mode === 'user'
@@ -64,6 +97,15 @@ function ClusterMarkerImpl({
           ? 14
           : 13;
 
+  const pulseOpacity = selectionPulse.interpolate({
+    inputRange: [0, 0.3, 1],
+    outputRange: [0, 0.5, 0],
+  });
+  const pulseScale = selectionPulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.86, 1.18],
+  });
+
   return (
     <View
       style={styles.root}
@@ -71,7 +113,23 @@ function ClusterMarkerImpl({
       accessibilityRole="button"
       accessibilityLabel={clusterAccessibilityLabel(point)}
       accessibilityHint="Zooms in to reveal nearby items"
+      accessibilityState={{ selected }}
     >
+      {animateSelection ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.selectionPulse,
+            {
+              borderColor: pulseColor,
+              shadowColor: pulseColor,
+              opacity: pulseOpacity,
+              transform: [{ scale: pulseScale }],
+            },
+          ]}
+        />
+      ) : null}
+
       {selected ? (
         <View
           pointerEvents="none"
@@ -214,6 +272,7 @@ function clusterMarkerPropsEqual(prev: Props, next: Props): boolean {
   return (
     prev.selected === next.selected &&
     prev.showComposition === next.showComposition &&
+    prev.reduceMotion === next.reduceMotion &&
     clusterVisualKey(prev.point) === clusterVisualKey(next.point) &&
     prev.point.lat === next.point.lat &&
     prev.point.lng === next.point.lng
@@ -278,6 +337,17 @@ const styles = StyleSheet.create({
   },
   compositionGlyph: {
     opacity: 0.95,
+  },
+  selectionPulse: {
+    position: 'absolute',
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    borderWidth: 1,
+    shadowOpacity: 0.36,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 7,
   },
   selectedRing: {
     position: 'absolute',
