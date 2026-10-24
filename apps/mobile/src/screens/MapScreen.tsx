@@ -602,10 +602,10 @@ export function MapScreen(): React.JSX.Element {
 					latitudeDelta: Math.max(0.005, (region?.latitudeDelta ?? 0.05) / 2.5),
 					longitudeDelta: Math.max(0.005, (region?.longitudeDelta ?? 0.05) / 2.5),
 				},
-				300,
+				reduceMotion ? 0 : NEXA_MOTION_MS.map,
 			);
 		},
-		[region?.latitudeDelta, region?.longitudeDelta],
+		[reduceMotion, region?.latitudeDelta, region?.longitudeDelta],
 	);
 
 	const zoomInForDiscovery = useCallback(() => {
