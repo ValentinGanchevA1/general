@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
-  AccessibilityInfo,
   Animated,
   Easing,
   StyleSheet,
   View,
 } from 'react-native';
+
+import { resolveLaunchReduceMotion } from './resolveLaunchReduceMotion';
 
 const VIOLET = '#7C5CFC';
 const CYAN = '#27D3F2';
@@ -43,7 +44,7 @@ export function NexaSpatialMapHandoff({
   useEffect(() => {
     let active = true;
 
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+    void resolveLaunchReduceMotion().then((enabled) => {
       if (active) setReduceMotion(enabled);
     });
 
