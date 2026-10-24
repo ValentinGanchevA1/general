@@ -1,6 +1,6 @@
-# G88
+# NEXA
 
-Map-first, real-time social platform. See nearby people, events, and listings; wave, chat, trade, attend.
+Map-first, real-time social platform for discovering nearby people, events, local activity, and listings — then connecting through lightweight interactions, chat, events, and local trade.
 
 | App | Path | Role |
 |-----|------|------|
@@ -36,13 +36,17 @@ pnpm --filter @g88/admin dev  # optional — admin queue
 | `CLAUDE.md` | Agent + contributor conventions |
 | `DEPLOY.md` | Render / Play / env (if present) |
 
-**Current phase:** P1–P3 shipped · P4.S Stories shipped · migrations **0001–0040** (next **0041**).  
-Privacy: locations fuzzed to H3 r10 (~120 m) at write time — see `ARCHITECTURE.md §3.3`.
+**Current phase:** see `STATUS.md` for the live implementation state and migration baseline.  
+Privacy: locations are privacy-coarsened to H3 r10 (~120 m) before persistence — see `ARCHITECTURE.md §3.3`.
 
 ## Monorepo
 
 pnpm workspaces. Import contracts only from `@g88/shared`. Never import from `legacy/`.
 
+### Compatibility identifiers
+
+NEXA is the public product identity. Existing technical identifiers such as `@g88/*`, Android package/application ID `com.g88`, storage keys, and legacy infrastructure host names are intentionally retained until/unless they receive a separately planned compatibility migration. Do not mechanically rename them as branding cleanup.
+
 ## License / ops
 
-Internal product. Privacy policy: `https://g88-legal.onrender.com/privacy`.
+Internal product. Canonical public privacy policy: `https://g88-legal.onrender.com/privacy` (legacy-compatible infrastructure URL; hosted content is NEXA-branded).
