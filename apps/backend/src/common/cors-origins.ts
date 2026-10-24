@@ -3,7 +3,7 @@
  *
  * Credentialed CORS must always use explicit origins. Development keeps a
  * small local allowlist for the admin and browser preview; production is
- * configured only through CORS_ORIGINS and fails closed when it is missing.
+ * configured through CORS_ORIGINS and/or the dedicated PUBLIC_WEB_ORIGIN.
  */
 const REQUIRED_DEV_ORIGINS = [
   'http://127.0.0.1:5173',
@@ -17,20 +17,24 @@ const REQUIRED_DEV_ORIGINS = [
 function normalizeOrigin(value: string): string {
   const parsed = new URL(value);
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error(`Unsupported CORS origin protocol: ${parsed.protocol}`);
+    throw new Error(`Unsupported browser origin protocol: ${parsed.protocol}`);
   }
   if (parsed.username || parsed.password || parsed.search || parsed.hash || parsed.pathname !== '/') {
-    throw new Error(`CORS_ORIGINS entries must be bare origins: ${value}`);
+    throw new Error(`Browser origins must be bare origins: ${value}`);
   }
   return parsed.origin;
 }
 
 function configuredOrigins(): string[] {
-  return (process.env.CORS_ORIGINS ?? '')
+  const values = (process.env.CORS_ORIGINS ?? '')
     .split(',')
     .map((origin) => origin.trim())
-    .filter(Boolean)
-    .map(normalizeOrigin);
+    .filter(Boolean);
+
+  const publicWebOrigin = process.env.PUBLIC_WEB_ORIGIN?.trim();
+  if (publicWebOrigin) values.push(publicWebOrigin);
+
+  return values.map(normalizeOrigin);
 }
 
 export function corsOrigins(): string[] {
@@ -57,12 +61,14 @@ export function assertProductionCorsOrigins(): void {
 
   const origins = corsOrigins();
   if (origins.length === 0) {
-    throw new Error('CORS_ORIGINS must contain at least one explicit HTTPS origin in production');
+    throw new Error(
+      'CORS_ORIGINS or PUBLIC_WEB_ORIGIN must contain at least one explicit HTTPS origin in production',
+    );
   }
 
   for (const origin of origins) {
     if (!origin.startsWith('https://')) {
-      throw new Error(`Production CORS origin must use HTTPS: ${origin}`);
+      throw new Error(`Production browser origin must use HTTPS: ${origin}`);
     }
   }
 }
