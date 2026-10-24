@@ -130,18 +130,28 @@ export function ProfileHeaderPhoto({
       <View style={styles.overlayContent} pointerEvents="box-none">
         {photoCount > 1 ? (
           <View style={styles.dots}>
-            {Array.from({ length: photoCount }).map((_, index) => (
-              <Pressable
-                key={index}
-                onPress={() => onSelectPhoto?.(index)}
-                hitSlop={6}
-                style={[
-                  styles.dot,
-                  index === activePhotoIndex && styles.dotActive,
-                  index === activePhotoIndex && { backgroundColor: themeColors.textPrimary },
-                ]}
-              />
-            ))}
+            {Array.from({ length: photoCount }).map((_, index) => {
+              const selected = index === activePhotoIndex;
+              return (
+                <Pressable
+                  key={index}
+                  onPress={() => onSelectPhoto?.(index)}
+                  disabled={onSelectPhoto == null}
+                  style={styles.dotTarget}
+                  accessibilityRole={onSelectPhoto != null ? 'button' : undefined}
+                  accessibilityLabel={`Photo ${index + 1} of ${photoCount}`}
+                  accessibilityState={{ selected, disabled: onSelectPhoto == null }}
+                >
+                  <View
+                    style={[
+                      styles.dot,
+                      selected && styles.dotActive,
+                      selected && { backgroundColor: themeColors.textPrimary },
+                    ]}
+                  />
+                </Pressable>
+              );
+            })}
           </View>
         ) : null}
 
@@ -288,14 +298,21 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.lg,
-    paddingTop: 56,
+    paddingTop: 36,
     backgroundColor: 'rgba(10,10,15,0.78)',
   },
   dots: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 6,
-    marginBottom: 12,
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  dotTarget: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dot: {
     width: 6,
