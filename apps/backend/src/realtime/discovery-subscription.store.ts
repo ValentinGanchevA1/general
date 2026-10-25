@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import type { DiscoverySubscriptionPayload } from '@g88/shared';
+import {
+  isEntityZoom,
+  type DiscoverySubscriptionPayload,
+  type EntityKind,
+  type LatLng,
+  type Viewport,
+} from '@g88/shared';
 
 export interface ActiveDiscoverySubscription {
   socketId: string;
@@ -7,10 +13,35 @@ export interface ActiveDiscoverySubscription {
   query: DiscoverySubscriptionPayload;
 }
 
+const MAX_CANDIDATE_SUBSCRIPTIONS = 500;
+
+function viewportContains(viewport: Viewport, point: LatLng): boolean {
+  if (point.lat < viewport.sw.lat || point.lat > viewport.ne.lat) return false;
+
+  if (viewport.sw.lng <= viewport.ne.lng) {
+    return point.lng >= viewport.sw.lng && point.lng <= viewport.ne.lng;
+  }
+
+  // Antimeridian-crossing viewport: [sw..180] U [-180..ne].
+  return point.lng >= viewport.sw.lng || point.lng <= viewport.ne.lng;
+}
+
+function subscriptionAllowsKind(
+  query: DiscoverySubscriptionPayload,
+  kind: EntityKind,
+): boolean {
+  if (!isEntityZoom(query.zoom)) return false;
+  if (query.topic !== undefined && kind === 'user') return false;
+  if ((query.friendsOnly === true || query.datingOnly === true) && kind !== 'user') {
+    return false;
+  }
+  return query.kinds === undefined || query.kinds.includes(kind);
+}
+
 /**
  * Process-local active discovery contexts, keyed by socket rather than user.
- * A user may have multiple devices/viewports. This store intentionally does
- * not fan out events yet; candidate lookup is a separate bounded step.
+ * A user may have multiple devices/viewports. Candidate lookup is deliberately
+ * bounded; viewer-specific privacy/filter resolution still happens downstream.
  */
 @Injectable()
 export class DiscoverySubscriptionStore {
@@ -26,5 +57,23 @@ export class DiscoverySubscriptionStore {
 
   delete(socketId: string): void {
     this.bySocket.delete(socketId);
+  }
+
+  candidatesForEntity(
+    kind: EntityKind,
+    location: LatLng,
+    limit = MAX_CANDIDATE_SUBSCRIPTIONS,
+  ): ActiveDiscoverySubscription[] {
+    if (limit <= 0) return [];
+
+    const candidates: ActiveDiscoverySubscription[] = [];
+    for (const subscription of this.bySocket.values()) {
+      if (!subscriptionAllowsKind(subscription.query, kind)) continue;
+      if (!viewportContains(subscription.query.viewport, location)) continue;
+
+      candidates.push(subscription);
+      if (candidates.length >= limit) break;
+    }
+    return candidates;
   }
 }
