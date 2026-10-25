@@ -153,6 +153,18 @@ function socketJoinConversation(conversationId: string): Promise<boolean> {
   });
 }
 
+function socketLeaveConversation(conversationId: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const s = sharedSocket;
+    if (!s?.connected) return resolve(false);
+    const timer = setTimeout(() => resolve(false), 3_000);
+    s.emit('conversation:leave', { conversationId }, (res) => {
+      clearTimeout(timer);
+      resolve(res.ok);
+    });
+  });
+}
+
 function socketJoinEvent(eventId: string): Promise<boolean> {
   return new Promise((resolve) => {
     const s = sharedSocket;
@@ -472,7 +484,8 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
       handlers.forEach((unsub) => unsub());
       handlers.clear();
       for (const conversationId of conversationIntents) {
-        roomRegistry.untrackConversation(conversationId);
+        const releasedFinal = roomRegistry.untrackConversation(conversationId);
+        if (releasedFinal) void socketLeaveConversation(conversationId);
       }
       conversationIntents.clear();
     };

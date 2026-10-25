@@ -48,6 +48,7 @@ import { WsJwtGuard } from './ws-jwt.guard';
 import {
   ChatSendDto,
   ConversationJoinDto,
+  ConversationLeaveDto,
   EventRoomDto,
   LocationShareStartDto,
   LocationShareStopDto,
@@ -211,6 +212,19 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       const { code, message } = extractApiError(err);
       return { ok: false, code, message };
     }
+  }
+
+  @SubscribeMessage('conversation:leave')
+  @UseGuards(WsJwtGuard)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async onConversationLeave(
+    @ConnectedSocket() client: G88Socket,
+    @MessageBody() payload: ConversationLeaveDto,
+  ): Promise<AckResult<{ left: true }>> {
+    const room = this.conversationRoom(payload.conversationId);
+    client.leave(room);
+    client.data.rooms.delete(room);
+    return { ok: true, data: { left: true } };
   }
 
   @SubscribeMessage('event:join')

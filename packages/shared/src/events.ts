@@ -276,6 +276,10 @@ export interface ClientToServerEvents {
     p: { conversationId: string },
     ack: (r: AckResult<{ joined: true }>) => void,
   ) => void;
+  'conversation:leave': (
+    p: { conversationId: string },
+    ack: (r: AckResult<{ left: true }>) => void,
+  ) => void;
   'chat:typing': (p: { conversationId: string }) => void;
   'chat:send': (
     p: ChatSendPayload,
