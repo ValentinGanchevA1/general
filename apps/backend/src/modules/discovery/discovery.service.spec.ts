@@ -99,6 +99,59 @@ describe('DiscoveryService', () => {
     });
   });
 
+  describe('block isolation', () => {
+    const expectAuthorBlockPredicate = (sql: string): void => {
+      expect(sql).toContain("WHEN 'user' THEN v_discoverable_entity.id");
+      expect(sql).toContain(
+        "WHEN 'event' THEN NULLIF(v_discoverable_entity.meta->>'hostId', '')::uuid",
+      );
+      expect(sql).toContain(
+        "WHEN 'listing' THEN NULLIF(v_discoverable_entity.meta->>'sellerId', '')::uuid",
+      );
+      expect(sql).toContain('ub.blocker_id = $3');
+      expect(sql).toContain('ub.blocked_id = $3');
+    };
+
+    it('applies bilateral block filtering to users, event hosts and listing sellers at entity zoom', async () => {
+      await call();
+
+      const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+      expectAuthorBlockPredicate(sql);
+      expect(params[2]).toBe('me');
+    });
+
+    it('applies the same author block filtering before cluster counts are computed', async () => {
+      (isEntityZoom as jest.Mock).mockReturnValue(false);
+
+      await call();
+
+      const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+      expectAuthorBlockPredicate(sql);
+      expect(sql).toContain('GROUP BY');
+      expect(params[2]).toBe('me');
+    });
+  });
+
+  describe('snapshot isolation', () => {
+    it('namespaces Redis snapshots by requester even when viewport hashes match', async () => {
+      const first = await call({ requesterId: 'viewer-a' });
+      const second = await call({ requesterId: 'viewer-b' });
+
+      expect(first.viewportHash).toBe(second.viewportHash);
+      const firstKey = redisSet.mock.calls[0]?.[0] as string;
+      const secondKey = redisSet.mock.calls[1]?.[0] as string;
+      expect(firstKey).toBe(`discovery:snap:viewer-a:${first.viewportHash}`);
+      expect(secondKey).toBe(`discovery:snap:viewer-b:${second.viewportHash}`);
+      expect(firstKey).not.toBe(secondKey);
+    });
+
+    it('reads a previous diff snapshot only from the current requester namespace', async () => {
+      await call({ requesterId: 'viewer-a', prevViewportHash: 'previous-hash' });
+
+      expect(redisGet).toHaveBeenCalledWith('discovery:snap:viewer-a:previous-hash');
+    });
+  });
+
   describe('presence enrichment', () => {
     const userMeta = {
       displayName: 'A',
