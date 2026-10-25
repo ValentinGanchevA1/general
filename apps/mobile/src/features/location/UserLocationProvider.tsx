@@ -19,6 +19,7 @@ import {
 } from './locationPermissionState';
 import {
   UserLocationContext,
+  type GetCurrentLocationOptions,
   type UserLocationContextValue,
 } from './UserLocationContext';
 
@@ -28,8 +29,10 @@ interface UserLocationProviderProps {
   enabled: boolean;
 }
 
+type LocationWaiter = (location: LatLng | null) => void;
+
 /**
- * Owns the single native GPS watcher for the authenticated application. Every
+ * Owns all native geolocation access for the authenticated application. Every
  * useUserLocation() consumer reads this shared state instead of creating its own
  * getCurrentPosition/watchPosition pair.
  */
@@ -40,9 +43,11 @@ export function UserLocationProvider({
   const [coords, setCoords] = useState<LatLng | null>(null);
   const [permissionStatus, setPermissionStatus] =
     useState<LocationPermissionStatus>('unknown');
+  const coordsRef = useRef<LatLng | null>(null);
   const permissionStatusRef = useRef<LocationPermissionStatus>('unknown');
   const watchId = useRef<number | null>(null);
   const permissionRequestRef = useRef<Promise<void> | null>(null);
+  const locationWaitersRef = useRef<Set<LocationWaiter>>(new Set());
   const enabledRef = useRef(enabled);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const launchInteractionsReady = useNexaLaunchInteractionsReady();
@@ -55,11 +60,47 @@ export function UserLocationProvider({
     [],
   );
 
-  const stopTracking = useCallback((): void => {
-    if (watchId.current === null) return;
-    Geolocation.clearWatch(watchId.current);
-    watchId.current = null;
+  const resolveLocationWaiters = useCallback(
+    (location: LatLng | null): void => {
+      const waiters = [...locationWaitersRef.current];
+      locationWaitersRef.current.clear();
+      for (const resolve of waiters) resolve(location);
+    },
+    [],
+  );
+
+  const updateCoords = useCallback(
+    (nextCoords: LatLng): void => {
+      coordsRef.current = nextCoords;
+      setCoords(nextCoords);
+      resolveLocationWaiters(nextCoords);
+    },
+    [resolveLocationWaiters],
+  );
+
+  const waitForCurrentLocation = useCallback((): Promise<LatLng | null> => {
+    const current = coordsRef.current;
+    if (current !== null) return Promise.resolve(current);
+
+    return new Promise((resolve) => {
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const finish: LocationWaiter = (location) => {
+        if (timer !== null) clearTimeout(timer);
+        locationWaitersRef.current.delete(finish);
+        resolve(location);
+      };
+      timer = setTimeout(() => finish(null), 15_000);
+      locationWaitersRef.current.add(finish);
+    });
   }, []);
+
+  const stopTracking = useCallback((): void => {
+    if (watchId.current !== null) {
+      Geolocation.clearWatch(watchId.current);
+      watchId.current = null;
+    }
+    resolveLocationWaiters(null);
+  }, [resolveLocationWaiters]);
 
   const startTracking = useCallback((): void => {
     if (
@@ -73,7 +114,7 @@ export function UserLocationProvider({
     const onOk = (pos: { coords: { latitude: number; longitude: number } }): void => {
       if (!enabledRef.current || appStateRef.current !== 'active') return;
       updatePermissionStatus('granted');
-      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      updateCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
     };
 
     const onErr = (err: { code?: number }): void => {
@@ -81,7 +122,9 @@ export function UserLocationProvider({
       if (err?.code === 1) {
         stopTracking();
         updatePermissionStatus('denied');
+        return;
       }
+      resolveLocationWaiters(null);
     };
 
     Geolocation.getCurrentPosition(
@@ -95,7 +138,12 @@ export function UserLocationProvider({
       onErr,
       { enableHighAccuracy: true, distanceFilter: 25 },
     );
-  }, [stopTracking, updatePermissionStatus]);
+  }, [
+    resolveLocationWaiters,
+    stopTracking,
+    updateCoords,
+    updatePermissionStatus,
+  ]);
 
   const performPermissionRequest = useCallback(
     (explicitRetry: boolean): Promise<void> => {
@@ -166,6 +214,49 @@ export function UserLocationProvider({
   const retryPermission = useCallback(
     (): Promise<void> => performPermissionRequest(true),
     [performPermissionRequest],
+  );
+
+  const getCurrentLocation = useCallback(
+    async (
+      options: GetCurrentLocationOptions = {},
+    ): Promise<LatLng | null> => {
+      if (!enabledRef.current || appStateRef.current !== 'active') return null;
+
+      const current = coordsRef.current;
+      if (current !== null) return current;
+
+      if (!launchInteractionsReady) return null;
+
+      if (permissionStatusRef.current !== 'granted') {
+        if (options.requestPermission !== true) return null;
+        await performPermissionRequest(true);
+      }
+
+      if (!enabledRef.current || appStateRef.current !== 'active') return null;
+
+      const afterPermission = coordsRef.current;
+      if (afterPermission !== null) return afterPermission;
+
+      // Android's explicit request resolves with an authoritative result. Never
+      // perform a native location read while permission is still unknown/denied.
+      if (
+        Platform.OS === 'android' &&
+        permissionStatusRef.current !== 'granted'
+      ) {
+        return null;
+      }
+
+      // iOS authorization/fix delivery is callback-driven. startTracking owns the
+      // native read and watcher; this method only waits for that shared first fix.
+      startTracking();
+      return waitForCurrentLocation();
+    },
+    [
+      launchInteractionsReady,
+      performPermissionRequest,
+      startTracking,
+      waitForCurrentLocation,
+    ],
   );
 
   // Keep async native callbacks aware of the current auth-session state without
@@ -262,8 +353,15 @@ export function UserLocationProvider({
       permissionStatus,
       requestPermission,
       retryPermission,
+      getCurrentLocation,
     }),
-    [coords, permissionStatus, requestPermission, retryPermission],
+    [
+      coords,
+      permissionStatus,
+      requestPermission,
+      retryPermission,
+      getCurrentLocation,
+    ],
   );
 
   return (

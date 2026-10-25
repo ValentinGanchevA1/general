@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, Platform } from 'react-native';
 
 import { appAlert } from '@/ui/appAlert';
-import Geolocation from '@react-native-community/geolocation';
 
 import type {
   ChatLocation,
@@ -38,7 +37,10 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
   const dispatch = useAppDispatch();
   const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
   const { on, connected } = useSocket();
-  const { coords: sharedCoords } = useUserLocation();
+  const {
+    coords: sharedCoords,
+    getCurrentLocation,
+  } = useUserLocation();
   const sharedLat = sharedCoords?.lat;
   const sharedLng = sharedCoords?.lng;
 
@@ -131,9 +133,8 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
     [myUserId],
   );
 
-  // The authenticated app already owns one high-accuracy native GPS watcher in
-  // UserLocationProvider. Live sharing consumes that shared stream instead of
-  // creating a second watchPosition subscription with identical settings.
+  // The authenticated app owns the only continuous native GPS watcher in
+  // UserLocationProvider. Live sharing consumes that shared stream.
   useEffect(() => {
     if (
       !isSharer ||
@@ -171,28 +172,14 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
     return () => clearInterval(interval);
   }, [isSharer, session?.id, session?.status, connected, emitUpdate]);
 
-  const getCurrentLocation = useCallback((): Promise<ChatLocation | null> => {
-    if (sharedLat != null && sharedLng != null) {
-      return Promise.resolve({ lat: sharedLat, lng: sharedLng });
-    }
-
-    // User-triggered start can race the shared provider's first fix. Keep a
-    // one-off native read as fallback, but never create another native watcher.
-    return new Promise((resolve) => {
-      Geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => resolve(null),
-        { enableHighAccuracy: true, timeout: 15_000, maximumAge: 10_000 },
-      );
-    });
-  }, [sharedLat, sharedLng]);
-
   const start = useCallback(
     async (duration: LocationShareDuration): Promise<void> => {
       if (starting) return;
       setStarting(true);
       try {
-        const location = await getCurrentLocation();
+        // Sharing is a direct user action, so the shared location owner may
+        // present native permission UI and wait for its provider-owned first fix.
+        const location = await getCurrentLocation({ requestPermission: true });
         if (!location) {
           appAlert(
             'Location unavailable',
