@@ -1,70 +1,68 @@
 import { useCallback, useState } from 'react';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 
-import type { MapCoordinate } from '@/features/map/contracts/mapRenderer';
+import type { CreateNearbyAction } from '@/components/map/CreateNearbySheet';
+import { openRootScreen } from '@/navigation/openRootScreen';
 import { track } from '@/lib/analytics';
-import type { RootStackParamList } from '@/navigation/AppNavigator';
-import type { CreateNearbyKind } from '@/components/map/CreateNearbySheet';
-import { setPendingCreateNearby } from '@/features/map/pendingCreateNearby';
-import { trackMapLongPressCreate } from '@/features/map/mapLongPressAnalytics';
+import { trackMapLongPressCreate } from './mapLongPressAnalytics';
+import type { MapCoordinate } from './contracts/mapRenderer';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+type LatLng = { lat: number; lng: number };
 
-export function useCreateNearby(navigation: Nav, blocked: boolean) {
-	const [createNearbyOpen, setCreateNearbyOpen] = useState(false);
-	const [createNearbyCoordinate, setCreateNearbyCoordinate] = useState<{
-		lat: number;
-		lng: number;
-	} | null>(null);
+/**
+ * Map long-press → CreateNearbySheet → Listing/Event/Alert create with initialLocation.
+ */
+export function useCreateNearby(
+  navigation: NavigationProp<ParamListBase>,
+  /** When an entity sheet is open, long-press is ignored. */
+  sheetBlocksLongPress: boolean,
+): {
+  createNearbyOpen: boolean;
+  setCreateNearbyOpen: (open: boolean) => void;
+  onMapLongPress: (coordinate: MapCoordinate) => void;
+  onCreateNearbySelect: (action: CreateNearbyAction) => void;
+} {
+  const [createNearbyOpen, setCreateNearbyOpen] = useState(false);
+  const [createNearbyCoords, setCreateNearbyCoords] = useState<LatLng | null>(null);
 
-	const onMapLongPress = useCallback(
-		(coordinate: MapCoordinate) => {
-			if (blocked) return;
-			const { latitude, longitude } = coordinate;
-			setCreateNearbyCoordinate({ lat: latitude, lng: longitude });
-			setCreateNearbyOpen(true);
-			trackMapLongPressCreate();
-		},
-		[blocked],
-	);
+  const onMapLongPress = useCallback(
+    (coordinate: MapCoordinate): void => {
+      if (sheetBlocksLongPress) return;
+      const { latitude, longitude } = coordinate;
+      trackMapLongPressCreate();
+      setCreateNearbyCoords({ lat: latitude, lng: longitude });
+      setCreateNearbyOpen(true);
+    },
+    [sheetBlocksLongPress],
+  );
 
-	const onCreateNearbySelect = useCallback(
-		(kind: CreateNearbyKind) => {
-			const coords = createNearbyCoordinate;
-			setCreateNearbyOpen(false);
-			setCreateNearbyCoordinate(null);
-			if (!coords) return;
-			if (kind === 'event') {
-				track('map.longpress_create_event');
-				navigation.navigate('CreateEvent', {
-					initialLat: coords.lat,
-					initialLng: coords.lng,
-				});
-				return;
-			}
-			if (kind === 'listing') {
-				track('map.longpress_create_listing');
-				navigation.navigate('CreateListing', {
-					initialLat: coords.lat,
-					initialLng: coords.lng,
-				});
-				return;
-			}
-			track('map.longpress_create_post');
-			setPendingCreateNearby({
-				kind: 'post',
-				lat: coords.lat,
-				lng: coords.lng,
-			});
-			navigation.navigate('CreatePost');
-		},
-		[createNearbyCoordinate, navigation],
-	);
+  const onCreateNearbySelect = useCallback(
+    (action: CreateNearbyAction): void => {
+      const location = createNearbyCoords;
+      track('map.create_choice', { kind: action });
+      const locParams = location ? { initialLocation: location } : {};
+      switch (action) {
+        case 'listing_sell':
+          openRootScreen(navigation, 'ListingCreate', { mode: 'sell', ...locParams });
+          break;
+        case 'listing_buy':
+          openRootScreen(navigation, 'ListingCreate', { mode: 'buy', ...locParams });
+          break;
+        case 'event':
+          openRootScreen(navigation, 'EventCreate', locParams);
+          break;
+        case 'alert':
+          openRootScreen(navigation, 'AlertComposer', locParams);
+          break;
+      }
+    },
+    [createNearbyCoords, navigation],
+  );
 
-	return {
-		createNearbyOpen,
-		setCreateNearbyOpen,
-		onMapLongPress,
-		onCreateNearbySelect,
-	};
+  return {
+    createNearbyOpen,
+    setCreateNearbyOpen,
+    onMapLongPress,
+    onCreateNearbySelect,
+  };
 }
