@@ -1,6 +1,7 @@
 export * from './geo';
 export * from './api';
 export * from './events';
+export * from './conversation-room';
 export * from './event';
 export * from './listing';
 export * from './notifications';
