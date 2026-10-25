@@ -21,6 +21,7 @@ export interface NexaLaunchPerformanceInput {
   mapReadyMs: number | null;
   overlayHiddenMs: number | null;
   mapReadyFailOpen: boolean;
+  spatialHandoffUsed: boolean;
 }
 
 /**
@@ -35,6 +36,7 @@ export function recordNexaLaunchPerformance(
     'nexa.launch.path': input.path,
     'nexa.launch.total_ms': input.totalMs,
     'nexa.launch.map_ready_fail_open': input.mapReadyFailOpen,
+    'nexa.launch.spatial_handoff_used': input.spatialHandoffUsed,
   };
 
   if (input.authReadyMs !== null) {
