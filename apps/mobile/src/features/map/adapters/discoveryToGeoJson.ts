@@ -92,4 +92,38 @@ export function discoveryToMapFeatureCollection(
   };
 }
 
+/**
+ * Reprojects a discovery snapshot while preserving GeoJSON feature identity for
+ * unchanged DiscoveryPoint objects. applyDiscoveryDiff already preserves those
+ * point references, so MapLibre updates can avoid rebuilding unchanged feature
+ * objects when a viewport diff touches only a subset of entities.
+ */
+export function updateMapFeatureCollection(
+  previousPoints: readonly DiscoveryPoint[],
+  previousCollection: NexaMapFeatureCollection,
+  points: readonly DiscoveryPoint[],
+): NexaMapFeatureCollection {
+  const previousPointByKey = new Map<DiscoveryPointKey, DiscoveryPoint>();
+  for (const point of previousPoints) {
+    previousPointByKey.set(getDiscoveryPointKey(point), point);
+  }
+
+  const previousFeatureByKey = new Map<DiscoveryPointKey, NexaMapPointFeature>();
+  for (const feature of previousCollection.features) {
+    previousFeatureByKey.set(feature.id, feature);
+  }
+
+  return {
+    type: 'FeatureCollection',
+    features: points.map((point) => {
+      const key = getDiscoveryPointKey(point);
+      if (previousPointByKey.get(key) === point) {
+        const previousFeature = previousFeatureByKey.get(key);
+        if (previousFeature !== undefined) return previousFeature;
+      }
+      return discoveryPointToMapFeature(point);
+    }),
+  };
+}
+
 export const MAP_ENTITY_KINDS: readonly EntityKind[] = ['user', 'event', 'listing'];
