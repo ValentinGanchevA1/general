@@ -27,7 +27,7 @@ function event(id: string, lat = 42.7): DiscoveryPoint {
     meta: {
       title: 'Event',
       coverUrl: null,
-      startsAt: null,
+      startsAt: '2026-10-25T12:00:00.000Z',
       attendeeCount: 0,
       capacity: null,
     },
