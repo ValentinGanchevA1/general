@@ -60,6 +60,7 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
     sessionRef.current = session;
   }, [session]);
 
+  const sessionId = session?.id ?? null;
   const isSharer = !!session && session.sharerId === myUserId;
 
   // Cold-open hydrate
@@ -142,7 +143,7 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
   useEffect(() => {
     if (
       !isSharer ||
-      !session ||
+      sessionId == null ||
       !connected ||
       userLat == null ||
       userLng == null
@@ -153,12 +154,12 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
     const location = { lat: userLat, lng: userLng };
     latestCoordsRef.current = location;
     void emitUpdate(location);
-  }, [isSharer, session?.id, connected, userLat, userLng, emitUpdate, session]);
+  }, [isSharer, sessionId, connected, userLat, userLng, emitUpdate]);
 
   // Keep the existing stationary fallback cadence, using the latest shared
   // foreground coordinates instead of owning another native GPS watcher.
   useEffect(() => {
-    if (!isSharer || !session || !connected) {
+    if (!isSharer || sessionId == null || !connected) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -179,7 +180,7 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
         intervalRef.current = null;
       }
     };
-  }, [isSharer, session?.id, connected, emitUpdate, session]);
+  }, [isSharer, sessionId, connected, emitUpdate]);
 
   const getCurrentLocation = useCallback((): Promise<ChatLocation | null> => {
     return new Promise((resolve) => {
