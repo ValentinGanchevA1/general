@@ -7,7 +7,7 @@ import { AnalyticsService, sanitizeProductAnalyticsProperties } from './analytic
 const HMAC_KEY = 'analytics-test-key-that-is-at-least-32-bytes-long';
 
 describe('AnalyticsService', () => {
-  const query = jest.fn<Promise<unknown>, [string, unknown[]]>();
+  const query = jest.fn();
   const db = { query } as unknown as DataSource;
   const service = new AnalyticsService(db);
   const originalKey = process.env.ANALYTICS_HMAC_KEY;
