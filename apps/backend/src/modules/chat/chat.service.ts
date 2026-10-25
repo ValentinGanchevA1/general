@@ -106,17 +106,36 @@ export class ChatService {
     senderId: string,
   ): Promise<void> {
     const [convo] = await tx.query<
-      Array<{ participant_ids: string[]; status: string; initiated_by: string | null }>
+      Array<{
+        participant_ids: string[];
+        status: string;
+        initiated_by: string | null;
+        blocked: boolean;
+      }>
     >(
-      `SELECT participant_ids, status, initiated_by
-         FROM conversations WHERE id = $1 LIMIT 1 FOR UPDATE`,
-      [conversationId],
+      `SELECT c.participant_ids, c.status, c.initiated_by,
+              EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $2 AND ub.blocked_id = ANY(c.participant_ids))
+                    OR (ub.blocked_id = $2 AND ub.blocker_id = ANY(c.participant_ids))
+              ) AS blocked
+         FROM conversations c
+        WHERE c.id = $1
+        LIMIT 1
+        FOR UPDATE`,
+      [conversationId, senderId],
     );
     if (!convo) {
       throw new NotFoundException({ code: 'chat.not_found', message: 'Conversation not found' });
     }
     if (!convo.participant_ids.includes(senderId)) {
       throw new ForbiddenException({ code: 'chat.forbidden', message: 'Not a participant' });
+    }
+    if (convo.blocked) {
+      throw new ForbiddenException({
+        code: 'chat.blocked',
+        message: 'Conversation unavailable because one participant is blocked',
+      });
     }
 
     if (convo.status === 'pending') {
@@ -158,9 +177,22 @@ export class ChatService {
     return row?.participant_ids ?? [];
   }
 
+  /**
+   * Access-aware participant check. A bilateral block intentionally makes an
+   * existing conversation inaccessible without deleting its historical rows.
+   */
   async isParticipant(conversationId: string, userId: string): Promise<boolean> {
     const rows = await this.db.query(
-      `SELECT 1 FROM conversations WHERE id = $1 AND $2 = ANY(participant_ids) LIMIT 1`,
+      `SELECT 1
+         FROM conversations c
+        WHERE c.id = $1
+          AND $2 = ANY(c.participant_ids)
+          AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $2 AND ub.blocked_id = ANY(c.participant_ids))
+                    OR (ub.blocked_id = $2 AND ub.blocker_id = ANY(c.participant_ids))
+              )
+        LIMIT 1`,
       [conversationId, userId],
     );
     return rows.length > 0;
@@ -259,6 +291,11 @@ export class ChatService {
        ) m ON true
        LEFT JOIN users u ON u.id = ANY(c.participant_ids) AND u.deleted_at IS NULL
        WHERE $1 = ANY(c.participant_ids)
+         AND NOT EXISTS (
+               SELECT 1 FROM user_blocks ub
+                WHERE (ub.blocker_id = $1 AND ub.blocked_id = ANY(c.participant_ids))
+                   OR (ub.blocked_id = $1 AND ub.blocker_id = ANY(c.participant_ids))
+             )
        GROUP BY c.id, c.status, c.initiated_by, c.last_message_at, m.body, m.sender_id, c.participant_ids
        ORDER BY c.last_message_at DESC NULLS LAST`,
       [userId],
