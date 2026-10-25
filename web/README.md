@@ -1,13 +1,14 @@
 # NEXA web preview v1
 
-Browser validation slice for the NEXA web/desktop client. It intentionally remains outside the pnpm workspace while browser auth, CORS, map behavior and realtime lifecycle are validated, avoiding a new lockfile importer in the frozen-install monorepo.
+Browser validation slice for the NEXA web/desktop client. `web/` is now a real pnpm workspace importer so browser runtime dependencies are explicit, pinned through the canonical lockfile and installed by the normal frozen workspace install.
 
 ## Implemented
 
 - Canonical **Map / Discover / Pulse / Connections / You** navigation.
 - Responsive desktop rail + mobile bottom navigation.
 - NEXA dark/light/system semantics: cyan for discovery/live and violet for action/identity.
-- Interactive Web Mercator map preview with pan/zoom, visible OSM raster tiles and required attribution.
+- Interactive Web Mercator loopback preview with pan/zoom, visible OSM raster tiles and required attribution.
+- Pinned **MapLibre GL JS 6.15.0** production renderer with a same-origin worker and bundled CSS.
 - Settled map bounds + zoom drive `POST /api/v1/discovery/nearby`; superseded requests are aborted.
 - Live `GET /api/v1/feed` Pulse activity.
 - Live Connections using the existing interactions, friends, conversations and `/realtime` Socket.IO contracts.
@@ -47,19 +48,34 @@ Local preview uses fixed loopback mappings only. Production uses same-origin `/a
 
 ## Map runtime boundary
 
-The accepted production direction is **MapLibre GL JS** with a managed vector-tile provider for beta and a PMTiles/self-hosted portability path. The package is not yet added to the frozen pnpm workspace, so the runtime policy is intentionally split from dependency adoption.
+The accepted production direction is **MapLibre GL JS + MapTiler Cloud** for beta, with a PMTiles/self-hosted portability path. The renderer dependency is exact-pinned at `maplibre-gl@6.15.0`; the build verifies that installed version before producing browser artifacts.
 
-- Standard OpenStreetMap raster tiles are available only on loopback (`localhost`, `127.0.0.1`, `::1`) for local preview, with attribution and no offline/prefetch path.
-- Every non-loopback browser origin fails closed to the production target (`maplibre` + `maptiler`) and does **not** generate OSM standard tile requests until the pinned MapLibre runtime and approved provider configuration are bundled.
-- Discovery points, viewport state, pan/zoom controls and `POST /discovery/nearby` remain renderer/provider independent; a missing production basemap does not change the spatial query contract.
-- The planned MapLibre worker path is same-origin at `/maplibre-worker.mjs`; the web edge CSP reserves only `worker-src 'self'` and does not add a CDN/external script origin.
-- Provider hostnames, style URLs and public API-key policy will be allowlisted explicitly in the implementation that actually bundles the provider. No arbitrary/user-editable map host is accepted.
+- Standard OpenStreetMap raster tiles remain available only on loopback (`localhost`, `127.0.0.1`, `::1`) for local preview, with attribution and no offline/prefetch path.
+- Every non-loopback browser origin requires HTTPS plus a valid build-generated MapTiler configuration. Missing/invalid config fails closed and never falls back to OSM standard tiles.
+- The MapLibre worker is copied from the pinned package to `/dist/maplibre-worker.mjs`; CSP uses `worker-src 'self'` and does not require a blob/CDN worker.
+- MapLibre CSS is copied from the pinned package into `/dist/maplibre-gl.css`.
+- Discovery points are rendered as a provider-neutral GeoJSON source; server cluster points are rendered directly and are **not** re-clustered in the browser.
+- Rotation/pitch are disabled; no geolocation control is added.
+- Provider/network errors are not rendered verbatim because provider URLs can contain the public API key.
+- The renderer removes its WebGL/worker instance when the containing app shell is replaced, preventing detached-map leaks under the current shell rendering model.
+
+### Production MapTiler build variables
+
+`node web/build.mjs` reads:
+
+- `NEXA_MAPTILER_API_KEY` — browser-public MapTiler API key. Do **not** treat it as a server secret; protect/restrict it in MapTiler to the approved NEXA web origin before launch.
+- `NEXA_MAPTILER_MAP_ID` — simple map identifier; defaults to `streets-v4`.
+- `NEXA_MAPTILER_REGION` — `eu` (default) or `global`.
+
+`eu` produces `https://api.maptiler.eu/...` style requests and is the privacy-first NEXA default. MapTiler documents the EU endpoint as EU-only infrastructure for end-user personal data such as IP addresses, but it is available only on paid plans. `global` explicitly selects `https://api.maptiler.com/...` for a future global rollout policy.
+
+The generated `/dist/map-config.js` contains only public browser map configuration. Arbitrary provider origins, path-like map IDs, whitespace/control characters in the key, and non-HTTPS public map activation are rejected.
 
 Opening Map, Discover or Connections does **not** request browser/device geolocation. The Varna default camera is product context, not the user's asserted position.
 
 ## Realtime build boundary
 
-The web bundle imports `socket.io-client` at build time from the already locked `apps/admin` workspace dependency. This avoids a runtime CDN/backend script inclusion and avoids a new web workspace importer. A dedicated web package/importer is the cleaner long-term architecture once the browser slice graduates from preview.
+The web client now owns its browser runtime dependency explicitly through the `web` pnpm importer (`socket.io-client@4.8.4`). The bundle no longer resolves Socket.IO from `apps/admin/node_modules`, and no runtime CDN/backend script inclusion is used.
 
 ## Real-browser regression gate
 
@@ -69,7 +85,8 @@ The web bundle imports `socket.io-client` at build time from the already locked 
 - Socket.IO access-token rotation, reconnect and active-room rejoin (#595);
 - map viewport supersession, request abort and stale-response protection (#596);
 - Connections friend accept, wave-back, REST history/read, room join, chat send, ack/event dedupe and peer receive (#638);
-- map runtime policy: loopback-only OSM preview, fail-closed public MapLibre target and same-origin worker contract.
+- map runtime policy: loopback-only OSM preview, HTTPS-only production activation, exact MapTiler origins and same-origin worker;
+- real MapLibre/WebGL initialization with the bundled worker, NEXA GeoJSON overlay and viewport callback using a local style so CI never depends on a paid provider key.
 
 This is strong Chromium regression coverage, not a declaration that every browser engine is production-supported.
 
@@ -88,5 +105,5 @@ The existence of this workflow is not itself a deployed pass. The release gate c
 
 1. Choose the production web hostname/deployment policy, configure same-origin `/api/v1` + `/socket.io`, and allowlist only the exact HTTPS browser origin.
 2. Define the supported-browser matrix and validate the Web Locks/BroadcastChannel session contract on each supported engine.
-3. Add a pinned `maplibre-gl` dependency through a reproducible lockfile/importer change, bundle its same-origin worker, then configure the approved production basemap/style/key origins and validate attribution, CSP, performance and provider terms.
+3. Provision a protected MapTiler browser key on the chosen paid plan/region, validate provider attribution and terms, and complete a production-map performance/lifecycle gate before enabling the key in public deployment.
 4. Run `Web Deployed Smoke` in authenticated mode against the final stable HTTPS staging/production-like topology and require a green result before web release.
