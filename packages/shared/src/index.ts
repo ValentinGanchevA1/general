@@ -1,5 +1,6 @@
 export * from './geo';
 export * from './api';
+export * from './discovery';
 export * from './events';
 export * from './event';
 export * from './listing';
