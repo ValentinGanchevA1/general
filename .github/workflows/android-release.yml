@@ -41,6 +41,10 @@ jobs:
     # can gate on it (the `secrets` context isn't allowed in `if:` directly).
     env:
       HAS_PLAY_SA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+      # These values are consumed by Babel while Metro creates the release JS bundle.
+      # Keep them at job scope so every transform worker receives the same config.
+      GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
     defaults:
       run:
         working-directory: apps/mobile
@@ -68,6 +72,34 @@ jobs:
         env:
           NEXA_PLAY_TRACK: ${{ inputs.track || 'alpha' }}
         run: node scripts/check-production-legal-urls.mjs
+
+      - name: Guard required release secrets
+        env:
+          GOOGLE_MAPS_API_KEY_RELEASE: ${{ secrets.GOOGLE_MAPS_API_KEY_RELEASE }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          missing=0
+          for name in \
+            GOOGLE_WEB_CLIENT_ID \
+            SENTRY_DSN \
+            GOOGLE_MAPS_API_KEY_RELEASE \
+            GOOGLE_SERVICES_JSON \
+            ANDROID_UPLOAD_KEYSTORE_BASE64 \
+            ANDROID_UPLOAD_STORE_PASSWORD \
+            ANDROID_UPLOAD_KEY_ALIAS \
+            ANDROID_UPLOAD_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Required release secret $name is missing"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Inject Maps keys
         env:
@@ -112,6 +144,9 @@ jobs:
           restore-keys: gradle-
 
       - name: Build signed release AAB
+        env:
+          SENTRY_RELEASE: com.g88@1.0.0+${{ github.run_number }}
+          SENTRY_DIST: ${{ github.run_number }}
         run: |
           cd android
           ATTEMPTS=5

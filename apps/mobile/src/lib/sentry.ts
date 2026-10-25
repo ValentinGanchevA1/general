@@ -5,6 +5,8 @@
  */
 import * as Sentry from '@sentry/react-native';
 
+import { APP_VERSION } from '@/constants/app';
+
 export const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: true,
   routeChangeTimeoutMs: 1_000,
@@ -69,21 +71,19 @@ export function recordNexaLaunchPerformance(
 }
 
 /**
- * Release string must match what CI / sentry-cli upload under for source maps
- * and native symbols to attach. Format: packageName@version+dist
+ * Release string must match Android versionName and the CI/sentry-cli release
+ * used for source maps/native symbols. Format: packageName@version+dist.
  *
- * Override via build-time env (babel inline):
- *   SENTRY_RELEASE=com.g88@0.1.0+42
- *   SENTRY_DIST=42
- * CI android-apk sets these from package version + github.run_number.
+ * APP_VERSION is the single application-version source used by UI and fallback
+ * telemetry. CI may provide SENTRY_RELEASE, but a stale version override is
+ * rejected so release events cannot silently split across old app versions.
  */
-const PACKAGE_VERSION = '0.1.0';
+const RELEASE_PREFIX = `com.g88@${APP_VERSION}+`;
 
 export function resolveSentryRelease(): string {
   const fromEnv = process.env.SENTRY_RELEASE as string | undefined;
-  if (fromEnv && fromEnv.length > 0) return fromEnv;
-  const dist = resolveSentryDist();
-  return `com.g88@${PACKAGE_VERSION}+${dist}`;
+  if (fromEnv?.startsWith(RELEASE_PREFIX)) return fromEnv;
+  return `${RELEASE_PREFIX}${resolveSentryDist()}`;
 }
 
 export function resolveSentryDist(): string {
