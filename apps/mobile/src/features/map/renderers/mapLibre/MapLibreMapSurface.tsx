@@ -1,36 +1,42 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
+import type { DiscoveryPoint } from '@g88/shared';
 import {
   Camera,
+  GeoJSONSource,
+  Layer,
   Map,
   type MapRef,
 } from '@maplibre/maplibre-react-native';
 
+import { discoveryToMapFeatureCollection } from '../../adapters/discoveryToGeoJson';
 import type { MapLibreBoundsSnapshot, MapLibreViewStateSnapshot } from '../../mapLibreAdapter';
 import { mapLibreSnapshotToViewportChange } from '../../mapLibreAdapter';
 import type { NexaMapViewportChange } from '../../contracts/mapRenderer';
 
 const DEVELOPMENT_MAP_STYLE = 'https://demotiles.maplibre.org/style.json';
+const DISCOVERY_SOURCE_ID = 'nexa-discovery';
 
 export interface MapLibreMapSurfaceProps {
+  points: readonly DiscoveryPoint[];
   onReady: () => void;
   onViewportSettled: (change: NexaMapViewportChange) => void;
 }
 
 /**
- * Minimal native MapLibre validation surface.
+ * Native MapLibre surface for the guarded renderer path.
  *
- * Discovery layers intentionally do not live here yet. Server-authoritative H3
- * points remain on the legacy renderer until the native GeoJSON layer slice is
- * parity-tested. This surface only proves map loading and renderer-neutral
- * viewport/camera translation behind the fail-closed rollout gate.
+ * The backend remains authoritative for H3 clustering, privacy filtering and
+ * ranking. This source only renders the already-bounded DiscoveryPoint set and
+ * intentionally allowlists properties instead of forwarding point metadata.
  */
 export const MapLibreMapSurface = React.forwardRef<MapRef, MapLibreMapSurfaceProps>(
   function MapLibreMapSurface(
-    { onReady, onViewportSettled },
+    { points, onReady, onViewportSettled },
     ref,
   ): React.JSX.Element {
     const localRef = React.useRef<MapRef>(null);
+    const data = React.useMemo(() => discoveryToMapFeatureCollection(points), [points]);
 
     React.useImperativeHandle(ref, () => {
       if (localRef.current === null) {
@@ -78,6 +84,19 @@ export const MapLibreMapSurface = React.forwardRef<MapRef, MapLibreMapSurfacePro
         }}
       >
         <Camera />
+        <GeoJSONSource id={DISCOVERY_SOURCE_ID} data={data}>
+          <Layer
+            id="nexa-discovery-points"
+            type="circle"
+            paint={{
+              'circle-color': '#8B5CF6',
+              'circle-opacity': 0.9,
+              'circle-radius': ['case', ['==', ['get', 'kind'], 'cluster'], 12, 7],
+              'circle-stroke-color': '#FFFFFF',
+              'circle-stroke-width': 1.5,
+            }}
+          />
+        </GeoJSONSource>
       </Map>
     );
   },

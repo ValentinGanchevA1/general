@@ -21,8 +21,6 @@ export interface NexaMapRuntimeSurfaceProps extends LegacyMapSurfaceProps {
  * MapLibre unavailable. When an explicit validation policy requests MapLibre
  * and marks the native bundle available, this boundary mounts the native
  * surface and translates its viewport back into the legacy region callback.
- * Discovery rendering stays on the legacy renderer until native GeoJSON parity
- * is implemented.
  */
 export const NexaMapRuntimeSurface = React.forwardRef<
   MapView,
@@ -31,6 +29,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
   {
     requestedRenderer,
     mapLibreAvailable,
+    points,
     onReady,
     onRegionChangeComplete,
     ...surfaceProps
@@ -45,6 +44,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
   if (renderer === 'maplibre') {
     return (
       <MapLibreMapSurface
+        points={points}
         onReady={onReady}
         onViewportSettled={({ viewport, camera }) => {
           const latitudeDelta = Math.abs(viewport.ne.lat - viewport.sw.lat);
@@ -64,6 +64,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
   return (
     <LegacyMapSurface
       ref={ref}
+      points={points}
       onReady={onReady}
       onRegionChangeComplete={onRegionChangeComplete}
       {...surfaceProps}
