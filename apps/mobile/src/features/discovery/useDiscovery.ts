@@ -3,18 +3,27 @@ import axios from 'axios';
 
 import {
   applyDiscoveryDiff,
+  getDiscoveryPointKey,
+  isEntityZoom,
   type DiscoveryResponse,
   type DiscoveryQuery,
   type DiscoveryPoint,
   type DiscoveryRankBy,
   type EntityKind,
+  type EntityPoint,
   type ListingMode,
   type Viewport,
 } from '@g88/shared';
 
 import { postJson } from '@/api/client';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { setDiscoveryZoom, setPoints } from '@/features/discovery/discoverySlice';
+import {
+  removePoint,
+  setDiscoveryZoom,
+  setPoints,
+  upsertPoint,
+} from '@/features/discovery/discoverySlice';
+import { useSocket } from '@/realtime/useSocket';
 import { extractMessage } from '@/utils/extractMessage';
 
 interface UseDiscoveryArgs {
@@ -45,6 +54,39 @@ function isViewportTooLarge(vp: Viewport): boolean {
   return latSpan > 15 || lngNorm > 15;
 }
 
+function isPointInViewport(point: EntityPoint, viewport: Viewport): boolean {
+  const withinLatitude = point.lat >= viewport.sw.lat && point.lat <= viewport.ne.lat;
+  if (!withinLatitude) return false;
+
+  if (viewport.sw.lng <= viewport.ne.lng) {
+    return point.lng >= viewport.sw.lng && point.lng <= viewport.ne.lng;
+  }
+
+  // Antimeridian-crossing viewport.
+  return point.lng >= viewport.sw.lng || point.lng <= viewport.ne.lng;
+}
+
+function matchesRealtimeQuery(
+  point: EntityPoint,
+  viewport: Viewport,
+  kinds: readonly EntityKind[] | undefined,
+  listingMode: ListingMode | undefined,
+  friendsOnly: boolean,
+): boolean {
+  if (!isPointInViewport(point, viewport)) return false;
+  if (kinds != null && kinds.length > 0 && !kinds.includes(point.kind)) return false;
+
+  if (friendsOnly) {
+    return point.kind === 'user' && point.meta.isFriend === true;
+  }
+
+  if (listingMode != null && point.kind === 'listing') {
+    return (point.meta.mode ?? 'sell') === listingMode;
+  }
+
+  return true;
+}
+
 export function useDiscovery({
   zoom,
   viewport,
@@ -59,6 +101,7 @@ export function useDiscovery({
 }: UseDiscoveryArgs): UseDiscoveryResult {
   const dispatch = useAppDispatch();
   const points = useAppSelector((state) => state.discovery.points);
+  const { on } = useSocket();
   const [data, setData] = useState<DiscoveryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -217,6 +260,57 @@ export function useDiscovery({
   useEffect(() => {
     return () => abortRef.current?.abort();
   }, []);
+
+  useEffect(() => {
+    // Clusters remain HTTP-authoritative. Topic and dating filters cannot be
+    // reconstructed safely from the sanitized realtime point alone, so those
+    // modes intentionally keep HTTP discovery as their only source for now.
+    if (
+      !enabled ||
+      viewport == null ||
+      !isEntityZoom(zoom) ||
+      (topic != null && topic.trim() !== '') ||
+      datingOnly
+    ) {
+      return;
+    }
+
+    const applyRealtimePoint = (point: EntityPoint): void => {
+      const key = getDiscoveryPointKey(point);
+      if (matchesRealtimeQuery(point, viewport, kinds, listingMode, friendsOnly)) {
+        dispatch(upsertPoint(point));
+      } else {
+        dispatch(removePoint(key));
+      }
+    };
+
+    const unsubscribeEnter = on('discovery:entity:enter', ({ point }) => {
+      applyRealtimePoint(point);
+    });
+    const unsubscribeUpdate = on('discovery:entity:update', ({ point }) => {
+      applyRealtimePoint(point);
+    });
+    const unsubscribeLeave = on('discovery:entity:leave', ({ key }) => {
+      dispatch(removePoint(key));
+    });
+
+    return () => {
+      unsubscribeEnter();
+      unsubscribeUpdate();
+      unsubscribeLeave();
+    };
+  }, [
+    enabled,
+    viewport,
+    zoom,
+    kinds,
+    topic,
+    listingMode,
+    friendsOnly,
+    datingOnly,
+    on,
+    dispatch,
+  ]);
 
   const refresh = useCallback(() => {
     if (!viewport) return;
