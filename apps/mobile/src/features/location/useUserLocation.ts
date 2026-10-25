@@ -6,6 +6,10 @@ import type { LatLng } from '@g88/shared';
 import { useNexaLaunchInteractionsReady } from '@/components/Brand/NexaLaunchSurfaceContext';
 
 import { NEXA_LOCATION_PERMISSION_COPY } from './locationPermissionCopy';
+import {
+  statusFromAndroidPermissionCheck,
+  type LocationPermissionStatus,
+} from './locationPermissionState';
 
 // Real GPS comes from @react-native-community/geolocation (a native module).
 // RN 0.83 no longer ships the legacy `navigator.geolocation` polyfill, so the
@@ -13,7 +17,7 @@ import { NEXA_LOCATION_PERMISSION_COPY } from './locationPermissionCopy';
 // view — see useUserLocation history. This module is autolinked; it needs an
 // Android rebuild, not just a Metro reload.
 
-export type LocationPermissionStatus = 'unknown' | 'granted' | 'denied';
+export type { LocationPermissionStatus } from './locationPermissionState';
 
 interface UseUserLocationResult {
   coords: LatLng | null;
@@ -94,11 +98,9 @@ export function useUserLocation(): UseUserLocationResult {
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         );
         if (cancelled) return;
-        if (!fine) {
-          setPermissionStatus('denied');
-          return;
-        }
-        setPermissionStatus('granted');
+        const quietStatus = statusFromAndroidPermissionCheck(fine);
+        setPermissionStatus(quietStatus);
+        if (quietStatus !== 'granted') return;
         startTracking();
         return;
       }
