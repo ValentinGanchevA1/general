@@ -32,6 +32,7 @@ const DISCOVERY_SELECTED_LAYER_ID = 'nexa-discovery-selected';
 export interface MapLibreMapSurfaceProps {
   points: readonly DiscoveryPoint[];
   selectedKey: DiscoveryPointKey | null;
+  dimUnselected: boolean;
   onReady: () => void;
   onPointPress: (key: DiscoveryPointKey) => void;
   onViewportSettled: (change: NexaMapViewportChange) => void;
@@ -44,7 +45,7 @@ function isDiscoveryPointKey(value: unknown): value is DiscoveryPointKey {
 /** Native MapLibre surface behind the guarded renderer path. */
 export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMapSurfaceProps>(
   function MapLibreMapSurface(
-    { points, selectedKey, onReady, onPointPress, onViewportSettled },
+    { points, selectedKey, dimUnselected, onReady, onPointPress, onViewportSettled },
     ref,
   ): React.JSX.Element {
     const mapRef = React.useRef<MapRef>(null);
@@ -108,6 +109,12 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
       () => ['==', ['id'], selectedKey ?? '__nexa-no-selection__'],
       [selectedKey],
     );
+    const baseOpacity = React.useMemo(
+      () => (dimUnselected && selectedKey !== null
+        ? ['case', ['==', ['id'], selectedKey], 0, 0.28]
+        : 0.92),
+      [dimUnselected, selectedKey],
+    );
 
     return (
       <Map
@@ -135,7 +142,7 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
                 'listing', '#22C55E',
                 '#8B5CF6',
               ],
-              'circle-opacity': 0.92,
+              'circle-opacity': baseOpacity,
               'circle-radius': [
                 'match',
                 ['get', 'kind'],
