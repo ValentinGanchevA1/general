@@ -50,6 +50,7 @@ function AppShell(): React.JSX.Element {
   );
   const { colors, scheme } = useAppTheme();
   const [showSpatialHandoff, setShowSpatialHandoff] = React.useState(false);
+  const [launchInteractionsReady, setLaunchInteractionsReady] = React.useState(false);
   const [mapSurfaceReady, setMapSurfaceReady] = React.useState(false);
   const [mapSurfaceWaitExpired, setMapSurfaceWaitExpired] = React.useState(false);
 
@@ -83,11 +84,17 @@ function AppShell(): React.JSX.Element {
   }, []);
 
   const handleLaunchHidden = React.useCallback((): void => {
-    setShowSpatialHandoff(requiresMapSurface);
+    if (requiresMapSurface) {
+      setShowSpatialHandoff(true);
+      return;
+    }
+    setShowSpatialHandoff(false);
+    setLaunchInteractionsReady(true);
   }, [requiresMapSurface]);
 
   const handleSpatialHandoffComplete = React.useCallback((): void => {
     setShowSpatialHandoff(false);
+    setLaunchInteractionsReady(true);
   }, []);
 
   return (
@@ -96,7 +103,10 @@ function AppShell(): React.JSX.Element {
         barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={colors.bg}
       />
-      <NexaLaunchSurfaceProvider onMapSurfaceReady={handleMapSurfaceReady}>
+      <NexaLaunchSurfaceProvider
+        onMapSurfaceReady={handleMapSurfaceReady}
+        interactionsReady={launchInteractionsReady}
+      >
         <AppNavigator />
       </NexaLaunchSurfaceProvider>
       <NexaLaunchOverlay ready={launchReady} onHidden={handleLaunchHidden} />
