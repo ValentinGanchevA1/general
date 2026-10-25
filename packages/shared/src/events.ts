@@ -227,7 +227,7 @@ export interface ServerToClientEvents {
   'friend:presence': (e: FriendPresenceEvent) => void;
   /** Someone sent you a friend request. */
   'friend:request': (e: FriendRequestEvent) => void;
-  /** Your friend request was accepted — delivered to the original requester. */
+  /** Your friend request was accepted. */
   'friend:accepted': (e: FriendAcceptedEvent) => void;
   'chat:message': (e: ChatMessageEvent) => void;
   'conversation:opened': (e: ConversationOpenedEvent) => void;
@@ -259,49 +259,82 @@ export type AckResult<T> =
   | { ok: false; code: string; message: string };
 
 export interface PresenceUpdatePayload {
-  lat: number;
-  lng: number;
+  location: LatLng;
+  /** Compass heading in degrees, optional — used for directional avatars. */
+  heading?: number;
+  /** Which entity kinds the user is "looking for" in this session. Influences ranking. */
+  intent?: EntityKind[];
+}
+
+export interface ChatSendPayload {
+  conversationId: string;
+  body: string;
+  /** Client-generated id for optimistic UI; server echoes it in the ack. */
+  clientMessageId: string;
+}
+
+export interface LocationShareStartPayload {
+  conversationId: string;
+  duration: LocationShareDuration;
+  location: ChatLocation;
+}
+
+export interface LocationShareUpdatePayload {
+  sessionId: string;
+  location: ChatLocation;
+}
+
+export interface LocationShareStopPayload {
+  sessionId: string;
 }
 
 export interface ClientToServerEvents {
   'presence:update': (
-    payload: PresenceUpdatePayload,
-    ack: (res: AckResult<{ cellId: string }>) => void,
+    p: PresenceUpdatePayload,
+    ack: (r: AckResult<{ cellId: string }>) => void,
   ) => void;
   'conversation:join': (
-    payload: { conversationId: string },
-    ack: (res: AckResult<{ conversationId: string }>) => void,
+    p: { conversationId: string },
+    ack: (r: AckResult<{ joined: true }>) => void,
   ) => void;
   'conversation:leave': (
-    payload: { conversationId: string },
-    ack: (res: AckResult<{ conversationId: string }>) => void,
+    p: { conversationId: string },
+    ack: (r: AckResult<{ left: true }>) => void,
   ) => void;
+  'chat:typing': (p: { conversationId: string }) => void;
   'chat:send': (
-    payload: { conversationId: string; body: string; clientMessageId: string },
-    ack: (res: AckResult<ChatMessageEvent>) => void,
-  ) => void;
-  'event:join': (
-    payload: { eventId: string },
-    ack: (res: AckResult<{ eventId: string }>) => void,
-  ) => void;
-  'event:leave': (
-    payload: { eventId: string },
-    ack: (res: AckResult<{ eventId: string }>) => void,
+    p: ChatSendPayload,
+    ack: (r: AckResult<ChatMessageEvent>) => void,
   ) => void;
   'location:share:start': (
-    payload: {
-      conversationId: string;
-      duration: LocationShareDuration;
-      location: ChatLocation;
-    },
-    ack: (res: AckResult<LocationShareStartedEvent>) => void,
+    p: LocationShareStartPayload,
+    ack: (r: AckResult<LocationShareSession>) => void,
   ) => void;
   'location:share:update': (
-    payload: { sessionId: string; location: ChatLocation },
-    ack: (res: AckResult<{ updatedAt: string }>) => void,
+    p: LocationShareUpdatePayload,
+    ack: (r: AckResult<{ updatedAt: string }>) => void,
   ) => void;
   'location:share:stop': (
-    payload: { sessionId: string },
-    ack: (res: AckResult<{ sessionId: string }>) => void,
+    p: LocationShareStopPayload,
+    ack: (r: AckResult<{ ended: true }>) => void,
   ) => void;
+  /** Subscribe to live poll/Q&A deltas for an event (room `event:{eventId}`). */
+  'event:join': (
+    p: { eventId: string },
+    ack: (r: AckResult<{ joined: true }>) => void,
+  ) => void;
+  /** Unsubscribe from an event's live deltas. */
+  'event:leave': (
+    p: { eventId: string },
+    ack: (r: AckResult<{ left: true }>) => void,
+  ) => void;
+}
+
+// Optional: socket data attached after auth handshake
+export interface SocketData {
+  userId: string;
+  /** Set when the gateway joins the socket to user/cell-scoped rooms. */
+  rooms: Set<string>;
+  /** True after first successful presence:update this connection (friend online fan-out). */
+  friendPresenceAnnounced?: boolean;
 }
