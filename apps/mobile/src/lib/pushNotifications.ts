@@ -21,7 +21,6 @@ import {
   getToken,
   onMessage,
   onNotificationOpenedApp,
-  onTokenRefresh,
   requestPermission as firebaseRequestPermission,
 } from '@react-native-firebase/messaging';
 
@@ -70,12 +69,6 @@ async function requestPermission(): Promise<boolean> {
 
 // ─── Token registration ─────────────────────────────────────────────────────
 
-async function registerTokenWithBackend(token: string): Promise<void> {
-  if (!token) return;
-  const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-  await api.post('/notifications/device-token', { token, platform });
-}
-
 export async function registerPushToken(): Promise<void> {
   if (!isFirebaseReady()) {
     if (__DEV__) {
@@ -98,7 +91,8 @@ export async function registerPushToken(): Promise<void> {
       console.log('[push] FCM token acquired:', token.slice(0, 20) + '...');
     }
 
-    await registerTokenWithBackend(token);
+    const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+    await api.post('/notifications/device-token', { token, platform });
     if (__DEV__) console.log('[push] token registered with backend');
   } catch (err) {
     if (__DEV__) console.warn('[push] registerPushToken failed:', err);
@@ -272,13 +266,12 @@ export function setupNotificationHandlers(navigate: NavigateFn): () => void {
   }
 
   try {
-    const messagingInstance = messaging();
-    const unsubForeground = onMessage(messagingInstance, async () => {
+    const unsubForeground = onMessage(messaging(), async () => {
       // Socket.IO owns foreground interaction delivery to avoid duplicate UI.
     });
 
     const unsubBackgroundTap = onNotificationOpenedApp(
-      messagingInstance,
+      messaging(),
       (remoteMessage) => {
         handleNotificationTap(
           remoteMessage.data as PushData,
@@ -288,16 +281,7 @@ export function setupNotificationHandlers(navigate: NavigateFn): () => void {
       },
     );
 
-    // FCM may rotate a token at any time. Re-register the fresh value while the
-    // authenticated session is alive so push delivery survives app upgrades,
-    // restore/reinstall edges, and Firebase token invalidation.
-    const unsubTokenRefresh = onTokenRefresh(messagingInstance, (token) => {
-      void registerTokenWithBackend(token).catch((err: unknown) => {
-        if (__DEV__) console.warn('[push] token refresh registration failed:', err);
-      });
-    });
-
-    void getInitialNotification(messagingInstance).then((remoteMessage) => {
+    void getInitialNotification(messaging()).then((remoteMessage) => {
       if (!remoteMessage) return;
       handleNotificationTap(
         remoteMessage.data as PushData,
@@ -309,7 +293,6 @@ export function setupNotificationHandlers(navigate: NavigateFn): () => void {
     return () => {
       unsubForeground();
       unsubBackgroundTap();
-      unsubTokenRefresh();
       if (pendingTimer) {
         clearTimeout(pendingTimer);
         pendingTimer = null;
