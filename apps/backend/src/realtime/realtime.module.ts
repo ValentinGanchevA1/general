@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { RealtimeGateway } from './realtime.gateway';
 import { WsJwtGuard } from './ws-jwt.guard';
 import { LocationShareSweepService } from './location-share.sweep';
+import { DiscoveryRealtimePublisher } from './discovery-realtime.publisher';
 import { PresenceModule } from '../modules/presence/presence.module';
 import { AuthModule } from '../modules/auth/auth.module';
 import { ChatModule } from '../modules/chat/chat.module';
@@ -19,7 +20,12 @@ import { FriendsModule } from '../modules/friends/friends.module';
     // Bidirectional: FriendsNotifyService → RealtimeGateway; gateway → FriendsService (presence).
     forwardRef(() => FriendsModule),
   ],
-  providers: [RealtimeGateway, WsJwtGuard, LocationShareSweepService],
-  exports: [RealtimeGateway],
+  providers: [
+    RealtimeGateway,
+    WsJwtGuard,
+    LocationShareSweepService,
+    DiscoveryRealtimePublisher,
+  ],
+  exports: [RealtimeGateway, DiscoveryRealtimePublisher],
 })
 export class RealtimeModule {}
