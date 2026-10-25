@@ -9,6 +9,7 @@ import type {
   LocationShareEndReason,
   LocationShareSession,
   EntityPoint,
+  DiscoveryQuery,
 } from './api';
 import type { DiscoveryPointKey } from './discovery';
 import type { EventQuestion, PollResult } from './event';
@@ -244,7 +245,7 @@ export interface ServerToClientEvents {
   'event:poll': (e: EventPollDelta) => void;
   /** New question asked in a joined event. */
   'event:question': (e: EventQuestionDelta) => void;
-  /** A question's upvote count changed in a joined event. */
+  /** A question's upvote count changed. */
   'event:question:upvote': (e: EventQuestionUpvoteDelta) => void;
   /** A new story was posted into a cell the socket is present in. */
   'story:new': (e: StoryNewEvent) => void;
@@ -265,6 +266,13 @@ export interface PresenceUpdatePayload {
   /** Which entity kinds the user is "looking for" in this session. Influences ranking. */
   intent?: EntityKind[];
 }
+
+/**
+ * Active map discovery context for viewer-scoped realtime deltas.
+ * `prevViewportHash` is deliberately excluded: it is an HTTP diff cursor, not
+ * part of the viewer's current visibility/filter subscription.
+ */
+export type DiscoverySubscriptionPayload = Omit<DiscoveryQuery, 'prevViewportHash'>;
 
 export interface ChatSendPayload {
   conversationId: string;
@@ -292,6 +300,15 @@ export interface ClientToServerEvents {
   'presence:update': (
     p: PresenceUpdatePayload,
     ack: (r: AckResult<{ cellId: string }>) => void,
+  ) => void;
+  /** Replace this socket's active map discovery viewport/filter context. */
+  'discovery:subscribe': (
+    p: DiscoverySubscriptionPayload,
+    ack: (r: AckResult<{ subscribed: true }>) => void,
+  ) => void;
+  /** Clear this socket's active map discovery context. */
+  'discovery:unsubscribe': (
+    ack: (r: AckResult<{ unsubscribed: true }>) => void,
   ) => void;
   'conversation:join': (
     p: { conversationId: string },
