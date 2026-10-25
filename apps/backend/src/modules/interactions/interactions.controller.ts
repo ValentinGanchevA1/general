@@ -12,6 +12,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { InteractionsInboxService } from './interactions-inbox.service';
 import { InteractionsService } from './interactions.service';
+import { WaveIdempotencyService } from './wave-idempotency.service';
 
 export class WaveDto implements WaveRequest {
   @IsUUID()
@@ -29,6 +30,7 @@ export class InteractionsController {
   constructor(
     private readonly interactions: InteractionsService,
     private readonly inboxProjection: InteractionsInboxService,
+    private readonly waveIdempotency: WaveIdempotencyService,
   ) {}
 
   @Post('wave')
@@ -37,7 +39,7 @@ export class InteractionsController {
     @Body() dto: WaveDto,
     @CurrentUser('id') userId: string,
   ): Promise<WaveResponse> {
-    return this.interactions.wave(userId, dto);
+    return this.waveIdempotency.wave(userId, dto);
   }
 
   /**

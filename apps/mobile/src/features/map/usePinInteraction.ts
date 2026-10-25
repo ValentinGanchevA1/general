@@ -99,11 +99,16 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
   }, [send]);
 
   const showPreview = state.matches('preview') || state.matches('loadingPin');
+  const wavePending = state.matches({social: 'wavePending'});
   const pending =
-    state.matches({social: 'wavePending'}) ||
+    wavePending ||
     state.matches({dating: 'likePending'});
 
   const ctx = state.context;
+  // Wave is a lightweight social signal. Reflect the intent immediately while
+  // the durable command is in flight, then automatically roll back if the
+  // machine returns to viewing after a failed request.
+  const waveOptimistic = ctx.waveSent || wavePending;
 
   useEffect(() => {
     const message = ctx.error?.trim();
@@ -172,11 +177,11 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
       viewerMode: ctx.viewerMode,
       peerAllowsDating,
       pending,
-      waveSent: ctx.waveSent,
+      waveSent: waveOptimistic,
       likeSent: ctx.likeSent,
       blocked: ctx.blockedByViewer || ctx.blockedByPeer,
     };
-  }, [showPreview, ctx, pending]);
+  }, [showPreview, ctx, pending, waveOptimistic]);
 
   /** Display name for seeding EntityBottomSheet when pin left the viewport. */
   const seedDisplayName = useMemo(() => {
@@ -213,7 +218,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     sendPass,
     sendMessage,
     pending,
-    waveSent: ctx.waveSent,
+    waveSent: waveOptimistic,
     likeSent: ctx.likeSent,
     isMatch: ctx.isMatch,
     hasMutualWave: ctx.hasMutualWave,
