@@ -3,56 +3,24 @@ import { StyleSheet } from 'react-native';
 import type { DiscoveryPoint } from '@g88/shared';
 import {
   Camera,
-  CircleLayer,
+  GeoJSONSource,
+  Layer,
   Map,
-  ShapeSource,
   type MapRef,
 } from '@maplibre/maplibre-react-native';
 
+import { discoveryToMapFeatureCollection } from '../../adapters/discoveryToGeoJson';
 import type { MapLibreBoundsSnapshot, MapLibreViewStateSnapshot } from '../../mapLibreAdapter';
 import { mapLibreSnapshotToViewportChange } from '../../mapLibreAdapter';
 import type { NexaMapViewportChange } from '../../contracts/mapRenderer';
-import { getDiscoveryPointKey } from '../../discoveryPointKey';
 
 const DEVELOPMENT_MAP_STYLE = 'https://demotiles.maplibre.org/style.json';
 const DISCOVERY_SOURCE_ID = 'nexa-discovery';
-
-interface DiscoveryFeatureProperties {
-  key: string;
-  kind: DiscoveryPoint['kind'];
-  count: number;
-}
-
-type DiscoveryFeatureCollection = GeoJSON.FeatureCollection<
-  GeoJSON.Point,
-  DiscoveryFeatureProperties
->;
 
 export interface MapLibreMapSurfaceProps {
   points: readonly DiscoveryPoint[];
   onReady: () => void;
   onViewportSettled: (change: NexaMapViewportChange) => void;
-}
-
-function toDiscoveryFeatureCollection(
-  points: readonly DiscoveryPoint[],
-): DiscoveryFeatureCollection {
-  return {
-    type: 'FeatureCollection',
-    features: points.map((point) => ({
-      type: 'Feature',
-      id: getDiscoveryPointKey(point),
-      geometry: {
-        type: 'Point',
-        coordinates: [point.coordinate.lng, point.coordinate.lat],
-      },
-      properties: {
-        key: getDiscoveryPointKey(point),
-        kind: point.kind,
-        count: point.kind === 'cluster' ? point.count : 1,
-      },
-    })),
-  };
 }
 
 /**
@@ -68,7 +36,7 @@ export const MapLibreMapSurface = React.forwardRef<MapRef, MapLibreMapSurfacePro
     ref,
   ): React.JSX.Element {
     const localRef = React.useRef<MapRef>(null);
-    const shape = React.useMemo(() => toDiscoveryFeatureCollection(points), [points]);
+    const data = React.useMemo(() => discoveryToMapFeatureCollection(points), [points]);
 
     React.useImperativeHandle(ref, () => {
       if (localRef.current === null) {
@@ -116,18 +84,19 @@ export const MapLibreMapSurface = React.forwardRef<MapRef, MapLibreMapSurfacePro
         }}
       >
         <Camera />
-        <ShapeSource id={DISCOVERY_SOURCE_ID} shape={shape}>
-          <CircleLayer
+        <GeoJSONSource id={DISCOVERY_SOURCE_ID} data={data}>
+          <Layer
             id="nexa-discovery-points"
-            style={{
-              circleColor: '#8B5CF6',
-              circleOpacity: 0.9,
-              circleRadius: ['case', ['==', ['get', 'kind'], 'cluster'], 12, 7],
-              circleStrokeColor: '#FFFFFF',
-              circleStrokeWidth: 1.5,
+            type="circle"
+            paint={{
+              'circle-color': '#8B5CF6',
+              'circle-opacity': 0.9,
+              'circle-radius': ['case', ['==', ['get', 'kind'], 'cluster'], 12, 7],
+              'circle-stroke-color': '#FFFFFF',
+              'circle-stroke-width': 1.5,
             }}
           />
-        </ShapeSource>
+        </GeoJSONSource>
       </Map>
     );
   },
