@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import { BrandLogo } from '@/components/Brand/BrandLogo';
+import { useNexaLaunchInteractionsReady } from '@/components/Brand/NexaLaunchSurfaceContext';
 import {
 	DarkTheme,
 	DefaultTheme,
@@ -188,11 +189,12 @@ export function AppNavigator(): React.JSX.Element {
 	const user = useAppSelector((s) => s.auth.user);
 	const restoring = useAppSelector((s) => s.auth.restoring);
 	const profileSetupComplete = useAppSelector((s) => s.auth.profileSetupComplete);
+	const launchInteractionsReady = useNexaLaunchInteractionsReady();
 	const prevUserRef = useRef<string | null>(null);
 	const navigationTheme = useMemo(() => buildNavigationTheme(themeColors, scheme === 'dark'), [themeColors, scheme]);
 	useEffect(() => { void dispatch(restoreSession()); }, [dispatch]);
-	useEffect(() => { if (user && prevUserRef.current !== user.id) { prevUserRef.current = user.id; void registerPushToken(); void pingGamification(); return setupNotificationHandlers((screen, params) => { openViaRef(screen as Parameters<typeof openViaRef>[0], params); }); } if (!user) prevUserRef.current = null; }, [user]);
-	useEffect(() => { if (!user || restoring) return; let cancelled = false; const t = setTimeout(() => { void (async () => { const phone = await takePendingPhoneVerify(); if (cancelled || !phone) return; openViaRef('Verification', { initialPhone: phone }); })(); }, 700); return () => { cancelled = true; clearTimeout(t); }; }, [user, restoring]);
+	useEffect(() => { if (!launchInteractionsReady) return; if (user && prevUserRef.current !== user.id) { prevUserRef.current = user.id; void registerPushToken(); void pingGamification(); return setupNotificationHandlers((screen, params) => { openViaRef(screen as Parameters<typeof openViaRef>[0], params); }); } if (!user) prevUserRef.current = null; }, [launchInteractionsReady, user]);
+	useEffect(() => { if (!launchInteractionsReady || !user || restoring) return; let cancelled = false; const t = setTimeout(() => { void (async () => { const phone = await takePendingPhoneVerify(); if (cancelled || !phone) return; openViaRef('Verification', { initialPhone: phone }); })(); }, 700); return () => { cancelled = true; clearTimeout(t); }; }, [launchInteractionsReady, user, restoring]);
 	if (restoring && user === null) return <View style={{ flex: 1, backgroundColor: themeColors.bg, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Loading" accessibilityRole="progressbar"><BrandLogo size={120} /></View>;
 	return <NavigationContainer ref={navigationRef} theme={navigationTheme} onReady={() => { navigationIntegration.registerNavigationContainer(navigationRef); }}><BottomSheetModalProvider>
 		<Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themeColors.bg } }}>
