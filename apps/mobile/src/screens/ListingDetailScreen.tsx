@@ -9,7 +9,7 @@ import {appAlert} from '@/ui/appAlert';
 import {ScreenHeader} from '@/components/ScreenHeader';
 import {EmptyState} from '@/components/EmptyState';
 import {useAppTheme, type ThemeColors} from '@/theme';
-import type {ApiError, CreateConversationRequest, CreateConversationResponse, ListingOffer, WaveRequest, WaveResponse} from '@g88/shared';
+import type {CreateConversationRequest, CreateConversationResponse, ListingOffer, WaveRequest, WaveResponse} from '@g88/shared';
 import type {CommerceStackParamList} from '@/navigation/stacks';
 import {useAppSelector} from '@/hooks/redux';
 import {postJson} from '@/api/client';
@@ -17,6 +17,7 @@ import {bumpListing, counterOffer, makeOffer, respondToOffer, toggleFavorite, up
 import {formatListingExpiry, formatPrice} from '@/features/trading/formatPrice';
 import {openRootScreen} from '@/navigation/openRootScreen';
 import {signalPostSocialActivation} from '@/features/nudges/postSocialActivation';
+import {extractMessage} from '@/utils/extractMessage';
 import {
 	resolveNexaConnectActionLabel,
 	resolveNexaOfferActionLabel,
@@ -24,6 +25,12 @@ import {
 } from '@/product/nexaActionLanguage';
 
 type R = RouteProp<CommerceStackParamList, 'ListingDetail'>;
+
+function errorCode(error: unknown): string | null {
+	if (typeof error !== 'object' || error === null || !('code' in error)) return null;
+	const code = (error as {code: unknown}).code;
+	return typeof code === 'string' ? code : null;
+}
 
 function useListingDetailTheme() {
 	const {colors} = useAppTheme();
@@ -98,12 +105,14 @@ function SellerContactButtons({sellerId, sellerName}: {sellerId: string; sellerN
 			const res = await postJson<CreateConversationRequest, CreateConversationResponse>('/conversations', {targetUserId: sellerId});
 			void signalPostSocialActivation('message');
 			openRootScreen(navigation, 'Chat', {conversationId: res.conversationId, otherUserName: sellerName, otherUserId: sellerId, requestPending: res.status === 'pending' && res.permission === 'request'});
-		} catch (e) { const err = e as ApiError; appAlert('Could not open chat', err.message || 'Try again.'); } finally { setMessaging(false); }
+		} catch (e) {
+			appAlert('Could not open chat', extractMessage(e, 'Try again.'));
+		} finally { setMessaging(false); }
 	}, [messaging, sellerId, sellerName, navigation]);
 	const onWave = useCallback(async () => {
 		setWaving(true);
 		try { await postJson<WaveRequest, WaveResponse>('/interactions/wave', {toUserId: sellerId, context: 'profile'}); appAlert('Wave sent', 'The seller will see your wave.'); }
-		catch (e) { const err = e as ApiError; appAlert(err.code === 'wave.cooldown' ? 'Already waved' : 'Could not wave', err.message || 'Try again.'); }
+		catch (e) { appAlert(errorCode(e) === 'wave.cooldown' ? 'Already waved' : 'Could not wave', extractMessage(e, 'Try again.')); }
 		finally { setWaving(false); }
 	}, [sellerId]);
 	return <View style={S.contactRow}>
@@ -125,14 +134,14 @@ function BuyerOffer({listingId, disabled, myOffer, askingCents, currency, onChan
 		if (amount.trim()) { const parsed = parseFloat(amount); if (Number.isNaN(parsed) || parsed < 0) { appAlert('Invalid price', 'Please enter a valid offer price, or leave it blank to offer at the asking price.'); return; } offerCents = Math.round(parsed * 100); }
 		setBusy(true);
 		try { await makeOffer(listingId, {...(offerCents != null ? {offerCents} : {}), ...(message.trim() ? {message: message.trim()} : {})}); setAmount(''); setMessage(''); onChanged(); }
-		catch (e) { appAlert('Could not send offer', (e as ApiError).message || 'Try again.'); } finally { setBusy(false); }
+		catch (e) { appAlert('Could not send offer', extractMessage(e, 'Try again.')); } finally { setBusy(false); }
 	}, [amount, message, listingId, onChanged]);
 	const onWithdraw = useCallback(async () => { setBusy(true); try { await withdrawOffer(listingId); onChanged(); } catch { /* noop */ } finally { setBusy(false); } }, [listingId, onChanged]);
 
 	if (myOffer && myOffer.status !== 'withdrawn') {
 		const isSellerCounter = myOffer.status === 'pending' && myOffer.lastActor === 'seller';
-		const onAcceptCounter = async () => { setBusy(true); try { await respondToOffer(myOffer.id, 'accepted'); onChanged(); } catch (e) { appAlert('Could not accept', (e as ApiError).message || 'Try again.'); } finally { setBusy(false); } };
-		const onDeclineCounter = async () => { setBusy(true); try { await respondToOffer(myOffer.id, 'declined'); onChanged(); } catch (e) { appAlert('Could not decline', (e as ApiError).message || 'Try again.'); } finally { setBusy(false); } };
+		const onAcceptCounter = async () => { setBusy(true); try { await respondToOffer(myOffer.id, 'accepted'); onChanged(); } catch (e) { appAlert('Could not accept', extractMessage(e, 'Try again.')); } finally { setBusy(false); } };
+		const onDeclineCounter = async () => { setBusy(true); try { await respondToOffer(myOffer.id, 'declined'); onChanged(); } catch (e) { appAlert('Could not decline', extractMessage(e, 'Try again.')); } finally { setBusy(false); } };
 		if (isSellerCounter && reofferOpen) return <View style={S.card}>
 			<Text style={S.cardTitle}>Counter offer</Text><Text style={S.counterHint}>Seller offered {myOffer.offerCents != null ? formatPrice(myOffer.offerCents, currency) : 'asking'}. Send a new amount.</Text>
 			<OfferInputs amount={amount} message={message} askingCents={askingCents} currency={currency} onAmount={setAmount} onMessage={setMessage}/>
@@ -166,13 +175,13 @@ function SellerControls({listingId, status, offers, currency, onChanged}: {listi
 	const [counterMsg, setCounterMsg] = useState('');
 	const [counterBusy, setCounterBusy] = useState(false);
 	const [bumping, setBumping] = useState(false);
-	const respond = useCallback(async (offerId: string, decision: 'accepted' | 'declined') => { try { await respondToOffer(offerId, decision); onChanged(); } catch (e) { appAlert('Could not respond', (e as ApiError).message || 'Try again.'); } }, [onChanged]);
+	const respond = useCallback(async (offerId: string, decision: 'accepted' | 'declined') => { try { await respondToOffer(offerId, decision); onChanged(); } catch (e) { appAlert('Could not respond', extractMessage(e, 'Try again.')); } }, [onChanged]);
 	const submitCounter = useCallback(async (offerId: string) => {
 		const parsed = parseFloat(counterAmount); if (Number.isNaN(parsed) || parsed < 0) { appAlert('Invalid price', 'Enter a valid counter amount.'); return; }
-		setCounterBusy(true); try { await counterOffer(offerId, {offerCents: Math.round(parsed * 100), ...(counterMsg.trim() ? {message: counterMsg.trim()} : {})}); setCounterFor(null); setCounterAmount(''); setCounterMsg(''); onChanged(); } catch (e) { appAlert('Could not counter', (e as ApiError).message || 'Try again.'); } finally { setCounterBusy(false); }
+		setCounterBusy(true); try { await counterOffer(offerId, {offerCents: Math.round(parsed * 100), ...(counterMsg.trim() ? {message: counterMsg.trim()} : {})}); setCounterFor(null); setCounterAmount(''); setCounterMsg(''); onChanged(); } catch (e) { appAlert('Could not counter', extractMessage(e, 'Try again.')); } finally { setCounterBusy(false); }
 	}, [counterAmount, counterMsg, onChanged]);
-	const setStatus = useCallback(async (next: 'sold' | 'withdrawn') => { try { await updateListingStatus(listingId, next); onChanged(); } catch (e) { appAlert('Could not update', (e as ApiError).message || 'Try again.'); } }, [listingId, onChanged]);
-	const onBump = useCallback(async () => { setBumping(true); try { await bumpListing(listingId); onChanged(); } catch (e) { appAlert('Could not bump', (e as ApiError).message || 'Try again.'); } finally { setBumping(false); } }, [listingId, onChanged]);
+	const setStatus = useCallback(async (next: 'sold' | 'withdrawn') => { try { await updateListingStatus(listingId, next); onChanged(); } catch (e) { appAlert('Could not update', extractMessage(e, 'Try again.')); } }, [listingId, onChanged]);
+	const onBump = useCallback(async () => { setBumping(true); try { await bumpListing(listingId); onChanged(); } catch (e) { appAlert('Could not bump', extractMessage(e, 'Try again.')); } finally { setBumping(false); } }, [listingId, onChanged]);
 	const pending = offers.filter((o) => o.status === 'pending');
 	return <View>
 		{status === 'active' ? <View style={S.sellerActions}><TouchableOpacity style={S.secondaryBtn} onPress={() => void onBump()} disabled={bumping}>{bumping ? <ActivityIndicator size="small" color={colors.primary}/> : <Text style={S.secondaryBtnText}>Bump listing</Text>}</TouchableOpacity><TouchableOpacity style={S.secondaryBtn} onPress={() => void setStatus('sold')}><Text style={S.secondaryBtnText}>Mark sold</Text></TouchableOpacity><TouchableOpacity style={S.secondaryBtn} onPress={() => void setStatus('withdrawn')}><Text style={S.secondaryBtnText}>Withdraw</Text></TouchableOpacity></View> : null}
