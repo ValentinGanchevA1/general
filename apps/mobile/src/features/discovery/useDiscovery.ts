@@ -87,6 +87,11 @@ export function useDiscovery({
       dispatch(setDiscoveryZoom(z));
 
       if (isViewportTooLarge(vp)) {
+        abortRef.current?.abort();
+        abortRef.current = null;
+        lastFetchKey.current = '';
+        prevHashRef.current = null;
+        cachedPointsRef.current = [];
         setData({
           points: [],
           resolution: 0,
