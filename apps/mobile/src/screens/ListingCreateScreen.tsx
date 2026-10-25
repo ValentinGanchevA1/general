@@ -21,6 +21,7 @@ import { pickAndUploadListingImage } from '@/features/trading/listingImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
 import { useAppTheme, type ThemeColors } from '@/theme';
+import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
 
 type Nav = NativeStackNavigationProp<CommerceStackParamList>;
 type R = RouteProp<CommerceStackParamList, 'ListingCreate'>;
@@ -36,6 +37,7 @@ export function ListingCreateScreen(): React.JSX.Element {
   const nav = useNavigation<Nav>();
   const route = useRoute<R>();
   const { coords } = useUserLocation();
+  const reduceMotion = useNexaReducedMotion();
   const mapRef = useRef<MapView>(null);
   const hasCentered = useRef(false);
   const priceRef = useRef<TextInput>(null);
@@ -97,9 +99,12 @@ export function ListingCreateScreen(): React.JSX.Element {
     const target = initialLocation ?? coords;
     if (target && !hasCentered.current) {
       hasCentered.current = true;
-      mapRef.current?.animateToRegion({ latitude: target.lat, longitude: target.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 400);
+      mapRef.current?.animateToRegion(
+        { latitude: target.lat, longitude: target.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
+        reduceMotion ? 0 : 400,
+      );
     }
-  }, [coords, initialLocation]);
+  }, [coords, initialLocation, reduceMotion]);
 
   const headerTitle = mode === 'buy' ? 'Looking to buy' : 'Sell an item';
   const titlePlaceholder = mode === 'buy' ? 'What are you looking for?' : 'What are you selling?';

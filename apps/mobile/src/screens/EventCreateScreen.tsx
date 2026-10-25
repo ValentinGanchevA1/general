@@ -32,6 +32,7 @@ import { pickAndUploadListingImage } from '@/features/trading/listingImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
 import { useAppTheme, type ThemeColors } from '@/theme';
+import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
 
 type Nav = NativeStackNavigationProp<EventsStackParamList>;
 type Route = NativeStackScreenProps<EventsStackParamList, 'EventCreate'>['route'];
@@ -65,6 +66,7 @@ export function EventCreateScreen(): React.JSX.Element {
 	const route = useRoute<Route>();
 	const initialLocation = route.params?.initialLocation;
 	const { coords } = useUserLocation();
+	const reduceMotion = useNexaReducedMotion();
 	const mapRef = useRef<MapView>(null);
 	const hasCentered = useRef(false);
 	const descriptionRef = useRef<TextInput>(null);
@@ -158,9 +160,9 @@ export function EventCreateScreen(): React.JSX.Element {
 		hasCentered.current = true;
 		mapRef.current?.animateToRegion(
 			{ latitude: target.lat, longitude: target.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
-			400,
+			reduceMotion ? 0 : 400,
 		);
-	}, [coords, initialLocation]);
+	}, [coords, initialLocation, reduceMotion]);
 
 	return (
 		<KeyboardAvoidingView style={S.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
