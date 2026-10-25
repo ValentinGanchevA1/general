@@ -311,9 +311,16 @@ export class StoriesService {
     storyId: string,
   ): Promise<{ viewed: true; viewCount: number }> {
     const [story] = (await this.db.query(
-      `SELECT author_id FROM stories
-        WHERE id = $1 AND deleted_at IS NULL AND expires_at > NOW()`,
-      [storyId],
+      `SELECT s.author_id FROM stories s
+        WHERE s.id = $1
+          AND s.deleted_at IS NULL
+          AND s.expires_at > NOW()
+          AND NOT EXISTS (
+            SELECT 1 FROM user_blocks ub
+             WHERE (ub.blocker_id = $2 AND ub.blocked_id = s.author_id)
+                OR (ub.blocker_id = s.author_id AND ub.blocked_id = $2)
+          )`,
+      [storyId, userId],
     )) as Array<{ author_id: string }>;
     if (!story) {
       throw new NotFoundException({ code: 'story.not_found', message: 'Story not found.' });
@@ -354,9 +361,16 @@ export class StoriesService {
     kind: StoryReactionKind,
   ): Promise<{ reaction: StoryReactionKind; reactionCount: number }> {
     const [story] = (await this.db.query(
-      `SELECT author_id FROM stories
-        WHERE id = $1 AND deleted_at IS NULL AND expires_at > NOW()`,
-      [storyId],
+      `SELECT s.author_id FROM stories s
+        WHERE s.id = $1
+          AND s.deleted_at IS NULL
+          AND s.expires_at > NOW()
+          AND NOT EXISTS (
+            SELECT 1 FROM user_blocks ub
+             WHERE (ub.blocker_id = $2 AND ub.blocked_id = s.author_id)
+                OR (ub.blocker_id = s.author_id AND ub.blocked_id = $2)
+          )`,
+      [storyId, userId],
     )) as Array<{ author_id: string }>;
     if (!story) {
       throw new NotFoundException({ code: 'story.not_found', message: 'Story not found.' });
