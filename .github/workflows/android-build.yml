@@ -12,6 +12,15 @@ name: Android Build
 # "Android APK (sideload)" workflow (android-apk.yml) via workflow_dispatch.
 on:
   workflow_dispatch:
+    inputs:
+      architecture:
+        description: APK architecture for manual device calibration
+        required: true
+        default: universal
+        type: choice
+        options:
+          - universal
+          - arm64-v8a
   push:
     branches: [master, "claude/**"]
     paths:
@@ -161,13 +170,22 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_DIST: ${{ github.run_number }}
           SENTRY_RELEASE: com.g88@0.1.0+${{ github.run_number }}
+          CALIBRATION_ARCHITECTURE: ${{ inputs.architecture }}
         run: |
           cd android
+          ARCH_ARGS=()
+          if [ "${CALIBRATION_ARCHITECTURE:-universal}" = "arm64-v8a" ]; then
+            ARCH_ARGS+=("-PreactNativeArchitectures=arm64-v8a")
+            echo "Building arm64-v8a calibration APK"
+          else
+            echo "Building universal APK"
+          fi
           ATTEMPTS=5
           for i in $(seq 1 "$ATTEMPTS"); do
             if ./gradlew assembleRelease --no-daemon \
               --init-script ci-init.gradle \
-              -PversionCodeOverride=${{ github.run_number }}; then
+              -PversionCodeOverride=${{ github.run_number }} \
+              "${ARCH_ARGS[@]}"; then
               exit 0
             fi
             if [ "$i" -eq "$ATTEMPTS" ]; then
@@ -180,6 +198,8 @@ jobs:
           done
 
       - name: Verify APK embeds JS bundle
+        env:
+          CALIBRATION_ARCHITECTURE: ${{ inputs.architecture }}
         run: |
           APK=android/app/build/outputs/apk/release/app-release.apk
           test -f "$APK" || { echo "::error::APK not produced at $APK"; exit 1; }
@@ -188,6 +208,14 @@ jobs:
             echo "::error::APK is missing assets/index.android.bundle — would crash with Unable to load script on device"
             unzip -l "$APK" | head -40
             exit 1
+          fi
+          if [ "${CALIBRATION_ARCHITECTURE:-universal}" = "arm64-v8a" ]; then
+            ABIS=$(unzip -Z1 "$APK" | awk -F/ '/^lib\/[^/]+\/.*\.so$/ { print $2 }' | sort -u)
+            if [ "$ABIS" != "arm64-v8a" ]; then
+              echo "::error::arm64 calibration APK contains unexpected ABI set: $ABIS"
+              exit 1
+            fi
+            echo "✓ arm64-v8a-only native payload verified"
           fi
           echo "✓ index.android.bundle present ($(unzip -l "$APK" | grep index.android.bundle))"
           ls -lh "$APK"
