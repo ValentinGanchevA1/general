@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { extractMessage } from '@/utils/extractMessage';
 import { fetchCurrentWeather } from './weatherService';
 import type { CurrentWeather, WeatherCoordinates } from './weatherTypes';
 
@@ -41,9 +42,7 @@ export function useCurrentWeather(
 				setError(null);
 			} catch (cause: unknown) {
 				if (!active || controller.signal.aborted) return;
-				setError(
-					cause instanceof Error ? cause.message : 'Unable to load weather',
-				);
+				setError(extractMessage(cause, 'Unable to load weather'));
 			} finally {
 				if (active) setLoading(false);
 			}
