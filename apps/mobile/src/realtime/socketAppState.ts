@@ -13,3 +13,11 @@ export function resolveSocketAppStateAction(
   if (state !== 'active') return 'disconnect';
   return connected ? 'none' : 'connect';
 }
+
+/** Cached presence may only be replayed after a foreground connection. */
+export function shouldReplayCachedPresence(
+  state: AppStateStatus,
+  hasCachedPresence: boolean,
+): boolean {
+  return state === 'active' && hasCachedPresence;
+}

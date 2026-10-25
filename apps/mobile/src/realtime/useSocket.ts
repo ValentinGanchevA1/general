@@ -16,7 +16,10 @@ import type {
 
 import { tokenStore } from '@/api/tokenStore';
 import { Config } from '@/config';
-import { resolveSocketAppStateAction } from './socketAppState';
+import {
+  resolveSocketAppStateAction,
+  shouldReplayCachedPresence,
+} from './socketAppState';
 
 type G88Socket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -45,6 +48,8 @@ let sharedSocket: G88Socket | null = null;
 let lifecycleBound = false;
 /** One AppState subscription owns foreground/background transport policy. */
 let appStateSubscription: { remove: () => void } | null = null;
+/** Last location heartbeat observed while the app was active, scoped to this login. */
+let lastPresencePayload: PresenceUpdatePayload | null = null;
 
 /** Monotonic suffix so two sends in the same ms never share an optimistic id. */
 let clientMessageSeq = 0;
@@ -118,7 +123,34 @@ function notifyConnectListeners(): void {
   }
 }
 
+function socketSendPresence(
+  payload: PresenceUpdatePayload,
+): Promise<{ cellId: string } | null> {
+  return new Promise((resolve) => {
+    if (AppState.currentState !== 'active') return resolve(null);
+    const s = sharedSocket;
+    if (!s?.connected) return resolve(null);
+    const timer = setTimeout(() => resolve(null), 3_000);
+    s.emit('presence:update', payload, (res) => {
+      clearTimeout(timer);
+      resolve(res.ok ? res.data : null);
+    });
+  });
+}
+
 async function onConnectedSideEffects(): Promise<void> {
+  if (
+    shouldReplayCachedPresence(
+      AppState.currentState,
+      lastPresencePayload !== null,
+    ) &&
+    lastPresencePayload !== null
+  ) {
+    // Re-establish online/cell presence immediately after foreground/network
+    // reconnect instead of waiting for the Map's next 30 s heartbeat.
+    void socketSendPresence(lastPresencePayload);
+  }
+
   notifyConnectListeners();
   // Heal friends badge after any gap offline.
   try {
@@ -387,19 +419,14 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
   );
 
   const sendPresence = useCallback(
-    (payload: PresenceUpdatePayload): Promise<{ cellId: string } | null> =>
-      new Promise((resolve) => {
-        // Presence must never leak stale foreground coordinates after backgrounding,
-        // even in the tiny window before Socket.IO finishes disconnecting.
-        if (AppState.currentState !== 'active') return resolve(null);
-        const s = sharedSocket;
-        if (!s?.connected) return resolve(null);
-        const timer = setTimeout(() => resolve(null), 3_000);
-        s.emit('presence:update', payload, (res) => {
-          clearTimeout(timer);
-          resolve(res.ok ? res.data : null);
-        });
-      }),
+    (payload: PresenceUpdatePayload): Promise<{ cellId: string } | null> => {
+      // Cache only foreground observations. Background timers cannot overwrite the
+      // last legitimate active location used for the next reconnect replay.
+      if (AppState.currentState === 'active') {
+        lastPresencePayload = payload;
+      }
+      return socketSendPresence(payload);
+    },
     [],
   );
 
@@ -465,6 +492,7 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
 
 export function disconnectSocket(): void {
   unbindAppStateLifecycle();
+  lastPresencePayload = null;
   if (sharedSocket) {
     sharedSocket.removeAllListeners();
     sharedSocket.disconnect();
