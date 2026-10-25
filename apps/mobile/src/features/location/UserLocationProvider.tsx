@@ -37,7 +37,6 @@ export function UserLocationProvider({
   const permissionRequestRef = useRef<Promise<void> | null>(null);
   const enabledRef = useRef(enabled);
   const launchInteractionsReady = useNexaLaunchInteractionsReady();
-  enabledRef.current = enabled;
 
   const stopTracking = useCallback((): void => {
     if (watchId.current === null) return;
@@ -118,6 +117,14 @@ export function UserLocationProvider({
     return request;
   }, [enabled, launchInteractionsReady, startTracking]);
 
+  // Keep async native callbacks aware of the current auth-session state without
+  // reading or writing refs during render. Session-bound remounting resets the
+  // exposed coordinates and permission state when the authenticated user changes.
+  useEffect(() => {
+    enabledRef.current = enabled;
+    if (!enabled) stopTracking();
+  }, [enabled, stopTracking]);
+
   // Warm path: already-granted Android permission can start GPS beneath the
   // launch overlay without presenting native UI. A negative quiet check remains
   // `unknown` because Android cannot distinguish never-asked from denied here.
@@ -145,13 +152,6 @@ export function UserLocationProvider({
       cancelled = true;
     };
   }, [enabled, startTracking]);
-
-  useEffect(() => {
-    if (enabled) return;
-    stopTracking();
-    setCoords(null);
-    setPermissionStatus('unknown');
-  }, [enabled, stopTracking]);
 
   useEffect(() => stopTracking, [stopTracking]);
 
