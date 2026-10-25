@@ -1,6 +1,6 @@
 import React from 'react';
-import type MapView from 'react-native-maps';
 
+import type { NexaMapController } from '../contracts/mapRenderer';
 import { NEXA_MAP_RENDERER_ROLLOUT } from '../mapRendererRollout';
 import {
   NexaMapRuntimeSurface,
@@ -12,16 +12,9 @@ export type NexaMapScreenSurfaceProps = Omit<
   'requestedRenderer' | 'mapLibreAvailable'
 >;
 
-/**
- * Product-facing map surface used by MapScreen.
- *
- * Renderer rollout policy is intentionally owned here instead of MapScreen so
- * product UI cannot accidentally couple itself to a concrete map SDK or infer
- * native renderer availability. The current policy resolves to the legacy
- * implementation with no visual or interaction changes.
- */
+/** Product-facing map surface used by MapScreen. */
 export const NexaMapScreenSurface = React.forwardRef<
-  MapView,
+  NexaMapController,
   NexaMapScreenSurfaceProps
 >(function NexaMapScreenSurface(props, ref): React.JSX.Element {
   return (
