@@ -55,10 +55,20 @@ Opening Map, Discover or Connections does **not** request browser/device geoloca
 
 The web bundle imports `socket.io-client` at build time from the already locked `apps/admin` workspace dependency. This avoids a runtime CDN/backend script inclusion and avoids a new web workspace importer. A dedicated web package/importer is the cleaner long-term architecture once the browser slice graduates from preview.
 
+## Real-browser regression gate
+
+`Web Preview CI` runs the real browser code in headless Chrome without Playwright/Cypress. The current suite covers:
+
+- multi-tab rotating refresh cookies, Web Locks serialization, HttpOnly isolation and BroadcastChannel session propagation (#594);
+- Socket.IO access-token rotation, reconnect and active-room rejoin (#595);
+- map viewport supersession, request abort and stale-response protection (#596);
+- Connections friend accept, wave-back, REST history/read, room join, chat send, ack/event dedupe and peer receive (#638).
+
+This is strong Chromium regression coverage, not a declaration that every browser engine is production-supported.
+
 ## Remaining release blockers
 
-1. Configure production same-origin reverse proxies for `/api/v1` and `/socket.io`, then set exact HTTPS `CORS_ORIGINS`.
-2. Validate Web Locks refresh serialization, account switching and logout propagation with multi-tab browser E2E across the supported browser matrix.
-3. Select the production map/tile stack.
-4. Add browser E2E for auth rotation, realtime reconnect/room rejoin, friend actions, chat send/receive and viewport races.
-5. Deploy a non-public preview and validate cookie/proxy behavior end to end.
+1. Choose the production web hostname/deployment policy, configure same-origin `/api/v1` + `/socket.io`, and allowlist only the exact HTTPS browser origin.
+2. Define the supported-browser matrix and validate the Web Locks/BroadcastChannel session contract on each supported engine.
+3. Select the production map/tile provider or self-hosted/vector-tile stack with explicit SLA, attribution, caching, CSP, privacy and usage terms.
+4. Validate login/refresh/logout, REST proxying and Socket.IO upgrades against the final deployed HTTPS topology.
