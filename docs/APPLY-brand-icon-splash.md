@@ -2,12 +2,12 @@
 
 ## Status (NEXA Visual System v4)
 
-- The final NEXA launch mark is the eye/discovery core surrounded by the entity orbit: circle, star, square, and location pin.
+- The final NEXA launch mark is the eye/discovery core surrounded by the entity orbit: circle, star, square, and diamond.
 - Android native launch still uses `react-native-bootsplash`, but the native frame is intentionally only the `#08090D` canvas. The complete symbol is no longer shown instantly before React Native motion starts.
 - React Native mounts `NexaLaunchOverlay` above navigation and performs the v4 ray-first sequence: dark canvas -> simultaneous light-ray ignition -> eye core materialization -> orbit refill -> entity glyph resolve -> NEXA wordmark fade-in -> application dissolve.
 - Visual System v4 refines the reusable `NexaSymbol`: a shallower upper lid, iris and pupil aligned to one optical center, and a restrained split lower lid make the mark read immediately as an eye rather than an antenna/broadcast glyph.
 - Orbiting entity glyphs remain launch/ecosystem composition; they do not become part of every small brand placement.
-- The splash waits only for boot-time auth/session restoration. Map entities, Socket.IO, location acquisition, push refresh, and other non-critical services continue after the app becomes interactive.
+- The splash waits for boot-time auth/session restoration. When the authenticated destination is Map, the final dissolve additionally waits for the native `MapView` surface to accept camera commands, with a 650 ms fail-open so Google Maps can never trap the user behind the splash. GPS, map tiles, discovery networking, Socket.IO, push refresh, and other non-critical services are not launch blockers.
 - Reduced Motion replaces orbit/ray motion with a short crossfade while preserving the final NEXA composition.
 - No additional animation dependency is required; the sequence uses React Native `Animated` plus the existing `react-native-linear-gradient` package.
 
@@ -18,10 +18,10 @@
 3. At ~80 ms, the eye core begins materializing through the rays with a smoother cubic scale/fade rather than a logo pop.
 4. At ~150 ms, the two elliptical orbit lines begin resolving around the eye while the orbit settles through a small rotation.
 5. A bright streak starts near the orbit at ~100 ms and sweeps across it to finish the refill effect while a brief violet-white ignition halo blooms around the core.
-6. At ~300 ms, circle, star, square, and pin entity markers resolve together around the orbit.
+6. At ~300 ms, circle, star, square, and diamond entity markers resolve together around the orbit.
 7. At ~650 ms, `NEXA` fades gently into place only after the symbol has become readable.
 8. The full entrance still settles at roughly 970 ms; ray-first ordering does not extend startup blocking.
-9. Once boot-time auth restore is complete, the wordmark and orbit dissolve first, then the eye and dark backdrop reveal the already-mounted app.
+9. Once launch readiness is satisfied, the wordmark and orbit dissolve first, then the eye and dark backdrop reveal the already-mounted app. For authenticated Map launches, readiness means auth restore plus native MapView readiness or the bounded 650 ms fail-open.
 
 ## Verify
 
@@ -31,10 +31,11 @@
 4. Confirm the rays are visibly the first branded event; the eye should not begin resolving until shortly after the rays ignite.
 5. Confirm there is no fully-formed static NEXA symbol before the animation starts and no white frame between native and React Native surfaces.
 6. Confirm the symbol reads as an eye at both launch size (`146`) and compact reusable sizes: upper lid + centered iris/pupil + subtle lower lid.
-7. Confirm the four orbit entities are legible on small Android devices without clipping: circle, star, square, pin.
+7. Confirm the four orbit entities are legible on small Android devices without clipping: circle, star, square, diamond.
 8. Enable Android "Remove animations" / system Reduced Motion and confirm the handoff becomes a short crossfade with no streak/orbit motion.
-9. Test both a fast session restore and an intentionally slow session restore. The entrance animation should complete once and hold cleanly until `ready=true`.
-10. Background/resume the app and confirm the branded runtime sequence does not replay while the process remains alive.
+9. Test both a fast session restore and an intentionally slow session restore. The entrance animation should complete once and hold cleanly until launch readiness is satisfied.
+10. On authenticated cold boot, confirm the splash does not dissolve onto an uninitialized native map surface; a Maps failure must still fail open within 650 ms after auth restore.
+11. Background/resume the app and confirm the branded runtime sequence does not replay while the process remains alive.
 
 ## iOS
 
