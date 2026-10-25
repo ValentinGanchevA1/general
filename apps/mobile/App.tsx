@@ -27,6 +27,7 @@ import { shouldRunNexaSpatialHandoff } from '@/components/Brand/nexaLaunchDestin
 import {
   NEXA_MAP_SURFACE_READY_FAIL_OPEN_MS,
   resolveNexaLaunchReady,
+  shouldPlayNexaSpatialHandoff,
 } from '@/components/Brand/nexaLaunchReadiness';
 import { buildNexaLaunchTelemetryProps } from '@/components/Brand/nexaLaunchTelemetry';
 import { UserLocationProvider } from '@/features/location/UserLocationProvider';
@@ -140,10 +141,18 @@ function AppShell(): React.JSX.Element {
       overlayHiddenAtRef.current = hiddenAtMs;
     }
 
-    if (requiresMapSurface) {
+    const playSpatialHandoff = shouldPlayNexaSpatialHandoff({
+      requiresMapSurface,
+      mapSurfaceReady: mapReadyAtRef.current !== null,
+    });
+    if (playSpatialHandoff) {
       setShowSpatialHandoff(true);
       return;
     }
+
+    // Auth/profile destinations and bounded map fail-open both expose the live
+    // application directly. A fail-open map keeps its own spatial loading state;
+    // do not play a decorative handoff that implies native readiness.
     setShowSpatialHandoff(false);
     setLaunchInteractionsReady(true);
     recordLaunchComplete(hiddenAtMs);
