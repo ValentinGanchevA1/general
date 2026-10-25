@@ -3,6 +3,7 @@ import type { DiscoveryPoint } from '@g88/shared';
 import {
   discoveryPointToMapFeature,
   discoveryToMapFeatureCollection,
+  updateMapFeatureCollection,
 } from '../adapters/discoveryToGeoJson';
 
 describe('discoveryToMapFeatureCollection', () => {
@@ -81,5 +82,21 @@ describe('discoveryToMapFeatureCollection', () => {
 
     expect(feature.properties.count).toBe(12);
     expect(serialized).not.toContain('"by"');
+  });
+
+  it('reuses unchanged feature objects across incremental snapshots', () => {
+    const previous = discoveryToMapFeatureCollection(points);
+    const updatedUser: DiscoveryPoint = {
+      ...points[1]!,
+      lat: 43.211,
+    };
+    const nextPoints = [points[0]!, updatedUser, points[2]!];
+
+    const next = updateMapFeatureCollection(points, previous, nextPoints);
+
+    expect(next.features[0]).toBe(previous.features[0]);
+    expect(next.features[1]).not.toBe(previous.features[1]);
+    expect(next.features[1]?.geometry.coordinates).toEqual([27.91, 43.211]);
+    expect(next.features[2]).toBe(previous.features[2]);
   });
 });
