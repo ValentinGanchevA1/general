@@ -29,6 +29,7 @@ import {
   resolveNexaLaunchReady,
 } from '@/components/Brand/nexaLaunchReadiness';
 import { buildNexaLaunchTelemetryProps } from '@/components/Brand/nexaLaunchTelemetry';
+import { getLastResolvedLaunchReduceMotion } from '@/components/Brand/resolveLaunchReduceMotion';
 import { UserLocationProvider } from '@/features/location/UserLocationProvider';
 
 Sentry.init({
@@ -64,6 +65,7 @@ function AppShell(): React.JSX.Element {
   );
   const mapReadyAtRef = React.useRef<number | null>(null);
   const overlayHiddenAtRef = React.useRef<number | null>(null);
+  const launchReduceMotionRef = React.useRef<boolean | null>(null);
   const launchTelemetrySentRef = React.useRef(false);
 
   const requiresMapSurface = React.useMemo(
@@ -110,6 +112,7 @@ function AppShell(): React.JSX.Element {
         overlayHiddenAtMs: overlayHiddenAtRef.current,
         requiresMapSurface,
         mapSurfaceWaitExpired,
+        reducedMotion: launchReduceMotionRef.current,
       });
 
       track('nexa_launch_complete', telemetry);
@@ -122,6 +125,7 @@ function AppShell(): React.JSX.Element {
         mapReadyMs: telemetry.mapReadyMs,
         overlayHiddenMs: telemetry.overlayHiddenMs,
         mapReadyFailOpen: telemetry.mapReadyFailOpen,
+        reducedMotion: telemetry.reducedMotion,
       });
     },
     [launchStartedAtMs, mapSurfaceWaitExpired, requiresMapSurface],
@@ -138,6 +142,9 @@ function AppShell(): React.JSX.Element {
     const hiddenAtMs = Date.now();
     if (overlayHiddenAtRef.current === null) {
       overlayHiddenAtRef.current = hiddenAtMs;
+    }
+    if (launchReduceMotionRef.current === null) {
+      launchReduceMotionRef.current = getLastResolvedLaunchReduceMotion();
     }
 
     if (requiresMapSurface) {
