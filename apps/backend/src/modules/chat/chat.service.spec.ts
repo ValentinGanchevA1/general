@@ -55,15 +55,46 @@ describe('ChatService', () => {
 
     it('forbids a non-participant', async () => {
       txQuery.mockResolvedValueOnce([
-        { participant_ids: ['a', 'b'], status: 'accepted', initiated_by: null },
+        { participant_ids: ['a', 'b'], status: 'accepted', initiated_by: null, blocked: false },
       ]);
       await expect(service.persist('c1', 'me', 'hi')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('forbids a blocked conversation before inserting a message', async () => {
+      txQuery.mockResolvedValueOnce([
+        { participant_ids: ['me', 'other'], status: 'accepted', initiated_by: null, blocked: true },
+      ]);
+
+      await expect(service.persist('c1', 'me', 'hi')).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'chat.blocked' }),
+      });
+      expect(txQuery).toHaveBeenCalledTimes(1);
+      expect(String(txQuery.mock.calls[0]![0])).toContain('user_blocks');
+      expect(String(txQuery.mock.calls[0]![0])).not.toContain('INSERT INTO messages');
+      expect(txQuery.mock.calls[0]![1]).toEqual(['c1', 'me']);
+    });
+
+    it('uses the same block gate for live-location session messages', async () => {
+      txQuery.mockResolvedValueOnce([
+        { participant_ids: ['me', 'other'], status: 'accepted', initiated_by: null, blocked: true },
+      ]);
+
+      await expect(
+        service.persistLocationSession(
+          'c1',
+          'me',
+          'ls1',
+          'Started sharing live location',
+          { lat: 42.7, lng: 23.3 },
+        ),
+      ).rejects.toMatchObject({ response: expect.objectContaining({ code: 'chat.blocked' }) });
+      expect(txQuery).toHaveBeenCalledTimes(1);
     });
 
     it('caps the initiator at one message while the request is pending', async () => {
       txQuery
         .mockResolvedValueOnce([
-          { participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'me' },
+          { participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'me', blocked: false },
         ])
         .mockResolvedValueOnce([{ count: 1 }]); // already sent a message
 
@@ -75,7 +106,7 @@ describe('ChatService', () => {
     it('allows the initiator the first request message', async () => {
       txQuery
         .mockResolvedValueOnce([
-          { participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'me' },
+          { participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'me', blocked: false },
         ])
         .mockResolvedValueOnce([{ count: 0 }]) // no prior message
         .mockResolvedValueOnce(MSG) // INSERT
@@ -90,7 +121,7 @@ describe('ChatService', () => {
     it('promotes the conversation to accepted when the recipient replies', async () => {
       txQuery
         .mockResolvedValueOnce([
-          { participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'other' },
+          { participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'other', blocked: false },
         ])
         .mockResolvedValueOnce([]) // UPDATE status → accepted (before insert)
         .mockResolvedValueOnce(MSG) // INSERT
@@ -107,7 +138,7 @@ describe('ChatService', () => {
     it('allows free messaging once the conversation is accepted', async () => {
       txQuery
         .mockResolvedValueOnce([
-          { participant_ids: ['me', 'other'], status: 'accepted', initiated_by: null },
+          { participant_ids: ['me', 'other'], status: 'accepted', initiated_by: null, blocked: false },
         ])
         .mockResolvedValueOnce(MSG)
         .mockResolvedValueOnce([]) // UPDATE last_message_at
@@ -119,8 +150,7 @@ describe('ChatService', () => {
   });
 
   describe('findMessages', () => {
-    it('forbids non-participants', async () => {
-      // isParticipant returns rows.length > 0 — empty result means not a participant
+    it('forbids non-participants or blocked participants', async () => {
       query.mockResolvedValueOnce([]);
       await expect(service.findMessages('c1', 'me')).rejects.toBeInstanceOf(ForbiddenException);
     });
@@ -226,6 +256,11 @@ describe('ChatService', () => {
       expect(list[0]!.lastMessage).toBeNull();
       expect(list[0]!.participants.find((p) => p.id === 'other')?.displayName).toBe('Other');
       expect(list[0]!.unreadCount).toBe(0);
+      const [sql, params] = query.mock.calls[0]!;
+      expect(String(sql)).toContain('user_blocks');
+      expect(String(sql)).toContain('ub.blocker_id = $1');
+      expect(String(sql)).toContain('ub.blocked_id = $1');
+      expect(params).toEqual(['me']);
     });
 
     it('builds lastMessage from the latest body/sender', async () => {
@@ -257,9 +292,15 @@ describe('ChatService', () => {
   });
 
   describe('membership helpers', () => {
-    it('isParticipant reflects the row presence', async () => {
+    it('isParticipant reflects block-aware row presence', async () => {
       query.mockResolvedValueOnce([{ exists: true }]);
       await expect(service.isParticipant('c1', 'me')).resolves.toBe(true);
+      const [sql, params] = query.mock.calls[0]!;
+      expect(String(sql)).toContain('user_blocks');
+      expect(String(sql)).toContain('ub.blocker_id = $2');
+      expect(String(sql)).toContain('ub.blocked_id = $2');
+      expect(params).toEqual(['c1', 'me']);
+
       query.mockResolvedValueOnce([]);
       await expect(service.isParticipant('c1', 'me')).resolves.toBe(false);
     });
