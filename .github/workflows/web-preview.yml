@@ -60,6 +60,7 @@ jobs:
           node --check web/e2e/chrome-cdp.mjs
           node --check web/e2e/realtime-reconnect.e2e.mjs
           node --check web/e2e/viewport-race.e2e.mjs
+          node --check web/e2e/connections-actions.e2e.mjs
 
       - name: Smoke test web edge
         run: |
@@ -93,3 +94,8 @@ jobs:
         env:
           CHROME_PATH: /usr/bin/google-chrome
         run: node web/e2e/viewport-race.e2e.mjs
+
+      - name: E2E Connections actions and chat flow
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: node web/e2e/connections-actions.e2e.mjs
