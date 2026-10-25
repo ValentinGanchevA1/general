@@ -143,6 +143,11 @@ export class ListingsService {
           AND l.status = 'active'
           AND (l.expires_at IS NULL OR l.expires_at > NOW())
           AND (l.visibility = 'public' OR l.seller_id = $1)
+          AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $1 AND ub.blocked_id = l.seller_id)
+                    OR (ub.blocker_id = l.seller_id AND ub.blocked_id = $1)
+              )
           AND ($5::text IS NULL OR l.category = $5)
           AND ($7::text IS NULL OR l.mode = $7)
           AND ST_DWithin(
@@ -164,11 +169,25 @@ export class ListingsService {
               ST_Y(l.location::geometry) AS lat, ST_X(l.location::geometry) AS lng,
               s.display_name AS seller_display_name, s.avatar_url AS seller_avatar_url,
               (f.user_id IS NOT NULL) AS favorited_by_me,
-              (SELECT COUNT(*) FROM trade_favorites tf WHERE tf.listing_id = l.id)::int AS favorite_count
+              (SELECT COUNT(*)
+                 FROM trade_favorites tf
+                WHERE tf.listing_id = l.id
+                  AND NOT EXISTS (
+                        SELECT 1 FROM user_blocks ub
+                         WHERE (ub.blocker_id = l.seller_id AND ub.blocked_id = tf.user_id)
+                            OR (ub.blocker_id = tf.user_id AND ub.blocked_id = l.seller_id)
+                      ))::int AS favorite_count
          FROM listings l
          JOIN users s ON s.id = l.seller_id
          LEFT JOIN trade_favorites f ON f.listing_id = l.id AND f.user_id = $1
-        WHERE l.id = $2 AND l.deleted_at IS NULL`,
+        WHERE l.id = $2
+          AND l.deleted_at IS NULL
+          AND (l.visibility = 'public' OR l.seller_id = $1)
+          AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $1 AND ub.blocked_id = l.seller_id)
+                    OR (ub.blocker_id = l.seller_id AND ub.blocked_id = $1)
+              )`,
       [userId, listingId],
     )) as Array<ListingRow & {
       description: string | null;
@@ -178,9 +197,6 @@ export class ListingsService {
       favorite_count: number;
     }>;
     if (!row) throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
-    if (row.visibility === 'private' && row.seller_id !== userId) {
-      throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
-    }
     const isSeller = row.seller_id === userId;
     const [mine] = (await this.db.query(
       `SELECT o.id, o.listing_id, o.buyer_id, o.offer_cents, o.message, o.status, o.last_actor, o.created_at,
@@ -190,12 +206,22 @@ export class ListingsService {
         WHERE o.listing_id = $1 AND o.buyer_id = $2`,
       [listingId, userId],
     )) as OfferRow[];
-    const openRows = (await this.db.query(
-      `SELECT COUNT(*)::int AS open_offers FROM trade_offers
-        WHERE listing_id = $1 AND status = 'pending'`,
-      [listingId],
-    )) as Array<{ open_offers: number }>;
-    const openOffers = openRows[0]?.open_offers ?? 0;
+    let openOffers = 0;
+    if (isSeller) {
+      const openRows = (await this.db.query(
+        `SELECT COUNT(*)::int AS open_offers
+           FROM trade_offers o
+          WHERE o.listing_id = $1
+            AND o.status = 'pending'
+            AND NOT EXISTS (
+                  SELECT 1 FROM user_blocks ub
+                   WHERE (ub.blocker_id = $2 AND ub.blocked_id = o.buyer_id)
+                      OR (ub.blocker_id = o.buyer_id AND ub.blocked_id = $2)
+                )`,
+        [listingId, userId],
+      )) as Array<{ open_offers: number }>;
+      openOffers = openRows[0]?.open_offers ?? 0;
+    }
     return {
       ...this.toSummary(row),
       description: row.description,
@@ -204,7 +230,7 @@ export class ListingsService {
       sellerAvatarUrl: row.seller_avatar_url,
       favoriteCount: row.favorite_count,
       myOffer: mine ? this.toOffer(mine) : null,
-      offerCount: isSeller ? openOffers : 0,
+      offerCount: openOffers,
     };
   }
 
@@ -219,8 +245,17 @@ export class ListingsService {
 
   async makeOffer(buyerId: string, listingId: string, dto: MakeOfferDto): Promise<ListingOffer> {
     const [listing] = (await this.db.query(
-      `SELECT seller_id, status FROM listings WHERE id = $1 AND deleted_at IS NULL`,
-      [listingId],
+      `SELECT l.seller_id, l.status
+         FROM listings l
+        WHERE l.id = $1
+          AND l.deleted_at IS NULL
+          AND (l.visibility = 'public' OR l.seller_id = $2)
+          AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $2 AND ub.blocked_id = l.seller_id)
+                    OR (ub.blocker_id = l.seller_id AND ub.blocked_id = $2)
+              )`,
+      [listingId, buyerId],
     )) as Array<{ seller_id: string; status: ListingStatus }>;
     if (!listing) {
       throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
@@ -260,7 +295,13 @@ export class ListingsService {
       `SELECT o.id, o.listing_id, o.buyer_id, o.status, l.seller_id, l.status AS listing_status
          FROM trade_offers o
          JOIN listings l ON l.id = o.listing_id
-        WHERE o.id = $1 AND l.deleted_at IS NULL`,
+        WHERE o.id = $1
+          AND l.deleted_at IS NULL
+          AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = l.seller_id AND ub.blocked_id = o.buyer_id)
+                    OR (ub.blocker_id = o.buyer_id AND ub.blocked_id = l.seller_id)
+              )`,
       [offerId],
     )) as Array<{
       id: string;
@@ -305,23 +346,22 @@ export class ListingsService {
   }
 
   async listOffers(userId: string, listingId: string): Promise<ListingOffer[]> {
-    const [listing] = (await this.db.query(
-      `SELECT seller_id FROM listings WHERE id = $1 AND deleted_at IS NULL`,
-      [listingId],
-    )) as Array<{ seller_id: string }>;
-    if (!listing) {
-      throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
-    }
+    const listing = await this.assertListingAccessible(userId, listingId);
     const isSeller = listing.seller_id === userId;
     const rows = (await this.db.query(
       `SELECT o.id, o.listing_id, o.buyer_id, o.offer_cents, o.message, o.status, o.last_actor, o.created_at,
               u.display_name AS buyer_display_name, u.avatar_url AS buyer_avatar_url
          FROM trade_offers o
          JOIN users u ON u.id = o.buyer_id
-        WHERE o.listing_id = $1 ${isSeller ? '' : 'AND o.buyer_id = $2'}
+        WHERE o.listing_id = $1
+          ${isSeller ? `AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $2 AND ub.blocked_id = o.buyer_id)
+                    OR (ub.blocker_id = o.buyer_id AND ub.blocked_id = $2)
+              )` : 'AND o.buyer_id = $2'}
         ORDER BY o.created_at DESC
         LIMIT ${OFFER_PREVIEW}`,
-      isSeller ? [listingId] : [listingId, userId],
+      [listingId, userId],
     )) as OfferRow[];
     return rows.map((o) => this.toOffer(o));
   }
@@ -346,7 +386,13 @@ export class ListingsService {
                 l.seller_id, l.status AS listing_status
            FROM trade_offers o
            JOIN listings l ON l.id = o.listing_id
-          WHERE o.id = $1 AND l.deleted_at IS NULL
+          WHERE o.id = $1
+            AND l.deleted_at IS NULL
+            AND NOT EXISTS (
+                  SELECT 1 FROM user_blocks ub
+                   WHERE (ub.blocker_id = l.seller_id AND ub.blocked_id = o.buyer_id)
+                      OR (ub.blocker_id = o.buyer_id AND ub.blocked_id = l.seller_id)
+                )
           FOR UPDATE OF o`,
         [offerId],
       );
@@ -425,13 +471,7 @@ export class ListingsService {
   }
 
   async toggleFavorite(userId: string, listingId: string): Promise<ToggleFavoriteResponse> {
-    const [listing] = (await this.db.query(
-      `SELECT id FROM listings WHERE id = $1 AND deleted_at IS NULL`,
-      [listingId],
-    )) as Array<{ id: string }>;
-    if (!listing) {
-      throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
-    }
+    await this.assertListingAccessible(userId, listingId);
     const [existing] = (await this.db.query(
       `SELECT 1 AS x FROM trade_favorites WHERE listing_id = $1 AND user_id = $2`,
       [listingId, userId],
@@ -452,7 +492,17 @@ export class ListingsService {
       favorited = true;
     }
     const countRows = (await this.db.query(
-      `SELECT COUNT(*)::int AS count FROM trade_favorites WHERE listing_id = $1`,
+      `SELECT COUNT(*)::int AS count
+         FROM trade_favorites tf
+        WHERE tf.listing_id = $1
+          AND NOT EXISTS (
+                SELECT 1
+                  FROM listings l
+                  JOIN user_blocks ub
+                    ON (ub.blocker_id = l.seller_id AND ub.blocked_id = tf.user_id)
+                    OR (ub.blocker_id = tf.user_id AND ub.blocked_id = l.seller_id)
+                 WHERE l.id = tf.listing_id
+              )`,
       [listingId],
     )) as Array<{ count: number }>;
     return { listingId, favorited, favoriteCount: countRows[0]?.count ?? 0 };
@@ -467,6 +517,12 @@ export class ListingsService {
          FROM trade_favorites f
          JOIN listings l ON l.id = f.listing_id AND l.deleted_at IS NULL
         WHERE f.user_id = $1
+          AND (l.visibility = 'public' OR l.seller_id = $1)
+          AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $1 AND ub.blocked_id = l.seller_id)
+                    OR (ub.blocker_id = l.seller_id AND ub.blocked_id = $1)
+              )
         ORDER BY f.created_at DESC
         LIMIT 100`,
       [userId],
@@ -521,6 +577,29 @@ export class ListingsService {
       [listingId, newExpires],
     );
     return this.detail(userId, listingId);
+  }
+
+  private async assertListingAccessible(
+    userId: string,
+    listingId: string,
+  ): Promise<{ seller_id: string }> {
+    const [listing] = (await this.db.query(
+      `SELECT l.seller_id
+         FROM listings l
+        WHERE l.id = $2
+          AND l.deleted_at IS NULL
+          AND (l.visibility = 'public' OR l.seller_id = $1)
+          AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $1 AND ub.blocked_id = l.seller_id)
+                    OR (ub.blocker_id = l.seller_id AND ub.blocked_id = $1)
+              )`,
+      [userId, listingId],
+    )) as Array<{ seller_id: string }>;
+    if (!listing) {
+      throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
+    }
+    return listing;
   }
 
   private async assertSeller(userId: string, listingId: string): Promise<void> {
