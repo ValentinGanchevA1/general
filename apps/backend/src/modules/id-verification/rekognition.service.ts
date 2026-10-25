@@ -22,6 +22,14 @@ export interface VerificationFaceAnalysis {
   error: string | null;
 }
 
+export interface RekognitionReadiness {
+  enabled: boolean;
+  configured: boolean;
+  region: string;
+  status: 'ready' | 'disabled' | 'misconfigured';
+  issue: string | null;
+}
+
 const SKIPPED: VerificationFaceAnalysis = {
   status: 'skipped',
   faceSimilarity: null,
@@ -38,15 +46,46 @@ export class RekognitionService {
   private readonly client: RekognitionClient | null;
   private readonly bucket: string;
   private readonly enabled: boolean;
+  private readonly region: string;
 
   constructor() {
     this.enabled = process.env.REKOGNITION_ENABLED === 'true';
     this.bucket = process.env.AWS_S3_BUCKET ?? '';
-    const region = process.env.AWS_REGION ?? 'eu-north-1';
+    this.region = process.env.AWS_REGION ?? 'eu-north-1';
     this.client =
       this.enabled && this.bucket
-        ? new RekognitionClient({ region })
+        ? new RekognitionClient({ region: this.region })
         : null;
+  }
+
+  getReadiness(): RekognitionReadiness {
+    if (!this.enabled) {
+      return {
+        enabled: false,
+        configured: false,
+        region: this.region,
+        status: 'disabled',
+        issue: 'REKOGNITION_ENABLED is not true',
+      };
+    }
+
+    if (!this.bucket) {
+      return {
+        enabled: true,
+        configured: false,
+        region: this.region,
+        status: 'misconfigured',
+        issue: 'AWS_S3_BUCKET is missing',
+      };
+    }
+
+    return {
+      enabled: true,
+      configured: true,
+      region: this.region,
+      status: 'ready',
+      issue: null,
+    };
   }
 
   /**
@@ -116,9 +155,7 @@ export class RekognitionService {
         }),
       );
 
-      const best = (compare.FaceMatches ?? []).reduce<
-        number | null
-      >((acc, m) => {
+      const best = (compare.FaceMatches ?? []).reduce<number | null>((acc, m) => {
         const s = m.Similarity;
         if (s === undefined) return acc;
         return acc === null ? s : Math.max(acc, s);
@@ -135,6 +172,7 @@ export class RekognitionService {
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      const safeError = err instanceof Error && err.name ? err.name : 'RekognitionError';
       this.logger.warn(`Rekognition analyze failed: ${message}`);
       return {
         status: 'error',
@@ -143,7 +181,7 @@ export class RekognitionService {
         idFrontFaceCount: null,
         selfieFaceConfidence: null,
         idFrontFaceConfidence: null,
-        error: message.slice(0, 500),
+        error: safeError.slice(0, 120),
       };
     }
   }
