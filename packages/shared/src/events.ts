@@ -9,8 +9,8 @@ import type {
   LocationShareEndReason,
   LocationShareSession,
   EntityPoint,
-  DiscoveryPointKey,
 } from './api';
+import type { DiscoveryPointKey } from './discovery';
 import type { EventQuestion, PollResult } from './event';
 import type { StoryNewEvent } from './story';
 
