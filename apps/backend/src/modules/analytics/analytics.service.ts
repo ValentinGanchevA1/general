@@ -123,6 +123,20 @@ export class AnalyticsService {
           WHERE received_at < NOW() - ($1::int * INTERVAL '1 day')`,
         [retentionDays],
       )
+      .then(async () => {
+        // Once all retained events for a subject have aged out, the raw-user-id
+        // identity bridge serves no analytical purpose. Remove it as part of the
+        // same best-effort retention cycle so linkable metadata does not outlive
+        // the event-retention window indefinitely.
+        await this.db.query(
+          `DELETE FROM analytics_subjects s
+            WHERE NOT EXISTS (
+              SELECT 1
+                FROM analytics_events e
+               WHERE e.subject_hash = s.subject_hash
+            )`,
+        );
+      })
       .catch(() => {
         // Retry later without affecting the product event that triggered cleanup.
         this.nextPruneAtMs = Date.now() + 60 * 60 * 1_000;
