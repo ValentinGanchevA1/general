@@ -151,9 +151,14 @@ try {
 
   await evaluate(runtime.cdp, tab, "document.querySelector('[data-action=\"accept-friend\"]')?.click()");
   await waitFor(() => state.acceptedFriend, 3_000, 'friend accept request');
-  assert(
-    await evaluate(runtime.cdp, tab, "document.body.textContent.includes('Friend request accepted.')"),
-    'friend accept confirmation was not surfaced in the UI',
+  await waitFor(
+    async () => await evaluate(
+      runtime.cdp,
+      tab,
+      "document.body.textContent.includes('Friend request accepted.')",
+    ),
+    3_000,
+    'friend accept confirmation',
   );
 
   await waitFor(

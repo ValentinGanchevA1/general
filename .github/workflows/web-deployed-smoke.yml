@@ -1,0 +1,46 @@
+name: Web Deployed Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      web_origin:
+        description: 'Bare HTTPS NEXA web origin, e.g. https://staging.example.com'
+        required: true
+        type: string
+      mode:
+        description: 'Authenticated requires WEB_SMOKE_EMAIL and WEB_SMOKE_PASSWORD repository secrets'
+        required: true
+        default: authenticated
+        type: choice
+        options:
+          - authenticated
+          - public-only
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  smoke:
+    name: HTTPS edge + browser session
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Run deployed smoke
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+          WEB_ORIGIN: ${{ inputs.web_origin }}
+          WEB_SMOKE_REQUIRE_AUTH: ${{ inputs.mode == 'authenticated' && '1' || '0' }}
+          WEB_SMOKE_EMAIL: ${{ secrets.WEB_SMOKE_EMAIL }}
+          WEB_SMOKE_PASSWORD: ${{ secrets.WEB_SMOKE_PASSWORD }}
+        run: node web/e2e/deployed-smoke.e2e.mjs
