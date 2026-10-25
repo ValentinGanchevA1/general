@@ -19,9 +19,11 @@ import {
   locationShareUpdate,
   useSocket,
 } from '@/realtime/useSocket';
+import { SocketRoomRegistry } from '@/realtime/socketRoomRegistry';
 
 const MIN_EMIT_MS = 5_000;
 const FALLBACK_INTERVAL_MS = 15_000;
+const conversationRoomRegistry = new SocketRoomRegistry();
 
 interface UseLiveLocationShareResult {
   session: LocationShareSession | null;
@@ -36,7 +38,7 @@ interface UseLiveLocationShareResult {
 export function useLiveLocationShare(conversationId: string): UseLiveLocationShareResult {
   const dispatch = useAppDispatch();
   const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
-  const { on, connected } = useSocket();
+  const { on, connected, socket } = useSocket();
 
   const [session, setSession] = useState<LocationShareSession | null>(null);
   const [starting, setStarting] = useState(false);
@@ -47,10 +49,26 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
   const watchIdRef = useRef<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const latestCoordsRef = useRef<ChatLocation | null>(null);
+  const socketRef = useRef(socket);
 
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  useEffect(() => {
+    socketRef.current = socket;
+  }, [socket]);
+
+  useEffect(() => {
+    return () => {
+      // ChatScreen owns the live conversation room. Release both reconnect intent
+      // and current connection membership when the chat unmounts or id changes.
+      conversationRoomRegistry.untrackConversation(conversationId);
+      const activeSocket = socketRef.current;
+      if (!activeSocket?.connected) return;
+      activeSocket.emit('conversation:leave', { conversationId }, () => undefined);
+    };
+  }, [conversationId]);
 
   const isSharer = !!session && session.sharerId === myUserId;
 
