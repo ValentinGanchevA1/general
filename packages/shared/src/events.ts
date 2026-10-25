@@ -8,6 +8,8 @@ import type {
   LocationShareDuration,
   LocationShareEndReason,
   LocationShareSession,
+  EntityPoint,
+  DiscoveryPointKey,
 } from './api';
 import type { EventQuestion, PollResult } from './event';
 import type { StoryNewEvent } from './story';
@@ -60,6 +62,19 @@ export interface PresenceDelta {
   added: Array<{ userId: string; lat: number; lng: number }>;
   /** Users that went offline or moved out of this cell. */
   removed: string[];
+}
+
+/**
+ * Server-authoritative discovery entity delta. Payloads must already satisfy
+ * viewer visibility/privacy rules and use the same sanitized EntityPoint shape
+ * returned by /discovery/nearby. Clusters remain query-authoritative.
+ */
+export interface DiscoveryEntityUpsertEvent {
+  point: EntityPoint;
+}
+
+export interface DiscoveryEntityLeaveEvent {
+  key: DiscoveryPointKey;
 }
 
 /** Close-friend online change (room `user:{friendId}`). */
@@ -202,11 +217,17 @@ export interface ServerToClientEvents {
   'dating:like_received': (e: DatingLikeReceivedEvent) => void;
   'dating:match_created': (e: DatingMatchCreatedEvent) => void;
   'presence:delta': (e: PresenceDelta) => void;
+  /** Sanitized discovery entity entered the viewer's active discovery stream. */
+  'discovery:entity:enter': (e: DiscoveryEntityUpsertEvent) => void;
+  /** Sanitized discovery entity changed while visible to this viewer. */
+  'discovery:entity:update': (e: DiscoveryEntityUpsertEvent) => void;
+  /** Discovery entity is no longer visible/in-scope for this viewer. */
+  'discovery:entity:leave': (e: DiscoveryEntityLeaveEvent) => void;
   /** A close friend went online/offline (delivered to each friend's user room). */
   'friend:presence': (e: FriendPresenceEvent) => void;
   /** Someone sent you a friend request. */
   'friend:request': (e: FriendRequestEvent) => void;
-  /** Your friend request was accepted. */
+  /** Your friend request was accepted — delivered to the original requester. */
   'friend:accepted': (e: FriendAcceptedEvent) => void;
   'chat:message': (e: ChatMessageEvent) => void;
   'conversation:opened': (e: ConversationOpenedEvent) => void;
@@ -238,82 +259,49 @@ export type AckResult<T> =
   | { ok: false; code: string; message: string };
 
 export interface PresenceUpdatePayload {
-  location: LatLng;
-  /** Compass heading in degrees, optional — used for directional avatars. */
-  heading?: number;
-  /** Which entity kinds the user is "looking for" in this session. Influences ranking. */
-  intent?: EntityKind[];
-}
-
-export interface ChatSendPayload {
-  conversationId: string;
-  body: string;
-  /** Client-generated id for optimistic UI; server echoes it in the ack. */
-  clientMessageId: string;
-}
-
-export interface LocationShareStartPayload {
-  conversationId: string;
-  duration: LocationShareDuration;
-  location: ChatLocation;
-}
-
-export interface LocationShareUpdatePayload {
-  sessionId: string;
-  location: ChatLocation;
-}
-
-export interface LocationShareStopPayload {
-  sessionId: string;
+  lat: number;
+  lng: number;
 }
 
 export interface ClientToServerEvents {
   'presence:update': (
-    p: PresenceUpdatePayload,
-    ack: (r: AckResult<{ cellId: string }>) => void,
+    payload: PresenceUpdatePayload,
+    ack: (res: AckResult<{ cellId: string }>) => void,
   ) => void;
   'conversation:join': (
-    p: { conversationId: string },
-    ack: (r: AckResult<{ joined: true }>) => void,
+    payload: { conversationId: string },
+    ack: (res: AckResult<{ conversationId: string }>) => void,
   ) => void;
   'conversation:leave': (
-    p: { conversationId: string },
-    ack: (r: AckResult<{ left: true }>) => void,
+    payload: { conversationId: string },
+    ack: (res: AckResult<{ conversationId: string }>) => void,
   ) => void;
-  'chat:typing': (p: { conversationId: string }) => void;
   'chat:send': (
-    p: ChatSendPayload,
-    ack: (r: AckResult<ChatMessageEvent>) => void,
+    payload: { conversationId: string; body: string; clientMessageId: string },
+    ack: (res: AckResult<ChatMessageEvent>) => void,
+  ) => void;
+  'event:join': (
+    payload: { eventId: string },
+    ack: (res: AckResult<{ eventId: string }>) => void,
+  ) => void;
+  'event:leave': (
+    payload: { eventId: string },
+    ack: (res: AckResult<{ eventId: string }>) => void,
   ) => void;
   'location:share:start': (
-    p: LocationShareStartPayload,
-    ack: (r: AckResult<LocationShareSession>) => void,
+    payload: {
+      conversationId: string;
+      duration: LocationShareDuration;
+      location: ChatLocation;
+    },
+    ack: (res: AckResult<LocationShareStartedEvent>) => void,
   ) => void;
   'location:share:update': (
-    p: LocationShareUpdatePayload,
-    ack: (r: AckResult<{ updatedAt: string }>) => void,
+    payload: { sessionId: string; location: ChatLocation },
+    ack: (res: AckResult<{ updatedAt: string }>) => void,
   ) => void;
   'location:share:stop': (
-    p: LocationShareStopPayload,
-    ack: (r: AckResult<{ ended: true }>) => void,
+    payload: { sessionId: string },
+    ack: (res: AckResult<{ sessionId: string }>) => void,
   ) => void;
-  /** Subscribe to live poll/Q&A deltas for an event (room `event:{eventId}`). */
-  'event:join': (
-    p: { eventId: string },
-    ack: (r: AckResult<{ joined: true }>) => void,
-  ) => void;
-  /** Unsubscribe from an event's live deltas. */
-  'event:leave': (
-    p: { eventId: string },
-    ack: (r: AckResult<{ left: true }>) => void,
-  ) => void;
-}
-
-// Optional: socket data attached after auth handshake
-export interface SocketData {
-  userId: string;
-  /** Set when the gateway joins the socket to user/cell-scoped rooms. */
-  rooms: Set<string>;
-  /** True after first successful presence:update this connection (friend online fan-out). */
-  friendPresenceAnnounced?: boolean;
 }
