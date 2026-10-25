@@ -1,7 +1,7 @@
 import { buildNexaLaunchTelemetryProps } from './nexaLaunchTelemetry';
 
 describe('buildNexaLaunchTelemetryProps', () => {
-  it('reports map launch timings without fail-open when the map is ready', () => {
+  it('reports map launch timings and the spatial handoff path when the map is ready', () => {
     expect(
       buildNexaLaunchTelemetryProps({
         startedAtMs: 1_000,
@@ -11,6 +11,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
         overlayHiddenAtMs: 2_080,
         requiresMapSurface: true,
         mapSurfaceWaitExpired: false,
+        spatialHandoffUsed: true,
       }),
     ).toEqual({
       path: 'map',
@@ -19,10 +20,11 @@ describe('buildNexaLaunchTelemetryProps', () => {
       mapReadyMs: 520,
       overlayHiddenMs: 1_080,
       mapReadyFailOpen: false,
+      spatialHandoffUsed: true,
     });
   });
 
-  it('marks map fail-open and keeps map readiness nullable', () => {
+  it('marks direct map fail-open separately from spatial handoff use', () => {
     expect(
       buildNexaLaunchTelemetryProps({
         startedAtMs: 10_000,
@@ -32,6 +34,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
         overlayHiddenAtMs: 11_400,
         requiresMapSurface: true,
         mapSurfaceWaitExpired: true,
+        spatialHandoffUsed: false,
       }),
     ).toEqual({
       path: 'map',
@@ -40,6 +43,30 @@ describe('buildNexaLaunchTelemetryProps', () => {
       mapReadyMs: null,
       overlayHiddenMs: 1_400,
       mapReadyFailOpen: true,
+      spatialHandoffUsed: false,
+    });
+  });
+
+  it('distinguishes late map readiness after timeout when the handoff still runs', () => {
+    expect(
+      buildNexaLaunchTelemetryProps({
+        startedAtMs: 5_000,
+        completedAtMs: 6_720,
+        authReadyAtMs: 5_120,
+        mapReadyAtMs: 5_820,
+        overlayHiddenAtMs: 6_180,
+        requiresMapSurface: true,
+        mapSurfaceWaitExpired: true,
+        spatialHandoffUsed: true,
+      }),
+    ).toEqual({
+      path: 'map',
+      totalMs: 1_720,
+      authReadyMs: 120,
+      mapReadyMs: 820,
+      overlayHiddenMs: 1_180,
+      mapReadyFailOpen: true,
+      spatialHandoffUsed: true,
     });
   });
 
@@ -53,6 +80,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
         overlayHiddenAtMs: 1_050,
         requiresMapSurface: false,
         mapSurfaceWaitExpired: true,
+        spatialHandoffUsed: true,
       }),
     ).toEqual({
       path: 'non_map',
@@ -61,6 +89,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
       mapReadyMs: null,
       overlayHiddenMs: 550,
       mapReadyFailOpen: false,
+      spatialHandoffUsed: false,
     });
   });
 
@@ -74,6 +103,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
         overlayHiddenAtMs: null,
         requiresMapSurface: false,
         mapSurfaceWaitExpired: false,
+        spatialHandoffUsed: false,
       }),
     ).toEqual({
       path: 'non_map',
@@ -82,6 +112,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
       mapReadyMs: null,
       overlayHiddenMs: null,
       mapReadyFailOpen: false,
+      spatialHandoffUsed: false,
     });
   });
 });

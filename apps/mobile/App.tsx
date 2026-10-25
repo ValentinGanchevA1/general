@@ -99,7 +99,7 @@ function AppShell(): React.JSX.Element {
   });
 
   const recordLaunchComplete = React.useCallback(
-    (completedAtMs: number): void => {
+    (completedAtMs: number, spatialHandoffUsed: boolean): void => {
       if (launchTelemetrySentRef.current) return;
       launchTelemetrySentRef.current = true;
 
@@ -111,6 +111,7 @@ function AppShell(): React.JSX.Element {
         overlayHiddenAtMs: overlayHiddenAtRef.current,
         requiresMapSurface,
         mapSurfaceWaitExpired,
+        spatialHandoffUsed,
       });
 
       track('nexa_launch_complete', telemetry);
@@ -123,6 +124,7 @@ function AppShell(): React.JSX.Element {
         mapReadyMs: telemetry.mapReadyMs,
         overlayHiddenMs: telemetry.overlayHiddenMs,
         mapReadyFailOpen: telemetry.mapReadyFailOpen,
+        spatialHandoffUsed: telemetry.spatialHandoffUsed,
       });
     },
     [launchStartedAtMs, mapSurfaceWaitExpired, requiresMapSurface],
@@ -155,13 +157,13 @@ function AppShell(): React.JSX.Element {
     // do not play a decorative handoff that implies native readiness.
     setShowSpatialHandoff(false);
     setLaunchInteractionsReady(true);
-    recordLaunchComplete(hiddenAtMs);
+    recordLaunchComplete(hiddenAtMs, false);
   }, [recordLaunchComplete, requiresMapSurface]);
 
   const handleSpatialHandoffComplete = React.useCallback((): void => {
     setShowSpatialHandoff(false);
     setLaunchInteractionsReady(true);
-    recordLaunchComplete(Date.now());
+    recordLaunchComplete(Date.now(), true);
   }, [recordLaunchComplete]);
 
   return (
