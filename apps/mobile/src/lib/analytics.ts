@@ -74,7 +74,7 @@ function normalizeApiPath(url: string | undefined): string {
 }
 
 function entityTypeFromDetailPath(path: string): 'person' | 'event' | 'listing' | null {
-  if (/^\/users\/[^/]+$/.test(path)) return 'person';
+  if (path !== '/users/me' && /^\/users\/[^/]+$/.test(path)) return 'person';
   if (/^\/events\/[^/]+$/.test(path)) return 'event';
   if (/^\/listings\/[^/]+$/.test(path)) return 'listing';
   return null;
