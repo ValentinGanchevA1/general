@@ -2,6 +2,18 @@ import { AccessibilityInfo } from 'react-native';
 
 export const LAUNCH_MOTION_PREFERENCE_TIMEOUT_MS = 250;
 
+let lastResolvedLaunchReduceMotion: boolean | null = null;
+
+/**
+ * Read the exact value most recently returned to a launch animation consumer.
+ * AppShell snapshots this when the overlay hides, before the spatial handoff can
+ * resolve its own motion mode, so performance telemetry describes the intro
+ * that the user actually saw (including timeout/error fail-open behavior).
+ */
+export function getLastResolvedLaunchReduceMotion(): boolean | null {
+  return lastResolvedLaunchReduceMotion;
+}
+
 /**
  * Resolve the motion mode exactly once for the current launch sequence.
  *
@@ -19,6 +31,7 @@ export function resolveLaunchReduceMotion(): Promise<boolean> {
       if (settled) return;
       settled = true;
       clearTimeout(timeoutId);
+      lastResolvedLaunchReduceMotion = enabled;
       resolve(enabled);
     };
 
