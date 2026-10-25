@@ -15,7 +15,6 @@ import {
   buildPeerRegionFocus,
 } from '@/components/map/focusPeerOnMap';
 import type { ListingModeFilterValue } from '@/components/map/ListingModeFilter';
-import { useNexaMapSurfaceReady } from '@/components/Brand/NexaLaunchSurfaceContext';
 import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
 import type { NexaMapController } from '@/features/map/contracts/mapRenderer';
 
@@ -76,8 +75,6 @@ function regionToViewport(region: Region): Viewport {
 
 const COLD_START_DELTA = 0.02;
 const COLD_START_MAX_ATTEMPTS = 6;
-const MAP_SURFACE_PROBE_MAX_ATTEMPTS = 5;
-const MAP_SURFACE_PROBE_RETRY_MS = 80;
 
 export function useMapFocus({
   mapRef,
@@ -103,31 +100,7 @@ export function useMapFocus({
   const focusAppliedKeyRef = useRef<string | null>(null);
   const hasCenteredOnUserRef = useRef(false);
   const coldStartAttemptsRef = useRef(0);
-  const markLaunchMapSurfaceReady = useNexaMapSurfaceReady();
   const reduceMotion = useNexaReducedMotion();
-
-  useEffect(() => {
-    let cancelled = false;
-    let attempts = 0;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const probeMapController = (): void => {
-      if (cancelled || attempts >= MAP_SURFACE_PROBE_MAX_ATTEMPTS) return;
-      attempts += 1;
-      if (mapRef.current == null) {
-        retryTimer = setTimeout(probeMapController, MAP_SURFACE_PROBE_RETRY_MS);
-        return;
-      }
-      markLaunchMapSurfaceReady();
-    };
-
-    const task = InteractionManager.runAfterInteractions(probeMapController);
-    return () => {
-      cancelled = true;
-      task.cancel();
-      if (retryTimer != null) clearTimeout(retryTimer);
-    };
-  }, [mapRef, markLaunchMapSurfaceReady]);
 
   const clearFocusParams = useCallback(() => {
     navigation.setParams({
