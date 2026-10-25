@@ -8,7 +8,7 @@ import MapView, {
 import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
 
 import { resolveMapStyle } from '@/components/map/mapStyle';
-import type { NexaMapController } from '../../contracts/mapRenderer';
+import type { MapCoordinate, NexaMapController } from '../../contracts/mapRenderer';
 import { LegacyDiscoveryLayer } from './LegacyDiscoveryLayer';
 
 export interface LegacyMapSurfaceProps {
@@ -19,7 +19,7 @@ export interface LegacyMapSurfaceProps {
   scheme: Parameters<typeof resolveMapStyle>[1];
   onReady: () => void;
   onRegionChangeComplete: (region: Region) => void;
-  onLongPress: (event: LongPressEvent) => void;
+  onLongPress: (coordinate: MapCoordinate) => void;
   onClusterPress: (point: ClusterPoint) => void;
   onEntityPress: (point: EntityPoint) => void;
 }
@@ -83,6 +83,14 @@ export const LegacyMapSurface = React.forwardRef<NexaMapController, LegacyMapSur
       },
     }), []);
 
+    const handleLongPress = React.useCallback(
+      (event: LongPressEvent): void => {
+        const { latitude, longitude } = event.nativeEvent.coordinate;
+        onLongPress({ latitude, longitude });
+      },
+      [onLongPress],
+    );
+
     return (
       <MapView
         ref={mapRef}
@@ -95,7 +103,7 @@ export const LegacyMapSurface = React.forwardRef<NexaMapController, LegacyMapSur
         toolbarEnabled={false}
         onMapReady={onReady}
         onRegionChangeComplete={onRegionChangeComplete}
-        onLongPress={onLongPress}
+        onLongPress={handleLongPress}
       >
         <LegacyDiscoveryLayer
           points={points}

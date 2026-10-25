@@ -13,6 +13,7 @@ import {
 type GeoJSONSourcePressHandler = NonNullable<
   React.ComponentProps<typeof GeoJSONSource>['onPress']
 >;
+type MapLongPressHandler = NonNullable<React.ComponentProps<typeof Map>['onLongPress']>;
 type CircleLayerSpecification = Extract<LayerSpecification, { type: 'circle' }>;
 type CircleLayerFilter = NonNullable<CircleLayerSpecification['filter']>;
 type CircleLayerPaint = NonNullable<CircleLayerSpecification['paint']>;
@@ -20,7 +21,11 @@ type CircleOpacity = NonNullable<CircleLayerPaint['circle-opacity']>;
 type CameraRef = React.ElementRef<typeof Camera>;
 
 import { discoveryToMapFeatureCollection } from '../../adapters/discoveryToGeoJson';
-import type { NexaMapController, NexaMapViewportChange } from '../../contracts/mapRenderer';
+import type {
+  MapCoordinate,
+  NexaMapController,
+  NexaMapViewportChange,
+} from '../../contracts/mapRenderer';
 import type { MapLibreBoundsSnapshot, MapLibreViewStateSnapshot } from '../../mapLibreAdapter';
 import { mapLibreSnapshotToViewportChange } from '../../mapLibreAdapter';
 
@@ -37,6 +42,7 @@ export interface MapLibreMapSurfaceProps {
   onReady: () => void;
   onPointPress: (key: DiscoveryPointKey) => void;
   onViewportSettled: (change: NexaMapViewportChange) => void;
+  onLongPress: (coordinate: MapCoordinate) => void;
 }
 
 function isDiscoveryPointKey(value: unknown): value is DiscoveryPointKey {
@@ -46,7 +52,15 @@ function isDiscoveryPointKey(value: unknown): value is DiscoveryPointKey {
 /** Native MapLibre surface behind the guarded renderer path. */
 export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMapSurfaceProps>(
   function MapLibreMapSurface(
-    { points, selectedKey, dimUnselected, onReady, onPointPress, onViewportSettled },
+    {
+      points,
+      selectedKey,
+      dimUnselected,
+      onReady,
+      onPointPress,
+      onViewportSettled,
+      onLongPress,
+    },
     ref,
   ): React.JSX.Element {
     const mapRef = React.useRef<MapRef>(null);
@@ -106,6 +120,14 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
       [onPointPress],
     );
 
+    const handleLongPress = React.useCallback<MapLongPressHandler>(
+      (event): void => {
+        const [longitude, latitude] = event.nativeEvent.lngLat;
+        onLongPress({ latitude, longitude });
+      },
+      [onLongPress],
+    );
+
     const selectedFilter = React.useMemo<CircleLayerFilter>(
       () => ['==', ['id'], selectedKey ?? '__nexa-no-selection__'],
       [selectedKey],
@@ -127,6 +149,7 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
         compass={false}
         onDidFinishLoadingMap={onReady}
         onRegionDidChange={() => { void handleRegionDidChange(); }}
+        onLongPress={handleLongPress}
       >
         <Camera ref={cameraRef} />
         <GeoJSONSource id={DISCOVERY_SOURCE_ID} data={data} onPress={handlePress}>

@@ -25,6 +25,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
     dimUnselected,
     onReady,
     onRegionChangeComplete,
+    onLongPress,
     onClusterPress,
     onEntityPress,
     ...surfaceProps
@@ -63,6 +64,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
             longitudeDelta: Math.abs(viewport.ne.lng - viewport.sw.lng),
           });
         }}
+        onLongPress={onLongPress}
       />
     );
   }
@@ -75,6 +77,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
       dimUnselected={interactionFocused}
       onReady={onReady}
       onRegionChangeComplete={onRegionChangeComplete}
+      onLongPress={onLongPress}
       onClusterPress={onClusterPress}
       onEntityPress={onEntityPress}
       {...surfaceProps}
