@@ -3,6 +3,8 @@ import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
 
 import { MapMarkers } from '@/components/map/MapMarkers';
 
+const EMPTY_ENTITY_KEYS: ReadonlySet<string> = new Set<string>();
+
 export interface LegacyDiscoveryLayerProps {
   points: DiscoveryPoint[];
   selectedEntityKey?: string | null;
@@ -24,11 +26,11 @@ export interface LegacyDiscoveryLayerProps {
  */
 export const LegacyDiscoveryLayer = React.memo(function LegacyDiscoveryLayer({
   points,
-  selectedEntityKey,
-  selectedClusterCellId,
-  newEntityKeys,
+  selectedEntityKey = null,
+  selectedClusterCellId = null,
+  newEntityKeys = EMPTY_ENTITY_KEYS,
   ownEntityKey = null,
-  unavailableEntityKeys,
+  unavailableEntityKeys = EMPTY_ENTITY_KEYS,
   dimUnselected = false,
   onClusterPress,
   onEntityPress,
