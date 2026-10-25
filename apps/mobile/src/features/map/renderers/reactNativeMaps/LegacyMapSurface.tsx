@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import MapView, {
   PROVIDER_GOOGLE,
-  type MapPressEvent,
+  type LongPressEvent,
   type Region,
 } from 'react-native-maps';
 import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
@@ -18,7 +18,7 @@ export interface LegacyMapSurfaceProps {
   scheme: Parameters<typeof resolveMapStyle>[1];
   onReady: () => void;
   onRegionChangeComplete: (region: Region) => void;
-  onLongPress: (event: MapPressEvent) => void;
+  onLongPress: (event: LongPressEvent) => void;
   onClusterPress: (point: ClusterPoint) => void;
   onEntityPress: (point: EntityPoint) => void;
 }
