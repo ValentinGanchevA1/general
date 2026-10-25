@@ -8,5 +8,8 @@ import { FriendsModule } from '../friends/friends.module';
   imports: [PresenceModule, FriendsModule],
   providers: [DiscoveryService],
   controllers: [DiscoveryController],
+  // Realtime delta producers must reuse this service rather than reimplementing
+  // viewer-specific discovery visibility/privacy rules.
+  exports: [DiscoveryService],
 })
 export class DiscoveryModule {}
