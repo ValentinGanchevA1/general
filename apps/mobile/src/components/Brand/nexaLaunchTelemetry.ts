@@ -10,6 +10,8 @@ export interface NexaLaunchTelemetryInput {
   mapSurfaceWaitExpired: boolean;
   /** True when the launch used the spatial handoff branch after overlay exit. */
   spatialHandoffUsed: boolean;
+  /** Exact Reduced Motion mode frozen by the branded launch resolver. */
+  reducedMotion: boolean | null;
 }
 
 export interface NexaLaunchTelemetryProps
@@ -21,6 +23,7 @@ export interface NexaLaunchTelemetryProps
   overlayHiddenMs: number | null;
   mapReadyFailOpen: boolean;
   spatialHandoffUsed: boolean;
+  reducedMotion: boolean | null;
 }
 
 function elapsedMs(startedAtMs: number, endedAtMs: number | null): number | null {
@@ -48,5 +51,6 @@ export function buildNexaLaunchTelemetryProps(
       input.requiresMapSurface && input.mapSurfaceWaitExpired,
     spatialHandoffUsed:
       input.requiresMapSurface && input.spatialHandoffUsed,
+    reducedMotion: input.reducedMotion,
   };
 }
