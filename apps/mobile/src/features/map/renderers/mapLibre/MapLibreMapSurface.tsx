@@ -36,6 +36,7 @@ const DISCOVERY_SOURCE_ID = 'nexa-discovery';
 const DISCOVERY_LAYER_ID = 'nexa-discovery-points';
 const DISCOVERY_SELECTED_HALO_LAYER_ID = 'nexa-discovery-selected-halo';
 const DISCOVERY_SELECTED_LAYER_ID = 'nexa-discovery-selected';
+const SELECTION_TRANSITION = { duration: 180, delay: 0 } as const;
 const DISCOVERY_KIND_COLOR: CircleColor = [
   'match',
   ['get', 'kind'],
@@ -187,6 +188,7 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
             paint={{
               'circle-color': DISCOVERY_KIND_COLOR,
               'circle-opacity': baseOpacity,
+              'circle-opacity-transition': SELECTION_TRANSITION,
               'circle-radius': DISCOVERY_MARKER_RADIUS,
               'circle-stroke-color': '#FFFFFF',
               'circle-stroke-width': 1.5,
@@ -199,9 +201,12 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
             paint={{
               'circle-color': DISCOVERY_KIND_COLOR,
               'circle-opacity': 0.2,
+              'circle-opacity-transition': SELECTION_TRANSITION,
               'circle-radius': DISCOVERY_SELECTED_HALO_RADIUS,
+              'circle-radius-transition': SELECTION_TRANSITION,
               'circle-stroke-color': DISCOVERY_KIND_COLOR,
               'circle-stroke-opacity': 0.5,
+              'circle-stroke-opacity-transition': SELECTION_TRANSITION,
               'circle-stroke-width': 2,
             }}
           />
@@ -212,9 +217,12 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
             paint={{
               'circle-color': DISCOVERY_KIND_COLOR,
               'circle-opacity': 1,
+              'circle-opacity-transition': SELECTION_TRANSITION,
               'circle-radius': DISCOVERY_SELECTED_RADIUS,
+              'circle-radius-transition': SELECTION_TRANSITION,
               'circle-stroke-color': '#FFFFFF',
               'circle-stroke-width': 3,
+              'circle-stroke-width-transition': SELECTION_TRANSITION,
             }}
           />
         </GeoJSONSource>
