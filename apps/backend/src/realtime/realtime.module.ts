@@ -3,6 +3,7 @@ import { RealtimeGateway } from './realtime.gateway';
 import { WsJwtGuard } from './ws-jwt.guard';
 import { LocationShareSweepService } from './location-share.sweep';
 import { DiscoveryRealtimePublisher } from './discovery-realtime.publisher';
+import { DiscoverySubscriptionStore } from './discovery-subscription.store';
 import { PresenceModule } from '../modules/presence/presence.module';
 import { AuthModule } from '../modules/auth/auth.module';
 import { ChatModule } from '../modules/chat/chat.module';
@@ -27,7 +28,8 @@ import { DiscoveryModule } from '../modules/discovery/discovery.module';
     WsJwtGuard,
     LocationShareSweepService,
     DiscoveryRealtimePublisher,
+    DiscoverySubscriptionStore,
   ],
-  exports: [RealtimeGateway, DiscoveryRealtimePublisher],
+  exports: [RealtimeGateway, DiscoveryRealtimePublisher, DiscoverySubscriptionStore],
 })
 export class RealtimeModule {}
