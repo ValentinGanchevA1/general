@@ -22,6 +22,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { appAlert } from '@/ui/appAlert';
 import { track } from '@/lib/analytics';
+import { extractMessage } from '@/utils/extractMessage';
 
 function shortReason(item: SuggestionCard): string {
   const n = item.mutualFriendsCount ?? 0;
@@ -90,7 +91,6 @@ export function FriendsSuggestionsRail({
   }, []);
 
   useEffect(() => {
-    // Defer so setLoading inside load is not sync-in-effect (react-hooks/set-state-in-effect).
     const t = setTimeout(() => {
       void load();
     }, 0);
@@ -135,7 +135,7 @@ export function FriendsSuggestionsRail({
                   setFeedback('Hidden for 7 days');
                   setTimeout(() => setFeedback(null), 2200);
                 } catch (e) {
-                  appAlert('Could not hide', isApiError(e) ? e.message : 'Try again.');
+                  appAlert('Could not hide', extractMessage(e, 'Try again.'));
                 } finally {
                   setBusyId(null);
                 }
@@ -158,7 +158,7 @@ export function FriendsSuggestionsRail({
                   setFeedback('Removed from suggestions');
                   setTimeout(() => setFeedback(null), 2200);
                 } catch (e) {
-                  appAlert('Could not hide', isApiError(e) ? e.message : 'Try again.');
+                  appAlert('Could not hide', extractMessage(e, 'Try again.'));
                 } finally {
                   setBusyId(null);
                 }
