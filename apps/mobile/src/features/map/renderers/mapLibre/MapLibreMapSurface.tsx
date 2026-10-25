@@ -22,6 +22,7 @@ import { mapLibreSnapshotToViewportChange } from '../../mapLibreAdapter';
 const DEVELOPMENT_MAP_STYLE = 'https://demotiles.maplibre.org/style.json';
 const DISCOVERY_SOURCE_ID = 'nexa-discovery';
 const DISCOVERY_LAYER_ID = 'nexa-discovery-points';
+const DISCOVERY_SELECTED_LAYER_ID = 'nexa-discovery-selected';
 
 export interface MapLibreMapSurfaceProps {
   points: readonly DiscoveryPoint[];
@@ -98,6 +99,11 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
       [onPointPress],
     );
 
+    const selectedFilter = React.useMemo(
+      () => ['==', ['id'], selectedKey ?? '__nexa-no-selection__'],
+      [selectedKey],
+    );
+
     return (
       <Map
         ref={mapRef}
@@ -117,9 +123,21 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
             paint={{
               'circle-color': '#8B5CF6',
               'circle-opacity': 0.9,
-              'circle-radius': ['case', ['==', ['id'], selectedKey ?? ''], 11, ['==', ['get', 'kind'], 'cluster'], 12, 7],
+              'circle-radius': ['case', ['==', ['get', 'kind'], 'cluster'], 12, 7],
               'circle-stroke-color': '#FFFFFF',
-              'circle-stroke-width': ['case', ['==', ['id'], selectedKey ?? ''], 3, 1.5],
+              'circle-stroke-width': 1.5,
+            }}
+          />
+          <Layer
+            id={DISCOVERY_SELECTED_LAYER_ID}
+            type="circle"
+            filter={selectedFilter}
+            paint={{
+              'circle-color': '#8B5CF6',
+              'circle-opacity': 1,
+              'circle-radius': 11,
+              'circle-stroke-color': '#FFFFFF',
+              'circle-stroke-width': 3,
             }}
           />
         </GeoJSONSource>
