@@ -43,7 +43,7 @@ function createService(options?: {
   const getReadiness = jest.fn().mockReturnValue({
     enabled: true,
     configured: true,
-    region: 'eu-north-1',
+    region: 'eu-central-1',
     status: 'ready',
     issue: null,
   });
@@ -182,6 +182,7 @@ describe('Trust Ops hardening', () => {
     expect(result.checks.adminUserCount).toBe(2);
     expect(result.checks.adminUsersConfigured).toBe(true);
     expect(result.checks.rekognition.status).toBe('ready');
+    expect(result.checks.rekognition.region).toBe('eu-central-1');
     expect(JSON.stringify(result)).not.toContain('admin-a');
     expect(JSON.stringify(result)).not.toContain('private-verifications');
   });
