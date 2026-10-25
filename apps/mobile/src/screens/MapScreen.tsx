@@ -1006,6 +1006,7 @@ function MapUnavailableFallback(): React.JSX.Element {
 
 function regionToViewport(region: Region): Viewport;
 function regionToViewport(region: null): null;
+function regionToViewport(region: Region | null): Viewport | null;
 function regionToViewport(region: Region | null): Viewport | null {
 	if (!region) return null;
 	const ne = {
