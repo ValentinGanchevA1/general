@@ -6,13 +6,16 @@ import {
   GeoJSONSource,
   Layer,
   Map,
+  type LayerSpecification,
   type MapRef,
 } from '@maplibre/maplibre-react-native';
 
 type GeoJSONSourcePressHandler = NonNullable<
   React.ComponentProps<typeof GeoJSONSource>['onPress']
 >;
-type LayerFilter = NonNullable<React.ComponentProps<typeof Layer>['filter']>;
+type CircleLayerFilter = NonNullable<
+  Extract<LayerSpecification, { type: 'circle' }>['filter']
+>;
 type CameraRef = React.ElementRef<typeof Camera>;
 
 import { discoveryToMapFeatureCollection } from '../../adapters/discoveryToGeoJson';
@@ -101,7 +104,7 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
       [onPointPress],
     );
 
-    const selectedFilter = React.useMemo<LayerFilter>(
+    const selectedFilter = React.useMemo<CircleLayerFilter>(
       () => ['==', ['id'], selectedKey ?? '__nexa-no-selection__'],
       [selectedKey],
     );
