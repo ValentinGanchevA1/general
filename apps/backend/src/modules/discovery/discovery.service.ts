@@ -51,6 +51,24 @@ const TOPIC_MATCH_SQL = (param: string): string =>
   `((kind = 'event'   AND g88_slugify(meta->>'title')    = ${param})
  OR (kind = 'listing' AND g88_slugify(meta->>'category') = ${param}))`;
 
+const DISCOVERY_OWNER_ID_SQL = `CASE v_discoverable_entity.kind
+  WHEN 'user' THEN v_discoverable_entity.id
+  WHEN 'event' THEN NULLIF(v_discoverable_entity.meta->>'hostId', '')::uuid
+  WHEN 'listing' THEN NULLIF(v_discoverable_entity.meta->>'sellerId', '')::uuid
+  ELSE NULL
+END`;
+
+function blockIsolationSql(requesterParam: string): string {
+  return `AND NOT EXISTS (
+           SELECT 1
+             FROM user_blocks ub
+            WHERE (ub.blocker_id = ${requesterParam}
+                   AND ub.blocked_id = (${DISCOVERY_OWNER_ID_SQL}))
+               OR (ub.blocker_id = (${DISCOVERY_OWNER_ID_SQL})
+                   AND ub.blocked_id = ${requesterParam})
+         )`;
+}
+
 @Injectable()
 export class DiscoveryService {
   private readonly logger = new Logger(DiscoveryService.name);
@@ -160,10 +178,10 @@ export class DiscoveryService {
     const viewportHash = this.hashViewport(
       params.viewport, params.zoom, kinds, topicSlug, listingMode, friendsOnly, rankBy, datingOnly,
     );
-    await this.storeSnapshot(viewportHash, points);
+    await this.storeSnapshot(params.requesterId, viewportHash, points);
 
     if (params.prevViewportHash) {
-      const diff = await this.computeDiff(params.prevViewportHash, points);
+      const diff = await this.computeDiff(params.requesterId, params.prevViewportHash, points);
       if (diff) {
         return {
           points: [],
@@ -184,23 +202,33 @@ export class DiscoveryService {
     };
   }
 
-  private snapshotKey(hash: string): string {
-    return `discovery:snap:${hash}`;
+  private snapshotKey(requesterId: string, hash: string): string {
+    return `discovery:snap:${requesterId}:${hash}`;
   }
 
   private pointKey(p: DiscoveryPoint): string {
     return p.kind === 'cluster' ? p.cellId : p.id;
   }
 
-  private async storeSnapshot(hash: string, points: DiscoveryPoint[]): Promise<void> {
-    await this.redis.set(this.snapshotKey(hash), JSON.stringify(points), 'EX', SNAPSHOT_TTL_SECONDS);
+  private async storeSnapshot(
+    requesterId: string,
+    hash: string,
+    points: DiscoveryPoint[],
+  ): Promise<void> {
+    await this.redis.set(
+      this.snapshotKey(requesterId, hash),
+      JSON.stringify(points),
+      'EX',
+      SNAPSHOT_TTL_SECONDS,
+    );
   }
 
   private async computeDiff(
+    requesterId: string,
     prevHash: string,
     currentPoints: DiscoveryPoint[],
   ): Promise<DiscoveryDiff | null> {
-    const raw = await this.redis.get(this.snapshotKey(prevHash));
+    const raw = await this.redis.get(this.snapshotKey(requesterId, prevHash));
     if (!raw) return null;
     let prevPoints: DiscoveryPoint[];
     try {
@@ -294,11 +322,7 @@ export class DiscoveryService {
          AND kind = ANY($2::text[])
          AND visibility = 'public'
          AND id <> $3
-         AND NOT (kind = 'user' AND EXISTS (
-           SELECT 1 FROM user_blocks ub
-            WHERE (ub.blocker_id = $3 AND ub.blocked_id = id)
-               OR (ub.blocker_id = id AND ub.blocked_id = $3)
-         ))
+         ${blockIsolationSql('$3')}
          ${topicClause}
          ${listingClause}
          ${friendsClause}
@@ -381,11 +405,7 @@ export class DiscoveryService {
          AND kind = ANY($2::text[])
          AND visibility = 'public'
          AND id <> $3
-         AND NOT (kind = 'user' AND EXISTS (
-           SELECT 1 FROM user_blocks ub
-            WHERE (ub.blocker_id = $3 AND ub.blocked_id = id)
-               OR (ub.blocker_id = id AND ub.blocked_id = $3)
-         ))
+         ${blockIsolationSql('$3')}
          ${topicClause}
          ${listingClause}
          ${friendsClause}
