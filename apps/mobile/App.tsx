@@ -108,7 +108,10 @@ function AppShell(): React.JSX.Element {
         onMapSurfaceReady={handleMapSurfaceReady}
         interactionsReady={launchInteractionsReady}
       >
-        <UserLocationProvider enabled={user != null}>
+        <UserLocationProvider
+          key={user?.id ?? 'signed-out'}
+          enabled={user != null}
+        >
           <AppNavigator />
         </UserLocationProvider>
       </NexaLaunchSurfaceProvider>
