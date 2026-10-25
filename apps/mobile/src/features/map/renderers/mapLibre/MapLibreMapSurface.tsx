@@ -47,26 +47,27 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
 
     React.useImperativeHandle(ref, () => ({
       flyTo(target, options) {
-        cameraRef.current?.setCamera({
-          centerCoordinate: [target.center.longitude, target.center.latitude],
-          ...(target.zoom !== undefined ? { zoomLevel: target.zoom } : {}),
-          ...(target.bearing !== undefined ? { heading: target.bearing } : {}),
+        cameraRef.current?.flyTo({
+          center: [target.center.longitude, target.center.latitude],
+          ...(target.zoom !== undefined ? { zoom: target.zoom } : {}),
+          ...(target.bearing !== undefined ? { bearing: target.bearing } : {}),
           ...(target.pitch !== undefined ? { pitch: target.pitch } : {}),
-          animationDuration: options?.durationMs ?? 0,
+          duration: options?.durationMs ?? 0,
         });
       },
       fitViewport(viewport, options) {
         const padding = options?.padding;
         cameraRef.current?.fitBounds(
-          [viewport.ne.lng, viewport.ne.lat],
-          [viewport.sw.lng, viewport.sw.lat],
-          [
-            padding?.top ?? 0,
-            padding?.right ?? 0,
-            padding?.bottom ?? 0,
-            padding?.left ?? 0,
-          ],
-          options?.durationMs ?? 0,
+          [viewport.sw.lng, viewport.sw.lat, viewport.ne.lng, viewport.ne.lat],
+          {
+            padding: {
+              top: padding?.top ?? 0,
+              right: padding?.right ?? 0,
+              bottom: padding?.bottom ?? 0,
+              left: padding?.left ?? 0,
+            },
+            duration: options?.durationMs ?? 0,
+          },
         );
       },
     }), []);
