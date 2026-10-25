@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PermissionsAndroid, Platform } from 'react-native';
+import {
+  AppState,
+  PermissionsAndroid,
+  Platform,
+  type AppStateStatus,
+} from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import type { LatLng } from '@g88/shared';
 
@@ -8,6 +13,7 @@ import { useNexaLaunchInteractionsReady } from '@/components/Brand/NexaLaunchSur
 import { NEXA_LOCATION_PERMISSION_COPY } from './locationPermissionCopy';
 import {
   shouldRequestLocationPermission,
+  statusFromAndroidForegroundCheck,
   statusFromAndroidPermissionCheck,
   type LocationPermissionStatus,
 } from './locationPermissionState';
@@ -37,6 +43,7 @@ export function UserLocationProvider({
   const watchId = useRef<number | null>(null);
   const permissionRequestRef = useRef<Promise<void> | null>(null);
   const enabledRef = useRef(enabled);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const launchInteractionsReady = useNexaLaunchInteractionsReady();
 
   const stopTracking = useCallback((): void => {
@@ -46,10 +53,16 @@ export function UserLocationProvider({
   }, []);
 
   const startTracking = useCallback((): void => {
-    if (!enabledRef.current || watchId.current !== null) return;
+    if (
+      !enabledRef.current ||
+      appStateRef.current !== 'active' ||
+      watchId.current !== null
+    ) {
+      return;
+    }
 
     const onOk = (pos: { coords: { latitude: number; longitude: number } }): void => {
-      if (!enabledRef.current) return;
+      if (!enabledRef.current || appStateRef.current !== 'active') return;
       setPermissionStatus('granted');
       setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
     };
@@ -80,7 +93,13 @@ export function UserLocationProvider({
       // Native permission sheets interrupt the launch dissolve/handoff. Automatic
       // callers may request once while status is unknown, but only direct user
       // recovery may reopen native UI after an explicit denial.
-      if (!enabled || !launchInteractionsReady) return Promise.resolve();
+      if (
+        !enabled ||
+        !launchInteractionsReady ||
+        appStateRef.current !== 'active'
+      ) {
+        return Promise.resolve();
+      }
       if (!shouldRequestLocationPermission(permissionStatus, explicitRetry)) {
         return Promise.resolve();
       }
@@ -155,7 +174,13 @@ export function UserLocationProvider({
         const fine = await PermissionsAndroid.check(
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         );
-        if (cancelled || !enabledRef.current) return;
+        if (
+          cancelled ||
+          !enabledRef.current ||
+          appStateRef.current !== 'active'
+        ) {
+          return;
+        }
         const quietStatus = statusFromAndroidPermissionCheck(fine);
         setPermissionStatus(quietStatus);
         if (quietStatus === 'granted') startTracking();
@@ -170,6 +195,49 @@ export function UserLocationProvider({
       cancelled = true;
     };
   }, [enabled, startTracking]);
+
+  useEffect(() => {
+    const onAppStateChange = (nextState: AppStateStatus): void => {
+      appStateRef.current = nextState;
+      if (!enabledRef.current) return;
+
+      if (nextState !== 'active') {
+        stopTracking();
+        return;
+      }
+
+      if (Platform.OS !== 'android') {
+        startTracking();
+        return;
+      }
+
+      void (async () => {
+        try {
+          const fine = await PermissionsAndroid.check(
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          );
+          if (
+            !enabledRef.current ||
+            appStateRef.current !== 'active'
+          ) {
+            return;
+          }
+          const nextStatus = statusFromAndroidForegroundCheck(
+            fine,
+            permissionStatus,
+          );
+          setPermissionStatus(nextStatus);
+          if (nextStatus === 'granted') startTracking();
+          else stopTracking();
+        } catch {
+          // A quiet refresh failure must not downgrade permission state or prompt.
+        }
+      })();
+    };
+
+    const subscription = AppState.addEventListener('change', onAppStateChange);
+    return () => subscription.remove();
+  }, [permissionStatus, startTracking, stopTracking]);
 
   useEffect(() => stopTracking, [stopTracking]);
 
