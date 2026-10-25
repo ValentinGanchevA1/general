@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
@@ -11,12 +11,16 @@ import type {
 } from '@g88/shared';
 
 import { PresenceService } from '../presence/presence.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 
 @Injectable()
 export class ChatService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly presence: PresenceService,
+    // Optional keeps isolated ChatService unit tests and degraded local setups
+    // independent from analytics; ChatModule wires this in production.
+    @Optional() private readonly analytics?: AnalyticsService,
   ) {}
 
   async persist(
@@ -24,7 +28,7 @@ export class ChatService {
     senderId: string,
     body: string,
   ): Promise<ChatMessage> {
-    return this.db.transaction(async (tx) => {
+    const message = await this.db.transaction(async (tx) => {
       await this.enforceParticipantAndRequestGate(tx, conversationId, senderId);
 
       const [msg] = await tx.query<ChatMessage[]>(
@@ -56,6 +60,14 @@ export class ChatService {
 
       return this.normalizeMessage(msg!);
     });
+
+    // Durable chat success is authoritative. Analytics is best-effort and must
+    // never delay/fail message delivery; no body or conversation identifier is sent.
+    if (this.analytics) {
+      void this.analytics.record(senderId, 'chat.message_sent').catch(() => undefined);
+    }
+
+    return message;
   }
 
   async persistLocationSession(

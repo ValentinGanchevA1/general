@@ -4,9 +4,10 @@ import { ChatController } from './chat.controller';
 import { LocationShareService } from './location-share.service';
 import { AuthModule } from '../auth/auth.module';
 import { PresenceModule } from '../presence/presence.module';
+import { AnalyticsModule } from '../analytics/analytics.module';
 
 @Module({
-  imports: [AuthModule, PresenceModule],
+  imports: [AuthModule, PresenceModule, AnalyticsModule],
   providers: [ChatService, LocationShareService],
   controllers: [ChatController],
   exports: [ChatService, LocationShareService],

@@ -32,6 +32,7 @@ import { ListingsModule } from './modules/listings/listings.module';
 import { HealthModule } from './modules/health/health.module';
 import { StoriesModule } from './modules/stories/stories.module';
 import { DatingModule } from './modules/dating/dating.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -89,6 +90,7 @@ import { DatingModule } from './modules/dating/dating.module';
     FriendsModule,
     StoriesModule,
     DatingModule,
+    AnalyticsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
