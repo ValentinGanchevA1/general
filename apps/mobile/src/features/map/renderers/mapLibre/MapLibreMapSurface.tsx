@@ -6,11 +6,15 @@ import {
   GeoJSONSource,
   Layer,
   Map,
+  type LayerSpecification,
   type MapRef,
 } from '@maplibre/maplibre-react-native';
 
 type GeoJSONSourcePressHandler = NonNullable<
   React.ComponentProps<typeof GeoJSONSource>['onPress']
+>;
+type CircleLayerFilter = NonNullable<
+  Extract<LayerSpecification, { type: 'circle' }>['filter']
 >;
 type CameraRef = React.ElementRef<typeof Camera>;
 
@@ -22,6 +26,8 @@ import { mapLibreSnapshotToViewportChange } from '../../mapLibreAdapter';
 const DEVELOPMENT_MAP_STYLE = 'https://demotiles.maplibre.org/style.json';
 const DISCOVERY_SOURCE_ID = 'nexa-discovery';
 const DISCOVERY_LAYER_ID = 'nexa-discovery-points';
+const DISCOVERY_SELECTED_HALO_LAYER_ID = 'nexa-discovery-selected-halo';
+const DISCOVERY_SELECTED_LAYER_ID = 'nexa-discovery-selected';
 
 export interface MapLibreMapSurfaceProps {
   points: readonly DiscoveryPoint[];
@@ -98,6 +104,11 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
       [onPointPress],
     );
 
+    const selectedFilter = React.useMemo<CircleLayerFilter>(
+      () => ['==', ['id'], selectedKey ?? '__nexa-no-selection__'],
+      [selectedKey],
+    );
+
     return (
       <Map
         ref={mapRef}
@@ -115,11 +126,51 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
             id={DISCOVERY_LAYER_ID}
             type="circle"
             paint={{
-              'circle-color': '#8B5CF6',
-              'circle-opacity': 0.9,
-              'circle-radius': ['case', ['==', ['id'], selectedKey ?? ''], 11, ['==', ['get', 'kind'], 'cluster'], 12, 7],
+              'circle-color': [
+                'match',
+                ['get', 'kind'],
+                'cluster', '#7C3AED',
+                'user', '#8B5CF6',
+                'event', '#F59E0B',
+                'listing', '#22C55E',
+                '#8B5CF6',
+              ],
+              'circle-opacity': 0.92,
+              'circle-radius': [
+                'match',
+                ['get', 'kind'],
+                'cluster', 13,
+                'event', 8,
+                'listing', 8,
+                7,
+              ],
               'circle-stroke-color': '#FFFFFF',
-              'circle-stroke-width': ['case', ['==', ['id'], selectedKey ?? ''], 3, 1.5],
+              'circle-stroke-width': 1.5,
+            }}
+          />
+          <Layer
+            id={DISCOVERY_SELECTED_HALO_LAYER_ID}
+            type="circle"
+            filter={selectedFilter}
+            paint={{
+              'circle-color': '#8B5CF6',
+              'circle-opacity': 0.2,
+              'circle-radius': 18,
+              'circle-stroke-color': '#8B5CF6',
+              'circle-stroke-opacity': 0.5,
+              'circle-stroke-width': 2,
+            }}
+          />
+          <Layer
+            id={DISCOVERY_SELECTED_LAYER_ID}
+            type="circle"
+            filter={selectedFilter}
+            paint={{
+              'circle-color': '#8B5CF6',
+              'circle-opacity': 1,
+              'circle-radius': 11,
+              'circle-stroke-color': '#FFFFFF',
+              'circle-stroke-width': 3,
             }}
           />
         </GeoJSONSource>
