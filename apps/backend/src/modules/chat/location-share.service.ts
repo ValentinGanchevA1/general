@@ -81,15 +81,21 @@ export class LocationShareService {
       throw new Error('Failed to create location share session');
     }
 
-    const message = await this.chat.persistLocationSession(
-      conversationId,
-      userId,
-      row.id,
-      this.bodyForStart(duration),
-      location,
-    );
-
-    return { session: this.toSession(row), message };
+    try {
+      const message = await this.chat.persistLocationSession(
+        conversationId,
+        userId,
+        row.id,
+        this.bodyForStart(duration),
+        location,
+      );
+      return { session: this.toSession(row), message };
+    } catch (err) {
+      // The session row is created before the chat message. Never leave a live
+      // share active if the conversation gate rejects the corresponding message.
+      await this.markEnded(row.id, 'conversation_closed');
+      throw err;
+    }
   }
 
   async update(
@@ -113,6 +119,7 @@ export class LocationShareService {
       });
     }
 
+    await this.assertNotBlockedInConversation(userId, session.conversation_id);
     await this.assertUpdateAllowed(session, location);
 
     const updatedAt = new Date().toISOString();
@@ -150,12 +157,8 @@ export class LocationShareService {
     conversationId: string,
     userId: string,
   ): Promise<LocationShareSession | null> {
-    if (!(await this.chat.isParticipant(conversationId, userId))) {
-      throw new ForbiddenException({
-        code: 'location.not_participant',
-        message: 'Not a participant',
-      });
-    }
+    await this.assertParticipant(userId, conversationId);
+    await this.assertNotBlockedInConversation(userId, conversationId);
 
     const [row] = await this.db.query<SessionRow[]>(
       `SELECT * FROM chat_location_sessions
@@ -262,7 +265,8 @@ export class LocationShareService {
   }
 
   private async assertParticipant(userId: string, conversationId: string): Promise<void> {
-    if (!(await this.chat.isParticipant(conversationId, userId))) {
+    const participantIds = await this.chat.getParticipantIds(conversationId);
+    if (!participantIds.includes(userId)) {
       throw new ForbiddenException({
         code: 'location.not_participant',
         message: 'Not a participant',
