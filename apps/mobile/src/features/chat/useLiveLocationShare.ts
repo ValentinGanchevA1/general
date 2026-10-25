@@ -13,6 +13,7 @@ import type {
 import { getJson } from '@/api/client';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { messageReceived } from '@/features/chat/chatSlice';
+import { useUserLocation } from '@/features/location/useUserLocation';
 import {
   locationShareStart,
   locationShareStop,
@@ -37,6 +38,9 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
   const dispatch = useAppDispatch();
   const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
   const { on, connected } = useSocket();
+  const { coords: sharedCoords } = useUserLocation();
+  const sharedLat = sharedCoords?.lat;
+  const sharedLng = sharedCoords?.lng;
 
   const [session, setSession] = useState<LocationShareSession | null>(null);
   const [starting, setStarting] = useState(false);
@@ -44,8 +48,6 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
 
   const sessionRef = useRef<LocationShareSession | null>(null);
   const lastEmitRef = useRef(0);
-  const watchIdRef = useRef<number | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const latestCoordsRef = useRef<ChatLocation | null>(null);
 
   useEffect(() => {
@@ -129,52 +131,53 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
     [myUserId],
   );
 
-  // GPS watch while we are the sharer of an active session
+  // The authenticated app already owns one high-accuracy native GPS watcher in
+  // UserLocationProvider. Live sharing consumes that shared stream instead of
+  // creating a second watchPosition subscription with identical settings.
   useEffect(() => {
-    if (!isSharer || !session || !connected) {
-      if (watchIdRef.current !== null) {
-        Geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
+    if (
+      !isSharer ||
+      session?.status !== 'active' ||
+      !connected ||
+      sharedLat == null ||
+      sharedLng == null
+    ) {
       return;
     }
 
-    if (watchIdRef.current === null) {
-      watchIdRef.current = Geolocation.watchPosition(
-        (pos) => {
-          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          latestCoordsRef.current = loc;
-          void emitUpdate(loc);
-        },
-        () => undefined,
-        { enableHighAccuracy: true, distanceFilter: 25 },
-      );
-    }
+    const location = { lat: sharedLat, lng: sharedLng };
+    latestCoordsRef.current = location;
+    void emitUpdate(location);
+  }, [
+    isSharer,
+    session?.id,
+    session?.status,
+    connected,
+    sharedLat,
+    sharedLng,
+    emitUpdate,
+  ]);
 
-    if (!intervalRef.current) {
-      intervalRef.current = setInterval(() => {
-        const loc = latestCoordsRef.current;
-        if (loc) void emitUpdate(loc);
-      }, FALLBACK_INTERVAL_MS);
-    }
+  // Preserve the existing heartbeat cadence for active live-share sessions even
+  // when the device has not moved enough to produce a new shared GPS fix.
+  useEffect(() => {
+    if (!isSharer || session?.status !== 'active' || !connected) return;
 
-    return () => {
-      if (watchIdRef.current !== null) {
-        Geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, [isSharer, session?.id, connected, emitUpdate, session]);
+    const interval = setInterval(() => {
+      const location = latestCoordsRef.current;
+      if (location) void emitUpdate(location);
+    }, FALLBACK_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [isSharer, session?.id, session?.status, connected, emitUpdate]);
 
   const getCurrentLocation = useCallback((): Promise<ChatLocation | null> => {
+    if (sharedLat != null && sharedLng != null) {
+      return Promise.resolve({ lat: sharedLat, lng: sharedLng });
+    }
+
+    // User-triggered start can race the shared provider's first fix. Keep a
+    // one-off native read as fallback, but never create another native watcher.
     return new Promise((resolve) => {
       Geolocation.getCurrentPosition(
         (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
@@ -182,7 +185,7 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
         { enableHighAccuracy: true, timeout: 15_000, maximumAge: 10_000 },
       );
     });
-  }, []);
+  }, [sharedLat, sharedLng]);
 
   const start = useCallback(
     async (duration: LocationShareDuration): Promise<void> => {
