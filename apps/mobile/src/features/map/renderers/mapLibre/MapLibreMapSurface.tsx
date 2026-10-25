@@ -9,6 +9,10 @@ import {
   type MapRef,
 } from '@maplibre/maplibre-react-native';
 
+type GeoJSONSourcePressHandler = NonNullable<
+  React.ComponentProps<typeof GeoJSONSource>['onPress']
+>;
+
 import { discoveryToMapFeatureCollection } from '../../adapters/discoveryToGeoJson';
 import type { MapLibreBoundsSnapshot, MapLibreViewStateSnapshot } from '../../mapLibreAdapter';
 import { mapLibreSnapshotToViewportChange } from '../../mapLibreAdapter';
@@ -77,9 +81,9 @@ export const MapLibreMapSurface = React.forwardRef<MapRef, MapLibreMapSurfacePro
       );
     }, [onViewportSettled]);
 
-    const handlePress = React.useCallback(
-      (event: { features?: ReadonlyArray<{ id?: string | number | null }> }): void => {
-        const key = event.features?.[0]?.id;
+    const handlePress = React.useCallback<GeoJSONSourcePressHandler>(
+      (event): void => {
+        const key = event.nativeEvent.features?.[0]?.id;
         if (isDiscoveryPointKey(key)) onPointPress(key);
       },
       [onPointPress],
