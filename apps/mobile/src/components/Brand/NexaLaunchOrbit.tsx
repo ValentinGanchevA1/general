@@ -285,6 +285,7 @@ function OrbitNodes({
 }
 
 function nodeReveal(progress: number, startMs: number): number {
+  'worklet';
   return interpolate(
     progress,
     [launchTime(startMs), launchTime(startMs + 120)],
