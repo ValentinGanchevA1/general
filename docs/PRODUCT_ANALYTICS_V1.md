@@ -27,6 +27,7 @@ Rules:
 - Client properties are allow-listed; backend applies the same boundary again before persistence.
 - Account deletion cascades through `analytics_subjects` into `analytics_events`.
 - Product events are retained 90 days by default; `ANALYTICS_RETENTION_DAYS` is clamped to 30–365 days.
+- When a subject has no retained analytics events after cleanup, its raw-user-id ↔ HMAC bridge row is deleted in the same retention cycle.
 - Analytics delivery is best-effort and may never fail a product action.
 
 Privacy consequence: deleted accounts disappear from historical cohort denominators. This is intentional; deletion semantics take precedence over perfectly stable historical metrics.
@@ -187,7 +188,8 @@ Only evaluate a cohort's D1/D7 after the corresponding day has fully elapsed; ot
 6. Verify Wave / RSVP / Offer failures create no product event.
 7. Verify successful chat persistence produces `chat.message_sent` without message/conversation fields.
 8. Delete a test account and confirm its `analytics_subjects` and `analytics_events` rows disappear via cascade.
-9. Build KPI reporting from the SQL definitions above; do not redefine activation/D1/D7 independently in dashboards.
+9. Verify retention cleanup removes an `analytics_subjects` bridge after its final retained event ages out.
+10. Build KPI reporting from the SQL definitions above; do not redefine activation/D1/D7 independently in dashboards.
 
 ## Not in v1
 
