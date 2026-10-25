@@ -21,6 +21,7 @@ export interface NexaLaunchPerformanceInput {
   mapReadyMs: number | null;
   overlayHiddenMs: number | null;
   mapReadyFailOpen: boolean;
+  reducedMotion: boolean | null;
 }
 
 /**
@@ -45,6 +46,9 @@ export function recordNexaLaunchPerformance(
   }
   if (input.overlayHiddenMs !== null) {
     attributes['nexa.launch.overlay_hidden_ms'] = input.overlayHiddenMs;
+  }
+  if (input.reducedMotion !== null) {
+    attributes['nexa.launch.reduced_motion'] = input.reducedMotion;
   }
 
   const span = Sentry.startInactiveSpan({
