@@ -30,5 +30,6 @@ export const NEXA_REDUCED_MOTION_TIMING_MS = {
 } as const;
 
 export function launchTime(milliseconds: number): number {
+  'worklet';
   return milliseconds / NEXA_LAUNCH_TIMING_MS.entranceComplete;
 }
