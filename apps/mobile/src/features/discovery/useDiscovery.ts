@@ -176,6 +176,7 @@ export function useDiscovery({
         setError(extractMessage(err, 'Discovery failed'));
       } finally {
         if (!ctrl.signal.aborted) setLoading(false);
+        if (abortRef.current === ctrl) abortRef.current = null;
       }
     },
     [dispatch],
@@ -189,6 +190,17 @@ export function useDiscovery({
       setLoading(false);
       return;
     }
+
+    // A new valid query invalidates an in-flight response immediately. Waiting
+    // until the next debounced fetch starts leaves a window where stale A data
+    // can commit after the UI has already moved to query B.
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+      lastFetchKey.current = '';
+      setLoading(false);
+    }
+
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly, datingOnly, rankBy);
