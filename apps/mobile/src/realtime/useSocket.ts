@@ -230,13 +230,11 @@ async function onConnectedSideEffects(): Promise<void> {
     if (outbox.length === 0) return;
 
     // Persisted/queued messages can outlive the ChatScreen that originally joined
-    // the room. Ensure those conversations are joined before the first retry.
+    // the room. Join those conversations transiently before the first retry;
+    // do not retain them in the active-screen room intent registry.
     const outboxConversationIds = [
       ...new Set(outbox.map((entry) => entry.conversationId)),
     ];
-    for (const conversationId of outboxConversationIds) {
-      roomRegistry.trackConversation(conversationId);
-    }
     const joinResults = await Promise.all(
       outboxConversationIds.map((conversationId) =>
         socketJoinConversation(conversationId),
@@ -402,6 +400,7 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
   const { autoConnect = true } = options;
   const [connected, setConnected] = useState(sharedSocket?.connected ?? false);
   const handlersRef = useRef<Set<() => void>>(new Set());
+  const conversationIntentsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!autoConnect) return;
@@ -467,10 +466,15 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
     void ensureSocket();
 
     const handlers = handlersRef.current;
+    const conversationIntents = conversationIntentsRef.current;
     return () => {
       cancelled = true;
       handlers.forEach((unsub) => unsub());
       handlers.clear();
+      for (const conversationId of conversationIntents) {
+        roomRegistry.untrackConversation(conversationId);
+      }
+      conversationIntents.clear();
     };
   }, [autoConnect]);
 
@@ -516,9 +520,12 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
 
   const joinConversation = useCallback(
     (conversationId: string): Promise<boolean> => {
-      // Track intent before checking connectivity so ChatScreen can mount while
-      // offline and still be joined automatically on the next connection.
-      roomRegistry.trackConversation(conversationId);
+      // Retain this hook's room intent exactly once. The hook cleanup releases it,
+      // so reconnect cost follows active consumers instead of navigation history.
+      if (!conversationIntentsRef.current.has(conversationId)) {
+        conversationIntentsRef.current.add(conversationId);
+        roomRegistry.trackConversation(conversationId);
+      }
       return socketJoinConversation(conversationId);
     },
     [],

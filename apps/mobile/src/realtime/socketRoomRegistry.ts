@@ -9,11 +9,22 @@ export interface SocketRoomSnapshot {
  * replayed after reconnects and cleared on logout.
  */
 export class SocketRoomRegistry {
-  private readonly conversationIds = new Set<string>();
+  private readonly conversationRefCounts = new Map<string, number>();
   private readonly eventIds = new Set<string>();
 
   trackConversation(conversationId: string): void {
-    this.conversationIds.add(conversationId);
+    const current = this.conversationRefCounts.get(conversationId) ?? 0;
+    this.conversationRefCounts.set(conversationId, current + 1);
+  }
+
+  untrackConversation(conversationId: string): void {
+    const current = this.conversationRefCounts.get(conversationId);
+    if (current === undefined) return;
+    if (current <= 1) {
+      this.conversationRefCounts.delete(conversationId);
+      return;
+    }
+    this.conversationRefCounts.set(conversationId, current - 1);
   }
 
   trackEvent(eventId: string): void {
@@ -26,13 +37,13 @@ export class SocketRoomRegistry {
 
   snapshot(): SocketRoomSnapshot {
     return {
-      conversationIds: [...this.conversationIds],
+      conversationIds: [...this.conversationRefCounts.keys()],
       eventIds: [...this.eventIds],
     };
   }
 
   clear(): void {
-    this.conversationIds.clear();
+    this.conversationRefCounts.clear();
     this.eventIds.clear();
   }
 }
