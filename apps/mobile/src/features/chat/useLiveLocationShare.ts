@@ -13,6 +13,7 @@ import type {
 import { getJson } from '@/api/client';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { messageReceived } from '@/features/chat/chatSlice';
+import { useUserLocation } from '@/features/location/useUserLocation';
 import {
   locationShareStart,
   locationShareStop,
@@ -37,6 +38,14 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
   const dispatch = useAppDispatch();
   const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
   const { on, connected } = useSocket();
+  const {
+    coords: userCoords,
+    permissionStatus,
+    requestPermission,
+    retryPermission,
+  } = useUserLocation();
+  const userLat = userCoords?.lat;
+  const userLng = userCoords?.lng;
 
   const [session, setSession] = useState<LocationShareSession | null>(null);
   const [starting, setStarting] = useState(false);
@@ -44,7 +53,6 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
 
   const sessionRef = useRef<LocationShareSession | null>(null);
   const lastEmitRef = useRef(0);
-  const watchIdRef = useRef<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const latestCoordsRef = useRef<ChatLocation | null>(null);
 
@@ -129,13 +137,28 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
     [myUserId],
   );
 
-  // GPS watch while we are the sharer of an active session
+  // Reuse the app-level foreground GPS watcher. This avoids a second native
+  // watchPosition while preserving the same 25 m movement source used elsewhere.
+  useEffect(() => {
+    if (
+      !isSharer ||
+      !session ||
+      !connected ||
+      userLat == null ||
+      userLng == null
+    ) {
+      return;
+    }
+
+    const location = { lat: userLat, lng: userLng };
+    latestCoordsRef.current = location;
+    void emitUpdate(location);
+  }, [isSharer, session?.id, connected, userLat, userLng, emitUpdate, session]);
+
+  // Keep the existing stationary fallback cadence, using the latest shared
+  // foreground coordinates instead of owning another native GPS watcher.
   useEffect(() => {
     if (!isSharer || !session || !connected) {
-      if (watchIdRef.current !== null) {
-        Geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -143,30 +166,14 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
       return;
     }
 
-    if (watchIdRef.current === null) {
-      watchIdRef.current = Geolocation.watchPosition(
-        (pos) => {
-          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          latestCoordsRef.current = loc;
-          void emitUpdate(loc);
-        },
-        () => undefined,
-        { enableHighAccuracy: true, distanceFilter: 25 },
-      );
-    }
-
     if (!intervalRef.current) {
       intervalRef.current = setInterval(() => {
-        const loc = latestCoordsRef.current;
-        if (loc) void emitUpdate(loc);
+        const location = latestCoordsRef.current;
+        if (location) void emitUpdate(location);
       }, FALLBACK_INTERVAL_MS);
     }
 
     return () => {
-      if (watchIdRef.current !== null) {
-        Geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -189,7 +196,21 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
       if (starting) return;
       setStarting(true);
       try {
-        const location = await getCurrentLocation();
+        // Starting a share is an explicit user action, so it may request or retry
+        // permission even though automatic map/pulse requests stay one-shot.
+        if (permissionStatus === 'denied') {
+          await retryPermission();
+        } else if (permissionStatus === 'unknown') {
+          await requestPermission();
+        }
+
+        const sharedLocation =
+          userLat != null && userLng != null
+            ? { lat: userLat, lng: userLng }
+            : null;
+        // React may not have committed provider coords yet after a just-approved
+        // permission sheet, so keep a one-shot native read as the startup fallback.
+        const location = sharedLocation ?? (await getCurrentLocation());
         if (!location) {
           appAlert(
             'Location unavailable',
@@ -203,13 +224,23 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
           appAlert('Could not share location', 'Check your connection and try again.');
           return;
         }
+        lastEmitRef.current = 0;
         // Server assigns session id — apply as soon as ack arrives (socket may also fan-out).
         setSession(result);
       } finally {
         setStarting(false);
       }
     },
-    [starting, getCurrentLocation, conversationId],
+    [
+      starting,
+      permissionStatus,
+      retryPermission,
+      requestPermission,
+      userLat,
+      userLng,
+      getCurrentLocation,
+      conversationId,
+    ],
   );
 
   const stop = useCallback(async (): Promise<void> => {
