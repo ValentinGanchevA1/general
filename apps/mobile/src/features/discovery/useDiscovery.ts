@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 
 import {
+  applyDiscoveryDiff,
   type DiscoveryResponse,
   type DiscoveryQuery,
   type DiscoveryPoint,
@@ -41,10 +42,6 @@ function isViewportTooLarge(vp: Viewport): boolean {
   const lngSpan = ((rawLng % 360) + 360) % 360;
   const lngNorm = lngSpan > 180 ? 360 - lngSpan : lngSpan;
   return latSpan > 15 || lngNorm > 15;
-}
-
-function pointKey(p: DiscoveryPoint): string {
-  return p.kind === 'cluster' ? p.cellId : p.id;
 }
 
 export function useDiscovery({
@@ -164,9 +161,7 @@ export function useDiscovery({
         prevHashRef.current = res.viewportHash;
 
         if (res.diff) {
-          const removedSet = new Set(res.diff.removed);
-          const kept = cachedPointsRef.current.filter((p) => !removedSet.has(pointKey(p)));
-          const merged = [...res.diff.added, ...kept];
+          const merged = applyDiscoveryDiff(cachedPointsRef.current, res.diff);
           cachedPointsRef.current = merged;
           setData({ ...res, points: merged, diff: null });
         } else {
