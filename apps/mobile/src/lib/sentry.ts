@@ -69,15 +69,15 @@ export function recordNexaLaunchPerformance(
 }
 
 /**
- * Release string must match what CI / sentry-cli upload under for source maps
- * and native symbols to attach. Format: packageName@version+dist
+ * Release string must match the Android versionName and the CI/sentry-cli
+ * release used for source maps/native symbols. Format: packageName@version+dist
  *
  * Override via build-time env (babel inline):
- *   SENTRY_RELEASE=com.g88@0.1.0+42
+ *   SENTRY_RELEASE=com.g88@1.0.0+42
  *   SENTRY_DIST=42
- * CI android-apk sets these from package version + github.run_number.
+ * Release CI sets these from Android versionName + github.run_number.
  */
-const PACKAGE_VERSION = '0.1.0';
+const PACKAGE_VERSION = '1.0.0';
 
 export function resolveSentryRelease(): string {
   const fromEnv = process.env.SENTRY_RELEASE as string | undefined;
