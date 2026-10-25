@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 
 import {
@@ -13,8 +13,8 @@ import {
 } from '@g88/shared';
 
 import { postJson } from '@/api/client';
-import { useAppDispatch } from '@/hooks/redux';
-import { setDiscoveryZoom } from '@/features/discovery/discoverySlice';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { setDiscoveryZoom, setPoints } from '@/features/discovery/discoverySlice';
 import { extractMessage } from '@/utils/extractMessage';
 
 interface UseDiscoveryArgs {
@@ -58,6 +58,7 @@ export function useDiscovery({
   enabled = true,
 }: UseDiscoveryArgs): UseDiscoveryResult {
   const dispatch = useAppDispatch();
+  const points = useAppSelector((state) => state.discovery.points);
   const [data, setData] = useState<DiscoveryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +93,7 @@ export function useDiscovery({
         lastFetchKey.current = '';
         prevHashRef.current = null;
         cachedPointsRef.current = [];
+        dispatch(setPoints([]));
         setData({
           points: [],
           resolution: 0,
@@ -166,9 +168,11 @@ export function useDiscovery({
         if (res.diff) {
           const merged = applyDiscoveryDiff(cachedPointsRef.current, res.diff);
           cachedPointsRef.current = merged;
+          dispatch(setPoints(merged));
           setData({ ...res, points: merged, diff: null });
         } else {
           cachedPointsRef.current = res.points;
+          dispatch(setPoints(res.points));
           setData(res);
         }
       } catch (err) {
@@ -222,5 +226,10 @@ export function useDiscovery({
     void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly, datingOnly, rankBy);
   }, [viewport, zoom, kinds, topic, listingMode, friendsOnly, datingOnly, rankBy, fetchNow]);
 
-  return { data, loading, error, refresh };
+  const canonicalData = useMemo<DiscoveryResponse | null>(() => {
+    if (data == null) return null;
+    return { ...data, points };
+  }, [data, points]);
+
+  return { data: canonicalData, loading, error, refresh };
 }
