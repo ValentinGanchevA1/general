@@ -68,12 +68,24 @@ export async function launchChrome(prefix = 'nexa-chrome-e2e-') {
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
 
   let errors = '';
+  let startupFailure = null;
   chrome.stderr?.on('data', (chunk) => {
     errors = `${errors}${String(chunk)}`.slice(-8_000);
+  });
+  chrome.once('error', (error) => {
+    startupFailure = `Chrome process error: ${error.message}`;
+  });
+  chrome.once('exit', (code, signal) => {
+    if (chrome.exitCode != null || chrome.signalCode != null) {
+      startupFailure = `Chrome exited before DevTools became ready (code=${String(code)}, signal=${String(signal)})`;
+    }
   });
 
   try {
     const version = await waitFor(async () => {
+      if (startupFailure) {
+        throw new Error(`${startupFailure}${errors ? `\n${errors}` : ''}`);
+      }
       try {
         const response = await fetch(`http://127.0.0.1:${debugPort}/json/version`);
         if (!response.ok) return null;
@@ -81,7 +93,7 @@ export async function launchChrome(prefix = 'nexa-chrome-e2e-') {
       } catch {
         return null;
       }
-    }, 12_000, 'Chrome DevTools endpoint');
+    }, 30_000, 'Chrome DevTools endpoint');
 
     if (typeof version.webSocketDebuggerUrl !== 'string') {
       throw new Error('Chrome did not expose a DevTools WebSocket URL');
