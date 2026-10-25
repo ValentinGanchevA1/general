@@ -1,7 +1,7 @@
 // Compact “Events Near You” map overlay.
 // The right side intentionally stays clear for MapScreen's GPS recenter control.
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useSyncExternalStore } from 'react';
 import {
 	Image,
 	Pressable,
@@ -19,6 +19,7 @@ import type { EventSummary, LatLng } from '@g88/shared';
 import { NexaEntityGlyph } from '@/components/Brand/NexaEntityGlyph';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
+import { mapSelectionVisibility } from '@/features/map/mapSelectionVisibility';
 import { useNearbyEvents } from './useEvents';
 import { formatEventDayShort } from './eventFormat';
 import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
@@ -56,8 +57,13 @@ export function EventsRail({ location }: { location: LatLng | null }): React.JSX
 	const { colors, shadow } = useAppTheme();
 	const styles = useMemo(() => createStyles(colors), [colors]);
 	const { events } = useNearbyEvents(location);
+	const selectedEntityVisible = useSyncExternalStore(
+		mapSelectionVisibility.subscribe,
+		mapSelectionVisibility.getSnapshot,
+		mapSelectionVisibility.getSnapshot,
+	);
 
-	if (!location || events.length === 0) return null;
+	if (!location || events.length === 0 || selectedEntityVisible) return null;
 
 	return (
 		<View style={[styles.wrap, shadow(0.14)]} pointerEvents="box-none">
