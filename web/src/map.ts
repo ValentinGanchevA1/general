@@ -1,5 +1,9 @@
 import type { DiscoveryPoint } from '../../packages/shared/src/api';
-import { previewRasterTileUrl, type NexaMapRuntime } from './map-runtime';
+import {
+  previewRasterTileUrl,
+  resolveMapRuntime,
+  type NexaMapRuntime,
+} from './map-runtime';
 
 export interface MapCenter {
   lat: number;
@@ -20,7 +24,7 @@ interface MountNexaMapOptions {
   container: HTMLElement;
   points: DiscoveryPoint[];
   camera: MapCamera;
-  runtime: NexaMapRuntime;
+  runtime?: NexaMapRuntime;
   onViewportSettled: (camera: MapCamera, viewport: MapViewport) => void;
 }
 
@@ -38,7 +42,8 @@ const MAX_ZOOM = 18;
 const MAX_LAT = 85.05112878;
 
 export function mountNexaMap(options: MountNexaMapOptions): void {
-  const { container, points, runtime, onViewportSettled } = options;
+  const { container, points, onViewportSettled } = options;
+  const runtime = options.runtime ?? resolveMapRuntime(window.location);
   let camera: MapCamera = normalizeCamera(options.camera);
   let drag: DragState | null = null;
   let frame = 0;
