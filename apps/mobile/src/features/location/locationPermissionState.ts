@@ -10,3 +10,16 @@ export function statusFromAndroidPermissionCheck(
 ): LocationPermissionStatus {
   return granted ? 'granted' : 'unknown';
 }
+
+/**
+ * Automatic screen-focus requests must never reopen native permission UI after
+ * an explicit denial. Only a user-triggered recovery action may retry.
+ */
+export function shouldRequestLocationPermission(
+  status: LocationPermissionStatus,
+  explicitRetry: boolean,
+): boolean {
+  if (status === 'granted') return false;
+  if (status === 'denied') return explicitRetry;
+  return true;
+}
