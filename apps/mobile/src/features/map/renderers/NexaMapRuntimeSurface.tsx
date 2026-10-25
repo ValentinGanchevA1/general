@@ -3,6 +3,7 @@ import type MapView from 'react-native-maps';
 
 import type { MapRendererKind } from '../mapRenderer';
 import { resolveAvailableMapRenderer } from '../mapRendererRuntime';
+import { MapLibreMapSurface } from './mapLibre/MapLibreMapSurface';
 import {
   LegacyMapSurface,
   type LegacyMapSurfaceProps,
@@ -16,17 +17,24 @@ export interface NexaMapRuntimeSurfaceProps extends LegacyMapSurfaceProps {
 /**
  * Single runtime entry point for NEXA map rendering.
  *
- * The public props intentionally remain renderer-neutral at the product layer.
- * Until the MapLibre native bundle and parity surface are present, requesting
- * MapLibre resolves to the proven legacy implementation rather than risking a
- * blank map. The MapLibre branch is deliberately not imported here yet so an
- * unavailable native module can never be loaded accidentally.
+ * Product rendering remains fail-closed because the rollout policy keeps
+ * MapLibre unavailable. When an explicit validation policy requests MapLibre
+ * and marks the native bundle available, this boundary mounts the native
+ * surface and translates its viewport back into the legacy region callback.
+ * Discovery rendering stays on the legacy renderer until native GeoJSON parity
+ * is implemented.
  */
 export const NexaMapRuntimeSurface = React.forwardRef<
   MapView,
   NexaMapRuntimeSurfaceProps
 >(function NexaMapRuntimeSurface(
-  { requestedRenderer, mapLibreAvailable, ...surfaceProps },
+  {
+    requestedRenderer,
+    mapLibreAvailable,
+    onReady,
+    onRegionChangeComplete,
+    ...surfaceProps
+  },
   ref,
 ): React.JSX.Element {
   const renderer = resolveAvailableMapRenderer({
@@ -35,10 +43,30 @@ export const NexaMapRuntimeSurface = React.forwardRef<
   });
 
   if (renderer === 'maplibre') {
-    // The native MapLibre surface is added in the next rollout slice. Keep this
-    // fail-closed until that implementation is bundled and parity-validated.
-    return <LegacyMapSurface ref={ref} {...surfaceProps} />;
+    return (
+      <MapLibreMapSurface
+        onReady={onReady}
+        onViewportSettled={({ viewport, camera }) => {
+          const latitudeDelta = Math.abs(viewport.ne.lat - viewport.sw.lat);
+          const longitudeDelta = Math.abs(viewport.ne.lng - viewport.sw.lng);
+
+          onRegionChangeComplete({
+            latitude: camera.center.latitude,
+            longitude: camera.center.longitude,
+            latitudeDelta,
+            longitudeDelta,
+          });
+        }}
+      />
+    );
   }
 
-  return <LegacyMapSurface ref={ref} {...surfaceProps} />;
+  return (
+    <LegacyMapSurface
+      ref={ref}
+      onReady={onReady}
+      onRegionChangeComplete={onRegionChangeComplete}
+      {...surfaceProps}
+    />
+  );
 });
