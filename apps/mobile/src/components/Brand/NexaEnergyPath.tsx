@@ -4,7 +4,6 @@ import Animated, {
   Extrapolation,
   createAnimatedComponent,
   interpolate,
-  type SharedValue,
   useAnimatedProps,
 } from 'react-native-reanimated';
 
@@ -14,10 +13,14 @@ import { NEXA_LAUNCH_VISUAL } from './nexaLaunchVisual';
 
 const AnimatedPath = createAnimatedComponent(Path);
 
+export interface NexaReadonlyProgress {
+  readonly value: number;
+}
+
 export interface NexaEnergyPathProps {
   d: string;
   length: number;
-  progress: SharedValue<number>;
+  progress: NexaReadonlyProgress;
   width: number;
   opacity?: number;
 }
