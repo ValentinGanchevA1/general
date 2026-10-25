@@ -1,5 +1,12 @@
 import { createHmac } from 'node:crypto';
-import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
@@ -25,6 +32,7 @@ const MIN_RETENTION_DAYS = 30;
 const MAX_RETENTION_DAYS = 365;
 const PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 const INITIAL_PRUNE_DELAY_MS = 15 * 60 * 1_000;
+const PRUNE_RETRY_DELAY_MS = 60 * 60 * 1_000;
 
 function pickString(
   props: ProductAnalyticsProperties,
@@ -94,11 +102,49 @@ export function sanitizeProductAnalyticsProperties(
   }
 }
 
+export async function pruneExpiredAnalytics(
+  db: DataSource,
+  retentionDays: number,
+): Promise<void> {
+  await db.query(
+    `DELETE FROM analytics_events
+      WHERE received_at < NOW() - ($1::int * INTERVAL '1 day')`,
+    [retentionDays],
+  );
+
+  await db.query(
+    `DELETE FROM analytics_subjects s
+      WHERE s.updated_at < NOW() - ($1::int * INTERVAL '1 day')
+        AND NOT EXISTS (
+          SELECT 1
+            FROM analytics_events e
+           WHERE e.subject_hash = s.subject_hash
+        )`,
+    [retentionDays],
+  );
+}
+
 @Injectable()
-export class AnalyticsService {
-  private nextPruneAtMs = Date.now() + INITIAL_PRUNE_DELAY_MS;
+export class AnalyticsService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(AnalyticsService.name);
+  private pruneTimer: ReturnType<typeof setTimeout> | null = null;
+  private pruneRunning = false;
+  private destroyed = false;
 
   constructor(@InjectDataSource() private readonly db: DataSource) {}
+
+  onModuleInit(): void {
+    this.destroyed = false;
+    this.schedulePrune(INITIAL_PRUNE_DELAY_MS);
+  }
+
+  onModuleDestroy(): void {
+    this.destroyed = true;
+    if (this.pruneTimer) {
+      clearTimeout(this.pruneTimer);
+      this.pruneTimer = null;
+    }
+  }
 
   private subjectHash(userId: string): string {
     const key = process.env.ANALYTICS_HMAC_KEY?.trim();
@@ -111,36 +157,35 @@ export class AnalyticsService {
     return createHmac('sha256', key).update(userId).digest('hex');
   }
 
-  private maybePruneExpired(): void {
-    const now = Date.now();
-    if (now < this.nextPruneAtMs) return;
-    this.nextPruneAtMs = now + PRUNE_INTERVAL_MS;
+  private schedulePrune(delayMs: number): void {
+    if (this.destroyed) return;
 
-    const retentionDays = resolveRetentionDays(process.env.ANALYTICS_RETENTION_DAYS);
-    void this.db
-      .query(
-        `DELETE FROM analytics_events
-          WHERE received_at < NOW() - ($1::int * INTERVAL '1 day')`,
-        [retentionDays],
-      )
-      .then(async () => {
-        // Once all retained events for a subject have aged out, the raw-user-id
-        // identity bridge serves no analytical purpose. Remove it as part of the
-        // same best-effort retention cycle so linkable metadata does not outlive
-        // the event-retention window indefinitely.
-        await this.db.query(
-          `DELETE FROM analytics_subjects s
-            WHERE NOT EXISTS (
-              SELECT 1
-                FROM analytics_events e
-               WHERE e.subject_hash = s.subject_hash
-            )`,
-        );
-      })
-      .catch(() => {
-        // Retry later without affecting the product event that triggered cleanup.
-        this.nextPruneAtMs = Date.now() + 60 * 60 * 1_000;
-      });
+    this.pruneTimer = setTimeout(() => {
+      this.pruneTimer = null;
+      void this.runPrune()
+        .then(() => {
+          this.schedulePrune(PRUNE_INTERVAL_MS);
+        })
+        .catch(() => {
+          this.logger.error('Product analytics retention sweep failed; retrying later.');
+          this.schedulePrune(PRUNE_RETRY_DELAY_MS);
+        });
+    }, delayMs);
+
+    if (typeof this.pruneTimer.unref === 'function') {
+      this.pruneTimer.unref();
+    }
+  }
+
+  private async runPrune(): Promise<void> {
+    if (this.pruneRunning) return;
+    this.pruneRunning = true;
+    try {
+      const retentionDays = resolveRetentionDays(process.env.ANALYTICS_RETENTION_DAYS);
+      await pruneExpiredAnalytics(this.db, retentionDays);
+    } finally {
+      this.pruneRunning = false;
+    }
   }
 
   async record(
@@ -172,7 +217,5 @@ export class AnalyticsService {
        FROM subject`,
       [userId, subjectHash, event, JSON.stringify(safeProperties)],
     );
-
-    this.maybePruneExpired();
   }
 }
