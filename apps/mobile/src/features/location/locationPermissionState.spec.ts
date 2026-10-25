@@ -1,5 +1,6 @@
 import {
   shouldRequestLocationPermission,
+  statusFromAndroidForegroundCheck,
   statusFromAndroidPermissionCheck,
 } from './locationPermissionState';
 
@@ -10,6 +11,24 @@ describe('statusFromAndroidPermissionCheck', () => {
 
   it('keeps a negative quiet check unknown until an explicit request resolves', () => {
     expect(statusFromAndroidPermissionCheck(false)).toBe('unknown');
+  });
+});
+
+describe('statusFromAndroidForegroundCheck', () => {
+  it('recognizes permission granted in settings', () => {
+    expect(statusFromAndroidForegroundCheck(true, 'denied')).toBe('granted');
+  });
+
+  it('treats revocation of a previously granted permission as denied', () => {
+    expect(statusFromAndroidForegroundCheck(false, 'granted')).toBe('denied');
+  });
+
+  it('preserves unknown when permission has never been requested', () => {
+    expect(statusFromAndroidForegroundCheck(false, 'unknown')).toBe('unknown');
+  });
+
+  it('preserves an explicit denial on a negative foreground check', () => {
+    expect(statusFromAndroidForegroundCheck(false, 'denied')).toBe('denied');
   });
 });
 
