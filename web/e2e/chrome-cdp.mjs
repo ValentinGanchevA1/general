@@ -50,14 +50,17 @@ export class CdpClient {
   }
 }
 
-export async function launchChrome(prefix = 'nexa-chrome-e2e-') {
+export async function launchChrome(prefix = 'nexa-chrome-e2e-', options = {}) {
   const profileDir = await mkdtemp(join(tmpdir(), prefix));
   const debugPort = await reserveDebugPort();
   const chromePath = findChrome();
+  const renderArgs = options.enableWebGl === true
+    ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']
+    : ['--disable-gpu'];
   const chrome = spawn(chromePath, [
     '--headless=new',
     '--no-sandbox',
-    '--disable-gpu',
+    ...renderArgs,
     '--disable-dev-shm-usage',
     '--no-first-run',
     '--no-default-browser-check',

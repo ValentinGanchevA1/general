@@ -5,6 +5,8 @@ on:
     paths:
       - 'web/**'
       - 'packages/shared/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
       - 'apps/backend/src/common/cors-origins.ts'
       - 'apps/backend/src/common/cors-origins.spec.ts'
       - '.github/workflows/web-preview.yml'
@@ -14,6 +16,8 @@ on:
     paths:
       - 'web/**'
       - 'packages/shared/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
       - 'apps/backend/src/common/cors-origins.ts'
       - 'apps/backend/src/common/cors-origins.spec.ts'
       - '.github/workflows/web-preview.yml'
@@ -27,7 +31,7 @@ env:
 jobs:
   web-preview:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -55,10 +59,16 @@ jobs:
       - name: Verify browser bundle
         run: |
           test -s web/dist/app.js
+          test -s web/dist/maplibre-worker.mjs
+          test -s web/dist/maplibre-gl.css
+          test -s web/dist/map-config.js
           node --check web/dist/app.js
+          node --check web/dist/maplibre-worker.mjs
+          node --check web/dist/map-config.js
           node --check web/edge.mjs
           node --check web/e2e/chrome-cdp.mjs
           node --check web/e2e/map-runtime-policy.e2e.mjs
+          node --check web/e2e/maplibre-renderer.e2e.mjs
           node --check web/e2e/realtime-reconnect.e2e.mjs
           node --check web/e2e/viewport-race.e2e.mjs
           node --check web/e2e/connections-actions.e2e.mjs
@@ -66,6 +76,11 @@ jobs:
 
       - name: Map runtime policy
         run: node web/e2e/map-runtime-policy.e2e.mjs
+
+      - name: E2E MapLibre renderer and same-origin worker
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: node web/e2e/maplibre-renderer.e2e.mjs
 
       - name: Smoke test web edge
         run: |
@@ -83,8 +98,12 @@ jobs:
           done
           curl --fail --silent http://127.0.0.1:4180/healthz | grep '"ok":true'
           curl --fail --silent http://127.0.0.1:4180/ | grep 'NEXA'
+          curl --fail --silent --head http://127.0.0.1:4180/dist/maplibre-worker.mjs | tr -d '\r' | grep -i '^content-type: text/javascript; charset=utf-8$'
           CSP="$(curl --fail --silent --head http://127.0.0.1:4180/ | tr -d '\r' | grep -i '^content-security-policy:')"
           echo "$CSP" | grep -F "worker-src 'self'"
+          echo "$CSP" | grep -F "img-src 'self' data: blob:"
+          echo "$CSP" | grep -F 'https://api.maptiler.eu'
+          echo "$CSP" | grep -F 'https://api.maptiler.com'
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' --request-target 'https://evil.example/api/v1/auth/me' http://127.0.0.1:4180/)" = '400'
 
       - name: E2E multitab auth coordination
