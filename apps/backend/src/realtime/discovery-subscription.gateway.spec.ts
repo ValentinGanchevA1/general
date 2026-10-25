@@ -1,13 +1,14 @@
+import { DiscoverySubscriptionDto } from './realtime.dto';
 import { DiscoverySubscriptionGateway } from './discovery-subscription.gateway';
 import { DiscoverySubscriptionStore } from './discovery-subscription.store';
 
-const query = {
+const query: DiscoverySubscriptionDto = {
   viewport: {
     ne: { lat: 43.3, lng: 28.1 },
     sw: { lat: 43.1, lng: 27.8 },
   },
   zoom: 16,
-  kinds: ['user'] as const,
+  kinds: ['user'],
 };
 
 describe('DiscoverySubscriptionGateway', () => {
