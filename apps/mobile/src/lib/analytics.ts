@@ -4,6 +4,7 @@
 // point, but only explicit product events leave the device. Arbitrary track()
 // calls remain Sentry breadcrumbs and are never uploaded to the analytics table.
 
+import axios from 'axios';
 import * as Sentry from '@sentry/react-native';
 import type {
   ProductAnalyticsEventName,
@@ -11,7 +12,8 @@ import type {
   ProductAnalyticsProperties,
 } from '@g88/shared';
 
-import { api } from '@/api/client';
+import { tokenStore } from '@/api/tokenStore';
+import { Config } from '@/config';
 
 export type AnalyticsProps = Record<string, string | number | boolean | null>;
 
@@ -29,6 +31,7 @@ const ENTITY_TYPES = new Set(['person', 'event', 'listing']);
 const SURFACES = new Set(['map', 'discover', 'pulse', 'profile', 'detail']);
 const RSVP_STATUSES = new Set(['going', 'maybe', 'declined']);
 const CONNECTION_MECHANISMS = new Set(['wave', 'friend', 'dating']);
+const SESSION_PATHS = new Set(['map', 'non_map']);
 
 /** True when the key is an exact match or a *Id / *Token / *Email suffix that looks PII-ish. */
 function shouldRedactKey(key: string): boolean {
@@ -56,6 +59,20 @@ function pickString(
   return typeof value === 'string' && allowed.has(value) ? value : undefined;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function normalizeApiPath(url: string | undefined): string {
+  if (!url) return '';
+  const withoutQuery = url.split('?')[0] ?? '';
+  return withoutQuery
+    .replace(/^https?:\/\/[^/]+\/api\/v1/, '')
+    .replace(/^\/api\/v1/, '');
+}
+
 export function sanitizeProductAnalyticsProperties(
   event: ProductAnalyticsEventName,
   props: AnalyticsProps = {},
@@ -63,7 +80,7 @@ export function sanitizeProductAnalyticsProperties(
   const out: ProductAnalyticsProperties = {};
   switch (event) {
     case 'app.session_started': {
-      const path = pickString(props, 'path', new Set(['map', 'non_map']));
+      const path = pickString(props, 'path', SESSION_PATHS);
       if (path) out.path = path;
       return out;
     }
@@ -97,9 +114,73 @@ export function sanitizeProductAnalyticsProperties(
 }
 
 /**
- * Fire-and-forget first-party analytics. Product behavior must never depend on
- * analytics availability; the server still authenticates, rate-limits and
- * applies its own property allow-list.
+ * Pure mapping from successful REST calls to product events. URL identifiers are
+ * used only for route matching and never copied into analytics properties.
+ */
+export function productEventsForApiSuccess(
+  method: string | undefined,
+  url: string | undefined,
+  data: unknown,
+): ProductAnalyticsIngestRequest[] {
+  const verb = method?.toLowerCase() ?? '';
+  const path = normalizeApiPath(url);
+
+  if (verb === 'post' && path === '/interactions/wave') {
+    const response = asRecord(data);
+    const mutual = response && Object.prototype.hasOwnProperty.call(response, 'conversationId')
+      ? response.conversationId != null
+      : undefined;
+    const events: ProductAnalyticsIngestRequest[] = [
+      {
+        event: 'interaction.wave_sent',
+        properties: mutual === undefined ? {} : { mutual },
+      },
+    ];
+    if (mutual === true) {
+      events.push({ event: 'connection.created', properties: { mechanism: 'wave' } });
+    }
+    return events;
+  }
+
+  if (verb === 'put' && /^\/events\/[^/]+\/rsvp$/.test(path)) {
+    const response = asRecord(data);
+    const status = typeof response?.status === 'string' && RSVP_STATUSES.has(response.status)
+      ? response.status
+      : undefined;
+    return [{
+      event: 'event.rsvp_confirmed',
+      properties: status ? { status } : {},
+    }];
+  }
+
+  if (verb === 'post' && /^\/listings\/[^/]+\/offers$/.test(path)) {
+    return [{ event: 'marketplace.offer_sent', properties: {} }];
+  }
+
+  return [];
+}
+
+async function uploadProductEvent(payload: ProductAnalyticsIngestRequest): Promise<void> {
+  const accessToken = await tokenStore.getAccessToken();
+  if (!accessToken) return;
+
+  await axios.post(
+    `${Config.API_BASE_URL}/api/v1/analytics/events`,
+    payload,
+    {
+      timeout: 3_000,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  );
+}
+
+/**
+ * Fire-and-forget first-party analytics. This intentionally bypasses the main
+ * API client so analytics failures cannot trigger refresh/logout or recursively
+ * generate analytics events.
  */
 export function trackProduct(
   event: ProductAnalyticsEventName,
@@ -109,7 +190,17 @@ export function trackProduct(
     event,
     properties: sanitizeProductAnalyticsProperties(event, props),
   };
-  void api.post('/analytics/events', payload).catch(() => undefined);
+  void uploadProductEvent(payload).catch(() => undefined);
+}
+
+export function trackSuccessfulProductApiCall(
+  method: string | undefined,
+  url: string | undefined,
+  data: unknown,
+): void {
+  for (const payload of productEventsForApiSuccess(method, url, data)) {
+    trackProduct(payload.event, payload.properties ?? {});
+  }
 }
 
 export function track(event: string, props: AnalyticsProps = {}): void {
