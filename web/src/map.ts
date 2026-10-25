@@ -4,6 +4,7 @@ import {
   resolveMapRuntime,
   type NexaMapRuntime,
 } from './map-runtime';
+import { mountMapLibreMap } from './maplibre-map';
 
 export interface MapCenter {
   lat: number;
@@ -44,6 +45,18 @@ const MAX_LAT = 85.05112878;
 export function mountNexaMap(options: MountNexaMapOptions): void {
   const { container, points, onViewportSettled } = options;
   const runtime = options.runtime ?? resolveMapRuntime(window.location);
+
+  if (runtime.status === 'ready' && runtime.renderer === 'maplibre') {
+    mountMapLibreMap({
+      container,
+      points,
+      camera: options.camera,
+      runtime,
+      onViewportSettled,
+    });
+    return;
+  }
+
   let camera: MapCamera = normalizeCamera(options.camera);
   let drag: DragState | null = null;
   let frame = 0;
@@ -72,7 +85,7 @@ export function mountNexaMap(options: MountNexaMapOptions): void {
 
   const attribution = document.createElement('div');
   attribution.className = 'map-attribution';
-  if (runtime.status === 'ready') {
+  if (runtime.status === 'ready' && runtime.renderer === 'preview-raster') {
     const attributionLink = document.createElement('a');
     attributionLink.href = runtime.attributionUrl;
     attributionLink.target = '_blank';
@@ -80,7 +93,9 @@ export function mountNexaMap(options: MountNexaMapOptions): void {
     attributionLink.textContent = runtime.attribution;
     attribution.append(attributionLink);
   } else {
-    attribution.textContent = 'Production basemap configuration required';
+    attribution.textContent = runtime.reason === 'production-map-requires-https'
+      ? 'Production basemap requires HTTPS'
+      : 'Production basemap configuration required';
   }
 
   const viewportLabel = document.createElement('div');
@@ -230,7 +245,7 @@ function renderLayers(
   const tileCount = 2 ** zoom;
 
   const tileFragment = document.createDocumentFragment();
-  if (runtime.status === 'ready') {
+  if (runtime.status === 'ready' && runtime.renderer === 'preview-raster') {
     for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
       for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
         const wrappedX = ((tileX % tileCount) + tileCount) % tileCount;
