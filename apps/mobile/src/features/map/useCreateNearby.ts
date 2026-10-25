@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react';
-import type { LongPressEvent } from 'react-native-maps';
 import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 
 import type { CreateNearbyAction } from '@/components/map/CreateNearbySheet';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { track } from '@/lib/analytics';
+import type { MapCoordinate } from './contracts/mapRenderer';
 
 type LatLng = { lat: number; lng: number };
 
@@ -18,16 +18,16 @@ export function useCreateNearby(
 ): {
   createNearbyOpen: boolean;
   setCreateNearbyOpen: (open: boolean) => void;
-  onMapLongPress: (e: LongPressEvent) => void;
+  onMapLongPress: (coordinate: MapCoordinate) => void;
   onCreateNearbySelect: (action: CreateNearbyAction) => void;
 } {
   const [createNearbyOpen, setCreateNearbyOpen] = useState(false);
   const [createNearbyCoords, setCreateNearbyCoords] = useState<LatLng | null>(null);
 
   const onMapLongPress = useCallback(
-    (e: LongPressEvent): void => {
+    (coordinate: MapCoordinate): void => {
       if (sheetBlocksLongPress) return;
-      const { latitude, longitude } = e.nativeEvent.coordinate;
+      const { latitude, longitude } = coordinate;
       track('map.longpress_create', { lat: latitude, lng: longitude });
       setCreateNearbyCoords({ lat: latitude, lng: longitude });
       setCreateNearbyOpen(true);
