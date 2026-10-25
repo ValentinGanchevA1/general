@@ -22,7 +22,11 @@ type CircleColor = NonNullable<CircleLayerPaint['circle-color']>;
 type CircleRadius = NonNullable<CircleLayerPaint['circle-radius']>;
 type CameraRef = React.ElementRef<typeof Camera>;
 
-import { discoveryToMapFeatureCollection } from '../../adapters/discoveryToGeoJson';
+import {
+  discoveryToMapFeatureCollection,
+  updateMapFeatureCollection,
+  type NexaMapFeatureCollection,
+} from '../../adapters/discoveryToGeoJson';
 import type {
   MapCoordinate,
   NexaMapController,
@@ -94,7 +98,20 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
   ): React.JSX.Element {
     const mapRef = React.useRef<MapRef>(null);
     const cameraRef = React.useRef<CameraRef>(null);
-    const data = React.useMemo(() => discoveryToMapFeatureCollection(points), [points]);
+    const previousPointsRef = React.useRef<readonly DiscoveryPoint[]>([]);
+    const featureCollectionRef = React.useRef<NexaMapFeatureCollection>(
+      discoveryToMapFeatureCollection([]),
+    );
+    const data = React.useMemo(() => {
+      const next = updateMapFeatureCollection(
+        previousPointsRef.current,
+        featureCollectionRef.current,
+        points,
+      );
+      previousPointsRef.current = points;
+      featureCollectionRef.current = next;
+      return next;
+    }, [points]);
 
     React.useImperativeHandle(ref, () => ({
       flyTo(target, options) {
