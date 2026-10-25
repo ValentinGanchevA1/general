@@ -71,24 +71,45 @@ export class DiscoveryEntityResolver {
     const context = params.context;
     if (context !== undefined && !contextAllowsKind(context, params.kind)) return null;
 
+    const friendsOnly = context?.friendsOnly === true;
+    const datingOnly = context?.datingOnly === true && !friendsOnly;
     let friendIds: string[] | null = null;
-    if (context?.friendsOnly === true) {
+    if (friendsOnly) {
       friendIds = await this.friends.listFriendIds(params.viewerId);
       if (!friendIds.includes(params.entityId)) return null;
     }
 
+    if (datingOnly) {
+      const openRows = await this.db.query<Array<{ open_to_dating: boolean }>>(
+        `SELECT COALESCE(open_to_dating, false) AS open_to_dating
+           FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+        [params.viewerId],
+      );
+      if (!openRows[0]?.open_to_dating) return null;
+    }
+
     const values: unknown[] = [params.entityId, params.kind, params.viewerId];
     let filters = '';
-    if (context?.topic !== undefined) {
-      values.push(context.topic);
+    const topicSlug = friendsOnly
+      ? ''
+      : context?.topic
+        ? context.topic.replace(/^#/, '').trim().toLowerCase()
+        : '';
+    if (topicSlug) {
+      values.push(topicSlug);
       filters += `\n          ${topicSql(`$${values.length}`)}`;
     }
-    if (context?.listingMode !== undefined) {
+    if (!friendsOnly && !datingOnly && context?.listingMode !== undefined) {
       values.push(context.listingMode);
       filters += `\n          ${listingModeSql(`$${values.length}`)}`;
     }
-    if (context?.datingOnly === true) {
-      filters += `\n          AND kind = 'user'\n          AND COALESCE((meta->>'openToDating')::boolean, false) = true`;
+    if (datingOnly) {
+      filters += `\n          AND kind = 'user' AND EXISTS (
+            SELECT 1 FROM users du
+             WHERE du.id = v_discoverable_entity.id
+               AND du.open_to_dating = true
+               AND du.deleted_at IS NULL
+          )`;
     }
 
     const rows = await this.db.query<EntityRow[]>(
@@ -113,6 +134,39 @@ export class DiscoveryEntityResolver {
 
     const row = rows[0];
     if (!row) return null;
+
+    if (datingOnly) {
+      const prefRows = await this.db.query<
+        Array<{ id: string; gender: string | null; seeking_genders: string[] | null }>
+      >(
+        `SELECT id, gender, COALESCE(seeking_genders, '{}') AS seeking_genders
+           FROM users
+          WHERE id = ANY($1::uuid[]) OR id = $2`,
+        [[row.id], params.viewerId],
+      );
+      const byId = new Map(prefRows.map((preference) => [preference.id, preference]));
+      const viewer = byId.get(params.viewerId);
+      const candidate = byId.get(row.id);
+      if (!viewer || !candidate) return null;
+      const viewerSeeking = Array.isArray(viewer.seeking_genders) ? viewer.seeking_genders : [];
+      const candidateSeeking = Array.isArray(candidate.seeking_genders)
+        ? candidate.seeking_genders
+        : [];
+      if (
+        viewerSeeking.length > 0 &&
+        candidate.gender !== null &&
+        !viewerSeeking.includes(candidate.gender)
+      ) {
+        return null;
+      }
+      if (
+        candidateSeeking.length > 0 &&
+        viewer.gender !== null &&
+        !candidateSeeking.includes(viewer.gender)
+      ) {
+        return null;
+      }
+    }
 
     if (row.kind !== 'user') {
       return {
