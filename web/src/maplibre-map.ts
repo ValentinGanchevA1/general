@@ -15,6 +15,11 @@ interface MountMapLibreOptions {
   onViewportSettled: (camera: MapCamera, viewport: MapViewport) => void;
 }
 
+export interface MapLibreMapController {
+  updatePoints(points: DiscoveryPoint[]): void;
+  destroy(): void;
+}
+
 interface NexaPointFeature {
   type: 'Feature';
   id: string;
@@ -34,6 +39,10 @@ interface NexaFeatureCollection {
   features: NexaPointFeature[];
 }
 
+interface MutableGeoJsonSource {
+  setData(data: NexaFeatureCollection): void;
+}
+
 const SOURCE_ID = 'nexa-discovery';
 const CLUSTER_LAYER_ID = 'nexa-discovery-clusters';
 const USER_LAYER_ID = 'nexa-discovery-users';
@@ -42,14 +51,19 @@ const LISTING_LAYER_ID = 'nexa-discovery-listings';
 const MIN_ZOOM = 10;
 const MAX_ZOOM = 18;
 
-export function mountMapLibreMap(options: MountMapLibreOptions): void {
-  const { container, points, camera, runtime, onViewportSettled } = options;
+export function mountMapLibreMap(options: MountMapLibreOptions): MapLibreMapController {
+  const { container, camera, runtime, onViewportSettled } = options;
+  let currentPoints = options.points;
+  let disposed = false;
+  let loaded = false;
+  let observer: MutationObserver | null = null;
 
   setWorkerUrl(runtime.workerUrl);
 
   container.dataset.mapRuntimeStatus = runtime.status;
   container.dataset.mapRenderer = runtime.renderer;
   container.dataset.basemapProvider = runtime.provider;
+  container.dataset.mapUpdateCount = '0';
   container.setAttribute('aria-label', 'Interactive NEXA map. Drag or zoom to search this area.');
 
   const map = new MapLibreMap({
@@ -71,22 +85,39 @@ export function mountMapLibreMap(options: MountMapLibreOptions): void {
   map.touchZoomRotate.disableRotation();
   map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
 
-  let disposed = false;
-  const cleanup = (): void => {
-    if (disposed) return;
-    disposed = true;
-    observer.disconnect();
-    map.remove();
+  const controller: MapLibreMapController = {
+    updatePoints(nextPoints) {
+      if (disposed) return;
+      currentPoints = nextPoints;
+      const nextCount = Number(container.dataset.mapUpdateCount ?? '0') + 1;
+      container.dataset.mapUpdateCount = String(nextCount);
+      if (!loaded) return;
+
+      const source = map.getSource(SOURCE_ID);
+      if (isMutableGeoJsonSource(source)) {
+        source.setData(toFeatureCollection(currentPoints));
+      }
+    },
+    destroy() {
+      if (disposed) return;
+      disposed = true;
+      observer?.disconnect();
+      observer = null;
+      container.dataset.mapReady = 'false';
+      container.dataset.mapDestroyed = 'true';
+      map.remove();
+    },
   };
 
-  const observer = new MutationObserver(() => {
-    if (!container.isConnected) cleanup();
+  observer = new MutationObserver(() => {
+    if (!container.isConnected) controller.destroy();
   });
   observer.observe(document.body, { childList: true, subtree: true });
 
   map.once('load', () => {
     if (disposed) return;
-    addDiscoveryOverlay(map, points);
+    addDiscoveryOverlay(map, currentPoints);
+    loaded = true;
     container.dataset.mapReady = 'true';
     map.on('moveend', () => {
       if (disposed) return;
@@ -110,6 +141,8 @@ export function mountMapLibreMap(options: MountMapLibreOptions): void {
     // raw provider error text into the UI or expose credential-bearing URLs.
     if (event.error) container.dataset.mapLoadError = 'true';
   });
+
+  return controller;
 }
 
 function addDiscoveryOverlay(map: MapLibreMap, points: DiscoveryPoint[]): void {
@@ -176,6 +209,12 @@ function addDiscoveryOverlay(map: MapLibreMap, points: DiscoveryPoint[]): void {
       'circle-stroke-width': 2,
     },
   });
+}
+
+function isMutableGeoJsonSource(value: unknown): value is MutableGeoJsonSource {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as { setData?: unknown };
+  return typeof candidate.setData === 'function';
 }
 
 function toFeatureCollection(points: DiscoveryPoint[]): NexaFeatureCollection {

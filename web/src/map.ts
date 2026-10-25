@@ -29,6 +29,10 @@ interface MountNexaMapOptions {
   onViewportSettled: (camera: MapCamera, viewport: MapViewport) => void;
 }
 
+interface MapController {
+  updatePoints(points: DiscoveryPoint[]): void;
+}
+
 interface DragState {
   pointerId: number;
   startX: number;
@@ -41,22 +45,31 @@ const TILE_SIZE = 256;
 const MIN_ZOOM = 10;
 const MAX_ZOOM = 18;
 const MAX_LAT = 85.05112878;
+const mapControllers = new WeakMap<HTMLElement, MapController>();
 
 export function mountNexaMap(options: MountNexaMapOptions): void {
   const { container, points, onViewportSettled } = options;
+  const existing = mapControllers.get(container);
+  if (existing) {
+    existing.updatePoints(points);
+    return;
+  }
+
   const runtime = options.runtime ?? resolveMapRuntime(window.location);
 
   if (runtime.status === 'ready' && runtime.renderer === 'maplibre') {
-    mountMapLibreMap({
+    const controller = mountMapLibreMap({
       container,
       points,
       camera: options.camera,
       runtime,
       onViewportSettled,
     });
+    mapControllers.set(container, controller);
     return;
   }
 
+  let currentPoints = points;
   let camera: MapCamera = normalizeCamera(options.camera);
   let drag: DragState | null = null;
   let frame = 0;
@@ -68,6 +81,7 @@ export function mountNexaMap(options: MountNexaMapOptions): void {
   surface.dataset.mapRuntimeStatus = runtime.status;
   surface.dataset.mapRenderer = runtime.renderer;
   surface.dataset.basemapProvider = runtime.provider;
+  surface.dataset.mapUpdateCount = '0';
   surface.setAttribute('role', 'application');
   surface.setAttribute('aria-label', 'Interactive map. Drag to pan and use plus or minus to zoom.');
   if (runtime.status === 'blocked') surface.classList.add('basemap-blocked');
@@ -115,7 +129,7 @@ export function mountNexaMap(options: MountNexaMapOptions): void {
     if (frame !== 0) return;
     frame = requestAnimationFrame(() => {
       frame = 0;
-      renderLayers(surface, tileLayer, featureLayer, points, camera, runtime);
+      renderLayers(surface, tileLayer, featureLayer, currentPoints, camera, runtime);
     });
   };
 
@@ -218,7 +232,16 @@ export function mountNexaMap(options: MountNexaMapOptions): void {
     settle();
   });
 
-  renderLayers(surface, tileLayer, featureLayer, points, camera, runtime);
+  mapControllers.set(container, {
+    updatePoints(nextPoints) {
+      currentPoints = nextPoints;
+      const nextCount = Number(surface.dataset.mapUpdateCount ?? '0') + 1;
+      surface.dataset.mapUpdateCount = String(nextCount);
+      scheduleRender();
+    },
+  });
+
+  renderLayers(surface, tileLayer, featureLayer, currentPoints, camera, runtime);
 }
 
 function renderLayers(
