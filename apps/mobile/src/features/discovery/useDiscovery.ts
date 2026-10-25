@@ -182,7 +182,13 @@ export function useDiscovery({
   );
 
   useEffect(() => {
-    if (!enabled || !viewport) return;
+    if (!enabled || !viewport) {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setLoading(false);
+      return;
+    }
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly, datingOnly, rankBy);
