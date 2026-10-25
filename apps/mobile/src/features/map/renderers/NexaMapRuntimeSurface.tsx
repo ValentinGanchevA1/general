@@ -4,6 +4,7 @@ import { getDiscoveryPointKey, type DiscoveryPointKey } from '@g88/shared';
 import type { NexaMapController } from '../contracts/mapRenderer';
 import type { MapRendererKind } from '../mapRenderer';
 import { resolveAvailableMapRenderer } from '../mapRendererRuntime';
+import { resolveRenderableMapSelection } from '../mapSelectionRuntime';
 import { MapLibreMapSurface } from './mapLibre/MapLibreMapSurface';
 import { LegacyMapSurface, type LegacyMapSurfaceProps } from './reactNativeMaps/LegacyMapSurface';
 
@@ -36,7 +37,11 @@ export const NexaMapRuntimeSurface = React.forwardRef<
     requested: requestedRenderer,
     mapLibreAvailable,
   });
-  const interactionFocused = dimUnselected || selectedEntityKey !== null;
+  const renderableSelection = resolveRenderableMapSelection(
+    points,
+    selectedEntityKey,
+    dimUnselected,
+  );
 
   if (renderer === 'maplibre') {
     const pointsByKey = new Map<DiscoveryPointKey, (typeof points)[number]>(
@@ -47,8 +52,8 @@ export const NexaMapRuntimeSurface = React.forwardRef<
       <MapLibreMapSurface
         ref={ref}
         points={points}
-        selectedKey={selectedEntityKey as DiscoveryPointKey | null}
-        dimUnselected={interactionFocused}
+        selectedKey={renderableSelection.selectedEntityKey as DiscoveryPointKey | null}
+        dimUnselected={renderableSelection.interactionFocused}
         onReady={onReady}
         onPointPress={(key) => {
           const point = pointsByKey.get(key);
@@ -73,8 +78,8 @@ export const NexaMapRuntimeSurface = React.forwardRef<
     <LegacyMapSurface
       ref={ref}
       points={points}
-      selectedEntityKey={selectedEntityKey}
-      dimUnselected={interactionFocused}
+      selectedEntityKey={renderableSelection.selectedEntityKey}
+      dimUnselected={renderableSelection.interactionFocused}
       onReady={onReady}
       onRegionChangeComplete={onRegionChangeComplete}
       onLongPress={onLongPress}
