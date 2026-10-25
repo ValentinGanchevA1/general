@@ -8,6 +8,7 @@ import type { AuthTokens, ApiError } from '@g88/shared';
 
 import { tokenStore } from './tokenStore';
 import { Config } from '@/config';
+import { trackSuccessfulProductApiCall } from '@/lib/analytics';
 
 /**
  * Centralized HTTP client.
@@ -17,6 +18,7 @@ import { Config } from '@/config';
  *  2. On 401, attempts a single refresh, then retries the original request.
  *  3. Concurrent 401s share a single in-flight refresh promise (no thundering herd).
  *  4. If refresh itself fails, clears tokens and broadcasts a logout event.
+ *  5. Successful business mutations may emit privacy-safe product events.
  */
 
 /**
@@ -73,7 +75,10 @@ api.interceptors.request.use(async (cfg: InternalAxiosRequestConfig) => {
 });
 
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    trackSuccessfulProductApiCall(res.config.method, res.config.url, res.data);
+    return res;
+  },
   async (err) => {
     const original = err.config as InternalAxiosRequestConfig & { _retry?: boolean };
     if (
