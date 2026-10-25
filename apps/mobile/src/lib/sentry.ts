@@ -23,12 +23,17 @@ export interface NexaLaunchPerformanceInput {
   mapReadyFailOpen: boolean;
   spatialHandoffUsed: boolean;
   reducedMotion: boolean | null;
+  interrupted: boolean;
 }
 
 /**
  * Emit a sampled, queryable Sentry span for the completed branded launch flow.
  * The span is created after completion with explicit historical boundaries, so
  * no mutable tracing object survives React renders/background transitions.
+ *
+ * Foreground-interrupted launches use a separate span op. Their wall-clock
+ * duration is still useful for diagnosis, but it must not pollute normal
+ * `ui.load` launch latency distributions used for device calibration.
  */
 export function recordNexaLaunchPerformance(
   input: NexaLaunchPerformanceInput,
@@ -38,6 +43,7 @@ export function recordNexaLaunchPerformance(
     'nexa.launch.total_ms': input.totalMs,
     'nexa.launch.map_ready_fail_open': input.mapReadyFailOpen,
     'nexa.launch.spatial_handoff_used': input.spatialHandoffUsed,
+    'nexa.launch.interrupted': input.interrupted,
   };
 
   if (input.authReadyMs !== null) {
@@ -55,7 +61,7 @@ export function recordNexaLaunchPerformance(
 
   const span = Sentry.startInactiveSpan({
     name: 'NEXA branded launch',
-    op: 'ui.load',
+    op: input.interrupted ? 'ui.load.interrupted' : 'ui.load',
     startTime: input.startedAtMs / 1_000,
     attributes,
   });
