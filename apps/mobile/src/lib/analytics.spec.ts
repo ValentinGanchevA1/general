@@ -58,6 +58,8 @@ describe('product analytics', () => {
       { event: 'entity.opened', properties: { entityType: 'listing' } },
     ]);
     expect(productEventsForApiSuccess('get', '/events/event-secret/polls', {})).toEqual([]);
+    expect(productEventsForApiSuccess('get', '/users/me', {})).toEqual([]);
+    expect(productEventsForApiSuccess('get', '/users/me/profile', {})).toEqual([]);
   });
 
   it('derives successful wave + connection without persisting route identifiers', () => {
