@@ -6,6 +6,7 @@ import {
   cleanupChrome,
   closeServer,
   createTab,
+  delay,
   evaluate,
   launchChrome,
   waitFor,
@@ -14,65 +15,87 @@ import {
 const fixtureBuild = await build({
   stdin: {
     contents: `
-      import { mountMapLibreMap } from './web/src/maplibre-map.ts';
+      import { mountNexaMap } from './web/src/map.ts';
 
       const container = document.querySelector('#map');
       if (!(container instanceof HTMLElement)) throw new Error('map container missing');
 
-      globalThis.__NEXA_MAP_TEST__ = { settled: null };
-
-      mountMapLibreMap({
-        container,
-        camera: { center: { lat: 43.2077, lng: 27.9167 }, zoom: 13 },
-        runtime: {
-          status: 'ready',
-          renderer: 'maplibre',
-          provider: 'maptiler',
-          workerUrl: '/dist/maplibre-worker.mjs',
-          styleUrl: '/style.json',
-          attribution: '© MapTiler © OpenStreetMap contributors',
-          apiOrigin: 'https://api.maptiler.eu',
+      const runtime = {
+        status: 'ready',
+        renderer: 'maplibre',
+        provider: 'maptiler',
+        workerUrl: '/dist/maplibre-worker.mjs',
+        styleUrl: '/style.json',
+        attribution: '© MapTiler © OpenStreetMap contributors',
+        apiOrigin: 'https://api.maptiler.eu',
+      };
+      const camera = { center: { lat: 43.2077, lng: 27.9167 }, zoom: 13 };
+      const initialPoints = [
+        {
+          kind: 'user',
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          lat: 43.211,
+          lng: 27.92,
+          meta: {
+            displayName: 'Map Tester',
+            avatarUrl: null,
+            verification: 'phone',
+            online: true,
+            lastSeenAt: null,
+          },
         },
-        points: [
-          {
-            kind: 'user',
-            id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-            lat: 43.211,
-            lng: 27.92,
-            meta: {
-              displayName: 'Map Tester',
-              avatarUrl: null,
-              verification: 'phone',
-              online: true,
-              lastSeenAt: null,
-            },
+        {
+          kind: 'event',
+          id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          lat: 43.205,
+          lng: 27.91,
+          meta: {
+            title: 'Renderer test event',
+            coverUrl: null,
+            startsAt: new Date().toISOString(),
+            attendeeCount: 4,
+            capacity: 12,
           },
-          {
-            kind: 'event',
-            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-            lat: 43.205,
-            lng: 27.91,
-            meta: {
-              title: 'Renderer test event',
-              coverUrl: null,
-              startsAt: new Date().toISOString(),
-              attendeeCount: 4,
-              capacity: 12,
-            },
+        },
+        {
+          kind: 'cluster',
+          cellId: '891e2040d2fffff',
+          lat: 43.214,
+          lng: 27.929,
+          count: 8,
+          by: { user: 6, event: 2 },
+        },
+      ];
+      const updatedPoints = [
+        {
+          kind: 'listing',
+          id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          lat: 43.209,
+          lng: 27.918,
+          meta: {
+            title: 'Updated listing',
+            thumbnailUrl: null,
+            priceCents: 1200,
+            currency: 'EUR',
+            category: 'goods',
+            mode: 'sell',
           },
-          {
-            kind: 'cluster',
-            cellId: '891e2040d2fffff',
-            lat: 43.214,
-            lng: 27.929,
-            count: 8,
-            by: { user: 6, event: 2 },
-          },
-        ],
-        onViewportSettled: (camera, viewport) => {
-          globalThis.__NEXA_MAP_TEST__.settled = { camera, viewport };
+        },
+      ];
+
+      globalThis.__NEXA_MAP_TEST__ = { settled: null };
+      const mount = (points) => mountNexaMap({
+        container,
+        camera,
+        runtime,
+        points,
+        onViewportSettled: (nextCamera, viewport) => {
+          globalThis.__NEXA_MAP_TEST__.settled = { camera: nextCamera, viewport };
         },
       });
+
+      globalThis.__NEXA_MAP_TEST__.update = () => mount(updatedPoints);
+      mount(initialPoints);
     `,
     resolveDir: process.cwd(),
     loader: 'js',
@@ -204,6 +227,35 @@ try {
     'MapLibre navigation controls were not created',
   );
 
+  const styleRequestsBeforeUpdate = requests.style;
+  const workerRequestsBeforeUpdate = requests.worker;
+  await evaluate(runtime.cdp, tab, `(() => {
+    globalThis.__NEXA_FIRST_CANVAS__ = document.querySelector('.maplibregl-canvas');
+    globalThis.__NEXA_MAP_TEST__.update();
+  })()`);
+  await waitFor(
+    async () => await evaluate(runtime.cdp, tab, "Number(document.querySelector('#map')?.dataset.mapUpdateCount ?? '0') >= 1"),
+    2_000,
+    'same-container MapLibre data update',
+  );
+  await delay(150);
+  assert(
+    await evaluate(runtime.cdp, tab, "document.querySelector('.maplibregl-canvas') === globalThis.__NEXA_FIRST_CANVAS__"),
+    'same-container data update recreated the MapLibre canvas',
+  );
+  assert(
+    await evaluate(runtime.cdp, tab, "document.querySelectorAll('.maplibregl-canvas').length === 1"),
+    'same-container update created duplicate MapLibre canvases',
+  );
+  assert(
+    requests.style === styleRequestsBeforeUpdate,
+    `same-container update reloaded the style (${styleRequestsBeforeUpdate} -> ${requests.style})`,
+  );
+  assert(
+    requests.worker === workerRequestsBeforeUpdate,
+    `same-container update created another worker request (${workerRequestsBeforeUpdate} -> ${requests.worker})`,
+  );
+
   await evaluate(runtime.cdp, tab, "document.querySelector('.maplibregl-ctrl-zoom-in')?.click()");
   const settled = await waitFor(
     async () => await evaluate(runtime.cdp, tab, 'globalThis.__NEXA_MAP_TEST__?.settled ?? null'),
@@ -221,7 +273,7 @@ try {
     'MapLibre viewport north/south bounds are inverted',
   );
 
-  console.log('NEXA MapLibre E2E passed: pinned renderer bundle, same-origin worker, GeoJSON overlay, WebGL canvas and viewport callback.');
+  console.log('NEXA MapLibre E2E passed: pinned renderer, same-origin worker, in-place GeoJSON update, one canvas and viewport callback.');
 } catch (error) {
   const chromeErrors = runtime.errors();
   if (chromeErrors) console.error(chromeErrors);
