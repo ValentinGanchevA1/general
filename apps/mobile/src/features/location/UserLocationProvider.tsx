@@ -7,6 +7,7 @@ import { useNexaLaunchInteractionsReady } from '@/components/Brand/NexaLaunchSur
 
 import { NEXA_LOCATION_PERMISSION_COPY } from './locationPermissionCopy';
 import {
+  shouldRequestLocationPermission,
   statusFromAndroidPermissionCheck,
   type LocationPermissionStatus,
 } from './locationPermissionState';
@@ -56,6 +57,7 @@ export function UserLocationProvider({
     const onErr = (err: { code?: number }): void => {
       if (!enabledRef.current) return;
       if (err?.code === 1) {
+        stopTracking();
         setPermissionStatus('denied');
       }
     };
@@ -71,51 +73,67 @@ export function UserLocationProvider({
       onErr,
       { enableHighAccuracy: true, distanceFilter: 25 },
     );
-  }, []);
+  }, [stopTracking]);
 
-  const requestPermission = useCallback((): Promise<void> => {
-    // Native permission sheets interrupt the launch dissolve/handoff. Calls from
-    // already-mounted screens are retried automatically because this callback
-    // identity changes only when auth or the one-shot interaction gate changes.
-    if (!enabled || !launchInteractionsReady) return Promise.resolve();
+  const performPermissionRequest = useCallback(
+    (explicitRetry: boolean): Promise<void> => {
+      // Native permission sheets interrupt the launch dissolve/handoff. Automatic
+      // callers may request once while status is unknown, but only direct user
+      // recovery may reopen native UI after an explicit denial.
+      if (!enabled || !launchInteractionsReady) return Promise.resolve();
+      if (!shouldRequestLocationPermission(permissionStatus, explicitRetry)) {
+        return Promise.resolve();
+      }
 
-    const inFlight = permissionRequestRef.current;
-    if (inFlight !== null) return inFlight;
+      const inFlight = permissionRequestRef.current;
+      if (inFlight !== null) return inFlight;
 
-    const request = (async (): Promise<void> => {
-      try {
-        if (Platform.OS === 'android') {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-            NEXA_LOCATION_PERMISSION_COPY,
-          );
-          if (!enabledRef.current) return;
-          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-            setPermissionStatus('denied');
-            return;
+      const request = (async (): Promise<void> => {
+        try {
+          if (Platform.OS === 'android') {
+            const granted = await PermissionsAndroid.request(
+              PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+              NEXA_LOCATION_PERMISSION_COPY,
+            );
+            if (!enabledRef.current) return;
+            if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+              setPermissionStatus('denied');
+              return;
+            }
+            setPermissionStatus('granted');
+          } else {
+            Geolocation.requestAuthorization();
           }
-          setPermissionStatus('granted');
-        } else {
-          Geolocation.requestAuthorization();
+
+          startTracking();
+        } catch {
+          // A native bridge failure is not an explicit user denial. Keep the
+          // permission state retryable and avoid rejecting fire-and-forget callers.
+          if (enabledRef.current) setPermissionStatus('unknown');
         }
+      })();
 
-        startTracking();
-      } catch {
-        // A native bridge failure is not an explicit user denial. Keep the
-        // permission state retryable and avoid rejecting fire-and-forget callers.
-        if (enabledRef.current) setPermissionStatus('unknown');
-      }
-    })();
+      permissionRequestRef.current = request;
+      const clearInFlight = (): void => {
+        if (permissionRequestRef.current === request) {
+          permissionRequestRef.current = null;
+        }
+      };
+      void request.then(clearInFlight, clearInFlight);
+      return request;
+    },
+    [enabled, launchInteractionsReady, permissionStatus, startTracking],
+  );
 
-    permissionRequestRef.current = request;
-    const clearInFlight = (): void => {
-      if (permissionRequestRef.current === request) {
-        permissionRequestRef.current = null;
-      }
-    };
-    void request.then(clearInFlight, clearInFlight);
-    return request;
-  }, [enabled, launchInteractionsReady, startTracking]);
+  const requestPermission = useCallback(
+    (): Promise<void> => performPermissionRequest(false),
+    [performPermissionRequest],
+  );
+
+  const retryPermission = useCallback(
+    (): Promise<void> => performPermissionRequest(true),
+    [performPermissionRequest],
+  );
 
   // Keep async native callbacks aware of the current auth-session state without
   // reading or writing refs during render. Session-bound remounting resets the
@@ -161,8 +179,9 @@ export function UserLocationProvider({
       permissionDenied: permissionStatus === 'denied',
       permissionStatus,
       requestPermission,
+      retryPermission,
     }),
-    [coords, permissionStatus, requestPermission],
+    [coords, permissionStatus, requestPermission, retryPermission],
   );
 
   return (
