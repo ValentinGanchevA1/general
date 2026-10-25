@@ -13,6 +13,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
         mapSurfaceWaitExpired: false,
         spatialHandoffUsed: true,
         reducedMotion: false,
+        interrupted: false,
       }),
     ).toEqual({
       path: 'map',
@@ -23,6 +24,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
       mapReadyFailOpen: false,
       spatialHandoffUsed: true,
       reducedMotion: false,
+      interrupted: false,
     });
   });
 
@@ -38,6 +40,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
         mapSurfaceWaitExpired: true,
         spatialHandoffUsed: false,
         reducedMotion: true,
+        interrupted: false,
       }),
     ).toEqual({
       path: 'map',
@@ -48,6 +51,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
       mapReadyFailOpen: true,
       spatialHandoffUsed: false,
       reducedMotion: true,
+      interrupted: false,
     });
   });
 
@@ -63,6 +67,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
         mapSurfaceWaitExpired: true,
         spatialHandoffUsed: true,
         reducedMotion: false,
+        interrupted: false,
       }),
     ).toEqual({
       path: 'map',
@@ -73,6 +78,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
       mapReadyFailOpen: true,
       spatialHandoffUsed: true,
       reducedMotion: false,
+      interrupted: false,
     });
   });
 
@@ -88,6 +94,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
         mapSurfaceWaitExpired: true,
         spatialHandoffUsed: true,
         reducedMotion: null,
+        interrupted: false,
       }),
     ).toEqual({
       path: 'non_map',
@@ -98,6 +105,28 @@ describe('buildNexaLaunchTelemetryProps', () => {
       mapReadyFailOpen: false,
       spatialHandoffUsed: false,
       reducedMotion: null,
+      interrupted: false,
+    });
+  });
+
+  it('preserves foreground interruption state for calibration filtering', () => {
+    expect(
+      buildNexaLaunchTelemetryProps({
+        startedAtMs: 1_000,
+        completedAtMs: 8_000,
+        authReadyAtMs: 1_150,
+        mapReadyAtMs: 1_400,
+        overlayHiddenAtMs: 7_700,
+        requiresMapSurface: true,
+        mapSurfaceWaitExpired: false,
+        spatialHandoffUsed: true,
+        reducedMotion: false,
+        interrupted: true,
+      }),
+    ).toMatchObject({
+      path: 'map',
+      totalMs: 7_000,
+      interrupted: true,
     });
   });
 
@@ -113,6 +142,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
         mapSurfaceWaitExpired: false,
         spatialHandoffUsed: false,
         reducedMotion: false,
+        interrupted: false,
       }),
     ).toEqual({
       path: 'non_map',
@@ -123,6 +153,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
       mapReadyFailOpen: false,
       spatialHandoffUsed: false,
       reducedMotion: false,
+      interrupted: false,
     });
   });
 });

@@ -24,6 +24,7 @@ describe('recordNexaLaunchPerformance', () => {
       mapReadyFailOpen: false,
       spatialHandoffUsed: true,
       reducedMotion: false,
+      interrupted: false,
     });
 
     expect(startInactiveSpan).toHaveBeenCalledWith({
@@ -35,6 +36,7 @@ describe('recordNexaLaunchPerformance', () => {
         'nexa.launch.total_ms': 1_650,
         'nexa.launch.map_ready_fail_open': false,
         'nexa.launch.spatial_handoff_used': true,
+        'nexa.launch.interrupted': false,
         'nexa.launch.auth_ready_ms': 180,
         'nexa.launch.map_ready_ms': 520,
         'nexa.launch.overlay_hidden_ms': 1_080,
@@ -42,6 +44,37 @@ describe('recordNexaLaunchPerformance', () => {
       },
     });
     expect(end).toHaveBeenCalledWith(2.65);
+  });
+
+  it('routes background-interrupted launches away from the normal ui.load stream', () => {
+    const end = jest.fn();
+    const startInactiveSpan = jest
+      .spyOn(Sentry, 'startInactiveSpan')
+      .mockReturnValue({ end } as never);
+
+    recordNexaLaunchPerformance({
+      startedAtMs: 1_000,
+      completedAtMs: 9_000,
+      path: 'map',
+      totalMs: 8_000,
+      authReadyMs: 150,
+      mapReadyMs: 500,
+      overlayHiddenMs: 7_700,
+      mapReadyFailOpen: false,
+      spatialHandoffUsed: true,
+      reducedMotion: false,
+      interrupted: true,
+    });
+
+    expect(startInactiveSpan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        op: 'ui.load.interrupted',
+        attributes: expect.objectContaining({
+          'nexa.launch.interrupted': true,
+        }),
+      }),
+    );
+    expect(end).toHaveBeenCalledWith(9);
   });
 
   it('omits nullable phase attributes when they were not observed', () => {
@@ -61,6 +94,7 @@ describe('recordNexaLaunchPerformance', () => {
       mapReadyFailOpen: false,
       spatialHandoffUsed: false,
       reducedMotion: null,
+      interrupted: false,
     });
 
     expect(startInactiveSpan).toHaveBeenCalledWith({
@@ -72,6 +106,7 @@ describe('recordNexaLaunchPerformance', () => {
         'nexa.launch.total_ms': 800,
         'nexa.launch.map_ready_fail_open': false,
         'nexa.launch.spatial_handoff_used': false,
+        'nexa.launch.interrupted': false,
       },
     });
     expect(end).toHaveBeenCalledWith(5.8);

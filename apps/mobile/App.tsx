@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import React from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
+import { AppState, StatusBar, StyleSheet, View } from 'react-native';
 import { Provider } from 'react-redux';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -68,6 +68,7 @@ function AppShell(): React.JSX.Element {
   const overlayHiddenAtRef = React.useRef<number | null>(null);
   const launchReduceMotionRef = React.useRef<boolean | null>(null);
   const launchTelemetrySentRef = React.useRef(false);
+  const launchInterruptedRef = React.useRef(AppState.currentState !== 'active');
 
   const requiresMapSurface = React.useMemo(
     () =>
@@ -83,6 +84,15 @@ function AppShell(): React.JSX.Element {
       authReadyAtRef.current = Date.now();
     }
   }, [restoring]);
+
+  React.useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (!launchTelemetrySentRef.current && nextState !== 'active') {
+        launchInterruptedRef.current = true;
+      }
+    });
+    return () => subscription.remove();
+  }, []);
 
   React.useEffect(() => {
     if (restoring || !requiresMapSurface || mapSurfaceReady) return;
@@ -115,6 +125,7 @@ function AppShell(): React.JSX.Element {
         mapSurfaceWaitExpired,
         spatialHandoffUsed,
         reducedMotion: launchReduceMotionRef.current,
+        interrupted: launchInterruptedRef.current,
       });
 
       track('nexa_launch_complete', telemetry);
@@ -129,6 +140,7 @@ function AppShell(): React.JSX.Element {
         mapReadyFailOpen: telemetry.mapReadyFailOpen,
         spatialHandoffUsed: telemetry.spatialHandoffUsed,
         reducedMotion: telemetry.reducedMotion,
+        interrupted: telemetry.interrupted,
       });
     },
     [launchStartedAtMs, mapSurfaceWaitExpired, requiresMapSurface],
