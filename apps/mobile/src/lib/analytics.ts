@@ -73,6 +73,13 @@ function normalizeApiPath(url: string | undefined): string {
     .replace(/^\/api\/v1/, '');
 }
 
+function entityTypeFromDetailPath(path: string): 'person' | 'event' | 'listing' | null {
+  if (/^\/users\/[^/]+$/.test(path)) return 'person';
+  if (/^\/events\/[^/]+$/.test(path)) return 'event';
+  if (/^\/listings\/[^/]+$/.test(path)) return 'listing';
+  return null;
+}
+
 export function sanitizeProductAnalyticsProperties(
   event: ProductAnalyticsEventName,
   props: AnalyticsProps = {},
@@ -125,6 +132,13 @@ export function productEventsForApiSuccess(
   const verb = method?.toLowerCase() ?? '';
   const path = normalizeApiPath(url);
 
+  if (verb === 'get') {
+    const entityType = entityTypeFromDetailPath(path);
+    if (entityType) {
+      return [{ event: 'entity.opened', properties: { entityType } }];
+    }
+  }
+
   if (verb === 'post' && path === '/interactions/wave') {
     const response = asRecord(data);
     const mutual = response && Object.prototype.hasOwnProperty.call(response, 'conversationId')
@@ -140,6 +154,17 @@ export function productEventsForApiSuccess(
       events.push({ event: 'connection.created', properties: { mechanism: 'wave' } });
     }
     return events;
+  }
+
+  if (verb === 'post' && /^\/friends\/requests\/[^/]+\/accept$/.test(path)) {
+    return [{ event: 'connection.created', properties: { mechanism: 'friend' } }];
+  }
+
+  if (verb === 'post' && path === '/dating/likes') {
+    const response = asRecord(data);
+    return response?.matched === true
+      ? [{ event: 'connection.created', properties: { mechanism: 'dating' } }]
+      : [];
   }
 
   if (verb === 'put' && /^\/events\/[^/]+\/rsvp$/.test(path)) {
