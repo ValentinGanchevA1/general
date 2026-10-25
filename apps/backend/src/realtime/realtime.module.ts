@@ -9,6 +9,7 @@ import { ChatModule } from '../modules/chat/chat.module';
 import { NotificationsModule } from '../modules/notifications/notifications.module';
 import { ChallengesModule } from '../modules/challenges/challenges.module';
 import { FriendsModule } from '../modules/friends/friends.module';
+import { DiscoveryModule } from '../modules/discovery/discovery.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { FriendsModule } from '../modules/friends/friends.module';
     AuthModule,
     ChatModule,
     NotificationsModule,
+    DiscoveryModule,
     forwardRef(() => ChallengesModule),
     // Bidirectional: FriendsNotifyService → RealtimeGateway; gateway → FriendsService (presence).
     forwardRef(() => FriendsModule),
