@@ -132,9 +132,11 @@ export class IdVerificationService {
       if (idBackKey) uploadedKeys.push(idBackKey);
 
       // Assist-only: never blocks submit; scores inform admin review.
+      // Send the already-validated payload bytes to Rekognition so its region
+      // can remain independent from the private S3 storage region.
       const analysis = await this.rekognitionService.analyzeVerification(
-        selfieKey,
-        idFrontKey,
+        dto.selfie,
+        dto.idFront,
       );
 
       verificationId = await this.db.transaction(async (manager) => {
