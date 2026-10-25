@@ -34,6 +34,7 @@ export function UserLocationProvider({
   const [permissionStatus, setPermissionStatus] =
     useState<LocationPermissionStatus>('unknown');
   const watchId = useRef<number | null>(null);
+  const permissionRequestRef = useRef<Promise<void> | null>(null);
   const enabledRef = useRef(enabled);
   const launchInteractionsReady = useNexaLaunchInteractionsReady();
   enabledRef.current = enabled;
@@ -73,28 +74,41 @@ export function UserLocationProvider({
     );
   }, []);
 
-  const requestPermission = useCallback(async (): Promise<void> => {
+  const requestPermission = useCallback((): Promise<void> => {
     // Native permission sheets interrupt the launch dissolve/handoff. Calls from
     // already-mounted screens are retried automatically because this callback
     // identity changes only when auth or the one-shot interaction gate changes.
-    if (!enabled || !launchInteractionsReady) return;
+    if (!enabled || !launchInteractionsReady) return Promise.resolve();
 
-    if (Platform.OS === 'android') {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        NEXA_LOCATION_PERMISSION_COPY,
-      );
-      if (!enabledRef.current) return;
-      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        setPermissionStatus('denied');
-        return;
+    const inFlight = permissionRequestRef.current;
+    if (inFlight !== null) return inFlight;
+
+    const request = (async (): Promise<void> => {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          NEXA_LOCATION_PERMISSION_COPY,
+        );
+        if (!enabledRef.current) return;
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          setPermissionStatus('denied');
+          return;
+        }
+        setPermissionStatus('granted');
+      } else {
+        Geolocation.requestAuthorization();
       }
-      setPermissionStatus('granted');
-    } else {
-      Geolocation.requestAuthorization();
-    }
 
-    startTracking();
+      startTracking();
+    })();
+
+    permissionRequestRef.current = request;
+    void request.finally(() => {
+      if (permissionRequestRef.current === request) {
+        permissionRequestRef.current = null;
+      }
+    });
+    return request;
   }, [enabled, launchInteractionsReady, startTracking]);
 
   // Warm path: already-granted Android permission can start GPS beneath the
