@@ -11,6 +11,7 @@ import { scrubSentryPayload } from '@g88/shared';
 import { store } from '@/store';
 import { AppNavigator } from '@/navigation/AppNavigator';
 import { Config } from '@/config';
+import { track } from '@/lib/analytics';
 import {
   navigationIntegration,
   resolveSentryDist,
@@ -26,6 +27,7 @@ import {
   NEXA_MAP_SURFACE_READY_FAIL_OPEN_MS,
   resolveNexaLaunchReady,
 } from '@/components/Brand/nexaLaunchReadiness';
+import { buildNexaLaunchTelemetryProps } from '@/components/Brand/nexaLaunchTelemetry';
 import { UserLocationProvider } from '@/features/location/UserLocationProvider';
 
 Sentry.init({
@@ -54,6 +56,14 @@ function AppShell(): React.JSX.Element {
   const [launchInteractionsReady, setLaunchInteractionsReady] = React.useState(false);
   const [mapSurfaceReady, setMapSurfaceReady] = React.useState(false);
   const [mapSurfaceWaitExpired, setMapSurfaceWaitExpired] = React.useState(false);
+  const [launchStartedAtMs] = React.useState(() => Date.now());
+
+  const authReadyAtRef = React.useRef<number | null>(
+    restoring ? null : launchStartedAtMs,
+  );
+  const mapReadyAtRef = React.useRef<number | null>(null);
+  const overlayHiddenAtRef = React.useRef<number | null>(null);
+  const launchTelemetrySentRef = React.useRef(false);
 
   const requiresMapSurface = React.useMemo(
     () =>
@@ -63,6 +73,12 @@ function AppShell(): React.JSX.Element {
       }),
     [profileSetupComplete, user],
   );
+
+  React.useEffect(() => {
+    if (!restoring && authReadyAtRef.current === null) {
+      authReadyAtRef.current = Date.now();
+    }
+  }, [restoring]);
 
   React.useEffect(() => {
     if (restoring || !requiresMapSurface || mapSurfaceReady) return;
@@ -80,23 +96,54 @@ function AppShell(): React.JSX.Element {
     mapSurfaceWaitExpired,
   });
 
+  const recordLaunchComplete = React.useCallback(
+    (completedAtMs: number): void => {
+      if (launchTelemetrySentRef.current) return;
+      launchTelemetrySentRef.current = true;
+
+      track(
+        'nexa_launch_complete',
+        buildNexaLaunchTelemetryProps({
+          startedAtMs: launchStartedAtMs,
+          completedAtMs,
+          authReadyAtMs: authReadyAtRef.current,
+          mapReadyAtMs: mapReadyAtRef.current,
+          overlayHiddenAtMs: overlayHiddenAtRef.current,
+          requiresMapSurface,
+          mapSurfaceWaitExpired,
+        }),
+      );
+    },
+    [launchStartedAtMs, mapSurfaceWaitExpired, requiresMapSurface],
+  );
+
   const handleMapSurfaceReady = React.useCallback((): void => {
+    if (mapReadyAtRef.current === null) {
+      mapReadyAtRef.current = Date.now();
+    }
     setMapSurfaceReady(true);
   }, []);
 
   const handleLaunchHidden = React.useCallback((): void => {
+    const hiddenAtMs = Date.now();
+    if (overlayHiddenAtRef.current === null) {
+      overlayHiddenAtRef.current = hiddenAtMs;
+    }
+
     if (requiresMapSurface) {
       setShowSpatialHandoff(true);
       return;
     }
     setShowSpatialHandoff(false);
     setLaunchInteractionsReady(true);
-  }, [requiresMapSurface]);
+    recordLaunchComplete(hiddenAtMs);
+  }, [recordLaunchComplete, requiresMapSurface]);
 
   const handleSpatialHandoffComplete = React.useCallback((): void => {
     setShowSpatialHandoff(false);
     setLaunchInteractionsReady(true);
-  }, []);
+    recordLaunchComplete(Date.now());
+  }, [recordLaunchComplete]);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.bg }]}>
