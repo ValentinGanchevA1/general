@@ -6,9 +6,10 @@ import { RekognitionService } from './rekognition.service';
 import { IdVerificationGateway } from './gateways/id-verification.gateway';
 import { S3Service } from '../../common/s3.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [NotificationsModule],
+  imports: [NotificationsModule, AuthModule],
   controllers: [IdVerificationController, AdminIdVerificationController],
   providers: [
     IdVerificationService,

@@ -1,16 +1,28 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
 import type { IdVerificationStatus } from '@g88/shared';
 import { S3Service } from '../../common/s3.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { SubmitIdVerificationDto } from './dto/submit-id-verification.dto';
+import {
+  SubmitIdVerificationDto,
+  VERIFICATION_IMAGE_CONTENT_TYPES,
+} from './dto/submit-id-verification.dto';
 import { DecideIdVerificationDto } from './dto/decide-id-verification.dto';
 import { ListPendingVerificationsDto } from './dto/list-pending-verifications.dto';
 import { ListPendingResponseDto } from './dto/list-pending-response.dto';
 import { AdminVerificationDetailDto } from './dto/admin-verification-detail.dto';
-import { RekognitionService } from './rekognition.service';
+import {
+  RekognitionService,
+  type RekognitionReadiness,
+} from './rekognition.service';
 import { IdVerificationGateway } from './gateways/id-verification.gateway';
 
 interface UserRow {
@@ -40,10 +52,38 @@ interface VerificationRow {
   rekognition_at: string | null;
 }
 
+interface LatestDecisionRow {
+  id: string;
+  status: 'pending' | 'verified' | 'rejected';
+}
+
+export interface TrustOpsReadiness {
+  ready: boolean;
+  checks: {
+    adminUsersConfigured: boolean;
+    adminUserCount: number;
+    s3BucketConfigured: boolean;
+    awsRegionConfigured: boolean;
+    rekognition: RekognitionReadiness;
+    verificationReadUrlTtlSeconds: number;
+    accountDeletionPurgesVerificationObjects: true;
+  };
+  issues: string[];
+}
+
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const VERIFICATION_READ_URL_TTL_SECONDS = 300;
+const ALLOWED_IMAGE_CONTENT_TYPES: readonly string[] = VERIFICATION_IMAGE_CONTENT_TYPES;
+
+function isPostgresUniqueViolation(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return false;
+  return (error as { code?: unknown }).code === '23505';
+}
 
 @Injectable()
 export class IdVerificationService {
+  private readonly logger = new Logger(IdVerificationService.name);
+
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly s3Service: S3Service,
@@ -60,55 +100,97 @@ export class IdVerificationService {
   async submitVerification(userId: string, dto: SubmitIdVerificationDto) {
     await this.requireEligible(userId);
 
-    const selfieKey = await this.uploadImage(userId, 'selfie', dto.selfie, dto.selfieContentType);
-    const idFrontKey = await this.uploadImage(userId, 'id-front', dto.idFront, dto.idFrontContentType);
-    const idBackKey =
-      dto.idBack !== undefined
-        ? await this.uploadImage(userId, 'id-back', dto.idBack, dto.idBackContentType ?? 'image/jpeg')
-        : null;
+    const uploadedKeys: string[] = [];
+    let verificationId: string | undefined;
 
-    // Assist-only: never blocks submit; scores inform admin review.
-    const analysis = await this.rekognitionService.analyzeVerification(selfieKey, idFrontKey);
-
-    const inserted = await this.db.query<{ id: string }[]>(
-      `INSERT INTO user_id_verifications (
-         user_id, selfie_url, id_front_url, id_back_url, status,
-         face_similarity, selfie_face_count, id_front_face_count,
-         selfie_face_confidence, id_front_face_confidence,
-         rekognition_status, rekognition_error, rekognition_at
-       ) VALUES (
-         $1, $2, $3, $4, 'pending',
-         $5, $6, $7, $8, $9, $10, $11, now()
-       )
-       RETURNING id`,
-      [
+    try {
+      const selfieKey = await this.uploadImage(
         userId,
-        selfieKey,
-        idFrontKey,
-        idBackKey,
-        analysis.faceSimilarity,
-        analysis.selfieFaceCount,
-        analysis.idFrontFaceCount,
-        analysis.selfieFaceConfidence,
-        analysis.idFrontFaceConfidence,
-        analysis.status,
-        analysis.error,
-      ],
-    );
+        'selfie',
+        dto.selfie,
+        dto.selfieContentType,
+      );
+      uploadedKeys.push(selfieKey);
 
-    await this.db.query(
-      `UPDATE users SET id_verification_status = 'pending' WHERE id = $1`,
-      [userId],
-    );
-
-    const verificationId = inserted[0]?.id;
-    if (verificationId) {
-      this.verificationGateway.emitVerificationUpdate({
-        id: verificationId,
+      const idFrontKey = await this.uploadImage(
         userId,
-        status: 'pending',
+        'id-front',
+        dto.idFront,
+        dto.idFrontContentType,
+      );
+      uploadedKeys.push(idFrontKey);
+
+      const idBackKey =
+        dto.idBack !== undefined
+          ? await this.uploadImage(
+              userId,
+              'id-back',
+              dto.idBack,
+              dto.idBackContentType ?? 'image/jpeg',
+            )
+          : null;
+      if (idBackKey) uploadedKeys.push(idBackKey);
+
+      // Assist-only: never blocks submit; scores inform admin review.
+      // Send the already-validated payload bytes to Rekognition so its region
+      // can remain independent from the private S3 storage region.
+      const analysis = await this.rekognitionService.analyzeVerification(
+        dto.selfie,
+        dto.idFront,
+      );
+
+      verificationId = await this.db.transaction(async (manager) => {
+        const inserted = await manager.query<{ id: string }[]>(
+          `INSERT INTO user_id_verifications (
+             user_id, selfie_url, id_front_url, id_back_url, status,
+             face_similarity, selfie_face_count, id_front_face_count,
+             selfie_face_confidence, id_front_face_confidence,
+             rekognition_status, rekognition_error, rekognition_at
+           ) VALUES (
+             $1, $2, $3, $4, 'pending',
+             $5, $6, $7, $8, $9, $10, $11, now()
+           )
+           RETURNING id`,
+          [
+            userId,
+            selfieKey,
+            idFrontKey,
+            idBackKey,
+            analysis.faceSimilarity,
+            analysis.selfieFaceCount,
+            analysis.idFrontFaceCount,
+            analysis.selfieFaceConfidence,
+            analysis.idFrontFaceConfidence,
+            analysis.status,
+            analysis.error,
+          ],
+        );
+
+        const insertedId = inserted[0]?.id;
+        if (!insertedId) {
+          throw new Error('ID verification insert did not return an id');
+        }
+
+        await manager.query(
+          `UPDATE users SET id_verification_status = 'pending' WHERE id = $1`,
+          [userId],
+        );
+
+        return insertedId;
       });
+    } catch (error) {
+      await this.cleanupUploadedVerificationMedia(uploadedKeys);
+      if (isPostgresUniqueViolation(error)) {
+        throw new BadRequestException('Verification already pending review');
+      }
+      throw error;
     }
+
+    this.verificationGateway.emitVerificationUpdate({
+      id: verificationId,
+      userId,
+      status: 'pending',
+    });
 
     return { status: 'pending' as const, verificationId };
   }
@@ -126,13 +208,54 @@ export class IdVerificationService {
     };
   }
 
+  getOperationalReadiness(): TrustOpsReadiness {
+    const adminUserCount = (process.env.ADMIN_USER_IDS ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean).length;
+    const s3BucketConfigured = Boolean(process.env.AWS_S3_BUCKET?.trim());
+    const awsRegionConfigured = Boolean(process.env.AWS_REGION?.trim());
+    const rekognition = this.rekognitionService.getReadiness();
+    const issues: string[] = [];
+
+    if (adminUserCount === 0) issues.push('ADMIN_USER_IDS is not configured');
+    if (!s3BucketConfigured) issues.push('AWS_S3_BUCKET is not configured');
+    if (!awsRegionConfigured) issues.push('AWS_REGION is not explicitly configured');
+    if (rekognition.status !== 'ready') {
+      issues.push(rekognition.issue ?? 'Rekognition is not ready');
+    }
+
+    return {
+      ready: issues.length === 0,
+      checks: {
+        adminUsersConfigured: adminUserCount > 0,
+        adminUserCount,
+        s3BucketConfigured,
+        awsRegionConfigured,
+        rekognition,
+        verificationReadUrlTtlSeconds: VERIFICATION_READ_URL_TTL_SECONDS,
+        accountDeletionPurgesVerificationObjects: true,
+      },
+      issues,
+    };
+  }
+
+  /**
+   * Durable admin command. This method remains strict: once the pending row has
+   * already been consumed it throws. HTTP/admin callers should use the idempotent
+   * wrapper below so retries do not create duplicate side effects.
+   */
   async decideVerification(
     adminId: string,
     targetUserId: string,
     dto: DecideIdVerificationDto,
   ) {
     const newStatus = dto.decision === 'approved' ? 'verified' : 'rejected';
-    const rejectionReason = dto.decision === 'rejected' ? dto.reason ?? null : null;
+    const trimmedReason = dto.reason?.trim();
+    if (dto.decision === 'rejected' && !trimmedReason) {
+      throw new BadRequestException('A rejection reason is required');
+    }
+    const rejectionReason = dto.decision === 'rejected' ? trimmedReason ?? null : null;
 
     // Atomic conditional update: prevents double-process race between two admins.
     // Notification stays outside the transaction (side-effect convention).
@@ -194,7 +317,7 @@ export class IdVerificationService {
     await this.notificationsService.notifyIdVerificationDecided(
       targetUserId,
       newStatus as 'verified' | 'rejected',
-      dto.decision === 'rejected' ? dto.reason : undefined,
+      dto.decision === 'rejected' ? trimmedReason : undefined,
     );
 
     this.verificationGateway.emitVerificationUpdate({
@@ -206,7 +329,46 @@ export class IdVerificationService {
     return { status: newStatus, verificationId: result };
   }
 
-  async listPendingVerifications(query: ListPendingVerificationsDto): Promise<ListPendingResponseDto> {
+  /**
+   * Retry-safe admin surface. Repeating the same final decision returns the
+   * existing result without emitting a second notification/socket update.
+   * A contradictory retry is a 409 conflict rather than silently overwriting audit state.
+   */
+  async decideVerificationIdempotent(
+    adminId: string,
+    targetUserId: string,
+    dto: DecideIdVerificationDto,
+  ) {
+    const desiredStatus = dto.decision === 'approved' ? 'verified' : 'rejected';
+
+    try {
+      return await this.decideVerification(adminId, targetUserId, dto);
+    } catch (error) {
+      if (!(error instanceof BadRequestException)) throw error;
+
+      const rows = await this.db.query<LatestDecisionRow[]>(
+        `SELECT id, status FROM user_id_verifications
+         WHERE user_id = $1
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [targetUserId],
+      );
+      const latest = rows[0];
+      if (!latest || latest.status === 'pending') throw error;
+
+      if (latest.status === desiredStatus) {
+        return { status: desiredStatus, verificationId: latest.id };
+      }
+
+      throw new ConflictException(
+        `Submission already ${latest.status}; cannot apply ${desiredStatus}`,
+      );
+    }
+  }
+
+  async listPendingVerifications(
+    query: ListPendingVerificationsDto,
+  ): Promise<ListPendingResponseDto> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const offset = (page - 1) * limit;
@@ -236,7 +398,9 @@ export class IdVerificationService {
     };
   }
 
-  async getVerificationDetail(targetUserId: string): Promise<AdminVerificationDetailDto> {
+  async getVerificationDetail(
+    targetUserId: string,
+  ): Promise<AdminVerificationDetailDto> {
     const rows = await this.db.query<VerificationRow[]>(
       `SELECT id, user_id, status, selfie_url, id_front_url, id_back_url,
               created_at, reviewed_by, reviewed_at, rejection_reason,
@@ -255,7 +419,9 @@ export class IdVerificationService {
     const [selfieUrl, idFrontUrl, idBackUrl] = await Promise.all([
       this.s3Service.verificationReadUrl(row.selfie_url),
       this.s3Service.verificationReadUrl(row.id_front_url),
-      row.id_back_url ? this.s3Service.verificationReadUrl(row.id_back_url) : Promise.resolve(null),
+      row.id_back_url
+        ? this.s3Service.verificationReadUrl(row.id_back_url)
+        : Promise.resolve(null),
     ]);
 
     return {
@@ -274,7 +440,8 @@ export class IdVerificationService {
       idFrontFaceCount: row.id_front_face_count,
       selfieFaceConfidence: row.selfie_face_confidence,
       idFrontFaceConfidence: row.id_front_face_confidence,
-      rekognitionStatus: (row.rekognition_status ?? 'skipped') as AdminVerificationDetailDto['rekognitionStatus'],
+      rekognitionStatus: (row.rekognition_status ??
+        'skipped') as AdminVerificationDetailDto['rekognitionStatus'],
       rekognitionError: row.rekognition_error,
       rekognitionAt: row.rekognition_at,
     };
@@ -303,6 +470,10 @@ export class IdVerificationService {
     base64: string,
     contentType: string,
   ): Promise<string> {
+    if (!ALLOWED_IMAGE_CONTENT_TYPES.includes(contentType)) {
+      throw new BadRequestException(`${kind} has an unsupported content type`);
+    }
+
     const buffer = Buffer.from(base64, 'base64');
     if (buffer.length === 0) {
       throw new BadRequestException(`${kind} image is empty or not valid base64`);
@@ -310,6 +481,21 @@ export class IdVerificationService {
     if (buffer.length > MAX_IMAGE_BYTES) {
       throw new BadRequestException(`${kind} image exceeds the 10 MB limit`);
     }
-    return this.s3Service.uploadVerificationBuffer(userId, kind, buffer, contentType);
+    return this.s3Service.uploadVerificationBuffer(
+      userId,
+      kind,
+      buffer,
+      contentType,
+    );
+  }
+
+  private async cleanupUploadedVerificationMedia(keys: string[]): Promise<void> {
+    if (keys.length === 0) return;
+    try {
+      await this.s3Service.deleteObjectsByKeys(keys);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to clean orphaned verification media: ${message}`);
+    }
   }
 }

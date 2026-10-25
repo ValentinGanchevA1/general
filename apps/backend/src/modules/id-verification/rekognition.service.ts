@@ -22,6 +22,16 @@ export interface VerificationFaceAnalysis {
   error: string | null;
 }
 
+export interface RekognitionReadiness {
+  enabled: boolean;
+  configured: boolean;
+  region: string;
+  status: 'ready' | 'disabled' | 'misconfigured';
+  issue: string | null;
+}
+
+const DEFAULT_REKOGNITION_REGION = 'eu-central-1';
+
 const SKIPPED: VerificationFaceAnalysis = {
   status: 'skipped',
   faceSimilarity: null,
@@ -36,42 +46,91 @@ const SKIPPED: VerificationFaceAnalysis = {
 export class RekognitionService {
   private readonly logger = new Logger(RekognitionService.name);
   private readonly client: RekognitionClient | null;
-  private readonly bucket: string;
   private readonly enabled: boolean;
+  private readonly region: string;
+  private readonly regionExplicitlyConfigured: boolean;
 
   constructor() {
     this.enabled = process.env.REKOGNITION_ENABLED === 'true';
-    this.bucket = process.env.AWS_S3_BUCKET ?? '';
-    const region = process.env.AWS_REGION ?? 'eu-north-1';
-    this.client =
-      this.enabled && this.bucket
-        ? new RekognitionClient({ region })
-        : null;
+    const configuredRegion = process.env.AWS_REKOGNITION_REGION?.trim();
+    this.regionExplicitlyConfigured = Boolean(configuredRegion);
+    this.region = configuredRegion || DEFAULT_REKOGNITION_REGION;
+    this.client = this.enabled ? new RekognitionClient({ region: this.region }) : null;
+  }
+
+  getReadiness(): RekognitionReadiness {
+    if (!this.enabled) {
+      return {
+        enabled: false,
+        configured: false,
+        region: this.region,
+        status: 'disabled',
+        issue: 'REKOGNITION_ENABLED is not true',
+      };
+    }
+
+    if (!this.regionExplicitlyConfigured) {
+      return {
+        enabled: true,
+        configured: false,
+        region: this.region,
+        status: 'misconfigured',
+        issue: 'AWS_REKOGNITION_REGION is not explicitly configured',
+      };
+    }
+
+    // Production incident guard: eu-north-1 currently has no Rekognition endpoint.
+    // Keep storage AWS_REGION independent; verification analysis uses raw image bytes.
+    if (this.region === 'eu-north-1') {
+      return {
+        enabled: true,
+        configured: false,
+        region: this.region,
+        status: 'misconfigured',
+        issue: 'AWS_REKOGNITION_REGION eu-north-1 is unsupported; use eu-central-1 or another supported Rekognition region',
+      };
+    }
+
+    return {
+      enabled: true,
+      configured: true,
+      region: this.region,
+      status: 'ready',
+      issue: null,
+    };
   }
 
   /**
    * Assist-only: never throws to the caller. Fail-open → status error/skipped
    * so submit still lands as pending for human review.
+   *
+   * Images are sent as bytes rather than S3Object references. This deliberately
+   * decouples private verification storage from the Rekognition region: AWS
+   * requires S3Object buckets to be in the same region as Rekognition, while the
+   * existing verification bucket is in eu-north-1 where Rekognition is unavailable.
    */
   async analyzeVerification(
-    selfieKey: string,
-    idFrontKey: string,
+    selfieBase64: string,
+    idFrontBase64: string,
   ): Promise<VerificationFaceAnalysis> {
-    if (!this.client || !this.bucket) {
+    if (!this.client) {
       return SKIPPED;
     }
+
+    const selfieBytes = Buffer.from(selfieBase64, 'base64');
+    const idFrontBytes = Buffer.from(idFrontBase64, 'base64');
 
     try {
       const [selfieDetect, idDetect] = await Promise.all([
         this.client.send(
           new DetectFacesCommand({
-            Image: { S3Object: { Bucket: this.bucket, Name: selfieKey } },
+            Image: { Bytes: selfieBytes },
             Attributes: ['DEFAULT'],
           }),
         ),
         this.client.send(
           new DetectFacesCommand({
-            Image: { S3Object: { Bucket: this.bucket, Name: idFrontKey } },
+            Image: { Bytes: idFrontBytes },
             Attributes: ['DEFAULT'],
           }),
         ),
@@ -110,15 +169,13 @@ export class RekognitionService {
       // SimilarityThreshold 0 → always return the best score for the admin UI.
       const compare = await this.client.send(
         new CompareFacesCommand({
-          SourceImage: { S3Object: { Bucket: this.bucket, Name: selfieKey } },
-          TargetImage: { S3Object: { Bucket: this.bucket, Name: idFrontKey } },
+          SourceImage: { Bytes: selfieBytes },
+          TargetImage: { Bytes: idFrontBytes },
           SimilarityThreshold: 0,
         }),
       );
 
-      const best = (compare.FaceMatches ?? []).reduce<
-        number | null
-      >((acc, m) => {
+      const best = (compare.FaceMatches ?? []).reduce<number | null>((acc, m) => {
         const s = m.Similarity;
         if (s === undefined) return acc;
         return acc === null ? s : Math.max(acc, s);
@@ -135,6 +192,7 @@ export class RekognitionService {
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      const safeError = err instanceof Error && err.name ? err.name : 'RekognitionError';
       this.logger.warn(`Rekognition analyze failed: ${message}`);
       return {
         status: 'error',
@@ -143,7 +201,7 @@ export class RekognitionService {
         idFrontFaceCount: null,
         selfieFaceConfidence: null,
         idFrontFaceConfidence: null,
-        error: message.slice(0, 500),
+        error: safeError.slice(0, 120),
       };
     }
   }

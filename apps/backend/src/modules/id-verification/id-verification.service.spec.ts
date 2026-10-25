@@ -5,6 +5,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 import { IdVerificationService } from './id-verification.service';
+import type { SubmitIdVerificationDto } from './dto/submit-id-verification.dto';
 import { S3Service } from '../../common/s3.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RekognitionService } from './rekognition.service';
@@ -66,7 +67,7 @@ describe('IdVerificationService', () => {
   });
 
   describe('submitVerification', () => {
-    const payload = {
+    const payload: SubmitIdVerificationDto = {
       selfie: B64,
       selfieContentType: 'image/png',
       idFront: B64,
@@ -83,10 +84,7 @@ describe('IdVerificationService', () => {
       expect(res).toEqual({ status: 'pending', verificationId: 'v-new' });
 
       expect(uploadVerificationBuffer).toHaveBeenCalledTimes(2);
-      expect(analyzeVerification).toHaveBeenCalledWith(
-        'verifications/u1/selfie-uuid.jpg',
-        'verifications/u1/id-front-uuid.jpg',
-      );
+      expect(analyzeVerification).toHaveBeenCalledWith(payload.selfie, payload.idFront);
 
       const insertParams = query.mock.calls[1]![1] as unknown[];
       expect(insertParams).toEqual([
