@@ -11,6 +11,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
         overlayHiddenAtMs: 2_080,
         requiresMapSurface: true,
         mapSurfaceWaitExpired: false,
+        reducedMotion: false,
       }),
     ).toEqual({
       path: 'map',
@@ -19,10 +20,11 @@ describe('buildNexaLaunchTelemetryProps', () => {
       mapReadyMs: 520,
       overlayHiddenMs: 1_080,
       mapReadyFailOpen: false,
+      reducedMotion: false,
     });
   });
 
-  it('marks map fail-open and keeps map readiness nullable', () => {
+  it('marks map fail-open and preserves Reduced Motion segmentation', () => {
     expect(
       buildNexaLaunchTelemetryProps({
         startedAtMs: 10_000,
@@ -32,6 +34,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
         overlayHiddenAtMs: 11_400,
         requiresMapSurface: true,
         mapSurfaceWaitExpired: true,
+        reducedMotion: true,
       }),
     ).toEqual({
       path: 'map',
@@ -40,6 +43,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
       mapReadyMs: null,
       overlayHiddenMs: 1_400,
       mapReadyFailOpen: true,
+      reducedMotion: true,
     });
   });
 
@@ -53,6 +57,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
         overlayHiddenAtMs: 1_050,
         requiresMapSurface: false,
         mapSurfaceWaitExpired: true,
+        reducedMotion: null,
       }),
     ).toEqual({
       path: 'non_map',
@@ -61,6 +66,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
       mapReadyMs: null,
       overlayHiddenMs: 550,
       mapReadyFailOpen: false,
+      reducedMotion: null,
     });
   });
 
@@ -74,6 +80,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
         overlayHiddenAtMs: null,
         requiresMapSurface: false,
         mapSurfaceWaitExpired: false,
+        reducedMotion: false,
       }),
     ).toEqual({
       path: 'non_map',
@@ -82,6 +89,7 @@ describe('buildNexaLaunchTelemetryProps', () => {
       mapReadyMs: null,
       overlayHiddenMs: null,
       mapReadyFailOpen: false,
+      reducedMotion: false,
     });
   });
 });
