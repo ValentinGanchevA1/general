@@ -17,31 +17,44 @@ import {
 
 interface UserLocationProviderProps {
   children: React.ReactNode;
+  /** Location is only active for an authenticated app session. */
+  enabled: boolean;
 }
 
 /**
- * Owns the single native GPS watcher for the mounted application. Every
+ * Owns the single native GPS watcher for the authenticated application. Every
  * useUserLocation() consumer reads this shared state instead of creating its own
  * getCurrentPosition/watchPosition pair.
  */
 export function UserLocationProvider({
   children,
+  enabled,
 }: UserLocationProviderProps): React.JSX.Element {
   const [coords, setCoords] = useState<LatLng | null>(null);
   const [permissionStatus, setPermissionStatus] =
     useState<LocationPermissionStatus>('unknown');
   const watchId = useRef<number | null>(null);
+  const enabledRef = useRef(enabled);
   const launchInteractionsReady = useNexaLaunchInteractionsReady();
+  enabledRef.current = enabled;
+
+  const stopTracking = useCallback((): void => {
+    if (watchId.current === null) return;
+    Geolocation.clearWatch(watchId.current);
+    watchId.current = null;
+  }, []);
 
   const startTracking = useCallback((): void => {
-    if (watchId.current !== null) return;
+    if (!enabledRef.current || watchId.current !== null) return;
 
     const onOk = (pos: { coords: { latitude: number; longitude: number } }): void => {
+      if (!enabledRef.current) return;
       setPermissionStatus('granted');
       setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
     };
 
     const onErr = (err: { code?: number }): void => {
+      if (!enabledRef.current) return;
       if (err?.code === 1) {
         setPermissionStatus('denied');
       }
@@ -63,14 +76,15 @@ export function UserLocationProvider({
   const requestPermission = useCallback(async (): Promise<void> => {
     // Native permission sheets interrupt the launch dissolve/handoff. Calls from
     // already-mounted screens are retried automatically because this callback
-    // identity changes only when the one-shot interaction gate becomes ready.
-    if (!launchInteractionsReady) return;
+    // identity changes only when auth or the one-shot interaction gate changes.
+    if (!enabled || !launchInteractionsReady) return;
 
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         NEXA_LOCATION_PERMISSION_COPY,
       );
+      if (!enabledRef.current) return;
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
         setPermissionStatus('denied');
         return;
@@ -81,19 +95,21 @@ export function UserLocationProvider({
     }
 
     startTracking();
-  }, [launchInteractionsReady, startTracking]);
+  }, [enabled, launchInteractionsReady, startTracking]);
 
   // Warm path: already-granted Android permission can start GPS beneath the
   // launch overlay without presenting native UI. A negative quiet check remains
   // `unknown` because Android cannot distinguish never-asked from denied here.
   useEffect(() => {
+    if (!enabled) return;
+
     let cancelled = false;
     void (async () => {
       if (Platform.OS === 'android') {
         const fine = await PermissionsAndroid.check(
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         );
-        if (cancelled) return;
+        if (cancelled || !enabledRef.current) return;
         const quietStatus = statusFromAndroidPermissionCheck(fine);
         setPermissionStatus(quietStatus);
         if (quietStatus === 'granted') startTracking();
@@ -107,16 +123,16 @@ export function UserLocationProvider({
     return () => {
       cancelled = true;
     };
-  }, [startTracking]);
+  }, [enabled, startTracking]);
 
   useEffect(() => {
-    return () => {
-      if (watchId.current !== null) {
-        Geolocation.clearWatch(watchId.current);
-        watchId.current = null;
-      }
-    };
-  }, []);
+    if (enabled) return;
+    stopTracking();
+    setCoords(null);
+    setPermissionStatus('unknown');
+  }, [enabled, stopTracking]);
+
+  useEffect(() => stopTracking, [stopTracking]);
 
   const value = useMemo<UserLocationContextValue>(
     () => ({
