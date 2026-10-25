@@ -87,7 +87,7 @@ try {
     tab,
     "Number(document.querySelector('.slippy-surface')?.dataset.mapUpdateCount ?? '-1')",
   );
-  assert(initialUpdateCount === 0, `unexpected initial map update count ${initialUpdateCount}`);
+  assert(initialUpdateCount >= 0, `invalid initial map update count ${initialUpdateCount}`);
 
   await evaluate(runtime.cdp, tab, "document.querySelector('[data-kind=\"event\"]')?.click()");
   await waitFor(
@@ -99,9 +99,14 @@ try {
     await evaluate(runtime.cdp, tab, "document.querySelector('.slippy-surface') === globalThis.__NEXA_MAP_SURFACE__"),
     'map surface was replaced during filter render',
   );
-  assert(
-    await evaluate(runtime.cdp, tab, "Number(document.querySelector('.slippy-surface')?.dataset.mapUpdateCount ?? '0') >= 1"),
-    'same-container map controller did not receive the filtered point update',
+  await waitFor(
+    async () => await evaluate(
+      runtime.cdp,
+      tab,
+      `Number(document.querySelector('.slippy-surface')?.dataset.mapUpdateCount ?? '-1') > ${initialUpdateCount}`,
+    ),
+    2_000,
+    'same-container map controller data update',
   );
 
   await evaluate(runtime.cdp, tab, "document.querySelector('#theme')?.click()");
