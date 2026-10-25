@@ -4,6 +4,7 @@ import {useMachine} from '@xstate/react';
 import type {EntityPoint, VerificationLevel} from '@g88/shared';
 import {formatNexaSpatialDistance} from '@/components/map/nexaSpatialSheet';
 import {nexaHaptics} from '@/haptics/nexaHaptics';
+import {resolveMapInteractionState} from './mapInteractionState';
 import {pinInteractionMachine} from './pinInteraction.machine';
 import type {ViewerMode} from './pinInteraction.types';
 
@@ -143,6 +144,12 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
         state.matches({dating: 'matched'}) ||
         state.matches({dating: 'messaging'})));
 
+  const interactionState = resolveMapInteractionState({
+    showPreview,
+    isDetail,
+    isFull,
+  });
+
   const previewProps = useMemo(() => {
     if (!showPreview || !ctx.pinId) return null;
     const profile = activeProfile;
@@ -202,6 +209,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
 
   return {
     state,
+    interactionState,
     send,
     openUserPin,
     dismiss,
