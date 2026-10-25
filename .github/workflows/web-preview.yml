@@ -61,6 +61,7 @@ jobs:
           node --check web/e2e/realtime-reconnect.e2e.mjs
           node --check web/e2e/viewport-race.e2e.mjs
           node --check web/e2e/connections-actions.e2e.mjs
+          node --check web/e2e/deployed-smoke.e2e.mjs
 
       - name: Smoke test web edge
         run: |
