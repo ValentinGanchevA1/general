@@ -87,6 +87,7 @@ export function mountMapLibreMap(options: MountMapLibreOptions): void {
   map.once('load', () => {
     if (disposed) return;
     addDiscoveryOverlay(map, points);
+    container.dataset.mapReady = 'true';
     map.on('moveend', () => {
       if (disposed) return;
       const center = map.getCenter();
