@@ -35,6 +35,8 @@ export const NexaMapRuntimeSurface = React.forwardRef<
     requested: requestedRenderer,
     mapLibreAvailable,
   });
+  const hasFocusedSelection = selectedEntityKey !== null;
+  const shouldDimUnselected = dimUnselected || hasFocusedSelection;
 
   if (renderer === 'maplibre') {
     const pointsByKey = new Map<DiscoveryPointKey, (typeof points)[number]>(
@@ -46,7 +48,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
         ref={ref}
         points={points}
         selectedKey={selectedEntityKey as DiscoveryPointKey | null}
-        dimUnselected={dimUnselected}
+        dimUnselected={shouldDimUnselected}
         onReady={onReady}
         onPointPress={(key) => {
           const point = pointsByKey.get(key);
@@ -71,7 +73,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
       ref={ref}
       points={points}
       selectedEntityKey={selectedEntityKey}
-      dimUnselected={dimUnselected}
+      dimUnselected={shouldDimUnselected}
       onReady={onReady}
       onRegionChangeComplete={onRegionChangeComplete}
       onClusterPress={onClusterPress}
