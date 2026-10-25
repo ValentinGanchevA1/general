@@ -1,5 +1,8 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+declare const __dirname: string;
+
+const { readFileSync } = jest.requireActual<{
+  readFileSync: (path: string, encoding: 'utf8') => string;
+}>('fs');
 
 const AUDITED_USER_FACING_FILES = [
   '../../components/ErrorBoundary.tsx',
@@ -31,7 +34,7 @@ describe('user-facing error presentation boundary', () => {
   it.each(AUDITED_USER_FACING_FILES)(
     '%s does not bypass extractMessage with a raw error message',
     (relativePath) => {
-      const source = readFileSync(resolve(__dirname, relativePath), 'utf8');
+      const source = readFileSync(`${__dirname}/${relativePath}`, 'utf8');
 
       for (const pattern of FORBIDDEN_DIRECT_MESSAGE_PATTERNS) {
         expect(source).not.toMatch(pattern);
