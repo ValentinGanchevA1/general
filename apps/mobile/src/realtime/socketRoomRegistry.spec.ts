@@ -1,17 +1,17 @@
 import { SocketRoomRegistry } from './socketRoomRegistry';
 
 describe('SocketRoomRegistry', () => {
-  it('reference-counts conversation intents while deduplicating snapshots', () => {
+  it('reference-counts conversation intents and signals only the final release', () => {
     const registry = new SocketRoomRegistry();
     registry.trackConversation('conversation-1');
     registry.trackConversation('conversation-1');
 
     expect(registry.snapshot().conversationIds).toEqual(['conversation-1']);
 
-    registry.untrackConversation('conversation-1');
+    expect(registry.untrackConversation('conversation-1')).toBe(false);
     expect(registry.snapshot().conversationIds).toEqual(['conversation-1']);
 
-    registry.untrackConversation('conversation-1');
+    expect(registry.untrackConversation('conversation-1')).toBe(true);
     expect(registry.snapshot().conversationIds).toEqual([]);
   });
 
@@ -27,7 +27,7 @@ describe('SocketRoomRegistry', () => {
 
   it('ignores conversation releases that were never retained', () => {
     const registry = new SocketRoomRegistry();
-    registry.untrackConversation('conversation-1');
+    expect(registry.untrackConversation('conversation-1')).toBe(false);
     expect(registry.snapshot().conversationIds).toEqual([]);
   });
 
