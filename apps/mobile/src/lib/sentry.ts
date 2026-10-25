@@ -12,6 +12,50 @@ export const navigationIntegration = Sentry.reactNavigationIntegration({
   useDispatchedActionData: true,
 });
 
+export interface NexaLaunchPerformanceInput {
+  startedAtMs: number;
+  completedAtMs: number;
+  path: 'map' | 'non_map';
+  totalMs: number;
+  authReadyMs: number | null;
+  mapReadyMs: number | null;
+  overlayHiddenMs: number | null;
+  mapReadyFailOpen: boolean;
+}
+
+/**
+ * Emit a sampled, queryable Sentry span for the completed branded launch flow.
+ * The span is created after completion with explicit historical boundaries, so
+ * no mutable tracing object survives React renders/background transitions.
+ */
+export function recordNexaLaunchPerformance(
+  input: NexaLaunchPerformanceInput,
+): void {
+  const attributes: Record<string, string | number | boolean> = {
+    'nexa.launch.path': input.path,
+    'nexa.launch.total_ms': input.totalMs,
+    'nexa.launch.map_ready_fail_open': input.mapReadyFailOpen,
+  };
+
+  if (input.authReadyMs !== null) {
+    attributes['nexa.launch.auth_ready_ms'] = input.authReadyMs;
+  }
+  if (input.mapReadyMs !== null) {
+    attributes['nexa.launch.map_ready_ms'] = input.mapReadyMs;
+  }
+  if (input.overlayHiddenMs !== null) {
+    attributes['nexa.launch.overlay_hidden_ms'] = input.overlayHiddenMs;
+  }
+
+  const span = Sentry.startInactiveSpan({
+    name: 'NEXA branded launch',
+    op: 'ui.load',
+    startTime: input.startedAtMs / 1_000,
+    attributes,
+  });
+  span.end(input.completedAtMs / 1_000);
+}
+
 /**
  * Release string must match what CI / sentry-cli upload under for source maps
  * and native symbols to attach. Format: packageName@version+dist
