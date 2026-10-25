@@ -4,6 +4,7 @@ import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 import type { CreateNearbyAction } from '@/components/map/CreateNearbySheet';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { track } from '@/lib/analytics';
+import { trackMapLongPressCreate } from './mapLongPressAnalytics';
 import type { MapCoordinate } from './contracts/mapRenderer';
 
 type LatLng = { lat: number; lng: number };
@@ -28,7 +29,7 @@ export function useCreateNearby(
     (coordinate: MapCoordinate): void => {
       if (sheetBlocksLongPress) return;
       const { latitude, longitude } = coordinate;
-      track('map.longpress_create', { lat: latitude, lng: longitude });
+      trackMapLongPressCreate();
       setCreateNearbyCoords({ lat: latitude, lng: longitude });
       setCreateNearbyOpen(true);
     },
