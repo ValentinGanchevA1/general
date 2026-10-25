@@ -16,6 +16,7 @@ import type {
 
 import { tokenStore } from '@/api/tokenStore';
 import { Config } from '@/config';
+import { resolveSocketAppStateAction } from './socketAppState';
 
 type G88Socket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -40,8 +41,10 @@ interface UseSocketResult {
 }
 
 let sharedSocket: G88Socket | null = null;
-/** Lifecycle listeners (connect/disconnect) bound once per socket instance. */
+/** Socket lifecycle listeners (connect/disconnect/error) bound once per instance. */
 let lifecycleBound = false;
+/** One AppState subscription owns foreground/background transport policy. */
+let appStateSubscription: { remove: () => void } | null = null;
 
 /** Monotonic suffix so two sends in the same ms never share an optimistic id. */
 let clientMessageSeq = 0;
@@ -61,7 +64,7 @@ const eventHandlers = new Map<
   Set<ServerToClientEvents[keyof ServerToClientEvents]>
 >();
 
-/** Runs on every successful socket connect (incl. reconnect). */
+/** Runs on every successful socket connect (incl. foreground reconnect). */
 const connectListeners = new Set<() => void>();
 
 /**
@@ -174,6 +177,32 @@ function bindLifecycle(s: G88Socket): void {
   });
 }
 
+function applySocketAppState(state: AppStateStatus): void {
+  const s = sharedSocket;
+  if (!s) return;
+
+  const action = resolveSocketAppStateAction(state, s.connected);
+  if (action === 'connect') {
+    s.connect();
+    return;
+  }
+  if (action === 'disconnect') {
+    // Always disconnect outside foreground, even if the handshake/reconnect is
+    // still in progress and `connected` has not flipped true yet.
+    s.disconnect();
+  }
+}
+
+function bindAppStateLifecycle(): void {
+  if (appStateSubscription) return;
+  appStateSubscription = AppState.addEventListener('change', applySocketAppState);
+}
+
+function unbindAppStateLifecycle(): void {
+  appStateSubscription?.remove();
+  appStateSubscription = null;
+}
+
 /** Normalize socket payload to ChatMessage (type required under exactOptionalPropertyTypes). */
 function toChatMessage(e: ChatMessageEvent): ChatMessage {
   return {
@@ -250,7 +279,8 @@ export function locationShareStop(sessionId: string): Promise<boolean> {
 
 /**
  * Module-level singleton so every screen shares one socket connection.
- * Survives screen navigation. Torn down only on logout.
+ * Survives screen navigation, pauses outside foreground, and is torn down only
+ * on logout.
  */
 export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
   const { autoConnect = true } = options;
@@ -264,14 +294,20 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
 
     const ensureSocket = async (): Promise<void> => {
       if (sharedSocket?.connected) {
-        if (!cancelled) setConnected(true);
+        bindAppStateLifecycle();
+        applySocketAppState(AppState.currentState);
+        if (!cancelled) setConnected(sharedSocket.connected);
         return;
       }
+
       const token = await tokenStore.getAccessToken();
       if (!token || cancelled) return;
 
-      if (!sharedSocket) {
-        sharedSocket = io(`${Config.API_BASE_URL}/realtime`, {
+      let socket = sharedSocket;
+      if (!socket) {
+        socket = io(`${Config.API_BASE_URL}/realtime`, {
+          // Foreground lifecycle owns the first connect as well as reconnects.
+          autoConnect: false,
           // Polling fallback when pure WS is blocked (strict mobile networks).
           transports: ['websocket', 'polling'],
           auth: async (cb) => {
@@ -282,46 +318,41 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
           reconnectionDelay: 500,
           reconnectionDelayMax: 5_000,
         }) as G88Socket;
+        sharedSocket = socket;
 
-        bindLifecycle(sharedSocket);
-        attachAllRegisteredHandlers(sharedSocket);
+        bindLifecycle(socket);
+        attachAllRegisteredHandlers(socket);
       } else {
-        // Existing instance, not connected — ensure lifecycle once, then connect.
-        bindLifecycle(sharedSocket);
-        sharedSocket.connect();
+        bindLifecycle(socket);
       }
 
-      // Per-hook connected flag (lifecycle connect already runs side effects).
+      // Per-hook connected flag (module lifecycle connect also runs side effects).
       const onConnect = (): void => {
         if (!cancelled) setConnected(true);
       };
       const onDisconnect = (): void => {
         if (!cancelled) setConnected(false);
       };
-      sharedSocket.on('connect', onConnect);
-      sharedSocket.on('disconnect', onDisconnect);
-      // If we raced into an already-open socket, sync state.
-      if (sharedSocket.connected && !cancelled) setConnected(true);
+      socket.on('connect', onConnect);
+      socket.on('disconnect', onDisconnect);
 
       // Cleanup only this hook's connect/disconnect flags — not the shared socket.
       handlersRef.current.add(() => {
-        sharedSocket?.off('connect', onConnect);
-        sharedSocket?.off('disconnect', onDisconnect);
+        socket.off('connect', onConnect);
+        socket.off('disconnect', onDisconnect);
       });
+
+      bindAppStateLifecycle();
+      applySocketAppState(AppState.currentState);
+      // If we raced into an already-open socket, sync state.
+      if (socket.connected && !cancelled) setConnected(true);
     };
 
     void ensureSocket();
 
-    const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
-      if (state === 'active' && sharedSocket && !sharedSocket.connected) {
-        sharedSocket.connect();
-      }
-    });
-
     const handlers = handlersRef.current;
     return () => {
       cancelled = true;
-      sub.remove();
       handlers.forEach((unsub) => unsub());
       handlers.clear();
     };
@@ -358,6 +389,9 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
   const sendPresence = useCallback(
     (payload: PresenceUpdatePayload): Promise<{ cellId: string } | null> =>
       new Promise((resolve) => {
+        // Presence must never leak stale foreground coordinates after backgrounding,
+        // even in the tiny window before Socket.IO finishes disconnecting.
+        if (AppState.currentState !== 'active') return resolve(null);
         const s = sharedSocket;
         if (!s?.connected) return resolve(null);
         const timer = setTimeout(() => resolve(null), 3_000);
@@ -430,6 +464,7 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
 }
 
 export function disconnectSocket(): void {
+  unbindAppStateLifecycle();
   if (sharedSocket) {
     sharedSocket.removeAllListeners();
     sharedSocket.disconnect();
