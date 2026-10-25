@@ -4,6 +4,7 @@ import type { ConversationSummary, ChatMessage, MessagePage } from '@g88/shared'
 
 import { getJson, postJson } from '@/api/client';
 import { logout } from '@/features/auth/authSlice';
+import { extractMessage } from '@/utils/extractMessage';
 import { clearChatOutbox } from './chatOutboxPersist';
 
 export interface OutboxEntry {
@@ -46,7 +47,7 @@ export const fetchConversations = createAsyncThunk(
     try {
       return await getJson<ConversationSummary[]>('/conversations');
     } catch (e) {
-      return rejectWithValue(e instanceof Error ? e.message : 'Failed to load conversations');
+      return rejectWithValue(extractMessage(e, 'Failed to load conversations'));
     }
   },
 );
@@ -62,7 +63,7 @@ export const fetchMessages = createAsyncThunk(
       const page = await getJson<MessagePage>(`/conversations/${conversationId}/messages${qs}`);
       return { conversationId, page };
     } catch (e) {
-      return rejectWithValue(e instanceof Error ? e.message : 'Failed to load messages');
+      return rejectWithValue(extractMessage(e, 'Failed to load messages'));
     }
   },
 );
@@ -74,7 +75,7 @@ export const markConversationReadRemote = createAsyncThunk(
       await postJson(`/conversations/${conversationId}/read`, {});
       return conversationId;
     } catch (e) {
-      return rejectWithValue(e instanceof Error ? e.message : 'Failed to mark read');
+      return rejectWithValue(extractMessage(e, 'Failed to mark read'));
     }
   },
 );
