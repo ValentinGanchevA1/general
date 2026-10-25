@@ -1,0 +1,129 @@
+import { createHmac } from 'node:crypto';
+import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+
+import {
+  PRODUCT_ANALYTICS_CONNECTION_MECHANISMS,
+  PRODUCT_ANALYTICS_ENTITY_TYPES,
+  PRODUCT_ANALYTICS_EVENTS,
+  PRODUCT_ANALYTICS_SURFACES,
+  RSVP_STATUSES,
+  type ProductAnalyticsEventName,
+  type ProductAnalyticsProperties,
+} from '@g88/shared';
+
+const EVENT_SET = new Set<string>(PRODUCT_ANALYTICS_EVENTS);
+const ENTITY_TYPE_SET = new Set<string>(PRODUCT_ANALYTICS_ENTITY_TYPES);
+const SURFACE_SET = new Set<string>(PRODUCT_ANALYTICS_SURFACES);
+const CONNECTION_SET = new Set<string>(PRODUCT_ANALYTICS_CONNECTION_MECHANISMS);
+const RSVP_SET = new Set<string>(RSVP_STATUSES);
+
+function pickString(
+  props: ProductAnalyticsProperties,
+  key: string,
+  allowed: ReadonlySet<string>,
+): string | undefined {
+  const value = props[key];
+  return typeof value === 'string' && allowed.has(value) ? value : undefined;
+}
+
+function pickBoolean(props: ProductAnalyticsProperties, key: string): boolean | undefined {
+  const value = props[key];
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+/**
+ * Second privacy boundary after the mobile allow-list. Unknown keys and invalid
+ * values are dropped rather than persisted, so arbitrary caller payloads cannot
+ * turn analytics_events into a shadow logging/PII table.
+ */
+export function sanitizeProductAnalyticsProperties(
+  event: ProductAnalyticsEventName,
+  input: ProductAnalyticsProperties | undefined,
+): ProductAnalyticsProperties {
+  const props = input ?? {};
+  const out: ProductAnalyticsProperties = {};
+
+  switch (event) {
+    case 'app.session_started': {
+      const path = pickString(props, 'path', new Set(['map', 'non_map']));
+      if (path) out.path = path;
+      return out;
+    }
+    case 'entity.opened': {
+      const entityType = pickString(props, 'entityType', ENTITY_TYPE_SET);
+      const surface = pickString(props, 'surface', SURFACE_SET);
+      if (entityType) out.entityType = entityType;
+      if (surface) out.surface = surface;
+      return out;
+    }
+    case 'interaction.wave_sent': {
+      const mutual = pickBoolean(props, 'mutual');
+      const surface = pickString(props, 'surface', SURFACE_SET);
+      if (mutual !== undefined) out.mutual = mutual;
+      if (surface) out.surface = surface;
+      return out;
+    }
+    case 'event.rsvp_confirmed': {
+      const status = pickString(props, 'status', RSVP_SET);
+      if (status) out.status = status;
+      return out;
+    }
+    case 'marketplace.offer_sent':
+    case 'chat.message_sent':
+      return out;
+    case 'connection.created': {
+      const mechanism = pickString(props, 'mechanism', CONNECTION_SET);
+      if (mechanism) out.mechanism = mechanism;
+      return out;
+    }
+  }
+}
+
+@Injectable()
+export class AnalyticsService {
+  constructor(@InjectDataSource() private readonly db: DataSource) {}
+
+  private subjectHash(userId: string): string {
+    const key = process.env.ANALYTICS_HMAC_KEY?.trim();
+    if (!key || key.length < 32) {
+      throw new ServiceUnavailableException({
+        code: 'analytics.not_configured',
+        message: 'Product analytics is not configured.',
+      });
+    }
+    return createHmac('sha256', key).update(userId).digest('hex');
+  }
+
+  async record(
+    userId: string,
+    event: ProductAnalyticsEventName,
+    properties?: ProductAnalyticsProperties,
+  ): Promise<void> {
+    if (!EVENT_SET.has(event)) {
+      throw new BadRequestException({
+        code: 'analytics.event_not_allowed',
+        message: 'Analytics event is not allowed.',
+      });
+    }
+
+    const subjectHash = this.subjectHash(userId);
+    const safeProperties = sanitizeProductAnalyticsProperties(event, properties);
+
+    await this.db.query(
+      `WITH subject AS (
+         INSERT INTO analytics_subjects (user_id, subject_hash, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (user_id) DO UPDATE
+           SET subject_hash = EXCLUDED.subject_hash,
+               updated_at = NOW()
+         RETURNING subject_hash
+       )
+       INSERT INTO analytics_events (subject_hash, event_name, properties)
+       SELECT subject_hash, $3, $4::jsonb
+       FROM subject`,
+      [userId, subjectHash, event, JSON.stringify(safeProperties)],
+    );
+  }
+}
