@@ -12,6 +12,20 @@ export function statusFromAndroidPermissionCheck(
 }
 
 /**
+ * Foreground refresh can detect a settings change without losing the distinction
+ * between "never asked" and "explicitly denied". Revoking a previously granted
+ * permission becomes denied; an untouched unknown state stays unknown.
+ */
+export function statusFromAndroidForegroundCheck(
+  granted: boolean,
+  previous: LocationPermissionStatus,
+): LocationPermissionStatus {
+  if (granted) return 'granted';
+  if (previous === 'granted') return 'denied';
+  return previous;
+}
+
+/**
  * Automatic screen-focus requests must never reopen native permission UI after
  * an explicit denial. Only a user-triggered recovery action may retry.
  */
