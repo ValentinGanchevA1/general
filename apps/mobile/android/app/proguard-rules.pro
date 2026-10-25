@@ -8,3 +8,9 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+
+# Calibration-only first R8 adoption step: measure code shrinking while keeping
+# class/method names and disabling optimizer rewrites. Do not ship this branch;
+# the goal is to validate release packaging and size before device smoke testing.
+-dontobfuscate
+-dontoptimize
