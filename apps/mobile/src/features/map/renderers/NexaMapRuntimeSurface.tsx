@@ -22,6 +22,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
     mapLibreAvailable,
     points,
     selectedEntityKey,
+    dimUnselected,
     onReady,
     onRegionChangeComplete,
     onClusterPress,
@@ -45,6 +46,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
         ref={ref}
         points={points}
         selectedKey={selectedEntityKey as DiscoveryPointKey | null}
+        dimUnselected={dimUnselected}
         onReady={onReady}
         onPointPress={(key) => {
           const point = pointsByKey.get(key);
@@ -69,6 +71,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
       ref={ref}
       points={points}
       selectedEntityKey={selectedEntityKey}
+      dimUnselected={dimUnselected}
       onReady={onReady}
       onRegionChangeComplete={onRegionChangeComplete}
       onClusterPress={onClusterPress}
