@@ -59,8 +59,8 @@ const PREVIEW_TILE_TEMPLATE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' a
 const PREVIEW_ATTRIBUTION = '© OpenStreetMap contributors' as const;
 const PREVIEW_ATTRIBUTION_URL = 'https://www.openstreetmap.org/copyright' as const;
 const MAPTILER_ATTRIBUTION = '© MapTiler © OpenStreetMap contributors' as const;
-const MAPTILER_EU_ORIGIN: MapTilerApiOrigin = 'https://api.maptiler.eu';
-const MAPTILER_GLOBAL_ORIGIN: MapTilerApiOrigin = 'https://api.maptiler.com';
+const MAPTILER_EU_ORIGIN = 'https://api.maptiler.eu' as const;
+const MAPTILER_GLOBAL_ORIGIN = 'https://api.maptiler.com' as const;
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
 const MAP_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/u;
 const API_KEY_RE = /^[^\u0000-\u0020\u007f]{1,256}$/u;
@@ -119,7 +119,7 @@ export function validateMapBuildConfig(value: unknown): MapBuildConfig | null {
 
   if (typeof key !== 'string' || !API_KEY_RE.test(key)) return null;
   if (typeof mapId !== 'string' || !MAP_ID_RE.test(mapId)) return null;
-  if (apiOrigin !== MAPTILER_EU_ORIGIN && apiOrigin !== MAPTILER_GLOBAL_ORIGIN) return null;
+  if (!isMapTilerApiOrigin(apiOrigin)) return null;
 
   return {
     maptilerApiKey: key,
@@ -161,6 +161,10 @@ function blockedRuntime(reason: BlockedMapRuntimeReason): BlockedProductionMapRu
 function isLocalPreview(location: MapRuntimeLocation): boolean {
   if (!LOOPBACK_HOSTS.has(location.hostname.toLowerCase())) return false;
   return location.protocol === 'http:' || location.protocol === 'https:';
+}
+
+function isMapTilerApiOrigin(value: unknown): value is MapTilerApiOrigin {
+  return value === MAPTILER_EU_ORIGIN || value === MAPTILER_GLOBAL_ORIGIN;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
