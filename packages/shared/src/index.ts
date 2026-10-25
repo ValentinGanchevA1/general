@@ -16,6 +16,7 @@ export * from './verification';
 export * from './friends';
 export * from './identity';
 export * from './dating';
+export * from './analytics';
 
 export interface PendingVerificationSummary {
   id: string;
