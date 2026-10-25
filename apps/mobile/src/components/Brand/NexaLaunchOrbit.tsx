@@ -7,7 +7,7 @@ import Svg, {
   type PathProps,
   type RectProps,
 } from 'react-native-svg';
-import Animated, {
+import {
   Extrapolation,
   createAnimatedComponent,
   interpolate,
