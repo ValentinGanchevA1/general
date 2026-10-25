@@ -6,7 +6,6 @@ import {
 } from 'react-native';
 
 import { appAlert } from '@/ui/appAlert';
-import type MapView from 'react-native-maps';
 import type { Region } from 'react-native-maps';
 import {
 	BottomSheetModal,
@@ -29,6 +28,7 @@ import { setPoints } from '@/features/discovery/discoverySlice';
 import { useSocket } from '@/realtime/useSocket';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { useUserLocation } from '@/features/location/useUserLocation';
+import type { NexaMapController } from '@/features/map/contracts/mapRenderer';
 import { NexaMapScreenSurface } from '@/features/map/renderers/NexaMapScreenSurface';
 import { prefetchAvatars } from '@/services/avatarCache';
 import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
@@ -119,7 +119,7 @@ export function MapScreen(): React.JSX.Element {
 	const [waveToast, setWaveToast] = useState<string | null>(null);
 	const reduceMotion = useNexaReducedMotion();
 	const markMapSurfaceReady = useNexaMapSurfaceReady();
-	const mapRef = useRef<MapView>(null);
+	const mapRef = useRef<NexaMapController | null>(null);
 	const entitySheetRef = useRef<BottomSheetModal>(null);
 	const presentedIdRef = useRef<string | null>(null);
 	const selectedPointRef = useRef<EntityPoint | null>(null);
@@ -252,7 +252,9 @@ export function MapScreen(): React.JSX.Element {
 		}
 		preSheetRegionRef.current = null;
 		if (restoreRegion != null) {
-			mapRef.current?.animateToRegion(restoreRegion, reduceMotion ? 0 : 220);
+			mapRef.current?.fitViewport(regionToViewport(restoreRegion), {
+				durationMs: reduceMotion ? 0 : 220,
+			});
 		}
 		dismissPinPreview();
 	}, [dismissPinPreview, reduceMotion]);
@@ -276,10 +278,9 @@ export function MapScreen(): React.JSX.Element {
 			const point = selectedPointRef.current;
 			if (point == null) return;
 			const target = regionForSelectedEntity(region, point, index);
-			mapRef.current?.animateToRegion(
-				target,
-				mapAnimationDuration(index, reduceMotion),
-			);
+			mapRef.current?.fitViewport(regionToViewport(target), {
+				durationMs: mapAnimationDuration(index, reduceMotion),
+			});
 		},
 		[region, reduceMotion],
 	);
@@ -594,29 +595,29 @@ export function MapScreen(): React.JSX.Element {
 
 	const onClusterPress = useCallback(
 		(c: ClusterPoint) => {
-			mapRef.current?.animateToRegion(
-				{
-					latitude: c.lat,
-					longitude: c.lng,
-					latitudeDelta: Math.max(0.005, (region?.latitudeDelta ?? 0.05) / 2.5),
-					longitudeDelta: Math.max(0.005, (region?.longitudeDelta ?? 0.05) / 2.5),
-				},
-				reduceMotion ? 0 : NEXA_MOTION_MS.map,
-			);
+			const target: Region = {
+				latitude: c.lat,
+				longitude: c.lng,
+				latitudeDelta: Math.max(0.005, (region?.latitudeDelta ?? 0.05) / 2.5),
+				longitudeDelta: Math.max(0.005, (region?.longitudeDelta ?? 0.05) / 2.5),
+			};
+			mapRef.current?.fitViewport(regionToViewport(target), {
+				durationMs: reduceMotion ? 0 : NEXA_MOTION_MS.map,
+			});
 		},
 		[reduceMotion, region?.latitudeDelta, region?.longitudeDelta],
 	);
 
 	const zoomInForDiscovery = useCallback(() => {
 		if (region == null) return;
-		mapRef.current?.animateToRegion(
-			{
-				...region,
-				latitudeDelta: Math.max(0.005, region.latitudeDelta / 2.5),
-				longitudeDelta: Math.max(0.005, region.longitudeDelta / 2.5),
-			},
-			reduceMotion ? 0 : NEXA_MOTION_MS.map,
-		);
+		const target: Region = {
+			...region,
+			latitudeDelta: Math.max(0.005, region.latitudeDelta / 2.5),
+			longitudeDelta: Math.max(0.005, region.longitudeDelta / 2.5),
+		};
+		mapRef.current?.fitViewport(regionToViewport(target), {
+			durationMs: reduceMotion ? 0 : NEXA_MOTION_MS.map,
+		});
 	}, [reduceMotion, region]);
 
 	useEffect(() => {
@@ -1003,6 +1004,9 @@ function MapUnavailableFallback(): React.JSX.Element {
 	);
 }
 
+function regionToViewport(region: Region): Viewport;
+function regionToViewport(region: null): null;
+function regionToViewport(region: Region | null): Viewport | null;
 function regionToViewport(region: Region | null): Viewport | null {
 	if (!region) return null;
 	const ne = {

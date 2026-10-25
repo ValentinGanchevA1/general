@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { InteractionManager } from 'react-native';
-import type MapView from 'react-native-maps';
 import type { Region } from 'react-native-maps';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 
-import type { EntityPoint, ListingMode, VerificationLevel } from '@g88/shared';
+import type { EntityPoint, ListingMode, VerificationLevel, Viewport } from '@g88/shared';
 
 import {
   clearPendingMapFocus,
@@ -18,6 +17,7 @@ import {
 import type { ListingModeFilterValue } from '@/components/map/ListingModeFilter';
 import { useNexaMapSurfaceReady } from '@/components/Brand/NexaLaunchSurfaceContext';
 import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
+import type { NexaMapController } from '@/features/map/contracts/mapRenderer';
 
 export type MapFocusParams = {
   focusMyPin?: boolean;
@@ -48,7 +48,7 @@ type PendingFocus = {
 type LatLng = { lat: number; lng: number };
 
 type Args = {
-  mapRef: React.RefObject<MapView | null>;
+  mapRef: React.RefObject<NexaMapController | null>;
   myCoords: LatLng | null;
   points: EntityPoint[];
   region: Region | null;
@@ -60,10 +60,18 @@ type Args = {
   params: MapFocusParams;
 };
 
-/** Continent / default MapView scale — not usable for discovery. */
 function isWorldScale(r: Region | null): boolean {
   if (r == null) return true;
   return r.latitudeDelta > 0.5 || r.longitudeDelta > 0.5;
+}
+
+function regionToViewport(region: Region): Viewport {
+  const halfLat = region.latitudeDelta / 2;
+  const halfLng = region.longitudeDelta / 2;
+  return {
+    sw: { lat: region.latitude - halfLat, lng: region.longitude - halfLng },
+    ne: { lat: region.latitude + halfLat, lng: region.longitude + halfLng },
+  };
 }
 
 const COLD_START_DELTA = 0.02;
@@ -71,10 +79,6 @@ const COLD_START_MAX_ATTEMPTS = 6;
 const MAP_SURFACE_PROBE_MAX_ATTEMPTS = 5;
 const MAP_SURFACE_PROBE_RETRY_MS = 80;
 
-/**
- * Orchestrates "View on map" / post-create pin focus:
- * route params + pendingMapFocus module → city-scale camera + entity sheet.
- */
 export function useMapFocus({
   mapRef,
   myCoords,
@@ -97,7 +101,6 @@ export function useMapFocus({
   const pendingFocusRef = useRef<PendingFocus | null>(null);
   const pendingFocusReaderRef = useRef(() => peekPendingMapFocus());
   const focusAppliedKeyRef = useRef<string | null>(null);
-  /** True only after camera is known city-scale (or focusMyPin applied). */
   const hasCenteredOnUserRef = useRef(false);
   const coldStartAttemptsRef = useRef(0);
   const markLaunchMapSurfaceReady = useNexaMapSurfaceReady();
@@ -108,29 +111,17 @@ export function useMapFocus({
     let attempts = 0;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const probeNativeMap = (): void => {
+    const probeMapController = (): void => {
       if (cancelled || attempts >= MAP_SURFACE_PROBE_MAX_ATTEMPTS) return;
       attempts += 1;
-
-      const map = mapRef.current;
-      if (map == null) {
-        retryTimer = setTimeout(probeNativeMap, MAP_SURFACE_PROBE_RETRY_MS);
+      if (mapRef.current == null) {
+        retryTimer = setTimeout(probeMapController, MAP_SURFACE_PROBE_RETRY_MS);
         return;
       }
-
-      void map
-        .getCamera()
-        .then(() => {
-          if (!cancelled) markLaunchMapSurfaceReady();
-        })
-        .catch(() => {
-          if (!cancelled && attempts < MAP_SURFACE_PROBE_MAX_ATTEMPTS) {
-            retryTimer = setTimeout(probeNativeMap, MAP_SURFACE_PROBE_RETRY_MS);
-          }
-        });
+      markLaunchMapSurfaceReady();
     };
 
-    const task = InteractionManager.runAfterInteractions(probeNativeMap);
+    const task = InteractionManager.runAfterInteractions(probeMapController);
     return () => {
       cancelled = true;
       task.cancel();
@@ -166,8 +157,6 @@ export function useMapFocus({
         longitudeDelta,
       };
 
-      // Keep discovery/chrome in sync even if animateToRegion is ignored
-      // (MapView not ready → continent default stays on screen).
       setRegion(nextRegion);
       hasCenteredOnUserRef.current = true;
       coldStartAttemptsRef.current = COLD_START_MAX_ATTEMPTS;
@@ -176,12 +165,13 @@ export function useMapFocus({
       clearFocusParams();
 
       const runCamera = (): void => {
-        mapRef.current?.animateToRegion(nextRegion, reduceMotion ? 0 : duration);
+        mapRef.current?.fitViewport(regionToViewport(nextRegion), {
+          durationMs: reduceMotion ? 0 : duration,
+        });
       };
 
       InteractionManager.runAfterInteractions(() => {
         runCamera();
-        // Retries: tab switch / first paint often drops the first animate.
         setTimeout(runCamera, 120);
         setTimeout(runCamera, 400);
         if (point) {
@@ -288,9 +278,7 @@ export function useMapFocus({
 
     const lat = pending.lat ?? fromUser?.lat ?? fromListing?.lat;
     const lng = pending.lng ?? fromUser?.lng ?? fromListing?.lng;
-    if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return;
-    }
+    if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
     const key = `${pending.userId ?? ''}|${pending.listingId ?? ''}|${lat}|${lng}|${mod?.token ?? 0}`;
     if (focusAppliedKeyRef.current === key) return;
@@ -299,9 +287,7 @@ export function useMapFocus({
     let point: EntityPoint | undefined;
     if (pending.listingId != null) {
       point = buildSeedListingPoint(pending.listingId, lat, lng, pending, fromListing);
-      if (pending.mode === 'buy' || pending.mode === 'sell') {
-        setListingModeFilter(pending.mode);
-      }
+      if (pending.mode === 'buy' || pending.mode === 'sell') setListingModeFilter(pending.mode);
     } else if (pending.userId != null) {
       point = buildSeedUserPoint(pending.userId, lat, lng, pending, fromUser);
     } else {
@@ -309,29 +295,18 @@ export function useMapFocus({
     }
 
     applyPeerFocus(lat, lng, point, mod?.token);
-  }, [
-    points,
-    applyPeerFocus,
-    buildSeedUserPoint,
-    buildSeedListingPoint,
-    setListingModeFilter,
-  ]);
+  }, [points, applyPeerFocus, buildSeedUserPoint, buildSeedListingPoint, setListingModeFilter]);
 
   useEffect(() => {
     if (focusMyPin) return;
     const hasUser = focusUserId != null && focusUserId !== '';
     const hasListing = focusListingId != null && focusListingId !== '';
     const hasCoords =
-      focusLat != null &&
-      focusLng != null &&
-      Number.isFinite(focusLat) &&
-      Number.isFinite(focusLng);
+      focusLat != null && focusLng != null && Number.isFinite(focusLat) && Number.isFinite(focusLng);
     if (!hasUser && !hasListing && !hasCoords) return;
     const mod = pendingFocusReaderRef.current();
     pendingFocusRef.current = {
-      ...(mod?.userId || hasUser
-        ? { userId: (hasUser ? focusUserId : mod?.userId) as string }
-        : {}),
+      ...(mod?.userId || hasUser ? { userId: (hasUser ? focusUserId : mod?.userId) as string } : {}),
       ...(mod?.listingId || hasListing
         ? { listingId: (hasListing ? focusListingId : mod?.listingId) as string }
         : {}),
@@ -355,16 +330,10 @@ export function useMapFocus({
     focusAppliedKeyRef.current = null;
   }, [focusUserId, focusListingId, focusLat, focusLng, focusMyPin]);
 
-  // Mark cold-start complete once discovery region is city-scale.
   useEffect(() => {
-    if (!isWorldScale(region)) {
-      hasCenteredOnUserRef.current = true;
-    }
+    if (!isWorldScale(region)) hasCenteredOnUserRef.current = true;
   }, [region]);
 
-  // Cold start: city-scale on GPS. World default is MapView with no initialRegion;
-  // a single animateToRegion is often dropped before map is ready. Retry while
-  // region is still world-scale (do not treat "attempted" as "landed").
   useEffect(() => {
     if (!myCoords) return;
     if (
@@ -373,9 +342,7 @@ export function useMapFocus({
       focusListingId ||
       pendingFocusRef.current ||
       pendingFocusReaderRef.current()
-    ) {
-      return;
-    }
+    ) return;
     if (!isWorldScale(region) && hasCenteredOnUserRef.current) return;
     if (coldStartAttemptsRef.current >= COLD_START_MAX_ATTEMPTS) return;
 
@@ -388,7 +355,9 @@ export function useMapFocus({
     };
     setRegion(nextRegion);
     const runCamera = (): void => {
-      mapRef.current?.animateToRegion(nextRegion, reduceMotion ? 0 : 400);
+      mapRef.current?.fitViewport(regionToViewport(nextRegion), {
+        durationMs: reduceMotion ? 0 : 400,
+      });
     };
     InteractionManager.runAfterInteractions(() => {
       runCamera();
@@ -396,16 +365,7 @@ export function useMapFocus({
       setTimeout(runCamera, 400);
       setTimeout(runCamera, 900);
     });
-  }, [
-    myCoords,
-    region,
-    focusMyPin,
-    focusUserId,
-    focusListingId,
-    mapRef,
-    reduceMotion,
-    setRegion,
-  ]);
+  }, [myCoords, region, focusMyPin, focusUserId, focusListingId, mapRef, reduceMotion, setRegion]);
 
   useFocusEffect(
     useCallback(() => {
@@ -420,7 +380,9 @@ export function useMapFocus({
         };
         setRegion(nextRegion);
         const runCamera = (): void => {
-          mapRef.current?.animateToRegion(nextRegion, reduceMotion ? 0 : 450);
+          mapRef.current?.fitViewport(regionToViewport(nextRegion), {
+            durationMs: reduceMotion ? 0 : 450,
+          });
         };
         InteractionManager.runAfterInteractions(() => {
           runCamera();
@@ -433,23 +395,18 @@ export function useMapFocus({
 
       const mod = pendingFocusReaderRef.current();
       const hasUser =
-        (focusUserId != null && focusUserId !== '') ||
-        (mod?.userId != null && mod.userId !== '');
+        (focusUserId != null && focusUserId !== '') || (mod?.userId != null && mod.userId !== '');
       const hasListing =
         (focusListingId != null && focusListingId !== '') ||
         (mod?.listingId != null && mod.listingId !== '');
       const lat = focusLat ?? mod?.lat;
       const lng = focusLng ?? mod?.lng;
-      const hasCoords =
-        lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
+      const hasCoords = lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
 
       if (hasUser || hasListing || hasCoords) {
-        const userId =
-          focusUserId != null && focusUserId !== '' ? focusUserId : mod?.userId;
+        const userId = focusUserId != null && focusUserId !== '' ? focusUserId : mod?.userId;
         const listingId =
-          focusListingId != null && focusListingId !== ''
-            ? focusListingId
-            : mod?.listingId;
+          focusListingId != null && focusListingId !== '' ? focusListingId : mod?.listingId;
         pendingFocusRef.current = {
           ...(userId ? { userId } : {}),
           ...(listingId ? { listingId } : {}),

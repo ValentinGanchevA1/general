@@ -8,6 +8,7 @@ import MapView, {
 import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
 
 import { resolveMapStyle } from '@/components/map/mapStyle';
+import type { NexaMapController } from '../../contracts/mapRenderer';
 import { LegacyDiscoveryLayer } from './LegacyDiscoveryLayer';
 
 export interface LegacyMapSurfaceProps {
@@ -25,12 +26,10 @@ export interface LegacyMapSurfaceProps {
 
 /**
  * Runtime boundary for the current react-native-maps implementation.
- *
- * Product/domain state stays outside this component. Keeping the current map
- * SDK behind a dedicated surface lets MapScreen preserve its existing behavior
- * while a MapLibre surface is validated in parallel behind the rollout gate.
+ * Product/domain state stays outside this component and camera commands are
+ * exposed only through the renderer-neutral NexaMapController contract.
  */
-export const LegacyMapSurface = React.forwardRef<MapView, LegacyMapSurfaceProps>(
+export const LegacyMapSurface = React.forwardRef<NexaMapController, LegacyMapSurfaceProps>(
   function LegacyMapSurface(
     {
       points,
@@ -46,9 +45,47 @@ export const LegacyMapSurface = React.forwardRef<MapView, LegacyMapSurfaceProps>
     },
     ref,
   ): React.JSX.Element {
+    const mapRef = React.useRef<MapView>(null);
+
+    React.useImperativeHandle(ref, () => ({
+      flyTo(target, options) {
+        const map = mapRef.current;
+        if (map === null) return;
+        map.animateCamera(
+          {
+            center: target.center,
+            ...(target.zoom !== undefined ? { zoom: target.zoom } : {}),
+            ...(target.bearing !== undefined ? { heading: target.bearing } : {}),
+            ...(target.pitch !== undefined ? { pitch: target.pitch } : {}),
+          },
+          { duration: options?.durationMs ?? 0 },
+        );
+      },
+      fitViewport(viewport, options) {
+        const map = mapRef.current;
+        if (map === null) return;
+        const padding = options?.padding;
+        map.fitToCoordinates(
+          [
+            { latitude: viewport.ne.lat, longitude: viewport.ne.lng },
+            { latitude: viewport.sw.lat, longitude: viewport.sw.lng },
+          ],
+          {
+            edgePadding: {
+              top: padding?.top ?? 0,
+              right: padding?.right ?? 0,
+              bottom: padding?.bottom ?? 0,
+              left: padding?.left ?? 0,
+            },
+            animated: (options?.durationMs ?? 0) > 0,
+          },
+        );
+      },
+    }), []);
+
     return (
       <MapView
-        ref={ref}
+        ref={mapRef}
         provider={PROVIDER_GOOGLE}
         customMapStyle={resolveMapStyle(mode, scheme)}
         style={StyleSheet.absoluteFill}
