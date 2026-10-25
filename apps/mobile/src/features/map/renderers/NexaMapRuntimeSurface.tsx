@@ -6,7 +6,7 @@ import { resolveAvailableMapRenderer } from '../mapRendererRuntime';
 import {
   LegacyMapSurface,
   type LegacyMapSurfaceProps,
-} from './legacy/LegacyMapSurface';
+} from './reactNativeMaps/LegacyMapSurface';
 
 export interface NexaMapRuntimeSurfaceProps extends LegacyMapSurfaceProps {
   requestedRenderer: MapRendererKind;
