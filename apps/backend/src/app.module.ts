@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { resolveRateLimitTracker } from './common/rate-limit-tracker';
 import { BlocksModule } from './modules/blocks/blocks.module';
 import { FriendsModule } from './modules/friends/friends.module';
 import { RedisModule } from './config/redis.module';
@@ -55,7 +56,10 @@ import { DatingModule } from './modules/dating/dating.module';
         };
       },
     }),
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    ThrottlerModule.forRoot({
+      throttlers: [{ ttl: 60_000, limit: 120 }],
+      getTracker: resolveRateLimitTracker,
+    }),
     RedisModule,
     AuthModule,
     UsersModule,
