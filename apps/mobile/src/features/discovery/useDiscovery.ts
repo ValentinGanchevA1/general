@@ -15,6 +15,7 @@ import {
 import { postJson } from '@/api/client';
 import { useAppDispatch } from '@/hooks/redux';
 import { setDiscoveryZoom } from '@/features/discovery/discoverySlice';
+import { extractMessage } from '@/utils/extractMessage';
 
 interface UseDiscoveryArgs {
   zoom: number;
@@ -83,9 +84,6 @@ export function useDiscovery({
       dating?: boolean,
       rb?: DiscoveryRankBy,
     ) => {
-      // Marker density follows the same debounced zoom that is actually sent to
-      // discovery. Rapid 14↔15 boundary jitter therefore cannot flip visual
-      // modes until the viewport has settled long enough to issue a request.
       dispatch(setDiscoveryZoom(z));
 
       if (isViewportTooLarge(vp)) {
@@ -170,7 +168,7 @@ export function useDiscovery({
         }
       } catch (err) {
         if (axios.isCancel(err) || ctrl.signal.aborted) return;
-        setError(err instanceof Error ? err.message : 'Discovery failed');
+        setError(extractMessage(err, 'Discovery failed'));
       } finally {
         if (!ctrl.signal.aborted) setLoading(false);
       }
