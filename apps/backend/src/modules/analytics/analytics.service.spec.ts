@@ -2,7 +2,11 @@ import { createHmac } from 'node:crypto';
 import { ServiceUnavailableException } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
 
-import { AnalyticsService, sanitizeProductAnalyticsProperties } from './analytics.service';
+import {
+  AnalyticsService,
+  pruneExpiredAnalytics,
+  sanitizeProductAnalyticsProperties,
+} from './analytics.service';
 
 const HMAC_KEY = 'analytics-test-key-that-is-at-least-32-bytes-long';
 
@@ -62,18 +66,18 @@ describe('AnalyticsService', () => {
     ]);
   });
 
-  it('removes orphan identity bridges after expired event rows are pruned', async () => {
-    const pruningService = new AnalyticsService(db);
-    Object.defineProperty(pruningService, 'nextPruneAtMs', { value: 0, writable: true });
+  it('prunes expired events and only then removes old orphan identity bridges', async () => {
+    await pruneExpiredAnalytics(db, 90);
 
-    await pruningService.record('11111111-1111-4111-8111-111111111111', 'app.session_started');
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(String(query.mock.calls[0]![0])).toContain('DELETE FROM analytics_events');
+    expect(query.mock.calls[0]![1]).toEqual([90]);
 
-    expect(query).toHaveBeenCalledTimes(3);
-    expect(String(query.mock.calls[1]![0])).toContain('DELETE FROM analytics_events');
-    expect(query.mock.calls[1]![1]).toEqual([90]);
-    expect(String(query.mock.calls[2]![0])).toContain('DELETE FROM analytics_subjects');
-    expect(String(query.mock.calls[2]![0])).toContain('NOT EXISTS');
+    const [subjectSql, subjectParams] = query.mock.calls[1]!;
+    expect(String(subjectSql)).toContain('DELETE FROM analytics_subjects');
+    expect(String(subjectSql)).toContain('s.updated_at <');
+    expect(String(subjectSql)).toContain('NOT EXISTS');
+    expect(subjectParams).toEqual([90]);
   });
 
   it('fails closed when the dedicated analytics HMAC key is absent', async () => {
