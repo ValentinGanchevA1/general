@@ -13,9 +13,9 @@ import {
 type GeoJSONSourcePressHandler = NonNullable<
   React.ComponentProps<typeof GeoJSONSource>['onPress']
 >;
-type CircleLayerFilter = NonNullable<
-  Extract<LayerSpecification, { type: 'circle' }>['filter']
->;
+type CircleLayerSpecification = Extract<LayerSpecification, { type: 'circle' }>;
+type CircleLayerFilter = NonNullable<CircleLayerSpecification['filter']>;
+type CircleOpacity = NonNullable<CircleLayerSpecification['paint']>['circle-opacity'];
 type CameraRef = React.ElementRef<typeof Camera>;
 
 import { discoveryToMapFeatureCollection } from '../../adapters/discoveryToGeoJson';
@@ -109,7 +109,7 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
       () => ['==', ['id'], selectedKey ?? '__nexa-no-selection__'],
       [selectedKey],
     );
-    const baseOpacity = React.useMemo(
+    const baseOpacity = React.useMemo<CircleOpacity>(
       () => (dimUnselected && selectedKey !== null
         ? ['case', ['==', ['id'], selectedKey], 0, 0.28]
         : 0.92),
