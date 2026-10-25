@@ -133,6 +133,11 @@ export class EventsService {
         WHERE e.deleted_at IS NULL
           AND e.starts_at > NOW()
           AND (e.visibility = 'public' OR e.host_id = $1)
+          AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $1 AND ub.blocked_id = e.host_id)
+                    OR (ub.blocker_id = e.host_id AND ub.blocked_id = $1)
+              )
           AND ST_DWithin(
                 e.location,
                 ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
@@ -155,7 +160,14 @@ export class EventsService {
          FROM events e
          JOIN users h ON h.id = e.host_id
          LEFT JOIN event_attendees a ON a.event_id = e.id AND a.user_id = $1
-        WHERE e.id = $2 AND e.deleted_at IS NULL`,
+        WHERE e.id = $2
+          AND e.deleted_at IS NULL
+          AND (e.visibility = 'public' OR e.host_id = $1)
+          AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $1 AND ub.blocked_id = e.host_id)
+                    OR (ub.blocker_id = e.host_id AND ub.blocked_id = $1)
+              )`,
       [userId, eventId],
     )) as Array<EventRow & {
       host_display_name: string;
@@ -163,18 +175,21 @@ export class EventsService {
     }>;
 
     if (!row) throw new NotFoundException({ code: 'event.not_found', message: 'Event not found.' });
-    if (row.visibility === 'private' && row.host_id !== userId) {
-      throw new NotFoundException({ code: 'event.not_found', message: 'Event not found.' });
-    }
 
     const attendees = (await this.db.query(
       `SELECT a.user_id, a.status, u.display_name, u.avatar_url
          FROM event_attendees a
          JOIN users u ON u.id = a.user_id
-        WHERE a.event_id = $1 AND a.status = 'going'
+        WHERE a.event_id = $1
+          AND a.status = 'going'
+          AND (a.user_id = $2 OR NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $2 AND ub.blocked_id = a.user_id)
+                    OR (ub.blocker_id = a.user_id AND ub.blocked_id = $2)
+              ))
         ORDER BY a.created_at ASC
-        LIMIT $2`,
-      [eventId, ATTENDEE_PREVIEW],
+        LIMIT $3`,
+      [eventId, userId, ATTENDEE_PREVIEW],
     )) as Array<{ user_id: string; status: RsvpStatus; display_name: string; avatar_url: string | null }>;
 
     return {
@@ -198,18 +213,22 @@ export class EventsService {
     await qr.connect();
     await qr.startTransaction();
     try {
-      // Lock the event row so the capacity check + count update are race-free.
+      // Lock the event row so the access + capacity check + count update are race-free.
       const [event] = await qr.query(
-        `SELECT id, host_id, capacity, visibility
-           FROM events
-          WHERE id = $1 AND deleted_at IS NULL
+        `SELECT e.id, e.host_id, e.capacity, e.visibility
+           FROM events e
+          WHERE e.id = $1
+            AND e.deleted_at IS NULL
+            AND (e.visibility = 'public' OR e.host_id = $2)
+            AND NOT EXISTS (
+                  SELECT 1 FROM user_blocks ub
+                   WHERE (ub.blocker_id = $2 AND ub.blocked_id = e.host_id)
+                      OR (ub.blocker_id = e.host_id AND ub.blocked_id = $2)
+                )
           FOR UPDATE`,
-        [eventId],
+        [eventId, userId],
       );
       if (!event) {
-        throw new NotFoundException({ code: 'event.not_found', message: 'Event not found.' });
-      }
-      if (event.visibility === 'private' && event.host_id !== userId) {
         throw new NotFoundException({ code: 'event.not_found', message: 'Event not found.' });
       }
 
@@ -308,6 +327,7 @@ export class EventsService {
   }
 
   async listPolls(userId: string, eventId: string): Promise<PollResult[]> {
+    await this.assertEventAccessible(userId, eventId);
     const polls = (await this.db.query(
       `SELECT id FROM event_polls WHERE event_id = $1 ORDER BY created_at ASC`,
       [eventId],
@@ -317,8 +337,18 @@ export class EventsService {
 
   async vote(userId: string, pollId: string, optionId: string): Promise<PollResult> {
     const [poll] = await this.db.query(
-      `SELECT closed_at FROM event_polls WHERE id = $1`,
-      [pollId],
+      `SELECT p.closed_at
+         FROM event_polls p
+         JOIN events e ON e.id = p.event_id
+        WHERE p.id = $1
+          AND e.deleted_at IS NULL
+          AND (e.visibility = 'public' OR e.host_id = $2)
+          AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $2 AND ub.blocked_id = e.host_id)
+                    OR (ub.blocker_id = e.host_id AND ub.blocked_id = $2)
+              )`,
+      [pollId, userId],
     );
     if (!poll) throw new NotFoundException({ code: 'poll.not_found', message: 'Poll not found.' });
     if (poll.closed_at) {
@@ -352,11 +382,7 @@ export class EventsService {
   // ─── Q&A ─────────────────────────────────────────────────────────────────
 
   async askQuestion(userId: string, eventId: string, dto: CreateQuestionDto): Promise<EventQuestion> {
-    const [event] = await this.db.query(
-      `SELECT id FROM events WHERE id = $1 AND deleted_at IS NULL`,
-      [eventId],
-    );
-    if (!event) throw new NotFoundException({ code: 'event.not_found', message: 'Event not found.' });
+    await this.assertEventAccessible(userId, eventId);
 
     const [row] = await this.db.query(
       `INSERT INTO event_questions (event_id, user_id, body)
@@ -383,6 +409,7 @@ export class EventsService {
   }
 
   async listQuestions(userId: string, eventId: string): Promise<EventQuestion[]> {
+    await this.assertEventAccessible(userId, eventId);
     const rows = (await this.db.query(
       `SELECT q.id, q.event_id, q.user_id, q.body, q.upvotes, q.answered, q.created_at,
               u.display_name,
@@ -391,6 +418,11 @@ export class EventsService {
          JOIN users u ON u.id = q.user_id
          LEFT JOIN event_question_upvotes uv ON uv.question_id = q.id AND uv.user_id = $1
         WHERE q.event_id = $2
+          AND (q.user_id = $1 OR NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $1 AND ub.blocked_id = q.user_id)
+                    OR (ub.blocker_id = q.user_id AND ub.blocked_id = $1)
+              ))
         ORDER BY q.upvotes DESC, q.created_at ASC`,
       [userId, eventId],
     )) as Array<{
@@ -416,6 +448,29 @@ export class EventsService {
     await qr.connect();
     await qr.startTransaction();
     try {
+      const [question] = await qr.query(
+        `SELECT q.event_id
+           FROM event_questions q
+           JOIN events e ON e.id = q.event_id
+          WHERE q.id = $1
+            AND e.deleted_at IS NULL
+            AND (e.visibility = 'public' OR e.host_id = $2)
+            AND NOT EXISTS (
+                  SELECT 1 FROM user_blocks ub
+                   WHERE (ub.blocker_id = $2 AND ub.blocked_id = e.host_id)
+                      OR (ub.blocker_id = e.host_id AND ub.blocked_id = $2)
+                )
+            AND (q.user_id = $2 OR NOT EXISTS (
+                  SELECT 1 FROM user_blocks ub
+                   WHERE (ub.blocker_id = $2 AND ub.blocked_id = q.user_id)
+                      OR (ub.blocker_id = q.user_id AND ub.blocked_id = $2)
+                ))`,
+        [questionId, userId],
+      );
+      if (!question) {
+        throw new NotFoundException({ code: 'question.not_found', message: 'Question not found.' });
+      }
+
       const inserted = await qr.query(
         `INSERT INTO event_question_upvotes (question_id, user_id)
               VALUES ($1, $2)
@@ -458,6 +513,25 @@ export class EventsService {
   }
 
   // ─── helpers ────────────────────────────────────────────────────────────────
+
+  private async assertEventAccessible(userId: string, eventId: string): Promise<void> {
+    const [event] = await this.db.query(
+      `SELECT e.id
+         FROM events e
+        WHERE e.id = $2
+          AND e.deleted_at IS NULL
+          AND (e.visibility = 'public' OR e.host_id = $1)
+          AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = $1 AND ub.blocked_id = e.host_id)
+                    OR (ub.blocker_id = e.host_id AND ub.blocked_id = $1)
+              )`,
+      [userId, eventId],
+    );
+    if (!event) {
+      throw new NotFoundException({ code: 'event.not_found', message: 'Event not found.' });
+    }
+  }
 
   private async assertHost(userId: string, eventId: string): Promise<void> {
     const [event] = await this.db.query(

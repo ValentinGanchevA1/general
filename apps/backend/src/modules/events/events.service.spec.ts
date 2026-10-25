@@ -67,6 +67,12 @@ describe('EventsService', () => {
   const future = new Date(Date.now() + 86_400_000).toISOString();
   const loc = { lat: 43.2, lng: 27.9 };
 
+  const expectBilateralBlockPredicate = (sql: string, other: string): void => {
+    expect(sql).toContain('user_blocks');
+    expect(sql).toContain(`blocked_id = ${other}`);
+    expect(sql).toContain(`blocker_id = ${other}`);
+  };
+
   describe('create', () => {
     it('rejects a start time in the past', async () => {
       await expect(
@@ -104,6 +110,45 @@ describe('EventsService', () => {
     });
   });
 
+  describe('block isolation', () => {
+    it('filters events hosted by either side of a block from nearby results', async () => {
+      query.mockResolvedValueOnce([]);
+
+      await service.nearby('viewer', { location: loc } as never);
+
+      const [sql, params] = query.mock.calls[0]!;
+      expectBilateralBlockPredicate(String(sql), 'e.host_id');
+      expect(params[0]).toBe('viewer');
+    });
+
+    it('treats a blocked host event as not found on detail and does not load attendees', async () => {
+      query.mockResolvedValueOnce([]);
+
+      await expect(service.detail('viewer', 'e1')).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(query).toHaveBeenCalledTimes(1);
+      const [sql] = query.mock.calls[0]!;
+      expectBilateralBlockPredicate(String(sql), 'e.host_id');
+    });
+
+    it('filters blocked attendees from an otherwise accessible event detail', async () => {
+      query
+        .mockResolvedValueOnce([{
+          id: 'e1', host_id: 'h1', title: 'X', description: null, cover_url: null,
+          starts_at: new Date(future), ends_at: null, capacity: null,
+          attendee_count: 1, visibility: 'public', lat: 43.2, lng: 27.9,
+          my_rsvp: null, host_display_name: 'Host', host_avatar_url: null,
+        }])
+        .mockResolvedValueOnce([]);
+
+      await service.detail('viewer', 'e1');
+
+      const [sql, params] = query.mock.calls[1]!;
+      expectBilateralBlockPredicate(String(sql), 'a.user_id');
+      expect(params).toEqual(['e1', 'viewer', 50]);
+    });
+  });
+
   describe('rsvp', () => {
     it('rejects when the event is at capacity and the user is newly going', async () => {
       const { runner } = makeQueryRunner([
@@ -135,12 +180,15 @@ describe('EventsService', () => {
       expect(runner.commitTransaction).toHaveBeenCalled();
     });
 
-    it('404s on a missing event', async () => {
-      const { runner } = makeQueryRunner([[]]); // SELECT FOR UPDATE -> none
+    it('404s on a missing or blocked event before mutating attendance', async () => {
+      const { runner, calls } = makeQueryRunner([[]]); // access+lock SELECT -> none
       createQueryRunner.mockReturnValue(runner);
       await expect(
         service.rsvp('u1', 'missing', { status: 'going' } as never),
       ).rejects.toBeInstanceOf(NotFoundException);
+      expectBilateralBlockPredicate(calls[0]!.sql, 'e.host_id');
+      expect(calls[0]!.params).toEqual(['missing', 'u1']);
+      expect(runner.rollbackTransaction).toHaveBeenCalled();
     });
   });
 
@@ -178,10 +226,20 @@ describe('EventsService', () => {
     });
   });
 
+  describe('listPolls', () => {
+    it('treats an inaccessible event as not found before listing poll ids', async () => {
+      query.mockResolvedValueOnce([]);
+
+      await expect(service.listPolls('viewer', 'e1')).rejects.toBeInstanceOf(NotFoundException);
+      expect(query).toHaveBeenCalledTimes(1);
+      expectBilateralBlockPredicate(String(query.mock.calls[0]![0]), 'e.host_id');
+    });
+  });
+
   describe('vote', () => {
     it('rejects an option from a different poll', async () => {
       query
-        .mockResolvedValueOnce([{ closed_at: null }]) // poll lookup
+        .mockResolvedValueOnce([{ closed_at: null }]) // accessible poll lookup
         .mockResolvedValueOnce([]); // option not found for this poll
       await expect(service.vote('u1', 'p1', 'bad-opt')).rejects.toBeInstanceOf(BadRequestException);
     });
@@ -192,9 +250,17 @@ describe('EventsService', () => {
       expect(realtime.emitEventPoll).not.toHaveBeenCalled();
     });
 
+    it('hides a poll whose event host is blocked', async () => {
+      query.mockResolvedValueOnce([]);
+
+      await expect(service.vote('u1', 'p1', 'o1')).rejects.toBeInstanceOf(NotFoundException);
+      expect(query).toHaveBeenCalledTimes(1);
+      expectBilateralBlockPredicate(String(query.mock.calls[0]![0]), 'e.host_id');
+    });
+
     it('records the vote and broadcasts the updated tally', async () => {
       query
-        .mockResolvedValueOnce([{ closed_at: null }]) // poll lookup
+        .mockResolvedValueOnce([{ closed_at: null }]) // accessible poll lookup
         .mockResolvedValueOnce([{ id: 'o1' }]) // option belongs to poll
         .mockResolvedValueOnce([]) // INSERT vote ON CONFLICT
         .mockResolvedValueOnce([{ id: 'p1', event_id: 'e1', question: 'Q', closed_at: null }]) // pollResult poll
@@ -209,9 +275,18 @@ describe('EventsService', () => {
   });
 
   describe('askQuestion', () => {
+    it('hides an inaccessible event before inserting a question', async () => {
+      query.mockResolvedValueOnce([]);
+
+      await expect(service.askQuestion('u1', 'e1', { body: 'B' } as never))
+        .rejects.toBeInstanceOf(NotFoundException);
+      expect(query).toHaveBeenCalledTimes(1);
+      expect(realtime.emitEventQuestion).not.toHaveBeenCalled();
+    });
+
     it('inserts the question and broadcasts an upvotedByMe-free delta', async () => {
       query
-        .mockResolvedValueOnce([{ id: 'e1' }]) // event exists
+        .mockResolvedValueOnce([{ id: 'e1' }]) // assertEventAccessible
         .mockResolvedValueOnce([{ // INSERT question RETURNING
           id: 'q1', event_id: 'e1', user_id: 'u1', body: 'B',
           upvotes: 0, answered: false, created_at: new Date(),
@@ -227,9 +302,35 @@ describe('EventsService', () => {
     });
   });
 
+  describe('listQuestions', () => {
+    it('filters questions authored by either side of a block', async () => {
+      query
+        .mockResolvedValueOnce([{ id: 'e1' }]) // assertEventAccessible
+        .mockResolvedValueOnce([]);
+
+      await service.listQuestions('viewer', 'e1');
+
+      const [sql, params] = query.mock.calls[1]!;
+      expectBilateralBlockPredicate(String(sql), 'q.user_id');
+      expect(params).toEqual(['viewer', 'e1']);
+    });
+  });
+
   describe('upvoteQuestion', () => {
+    it('rejects an inaccessible event/question author before inserting an upvote', async () => {
+      const { runner, calls } = makeQueryRunner([[]]);
+      createQueryRunner.mockReturnValue(runner);
+
+      await expect(service.upvoteQuestion('u1', 'q1')).rejects.toBeInstanceOf(NotFoundException);
+      expect(calls).toHaveLength(1);
+      expectBilateralBlockPredicate(calls[0]!.sql, 'e.host_id');
+      expectBilateralBlockPredicate(calls[0]!.sql, 'q.user_id');
+      expect(runner.rollbackTransaction).toHaveBeenCalled();
+    });
+
     it('increments only on a new (deduped) upvote and broadcasts the count', async () => {
       const { runner } = makeQueryRunner([
+        [{ event_id: 'e1' }], // access gate
         [{ question_id: 'q1' }], // INSERT ... RETURNING (new row)
         [], // UPDATE event_questions upvotes (no RETURNING)
         [{ upvotes: 4, event_id: 'e1' }], // SELECT upvotes, event_id
@@ -246,6 +347,7 @@ describe('EventsService', () => {
 
     it('is idempotent when the user already upvoted (no broadcast)', async () => {
       const { runner } = makeQueryRunner([
+        [{ event_id: 'e1' }], // access gate
         [], // INSERT ON CONFLICT DO NOTHING -> no row
         [{ upvotes: 9, event_id: 'e1' }], // SELECT current upvotes
       ]);
