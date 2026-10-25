@@ -3,6 +3,8 @@ import { PermissionsAndroid, Platform } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import type { LatLng } from '@g88/shared';
 
+import { useNexaLaunchInteractionsReady } from '@/components/Brand/NexaLaunchSurfaceContext';
+
 import { NEXA_LOCATION_PERMISSION_COPY } from './locationPermissionCopy';
 
 // Real GPS comes from @react-native-community/geolocation (a native module).
@@ -26,6 +28,7 @@ export function useUserLocation(): UseUserLocationResult {
   const [permissionStatus, setPermissionStatus] =
     useState<LocationPermissionStatus>('unknown');
   const watchId = useRef<number | null>(null);
+  const launchInteractionsReady = useNexaLaunchInteractionsReady();
 
   const startTracking = useCallback(() => {
     // Don't stack watchers if requestPermission runs more than once.
@@ -59,6 +62,11 @@ export function useUserLocation(): UseUserLocationResult {
   }, []);
 
   const requestPermission = useCallback(async () => {
+    // Native permission sheets interrupt the launch dissolve/handoff. MapScreen's
+    // mount effect depends on this callback, so it automatically retries when the
+    // one-shot launch gate flips to ready. Calls outside AppShell default to ready.
+    if (!launchInteractionsReady) return;
+
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
@@ -73,10 +81,11 @@ export function useUserLocation(): UseUserLocationResult {
       Geolocation.requestAuthorization();
     }
     startTracking();
-  }, [startTracking]);
+  }, [launchInteractionsReady, startTracking]);
 
   // If the user already granted location (common on Pulse after visiting Map),
-  // start GPS without waiting for an explicit requestPermission() call.
+  // start GPS without waiting for an explicit requestPermission() call. This
+  // warm path intentionally remains available under the launch overlay.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
