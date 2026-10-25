@@ -61,11 +61,21 @@ export function NexaLaunchOrbit({
     strokeDashoffset: length * (1 - orbitProgress.value),
   }));
 
-  const headProps = useAnimatedProps<PathProps>(() => ({
-    strokeDashoffset: length - orbitProgress.value * (length + 12),
+  const violetHeadProps = useAnimatedProps<PathProps>(() => ({
+    strokeDashoffset: length - orbitProgress.value * (length + 17),
     opacity: interpolate(
       orbitProgress.value,
       [0, 0.04, 0.9, 1],
+      [0, 0.22, 0.22, 0],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  const whiteHeadProps = useAnimatedProps<PathProps>(() => ({
+    strokeDashoffset: length - orbitProgress.value * (length + 7),
+    opacity: interpolate(
+      orbitProgress.value,
+      [0, 0.04, 0.92, 1],
       [0, 1, 1, 0],
       Extrapolation.CLAMP,
     ),
@@ -104,8 +114,7 @@ export function NexaLaunchOrbit({
         strokeWidth={8}
         strokeLinecap="round"
         strokeDasharray={`17 ${length}`}
-        opacity={0.2}
-        animatedProps={headProps}
+        animatedProps={violetHeadProps}
       />
       <AnimatedPath
         d={d}
@@ -114,7 +123,7 @@ export function NexaLaunchOrbit({
         strokeWidth={2.8}
         strokeLinecap="round"
         strokeDasharray={`7 ${length}`}
-        animatedProps={headProps}
+        animatedProps={whiteHeadProps}
       />
 
       {layer === 'front' ? (
@@ -148,6 +157,9 @@ function OrbitNodes({
   });
 
   const starProps = useAnimatedProps<PathProps>(() => ({
+    opacity: nodeReveal(progress.value, T.node2),
+  }));
+  const starCoreProps = useAnimatedProps<CircleProps>(() => ({
     opacity: nodeReveal(progress.value, T.node2),
   }));
   const starHaloProps = useAnimatedProps<CircleProps>(() => {
@@ -224,7 +236,13 @@ function OrbitNodes({
         fill={nexaDark.textPrimary}
         animatedProps={starProps}
       />
-      <Circle cx={283} cy={93} r={3.5} fill={nexaBrand.symbolCore} />
+      <AnimatedCircle
+        cx={283}
+        cy={93}
+        r={3.5}
+        fill={nexaBrand.symbolCore}
+        animatedProps={starCoreProps}
+      />
 
       <AnimatedCircle
         cx={252}
