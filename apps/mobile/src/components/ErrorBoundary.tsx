@@ -12,6 +12,8 @@ interface State {
   message: string;
 }
 
+const DEFAULT_ERROR_MESSAGE = 'An unexpected error occurred. Try again.';
+
 function DefaultErrorFallback({ message, onRetry }: { message: string; onRetry: () => void }): React.JSX.Element {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -30,10 +32,10 @@ function DefaultErrorFallback({ message, onRetry }: { message: string; onRetry: 
 export class ErrorBoundary extends React.Component<Props, State> {
   state: State = { hasError: false, message: '' };
 
-  static getDerivedStateFromError(error: unknown): State {
+  static getDerivedStateFromError(_error: unknown): State {
     return {
       hasError: true,
-      message: error instanceof Error ? error.message : 'An unexpected error occurred',
+      message: DEFAULT_ERROR_MESSAGE,
     };
   }
 

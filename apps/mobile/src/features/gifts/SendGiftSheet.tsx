@@ -19,8 +19,9 @@ import {
 import { appAlert } from '@/ui/appAlert';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { ApiError, GiftCatalogItem } from '@g88/shared';
+import type { GiftCatalogItem } from '@g88/shared';
 import { useAppTheme, type ThemeColors } from '@/theme';
+import { extractMessage } from '@/utils/extractMessage';
 import { sendGift, useGiftBalance, useGiftCatalog } from './useGifts';
 
 interface Props {
@@ -30,6 +31,12 @@ interface Props {
   onClose: () => void;
   /** Called with the new wallet balance after a successful send. */
   onSent?: (spendableXp: number) => void;
+}
+
+function readErrorCode(error: unknown): string | null {
+  if (error === null || typeof error !== 'object' || !('code' in error)) return null;
+  const code = (error as { code: unknown }).code;
+  return typeof code === 'string' ? code : null;
 }
 
 export function SendGiftSheet({
@@ -68,17 +75,17 @@ export function SendGiftSheet({
       onSent?.(res.spendableXp);
       appAlert(`Gift sent ${selected.emoji}`, `You sent a ${selected.label} to ${recipientName}.`);
       close();
-    } catch (err) {
-      const e = err as ApiError;
+    } catch (error) {
+      const code = readErrorCode(error);
       appAlert(
-        e.code === 'gift.insufficient_xp'
+        code === 'gift.insufficient_xp'
           ? 'Not enough XP'
-          : e.code === 'gift.blocked'
+          : code === 'gift.blocked'
             ? 'Blocked'
             : 'Could not send gift',
-        e.message || 'Try again in a moment.',
+        extractMessage(error, 'Try again in a moment.'),
       );
-      if (e.code === 'gift.insufficient_xp') refresh();
+      if (code === 'gift.insufficient_xp') refresh();
     } finally {
       setSending(false);
     }

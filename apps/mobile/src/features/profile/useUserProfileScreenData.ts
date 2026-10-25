@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type {
-  ApiError,
   CreateConversationRequest,
   CreateConversationResponse,
   PublicUserProfile,
@@ -16,13 +15,7 @@ import { deleteJson, getJson, postJson } from '@/api/client';
 import { withNexaMutationFeedback } from '@/haptics/nexaInteractionFeedback';
 import { setPendingMapFocus } from '@/navigation/pendingMapFocus';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
-
-function errMessage(e: unknown, fallback: string): string {
-  if (typeof e === 'object' && e !== null && 'message' in e) {
-    return String((e as ApiError).message);
-  }
-  return fallback;
-}
+import { extractMessage } from '@/utils/extractMessage';
 
 function emptyRel(): RelationshipSummary {
   return {
@@ -116,7 +109,7 @@ export function useUserProfileScreenData(userId: string, navigation: Nav) {
       );
       appAlert('Wave sent', `You waved at ${profile?.displayName ?? 'them'}.`);
     } catch (e) {
-      appAlert('Wave failed', errMessage(e, 'Could not send wave'));
+      appAlert('Wave failed', extractMessage(e, 'Could not send wave'));
     } finally {
       setWaving(false);
     }
@@ -141,7 +134,7 @@ export function useUserProfileScreenData(userId: string, navigation: Nav) {
         otherUserIdVerified: profile?.idVerified ?? false,
       });
     } catch (e) {
-      appAlert('Could not open chat', errMessage(e, 'Try again in a moment.'));
+      appAlert('Could not open chat', extractMessage(e, 'Try again in a moment.'));
     } finally {
       setMessaging(false);
     }
@@ -243,7 +236,7 @@ export function useUserProfileScreenData(userId: string, navigation: Nav) {
       try {
         await withNexaMutationFeedback(fn, 'commit');
       } catch (e) {
-        appAlert('Could not update', errMessage(e, 'Try again in a moment.'));
+        appAlert('Could not update', extractMessage(e, 'Try again in a moment.'));
       } finally {
         await loadRelationship();
         setBusy(false);

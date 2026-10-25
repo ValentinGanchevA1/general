@@ -28,6 +28,7 @@ import { postJson } from '@/api/client';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
 import { fontSize, spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
+import { extractMessage } from '@/utils/extractMessage';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type R = RouteProp<RootStackParamList, 'AlertComposer'>;
@@ -79,7 +80,7 @@ export function AlertComposerScreen(): React.JSX.Element {
       dispatch(setPendingFilter('alerts'));
       nav.navigate('Main', { screen: 'Pulse' });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      setError(extractMessage(err, 'Something went wrong. Please try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -197,13 +198,10 @@ export function AlertComposerScreen(): React.JSX.Element {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bg },
-
     postBtn: { color: colors.primary, fontSize: fontSize.md + 1, fontWeight: '700' },
     postBtnDisabled: { color: colors.textFaint },
-
     scroll: { flex: 1 },
     scrollContent: { padding: spacing.lg, gap: spacing.sm },
-
     sectionLabel: {
       color: colors.textSecondary,
       fontSize: fontSize.xs,
@@ -214,7 +212,6 @@ function createStyles(colors: ThemeColors) {
       marginBottom: 4,
     },
     optional: { color: colors.textFaint, textTransform: 'none', fontWeight: '400' },
-
     chips: { paddingBottom: 4, gap: spacing.sm },
     chip: {
       flexDirection: 'row',
@@ -229,11 +226,9 @@ function createStyles(colors: ThemeColors) {
     chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     chipText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '600' },
     chipTextActive: { color: colors.onPrimary },
-
     bodyInput: { minHeight: 120, lineHeight: 22 },
     charCount: { color: colors.textFaint, fontSize: fontSize.xs, textAlign: 'right', marginTop: 4 },
     charCountWarn: { color: colors.warning },
-
     errorBox: {
       flexDirection: 'row',
       alignItems: 'center',

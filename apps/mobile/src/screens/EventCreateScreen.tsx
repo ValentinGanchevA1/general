@@ -33,6 +33,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
 import { useAppTheme, type ThemeColors } from '@/theme';
 import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
+import { extractMessage } from '@/utils/extractMessage';
 
 type Nav = NativeStackNavigationProp<EventsStackParamList>;
 type Route = NativeStackScreenProps<EventsStackParamList, 'EventCreate'>['route'];
@@ -112,7 +113,7 @@ export function EventCreateScreen(): React.JSX.Element {
 			const url = await pickAndUploadListingImage();
 			if (url) setCoverUrl(url);
 		} catch (err) {
-			setError(err instanceof Error ? err.message : 'Could not upload that photo. Please try again.');
+			setError(extractMessage(err, 'Could not upload that photo. Please try again.'));
 		} finally {
 			setUploading(false);
 		}
@@ -143,7 +144,7 @@ export function EventCreateScreen(): React.JSX.Element {
 			const created = await createEvent(req);
 			nav.replace('EventDetail', { eventId: created.id });
 		} catch (err) {
-			setError(err instanceof Error ? err.message : 'Could not create the event. Please try again.');
+			setError(extractMessage(err, 'Could not create the event. Please try again.'));
 		} finally {
 			setSubmitting(false);
 		}

@@ -29,6 +29,7 @@ import type {
   WaveResponse,
 } from '@g88/shared';
 import {getJson, postJson} from '@/api/client';
+import {extractMessage} from '@/utils/extractMessage';
 
 function peerModeFromProfile(
   profile: PublicUserProfile,
@@ -280,10 +281,7 @@ export const pinInteractionMachine = setup({
         onError: {
           target: 'error',
           actions: assign({
-            error: ({event}) =>
-              event.error instanceof Error
-                ? event.error.message
-                : 'Failed to load pin',
+            error: ({event}) => extractMessage(event.error, 'Failed to load pin'),
           }),
         },
       },
@@ -371,10 +369,7 @@ export const pinInteractionMachine = setup({
             onError: {
               target: 'viewing',
               actions: assign({
-                error: ({event}) =>
-                  event.error instanceof Error
-                    ? event.error.message
-                    : 'Wave failed',
+                error: ({event}) => extractMessage(event.error, 'Wave failed'),
               }),
             },
           },
@@ -437,10 +432,7 @@ export const pinInteractionMachine = setup({
             onError: {
               target: 'viewing',
               actions: assign({
-                error: ({event}) =>
-                  event.error instanceof Error
-                    ? event.error.message
-                    : 'Like failed',
+                error: ({event}) => extractMessage(event.error, 'Like failed'),
               }),
             },
           },
@@ -483,10 +475,7 @@ export const pinInteractionMachine = setup({
             onError: {
               target: 'viewing',
               actions: assign({
-                error: ({event}) =>
-                  event.error instanceof Error
-                    ? event.error.message
-                    : 'Pass failed',
+                error: ({event}) => extractMessage(event.error, 'Pass failed'),
               }),
             },
           },
@@ -508,10 +497,7 @@ export const pinInteractionMachine = setup({
         onError: {
           target: 'detailSheet',
           actions: assign({
-            error: ({event}) =>
-              event.error instanceof Error
-                ? event.error.message
-                : 'Block failed',
+            error: ({event}) => extractMessage(event.error, 'Block failed'),
           }),
         },
       },

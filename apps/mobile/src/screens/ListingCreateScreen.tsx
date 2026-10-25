@@ -22,6 +22,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
 import { useAppTheme, type ThemeColors } from '@/theme';
 import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
+import { extractMessage } from '@/utils/extractMessage';
 
 type Nav = NativeStackNavigationProp<CommerceStackParamList>;
 type R = RouteProp<CommerceStackParamList, 'ListingCreate'>;
@@ -65,7 +66,7 @@ export function ListingCreateScreen(): React.JSX.Element {
   const onPickPhoto = useCallback(async () => {
     setUploading(true); setError(null);
     try { const url = await pickAndUploadListingImage(); if (url) setThumbnailUrl(url); }
-    catch (err) { setError(err instanceof Error ? err.message : 'Could not upload that photo. Please try again.'); }
+    catch (err) { setError(extractMessage(err, 'Could not upload that photo. Please try again.')); }
     finally { setUploading(false); }
   }, []);
 
@@ -90,7 +91,7 @@ export function ListingCreateScreen(): React.JSX.Element {
           focusListingId: created.id, focusLat: created.location.lat, focusLng: created.location.lng,
         }, merge: true }, merge: true } as never);
       } else nav.replace('ListingDetail', { listingId: created.id });
-    } catch (err) { setError(err instanceof Error ? err.message : 'Could not create the listing. Please try again.'); }
+    } catch (err) { setError(extractMessage(err, 'Could not create the listing. Please try again.')); }
     finally { setSubmitting(false); }
   }, [canSubmit, title, priceCents, currency, category, venue, mode, description, thumbnailUrl, nav]);
 

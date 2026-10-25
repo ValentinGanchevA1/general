@@ -14,18 +14,7 @@ import type {
 
 import { getJson, postJson } from '@/api/client';
 import { logout } from '@/features/auth/authSlice';
-
-function errorMessage(e: unknown, fallback: string): string {
-  if (typeof e === 'string' && e.trim()) return e;
-  if (e && typeof e === 'object') {
-    const o = e as { message?: unknown; code?: unknown; payload?: unknown };
-    if (typeof o.message === 'string' && o.message.trim()) return o.message;
-    if (typeof o.payload === 'string' && o.payload.trim()) return o.payload;
-    if (typeof o.code === 'string' && o.code.trim()) return o.code;
-  }
-  if (e instanceof Error && e.message) return e.message;
-  return fallback;
-}
+import { extractMessage } from '@/utils/extractMessage';
 
 export interface StoriesState {
   nearby: StoryCard[];
@@ -65,7 +54,7 @@ export const fetchNearbyStories = createAsyncThunk<
     });
     return res.stories;
   } catch (e) {
-    return rejectWithValue(errorMessage(e, 'Failed to load stories'));
+    return rejectWithValue(extractMessage(e, 'Failed to load stories'));
   }
 });
 
@@ -86,7 +75,7 @@ export const fetchAuthorStories = createAsyncThunk<
     );
     return { authorId, stories };
   } catch (e) {
-    return rejectWithValue(errorMessage(e, 'Failed to load author stories'));
+    return rejectWithValue(extractMessage(e, 'Failed to load author stories'));
   }
 });
 
@@ -99,7 +88,7 @@ export const presignStory = createAsyncThunk<
       contentType,
     });
   } catch (e) {
-    return rejectWithValue(errorMessage(e, 'Presign failed'));
+    return rejectWithValue(extractMessage(e, 'Could not prepare story upload'));
   }
 });
 
@@ -116,7 +105,7 @@ export const createStory = createAsyncThunk<
     const res = await postJson<typeof body, CreateStoryResponse>('/stories', body);
     return res.story;
   } catch (e) {
-    return rejectWithValue(errorMessage(e, 'Failed to create story'));
+    return rejectWithValue(extractMessage(e, 'Failed to create story'));
   }
 });
 
@@ -130,7 +119,7 @@ export const recordStoryView = createAsyncThunk<
       {},
     );
   } catch (e) {
-    return rejectWithValue(errorMessage(e, 'Failed to record view'));
+    return rejectWithValue(extractMessage(e, 'Failed to record view'));
   }
 });
 
@@ -144,7 +133,7 @@ export const reactToStory = createAsyncThunk<
       { kind },
     );
   } catch (e) {
-    return rejectWithValue(errorMessage(e, 'Failed to react'));
+    return rejectWithValue(extractMessage(e, 'Failed to react'));
   }
 });
 
@@ -180,7 +169,7 @@ const slice = createSlice({
     });
     b.addCase(fetchNearbyStories.rejected, (s, a) => {
       s.loading = false;
-      s.error = (a.payload as string) ?? 'Failed';
+      s.error = typeof a.payload === 'string' ? a.payload : 'Failed to load stories';
     });
 
     b.addCase(fetchAuthorStories.fulfilled, (s, a) => {
@@ -199,7 +188,7 @@ const slice = createSlice({
     });
     b.addCase(createStory.rejected, (s, a) => {
       s.posting = false;
-      s.error = (a.payload as string) ?? 'Create failed';
+      s.error = typeof a.payload === 'string' ? a.payload : 'Failed to create story';
     });
 
     b.addCase(recordStoryView.fulfilled, (s, a) => {
