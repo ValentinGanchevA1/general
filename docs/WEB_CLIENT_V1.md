@@ -38,7 +38,7 @@ No backend schema, PostGIS query or persistence change is introduced.
 - BroadcastChannel communicates only a `session-changed` control signal. Access and refresh tokens are never broadcast between tabs.
 - Login, logout or terminal refresh rejection causes other tabs to reload and recover from the current HttpOnly-cookie state, preventing a replaced account/session from leaving a stale access token active in another tab.
 - A short-lived `sessionStorage` marker suppresses cross-tab reload-signal loops. It contains no credential or account data.
-- Public deployment requires HTTPS/current browsers with Web Locks. The fallback path preserves browser functionality when Web Locks are unavailable but cannot guarantee cross-tab refresh serialization; supported-browser E2E must verify this boundary.
+- Public deployment requires HTTPS/current browsers with Web Locks. The fallback path preserves browser functionality when Web Locks are unavailable but cannot guarantee cross-tab refresh serialization; the final supported-browser policy must explicitly define this boundary.
 
 ## CORS / edge contract
 
@@ -74,6 +74,15 @@ No backend schema, PostGIS query or persistence change is introduced.
 - When the access token rotates, the socket reconnects with the new handshake token because guarded gateway events re-verify `handshake.auth.token`. Any active conversation is then rejoined.
 - Location/location-session chat messages display a generic sharing label in the list; raw coordinates are not rendered by this Connections slice.
 - Realtime/backend error details are not surfaced verbatim in the Connections UI; user-visible failures are generic while server-side diagnostics remain authoritative.
+
+## Automated browser validation
+
+`Web Preview CI` now runs the actual browser code in headless Chrome through the dependency-free CDP harness. These checks are regression evidence for the implemented contracts; they do not by themselves define the final cross-browser support matrix.
+
+- **Multi-tab auth (#594):** two real same-origin tabs share an HttpOnly rotating refresh cookie; the unlocked control reproduces replay, Web Locks serialize rotations, the cookie remains unavailable to JavaScript, and BroadcastChannel/reload-loop behavior is verified.
+- **Realtime token rotation (#595):** the real `WebRealtimeClient` connects with one token, rotates the token, reconnects with a new Socket.IO handshake, rejoins the active conversation, and receives room traffic afterward.
+- **Viewport race (#596):** the actual bundled app pans to newer viewports, aborts an older slow `/discovery/nearby` request, and prevents its stale response from overwriting the current result.
+- **Connections actions/chat (#638):** the actual bundled app accepts a friend request, sends a wave-back, opens REST history, marks read, joins the Socket.IO room, sends chat, deduplicates ack + event delivery, and renders a peer reply.
 
 ## DOM / request security
 
@@ -117,8 +126,9 @@ No backend schema, PostGIS query or persistence change is introduced.
 
 ## Remaining release blockers
 
-1. Select the production web hostname, configure same-origin `/api/v1` + `/socket.io` reverse proxies, and put the HTTPS web origin in `CORS_ORIGINS`.
-2. Validate Web Locks refresh serialization, account switching and logout propagation with multi-tab E2E across the supported browser matrix.
-3. Select the production map/tile provider or self-hosted vector-tile stack and document SLA, attribution, caching, CSP and privacy policy.
-4. Add browser E2E coverage for auth rotation, Socket.IO reconnect/room rejoin, friend actions, chat send/receive and map viewport races.
-5. Deploy a non-public preview and validate browser cookie/proxy behavior end to end.
+1. **Production hosting:** choose the final web hostname/deployment policy, expose same-origin `/api/v1` + `/socket.io`, and configure the exact HTTPS browser origin in the backend allowlist without weakening the current fail-closed CORS policy.
+2. **Supported-browser policy:** define the production browser matrix and validate the Web Locks/BroadcastChannel session contract on every supported engine; the current automated browser gate is Chrome/Chromium only.
+3. **Production map stack:** replace preview-only OSM standard raster tiles with an approved provider or self-hosted/vector-tile stack and document SLA, attribution, caching, CSP, privacy and usage terms.
+4. **Deployed end-to-end validation:** run the browser auth cookie, REST proxy and Socket.IO upgrade flows against the final HTTPS preview/production topology, including login/refresh/logout and reconnect behavior.
+
+The core Chromium browser interaction gaps originally tracked for multi-tab auth, realtime reconnect/room rejoin, friend/wave/chat actions and viewport stale-response races are covered by merged real-browser E2E tests (#594, #595, #596, #638).
