@@ -63,15 +63,10 @@ export function UserLocationProvider({
   const requestPermission = useCallback(async (): Promise<void> => {
     // Native permission sheets interrupt the launch dissolve/handoff. Calls from
     // already-mounted screens are retried automatically because this callback
-    // identity changes when the one-shot interaction gate becomes ready.
+    // identity changes only when the one-shot interaction gate becomes ready.
     if (!launchInteractionsReady) return;
 
     if (Platform.OS === 'android') {
-      if (permissionStatus === 'granted') {
-        startTracking();
-        return;
-      }
-
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         NEXA_LOCATION_PERMISSION_COPY,
@@ -86,7 +81,7 @@ export function UserLocationProvider({
     }
 
     startTracking();
-  }, [launchInteractionsReady, permissionStatus, startTracking]);
+  }, [launchInteractionsReady, startTracking]);
 
   // Warm path: already-granted Android permission can start GPS beneath the
   // launch overlay without presenting native UI. A negative quiet check remains
