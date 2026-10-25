@@ -23,6 +23,10 @@ export class ConversationJoinDto {
   @IsUUID() conversationId!: string;
 }
 
+export class ConversationLeaveDto {
+  @IsUUID() conversationId!: string;
+}
+
 export class ChatSendDto {
   @IsUUID() conversationId!: string;
   @IsString() @MaxLength(2000) body!: string;

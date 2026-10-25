@@ -17,14 +17,19 @@ export class SocketRoomRegistry {
     this.conversationRefCounts.set(conversationId, current + 1);
   }
 
-  untrackConversation(conversationId: string): void {
+  /**
+   * Release one active consumer. Returns true only when the final reference was
+   * removed and the transport may safely leave the connection-scoped room.
+   */
+  untrackConversation(conversationId: string): boolean {
     const current = this.conversationRefCounts.get(conversationId);
-    if (current === undefined) return;
+    if (current === undefined) return false;
     if (current <= 1) {
       this.conversationRefCounts.delete(conversationId);
-      return;
+      return true;
     }
     this.conversationRefCounts.set(conversationId, current - 1);
+    return false;
   }
 
   trackEvent(eventId: string): void {
