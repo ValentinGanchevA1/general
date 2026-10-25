@@ -715,7 +715,17 @@ function bind(): void {
   if (messageList) messageList.scrollTop = messageList.scrollHeight;
 }
 function render(): void {
+  const preservedMap = state.tab === 'map'
+    ? root.querySelector<HTMLElement>('#nexa-map')
+    : null;
+
   root.replaceChildren(safeFragment(shell()));
+
+  if (preservedMap && state.tab === 'map') {
+    const placeholder = root.querySelector<HTMLElement>('#nexa-map');
+    if (placeholder && placeholder !== preservedMap) placeholder.replaceWith(preservedMap);
+  }
+
   bind();
 }
 
