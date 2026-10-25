@@ -8,7 +8,9 @@ import type {
   LocationShareDuration,
   LocationShareEndReason,
   LocationShareSession,
+  EntityPoint,
 } from './api';
+import type { DiscoveryPointKey } from './discovery';
 import type { EventQuestion, PollResult } from './event';
 import type { StoryNewEvent } from './story';
 
@@ -60,6 +62,19 @@ export interface PresenceDelta {
   added: Array<{ userId: string; lat: number; lng: number }>;
   /** Users that went offline or moved out of this cell. */
   removed: string[];
+}
+
+/**
+ * Server-authoritative discovery entity delta. Payloads must already satisfy
+ * viewer visibility/privacy rules and use the same sanitized EntityPoint shape
+ * returned by /discovery/nearby. Clusters remain query-authoritative.
+ */
+export interface DiscoveryEntityUpsertEvent {
+  point: EntityPoint;
+}
+
+export interface DiscoveryEntityLeaveEvent {
+  key: DiscoveryPointKey;
 }
 
 /** Close-friend online change (room `user:{friendId}`). */
@@ -202,6 +217,12 @@ export interface ServerToClientEvents {
   'dating:like_received': (e: DatingLikeReceivedEvent) => void;
   'dating:match_created': (e: DatingMatchCreatedEvent) => void;
   'presence:delta': (e: PresenceDelta) => void;
+  /** Sanitized discovery entity entered the viewer's active discovery stream. */
+  'discovery:entity:enter': (e: DiscoveryEntityUpsertEvent) => void;
+  /** Sanitized discovery entity changed while visible to this viewer. */
+  'discovery:entity:update': (e: DiscoveryEntityUpsertEvent) => void;
+  /** Discovery entity is no longer visible/in-scope for this viewer. */
+  'discovery:entity:leave': (e: DiscoveryEntityLeaveEvent) => void;
   /** A close friend went online/offline (delivered to each friend's user room). */
   'friend:presence': (e: FriendPresenceEvent) => void;
   /** Someone sent you a friend request. */
