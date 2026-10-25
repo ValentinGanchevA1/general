@@ -13,13 +13,9 @@ export interface BlockedUserRow {
 
 /**
  * Owns user-to-user blocking. Storage is directional (blocker_id/blocked_id),
- * but the effect is symmetric and checked independently from two places:
- *  - DiscoveryService: hides a blocked user's dot from the map, both directions.
- *  - MessagingService: keeps its own self-contained isBlocked() (same predicate,
- *    queried directly) so MessagingModule's wiring doesn't need to change —
- *    keep the two in sync if this predicate ever changes.
- *  - FriendsService: follow/request create paths call isBlocked(); on block we
- *    hard-delete follows, friendships, and cancel pending friend_requests.
+ * but the effect is symmetric and checked independently from interaction/read
+ * surfaces. Blocking also tears down relationship state and active live-location
+ * sessions so a block becomes an immediate privacy boundary.
  */
 @Injectable()
 export class BlocksService {
@@ -39,6 +35,25 @@ export class BlocksService {
        ON CONFLICT (blocker_id, blocked_id) DO NOTHING`,
       [blockerId, blockedId],
     );
+
+    // A live-location share is sensitive data. End any active sessions in a
+    // conversation containing both users as soon as the block becomes durable.
+    await this.db.query(
+      `UPDATE chat_location_sessions cls
+          SET status = 'ended',
+              ended_at = NOW(),
+              end_reason = 'blocked'
+        WHERE cls.status = 'active'
+          AND EXISTS (
+                SELECT 1
+                  FROM conversations c
+                 WHERE c.id = cls.conversation_id
+                   AND $1 = ANY(c.participant_ids)
+                   AND $2 = ANY(c.participant_ids)
+              )`,
+      [blockerId, blockedId],
+    );
+
     // Hard-delete social graph edges (follows, friendships, pending requests).
     await this.friends.onBlock(blockerId, blockedId);
   }
