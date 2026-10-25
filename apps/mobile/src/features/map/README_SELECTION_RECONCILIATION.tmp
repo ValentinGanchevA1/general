@@ -1,0 +1,1 @@
+Renderer selection is reconciled against currently rendered discovery points. Product QuickPeek lifecycle remains state-machine owned; viewport churn must not create ghost marker focus.
