@@ -2,12 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
-import type { DiscoveryPoint, EntityKind, UserMeta } from '@g88/shared';
+import type {
+  DiscoveryPoint,
+  DiscoverySubscriptionPayload,
+  EntityKind,
+  UserMeta,
+} from '@g88/shared';
 
 import { FriendsService } from '../friends/friends.service';
 import { PresenceService } from '../presence/presence.service';
 
-type DiscoverableKind = Exclude<EntityKind, 'cluster'>;
+type DiscoverableKind = EntityKind;
 
 interface EntityRow {
   id: string;
@@ -24,10 +29,30 @@ const OWNER_ID_SQL = `CASE v_discoverable_entity.kind
   ELSE NULL
 END`;
 
+function contextAllowsKind(
+  context: DiscoverySubscriptionPayload,
+  kind: DiscoverableKind,
+): boolean {
+  if (context.topic !== undefined && kind === 'user') return false;
+  if ((context.friendsOnly === true || context.datingOnly === true) && kind !== 'user') {
+    return false;
+  }
+  return context.kinds === undefined || context.kinds.includes(kind);
+}
+
+function topicSql(param: string): string {
+  return `AND ((kind = 'event' AND g88_slugify(meta->>'title') = ${param})
+         OR (kind = 'listing' AND g88_slugify(meta->>'category') = ${param}))`;
+}
+
+function listingModeSql(param: string): string {
+  return `AND (kind <> 'listing' OR COALESCE(meta->>'mode', 'sell') = ${param})`;
+}
+
 /**
- * Resolves one realtime discovery entity through the same viewer-facing privacy
- * boundary used by discovery: public visibility, self exclusion, bilateral
- * blocks, and friend-only presence enrichment.
+ * Resolves one realtime discovery entity through the viewer-facing privacy and
+ * active-filter boundary. Candidate viewport/entity-zoom gating happens in the
+ * subscription store; this resolver re-checks filters that require DB/social state.
  */
 @Injectable()
 export class DiscoveryEntityResolver {
@@ -41,7 +66,31 @@ export class DiscoveryEntityResolver {
     viewerId: string;
     kind: DiscoverableKind;
     entityId: string;
+    context?: DiscoverySubscriptionPayload;
   }): Promise<DiscoveryPoint | null> {
+    const context = params.context;
+    if (context !== undefined && !contextAllowsKind(context, params.kind)) return null;
+
+    let friendIds: string[] | null = null;
+    if (context?.friendsOnly === true) {
+      friendIds = await this.friends.listFriendIds(params.viewerId);
+      if (!friendIds.includes(params.entityId)) return null;
+    }
+
+    const values: unknown[] = [params.entityId, params.kind, params.viewerId];
+    let filters = '';
+    if (context?.topic !== undefined) {
+      values.push(context.topic);
+      filters += `\n          ${topicSql(`$${values.length}`)}`;
+    }
+    if (context?.listingMode !== undefined) {
+      values.push(context.listingMode);
+      filters += `\n          ${listingModeSql(`$${values.length}`)}`;
+    }
+    if (context?.datingOnly === true) {
+      filters += `\n          AND kind = 'user'\n          AND COALESCE((meta->>'openToDating')::boolean, false) = true`;
+    }
+
     const rows = await this.db.query<EntityRow[]>(
       `SELECT id, kind,
               ST_Y(location::geometry) AS lat,
@@ -57,9 +106,9 @@ export class DiscoveryEntityResolver {
               FROM user_blocks ub
              WHERE (ub.blocker_id = $3 AND ub.blocked_id = (${OWNER_ID_SQL}))
                 OR (ub.blocker_id = (${OWNER_ID_SQL}) AND ub.blocked_id = $3)
-          )
+          )${filters}
         LIMIT 1`,
-      [params.entityId, params.kind, params.viewerId],
+      values,
     );
 
     const row = rows[0];
@@ -75,8 +124,8 @@ export class DiscoveryEntityResolver {
       } as DiscoveryPoint;
     }
 
-    const friendIds = await this.friends.listFriendIds(params.viewerId);
-    const isFriend = friendIds.includes(row.id);
+    const resolvedFriendIds = friendIds ?? (await this.friends.listFriendIds(params.viewerId));
+    const isFriend = resolvedFriendIds.includes(row.id);
     let online = false;
     let lastSeenAt: string | null = null;
 
