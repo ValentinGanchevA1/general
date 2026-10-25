@@ -6,11 +6,8 @@ import {
 } from 'react-native';
 
 import { appAlert } from '@/ui/appAlert';
-import MapView, {
-	PROVIDER_GOOGLE,
-	type Region,
-} from 'react-native-maps';
-import { resolveMapStyle } from '@/components/map/mapStyle';
+import type MapView from 'react-native-maps';
+import type { Region } from 'react-native-maps';
 import {
 	BottomSheetModal,
 	BottomSheetView,
@@ -32,7 +29,7 @@ import { setPoints } from '@/features/discovery/discoverySlice';
 import { useSocket } from '@/realtime/useSocket';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { useUserLocation } from '@/features/location/useUserLocation';
-import { MapMarkers } from '@/components/map/MapMarkers';
+import { NexaMapScreenSurface } from '@/features/map/renderers/NexaMapScreenSurface';
 import { prefetchAvatars } from '@/services/avatarCache';
 import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -825,27 +822,19 @@ export function MapScreen(): React.JSX.Element {
 	return (
 		<View style={styles.root}>
 			<ErrorBoundary fallback={<MapUnavailableFallback />}>
-				<MapView
+				<NexaMapScreenSurface
 					ref={mapRef}
-					provider={PROVIDER_GOOGLE}
-					customMapStyle={resolveMapStyle(mode, scheme)}
-					style={StyleSheet.absoluteFill}
-					showsUserLocation
-					showsMyLocationButton={false}
-					showsCompass={false}
-					toolbarEnabled={false}
-					onMapReady={markMapSurfaceReady}
+					points={filteredPoints}
+					selectedEntityKey={selectedMarkerKey}
+					dimUnselected={selected != null}
+					mode={mode}
+					scheme={scheme}
+					onReady={markMapSurfaceReady}
 					onRegionChangeComplete={onRegionChangeComplete}
 					onLongPress={onMapLongPress}
-				>
-					<MapMarkers
-						points={filteredPoints}
-						selectedEntityKey={selectedMarkerKey}
-						dimUnselected={selected != null}
-						onEntityPress={onEntityPress}
-						onClusterPress={onClusterPress}
-					/>
-				</MapView>
+					onEntityPress={onEntityPress}
+					onClusterPress={onClusterPress}
+				/>
 			</ErrorBoundary>
 
 			<MapChrome
