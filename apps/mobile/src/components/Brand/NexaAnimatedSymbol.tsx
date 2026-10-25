@@ -5,7 +5,7 @@ import Svg, {
   type CircleProps,
   type LineProps,
 } from 'react-native-svg';
-import Animated, {
+import {
   Extrapolation,
   createAnimatedComponent,
   interpolate,
