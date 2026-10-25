@@ -84,30 +84,37 @@ export function UserLocationProvider({
     if (inFlight !== null) return inFlight;
 
     const request = (async (): Promise<void> => {
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          NEXA_LOCATION_PERMISSION_COPY,
-        );
-        if (!enabledRef.current) return;
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          setPermissionStatus('denied');
-          return;
+      try {
+        if (Platform.OS === 'android') {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+            NEXA_LOCATION_PERMISSION_COPY,
+          );
+          if (!enabledRef.current) return;
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            setPermissionStatus('denied');
+            return;
+          }
+          setPermissionStatus('granted');
+        } else {
+          Geolocation.requestAuthorization();
         }
-        setPermissionStatus('granted');
-      } else {
-        Geolocation.requestAuthorization();
-      }
 
-      startTracking();
+        startTracking();
+      } catch {
+        // A native bridge failure is not an explicit user denial. Keep the
+        // permission state retryable and avoid rejecting fire-and-forget callers.
+        if (enabledRef.current) setPermissionStatus('unknown');
+      }
     })();
 
     permissionRequestRef.current = request;
-    void request.finally(() => {
+    const clearInFlight = (): void => {
       if (permissionRequestRef.current === request) {
         permissionRequestRef.current = null;
       }
-    });
+    };
+    void request.then(clearInFlight, clearInFlight);
     return request;
   }, [enabled, launchInteractionsReady, startTracking]);
 
