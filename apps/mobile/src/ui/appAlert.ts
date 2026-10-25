@@ -4,6 +4,8 @@
 // Matches the Alert.alert call signature so call sites can migrate 1:1.
 // Requires <AppAlertHost /> mounted once under the root navigator.
 
+import { extractMessage } from '@/utils/extractMessage';
+
 export type AppAlertButtonStyle = 'default' | 'cancel' | 'destructive';
 
 export interface AppAlertButton {
@@ -25,6 +27,8 @@ export interface AppAlertRequest {
 }
 
 type Listener = (req: AppAlertRequest | null) => void;
+
+const ALERT_ERROR_FALLBACK = 'Something went wrong — try again in a moment';
 
 let listener: Listener | null = null;
 let pending: AppAlertRequest | null = null;
@@ -49,12 +53,14 @@ export function appAlert(
     buttons && buttons.length > 0
       ? buttons
       : [{ text: 'OK', style: 'default' }];
+  const safeMessage =
+    message !== undefined ? extractMessage(message, ALERT_ERROR_FALLBACK) : undefined;
 
   // exactOptionalPropertyTypes: omit keys when undefined (do not assign undefined).
   const req: AppAlertRequest = {
     title,
     buttons: resolved,
-    ...(message !== undefined ? { message } : {}),
+    ...(safeMessage !== undefined ? { message: safeMessage } : {}),
     ...(options !== undefined ? { options } : {}),
   };
 
