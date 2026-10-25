@@ -47,6 +47,19 @@ describe('product analytics', () => {
     ).toEqual({ entityType: 'person', surface: 'map' });
   });
 
+  it('derives exact detail loads without copying entity IDs', () => {
+    expect(productEventsForApiSuccess('get', '/users/user-secret', {})).toEqual([
+      { event: 'entity.opened', properties: { entityType: 'person' } },
+    ]);
+    expect(productEventsForApiSuccess('get', '/events/event-secret', {})).toEqual([
+      { event: 'entity.opened', properties: { entityType: 'event' } },
+    ]);
+    expect(productEventsForApiSuccess('get', '/listings/listing-secret?source=map', {})).toEqual([
+      { event: 'entity.opened', properties: { entityType: 'listing' } },
+    ]);
+    expect(productEventsForApiSuccess('get', '/events/event-secret/polls', {})).toEqual([]);
+  });
+
   it('derives successful wave + connection without persisting route identifiers', () => {
     expect(
       productEventsForApiSuccess('post', '/interactions/wave', {
@@ -55,6 +68,19 @@ describe('product analytics', () => {
     ).toEqual([
       { event: 'interaction.wave_sent', properties: { mutual: true } },
       { event: 'connection.created', properties: { mechanism: 'wave' } },
+    ]);
+  });
+
+  it('derives friend and dating connections only when they become real', () => {
+    expect(
+      productEventsForApiSuccess('post', '/friends/requests/request-secret/accept', {
+        friends: true,
+      }),
+    ).toEqual([{ event: 'connection.created', properties: { mechanism: 'friend' } }]);
+
+    expect(productEventsForApiSuccess('post', '/dating/likes', { matched: false })).toEqual([]);
+    expect(productEventsForApiSuccess('post', '/dating/likes', { matched: true })).toEqual([
+      { event: 'connection.created', properties: { mechanism: 'dating' } },
     ]);
   });
 
@@ -99,6 +125,13 @@ describe('product analytics', () => {
         headers: expect.objectContaining({ Authorization: 'Bearer test-access-token' }),
       }),
     );
+  });
+
+  it('does not upload when there is no authenticated access token', async () => {
+    getAccessToken.mockResolvedValueOnce(null);
+    trackProduct('app.session_started', { path: 'map' });
+    await flushAsyncAnalytics();
+    expect(axiosPost).not.toHaveBeenCalled();
   });
 
   it('keeps arbitrary diagnostic events out of product analytics', async () => {
