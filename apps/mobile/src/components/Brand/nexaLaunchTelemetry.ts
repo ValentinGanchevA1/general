@@ -8,6 +8,8 @@ export interface NexaLaunchTelemetryInput {
   overlayHiddenAtMs: number | null;
   requiresMapSurface: boolean;
   mapSurfaceWaitExpired: boolean;
+  /** True when the launch used the spatial handoff branch after overlay exit. */
+  spatialHandoffUsed: boolean;
 }
 
 export interface NexaLaunchTelemetryProps
@@ -18,6 +20,7 @@ export interface NexaLaunchTelemetryProps
   mapReadyMs: number | null;
   overlayHiddenMs: number | null;
   mapReadyFailOpen: boolean;
+  spatialHandoffUsed: boolean;
 }
 
 function elapsedMs(startedAtMs: number, endedAtMs: number | null): number | null {
@@ -43,5 +46,7 @@ export function buildNexaLaunchTelemetryProps(
     overlayHiddenMs: elapsedMs(input.startedAtMs, input.overlayHiddenAtMs),
     mapReadyFailOpen:
       input.requiresMapSurface && input.mapSurfaceWaitExpired,
+    spatialHandoffUsed:
+      input.requiresMapSurface && input.spatialHandoffUsed,
   };
 }
