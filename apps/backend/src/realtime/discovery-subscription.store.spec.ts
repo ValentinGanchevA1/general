@@ -31,4 +31,47 @@ describe('DiscoverySubscriptionStore', () => {
 
     expect(store.get('socket-a')).toBeNull();
   });
+
+  it('returns only entity-zoom subscriptions whose viewport and kinds can contain the entity', () => {
+    const store = new DiscoverySubscriptionStore();
+    store.set('matching', 'viewer-1', query);
+    store.set('cluster-zoom', 'viewer-2', { ...query, zoom: 14 });
+    store.set('wrong-kind', 'viewer-3', { ...query, kinds: ['event'] });
+    store.set('outside', 'viewer-4', {
+      ...query,
+      viewport: {
+        ne: { lat: 42.8, lng: 27.5 },
+        sw: { lat: 42.6, lng: 27.2 },
+      },
+    });
+
+    expect(store.candidatesForEntity('user', { lat: 43.2, lng: 27.9 })).toEqual([
+      expect.objectContaining({ socketId: 'matching', viewerId: 'viewer-1' }),
+    ]);
+  });
+
+  it('handles antimeridian viewports and caps candidate fan-out', () => {
+    const store = new DiscoverySubscriptionStore();
+    const antimeridianQuery: DiscoverySubscriptionPayload = {
+      viewport: {
+        ne: { lat: 10, lng: -170 },
+        sw: { lat: -10, lng: 170 },
+      },
+      zoom: 16,
+      kinds: ['listing'],
+    };
+    store.set('socket-a', 'viewer-1', antimeridianQuery);
+    store.set('socket-b', 'viewer-2', antimeridianQuery);
+
+    expect(store.candidatesForEntity('listing', { lat: 0, lng: 179 }, 1)).toEqual([
+      expect.objectContaining({ socketId: 'socket-a' }),
+    ]);
+  });
+
+  it('does not select user subscriptions when a topic filter is active', () => {
+    const store = new DiscoverySubscriptionStore();
+    store.set('socket-a', 'viewer-1', { ...query, friendsOnly: false, topic: 'music' });
+
+    expect(store.candidatesForEntity('user', { lat: 43.2, lng: 27.9 })).toEqual([]);
+  });
 });
