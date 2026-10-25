@@ -20,6 +20,7 @@ import {
   resolveSocketAppStateAction,
   shouldReplayCachedPresence,
 } from './socketAppState';
+import { SocketRoomRegistry } from './socketRoomRegistry';
 
 type G88Socket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -50,6 +51,8 @@ let lifecycleBound = false;
 let appStateSubscription: { remove: () => void } | null = null;
 /** Last location heartbeat observed while the app was active, scoped to this login. */
 let lastPresencePayload: PresenceUpdatePayload | null = null;
+/** Room membership intent survives connection-scoped Socket.IO reconnects. */
+const roomRegistry = new SocketRoomRegistry();
 
 /** Monotonic suffix so two sends in the same ms never share an optimistic id. */
 let clientMessageSeq = 0;
@@ -138,6 +141,61 @@ function socketSendPresence(
   });
 }
 
+function socketJoinConversation(conversationId: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const s = sharedSocket;
+    if (!s?.connected) return resolve(false);
+    const timer = setTimeout(() => resolve(false), 3_000);
+    s.emit('conversation:join', { conversationId }, (res) => {
+      clearTimeout(timer);
+      resolve(res.ok);
+    });
+  });
+}
+
+function socketJoinEvent(eventId: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const s = sharedSocket;
+    if (!s?.connected) return resolve(false);
+    const timer = setTimeout(() => resolve(false), 3_000);
+    s.emit('event:join', { eventId }, (res) => {
+      clearTimeout(timer);
+      resolve(res.ok);
+    });
+  });
+}
+
+function socketLeaveEvent(eventId: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const s = sharedSocket;
+    if (!s?.connected) return resolve(false);
+    const timer = setTimeout(() => resolve(false), 3_000);
+    s.emit('event:leave', { eventId }, (res) => {
+      clearTimeout(timer);
+      resolve(res.ok);
+    });
+  });
+}
+
+async function rejoinTrackedRooms(): Promise<void> {
+  const { conversationIds, eventIds } = roomRegistry.snapshot();
+  if (conversationIds.length === 0 && eventIds.length === 0) return;
+
+  const results = await Promise.all([
+    ...conversationIds.map((conversationId) =>
+      socketJoinConversation(conversationId),
+    ),
+    ...eventIds.map((eventId) => socketJoinEvent(eventId)),
+  ]);
+
+  if (__DEV__) {
+    const failures = results.filter((ok) => !ok).length;
+    if (failures > 0) {
+      console.warn(`[socket] failed to rejoin ${failures} tracked room(s)`);
+    }
+  }
+}
+
 async function onConnectedSideEffects(): Promise<void> {
   if (
     shouldReplayCachedPresence(
@@ -150,6 +208,10 @@ async function onConnectedSideEffects(): Promise<void> {
     // reconnect instead of waiting for the Map's next 30 s heartbeat.
     void socketSendPresence(lastPresencePayload);
   }
+
+  // Socket.IO rooms are connection-scoped. Restore the current session's room
+  // intents before any reconnect listener or queued chat send can depend on them.
+  await rejoinTrackedRooms();
 
   notifyConnectListeners();
   // Heal friends badge after any gap offline.
@@ -166,10 +228,32 @@ async function onConnectedSideEffects(): Promise<void> {
     const { store } = await import('@/store');
     const { outbox } = store.getState().chat;
     if (outbox.length === 0) return;
+
+    // Persisted/queued messages can outlive the ChatScreen that originally joined
+    // the room. Ensure those conversations are joined before the first retry.
+    const outboxConversationIds = [
+      ...new Set(outbox.map((entry) => entry.conversationId)),
+    ];
+    for (const conversationId of outboxConversationIds) {
+      roomRegistry.trackConversation(conversationId);
+    }
+    const joinResults = await Promise.all(
+      outboxConversationIds.map((conversationId) =>
+        socketJoinConversation(conversationId),
+      ),
+    );
+    const joinedConversations = new Set(
+      outboxConversationIds.filter((_, index) => joinResults[index] === true),
+    );
+
     const { messageConfirmed, outboxRetryIncremented } = await import(
       '@/features/chat/chatSlice'
     );
     for (const entry of outbox) {
+      if (!joinedConversations.has(entry.conversationId)) {
+        store.dispatch(outboxRetryIncremented(entry.optimisticId));
+        continue;
+      }
       const result = await socketSendMessage(
         entry.conversationId,
         entry.body,
@@ -431,16 +515,12 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
   );
 
   const joinConversation = useCallback(
-    (conversationId: string): Promise<boolean> =>
-      new Promise((resolve) => {
-        const s = sharedSocket;
-        if (!s?.connected) return resolve(false);
-        const timer = setTimeout(() => resolve(false), 3_000);
-        s.emit('conversation:join', { conversationId }, (res) => {
-          clearTimeout(timer);
-          resolve(res.ok);
-        });
-      }),
+    (conversationId: string): Promise<boolean> => {
+      // Track intent before checking connectivity so ChatScreen can mount while
+      // offline and still be joined automatically on the next connection.
+      roomRegistry.trackConversation(conversationId);
+      return socketJoinConversation(conversationId);
+    },
     [],
   );
 
@@ -451,30 +531,20 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
   );
 
   const joinEvent = useCallback(
-    (eventId: string): Promise<boolean> =>
-      new Promise((resolve) => {
-        const s = sharedSocket;
-        if (!s?.connected) return resolve(false);
-        const timer = setTimeout(() => resolve(false), 3_000);
-        s.emit('event:join', { eventId }, (res) => {
-          clearTimeout(timer);
-          resolve(res.ok);
-        });
-      }),
+    (eventId: string): Promise<boolean> => {
+      roomRegistry.trackEvent(eventId);
+      return socketJoinEvent(eventId);
+    },
     [],
   );
 
   const leaveEvent = useCallback(
-    (eventId: string): Promise<boolean> =>
-      new Promise((resolve) => {
-        const s = sharedSocket;
-        if (!s?.connected) return resolve(false);
-        const timer = setTimeout(() => resolve(false), 3_000);
-        s.emit('event:leave', { eventId }, (res) => {
-          clearTimeout(timer);
-          resolve(res.ok);
-        });
-      }),
+    (eventId: string): Promise<boolean> => {
+      // Remove intent even while offline; otherwise a closed event screen would
+      // be rejoined when the foreground connection comes back.
+      roomRegistry.untrackEvent(eventId);
+      return socketLeaveEvent(eventId);
+    },
     [],
   );
 
@@ -493,6 +563,7 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
 export function disconnectSocket(): void {
   unbindAppStateLifecycle();
   lastPresencePayload = null;
+  roomRegistry.clear();
   if (sharedSocket) {
     sharedSocket.removeAllListeners();
     sharedSocket.disconnect();
