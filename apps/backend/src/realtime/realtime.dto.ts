@@ -1,18 +1,52 @@
 import { Type } from 'class-transformer';
 import {
+  IsArray,
+  IsBoolean,
   IsIn,
   IsLatitude,
   IsLongitude,
   IsNumber,
+  IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
   ValidateNested,
 } from 'class-validator';
+import type { DiscoveryRankBy, EntityKind, ListingMode } from '@g88/shared';
 
 class LocationDto {
   @IsNumber() @IsLatitude() lat!: number;
   @IsNumber() @IsLongitude() lng!: number;
+}
+
+class DiscoveryViewportDto {
+  @ValidateNested() @Type(() => LocationDto) ne!: LocationDto;
+  @ValidateNested() @Type(() => LocationDto) sw!: LocationDto;
+}
+
+export class DiscoverySubscriptionDto {
+  @ValidateNested() @Type(() => DiscoveryViewportDto) viewport!: DiscoveryViewportDto;
+
+  @IsNumber() @Min(0) @Max(22) zoom!: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(['user', 'event', 'listing'], { each: true })
+  kinds?: EntityKind[];
+
+  @IsOptional() @IsString() @MaxLength(40) topic?: string;
+
+  @IsOptional() @IsIn(['sell', 'buy']) listingMode?: ListingMode;
+
+  @IsOptional() @IsBoolean() friendsOnly?: boolean;
+
+  @IsOptional() @IsBoolean() datingOnly?: boolean;
+
+  @IsOptional()
+  @IsIn(['relevance', 'distance', 'newest'])
+  rankBy?: DiscoveryRankBy;
 }
 
 export class PresenceUpdateDto {

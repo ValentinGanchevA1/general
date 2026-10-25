@@ -4,6 +4,7 @@ import { WsJwtGuard } from './ws-jwt.guard';
 import { LocationShareSweepService } from './location-share.sweep';
 import { DiscoveryRealtimePublisher } from './discovery-realtime.publisher';
 import { DiscoverySubscriptionStore } from './discovery-subscription.store';
+import { DiscoverySubscriptionGateway } from './discovery-subscription.gateway';
 import { PresenceModule } from '../modules/presence/presence.module';
 import { AuthModule } from '../modules/auth/auth.module';
 import { ChatModule } from '../modules/chat/chat.module';
@@ -25,6 +26,7 @@ import { DiscoveryModule } from '../modules/discovery/discovery.module';
   ],
   providers: [
     RealtimeGateway,
+    DiscoverySubscriptionGateway,
     WsJwtGuard,
     LocationShareSweepService,
     DiscoveryRealtimePublisher,
