@@ -12,6 +12,8 @@ export interface NexaLaunchTelemetryInput {
   spatialHandoffUsed: boolean;
   /** Exact Reduced Motion mode frozen by the branded launch resolver. */
   reducedMotion: boolean | null;
+  /** True when the app left the foreground before the branded launch completed. */
+  interrupted: boolean;
 }
 
 export interface NexaLaunchTelemetryProps
@@ -24,6 +26,7 @@ export interface NexaLaunchTelemetryProps
   mapReadyFailOpen: boolean;
   spatialHandoffUsed: boolean;
   reducedMotion: boolean | null;
+  interrupted: boolean;
 }
 
 function elapsedMs(startedAtMs: number, endedAtMs: number | null): number | null {
@@ -52,5 +55,6 @@ export function buildNexaLaunchTelemetryProps(
     spatialHandoffUsed:
       input.requiresMapSurface && input.spatialHandoffUsed,
     reducedMotion: input.reducedMotion,
+    interrupted: input.interrupted,
   };
 }
