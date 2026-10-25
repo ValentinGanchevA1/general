@@ -2,26 +2,29 @@ import { Injectable } from '@nestjs/common';
 import type {
   DiscoveryEntityLeaveEvent,
   DiscoveryEntityUpsertEvent,
+  DiscoveryPointKey,
   EntityKind,
+  LatLng,
 } from '@g88/shared';
 
 import { DiscoveryEntityResolver } from '../modules/discovery/discovery-entity-resolver.service';
 import { RealtimeGateway } from './realtime.gateway';
+import { DiscoverySubscriptionStore } from './discovery-subscription.store';
 
-type DiscoverableKind = Exclude<EntityKind, 'cluster'>;
+type DiscoverableKind = EntityKind;
 type DiscoveryRealtimeChange = 'enter' | 'update';
 
 /**
- * Emits discovery deltas only to a specific viewer's authenticated room.
- *
- * Raw entity changes must use publishEntityChange(), which resolves the entity
- * through the viewer-specific discovery privacy boundary before emission.
+ * Emits discovery deltas only to sockets with an active matching discovery
+ * subscription. Candidate selection is coarse; every candidate still passes
+ * through the viewer-specific resolver before emission.
  */
 @Injectable()
 export class DiscoveryRealtimePublisher {
   constructor(
     private readonly realtime: RealtimeGateway,
     private readonly resolver: DiscoveryEntityResolver,
+    private readonly subscriptions: DiscoverySubscriptionStore,
   ) {}
 
   async publishEntityChange(params: {
@@ -46,6 +49,42 @@ export class DiscoveryRealtimePublisher {
     return true;
   }
 
+  async publishEntityChangeToSubscribers(params: {
+    kind: DiscoverableKind;
+    entityId: string;
+    location: LatLng;
+    change: DiscoveryRealtimeChange;
+  }): Promise<number> {
+    const candidates = this.subscriptions.candidatesForEntity(params.kind, params.location);
+    let published = 0;
+
+    for (const candidate of candidates) {
+      const point = await this.resolver.resolveForViewer({
+        viewerId: candidate.viewerId,
+        kind: params.kind,
+        entityId: params.entityId,
+        context: candidate.query,
+      });
+
+      if (point == null || point.kind === 'cluster') {
+        this.emitLeaveToSocket(candidate.socketId, {
+          key: `${params.kind}:${params.entityId}` as DiscoveryPointKey,
+        });
+        continue;
+      }
+
+      const event: DiscoveryEntityUpsertEvent = { point };
+      if (params.change === 'enter') {
+        this.emitEnterToSocket(candidate.socketId, event);
+      } else {
+        this.emitUpdateToSocket(candidate.socketId, event);
+      }
+      published += 1;
+    }
+
+    return published;
+  }
+
   emitEnter(viewerId: string, event: DiscoveryEntityUpsertEvent): void {
     this.realtime.server
       .to(this.viewerRoom(viewerId))
@@ -62,6 +101,18 @@ export class DiscoveryRealtimePublisher {
     this.realtime.server
       .to(this.viewerRoom(viewerId))
       .emit('discovery:entity:leave', event);
+  }
+
+  private emitEnterToSocket(socketId: string, event: DiscoveryEntityUpsertEvent): void {
+    this.realtime.server.to(socketId).emit('discovery:entity:enter', event);
+  }
+
+  private emitUpdateToSocket(socketId: string, event: DiscoveryEntityUpsertEvent): void {
+    this.realtime.server.to(socketId).emit('discovery:entity:update', event);
+  }
+
+  private emitLeaveToSocket(socketId: string, event: DiscoveryEntityLeaveEvent): void {
+    this.realtime.server.to(socketId).emit('discovery:entity:leave', event);
   }
 
   private viewerRoom(viewerId: string): string {
