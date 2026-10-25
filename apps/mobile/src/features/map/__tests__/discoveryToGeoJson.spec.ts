@@ -84,6 +84,15 @@ describe('discoveryToMapFeatureCollection', () => {
     expect(serialized).not.toContain('"by"');
   });
 
+  it('reuses the collection when an incremental snapshot is unchanged', () => {
+    const previous = discoveryToMapFeatureCollection(points);
+    const samePoints = [...points];
+
+    const next = updateMapFeatureCollection(points, previous, samePoints);
+
+    expect(next).toBe(previous);
+  });
+
   it('reuses unchanged feature objects across incremental snapshots', () => {
     const previous = discoveryToMapFeatureCollection(points);
     const updatedUser: DiscoveryPoint = {

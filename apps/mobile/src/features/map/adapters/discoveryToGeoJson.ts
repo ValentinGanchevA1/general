@@ -103,6 +103,11 @@ export function updateMapFeatureCollection(
   previousCollection: NexaMapFeatureCollection,
   points: readonly DiscoveryPoint[],
 ): NexaMapFeatureCollection {
+  const snapshotUnchanged =
+    previousPoints.length === points.length &&
+    points.every((point, index) => previousPoints[index] === point);
+  if (snapshotUnchanged) return previousCollection;
+
   const previousPointByKey = new Map<DiscoveryPointKey, DiscoveryPoint>();
   for (const point of previousPoints) {
     previousPointByKey.set(getDiscoveryPointKey(point), point);
