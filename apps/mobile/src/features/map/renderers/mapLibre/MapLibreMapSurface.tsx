@@ -15,7 +15,8 @@ type GeoJSONSourcePressHandler = NonNullable<
 >;
 type CircleLayerSpecification = Extract<LayerSpecification, { type: 'circle' }>;
 type CircleLayerFilter = NonNullable<CircleLayerSpecification['filter']>;
-type CircleOpacity = NonNullable<CircleLayerSpecification['paint']>['circle-opacity'];
+type CircleLayerPaint = NonNullable<CircleLayerSpecification['paint']>;
+type CircleOpacity = NonNullable<CircleLayerPaint['circle-opacity']>;
 type CameraRef = React.ElementRef<typeof Camera>;
 
 import { discoveryToMapFeatureCollection } from '../../adapters/discoveryToGeoJson';
