@@ -11,12 +11,24 @@ describe('resolveRateLimitTracker', () => {
     ).toBe('203.0.113.42');
   });
 
-  it('supports an IPv6 client address', () => {
+  it('groups IPv6 privacy addresses by /64 like the built-in throttler', () => {
     expect(
       resolveRateLimitTracker({
-        headers: { 'x-forwarded-for': '2001:db8::1234, 10.0.0.5' },
+        headers: { 'x-forwarded-for': '2001:db8:abcd:1234:1111:2222:3333:4444' },
       }),
-    ).toBe('2001:db8::1234');
+    ).toBe('2001:db8:abcd:1234::/64');
+
+    expect(
+      resolveRateLimitTracker({
+        headers: { 'x-forwarded-for': '2001:db8:abcd:1234:aaaa:bbbb:cccc:dddd' },
+      }),
+    ).toBe('2001:db8:abcd:1234::/64');
+  });
+
+  it('normalizes IPv4-mapped IPv6 addresses to their IPv4 identity', () => {
+    expect(
+      resolveRateLimitTracker({ headers: { 'x-forwarded-for': '::ffff:192.0.2.31' } }),
+    ).toBe('192.0.2.31');
   });
 
   it('supports Node header arrays', () => {
