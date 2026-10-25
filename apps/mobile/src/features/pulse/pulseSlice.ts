@@ -5,6 +5,7 @@ import type { ActivityItem, ActivityType, FeedResponse } from '@g88/shared';
 
 import { getJson } from '@/api/client';
 import { logout } from '@/features/auth/authSlice';
+import { extractMessage } from '@/utils/extractMessage';
 
 export interface PulseState {
   items: ActivityItem[];
@@ -37,7 +38,7 @@ export const fetchFeed = createAsyncThunk<FeedResponse, FetchFeedArgs | undefine
       const suffix = qs.length ? `?${qs.join('&')}` : '';
       return await getJson<FeedResponse>(`/feed${suffix}`);
     } catch (e) {
-      return rejectWithValue(e instanceof Error ? e.message : 'Failed to load Pulse');
+      return rejectWithValue(extractMessage(e, 'Failed to load Pulse'));
     }
   },
 );
@@ -57,7 +58,7 @@ const slice = createSlice({
     });
     b.addCase(fetchFeed.rejected, (s, a) => {
       s.loading = false;
-      s.error = (a.payload as string | undefined) ?? a.error.message ?? 'Failed';
+      s.error = typeof a.payload === 'string' ? a.payload : 'Failed to load Pulse';
     });
     b.addCase(logout.fulfilled, () => initialState);
     b.addCase(logout.rejected, () => initialState);
