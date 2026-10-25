@@ -18,6 +18,7 @@ type CircleLayerSpecification = Extract<LayerSpecification, { type: 'circle' }>;
 type CircleLayerFilter = NonNullable<CircleLayerSpecification['filter']>;
 type CircleLayerPaint = NonNullable<CircleLayerSpecification['paint']>;
 type CircleOpacity = NonNullable<CircleLayerPaint['circle-opacity']>;
+type CircleColor = NonNullable<CircleLayerPaint['circle-color']>;
 type CameraRef = React.ElementRef<typeof Camera>;
 
 import { discoveryToMapFeatureCollection } from '../../adapters/discoveryToGeoJson';
@@ -34,6 +35,15 @@ const DISCOVERY_SOURCE_ID = 'nexa-discovery';
 const DISCOVERY_LAYER_ID = 'nexa-discovery-points';
 const DISCOVERY_SELECTED_HALO_LAYER_ID = 'nexa-discovery-selected-halo';
 const DISCOVERY_SELECTED_LAYER_ID = 'nexa-discovery-selected';
+const DISCOVERY_KIND_COLOR: CircleColor = [
+  'match',
+  ['get', 'kind'],
+  'cluster', '#7C3AED',
+  'user', '#8B5CF6',
+  'event', '#F59E0B',
+  'listing', '#22C55E',
+  '#8B5CF6',
+];
 
 export interface MapLibreMapSurfaceProps {
   points: readonly DiscoveryPoint[];
@@ -157,15 +167,7 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
             id={DISCOVERY_LAYER_ID}
             type="circle"
             paint={{
-              'circle-color': [
-                'match',
-                ['get', 'kind'],
-                'cluster', '#7C3AED',
-                'user', '#8B5CF6',
-                'event', '#F59E0B',
-                'listing', '#22C55E',
-                '#8B5CF6',
-              ],
+              'circle-color': DISCOVERY_KIND_COLOR,
               'circle-opacity': baseOpacity,
               'circle-radius': [
                 'match',
@@ -184,10 +186,10 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
             type="circle"
             filter={selectedFilter}
             paint={{
-              'circle-color': '#8B5CF6',
+              'circle-color': DISCOVERY_KIND_COLOR,
               'circle-opacity': 0.2,
               'circle-radius': 18,
-              'circle-stroke-color': '#8B5CF6',
+              'circle-stroke-color': DISCOVERY_KIND_COLOR,
               'circle-stroke-opacity': 0.5,
               'circle-stroke-width': 2,
             }}
@@ -197,7 +199,7 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
             type="circle"
             filter={selectedFilter}
             paint={{
-              'circle-color': '#8B5CF6',
+              'circle-color': DISCOVERY_KIND_COLOR,
               'circle-opacity': 1,
               'circle-radius': 11,
               'circle-stroke-color': '#FFFFFF',
