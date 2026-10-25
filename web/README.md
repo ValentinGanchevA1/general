@@ -66,9 +66,20 @@ The web bundle imports `socket.io-client` at build time from the already locked 
 
 This is strong Chromium regression coverage, not a declaration that every browser engine is production-supported.
 
+## Deployed HTTPS smoke gate
+
+`Web Deployed Smoke` is a manual `workflow_dispatch` gate for a stable staging/production-like HTTPS origin.
+
+- `public-only` verifies edge health, required security headers, same-origin `/api/v1` reachability and a real `/socket.io` WebSocket/Engine.IO upgrade.
+- `authenticated` additionally signs in through the deployed UI, verifies the refresh cookie remains HttpOnly, rotates `/auth/web/refresh`, waits for realtime Connections and signs out.
+- Authenticated mode reads only `WEB_SMOKE_EMAIL` and `WEB_SMOKE_PASSWORD` repository secrets; credentials are never accepted as workflow inputs or committed to the repo.
+- The default authenticated mode fails closed when those secrets are not configured.
+
+The existence of this workflow is not itself a deployed pass. The release gate closes only after it succeeds against the chosen stable HTTPS topology.
+
 ## Remaining release blockers
 
 1. Choose the production web hostname/deployment policy, configure same-origin `/api/v1` + `/socket.io`, and allowlist only the exact HTTPS browser origin.
 2. Define the supported-browser matrix and validate the Web Locks/BroadcastChannel session contract on each supported engine.
 3. Select the production map/tile provider or self-hosted/vector-tile stack with explicit SLA, attribution, caching, CSP, privacy and usage terms.
-4. Validate login/refresh/logout, REST proxying and Socket.IO upgrades against the final deployed HTTPS topology.
+4. Run `Web Deployed Smoke` in authenticated mode against the final stable HTTPS staging/production-like topology and require a green result before web release.
