@@ -26,6 +26,7 @@ import {
   NEXA_MAP_SURFACE_READY_FAIL_OPEN_MS,
   resolveNexaLaunchReady,
 } from '@/components/Brand/nexaLaunchReadiness';
+import { UserLocationProvider } from '@/features/location/UserLocationProvider';
 
 Sentry.init({
   dsn: Config.SENTRY_DSN,
@@ -107,7 +108,12 @@ function AppShell(): React.JSX.Element {
         onMapSurfaceReady={handleMapSurfaceReady}
         interactionsReady={launchInteractionsReady}
       >
-        <AppNavigator />
+        <UserLocationProvider
+          key={user?.id ?? 'signed-out'}
+          enabled={user != null}
+        >
+          <AppNavigator />
+        </UserLocationProvider>
       </NexaLaunchSurfaceProvider>
       <NexaLaunchOverlay ready={launchReady} onHidden={handleLaunchHidden} />
       {showSpatialHandoff ? (
