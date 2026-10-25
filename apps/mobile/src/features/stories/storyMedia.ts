@@ -9,6 +9,7 @@
 // Android: if CAMERA is declared in the app manifest, image-picker requires
 // the host to request the runtime permission before launchCamera.
 
+import * as Sentry from '@sentry/react-native';
 import { PermissionsAndroid, Platform } from 'react-native';
 
 import { appAlert } from '@/ui/appAlert';
@@ -125,11 +126,10 @@ async function readVideoAsBase64(asset: Asset): Promise<string> {
     }
   }
 
-  throw new Error(
-    lastError?.message
-      ? `Could not read the video file (${lastError.message})`
-      : 'Could not read the video file',
-  );
+  if (lastError) {
+    Sentry.captureException(lastError, { tags: { resource: 'stories.media.read' } });
+  }
+  throw new Error('Could not read the video file. Try again or pick from Library.');
 }
 
 function uniquePaths(paths: Array<string | undefined | null>): string[] {
@@ -243,12 +243,24 @@ async function pickAsset(source: Source): Promise<Asset | null> {
 
   if (result.didCancel) return null;
   if (result.errorCode) {
-    throw new Error(result.errorMessage ?? `Picker error (${result.errorCode})`);
+    Sentry.captureMessage('Story media picker failed', {
+      level: 'warning',
+      tags: { resource: 'stories.media.picker', errorCode: result.errorCode },
+      extra: { errorMessage: result.errorMessage ?? null },
+    });
+    throw new Error('Could not open the selected media. Try again.');
   }
 
   const asset = result.assets?.[0];
   if (!asset?.uri) {
-    throw new Error(result.errorMessage ?? 'Could not read the selected media');
+    if (result.errorMessage) {
+      Sentry.captureMessage('Story media picker returned no asset URI', {
+        level: 'warning',
+        tags: { resource: 'stories.media.picker' },
+        extra: { errorMessage: result.errorMessage },
+      });
+    }
+    throw new Error('Could not read the selected media. Try again.');
   }
   return asset;
 }
