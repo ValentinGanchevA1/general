@@ -20,6 +20,7 @@ module.exports = {
   setContext: noop,
   setExtra: noop,
   setExtras: noop,
+  startInactiveSpan: () => ({ end: noop, setAttribute: noop, setAttributes: noop }),
   withScope: (cb) => cb({ setTag: noop, setExtra: noop, setContext: noop }),
   flush: () => Promise.resolve(true),
   close: () => Promise.resolve(true),

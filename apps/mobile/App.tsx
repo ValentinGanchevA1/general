@@ -14,6 +14,7 @@ import { Config } from '@/config';
 import { track } from '@/lib/analytics';
 import {
   navigationIntegration,
+  recordNexaLaunchPerformance,
   resolveSentryDist,
   resolveSentryRelease,
 } from '@/lib/sentry';
@@ -101,18 +102,27 @@ function AppShell(): React.JSX.Element {
       if (launchTelemetrySentRef.current) return;
       launchTelemetrySentRef.current = true;
 
-      track(
-        'nexa_launch_complete',
-        buildNexaLaunchTelemetryProps({
-          startedAtMs: launchStartedAtMs,
-          completedAtMs,
-          authReadyAtMs: authReadyAtRef.current,
-          mapReadyAtMs: mapReadyAtRef.current,
-          overlayHiddenAtMs: overlayHiddenAtRef.current,
-          requiresMapSurface,
-          mapSurfaceWaitExpired,
-        }),
-      );
+      const telemetry = buildNexaLaunchTelemetryProps({
+        startedAtMs: launchStartedAtMs,
+        completedAtMs,
+        authReadyAtMs: authReadyAtRef.current,
+        mapReadyAtMs: mapReadyAtRef.current,
+        overlayHiddenAtMs: overlayHiddenAtRef.current,
+        requiresMapSurface,
+        mapSurfaceWaitExpired,
+      });
+
+      track('nexa_launch_complete', telemetry);
+      recordNexaLaunchPerformance({
+        startedAtMs: launchStartedAtMs,
+        completedAtMs,
+        path: telemetry.path,
+        totalMs: telemetry.totalMs,
+        authReadyMs: telemetry.authReadyMs,
+        mapReadyMs: telemetry.mapReadyMs,
+        overlayHiddenMs: telemetry.overlayHiddenMs,
+        mapReadyFailOpen: telemetry.mapReadyFailOpen,
+      });
     },
     [launchStartedAtMs, mapSurfaceWaitExpired, requiresMapSurface],
   );
