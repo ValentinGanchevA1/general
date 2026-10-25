@@ -32,6 +32,12 @@ describe('extractMessage', () => {
     );
   });
 
+  it('keeps cold-start 503 transport failures on the existing transient-server copy', () => {
+    expect(extractMessage(new Error('Request failed with status code 503'), 'Failed to load')).toBe(
+      'Server is waking up — try again in a few seconds',
+    );
+  });
+
   it('preserves product-authored API messages', () => {
     expect(
       extractMessage(
