@@ -13,8 +13,10 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AnalyticsService } from './analytics.service';
 
+const PRODUCT_ANALYTICS_EVENT_VALUES: string[] = [...PRODUCT_ANALYTICS_EVENTS];
+
 class IngestAnalyticsEventDto implements ProductAnalyticsIngestRequest {
-  @IsIn(PRODUCT_ANALYTICS_EVENTS)
+  @IsIn(PRODUCT_ANALYTICS_EVENT_VALUES)
   event!: ProductAnalyticsEventName;
 
   @IsOptional()
