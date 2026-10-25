@@ -17,6 +17,7 @@ import {
 } from '@/components/map/focusPeerOnMap';
 import type { ListingModeFilterValue } from '@/components/map/ListingModeFilter';
 import { useNexaMapSurfaceReady } from '@/components/Brand/NexaLaunchSurfaceContext';
+import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
 
 export type MapFocusParams = {
   focusMyPin?: boolean;
@@ -100,6 +101,7 @@ export function useMapFocus({
   const hasCenteredOnUserRef = useRef(false);
   const coldStartAttemptsRef = useRef(0);
   const markLaunchMapSurfaceReady = useNexaMapSurfaceReady();
+  const reduceMotion = useNexaReducedMotion();
 
   useEffect(() => {
     let cancelled = false;
@@ -174,7 +176,7 @@ export function useMapFocus({
       clearFocusParams();
 
       const runCamera = (): void => {
-        mapRef.current?.animateToRegion(nextRegion, duration);
+        mapRef.current?.animateToRegion(nextRegion, reduceMotion ? 0 : duration);
       };
 
       InteractionManager.runAfterInteractions(() => {
@@ -183,11 +185,14 @@ export function useMapFocus({
         setTimeout(runCamera, 120);
         setTimeout(runCamera, 400);
         if (point) {
-          setTimeout(() => setSelected(point), Math.min(duration, 280));
+          setTimeout(
+            () => setSelected(point),
+            reduceMotion ? 0 : Math.min(duration, 280),
+          );
         }
       });
     },
-    [clearFocusParams, mapRef, myCoords, setRegion, setSelected],
+    [clearFocusParams, mapRef, myCoords, reduceMotion, setRegion, setSelected],
   );
 
   const buildSeedUserPoint = useCallback(
@@ -383,7 +388,7 @@ export function useMapFocus({
     };
     setRegion(nextRegion);
     const runCamera = (): void => {
-      mapRef.current?.animateToRegion(nextRegion, 400);
+      mapRef.current?.animateToRegion(nextRegion, reduceMotion ? 0 : 400);
     };
     InteractionManager.runAfterInteractions(() => {
       runCamera();
@@ -391,7 +396,16 @@ export function useMapFocus({
       setTimeout(runCamera, 400);
       setTimeout(runCamera, 900);
     });
-  }, [myCoords, region, focusMyPin, focusUserId, focusListingId, mapRef, setRegion]);
+  }, [
+    myCoords,
+    region,
+    focusMyPin,
+    focusUserId,
+    focusListingId,
+    mapRef,
+    reduceMotion,
+    setRegion,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -406,7 +420,7 @@ export function useMapFocus({
         };
         setRegion(nextRegion);
         const runCamera = (): void => {
-          mapRef.current?.animateToRegion(nextRegion, 450);
+          mapRef.current?.animateToRegion(nextRegion, reduceMotion ? 0 : 450);
         };
         InteractionManager.runAfterInteractions(() => {
           runCamera();
@@ -469,6 +483,7 @@ export function useMapFocus({
       clearFocusParams,
       tryApplyPendingFocus,
       mapRef,
+      reduceMotion,
       setRegion,
     ]),
   );
