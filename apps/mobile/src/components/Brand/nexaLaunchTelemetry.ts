@@ -8,6 +8,7 @@ export interface NexaLaunchTelemetryInput {
   overlayHiddenAtMs: number | null;
   requiresMapSurface: boolean;
   mapSurfaceWaitExpired: boolean;
+  reducedMotion: boolean | null;
 }
 
 export interface NexaLaunchTelemetryProps
@@ -18,6 +19,7 @@ export interface NexaLaunchTelemetryProps
   mapReadyMs: number | null;
   overlayHiddenMs: number | null;
   mapReadyFailOpen: boolean;
+  reducedMotion: boolean | null;
 }
 
 function elapsedMs(startedAtMs: number, endedAtMs: number | null): number | null {
@@ -43,5 +45,6 @@ export function buildNexaLaunchTelemetryProps(
     overlayHiddenMs: elapsedMs(input.startedAtMs, input.overlayHiddenAtMs),
     mapReadyFailOpen:
       input.requiresMapSurface && input.mapSurfaceWaitExpired,
+    reducedMotion: input.reducedMotion,
   };
 }
