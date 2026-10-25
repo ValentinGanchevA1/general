@@ -113,7 +113,7 @@ describe('LocationShareService', () => {
     expect(getParticipantIds).not.toHaveBeenCalled();
     expect(query).toHaveBeenCalledTimes(2);
     const [sql, params] = query.mock.calls[1]!;
-    expect(String(sql)).toContain("end_reason = $3");
+    expect(String(sql)).toContain('end_reason = $3');
     expect(params[0]).toBe('ls1');
     expect(params[2]).toBe('stopped');
   });
@@ -148,11 +148,11 @@ describe('LocationShareService', () => {
       'Started sharing live location for 15 minutes',
       { lat: 42.7, lng: 23.3 },
     );
-    const cleanupCall = query.mock.calls.find((call) =>
-      String(call[0]).includes('SET status = \'ended\''),
-    );
+    const cleanupCall = query.mock.calls.find((call) => {
+      const params = call[1] as unknown[];
+      return params?.[0] === 'ls-new' && params?.[2] === 'conversation_closed';
+    });
     expect(cleanupCall).toBeDefined();
-    expect(cleanupCall![1][0]).toBe('ls-new');
-    expect(cleanupCall![1][2]).toBe('conversation_closed');
+    expect(String(cleanupCall![0])).toContain("SET status = 'ended'");
   });
 });
