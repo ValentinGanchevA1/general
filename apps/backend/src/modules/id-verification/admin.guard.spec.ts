@@ -1,4 +1,5 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
+import type { ExecutionContext } from '@nestjs/common';
 import { AdminGuard } from './admin.guard';
 
 interface RequestUser {
