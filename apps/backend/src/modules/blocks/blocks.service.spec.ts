@@ -32,12 +32,25 @@ describe('BlocksService', () => {
     expect(onBlock).not.toHaveBeenCalled();
   });
 
-  it('block() upserts via ON CONFLICT DO NOTHING then cascades graph delete', async () => {
+  it('block() upserts, ends active live-location sessions, then cascades graph delete', async () => {
     await service.block(A, B);
-    const [sql, params] = query.mock.calls[0]!;
-    expect(sql).toContain('ON CONFLICT (blocker_id, blocked_id) DO NOTHING');
-    expect(params).toEqual([A, B]);
+
+    expect(query).toHaveBeenCalledTimes(2);
+    const [insertSql, insertParams] = query.mock.calls[0]!;
+    expect(insertSql).toContain('ON CONFLICT (blocker_id, blocked_id) DO NOTHING');
+    expect(insertParams).toEqual([A, B]);
+
+    const [locationSql, locationParams] = query.mock.calls[1]!;
+    expect(locationSql).toContain('UPDATE chat_location_sessions cls');
+    expect(locationSql).toContain("end_reason = 'blocked'");
+    expect(locationSql).toContain('$1 = ANY(c.participant_ids)');
+    expect(locationSql).toContain('$2 = ANY(c.participant_ids)');
+    expect(locationParams).toEqual([A, B]);
     expect(onBlock).toHaveBeenCalledWith(A, B);
+
+    const locationOrder = query.mock.invocationCallOrder[1]!;
+    const graphCleanupOrder = onBlock.mock.invocationCallOrder[0]!;
+    expect(locationOrder).toBeLessThan(graphCleanupOrder);
   });
 
   it('unblock() deletes the directional row', async () => {
