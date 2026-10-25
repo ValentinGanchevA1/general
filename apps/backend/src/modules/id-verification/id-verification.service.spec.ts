@@ -5,6 +5,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 import { IdVerificationService } from './id-verification.service';
+import type { SubmitIdVerificationDto } from './dto/submit-id-verification.dto';
 import { S3Service } from '../../common/s3.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RekognitionService } from './rekognition.service';
@@ -66,7 +67,7 @@ describe('IdVerificationService', () => {
   });
 
   describe('submitVerification', () => {
-    const payload = {
+    const payload: SubmitIdVerificationDto = {
       selfie: B64,
       selfieContentType: 'image/png',
       idFront: B64,
