@@ -1,4 +1,5 @@
 import React from 'react';
+import type { DiscoveryPointKey } from '@g88/shared';
 import type MapView from 'react-native-maps';
 
 import type { MapRendererKind } from '../mapRenderer';
@@ -20,7 +21,8 @@ export interface NexaMapRuntimeSurfaceProps extends LegacyMapSurfaceProps {
  * Product rendering remains fail-closed because the rollout policy keeps
  * MapLibre unavailable. When an explicit validation policy requests MapLibre
  * and marks the native bundle available, this boundary mounts the native
- * surface and translates its viewport back into the legacy region callback.
+ * surface and translates its viewport and point presses back into the legacy
+ * screen contract until the renderer-neutral controller boundary lands.
  */
 export const NexaMapRuntimeSurface = React.forwardRef<
   MapView,
@@ -30,8 +32,11 @@ export const NexaMapRuntimeSurface = React.forwardRef<
     requestedRenderer,
     mapLibreAvailable,
     points,
+    selectedEntityKey,
     onReady,
     onRegionChangeComplete,
+    onClusterPress,
+    onEntityPress,
     ...surfaceProps
   },
   ref,
@@ -42,10 +47,26 @@ export const NexaMapRuntimeSurface = React.forwardRef<
   });
 
   if (renderer === 'maplibre') {
+    const pointsByKey = new Map<DiscoveryPointKey, (typeof points)[number]>(
+      points.map((point) => {
+        const key: DiscoveryPointKey = point.kind === 'cluster'
+          ? `cluster:${point.cellId}`
+          : `${point.kind}:${point.id}`;
+        return [key, point];
+      }),
+    );
+
     return (
       <MapLibreMapSurface
         points={points}
+        selectedKey={selectedEntityKey as DiscoveryPointKey | null}
         onReady={onReady}
+        onPointPress={(key) => {
+          const point = pointsByKey.get(key);
+          if (point === undefined) return;
+          if (point.kind === 'cluster') onClusterPress(point);
+          else onEntityPress(point);
+        }}
         onViewportSettled={({ viewport, camera }) => {
           const latitudeDelta = Math.abs(viewport.ne.lat - viewport.sw.lat);
           const longitudeDelta = Math.abs(viewport.ne.lng - viewport.sw.lng);
@@ -65,8 +86,11 @@ export const NexaMapRuntimeSurface = React.forwardRef<
     <LegacyMapSurface
       ref={ref}
       points={points}
+      selectedEntityKey={selectedEntityKey}
       onReady={onReady}
       onRegionChangeComplete={onRegionChangeComplete}
+      onClusterPress={onClusterPress}
+      onEntityPress={onEntityPress}
       {...surfaceProps}
     />
   );

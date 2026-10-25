@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import type { DiscoveryPoint } from '@g88/shared';
+import type { DiscoveryPoint, DiscoveryPointKey } from '@g88/shared';
 import {
   Camera,
   GeoJSONSource,
@@ -9,6 +9,10 @@ import {
   type MapRef,
 } from '@maplibre/maplibre-react-native';
 
+type GeoJSONSourcePressHandler = NonNullable<
+  React.ComponentProps<typeof GeoJSONSource>['onPress']
+>;
+
 import { discoveryToMapFeatureCollection } from '../../adapters/discoveryToGeoJson';
 import type { MapLibreBoundsSnapshot, MapLibreViewStateSnapshot } from '../../mapLibreAdapter';
 import { mapLibreSnapshotToViewportChange } from '../../mapLibreAdapter';
@@ -16,11 +20,18 @@ import type { NexaMapViewportChange } from '../../contracts/mapRenderer';
 
 const DEVELOPMENT_MAP_STYLE = 'https://demotiles.maplibre.org/style.json';
 const DISCOVERY_SOURCE_ID = 'nexa-discovery';
+const DISCOVERY_LAYER_ID = 'nexa-discovery-points';
 
 export interface MapLibreMapSurfaceProps {
   points: readonly DiscoveryPoint[];
+  selectedKey: DiscoveryPointKey | null;
   onReady: () => void;
+  onPointPress: (key: DiscoveryPointKey) => void;
   onViewportSettled: (change: NexaMapViewportChange) => void;
+}
+
+function isDiscoveryPointKey(value: unknown): value is DiscoveryPointKey {
+  return typeof value === 'string' && /^(cluster|user|event|listing):.+$/.test(value);
 }
 
 /**
@@ -32,7 +43,7 @@ export interface MapLibreMapSurfaceProps {
  */
 export const MapLibreMapSurface = React.forwardRef<MapRef, MapLibreMapSurfaceProps>(
   function MapLibreMapSurface(
-    { points, onReady, onViewportSettled },
+    { points, selectedKey, onReady, onPointPress, onViewportSettled },
     ref,
   ): React.JSX.Element {
     const localRef = React.useRef<MapRef>(null);
@@ -70,6 +81,14 @@ export const MapLibreMapSurface = React.forwardRef<MapRef, MapLibreMapSurfacePro
       );
     }, [onViewportSettled]);
 
+    const handlePress = React.useCallback<GeoJSONSourcePressHandler>(
+      (event): void => {
+        const key = event.nativeEvent.features?.[0]?.id;
+        if (isDiscoveryPointKey(key)) onPointPress(key);
+      },
+      [onPointPress],
+    );
+
     return (
       <Map
         ref={localRef}
@@ -84,16 +103,32 @@ export const MapLibreMapSurface = React.forwardRef<MapRef, MapLibreMapSurfacePro
         }}
       >
         <Camera />
-        <GeoJSONSource id={DISCOVERY_SOURCE_ID} data={data}>
+        <GeoJSONSource
+          id={DISCOVERY_SOURCE_ID}
+          data={data}
+          onPress={handlePress}
+        >
           <Layer
-            id="nexa-discovery-points"
+            id={DISCOVERY_LAYER_ID}
             type="circle"
             paint={{
               'circle-color': '#8B5CF6',
               'circle-opacity': 0.9,
-              'circle-radius': ['case', ['==', ['get', 'kind'], 'cluster'], 12, 7],
+              'circle-radius': [
+                'case',
+                ['==', ['id'], selectedKey ?? ''],
+                11,
+                ['==', ['get', 'kind'], 'cluster'],
+                12,
+                7,
+              ],
               'circle-stroke-color': '#FFFFFF',
-              'circle-stroke-width': 1.5,
+              'circle-stroke-width': [
+                'case',
+                ['==', ['id'], selectedKey ?? ''],
+                3,
+                1.5,
+              ],
             }}
           />
         </GeoJSONSource>
