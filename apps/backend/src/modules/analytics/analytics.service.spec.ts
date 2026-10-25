@@ -62,6 +62,20 @@ describe('AnalyticsService', () => {
     ]);
   });
 
+  it('removes orphan identity bridges after expired event rows are pruned', async () => {
+    const pruningService = new AnalyticsService(db);
+    Object.defineProperty(pruningService, 'nextPruneAtMs', { value: 0, writable: true });
+
+    await pruningService.record('11111111-1111-4111-8111-111111111111', 'app.session_started');
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(query).toHaveBeenCalledTimes(3);
+    expect(String(query.mock.calls[1]![0])).toContain('DELETE FROM analytics_events');
+    expect(query.mock.calls[1]![1]).toEqual([90]);
+    expect(String(query.mock.calls[2]![0])).toContain('DELETE FROM analytics_subjects');
+    expect(String(query.mock.calls[2]![0])).toContain('NOT EXISTS');
+  });
+
   it('fails closed when the dedicated analytics HMAC key is absent', async () => {
     delete process.env.ANALYTICS_HMAC_KEY;
 
