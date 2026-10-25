@@ -18,6 +18,13 @@ const ENTITY_TYPE_SET = new Set<string>(PRODUCT_ANALYTICS_ENTITY_TYPES);
 const SURFACE_SET = new Set<string>(PRODUCT_ANALYTICS_SURFACES);
 const CONNECTION_SET = new Set<string>(PRODUCT_ANALYTICS_CONNECTION_MECHANISMS);
 const RSVP_SET = new Set<string>(RSVP_STATUSES);
+const SESSION_PATH_SET = new Set<string>(['map', 'non_map']);
+
+const DEFAULT_RETENTION_DAYS = 90;
+const MIN_RETENTION_DAYS = 30;
+const MAX_RETENTION_DAYS = 365;
+const PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1_000;
+const INITIAL_PRUNE_DELAY_MS = 15 * 60 * 1_000;
 
 function pickString(
   props: ProductAnalyticsProperties,
@@ -31,6 +38,12 @@ function pickString(
 function pickBoolean(props: ProductAnalyticsProperties, key: string): boolean | undefined {
   const value = props[key];
   return typeof value === 'boolean' ? value : undefined;
+}
+
+function resolveRetentionDays(raw: string | undefined): number {
+  const parsed = Number.parseInt(raw ?? '', 10);
+  if (!Number.isFinite(parsed)) return DEFAULT_RETENTION_DAYS;
+  return Math.min(MAX_RETENTION_DAYS, Math.max(MIN_RETENTION_DAYS, parsed));
 }
 
 /**
@@ -47,7 +60,7 @@ export function sanitizeProductAnalyticsProperties(
 
   switch (event) {
     case 'app.session_started': {
-      const path = pickString(props, 'path', new Set(['map', 'non_map']));
+      const path = pickString(props, 'path', SESSION_PATH_SET);
       if (path) out.path = path;
       return out;
     }
@@ -83,6 +96,8 @@ export function sanitizeProductAnalyticsProperties(
 
 @Injectable()
 export class AnalyticsService {
+  private nextPruneAtMs = Date.now() + INITIAL_PRUNE_DELAY_MS;
+
   constructor(@InjectDataSource() private readonly db: DataSource) {}
 
   private subjectHash(userId: string): string {
@@ -94,6 +109,24 @@ export class AnalyticsService {
       });
     }
     return createHmac('sha256', key).update(userId).digest('hex');
+  }
+
+  private maybePruneExpired(): void {
+    const now = Date.now();
+    if (now < this.nextPruneAtMs) return;
+    this.nextPruneAtMs = now + PRUNE_INTERVAL_MS;
+
+    const retentionDays = resolveRetentionDays(process.env.ANALYTICS_RETENTION_DAYS);
+    void this.db
+      .query(
+        `DELETE FROM analytics_events
+          WHERE received_at < NOW() - ($1::int * INTERVAL '1 day')`,
+        [retentionDays],
+      )
+      .catch(() => {
+        // Retry later without affecting the product event that triggered cleanup.
+        this.nextPruneAtMs = Date.now() + 60 * 60 * 1_000;
+      });
   }
 
   async record(
@@ -125,5 +158,7 @@ export class AnalyticsService {
        FROM subject`,
       [userId, subjectHash, event, JSON.stringify(safeProperties)],
     );
+
+    this.maybePruneExpired();
   }
 }
