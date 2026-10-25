@@ -6,6 +6,11 @@ import { DiscoveryEntityResolver } from './discovery-entity-resolver.service';
 import { FriendsService } from '../friends/friends.service';
 import { PresenceService } from '../presence/presence.service';
 
+const context = {
+  viewport: { ne: { lat: 2, lng: 2 }, sw: { lat: 1, lng: 1 } },
+  zoom: 16,
+};
+
 describe('DiscoveryEntityResolver', () => {
   let resolver: DiscoveryEntityResolver;
   let query: jest.Mock;
@@ -47,6 +52,85 @@ describe('DiscoveryEntityResolver', () => {
     expect(sql).toContain('ub.blocker_id = $3');
     expect(sql).toContain('ub.blocked_id = $3');
     expect(params).toEqual(['event-1', 'event', 'viewer']);
+  });
+
+  it('rejects kinds excluded by the active subscription before querying', async () => {
+    await expect(
+      resolver.resolveForViewer({
+        viewerId: 'viewer',
+        kind: 'listing',
+        entityId: 'l1',
+        context: { ...context, kinds: ['user'] },
+      }),
+    ).resolves.toBeNull();
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('applies normalized topic and listing mode filters to the entity query', async () => {
+    await resolver.resolveForViewer({
+      viewerId: 'viewer',
+      kind: 'listing',
+      entityId: 'l1',
+      context: { ...context, topic: '# Bikes ', listingMode: 'buy' },
+    });
+
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("g88_slugify(meta->>'category') = $4");
+    expect(sql).toContain("COALESCE(meta->>'mode', 'sell') = $5");
+    expect(params).toEqual(['l1', 'listing', 'viewer', 'bikes', 'buy']);
+  });
+
+  it('rejects non-friends in friends-only mode without entity query', async () => {
+    listFriendIds.mockResolvedValueOnce(['other']);
+    await expect(
+      resolver.resolveForViewer({
+        viewerId: 'viewer',
+        kind: 'user',
+        entityId: 'u1',
+        context: { ...context, friendsOnly: true },
+      }),
+    ).resolves.toBeNull();
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('rejects dating mode when the viewer is not open to dating', async () => {
+    query.mockResolvedValueOnce([{ open_to_dating: false }]);
+    await expect(
+      resolver.resolveForViewer({
+        viewerId: 'viewer',
+        kind: 'user',
+        entityId: 'u1',
+        context: { ...context, datingOnly: true },
+      }),
+    ).resolves.toBeNull();
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a dating candidate when mutual gender preferences do not match', async () => {
+    query
+      .mockResolvedValueOnce([{ open_to_dating: true }])
+      .mockResolvedValueOnce([
+        {
+          id: 'u1',
+          kind: 'user',
+          lat: 1.02,
+          lng: 1.03,
+          meta: { displayName: 'A', avatarUrl: null, verification: 'email' },
+        },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'viewer', gender: 'male', seeking_genders: ['female'] },
+        { id: 'u1', gender: 'male', seeking_genders: ['female'] },
+      ]);
+
+    await expect(
+      resolver.resolveForViewer({
+        viewerId: 'viewer',
+        kind: 'user',
+        entityId: 'u1',
+        context: { ...context, datingOnly: true },
+      }),
+    ).resolves.toBeNull();
   });
 
   it('returns null when the entity is not visible to the viewer', async () => {
