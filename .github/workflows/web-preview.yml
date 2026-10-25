@@ -58,10 +58,14 @@ jobs:
           node --check web/dist/app.js
           node --check web/edge.mjs
           node --check web/e2e/chrome-cdp.mjs
+          node --check web/e2e/map-runtime-policy.e2e.mjs
           node --check web/e2e/realtime-reconnect.e2e.mjs
           node --check web/e2e/viewport-race.e2e.mjs
           node --check web/e2e/connections-actions.e2e.mjs
           node --check web/e2e/deployed-smoke.e2e.mjs
+
+      - name: Map runtime policy
+        run: node web/e2e/map-runtime-policy.e2e.mjs
 
       - name: Smoke test web edge
         run: |
@@ -79,6 +83,8 @@ jobs:
           done
           curl --fail --silent http://127.0.0.1:4180/healthz | grep '"ok":true'
           curl --fail --silent http://127.0.0.1:4180/ | grep 'NEXA'
+          CSP="$(curl --fail --silent --head http://127.0.0.1:4180/ | tr -d '\r' | grep -i '^content-security-policy:')"
+          echo "$CSP" | grep -F "worker-src 'self'"
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' --request-target 'https://evil.example/api/v1/auth/me' http://127.0.0.1:4180/)" = '400'
 
       - name: E2E multitab auth coordination

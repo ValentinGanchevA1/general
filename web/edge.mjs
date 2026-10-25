@@ -279,7 +279,7 @@ function serveStatic(pathname, response) {
 function setSecurityHeaders(response) {
   response.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   );
   response.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
   response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');

@@ -1,4 +1,9 @@
 import type { DiscoveryPoint } from '../../packages/shared/src/api';
+import {
+  previewRasterTileUrl,
+  resolveMapRuntime,
+  type NexaMapRuntime,
+} from './map-runtime';
 
 export interface MapCenter {
   lat: number;
@@ -19,6 +24,7 @@ interface MountNexaMapOptions {
   container: HTMLElement;
   points: DiscoveryPoint[];
   camera: MapCamera;
+  runtime?: NexaMapRuntime;
   onViewportSettled: (camera: MapCamera, viewport: MapViewport) => void;
 }
 
@@ -34,10 +40,10 @@ const TILE_SIZE = 256;
 const MIN_ZOOM = 10;
 const MAX_ZOOM = 18;
 const MAX_LAT = 85.05112878;
-const TILE_URL = 'https://tile.openstreetmap.org';
 
 export function mountNexaMap(options: MountNexaMapOptions): void {
   const { container, points, onViewportSettled } = options;
+  const runtime = options.runtime ?? resolveMapRuntime(window.location);
   let camera: MapCamera = normalizeCamera(options.camera);
   let drag: DragState | null = null;
   let frame = 0;
@@ -46,8 +52,12 @@ export function mountNexaMap(options: MountNexaMapOptions): void {
   const surface = document.createElement('div');
   surface.className = 'slippy-surface';
   surface.tabIndex = 0;
+  surface.dataset.mapRuntimeStatus = runtime.status;
+  surface.dataset.mapRenderer = runtime.renderer;
+  surface.dataset.basemapProvider = runtime.provider;
   surface.setAttribute('role', 'application');
   surface.setAttribute('aria-label', 'Interactive map. Drag to pan and use plus or minus to zoom.');
+  if (runtime.status === 'blocked') surface.classList.add('basemap-blocked');
 
   const tileLayer = document.createElement('div');
   tileLayer.className = 'tile-layer';
@@ -62,19 +72,25 @@ export function mountNexaMap(options: MountNexaMapOptions): void {
 
   const attribution = document.createElement('div');
   attribution.className = 'map-attribution';
-  const attributionLink = document.createElement('a');
-  attributionLink.href = 'https://www.openstreetmap.org/copyright';
-  attributionLink.target = '_blank';
-  attributionLink.rel = 'noopener noreferrer';
-  attributionLink.textContent = '© OpenStreetMap contributors';
-  attribution.append(attributionLink);
+  if (runtime.status === 'ready') {
+    const attributionLink = document.createElement('a');
+    attributionLink.href = runtime.attributionUrl;
+    attributionLink.target = '_blank';
+    attributionLink.rel = 'noopener noreferrer';
+    attributionLink.textContent = runtime.attribution;
+    attribution.append(attributionLink);
+  } else {
+    attribution.textContent = 'Production basemap configuration required';
+  }
 
   const viewportLabel = document.createElement('div');
   viewportLabel.className = 'map-place';
   const viewportTitle = document.createElement('b');
   viewportTitle.textContent = 'Varna';
   const viewportSubtitle = document.createElement('small');
-  viewportSubtitle.textContent = 'Drag or zoom to search this area';
+  viewportSubtitle.textContent = runtime.status === 'ready'
+    ? 'Drag or zoom to search this area'
+    : 'Discovery overlay active · production basemap pending';
   viewportLabel.append(viewportTitle, viewportSubtitle);
 
   surface.append(tileLayer, featureLayer, controls, viewportLabel, attribution);
@@ -84,7 +100,7 @@ export function mountNexaMap(options: MountNexaMapOptions): void {
     if (frame !== 0) return;
     frame = requestAnimationFrame(() => {
       frame = 0;
-      renderLayers(surface, tileLayer, featureLayer, points, camera);
+      renderLayers(surface, tileLayer, featureLayer, points, camera, runtime);
     });
   };
 
@@ -187,7 +203,7 @@ export function mountNexaMap(options: MountNexaMapOptions): void {
     settle();
   });
 
-  renderLayers(surface, tileLayer, featureLayer, points, camera);
+  renderLayers(surface, tileLayer, featureLayer, points, camera, runtime);
 }
 
 function renderLayers(
@@ -196,6 +212,7 @@ function renderLayers(
   featureLayer: HTMLElement,
   points: DiscoveryPoint[],
   camera: MapCamera,
+  runtime: NexaMapRuntime,
 ): void {
   const width = surface.clientWidth;
   const height = surface.clientHeight;
@@ -213,19 +230,23 @@ function renderLayers(
   const tileCount = 2 ** zoom;
 
   const tileFragment = document.createDocumentFragment();
-  for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
-    for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
-      const wrappedX = ((tileX % tileCount) + tileCount) % tileCount;
-      const image = document.createElement('img');
-      image.className = 'map-tile';
-      image.alt = '';
-      image.draggable = false;
-      image.decoding = 'async';
-      image.referrerPolicy = 'strict-origin-when-cross-origin';
-      image.src = `${TILE_URL}/${zoom}/${wrappedX}/${tileY}.png`;
-      image.style.left = `${tileX * TILE_SIZE - left}px`;
-      image.style.top = `${tileY * TILE_SIZE - top}px`;
-      tileFragment.append(image);
+  if (runtime.status === 'ready') {
+    for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
+      for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
+        const wrappedX = ((tileX % tileCount) + tileCount) % tileCount;
+        const tileUrl = previewRasterTileUrl(runtime, zoom, wrappedX, tileY);
+        if (!tileUrl) continue;
+        const image = document.createElement('img');
+        image.className = 'map-tile';
+        image.alt = '';
+        image.draggable = false;
+        image.decoding = 'async';
+        image.referrerPolicy = 'strict-origin-when-cross-origin';
+        image.src = tileUrl;
+        image.style.left = `${tileX * TILE_SIZE - left}px`;
+        image.style.top = `${tileY * TILE_SIZE - top}px`;
+        tileFragment.append(image);
+      }
     }
   }
   tileLayer.replaceChildren(tileFragment);

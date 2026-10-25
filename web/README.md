@@ -45,9 +45,15 @@ Local preview uses fixed loopback mappings only. Production uses same-origin `/a
 - Access-token rotation reconnects Socket.IO with the new handshake token and rejoins the active chat room.
 - Public deployment requires HTTPS/current browsers with Web Locks; legacy fallback remains functional but does not provide cross-tab serialization.
 
-## Map preview boundary
+## Map runtime boundary
 
-The draft uses the standard OpenStreetMap raster tile service only for visible preview tiles, with attribution and no offline/prefetch path. Public NEXA must select a production tile provider or self-hosted/vector-tile stack with explicit SLA, privacy, caching and usage terms.
+The accepted production direction is **MapLibre GL JS** with a managed vector-tile provider for beta and a PMTiles/self-hosted portability path. The package is not yet added to the frozen pnpm workspace, so the runtime policy is intentionally split from dependency adoption.
+
+- Standard OpenStreetMap raster tiles are available only on loopback (`localhost`, `127.0.0.1`, `::1`) for local preview, with attribution and no offline/prefetch path.
+- Every non-loopback browser origin fails closed to the production target (`maplibre` + `maptiler`) and does **not** generate OSM standard tile requests until the pinned MapLibre runtime and approved provider configuration are bundled.
+- Discovery points, viewport state, pan/zoom controls and `POST /discovery/nearby` remain renderer/provider independent; a missing production basemap does not change the spatial query contract.
+- The planned MapLibre worker path is same-origin at `/maplibre-worker.mjs`; the web edge CSP reserves only `worker-src 'self'` and does not add a CDN/external script origin.
+- Provider hostnames, style URLs and public API-key policy will be allowlisted explicitly in the implementation that actually bundles the provider. No arbitrary/user-editable map host is accepted.
 
 Opening Map, Discover or Connections does **not** request browser/device geolocation. The Varna default camera is product context, not the user's asserted position.
 
@@ -62,7 +68,8 @@ The web bundle imports `socket.io-client` at build time from the already locked 
 - multi-tab rotating refresh cookies, Web Locks serialization, HttpOnly isolation and BroadcastChannel session propagation (#594);
 - Socket.IO access-token rotation, reconnect and active-room rejoin (#595);
 - map viewport supersession, request abort and stale-response protection (#596);
-- Connections friend accept, wave-back, REST history/read, room join, chat send, ack/event dedupe and peer receive (#638).
+- Connections friend accept, wave-back, REST history/read, room join, chat send, ack/event dedupe and peer receive (#638);
+- map runtime policy: loopback-only OSM preview, fail-closed public MapLibre target and same-origin worker contract.
 
 This is strong Chromium regression coverage, not a declaration that every browser engine is production-supported.
 
@@ -81,5 +88,5 @@ The existence of this workflow is not itself a deployed pass. The release gate c
 
 1. Choose the production web hostname/deployment policy, configure same-origin `/api/v1` + `/socket.io`, and allowlist only the exact HTTPS browser origin.
 2. Define the supported-browser matrix and validate the Web Locks/BroadcastChannel session contract on each supported engine.
-3. Select the production map/tile provider or self-hosted/vector-tile stack with explicit SLA, attribution, caching, CSP, privacy and usage terms.
+3. Add a pinned `maplibre-gl` dependency through a reproducible lockfile/importer change, bundle its same-origin worker, then configure the approved production basemap/style/key origins and validate attribution, CSP, performance and provider terms.
 4. Run `Web Deployed Smoke` in authenticated mode against the final stable HTTPS staging/production-like topology and require a green result before web release.
