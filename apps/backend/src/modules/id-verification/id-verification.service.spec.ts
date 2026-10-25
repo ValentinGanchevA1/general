@@ -84,10 +84,7 @@ describe('IdVerificationService', () => {
       expect(res).toEqual({ status: 'pending', verificationId: 'v-new' });
 
       expect(uploadVerificationBuffer).toHaveBeenCalledTimes(2);
-      expect(analyzeVerification).toHaveBeenCalledWith(
-        'verifications/u1/selfie-uuid.jpg',
-        'verifications/u1/id-front-uuid.jpg',
-      );
+      expect(analyzeVerification).toHaveBeenCalledWith(payload.selfie, payload.idFront);
 
       const insertParams = query.mock.calls[1]![1] as unknown[];
       expect(insertParams).toEqual([
