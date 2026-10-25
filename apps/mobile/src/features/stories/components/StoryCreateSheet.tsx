@@ -15,6 +15,7 @@ import Video from 'react-native-video';
 import { STORY_LIMITS } from '@g88/shared';
 
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { extractMessage } from '@/utils/extractMessage';
 import { createStory, presignStory } from '../storiesSlice';
 
 interface PendingMedia {
@@ -41,7 +42,7 @@ export function StoryCreateSheet({
   onClose,
   location,
   pickAndUpload,
-}: Props) {
+}: Props): React.JSX.Element {
   const dispatch = useAppDispatch();
   const posting = useAppSelector((s) => s.stories.posting);
   const [caption, setCaption] = useState('');
@@ -49,19 +50,19 @@ export function StoryCreateSheet({
   const [pending, setPending] = useState<PendingMedia | null>(null);
   const [picking, setPicking] = useState(false);
 
-  const resetForm = () => {
+  const resetForm = (): void => {
     setError(null);
     setPicking(false);
     setCaption('');
     setPending(null);
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     resetForm();
     onClose();
   };
 
-  const onPick = async () => {
+  const onPick = async (): Promise<void> => {
     setError(null);
     setPicking(true);
     try {
@@ -80,7 +81,7 @@ export function StoryCreateSheet({
     }
   };
 
-  const onPost = async () => {
+  const onPost = async (): Promise<void> => {
     setError(null);
     if (!location) {
       setError('Location unavailable — enable location and try again.');
@@ -108,7 +109,7 @@ export function StoryCreateSheet({
     }
   };
 
-  const onChangeMedia = () => {
+  const onChangeMedia = (): void => {
     setPending(null);
     setError(null);
     void onPick();
@@ -212,12 +213,9 @@ export function StoryCreateSheet({
 }
 
 function humanizeError(e: unknown, fallback: string): string {
-  const raw = extractErrorMessage(e);
-  if (!raw || raw === 'Rejected') return fallback;
+  const raw = extractMessage(e, fallback);
+  if (raw === 'Rejected') return fallback;
   const lower = raw.toLowerCase();
-  if (lower.includes('network') || lower.includes('timeout')) {
-    return 'Network problem. Check connection and try again.';
-  }
   if (lower.includes('permission') || lower.includes('camera')) {
     return 'Camera or library permission needed. Allow access in Settings.';
   }
@@ -227,19 +225,9 @@ function humanizeError(e: unknown, fallback: string): string {
   if (lower.includes('gate') || lower.includes('verify') || lower.includes('email')) {
     return raw;
   }
-  // Cap length so we don't dump stack traces into the sheet
+  // Product-authored messages are allowed, but cap copy so a malformed error
+  // can never dump a large diagnostic string into the sheet.
   return raw.length > 120 ? fallback : raw;
-}
-
-function extractErrorMessage(e: unknown): string | null {
-  if (typeof e === 'string' && e.trim()) return e;
-  if (e && typeof e === 'object') {
-    const o = e as { payload?: unknown; message?: unknown };
-    if (typeof o.payload === 'string' && o.payload.trim()) return o.payload;
-    if (typeof o.message === 'string' && o.message.trim()) return o.message;
-  }
-  if (e instanceof Error && e.message) return e.message;
-  return null;
 }
 
 const styles = StyleSheet.create({
