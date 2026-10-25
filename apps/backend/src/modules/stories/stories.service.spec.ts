@@ -25,6 +25,7 @@ describe('StoriesService', () => {
   let emitStoryNew: jest.Mock;
 
   const USER = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const OTHER = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
   const PUBLIC_URL =
     'https://g88-uploads-dev.s3.eu-north-1.amazonaws.com/stories/' +
     USER +
@@ -62,6 +63,14 @@ describe('StoriesService', () => {
 
   function mockUserAndStrikes(user: GateUser, strikePts = 0) {
     query.mockResolvedValueOnce([user]).mockResolvedValueOnce([{ pts: strikePts }]);
+  }
+
+  function expectStoryBlockPredicate(sql: string): void {
+    expect(sql).toContain('user_blocks');
+    expect(sql).toContain('ub.blocker_id = $2');
+    expect(sql).toContain('ub.blocked_id = s.author_id');
+    expect(sql).toContain('ub.blocker_id = s.author_id');
+    expect(sql).toContain('ub.blocked_id = $2');
   }
 
   beforeEach(async () => {
@@ -271,12 +280,53 @@ describe('StoriesService', () => {
     });
   });
 
+  describe('direct interaction block isolation', () => {
+    it('recordView treats a blocked-author story as not found before any view write', async () => {
+      query.mockResolvedValueOnce([]);
+
+      await expect(service.recordView(USER, 's1')).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(query).toHaveBeenCalledTimes(1);
+      const [sql, params] = query.mock.calls[0]!;
+      expectStoryBlockPredicate(String(sql));
+      expect(params).toEqual(['s1', USER]);
+      expect(String(sql)).not.toContain('story_views');
+    });
+
+    it('react treats a blocked-author story as not found before any reaction write', async () => {
+      query.mockResolvedValueOnce([]);
+
+      await expect(service.react(USER, 's1', 'heart')).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(query).toHaveBeenCalledTimes(1);
+      const [sql, params] = query.mock.calls[0]!;
+      expectStoryBlockPredicate(String(sql));
+      expect(params).toEqual(['s1', USER]);
+      expect(String(sql)).not.toContain('story_reactions');
+    });
+
+    it('recordView preserves normal writes for an accessible foreign story', async () => {
+      query
+        .mockResolvedValueOnce([{ author_id: OTHER }])
+        .mockResolvedValueOnce([{ story_id: 's1' }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ view_count: 3 }]);
+
+      const result = await service.recordView(USER, 's1');
+
+      expect(result).toEqual({ viewed: true, viewCount: 3 });
+      expectStoryBlockPredicate(String(query.mock.calls[0]![0]));
+      expect(String(query.mock.calls[1]![0])).toContain('INSERT INTO story_views');
+    });
+  });
+
   describe('react / remove guards', () => {
     it('rejects self-react', async () => {
       query.mockResolvedValueOnce([{ author_id: USER }]);
       await expect(service.react(USER, 's1', 'heart')).rejects.toBeInstanceOf(
         BadRequestException,
       );
+      expectStoryBlockPredicate(String(query.mock.calls[0]![0]));
     });
 
     it('remove returns not found when no row updated', async () => {
