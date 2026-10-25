@@ -8,7 +8,10 @@ export interface UserLocationContextValue {
   /** True only after an explicit denial (or native permission-denied error). */
   permissionDenied: boolean;
   permissionStatus: LocationPermissionStatus;
+  /** Initial/automatic request. Does not reopen native UI after explicit denial. */
   requestPermission: () => Promise<void>;
+  /** User-triggered recovery action allowed to retry after explicit denial. */
+  retryPermission: () => Promise<void>;
 }
 
 const noopRequestPermission = async (): Promise<void> => undefined;
@@ -22,4 +25,5 @@ export const UserLocationContext = createContext<UserLocationContextValue>({
   permissionDenied: false,
   permissionStatus: 'unknown',
   requestPermission: noopRequestPermission,
+  retryPermission: noopRequestPermission,
 });

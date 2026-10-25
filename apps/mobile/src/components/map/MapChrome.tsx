@@ -38,7 +38,7 @@ export function MapChrome({
 	onDismissChallenge,
 }: Props): React.JSX.Element {
 	const insets = useSafeAreaInsets();
-	const { coords, permissionDenied, requestPermission } = useUserLocation();
+	const { coords, permissionDenied, retryPermission } = useUserLocation();
 	const weatherTop = mapWeatherTop(insets.top, sheetOpen, topStack);
 	const secondaryTop = mapChallengeTop(insets.top);
 	const showNudge = topStack.nudgeVisible;
@@ -48,7 +48,7 @@ export function MapChrome({
 		<>
 			{permissionDenied ? (
 				<View style={[styles.locationWrap, { top: weatherTop }]} pointerEvents="box-none">
-					<LocationPermissionBanner onRetry={() => void requestPermission()} />
+					<LocationPermissionBanner onRetry={() => void retryPermission()} />
 				</View>
 			) : null}
 
