@@ -105,6 +105,12 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     state.matches({dating: 'likePending'});
 
   const ctx = state.context;
+  // PIN_TAP is accepted from every state. During the next pin's loading state,
+  // the machine may still carry the previous profile until the actor resolves.
+  // Never render that stale identity under the newly selected marker.
+  const activeProfile =
+    ctx.profile?.id === ctx.pinId ? ctx.profile : undefined;
+
   // Wave is a lightweight social signal. Reflect the intent immediately while
   // the durable command is in flight, then automatically roll back if the
   // machine returns to viewing after a failed request.
@@ -139,12 +145,14 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
 
   const previewProps = useMemo(() => {
     if (!showPreview || !ctx.pinId) return null;
-    const profile = ctx.profile;
+    const profile = activeProfile;
     const name =
       profile && 'displayName' in profile && typeof profile.displayName === 'string'
         ? profile.displayName
         : 'User';
-    const distanceLabel = formatNexaSpatialDistance(ctx.distanceMeters);
+    const distanceLabel = formatNexaSpatialDistance(
+      profile ? ctx.distanceMeters : undefined,
+    );
     const peerAllowsDating =
       ctx.peerMode === 'dating' || ctx.peerMode === 'both';
 
@@ -181,16 +189,16 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
       likeSent: ctx.likeSent,
       blocked: ctx.blockedByViewer || ctx.blockedByPeer,
     };
-  }, [showPreview, ctx, pending, waveOptimistic]);
+  }, [showPreview, ctx, activeProfile, pending, waveOptimistic]);
 
   /** Display name for seeding EntityBottomSheet when pin left the viewport. */
   const seedDisplayName = useMemo(() => {
-    const profile = ctx.profile;
+    const profile = activeProfile;
     if (profile && 'displayName' in profile && typeof profile.displayName === 'string') {
       return profile.displayName;
     }
     return 'User';
-  }, [ctx.profile]);
+  }, [activeProfile]);
 
   return {
     state,
