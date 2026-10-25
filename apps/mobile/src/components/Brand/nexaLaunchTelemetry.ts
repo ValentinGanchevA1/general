@@ -10,7 +10,8 @@ export interface NexaLaunchTelemetryInput {
   mapSurfaceWaitExpired: boolean;
 }
 
-export interface NexaLaunchTelemetryProps {
+export interface NexaLaunchTelemetryProps
+  extends Record<string, string | number | boolean | null> {
   path: NexaLaunchTelemetryPath;
   totalMs: number;
   authReadyMs: number | null;
