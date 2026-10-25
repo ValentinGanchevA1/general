@@ -1,6 +1,7 @@
 import {
   NEXA_MAP_SURFACE_READY_FAIL_OPEN_MS,
   resolveNexaLaunchReady,
+  shouldPlayNexaSpatialHandoff,
 } from './nexaLaunchReadiness';
 
 describe('resolveNexaLaunchReady', () => {
@@ -57,6 +58,35 @@ describe('resolveNexaLaunchReady', () => {
         requiresMapSurface: true,
         mapSurfaceReady: false,
         mapSurfaceWaitExpired: false,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('shouldPlayNexaSpatialHandoff', () => {
+  it('plays only when the destination requires Map and the native map is actually ready', () => {
+    expect(
+      shouldPlayNexaSpatialHandoff({
+        requiresMapSurface: true,
+        mapSurfaceReady: true,
+      }),
+    ).toBe(true);
+  });
+
+  it('skips the handoff for a map fail-open before native readiness', () => {
+    expect(
+      shouldPlayNexaSpatialHandoff({
+        requiresMapSurface: true,
+        mapSurfaceReady: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('skips the handoff for auth/profile destinations even if MapView reports ready', () => {
+    expect(
+      shouldPlayNexaSpatialHandoff({
+        requiresMapSurface: false,
+        mapSurfaceReady: true,
       }),
     ).toBe(false);
   });
