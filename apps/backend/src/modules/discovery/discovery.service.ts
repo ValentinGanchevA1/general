@@ -8,7 +8,6 @@ import type Redis from 'ioredis';
 import {
   type DiscoveryRankBy,
   type DiscoveryResponse,
-  type DiscoveryDiff,
   type DiscoveryPoint,
   type EntityKind,
   type ListingMode,
@@ -24,6 +23,7 @@ import {
 import { REDIS_CLIENT } from '../../config/redis.provider';
 import { PresenceService } from '../presence/presence.service';
 import { FriendsService } from '../friends/friends.service';
+import { buildDiscoveryDiffFromSnapshot } from './discoveryDiff';
 import {
   computeRankScore,
   haversineM,
@@ -39,7 +39,6 @@ const H3_CELL_AREA_KM2: Record<number, number> = {
   4: 1770.3, 5: 252.9, 6: 36.13, 7: 5.161, 8: 0.7373, 9: 0.1053, 10: 0.01504,
 };
 const SNAPSHOT_TTL_SECONDS = 30;
-const DIFF_FALLBACK_THRESHOLD = 0.6;
 
 function listingModeSql(mode: ListingMode | undefined): string {
   if (mode === 'buy') return `AND (kind <> 'listing' OR meta->>'mode' = 'buy')`;
@@ -181,7 +180,12 @@ export class DiscoveryService {
     await this.storeSnapshot(params.requesterId, viewportHash, points);
 
     if (params.prevViewportHash) {
-      const diff = await this.computeDiff(params.requesterId, params.prevViewportHash, points);
+      const rawSnapshot = await this.redis.get(
+        this.snapshotKey(params.requesterId, params.prevViewportHash),
+      );
+      const diff = rawSnapshot === null
+        ? null
+        : buildDiscoveryDiffFromSnapshot(rawSnapshot, points);
       if (diff) {
         return {
           points: [],
@@ -206,10 +210,6 @@ export class DiscoveryService {
     return `discovery:snap:${requesterId}:${hash}`;
   }
 
-  private pointKey(p: DiscoveryPoint): string {
-    return p.kind === 'cluster' ? p.cellId : p.id;
-  }
-
   private async storeSnapshot(
     requesterId: string,
     hash: string,
@@ -221,65 +221,6 @@ export class DiscoveryService {
       'EX',
       SNAPSHOT_TTL_SECONDS,
     );
-  }
-
-  private async computeDiff(
-    requesterId: string,
-    prevHash: string,
-    currentPoints: DiscoveryPoint[],
-  ): Promise<DiscoveryDiff | null> {
-    const raw = await this.redis.get(this.snapshotKey(requesterId, prevHash));
-    if (!raw) return null;
-    let prevPoints: DiscoveryPoint[];
-    try {
-      prevPoints = JSON.parse(raw) as DiscoveryPoint[];
-    } catch {
-      return null;
-    }
-
-    const currentByKey = new Map(currentPoints.map((p) => [this.pointKey(p), p]));
-    const prevByKey = new Map(prevPoints.map((p) => [this.pointKey(p), p]));
-    const removed: string[] = [];
-    const added: DiscoveryPoint[] = [];
-    let pureRemovedCount = 0;
-
-    for (const [key, prevPoint] of prevByKey) {
-      const curPoint = currentByKey.get(key);
-      if (!curPoint) {
-        removed.push(key);
-        pureRemovedCount += 1;
-      } else if (this.canonicalJson(prevPoint) !== this.canonicalJson(curPoint)) {
-        removed.push(key);
-        added.push(curPoint);
-      }
-    }
-    for (const [key, curPoint] of currentByKey) {
-      if (!prevByKey.has(key)) added.push(curPoint);
-    }
-
-    if (prevPoints.length > 0 && pureRemovedCount / prevPoints.length > DIFF_FALLBACK_THRESHOLD) {
-      return null;
-    }
-    if (added.length === 0 && removed.length === 0) {
-      return { added: [], removed: [] };
-    }
-    return { added, removed };
-  }
-
-  private canonicalJson(value: unknown): string {
-    return JSON.stringify(value, (key, val) => {
-      if (key === 'rankScore') return undefined;
-      if (val && typeof val === 'object' && !Array.isArray(val)) {
-        return Object.keys(val as Record<string, unknown>)
-          .sort((a, b) => a.localeCompare(b))
-          .reduce<Record<string, unknown>>((acc, k) => {
-            if (k === 'rankScore') return acc;
-            acc[k] = (val as Record<string, unknown>)[k];
-            return acc;
-          }, {});
-      }
-      return val;
-    });
   }
 
   private async clusterByCell(
