@@ -316,14 +316,11 @@ export const CityAutocompleteField = forwardRef<TextInput, CityAutocompleteField
     const [loading, setLoading] = useState(false);
     const [searchFailed, setSearchFailed] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const query = city.trim();
+    const shouldSearch = showSuggestions && query.length >= 2;
 
     useEffect(() => {
-      const query = city.trim();
-      if (!showSuggestions || query.length < 2) {
-        setSuggestions([]);
-        setLoading(false);
-        return undefined;
-      }
+      if (!shouldSearch) return undefined;
 
       const controller = new AbortController();
       const timer = setTimeout(() => {
@@ -343,7 +340,7 @@ export const CityAutocompleteField = forwardRef<TextInput, CityAutocompleteField
         clearTimeout(timer);
         controller.abort();
       };
-    }, [city, showSuggestions]);
+    }, [query, shouldSearch]);
 
     const handleCityChange = (value: string): void => {
       onCityChange(value);
@@ -376,7 +373,7 @@ export const CityAutocompleteField = forwardRef<TextInput, CityAutocompleteField
             returnKeyType="done"
             testID="onboarding-city"
             trailingAccessory={
-              loading ? (
+              shouldSearch && loading ? (
                 <ActivityIndicator size="small" color={colors.discovery} style={styles.inputAccessory} />
               ) : (
                 <Icon name="map-marker-outline" size={22} color={colors.discovery} style={styles.inputAccessory} />
@@ -384,7 +381,7 @@ export const CityAutocompleteField = forwardRef<TextInput, CityAutocompleteField
             }
           />
 
-          {showSuggestions && suggestions.length > 0 ? (
+          {shouldSearch && suggestions.length > 0 ? (
             <View
               style={[
                 styles.suggestions,
@@ -425,7 +422,7 @@ export const CityAutocompleteField = forwardRef<TextInput, CityAutocompleteField
             </View>
           ) : null}
 
-          {searchFailed ? (
+          {shouldSearch && searchFailed ? (
             <Text style={[styles.autocompleteHint, { color: colors.textTertiary }]}>
               Suggestions unavailable — you can enter the city and country manually.
             </Text>
