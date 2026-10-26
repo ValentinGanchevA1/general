@@ -123,3 +123,14 @@ describe('client refresh interceptor — session-drop-on-boot', () => {
     expect(onLogout).not.toHaveBeenCalled();
   });
 });
+
+describe('password recovery requests', () => {
+  it.each(['/auth/forgot-password', '/auth/reset-password'])('does not refresh or clear an unrelated session on %s rejection', async (endpoint) => {
+    const { api, authEvents, clear } = freshClient({ kind: 'status', status: 401 });
+    const onLogout = jest.fn();
+    authEvents.on('logout', onLogout);
+    await expect(api.post(endpoint, {})).rejects.toMatchObject({ statusCode: 401 });
+    expect(clear).not.toHaveBeenCalled();
+    expect(onLogout).not.toHaveBeenCalled();
+  });
+});

@@ -2,7 +2,7 @@
 
 > **Synced:** 2026-10-26  
 > **HEAD truth:** `master` at **`2f680c76`** after product/roadmap reconciliation **#787**; current master also includes chat refresh diagnostics **#805**, backend-only PostHog mirroring **#804**, remote renderer policy **#801–#803**, MapLibre provider-canary infrastructure **#799–#800**, and iOS native/runtime rollout hardening **#788–#798** plus the current iOS canary runtime hardening commit.  
-> **Database migrations:** unique prefixes **0001–0050**; next free **0051** (CI migration-prefix guard).  
+> **Database migrations:** unique prefixes **0001–0051**; next free **0052** (CI migration-prefix guard).
 > Root `STATUS.md` is a historical progress log and may lag. This file is the live status pointer from `README.md`.
 
 ---
@@ -34,7 +34,7 @@ Current high-signal slices:
 | **Admin** | ✅ | Vite verification queue; active browser-facing identity is `NEXA Admin` (#781) |
 | **Web v1 foundation** | ✅ code foundation | Browser Map / Discover / Pulse / Connections / You, hardened HttpOnly refresh flow, same-origin edge, realtime chat and Chromium browser E2E |
 | **Product analytics** | ✅ canonical pipeline | Backend/Postgres allow-listed event persistence is canonical; optional PostHog mirror is backend-only and disabled until explicitly configured/verified (#804) |
-| **Migrations** | ✅ | `0001–0050`; next free `0051` |
+| **Migrations** | ✅ | `0001–0051`; next free `0052` |
 
 This snapshot intentionally does not restate every historical feature/PR. `packages/shared`, current code and focused feature docs remain the detailed contract sources.
 

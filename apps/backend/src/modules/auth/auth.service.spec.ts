@@ -70,3 +70,12 @@ describe('AuthService', () => {
     });
   });
 });
+
+describe('AuthService refresh version boundary', () => {
+  it('rejects an in-flight refresh from the version before password reset', async () => {
+    const db = { query: jest.fn().mockResolvedValueOnce([{ user_id: 'u1', family: 'f1', auth_version: 0 }]).mockResolvedValueOnce([{ id: 'u1', email: 'person@example.com', auth_version: 1 }]) };
+    const service = new AuthService(db as unknown as import('typeorm').DataSource, mockJwt as unknown as JwtService);
+    await expect(service.refresh('old-refresh')).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(db.query).toHaveBeenCalledTimes(2);
+  });
+});

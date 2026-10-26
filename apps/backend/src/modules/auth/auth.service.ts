@@ -22,6 +22,7 @@ interface UserRow {
   display_name: string;
   avatar_url: string | null;
   verification_level: string;
+  auth_version: number;
 }
 
 interface RefreshTokenRow {
@@ -29,6 +30,7 @@ interface RefreshTokenRow {
   user_id: string;
   family: string;
   revoked_at: string | null;
+  auth_version: number;
 }
 
 @Injectable()
@@ -57,7 +59,7 @@ export class AuthService {
       rows = await this.db.query<UserRow[]>(
         `INSERT INTO users (email, password_hash, display_name)
               VALUES ($1, $2, $3)
-           RETURNING id, email, password_hash, display_name, avatar_url, verification_level`,
+           RETURNING id, email, password_hash, display_name, avatar_url, verification_level, auth_version`,
         [email, passwordHash, displayName],
       );
     } catch (err) {
@@ -78,7 +80,7 @@ export class AuthService {
 
   async login(email: string, password: string): Promise<LoginResponse> {
     const rows = await this.db.query<UserRow[]>(
-      `SELECT id, email, password_hash, display_name, avatar_url, verification_level
+      `SELECT id, email, password_hash, display_name, avatar_url, verification_level, auth_version
          FROM users WHERE email = $1 AND deleted_at IS NULL LIMIT 1`,
       [email],
     );
@@ -102,7 +104,7 @@ export class AuthService {
       `UPDATE refresh_tokens
           SET revoked_at = NOW()
         WHERE token_hash = $1 AND expires_at > NOW() AND revoked_at IS NULL
-        RETURNING id, user_id, family, revoked_at`,
+        RETURNING id, user_id, family, revoked_at, auth_version`,
       [hash],
     );
     const stored = claimed[0];
@@ -119,10 +121,10 @@ export class AuthService {
     }
 
     const rows = await this.db.query<UserRow[]>(
-      `SELECT id, email FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+      `SELECT id, email, password_hash, auth_version FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
       [stored.user_id],
     );
-    if (!rows[0]) {
+    if (!rows[0] || rows[0].auth_version !== stored.auth_version) {
       throw new UnauthorizedException({ code: 'auth.invalid_refresh', message: 'Invalid refresh token' });
     }
     return this.issueTokens(rows[0], stored.family);
@@ -161,7 +163,7 @@ export class AuthService {
     }
 
     const existing = await this.db.query<UserRow[]>(
-      `SELECT id, email, display_name, avatar_url, verification_level
+      `SELECT id, email, display_name, avatar_url, verification_level, auth_version
          FROM users
         WHERE (google_id = $1 OR email = $2) AND deleted_at IS NULL
         LIMIT 1`,
@@ -185,7 +187,7 @@ export class AuthService {
         [googleId, user.id],
       );
       const refreshed = await this.db.query<UserRow[]>(
-        `SELECT id, email, display_name, avatar_url, verification_level
+        `SELECT id, email, display_name, avatar_url, verification_level, auth_version
            FROM users WHERE id = $1`,
         [user.id],
       );
@@ -194,7 +196,7 @@ export class AuthService {
       const rows = await this.db.query<UserRow[]>(
         `INSERT INTO users (email, display_name, avatar_url, google_id, verification_level, email_verified_at)
               VALUES ($1, $2, $3, $4, 'email', NOW())
-           RETURNING id, email, display_name, avatar_url, verification_level`,
+           RETURNING id, email, display_name, avatar_url, verification_level, auth_version`,
         [email, name ?? email.split('@')[0], picture ?? null, googleId],
       );
       const inserted = rows[0];
@@ -210,7 +212,7 @@ export class AuthService {
 
   async me(userId: string): Promise<AuthenticatedUser> {
     const rows = await this.db.query<UserRow[]>(
-      `SELECT id, email, display_name, avatar_url, verification_level
+      `SELECT id, email, display_name, avatar_url, verification_level, auth_version
          FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
       [userId],
     );
@@ -219,7 +221,7 @@ export class AuthService {
   }
 
   private async issueTokens(
-    user: Pick<UserRow, 'id' | 'email'>,
+    user: Pick<UserRow, 'id' | 'email' | 'auth_version'>,
     family?: string,
   ): Promise<AuthTokens> {
     const rawRefreshToken = randomBytes(32).toString('hex');
@@ -227,11 +229,17 @@ export class AuthService {
     const tokenFamily = family ?? randomUUID();
     const expiresAt = new Date(Date.now() + AuthService.REFRESH_TTL_DAYS * 86_400_000);
 
-    await this.db.query(
-      `INSERT INTO refresh_tokens (user_id, token_hash, family, expires_at)
-            VALUES ($1, $2, $3, $4)`,
-      [user.id, tokenHash, tokenFamily, expiresAt.toISOString()],
+    const inserted = await this.db.query<Array<{ id: string }>>(
+      `INSERT INTO refresh_tokens (user_id, token_hash, family, expires_at, auth_version)
+       SELECT id, $2, $3, $4, auth_version FROM users
+        WHERE id = $1 AND auth_version = $5 AND deleted_at IS NULL FOR SHARE
+       RETURNING id`,
+      [user.id, tokenHash, tokenFamily, expiresAt.toISOString(), user.auth_version],
     );
+    // An in-flight login/refresh using the old version cannot recreate a session after reset.
+    if (!inserted[0]) {
+      throw new UnauthorizedException({ code: 'auth.session_changed', message: 'Your account credentials changed. Please sign in again.' });
+    }
 
     const payload: JwtPayload = { sub: user.id, email: user.email };
     const accessToken = this.jwt.sign(payload);

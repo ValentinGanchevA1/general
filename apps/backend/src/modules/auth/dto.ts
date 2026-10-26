@@ -1,4 +1,5 @@
-import { IsEmail, IsString, MinLength, MaxLength } from 'class-validator';
+import type { ForgotPasswordRequest, ResetPasswordRequest } from '@g88/shared';
+import { IsEmail, IsString, MinLength, MaxLength, Matches, IsByteLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -38,3 +39,21 @@ export class GoogleOAuthDto {
   idToken!: string;
 }
 
+
+export class ForgotPasswordDto implements ForgotPasswordRequest {
+  @IsEmail()
+  @MaxLength(254)
+  email!: string;
+}
+
+export class ResetPasswordDto extends ForgotPasswordDto implements ResetPasswordRequest {
+  @IsString()
+  @Matches(/^\d{8}$/)
+  resetCode!: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  @IsByteLength(0, 72)
+  newPassword!: string;
+}

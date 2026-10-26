@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -12,10 +13,16 @@ import {
   View,
 } from 'react-native';
 
-import { BrandLogo } from '@/components/Brand/BrandLogo';
-import { NexaDiscoveryHero } from '@/components/Brand/NexaDiscoveryHero';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { NexaWordmark } from '@/components/Brand/NexaWordmark';
+import { GoogleMark } from '@/components/GoogleMark';
+import { PasswordRecoveryScreen } from './PasswordRecoveryScreen';
+import { clearPasswordRecovery } from '@/features/auth/passwordResetSlice';
 import { FormField } from '@/components/FormField';
-import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@/constants/app';
+import { PRIVACY_POLICY_URL, SUPPORT_EMAIL, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { clearError, login, loginWithGoogle, register } from '@/features/auth/authSlice';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { setPendingPhoneVerify } from '@/services/pendingPhone';
@@ -62,14 +69,17 @@ function validate(
 
 export function AuthScreen(): React.JSX.Element {
   const { colors } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((s) => s.auth);
 
+  const [recovering, setRecovering] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const emailRef = useRef<TextInput>(null);
@@ -87,6 +97,7 @@ export function AuthScreen(): React.JSX.Element {
 
   const submit = (): void => {
     void (async () => {
+      if (loading) return;
       dispatch(clearError());
       const nextErrors = validate(mode, email, password, displayName);
       setFieldErrors(nextErrors);
@@ -109,18 +120,34 @@ export function AuthScreen(): React.JSX.Element {
   const toggleMode = (): void => {
     dispatch(clearError());
     setFieldErrors({});
+    setPasswordVisible(false);
     setMode((m) => (m === 'login' ? 'register' : 'login'));
   };
 
-  const openTerms = (): void => {
-    void Linking.openURL(TERMS_OF_SERVICE_URL);
+  const openLink = (url: string): void => {
+    void Linking.openURL(url).catch(() => {
+      Alert.alert('Unable to open link', `Please contact ${SUPPORT_EMAIL} for help.`);
+    });
   };
 
-  const openPrivacy = (): void => {
-    void Linking.openURL(PRIVACY_POLICY_URL);
+  const requestPasswordHelp = (): void => {
+    dispatch(clearPasswordRecovery());
+    dispatch(clearError());
+    setPassword('');
+    setPasswordVisible(false);
+    setRecovering(true);
   };
 
   const isLogin = mode === 'login';
+
+  if (recovering) {
+    return <PasswordRecoveryScreen initialEmail={email} onClose={(recoveryEmail) => {
+      setEmail(recoveryEmail);
+      setPassword('');
+      setFieldErrors({});
+      setRecovering(false);
+    }} />;
+  }
 
   return (
     <KeyboardAvoidingView
@@ -128,135 +155,146 @@ export function AuthScreen(): React.JSX.Element {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: Math.max(insets.top, 24), paddingBottom: Math.max(insets.bottom, 24) },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.heroBlock}>
-          <BrandLogo size={62} style={styles.logoImage} />
-          <Text style={[styles.eyebrow, { color: colors.discovery }]}>LOCAL DISCOVERY</Text>
-          <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
-            {isLogin ? 'See what’s happening nearby.' : 'Start discovering around you.'}
-          </Text>
-          <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            People, events and listings — live on the map.
-          </Text>
-          <NexaDiscoveryHero compact />
-        </View>
-
-        <View
-          style={[
-            styles.panel,
-            {
-              backgroundColor: colors.surfacePrimary,
-              borderColor: colors.borderDefault,
-            },
-          ]}
-        >
-          <View style={styles.panelHeading}>
-            <Text style={[styles.title, { color: colors.textPrimary }]}>
-              {isLogin ? 'Welcome back' : 'Create your NEXA account'}
-            </Text>
-            <Text style={[styles.subtitle, { color: colors.textTertiary }]}>
-              {isLogin
-                ? 'Sign in to return to your local map.'
-                : 'One account for discovery, connection and participation.'}
+        <View style={styles.content}>
+          <View style={styles.heroBlock}>
+            <NexaWordmark />
+            <Text style={[styles.tagline, { color: colors.textSecondary }]}>
+              a gateway to your local world.
             </Text>
           </View>
 
-          {mode === 'register' ? (
-            <FormField
-              placeholder="Display name"
-              value={displayName}
-              onChangeText={(text) => {
-                setDisplayName(text);
-                clearFieldError('displayName');
-              }}
-              autoCapitalize="words"
-              returnKeyType="next"
-              onSubmitEditing={() => emailRef.current?.focus()}
-              error={fieldErrors.displayName}
-              accessibilityLabel="Display name"
-            />
-          ) : null}
-
-          <FormField
-            ref={emailRef}
-            placeholder="Email"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              clearFieldError('email');
-            }}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-            returnKeyType="next"
-            onSubmitEditing={() =>
-              mode === 'register' ? phoneRef.current?.focus() : passwordRef.current?.focus()
-            }
-            error={fieldErrors.email}
-            accessibilityLabel="Email"
-          />
-
-          {mode === 'register' ? (
-            <FormField
-              ref={phoneRef}
-              placeholder="Phone (optional) e.g. +359888123456"
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              autoComplete="tel"
-              returnKeyType="next"
-              onSubmitEditing={() => passwordRef.current?.focus()}
-              accessibilityLabel="Phone number optional"
-            />
-          ) : null}
-
-          <FormField
-            ref={passwordRef}
-            placeholder="Password"
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              clearFieldError('password');
-            }}
-            secureTextEntry
-            returnKeyType="done"
-            onSubmitEditing={submit}
-            error={fieldErrors.password}
-            accessibilityLabel="Password"
-          />
-
-          {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
-
-          <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: colors.actionPrimary }]}
-            onPress={submit}
-            disabled={loading}
-            activeOpacity={0.82}
-            accessibilityRole="button"
-            accessibilityLabel={isLogin ? 'Sign in' : 'Join NEXA'}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.onPrimary} />
-            ) : (
-              <Text style={[styles.primaryButtonText, { color: colors.onPrimary }]}>
-                {isLogin ? 'Sign in' : 'Join NEXA'}
+          <View style={styles.form}>
+            {!isLogin ? (
+              <Text accessibilityRole="header" style={[styles.title, { color: colors.textPrimary }]}>
+                Create your NEXA account
               </Text>
-            )}
-          </TouchableOpacity>
+            ) : null}
 
-          <TouchableOpacity
-            onPress={toggleMode}
-            style={styles.toggle}
-            activeOpacity={0.72}
-            accessibilityRole="button"
-          >
-            <Text style={[styles.toggleText, { color: colors.actionPrimary }]}>
-              {isLogin ? 'New to NEXA? Create account' : 'Already on NEXA? Sign in'}
-            </Text>
-          </TouchableOpacity>
+            {mode === 'register' ? (
+              <FormField
+                placeholder="Display name"
+                value={displayName}
+                onChangeText={(text) => {
+                  setDisplayName(text);
+                  clearFieldError('displayName');
+                }}
+                autoCapitalize="words"
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current?.focus()}
+                error={fieldErrors.displayName}
+                accessibilityLabel="Display name"
+              />
+            ) : null}
+
+            <FormField
+              ref={emailRef}
+              leadingAccessory={<Icon name="email-outline" size={22} color={colors.textSecondary} style={styles.fieldIcon} />}
+              placeholder="Email"
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                clearFieldError('email');
+              }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              returnKeyType="next"
+              onSubmitEditing={() =>
+                mode === 'register' ? phoneRef.current?.focus() : passwordRef.current?.focus()
+              }
+              error={fieldErrors.email}
+              accessibilityLabel="Email"
+            />
+
+            {mode === 'register' ? (
+              <FormField
+                ref={phoneRef}
+                placeholder="Phone (optional) e.g. +359888123456"
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                autoComplete="tel"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                accessibilityLabel="Phone number optional"
+              />
+            ) : null}
+
+            <FormField
+              ref={passwordRef}
+              placeholder="Password"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                clearFieldError('password');
+              }}
+              leadingAccessory={<Icon name="lock-outline" size={22} color={colors.textSecondary} style={styles.fieldIcon} />}
+              trailingAccessory={
+                <TouchableOpacity
+                  onPress={() => setPasswordVisible((visible) => !visible)}
+                  style={styles.visibilityButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+                  accessibilityState={{ selected: passwordVisible }}
+                >
+                  <Icon name={passwordVisible ? 'eye-off-outline' : 'eye-outline'} size={24} color={colors.textSecondary} />
+                </TouchableOpacity>
+              }
+              secureTextEntry={!passwordVisible}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete={isLogin ? 'current-password' : 'new-password'}
+              returnKeyType="done"
+              onSubmitEditing={submit}
+              error={fieldErrors.password}
+              accessibilityLabel="Password"
+            />
+
+            {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.primaryButton, loading && styles.disabled]}
+              onPress={submit}
+              disabled={loading}
+              activeOpacity={0.82}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: loading, busy: loading }}
+              accessibilityLabel={isLogin ? 'Sign in' : 'Join NEXA'}
+            >
+              <LinearGradient
+                colors={[colors.brandViolet, colors.brandVioletBright]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.primaryFill}
+              >
+                {loading ? (
+                  <ActivityIndicator color={colors.onPrimary} />
+                ) : (
+                  <Text style={[styles.primaryButtonText, { color: colors.onPrimary }]}>
+                    {isLogin ? 'Sign in' : 'Join NEXA'}
+                  </Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {isLogin ? (
+              <TouchableOpacity
+                onPress={requestPasswordHelp}
+                style={styles.textButton}
+                accessibilityRole="button"
+                accessibilityLabel="Forgot password?"
+              >
+                <Text style={[styles.linkText, { color: colors.actionPrimary }]}>Forgot password?</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
 
           <View style={styles.dividerRow}>
             <View style={[styles.dividerLine, { backgroundColor: colors.borderDefault }]} />
@@ -267,6 +305,7 @@ export function AuthScreen(): React.JSX.Element {
           <TouchableOpacity
             style={[
               styles.googleButton,
+              loading && styles.disabled,
               {
                 backgroundColor: colors.surfaceSecondary,
                 borderColor: colors.borderStrong,
@@ -280,28 +319,41 @@ export function AuthScreen(): React.JSX.Element {
             disabled={loading}
             activeOpacity={0.82}
             accessibilityRole="button"
+            accessibilityState={{ disabled: loading }}
             accessibilityLabel="Continue with Google"
           >
+            <GoogleMark />
             <Text style={[styles.googleButtonText, { color: colors.textPrimary }]}>
               Continue with Google
             </Text>
           </TouchableOpacity>
 
-          <Text style={[styles.privacyNote, { color: colors.textTertiary }]}>
-            You control whether your profile is visible on the map.
-          </Text>
+          <View style={styles.accountBlock}>
+            <Text style={[styles.accountPrompt, { color: colors.textTertiary }]}>
+              {isLogin ? 'New to NEXA?' : 'Already on NEXA?'}
+            </Text>
+            <TouchableOpacity
+              onPress={toggleMode}
+              disabled={loading}
+              style={styles.textButton}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: loading }}
+            >
+              <Text style={[styles.accountLink, { color: colors.actionPrimary }]}>
+                {isLogin ? 'Create account' : 'Sign in'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-          <Text style={[styles.legal, { color: colors.textTertiary }]}>
-            By continuing you agree to our{' '}
-            <Text style={[styles.legalLink, { color: colors.discovery }]} onPress={openTerms}>
-              Terms of Service
-            </Text>
-            {' '}and{' '}
-            <Text style={[styles.legalLink, { color: colors.discovery }]} onPress={openPrivacy}>
-              Privacy Policy
-            </Text>
-            .
-          </Text>
+          <View style={styles.legalRow}>
+            <TouchableOpacity accessibilityRole="link" onPress={() => openLink(TERMS_OF_SERVICE_URL)} style={styles.legalButton}>
+              <Text style={[styles.legalLink, { color: colors.textTertiary }]}>Terms of Service</Text>
+            </TouchableOpacity>
+            <Text accessible={false} style={{ color: colors.textTertiary }}>·</Text>
+            <TouchableOpacity accessibilityRole="link" onPress={() => openLink(PRIVACY_POLICY_URL)} style={styles.legalButton}>
+              <Text style={[styles.legalLink, { color: colors.textTertiary }]}>Privacy Policy</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -310,121 +362,30 @@ export function AuthScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingTop: 28,
-    paddingBottom: 36,
-  },
-  heroBlock: {
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
-  },
-  logoImage: {
-    marginBottom: 2,
-  },
-  eyebrow: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.8,
-  },
-  heroTitle: {
-    maxWidth: 360,
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: '800',
-    textAlign: 'center',
-    letterSpacing: -0.4,
-  },
-  heroSubtitle: {
-    maxWidth: 340,
-    fontSize: fontSize.sm,
-    lineHeight: 20,
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  panel: {
-    width: '100%',
-    maxWidth: 440,
-    alignSelf: 'center',
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.xl,
-  },
-  panelHeading: {
-    gap: 4,
-    marginBottom: spacing.xs,
-  },
-  title: {
-    fontSize: fontSize.lg,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: fontSize.sm,
-    lineHeight: 19,
-    textAlign: 'center',
-  },
-  error: {
-    fontSize: fontSize.sm,
-    lineHeight: 19,
-    textAlign: 'center',
-  },
-  primaryButton: {
-    minHeight: 50,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.xs,
-  },
-  primaryButtonText: {
-    fontWeight: '800',
-    fontSize: fontSize.md,
-  },
-  toggle: {
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toggleText: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: spacing.xs,
-    gap: spacing.sm,
-  },
+  scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing.xxl },
+  content: { width: '100%', maxWidth: 400, alignSelf: 'center' },
+  heroBlock: { alignItems: 'center', marginTop: 24, marginBottom: 56, gap: spacing.md },
+  tagline: { fontSize: fontSize.sm, textAlign: 'center', letterSpacing: 1.1 },
+  form: { gap: spacing.md },
+  title: { fontSize: fontSize.lg, fontWeight: '600', textAlign: 'center', marginBottom: spacing.sm },
+  fieldIcon: { marginLeft: spacing.lg },
+  visibilityButton: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  error: { fontSize: fontSize.sm, lineHeight: 19, textAlign: 'center' },
+  primaryButton: { borderRadius: radius.md, overflow: 'hidden', marginTop: spacing.sm },
+  primaryFill: { minHeight: 52, alignItems: 'center', justifyContent: 'center', padding: spacing.md },
+  primaryButtonText: { fontSize: fontSize.lg, fontWeight: '500' },
+  disabled: { opacity: 0.55 },
+  textButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm },
+  linkText: { fontSize: fontSize.md },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xl, marginBottom: spacing.xl, gap: spacing.lg },
   dividerLine: { flex: 1, height: StyleSheet.hairlineWidth },
-  dividerText: { fontSize: fontSize.xs },
-  googleButton: {
-    minHeight: 50,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  googleButtonText: {
-    fontWeight: '700',
-    fontSize: fontSize.md,
-  },
-  privacyNote: {
-    fontSize: fontSize.xs,
-    lineHeight: 18,
-    textAlign: 'center',
-    marginTop: spacing.xs,
-  },
-  legal: {
-    fontSize: fontSize.xs,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  legalLink: {
-    textDecorationLine: 'underline',
-    fontWeight: '600',
-  },
+  dividerText: { fontSize: fontSize.sm },
+  googleButton: { minHeight: 52, borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.md },
+  googleButtonText: { fontWeight: '500', fontSize: fontSize.md, flexShrink: 1 },
+  accountBlock: { marginTop: spacing.xl, alignItems: 'center' },
+  accountPrompt: { fontSize: fontSize.md },
+  accountLink: { fontSize: fontSize.lg, fontWeight: '600' },
+  legalRow: { marginTop: 28, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', columnGap: spacing.sm },
+  legalButton: { minHeight: 44, justifyContent: 'center' },
+  legalLink: { fontSize: fontSize.xs, textDecorationLine: 'underline' },
 });
