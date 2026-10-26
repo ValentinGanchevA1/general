@@ -8,14 +8,14 @@ export interface MapRendererRolloutPolicy {
 /**
  * Production-safe rollout policy for the map renderer boundary.
  *
- * Keep both switches false/legacy until the MapLibre native bundle has passed
- * camera, viewport, discovery, selection, and Android/iOS parity validation.
- * Separating request from availability prevents a remote/config request from
- * loading a renderer that is not actually bundled in the binary.
+ * The native MapLibre implementation is bundled and available in the mobile
+ * binary, but product traffic remains on the proven legacy renderer until the
+ * production style/provider path and Android/iOS parity gates are complete.
+ * Availability declares binary capability only; it does not activate MapLibre.
  */
 export const NEXA_MAP_RENDERER_ROLLOUT: Readonly<MapRendererRolloutPolicy> = {
   requestedRenderer: 'legacy',
-  mapLibreAvailable: false,
+  mapLibreAvailable: true,
 };
 
 export function mapRendererRolloutPolicy(
