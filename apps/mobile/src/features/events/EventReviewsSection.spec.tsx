@@ -28,8 +28,7 @@ function setup(value = context) {
   });
   return { s, ui };
 }
-beforeEach(() => { jest.clearAllMocks(); jest.useFakeTimers(); });
-afterEach(() => jest.useRealTimers());
+beforeEach(() => jest.clearAllMocks());
 it('starts without a score, supports optional tags/comment and preserves draft on failure', async () => {
   const { s, ui } = setup();
   expect(ui.getByRole('button', { name: 'Publish review' }).props.accessibilityState.disabled).toBe(true);
