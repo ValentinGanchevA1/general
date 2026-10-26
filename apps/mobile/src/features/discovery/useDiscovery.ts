@@ -23,6 +23,8 @@ import {
   setPoints,
   upsertPoint,
 } from '@/features/discovery/discoverySlice';
+import { createDiscoveryMutationLog } from '@/features/discovery/discoveryMutationLog';
+import { replayDiscoveryMutations } from '@/features/discovery/discoveryMutationReplay';
 import { useSocket } from '@/realtime/useSocket';
 import { extractMessage } from '@/utils/extractMessage';
 
@@ -110,7 +112,11 @@ export function useDiscovery({
   const abortRef = useRef<AbortController | null>(null);
   const lastFetchKey = useRef<string>('');
   const prevHashRef = useRef<string | null>(null);
+  // This remains the exact HTTP snapshot baseline associated with prevHashRef.
+  // Realtime reconciliation is committed to Redux separately and must not
+  // contaminate the next server diff baseline.
   const cachedPointsRef = useRef<DiscoveryPoint[]>([]);
+  const mutationLogRef = useRef(createDiscoveryMutationLog());
   const lastTopicRef = useRef<string | null>(null);
   const lastListingModeRef = useRef<string | null>(null);
   const lastFriendsOnlyRef = useRef(false);
@@ -136,6 +142,7 @@ export function useDiscovery({
         lastFetchKey.current = '';
         prevHashRef.current = null;
         cachedPointsRef.current = [];
+        mutationLogRef.current.reset();
         dispatch(setPoints([]));
         setData({
           points: [],
@@ -170,6 +177,7 @@ export function useDiscovery({
       if (topicChanged || modeChanged || friendsChanged || datingChanged || rankChanged) {
         prevHashRef.current = null;
         cachedPointsRef.current = [];
+        mutationLogRef.current.reset();
         lastTopicRef.current = t ?? null;
         lastListingModeRef.current = lm ?? null;
         lastFriendsOnlyRef.current = fo === true;
@@ -181,6 +189,7 @@ export function useDiscovery({
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
+      const requestMutationSequence = mutationLogRef.current.currentSequence();
 
       setLoading(true);
       setError(null);
@@ -207,17 +216,20 @@ export function useDiscovery({
         if (ctrl.signal.aborted) return;
 
         prevHashRef.current = res.viewportHash;
+        const httpPoints = res.diff
+          ? applyDiscoveryDiff(cachedPointsRef.current, res.diff)
+          : res.points;
+        cachedPointsRef.current = httpPoints;
 
-        if (res.diff) {
-          const merged = applyDiscoveryDiff(cachedPointsRef.current, res.diff);
-          cachedPointsRef.current = merged;
-          dispatch(setPoints(merged));
-          setData({ ...res, points: merged, diff: null });
-        } else {
-          cachedPointsRef.current = res.points;
-          dispatch(setPoints(res.points));
-          setData(res);
-        }
+        const reconciledPoints = replayDiscoveryMutations(
+          httpPoints,
+          mutationLogRef.current.mutationsAfter(requestMutationSequence),
+          requestMutationSequence,
+        );
+
+        dispatch(setPoints(reconciledPoints));
+        setData({ ...res, points: reconciledPoints, diff: null });
+        mutationLogRef.current.reset();
       } catch (err) {
         if (axios.isCancel(err) || ctrl.signal.aborted) return;
         setError(extractMessage(err, 'Discovery failed'));
@@ -234,6 +246,7 @@ export function useDiscovery({
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       abortRef.current?.abort();
       abortRef.current = null;
+      mutationLogRef.current.reset();
       setLoading(false);
       return;
     }
@@ -278,8 +291,10 @@ export function useDiscovery({
     const applyRealtimePoint = (point: EntityPoint): void => {
       const key = getDiscoveryPointKey(point);
       if (matchesRealtimeQuery(point, viewport, kinds, listingMode, friendsOnly)) {
+        mutationLogRef.current.recordUpsert(point);
         dispatch(upsertPoint(point));
       } else {
+        mutationLogRef.current.recordRemove(key);
         dispatch(removePoint(key));
       }
     };
@@ -291,6 +306,7 @@ export function useDiscovery({
       applyRealtimePoint(point);
     });
     const unsubscribeLeave = on('discovery:entity:leave', ({ key }) => {
+      mutationLogRef.current.recordRemove(key);
       dispatch(removePoint(key));
     });
 
@@ -317,6 +333,7 @@ export function useDiscovery({
     lastFetchKey.current = '';
     prevHashRef.current = null;
     cachedPointsRef.current = [];
+    mutationLogRef.current.reset();
     void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly, datingOnly, rankBy);
   }, [viewport, zoom, kinds, topic, listingMode, friendsOnly, datingOnly, rankBy, fetchNow]);
 
