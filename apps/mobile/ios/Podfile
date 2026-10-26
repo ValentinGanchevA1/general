@@ -33,5 +33,6 @@ target 'G88' do
       config[:reactNativePath],
       :mac_catalyst_enabled => false
     )
+    $MLRN.post_install(installer)
   end
 end

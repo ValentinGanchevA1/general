@@ -11,6 +11,7 @@ import { LegacyMapSurface, type LegacyMapSurfaceProps } from './reactNativeMaps/
 export interface NexaMapRuntimeSurfaceProps extends LegacyMapSurfaceProps {
   requestedRenderer: MapRendererKind;
   mapLibreAvailable: boolean;
+  mapLibreStyleUrl: string | null;
 }
 
 /** Single runtime entry point for NEXA map rendering. */
@@ -21,6 +22,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
   {
     requestedRenderer,
     mapLibreAvailable,
+    mapLibreStyleUrl,
     points,
     selectedEntityKey,
     dimUnselected,
@@ -36,6 +38,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
   const renderer = resolveAvailableMapRenderer({
     requested: requestedRenderer,
     mapLibreAvailable,
+    mapLibreConfigured: mapLibreStyleUrl !== null,
   });
   const renderableSelection = resolveRenderableMapSelection(
     points,
@@ -43,7 +46,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
     dimUnselected,
   );
 
-  if (renderer === 'maplibre') {
+  if (renderer === 'maplibre' && mapLibreStyleUrl !== null) {
     const pointsByKey = new Map<DiscoveryPointKey, (typeof points)[number]>(
       points.map((point) => [getDiscoveryPointKey(point), point]),
     );
@@ -51,6 +54,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
     return (
       <MapLibreMapSurface
         ref={ref}
+        mapStyle={mapLibreStyleUrl}
         points={points}
         selectedKey={renderableSelection.selectedEntityKey as DiscoveryPointKey | null}
         dimUnselected={renderableSelection.interactionFocused}

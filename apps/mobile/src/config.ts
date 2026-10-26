@@ -43,4 +43,12 @@ export const Config = {
     (process.env.GOOGLE_WEB_CLIENT_ID as string | undefined) ?? '',
   // Public Sentry DSN — leave empty to disable Sentry in dev builds
   SENTRY_DSN: (process.env.SENTRY_DSN as string | undefined) ?? '',
+  // Public MapTiler client configuration. The API key is embedded in the app bundle;
+  // treat it as a client credential and restrict/rotate it in MapTiler, never as a secret.
+  MAPTILER_API_KEY:
+    (process.env.NEXA_MAPTILER_API_KEY as string | undefined) ?? '',
+  MAPTILER_MAP_ID:
+    (process.env.NEXA_MAPTILER_MAP_ID as string | undefined) ?? 'streets-v4',
+  MAPTILER_REGION:
+    (process.env.NEXA_MAPTILER_REGION as string | undefined) ?? 'eu',
 } as const;

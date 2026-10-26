@@ -35,7 +35,6 @@ import type {
 import type { MapLibreBoundsSnapshot, MapLibreViewStateSnapshot } from '../../mapLibreAdapter';
 import { mapLibreSnapshotToViewportChange } from '../../mapLibreAdapter';
 
-const DEVELOPMENT_MAP_STYLE = 'https://demotiles.maplibre.org/style.json';
 const DISCOVERY_SOURCE_ID = 'nexa-discovery';
 const DISCOVERY_LAYER_ID = 'nexa-discovery-points';
 const DISCOVERY_SELECTED_HALO_LAYER_ID = 'nexa-discovery-selected-halo';
@@ -69,6 +68,7 @@ const DISCOVERY_SELECTED_HALO_RADIUS: CircleRadius = [
 ];
 
 export interface MapLibreMapSurfaceProps {
+  mapStyle: string;
   points: readonly DiscoveryPoint[];
   selectedKey: DiscoveryPointKey | null;
   dimUnselected: boolean;
@@ -86,6 +86,7 @@ function isDiscoveryPointKey(value: unknown): value is DiscoveryPointKey {
 export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMapSurfaceProps>(
   function MapLibreMapSurface(
     {
+      mapStyle,
       points,
       selectedKey,
       dimUnselected,
@@ -188,9 +189,9 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
     return (
       <Map
         ref={mapRef}
-        mapStyle={DEVELOPMENT_MAP_STYLE}
+        mapStyle={mapStyle}
         style={StyleSheet.absoluteFill}
-        attribution={false}
+        attribution
         logo={false}
         compass={false}
         onDidFinishLoadingMap={onReady}
