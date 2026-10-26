@@ -33,6 +33,17 @@ type MutationHandler = (
   mutation: Parameters<DiscoveryMutationBusService['publish']>[0],
 ) => Promise<void>;
 
+async function waitForCallCount(
+  getCallCount: () => number,
+  expected: number,
+  maxTurns = 10,
+): Promise<void> {
+  for (let turn = 0; turn < maxTurns; turn += 1) {
+    if (getCallCount() >= expected) return;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+}
+
 describe('DiscoveryRealtimePublisher resolver concurrency', () => {
   it('resolves all candidates without running more than 16 viewer queries at once', async () => {
     const pendingResolvers: Array<(point: DiscoveryPoint) => void> = [];
@@ -83,10 +94,11 @@ describe('DiscoveryRealtimePublisher resolver concurrency', () => {
 
     expect(resolveForViewer).toHaveBeenCalledTimes(16);
     pendingResolvers.slice(0, 16).forEach((resolve) => resolve(userPoint));
-    await Promise.resolve();
-    await Promise.resolve();
+
+    await waitForCallCount(() => resolveForViewer.mock.calls.length, 17);
 
     expect(resolveForViewer).toHaveBeenCalledTimes(17);
+    expect(pendingResolvers).toHaveLength(17);
     pendingResolvers[16]?.(userPoint);
     await fanout;
 
