@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import type Redis from 'ioredis';
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 
 import { REDIS_CLIENT } from '../../config/redis.provider';
 import { DiscoveryRealtimePublisher } from '../../realtime/discovery-realtime.publisher';
@@ -13,6 +13,12 @@ const STARTUP_JITTER_MS = 20_000;
 const RECOVERY_WINDOW_DAYS = 7;
 const LOCK_TTL_SECONDS = 120;
 const DONE_TTL_SECONDS = 8 * 24 * 60 * 60;
+const RELEASE_LOCK_SCRIPT = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+`;
 
 interface ExpiredEventRow {
   id: string;
@@ -27,9 +33,10 @@ interface ExpiredEventRow {
  * A short Redis lock prevents concurrent multi-instance publication while a
  * longer done marker suppresses successful repeats. If a process dies after
  * taking the lock but before publishing, the lock expires quickly and another
- * sweep can recover the transition. We do not mutate event product state here;
- * this service only publishes the discovery boundary transition that HTTP
- * queries already enforce.
+ * sweep can recover the transition. Lock release is ownership-checked so a
+ * slow worker cannot delete a successor's lock after its own TTL expires.
+ * We do not mutate event product state here; this service only publishes the
+ * discovery boundary transition that HTTP queries already enforce.
  */
 @Injectable()
 export class EventsDiscoveryLifecycleService implements OnModuleInit, OnModuleDestroy {
@@ -77,9 +84,10 @@ export class EventsDiscoveryLifecycleService implements OnModuleInit, OnModuleDe
         if (await this.redis.get(this.doneKey(row.id))) continue;
 
         const lockKey = this.lockKey(row.id);
+        const lockToken = randomUUID();
         const locked = await this.redis.set(
           lockKey,
-          '1',
+          lockToken,
           'EX',
           LOCK_TTL_SECONDS,
           'NX',
@@ -106,7 +114,7 @@ export class EventsDiscoveryLifecycleService implements OnModuleInit, OnModuleDe
             }`,
           );
         } finally {
-          await this.redis.del(lockKey).catch(() => undefined);
+          await this.releaseLock(lockKey, lockToken).catch(() => undefined);
         }
       }
 
@@ -120,6 +128,10 @@ export class EventsDiscoveryLifecycleService implements OnModuleInit, OnModuleDe
         }`,
       );
     }
+  }
+
+  private async releaseLock(lockKey: string, lockToken: string): Promise<void> {
+    await this.redis.eval(RELEASE_LOCK_SCRIPT, 1, lockKey, lockToken);
   }
 
   private lockKey(eventId: string): string {
