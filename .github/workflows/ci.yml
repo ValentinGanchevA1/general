@@ -44,6 +44,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build shared
         run: pnpm --filter @g88/shared build
+      - name: Test runtime renderer policy verifier
+        run: node --test scripts/check-runtime-renderer-policy.test.mjs
       - name: Migration prefix uniqueness
         run: node apps/backend/scripts/check-migration-prefixes.mjs
       - name: Lint
