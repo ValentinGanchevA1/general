@@ -99,7 +99,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     send({type: 'MESSAGE'});
   }, [send]);
 
-  const showPreview = state.matches('preview') || state.matches('loadingPin');
+  const previewRequested = state.matches('preview') || state.matches('loadingPin');
   const wavePending = state.matches({social: 'wavePending'});
   const pending =
     wavePending ||
@@ -145,10 +145,13 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
         state.matches({dating: 'messaging'})));
 
   const interactionState = resolveMapInteractionState({
-    showPreview,
+    showPreview: previewRequested,
     isDetail,
     isFull,
   });
+  // Expose preview visibility from the canonical presentation state so callers
+  // cannot drift back to a parallel machine-state interpretation.
+  const showPreview = interactionState === 'quick_peek';
 
   const previewProps = useMemo(() => {
     if (!showPreview || !ctx.pinId) return null;
