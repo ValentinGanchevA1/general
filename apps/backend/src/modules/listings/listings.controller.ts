@@ -22,6 +22,7 @@ import type {
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { DiscoveryRealtimePublisher } from '../../realtime/discovery-realtime.publisher';
 import { ListingsService } from './listings.service';
 import {
   BrowseListingsDto,
@@ -36,17 +37,29 @@ import {
 @Controller('listings')
 @UseGuards(JwtAuthGuard)
 export class ListingsController {
-  constructor(private readonly listings: ListingsService) {}
+  constructor(
+    private readonly listings: ListingsService,
+    private readonly discovery: DiscoveryRealtimePublisher,
+  ) {}
 
   /** POST /api/v1/listings — create a listing the caller sells. */
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 15 } })
-  create(
+  async create(
     @CurrentUser('id') userId: string,
     @Body() dto: CreateListingDto,
   ): Promise<ListingSummary> {
-    return this.listings.create(userId, dto);
+    const listing = await this.listings.create(userId, dto);
+    if ((dto.visibility ?? 'public') === 'public') {
+      void this.discovery.publishEntityChangeToSubscribers({
+        kind: 'listing',
+        entityId: listing.id,
+        location: dto.location,
+        change: 'enter',
+      });
+    }
+    return listing;
   }
 
   /**
