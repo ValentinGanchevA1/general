@@ -33,6 +33,7 @@ import { HealthModule } from './modules/health/health.module';
 import { StoriesModule } from './modules/stories/stories.module';
 import { DatingModule } from './modules/dating/dating.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { RuntimeConfigModule } from './modules/runtime-config/runtime-config.module';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     EventsModule,
     ListingsModule,
     HealthModule,
+    RuntimeConfigModule,
     BlocksModule,
     FriendsModule,
     StoriesModule,
