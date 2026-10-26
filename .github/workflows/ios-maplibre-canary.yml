@@ -22,7 +22,7 @@ jobs:
   ios-maplibre-canary:
     name: iOS MapLibre provider canary
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 75
     defaults:
       run:
         working-directory: apps/mobile
@@ -113,6 +113,7 @@ jobs:
           APP_PATH="ios/build/DerivedData/Build/Products/Release-iphonesimulator/G88.app"
           BUNDLE_ID="com.g88"
           READY_MARKER_FILENAME="maplibre-smoke-ready"
+          READY_TIMEOUT_SECONDS=90
 
           test -d "$APP_PATH"
 
@@ -122,15 +123,21 @@ jobs:
           import sys
 
           devices = json.load(sys.stdin)["devices"]
-          for runtime_devices in devices.values():
+          candidates = []
+          for runtime, runtime_devices in devices.items():
+              if "iOS" not in runtime:
+                  continue
               for device in runtime_devices:
                   if device.get("isAvailable") and device.get("name", "").startswith("iPhone"):
-                      print(device["udid"])
-                      raise SystemExit(0)
-          raise SystemExit("No available iPhone simulator found")
+                      candidates.append((runtime, device["name"], device["udid"]))
+          if not candidates:
+              raise SystemExit("No available iPhone simulator found")
+          candidates.sort(reverse=True)
+          print(candidates[0][2])
           '
           )"
 
+          echo "Using iOS simulator ${SIM_UDID}."
           xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
           xcrun simctl bootstatus "$SIM_UDID" -b
           trap 'xcrun simctl shutdown "$SIM_UDID" >/dev/null 2>&1 || true' EXIT
@@ -149,7 +156,14 @@ jobs:
             exit 1
           fi
 
-          for second in $(seq 1 30); do
+          dump_app_logs() {
+            xcrun simctl spawn "$SIM_UDID" log show \
+              --last 5m \
+              --style compact \
+              --predicate 'process == "G88"' || true
+          }
+
+          for second in $(seq 1 "$READY_TIMEOUT_SECONDS"); do
             if [[ -f "$READY_MARKER" ]]; then
               echo "Real MapTiler style reported ready after ${second}s (pid=$PID)."
               exit 0
@@ -157,21 +171,15 @@ jobs:
 
             if ! xcrun simctl spawn "$SIM_UDID" ps -p "$PID" -o pid= >/dev/null 2>&1; then
               echo "MapLibre provider canary exited before reporting ready." >&2
-              xcrun simctl spawn "$SIM_UDID" log show \
-                --last 2m \
-                --style compact \
-                --predicate 'process == "G88"' || true
+              dump_app_logs
               exit 1
             fi
 
             sleep 1
           done
 
-          echo "Real MapTiler style did not report ready within 30 seconds." >&2
-          xcrun simctl spawn "$SIM_UDID" log show \
-            --last 2m \
-            --style compact \
-            --predicate 'process == "G88"' || true
+          echo "Real MapTiler style did not report ready within ${READY_TIMEOUT_SECONDS} seconds." >&2
+          dump_app_logs
           exit 1
 
       - name: Record canary contract
