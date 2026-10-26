@@ -149,12 +149,9 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     isDetail,
     isFull,
   });
-  // Expose preview visibility from the canonical presentation state so callers
-  // cannot drift back to a parallel machine-state interpretation.
-  const showPreview = interactionState === 'quick_peek';
 
   const previewProps = useMemo(() => {
-    if (!showPreview || !ctx.pinId) return null;
+    if (interactionState !== 'quick_peek' || !ctx.pinId) return null;
     const profile = activeProfile;
     const name =
       profile && 'displayName' in profile && typeof profile.displayName === 'string'
@@ -199,7 +196,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
       likeSent: ctx.likeSent,
       blocked: ctx.blockedByViewer || ctx.blockedByPeer,
     };
-  }, [showPreview, ctx, activeProfile, pending, waveOptimistic]);
+  }, [interactionState, ctx, activeProfile, pending, waveOptimistic]);
 
   /** Display name for seeding EntityBottomSheet when pin left the viewport. */
   const seedDisplayName = useMemo(() => {
@@ -221,7 +218,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     backFromFull,
     quickWave,
     quickLike,
-    showPreview,
+    showPreview: interactionState === 'quick_peek',
     previewProps,
     /** Pin id currently in machine context (for sheet handoff). */
     activePinId: ctx.pinId || null,
