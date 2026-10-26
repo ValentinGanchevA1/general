@@ -1,7 +1,10 @@
 import React from 'react';
 import Svg, {
   Circle,
+  Defs,
   Line,
+  RadialGradient,
+  Stop,
   type CircleProps,
   type LineProps,
 } from 'react-native-svg';
@@ -13,7 +16,7 @@ import {
   useDerivedValue,
 } from 'react-native-reanimated';
 
-import { nexaBrand, nexaDark } from '@/theme';
+import { nexaBrand } from '@/theme';
 
 import {
   NexaEnergyPath,
@@ -75,7 +78,16 @@ export function NexaAnimatedSymbol({
     opacity: interpolate(
       irisProgress.value,
       [0, 0.12, 1],
-      [0, 0.58, 0.82],
+      [0, 0.72, 0.95],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  const lensRingProps = useAnimatedProps<CircleProps>(() => ({
+    opacity: interpolate(
+      irisProgress.value,
+      [0, 0.32, 1],
+      [0, 0.28, 0.68],
       Extrapolation.CLAMP,
     ),
   }));
@@ -85,16 +97,16 @@ export function NexaAnimatedSymbol({
       progress.value,
       [
         launchTime(T.pupilIgnition),
-        launchTime(125),
-        launchTime(220),
+        launchTime(150),
+        launchTime(300),
       ],
-      [0, 1, 0.38],
+      [0, 1, 0.58],
       Extrapolation.CLAMP,
     );
 
     return {
-      r: interpolate(ignition, [0, 1], [3, 33]),
-      opacity: interpolate(ignition, [0, 1], [0, 0.19]),
+      r: interpolate(ignition, [0, 1], [3, 42]),
+      opacity: interpolate(ignition, [0, 1], [0, 0.72]),
     };
   });
 
@@ -103,16 +115,16 @@ export function NexaAnimatedSymbol({
       progress.value,
       [
         launchTime(T.pupilIgnition),
-        launchTime(120),
-        launchTime(230),
+        launchTime(145),
+        launchTime(315),
       ],
-      [0, 1, 0.44],
+      [0, 1, 0.68],
       Extrapolation.CLAMP,
     );
 
     return {
-      r: interpolate(ignition, [0, 1], [2, 21]),
-      opacity: interpolate(ignition, [0, 1], [0, 0.28]),
+      r: interpolate(ignition, [0, 1], [2, 28]),
+      opacity: interpolate(ignition, [0, 1], [0, 0.78]),
     };
   });
 
@@ -121,10 +133,10 @@ export function NexaAnimatedSymbol({
       progress.value,
       [
         launchTime(T.pupilIgnition),
-        launchTime(125),
-        launchTime(210),
+        launchTime(155),
+        launchTime(260),
       ],
-      [1, NEXA_EYE.pupilRadius * 1.17, NEXA_EYE.pupilRadius],
+      [1, NEXA_EYE.pupilRadius * 1.22, NEXA_EYE.pupilRadius * 1.06],
       Extrapolation.CLAMP,
     );
 
@@ -132,7 +144,7 @@ export function NexaAnimatedSymbol({
       r: radius,
       opacity: interpolate(
         progress.value,
-        [launchTime(T.pupilIgnition), launchTime(100)],
+        [launchTime(T.pupilIgnition), launchTime(125)],
         [0, 1],
         Extrapolation.CLAMP,
       ),
@@ -142,13 +154,13 @@ export function NexaAnimatedSymbol({
   const hotCoreProps = useAnimatedProps<CircleProps>(() => ({
     r: interpolate(
       progress.value,
-      [launchTime(T.pupilIgnition), launchTime(130)],
-      [0, 4.2],
+      [launchTime(T.pupilIgnition), launchTime(160)],
+      [0, 4.8],
       Extrapolation.CLAMP,
     ),
     opacity: interpolate(
       progress.value,
-      [launchTime(T.pupilIgnition), launchTime(115)],
+      [launchTime(T.pupilIgnition), launchTime(140)],
       [0, 1],
       Extrapolation.CLAMP,
     ),
@@ -159,11 +171,11 @@ export function NexaAnimatedSymbol({
       progress.value,
       [
         launchTime(T.pupilIgnition),
-        launchTime(85),
-        launchTime(145),
-        launchTime(230),
+        launchTime(110),
+        launchTime(190),
+        launchTime(330),
       ],
-      [0, 0.92, 0.72, 0],
+      [0, 1, 0.78, 0],
       Extrapolation.CLAMP,
     ),
   }));
@@ -176,54 +188,89 @@ export function NexaAnimatedSymbol({
       accessible={false}
       pointerEvents="none"
     >
+      <Defs>
+        <RadialGradient id="nexa-iris-aura" cx="50%" cy="50%" r="50%">
+          <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.96} />
+          <Stop offset="0.22" stopColor="#DCD3FF" stopOpacity={0.92} />
+          <Stop offset="0.5" stopColor={nexaBrand.violetBright} stopOpacity={0.72} />
+          <Stop offset="0.76" stopColor={nexaBrand.cyanBright} stopOpacity={0.22} />
+          <Stop offset="1" stopColor={nexaBrand.violetBright} stopOpacity={0} />
+        </RadialGradient>
+        <RadialGradient id="nexa-pupil-core" cx="48%" cy="44%" r="56%">
+          <Stop offset="0" stopColor="#FFFFFF" stopOpacity={1} />
+          <Stop offset="0.38" stopColor="#F1ECFF" stopOpacity={1} />
+          <Stop offset="0.72" stopColor={nexaBrand.symbolCore} stopOpacity={1} />
+          <Stop offset="1" stopColor={nexaBrand.violetBright} stopOpacity={0.96} />
+        </RadialGradient>
+      </Defs>
+
       <AnimatedLine
         x1={80}
-        y1={68}
+        y1={67}
         x2={80}
-        y2={56}
-        stroke={nexaDark.textPrimary}
-        strokeWidth={1.3}
+        y2={53}
+        stroke="#FFFFFF"
+        strokeWidth={1.5}
         animatedProps={rayProps}
       />
       <AnimatedLine
         x1={69}
         y1={73}
-        x2={60}
-        y2={66}
+        x2={59}
+        y2={65}
         stroke={nexaBrand.violetBright}
-        strokeWidth={1.3}
+        strokeWidth={1.4}
         animatedProps={rayProps}
       />
       <AnimatedLine
         x1={91}
         y1={73}
-        x2={100}
-        y2={66}
+        x2={101}
+        y2={65}
         stroke={nexaBrand.cyanBright}
-        strokeWidth={1.3}
+        strokeWidth={1.4}
         animatedProps={rayProps}
       />
 
       <AnimatedCircle
         cx={NEXA_EYE.centerX}
         cy={NEXA_EYE.centerY}
-        fill={nexaBrand.violetBright}
+        fill="url(#nexa-iris-aura)"
         animatedProps={outerHaloProps}
       />
       <AnimatedCircle
         cx={NEXA_EYE.centerX}
         cy={NEXA_EYE.centerY}
-        fill={nexaBrand.cyanBright}
+        fill="url(#nexa-iris-aura)"
         animatedProps={innerHaloProps}
       />
 
       <AnimatedCircle
         cx={NEXA_EYE.centerX}
         cy={NEXA_EYE.centerY}
+        r={36}
+        fill="none"
+        stroke="rgba(146,120,255,0.28)"
+        strokeWidth={1.1}
+        animatedProps={lensRingProps}
+      />
+      <AnimatedCircle
+        cx={NEXA_EYE.centerX}
+        cy={NEXA_EYE.centerY}
+        r={31.5}
+        fill="none"
+        stroke="rgba(98,230,255,0.18)"
+        strokeWidth={0.9}
+        animatedProps={lensRingProps}
+      />
+
+      <AnimatedCircle
+        cx={NEXA_EYE.centerX}
+        cy={NEXA_EYE.centerY}
         r={NEXA_EYE.irisRadius}
-        fill="rgba(8,9,13,0.48)"
+        fill="rgba(8,9,13,0.34)"
         stroke={nexaBrand.symbolCore}
-        strokeWidth={2}
+        strokeWidth={2.2}
         strokeLinecap="round"
         strokeDasharray={`${NEXA_EYE_PATH_LENGTH.iris} ${NEXA_EYE_PATH_LENGTH.iris}`}
         animatedProps={irisProps}
@@ -247,27 +294,27 @@ export function NexaAnimatedSymbol({
         length={NEXA_EYE_PATH_LENGTH.lower}
         progress={lowerProgress}
         width={NEXA_LAUNCH_VISUAL.lowerStroke}
-        opacity={0.72}
+        opacity={0.82}
       />
       <NexaEnergyPath
         d={NEXA_EYE.lowerRight}
         length={NEXA_EYE_PATH_LENGTH.lower}
         progress={lowerProgress}
         width={NEXA_LAUNCH_VISUAL.lowerStroke}
-        opacity={0.72}
+        opacity={0.82}
       />
 
       <AnimatedCircle
         cx={NEXA_EYE.centerX}
         cy={NEXA_EYE.centerY}
-        fill={nexaBrand.symbolCore}
-        stroke={nexaDark.textPrimary}
-        strokeWidth={1}
+        fill="url(#nexa-pupil-core)"
+        stroke="#FFFFFF"
+        strokeWidth={1.15}
         animatedProps={pupilProps}
       />
       <AnimatedCircle
-        cx={NEXA_EYE.centerX}
-        cy={NEXA_EYE.centerY}
+        cx={NEXA_EYE.centerX - 2.2}
+        cy={NEXA_EYE.centerY - 2.4}
         fill="#FFFFFF"
         animatedProps={hotCoreProps}
       />

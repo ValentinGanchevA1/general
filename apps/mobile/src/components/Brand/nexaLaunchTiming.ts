@@ -1,25 +1,25 @@
 export const NEXA_LAUNCH_TIMING_MS = {
-  pupilIgnition: 40,
+  pupilIgnition: 50,
 
-  eyeDrawStart: 130,
-  irisDrawStart: 210,
-  lowerLidDrawStart: 270,
-  eyeComplete: 450,
+  eyeDrawStart: 120,
+  irisDrawStart: 185,
+  lowerLidDrawStart: 245,
+  eyeComplete: 445,
 
-  orbitDrawStart: 460,
-  orbitComplete: 710,
+  orbitDrawStart: 455,
+  orbitComplete: 760,
 
-  node1: 580,
-  node2: 620,
-  node3: 660,
-  node4: 700,
+  node1: 590,
+  node2: 640,
+  node3: 690,
+  node4: 735,
 
-  convergenceStart: 700,
-  convergencePeak: 735,
-  convergenceEnd: 805,
+  convergenceStart: 760,
+  convergencePeak: 810,
+  convergenceEnd: 865,
 
-  wordmarkReveal: 810,
-  wordmarkComplete: 1050,
+  wordmarkReveal: 890,
+  wordmarkComplete: 1040,
 
   entranceComplete: 1080,
 } as const;
