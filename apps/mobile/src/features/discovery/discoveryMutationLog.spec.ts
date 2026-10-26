@@ -45,12 +45,14 @@ describe('createDiscoveryMutationLog', () => {
     expect(log.mutationsAfter(beforeReset)).toHaveLength(1);
   });
 
-  it('bounds retained mutation history', () => {
-    const log = createDiscoveryMutationLog(2);
-    log.recordUpsert(userPoint);
-    log.recordUpsert({ ...userPoint, lat: 43 });
-    log.recordRemove('user:user-1' as DiscoveryPointKey);
+  it('retains the complete active request window', () => {
+    const log = createDiscoveryMutationLog();
+    const requestSequence = log.currentSequence();
 
-    expect(log.mutationsAfter(0)).toHaveLength(2);
+    for (let index = 0; index < 300; index += 1) {
+      log.recordUpsert({ ...userPoint, lat: 42 + index / 1000 });
+    }
+
+    expect(log.mutationsAfter(requestSequence)).toHaveLength(300);
   });
 });
