@@ -1,9 +1,9 @@
 # NEXA — Product
 
 > **Authoritative source for what we are building and why.**  
-> Sibling docs: `ARCHITECTURE.md` (how), `ROADMAP.md` (when), `SPECIFICATION.md` (contracts), `STATUS.md` (live progress).  
+> Sibling docs: `ARCHITECTURE.md` (how), `ROADMAP.md` (when), `SPECIFICATION.md` (contracts), `docs/STATUS_CURRENT.md` (live progress).  
 > **Compatibility note:** public product identity is **NEXA**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
-> Last revised: **2026-09-14**.
+> Last reconciled: **2026-10-26**.
 
 ---
 
@@ -37,28 +37,34 @@ A map-first social app: see who and what is nearby, then act on it — wave, cha
 | β | Sofia | Varna unit economics validated |
 | γ | Other BG / select EU cities | β retention + abuse tools stable |
 
-## Product pillars (shipped vs horizon)
+## Product pillars (shipped vs gated)
 
 | Pillar | Status |
 |--------|--------|
-| Map discovery + presence | ✅ Shipped (H3, clustering, viewport diff, filters) |
-| Auth + progressive verification | ✅ Email · phone · ID (human review + assist Rekognition) |
+| Map discovery + presence | ✅ Shipped (H3, clustering, viewport diff, filters, privacy-aware realtime deltas) |
+| Auth + progressive verification | ✅ Email · phone · ID (human review + assist-only Rekognition) |
 | Wave + 1:1 chat | ✅ Shipped (+ live location share sessions) |
 | Friends graph | ✅ Requests, mutual, suggestions, online privacy |
 | Events | ✅ Create · discover · RSVP · polls/Q&A |
 | Marketplace | ✅ Listings · offers · counter · Wanted mode |
 | Gifts + gamification | ✅ XP, challenges, achievements, leaderboard |
-| Stories | ✅ P4.S on Pulse (soft gate: email + account age) |
-| Interactions inbox | ✅ Waves + friend requests + recent followers |
+| Stories | ✅ Pulse stories (soft gate: email + account age) |
+| Connections | ✅ Activity inbox + conversations/chat |
+| Browser client | 🟡 Foundation merged; public release gated on final production topology, browser matrix, map provider and deployed HTTPS validation |
+| Mobile MapLibre renderer | 🟡 Controlled rollout: native/provider/runtime/remote-kill-switch code gates merged; production default remains `legacy` pending manual provider-canary evidence, physical-device validation and a separate activation step |
+| Product analytics mirror | 🟡 Backend-only PostHog mirror merged behind explicit enablement; canonical Postgres analytics remains the source of truth |
 | Group chat / live streaming / paid gifts | 📋 Horizon — explicit go-ahead required |
 | Monetization (premium, Connect) | 📋 Horizon — gated on retention |
+
+The canonical primary navigation is **Map / Discover / Pulse / Connections / You**. Browser and mobile should converge on the same product language without assuming they share every implementation detail.
 
 ## Non-goals (explicit)
 
 - Anonymous-only social (verification ladder is core).
 - Global cold-start feed (map + viewport is the primary surface).
 - Microservices / Kafka / GraphQL before load justifies them.
-- iOS App Store before Android closed testing proves the loop.
+- Treating a bundled renderer/provider SDK, green simulator smoke, merged canary workflow, or remote-policy code as production activation without real rollout evidence.
+- iOS App Store launch before Android closed testing proves the core loop; cross-platform technical rollouts such as MapLibre activation still require appropriate runtime/device evidence.
 
 ## Success metrics (α)
 
@@ -67,4 +73,4 @@ A map-first social app: see who and what is nearby, then act on it — wave, cha
 - Listings with ≥1 offer within 48h.
 - Zero tolerance for unblocked harassment paths (blocks + strikes).
 
-See `STATUS.md` for engineering truth and ops gaps.
+See `docs/STATUS_CURRENT.md` for engineering truth, migration baseline and current release gates.
