@@ -8,6 +8,7 @@ import idVerificationReducer from '@/features/verification/idVerificationSlice';
 import storiesReducer from '@/features/stories/storiesSlice';
 import friendsReducer from '@/features/friends/friendsSlice';
 import mapNoveltyReducer from '@/features/map/mapNoveltySlice';
+import mapRendererPolicyReducer from '@/features/map/mapRendererPolicySlice';
 import {
   collectPendingMessages,
   loadChatOutbox,
@@ -25,6 +26,7 @@ export const store = configureStore({
     stories: storiesReducer,
     friends: friendsReducer,
     mapNovelty: mapNoveltyReducer,
+    mapRendererPolicy: mapRendererPolicyReducer,
   },
 });
 

@@ -1,4 +1,5 @@
 import { Controller, Get, Header } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   MAP_RENDERER_POLICY_CACHE_TTL_SECONDS,
   MAP_RENDERER_POLICY_VERSION,
@@ -19,6 +20,7 @@ export function resolveMapLibreRemoteEnabled(value: string | undefined): boolean
 @Controller('runtime-config')
 export class RuntimeConfigController {
   @Get('map-renderer')
+  @SkipThrottle()
   @Header('Cache-Control', 'no-store')
   getMapRendererPolicy(): MapRendererPolicyDto {
     return {
