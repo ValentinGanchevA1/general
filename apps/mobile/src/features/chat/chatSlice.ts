@@ -11,6 +11,7 @@ import {
   type ConversationRefreshFailure,
 } from './chatDiagnostics';
 import { clearChatOutbox } from './chatOutboxPersist';
+import { compareConversationSummaries } from './conversationSort';
 
 export interface OutboxEntry {
   optimisticId: string;
@@ -120,15 +121,32 @@ const chatSlice = createSlice({
       state,
       action: PayloadAction<ChatMessage & { viewerId?: string }>,
     ) {
-      const { conversationId, senderId, body, createdAt, viewerId } = action.payload;
+      const { viewerId, ...message } = action.payload;
+      const { id, conversationId, senderId, body, createdAt } = message;
       const existing = state.messages[conversationId] ?? [];
-      if (!existing.some((m) => m.id === action.payload.id)) {
-        state.messages[conversationId] = [action.payload, ...existing];
-      }
+      const alreadySeen = existing.some((m) => m.id === id);
+      if (alreadySeen) return;
+
+      state.messages[conversationId] = [message, ...existing];
+
       const convo = state.conversations.find((c) => c.id === conversationId);
       if (convo) {
-        convo.lastMessage = { senderId, body };
-        convo.lastMessageAt = createdAt;
+        const currentLastAt = convo.lastMessageAt
+          ? Date.parse(convo.lastMessageAt)
+          : Number.NEGATIVE_INFINITY;
+        const incomingAt = Date.parse(createdAt);
+        const canAdvancePreview =
+          convo.lastMessageAt === null ||
+          Number.isNaN(currentLastAt) ||
+          Number.isNaN(incomingAt) ||
+          incomingAt >= currentLastAt;
+
+        if (canAdvancePreview) {
+          convo.lastMessage = { senderId, body };
+          convo.lastMessageAt = createdAt;
+          state.conversations.sort(compareConversationSummaries);
+        }
+
         const isActive = state.activeConversationId === conversationId;
         if (!isActive && viewerId && senderId !== viewerId) {
           convo.unreadCount = (convo.unreadCount ?? 0) + 1;
@@ -155,22 +173,44 @@ const chatSlice = createSlice({
       state,
       action: PayloadAction<{ optimisticId: string; confirmed: ChatMessage }>,
     ) {
-      const { conversationId } = action.payload.confirmed;
+      const { optimisticId, confirmed } = action.payload;
+      const { conversationId, senderId, body, createdAt } = confirmed;
       const list = state.messages[conversationId];
-      if (!list) return;
-      const idx = list.findIndex((m) => m.id === action.payload.optimisticId);
-      if (idx !== -1) {
-        const alreadyPresent = list.some(
-          (m, i) => i !== idx && m.id === action.payload.confirmed.id,
-        );
-        if (alreadyPresent) {
-          list.splice(idx, 1);
-        } else {
-          list[idx] = action.payload.confirmed;
+      if (list) {
+        const idx = list.findIndex((m) => m.id === optimisticId);
+        if (idx !== -1) {
+          const alreadyPresent = list.some(
+            (m, i) => i !== idx && m.id === confirmed.id,
+          );
+          if (alreadyPresent) {
+            list.splice(idx, 1);
+          } else {
+            list[idx] = confirmed;
+          }
         }
       }
-      state.outbox = state.outbox.filter((e) => e.optimisticId !== action.payload.optimisticId);
-      state.failedIds = state.failedIds.filter((id) => id !== action.payload.optimisticId);
+
+      const convo = state.conversations.find((c) => c.id === conversationId);
+      if (convo) {
+        const currentLastAt = convo.lastMessageAt
+          ? Date.parse(convo.lastMessageAt)
+          : Number.NEGATIVE_INFINITY;
+        const confirmedAt = Date.parse(createdAt);
+        const canAdvancePreview =
+          convo.lastMessageAt === null ||
+          Number.isNaN(currentLastAt) ||
+          Number.isNaN(confirmedAt) ||
+          confirmedAt >= currentLastAt;
+
+        if (canAdvancePreview) {
+          convo.lastMessage = { senderId, body };
+          convo.lastMessageAt = createdAt;
+          state.conversations.sort(compareConversationSummaries);
+        }
+      }
+
+      state.outbox = state.outbox.filter((e) => e.optimisticId !== optimisticId);
+      state.failedIds = state.failedIds.filter((id) => id !== optimisticId);
     },
 
     messageQueued(state, action: PayloadAction<OutboxEntry>) {
