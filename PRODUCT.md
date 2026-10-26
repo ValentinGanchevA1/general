@@ -50,8 +50,9 @@ A map-first social app: see who and what is nearby, then act on it — wave, cha
 | Gifts + gamification | ✅ XP, challenges, achievements, leaderboard |
 | Stories | ✅ Pulse stories (soft gate: email + account age) |
 | Connections | ✅ Activity inbox + conversations/chat |
-| Browser client | 🟡 Foundation merged; public release gated on production hosting, browser matrix, map provider and deployed HTTPS validation |
-| Mobile MapLibre renderer | 🟡 Capability + MapTiler config gates merged; iOS unsigned Release simulator compile is green; legacy renderer remains active by default pending configured Android release/device smoke and iOS runtime/device parity |
+| Browser client | 🟡 Foundation merged; public release gated on final production topology, browser matrix, map provider and deployed HTTPS validation |
+| Mobile MapLibre renderer | 🟡 Controlled rollout: native/provider/runtime/remote-kill-switch code gates merged; production default remains `legacy` pending manual provider-canary evidence, physical-device validation and a separate activation step |
+| Product analytics mirror | 🟡 Backend-only PostHog mirror merged behind explicit enablement; canonical Postgres analytics remains the source of truth |
 | Group chat / live streaming / paid gifts | 📋 Horizon — explicit go-ahead required |
 | Monetization (premium, Connect) | 📋 Horizon — gated on retention |
 
@@ -62,8 +63,8 @@ The canonical primary navigation is **Map / Discover / Pulse / Connections / You
 - Anonymous-only social (verification ladder is core).
 - Global cold-start feed (map + viewport is the primary surface).
 - Microservices / Kafka / GraphQL before load justifies them.
-- Treating a bundled renderer/provider SDK as production activation without release validation.
-- iOS App Store launch before Android closed testing proves the core loop; cross-platform technical rollouts such as MapLibre activation still require iOS runtime/device parity even though the unsigned Release simulator compile is green.
+- Treating a bundled renderer/provider SDK, green simulator smoke, merged canary workflow, or remote-policy code as production activation without real rollout evidence.
+- iOS App Store launch before Android closed testing proves the core loop; cross-platform technical rollouts such as MapLibre activation still require appropriate runtime/device evidence.
 
 ## Success metrics (α)
 
