@@ -20,6 +20,8 @@ import {
   type ProductAnalyticsProperties,
 } from '@g88/shared';
 
+import { PostHogAnalyticsSink } from './posthog-analytics.sink';
+
 const EVENT_SET = new Set<string>(PRODUCT_ANALYTICS_EVENTS);
 const ENTITY_TYPE_SET = new Set<string>(PRODUCT_ANALYTICS_ENTITY_TYPES);
 const SURFACE_SET = new Set<string>(PRODUCT_ANALYTICS_SURFACES);
@@ -131,7 +133,10 @@ export class AnalyticsService implements OnModuleInit, OnModuleDestroy {
   private pruneRunning = false;
   private destroyed = false;
 
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    private readonly posthog: PostHogAnalyticsSink,
+  ) {}
 
   onModuleInit(): void {
     this.destroyed = false;
@@ -217,5 +222,9 @@ export class AnalyticsService implements OnModuleInit, OnModuleDestroy {
        FROM subject`,
       [userId, subjectHash, event, JSON.stringify(safeProperties)],
     );
+
+    // Postgres remains canonical. External analytics is a best-effort mirror and
+    // never extends product-action latency or changes product success semantics.
+    void this.posthog.capture(subjectHash, event, safeProperties);
   }
 }
