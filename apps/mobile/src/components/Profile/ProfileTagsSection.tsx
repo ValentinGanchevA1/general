@@ -1,13 +1,16 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { GOAL_OPTIONS } from '@/features/profile/goalOptions';
+import { interestLabel } from '@/features/profile/interestOptions';
+import { PURPOSE_OPTIONS } from '@/features/profile/goalOptions';
 import { spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
 
 interface Props {
   interests?: string[];
+  /** Persisted as `goals`; user-facing concept is Purpose. */
   goals?: string[];
-  /** Label for goals block. Self: "Looking for"; public often "Goals". */
+  purposeTitle?: string;
+  /** @deprecated Compatibility alias. Prefer purposeTitle. */
   goalsTitle?: string;
   /** When false, skip horizontal padding. Default true. */
   padded?: boolean;
@@ -16,37 +19,41 @@ interface Props {
 export function ProfileTagsSection({
   interests = [],
   goals = [],
-  goalsTitle = 'Looking for',
+  purposeTitle,
+  goalsTitle,
   padded = true,
 }: Props): React.JSX.Element | null {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const resolvedPurposeTitle = purposeTitle ?? (goalsTitle === 'Goals' ? 'Purpose' : goalsTitle) ?? 'Purpose';
 
   if (interests.length === 0 && goals.length === 0) return null;
+
   return (
     <>
       {interests.length > 0 ? (
         <View style={[styles.section, padded && styles.padded]}>
           <Text style={styles.sectionTitle}>Interests</Text>
           <View style={styles.tagsContainer}>
-            {interests.map((interest, index) => (
-              <View key={index} style={styles.tag}>
-                <Text style={styles.tagText}>{interest}</Text>
+            {interests.map((interest) => (
+              <View key={interest} style={styles.tag}>
+                <Text style={styles.tagText}>{interestLabel(interest)}</Text>
               </View>
             ))}
           </View>
         </View>
       ) : null}
+
       {goals.length > 0 ? (
         <View style={[styles.section, padded && styles.padded]}>
-          <Text style={styles.sectionTitle}>{goalsTitle}</Text>
+          <Text style={styles.sectionTitle}>{resolvedPurposeTitle}</Text>
           <View style={styles.tagsContainer}>
-            {goals.map((goal, index) => {
-              const cfg = GOAL_OPTIONS.find((g) => g.value === goal);
+            {goals.map((goal) => {
+              const cfg = PURPOSE_OPTIONS.find((option) => option.value === goal);
               return (
-                <View key={index} style={styles.goalTag}>
-                  <Text style={styles.goalIcon}>{cfg?.icon ?? '🎯'}</Text>
-                  <Text style={styles.goalText}>{cfg?.label ?? goal}</Text>
+                <View key={goal} style={styles.purposeTag}>
+                  <Text style={styles.purposeIcon}>{cfg?.icon ?? '🎯'}</Text>
+                  <Text style={styles.purposeText}>{cfg?.label ?? goal}</Text>
                 </View>
               );
             })}
@@ -75,7 +82,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: radius.pill,
     },
     tagText: { color: colors.textPrimary, fontSize: 14 },
-    goalTag: {
+    purposeTag: {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: colors.surfaceRaised,
@@ -84,7 +91,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: radius.pill,
       gap: 8,
     },
-    goalIcon: { fontSize: 16 },
-    goalText: { color: colors.textPrimary, fontSize: 14, fontWeight: '500' },
+    purposeIcon: { fontSize: 16 },
+    purposeText: { color: colors.textPrimary, fontSize: 14, fontWeight: '500' },
   });
 }

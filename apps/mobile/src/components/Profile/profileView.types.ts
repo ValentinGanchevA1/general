@@ -25,6 +25,8 @@ export type ProfileViewModel = {
   coverUrl: string | null;
   photoUrls: string[];
   bio: string | null;
+  /** Public only when the owner opted in; self mapper applies the same visibility gate. */
+  occupation: string | null;
   interests: string[];
   goals: string[];
   /** Pre-formatted via formatPublicIdentityParts (opted-in fields only). */

@@ -47,6 +47,9 @@ import { S3Service } from '../../common/s3.service';
 class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @IsString() displayName?: string;
   @IsOptional() @IsString() bio?: string;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(80)
+  occupation?: string | null;
+  @IsOptional() @IsBoolean() showOccupation?: boolean;
   @IsOptional() @IsString() avatarUrl?: string;
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() coverUrl?: string | null;
   @IsOptional() @IsIn(['public', 'private']) visibility?: 'public' | 'private';

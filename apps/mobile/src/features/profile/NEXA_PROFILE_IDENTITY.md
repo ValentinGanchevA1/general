@@ -1,21 +1,57 @@
-# NEXA You / Profile Identity v2
+# NEXA You / Profile Identity v3
 
-`You` is the self-identity hub in NEXA. It is not a second discovery feed and it should not compete with the map.
+`You` is the user's self-profile in NEXA. It should primarily answer **“How do I appear in my local world?”**, not behave like a second Settings screen.
 
 ## Product role
 
-- **Map** is where nearby discovery and spatial presence happen.
-- **Connections** is where relationships return.
-- **You** is where the user understands and manages their identity, verification, presence and personal activity.
+- **Map** owns nearby discovery and spatial presence.
+- **Connections** owns relationships and returning conversations.
+- **You** owns personal identity, interests, Purpose, content, trust and personal activity.
+- **Settings** owns account/configuration management.
 
 ## Hierarchy
 
-1. **You hero** — NEXA identity, avatar, display name and compact identity line.
-2. **Identity signals** — verification state, relationship count and activity level shown as factual summaries.
-3. **Identity** — profile content the user owns: photos and bio.
-4. **Presence** — friends and map presence.
-5. **Activity** — storyline and marketplace participation.
-6. **Account** — premium/account-level destination.
+1. **Hero** — avatar, display name, age when enabled, verification, compact origin line.
+2. **Summary** — factual trust signals, friends and level.
+3. **About me** — inline bio plus derived/opted-in profile facts such as age, zodiac, origin and nationality.
+4. **Interests & Purpose** — what the user likes and why they use NEXA.
+5. **Photos** — personal visual identity.
+6. **Activity** — own Storyline, marketplace participation and achievements.
+7. **Connections** — friends and map presence.
+8. **Trust** — verification signals and Trust Center entry.
+9. **Account** — premium/account-level destinations.
+
+## Interests vs Purpose
+
+### Interests
+
+Interests describe persistent affinities such as Football, Music, Reading, Cinema, Travel or Technology. They are normalized tags intended for shared-interest suggestions and later matching/ranking signals.
+
+### Purpose
+
+Purpose describes core intent: why the user is using NEXA. The user-facing term is **Purpose**, while persistence intentionally remains the existing `goals[]` field so current messaging and recommendation logic stays compatible.
+
+Interests and Purpose must not be collapsed into one concept.
+
+## Editing rules
+
+- There is no large **Edit profile** CTA below the avatar.
+- About me and Interests/Purpose expose small contextual edit affordances.
+- Bio is rendered inline rather than as a navigation row that duplicates Edit Profile.
+- Settings remains a separate cog/destination.
+
+## Storyline rule
+
+The self Profile must never navigate to `UserProfile` using the current user's id merely to focus Storyline. Own Storyline is rendered on the self surface (or may later move to a dedicated self-management screen). `UserProfileScreen` remains the visitor/public-profile surface.
+
+## Trust and privacy rules
+
+- Verification is presented as completed signals, never as a vanity/popularity score.
+- Exact date of birth is owner-only; age and zodiac may be derived from it.
+- Existing hometown fields are displayed as **From**, not falsely labelled as place of birth.
+- Map presence copy never reveals exact coordinates.
+- Private map visibility remains explicit and does not imply the profile is hidden everywhere.
+- No success state is shown before authoritative profile/verification data confirms it.
 
 ## Semantic color ownership
 
@@ -24,27 +60,13 @@
 - Premium gold is reserved for subscription identity.
 - Neutral surfaces carry content and navigation hierarchy.
 
-## Trust and privacy rules
-
-- Verification is presented as completed signals, never as a vanity or popularity score.
-- Social links are not framed as trust boosters.
-- Map presence copy does not reveal exact coordinates or visibility reasons.
-- Private map visibility remains explicit and does not imply the profile is hidden everywhere.
-- No success state is shown before authoritative profile/verification data confirms it.
-
-## Interaction rules
-
-- Primary self-management action is **Edit profile**.
-- Verification routes to Trust Center.
-- Map presence returns to the canonical Map surface.
-- Navigation rows remain at least 44dp high and expose useful accessibility labels.
-
 ## Acceptance criteria
 
 - The visible screen identity is `You`, not a generic profile/settings page.
-- The hero explains self identity without adding a social feed.
-- Verification copy remains factual and score-free.
-- Map presence is a first-class destination and respects privacy state.
-- Flat miscellaneous rows are grouped into Identity, Presence, Activity and Account.
-- Existing navigation, REST, Socket.IO and profile data contracts remain unchanged.
-- Existing light, dark and PROTOS NEXUS themes continue to resolve through semantic tokens.
+- No duplicate Bio/Edit Profile navigation exists.
+- Interests and Purpose are visible and editable as separate concepts.
+- Own Storyline does not route through `UserProfile`.
+- Verification remains factual and score-free.
+- Map presence remains a first-class destination and respects privacy state.
+- Existing `goals` REST/storage semantics remain compatible while the UI says Purpose.
+- Existing light/dark themes continue to resolve through semantic tokens.

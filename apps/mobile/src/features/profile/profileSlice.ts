@@ -34,6 +34,8 @@ function applyOptimistic(profile: UserProfile, req: UpdateProfileRequest): UserP
     ...profile,
     ...(req.displayName !== undefined ? { displayName: req.displayName } : {}),
     ...(req.bio !== undefined ? { bio: req.bio } : {}),
+    ...(req.occupation !== undefined ? { occupation: req.occupation } : {}),
+    ...(req.showOccupation !== undefined ? { showOccupation: req.showOccupation } : {}),
     ...(req.avatarUrl !== undefined ? { avatarUrl: req.avatarUrl } : {}),
     ...(req.coverUrl !== undefined ? { coverUrl: req.coverUrl } : {}),
     ...(req.visibility !== undefined ? { visibility: req.visibility } : {}),
