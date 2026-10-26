@@ -8,7 +8,7 @@ import type {
 } from '@g88/shared';
 
 import { DiscoveryEntityResolver } from '../modules/discovery/discovery-entity-resolver.service';
-import { RealtimeGateway } from './realtime.gateway';
+import { RealtimeEmitterService } from './realtime-emitter.service';
 import {
   type ActiveDiscoverySubscription,
   DiscoverySubscriptionStore,
@@ -25,7 +25,7 @@ type DiscoveryRealtimeChange = 'enter' | 'update';
 @Injectable()
 export class DiscoveryRealtimePublisher {
   constructor(
-    private readonly realtime: RealtimeGateway,
+    private readonly realtime: RealtimeEmitterService,
     private readonly resolver: DiscoveryEntityResolver,
     private readonly subscriptions: DiscoverySubscriptionStore,
   ) {}
@@ -97,21 +97,15 @@ export class DiscoveryRealtimePublisher {
   }
 
   emitEnter(viewerId: string, event: DiscoveryEntityUpsertEvent): void {
-    this.realtime.server
-      .to(this.viewerRoom(viewerId))
-      .emit('discovery:entity:enter', event);
+    this.realtime.to(this.viewerRoom(viewerId)).emit('discovery:entity:enter', event);
   }
 
   emitUpdate(viewerId: string, event: DiscoveryEntityUpsertEvent): void {
-    this.realtime.server
-      .to(this.viewerRoom(viewerId))
-      .emit('discovery:entity:update', event);
+    this.realtime.to(this.viewerRoom(viewerId)).emit('discovery:entity:update', event);
   }
 
   emitLeave(viewerId: string, event: DiscoveryEntityLeaveEvent): void {
-    this.realtime.server
-      .to(this.viewerRoom(viewerId))
-      .emit('discovery:entity:leave', event);
+    this.realtime.to(this.viewerRoom(viewerId)).emit('discovery:entity:leave', event);
   }
 
   private async publishToCandidates(
@@ -152,15 +146,15 @@ export class DiscoveryRealtimePublisher {
   }
 
   private emitEnterToSocket(socketId: string, event: DiscoveryEntityUpsertEvent): void {
-    this.realtime.server.to(socketId).emit('discovery:entity:enter', event);
+    this.realtime.to(socketId).emit('discovery:entity:enter', event);
   }
 
   private emitUpdateToSocket(socketId: string, event: DiscoveryEntityUpsertEvent): void {
-    this.realtime.server.to(socketId).emit('discovery:entity:update', event);
+    this.realtime.to(socketId).emit('discovery:entity:update', event);
   }
 
   private emitLeaveToSocket(socketId: string, event: DiscoveryEntityLeaveEvent): void {
-    this.realtime.server.to(socketId).emit('discovery:entity:leave', event);
+    this.realtime.to(socketId).emit('discovery:entity:leave', event);
   }
 
   private viewerRoom(viewerId: string): string {
