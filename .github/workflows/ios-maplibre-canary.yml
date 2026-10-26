@@ -1,0 +1,190 @@
+name: iOS MapLibre Canary
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-maplibre-canary
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  NEXA_MAP_RENDERER: maplibre
+  NEXA_MAPLIBRE_SMOKE_STYLE: provider
+  NEXA_MAPTILER_API_KEY: ${{ secrets.NEXA_MAPTILER_API_KEY }}
+  NEXA_MAPTILER_MAP_ID: ${{ vars.NEXA_MAPTILER_MAP_ID || 'streets-v4' }}
+  NEXA_MAPTILER_REGION: ${{ vars.NEXA_MAPTILER_REGION || 'eu' }}
+
+jobs:
+  ios-maplibre-canary:
+    name: iOS MapLibre provider canary
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1
+        with:
+          ruby-version: '3.3.3'
+
+      - name: Install pinned CocoaPods
+        run: gem install cocoapods -v 1.17.0 --no-document
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: ${{ github.workspace }}
+
+      - name: Validate real MapTiler client config
+        run: node scripts/check-maplibre-release-config.mjs
+
+      - name: Bootstrap React Native iOS shell
+        run: node scripts/bootstrap-ios-native.mjs
+
+      - name: Install iOS pods
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          LOG_FILE="${RUNNER_TEMP}/nexa-pod-install.log"
+          MAX_ATTEMPTS=3
+
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            echo "CocoaPods install attempt ${attempt}/${MAX_ATTEMPTS}"
+            rm -f "$LOG_FILE"
+
+            set +e
+            pod install --project-directory=ios 2>&1 | tee "$LOG_FILE"
+            status=${PIPESTATUS[0]}
+            set -e
+
+            if [[ "$status" -eq 0 ]]; then
+              echo "CocoaPods install succeeded on attempt ${attempt}."
+              exit 0
+            fi
+
+            if ! grep -Fq 'pathname contains null byte' "$LOG_FILE"; then
+              echo "CocoaPods failed with a non-retryable error." >&2
+              exit "$status"
+            fi
+
+            if [[ "$attempt" -eq "$MAX_ATTEMPTS" ]]; then
+              echo "CocoaPods hit the known pnpm null-byte failure ${MAX_ATTEMPTS} times." >&2
+              exit "$status"
+            fi
+
+            echo "Known transient CocoaPods/pnpm null-byte failure; regenerating Pods and retrying."
+            rm -rf ios/Pods ios/Podfile.lock
+            sleep 2
+          done
+
+      - name: Build MapLibre provider canary
+        run: >-
+          xcodebuild
+          -workspace ios/G88.xcworkspace
+          -scheme G88
+          -configuration Release
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath ios/build/DerivedData
+          ENTRY_FILE=maplibre-smoke.js
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
+          build
+
+      - name: Exercise real MapTiler style through NEXA runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_PATH="ios/build/DerivedData/Build/Products/Release-iphonesimulator/G88.app"
+          BUNDLE_ID="com.g88"
+          READY_MARKER_FILENAME="maplibre-smoke-ready"
+
+          test -d "$APP_PATH"
+
+          SIM_UDID="$(
+            xcrun simctl list devices available --json | python3 -c '
+          import json
+          import sys
+
+          devices = json.load(sys.stdin)["devices"]
+          for runtime_devices in devices.values():
+              for device in runtime_devices:
+                  if device.get("isAvailable") and device.get("name", "").startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit(0)
+          raise SystemExit("No available iPhone simulator found")
+          '
+          )"
+
+          xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
+          xcrun simctl bootstatus "$SIM_UDID" -b
+          trap 'xcrun simctl shutdown "$SIM_UDID" >/dev/null 2>&1 || true' EXIT
+
+          xcrun simctl install "$SIM_UDID" "$APP_PATH"
+          APP_DATA="$(xcrun simctl get_app_container "$SIM_UDID" "$BUNDLE_ID" data)"
+          READY_MARKER="${APP_DATA}/Documents/${READY_MARKER_FILENAME}"
+          rm -f "$READY_MARKER"
+
+          LAUNCH_OUTPUT="$(xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID")"
+          echo "$LAUNCH_OUTPUT"
+
+          PID="${LAUNCH_OUTPUT##*: }"
+          if [[ ! "$PID" =~ ^[0-9]+$ ]]; then
+            echo "Unable to parse simulator process id from MapLibre canary launch output." >&2
+            exit 1
+          fi
+
+          for second in $(seq 1 30); do
+            if [[ -f "$READY_MARKER" ]]; then
+              echo "Real MapTiler style reported ready after ${second}s (pid=$PID)."
+              exit 0
+            fi
+
+            if ! xcrun simctl spawn "$SIM_UDID" ps -p "$PID" -o pid= >/dev/null 2>&1; then
+              echo "MapLibre provider canary exited before reporting ready." >&2
+              xcrun simctl spawn "$SIM_UDID" log show \
+                --last 2m \
+                --style compact \
+                --predicate 'process == "G88"' || true
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          echo "Real MapTiler style did not report ready within 30 seconds." >&2
+          xcrun simctl spawn "$SIM_UDID" log show \
+            --last 2m \
+            --style compact \
+            --predicate 'process == "G88"' || true
+          exit 1
+
+      - name: Record canary contract
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## MapLibre iOS provider canary'
+            echo
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Map ID: \`${NEXA_MAPTILER_MAP_ID}\`"
+            echo "- Region: \`${NEXA_MAPTILER_REGION}\`"
+            echo '- Renderer request: `maplibre`'
+            echo '- Style source: real MapTiler provider URL'
+            echo '- Production default changed: no'
+          } >> "$GITHUB_STEP_SUMMARY"

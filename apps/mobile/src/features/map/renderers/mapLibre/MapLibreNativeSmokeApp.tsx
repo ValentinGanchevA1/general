@@ -10,6 +10,8 @@ import { resolveMapLibreStyleRuntime } from '../../mapLibreStyleRuntime';
 import { NexaMapRuntimeSurface } from '../NexaMapRuntimeSurface';
 
 const READY_MARKER_FILENAME = 'maplibre-smoke-ready';
+const USE_PROVIDER_STYLE =
+  (process.env.NEXA_MAPLIBRE_SMOKE_STYLE as string | undefined) === 'provider';
 const SMOKE_STYLE: StyleSpecification = {
   version: 8,
   name: 'NEXA MapLibre runtime smoke',
@@ -84,7 +86,8 @@ const PROVIDER_RUNTIME = resolveMapLibreStyleRuntime({
 
 /**
  * CI-only runtime-router smoke app. It validates the production provider config
- * gate, then renders through NexaMapRuntimeSurface with an offline local style.
+ * gate, then renders through NexaMapRuntimeSurface. Pull-request CI stays
+ * deterministic/offline; the manual canary may opt into the real provider style.
  * The production App.tsx/navigation path is never involved.
  */
 export function MapLibreNativeSmokeApp(): React.JSX.Element {
@@ -106,12 +109,16 @@ export function MapLibreNativeSmokeApp(): React.JSX.Element {
     );
   }
 
+  const mapLibreStyle = USE_PROVIDER_STYLE
+    ? PROVIDER_RUNTIME.styleUrl
+    : SMOKE_STYLE;
+
   return (
     <View style={styles.root}>
       <NexaMapRuntimeSurface
         requestedRenderer={NEXA_MAP_RENDERER_ROLLOUT.requestedRenderer}
         mapLibreAvailable={NEXA_MAP_RENDERER_ROLLOUT.mapLibreAvailable}
-        mapLibreStyle={SMOKE_STYLE}
+        mapLibreStyle={mapLibreStyle}
         points={SMOKE_POINTS}
         selectedEntityKey="user:smoke-user"
         dimUnselected
