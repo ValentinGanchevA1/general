@@ -37,7 +37,7 @@ const MONTHS = [
 
 interface BirthDateFieldProps {
   value: string;
-  error?: string;
+  error?: string | undefined;
   onChange: (value: string) => void;
   onComplete?: () => void;
 }
