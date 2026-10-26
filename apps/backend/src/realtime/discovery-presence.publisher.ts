@@ -4,8 +4,8 @@ import type { LatLng } from '@g88/shared';
 import { DiscoveryRealtimePublisher } from './discovery-realtime.publisher';
 
 /**
- * Bridges presence movement into discovery realtime without making the core
- * RealtimeGateway depend on DiscoveryRealtimePublisher directly.
+ * Adapts presence heartbeats into discovery entity changes while retaining the
+ * previous fuzzed location required for movement-aware leave routing.
  */
 @Injectable()
 export class DiscoveryPresencePublisher {
@@ -20,7 +20,7 @@ export class DiscoveryPresencePublisher {
 
     try {
       if (previousLocation !== undefined) {
-        await this.discovery.publishEntityMovementToSubscribers({
+        await this.discovery.publishEntityMovement({
           kind: 'user',
           entityId: userId,
           previousLocation,
