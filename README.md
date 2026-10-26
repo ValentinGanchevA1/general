@@ -28,15 +28,16 @@ pnpm --filter @g88/admin dev  # optional — admin queue
 
 | Doc | Purpose |
 |-----|---------|
-| `STATUS.md` | Where we are / what's next |
-| `ROADMAP.md` | Phase sequence and gates |
-| `ARCHITECTURE.md` | System design and invariants |
-| `SPECIFICATION.md` | Feature contracts |
+| `docs/STATUS_CURRENT.md` | Live implementation state, current gates and migration baseline |
+| `ROADMAP.md` | Phase sequence and gates; reconcile older snapshot prose against current status before treating it as live |
+| `ARCHITECTURE.md` | System design and invariants; code/shared contracts win if older snapshot details drift |
+| `SPECIFICATION.md` | Feature contracts; `packages/shared` and shipped code are field-level truth |
 | `PRODUCT.md` | What / why / launch market |
 | `CLAUDE.md` | Agent + contributor conventions |
+| `STATUS.md` | Historical progress log; not the live status authority |
 | `DEPLOY.md` | Render / Play / env (if present) |
 
-**Current phase:** see `STATUS.md` for the live implementation state and migration baseline.  
+**Current phase:** see `docs/STATUS_CURRENT.md` for the live implementation state and migration baseline.  
 Privacy: locations are privacy-coarsened to H3 r10 (~120 m) before persistence — see `ARCHITECTURE.md §3.3`.
 
 ## Monorepo
