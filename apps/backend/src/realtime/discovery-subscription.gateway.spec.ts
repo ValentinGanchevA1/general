@@ -30,6 +30,64 @@ describe('DiscoverySubscriptionGateway', () => {
     expect(store.get('socket-a')?.query.zoom).toBe(17);
   });
 
+  it('rejects oversized viewports without replacing the active subscription', () => {
+    const store = new DiscoverySubscriptionStore();
+    const gateway = new DiscoverySubscriptionGateway(store);
+    const client = { id: 'socket-a', data: { userId: 'viewer-1' } };
+
+    gateway.onSubscribe(client as never, query);
+    const result = gateway.onSubscribe(client as never, {
+      ...query,
+      viewport: {
+        sw: { lat: 10, lng: 20 },
+        ne: { lat: 26, lng: 21 },
+      },
+      zoom: 18,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: 'discovery.viewport_too_large',
+      message: 'Discovery viewport must span at most 15 degrees per axis.',
+    });
+    expect(store.get('socket-a')?.query.zoom).toBe(16);
+  });
+
+  it('accepts a bounded viewport crossing the antimeridian', () => {
+    const store = new DiscoverySubscriptionStore();
+    const gateway = new DiscoverySubscriptionGateway(store);
+    const client = { id: 'socket-a', data: { userId: 'viewer-1' } };
+
+    const result = gateway.onSubscribe(client as never, {
+      ...query,
+      viewport: {
+        sw: { lat: -5, lng: 175 },
+        ne: { lat: 5, lng: -175 },
+      },
+    });
+
+    expect(result).toEqual({ ok: true, data: { subscribed: true } });
+    expect(store.get('socket-a')).not.toBeNull();
+  });
+
+  it('rejects inverted latitude bounds', () => {
+    const store = new DiscoverySubscriptionStore();
+    const gateway = new DiscoverySubscriptionGateway(store);
+    const client = { id: 'socket-a', data: { userId: 'viewer-1' } };
+
+    expect(gateway.onSubscribe(client as never, {
+      ...query,
+      viewport: {
+        sw: { lat: 20, lng: 20 },
+        ne: { lat: 10, lng: 21 },
+      },
+    })).toMatchObject({
+      ok: false,
+      code: 'discovery.viewport_too_large',
+    });
+    expect(store.get('socket-a')).toBeNull();
+  });
+
   it('clears state on unsubscribe and disconnect idempotently', () => {
     const store = new DiscoverySubscriptionStore();
     const gateway = new DiscoverySubscriptionGateway(store);
