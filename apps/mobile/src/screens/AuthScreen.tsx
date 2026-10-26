@@ -19,6 +19,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NexaWordmark } from '@/components/Brand/NexaWordmark';
 import { GoogleMark } from '@/components/GoogleMark';
+import { PasswordRecoveryScreen } from './PasswordRecoveryScreen';
+import { clearPasswordRecovery } from '@/features/auth/passwordResetSlice';
 import { FormField } from '@/components/FormField';
 import { PRIVACY_POLICY_URL, SUPPORT_EMAIL, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { clearError, login, loginWithGoogle, register } from '@/features/auth/authSlice';
@@ -71,6 +73,7 @@ export function AuthScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((s) => s.auth);
 
+  const [recovering, setRecovering] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -128,17 +131,23 @@ export function AuthScreen(): React.JSX.Element {
   };
 
   const requestPasswordHelp = (): void => {
-    Alert.alert(
-      'Account access help',
-      'In-app password reset is not available yet. Contact support for help accessing your account. Never send your password.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Contact support', onPress: () => openLink(`mailto:${SUPPORT_EMAIL}?subject=NEXA%20account%20access%20help`) },
-      ],
-    );
+    dispatch(clearPasswordRecovery());
+    dispatch(clearError());
+    setPassword('');
+    setPasswordVisible(false);
+    setRecovering(true);
   };
 
   const isLogin = mode === 'login';
+
+  if (recovering) {
+    return <PasswordRecoveryScreen initialEmail={email} onClose={(recoveryEmail) => {
+      setEmail(recoveryEmail);
+      setPassword('');
+      setFieldErrors({});
+      setRecovering(false);
+    }} />;
+  }
 
   return (
     <KeyboardAvoidingView

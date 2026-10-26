@@ -1,10 +1,12 @@
 import React from 'react';
-import { Alert, Linking } from 'react-native';
+import { Linking } from 'react-native';
 import { fireEvent, render } from '@testing-library/react-native';
 
 import { clearError, login, loginWithGoogle, register } from '@/features/auth/authSlice';
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { AuthScreen } from './AuthScreen';
+
+jest.mock('./PasswordRecoveryScreen', () => ({ PasswordRecoveryScreen: 'PasswordRecoveryScreen' }));
 
 const mockDispatch = jest.fn();
 let mockAuth = { loading: false, error: null as string | null };
@@ -87,16 +89,14 @@ it('blocks button and keyboard submission while authentication is pending', () =
   expect(loginWithGoogle).not.toHaveBeenCalled();
 });
 
-it('opens configured legal links and explains the account-help fallback', () => {
+it('opens configured legal links and enters password recovery', () => {
   const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   const screen = render(<AuthScreen />);
   fireEvent.press(screen.getByText('Terms of Service'));
   expect(openURL).toHaveBeenCalledWith(TERMS_OF_SERVICE_URL);
   fireEvent.press(screen.getByText('Privacy Policy'));
   expect(openURL).toHaveBeenCalledWith(PRIVACY_POLICY_URL);
   fireEvent.press(screen.getByLabelText('Forgot password?'));
-  expect(alert).toHaveBeenCalledWith('Account access help', expect.stringContaining('not available yet'), expect.any(Array));
+  expect(screen.UNSAFE_getByType('PasswordRecoveryScreen' as unknown as React.ComponentType).props.initialEmail).toBe('');
   openURL.mockRestore();
-  alert.mockRestore();
 });

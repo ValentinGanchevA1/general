@@ -55,6 +55,16 @@ REST and Socket.IO currently share the NestJS application boundary; realtime nam
 
 Mobile/API auth uses JWT access + rotating refresh-family semantics. Google OAuth is supported. Apple Sign-In remains a separate product/auth scope decision; current iOS build/runtime work does not implicitly enable it.
 
+Password recovery uses an 8-digit email code (15-minute lifetime, 5 guesses,
+60-second resend cooldown, 5 requests per hour per email HMAC). Challenges and an
+AES-GCM encrypted mail outbox are stored in PostgreSQL; API workers use leased
+`SKIP LOCKED` claims to deliver through SendGrid with at most 3 attempts. Reset
+atomically changes the bcrypt hash, increments `auth_version`, revokes refresh
+tokens and consumes the challenge. Refresh issuance locks the user version to
+prevent in-flight authentication from recreating a pre-reset refresh session.
+Already-issued access tokens retain their existing 15-minute expiry. See
+`docs/PASSWORD_RECOVERY.md` for configuration and QA.
+
 Browser auth has a distinct hardened boundary:
 
 - access token is memory-only;
@@ -71,7 +81,7 @@ Admin uses authenticated admin guards; browser-facing identity is NEXA Admin.
 
 ### 3.8 Migrations
 
-Raw SQL migrations. **0001–0050** are allocated on current master; **next free 0051**. CI enforces unique numeric prefixes.
+Raw SQL migrations. **0001–0051** are allocated on current master; **next free 0052**. CI enforces unique numeric prefixes.
 
 ### 3.9 Shared contracts
 

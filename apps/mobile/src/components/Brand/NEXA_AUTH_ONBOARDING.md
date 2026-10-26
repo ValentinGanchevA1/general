@@ -24,7 +24,7 @@ The sequence communicates:
 - email/password, registration, optional phone and Google auth contracts are unchanged
 - safe-area-aware scroll layout preserves access with the keyboard and larger text
 - separate Terms and Privacy links retain configured destinations; issue #592 still owns publication of a dedicated Terms document
-- “Forgot password?” explains the absence of self-service reset and offers account-access support; it does not claim to send a reset email
+- “Forgot password?” opens email request → 8-digit email code + new password/confirmation → success → sign in; recovery errors and request status live in Redux, secrets remain local to the form
 - no location permission request or location imagery is introduced
 
 ## Spatial discovery hero
