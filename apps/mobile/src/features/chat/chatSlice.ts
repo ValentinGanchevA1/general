@@ -11,6 +11,7 @@ import {
   type ConversationRefreshFailure,
 } from './chatDiagnostics';
 import { clearChatOutbox } from './chatOutboxPersist';
+import { compareConversationSummaries } from './conversationSort';
 
 export interface OutboxEntry {
   optimisticId: string;
@@ -120,16 +121,19 @@ const chatSlice = createSlice({
       state,
       action: PayloadAction<ChatMessage & { viewerId?: string }>,
     ) {
-      const { conversationId, senderId, body, createdAt, viewerId } = action.payload;
+      const { viewerId, ...message } = action.payload;
+      const { id, conversationId, senderId, body, createdAt } = message;
       const existing = state.messages[conversationId] ?? [];
-      const alreadySeen = existing.some((m) => m.id === action.payload.id);
+      const alreadySeen = existing.some((m) => m.id === id);
       if (alreadySeen) return;
 
-      state.messages[conversationId] = [action.payload, ...existing];
+      state.messages[conversationId] = [message, ...existing];
 
       const convo = state.conversations.find((c) => c.id === conversationId);
       if (convo) {
-        const currentLastAt = convo.lastMessageAt ? Date.parse(convo.lastMessageAt) : Number.NEGATIVE_INFINITY;
+        const currentLastAt = convo.lastMessageAt
+          ? Date.parse(convo.lastMessageAt)
+          : Number.NEGATIVE_INFINITY;
         const incomingAt = Date.parse(createdAt);
         const canAdvancePreview =
           convo.lastMessageAt === null ||
@@ -140,6 +144,7 @@ const chatSlice = createSlice({
         if (canAdvancePreview) {
           convo.lastMessage = { senderId, body };
           convo.lastMessageAt = createdAt;
+          state.conversations.sort(compareConversationSummaries);
         }
 
         const isActive = state.activeConversationId === conversationId;
