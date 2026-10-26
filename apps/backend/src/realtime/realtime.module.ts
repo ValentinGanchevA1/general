@@ -4,6 +4,7 @@ import { RealtimeEmitterService } from './realtime-emitter.service';
 import { WsJwtGuard } from './ws-jwt.guard';
 import { LocationShareSweepService } from './location-share.sweep';
 import { DiscoveryRealtimePublisher } from './discovery-realtime.publisher';
+import { DiscoveryMutationBusService } from './discovery-mutation-bus.service';
 import { DiscoveryPresencePublisher } from './discovery-presence.publisher';
 import { DiscoverySubscriptionStore } from './discovery-subscription.store';
 import { DiscoverySubscriptionGateway } from './discovery-subscription.gateway';
@@ -33,6 +34,7 @@ import { DiscoveryModule } from '../modules/discovery/discovery.module';
     WsJwtGuard,
     LocationShareSweepService,
     DiscoveryRealtimePublisher,
+    DiscoveryMutationBusService,
     DiscoveryPresencePublisher,
     DiscoverySubscriptionStore,
   ],

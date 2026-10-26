@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import type {
   DiscoveryEntityLeaveEvent,
   DiscoveryEntityUpsertEvent,
@@ -8,6 +8,10 @@ import type {
 } from '@g88/shared';
 
 import { DiscoveryEntityResolver } from '../modules/discovery/discovery-entity-resolver.service';
+import {
+  DiscoveryMutationBusService,
+  type DiscoveryMutation,
+} from './discovery-mutation-bus.service';
 import { RealtimeEmitterService } from './realtime-emitter.service';
 import {
   type ActiveDiscoverySubscription,
@@ -19,16 +23,21 @@ type DiscoveryRealtimeChange = 'enter' | 'update';
 
 /**
  * Emits discovery deltas only to sockets with an active matching discovery
- * subscription. Candidate selection is coarse; every upsert candidate still
- * passes through the viewer-specific resolver before emission.
+ * subscription. Mutations are distributed through Redis so each backend
+ * instance performs viewer-safe fanout against its own local subscriptions.
  */
 @Injectable()
-export class DiscoveryRealtimePublisher {
+export class DiscoveryRealtimePublisher implements OnModuleInit {
   constructor(
     private readonly realtime: RealtimeEmitterService,
     private readonly resolver: DiscoveryEntityResolver,
     private readonly subscriptions: DiscoverySubscriptionStore,
+    private readonly mutationBus: DiscoveryMutationBusService,
   ) {}
+
+  onModuleInit(): void {
+    this.mutationBus.setHandler((mutation) => this.consumeMutation(mutation));
+  }
 
   async publishEntityChange(params: {
     viewerId: string;
@@ -58,22 +67,48 @@ export class DiscoveryRealtimePublisher {
     location: LatLng;
     change: DiscoveryRealtimeChange;
   }): Promise<number> {
-    const candidates = this.subscriptions.candidatesForEntity(params.kind, params.location);
-    return this.publishToCandidates(params, candidates);
+    await this.mutationBus.publish({ type: 'change', ...params });
+    return 0;
   }
 
-  /**
-   * Routes a movement through both sides of the viewport transition.
-   * Subscribers containing only the previous location receive a leave without
-   * resolving the entity at its new location. Current-location candidates are
-   * resolved normally before any upsert is emitted.
-   */
   async publishEntityMovement(params: {
     kind: DiscoverableKind;
     entityId: string;
     previousLocation: LatLng;
     location: LatLng;
   }): Promise<number> {
+    await this.mutationBus.publish({ type: 'movement', ...params });
+    return 0;
+  }
+
+  emitEnter(viewerId: string, event: DiscoveryEntityUpsertEvent): void {
+    this.realtime.to(this.viewerRoom(viewerId)).emit('discovery:entity:enter', event);
+  }
+
+  emitUpdate(viewerId: string, event: DiscoveryEntityUpsertEvent): void {
+    this.realtime.to(this.viewerRoom(viewerId)).emit('discovery:entity:update', event);
+  }
+
+  emitLeave(viewerId: string, event: DiscoveryEntityLeaveEvent): void {
+    this.realtime.to(this.viewerRoom(viewerId)).emit('discovery:entity:leave', event);
+  }
+
+  private async consumeMutation(mutation: DiscoveryMutation): Promise<void> {
+    if (mutation.type === 'movement') {
+      await this.publishMovementLocally(mutation);
+      return;
+    }
+
+    const candidates = this.subscriptions.candidatesForEntity(mutation.kind, mutation.location);
+    await this.publishToCandidates(mutation, candidates);
+  }
+
+  private async publishMovementLocally(params: {
+    kind: DiscoverableKind;
+    entityId: string;
+    previousLocation: LatLng;
+    location: LatLng;
+  }): Promise<void> {
     const previousCandidates = this.subscriptions.candidatesForEntity(
       params.kind,
       params.previousLocation,
@@ -90,22 +125,10 @@ export class DiscoveryRealtimePublisher {
       }
     }
 
-    return this.publishToCandidates(
+    await this.publishToCandidates(
       { ...params, change: 'update' },
       currentCandidates,
     );
-  }
-
-  emitEnter(viewerId: string, event: DiscoveryEntityUpsertEvent): void {
-    this.realtime.to(this.viewerRoom(viewerId)).emit('discovery:entity:enter', event);
-  }
-
-  emitUpdate(viewerId: string, event: DiscoveryEntityUpsertEvent): void {
-    this.realtime.to(this.viewerRoom(viewerId)).emit('discovery:entity:update', event);
-  }
-
-  emitLeave(viewerId: string, event: DiscoveryEntityLeaveEvent): void {
-    this.realtime.to(this.viewerRoom(viewerId)).emit('discovery:entity:leave', event);
   }
 
   private async publishToCandidates(

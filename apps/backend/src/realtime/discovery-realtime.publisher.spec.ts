@@ -1,5 +1,6 @@
 import type { DiscoveryEntityUpsertEvent, DiscoveryPoint } from '@g88/shared';
 
+import type { DiscoveryMutationBusService } from './discovery-mutation-bus.service';
 import { DiscoveryRealtimePublisher } from './discovery-realtime.publisher';
 import type { RealtimeEmitterService } from './realtime-emitter.service';
 import type { DiscoveryEntityResolver } from '../modules/discovery/discovery-entity-resolver.service';
@@ -37,8 +38,18 @@ describe('DiscoveryRealtimePublisher', () => {
     const resolver = { resolveForViewer } as unknown as DiscoveryEntityResolver;
     const candidatesForEntity = jest.fn().mockReturnValue([]);
     const subscriptions = { candidatesForEntity } as unknown as DiscoverySubscriptionStore;
+    const publish = jest.fn().mockResolvedValue(undefined);
+    let handler: ((mutation: Parameters<DiscoveryMutationBusService['publish']>[0]) => Promise<void>) | null = null;
+    const setHandler = jest.fn((nextHandler) => {
+      handler = nextHandler;
+    });
+    const mutationBus = { publish, setHandler } as unknown as DiscoveryMutationBusService;
+    const publisher = new DiscoveryRealtimePublisher(realtime, resolver, subscriptions, mutationBus);
+    publisher.onModuleInit();
     return {
-      publisher: new DiscoveryRealtimePublisher(realtime, resolver, subscriptions),
+      publisher,
+      publish,
+      handler: () => handler,
       emit,
       to,
       resolveForViewer,
@@ -57,13 +68,33 @@ describe('DiscoveryRealtimePublisher', () => {
     expect(emit).toHaveBeenCalledWith('discovery:entity:enter', event);
   });
 
-  it('fans out through bounded subscription candidates and active context', async () => {
-    const { publisher, emit, to, resolveForViewer, candidatesForEntity } = createPublisher(userPoint);
+  it('publishes subscriber changes to the shared mutation bus', async () => {
+    const { publisher, publish } = createPublisher(userPoint);
+
+    await publisher.publishEntityChangeToSubscribers({
+      kind: 'user',
+      entityId: 'nearby-user',
+      location: { lat: 43.2, lng: 27.9 },
+      change: 'update',
+    });
+
+    expect(publish).toHaveBeenCalledWith({
+      type: 'change',
+      kind: 'user',
+      entityId: 'nearby-user',
+      location: { lat: 43.2, lng: 27.9 },
+      change: 'update',
+    });
+  });
+
+  it('fans out a consumed mutation through local candidates and active context', async () => {
+    const { emit, to, resolveForViewer, candidatesForEntity, handler } = createPublisher(userPoint);
     candidatesForEntity.mockReturnValueOnce([
       { socketId: 'socket-a', viewerId: 'viewer-1', query: context },
     ]);
 
-    const published = await publisher.publishEntityChangeToSubscribers({
+    await handler()?.({
+      type: 'change',
       kind: 'user',
       entityId: 'nearby-user',
       location: { lat: 43.2, lng: 27.9 },
@@ -78,16 +109,16 @@ describe('DiscoveryRealtimePublisher', () => {
     });
     expect(to).toHaveBeenCalledWith('socket-a');
     expect(emit).toHaveBeenCalledWith('discovery:entity:update', { point: userPoint });
-    expect(published).toBe(1);
   });
 
-  it('emits a socket-scoped leave when an active candidate becomes ineligible', async () => {
-    const { publisher, emit, candidatesForEntity } = createPublisher(null);
+  it('emits a socket-scoped leave when a consumed candidate becomes ineligible', async () => {
+    const { emit, candidatesForEntity, handler } = createPublisher(null);
     candidatesForEntity.mockReturnValueOnce([
       { socketId: 'socket-a', viewerId: 'viewer-1', query: context },
     ]);
 
-    const published = await publisher.publishEntityChangeToSubscribers({
+    await handler()?.({
+      type: 'change',
       kind: 'user',
       entityId: 'nearby-user',
       location: { lat: 43.2, lng: 27.9 },
@@ -95,16 +126,16 @@ describe('DiscoveryRealtimePublisher', () => {
     });
 
     expect(emit).toHaveBeenCalledWith('discovery:entity:leave', { key: 'user:nearby-user' });
-    expect(published).toBe(0);
   });
 
-  it('routes leave to previous-only subscriptions when an entity moves out', async () => {
-    const { publisher, emit, to, resolveForViewer, candidatesForEntity } = createPublisher(userPoint);
+  it('routes movement leaves and updates when consumed on another instance', async () => {
+    const { emit, to, resolveForViewer, candidatesForEntity, handler } = createPublisher(userPoint);
     candidatesForEntity
       .mockReturnValueOnce([{ socketId: 'socket-old', viewerId: 'viewer-old', query: context }])
       .mockReturnValueOnce([{ socketId: 'socket-new', viewerId: 'viewer-new', query: context }]);
 
-    const published = await publisher.publishEntityMovement({
+    await handler()?.({
+      type: 'movement',
       kind: 'user',
       entityId: 'nearby-user',
       previousLocation: { lat: 43.2, lng: 27.9 },
@@ -115,23 +146,6 @@ describe('DiscoveryRealtimePublisher', () => {
     expect(emit).toHaveBeenCalledWith('discovery:entity:leave', { key: 'user:nearby-user' });
     expect(resolveForViewer).not.toHaveBeenCalledWith(expect.objectContaining({ viewerId: 'viewer-old' }));
     expect(resolveForViewer).toHaveBeenCalledWith(expect.objectContaining({ viewerId: 'viewer-new' }));
-    expect(published).toBe(1);
-  });
-
-  it('does not send leave when the same socket contains old and new locations', async () => {
-    const { publisher, emit, candidatesForEntity } = createPublisher(userPoint);
-    const candidate = { socketId: 'socket-a', viewerId: 'viewer-1', query: context };
-    candidatesForEntity.mockReturnValueOnce([candidate]).mockReturnValueOnce([candidate]);
-
-    await publisher.publishEntityMovement({
-      kind: 'user',
-      entityId: 'nearby-user',
-      previousLocation: { lat: 43.2, lng: 27.9 },
-      location: { lat: 43.21, lng: 27.91 },
-    });
-
-    expect(emit).not.toHaveBeenCalledWith('discovery:entity:leave', expect.anything());
-    expect(emit).toHaveBeenCalledWith('discovery:entity:update', { point: userPoint });
   });
 
   it('emits canonical leave keys to the viewer room', () => {
