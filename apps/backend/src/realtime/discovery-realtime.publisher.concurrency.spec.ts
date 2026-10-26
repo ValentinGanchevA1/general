@@ -36,10 +36,26 @@ type MutationHandler = (
 describe('DiscoveryRealtimePublisher resolver concurrency', () => {
   it('resolves all candidates without running more than 16 viewer queries at once', async () => {
     const pendingResolvers: Array<(point: DiscoveryPoint) => void> = [];
+    let activeResolvers = 0;
+    let maxActiveResolvers = 0;
+    let totalResolverStarts = 0;
+    let markSeventeenthStarted: (() => void) | null = null;
+    const seventeenthStarted = new Promise<void>((resolve) => {
+      markSeventeenthStarted = resolve;
+    });
+
     const resolveForViewer = jest.fn(
       () =>
         new Promise<DiscoveryPoint>((resolve) => {
-          pendingResolvers.push(resolve);
+          totalResolverStarts += 1;
+          activeResolvers += 1;
+          maxActiveResolvers = Math.max(maxActiveResolvers, activeResolvers);
+          if (totalResolverStarts === 17) markSeventeenthStarted?.();
+
+          pendingResolvers.push((point) => {
+            activeResolvers -= 1;
+            resolve(point);
+          });
         }),
     );
     const resolver = { resolveForViewer } as unknown as DiscoveryEntityResolver;
@@ -82,14 +98,19 @@ describe('DiscoveryRealtimePublisher resolver concurrency', () => {
     });
 
     expect(resolveForViewer).toHaveBeenCalledTimes(16);
+    expect(maxActiveResolvers).toBe(16);
+
     pendingResolvers.slice(0, 16).forEach((resolve) => resolve(userPoint));
-    await Promise.resolve();
-    await Promise.resolve();
+    await seventeenthStarted;
 
     expect(resolveForViewer).toHaveBeenCalledTimes(17);
+    expect(maxActiveResolvers).toBeLessThanOrEqual(16);
+
     pendingResolvers[16]?.(userPoint);
     await fanout;
 
     expect(resolveForViewer).toHaveBeenCalledTimes(17);
+    expect(activeResolvers).toBe(0);
+    expect(maxActiveResolvers).toBeLessThanOrEqual(16);
   });
 });
