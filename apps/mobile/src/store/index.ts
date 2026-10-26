@@ -1,3 +1,4 @@
+import eventReviewsReducer from '@/features/events/eventReviewsSlice';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '@/features/auth/authSlice';
 import profileReducer from '@/features/profile/profileSlice';
@@ -18,6 +19,7 @@ import {
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    eventReviews: eventReviewsReducer,
     profile: profileReducer,
     chat: chatReducer,
     pulse: pulseReducer,

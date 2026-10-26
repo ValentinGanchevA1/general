@@ -1,3 +1,5 @@
+import { EventReviewsService } from './event-reviews.service';
+import { EventReviewsController, AdminEventReviewsController } from './event-reviews.controller';
 import { Module } from '@nestjs/common';
 import { EventsController } from './events.controller';
 import { EventsService } from './events.service';
@@ -7,7 +9,7 @@ import { RealtimeModule } from '../../realtime/realtime.module';
 
 @Module({
   imports: [NotificationsModule, RealtimeModule],
-  controllers: [EventsController],
-  providers: [EventsService, EventsDiscoveryLifecycleService],
+  controllers: [EventsController, EventReviewsController, AdminEventReviewsController],
+  providers: [EventReviewsService, EventsService, EventsDiscoveryLifecycleService],
 })
 export class EventsModule {}

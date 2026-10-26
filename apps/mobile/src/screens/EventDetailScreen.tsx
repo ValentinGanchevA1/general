@@ -19,6 +19,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import { EventReviewsSection } from '@/features/events/EventReviewsSection';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { useAppTheme, type ThemeColors } from '@/theme';
@@ -96,6 +97,8 @@ export function EventDetailScreen(): React.JSX.Element {
 
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
       style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} progressBackgroundColor={colors.surfaceRaised} />}
@@ -148,6 +151,8 @@ export function EventDetailScreen(): React.JSX.Element {
           </TouchableOpacity>
         ))}
       </> : null}
+
+      <EventReviewsSection key={eventId} event={event} isHost={isHost} onEnded={refresh} />
 
       <PollsSection polls={polls} isHost={isHost} eventId={eventId} onChanged={refreshPolls} />
       <QuestionsSection eventId={eventId} questions={questions} onChanged={refreshQuestions} />

@@ -213,3 +213,25 @@ See `ROADMAP.md` and `docs/STATUS_CURRENT.md` for current gates.
 | 2026-09-14 | §2.14 paths corrected to ListingsController; §2.4–§2.6 chat/messaging routes documented |
 | 2026-09-12 | §2.12 Friends; §2.7 waves blocked verified |
 | 2026-08-13 | Stories, email OTP, ID admin, live location documented |
+
+## Event reviews
+
+Confirmed attendees can publish one review after event completion. RSVP Going alone
+is insufficient. The authenticated host confirms existing Going participants during
+the event; no personal GPS proof is collected. Events with no `endsAt` need the
+host's explicit End event action. Hosts cannot review their own events.
+
+Reviews require integer 1–5 stars (no default selection). Optional input is limited
+to three distinct shared tags and a trimmed plain-text comment of 500 Unicode code
+points. PostgreSQL enforces uniqueness and an immutable 24-hour editing deadline
+from creation. At the deadline, edits are rejected; edits never extend it.
+
+Event access and bilateral block rules apply to review reads/writes and visible
+aggregates. Moderation hiding retains uniqueness, removes the review from aggregates,
+and does not affect identity verification. Reporting and a guarded admin report
+queue/hide action are available; attendance disputes route to Help/support.
+
+The mobile review section lives in EventDetail; stars-only publishing is two taps
+from that open detail. Existing Map / Discover / Pulse / Connections / You navigation
+is preserved. Failed requests retain the in-memory draft; session teardown clears it.
+See `docs/EVENT_REVIEWS.md` for routes, rollout and validation.
