@@ -104,12 +104,22 @@ export class ListingsController {
 
   /** PUT /api/v1/listings/:id/status — seller marks active/sold/withdrawn. */
   @Put(':id/status')
-  updateStatus(
+  async updateStatus(
     @CurrentUser('id') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateListingStatusDto,
   ): Promise<ListingDetail> {
-    return this.listings.updateStatus(userId, id, dto.status);
+    const listing = await this.listings.updateStatus(userId, id, dto.status);
+    const location = listing.location;
+    if (location !== undefined) {
+      void this.discovery.publishEntityChangeToSubscribers({
+        kind: 'listing',
+        entityId: listing.id,
+        location,
+        change: listing.status === 'active' ? 'enter' : 'update',
+      });
+    }
+    return listing;
   }
 
   /** POST /api/v1/listings/:id/bump — seller extends expires_at (rate-limited). */
