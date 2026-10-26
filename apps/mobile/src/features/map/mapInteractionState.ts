@@ -5,7 +5,7 @@ export type MapInteractionState =
   | 'full_profile';
 
 export interface MapInteractionStateInput {
-  showPreview: boolean;
+  previewRequested: boolean;
   isDetail: boolean;
   isFull: boolean;
 }
@@ -18,12 +18,12 @@ export interface MapInteractionStateInput {
  * from several booleans with subtly different rules.
  */
 export function resolveMapInteractionState({
-  showPreview,
+  previewRequested,
   isDetail,
   isFull,
 }: MapInteractionStateInput): MapInteractionState {
   if (isFull) return 'full_profile';
   if (isDetail) return 'detail';
-  if (showPreview) return 'quick_peek';
+  if (previewRequested) return 'quick_peek';
   return 'idle';
 }

@@ -4,7 +4,7 @@ describe('resolveMapInteractionState', () => {
   it('returns idle when no interaction surface is active', () => {
     expect(
       resolveMapInteractionState({
-        showPreview: false,
+        previewRequested: false,
         isDetail: false,
         isFull: false,
       }),
@@ -14,7 +14,7 @@ describe('resolveMapInteractionState', () => {
   it('maps preview to quick_peek', () => {
     expect(
       resolveMapInteractionState({
-        showPreview: true,
+        previewRequested: true,
         isDetail: false,
         isFull: false,
       }),
@@ -24,7 +24,7 @@ describe('resolveMapInteractionState', () => {
   it('maps detail states to detail even if preview is transiently true', () => {
     expect(
       resolveMapInteractionState({
-        showPreview: true,
+        previewRequested: true,
         isDetail: true,
         isFull: false,
       }),
@@ -34,7 +34,7 @@ describe('resolveMapInteractionState', () => {
   it('gives full profile highest precedence', () => {
     expect(
       resolveMapInteractionState({
-        showPreview: true,
+        previewRequested: true,
         isDetail: true,
         isFull: true,
       }),

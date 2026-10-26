@@ -145,7 +145,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
         state.matches({dating: 'messaging'})));
 
   const interactionState = resolveMapInteractionState({
-    showPreview: previewRequested,
+    previewRequested,
     isDetail,
     isFull,
   });
