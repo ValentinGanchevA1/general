@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto';
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 
 /** Recovery-specific secrets and mail transport. No dev code or logging fallback. */

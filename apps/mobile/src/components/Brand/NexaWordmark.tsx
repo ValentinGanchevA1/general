@@ -6,7 +6,7 @@ import { nexaBrand, nexaDark } from '@/theme';
 
 /** Horizontal auth lockup. Vector outlines keep the wordmark independent of fonts. */
 export function NexaWordmark(): React.JSX.Element {
-  const gradientId = `nexa-wordmark-${useId().replace(/:/g, '')}`;
+  const gradientId = `nexa-wordmark-${useId().replaceAll(':', '')}`;
   return (
     <View style={styles.root} accessible accessibilityRole="image" accessibilityLabel="NEXA">
       <Svg width="100%" height="100%" viewBox="0 0 360 54" accessible={false}>
