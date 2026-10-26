@@ -1,7 +1,8 @@
-# STATUS — G88
+# STATUS — NEXA
 
 > **Last updated:** 2026-09-24  
-> **Authority:** live progress. Sequence/gates → `ROADMAP.md`. System design → `ARCHITECTURE.md`. Feature contracts → `SPECIFICATION.md`. Snapshot → `docs/STATUS_CURRENT.md`.
+> **Authority:** live progress. Sequence/gates → `ROADMAP.md`. System design → `ARCHITECTURE.md`. Feature contracts → `SPECIFICATION.md`. Snapshot → `docs/STATUS_CURRENT.md`.  
+> **Compatibility note:** public product identity is **NEXA**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.
 
 ### ✅ Where we are / ⏭️ What's next
 
