@@ -112,6 +112,9 @@ export function useDiscovery({
   const abortRef = useRef<AbortController | null>(null);
   const lastFetchKey = useRef<string>('');
   const prevHashRef = useRef<string | null>(null);
+  // This remains the exact HTTP snapshot baseline associated with prevHashRef.
+  // Realtime reconciliation is committed to Redux separately and must not
+  // contaminate the next server diff baseline.
   const cachedPointsRef = useRef<DiscoveryPoint[]>([]);
   const mutationLogRef = useRef(createDiscoveryMutationLog());
   const lastTopicRef = useRef<string | null>(null);
@@ -216,13 +219,14 @@ export function useDiscovery({
         const httpPoints = res.diff
           ? applyDiscoveryDiff(cachedPointsRef.current, res.diff)
           : res.points;
+        cachedPointsRef.current = httpPoints;
+
         const reconciledPoints = replayDiscoveryMutations(
           httpPoints,
           mutationLogRef.current.mutationsAfter(requestMutationSequence),
           requestMutationSequence,
         );
 
-        cachedPointsRef.current = reconciledPoints;
         dispatch(setPoints(reconciledPoints));
         setData({ ...res, points: reconciledPoints, diff: null });
         mutationLogRef.current.reset();
