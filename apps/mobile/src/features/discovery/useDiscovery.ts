@@ -247,7 +247,6 @@ export function useDiscovery({
       abortRef.current?.abort();
       abortRef.current = null;
       mutationLogRef.current.reset();
-      setLoading(false);
       return;
     }
 
@@ -258,7 +257,6 @@ export function useDiscovery({
       abortRef.current.abort();
       abortRef.current = null;
       lastFetchKey.current = '';
-      setLoading(false);
     }
 
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -342,5 +340,6 @@ export function useDiscovery({
     return { ...data, points };
   }, [data, points]);
 
-  return { data: canonicalData, loading, error, refresh };
+  const visibleLoading = enabled && viewport != null ? loading : false;
+  return { data: canonicalData, loading: visibleLoading, error, refresh };
 }
