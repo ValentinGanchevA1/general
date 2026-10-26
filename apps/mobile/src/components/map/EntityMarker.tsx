@@ -16,6 +16,8 @@ interface Props {
   dimmed?: boolean;
   unavailable?: boolean;
   reduceMotion?: boolean;
+  personAvatarUri?: string | null;
+  onPersonAvatarRenderError?: () => void;
 }
 
 function initialsFromName(name: string): string {
@@ -88,6 +90,8 @@ function EntityMarkerImpl({
   dimmed = false,
   unavailable = false,
   reduceMotion = true,
+  personAvatarUri = null,
+  onPersonAvatarRenderError,
 }: Props): React.JSX.Element {
   useEffect(() => {
     if (!selected) return;
@@ -106,6 +110,8 @@ function EntityMarkerImpl({
         entityType="person"
         density={density}
         label={initialsFromName(name) || '?'}
+        avatarUri={personAvatarUri}
+        onAvatarRenderError={onPersonAvatarRenderError}
         {...(showCaption ? { caption: name.slice(0, 10) } : {})}
         state={{ selected, live, verified, isNew, own, dimmed, unavailable }}
         accessibilityLabel={`${name}, person${live ? ', live' : ''}${verified ? ', verified' : ''}`}
@@ -159,7 +165,9 @@ function entityMarkerPropsEqual(prev: Props, next: Props): boolean {
     prev.own === next.own &&
     prev.dimmed === next.dimmed &&
     prev.unavailable === next.unavailable &&
-    prev.reduceMotion === next.reduceMotion
+    prev.reduceMotion === next.reduceMotion &&
+    prev.personAvatarUri === next.personAvatarUri &&
+    prev.onPersonAvatarRenderError === next.onPersonAvatarRenderError
   );
 }
 
