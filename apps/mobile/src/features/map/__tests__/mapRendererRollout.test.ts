@@ -4,32 +4,32 @@ import {
 } from '../mapRendererRollout';
 
 describe('map renderer rollout policy', () => {
-  it('ships with the proven legacy renderer and MapLibre unavailable', () => {
+  it('ships with the proven legacy renderer while the native MapLibre bundle is available', () => {
     expect(NEXA_MAP_RENDERER_ROLLOUT).toEqual({
-      requestedRenderer: 'legacy',
-      mapLibreAvailable: false,
-    });
-  });
-
-  it('supports an explicit renderer request without implying native availability', () => {
-    expect(
-      mapRendererRolloutPolicy({ requestedRenderer: 'maplibre' }),
-    ).toEqual({
-      requestedRenderer: 'maplibre',
-      mapLibreAvailable: false,
-    });
-  });
-
-  it('requires availability to be enabled independently', () => {
-    expect(
-      mapRendererRolloutPolicy({ mapLibreAvailable: true }),
-    ).toEqual({
       requestedRenderer: 'legacy',
       mapLibreAvailable: true,
     });
   });
 
-  it('allows the validated MapLibre rollout state only when both switches are explicit', () => {
+  it('can request MapLibre without changing the independently declared availability', () => {
+    expect(
+      mapRendererRolloutPolicy({ requestedRenderer: 'maplibre' }),
+    ).toEqual({
+      requestedRenderer: 'maplibre',
+      mapLibreAvailable: true,
+    });
+  });
+
+  it('can fail closed by disabling native availability independently', () => {
+    expect(
+      mapRendererRolloutPolicy({ mapLibreAvailable: false }),
+    ).toEqual({
+      requestedRenderer: 'legacy',
+      mapLibreAvailable: false,
+    });
+  });
+
+  it('allows the validated MapLibre rollout state only when both switches are enabled', () => {
     expect(
       mapRendererRolloutPolicy({
         requestedRenderer: 'maplibre',
