@@ -1,27 +1,27 @@
 export const NEXA_LAUNCH_TIMING_MS = {
-  pupilIgnition: 60,
+  pupilIgnition: 50,
 
-  eyeDrawStart: 160,
-  irisDrawStart: 245,
-  lowerLidDrawStart: 330,
-  eyeComplete: 610,
+  eyeDrawStart: 120,
+  irisDrawStart: 185,
+  lowerLidDrawStart: 245,
+  eyeComplete: 445,
 
-  orbitDrawStart: 500,
-  orbitComplete: 1040,
+  orbitDrawStart: 455,
+  orbitComplete: 760,
 
-  node1: 740,
-  node2: 810,
-  node3: 900,
-  node4: 980,
+  node1: 590,
+  node2: 640,
+  node3: 690,
+  node4: 735,
 
-  convergenceStart: 1040,
-  convergencePeak: 1110,
-  convergenceEnd: 1190,
+  convergenceStart: 760,
+  convergencePeak: 810,
+  convergenceEnd: 865,
 
-  wordmarkReveal: 1140,
-  wordmarkComplete: 1380,
+  wordmarkReveal: 890,
+  wordmarkComplete: 1040,
 
-  entranceComplete: 1450,
+  entranceComplete: 1080,
 } as const;
 
 export const NEXA_REDUCED_MOTION_TIMING_MS = {
