@@ -1,5 +1,5 @@
 /**
- * G88 Synthetic Monitor — P1 critical path
+ * NEXA Synthetic Monitor — P1 critical path
  *
  * Flow: login (or register on first run) → discovery → wave → chat via socket
  *       → interest-based message request (shared-interest gate, one-message
@@ -198,7 +198,7 @@ function joinConversation(socket, conversationId) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-console.log(`G88 Synthetic Monitor — ${new Date().toISOString()}`);
+console.log(`NEXA Synthetic Monitor — ${new Date().toISOString()}`);
 console.log(`Target: ${BASE}\n`);
 
 // ── Step 1: Auth ──────────────────────────────────────────────────────────────
