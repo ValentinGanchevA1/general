@@ -9,15 +9,18 @@ import type {
 
 import { DiscoveryEntityResolver } from '../modules/discovery/discovery-entity-resolver.service';
 import { RealtimeGateway } from './realtime.gateway';
-import { DiscoverySubscriptionStore } from './discovery-subscription.store';
+import {
+  type ActiveDiscoverySubscription,
+  DiscoverySubscriptionStore,
+} from './discovery-subscription.store';
 
 type DiscoverableKind = EntityKind;
 type DiscoveryRealtimeChange = 'enter' | 'update';
 
 /**
  * Emits discovery deltas only to sockets with an active matching discovery
- * subscription. Candidate selection is coarse; every candidate still passes
- * through the viewer-specific resolver before emission.
+ * subscription. Candidate selection is coarse; every upsert candidate still
+ * passes through the viewer-specific resolver before emission.
  */
 @Injectable()
 export class DiscoveryRealtimePublisher {
@@ -56,6 +59,69 @@ export class DiscoveryRealtimePublisher {
     change: DiscoveryRealtimeChange;
   }): Promise<number> {
     const candidates = this.subscriptions.candidatesForEntity(params.kind, params.location);
+    return this.publishToCandidates(params, candidates);
+  }
+
+  /**
+   * Routes a movement through both sides of the viewport transition.
+   * Subscribers containing only the previous location receive a leave without
+   * resolving the entity at its new location. Current-location candidates are
+   * resolved normally before any upsert is emitted.
+   */
+  async publishEntityMovement(params: {
+    kind: DiscoverableKind;
+    entityId: string;
+    previousLocation: LatLng;
+    location: LatLng;
+  }): Promise<number> {
+    const previousCandidates = this.subscriptions.candidatesForEntity(
+      params.kind,
+      params.previousLocation,
+    );
+    const currentCandidates = this.subscriptions.candidatesForEntity(params.kind, params.location);
+    const currentSocketIds = new Set(currentCandidates.map((candidate) => candidate.socketId));
+    const leaveEvent: DiscoveryEntityLeaveEvent = {
+      key: `${params.kind}:${params.entityId}` as DiscoveryPointKey,
+    };
+
+    for (const candidate of previousCandidates) {
+      if (!currentSocketIds.has(candidate.socketId)) {
+        this.emitLeaveToSocket(candidate.socketId, leaveEvent);
+      }
+    }
+
+    return this.publishToCandidates(
+      { ...params, change: 'update' },
+      currentCandidates,
+    );
+  }
+
+  emitEnter(viewerId: string, event: DiscoveryEntityUpsertEvent): void {
+    this.realtime.server
+      .to(this.viewerRoom(viewerId))
+      .emit('discovery:entity:enter', event);
+  }
+
+  emitUpdate(viewerId: string, event: DiscoveryEntityUpsertEvent): void {
+    this.realtime.server
+      .to(this.viewerRoom(viewerId))
+      .emit('discovery:entity:update', event);
+  }
+
+  emitLeave(viewerId: string, event: DiscoveryEntityLeaveEvent): void {
+    this.realtime.server
+      .to(this.viewerRoom(viewerId))
+      .emit('discovery:entity:leave', event);
+  }
+
+  private async publishToCandidates(
+    params: {
+      kind: DiscoverableKind;
+      entityId: string;
+      change: DiscoveryRealtimeChange;
+    },
+    candidates: readonly ActiveDiscoverySubscription[],
+  ): Promise<number> {
     let published = 0;
 
     for (const candidate of candidates) {
@@ -83,24 +149,6 @@ export class DiscoveryRealtimePublisher {
     }
 
     return published;
-  }
-
-  emitEnter(viewerId: string, event: DiscoveryEntityUpsertEvent): void {
-    this.realtime.server
-      .to(this.viewerRoom(viewerId))
-      .emit('discovery:entity:enter', event);
-  }
-
-  emitUpdate(viewerId: string, event: DiscoveryEntityUpsertEvent): void {
-    this.realtime.server
-      .to(this.viewerRoom(viewerId))
-      .emit('discovery:entity:update', event);
-  }
-
-  emitLeave(viewerId: string, event: DiscoveryEntityLeaveEvent): void {
-    this.realtime.server
-      .to(this.viewerRoom(viewerId))
-      .emit('discovery:entity:leave', event);
   }
 
   private emitEnterToSocket(socketId: string, event: DiscoveryEntityUpsertEvent): void {
