@@ -86,4 +86,18 @@ describe('chatSlice.messageReceived realtime ordering', () => {
     expect(state.conversations[0]?.lastMessageAt).toBe('2026-06-14T00:00:10Z');
     expect(state.conversations[0]?.unreadCount).toBe(1);
   });
+
+  it('keeps message history newest-first when an older event arrives late', () => {
+    const newer = { ...msg('srv-new', 'newer', '2026-06-14T00:00:20Z', peer), viewerId: me };
+    const older = { ...msg('srv-old', 'older', '2026-06-14T00:00:05Z', peer), viewerId: me };
+    let state = reducer(seededState(), messageReceived(newer));
+    state = reducer(state, messageReceived(older));
+
+    expect((state.messages[convoId] ?? []).map((message) => message.id)).toEqual([
+      'srv-new',
+      'srv-old',
+    ]);
+    expect(state.conversations[0]?.lastMessage).toEqual({ senderId: peer, body: 'newer' });
+    expect(state.conversations[0]?.lastMessageAt).toBe('2026-06-14T00:00:20Z');
+  });
 });
