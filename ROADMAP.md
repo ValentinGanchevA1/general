@@ -1,7 +1,8 @@
-# G88 — Roadmap
+# NEXA — Roadmap
 
 > **Authoritative source for sequence and timing.**
 > Sibling docs: `PRODUCT.md` (what/why), `SPECIFICATION.md` (contracts), `ARCHITECTURE.md` (how), `STATUS.md` (live progress).
+> **Compatibility note:** public product identity is **NEXA**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.
 > Last revised: **2026-09-14**.
 
 ---
