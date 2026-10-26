@@ -56,7 +56,7 @@ export class EventsController {
         entityId: event.id,
         location: dto.location,
         change: 'enter',
-      });
+      }).catch(() => undefined);
     }
     return event;
   }
