@@ -7,6 +7,11 @@ import { DiscoveryRealtimePublisher } from './discovery-realtime.publisher';
 
 const LOCATION_KEY_PREFIX = 'discovery:presence-location:';
 const LOCATION_TTL_SECONDS = 180;
+const SWAP_LOCATION_SCRIPT = `
+local previous = redis.call('GET', KEYS[1])
+redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+return previous
+`;
 
 /**
  * Adapts presence heartbeats into discovery entity changes while retaining the
@@ -61,9 +66,16 @@ export class DiscoveryPresencePublisher {
   private async swapLocation(userId: string, location: LatLng): Promise<LatLng | null> {
     const key = this.locationKey(userId);
     const serialized = JSON.stringify(location);
-    const previous = await this.redis.getset(key, serialized);
-    await this.redis.expire(key, LOCATION_TTL_SECONDS);
-    return this.parseLocation(previous);
+    // GET + replacement + TTL must be one Redis operation. A process failure
+    // between GETSET and EXPIRE would otherwise leave movement history immortal.
+    const previous = await this.redis.eval(
+      SWAP_LOCATION_SCRIPT,
+      1,
+      key,
+      serialized,
+      String(LOCATION_TTL_SECONDS),
+    );
+    return this.parseLocation(typeof previous === 'string' ? previous : null);
   }
 
   private parseLocation(value: string | null): LatLng | null {
