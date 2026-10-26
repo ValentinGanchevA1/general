@@ -37,7 +37,7 @@ const DENY_KEY_SUBSTRINGS: readonly string[] = [
   'password', 'passwd', 'secret', 'token', 'apikey', 'authorization',
   'cookie', 'credential', 'privatekey', 'clientsecret', 'session',
   'signature', 'bearer', 'jwt', 'csrf', 'xsrf', 'connectionstring',
-  'databaseurl', 'accesskey', 'secretkey',
+  'databaseurl', 'accesskey', 'secretkey', 'resetcode',
   // PII / privacy-invariant location fields
   'latitude', 'longitude', 'location', 'coordinate', 'geohash',
   'phone', 'email', 'iddocument', 'idphoto', 'selfie',

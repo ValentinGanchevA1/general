@@ -77,3 +77,5 @@ export interface VerificationUpdatedEvent {
   status: 'pending' | 'verified' | 'rejected';
 }
 export * from './eventReview';
+
+export * from './passwordReset';

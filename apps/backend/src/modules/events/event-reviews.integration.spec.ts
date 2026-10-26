@@ -23,7 +23,7 @@ suite('Event reviews PostgreSQL integration', () => {
       CREATE TABLE events (id uuid PRIMARY KEY, host_id uuid REFERENCES users(id) ON DELETE CASCADE, starts_at timestamptz NOT NULL, ends_at timestamptz, visibility text, deleted_at timestamptz);
       CREATE TABLE event_attendees (event_id uuid REFERENCES events(id) ON DELETE CASCADE, user_id uuid REFERENCES users(id) ON DELETE CASCADE, status text, PRIMARY KEY(event_id,user_id));
       CREATE TABLE user_blocks (blocker_id uuid, blocked_id uuid);`);
-    await db.query(readFileSync(join(__dirname, '../../..', 'migrations/0051_event_reviews.sql'), 'utf8'));
+    await db.query(readFileSync(join(__dirname, '../../..', 'migrations/0052_event_reviews.sql'), 'utf8'));
     service = new EventReviewsService(db);
   }, 30_000);
   afterAll(async () => {

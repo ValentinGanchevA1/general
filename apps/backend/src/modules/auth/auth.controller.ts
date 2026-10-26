@@ -12,12 +12,13 @@ import {
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 
-import type { LoginResponse, AuthTokens, AuthenticatedUser } from '@g88/shared';
+import type { LoginResponse, AuthTokens, AuthenticatedUser, ForgotPasswordResponse, ResetPasswordResponse } from '@g88/shared';
 
 import { AuthService } from './auth.service';
+import { PasswordResetService } from './password-reset.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
-import { GoogleOAuthDto, LoginDto, LogoutDto, RefreshDto, RegisterDto } from './dto';
+import { ForgotPasswordDto, ResetPasswordDto, GoogleOAuthDto, LoginDto, LogoutDto, RefreshDto, RegisterDto } from './dto';
 import {
   assertTrustedWebAuthRequest,
   clearWebRefreshCookie,
@@ -31,7 +32,21 @@ import {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(private readonly auth: AuthService, private readonly recovery: PasswordResetService) {}
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<ForgotPasswordResponse> {
+    return this.recovery.request(dto.email);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<ResetPasswordResponse> {
+    return this.recovery.reset(dto);
+  }
 
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })

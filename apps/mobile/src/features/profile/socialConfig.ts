@@ -1,6 +1,14 @@
 import type { SocialProvider, SubscriptionTier } from '@g88/shared';
 import type { ThemeColors } from '@/theme';
 
+/** Third-party provider artwork; intentionally outside the NEXA UI palette. */
+export const GOOGLE_BRAND_COLORS = {
+  blue: '#4285F4',
+  green: '#34A853',
+  yellow: '#FBBC05',
+  red: '#EA4335',
+} as const;
+
 /** MaterialCommunityIcons name + brand colour per social provider. */
 export const SOCIAL_PROVIDER_CONFIG: Record<
   SocialProvider,

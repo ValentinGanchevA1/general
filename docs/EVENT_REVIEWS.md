@@ -51,7 +51,7 @@ trigger enforce the strict edit boundary even after waiting for a lock.
 
 ## Rollout and validation
 
-- Apply migration `0051_event_reviews.sql` before deploying the backend; then deploy
+- Apply migration `0052_event_reviews.sql` before deploying the backend; then deploy
   the mobile client. No production migration/deployment is performed by this PR.
 - Existing RC3 remains unchanged. This feature needs a subsequent audited candidate.
 - Shared/backend/mobile typechecks and focused tests cover field limits, eligibility,

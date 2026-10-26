@@ -1,6 +1,7 @@
 import eventReviewsReducer from '@/features/events/eventReviewsSlice';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '@/features/auth/authSlice';
+import passwordResetReducer from '@/features/auth/passwordResetSlice';
 import profileReducer from '@/features/profile/profileSlice';
 import chatReducer, { outboxHydrated } from '@/features/chat/chatSlice';
 import pulseReducer from '@/features/pulse/pulseSlice';
@@ -20,6 +21,7 @@ export const store = configureStore({
   reducer: {
     auth: authReducer,
     eventReviews: eventReviewsReducer,
+    passwordReset: passwordResetReducer,
     profile: profileReducer,
     chat: chatReducer,
     pulse: pulseReducer,
