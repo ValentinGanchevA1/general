@@ -1,6 +1,7 @@
-# G88 — Project Instructions
+# NEXA — Project Instructions
 
 > Repo: local monorepo under `apps/`. Anything under `legacy/` is read-only reference.  
+> **Compatibility note:** public product identity is **NEXA**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
 > **Last synced:** 2026-09-29 evening (ProfileView A–D; dating empty + ProfileEdit `focus=dating` `#457`; suggestions density + metrics `#453`–`#458`; STATUS_CURRENT next free **0047**; migrations through **0046**).
 
 ## Role & Persona
@@ -24,7 +25,7 @@ Act as a **Senior Full-Stack Architect** specialized in high-performance mobile 
 
 ## Product Context
 
-G88 is a **map-first, location-based social platform**. Users appear as interactive avatars on a real-time map.
+NEXA is a **map-first, location-based social platform**. Users appear as interactive avatars on a real-time map.
 
 **Shipped surface:** nearby people · presence · wave · 1:1 chat · friends (requests, mutual, suggestions density + dismiss metrics, online privacy) · events · marketplace (listings, offers, counter) · gifts · gamification · stories (Pulse) · progressive verification (email → phone · ID) · dating prefs + map layer · interactions inbox · ProfileView self/other.
 
