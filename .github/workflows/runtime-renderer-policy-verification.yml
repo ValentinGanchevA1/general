@@ -1,0 +1,52 @@
+name: Runtime Renderer Policy Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_enabled:
+        description: Expected live mapLibreEnabled value
+        required: true
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-renderer-policy-verification
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  POLICY_URL: https://g88-api.onrender.com/api/v1/runtime-config/map-renderer
+
+jobs:
+  verify:
+    name: Verify live runtime renderer policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 22
+
+      - name: Verify live policy contract
+        run: node scripts/check-runtime-renderer-policy.mjs "$POLICY_URL" "${{ inputs.expected_enabled }}"
+
+      - name: Record verification contract
+        if: always()
+        run: |
+          {
+            echo "### Runtime renderer policy verification"
+            echo "- URL: \`$POLICY_URL\`"
+            echo "- Expected mapLibreEnabled: \`${{ inputs.expected_enabled }}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- This workflow is read-only and never mutates Render configuration."
+          } >> "$GITHUB_STEP_SUMMARY"
