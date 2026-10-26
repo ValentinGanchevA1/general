@@ -1,16 +1,13 @@
-# NEXA Auth + Onboarding v4
+# NEXA Auth + Onboarding v5
 
 ## Product intent
 
-Auth and first-run setup must introduce NEXA as a map-first local discovery product, not as a generic social network.
+Auth and first-run setup introduce NEXA as a map-first local discovery product, not as a generic social network.
 
-The sequence communicates:
+The first-run sequence establishes two distinct matching signals:
 
-1. local discovery
-2. profile context
-3. privacy control
-4. discovery intent
-5. map visibility
+- **Interests** — what the user likes and does; normalized tags used for shared-interest discovery.
+- **Purpose** — the user's core reason for using NEXA. Purpose is persisted through the existing `goals` contract for backward compatibility.
 
 ## Auth screen
 
@@ -18,44 +15,57 @@ The sequence communicates:
 - uncluttered, theme-aware form; dark mode matches the approved dark/violet reference
 - no discovery hero, panel border, welcome heading or sign-in subtitle on login
 - email/password fields have leading icons; password visibility is an accessible 48dp control
-- primary action uses a violet gradient from canonical theme tokens
+- primary action uses canonical semantic theme tokens
 - neutral Google sign-in treatment with the provider's multicolor mark
 - create-account action follows Google sign-in
 - email/password, registration, optional phone and Google auth contracts are unchanged
 - safe-area-aware scroll layout preserves access with the keyboard and larger text
-- separate Terms and Privacy links retain configured destinations; issue #592 still owns publication of a dedicated Terms document
-- “Forgot password?” opens email request → 8-digit email code + new password/confirmation → success → sign in; recovery errors and request status live in Redux, secrets remain local to the form
-- no location permission request or location imagery is introduced
-
-## Spatial discovery hero
-
-`NexaDiscoveryHero` is decorative and contains no real user/location data.
-
-It renders the reusable `NexaEntityOrbit`, which is the expanded NEXA ecosystem mark for hero-sized surfaces. The compact app identity remains `NexaSymbol`.
-
-Canonical entity vocabulary:
-
-- person: circle
-- event: four-point star
-- listing: square
-- opportunity / other: diamond
-- two elliptical discovery/action orbit paths around the final eye core
-
-The same circle / star / square / diamond vocabulary is used by the animated launch composition and map marker system so first-run product identity does not switch visual languages after splash.
-
-The component is intentionally non-interactive and hidden from the accessibility tree.
+- separate Terms and Privacy links retain configured destinations
+- “Forgot password?” uses the recovery workflow owned by Auth
+- no location permission request is introduced during authentication
 
 ## Profile onboarding
 
-The existing five-step data contract remains intact:
+The five user-facing setup steps are:
 
-1. identity / display name
-2. profile context / bio
-3. age + optional origin visibility
-4. discovery goals
-5. map visibility
+1. **Identity** — display name
+2. **Interests** — choose at least 3 predefined normalized tags
+3. **About you** — date of birth + optional origin visibility
+4. **Purpose** — choose at least one core reason for using NEXA
+5. **Map visibility** — Discoverable or Private browsing
 
-No profile API or persistence contract changes are part of this branding pass.
+### Interests
+
+Interests are selected from the curated taxonomy in `features/profile/interestOptions.ts` rather than entered as arbitrary free text. Stable lowercase keys are persisted in `interests[]`; localized/user-facing labels are presentation data.
+
+Examples include Football, Music, Reading, Cinema, Travel, Fitness, Technology, AI and Cybersecurity.
+
+The minimum of three gives matching/suggestion systems a useful cold-start signal without asking for a long profile form.
+
+### Purpose
+
+Purpose replaces **Goals** as the user-facing term. It answers “Why are you here?” rather than “What do you like?”. Current values remain compatible with the existing backend contract:
+
+- Meet people
+- Local events
+- Networking
+- Explore area
+- Activity partner
+- Just chatting
+
+Persistence intentionally remains `goals[]` because messaging and recommendation logic already consume it. Internal migration away from that field name is not required for Profile v3.
+
+### Bio
+
+Bio is no longer a mandatory first-run step. It is an optional **About me** field edited from the Profile surface after setup.
+
+The current authentication state still derives `profileSetupComplete` from a non-null Bio, so onboarding writes an empty string as a temporary compatibility marker. This should be replaced in a later schema migration with an explicit onboarding-completed field.
+
+### Age, zodiac and origin
+
+Exact date of birth is owner-only. It may be used to derive age and zodiac, but the exact date is not shown publicly.
+
+The existing hometown fields are presented as **From** rather than incorrectly claiming they represent place of birth.
 
 ### Visibility language
 
@@ -69,7 +79,7 @@ The UI does not expose a public numeric trust score and does not imply precise c
 
 - primary/back controls use >= 44dp targets
 - onboarding progress announces the current step
-- selectable goal and visibility options expose selected state
+- interest, Purpose and visibility options expose selected state
 - text remains the source of meaning; color is supplemental
 - decorative spatial artwork is excluded from screen readers
 
@@ -77,7 +87,7 @@ The UI does not expose a public numeric trust score and does not imply precise c
 
 Touched auth/onboarding UI uses `useAppTheme().colors` semantic tokens.
 
-`FormField` is theme-aware so auth/onboarding fields remain consistent in dark and light modes.
+`FormField` remains theme-aware so auth/onboarding fields stay consistent in dark and light modes.
 
 ## Brand surface contract
 
@@ -92,6 +102,5 @@ This change does not:
 - modify authentication endpoints or token/session behavior
 - add or change identity-verification requirements
 - request location during auth/onboarding
-- change discovery ranking
-- expose exact coordinates
-- rename internal `@g88/*`, native package IDs, storage keys or backend identifiers
+- expose exact coordinates or exact date of birth
+- rename internal `goals` storage before dependent matching/messaging code is migrated
