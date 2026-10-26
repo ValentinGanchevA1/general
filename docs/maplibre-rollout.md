@@ -46,6 +46,22 @@ The effective production MapLibre decision is therefore:
 
 `build requests maplibre` **AND** `fresh remote policy allows maplibre` **AND** `native MapLibre is available` **AND** `provider config is valid`.
 
+## Live policy verification
+
+The manual `Runtime Renderer Policy Verification` workflow is the audit-able read-only check for the deployed public policy endpoint. It never changes Render configuration.
+
+For the B2.6 live rollback proof, use this sequence only after a backend deployment containing B2.6a/B2.6b is live:
+
+1. Run **Actions → Runtime Renderer Policy Verification** with `expected_enabled=false` and require green.
+2. Change backend `NEXA_MAPLIBRE_REMOTE_ENABLED` to exact `true` and let the backend apply that configuration.
+3. Run the workflow with `expected_enabled=true` and require green.
+4. Change the backend variable back to `false` or remove it.
+5. Run the workflow again with `expected_enabled=false` and require green.
+
+Each run validates HTTP 200, the v1 response shape, boolean `mapLibreEnabled`, integer TTL between 1 and 60 seconds, and `Cache-Control: no-store`. A 404 means the backend deployment is too old and the env toggle must not be treated as a valid B2.6 test.
+
+The workflow proves the live server control plane. A MapLibre-capable non-production client must still verify that `true` enables its renderer request and that the final `false` returns it to `legacy` within the bounded policy lifetime.
+
 ## iOS provider canary
 
 Run **Actions → iOS MapLibre Canary → Run workflow** from the intended release commit on `master`.
