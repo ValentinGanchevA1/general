@@ -16,7 +16,7 @@ import {
   useDerivedValue,
 } from 'react-native-reanimated';
 
-import { nexaBrand, nexaDark } from '@/theme';
+import { nexaBrand } from '@/theme';
 
 import {
   NexaEnergyPath,
