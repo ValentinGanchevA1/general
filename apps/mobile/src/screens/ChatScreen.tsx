@@ -10,7 +10,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { type RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import {
+  type RouteProp,
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { ChatMessage, PublicUserProfile, VerificationLevel } from '@g88/shared';
@@ -23,11 +28,11 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {
   fetchMessages,
-  messageReceived,
   messageSentOptimistic,
   messageConfirmed,
   messageQueued,
   failedMessageCleared,
+  setActiveConversation,
 } from '@/features/chat/chatSlice';
 import { socketSendMessage, useSocket } from '@/realtime/useSocket';
 import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
@@ -148,7 +153,7 @@ export function ChatScreen(): React.JSX.Element {
     blockedByViewer: boolean;
     avatarUrl: string | null;
   } | null>(null);
-  const { on, joinConversation, sendMessage } = useSocket();
+  const { joinConversation, sendMessage } = useSocket();
 
   const {
     session: liveSession,
@@ -199,14 +204,14 @@ export function ChatScreen(): React.JSX.Element {
     void joinConversation(conversationId);
   }, [conversationId, dispatch, joinConversation]);
 
-  useEffect(() => on('chat:message', (msg) => {
-    dispatch(messageReceived({
-      ...msg,
-      type: msg.type ?? 'text',
-      location: msg.location ?? null,
-      locationSessionId: msg.locationSessionId ?? null,
-    }));
-  }), [on, dispatch]);
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(setActiveConversation(conversationId));
+      return () => {
+        dispatch(setActiveConversation(null));
+      };
+    }, [conversationId, dispatch]),
+  );
 
   const send = useCallback(async (): Promise<void> => {
     const text = body.trim();
