@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -174,7 +175,7 @@ export class ListingsController {
     return this.listings.withdrawOffer(userId, id);
   }
 
-  /** PUT /api/v1/listings/offers/:offerId — seller accepts/declines an offer. */
+  /** PUT /api/v1/listings/offers/:offerId — seller or countered buyer accepts/declines. */
   @Put('offers/:offerId')
   async respondToOffer(
     @CurrentUser('id') userId: string,
@@ -183,14 +184,21 @@ export class ListingsController {
   ): Promise<ListingOffer> {
     const offer = await this.listings.respondToOffer(userId, offerId, dto.status);
     if (dto.status === 'accepted') {
-      const listing = await this.listings.detail(userId, offer.listingId);
-      if (listing.visibility === 'public') {
-        void this.discovery.publishEntityChangeToSubscribers({
-          kind: 'listing',
-          entityId: listing.id,
-          location: listing.location,
-          change: 'update',
-        }).catch(() => undefined);
+      try {
+        const listing = await this.listings.detail(userId, offer.listingId);
+        if (listing.visibility === 'public') {
+          void this.discovery.publishEntityChangeToSubscribers({
+            kind: 'listing',
+            entityId: listing.id,
+            location: listing.location,
+            change: 'update',
+          }).catch(() => undefined);
+        }
+      } catch (error: unknown) {
+        // A buyer may accept a seller counter on a private listing. The mutation
+        // is already committed, but private listing detail intentionally remains
+        // seller-only and there is no public discovery pin to update.
+        if (!(error instanceof NotFoundException)) throw error;
       }
     }
     return offer;
