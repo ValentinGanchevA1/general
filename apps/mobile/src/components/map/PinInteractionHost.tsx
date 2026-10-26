@@ -1,8 +1,5 @@
-import React from 'react';
-import {StyleSheet, View} from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import React, {useEffect, useRef} from 'react';
 
-import {PreviewCallout} from './PreviewCallout';
 import type {PreviewCalloutProps} from './PreviewCallout';
 
 interface Props {
@@ -18,43 +15,27 @@ interface Props {
 }
 
 /**
- * Stage-1 overlay host for pin preview callout.
- * Anchored above bottom chrome / FAB zone.
+ * Map user-pin taps now hand off directly to EntityBottomSheet once the
+ * pinInteraction machine has loaded the peer. Keep the legacy callback surface
+ * while the internal preview state still exists, but do not render a second
+ * floating callout before the sheet.
  */
 export function PinInteractionHost({
   visible,
   previewProps,
-  onQuickWave,
-  onQuickLike,
   onOpenDetail,
-  onDismiss,
 }: Props): React.JSX.Element | null {
-  const insets = useSafeAreaInsets();
+  const handedOffRef = useRef(false);
 
-  if (!visible || previewProps == null) return null;
+  useEffect(() => {
+    if (!visible || previewProps == null) {
+      handedOffRef.current = false;
+      return;
+    }
+    if (handedOffRef.current) return;
+    handedOffRef.current = true;
+    onOpenDetail();
+  }, [visible, previewProps, onOpenDetail]);
 
-  return (
-    <View
-      style={[styles.wrap, {bottom: Math.max(insets.bottom, 12) + 72}]}
-      pointerEvents="box-none"
-    >
-      <PreviewCallout
-        {...previewProps}
-        onQuickWave={onQuickWave}
-        onQuickLike={onQuickLike}
-        onOpenDetail={onOpenDetail}
-        onDismiss={onDismiss}
-      />
-    </View>
-  );
+  return null;
 }
-
-const styles = StyleSheet.create({
-  wrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 40,
-  },
-});
