@@ -8,7 +8,7 @@ describe('EventsDiscoveryLifecycleService', () => {
     const redis = {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn().mockResolvedValue('OK'),
-      del: jest.fn().mockResolvedValue(1),
+      eval: jest.fn().mockResolvedValue(1),
     };
     const discoveryRealtime = {
       publishEntityChangeToSubscribers: jest.fn().mockResolvedValue(0),
@@ -30,7 +30,7 @@ describe('EventsDiscoveryLifecycleService', () => {
     expect(redis.set).toHaveBeenNthCalledWith(
       1,
       'discovery:event-expiry:lock:event-1',
-      '1',
+      expect.any(String),
       'EX',
       120,
       'NX',
@@ -48,7 +48,14 @@ describe('EventsDiscoveryLifecycleService', () => {
       'EX',
       8 * 24 * 60 * 60,
     );
-    expect(redis.del).toHaveBeenCalledWith('discovery:event-expiry:lock:event-1');
+    const lockToken = redis.set.mock.calls[0]?.[1];
+    expect(typeof lockToken).toBe('string');
+    expect(redis.eval).toHaveBeenCalledWith(
+      expect.stringContaining("redis.call('GET', KEYS[1]) == ARGV[1]"),
+      1,
+      'discovery:event-expiry:lock:event-1',
+      lockToken,
+    );
   });
 
   it('skips events whose successful transition is already recorded', async () => {
@@ -68,7 +75,7 @@ describe('EventsDiscoveryLifecycleService', () => {
     await service.sweep();
 
     expect(discoveryRealtime.publishEntityChangeToSubscribers).not.toHaveBeenCalled();
-    expect(redis.del).not.toHaveBeenCalled();
+    expect(redis.eval).not.toHaveBeenCalled();
   });
 
   it('re-checks the done marker after winning the lock', async () => {
@@ -78,10 +85,10 @@ describe('EventsDiscoveryLifecycleService', () => {
     await service.sweep();
 
     expect(discoveryRealtime.publishEntityChangeToSubscribers).not.toHaveBeenCalled();
-    expect(redis.del).toHaveBeenCalledWith('discovery:event-expiry:lock:event-1');
+    expect(redis.eval).toHaveBeenCalledTimes(1);
   });
 
-  it('releases only the short lock when publication fails so a later sweep can retry', async () => {
+  it('releases the owned short lock when publication fails so a later sweep can retry', async () => {
     const { service, redis, discoveryRealtime } = setup();
     discoveryRealtime.publishEntityChangeToSubscribers.mockRejectedValue(new Error('redis unavailable'));
 
@@ -94,7 +101,24 @@ describe('EventsDiscoveryLifecycleService', () => {
       expect.anything(),
       expect.anything(),
     );
-    expect(redis.del).toHaveBeenCalledWith('discovery:event-expiry:lock:event-1');
+    const lockToken = redis.set.mock.calls[0]?.[1];
+    expect(redis.eval).toHaveBeenCalledWith(
+      expect.any(String),
+      1,
+      'discovery:event-expiry:lock:event-1',
+      lockToken,
+    );
+  });
+
+  it('uses compare-and-delete so an expired owner cannot delete a replacement lock', async () => {
+    const { service, redis } = setup();
+
+    await service.sweep();
+
+    const script = redis.eval.mock.calls[0]?.[0];
+    expect(script).toContain("redis.call('GET', KEYS[1]) == ARGV[1]");
+    expect(script).toContain("redis.call('DEL', KEYS[1])");
+    expect(redis.eval.mock.calls[0]?.[3]).toBe(redis.set.mock.calls[0]?.[1]);
   });
 
   it('is a no-op when there are no expired public events', async () => {
@@ -104,6 +128,7 @@ describe('EventsDiscoveryLifecycleService', () => {
 
     expect(redis.get).not.toHaveBeenCalled();
     expect(redis.set).not.toHaveBeenCalled();
+    expect(redis.eval).not.toHaveBeenCalled();
     expect(discoveryRealtime.publishEntityChangeToSubscribers).not.toHaveBeenCalled();
   });
 });
