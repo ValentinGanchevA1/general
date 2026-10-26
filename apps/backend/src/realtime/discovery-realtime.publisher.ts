@@ -21,6 +21,8 @@ import {
 type DiscoverableKind = EntityKind;
 type DiscoveryRealtimeChange = 'enter' | 'update';
 
+const RESOLVER_CONCURRENCY = 16;
+
 /**
  * Emits discovery deltas only to sockets with an active matching discovery
  * subscription. Mutations are distributed through Redis so each backend
@@ -141,31 +143,46 @@ export class DiscoveryRealtimePublisher implements OnModuleInit {
   ): Promise<number> {
     let published = 0;
 
-    for (const candidate of candidates) {
-      const point = await this.resolver.resolveForViewer({
-        viewerId: candidate.viewerId,
-        kind: params.kind,
-        entityId: params.entityId,
-        context: candidate.query,
-      });
-
-      if (point == null || point.kind === 'cluster') {
-        this.emitLeaveToSocket(candidate.socketId, {
-          key: `${params.kind}:${params.entityId}` as DiscoveryPointKey,
-        });
-        continue;
-      }
-
-      const event: DiscoveryEntityUpsertEvent = { point };
-      if (params.change === 'enter') {
-        this.emitEnterToSocket(candidate.socketId, event);
-      } else {
-        this.emitUpdateToSocket(candidate.socketId, event);
-      }
-      published += 1;
+    for (let offset = 0; offset < candidates.length; offset += RESOLVER_CONCURRENCY) {
+      const batch = candidates.slice(offset, offset + RESOLVER_CONCURRENCY);
+      const results = await Promise.all(
+        batch.map((candidate) => this.publishToCandidate(params, candidate)),
+      );
+      published += results.reduce((total, result) => total + result, 0);
     }
 
     return published;
+  }
+
+  private async publishToCandidate(
+    params: {
+      kind: DiscoverableKind;
+      entityId: string;
+      change: DiscoveryRealtimeChange;
+    },
+    candidate: ActiveDiscoverySubscription,
+  ): Promise<number> {
+    const point = await this.resolver.resolveForViewer({
+      viewerId: candidate.viewerId,
+      kind: params.kind,
+      entityId: params.entityId,
+      context: candidate.query,
+    });
+
+    if (point == null || point.kind === 'cluster') {
+      this.emitLeaveToSocket(candidate.socketId, {
+        key: `${params.kind}:${params.entityId}` as DiscoveryPointKey,
+      });
+      return 0;
+    }
+
+    const event: DiscoveryEntityUpsertEvent = { point };
+    if (params.change === 'enter') {
+      this.emitEnterToSocket(candidate.socketId, event);
+    } else {
+      this.emitUpdateToSocket(candidate.socketId, event);
+    }
+    return 1;
   }
 
   private emitEnterToSocket(socketId: string, event: DiscoveryEntityUpsertEvent): void {
