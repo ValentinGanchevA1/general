@@ -81,7 +81,7 @@ Admin uses authenticated admin guards; browser-facing identity is NEXA Admin.
 
 ### 3.8 Migrations
 
-Raw SQL migrations. **0001–0051** are allocated on current master; **next free 0052**. CI enforces unique numeric prefixes.
+Raw SQL migrations. **0001–0052** are allocated on current master; **next free 0053**. CI enforces unique numeric prefixes.
 
 ### 3.9 Shared contracts
 
