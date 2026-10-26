@@ -22,6 +22,7 @@ import type {
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { DiscoveryRealtimePublisher } from '../../realtime/discovery-realtime.publisher';
 import { EventsService } from './events.service';
 import {
   CreateEventDto,
@@ -35,17 +36,29 @@ import {
 @Controller('events')
 @UseGuards(JwtAuthGuard)
 export class EventsController {
-  constructor(private readonly events: EventsService) {}
+  constructor(
+    private readonly events: EventsService,
+    private readonly discovery: DiscoveryRealtimePublisher,
+  ) {}
 
   /** POST /api/v1/events — create an event the caller hosts. */
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
-  create(
+  async create(
     @CurrentUser('id') userId: string,
     @Body() dto: CreateEventDto,
   ): Promise<EventSummary> {
-    return this.events.create(userId, dto);
+    const event = await this.events.create(userId, dto);
+    if (event.visibility === 'public') {
+      void this.discovery.publishEntityChangeToSubscribers({
+        kind: 'event',
+        entityId: event.id,
+        location: dto.location,
+        change: 'enter',
+      });
+    }
+    return event;
   }
 
   /** POST /api/v1/events/nearby — "events near you" rail/list. */
