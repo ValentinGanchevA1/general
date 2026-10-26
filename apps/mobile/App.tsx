@@ -31,6 +31,7 @@ import {
 } from '@/components/Brand/nexaLaunchReadiness';
 import { buildNexaLaunchTelemetryProps } from '@/components/Brand/nexaLaunchTelemetry';
 import { getLastResolvedLaunchReduceMotion } from '@/components/Brand/resolveLaunchReduceMotion';
+import { ChatRealtimeSync } from '@/features/chat/ChatRealtimeSync';
 import { UserLocationProvider } from '@/features/location/UserLocationProvider';
 
 Sentry.init({
@@ -199,6 +200,7 @@ function AppShell(): React.JSX.Element {
           key={user?.id ?? 'signed-out'}
           enabled={user != null}
         >
+          {user ? <ChatRealtimeSync viewerId={user.id} /> : null}
           <AppNavigator />
         </UserLocationProvider>
       </NexaLaunchSurfaceProvider>
