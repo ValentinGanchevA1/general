@@ -1,5 +1,10 @@
 -- Confirmed attendance is separate from RSVP. No personal location is collected.
-CREATE TABLE event_attendance_confirmations (
+--
+-- This migration is intentionally repeat-safe. Release/preview environments can
+-- reach the database with these objects already present while schema_migrations
+-- is missing the filename. Re-running must complete the schema instead of
+-- failing on the first existing relation.
+CREATE TABLE IF NOT EXISTS event_attendance_confirmations (
   event_id uuid NOT NULL,
   user_id uuid NOT NULL,
   confirmed_at timestamptz NOT NULL DEFAULT statement_timestamp(),
@@ -7,7 +12,8 @@ CREATE TABLE event_attendance_confirmations (
   PRIMARY KEY (event_id, user_id),
   FOREIGN KEY (event_id, user_id) REFERENCES event_attendees(event_id, user_id) ON DELETE CASCADE
 );
-CREATE TABLE event_reviews (
+
+CREATE TABLE IF NOT EXISTS event_reviews (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id uuid NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -23,8 +29,9 @@ CREATE TABLE event_reviews (
   CHECK (cardinality(tags) <= 3 AND array_position(tags, NULL) IS NULL AND
     tags <@ ARRAY['welcoming','well_organized','great_venue','good_value','could_improve']::text[])
 );
-CREATE INDEX event_reviews_page_idx ON event_reviews(event_id, id) WHERE hidden_at IS NULL;
-CREATE FUNCTION enforce_event_review_update() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE INDEX IF NOT EXISTS event_reviews_page_idx ON event_reviews(event_id, id) WHERE hidden_at IS NULL;
+
+CREATE OR REPLACE FUNCTION enforce_event_review_update() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP = 'UPDATE' AND (NEW.id <> OLD.id OR NEW.created_at <> OLD.created_at OR NEW.editable_until <> OLD.editable_until OR
      NEW.event_id <> OLD.event_id OR NEW.user_id <> OLD.user_id) THEN
@@ -39,9 +46,11 @@ BEGIN
   END IF;
   RETURN NEW;
 END $$;
+DROP TRIGGER IF EXISTS event_review_write ON event_reviews;
 CREATE TRIGGER event_review_write BEFORE INSERT OR UPDATE ON event_reviews
   FOR EACH ROW EXECUTE FUNCTION enforce_event_review_update();
-CREATE TABLE event_review_reports (
+
+CREATE TABLE IF NOT EXISTS event_review_reports (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   review_id uuid NOT NULL REFERENCES event_reviews(id) ON DELETE CASCADE,
   reporter_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -49,4 +58,4 @@ CREATE TABLE event_review_reports (
   created_at timestamptz NOT NULL DEFAULT statement_timestamp(),
   UNIQUE (review_id, reporter_id)
 );
-CREATE INDEX event_review_reports_queue_idx ON event_review_reports(created_at, id);
+CREATE INDEX IF NOT EXISTS event_review_reports_queue_idx ON event_review_reports(created_at, id);

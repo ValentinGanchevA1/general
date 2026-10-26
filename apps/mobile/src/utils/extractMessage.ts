@@ -53,9 +53,11 @@ function readStatusCode(e: unknown, raw: string | null): number | null {
 }
 
 function isTransportMessage(msg: string): boolean {
-  const m = msg.trim().toLowerCase();
+  const trimmed = msg.trim();
+  const m = trimmed.toLowerCase();
   return (
-    /^request failed with status code\s+\d{3}$/i.test(msg.trim()) ||
+    /^request failed with status code\s+\d{3}$/i.test(trimmed) ||
+    /^cannot\s+(get|post|put|patch|delete)\s+\/api(?:\/|$)/i.test(trimmed) ||
     m === 'network error' ||
     m === 'failed to fetch' ||
     m === 'network request failed'
