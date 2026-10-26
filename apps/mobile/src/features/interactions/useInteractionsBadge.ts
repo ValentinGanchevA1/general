@@ -55,7 +55,7 @@ export function useInteractionsBadge(): {
   );
 
   useEffect(() => {
-    const unsub = on('chat:message', () => {
+    const unsub = on('conversation:opened', () => {
       if (userId) void dispatch(fetchConversations());
     });
     return unsub;
