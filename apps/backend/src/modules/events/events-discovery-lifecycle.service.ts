@@ -11,7 +11,8 @@ const SWEEP_INTERVAL_MS = 60_000;
 const STARTUP_DELAY_MIN_MS = 10_000;
 const STARTUP_JITTER_MS = 20_000;
 const RECOVERY_WINDOW_DAYS = 7;
-const CLAIM_TTL_SECONDS = 8 * 24 * 60 * 60;
+const LOCK_TTL_SECONDS = 120;
+const DONE_TTL_SECONDS = 8 * 24 * 60 * 60;
 
 interface ExpiredEventRow {
   id: string;
@@ -23,9 +24,12 @@ interface ExpiredEventRow {
  * Keeps long-lived realtime discovery subscriptions aligned with the existing
  * event retention rule in v_discoverable_entity: starts_at > NOW() - 1 day.
  *
- * The Redis claim makes concurrent multi-instance sweeps idempotent. We do not
- * mutate event product state here; this service only publishes the discovery
- * boundary transition that HTTP queries already enforce.
+ * A short Redis lock prevents concurrent multi-instance publication while a
+ * longer done marker suppresses successful repeats. If a process dies after
+ * taking the lock but before publishing, the lock expires quickly and another
+ * sweep can recover the transition. We do not mutate event product state here;
+ * this service only publishes the discovery boundary transition that HTTP
+ * queries already enforce.
  */
 @Injectable()
 export class EventsDiscoveryLifecycleService implements OnModuleInit, OnModuleDestroy {
@@ -70,31 +74,39 @@ export class EventsDiscoveryLifecycleService implements OnModuleInit, OnModuleDe
 
       let published = 0;
       for (const row of rows) {
-        const claimed = await this.redis.set(
-          `discovery:event-expiry:${row.id}`,
+        if (await this.redis.get(this.doneKey(row.id))) continue;
+
+        const lockKey = this.lockKey(row.id);
+        const locked = await this.redis.set(
+          lockKey,
           '1',
           'EX',
-          CLAIM_TTL_SECONDS,
+          LOCK_TTL_SECONDS,
           'NX',
         );
-        if (claimed !== 'OK') continue;
+        if (locked !== 'OK') continue;
 
         try {
+          // Re-check after acquiring the lock: another instance may have
+          // completed publication between our initial done check and lock win.
+          if (await this.redis.get(this.doneKey(row.id))) continue;
+
           await this.discoveryRealtime.publishEntityChangeToSubscribers({
             kind: 'event',
             entityId: row.id,
             location: { lat: row.lat, lng: row.lng },
             change: 'update',
           });
+          await this.redis.set(this.doneKey(row.id), '1', 'EX', DONE_TTL_SECONDS);
           published += 1;
         } catch (error) {
-          // Release the claim so the next sweep can retry publication.
-          await this.redis.del(`discovery:event-expiry:${row.id}`).catch(() => undefined);
           this.logger.warn(
             `Event discovery expiry publication failed for ${row.id}: ${
               error instanceof Error ? error.message : String(error)
             }`,
           );
+        } finally {
+          await this.redis.del(lockKey).catch(() => undefined);
         }
       }
 
@@ -108,5 +120,13 @@ export class EventsDiscoveryLifecycleService implements OnModuleInit, OnModuleDe
         }`,
       );
     }
+  }
+
+  private lockKey(eventId: string): string {
+    return `discovery:event-expiry:lock:${eventId}`;
+  }
+
+  private doneKey(eventId: string): string {
+    return `discovery:event-expiry:done:${eventId}`;
   }
 }
