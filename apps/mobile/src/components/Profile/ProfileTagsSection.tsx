@@ -10,6 +10,8 @@ interface Props {
   /** Persisted as `goals`; user-facing concept is Purpose. */
   goals?: string[];
   purposeTitle?: string;
+  /** @deprecated Compatibility alias. Prefer purposeTitle. */
+  goalsTitle?: string;
   /** When false, skip horizontal padding. Default true. */
   padded?: boolean;
 }
@@ -17,11 +19,13 @@ interface Props {
 export function ProfileTagsSection({
   interests = [],
   goals = [],
-  purposeTitle = 'Purpose',
+  purposeTitle,
+  goalsTitle,
   padded = true,
 }: Props): React.JSX.Element | null {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const resolvedPurposeTitle = purposeTitle ?? (goalsTitle === 'Goals' ? 'Purpose' : goalsTitle) ?? 'Purpose';
 
   if (interests.length === 0 && goals.length === 0) return null;
 
@@ -42,7 +46,7 @@ export function ProfileTagsSection({
 
       {goals.length > 0 ? (
         <View style={[styles.section, padded && styles.padded]}>
-          <Text style={styles.sectionTitle}>{purposeTitle}</Text>
+          <Text style={styles.sectionTitle}>{resolvedPurposeTitle}</Text>
           <View style={styles.tagsContainer}>
             {goals.map((goal) => {
               const cfg = PURPOSE_OPTIONS.find((option) => option.value === goal);
