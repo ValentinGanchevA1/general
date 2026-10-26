@@ -176,12 +176,24 @@ export class ListingsController {
 
   /** PUT /api/v1/listings/offers/:offerId — seller accepts/declines an offer. */
   @Put('offers/:offerId')
-  respondToOffer(
+  async respondToOffer(
     @CurrentUser('id') userId: string,
     @Param('offerId', ParseUUIDPipe) offerId: string,
     @Body() dto: RespondOfferDto,
   ): Promise<ListingOffer> {
-    return this.listings.respondToOffer(userId, offerId, dto.status);
+    const offer = await this.listings.respondToOffer(userId, offerId, dto.status);
+    if (dto.status === 'accepted') {
+      const listing = await this.listings.detail(userId, offer.listingId);
+      if (listing.visibility === 'public') {
+        void this.discovery.publishEntityChangeToSubscribers({
+          kind: 'listing',
+          entityId: listing.id,
+          location: listing.location,
+          change: 'update',
+        });
+      }
+    }
+    return offer;
   }
 
   /**
