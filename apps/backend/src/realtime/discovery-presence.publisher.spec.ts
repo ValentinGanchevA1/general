@@ -5,17 +5,17 @@ import { DiscoveryPresencePublisher } from './discovery-presence.publisher';
 
 describe('DiscoveryPresencePublisher', () => {
   const createRedis = (state = new Map<string, string>()) => {
-    const getset = jest.fn(async (key: string, value: string) => {
-      const previous = state.get(key) ?? null;
-      state.set(key, value);
-      return previous;
-    });
-    const expire = jest.fn().mockResolvedValue(1);
+    const evalScript = jest.fn(
+      async (_script: string, _keyCount: number, key: string, value: string, _ttl: string) => {
+        const previous = state.get(key) ?? null;
+        state.set(key, value);
+        return previous;
+      },
+    );
     return {
-      redis: { getset, expire } as unknown as Redis,
+      redis: { eval: evalScript } as unknown as Redis,
       state,
-      getset,
-      expire,
+      evalScript,
     };
   };
 
@@ -50,8 +50,24 @@ describe('DiscoveryPresencePublisher', () => {
     expect(publishEntityMovement).not.toHaveBeenCalled();
   });
 
+  it('atomically replaces the routing location with its ttl', async () => {
+    const { subject, evalScript } = createSubject();
+    const location = { lat: 43.2, lng: 27.9 };
+
+    await subject.publishHeartbeat('user-1', location);
+
+    expect(evalScript).toHaveBeenCalledTimes(1);
+    expect(evalScript).toHaveBeenCalledWith(
+      expect.stringContaining("redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])"),
+      1,
+      'discovery:presence-location:user-1',
+      JSON.stringify(location),
+      '180',
+    );
+  });
+
   it('routes later heartbeats with the previous Redis-backed location', async () => {
-    const { subject, publishEntityMovement, expire } = createSubject();
+    const { subject, publishEntityMovement, evalScript } = createSubject();
     const previousLocation = { lat: 43.2, lng: 27.9 };
     const location = { lat: 43.25, lng: 27.95 };
 
@@ -64,7 +80,13 @@ describe('DiscoveryPresencePublisher', () => {
       previousLocation,
       location,
     });
-    expect(expire).toHaveBeenLastCalledWith('discovery:presence-location:user-1', 180);
+    expect(evalScript).toHaveBeenLastCalledWith(
+      expect.any(String),
+      1,
+      'discovery:presence-location:user-1',
+      JSON.stringify(location),
+      '180',
+    );
   });
 
   it('retains movement history across publisher instances', async () => {
