@@ -6,6 +6,11 @@ import { validateProductionLegalUrls } from './legal-url-gate.mjs';
 
 const track = (process.env.NEXA_PLAY_TRACK ?? '').trim().toLowerCase();
 
+if (track !== 'production') {
+  console.log(`[legal-gate] track=${track || 'unset'}; production legal URL gate not required.`);
+  process.exit(0);
+}
+
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const constantsPath = path.resolve(scriptDir, '../src/constants/app.ts');
 const source = readFileSync(constantsPath, 'utf8');
@@ -21,15 +26,10 @@ function readExportedString(name) {
   return match[1];
 }
 
-const result = validateProductionLegalUrls({
+validateProductionLegalUrls({
   track,
   privacyUrl: readExportedString('PRIVACY_POLICY_URL'),
   termsUrl: readExportedString('TERMS_OF_SERVICE_URL'),
 });
-
-if (!result.required) {
-  console.log(`[legal-gate] track=${track || 'unset'}; production legal URL gate not required.`);
-  process.exit(0);
-}
 
 console.log('[legal-gate] Production legal URLs are distinct and HTTPS.');
