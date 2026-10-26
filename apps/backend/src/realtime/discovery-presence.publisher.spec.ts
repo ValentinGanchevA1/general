@@ -11,13 +11,11 @@ describe('DiscoveryPresencePublisher', () => {
       return previous;
     });
     const expire = jest.fn().mockResolvedValue(1);
-    const del = jest.fn(async (key: string) => (state.delete(key) ? 1 : 0));
     return {
-      redis: { getset, expire, del } as unknown as Redis,
+      redis: { getset, expire } as unknown as Redis,
       state,
       getset,
       expire,
-      del,
     };
   };
 
@@ -87,15 +85,22 @@ describe('DiscoveryPresencePublisher', () => {
     });
   });
 
-  it('forgets distributed movement history when presence is cleared', async () => {
-    const { subject, publishEntityChangeToSubscribers, publishEntityMovement, del } = createSubject();
+  it('retains the routing origin across a process-local disconnect', async () => {
+    const redisState = new Map<string, string>();
+    const first = createSubject(redisState);
+    const second = createSubject(redisState);
+    const previousLocation = { lat: 43.2, lng: 27.9 };
+    const location = { lat: 43.25, lng: 27.95 };
 
-    await subject.publishHeartbeat('user-1', { lat: 43.2, lng: 27.9 });
-    await subject.clear('user-1');
-    await subject.publishHeartbeat('user-1', { lat: 43.25, lng: 27.95 });
+    await first.subject.publishHeartbeat('user-1', previousLocation);
+    first.subject.clear('user-1');
+    await second.subject.publishHeartbeat('user-1', location);
 
-    expect(del).toHaveBeenCalledWith('discovery:presence-location:user-1');
-    expect(publishEntityChangeToSubscribers).toHaveBeenCalledTimes(2);
-    expect(publishEntityMovement).not.toHaveBeenCalled();
+    expect(second.publishEntityMovement).toHaveBeenCalledWith({
+      kind: 'user',
+      entityId: 'user-1',
+      previousLocation,
+      location,
+    });
   });
 });
