@@ -12,7 +12,6 @@ import {
   type NexaEntityGlyphKind,
 } from '@/components/Brand/NexaEntityGlyph';
 import { ListRow } from '@/components/ListRow';
-import { ScreenHeader } from '@/components/ScreenHeader';
 import { radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
@@ -69,7 +68,6 @@ export function AboutScreen(): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="About" />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.brand}>
           <View style={styles.wordmark}>
