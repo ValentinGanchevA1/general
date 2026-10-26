@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Animated,
   Easing,
+  Image,
   StyleSheet,
   Text,
   View,
@@ -32,6 +33,8 @@ export interface NexaEntityMarkerProps {
   density?: NexaMarkerDensity;
   state?: NexaMarkerState;
   label?: string;
+  avatarUri?: string | null;
+  onAvatarRenderError?: () => void;
   caption?: string;
   accessibilityLabel?: string;
   reduceMotion?: boolean;
@@ -52,6 +55,8 @@ export function NexaEntityMarker({
   density = 'standard',
   state = {},
   label,
+  avatarUri,
+  onAvatarRenderError,
   caption,
   accessibilityLabel,
   reduceMotion = true,
@@ -101,37 +106,29 @@ export function NexaEntityMarker({
 
   const diamondSide = diamondSideForBoundingSize(visual.visualSize);
   const coreStyle: ViewStyle =
-    visual.shape === 'circle'
+    visual.shape === 'diamond'
       ? {
-          width: visual.visualSize,
-          height: visual.visualSize,
-          borderRadius: visual.visualSize / 2,
+          width: diamondSide,
+          height: diamondSide,
+          borderRadius: Math.max(2, diamondSide * 0.14),
           borderColor: entityColor,
           backgroundColor: subtleFill,
+          transform: [{ rotate: '45deg' }],
         }
-      : visual.shape === 'diamond'
+      : visual.shape === 'square'
         ? {
-            width: diamondSide,
-            height: diamondSide,
-            borderRadius: Math.max(2, diamondSide * 0.14),
+            width: visual.visualSize * 0.82,
+            height: visual.visualSize * 0.82,
+            borderRadius: Math.max(3, visual.visualSize * 0.16),
             borderColor: entityColor,
-            backgroundColor: subtleFill,
-            transform: [{ rotate: '45deg' }],
+            backgroundColor: colors.surfacePrimary,
           }
-        : visual.shape === 'square'
-          ? {
-              width: visual.visualSize * 0.82,
-              height: visual.visualSize * 0.82,
-              borderRadius: Math.max(3, visual.visualSize * 0.16),
-              borderColor: entityColor,
-              backgroundColor: colors.surfacePrimary,
-            }
-          : {
-              width: visual.visualSize,
-              height: visual.visualSize,
-              borderColor: 'transparent',
-              backgroundColor: 'transparent',
-            };
+        : {
+            width: visual.visualSize,
+            height: visual.visualSize,
+            borderColor: 'transparent',
+            backgroundColor: 'transparent',
+          };
 
   const iconSize = Math.max(10, Math.round(visual.visualSize * 0.48));
   const pulseOpacity = selectionPulse.interpolate({
@@ -142,6 +139,7 @@ export function NexaEntityMarker({
     inputRange: [0, 1],
     outputRange: [0.84, 1.22],
   });
+  const personRingColor = visual.showVerifiedBadge ? colors.verified : entityColor;
 
   return (
     <View
@@ -218,24 +216,46 @@ export function NexaEntityMarker({
               size={visual.visualSize}
               color={entityColor}
             />
+          ) : entityType === 'person' ? (
+            <View
+              style={[
+                styles.personCore,
+                {
+                  width: visual.visualSize,
+                  height: visual.visualSize,
+                  borderRadius: visual.visualSize / 2,
+                  borderColor: personRingColor,
+                  backgroundColor: subtleFill,
+                },
+              ]}
+            >
+              {avatarUri ? (
+                <Image
+                  source={{ uri: avatarUri }}
+                  style={styles.avatarImage}
+                  resizeMode="cover"
+                  onError={onAvatarRenderError}
+                />
+              ) : (
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.initials,
+                    {
+                      color: personRingColor,
+                      fontSize: Math.max(9, Math.round(visual.visualSize * 0.38)),
+                    },
+                  ]}
+                >
+                  {label}
+                </Text>
+              )}
+            </View>
           ) : (
             <>
               <View style={[styles.core, coreStyle]} />
               <View pointerEvents="none" style={styles.iconLayer}>
-                {entityType === 'person' && label ? (
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.initials,
-                      {
-                        color: colors.entityPerson,
-                        fontSize: Math.max(9, Math.round(visual.visualSize * 0.38)),
-                      },
-                    ]}
-                  >
-                    {label}
-                  </Text>
-                ) : entityType === 'listing' ? (
+                {entityType === 'listing' ? (
                   <Icon name="tag-outline" size={iconSize} color={colors.entityListing} />
                 ) : null}
               </View>
@@ -319,6 +339,16 @@ const styles = StyleSheet.create({
   core: {
     position: 'absolute',
     borderWidth: 2,
+  },
+  personCore: {
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   iconLayer: {
     position: 'absolute',
