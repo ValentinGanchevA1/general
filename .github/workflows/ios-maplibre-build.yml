@@ -1,0 +1,76 @@
+name: iOS MapLibre Build
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'apps/mobile/ios/**'
+      - 'apps/mobile/package.json'
+      - 'apps/mobile/app.json'
+      - 'apps/mobile/index.js'
+      - 'apps/mobile/babel.config.js'
+      - 'apps/mobile/metro.config.js'
+      - 'apps/mobile/src/config.ts'
+      - 'apps/mobile/src/features/map/**'
+      - 'apps/mobile/scripts/bootstrap-ios-native.mjs'
+      - 'apps/mobile/scripts/maplibre-release-config*.mjs'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/ios-maplibre-build.yml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Synthetic public client config: validates the release contract without exposing production credentials.
+  NEXA_MAPTILER_API_KEY: ci-public-maptiler-key
+  NEXA_MAPTILER_MAP_ID: streets-v4
+  NEXA_MAPTILER_REGION: eu
+
+jobs:
+  ios-maplibre:
+    name: iOS MapLibre compile
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: ${{ github.workspace }}
+
+      - name: Validate MapLibre release config
+        run: node scripts/check-maplibre-release-config.mjs
+
+      - name: Bootstrap React Native iOS shell
+        run: node scripts/bootstrap-ios-native.mjs
+
+      - name: Verify CocoaPods
+        run: pod --version
+
+      - name: Install iOS pods
+        run: pod install --project-directory=ios
+
+      - name: Compile unsigned Release for iOS Simulator
+        run: >-
+          xcodebuild
+          -workspace ios/G88.xcworkspace
+          -scheme G88
+          -configuration Release
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
+          build
