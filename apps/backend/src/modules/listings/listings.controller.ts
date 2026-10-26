@@ -110,12 +110,11 @@ export class ListingsController {
     @Body() dto: UpdateListingStatusDto,
   ): Promise<ListingDetail> {
     const listing = await this.listings.updateStatus(userId, id, dto.status);
-    const location = listing.location;
-    if (location !== undefined) {
+    if (listing.visibility === 'public') {
       void this.discovery.publishEntityChangeToSubscribers({
         kind: 'listing',
         entityId: listing.id,
-        location,
+        location: listing.location,
         change: listing.status === 'active' ? 'enter' : 'update',
       });
     }
