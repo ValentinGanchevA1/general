@@ -43,6 +43,10 @@ function conversation(): ConversationSummary {
   };
 }
 
+function seededState() {
+  return reducer(undefined, fetchConversations.fulfilled([conversation()], 'seed', undefined));
+}
+
 describe('chatSlice.messageConfirmed', () => {
   it('replaces the optimistic message with the confirmed one (ack-first path)', () => {
     let state = reducer(undefined, messageSentOptimistic(msg('opt-1')));
@@ -51,6 +55,17 @@ describe('chatSlice.messageConfirmed', () => {
     const list = state.messages[convoId] ?? [];
     expect(list).toHaveLength(1);
     expect(list[0]?.id).toBe('srv-1');
+  });
+
+  it('updates the conversation preview before a duplicate broadcast arrives', () => {
+    const confirmed = msg('srv-1', 'sent now', '2026-06-14T00:00:20Z', me);
+    let state = reducer(seededState(), messageSentOptimistic(msg('opt-1', 'sent now')));
+    state = reducer(state, messageConfirmed({ optimisticId: 'opt-1', confirmed }));
+    state = reducer(state, messageReceived({ ...confirmed, viewerId: me }));
+
+    expect(state.conversations[0]?.lastMessage).toEqual({ senderId: me, body: 'sent now' });
+    expect(state.conversations[0]?.lastMessageAt).toBe('2026-06-14T00:00:20Z');
+    expect(state.messages[convoId]).toHaveLength(1);
   });
 
   it('does NOT duplicate when the broadcast beats the ack (race)', () => {
@@ -66,10 +81,6 @@ describe('chatSlice.messageConfirmed', () => {
 });
 
 describe('chatSlice.messageReceived realtime ordering', () => {
-  function seededState() {
-    return reducer(undefined, fetchConversations.fulfilled([conversation()], 'seed', undefined));
-  }
-
   it('is idempotent for duplicate socket delivery and does not double unread', () => {
     const incoming = { ...msg('srv-peer', 'new', '2026-06-14T00:00:20Z', peer), viewerId: me };
     let state = reducer(seededState(), messageReceived(incoming));
@@ -101,5 +112,6 @@ describe('chatSlice.messageReceived realtime ordering', () => {
 
     expect(state.conversations[0]?.unreadCount).toBe(0);
     expect(state.messages[convoId]?.[0]?.id).toBe('srv-active');
+    expect(state.messages[convoId]?.[0]).not.toHaveProperty('viewerId');
   });
 });
