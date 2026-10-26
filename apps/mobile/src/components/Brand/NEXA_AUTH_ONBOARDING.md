@@ -1,4 +1,4 @@
-# NEXA Auth + Onboarding v3
+# NEXA Auth + Onboarding v4
 
 ## Product intent
 
@@ -14,15 +14,18 @@ The sequence communicates:
 
 ## Auth screen
 
-- canonical NEXA lockup
-- spatial discovery motif instead of stock/social artwork
-- primary action uses violet (`actionPrimary`)
-- discovery emphasis uses cyan (`discovery`)
-- neutral Google sign-in treatment
+- horizontal outlined-vector NEXA wordmark with filled eye/iris and the tagline “a gateway to your local world.”
+- uncluttered, theme-aware form; dark mode matches the approved dark/violet reference
+- no discovery hero, panel border, welcome heading or sign-in subtitle on login
+- email/password fields have leading icons; password visibility is an accessible 48dp control
+- primary action uses a violet gradient from canonical theme tokens
+- neutral Google sign-in treatment with the provider's multicolor mark
+- create-account action follows Google sign-in
 - email/password, registration, optional phone and Google auth contracts are unchanged
-- legal links remain unchanged
-- no location permission request is introduced
-- no map or previous-session location screenshot is shown behind auth
+- safe-area-aware scroll layout preserves access with the keyboard and larger text
+- separate Terms and Privacy links retain configured destinations; issue #592 still owns publication of a dedicated Terms document
+- “Forgot password?” explains the absence of self-service reset and offers account-access support; it does not claim to send a reset email
+- no location permission request or location imagery is introduced
 
 ## Spatial discovery hero
 

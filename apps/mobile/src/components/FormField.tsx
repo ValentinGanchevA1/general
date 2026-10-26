@@ -12,11 +12,13 @@ import { fontSize, radius, spacing, useAppTheme } from '@/theme';
 export interface FormFieldProps extends TextInputProps {
   error?: string | undefined;
   label?: string | undefined;
+  leadingAccessory?: React.ReactNode;
+  trailingAccessory?: React.ReactNode;
 }
 
 /** TextInput + optional label + inline error using the active NEXA theme. */
 export const FormField = forwardRef<TextInput, FormFieldProps>(function FormField(
-  { error, label, style, ...rest },
+  { error, label, style, leadingAccessory, trailingAccessory, ...rest },
   ref,
 ) {
   const { colors } = useAppTheme();
@@ -24,22 +26,26 @@ export const FormField = forwardRef<TextInput, FormFieldProps>(function FormFiel
   return (
     <View style={styles.wrap}>
       {label ? <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text> : null}
-      <TextInput
-        ref={ref}
+      <View
         style={[
-          styles.input,
+          styles.control,
           {
             backgroundColor: colors.surfaceSecondary,
-            color: colors.textPrimary,
             borderColor: error ? colors.danger : colors.borderDefault,
           },
-          style,
         ]}
-        placeholderTextColor={colors.textTertiary}
-        selectionColor={colors.discovery}
-        {...rest}
-      />
-      {error ? <Text style={[styles.fieldError, { color: colors.danger }]}>{error}</Text> : null}
+      >
+        {leadingAccessory}
+        <TextInput
+          ref={ref}
+          style={[styles.input, { color: colors.textPrimary }, style]}
+          placeholderTextColor={colors.textTertiary}
+          selectionColor={colors.discovery}
+          {...rest}
+        />
+        {trailingAccessory}
+      </View>
+      {error ? <Text accessibilityRole="alert" style={[styles.fieldError, { color: colors.danger }]}>{error}</Text> : null}
     </View>
   );
 });
@@ -51,13 +57,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 2,
   },
-  input: {
+  control: {
     minHeight: 50,
     borderRadius: radius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  input: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 50,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: fontSize.md,
-    borderWidth: 1,
   },
   fieldError: {
     fontSize: fontSize.xs,
