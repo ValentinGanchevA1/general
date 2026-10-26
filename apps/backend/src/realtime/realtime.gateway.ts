@@ -276,7 +276,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         payload.body,
       );
 
-      this.server.to(this.conversationRoom(payload.conversationId)).emit('chat:message', msg);
+      await this.emitChatMessageToParticipants(msg);
       void this.pushToOfflineParticipants(payload.conversationId, client.data.userId, msg.body);
       void this.challenges
         .increment(client.data.userId, 'chat_sent')
@@ -514,6 +514,19 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     } catch (err) {
       this.logger.error(`notifyFriendsPresence failed user=${userId}: ${err}`);
     }
+  }
+
+  private async emitChatMessageToParticipants(message: ChatMessageEvent): Promise<void> {
+    const rooms = [this.conversationRoom(message.conversationId)];
+    try {
+      const participantIds = await this.chat.getParticipantIds(message.conversationId);
+      rooms.push(...participantIds.map((id) => this.userRoom(id)));
+    } catch {
+      // Persistence already succeeded: preserve room delivery and the successful ack.
+      this.logger.warn('Chat participant fanout unavailable; using conversation room');
+    }
+    // Socket.IO unions rooms, so sockets in both rooms receive the event once.
+    this.server.to(rooms).emit('chat:message', message);
   }
 
   private async pushToOfflineParticipants(
