@@ -122,13 +122,26 @@ const chatSlice = createSlice({
     ) {
       const { conversationId, senderId, body, createdAt, viewerId } = action.payload;
       const existing = state.messages[conversationId] ?? [];
-      if (!existing.some((m) => m.id === action.payload.id)) {
-        state.messages[conversationId] = [action.payload, ...existing];
-      }
+      const alreadySeen = existing.some((m) => m.id === action.payload.id);
+      if (alreadySeen) return;
+
+      state.messages[conversationId] = [action.payload, ...existing];
+
       const convo = state.conversations.find((c) => c.id === conversationId);
       if (convo) {
-        convo.lastMessage = { senderId, body };
-        convo.lastMessageAt = createdAt;
+        const currentLastAt = convo.lastMessageAt ? Date.parse(convo.lastMessageAt) : Number.NEGATIVE_INFINITY;
+        const incomingAt = Date.parse(createdAt);
+        const canAdvancePreview =
+          convo.lastMessageAt === null ||
+          Number.isNaN(currentLastAt) ||
+          Number.isNaN(incomingAt) ||
+          incomingAt >= currentLastAt;
+
+        if (canAdvancePreview) {
+          convo.lastMessage = { senderId, body };
+          convo.lastMessageAt = createdAt;
+        }
+
         const isActive = state.activeConversationId === conversationId;
         if (!isActive && viewerId && senderId !== viewerId) {
           convo.unreadCount = (convo.unreadCount ?? 0) + 1;
