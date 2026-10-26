@@ -48,12 +48,14 @@ export class DiscoveryPresencePublisher {
     }
   }
 
-  async clear(userId: string): Promise<void> {
-    try {
-      await this.redis.del(this.locationKey(userId));
-    } catch (error) {
-      this.logger.error(`discovery presence clear failed user=${userId}: ${String(error)}`);
-    }
+  /**
+   * Disconnect is process-local, so it cannot prove the user has no sockets on
+   * another backend instance. Keep the last routing origin until its short TTL
+   * expires; this also lets a reconnect remove pins from the pre-disconnect
+   * viewport on its next heartbeat.
+   */
+  clear(_userId: string): void {
+    // Redis TTL owns cleanup across instances.
   }
 
   private async swapLocation(userId: string, location: LatLng): Promise<LatLng | null> {
