@@ -15,6 +15,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { BrandLogo } from '@/components/Brand/BrandLogo';
 import { NexaDiscoveryHero } from '@/components/Brand/NexaDiscoveryHero';
+import { BirthDateField, CityAutocompleteField } from '@/components/profile/ProfileOriginFields';
 import { FormField } from '@/components/FormField';
 import { INTEREST_OPTIONS } from '@/features/profile/interestOptions';
 import { PURPOSE_OPTIONS } from '@/features/profile/goalOptions';
@@ -174,7 +175,6 @@ function StepOrigin({
 }): React.JSX.Element {
   const { colors } = useAppTheme();
   const cityRef = useRef<TextInput>(null);
-  const countryRef = useRef<TextInput>(null);
 
   return (
     <View style={styles.stepBody}>
@@ -183,42 +183,21 @@ function StepOrigin({
         title="Age & origin"
         subtitle="You must be 18+. Exact date of birth stays private; NEXA can derive your age and zodiac from it."
       />
-      <FormField
-        label="Date of birth"
-        value={dateOfBirth}
-        onChangeText={(value) => onChange({ dateOfBirth: value })}
-        placeholder="YYYY-MM-DD"
-        keyboardType="numbers-and-punctuation"
-        maxLength={10}
-        autoCapitalize="none"
-        returnKeyType="next"
-        onSubmitEditing={() => cityRef.current?.focus()}
-        error={error || undefined}
-        testID="onboarding-dob"
-      />
-      <FormField
-        ref={cityRef}
-        label="From"
-        value={hometownCity}
-        onChangeText={(value) => onChange({ hometownCity: value })}
-        placeholder="e.g. Varna"
-        autoCapitalize="words"
-        maxLength={80}
-        returnKeyType="next"
-        onSubmitEditing={() => countryRef.current?.focus()}
-        testID="onboarding-city"
-      />
-      <FormField
-        ref={countryRef}
-        label="Country"
-        value={hometownCountry}
-        onChangeText={(value) => onChange({ hometownCountry: value })}
-        placeholder="e.g. BG"
-        autoCapitalize="characters"
-        maxLength={40}
-        returnKeyType="done"
-        testID="onboarding-country"
-      />
+      <View style={styles.originFields}>
+        <BirthDateField
+          value={dateOfBirth}
+          onChange={(value) => onChange({ dateOfBirth: value })}
+          onComplete={() => cityRef.current?.focus()}
+          error={error || undefined}
+        />
+        <CityAutocompleteField
+          ref={cityRef}
+          city={hometownCity}
+          country={hometownCountry}
+          onCityChange={(value) => onChange({ hometownCity: value })}
+          onCountryChange={(value) => onChange({ hometownCountry: value })}
+        />
+      </View>
       <View style={[styles.toggleRow, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderDefault }]}>
         <View style={styles.toggleCopy}>
           <Text style={[styles.toggleLabel, { color: colors.textPrimary }]}>Show age</Text>
@@ -400,7 +379,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
           <Text style={[styles.welcomeHeading, { color: colors.textPrimary }]}>Make the map yours.</Text>
           <Text style={[styles.welcomeSub, { color: colors.textSecondary }]}>Tell NEXA what you like, why you’re here, and how you want to appear nearby.</Text>
         </ScrollView>
-        <View style={[styles.welcomeFooter, { backgroundColor: colors.canvas, borderTopColor: colors.borderSubtle }]}>
+        <View style={[styles.welcomeFooter, { backgroundColor: colors.canvas, borderTopColor: colors.borderSubtle }]}> 
           <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.actionPrimary }]} onPress={() => setStep(1)} activeOpacity={0.82} accessibilityRole="button">
             <Text style={[styles.primaryButtonText, { color: colors.onPrimary }]}>Set up my profile</Text>
           </TouchableOpacity>
@@ -483,6 +462,7 @@ const styles = StyleSheet.create({
   choiceIcon: { fontSize: 20 },
   choiceLabel: { flex: 1, fontSize: fontSize.md, fontWeight: '600' },
   selectionCount: { marginTop: spacing.md, fontSize: fontSize.sm },
+  originFields: { gap: spacing.sm },
   toggleRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: radius.md, padding: 14, marginTop: spacing.sm, gap: 12 },
   toggleCopy: { flex: 1 },
   toggleLabel: { fontSize: fontSize.md, fontWeight: '600' },
