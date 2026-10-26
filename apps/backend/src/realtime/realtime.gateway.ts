@@ -45,6 +45,7 @@ import type {
 } from '@g88/shared';
 
 import { WsJwtGuard } from './ws-jwt.guard';
+import { DiscoveryPresencePublisher } from './discovery-presence.publisher';
 import {
   ChatSendDto,
   ConversationJoinDto,
@@ -103,6 +104,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   constructor(
     private readonly presence: PresenceService,
+    private readonly discoveryPresence: DiscoveryPresencePublisher,
     private readonly chat: ChatService,
     private readonly locationShare: LocationShareService,
     private readonly notifications: NotificationsService,
@@ -141,6 +143,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     const others = remaining.filter((s) => s.id !== client.id);
     if (others.length === 0) {
       await this.presence.markOffline(userId);
+      this.discoveryPresence.clear(userId);
       if (client.data.friendPresenceAnnounced) {
         void this.notifyFriendsPresence(userId, false);
       }
@@ -157,6 +160,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     try {
       const result = await this.presence.heartbeat(client.data.userId, payload.location);
       const newRoom = this.cellRoom(result.cellId);
+
+      void this.discoveryPresence.publishHeartbeat(client.data.userId, {
+        lat: result.lat,
+        lng: result.lng,
+      });
 
       for (const room of client.data.rooms) {
         if (room.startsWith('cell:')) {
