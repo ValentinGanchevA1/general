@@ -47,11 +47,10 @@ jobs:
           node-version-file: '.nvmrc'
           cache: pnpm
 
-      # GitHub's macos-15 image currently exposes Ruby 3.3.12/RubyGems 4 by
-      # default. CocoaPods can crash while generating a Pods project for pnpm
-      # monorepos on that toolchain with "pathname contains null byte".
-      # Keep the iOS probe on a known-stable Ruby 3.3 patch level instead of
-      # relying on mutable runner defaults.
+      # Keep Ruby/CocoaPods explicit so the iOS probe is not coupled to mutable
+      # macOS runner defaults. The pnpm/CocoaPods null-byte bug is still
+      # intermittent across Ruby/CocoaPods versions, so the install step below
+      # retries only that exact known transient failure.
       - uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1
         with:
           ruby-version: '3.3.3'
@@ -75,7 +74,41 @@ jobs:
           pod --version
 
       - name: Install iOS pods
-        run: pod install --project-directory=ios
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          LOG_FILE="${RUNNER_TEMP}/nexa-pod-install.log"
+          MAX_ATTEMPTS=3
+
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            echo "CocoaPods install attempt ${attempt}/${MAX_ATTEMPTS}"
+            rm -f "$LOG_FILE"
+
+            set +e
+            pod install --project-directory=ios 2>&1 | tee "$LOG_FILE"
+            status=${PIPESTATUS[0]}
+            set -e
+
+            if [[ "$status" -eq 0 ]]; then
+              echo "CocoaPods install succeeded on attempt ${attempt}."
+              exit 0
+            fi
+
+            if ! grep -Fq 'pathname contains null byte' "$LOG_FILE"; then
+              echo "CocoaPods failed with a non-retryable error." >&2
+              exit "$status"
+            fi
+
+            if [[ "$attempt" -eq "$MAX_ATTEMPTS" ]]; then
+              echo "CocoaPods hit the known pnpm null-byte failure ${MAX_ATTEMPTS} times." >&2
+              exit "$status"
+            fi
+
+            echo "Known transient CocoaPods/pnpm null-byte failure; regenerating Pods and retrying."
+            rm -rf ios/Pods ios/Podfile.lock
+            sleep 2
+          done
 
       - name: Compile unsigned Release for iOS Simulator
         run: >-
