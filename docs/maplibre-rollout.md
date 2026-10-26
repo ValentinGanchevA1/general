@@ -2,13 +2,13 @@
 
 ## Current state
 
-Production stays on the `legacy` renderer by default. MapLibre is available in the native bundle, guarded by build-time renderer request, native availability, and validated MapTiler provider configuration.
+Production stays on the `legacy` renderer by default. MapLibre is available in the native bundle, guarded by build-time renderer request, native availability, validated MapTiler provider configuration, and the server-owned runtime renderer policy.
 
 The manual `iOS MapLibre Canary` workflow is the first gate that intentionally uses the real MapTiler client configuration and real provider style URL. It does not change the production default.
 
 The manual `Android MapLibre Canary` workflow builds a non-production Release APK from the same real provider configuration and forces the CI-only `maplibre-smoke.js` entry. It proves the Android artifact contains the MapLibre provider-canary bundle, but it does not replace physical-device interaction smoke.
 
-B2.6 adds a server-owned runtime renderer policy so future MapLibre production releases can be disabled without publishing a new mobile binary. B2.6a defines the public backend contract; B2.6b must wire that contract into the mobile Redux/runtime renderer gate before this becomes an active rollback mechanism.
+B2.6 provides a server-owned runtime renderer policy so MapLibre-capable production releases can be disabled without publishing a new mobile binary. B2.6a defines the public backend contract. B2.6b wires that contract into the mobile Redux/runtime renderer gate with bounded local caching and fail-closed refresh behavior.
 
 ## Canary prerequisites
 
@@ -30,8 +30,21 @@ Server-side activation is fail-closed:
 - Missing values, `false`, alternate casing, whitespace, numeric truthy values, and malformed values all resolve to disabled.
 - The endpoint is read-only and returns no secret material.
 - HTTP intermediaries are instructed not to cache the response; the mobile client owns its bounded local cache policy.
+- The endpoint is exempt from the application IP throttler because carrier-NAT clients can legitimately share one public IP and would otherwise create false policy outages. The endpoint performs no DB or Redis work.
 
-B2.6a only exposes this contract. Until B2.6b is merged and released, changing `NEXA_MAPLIBRE_REMOTE_ENABLED` does **not** affect existing mobile renderer selection.
+Mobile activation is also fail-closed:
+
+- A release must still be built with exact `NEXA_MAP_RENDERER=maplibre`; remote policy can never promote a `legacy` build.
+- The response is runtime-validated. Wrong version, malformed fields, non-boolean enable values, non-integer TTLs, and TTLs above the client maximum are rejected.
+- A valid policy may be persisted only until its server TTL, capped by the client maximum of 60 seconds.
+- Persisted data is revalidated on read; expired or overlong cached enable permissions are discarded.
+- The map hydrates a still-valid cache for startup continuity and immediately revalidates it with the backend.
+- The policy refreshes at TTL expiry and when the app returns to the foreground while the map is mounted.
+- Network failure, malformed response, or expired policy immediately resolves renderer permission to `legacy`; the client retries from the safe state.
+
+The effective production MapLibre decision is therefore:
+
+`build requests maplibre` **AND** `fresh remote policy allows maplibre` **AND** `native MapLibre is available` **AND** `provider config is valid`.
 
 ## iOS provider canary
 
@@ -71,7 +84,7 @@ Do not flip the production default to MapLibre until all of the following are tr
 4. The Android provider-canary APK is green and that exact artifact passes physical-device smoke for launch, map load, pan/zoom, cluster press, entity press, long press, selection, and dimming.
 5. A physical iOS device smoke passes the same interaction set plus foreground/background recovery and location-permission transitions.
 6. MapTiler client-key restrictions, rotation procedure, and quota/alerting are configured provider-side.
-7. The remote renderer policy is wired into the mobile runtime, tested fail-closed, and verified to force `legacy` without publishing a new client build.
+7. The remote renderer policy is verified to force `legacy` in a MapLibre-capable client without publishing a new client build, including TTL expiry and network-failure behavior.
 8. There are no unresolved MapLibre-specific startup crashes, ready timeouts, provider authorization failures, or interaction regressions.
 
 Production activation must be a separate PR. The canary workflows must never mutate the renderer default.
@@ -89,14 +102,13 @@ Rollback to `legacy` on any of the following after activation:
 
 ## Rollback procedure
 
-Before B2.6b is released, rollback remains build-time:
+For clients that include B2.6b, the primary renderer rollback is remote:
 
-1. Set the release renderer request to `legacy` or omit `NEXA_MAP_RENDERER`.
-2. Rebuild and redeploy the affected client release.
-3. Keep backend/API/database state unchanged; renderer rollback is client-side only.
-4. Rotate/restrict the MapTiler client key only if credential exposure or abuse is involved.
-5. Preserve the MapLibre implementation and canary workflows for diagnosis and the next controlled rollout attempt.
-
-After B2.6b is released and verified, the first rollback action becomes setting `NEXA_MAPLIBRE_REMOTE_ENABLED` to disabled on the backend and applying that backend configuration. A client rebuild remains the secondary rollback if the remote control path itself is impaired.
+1. Set backend `NEXA_MAPLIBRE_REMOTE_ENABLED` to disabled or remove it, then apply the backend configuration.
+2. Active map clients revalidate at their bounded policy deadline (maximum 60 seconds) and on foreground. On refresh failure they also fail closed to `legacy`.
+3. Keep backend/API/database state unchanged; no data migration is involved.
+4. Use a client rebuild with `NEXA_MAP_RENDERER=legacy` as the secondary rollback if the remote control path itself is impaired or for older clients that predate B2.6b.
+5. Rotate/restrict the MapTiler client key only if credential exposure or abuse is involved.
+6. Preserve the MapLibre implementation and canary workflows for diagnosis and the next controlled rollout attempt.
 
 No data migration or server rollback is required for renderer rollback.

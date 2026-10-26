@@ -1,6 +1,7 @@
 import {
   mapRendererRolloutPolicy,
   NEXA_MAP_RENDERER_ROLLOUT,
+  resolveRemoteMapRendererRequest,
   resolveRequestedMapRenderer,
 } from '../mapRendererRollout';
 
@@ -16,6 +17,13 @@ describe('map renderer rollout policy', () => {
 
   it('accepts only the exact MapLibre opt-in value', () => {
     expect(resolveRequestedMapRenderer('maplibre')).toBe('maplibre');
+  });
+
+  it('requires both build-time request and remote permission', () => {
+    expect(resolveRemoteMapRendererRequest('legacy', false)).toBe('legacy');
+    expect(resolveRemoteMapRendererRequest('legacy', true)).toBe('legacy');
+    expect(resolveRemoteMapRendererRequest('maplibre', false)).toBe('legacy');
+    expect(resolveRemoteMapRendererRequest('maplibre', true)).toBe('maplibre');
   });
 
   it('keeps native MapLibre availability independent from the requested renderer', () => {
