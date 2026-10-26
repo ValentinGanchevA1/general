@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import type Redis from 'ioredis';
@@ -28,7 +28,6 @@ import { REDIS_CLIENT } from '../../config/redis.provider';
  */
 @Injectable()
 export class PresenceService {
-  private readonly logger = new Logger(PresenceService.name);
   private static readonly TTL_SECONDS = 120;
   /** Keep last-seen long enough for ranking activity decay (see scoring.activityScore). */
   private static readonly LAST_SEEN_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -43,7 +42,9 @@ export class PresenceService {
    * Returns the cell id, the previous cell id (null if first heartbeat or same
    * cell), and the fuzzed lat/lng so the gateway can emit presence:delta.
    *
-   * Location is fuzzed to r10 centroid before any storage or fan-out.
+   * Location is fuzzed to r10 centroid before any storage or fan-out. When the
+   * r8 cell changes, Postgres persistence completes before this method returns
+   * so discovery fan-out cannot resolve the previous canonical location.
    */
   async heartbeat(
     userId: string,
@@ -73,12 +74,12 @@ export class PresenceService {
       pipe.zrem(`presence:cell:${prevCellId}`, userId);
     }
 
-    // Flush location + all H3 cells to Postgres when the r8 cell changes.
-    // Skipped when the user hasn't moved between cells to avoid per-heartbeat writes.
+    // Discovery resolution reads the persisted Postgres location. Keep this
+    // write in the heartbeat's ordering boundary whenever the canonical r8
+    // location changes; returning earlier can publish the new movement against
+    // the previous database coordinates.
     if (!prevCellId || prevCellId !== cellId) {
-      this.persistLocation(userId, fuzzed, cells).catch((err) =>
-        this.logger.error(`persistLocation failed user=${userId}: ${err}`),
-      );
+      await this.persistLocation(userId, fuzzed, cells);
     }
 
     await pipe.exec();
