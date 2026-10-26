@@ -12,6 +12,7 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
   SocketData,
+  Viewport,
 } from '@g88/shared';
 
 import { corsOrigins } from '../common/cors-origins';
@@ -25,6 +26,24 @@ type G88Socket = Socket<
   Record<string, never>,
   SocketData
 >;
+
+const MAX_VIEWPORT_SPAN_DEGREES = 15;
+
+function longitudeSpan(viewport: Viewport): number {
+  if (viewport.sw.lng <= viewport.ne.lng) {
+    return viewport.ne.lng - viewport.sw.lng;
+  }
+  return 360 - viewport.sw.lng + viewport.ne.lng;
+}
+
+function isBoundedViewport(viewport: Viewport): boolean {
+  const latitudeSpan = viewport.ne.lat - viewport.sw.lat;
+  return (
+    latitudeSpan >= 0 &&
+    latitudeSpan <= MAX_VIEWPORT_SPAN_DEGREES &&
+    longitudeSpan(viewport) <= MAX_VIEWPORT_SPAN_DEGREES
+  );
+}
 
 /**
  * Owns only the discovery subscription lifecycle on the shared realtime
@@ -47,6 +66,14 @@ export class DiscoverySubscriptionGateway implements OnGatewayDisconnect {
     @ConnectedSocket() client: G88Socket,
     @MessageBody() payload: DiscoverySubscriptionDto,
   ): AckResult<{ subscribed: true }> {
+    if (!isBoundedViewport(payload.viewport)) {
+      return {
+        ok: false,
+        code: 'discovery.viewport_too_large',
+        message: `Discovery viewport must span at most ${MAX_VIEWPORT_SPAN_DEGREES} degrees per axis.`,
+      };
+    }
+
     this.subscriptions.set(client.id, client.data.userId, payload);
     return { ok: true, data: { subscribed: true } };
   }
