@@ -1,6 +1,8 @@
-# G88 Architecture
+# NEXA Architecture
 
 Map-first, real-time, identity-verified social + local marketplace monorepo.
+
+> **Compatibility note:** public product identity is **NEXA**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.
 
 ## 1. Monorepo layout
 
