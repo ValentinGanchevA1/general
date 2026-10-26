@@ -5,6 +5,11 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
+# CocoaPods <= 1.17.0 has an upstream project-generation bug when local pod
+# paths traverse pnpm symlinks. The workaround is version-bounded and only
+# falls back on the exact `pathname contains null byte` failure.
+require_relative './cocoapods_pnpm_pathname_workaround'
+
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
