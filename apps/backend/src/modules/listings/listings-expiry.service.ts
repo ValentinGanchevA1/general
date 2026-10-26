@@ -1,4 +1,5 @@
 import {
+  Inject,
   Injectable,
   Logger,
   OnModuleDestroy,
@@ -6,25 +7,41 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { randomInt } from 'node:crypto';
+import type Redis from 'ioredis';
+import { randomInt, randomUUID } from 'node:crypto';
 
 import type { LatLng } from '@g88/shared';
 
+import { REDIS_CLIENT } from '../../config/redis.provider';
 import { DiscoveryRealtimePublisher } from '../../realtime/discovery-realtime.publisher';
+
+const RECOVERY_WINDOW_DAYS = 7;
+const LOCK_TTL_SECONDS = 120;
+const DONE_TTL_SECONDS = 8 * 24 * 60 * 60;
+const RELEASE_LOCK_SCRIPT = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+`;
 
 interface ExpiredListingRow {
   id: string;
+  expires_at: Date;
   lat: number;
   lng: number;
 }
 
 /**
- * Removes expired active listings from realtime discovery.
+ * Removes expired active listings from realtime discovery without changing
+ * their product status. Expiry is a discoverability boundary; an expired
+ * listing stays active so the seller can bump it and extend expires_at.
  *
  * The discoverable view already excludes expired listings from HTTP snapshots.
- * This sweeper closes the realtime gap for clients that keep a socket
- * subscription open across the expiry boundary. Multiple backend instances may
- * sweep the same row; duplicate leave mutations are safe and idempotent.
+ * Each exact expires_at version uses a short ownership-checked Redis lock plus
+ * a durable done marker. A crash before publication therefore recovers after
+ * the short lock expires, while a later bump creates an independent lifecycle
+ * version that can expire again normally.
  */
 @Injectable()
 export class ListingsExpiryService implements OnModuleInit, OnModuleDestroy {
@@ -34,6 +51,7 @@ export class ListingsExpiryService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     @InjectDataSource() private readonly db: DataSource,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly discovery: DiscoveryRealtimePublisher,
   ) {}
 
@@ -56,44 +74,81 @@ export class ListingsExpiryService implements OnModuleInit, OnModuleDestroy {
   async sweep(): Promise<void> {
     try {
       const expired = (await this.db.query(
-        `UPDATE listings
-            SET status = 'withdrawn', updated_at = NOW()
+        `SELECT id, expires_at,
+                ST_Y(location::geometry) AS lat,
+                ST_X(location::geometry) AS lng
+           FROM listings
           WHERE deleted_at IS NULL
+            AND visibility = 'public'
             AND status = 'active'
             AND expires_at IS NOT NULL
             AND expires_at <= NOW()
-          RETURNING id,
-                    ST_Y(location::geometry) AS lat,
-                    ST_X(location::geometry) AS lng`,
+            AND expires_at > NOW() - interval '${RECOVERY_WINDOW_DAYS} days'`,
       )) as ExpiredListingRow[];
 
-      if (expired.length === 0) return;
+      let published = 0;
+      for (const listing of expired) {
+        const version = this.versionKey(listing);
+        const doneKey = this.doneKey(version);
+        if (await this.redis.get(doneKey)) continue;
 
-      const results = await Promise.allSettled(
-        expired.map((listing) =>
-          this.discovery.publishEntityChangeToSubscribers({
+        const lockKey = this.lockKey(version);
+        const lockToken = randomUUID();
+        const locked = await this.redis.set(
+          lockKey,
+          lockToken,
+          'EX',
+          LOCK_TTL_SECONDS,
+          'NX',
+        );
+        if (locked !== 'OK') continue;
+
+        try {
+          if (await this.redis.get(doneKey)) continue;
+
+          await this.discovery.publishEntityChangeToSubscribers({
             kind: 'listing',
             entityId: listing.id,
             location: this.toLocation(listing),
             change: 'update',
-          }),
-        ),
-      );
-
-      const failed = results.filter((result) => result.status === 'rejected').length;
-      if (failed > 0) {
-        this.logger.warn(
-          `Expired ${expired.length} listings; ${failed} realtime discovery publications failed.`,
-        );
-        return;
+          });
+          await this.redis.set(doneKey, '1', 'EX', DONE_TTL_SECONDS);
+          published += 1;
+        } catch (error) {
+          this.logger.warn(
+            `Listing discovery expiry publication failed for ${listing.id}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        } finally {
+          await this.releaseLock(lockKey, lockToken).catch(() => undefined);
+        }
       }
 
-      this.logger.log(`Expired ${expired.length} listings and published discovery leaves.`);
+      if (published > 0) {
+        this.logger.log(`Published ${published} listing discovery expiry transition(s).`);
+      }
     } catch (err) {
       this.logger.warn(
         `Listing expiry sweep failed: ${err instanceof Error ? err.message : err}`,
       );
     }
+  }
+
+  private async releaseLock(lockKey: string, lockToken: string): Promise<void> {
+    await this.redis.eval(RELEASE_LOCK_SCRIPT, 1, lockKey, lockToken);
+  }
+
+  private versionKey(row: ExpiredListingRow): string {
+    return `${row.id}:${new Date(row.expires_at).getTime()}`;
+  }
+
+  private lockKey(version: string): string {
+    return `discovery:listing-expiry:lock:${version}`;
+  }
+
+  private doneKey(version: string): string {
+    return `discovery:listing-expiry:done:${version}`;
   }
 
   private toLocation(row: ExpiredListingRow): LatLng {

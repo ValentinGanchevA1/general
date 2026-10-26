@@ -126,11 +126,20 @@ export class ListingsController {
   @Post(':id/bump')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
-  bump(
+  async bump(
     @CurrentUser('id') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ListingDetail> {
-    return this.listings.bump(userId, id);
+    const listing = await this.listings.bump(userId, id);
+    if (listing.visibility === 'public') {
+      void this.discovery.publishEntityChangeToSubscribers({
+        kind: 'listing',
+        entityId: listing.id,
+        location: listing.location,
+        change: 'enter',
+      }).catch(() => undefined);
+    }
+    return listing;
   }
 
   /** PUT /api/v1/listings/:id/favorite — toggle save-for-later. */

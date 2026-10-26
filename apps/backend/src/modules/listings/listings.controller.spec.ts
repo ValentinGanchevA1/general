@@ -67,4 +67,50 @@ describe('ListingsController', () => {
       change: 'update',
     });
   });
+
+  it('publishes a public bumped listing as a discovery enter', async () => {
+    const bumpedListing = {
+      id: 'listing-1',
+      visibility: 'public',
+      location: { lat: 43.2, lng: 27.9 },
+    };
+    const listings = {
+      bump: jest.fn().mockResolvedValue(bumpedListing),
+    };
+    const discovery = {
+      publishEntityChangeToSubscribers: jest.fn().mockResolvedValue(undefined),
+    };
+    const controller = new ListingsController(
+      listings as unknown as ListingsService,
+      discovery as unknown as DiscoveryRealtimePublisher,
+    );
+
+    await expect(controller.bump('seller-1', 'listing-1')).resolves.toEqual(bumpedListing);
+    expect(discovery.publishEntityChangeToSubscribers).toHaveBeenCalledWith({
+      kind: 'listing',
+      entityId: 'listing-1',
+      location: { lat: 43.2, lng: 27.9 },
+      change: 'enter',
+    });
+  });
+
+  it('does not publish a private bumped listing', async () => {
+    const listings = {
+      bump: jest.fn().mockResolvedValue({
+        id: 'listing-1',
+        visibility: 'private',
+        location: { lat: 43.2, lng: 27.9 },
+      }),
+    };
+    const discovery = {
+      publishEntityChangeToSubscribers: jest.fn(),
+    };
+    const controller = new ListingsController(
+      listings as unknown as ListingsService,
+      discovery as unknown as DiscoveryRealtimePublisher,
+    );
+
+    await controller.bump('seller-1', 'listing-1');
+    expect(discovery.publishEntityChangeToSubscribers).not.toHaveBeenCalled();
+  });
 });
