@@ -7,7 +7,13 @@ const userPoint: EntityPoint = {
   id: 'user-1',
   lat: 42,
   lng: 27,
-  meta: {},
+  meta: {
+    displayName: 'User',
+    avatarUrl: null,
+    verification: 'none',
+    online: false,
+    lastSeenAt: null,
+  },
 };
 
 describe('createDiscoveryMutationLog', () => {
