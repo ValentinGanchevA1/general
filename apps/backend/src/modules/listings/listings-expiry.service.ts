@@ -8,7 +8,7 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import type Redis from 'ioredis';
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 
 import type { LatLng } from '@g88/shared';
 
@@ -16,7 +16,14 @@ import { REDIS_CLIENT } from '../../config/redis.provider';
 import { DiscoveryRealtimePublisher } from '../../realtime/discovery-realtime.publisher';
 
 const RECOVERY_WINDOW_DAYS = 7;
-const CLAIM_TTL_SECONDS = 8 * 24 * 60 * 60;
+const LOCK_TTL_SECONDS = 120;
+const DONE_TTL_SECONDS = 8 * 24 * 60 * 60;
+const RELEASE_LOCK_SCRIPT = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+`;
 
 interface ExpiredListingRow {
   id: string;
@@ -31,9 +38,10 @@ interface ExpiredListingRow {
  * listing stays active so the seller can bump it and extend expires_at.
  *
  * The discoverable view already excludes expired listings from HTTP snapshots.
- * A versioned Redis claim makes the realtime boundary transition idempotent
- * across backend instances while allowing a later bumped expiry to claim its
- * own future transition.
+ * Each exact expires_at version uses a short ownership-checked Redis lock plus
+ * a durable done marker. A crash before publication therefore recovers after
+ * the short lock expires, while a later bump creates an independent lifecycle
+ * version that can expire again normally.
  */
 @Injectable()
 export class ListingsExpiryService implements OnModuleInit, OnModuleDestroy {
@@ -80,31 +88,40 @@ export class ListingsExpiryService implements OnModuleInit, OnModuleDestroy {
 
       let published = 0;
       for (const listing of expired) {
-        const claimKey = this.claimKey(listing);
-        const claimed = await this.redis.set(
-          claimKey,
-          '1',
+        const version = this.versionKey(listing);
+        const doneKey = this.doneKey(version);
+        if (await this.redis.get(doneKey)) continue;
+
+        const lockKey = this.lockKey(version);
+        const lockToken = randomUUID();
+        const locked = await this.redis.set(
+          lockKey,
+          lockToken,
           'EX',
-          CLAIM_TTL_SECONDS,
+          LOCK_TTL_SECONDS,
           'NX',
         );
-        if (claimed !== 'OK') continue;
+        if (locked !== 'OK') continue;
 
         try {
+          if (await this.redis.get(doneKey)) continue;
+
           await this.discovery.publishEntityChangeToSubscribers({
             kind: 'listing',
             entityId: listing.id,
             location: this.toLocation(listing),
             change: 'update',
           });
+          await this.redis.set(doneKey, '1', 'EX', DONE_TTL_SECONDS);
           published += 1;
         } catch (error) {
-          await this.redis.del(claimKey).catch(() => undefined);
           this.logger.warn(
             `Listing discovery expiry publication failed for ${listing.id}: ${
               error instanceof Error ? error.message : String(error)
             }`,
           );
+        } finally {
+          await this.releaseLock(lockKey, lockToken).catch(() => undefined);
         }
       }
 
@@ -118,8 +135,20 @@ export class ListingsExpiryService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private claimKey(row: ExpiredListingRow): string {
-    return `discovery:listing-expiry:${row.id}:${new Date(row.expires_at).getTime()}`;
+  private async releaseLock(lockKey: string, lockToken: string): Promise<void> {
+    await this.redis.eval(RELEASE_LOCK_SCRIPT, 1, lockKey, lockToken);
+  }
+
+  private versionKey(row: ExpiredListingRow): string {
+    return `${row.id}:${new Date(row.expires_at).getTime()}`;
+  }
+
+  private lockKey(version: string): string {
+    return `discovery:listing-expiry:lock:${version}`;
+  }
+
+  private doneKey(version: string): string {
+    return `discovery:listing-expiry:done:${version}`;
   }
 
   private toLocation(row: ExpiredListingRow): LatLng {
