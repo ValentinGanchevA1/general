@@ -50,7 +50,7 @@ describe('DiscoverySubscriptionStore', () => {
     ]);
   });
 
-  it('handles antimeridian viewports and caps candidate fan-out', () => {
+  it('handles antimeridian viewports', () => {
     const store = new DiscoverySubscriptionStore();
     const antimeridianQuery: DiscoverySubscriptionPayload = {
       viewport: {
@@ -63,9 +63,24 @@ describe('DiscoverySubscriptionStore', () => {
     store.set('socket-a', 'viewer-1', antimeridianQuery);
     store.set('socket-b', 'viewer-2', antimeridianQuery);
 
-    expect(store.candidatesForEntity('listing', { lat: 0, lng: 179 }, 1)).toEqual([
+    expect(store.candidatesForEntity('listing', { lat: 0, lng: 179 })).toEqual([
       expect.objectContaining({ socketId: 'socket-a' }),
+      expect.objectContaining({ socketId: 'socket-b' }),
     ]);
+  });
+
+  it('returns every matching local subscription beyond the legacy 500 candidate cap', () => {
+    const store = new DiscoverySubscriptionStore();
+    for (let index = 0; index < 501; index += 1) {
+      store.set(`socket-${index}`, `viewer-${index}`, query);
+    }
+
+    const candidates = store.candidatesForEntity('user', { lat: 43.2, lng: 27.9 });
+
+    expect(candidates).toHaveLength(501);
+    expect(candidates[500]).toEqual(
+      expect.objectContaining({ socketId: 'socket-500', viewerId: 'viewer-500' }),
+    );
   });
 
   it('does not select user subscriptions when a topic filter is active', () => {
