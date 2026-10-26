@@ -6,7 +6,7 @@ import { DiscoveryPresencePublisher } from './discovery-presence.publisher';
 describe('DiscoveryPresencePublisher', () => {
   const createRedis = (state = new Map<string, string>()) => {
     const evalScript = jest.fn(
-      async (_script: string, _keyCount: number, key: string, value: string, ttl: string) => {
+      async (_script: string, _keyCount: number, key: string, value: string, _ttl: string) => {
         const previous = state.get(key) ?? null;
         state.set(key, value);
         return previous;
