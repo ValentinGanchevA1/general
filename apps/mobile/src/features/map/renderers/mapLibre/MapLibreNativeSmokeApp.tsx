@@ -25,7 +25,7 @@ const SMOKE_STYLE: StyleSpecification = {
   ],
 };
 
-const SMOKE_POINTS: readonly DiscoveryPoint[] = [
+const SMOKE_POINTS: DiscoveryPoint[] = [
   {
     kind: 'cluster',
     cellId: 'smoke-cluster',
