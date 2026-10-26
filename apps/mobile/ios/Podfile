@@ -17,6 +17,13 @@ end
 target 'G88' do
   config = use_native_modules!
 
+  # Firebase's Swift pods are integrated as static libraries in this RN setup.
+  # Their Obj-C transitive dependencies need module maps so Swift can import them.
+  # Keep this targeted instead of enabling use_modular_headers! globally, which
+  # would change module semantics for the full React Native / MapLibre pod graph.
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'RecaptchaInterop', :modular_headers => true
+
   use_react_native!(
     :path => config[:reactNativePath],
     :app_path => "#{Pod::Config.instance.installation_root}/.."
