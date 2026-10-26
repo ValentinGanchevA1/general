@@ -32,6 +32,11 @@ import { fontSize, radius, spacing, useAppTheme } from '@/theme';
 const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const MIN_PASSWORD_LEN = 8;
 
+const MODE_LABELS = {
+  login: { primary: 'Sign in', prompt: 'New to NEXA?', switchMode: 'Create account', autoComplete: 'current-password' },
+  register: { primary: 'Join NEXA', prompt: 'Already on NEXA?', switchMode: 'Sign in', autoComplete: 'new-password' },
+} as const;
+
 interface FieldErrors {
   email?: string;
   password?: string;
@@ -139,6 +144,7 @@ export function AuthScreen(): React.JSX.Element {
   };
 
   const isLogin = mode === 'login';
+  const labels = MODE_LABELS[mode];
 
   if (recovering) {
     return <PasswordRecoveryScreen initialEmail={email} onClose={(recoveryEmail) => {
@@ -250,7 +256,7 @@ export function AuthScreen(): React.JSX.Element {
               secureTextEntry={!passwordVisible}
               autoCapitalize="none"
               autoCorrect={false}
-              autoComplete={isLogin ? 'current-password' : 'new-password'}
+              autoComplete={labels.autoComplete}
               returnKeyType="done"
               onSubmitEditing={submit}
               error={fieldErrors.password}
@@ -266,7 +272,7 @@ export function AuthScreen(): React.JSX.Element {
               activeOpacity={0.82}
               accessibilityRole="button"
               accessibilityState={{ disabled: loading, busy: loading }}
-              accessibilityLabel={isLogin ? 'Sign in' : 'Join NEXA'}
+              accessibilityLabel={labels.primary}
             >
               <LinearGradient
                 colors={[colors.brandViolet, colors.brandVioletBright]}
@@ -278,7 +284,7 @@ export function AuthScreen(): React.JSX.Element {
                   <ActivityIndicator color={colors.onPrimary} />
                 ) : (
                   <Text style={[styles.primaryButtonText, { color: colors.onPrimary }]}>
-                    {isLogin ? 'Sign in' : 'Join NEXA'}
+                    {labels.primary}
                   </Text>
                 )}
               </LinearGradient>
@@ -330,7 +336,7 @@ export function AuthScreen(): React.JSX.Element {
 
           <View style={styles.accountBlock}>
             <Text style={[styles.accountPrompt, { color: colors.textTertiary }]}>
-              {isLogin ? 'New to NEXA?' : 'Already on NEXA?'}
+              {labels.prompt}
             </Text>
             <TouchableOpacity
               onPress={toggleMode}
@@ -340,7 +346,7 @@ export function AuthScreen(): React.JSX.Element {
               accessibilityState={{ disabled: loading }}
             >
               <Text style={[styles.accountLink, { color: colors.actionPrimary }]}>
-                {isLogin ? 'Create account' : 'Sign in'}
+                {labels.switchMode}
               </Text>
             </TouchableOpacity>
           </View>

@@ -7,7 +7,40 @@ import { clearPasswordRecovery, clearRecoveryError, requestPasswordReset, resetP
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fontSize, radius, spacing, useAppTheme } from '@/theme';
 
-interface Props { initialEmail: string; onClose: (email: string) => void }
+interface Props { readonly initialEmail: string; readonly onClose: (email: string) => void }
+
+const STEP_LABELS = {
+  email: { title: 'Forgot password?', action: 'Send reset code' },
+  code: { title: 'Reset password', action: 'Update password' },
+  success: { title: 'Password updated', action: 'Back to sign in' },
+} as const;
+
+// Split at delimiters so a long, invalid domain cannot trigger regex backtracking.
+function isRecoveryEmailValid(email: string): boolean {
+  if (email.length > 254 || /\s/.test(email)) return false;
+  const at = email.indexOf('@');
+  if (at <= 0 || at !== email.lastIndexOf('@')) return false;
+  const dot = email.indexOf('.', at + 2);
+  return dot !== -1 && dot < email.length - 1;
+}
+
+function utf8CodePointBytes(point: number): number {
+  if (point <= 0x7f) return 1;
+  if (point <= 0x7ff) return 2;
+  if (point <= 0xffff) return 3;
+  return 4;
+}
+
+function validateReset(resetCode: string, password: string, confirmation: string): string | null {
+  if (!/^\d{8}$/.test(resetCode)) return 'Enter the 8-digit code from your email.';
+  let bytes = 0;
+  for (const char of password) {
+    bytes += utf8CodePointBytes(char.codePointAt(0) ?? 0);
+  }
+  if (password.length < 8 || bytes > 72) return 'Use at least 8 characters and no more than 72 UTF-8 bytes.';
+  if (password !== confirmation) return 'Passwords do not match.';
+  return null;
+}
 
 export function PasswordRecoveryScreen({ initialEmail, onClose }: Props): React.JSX.Element {
   const { colors } = useAppTheme();
@@ -45,7 +78,7 @@ export function PasswordRecoveryScreen({ initialEmail, onClose }: Props): React.
   const send = (): void => {
     if (busy || (step === 'code' && Date.now() < retryAt)) return;
     clearError();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.trim().length > 254) {
+    if (!isRecoveryEmailValid(email.trim())) {
       setValidationError('Enter a valid email address.'); return;
     }
     void dispatch(requestPasswordReset({ email: email.trim() })).then((action) => {
@@ -58,14 +91,8 @@ export function PasswordRecoveryScreen({ initialEmail, onClose }: Props): React.
   const confirm = (): void => {
     if (busy) return;
     clearError();
-    if (!/^\d{8}$/.test(resetCode)) { setValidationError('Enter the 8-digit code from your email.'); return; }
-    let bytes = 0;
-    for (const char of newPassword) {
-      const point = char.codePointAt(0) ?? 0;
-      bytes += point <= 0x7f ? 1 : point <= 0x7ff ? 2 : point <= 0xffff ? 3 : 4;
-    }
-    if (newPassword.length < 8 || bytes > 72) { setValidationError('Use at least 8 characters and no more than 72 UTF-8 bytes.'); return; }
-    if (newPassword !== confirmation) { setValidationError('Passwords do not match.'); return; }
+    const issue = validateReset(resetCode, newPassword, confirmation);
+    if (issue) { setValidationError(issue); return; }
     void dispatch(resetPassword({ email: email.trim(), resetCode, newPassword })).then((action) => {
       if (resetPassword.fulfilled.match(action)) {
         setResetCode(''); setNewPassword(''); setConfirmation(''); setVisible(false);
@@ -73,13 +100,18 @@ export function PasswordRecoveryScreen({ initialEmail, onClose }: Props): React.
     });
   };
 
+  const primaryAction = { email: send, code: confirm, success: close }[step];
+  const labels = STEP_LABELS[step];
+  const visibilityLabel = visible ? 'Hide passwords' : 'Show passwords';
+  const displayedError = validationError ?? error;
+
   return (
     <KeyboardAvoidingView style={[styles.root, { backgroundColor: colors.canvas }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top, 24), paddingBottom: Math.max(insets.bottom, 24) }]}>
         <View style={styles.content}>
           <View style={styles.brand}><NexaWordmark /></View>
           <Text accessibilityRole="header" style={[styles.title, { color: colors.textPrimary }]}>
-            {step === 'email' ? 'Forgot password?' : step === 'code' ? 'Reset password' : 'Password updated'}
+            {labels.title}
           </Text>
           <Text accessibilityLiveRegion="polite" style={[styles.description, { color: colors.textSecondary }]}>
             {step === 'email'
@@ -104,17 +136,17 @@ export function PasswordRecoveryScreen({ initialEmail, onClose }: Props): React.
               <FormField accessibilityLabel="Confirm password" placeholder="Confirm password" value={confirmation} editable={!busy}
                 secureTextEntry={!visible} autoCapitalize="none" autoCorrect={false} autoComplete="new-password"
                 onChangeText={(value) => { setConfirmation(value); clearError(); }} returnKeyType="done" onSubmitEditing={confirm} />
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel={visible ? 'Hide passwords' : 'Show passwords'}
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={visibilityLabel}
                 onPress={() => setVisible((value) => !value)} style={styles.textButton}>
-                <Text style={{ color: colors.actionPrimary }}>{visible ? 'Hide passwords' : 'Show passwords'}</Text>
+                <Text style={{ color: colors.actionPrimary }}>{visibilityLabel}</Text>
               </TouchableOpacity>
             </>
           ) : null}
-          {validationError || error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: colors.danger }}>{validationError ?? error}</Text> : null}
+          {displayedError ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: colors.danger }}>{displayedError}</Text> : null}
           <TouchableOpacity accessibilityRole="button" disabled={busy} accessibilityState={{ disabled: busy, busy }}
             style={[styles.primary, { backgroundColor: colors.actionPrimary }, busy && styles.disabled]}
-            onPress={step === 'email' ? send : step === 'code' ? confirm : close}>
-            {busy ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={[styles.buttonText, { color: colors.onPrimary }]}>{step === 'email' ? 'Send reset code' : step === 'code' ? 'Update password' : 'Back to sign in'}</Text>}
+            onPress={primaryAction}>
+            {busy ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={[styles.buttonText, { color: colors.onPrimary }]}>{labels.action}</Text>}
           </TouchableOpacity>
           {step === 'code' ? (
             <>

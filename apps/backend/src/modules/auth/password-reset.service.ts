@@ -1,4 +1,4 @@
-import { randomInt, randomUUID, timingSafeEqual } from 'crypto';
+import { randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Inject, Injectable, Logger, BadRequestException, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';

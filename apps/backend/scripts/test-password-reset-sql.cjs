@@ -4,10 +4,10 @@
  * to its absolute node_modules/@electric-sql/pglite path. No app dependency.
  * Exercises real migration, service SQL, bcrypt and session-version boundary.
  */
-const fs = require('fs');
-const assert = require('assert/strict');
-const { createRequire } = require('module');
-const repo = require('path').resolve(__dirname, '../../..');
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const { createRequire } = require('node:module');
+const repo = require('node:path').resolve(__dirname, '../../..');
 const backendRequire = createRequire(`${repo}/apps/backend/package.json`);
 const ts = backendRequire('typescript');
 backendRequire('reflect-metadata');
