@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   RefreshControl,
@@ -45,7 +45,7 @@ import { withNexaMutationFeedback } from '@/haptics/nexaInteractionFeedback';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { focusUserOnMap } from '@/navigation/focusUserOnMap';
-import { useSocket } from '@/realtime/useSocket';
+import { onSocketConnected, useSocket } from '@/realtime/useSocket';
 import { appAlert } from '@/ui/appAlert';
 import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
@@ -287,10 +287,24 @@ export function InteractionsScreen(): React.JSX.Element {
   const [busyIds, setBusyIds] = useState<string[]>([]);
   const [tab, setTab] = useState<NexaConnectionsView>('activity');
   const [chatError, setChatError] = useState(false);
+  const loadChatsInFlightRef = useRef<Promise<void> | null>(null);
 
-  const loadChats = useCallback(async (): Promise<void> => {
-    const result = await dispatch(fetchConversations());
-    setChatError(fetchConversations.rejected.match(result));
+  const loadChats = useCallback((): Promise<void> => {
+    const existing = loadChatsInFlightRef.current;
+    if (existing) return existing;
+
+    const task = (async (): Promise<void> => {
+      const result = await dispatch(fetchConversations());
+      setChatError(fetchConversations.rejected.match(result));
+    })();
+
+    loadChatsInFlightRef.current = task;
+    void task.finally(() => {
+      if (loadChatsInFlightRef.current === task) {
+        loadChatsInFlightRef.current = null;
+      }
+    });
+    return task;
   }, [dispatch]);
 
   useFocusEffect(
@@ -301,7 +315,8 @@ export function InteractionsScreen(): React.JSX.Element {
 
   useEffect(() => {
     const unsubs = [
-      on('chat:message', () => { void loadChats(); }),
+      onSocketConnected(() => { void loadChats(); }),
+      on('conversation:opened', () => { void loadChats(); }),
       on('friend:accepted', () => { void loadChats(); }),
     ];
     return () => {

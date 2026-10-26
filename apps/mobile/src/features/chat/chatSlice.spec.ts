@@ -1,22 +1,44 @@
 import reducer, {
+  fetchConversations,
   messageSentOptimistic,
   messageReceived,
   messageConfirmed,
 } from './chatSlice';
 
-import type { ChatMessage } from '@g88/shared';
+import type { ChatMessage, ConversationSummary } from '@g88/shared';
 
 const convoId = 'c1';
 const me = 'me';
+const peer = 'peer';
 
-function msg(id: string, body = 'hi'): ChatMessage {
+function msg(
+  id: string,
+  body = 'hi',
+  createdAt = '2026-06-14T00:00:00Z',
+  senderId = me,
+): ChatMessage {
   return {
     id,
     conversationId: convoId,
-    senderId: me,
+    senderId,
     body,
     type: 'text',
-    createdAt: '2026-06-14T00:00:00Z',
+    createdAt,
+  };
+}
+
+function conversation(): ConversationSummary {
+  return {
+    id: convoId,
+    participantIds: [me, peer],
+    participants: [],
+    unreadCount: 0,
+    lastMessage: { senderId: peer, body: 'latest' },
+    lastMessageAt: '2026-06-14T00:00:10Z',
+    status: 'accepted',
+    initiatedBy: peer,
+    peerOnline: false,
+    isFriend: false,
   };
 }
 
@@ -31,16 +53,37 @@ describe('chatSlice.messageConfirmed', () => {
   });
 
   it('does NOT duplicate when the broadcast beats the ack (race)', () => {
-    // 1. Optimistic insert.
     let state = reducer(undefined, messageSentOptimistic(msg('opt-1')));
-    // 2. Server fans chat:message back to the sender BEFORE the ack resolves.
     state = reducer(state, messageReceived(msg('srv-1')));
-    // 3. Late ack confirms the same server id.
     state = reducer(state, messageConfirmed({ optimisticId: 'opt-1', confirmed: msg('srv-1') }));
 
     const list = state.messages[convoId] ?? [];
     const ids = list.map((m) => m.id);
-    expect(ids).toEqual(['srv-1']); // optimistic dropped, no duplicate key
+    expect(ids).toEqual(['srv-1']);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe('chatSlice.messageReceived realtime ordering', () => {
+  function seededState() {
+    return reducer(undefined, fetchConversations.fulfilled([conversation()], 'seed', undefined));
+  }
+
+  it('is idempotent for duplicate socket delivery and does not double unread', () => {
+    const incoming = { ...msg('srv-peer', 'new', '2026-06-14T00:00:20Z', peer), viewerId: me };
+    let state = reducer(seededState(), messageReceived(incoming));
+    state = reducer(state, messageReceived(incoming));
+
+    expect(state.messages[convoId]).toHaveLength(1);
+    expect(state.conversations[0]?.unreadCount).toBe(1);
+  });
+
+  it('does not let an older out-of-order event regress the conversation preview', () => {
+    const older = { ...msg('srv-old', 'older', '2026-06-14T00:00:05Z', peer), viewerId: me };
+    const state = reducer(seededState(), messageReceived(older));
+
+    expect(state.conversations[0]?.lastMessage).toEqual({ senderId: peer, body: 'latest' });
+    expect(state.conversations[0]?.lastMessageAt).toBe('2026-06-14T00:00:10Z');
+    expect(state.conversations[0]?.unreadCount).toBe(1);
   });
 });
