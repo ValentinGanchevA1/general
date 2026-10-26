@@ -3,6 +3,7 @@ import { RealtimeGateway } from './realtime.gateway';
 import { WsJwtGuard } from './ws-jwt.guard';
 import { LocationShareSweepService } from './location-share.sweep';
 import { DiscoveryRealtimePublisher } from './discovery-realtime.publisher';
+import { DiscoveryPresencePublisher } from './discovery-presence.publisher';
 import { DiscoverySubscriptionStore } from './discovery-subscription.store';
 import { DiscoverySubscriptionGateway } from './discovery-subscription.gateway';
 import { PresenceModule } from '../modules/presence/presence.module';
@@ -30,8 +31,14 @@ import { DiscoveryModule } from '../modules/discovery/discovery.module';
     WsJwtGuard,
     LocationShareSweepService,
     DiscoveryRealtimePublisher,
+    DiscoveryPresencePublisher,
     DiscoverySubscriptionStore,
   ],
-  exports: [RealtimeGateway, DiscoveryRealtimePublisher, DiscoverySubscriptionStore],
+  exports: [
+    RealtimeGateway,
+    DiscoveryRealtimePublisher,
+    DiscoveryPresencePublisher,
+    DiscoverySubscriptionStore,
+  ],
 })
 export class RealtimeModule {}
