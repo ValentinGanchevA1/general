@@ -68,6 +68,20 @@ export function NexaLaunchComposition({
     opacity: containerOpacity.value,
   }));
 
+  const ambientAuraStyle = useAnimatedStyle(() => {
+    const reveal = interpolate(
+      progress.value,
+      [launchTime(T.pupilIgnition), launchTime(T.orbitComplete)],
+      [0, 1],
+      Extrapolation.CLAMP,
+    );
+
+    return {
+      opacity: 0.04 + reveal * 0.12,
+      transform: [{ scale: 0.86 + reveal * 0.14 }],
+    };
+  });
+
   const convergenceAuraStyle = useAnimatedStyle(() => {
     const pulse = interpolate(
       progress.value,
@@ -81,8 +95,8 @@ export function NexaLaunchComposition({
     );
 
     return {
-      opacity: 0.08 + pulse * 0.38,
-      transform: [{ scale: 1 + pulse * 0.11 }],
+      opacity: 0.1 + pulse * 0.42,
+      transform: [{ scale: 1 + pulse * 0.12 }],
     };
   });
 
@@ -119,12 +133,19 @@ export function NexaLaunchComposition({
 
     return {
       opacity: reveal,
-      transform: [{ translateY: 4 * (1 - reveal) }],
+      transform: [
+        { translateY: 7 * (1 - reveal) },
+        { scale: 0.985 + reveal * 0.015 },
+      ],
     };
   });
 
   return (
     <Animated.View style={[styles.stage, containerStyle]}>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.ambientAura, ambientAuraStyle]}
+      />
       <Animated.View
         pointerEvents="none"
         style={[styles.convergenceAura, convergenceAuraStyle]}
@@ -146,9 +167,16 @@ export function NexaLaunchComposition({
       </View>
 
       <Animated.View style={[styles.wordmarkWrap, wordmarkStyle]}>
+        <Text
+          style={[styles.wordmark, styles.wordmarkBloom]}
+          accessibilityElementsHidden
+        >
+          NEXA
+        </Text>
         <Text style={styles.wordmark} accessibilityElementsHidden>
           NEXA
         </Text>
+        <View style={styles.wordmarkFlare} />
       </Animated.View>
     </Animated.View>
   );
@@ -156,20 +184,30 @@ export function NexaLaunchComposition({
 
 const styles = StyleSheet.create({
   stage: {
-    width: 340,
-    height: 318,
+    width: 360,
+    height: 338,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  ambientAura: {
+    position: 'absolute',
+    top: 20,
+    width: 286,
+    height: 286,
+    borderRadius: 143,
+    backgroundColor: 'rgba(57,46,145,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(98,230,255,0.08)',
   },
   convergenceAura: {
     position: 'absolute',
     top: 48,
-    width: 205,
-    height: 205,
-    borderRadius: 102.5,
-    backgroundColor: 'rgba(124,92,252,0.08)',
+    width: 224,
+    height: 224,
+    borderRadius: 112,
+    backgroundColor: 'rgba(124,92,252,0.11)',
     borderWidth: 1,
-    borderColor: 'rgba(200,190,255,0.24)',
+    borderColor: 'rgba(214,205,255,0.32)',
   },
   orbitLayer: {
     position: 'absolute',
@@ -181,7 +219,7 @@ const styles = StyleSheet.create({
   },
   symbolStage: {
     position: 'absolute',
-    top: 54,
+    top: 47,
     width: NEXA_LAUNCH_VISUAL.symbolSize,
     height: NEXA_LAUNCH_VISUAL.symbolSize,
     alignItems: 'center',
@@ -189,18 +227,38 @@ const styles = StyleSheet.create({
   },
   wordmarkWrap: {
     position: 'absolute',
-    top: 246,
+    top: 258,
+    minWidth: 230,
     alignItems: 'center',
   },
   wordmark: {
-    color: nexaDark.textPrimary,
+    color: '#F7F4FF',
     fontSize: NEXA_LAUNCH_VISUAL.wordmarkSize,
     fontWeight: '400',
-    lineHeight: 37,
+    lineHeight: 39,
     letterSpacing: NEXA_LAUNCH_VISUAL.wordmarkTracking,
     textAlign: 'center',
-    textShadowColor: 'rgba(146,120,255,0.26)',
+    textShadowColor: 'rgba(174,151,255,0.7)',
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 7,
+    textShadowRadius: 10,
+  },
+  wordmarkBloom: {
+    position: 'absolute',
+    color: nexaDark.textPrimary,
+    opacity: 0.3,
+    textShadowColor: 'rgba(124,92,252,0.95)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 18,
+  },
+  wordmarkFlare: {
+    marginTop: 8,
+    width: 62,
+    height: 1,
+    backgroundColor: 'rgba(146,120,255,0.36)',
+    shadowColor: '#9278FF',
+    shadowOpacity: 0.8,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 2,
   },
 });
