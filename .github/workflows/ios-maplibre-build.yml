@@ -85,6 +85,58 @@ jobs:
           -configuration Release
           -sdk iphonesimulator
           -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath ios/build/DerivedData
           CODE_SIGNING_ALLOWED=NO
           CODE_SIGNING_REQUIRED=NO
           build
+
+      - name: Launch Release app in iOS Simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_PATH="ios/build/DerivedData/Build/Products/Release-iphonesimulator/G88.app"
+          BUNDLE_ID="com.g88"
+
+          test -d "$APP_PATH"
+
+          SIM_UDID="$(
+            xcrun simctl list devices available --json | python3 -c '
+          import json
+          import sys
+
+          devices = json.load(sys.stdin)["devices"]
+          for runtime_devices in devices.values():
+              for device in runtime_devices:
+                  if device.get("isAvailable") and device.get("name", "").startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit(0)
+          raise SystemExit("No available iPhone simulator found")
+          '
+          )"
+
+          xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
+          xcrun simctl bootstatus "$SIM_UDID" -b
+          trap 'xcrun simctl shutdown "$SIM_UDID" >/dev/null 2>&1 || true' EXIT
+
+          xcrun simctl install "$SIM_UDID" "$APP_PATH"
+          LAUNCH_OUTPUT="$(xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID")"
+          echo "$LAUNCH_OUTPUT"
+
+          PID="${LAUNCH_OUTPUT##*: }"
+          if [[ ! "$PID" =~ ^[0-9]+$ ]]; then
+            echo "Unable to parse simulator process id from launch output." >&2
+            exit 1
+          fi
+
+          sleep 5
+          if ! xcrun simctl spawn "$SIM_UDID" ps -p "$PID" -o pid= >/dev/null 2>&1; then
+            echo "NEXA exited during the launch smoke window." >&2
+            xcrun simctl spawn "$SIM_UDID" log show \
+              --last 2m \
+              --style compact \
+              --predicate 'process == "G88"' || true
+            exit 1
+          fi
+
+          echo "NEXA launch smoke passed with pid=$PID."
