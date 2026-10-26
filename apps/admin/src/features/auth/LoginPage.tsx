@@ -26,7 +26,7 @@ export function LoginPage() {
           <div className="inline-flex items-center justify-center size-12 rounded-xl bg-muted border">
             <Shield className="w-6 h-6" />
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">G88 Admin</h1>
+          <h1 className="text-xl font-semibold tracking-tight">NEXA Admin</h1>
           <p className="text-sm text-muted-foreground">
             Sign in with an account listed in backend{' '}
             <code className="text-xs">ADMIN_USER_IDS</code>
