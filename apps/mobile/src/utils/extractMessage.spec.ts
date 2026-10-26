@@ -26,6 +26,19 @@ describe('extractMessage', () => {
     );
   });
 
+  it('does not expose Nest missing-route API paths', () => {
+    expect(
+      extractMessage(
+        {
+          statusCode: 404,
+          code: 'unknown',
+          message: 'Cannot GET /api/v1/events/9812eebf-57e5-4a79-ba23-52bd014a44d9/reviews',
+        },
+        'Could not load event reviews. Try again.',
+      ),
+    ).toBe('Could not load event reviews. Try again.');
+  });
+
   it('does not expose generic axios 5xx transport text', () => {
     expect(extractMessage(new Error('Request failed with status code 500'), 'Failed to load')).toBe(
       'Something went wrong — try again in a moment',
