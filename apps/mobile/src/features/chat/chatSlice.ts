@@ -53,6 +53,15 @@ const initialState: ChatState = {
   outboxHydrated: false,
 };
 
+function newestFirst(messages: ChatMessage[]): ChatMessage[] {
+  return messages.sort((left, right) => {
+    const leftAt = Date.parse(left.createdAt);
+    const rightAt = Date.parse(right.createdAt);
+    if (Number.isNaN(leftAt) || Number.isNaN(rightAt)) return 0;
+    return rightAt - leftAt;
+  });
+}
+
 export const fetchConversations = createAsyncThunk<
   ConversationSummary[],
   void,
@@ -125,7 +134,7 @@ const chatSlice = createSlice({
       const alreadySeen = existing.some((m) => m.id === action.payload.id);
       if (alreadySeen) return;
 
-      state.messages[conversationId] = [action.payload, ...existing];
+      state.messages[conversationId] = newestFirst([...existing, action.payload]);
 
       const convo = state.conversations.find((c) => c.id === conversationId);
       if (convo) {
