@@ -1,6 +1,9 @@
 import type { DiscoveryPoint } from '@g88/shared';
 
-import { buildDiscoveryDiff } from './discoveryDiff';
+import {
+  buildDiscoveryDiff,
+  buildDiscoveryDiffFromSnapshot,
+} from './discoveryDiff';
 
 function user(id: string, lat = 42.7): DiscoveryPoint {
   return {
@@ -70,5 +73,32 @@ describe('buildDiscoveryDiff', () => {
     const current = [user('u1')];
 
     expect(buildDiscoveryDiff(previous, current)).toBeNull();
+  });
+});
+
+describe('buildDiscoveryDiffFromSnapshot', () => {
+  it('preserves canonical cross-domain identity from a cached snapshot', () => {
+    const previous = [user('shared'), event('shared')];
+
+    expect(
+      buildDiscoveryDiffFromSnapshot(
+        JSON.stringify(previous),
+        [event('shared')],
+        1,
+      ),
+    ).toEqual({
+      added: [],
+      removed: ['user:shared'],
+    });
+  });
+
+  it('falls back when the cached snapshot is malformed JSON', () => {
+    expect(buildDiscoveryDiffFromSnapshot('{broken', [user('u1')])).toBeNull();
+  });
+
+  it('falls back when the cached snapshot is not an array', () => {
+    expect(
+      buildDiscoveryDiffFromSnapshot(JSON.stringify({ points: [user('u1')] }), [user('u1')]),
+    ).toBeNull();
   });
 });
