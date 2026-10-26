@@ -3,6 +3,7 @@ import reducer, {
   messageSentOptimistic,
   messageReceived,
   messageConfirmed,
+  setActiveConversation,
 } from './chatSlice';
 
 import type { ChatMessage, ConversationSummary } from '@g88/shared';
@@ -85,5 +86,20 @@ describe('chatSlice.messageReceived realtime ordering', () => {
     expect(state.conversations[0]?.lastMessage).toEqual({ senderId: peer, body: 'latest' });
     expect(state.conversations[0]?.lastMessageAt).toBe('2026-06-14T00:00:10Z');
     expect(state.conversations[0]?.unreadCount).toBe(1);
+  });
+
+  it('does not increment unread while the conversation is focused', () => {
+    let state = seededState();
+    state = reducer(state, setActiveConversation(convoId));
+    state = reducer(
+      state,
+      messageReceived({
+        ...msg('srv-active', 'visible now', '2026-06-14T00:00:20Z', peer),
+        viewerId: me,
+      }),
+    );
+
+    expect(state.conversations[0]?.unreadCount).toBe(0);
+    expect(state.messages[convoId]?.[0]?.id).toBe('srv-active');
   });
 });
