@@ -48,8 +48,6 @@ export interface PinContext {
   /** Dating match thread (from like response or MATCH_CREATED). */
   datingConversationId?: string | null;
 
-  /** When true, a pin tap skips PreviewCallout after loading and opens detail. */
-  openDetailOnLoad: boolean;
   stage: Stage;
   error?: string | undefined;
   lastResult?:
@@ -70,8 +68,6 @@ export type PinEvent =
       lat: number;
       lng: number;
       viewerMode: ViewerMode;
-      /** Direct map-pin selection should open EntityBottomSheet after load. */
-      openDetail?: boolean;
     }
   | {type: 'LAYER_CHANGED'; viewerMode: ViewerMode}
   | {type: 'DISMISS'}
