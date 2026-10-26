@@ -50,6 +50,46 @@ describe('DiscoverySubscriptionStore', () => {
     ]);
   });
 
+  it('removes stale spatial buckets when a socket replaces its viewport', () => {
+    const store = new DiscoverySubscriptionStore();
+    store.set('moving-socket', 'viewer-1', query);
+    store.set('moving-socket', 'viewer-1', {
+      ...query,
+      viewport: {
+        ne: { lat: 44.3, lng: 29.1 },
+        sw: { lat: 44.1, lng: 28.8 },
+      },
+    });
+
+    expect(store.candidatesForEntity('user', { lat: 43.2, lng: 27.9 })).toEqual([]);
+    expect(store.candidatesForEntity('user', { lat: 44.2, lng: 28.9 })).toEqual([
+      expect.objectContaining({ socketId: 'moving-socket' }),
+    ]);
+  });
+
+  it('removes spatial buckets when a subscription is deleted', () => {
+    const store = new DiscoverySubscriptionStore();
+    store.set('socket-a', 'viewer-1', query);
+
+    store.delete('socket-a');
+
+    expect(store.candidatesForEntity('user', { lat: 43.2, lng: 27.9 })).toEqual([]);
+  });
+
+  it('keeps exact viewport filtering inside a shared coarse bucket', () => {
+    const store = new DiscoverySubscriptionStore();
+    store.set('socket-a', 'viewer-1', {
+      ...query,
+      viewport: {
+        ne: { lat: 43.25, lng: 27.95 },
+        sw: { lat: 43.15, lng: 27.85 },
+      },
+    });
+
+    expect(store.candidatesForEntity('user', { lat: 43.2, lng: 27.9 })).toHaveLength(1);
+    expect(store.candidatesForEntity('user', { lat: 43.5, lng: 27.9 })).toEqual([]);
+  });
+
   it('handles antimeridian viewports', () => {
     const store = new DiscoverySubscriptionStore();
     const antimeridianQuery: DiscoverySubscriptionPayload = {
@@ -64,6 +104,10 @@ describe('DiscoverySubscriptionStore', () => {
     store.set('socket-b', 'viewer-2', antimeridianQuery);
 
     expect(store.candidatesForEntity('listing', { lat: 0, lng: 179 })).toEqual([
+      expect.objectContaining({ socketId: 'socket-a' }),
+      expect.objectContaining({ socketId: 'socket-b' }),
+    ]);
+    expect(store.candidatesForEntity('listing', { lat: 0, lng: -179 })).toEqual([
       expect.objectContaining({ socketId: 'socket-a' }),
       expect.objectContaining({ socketId: 'socket-b' }),
     ]);
