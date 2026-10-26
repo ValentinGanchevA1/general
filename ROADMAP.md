@@ -15,7 +15,7 @@
 | P2 — pre-launch hardening | ✅ engineering shipped | Production sign-off still depends on legal + physical-device + store gates |
 | P3 — habit-forming features | ✅ shipped | Events · trading · friends · verification · gifts/gamification · interactions |
 | P4+ product expansion | 🟡 partial | Stories shipped; web foundation merged; monetization/group chat/live streaming remain gated |
-| Mobile renderer migration | 🟡 controlled rollout | MapLibre capability/config gates merged; legacy renderer remains default; iOS compile probe is present but native CocoaPods parity is still red pending follow-up |
+| Mobile renderer migration | 🟡 controlled rollout | MapLibre capability/config gates merged; legacy renderer remains default; iOS probe is blocked during CocoaPods Pods-project generation on the pnpm pathname issue |
 | Browser public release | 🟡 foundation merged | Hosting/browser matrix/map provider/deployed HTTPS validation remain |
 
 **Live migration baseline:** `0001–0050`; next free `0051` (CI prefix guard).  
@@ -102,8 +102,10 @@ This is a controlled renderer migration, not a product-phase rewrite.
 | B2.3 Android release config injection/validation | ✅ code | release workflows require/validate MapTiler config (#780) |
 | B2.4 Configured Android release/device smoke | ⏳ | prove packaged key/style path on release artifact/device |
 | B2.5a iOS native compile probe infrastructure | ✅ code | ephemeral RN 0.83 native shell + unsigned Release simulator workflow merged (#786) |
-| B2.5b iOS CocoaPods integration | 🔴 blocker | probe currently fails at static Swift/Firebase module-map integration; fix and require green pod install + compile before parity claims |
-| B2.5c iOS runtime/device parity | ⏳ | after compile gate is green, validate actual runtime/device behavior before cross-platform default activation |
+| B2.5b Firebase Swift module maps | ✅ code | targeted `GoogleUtilities` + `RecaptchaInterop` modular headers merged in #788; global modular headers deliberately avoided |
+| B2.5c CocoaPods project generation | 🔴 blocker | CocoaPods 1.17.0 now reaches `Generating Pods project` but fails with `ArgumentError: pathname contains null byte` on the pnpm symlink graph; resolve deterministically before simulator compile can run |
+| B2.5d iOS unsigned simulator compile | ⏳ | cannot run until B2.5c is green |
+| B2.5e iOS runtime/device parity | ⏳ | after compile is green, validate actual runtime/device behavior before cross-platform default activation |
 | B2.6 Controlled activation PR | ⏳ | switch `requestedRenderer` from `legacy` to `maplibre` only after prior gates; retain fail-closed fallback |
 
 **Current production behavior:** `requestedRenderer = legacy`. Native availability, a configured provider, or a compile-probe workflow is not activation.
@@ -122,7 +124,7 @@ Do not introduce these because they are fashionable; require a measured product/
 |---|---|---|
 | R-Legal | Terms label does not yet have final reviewed dedicated Terms document | #592 blocks production sign-off; do not invent legal language |
 | R-Device | Static CI cannot prove launch/map/accessibility/device ergonomics | #580 + #669 physical-device evidence |
-| R-MapRollout | Bundled MapLibre/provider config could be mistaken for production activation | keep `legacy` default; clear the red iOS compile gate, then configured release/device smoke + narrow activation PR |
+| R-MapRollout | Bundled MapLibre/provider config could be mistaken for production activation | keep `legacy` default; clear CocoaPods project generation, simulator compile and device/runtime gates before a narrow activation PR |
 | R-WebRelease | Browser foundation mistaken for production-ready web product | final hosting/browser/provider/deployed-E2E gates remain explicit |
 | R-Play | Store-owner/review delay | sideload/release artifact path remains available; #616 sequences final visuals after device sign-off |
 | R-Rekognition | Assist integration unavailable/misconfigured | human verification decision remains authoritative; assist-only semantics |
@@ -130,7 +132,7 @@ Do not introduce these because they are fashionable; require a measured product/
 
 ## Changelog
 
-- **2026-10-26** — Reconciled roadmap to NEXA live status: migrations `0001–0050` / next `0051`; web foundation moved from horizon to gated release track; MapLibre/MapTiler rollout gates recorded; #786 added the iOS compile probe and exposed the current CocoaPods module-map blocker; legal + physical-device production gates remain explicit.
+- **2026-10-26** — Reconciled roadmap to NEXA live status: migrations `0001–0050` / next `0051`; web foundation moved from horizon to gated release track; MapLibre/MapTiler rollout gates recorded; #786 added the iOS compile probe, #788 cleared the Firebase module-map blocker, and the current iOS gate is CocoaPods 1.17.0 Pods-project generation failing on the pnpm `pathname contains null byte` issue; legal + physical-device production gates remain explicit.
 - **2026-09-14** — P2/P3 engineering marked closed; Stories shipped; post-P3 friends/map/sheet/offers work documented.
 - **2026-09-12** — P2 block/wave hardening verified.
 - **2026-08–09** — Friends, Stories, profile origin, ID admin and offers moved ahead of their original placement.
