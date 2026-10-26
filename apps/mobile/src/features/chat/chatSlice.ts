@@ -173,22 +173,44 @@ const chatSlice = createSlice({
       state,
       action: PayloadAction<{ optimisticId: string; confirmed: ChatMessage }>,
     ) {
-      const { conversationId } = action.payload.confirmed;
+      const { optimisticId, confirmed } = action.payload;
+      const { conversationId, senderId, body, createdAt } = confirmed;
       const list = state.messages[conversationId];
-      if (!list) return;
-      const idx = list.findIndex((m) => m.id === action.payload.optimisticId);
-      if (idx !== -1) {
-        const alreadyPresent = list.some(
-          (m, i) => i !== idx && m.id === action.payload.confirmed.id,
-        );
-        if (alreadyPresent) {
-          list.splice(idx, 1);
-        } else {
-          list[idx] = action.payload.confirmed;
+      if (list) {
+        const idx = list.findIndex((m) => m.id === optimisticId);
+        if (idx !== -1) {
+          const alreadyPresent = list.some(
+            (m, i) => i !== idx && m.id === confirmed.id,
+          );
+          if (alreadyPresent) {
+            list.splice(idx, 1);
+          } else {
+            list[idx] = confirmed;
+          }
         }
       }
-      state.outbox = state.outbox.filter((e) => e.optimisticId !== action.payload.optimisticId);
-      state.failedIds = state.failedIds.filter((id) => id !== action.payload.optimisticId);
+
+      const convo = state.conversations.find((c) => c.id === conversationId);
+      if (convo) {
+        const currentLastAt = convo.lastMessageAt
+          ? Date.parse(convo.lastMessageAt)
+          : Number.NEGATIVE_INFINITY;
+        const confirmedAt = Date.parse(createdAt);
+        const canAdvancePreview =
+          convo.lastMessageAt === null ||
+          Number.isNaN(currentLastAt) ||
+          Number.isNaN(confirmedAt) ||
+          confirmedAt >= currentLastAt;
+
+        if (canAdvancePreview) {
+          convo.lastMessage = { senderId, body };
+          convo.lastMessageAt = createdAt;
+          state.conversations.sort(compareConversationSummaries);
+        }
+      }
+
+      state.outbox = state.outbox.filter((e) => e.optimisticId !== optimisticId);
+      state.failedIds = state.failedIds.filter((id) => id !== optimisticId);
     },
 
     messageQueued(state, action: PayloadAction<OutboxEntry>) {
