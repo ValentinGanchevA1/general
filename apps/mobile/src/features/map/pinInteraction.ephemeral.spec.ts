@@ -52,7 +52,10 @@ function machineWithConditionalLoad() {
           relationship: {...emptyRelationship},
         };
       }),
-      sendWave: fromPromise(async () => ({
+      sendWave: fromPromise<
+        {mutual: boolean; conversationId: string | null},
+        {pinId: string}
+      >(async () => ({
         mutual: false,
         conversationId: null,
       })),

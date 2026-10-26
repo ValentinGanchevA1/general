@@ -27,8 +27,8 @@ export interface PinContext {
   viewerMode: ViewerMode;
   peerMode: PeerMode;
 
-  profile?: PublicUserProfile;
-  distanceMeters?: number;
+  profile?: PublicUserProfile | undefined;
+  distanceMeters?: number | undefined;
 
   waveSent: boolean;
   hasMutualWave: boolean;
@@ -49,14 +49,15 @@ export interface PinContext {
   datingConversationId?: string | null;
 
   stage: Stage;
-  error?: string;
+  error?: string | undefined;
   lastResult?:
     | 'wave_sent'
     | 'like_sent'
     | 'matched'
     | 'message_opened'
     | 'blocked'
-    | 'passed';
+    | 'passed'
+    | undefined;
 }
 
 export type PinEvent =
