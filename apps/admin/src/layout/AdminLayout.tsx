@@ -18,7 +18,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       <header className="border-b bg-card/50 backdrop-blur sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-12 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="font-semibold tracking-tight truncate">G88 Admin</span>
+            <span className="font-semibold tracking-tight truncate">NEXA Admin</span>
             <span className="text-xs text-muted-foreground hidden sm:inline">
               ID verification
             </span>
