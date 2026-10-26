@@ -218,7 +218,6 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     backFromFull,
     quickWave,
     quickLike,
-    showPreview: interactionState === 'quick_peek',
     previewProps,
     /** Pin id currently in machine context (for sheet handoff). */
     activePinId: ctx.pinId || null,
