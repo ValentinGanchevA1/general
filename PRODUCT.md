@@ -1,7 +1,8 @@
-# G88 — Product
+# NEXA — Product
 
 > **Authoritative source for what we are building and why.**  
 > Sibling docs: `ARCHITECTURE.md` (how), `ROADMAP.md` (when), `SPECIFICATION.md` (contracts), `STATUS.md` (live progress).  
+> **Compatibility note:** public product identity is **NEXA**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
 > Last revised: **2026-09-14**.
 
 ---
@@ -20,7 +21,7 @@ A map-first social app: see who and what is nearby, then act on it — wave, cha
 | Nextdoor | Neighborhood text wall | Real-time presence, lightweight outreach |
 | Facebook Marketplace | Local listings | Social layer that closes the deal |
 
-**G88 puts verified people and live activity on a shared map and gives low-commitment ways to interact in the physical world.**
+**NEXA puts verified people and live activity on a shared map and gives low-commitment ways to interact in the physical world.**
 
 ## Target users
 

@@ -1,6 +1,7 @@
-# G88 — Specification
+# NEXA — Specification
 
 > Feature contracts. Types of record: `packages/shared`. Live progress: `STATUS.md`.
+> **Compatibility note:** public product identity is **NEXA**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.
 > Last revised: **2026-09-14**.
 
 ---
