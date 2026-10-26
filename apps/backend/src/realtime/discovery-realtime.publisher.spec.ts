@@ -147,6 +147,78 @@ describe('DiscoveryRealtimePublisher', () => {
     expect(published).toBe(0);
   });
 
+  it('routes leave to previous-only viewport subscriptions when an entity moves out', async () => {
+    const point: DiscoveryPoint = {
+      kind: 'user',
+      id: 'nearby-user',
+      lat: 43.4,
+      lng: 28.2,
+      meta: {
+        displayName: 'Nearby user',
+        avatarUrl: null,
+        verification: 'none',
+        online: false,
+        lastSeenAt: null,
+      },
+    };
+    const { publisher, emit, to, resolveForViewer, candidatesForEntity } = createPublisher(point);
+    const previousOnly = { socketId: 'socket-old', viewerId: 'viewer-old', query: context };
+    const current = { socketId: 'socket-new', viewerId: 'viewer-new', query: context };
+    candidatesForEntity
+      .mockReturnValueOnce([previousOnly])
+      .mockReturnValueOnce([current]);
+
+    const published = await publisher.publishEntityMovement({
+      kind: 'user',
+      entityId: 'nearby-user',
+      previousLocation: { lat: 43.2, lng: 27.9 },
+      location: { lat: 43.4, lng: 28.2 },
+    });
+
+    expect(candidatesForEntity).toHaveBeenNthCalledWith(1, 'user', { lat: 43.2, lng: 27.9 });
+    expect(candidatesForEntity).toHaveBeenNthCalledWith(2, 'user', { lat: 43.4, lng: 28.2 });
+    expect(to).toHaveBeenCalledWith('socket-old');
+    expect(emit).toHaveBeenCalledWith('discovery:entity:leave', { key: 'user:nearby-user' });
+    expect(resolveForViewer).not.toHaveBeenCalledWith(
+      expect.objectContaining({ viewerId: 'viewer-old' }),
+    );
+    expect(resolveForViewer).toHaveBeenCalledWith(
+      expect.objectContaining({ viewerId: 'viewer-new', context }),
+    );
+    expect(to).toHaveBeenCalledWith('socket-new');
+    expect(emit).toHaveBeenCalledWith('discovery:entity:update', { point });
+    expect(published).toBe(1);
+  });
+
+  it('does not send leave when the same socket contains both old and new locations', async () => {
+    const point: DiscoveryPoint = {
+      kind: 'user',
+      id: 'nearby-user',
+      lat: 43.21,
+      lng: 27.91,
+      meta: {
+        displayName: 'Nearby user',
+        avatarUrl: null,
+        verification: 'none',
+        online: false,
+        lastSeenAt: null,
+      },
+    };
+    const { publisher, emit, candidatesForEntity } = createPublisher(point);
+    const candidate = { socketId: 'socket-a', viewerId: 'viewer-1', query: context };
+    candidatesForEntity.mockReturnValueOnce([candidate]).mockReturnValueOnce([candidate]);
+
+    await publisher.publishEntityMovement({
+      kind: 'user',
+      entityId: 'nearby-user',
+      previousLocation: { lat: 43.2, lng: 27.9 },
+      location: { lat: 43.21, lng: 27.91 },
+    });
+
+    expect(emit).not.toHaveBeenCalledWith('discovery:entity:leave', expect.anything());
+    expect(emit).toHaveBeenCalledWith('discovery:entity:update', { point });
+  });
+
   it('does not emit when the viewer-safe resolver hides the entity', async () => {
     const { publisher, emit } = createPublisher(null);
 
