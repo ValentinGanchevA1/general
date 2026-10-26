@@ -51,7 +51,7 @@ A map-first social app: see who and what is nearby, then act on it — wave, cha
 | Stories | ✅ Pulse stories (soft gate: email + account age) |
 | Connections | ✅ Activity inbox + conversations/chat |
 | Browser client | 🟡 Foundation merged; public release gated on production hosting, browser matrix, map provider and deployed HTTPS validation |
-| Mobile MapLibre renderer | 🟡 Capability + MapTiler config gates merged; legacy renderer remains active by default pending release/device/iOS parity |
+| Mobile MapLibre renderer | 🟡 Capability + MapTiler config gates merged; iOS unsigned Release simulator compile is green; legacy renderer remains active by default pending configured Android release/device smoke and iOS runtime/device parity |
 | Group chat / live streaming / paid gifts | 📋 Horizon — explicit go-ahead required |
 | Monetization (premium, Connect) | 📋 Horizon — gated on retention |
 
@@ -63,7 +63,7 @@ The canonical primary navigation is **Map / Discover / Pulse / Connections / You
 - Global cold-start feed (map + viewport is the primary surface).
 - Microservices / Kafka / GraphQL before load justifies them.
 - Treating a bundled renderer/provider SDK as production activation without release validation.
-- iOS App Store launch before Android closed testing proves the core loop; iOS build/device parity may still be required for cross-platform technical rollouts such as MapLibre activation.
+- iOS App Store launch before Android closed testing proves the core loop; cross-platform technical rollouts such as MapLibre activation still require iOS runtime/device parity even though the unsigned Release simulator compile is green.
 
 ## Success metrics (α)
 
