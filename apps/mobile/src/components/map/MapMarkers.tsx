@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Image } from 'react-native';
 import { Marker } from 'react-native-maps';
 import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
 
@@ -23,6 +24,7 @@ import {
   resolveNexaMarkerRevealCountForBand,
   shouldResetNexaRevealForReplacement,
 } from './nexaProgressiveReveal';
+import { resolvePersonMarkerAvatarUrl } from './nexaPersonMarkerMedia';
 import { clusterVisualKey, entityVisualKey } from './markerVisualKeys';
 import { useTracksViewChanges } from './useTracksViewChanges';
 
@@ -414,6 +416,33 @@ function EntityMarkerItemImpl({
   themeVisualKey,
   onPress,
 }: EntityItemProps): React.JSX.Element {
+  const candidateAvatarUrl = resolvePersonMarkerAvatarUrl(point, density, selected);
+  const [personAvatarUri, setPersonAvatarUri] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    void Promise.resolve().then(() => {
+      if (active) setPersonAvatarUri(null);
+    });
+
+    if (candidateAvatarUrl == null) {
+      return () => {
+        active = false;
+      };
+    }
+
+    void Image.prefetch(candidateAvatarUrl)
+      .then((loaded) => {
+        if (active && loaded) setPersonAvatarUri(candidateAvatarUrl);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [candidateAvatarUrl]);
+
   const baseVisualKey = entityVisualKey(point);
   const renderKey = [
     baseVisualKey,
@@ -424,6 +453,7 @@ function EntityMarkerItemImpl({
     own ? 'own' : 'other',
     dimmed ? 'dim' : 'normal',
     unavailable ? 'unavailable' : 'available',
+    personAvatarUri ?? 'avatar-fallback',
     themeVisualKey,
   ].join('|');
   const tracksViewChanges = useTracksViewChanges([renderKey], selected);
@@ -437,6 +467,10 @@ function EntityMarkerItemImpl({
   const handlePress = useCallback(() => {
     onPress(point);
   }, [onPress, point]);
+
+  const handlePersonAvatarRenderError = useCallback(() => {
+    setPersonAvatarUri(null);
+  }, []);
 
   return (
     <Marker
@@ -456,6 +490,8 @@ function EntityMarkerItemImpl({
         dimmed={dimmed}
         unavailable={unavailable}
         reduceMotion={reduceMotion}
+        personAvatarUri={personAvatarUri}
+        onPersonAvatarRenderError={handlePersonAvatarRenderError}
       />
     </Marker>
   );
