@@ -7,7 +7,8 @@ Use this file as a quick operational reference for coding agents working on this
 - `ARCHITECTURE.md` — system-level decisions and invariants
 - `ROADMAP.md` — sequence and gating
 - `SPECIFICATION.md` — feature-level contracts
-- `STATUS.md` — current implementation reality
+- `docs/STATUS_CURRENT.md` — current implementation reality and release gates
+- `STATUS.md` — historical progress log; do not use for current priorities or migration numbering
 
 ## Working constraints
 
