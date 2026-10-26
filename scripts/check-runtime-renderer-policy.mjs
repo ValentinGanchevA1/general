@@ -24,7 +24,7 @@ try {
     signal: controller.signal,
   });
 
-  if (!response.ok) {
+  if (response.status !== 200) {
     fail(`expected HTTP 200, received ${response.status}`);
   } else {
     const cacheControl = response.headers.get('cache-control') ?? '';
