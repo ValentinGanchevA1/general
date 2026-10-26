@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { RealtimeGateway } from './realtime.gateway';
+import { RealtimeEmitterService } from './realtime-emitter.service';
 import { WsJwtGuard } from './ws-jwt.guard';
 import { LocationShareSweepService } from './location-share.sweep';
 import { DiscoveryRealtimePublisher } from './discovery-realtime.publisher';
@@ -27,6 +28,7 @@ import { DiscoveryModule } from '../modules/discovery/discovery.module';
   ],
   providers: [
     RealtimeGateway,
+    RealtimeEmitterService,
     DiscoverySubscriptionGateway,
     WsJwtGuard,
     LocationShareSweepService,
@@ -36,6 +38,7 @@ import { DiscoveryModule } from '../modules/discovery/discovery.module';
   ],
   exports: [
     RealtimeGateway,
+    RealtimeEmitterService,
     DiscoveryRealtimePublisher,
     DiscoveryPresencePublisher,
     DiscoverySubscriptionStore,
