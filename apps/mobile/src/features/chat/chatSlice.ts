@@ -4,7 +4,12 @@ import type { ConversationSummary, ChatMessage, MessagePage } from '@g88/shared'
 
 import { getJson, postJson } from '@/api/client';
 import { logout } from '@/features/auth/authSlice';
+import { track } from '@/lib/analytics';
 import { extractMessage } from '@/utils/extractMessage';
+import {
+  classifyConversationRefreshFailure,
+  type ConversationRefreshFailure,
+} from './chatDiagnostics';
 import { clearChatOutbox } from './chatOutboxPersist';
 
 export interface OutboxEntry {
@@ -14,9 +19,15 @@ export interface OutboxEntry {
   retries: number;
 }
 
+interface FetchConversationsRejection {
+  message: string;
+  failure: ConversationRefreshFailure;
+}
+
 interface ChatState {
   conversations: ConversationSummary[];
   conversationsLoading: boolean;
+  conversationsError: ConversationRefreshFailure | null;
   messages: Record<string, ChatMessage[]>;
   messagesLoading: Record<string, boolean>;
   nextCursor: Record<string, string | null>;
@@ -32,6 +43,7 @@ const MAX_RETRIES = 3;
 const initialState: ChatState = {
   conversations: [],
   conversationsLoading: false,
+  conversationsError: null,
   messages: {},
   messagesLoading: {},
   nextCursor: {},
@@ -41,13 +53,25 @@ const initialState: ChatState = {
   outboxHydrated: false,
 };
 
-export const fetchConversations = createAsyncThunk(
+export const fetchConversations = createAsyncThunk<
+  ConversationSummary[],
+  void,
+  { rejectValue: FetchConversationsRejection }
+>(
   'chat/fetchConversations',
   async (_, { rejectWithValue }) => {
     try {
       return await getJson<ConversationSummary[]>('/conversations');
     } catch (e) {
-      return rejectWithValue(extractMessage(e, 'Failed to load conversations'));
+      const failure = classifyConversationRefreshFailure(e);
+      track('chat_conversations_refresh_failed', {
+        failureClass: failure.failureClass,
+        statusCode: failure.statusCode,
+      });
+      return rejectWithValue({
+        message: extractMessage(e, 'Failed to load conversations'),
+        failure,
+      });
     }
   },
 );
@@ -204,13 +228,19 @@ const chatSlice = createSlice({
     builder
       .addCase(fetchConversations.pending, (state) => {
         state.conversationsLoading = true;
+        state.conversationsError = null;
       })
       .addCase(fetchConversations.fulfilled, (state, action) => {
         state.conversationsLoading = false;
+        state.conversationsError = null;
         state.conversations = action.payload;
       })
-      .addCase(fetchConversations.rejected, (state) => {
+      .addCase(fetchConversations.rejected, (state, action) => {
         state.conversationsLoading = false;
+        state.conversationsError = action.payload?.failure ?? {
+          failureClass: 'unknown',
+          statusCode: null,
+        };
       })
       .addCase(fetchMessages.pending, (state, action) => {
         state.messagesLoading[action.meta.arg.conversationId] = true;
