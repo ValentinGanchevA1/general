@@ -73,6 +73,39 @@ describe('PresenceService', () => {
       expect(res.prevCellId).toBe('old-cell');
       expect(pipe.zrem).toHaveBeenCalledWith('presence:cell:old-cell', 'u1');
     });
+
+    it('waits for canonical Postgres location persistence before completing the heartbeat', async () => {
+      let resolvePersistence!: (value: unknown) => void;
+      const persistence = new Promise<unknown>((resolve) => {
+        resolvePersistence = resolve;
+      });
+      query.mockReturnValueOnce(persistence);
+
+      let settled = false;
+      const heartbeat = service.heartbeat('u1', loc).then(() => {
+        settled = true;
+      });
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(query).toHaveBeenCalledTimes(1);
+      expect(pipe.exec).not.toHaveBeenCalled();
+      expect(settled).toBe(false);
+
+      resolvePersistence([]);
+      await heartbeat;
+
+      expect(pipe.exec).toHaveBeenCalledTimes(1);
+      expect(settled).toBe(true);
+    });
+
+    it('rejects when canonical location persistence fails instead of exposing stale coordinates', async () => {
+      query.mockRejectedValueOnce(new Error('database unavailable'));
+
+      await expect(service.heartbeat('u1', loc)).rejects.toThrow('database unavailable');
+      expect(pipe.exec).not.toHaveBeenCalled();
+    });
   });
 
   describe('whichAreOnline', () => {
