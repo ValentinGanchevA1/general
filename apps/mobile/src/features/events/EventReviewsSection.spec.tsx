@@ -29,7 +29,7 @@ function setup(value = context) {
   return { s, ui };
 }
 beforeEach(() => jest.clearAllMocks());
-it('starts without a score, supports optional tags/comment and preserves draft on failure', async () => {
+it('starts without a score and supports optional tags and Unicode comments', () => {
   const { s, ui } = setup();
   expect(ui.getByRole('button', { name: 'Publish review' }).props.accessibilityState.disabled).toBe(true);
   fireEvent.press(ui.getByLabelText('Rate 4 of 5 stars'));
@@ -37,9 +37,14 @@ it('starts without a score, supports optional tags/comment and preserves draft o
   fireEvent.press(ui.getByLabelText('Welcoming'));
   fireEvent.changeText(ui.getByLabelText('Review comment, optional'), '😀'.repeat(501));
   expect(Array.from(s.getState().eventReviews.entries.e!.draft.comment)).toHaveLength(500);
+});
+it('preserves a draft after a failed publish', async () => {
+  const { s, ui } = setup();
+  fireEvent.press(ui.getByLabelText('Rate 4 of 5 stars'));
+  fireEvent.changeText(ui.getByLabelText('Review comment, optional'), 'A helpful detail');
   jest.mocked(postJson).mockRejectedValue({ statusCode: 0, message: 'Network error' });
   await act(async () => { fireEvent.press(ui.getByText('Publish review')); });
-  expect(s.getState().eventReviews.entries.e!.draft.rating).toBe(4);
+  expect(s.getState().eventReviews.entries.e!.draft).toMatchObject({ rating: 4, comment: 'A helpful detail' });
   expect(ui.getByText('Server is waking up — try again in a few seconds')).toBeTruthy();
   expect(ui.getByText('Publish review')).toBeTruthy();
 });
