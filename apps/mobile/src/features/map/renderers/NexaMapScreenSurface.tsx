@@ -11,7 +11,7 @@ import {
 
 export type NexaMapScreenSurfaceProps = Omit<
   NexaMapRuntimeSurfaceProps,
-  'requestedRenderer' | 'mapLibreAvailable' | 'mapLibreStyleUrl'
+  'requestedRenderer' | 'mapLibreAvailable' | 'mapLibreStyle'
 >;
 
 const MAPLIBRE_STYLE_RUNTIME = resolveMapLibreStyleRuntime({
@@ -31,7 +31,7 @@ export const NexaMapScreenSurface = React.forwardRef<
       {...props}
       requestedRenderer={NEXA_MAP_RENDERER_ROLLOUT.requestedRenderer}
       mapLibreAvailable={NEXA_MAP_RENDERER_ROLLOUT.mapLibreAvailable}
-      mapLibreStyleUrl={
+      mapLibreStyle={
         MAPLIBRE_STYLE_RUNTIME.status === 'ready'
           ? MAPLIBRE_STYLE_RUNTIME.styleUrl
           : null

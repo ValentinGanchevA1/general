@@ -5,13 +5,16 @@ import type { NexaMapController } from '../contracts/mapRenderer';
 import type { MapRendererKind } from '../mapRenderer';
 import { resolveAvailableMapRenderer } from '../mapRendererRuntime';
 import { resolveRenderableMapSelection } from '../mapSelectionRuntime';
-import { MapLibreMapSurface } from './mapLibre/MapLibreMapSurface';
+import {
+  MapLibreMapSurface,
+  type MapLibreMapSurfaceProps,
+} from './mapLibre/MapLibreMapSurface';
 import { LegacyMapSurface, type LegacyMapSurfaceProps } from './reactNativeMaps/LegacyMapSurface';
 
 export interface NexaMapRuntimeSurfaceProps extends LegacyMapSurfaceProps {
   requestedRenderer: MapRendererKind;
   mapLibreAvailable: boolean;
-  mapLibreStyleUrl: string | null;
+  mapLibreStyle: MapLibreMapSurfaceProps['mapStyle'] | null;
 }
 
 /** Single runtime entry point for NEXA map rendering. */
@@ -22,7 +25,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
   {
     requestedRenderer,
     mapLibreAvailable,
-    mapLibreStyleUrl,
+    mapLibreStyle,
     points,
     selectedEntityKey,
     dimUnselected,
@@ -38,7 +41,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
   const renderer = resolveAvailableMapRenderer({
     requested: requestedRenderer,
     mapLibreAvailable,
-    mapLibreConfigured: mapLibreStyleUrl !== null,
+    mapLibreConfigured: mapLibreStyle !== null,
   });
   const renderableSelection = resolveRenderableMapSelection(
     points,
@@ -46,7 +49,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
     dimUnselected,
   );
 
-  if (renderer === 'maplibre' && mapLibreStyleUrl !== null) {
+  if (renderer === 'maplibre' && mapLibreStyle !== null) {
     const pointsByKey = new Map<DiscoveryPointKey, (typeof points)[number]>(
       points.map((point) => [getDiscoveryPointKey(point), point]),
     );
@@ -54,7 +57,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
     return (
       <MapLibreMapSurface
         ref={ref}
-        mapStyle={mapLibreStyleUrl}
+        mapStyle={mapLibreStyle}
         points={points}
         selectedKey={renderableSelection.selectedEntityKey as DiscoveryPointKey | null}
         dimUnselected={renderableSelection.interactionFocused}

@@ -4,13 +4,15 @@ import type { DiscoveryPoint } from '@g88/shared';
 import type { StyleSpecification } from '@maplibre/maplibre-react-native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 
+import { Config } from '@/config';
 import { NEXA_MAP_RENDERER_ROLLOUT } from '../../mapRendererRollout';
-import { MapLibreMapSurface } from './MapLibreMapSurface';
+import { resolveMapLibreStyleRuntime } from '../../mapLibreStyleRuntime';
+import { NexaMapRuntimeSurface } from '../NexaMapRuntimeSurface';
 
 const READY_MARKER_FILENAME = 'maplibre-smoke-ready';
 const SMOKE_STYLE: StyleSpecification = {
   version: 8,
-  name: 'NEXA MapLibre renderer smoke',
+  name: 'NEXA MapLibre runtime smoke',
   sources: {},
   layers: [
     {
@@ -74,15 +76,26 @@ const SMOKE_POINTS: readonly DiscoveryPoint[] = [
   },
 ];
 
+const PROVIDER_RUNTIME = resolveMapLibreStyleRuntime({
+  apiKey: Config.MAPTILER_API_KEY,
+  mapId: Config.MAPTILER_MAP_ID,
+  region: Config.MAPTILER_REGION,
+});
+
 /**
- * CI-only NEXA renderer smoke app. It is bundled through a separate ENTRY_FILE
- * and is never reachable from the production App.tsx/navigation path.
+ * CI-only runtime-router smoke app. It validates the production provider config
+ * gate, then renders through NexaMapRuntimeSurface with an offline local style.
+ * The production App.tsx/navigation path is never involved.
  */
 export function MapLibreNativeSmokeApp(): React.JSX.Element {
   const handleReady = React.useCallback((): void => {
     const markerPath = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/${READY_MARKER_FILENAME}`;
     void ReactNativeBlobUtil.fs.writeFile(markerPath, 'ready\n', 'utf8');
   }, []);
+
+  if (PROVIDER_RUNTIME.status !== 'ready') {
+    throw new Error('[maplibre-smoke] provider config gate is not ready');
+  }
 
   if (
     NEXA_MAP_RENDERER_ROLLOUT.requestedRenderer !== 'maplibre' ||
@@ -95,15 +108,20 @@ export function MapLibreNativeSmokeApp(): React.JSX.Element {
 
   return (
     <View style={styles.root}>
-      <MapLibreMapSurface
-        mapStyle={SMOKE_STYLE}
+      <NexaMapRuntimeSurface
+        requestedRenderer={NEXA_MAP_RENDERER_ROLLOUT.requestedRenderer}
+        mapLibreAvailable={NEXA_MAP_RENDERER_ROLLOUT.mapLibreAvailable}
+        mapLibreStyle={SMOKE_STYLE}
         points={SMOKE_POINTS}
-        selectedKey="user:smoke-user"
+        selectedEntityKey="user:smoke-user"
         dimUnselected
+        mode="dark"
+        scheme="dark"
         onReady={handleReady}
-        onPointPress={() => {}}
-        onViewportSettled={() => {}}
+        onRegionChangeComplete={() => {}}
         onLongPress={() => {}}
+        onClusterPress={() => {}}
+        onEntityPress={() => {}}
       />
     </View>
   );
