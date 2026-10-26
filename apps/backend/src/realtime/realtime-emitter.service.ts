@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import type { ClientToServerEvents, ServerToClientEvents, SocketData } from '@g88/shared';
 import type { Server } from 'socket.io';
+
+import { RealtimeGateway } from './realtime.gateway';
 
 export type G88RealtimeServer = Server<
   ClientToServerEvents,
@@ -11,20 +14,15 @@ export type G88RealtimeServer = Server<
 
 /**
  * Small Socket.IO emission boundary shared by realtime producers.
- * The gateway owns connection lifecycle; producers depend only on this service.
+ * Resolves the gateway lazily so producers do not participate in the gateway's
+ * constructor dependency graph.
  */
 @Injectable()
 export class RealtimeEmitterService {
-  private server: G88RealtimeServer | null = null;
-
-  attach(server: G88RealtimeServer): void {
-    this.server = server;
-  }
+  constructor(private readonly moduleRef: ModuleRef) {}
 
   to(roomOrSocketId: string): ReturnType<G88RealtimeServer['to']> {
-    if (this.server === null) {
-      throw new Error('RealtimeEmitterService is not attached to a Socket.IO server');
-    }
-    return this.server.to(roomOrSocketId);
+    const gateway = this.moduleRef.get(RealtimeGateway, { strict: false });
+    return gateway.server.to(roomOrSocketId);
   }
 }
