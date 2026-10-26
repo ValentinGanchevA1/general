@@ -57,7 +57,7 @@ export class ListingsController {
         entityId: listing.id,
         location: dto.location,
         change: 'enter',
-      });
+      }).catch(() => undefined);
     }
     return listing;
   }
@@ -116,7 +116,7 @@ export class ListingsController {
         entityId: listing.id,
         location: listing.location,
         change: listing.status === 'active' ? 'enter' : 'update',
-      });
+      }).catch(() => undefined);
     }
     return listing;
   }
@@ -190,7 +190,7 @@ export class ListingsController {
           entityId: listing.id,
           location: listing.location,
           change: 'update',
-        });
+        }).catch(() => undefined);
       }
     }
     return offer;
