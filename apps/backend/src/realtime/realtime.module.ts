@@ -22,7 +22,7 @@ import { DiscoveryModule } from '../modules/discovery/discovery.module';
     AuthModule,
     ChatModule,
     NotificationsModule,
-    DiscoveryModule,
+    forwardRef(() => DiscoveryModule),
     forwardRef(() => ChallengesModule),
     // Bidirectional: FriendsNotifyService → RealtimeGateway; gateway → FriendsService (presence).
     forwardRef(() => FriendsModule),
