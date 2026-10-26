@@ -30,6 +30,8 @@ function baseSelf(over: Partial<UserProfile> = {}): UserProfile {
     verification: 'phone',
     avatarUrl: null,
     bio: null,
+    occupation: 'Software engineer',
+    showOccupation: true,
     visibility: 'public',
     goals: [],
     interests: [],
@@ -95,6 +97,14 @@ describe('mapPublicToViewModel', () => {
     expect(vm.mutualFriendsCount).toBe(0);
   });
 
+  it('maps public occupation when the server exposes it', () => {
+    const vm = mapPublicToViewModel(
+      basePublic({ occupation: 'Software engineer' }),
+      { rel: null, friendLabel: 'Add friend' },
+    );
+    expect(vm.occupation).toBe('Software engineer');
+  });
+
   it('maps relationship + blocked + canMessage', () => {
     const rel: RelationshipSummary = {
       state: 'friends',
@@ -143,8 +153,8 @@ describe('mapPublicToViewModel', () => {
 });
 
 describe('mapSelfToViewModel', () => {
-  it('applies show_* gates for identity and hometown', () => {
-    const hidden = mapSelfToViewModel(baseSelf({ showGender: false, showNationality: false, showOrientation: false, showHometown: false, showAge: false }), {
+  it('applies show_* gates for identity, hometown and occupation', () => {
+    const hidden = mapSelfToViewModel(baseSelf({ showGender: false, showNationality: false, showOrientation: false, showHometown: false, showAge: false, showOccupation: false }), {
       photoUrls: ['https://x/a.jpg'],
       tierLabel: 'Free',
       isPaid: false,
@@ -153,6 +163,7 @@ describe('mapSelfToViewModel', () => {
     expect(hidden.identityLine).toBeNull();
     expect(hidden.hometownLine).toBeNull();
     expect(hidden.age).toBeNull();
+    expect(hidden.occupation).toBeNull();
     expect(hidden.photoUrls).toEqual(['https://x/a.jpg']);
     expect(hidden.mapVisible).toBe(true);
     expect(hidden.idVerified).toBe(false);
@@ -167,6 +178,7 @@ describe('mapSelfToViewModel', () => {
     expect(shown.identityLine).toBe('Woman · BG');
     expect(shown.hometownLine).toBe('Sofia, BG');
     expect(shown.age).toBe(28);
+    expect(shown.occupation).toBe('Software engineer');
     expect(shown.isPaid).toBe(true);
     expect(shown.tierLabel).toBe('Premium');
     expect(shown.mapVisible).toBe(false);

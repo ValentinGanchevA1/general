@@ -181,6 +181,7 @@ export function ProfileScreen(): React.JSX.Element {
   const nameOnly = p.displayName ?? displayName.split(',')[0] ?? 'You';
   const ageSuffix = p.age != null ? `, ${p.age}` : '';
   const bio = (p.bio ?? '').trim();
+  const occupation = p.showOccupation === false ? '' : (p.occupation ?? '').trim();
   const zodiac = zodiacFromDateOfBirth(p.dateOfBirth);
   const origin = [p.hometownCity, p.hometownCountry].filter(Boolean).join(', ');
   const photoCount = photos.length;
@@ -237,6 +238,7 @@ export function ProfileScreen(): React.JSX.Element {
       <View style={S.aboutCard}>
         {bio ? <Text style={S.bioText}>{bio}</Text> : <Text style={S.bioEmpty}>Add a short intro about yourself.</Text>}
         <View style={S.detailsWrap}>
+          {occupation ? <Detail icon="briefcase-outline" text={occupation} /> : null}
           {p.age != null ? <Detail icon="cake-variant-outline" text={`${p.age}${zodiac ? ` · ${zodiac}` : ''}`} /> : zodiac ? <Detail icon="star-four-points-outline" text={zodiac} /> : null}
           {origin ? <Detail icon="map-marker-outline" text={`From ${origin}`} /> : null}
           {p.nationality ? <Detail icon="flag-outline" text={p.nationality} /> : null}

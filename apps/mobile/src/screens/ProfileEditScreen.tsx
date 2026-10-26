@@ -119,6 +119,8 @@ export function ProfileEditScreen(): React.JSX.Element {
 
   const [displayName, setDisplayName] = useState(profile?.displayName ?? '');
   const [bio, setBio] = useState(profile?.bio ?? '');
+  const [occupation, setOccupation] = useState(profile?.occupation ?? '');
+  const [showOccupation, setShowOccupation] = useState(profile?.showOccupation ?? true);
   const [interests, setInterests] = useState<string[]>(profile?.interests ?? []);
   const [goals, setGoals] = useState<string[]>(profile?.goals ?? []);
   const [dateOfBirth, setDateOfBirth] = useState(profile?.dateOfBirth ?? '');
@@ -173,6 +175,8 @@ export function ProfileEditScreen(): React.JSX.Element {
     const result = await dispatch(updateProfile({
       displayName: displayName.trim(),
       bio: bio.trim(),
+      occupation: occupation.trim() || null,
+      showOccupation,
       interests,
       goals,
       dateOfBirth: dob || null,
@@ -235,6 +239,9 @@ export function ProfileEditScreen(): React.JSX.Element {
 
         <Text style={styles.section}>ABOUT YOU</Text>
         <Text style={styles.hint}>Optional profile details. Visibility remains under your control.</Text>
+        <FormField label="Occupation" value={occupation} onChangeText={setOccupation} placeholder="e.g. Software engineer" maxLength={80} testID="profile-edit-occupation" />
+        <View style={styles.toggleRow}><View style={styles.toggleText}><Text style={styles.toggleLabel}>Show occupation on profile</Text><Text style={styles.toggleSub}>When off, your saved occupation stays private</Text></View>{themedSwitch(showOccupation, setShowOccupation)}</View>
+
         <Text style={styles.fieldLabel}>Gender</Text>
         <ChipRow options={GENDERS} labels={GENDER_LABELS} value={gender} onChange={setGender} />
         {gender === 'self_describe' ? <FormField label="Describe gender" value={genderSelfDescribe} onChangeText={setGenderSelfDescribe} placeholder="Your terms" maxLength={40} testID="profile-edit-gender-self" /> : null}

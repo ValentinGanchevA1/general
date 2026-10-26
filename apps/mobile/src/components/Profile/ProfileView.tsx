@@ -135,6 +135,7 @@ export function ProfileView({
 						{...(actions.onPressVisibility != null ? { onPressVisibility: actions.onPressVisibility } : {})}
 					/>
 					<ProfileIdentityLine mode="self" identityLine={profile.identityLine} hometownLine={profile.hometownLine} {...(actions.onPressIdentityPreview != null ? { onPress: actions.onPressIdentityPreview } : {})} />
+					{profile.occupation ? <Text style={styles.occupationLine}>{profile.occupation}</Text> : null}
 					<View onLayout={onSectionLayout('trust')}>
 						<ProfileTrustScoreCard score={profile.verificationScore} idVerified={profile.idVerified} {...(actions.onOpenTrustDetails != null ? { onPress: actions.onOpenTrustDetails } : actions.onPressVerificationBadge != null ? { onPress: actions.onPressVerificationBadge } : {})} />
 					</View>
@@ -176,6 +177,7 @@ export function ProfileView({
 							<VerificationBadge verification={profile.verification} idVerified={profile.idVerified} size={18} />
 						</View>
 						<ProfileIdentityLine mode="other" identityLine={profile.identityLine} hometownLine={profile.hometownLine} />
+						{profile.occupation ? <Text style={styles.occupationLine}>{profile.occupation}</Text> : null}
 						<View style={styles.placeRow}>
 							{profile.online ? <Text style={styles.onlineLabel}>Online now</Text> : null}
 							{profile.distanceMeters != null ? <>{profile.online ? <Text style={styles.placeDot}>·</Text> : null}<Text style={styles.distanceLabel}>{formatDistanceAway(profile.distanceMeters)}</Text></> : !profile.online ? <Text style={styles.offlineLabel}>Recently nearby</Text> : null}
@@ -216,6 +218,7 @@ function createStyles(colors: ThemeColors) {
 		heroMeta: { alignItems: 'center', paddingHorizontal: spacing.xl, marginTop: 10, gap: 4 },
 		nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 		displayName: { color: colors.textPrimary, fontSize: fontSize.xl, fontWeight: '700' },
+		occupationLine: { color: colors.textMuted, fontSize: 13, textAlign: 'center', marginTop: 2 },
 		placeRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: 2 },
 		onlineLabel: { color: colors.success, fontWeight: '600', fontSize: 13 },
 		distanceLabel: { color: colors.textMuted, fontSize: 13 },

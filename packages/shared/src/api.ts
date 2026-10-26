@@ -203,6 +203,10 @@ export interface ProfileBadges {
 export interface UpdateProfileRequest {
   displayName?: string;
   bio?: string;
+  /** Free-text occupation/title; null or blank clears. Max 80 characters. */
+  occupation?: string | null;
+  /** Controls whether occupation is exposed on public/self-as-public profile surfaces. */
+  showOccupation?: boolean;
   avatarUrl?: string;
   visibility?: 'public' | 'private';
   goals?: string[];
@@ -239,6 +243,10 @@ export type IdVerificationStatus = 'none' | 'pending' | 'verified' | 'rejected';
 
 export interface UserProfile extends AuthenticatedUser {
   bio: string | null;
+  /** Owner-only stored value. */
+  occupation?: string | null;
+  /** Owner preference; defaults true for rows created before occupation support. */
+  showOccupation?: boolean;
   visibility: 'public' | 'private';
   goals: string[];
   interests: string[];
@@ -308,6 +316,8 @@ export interface PublicUserProfile {
   id: string;
   displayName: string;
   bio: string | null;
+  /** Present only when showOccupation is enabled and a value exists. */
+  occupation?: string | null;
   avatarUrl: string | null;
   /** Full-bleed cover/background when set. Independent of avatar. */
   coverUrl: string | null;

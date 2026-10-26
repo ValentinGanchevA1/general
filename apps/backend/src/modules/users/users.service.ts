@@ -45,6 +45,8 @@ interface UserRow {
   avatar_url: string | null;
   cover_url: string | null;
   bio: string | null;
+  occupation: string | null;
+  show_occupation: boolean;
   verification_level: string;
   visibility: 'public' | 'private';
   goals: string[];
@@ -81,6 +83,8 @@ interface PublicUserRow {
   avatar_url: string | null;
   cover_url: string | null;
   bio: string | null;
+  occupation: string | null;
+  show_occupation: boolean;
   verification_level: string;
   id_verification_status: IdVerificationStatus;
   goals: string[];
@@ -107,11 +111,12 @@ interface SocialLinkRow {
 }
 
 const USER_COLUMNS = `
-  id, email, display_name, avatar_url, cover_url, bio, verification_level, visibility,
+  id, email, display_name, avatar_url, cover_url, bio, occupation, verification_level, visibility,
   goals, interests, phone, email_verified_at, phone_verified_at, subscription_tier, id_verification_status, created_at,
   date_of_birth::text AS date_of_birth,
   hometown_city, hometown_country, show_age, show_hometown,
   gender, gender_self_describe, sexual_orientation, orientation_self_describe, nationality,
+  COALESCE(show_occupation, true) AS show_occupation,
   COALESCE(show_gender, true) AS show_gender,
   COALESCE(show_orientation, false) AS show_orientation,
   COALESCE(show_nationality, true) AS show_nationality,
@@ -236,11 +241,12 @@ export class UsersService {
                 (SELECT url FROM user_photos WHERE user_id = users.id ORDER BY position ASC LIMIT 1)
               ) AS avatar_url,
               cover_url,
-              bio, verification_level,
+              bio, occupation, verification_level,
               id_verification_status, goals,
               date_part('year', age(date_of_birth))::int AS age,
               hometown_city, hometown_country, show_age, show_hometown,
               gender, gender_self_describe, sexual_orientation, orientation_self_describe, nationality,
+              COALESCE(show_occupation, true) AS show_occupation,
               COALESCE(show_gender, true) AS show_gender,
               COALESCE(show_orientation, false) AS show_orientation,
               COALESCE(show_nationality, true) AS show_nationality
@@ -295,6 +301,7 @@ export class UsersService {
       idVerified: r.id_verification_status === 'verified',
       goals: r.goals ?? [],
       online: onlineSet.has(r.id),
+      ...(r.show_occupation && r.occupation ? { occupation: r.occupation } : {}),
       ...(r.show_age && r.age != null ? { age: r.age } : {}),
       ...(r.show_hometown && (r.hometown_city || r.hometown_country)
         ? {
@@ -425,6 +432,18 @@ export class UsersService {
     if (req.bio !== undefined) {
       params.push(req.bio);
       setClauses.push(`bio = $${params.length}`);
+    }
+    if (req.occupation !== undefined) {
+      const occupation =
+        req.occupation === null || req.occupation.trim() === ''
+          ? null
+          : req.occupation.trim().slice(0, 80);
+      params.push(occupation);
+      setClauses.push(`occupation = $${params.length}`);
+    }
+    if (req.showOccupation !== undefined) {
+      params.push(req.showOccupation);
+      setClauses.push(`show_occupation = $${params.length}`);
     }
     if (req.avatarUrl !== undefined) {
       params.push(req.avatarUrl);
@@ -727,6 +746,8 @@ export class UsersService {
     return {
       ...this.toPublic(r),
       bio: r.bio,
+      occupation: r.occupation ?? null,
+      showOccupation: r.show_occupation ?? true,
       visibility: r.visibility,
       goals: r.goals ?? [],
       interests: r.interests ?? [],
