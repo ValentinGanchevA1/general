@@ -74,3 +74,29 @@ export function buildDiscoveryDiff(
 
   return { added, removed };
 }
+
+/**
+ * Parses a Redis discovery snapshot and delegates identity/equality semantics to
+ * buildDiscoveryDiff. Corrupt or non-array snapshots deliberately fall back to
+ * a full response rather than attempting a partial diff from untrusted cache
+ * state.
+ */
+export function buildDiscoveryDiffFromSnapshot(
+  rawSnapshot: string,
+  currentPoints: readonly DiscoveryPoint[],
+  fallbackThreshold = DISCOVERY_DIFF_FALLBACK_THRESHOLD,
+): DiscoveryDiff | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawSnapshot) as unknown;
+  } catch {
+    return null;
+  }
+
+  if (!Array.isArray(parsed)) return null;
+  return buildDiscoveryDiff(
+    parsed as DiscoveryPoint[],
+    currentPoints,
+    fallbackThreshold,
+  );
+}
