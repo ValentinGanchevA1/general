@@ -146,9 +146,9 @@ export function MapScreen(): React.JSX.Element {
 		openFull: openPinFull,
 		backFromFull: backFromPinFull,
 		isFull: pinIsFull,
+		interactionState: pinInteractionState,
 		quickWave,
 		quickLike,
-		showPreview,
 		previewProps,
 		activePinId,
 		pinLat,
@@ -218,7 +218,10 @@ export function MapScreen(): React.JSX.Element {
 		setCreateNearbyOpen,
 		onMapLongPress,
 		onCreateNearbySelect,
-	} = useCreateNearby(navigation, selected != null || showPreview);
+	} = useCreateNearby(
+		navigation,
+		selected != null || pinInteractionState !== 'idle',
+	);
 
 	useMapFocus({
 		mapRef,
@@ -638,12 +641,14 @@ export function MapScreen(): React.JSX.Element {
 		return () => clearTimeout(t);
 	}, [waveToast]);
 
-	const sheetOpen = selected != null || showPreview;
+	const sheetOpen = selected != null || pinInteractionState !== 'idle';
 	const selectedMarkerKey = useMemo(() => {
 		if (selected != null) return nexaEntitySelectionKey(selected);
-		if (showPreview && activePinId != null) return `user:${activePinId}`;
+		if (pinInteractionState !== 'idle' && activePinId != null) {
+			return `user:${activePinId}`;
+		}
 		return null;
-	}, [selected, showPreview, activePinId]);
+	}, [selected, pinInteractionState, activePinId]);
 	const isCityScale =
 		region != null &&
 		region.latitudeDelta > 0 &&
@@ -962,7 +967,7 @@ export function MapScreen(): React.JSX.Element {
 				</View>
 			) : null}
 
-			{showPreview && previewProps ? (
+			{pinInteractionState === 'quick_peek' && previewProps ? (
 				<PinInteractionHost
 					visible
 					previewProps={previewProps}
