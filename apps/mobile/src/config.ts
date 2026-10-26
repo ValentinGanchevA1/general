@@ -43,6 +43,10 @@ export const Config = {
     (process.env.GOOGLE_WEB_CLIENT_ID as string | undefined) ?? '',
   // Public Sentry DSN — leave empty to disable Sentry in dev builds
   SENTRY_DSN: (process.env.SENTRY_DSN as string | undefined) ?? '',
+  // Build-time renderer request. Only the exact value "maplibre" opts in;
+  // the rollout resolver fails closed to legacy for every other value.
+  MAP_RENDERER_REQUESTED:
+    (process.env.NEXA_MAP_RENDERER as string | undefined) ?? 'legacy',
   // Public MapTiler client configuration. The API key is embedded in the app bundle;
   // treat it as a client credential and restrict/rotate it in MapTiler, never as a secret.
   MAPTILER_API_KEY:
