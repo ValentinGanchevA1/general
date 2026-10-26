@@ -29,6 +29,10 @@ const userPoint: DiscoveryPoint = {
   },
 };
 
+type MutationHandler = (
+  mutation: Parameters<DiscoveryMutationBusService['publish']>[0],
+) => Promise<void>;
+
 describe('DiscoveryRealtimePublisher resolver concurrency', () => {
   it('resolves all candidates without running more than 16 viewer queries at once', async () => {
     const pendingResolvers: Array<(point: DiscoveryPoint) => void> = [];
@@ -51,10 +55,10 @@ describe('DiscoveryRealtimePublisher resolver concurrency', () => {
       candidatesForEntity: jest.fn().mockReturnValue(candidates),
     } as unknown as DiscoverySubscriptionStore;
 
-    let handler: ((mutation: Parameters<DiscoveryMutationBusService['publish']>[0]) => Promise<void>) | null = null;
+    let handler: MutationHandler | null = null;
     const mutationBus = {
       publish: jest.fn().mockResolvedValue(undefined),
-      setHandler: jest.fn((nextHandler) => {
+      setHandler: jest.fn((nextHandler: MutationHandler) => {
         handler = nextHandler;
       }),
     } as unknown as DiscoveryMutationBusService;
@@ -67,7 +71,9 @@ describe('DiscoveryRealtimePublisher resolver concurrency', () => {
     );
     publisher.onModuleInit();
 
-    const fanout = handler?.({
+    expect(handler).not.toBeNull();
+    const registeredHandler = handler as unknown as MutationHandler;
+    const fanout = registeredHandler({
       type: 'change',
       kind: 'user',
       entityId: 'nearby-user',
