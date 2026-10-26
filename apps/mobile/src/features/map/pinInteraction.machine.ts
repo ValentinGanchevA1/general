@@ -163,6 +163,10 @@ export const pinInteractionMachine = setup({
         lng: event.lng,
         viewerMode: event.viewerMode,
         stage: 'preview' as const,
+        profile: undefined,
+        distanceMeters: undefined,
+        error: undefined,
+        lastResult: undefined,
         waveSent: false,
         hasMutualWave: false,
         likeSent: false,
@@ -195,6 +199,10 @@ export const pinInteractionMachine = setup({
       pinId: '',
       pinType: 'user' as const,
       stage: 'preview' as const,
+      profile: undefined,
+      distanceMeters: undefined,
+      error: undefined,
+      lastResult: undefined,
       waveSent: false,
       hasMutualWave: false,
       likeSent: false,
@@ -274,7 +282,7 @@ export const pinInteractionMachine = setup({
               stage: 'preview' as const,
             };
             return event.output.distanceMeters != null
-              ? { ...base, distanceMeters: event.output.distanceMeters }
+              ? {...base, distanceMeters: event.output.distanceMeters}
               : base;
           }),
         },
