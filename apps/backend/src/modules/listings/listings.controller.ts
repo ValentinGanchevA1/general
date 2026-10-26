@@ -57,7 +57,7 @@ export class ListingsController {
         entityId: listing.id,
         location: dto.location,
         change: 'enter',
-      });
+      }).catch(() => undefined);
     }
     return listing;
   }
@@ -104,12 +104,21 @@ export class ListingsController {
 
   /** PUT /api/v1/listings/:id/status — seller marks active/sold/withdrawn. */
   @Put(':id/status')
-  updateStatus(
+  async updateStatus(
     @CurrentUser('id') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateListingStatusDto,
   ): Promise<ListingDetail> {
-    return this.listings.updateStatus(userId, id, dto.status);
+    const listing = await this.listings.updateStatus(userId, id, dto.status);
+    if (listing.visibility === 'public') {
+      void this.discovery.publishEntityChangeToSubscribers({
+        kind: 'listing',
+        entityId: listing.id,
+        location: listing.location,
+        change: listing.status === 'active' ? 'enter' : 'update',
+      }).catch(() => undefined);
+    }
+    return listing;
   }
 
   /** POST /api/v1/listings/:id/bump — seller extends expires_at (rate-limited). */
@@ -167,12 +176,24 @@ export class ListingsController {
 
   /** PUT /api/v1/listings/offers/:offerId — seller accepts/declines an offer. */
   @Put('offers/:offerId')
-  respondToOffer(
+  async respondToOffer(
     @CurrentUser('id') userId: string,
     @Param('offerId', ParseUUIDPipe) offerId: string,
     @Body() dto: RespondOfferDto,
   ): Promise<ListingOffer> {
-    return this.listings.respondToOffer(userId, offerId, dto.status);
+    const offer = await this.listings.respondToOffer(userId, offerId, dto.status);
+    if (dto.status === 'accepted') {
+      const listing = await this.listings.detail(userId, offer.listingId);
+      if (listing.visibility === 'public') {
+        void this.discovery.publishEntityChangeToSubscribers({
+          kind: 'listing',
+          entityId: listing.id,
+          location: listing.location,
+          change: 'update',
+        }).catch(() => undefined);
+      }
+    }
+    return offer;
   }
 
   /**
