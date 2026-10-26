@@ -7,18 +7,22 @@ import {
   pruneExpiredAnalytics,
   sanitizeProductAnalyticsProperties,
 } from './analytics.service';
+import type { PostHogAnalyticsSink } from './posthog-analytics.sink';
 
 const HMAC_KEY = 'analytics-test-key-that-is-at-least-32-bytes-long';
 
 describe('AnalyticsService', () => {
   const query = jest.fn();
   const db = { query } as unknown as DataSource;
-  const service = new AnalyticsService(db);
+  const posthogCapture = jest.fn(() => Promise.resolve());
+  const posthog = { capture: posthogCapture } as unknown as PostHogAnalyticsSink;
+  const service = new AnalyticsService(db, posthog);
   const originalKey = process.env.ANALYTICS_HMAC_KEY;
 
   beforeEach(() => {
     query.mockReset();
     query.mockResolvedValue([]);
+    posthogCapture.mockClear();
     process.env.ANALYTICS_HMAC_KEY = HMAC_KEY;
   });
 
@@ -66,6 +70,37 @@ describe('AnalyticsService', () => {
     ]);
   });
 
+  it('mirrors only the pseudonymous subject and sanitized properties after canonical persistence', async () => {
+    const userId = '11111111-1111-4111-8111-111111111111';
+    const expectedHash = createHmac('sha256', HMAC_KEY).update(userId).digest('hex');
+
+    await service.record(userId, 'entity.opened', {
+      entityType: 'person',
+      surface: 'map',
+      userId,
+      lat: 43.2,
+      body: 'must-not-leave-backend',
+    });
+
+    expect(posthogCapture).toHaveBeenCalledTimes(1);
+    expect(posthogCapture).toHaveBeenCalledWith(expectedHash, 'entity.opened', {
+      entityType: 'person',
+      surface: 'map',
+    });
+    expect(JSON.stringify(posthogCapture.mock.calls)).not.toContain(userId);
+    expect(JSON.stringify(posthogCapture.mock.calls)).not.toContain('must-not-leave-backend');
+  });
+
+  it('does not mirror an event when canonical persistence fails', async () => {
+    query.mockRejectedValueOnce(new Error('database unavailable'));
+
+    await expect(
+      service.record('11111111-1111-4111-8111-111111111111', 'chat.message_sent'),
+    ).rejects.toThrow('database unavailable');
+
+    expect(posthogCapture).not.toHaveBeenCalled();
+  });
+
   it('prunes expired events and only then removes old orphan identity bridges', async () => {
     await pruneExpiredAnalytics(db, 90);
 
@@ -87,5 +122,6 @@ describe('AnalyticsService', () => {
       ServiceUnavailableException,
     );
     expect(query).not.toHaveBeenCalled();
+    expect(posthogCapture).not.toHaveBeenCalled();
   });
 });
