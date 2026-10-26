@@ -45,6 +45,9 @@ jobs:
       # Keep them at job scope so every transform worker receives the same config.
       GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      NEXA_MAPTILER_API_KEY: ${{ secrets.NEXA_MAPTILER_API_KEY }}
+      NEXA_MAPTILER_MAP_ID: ${{ vars.NEXA_MAPTILER_MAP_ID || 'streets-v4' }}
+      NEXA_MAPTILER_REGION: ${{ vars.NEXA_MAPTILER_REGION || 'eu' }}
     defaults:
       run:
         working-directory: apps/mobile
@@ -86,6 +89,7 @@ jobs:
           for name in \
             GOOGLE_WEB_CLIENT_ID \
             SENTRY_DSN \
+            NEXA_MAPTILER_API_KEY \
             GOOGLE_MAPS_API_KEY_RELEASE \
             GOOGLE_SERVICES_JSON \
             ANDROID_UPLOAD_KEYSTORE_BASE64 \
@@ -100,6 +104,9 @@ jobs:
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
+
+      - name: Guard MapLibre release config
+        run: node scripts/check-maplibre-release-config.mjs
 
       - name: Inject Maps keys
         env:
