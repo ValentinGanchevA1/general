@@ -1,17 +1,16 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import {
-  Map,
-  type StyleSpecification,
-} from '@maplibre/maplibre-react-native';
+import type { DiscoveryPoint } from '@g88/shared';
+import type { StyleSpecification } from '@maplibre/maplibre-react-native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 
 import { NEXA_MAP_RENDERER_ROLLOUT } from '../../mapRendererRollout';
+import { MapLibreMapSurface } from './MapLibreMapSurface';
 
 const READY_MARKER_FILENAME = 'maplibre-smoke-ready';
 const SMOKE_STYLE: StyleSpecification = {
   version: 8,
-  name: 'NEXA MapLibre native smoke',
+  name: 'NEXA MapLibre renderer smoke',
   sources: {},
   layers: [
     {
@@ -24,9 +23,60 @@ const SMOKE_STYLE: StyleSpecification = {
   ],
 };
 
+const SMOKE_POINTS: readonly DiscoveryPoint[] = [
+  {
+    kind: 'cluster',
+    cellId: 'smoke-cluster',
+    lat: 0.018,
+    lng: 0.018,
+    count: 4,
+    by: { user: 2, event: 1, listing: 1 },
+  },
+  {
+    kind: 'user',
+    id: 'smoke-user',
+    lat: 0,
+    lng: 0,
+    meta: {
+      displayName: 'Smoke User',
+      avatarUrl: null,
+      verification: 'id',
+      online: true,
+      lastSeenAt: null,
+    },
+  },
+  {
+    kind: 'event',
+    id: 'smoke-event',
+    lat: 0.012,
+    lng: -0.012,
+    meta: {
+      title: 'Smoke Event',
+      coverUrl: null,
+      startsAt: '2030-01-01T12:00:00.000Z',
+      attendeeCount: 12,
+      capacity: 50,
+    },
+  },
+  {
+    kind: 'listing',
+    id: 'smoke-listing',
+    lat: -0.012,
+    lng: 0.012,
+    meta: {
+      title: 'Smoke Listing',
+      thumbnailUrl: null,
+      priceCents: 2500,
+      currency: 'EUR',
+      category: 'smoke',
+      mode: 'sell',
+    },
+  },
+];
+
 /**
- * CI-only native smoke app. It is bundled through a separate ENTRY_FILE and is
- * never reachable from the production App.tsx/navigation path.
+ * CI-only NEXA renderer smoke app. It is bundled through a separate ENTRY_FILE
+ * and is never reachable from the production App.tsx/navigation path.
  */
 export function MapLibreNativeSmokeApp(): React.JSX.Element {
   const handleReady = React.useCallback((): void => {
@@ -45,13 +95,15 @@ export function MapLibreNativeSmokeApp(): React.JSX.Element {
 
   return (
     <View style={styles.root}>
-      <Map
+      <MapLibreMapSurface
         mapStyle={SMOKE_STYLE}
-        style={StyleSheet.absoluteFill}
-        attribution={false}
-        logo={false}
-        compass={false}
-        onDidFinishLoadingMap={handleReady}
+        points={SMOKE_POINTS}
+        selectedKey="user:smoke-user"
+        dimUnselected
+        onReady={handleReady}
+        onPointPress={() => {}}
+        onViewportSettled={() => {}}
+        onLongPress={() => {}}
       />
     </View>
   );

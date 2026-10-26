@@ -14,6 +14,7 @@ type GeoJSONSourcePressHandler = NonNullable<
   React.ComponentProps<typeof GeoJSONSource>['onPress']
 >;
 type MapLongPressHandler = NonNullable<React.ComponentProps<typeof Map>['onLongPress']>;
+type MapStyle = React.ComponentProps<typeof Map>['mapStyle'];
 type CircleLayerSpecification = Extract<LayerSpecification, { type: 'circle' }>;
 type CircleLayerFilter = NonNullable<CircleLayerSpecification['filter']>;
 type CircleLayerPaint = NonNullable<CircleLayerSpecification['paint']>;
@@ -68,7 +69,7 @@ const DISCOVERY_SELECTED_HALO_RADIUS: CircleRadius = [
 ];
 
 export interface MapLibreMapSurfaceProps {
-  mapStyle: string;
+  mapStyle: MapStyle;
   points: readonly DiscoveryPoint[];
   selectedKey: DiscoveryPointKey | null;
   dimUnselected: boolean;
