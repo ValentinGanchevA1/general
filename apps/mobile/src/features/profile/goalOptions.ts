@@ -1,10 +1,14 @@
-export interface GoalOption {
+export interface PurposeOption {
   value: string;
   label: string;
   icon: string;
 }
 
-export const GOAL_OPTIONS: GoalOption[] = [
+/**
+ * Product language: Purpose = the user's core reason for using NEXA.
+ * Persistence remains `goals` for backward compatibility with matching and messaging.
+ */
+export const PURPOSE_OPTIONS: readonly PurposeOption[] = [
   { value: 'meet', label: 'Meet people', icon: '👋' },
   { value: 'events', label: 'Local events', icon: '🎉' },
   { value: 'networking', label: 'Networking', icon: '💼' },
@@ -12,3 +16,7 @@ export const GOAL_OPTIONS: GoalOption[] = [
   { value: 'activities', label: 'Activity partner', icon: '⚽' },
   { value: 'chat', label: 'Just chatting', icon: '💬' },
 ];
+
+/** @deprecated Use PURPOSE_OPTIONS in UI code. Kept to avoid breaking older imports. */
+export const GOAL_OPTIONS = PURPOSE_OPTIONS;
+export type GoalOption = PurposeOption;
