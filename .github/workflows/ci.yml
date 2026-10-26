@@ -75,5 +75,7 @@ jobs:
         run: pnpm --filter @g88/mobile exec eslint src --ext .ts,.tsx --max-warnings 0
       - name: Typecheck
         run: pnpm --filter @g88/mobile typecheck
+      - name: Test MapLibre release config gate
+        run: node --test apps/mobile/scripts/maplibre-release-config.test.mjs
       - name: Test
         run: pnpm --filter @g88/mobile exec jest --ci

@@ -39,6 +39,11 @@ jobs:
   apk:
     name: Signed APK
     runs-on: ubuntu-latest
+    env:
+      # Public client-side MapTiler config consumed by Babel/Metro in release builds.
+      NEXA_MAPTILER_API_KEY: ${{ secrets.NEXA_MAPTILER_API_KEY }}
+      NEXA_MAPTILER_MAP_ID: ${{ vars.NEXA_MAPTILER_MAP_ID || 'streets-v4' }}
+      NEXA_MAPTILER_REGION: ${{ vars.NEXA_MAPTILER_REGION || 'eu' }}
     # Job-level permissions are required in addition to workflow-level:
     # some GitHub runners / org policies only honor the job scope for
     # contents:write when creating releases/tags.
@@ -75,6 +80,7 @@ jobs:
         run: |
           set -euo pipefail
           required=(
+            NEXA_MAPTILER_API_KEY
             GOOGLE_MAPS_API_KEY_DEBUG
             GOOGLE_MAPS_API_KEY_RELEASE
             GOOGLE_SERVICES_JSON
@@ -90,6 +96,9 @@ jobs:
             fi
           done
           echo "All required Android release secrets are available."
+
+      - name: Guard MapLibre release config
+        run: node scripts/check-maplibre-release-config.mjs
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -235,6 +244,8 @@ jobs:
         # process env, otherwise they inline as '' and Google Sign-In + Sentry are
         # silently disabled in the APK. The web client id is public (OAuth web
         # client); SENTRY_DSN is a public DSN kept as a secret for hygiene.
+        # MapTiler release config lives at job scope for the same reason: every
+        # Metro/Babel worker must receive an identical validated provider config.
         #
         # SENTRY_RELEASE / SENTRY_DIST must match versionCodeOverride so that
         # when source-map upload is wired (wizard + SENTRY_AUTH_TOKEN), artifacts
