@@ -6,8 +6,8 @@ import {
 } from './nexaEntityMarkerVisuals';
 
 describe('NEXA entity marker visual contract', () => {
-  it('keeps a 44dp minimum marker stage', () => {
-    expect(NEXA_MARKER_TOUCH_SIZE).toBe(44);
+  it('keeps a 48dp minimum marker stage for reliable Android taps', () => {
+    expect(NEXA_MARKER_TOUCH_SIZE).toBe(48);
   });
 
   it('maps entity types to the final canonical geometry', () => {
@@ -17,7 +17,7 @@ describe('NEXA entity marker visual contract', () => {
     expect(resolveNexaMarkerVisual('opportunity').shape).toBe('diamond');
   });
 
-  it('uses 18/24/32dp visual sizes and selected overrides density', () => {
+  it('uses compact/standard sizes and makes selection dominate either density', () => {
     expect(resolveNexaMarkerVisual('person', 'compact').visualSize).toBe(
       NEXA_MARKER_VISUAL_SIZE.compact,
     );
@@ -27,6 +27,10 @@ describe('NEXA entity marker visual contract', () => {
     expect(
       resolveNexaMarkerVisual('person', 'compact', { selected: true }).visualSize,
     ).toBe(NEXA_MARKER_VISUAL_SIZE.selected);
+    expect(NEXA_MARKER_VISUAL_SIZE.selected).toBeGreaterThan(
+      NEXA_MARKER_VISUAL_SIZE.standard,
+    );
+    expect(NEXA_MARKER_VISUAL_SIZE.selected).toBeGreaterThanOrEqual(34);
   });
 
   it('preserves combinable state modifiers', () => {
