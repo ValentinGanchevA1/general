@@ -14,6 +14,7 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { Gender, SexualOrientation } from '@g88/shared';
 import {
@@ -26,19 +27,32 @@ import type { AccountStackParamList } from '@/navigation/stacks';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { INTEREST_OPTIONS } from '@/features/profile/interestOptions';
 import { PURPOSE_OPTIONS } from '@/features/profile/goalOptions';
+import {
+  CITY_OPTIONS,
+  COUNTRY_OPTIONS,
+  NATIONALITY_OPTIONS,
+  countryName,
+  resolveCountry,
+} from '@/features/profile/profileReferenceData';
 import { updateProfile } from '@/features/profile/profileSlice';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
+import { ProfileDatePicker, formatProfileDate } from '@/components/Profile/ProfileDatePicker';
+import {
+  ProfileSearchPicker,
+  type ProfileSearchOption,
+} from '@/components/Profile/ProfileSearchPicker';
 import { useFieldErrors } from '@/hooks/useFieldErrors';
 import { fontSize, spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<AccountStackParamList>;
 type EditRoute = RouteProp<AccountStackParamList, 'ProfileEdit'>;
-type FieldKey = 'displayName' | 'dateOfBirth' | 'hometownCity' | 'hometownCountry';
+type FieldKey = 'displayName' | 'dateOfBirth';
+type PickerKind = 'city' | 'country' | 'nationality' | null;
 
 function isAdult(isoDate: string): boolean {
-  const dob = new Date(isoDate);
+  const dob = new Date(`${isoDate}T12:00:00`);
   if (Number.isNaN(dob.getTime())) return false;
   const today = new Date();
   let years = today.getFullYear() - dob.getFullYear();
@@ -108,6 +122,69 @@ function MultiSelectOptions({
   );
 }
 
+function VisibilityLine({
+  label,
+  value,
+  onChange,
+  sensitive = false,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+  sensitive?: boolean;
+}): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const switchTrack = { false: colors.borderStrong, true: colors.primaryTrack };
+  return (
+    <View style={styles.visibilityLine}>
+      <Icon name={value ? 'eye-outline' : 'lock-outline'} size={16} color={value ? colors.primary : colors.textMuted} />
+      <Text style={styles.visibilityContext}>{label}</Text>
+      <Text style={[styles.visibilityState, value && styles.visibilityStateOn]}>{value ? 'Public' : 'Private'}</Text>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={switchTrack}
+        thumbColor={value ? colors.primary : colors.textFaint}
+        accessibilityLabel={`${label}: ${value ? 'public' : 'private'}`}
+      />
+      {sensitive && !value ? <Text style={styles.sensitiveDefault}>Default</Text> : null}
+    </View>
+  );
+}
+
+function PickerField({
+  label,
+  value,
+  placeholder,
+  onPress,
+  testID,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onPress: () => void;
+  testID?: string;
+}): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <TouchableOpacity
+      style={styles.pickerField}
+      onPress={onPress}
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value || placeholder}`}
+    >
+      <View style={styles.pickerFieldTextWrap}>
+        <Text style={styles.pickerFieldLabel}>{label}</Text>
+        <Text style={[styles.pickerFieldValue, !value && styles.pickerFieldPlaceholder]} numberOfLines={1}>{value || placeholder}</Text>
+      </View>
+      <Icon name="chevron-down" size={20} color={colors.textMuted} />
+    </TouchableOpacity>
+  );
+}
+
 export function ProfileEditScreen(): React.JSX.Element {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -125,7 +202,7 @@ export function ProfileEditScreen(): React.JSX.Element {
   const [goals, setGoals] = useState<string[]>(profile?.goals ?? []);
   const [dateOfBirth, setDateOfBirth] = useState(profile?.dateOfBirth ?? '');
   const [hometownCity, setHometownCity] = useState(profile?.hometownCity ?? '');
-  const [hometownCountry, setHometownCountry] = useState(profile?.hometownCountry ?? '');
+  const [hometownCountry, setHometownCountry] = useState(resolveCountry(profile?.hometownCountry)?.code ?? profile?.hometownCountry ?? '');
   const [showAge, setShowAge] = useState(profile?.showAge ?? true);
   const [showHometown, setShowHometown] = useState(profile?.showHometown ?? true);
   const [gender, setGender] = useState<Gender | null>(profile?.gender ?? null);
@@ -138,11 +215,10 @@ export function ProfileEditScreen(): React.JSX.Element {
   const [showNationality, setShowNationality] = useState(profile?.showNationality ?? true);
   const [openToDating, setOpenToDating] = useState(profile?.openToDating ?? false);
   const [seekingGenders, setSeekingGenders] = useState<Gender[]>(profile?.seekingGenders ?? []);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [pickerKind, setPickerKind] = useState<PickerKind>(null);
   const { errors, setErrors, clear } = useFieldErrors<FieldKey>();
   const bioRef = useRef<TextInput>(null);
-  const dobRef = useRef<TextInput>(null);
-  const cityRef = useRef<TextInput>(null);
-  const countryRef = useRef<TextInput>(null);
   const scrollRef = useRef<ScrollView>(null);
   const datingYRef = useRef(0);
   const route = useRoute<EditRoute>();
@@ -202,6 +278,48 @@ export function ProfileEditScreen(): React.JSX.Element {
     <Switch value={value} onValueChange={onValueChange} trackColor={switchTrack} thumbColor={value ? colors.primary : colors.textFaint} />
   );
 
+  const cityOptions = useMemo<ProfileSearchOption[]>(() => CITY_OPTIONS.map((option) => ({
+    value: `${option.city}::${option.countryCode}`,
+    label: option.city,
+    meta: countryName(option.countryCode),
+    searchText: option.countryCode,
+  })), []);
+
+  const countryOptions = useMemo<ProfileSearchOption[]>(() => COUNTRY_OPTIONS.map((option) => ({
+    value: option.code,
+    label: option.name,
+    meta: option.code,
+  })), []);
+
+  const nationalityOptions = useMemo<ProfileSearchOption[]>(() => NATIONALITY_OPTIONS.map((option) => ({
+    value: option.value,
+    label: option.label,
+    meta: countryName(option.countryCode),
+  })), []);
+
+  const selectedCityValue = hometownCity && hometownCountry ? `${hometownCity}::${hometownCountry}` : hometownCity;
+
+  const selectCity = (option: ProfileSearchOption): void => {
+    const separator = option.value.lastIndexOf('::');
+    if (separator > 0) {
+      setHometownCity(option.value.slice(0, separator));
+      setHometownCountry(option.value.slice(separator + 2));
+    } else {
+      setHometownCity(option.value);
+    }
+    setPickerKind(null);
+  };
+
+  const selectCountry = (option: ProfileSearchOption): void => {
+    const previous = hometownCountry;
+    setHometownCountry(option.value);
+    if (previous && previous !== option.value) {
+      const knownCity = CITY_OPTIONS.find((candidate) => candidate.city.toLocaleLowerCase() === hometownCity.trim().toLocaleLowerCase());
+      if (knownCity && knownCity.countryCode !== option.value) setHometownCity('');
+    }
+    setPickerKind(null);
+  };
+
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScreenHeader
@@ -218,7 +336,7 @@ export function ProfileEditScreen(): React.JSX.Element {
       <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <Text style={styles.section}>PROFILE</Text>
         <FormField label="Display name" value={displayName} onChangeText={(t) => { setDisplayName(t); clear('displayName'); }} placeholder="Your name" maxLength={50} returnKeyType="next" onSubmitEditing={() => bioRef.current?.focus()} error={errors.displayName} testID="profile-edit-display-name" />
-        <FormField ref={bioRef} label="Bio" value={bio} onChangeText={setBio} placeholder="A short intro" multiline maxLength={160} style={styles.bioInput} returnKeyType="next" onSubmitEditing={() => dobRef.current?.focus()} testID="profile-edit-bio" />
+        <FormField ref={bioRef} label="Bio" value={bio} onChangeText={setBio} placeholder="A short intro" multiline maxLength={160} style={styles.bioInput} testID="profile-edit-bio" />
         <Text style={styles.charCount}>{bio.length}/160</Text>
 
         <Text style={styles.section}>INTERESTS</Text>
@@ -230,30 +348,42 @@ export function ProfileEditScreen(): React.JSX.Element {
         <MultiSelectOptions options={PURPOSE_OPTIONS} selected={goals} onToggle={(value) => toggle(setGoals, value)} />
 
         <Text style={styles.section}>ORIGIN</Text>
-        <FormField ref={dobRef} label="Date of birth (YYYY-MM-DD)" value={dateOfBirth} onChangeText={(t) => { setDateOfBirth(t); clear('dateOfBirth'); }} placeholder="1990-01-15" autoCapitalize="none" returnKeyType="next" onSubmitEditing={() => cityRef.current?.focus()} error={errors.dateOfBirth} testID="profile-edit-dob" />
-        <Text style={styles.hint}>Private exact date; used for age and zodiac. Must be 18+.</Text>
-        <FormField ref={cityRef} label="From" value={hometownCity} onChangeText={setHometownCity} placeholder="Varna" returnKeyType="next" onSubmitEditing={() => countryRef.current?.focus()} testID="profile-edit-city" />
-        <FormField ref={countryRef} label="Country" value={hometownCountry} onChangeText={setHometownCountry} placeholder="BG" autoCapitalize="characters" maxLength={40} returnKeyType="done" testID="profile-edit-country" />
-        <View style={styles.toggleRow}><View style={styles.toggleText}><Text style={styles.toggleLabel}>Show age on profile</Text><Text style={styles.toggleSub}>Others see age, not your exact birth date</Text></View>{themedSwitch(showAge, setShowAge)}</View>
-        <View style={styles.toggleRow}><View style={styles.toggleText}><Text style={styles.toggleLabel}>Show where I’m from</Text><Text style={styles.toggleSub}>City and country on your public profile</Text></View>{themedSwitch(showHometown, setShowHometown)}</View>
+        <Text style={styles.hint}>Your exact birth date stays private. City, country and nationality can be shown independently.</Text>
+
+        <TouchableOpacity style={styles.compactCard} onPress={() => setDatePickerOpen(true)} testID="profile-edit-dob" accessibilityRole="button">
+          <View style={styles.compactMain}>
+            <Text style={styles.compactLabel}>Date of birth</Text>
+            <Text style={[styles.compactValue, !dateOfBirth && styles.pickerFieldPlaceholder]}>{dateOfBirth ? formatProfileDate(dateOfBirth) : 'Select date'}</Text>
+            <Text style={styles.compactHint}>Private exact date · 18+ required</Text>
+          </View>
+          <Icon name="calendar-outline" size={22} color={colors.primary} />
+        </TouchableOpacity>
+        {errors.dateOfBirth ? <Text style={styles.fieldError}>{errors.dateOfBirth}</Text> : null}
+        <VisibilityLine label="Age on profile" value={showAge} onChange={setShowAge} />
+
+        <View style={styles.originPair}>
+          <PickerField label="City" value={hometownCity} placeholder="Choose city" onPress={() => setPickerKind('city')} testID="profile-edit-city" />
+          <PickerField label="Country" value={countryName(hometownCountry)} placeholder="Choose country" onPress={() => setPickerKind('country')} testID="profile-edit-country" />
+        </View>
+        <VisibilityLine label="Where I’m from" value={showHometown} onChange={setShowHometown} />
+
+        <PickerField label="Nationality" value={nationality} placeholder="Choose nationality" onPress={() => setPickerKind('nationality')} testID="profile-edit-nationality" />
+        <VisibilityLine label="Nationality" value={showNationality} onChange={setShowNationality} />
 
         <Text style={styles.section}>ABOUT YOU</Text>
-        <Text style={styles.hint}>Optional profile details. Visibility remains under your control.</Text>
+        <Text style={styles.hint}>Optional profile details. Visibility stays next to the information it controls.</Text>
         <FormField label="Occupation" value={occupation} onChangeText={setOccupation} placeholder="e.g. Software engineer" maxLength={80} testID="profile-edit-occupation" />
-        <View style={styles.toggleRow}><View style={styles.toggleText}><Text style={styles.toggleLabel}>Show occupation on profile</Text><Text style={styles.toggleSub}>When off, your saved occupation stays private</Text></View>{themedSwitch(showOccupation, setShowOccupation)}</View>
+        <VisibilityLine label="Occupation" value={showOccupation} onChange={setShowOccupation} />
 
         <Text style={styles.fieldLabel}>Gender</Text>
         <ChipRow options={GENDERS} labels={GENDER_LABELS} value={gender} onChange={setGender} />
         {gender === 'self_describe' ? <FormField label="Describe gender" value={genderSelfDescribe} onChangeText={setGenderSelfDescribe} placeholder="Your terms" maxLength={40} testID="profile-edit-gender-self" /> : null}
-        <View style={styles.toggleRow}><View style={styles.toggleText}><Text style={styles.toggleLabel}>Show gender on profile</Text></View>{themedSwitch(showGender, setShowGender)}</View>
+        <VisibilityLine label="Gender" value={showGender} onChange={setShowGender} />
 
         <Text style={styles.fieldLabel}>Sexual orientation</Text>
         <ChipRow options={SEXUAL_ORIENTATIONS} labels={ORIENTATION_LABELS} value={sexualOrientation} onChange={setSexualOrientation} />
         {sexualOrientation === 'self_describe' ? <FormField label="Describe orientation" value={orientationSelfDescribe} onChangeText={setOrientationSelfDescribe} placeholder="Your terms" maxLength={40} testID="profile-edit-orientation-self" /> : null}
-        <View style={styles.toggleRow}><View style={styles.toggleText}><Text style={styles.toggleLabel}>Show orientation on profile</Text><Text style={styles.toggleSub}>Off by default</Text></View>{themedSwitch(showOrientation, setShowOrientation)}</View>
-
-        <FormField label="Nationality" value={nationality} onChangeText={setNationality} placeholder="BG" autoCapitalize="characters" maxLength={40} testID="profile-edit-nationality" />
-        <View style={styles.toggleRow}><View style={styles.toggleText}><Text style={styles.toggleLabel}>Show nationality on profile</Text></View>{themedSwitch(showNationality, setShowNationality)}</View>
+        <VisibilityLine label="Orientation" value={showOrientation} onChange={setShowOrientation} sensitive />
 
         <View onLayout={(e) => { datingYRef.current = e.nativeEvent.layout.y; }}>
           <Text style={styles.section}>DATING</Text>
@@ -282,6 +412,48 @@ export function ProfileEditScreen(): React.JSX.Element {
         <TouchableOpacity style={styles.btn} onPress={() => { void save(); }} disabled={loading}>{loading ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.btnText}>Save</Text>}</TouchableOpacity>
         <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
       </ScrollView>
+
+      <ProfileDatePicker
+        visible={datePickerOpen}
+        value={dateOfBirth}
+        onClose={() => setDatePickerOpen(false)}
+        onChange={(value) => {
+          setDateOfBirth(value);
+          clear('dateOfBirth');
+        }}
+      />
+      <ProfileSearchPicker
+        visible={pickerKind === 'city'}
+        title="City"
+        placeholder="Search city or country"
+        options={cityOptions}
+        selectedValue={selectedCityValue}
+        allowCustom
+        customLabel={(value) => `Use “${value}” as city`}
+        onClose={() => setPickerKind(null)}
+        onSelect={selectCity}
+      />
+      <ProfileSearchPicker
+        visible={pickerKind === 'country'}
+        title="Country"
+        placeholder="Search country"
+        options={countryOptions}
+        selectedValue={hometownCountry}
+        onClose={() => setPickerKind(null)}
+        onSelect={selectCountry}
+      />
+      <ProfileSearchPicker
+        visible={pickerKind === 'nationality'}
+        title="Nationality"
+        placeholder="Search nationality"
+        options={nationalityOptions}
+        selectedValue={nationality}
+        onClose={() => setPickerKind(null)}
+        onSelect={(option) => {
+          setNationality(option.value);
+          setPickerKind(null);
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -307,10 +479,55 @@ function createStyles(colors: ThemeColors) {
     bioInput: { minHeight: 100, textAlignVertical: 'top' as const },
     charCount: { color: colors.textFaint, fontSize: fontSize.xs, textAlign: 'right' },
     hint: { color: colors.textFaint, fontSize: fontSize.xs, marginBottom: 4, lineHeight: 17 },
+    compactCard: {
+      minHeight: 78,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    compactMain: { flex: 1 },
+    compactLabel: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: '600' },
+    compactValue: { color: colors.textPrimary, fontSize: fontSize.md, marginTop: 3 },
+    compactHint: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 3 },
+    originPair: { flexDirection: 'row', gap: 10 },
+    pickerField: {
+      flex: 1,
+      minHeight: 68,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+    },
+    pickerFieldTextWrap: { flex: 1, minWidth: 0 },
+    pickerFieldLabel: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: '600' },
+    pickerFieldValue: { color: colors.textPrimary, fontSize: fontSize.sm, marginTop: 4 },
+    pickerFieldPlaceholder: { color: colors.textFaint },
+    fieldError: { color: colors.danger, fontSize: fontSize.xs },
+    visibilityLine: {
+      minHeight: 42,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      paddingHorizontal: 4,
+    },
+    visibilityContext: { flex: 1, color: colors.textMuted, fontSize: fontSize.sm },
+    visibilityState: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: '700' },
+    visibilityStateOn: { color: colors.primary },
+    sensitiveDefault: { color: colors.textFaint, fontSize: 10 },
     toggleRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 14, marginTop: spacing.sm, gap: 12 },
     toggleText: { flex: 1 },
     toggleLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600' },
-    toggleSub: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
     phoneRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 14, borderWidth: 1, borderColor: colors.borderStrong, gap: 12 },
     phoneText: { flex: 1, color: colors.textPrimary, fontSize: fontSize.md },
     phoneMuted: { color: colors.textFaint },
