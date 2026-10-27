@@ -1,13 +1,6 @@
 import type { SocialProvider } from '@g88/shared';
 
-/**
- * Per-provider OAuth2 config for account *linking* (not sign-in). A provider is
- * "active" only when both its client id and secret env vars are set — otherwise
- * the start endpoint 503s.
- *
- * All providers use Authorization Code + PKCE (S256). The code_verifier is
- * stored in Redis for the lifetime of the signed state (see SocialService).
- */
+/** Per-provider OAuth2 config for account linking (not sign-in). */
 export interface ProviderConfig {
   authorizeUrl: string;
   tokenUrl: string;
@@ -15,13 +8,12 @@ export interface ProviderConfig {
   scope: string;
   clientIdEnv: string;
   clientSecretEnv: string;
+  /** Whether this provider supports the S256 PKCE flow used by NEXA. */
+  supportsPkce?: boolean;
   /** Some providers (Instagram/Facebook) take the token as a query param, not a Bearer header. */
   tokenInQuery?: boolean;
-  /** Extra static params appended to the authorize URL (beyond PKCE). */
   extraAuthParams?: Record<string, string>;
-  /** TikTok uses client_key instead of client_id on some endpoints. */
   clientIdParam?: 'client_id' | 'client_key';
-  /** Pull a stable id + handle out of the provider's userinfo payload. */
   parseUser: (json: Record<string, unknown>) => { id: string; username: string | null };
 }
 
@@ -29,23 +21,25 @@ const str = (v: unknown): string | null => (typeof v === 'string' && v.length > 
 
 export const PROVIDERS: Record<SocialProvider, ProviderConfig> = {
   instagram: {
-    authorizeUrl: 'https://api.instagram.com/oauth/authorize',
+    authorizeUrl: 'https://www.instagram.com/oauth/authorize',
     tokenUrl: 'https://api.instagram.com/oauth/access_token',
     userInfoUrl: 'https://graph.instagram.com/me?fields=id,username',
-    scope: 'user_profile',
+    scope: 'instagram_business_basic',
     clientIdEnv: 'INSTAGRAM_CLIENT_ID',
     clientSecretEnv: 'INSTAGRAM_CLIENT_SECRET',
+    supportsPkce: false,
     tokenInQuery: true,
+    extraAuthParams: { force_reauth: 'true' },
     parseUser: (j) => ({ id: str(j.id) ?? '', username: str(j.username) }),
   },
   twitter: {
-    // X rebrand: authorize lives on x.com; token on api.x.com
     authorizeUrl: 'https://x.com/i/oauth2/authorize',
     tokenUrl: 'https://api.x.com/2/oauth2/token',
     userInfoUrl: 'https://api.x.com/2/users/me',
     scope: 'users.read tweet.read offline.access',
     clientIdEnv: 'TWITTER_CLIENT_ID',
     clientSecretEnv: 'TWITTER_CLIENT_SECRET',
+    supportsPkce: true,
     parseUser: (j) => {
       const data = (j.data ?? {}) as Record<string, unknown>;
       return { id: str(data.id) ?? '', username: str(data.username) };
@@ -58,6 +52,7 @@ export const PROVIDERS: Record<SocialProvider, ProviderConfig> = {
     scope: 'user.info.basic',
     clientIdEnv: 'TIKTOK_CLIENT_ID',
     clientSecretEnv: 'TIKTOK_CLIENT_SECRET',
+    supportsPkce: true,
     clientIdParam: 'client_key',
     parseUser: (j) => {
       const user = ((j.data as Record<string, unknown>)?.user ?? {}) as Record<string, unknown>;
@@ -71,6 +66,7 @@ export const PROVIDERS: Record<SocialProvider, ProviderConfig> = {
     scope: 'public_profile',
     clientIdEnv: 'FACEBOOK_CLIENT_ID',
     clientSecretEnv: 'FACEBOOK_CLIENT_SECRET',
+    supportsPkce: true,
     tokenInQuery: true,
     parseUser: (j) => ({ id: str(j.id) ?? '', username: str(j.name) }),
   },
@@ -81,6 +77,7 @@ export const PROVIDERS: Record<SocialProvider, ProviderConfig> = {
     scope: 'openid profile',
     clientIdEnv: 'LINKEDIN_CLIENT_ID',
     clientSecretEnv: 'LINKEDIN_CLIENT_SECRET',
+    supportsPkce: true,
     parseUser: (j) => ({ id: str(j.sub) ?? '', username: str(j.name) }),
   },
   spotify: {
@@ -90,6 +87,7 @@ export const PROVIDERS: Record<SocialProvider, ProviderConfig> = {
     scope: 'user-read-private',
     clientIdEnv: 'SPOTIFY_CLIENT_ID',
     clientSecretEnv: 'SPOTIFY_CLIENT_SECRET',
+    supportsPkce: true,
     parseUser: (j) => ({ id: str(j.id) ?? '', username: str(j.display_name) ?? str(j.id) }),
   },
 };
