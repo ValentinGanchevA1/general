@@ -42,6 +42,19 @@ interface SweepRow {
   end_reason: SweepEndReason;
 }
 
+/**
+ * TypeORM's raw PostgreSQL mutation path can return `[rows, rowCount]` for
+ * INSERT/UPDATE ... RETURNING. Normalize that driver shape without changing
+ * SELECT handling elsewhere in the service.
+ */
+function mutationRows<T>(result: unknown): T[] {
+  if (!Array.isArray(result)) return [];
+  if (result.length === 2 && Array.isArray(result[0]) && typeof result[1] === 'number') {
+    return result[0] as T[];
+  }
+  return result as T[];
+}
+
 /** One session closed by the sweep job. */
 export interface SweptLocationSession {
   id: string;
@@ -81,13 +94,14 @@ export class LocationShareService {
 
     const endsAt = this.computeEndsAt(duration);
 
-    const [row] = await this.db.query<SessionRow[]>(
+    const rawInsert: unknown = await this.db.query(
       `INSERT INTO chat_location_sessions
          (conversation_id, sharer_id, duration, ends_at, last_lat, last_lng)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
       [conversationId, userId, duration, endsAt, location.lat, location.lng],
     );
+    const [row] = mutationRows<SessionRow>(rawInsert);
     if (!row) {
       throw new Error('Failed to create location share session');
     }
@@ -186,7 +200,7 @@ export class LocationShareService {
    */
   async sweepExpired(): Promise<SweptLocationSession[]> {
     const staleCutoff = new Date(Date.now() - LocationShareService.STALE_MS).toISOString();
-    const rows = await this.db.query<SweepRow[]>(
+    const rawRows: unknown = await this.db.query(
       `WITH candidates AS (
          SELECT id
            FROM chat_location_sessions
@@ -217,6 +231,7 @@ export class LocationShareService {
        RETURNING s.id, s.conversation_id, s.ended_at, s.end_reason`,
       [staleCutoff, LocationShareService.SWEEP_BATCH_SIZE],
     );
+    const rows = mutationRows<SweepRow>(rawRows);
 
     const closed = rows.map((row): SweptLocationSession => ({
       id: row.id,
