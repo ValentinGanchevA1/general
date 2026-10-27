@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { useAppTheme } from '@/theme';
 
@@ -10,60 +10,82 @@ interface NexaDiscoveryHeroProps {
 }
 
 /**
- * Decorative map-first brand motif for auth/onboarding surfaces.
- * Uses the final NEXA ecosystem vocabulary without exposing real location data.
+ * Branded discovery hero for auth/onboarding surfaces.
+ *
+ * Keeps the NEXA identity, ecosystem orbit and motto in one responsive lockup
+ * so onboarding never renders a duplicated symbol/wordmark above the hero.
  */
 export function NexaDiscoveryHero({
   compact = false,
 }: NexaDiscoveryHeroProps): React.JSX.Element {
   const { colors } = useAppTheme();
-  const height = compact ? 112 : 156;
-  const orbitSize = compact ? 150 : 205;
+  const { width } = useWindowDimensions();
+  const availableWidth = Math.max(240, width - (compact ? 40 : 56));
+  const heroWidth = Math.min(420, availableWidth);
+  const orbitSize = Math.round(
+    Math.min(compact ? 170 : 320, heroWidth * (compact ? 0.72 : 0.92)),
+  );
+  const haloSize = Math.round(orbitSize * 0.72);
 
   return (
     <View
       pointerEvents="none"
-      accessible={false}
-      importantForAccessibility="no-hide-descendants"
-      style={[
-        styles.root,
-        {
-          height,
-          backgroundColor: colors.mapBase,
-          borderColor: colors.borderDefault,
-        },
-      ]}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel="NEXA. Your local world."
+      style={[styles.root, compact ? styles.compactRoot : styles.defaultRoot]}
     >
       <View
-        style={[
-          styles.gridHorizontal,
-          styles.gridHorizontalTop,
-          { backgroundColor: colors.borderSubtle },
-        ]}
-      />
-      <View
-        style={[
-          styles.gridHorizontal,
-          styles.gridHorizontalBottom,
-          { backgroundColor: colors.borderSubtle },
-        ]}
-      />
-      <View
-        style={[
-          styles.gridVertical,
-          styles.gridVerticalLeft,
-          { backgroundColor: colors.borderSubtle },
-        ]}
-      />
-      <View
-        style={[
-          styles.gridVertical,
-          styles.gridVerticalRight,
-          { backgroundColor: colors.borderSubtle },
-        ]}
-      />
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={styles.visual}
+      >
+        <View
+          style={[
+            styles.haloOuter,
+            {
+              width: haloSize,
+              height: haloSize,
+              borderRadius: haloSize / 2,
+              backgroundColor: colors.actionSoft,
+            },
+          ]}
+        />
+        <View
+          style={[
+            styles.haloInner,
+            {
+              width: Math.round(haloSize * 0.62),
+              height: Math.round(haloSize * 0.62),
+              borderRadius: Math.round(haloSize * 0.31),
+              backgroundColor: colors.discoverySoft,
+              borderColor: colors.discoveryBorder,
+            },
+          ]}
+        />
+        <NexaEntityOrbit size={orbitSize} />
+      </View>
 
-      <NexaEntityOrbit size={orbitSize} />
+      <Text
+        accessibilityElementsHidden
+        style={[
+          styles.wordmark,
+          compact ? styles.wordmarkCompact : styles.wordmarkDefault,
+          { color: colors.textPrimary },
+        ]}
+      >
+        NEXA
+      </Text>
+      <Text
+        accessibilityElementsHidden
+        style={[
+          styles.motto,
+          compact ? styles.mottoCompact : styles.mottoDefault,
+          { color: colors.discovery },
+        ]}
+      >
+        YOUR LOCAL WORLD
+      </Text>
     </View>
   );
 }
@@ -71,29 +93,63 @@ export function NexaDiscoveryHero({
 const styles = StyleSheet.create({
   root: {
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 440,
     alignSelf: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 28,
-    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  defaultRoot: {
+    minHeight: 286,
+  },
+  compactRoot: {
+    minHeight: 190,
+  },
+  visual: {
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
-  gridHorizontal: {
+  haloOuter: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    height: StyleSheet.hairlineWidth,
+    opacity: 0.38,
   },
-  gridHorizontalTop: { top: '34%' },
-  gridHorizontalBottom: { top: '68%' },
-  gridVertical: {
+  haloInner: {
     position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: StyleSheet.hairlineWidth,
+    opacity: 0.42,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  gridVerticalLeft: { left: '32%' },
-  gridVerticalRight: { left: '68%' },
+  wordmark: {
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  wordmarkDefault: {
+    marginTop: -8,
+    fontSize: 30,
+    lineHeight: 38,
+    letterSpacing: 11,
+    paddingLeft: 11,
+  },
+  wordmarkCompact: {
+    marginTop: -4,
+    fontSize: 22,
+    lineHeight: 28,
+    letterSpacing: 8,
+    paddingLeft: 8,
+  },
+  motto: {
+    textAlign: 'center',
+    fontWeight: '700',
+  },
+  mottoDefault: {
+    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: 3.1,
+  },
+  mottoCompact: {
+    marginTop: 5,
+    fontSize: 10,
+    lineHeight: 14,
+    letterSpacing: 2.4,
+  },
 });
