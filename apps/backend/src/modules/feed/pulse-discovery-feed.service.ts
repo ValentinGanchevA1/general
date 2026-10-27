@@ -33,7 +33,7 @@ export class PulseDiscoveryFeedService {
       wants('event') ? this.selectEvents(userId, limit) : Promise.resolve<ActivityItem[]>([]),
     ]);
 
-    const items = [...base.items, ...events]
+    const items = [...base.items.map((item) => this.withNarrative(item)), ...events]
       .sort((a, b) => this.score(b) - this.score(a))
       .slice(0, limit);
 
@@ -41,6 +41,36 @@ export class PulseDiscoveryFeedService {
       items,
       nextSince: items[0]?.createdAt ?? new Date().toISOString(),
     };
+  }
+
+  private withNarrative(item: ActivityItem): ActivityItem {
+    if (item.narrative) return item;
+
+    if (item.type === 'listing') {
+      return {
+        ...item,
+        narrative: {
+          kind: 'listing_created',
+          verb: 'listed',
+          objectLabel: item.title,
+          placeLabel: null,
+        },
+      };
+    }
+
+    if (item.type === 'alert') {
+      return {
+        ...item,
+        narrative: {
+          kind: 'alert_posted',
+          verb: 'posted',
+          objectLabel: item.title,
+          placeLabel: null,
+        },
+      };
+    }
+
+    return item;
   }
 
   private score(item: ActivityItem): number {
@@ -108,6 +138,12 @@ export class PulseDiscoveryFeedService {
       distanceM: Math.round(Number(row.distance_m)),
       createdAt: new Date(row.created_at).toISOString(),
       unread: false,
+      narrative: {
+        kind: 'event_created',
+        verb: 'created',
+        objectLabel: row.title,
+        placeLabel: null,
+      },
       deepLink: { screen: 'EventDetail', params: { eventId: row.id } },
     }));
   }
