@@ -1,16 +1,21 @@
 // apps/backend/src/modules/feed/feed.controller.ts
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 
-import type { FeedResponse, ActivityType } from '@g88/shared';
+import type { ActivityType, FeedResponse, PulseCheckInResult } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { PulseCheckInService } from './pulse-check-in.service';
+import { CreatePulseCheckInDto } from './pulse-check-in.dto';
 import { PulseDiscoveryFeedService } from './pulse-discovery-feed.service';
 
 @Controller('feed')
 @UseGuards(JwtAuthGuard)
 export class FeedController {
-  constructor(private readonly feed: PulseDiscoveryFeedService) {}
+  constructor(
+    private readonly feed: PulseDiscoveryFeedService,
+    private readonly checkIns: PulseCheckInService,
+  ) {}
 
   @Get()
   async list(
@@ -22,7 +27,7 @@ export class FeedController {
     // Pulse is a local-discovery surface. Personal activity belongs in Interactions.
     const sinceDate = since ? new Date(since) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const requested = (types ? types.split(',').filter(Boolean) : []) as ActivityType[];
-    const pulseTypes: ActivityType[] = ['alert', 'listing', 'event'];
+    const pulseTypes: ActivityType[] = ['alert', 'listing', 'event', 'place'];
     const typeList = requested.length > 0
       ? requested.filter((type) => pulseTypes.includes(type))
       : pulseTypes;
@@ -33,5 +38,13 @@ export class FeedController {
     }
 
     return this.feed.aggregate(userId, sinceDate, typeList, cap);
+  }
+
+  @Post('check-ins')
+  createCheckIn(
+    @CurrentUser('id') userId: string,
+    @Body() dto: CreatePulseCheckInDto,
+  ): Promise<PulseCheckInResult> {
+    return this.checkIns.create(userId, dto);
   }
 }
