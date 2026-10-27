@@ -108,6 +108,12 @@ export class PulseDiscoveryFeedService {
       distanceM: Math.round(Number(row.distance_m)),
       createdAt: new Date(row.created_at).toISOString(),
       unread: false,
+      narrative: {
+        kind: 'event_created',
+        verb: 'created',
+        objectLabel: row.title,
+        placeLabel: null,
+      },
       deepLink: { screen: 'EventDetail', params: { eventId: row.id } },
     }));
   }
