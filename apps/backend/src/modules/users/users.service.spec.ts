@@ -257,6 +257,7 @@ describe('UsersService — public profile trust fields', () => {
   let query: jest.Mock;
   const whichAreOnline = jest.fn().mockResolvedValue(new Set<string>());
   const hasBlocked = jest.fn().mockResolvedValue(false);
+  const isBlocked = jest.fn().mockResolvedValue(false);
   const permissionFor = jest
     .fn()
     .mockResolvedValue({ matched: false, sharedInterests: [], canMessage: 'none', conversation: null });
@@ -264,6 +265,7 @@ describe('UsersService — public profile trust fields', () => {
   beforeEach(async () => {
     query = jest.fn().mockResolvedValue([]);
     hasBlocked.mockClear().mockResolvedValue(false);
+    isBlocked.mockClear().mockResolvedValue(false);
     whichAreOnline.mockClear().mockResolvedValue(new Set<string>());
     permissionFor.mockClear().mockResolvedValue({
       matched: false,
@@ -278,7 +280,7 @@ describe('UsersService — public profile trust fields', () => {
         { provide: PresenceService, useValue: { whichAreOnline } },
         { provide: MessagingService, useValue: { permissionFor } },
         { provide: S3Service, useValue: {} },
-        { provide: BlocksService, useValue: { hasBlocked } },
+        { provide: BlocksService, useValue: { hasBlocked, isBlocked } },
       ],
     }).compile();
     service = mod.get(UsersService);
