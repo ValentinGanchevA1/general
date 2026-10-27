@@ -111,7 +111,7 @@ function EntityMarkerImpl({
         density={density}
         label={initialsFromName(name) || '?'}
         avatarUri={personAvatarUri}
-        onAvatarRenderError={onPersonAvatarRenderError}
+        {...(onPersonAvatarRenderError ? { onAvatarRenderError: onPersonAvatarRenderError } : {})}
         {...(showCaption ? { caption: name.slice(0, 10) } : {})}
         state={{ selected, live, verified, isNew, own, dimmed, unavailable }}
         accessibilityLabel={`${name}, person${live ? ', live' : ''}${verified ? ', verified' : ''}`}
