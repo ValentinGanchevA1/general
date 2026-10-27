@@ -17,7 +17,7 @@ export type ProfileIdentityLineProps = {
   emptyHint?: string;
   /**
    * other-mode horizontal alignment.
-   * Profile hero centers; map sheet uses start.
+   * Profile hero and map person sheet center; compact rows can use start.
    */
   align?: 'center' | 'start';
 };
@@ -97,8 +97,8 @@ function createStyles(colors: ThemeColors) {
     textStart: {
       textAlign: 'left',
     },
-    originLine: { color: colors.textMuted, fontSize: 14 },
-    identityLine: { color: colors.textFaint, fontSize: 13 },
+    originLine: { color: colors.textMuted, fontSize: 14, textAlign: 'center' },
+    identityLine: { color: colors.textFaint, fontSize: 13, textAlign: 'center' },
     selfBox: {
       marginTop: spacing.sm,
       marginHorizontal: spacing.xl,

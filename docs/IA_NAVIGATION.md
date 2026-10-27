@@ -65,6 +65,7 @@ NavigationContainer
 - Home/default product surface.
 - Accepts focus params for the signed-in user, another user, a listing, coordinates and contextual create entry.
 - Entity sheets/actions remain map-owned rather than becoming extra primary tabs.
+- Person sheets retain the discovery header, then center the avatar/identity and public origins, shared-interest chips and Purpose, followed by compatibility/mutual metrics. Mutual friends opens from its metric without a duplicate avatar row; View Full Profile occupies its own action row.
 - Map/discovery privacy precision remains server-authoritative.
 
 ### Discover
