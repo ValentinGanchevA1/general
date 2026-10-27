@@ -3,7 +3,7 @@
 > **Authoritative source for sequence and gates.**  
 > Sibling docs: `PRODUCT.md` (what/why), `SPECIFICATION.md` (contracts), `ARCHITECTURE.md` (how), `docs/STATUS_CURRENT.md` (live progress).  
 > **Compatibility note:** public product identity is **NEXA**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
-> Last reconciled: **2026-10-26**.
+> Last reconciled: **2026-10-27**.
 
 ---
 
@@ -18,7 +18,7 @@
 | Mobile renderer migration | 🟡 controlled rollout | Native/provider/runtime/remote-policy gates are merged; production remains `legacy` pending manual provider canaries, physical-device validation and explicit activation |
 | Browser public release | 🟡 foundation merged | Hosting/browser matrix/map provider/deployed HTTPS validation remain |
 
-**Live migration baseline:** `0001–0050`; next free `0051` (CI prefix guard).  
+**Migration allocation:** inspect the migration directory and CI prefix guard before choosing a number. Merged changes include recovery `0051`, reviews `0052`, and occupation `0053`; this does not certify the deployed schema.  
 **Target launch market:** **Varna, BG** (see `PRODUCT.md`).
 
 ## How to read this doc
@@ -119,7 +119,8 @@ Canonical product analytics persist through the backend/Postgres allow-listed ev
 - Postgres remains source of truth;
 - only the existing HMAC subject hash + canonical event name + sanitized low-cardinality properties may be mirrored;
 - raw user IDs, exact location, free text, auth tokens and private entity identifiers remain outside the mirror;
-- keep the sink disabled until deployment configuration and controlled event-shape verification are complete.
+- keep `POSTHOG_ENABLED=false` until #815 retention and personless-event/account-deletion verification is complete;
+- #829 is an open implementation proposal, not production enablement evidence.
 
 ---
 
@@ -143,6 +144,8 @@ Do not introduce these because they are fashionable; require a measured product/
 | R-Abuse | Spam/harassment/local discovery abuse | blocks, rate limits, strikes, server-side visibility and privacy policies remain authoritative |
 
 ## Changelog
+
+- **2026-10-27** — Reconciled merged login/recovery, event reviews and migration recovery, Profile v3 and splash changes in `docs/STATUS_CURRENT.md`. #828/#829 remain open. RC3 does not certify newer features; a later candidate requires an exact commit/artifact and fresh device checks. Preserved legal, device, web and renderer gates; strengthened PostHog gating with #815.
 
 - **2026-10-26** — Reconciled roadmap to current NEXA master: migrations `0001–0050` / next `0051`; web foundation remains a gated public-release track; iOS native compile/launch and MapLibre runtime-router CI gates are green; real-provider iOS/Android canary workflows and remote renderer kill-switch are merged; remaining activation work is operational policy proof + physical-device/provider evidence + a separate production opt-in. Backend-only privacy-safe PostHog mirroring is also merged behind explicit enablement.
 - **2026-09-14** — P2/P3 engineering marked closed; Stories shipped; post-P3 friends/map/sheet/offers work documented.
