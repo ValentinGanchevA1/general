@@ -1,8 +1,8 @@
 # NEXA — current status
 
-> **Synced:** 2026-10-26  
-> **HEAD truth:** `master` at **`2f680c76`** after product/roadmap reconciliation **#787**; current master also includes chat refresh diagnostics **#805**, backend-only PostHog mirroring **#804**, remote renderer policy **#801–#803**, MapLibre provider-canary infrastructure **#799–#800**, and iOS native/runtime rollout hardening **#788–#798** plus the current iOS canary runtime hardening commit.  
-> **Database migrations:** unique prefixes **0001–0052**; next free **0053** (CI migration-prefix guard).
+> **Synced:** 2026-10-27  
+> **Verified source baseline:** `master` at `303439b9cb3e46db5aefa29ff18b28f5a0c53606` (#827). Merged code is not evidence of deployed backend state or physical-device sign-off.
+> **Migration allocation:** inspect `apps/backend/migrations` and the CI prefix guard before allocating a number. Merged changes include password recovery (0051), event reviews (0052), and profile occupation (0053); deployment application is not verified by this snapshot.
 > Root `STATUS.md` is a historical progress log and may lag. This file is the live status pointer from `README.md`.
 
 ---
@@ -34,20 +34,47 @@ Current high-signal slices:
 | **Admin** | ✅ | Vite verification queue; active browser-facing identity is `NEXA Admin` (#781) |
 | **Web v1 foundation** | ✅ code foundation | Browser Map / Discover / Pulse / Connections / You, hardened HttpOnly refresh flow, same-origin edge, realtime chat and Chromium browser E2E |
 | **Product analytics** | ✅ canonical pipeline | Backend/Postgres allow-listed event persistence is canonical; optional PostHog mirror is backend-only and disabled until explicitly configured/verified (#804) |
-| **Migrations** | ✅ | `0001–0052`; next free `0053` |
+| **Migrations** | ✅ source changes | Recovery 0051, reviews 0052 and occupation 0053 merged; verify deployed schema separately |
 
 This snapshot intentionally does not restate every historical feature/PR. `packages/shared`, current code and focused feature docs remain the detailed contract sources.
 
 ---
 
-## Event review implementation — pending merge/deployment
+## Recent merged work and remaining verification
 
-Issue **#816** has a backend/shared/mobile implementation on the feature branch:
-host-confirmed attendance, explicit completion, one review per attendee, immutable
-24-hour editing, paginated review/attendance surfaces and guarded moderation.
-Migration **0052** is included; deployment must apply it before the new API/client.
-This does not change the frozen RC3 baseline or satisfy device release QA.
-See `docs/EVENT_REVIEWS.md` for the contract and remaining physical-device checks.
+| Area | Merged evidence | Remaining verification |
+|---|---|---|
+| Login and password recovery | #817, #819 | Deployed mail configuration, real delivery and device recovery flow |
+| Event reviews | #818, #823 | Successful backend deployment/schema application and device QA under #816 |
+| Profile v3 / Interests / Purpose / occupation privacy | #821 | Device onboarding/edit/public-profile privacy regression |
+| DOB picker and city autocomplete | #822, #824, #826 | Device date bounds, keyboard and manual fallback |
+| Realtime chat | #810, #812 | Two-client unread/preview/read-receipt smoke |
+| Direct person pin to sheet | #814 | Selection/dismiss/return-to-map device smoke |
+| Radiant Orbit v6 splash | #827 | Updated physical-device motion/accessibility evidence under #669 |
+
+Event reviews are merged, including the repeat-safe migration recovery in #823.
+Do not describe #816 as unimplemented because its device QA issue remains open.
+Render workspace `g88` reports production `g88-api` deployment
+`dep-dbft1ojbdu5s73d87r40` as `live` on commit
+`303439b9cb3e46db5aefa29ff18b28f5a0c53606` (finished 2026-10-26T22:17:27Z).
+Runtime logs from 2026-10-27T00:35:23Z confirm registration of EventReviewsController
+and GET/POST/PATCH review routes. This establishes deployed controller presence,
+not authenticated review behavior or independently inspected database schema.
+Direct `/health` probing from the checking environment timed out; current HTTP
+reachability and the full authenticated review flow remain unverified.
+
+As of this reconciliation, #828 (avatar pins) and #829 (PostHog privacy deletion)
+remain open and are not part of the merged feature baseline.
+
+### Next candidate scope
+
+RC3 remains frozen at `040f0ace62438ba0f047171fa60e6ba355ed19ca`.
+It does not certify the newer login, profile, reviews or splash changes.
+Before superseding it, select an exact commit after intended PRs pass review/CI,
+record the APK/build run and SHA-256, confirm backend/schema compatibility, then
+run #580/#669 plus the feature-specific checks above. Capture #616 screenshots
+from that approved candidate. No new candidate is declared or frozen by this document.
+See `docs/EVENT_REVIEWS.md` for review-specific checks.
 
 ---
 
@@ -132,7 +159,8 @@ The PostHog mirror (#804):
 - starts only after successful canonical persistence;
 - sends only the existing HMAC subject hash, canonical event name and already-sanitized low-cardinality properties;
 - does not receive raw user IDs, exact coordinates, free text, auth tokens, contact data or private entity/conversation identifiers;
-- remains off until deployment configuration and controlled capture-shape verification are complete.
+- must remain disabled (`POSTHOG_ENABLED=false`) until #815 retention/personless-event deletion requirements are verified;
+- #829 proposes a durable deletion pipeline but remains open; staging deletion/query verification is still required before production enablement.
 
 Conversation refresh diagnostics (#805) use the same privacy principle: fixed classes/status only, no retained free-text transport detail.
 
@@ -145,7 +173,7 @@ Conversation refresh diagnostics (#805) use the same privacy principle: fixed cl
 3. **Controlled MapLibre rollout evidence** — complete live remote-policy proof, manual provider canaries and physical-device validation before any production opt-in.
 4. **Play Store visuals** — finish #616 only after the approved device baseline has no open P0/P1 release blocker.
 5. **Web production topology** — choose final hostname/edge policy + production tile stack and run deployed HTTPS validation against the final topology.
-6. **Analytics mirror rollout** — configure/enable PostHog only after controlled event-shape verification; canonical Postgres persistence stays authoritative.
+6. **Analytics mirror rollout** — resolve #815 retention/account-deletion verification, review #829 and prove staging deletion before production enablement; canonical Postgres persistence stays authoritative.
 7. **Remaining authority-doc reconciliation** — update `ARCHITECTURE.md`, `SPECIFICATION.md` and contributor guidance only where current code can prove replacement facts; preserve historical references and compatibility identifiers.
 
 Explicitly deferred unless reprioritized: live streaming, broad microservices/Kafka/GraphQL rewrites, and speculative features not tied to the release gates above.
