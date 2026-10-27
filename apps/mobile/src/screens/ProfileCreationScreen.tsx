@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { BrandLogo } from '@/components/Brand/BrandLogo';
 import { NexaDiscoveryHero } from '@/components/Brand/NexaDiscoveryHero';
 import { BirthDateField, CityAutocompleteField } from '@/components/profile/ProfileOriginFields';
 import { FormField } from '@/components/FormField';
@@ -373,8 +372,6 @@ export function ProfileCreationScreen(): React.JSX.Element {
     return (
       <View style={[styles.root, { backgroundColor: colors.canvas }]}>
         <ScrollView contentContainerStyle={styles.welcomeBody} showsVerticalScrollIndicator={false}>
-          <BrandLogo size={72} />
-          <Text style={[styles.welcomeEyebrow, { color: colors.discovery }]}>YOUR LOCAL WORLD</Text>
           <NexaDiscoveryHero />
           <Text style={[styles.welcomeHeading, { color: colors.textPrimary }]}>Make the map yours.</Text>
           <Text style={[styles.welcomeSub, { color: colors.textSecondary }]}>Tell NEXA what you like, why you’re here, and how you want to appear nearby.</Text>
@@ -437,9 +434,8 @@ export function ProfileCreationScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  welcomeBody: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing.xl, paddingTop: 56, paddingBottom: 24 },
-  welcomeEyebrow: { marginTop: spacing.xl, fontSize: 12, fontWeight: '800', letterSpacing: 1.6 },
-  welcomeHeading: { marginTop: spacing.xl, fontSize: 32, fontWeight: '800', letterSpacing: -0.7 },
+  welcomeBody: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing.xl, paddingTop: 40, paddingBottom: 24 },
+  welcomeHeading: { marginTop: spacing.lg, fontSize: 32, fontWeight: '800', letterSpacing: -0.7 },
   welcomeSub: { marginTop: spacing.sm, fontSize: fontSize.md, lineHeight: 23 },
   welcomeFooter: { padding: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth },
   primaryButton: { minHeight: 56, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
