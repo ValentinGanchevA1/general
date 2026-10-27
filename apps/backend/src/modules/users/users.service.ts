@@ -280,7 +280,8 @@ export class UsersService {
         canMessage: perm.canMessage,
       };
       blockedByViewer = blocked;
-      if (meters != null) distanceMeters = meters;
+      // Round distance to kilometer buckets to avoid exposing precise proximity.
+      if (meters != null) distanceMeters = Math.round(meters / 1000) * 1000;
       if (pin) {
         mapLat = pin.lat;
         mapLng = pin.lng;
@@ -338,11 +339,13 @@ export class UsersService {
     };
   }
 
+  /** Public pins are snapped to ~2 km grid cells; never return stored GPS coordinates. */
   private async subjectMapPin(
     targetId: string,
   ): Promise<{ lat: number; lng: number } | null> {
     const rows = await this.db.query<Array<{ lat: number | string; lng: number | string }>>(
-      `SELECT ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng
+      `SELECT ST_Y(ST_SnapToGrid(location::geometry, 0.02)) AS lat,
+              ST_X(ST_SnapToGrid(location::geometry, 0.02)) AS lng
          FROM users
         WHERE id = $1
           AND deleted_at IS NULL
