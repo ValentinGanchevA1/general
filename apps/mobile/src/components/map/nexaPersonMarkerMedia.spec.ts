@@ -23,11 +23,13 @@ describe('resolvePersonMarkerAvatarUrl', () => {
     );
   });
 
-  it('suppresses avatar media for compact unselected markers', () => {
-    expect(resolvePersonMarkerAvatarUrl(userPoint, 'compact', false)).toBeNull();
+  it('keeps avatar media at compact density to preserve marker identity', () => {
+    expect(resolvePersonMarkerAvatarUrl(userPoint, 'compact', false)).toBe(
+      'https://cdn.example.com/avatar.jpg',
+    );
   });
 
-  it('allows the selected person avatar even at compact density', () => {
+  it('keeps the same avatar when compact marker becomes selected', () => {
     expect(resolvePersonMarkerAvatarUrl(userPoint, 'compact', true)).toBe(
       'https://cdn.example.com/avatar.jpg',
     );
