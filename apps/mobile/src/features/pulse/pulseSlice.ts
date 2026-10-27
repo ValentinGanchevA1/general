@@ -1,9 +1,15 @@
 // apps/mobile/src/features/pulse/pulseSlice.ts
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import type { ActivityItem, ActivityType, FeedResponse } from '@g88/shared';
+import type {
+  ActivityItem,
+  ActivityType,
+  CreatePulseCheckInRequest,
+  FeedResponse,
+  PulseCheckInResult,
+} from '@g88/shared';
 
-import { getJson } from '@/api/client';
+import { getJson, postJson } from '@/api/client';
 import { logout } from '@/features/auth/authSlice';
 import { extractMessage } from '@/utils/extractMessage';
 
@@ -13,6 +19,8 @@ export interface PulseState {
   error: string | null;
   lastFetchedAt: string | null;
   pendingFilter: string | null;
+  checkInSubmitting: boolean;
+  checkInError: string | null;
 }
 
 const initialState: PulseState = {
@@ -21,6 +29,8 @@ const initialState: PulseState = {
   error: null,
   lastFetchedAt: null,
   pendingFilter: null,
+  checkInSubmitting: false,
+  checkInError: null,
 };
 
 export interface FetchFeedArgs {
@@ -43,6 +53,21 @@ export const fetchFeed = createAsyncThunk<FeedResponse, FetchFeedArgs | undefine
   },
 );
 
+export const createPulseCheckIn = createAsyncThunk<
+  PulseCheckInResult,
+  CreatePulseCheckInRequest,
+  { rejectValue: string }
+>(
+  'pulse/createCheckIn',
+  async (input, { rejectWithValue }) => {
+    try {
+      return await postJson<CreatePulseCheckInRequest, PulseCheckInResult>('/feed/check-ins', input);
+    } catch (e) {
+      return rejectWithValue(extractMessage(e, 'Could not check in'));
+    }
+  },
+);
+
 const slice = createSlice({
   name: 'pulse',
   initialState,
@@ -50,6 +75,7 @@ const slice = createSlice({
     clearPulse: (s) => { s.items = []; s.error = null; },
     setPendingFilter: (s, a: PayloadAction<string>) => { s.pendingFilter = a.payload; },
     clearPendingFilter: (s) => { s.pendingFilter = null; },
+    clearCheckInError: (s) => { s.checkInError = null; },
   },
   extraReducers: (b) => {
     b.addCase(fetchFeed.pending, (s) => { s.loading = true; s.error = null; });
@@ -60,10 +86,22 @@ const slice = createSlice({
       s.loading = false;
       s.error = typeof a.payload === 'string' ? a.payload : 'Failed to load Pulse';
     });
+    b.addCase(createPulseCheckIn.pending, (s) => {
+      s.checkInSubmitting = true;
+      s.checkInError = null;
+    });
+    b.addCase(createPulseCheckIn.fulfilled, (s) => {
+      s.checkInSubmitting = false;
+      s.checkInError = null;
+    });
+    b.addCase(createPulseCheckIn.rejected, (s, a) => {
+      s.checkInSubmitting = false;
+      s.checkInError = a.payload ?? 'Could not check in';
+    });
     b.addCase(logout.fulfilled, () => initialState);
     b.addCase(logout.rejected, () => initialState);
   },
 });
 
-export const { clearPulse, setPendingFilter, clearPendingFilter } = slice.actions;
+export const { clearPulse, setPendingFilter, clearPendingFilter, clearCheckInError } = slice.actions;
 export default slice.reducer;

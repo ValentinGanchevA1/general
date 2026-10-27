@@ -9,6 +9,7 @@ import { FeedService } from './feed.service';
 
 const MAX_DISTANCE_M = 10_000;
 const RECENCY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const CHECK_IN_CELL_RADIUS = 8;
 
 @Injectable()
 export class PulseDiscoveryFeedService {
@@ -26,14 +27,19 @@ export class PulseDiscoveryFeedService {
     const wants = (type: ActivityType): boolean => types.includes(type);
     const legacyTypes = types.filter((type) => type === 'alert' || type === 'listing');
 
-    const [base, events] = await Promise.all([
+    const [base, events, checkIns] = await Promise.all([
       legacyTypes.length > 0
         ? this.feed.aggregate(userId, since, legacyTypes, limit)
         : Promise.resolve<FeedResponse>({ items: [], nextSince: new Date().toISOString() }),
       wants('event') ? this.selectEvents(userId, limit) : Promise.resolve<ActivityItem[]>([]),
+      wants('place') ? this.selectCheckIns(userId, since, limit) : Promise.resolve<ActivityItem[]>([]),
     ]);
 
-    const items = [...base.items.map((item) => this.withNarrative(item)), ...events]
+    const items = [
+      ...base.items.map((item) => this.withNarrative(item)),
+      ...events,
+      ...checkIns,
+    ]
       .sort((a, b) => this.score(b) - this.score(a))
       .slice(0, limit);
 
@@ -79,8 +85,115 @@ export class PulseDiscoveryFeedService {
     const distance = item.distanceM == null
       ? 0.5
       : Math.max(0, 1 - item.distanceM / MAX_DISTANCE_M);
-    const urgency = item.type === 'alert' ? 1 : item.type === 'event' ? 0.7 : 0.35;
+    const urgency = item.type === 'alert'
+      ? 1
+      : item.type === 'place'
+        ? 0.8
+        : item.type === 'event'
+          ? 0.7
+          : 0.35;
     return recency * 0.45 + distance * 0.35 + urgency * 0.2;
+  }
+
+  private async selectCheckIns(
+    userId: string,
+    since: Date,
+    limit: number,
+  ): Promise<ActivityItem[]> {
+    const [viewer] = await this.db.query<Array<{ location_h3_r7: string | null }>>(
+      `SELECT location_h3_r7 FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      [userId],
+    );
+    if (!viewer?.location_h3_r7) return [];
+
+    const cells = h3.gridDisk(viewer.location_h3_r7, CHECK_IN_CELL_RADIUS);
+    const rows = await this.db.query<Array<{
+      id: string;
+      user_id: string;
+      display_name: string;
+      place_label: string;
+      audience: 'friends' | 'nearby';
+      location_h3_r7: string;
+      created_at: Date;
+    }>>(
+      `SELECT ci.id,
+              ci.user_id,
+              u.display_name,
+              ci.place_label,
+              ci.audience,
+              ci.location_h3_r7,
+              ci.created_at
+         FROM pulse_check_ins ci
+         JOIN users u ON u.id = ci.user_id AND u.deleted_at IS NULL
+        WHERE ci.deleted_at IS NULL
+          AND ci.expires_at > NOW()
+          AND ci.created_at > $2
+          AND ci.location_h3_r7 = ANY($3::text[])
+          AND NOT EXISTS (
+            SELECT 1
+              FROM user_blocks b
+             WHERE (b.blocker_id = $1 AND b.blocked_id = ci.user_id)
+                OR (b.blocker_id = ci.user_id AND b.blocked_id = $1)
+          )
+          AND (
+            ci.user_id = $1
+            OR ci.audience = 'nearby'
+            OR (
+              ci.audience = 'friends'
+              AND EXISTS (
+                SELECT 1
+                  FROM friendships f
+                 WHERE (f.user_low_id = $1 AND f.user_high_id = ci.user_id)
+                    OR (f.user_low_id = ci.user_id AND f.user_high_id = $1)
+              )
+            )
+          )
+        ORDER BY ci.created_at DESC
+        LIMIT $4`,
+      [userId, since.toISOString(), cells, Math.min(limit * 3, 300)],
+    );
+
+    return rows
+      .map((row): ActivityItem => {
+        const distanceM = this.distanceBetweenCellsM(viewer.location_h3_r7!, row.location_h3_r7);
+        return {
+          id: `place:${row.id}`,
+          type: 'place',
+          category: null,
+          title: row.place_label,
+          preview: row.audience === 'friends' ? 'Shared with friends' : 'Shared nearby',
+          actorId: row.user_id,
+          actorName: row.display_name,
+          distanceM,
+          createdAt: new Date(row.created_at).toISOString(),
+          unread: false,
+          narrative: {
+            kind: 'place_visit',
+            verb: 'visited',
+            objectLabel: row.place_label,
+            placeLabel: null,
+          },
+          deepLink: { screen: 'Main', params: { screen: 'Map' } },
+        };
+      })
+      .filter((item) => item.distanceM != null && item.distanceM <= MAX_DISTANCE_M)
+      .slice(0, limit);
+  }
+
+  private distanceBetweenCellsM(leftCell: string, rightCell: string): number {
+    const [leftLat, leftLng] = h3.cellToLatLng(leftCell);
+    const [rightLat, rightLng] = h3.cellToLatLng(rightCell);
+    const toRadians = (value: number): number => value * Math.PI / 180;
+    const latDelta = toRadians(rightLat - leftLat);
+    const lngDelta = toRadians(rightLng - leftLng);
+    const leftLatRad = toRadians(leftLat);
+    const rightLatRad = toRadians(rightLat);
+    const sinLat = Math.sin(latDelta / 2);
+    const sinLng = Math.sin(lngDelta / 2);
+    const a = sinLat * sinLat
+      + Math.cos(leftLatRad) * Math.cos(rightLatRad) * sinLng * sinLng;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(6_371_000 * c);
   }
 
   private async selectEvents(userId: string, limit: number): Promise<ActivityItem[]> {

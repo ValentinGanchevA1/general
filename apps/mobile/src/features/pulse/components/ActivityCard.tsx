@@ -13,6 +13,7 @@ const ICON_BY_TYPE: Record<ActivityType, string> = {
 	alert: 'alert-circle-outline',
 	match: 'heart',
 	event: 'calendar-outline',
+	place: 'map-marker-outline',
 };
 
 function getAccentByType(colors: ThemeColors): Record<ActivityType, string> {
@@ -23,6 +24,7 @@ function getAccentByType(colors: ThemeColors): Record<ActivityType, string> {
 		alert: colors.danger,
 		match: colors.entityPerson,
 		event: colors.entityEvent,
+		place: colors.primary,
 	};
 }
 
@@ -44,7 +46,10 @@ export function ActivityCard({ item, onPress, onView }: Props): React.JSX.Elemen
 		.toUpperCase();
 	const distance = item.distanceM != null ? formatDistance(item.distanceM) : null;
 	const meta = [relTime(item.createdAt), distance].filter(Boolean).join(' · ');
-	const isDiscoveryItem = item.type === 'listing' || item.type === 'alert' || item.type === 'event';
+	const isDiscoveryItem = item.type === 'listing'
+		|| item.type === 'alert'
+		|| item.type === 'event'
+		|| item.type === 'place';
 	const sentence = getActivitySentence(item);
 	const accent = accentByType[item.type];
 
