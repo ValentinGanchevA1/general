@@ -234,6 +234,9 @@ export class UsersService {
   }
 
   async getPublicProfile(userId: string, viewerId?: string): Promise<PublicUserProfile> {
+    if (viewerId && viewerId !== userId && await this.blocks.isBlocked(viewerId, userId)) {
+      throw new NotFoundException({ code: 'users.not_found', message: 'User not found' });
+    }
     const rows = await this.db.query<PublicUserRow[]>(
       `SELECT id, display_name,
               COALESCE(
