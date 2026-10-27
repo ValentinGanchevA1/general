@@ -10,9 +10,56 @@ interface SweepRowFixture {
   end_reason: 'expired' | 'timeout';
 }
 
+describe('LocationShareService mutation result handling', () => {
+  it('unwraps PostgreSQL mutation tuples for INSERT ... RETURNING', async () => {
+    const now = '2026-10-27T16:00:00.000Z';
+    const sessionRow = {
+      id: 'session-new',
+      conversation_id: 'conversation-a',
+      sharer_id: 'user-a',
+      status: 'active',
+      duration: '15m',
+      started_at: now,
+      ends_at: '2026-10-27T16:15:00.000Z',
+      last_lat: 43.2,
+      last_lng: 27.9,
+      last_updated_at: now,
+      ended_at: null,
+      end_reason: null,
+    };
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([[], 0])
+      .mockResolvedValueOnce([[sessionRow], 1]);
+    const persistLocationSession = jest.fn().mockResolvedValue({ id: 'message-a' });
+    const chat = {
+      isParticipant: jest.fn().mockResolvedValue(true),
+      getParticipantIds: jest.fn().mockResolvedValue(['user-a']),
+      persistLocationSession,
+    } as unknown as ChatService;
+    const service = new LocationShareService({ query } as unknown as DataSource, chat);
+
+    const result = await service.start('user-a', 'conversation-a', '15m', {
+      lat: 43.2,
+      lng: 27.9,
+    });
+
+    expect(result.session.id).toBe('session-new');
+    expect(result.session.conversationId).toBe('conversation-a');
+    expect(result.session.sharerId).toBe('user-a');
+    expect(persistLocationSession).toHaveBeenCalledWith(
+      'conversation-a',
+      'user-a',
+      'session-new',
+      'Started sharing live location for 15 minutes',
+      { lat: 43.2, lng: 27.9 },
+    );
+  });
+});
+
 describe('LocationShareService sweepExpired', () => {
   const makeService = (rows: SweepRowFixture[]) => {
-    const query = jest.fn(async (_sql: string, _params?: unknown[]): Promise<SweepRowFixture[]> => rows);
+    const query = jest.fn(async (_sql: string, _params?: unknown[]): Promise<unknown> => [rows, rows.length]);
     const db = { query } as unknown as DataSource;
     const chat = {} as ChatService;
     return { service: new LocationShareService(db, chat), query };
@@ -65,7 +112,7 @@ describe('LocationShareService sweepExpired', () => {
     ]);
   });
 
-  it('returns no closures when no active candidate is claimed', async () => {
+  it('returns no closures when the mutation tuple reports no rows', async () => {
     const { service, query } = makeService([]);
 
     await expect(service.sweepExpired()).resolves.toEqual([]);
