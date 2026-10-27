@@ -1,7 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
 	ActivityIndicator,
-	Image,
 	Text,
 	TouchableOpacity,
 	View,
@@ -15,8 +14,6 @@ import type {
 	CreateConversationResponse,
 	EntityPoint,
 	EventMeta,
-	FriendCard,
-	FriendsPage,
 	ListingMeta,
 	PublicUserProfile,
 	RelationshipSummary,
@@ -36,6 +33,8 @@ import {ProfileTrustBlock} from '@/components/Profile/ProfileTrustBlock';
 import {ProfileStatsRow} from '@/components/Profile/ProfileStatsRow';
 import {ProfileIdentityLine} from '@/components/Profile/ProfileIdentityLine';
 import {publicIdentityLines} from '@/features/profile/mapToProfileViewModel';
+import {interestLabel} from '@/features/profile/interestOptions';
+import {PURPOSE_OPTIONS} from '@/features/profile/goalOptions';
 import {softCompatibilityPercent} from '@/features/profile/softCompatibility';
 import {
 	resolveNexaConnectActionLabel,
@@ -147,7 +146,6 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull, onLik
 	const [opening, setOpening] = useState(false);
 	const [blocking, setBlocking] = useState(false);
 	const [mutualCount, setMutualCount] = useState(0);
-	const [mutualPreview, setMutualPreview] = useState<FriendCard[]>([]);
 	const [reloadToken, setReloadToken] = useState(0);
 	const likeSent = likeSentControlled === true;
 	const datingMatched = isMatchControlled === true;
@@ -173,9 +171,6 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull, onLik
 				if (cancelled) return;
 				const count = rel.mutualFriendsCount ?? 0;
 				setMutualCount(count);
-				if (count < 1) { setMutualPreview([]); return; }
-				const page = await getJson<FriendsPage>(`/friends/mutual/${point.id}?limit=3`);
-				if (!cancelled) setMutualPreview(page.items.slice(0, 3));
 			} catch { /* mutual is additive */ }
 		})();
 		return () => { cancelled = true; };
@@ -199,6 +194,9 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull, onLik
 		if (distanceLabel != null) parts.push(distanceLabel);
 		return parts.length > 0 ? parts.join(' · ') : null;
 	})();
+	const sharedInterests = profile?.relationship?.sharedInterests ?? [];
+	const compatibility = softCompatibilityPercent(sharedInterests);
+	const purposes = profile?.goals ?? [];
 	const relationshipKnown = profile != null;
 	const matched = profile?.relationship?.matched === true;
 	const messageAllowed = canMessage !== 'none' && !blocked;
@@ -257,7 +255,7 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull, onLik
 	const isDating = viewerMode === 'dating';
 	const handleLike = (): void => { if (!liking && !likeSent && !blocked && isDating) onLike?.(); };
 	const handlePass = (): void => { if (!passing && !blocked && isDating) onPass?.(); };
-	const profileButton = <TouchableOpacity key="profile" style={[styles.profileBtn, styles.ctaFlexShrink]} onPress={handleOpenProfile} accessibilityRole="button" accessibilityLabel="View full profile"><Text style={styles.profileBtnText}>View Full Profile</Text></TouchableOpacity>;
+	const profileButton = <TouchableOpacity key="profile" style={[styles.profileBtn, styles.fullProfileBtn]} onPress={handleOpenProfile} accessibilityRole="button" accessibilityLabel="View full profile"><Text style={styles.profileBtnText}>View Full Profile</Text></TouchableOpacity>;
 	const messageButton = <TouchableOpacity key="message" style={[styles.primaryBtn, styles.messageBtn, opening ? styles.btnDisabled : undefined, styles.ctaFlex]} onPress={() => void onMessage()} disabled={opening} accessibilityRole="button" accessibilityLabel={messageActionLabel}><Text style={styles.primaryBtnText}>{opening ? '…' : messageActionLabel}</Text></TouchableOpacity>;
 	const waveButton = <TouchableOpacity key="wave" style={[styles.primaryBtn, styles.waveBtn, waving ? styles.btnDisabled : undefined, styles.ctaFlex]} onPress={onWave} disabled={waving} accessibilityRole="button" accessibilityLabel={waveActionLabel}><Text style={styles.primaryBtnText}>{waving ? '…' : waveActionLabel}</Text></TouchableOpacity>;
 	const likeButton = <TouchableOpacity key="like" style={[styles.primaryBtn, styles.likeBtn, liking || likeSent ? styles.btnDisabled : undefined, styles.ctaFlex]} onPress={handleLike} disabled={liking || likeSent} accessibilityRole="button" accessibilityLabel={likeSent ? 'Liked' : 'Like'}><Text style={styles.primaryBtnText}>{liking ? '…' : likeSent ? 'Liked' : 'Like'}</Text></TouchableOpacity>;
@@ -277,13 +275,30 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull, onLik
 
 	return <View style={styles.sheet}>
 		<NexaSpatialKindHeader kind="person" arrivalKey={point.id} trailing={overflowAction} />
-		<View style={styles.userHeader}><View style={styles.userHeaderMain}><IdentityBlock name={displayName} avatarUrl={meta.avatarUrl ?? null} verification={meta.verification ?? profile?.verification ?? 'none'} idVerified={idVerified} online={meta.online} subtitle={subtitle} ringVariant={ringVariant} size={56} onPress={handleOpenProfile} /></View></View>
-		{!fetching && profile != null ? <View style={styles.identityLineWrap}><ProfileIdentityLine mode="other" align="start" identityLine={identityLine} hometownLine={hometownLine} /></View> : null}
-		{!fetching && profile != null ? (() => { const shared = profile.relationship?.sharedInterests ?? []; const compat = softCompatibilityPercent(shared); if (compat == null && shared.length < 1 && mutualCount < 1) return null; return <View style={styles.compatRow}>{compat != null ? <View style={styles.compatStat}><Text style={styles.compatValue}>{compat}%</Text><Text style={styles.compatLabel}>Compatibility</Text></View> : null}{shared.length > 0 ? <View style={styles.compatStat}><Text style={styles.compatValue}>{shared.length}</Text><Text style={styles.compatLabel}>Mutual interests</Text></View> : null}{mutualCount > 0 ? <View style={styles.compatStat}><Text style={styles.compatValue}>{mutualCount}</Text><Text style={styles.compatLabel}>Mutual friends</Text></View> : null}</View>; })() : null}
-		{!fetching && (profile?.relationship?.sharedInterests?.length ?? 0) > 0 ? <View style={styles.interestChips}>{(profile?.relationship?.sharedInterests ?? []).slice(0, 6).map((tag) => <View key={tag} style={styles.interestChip}><Text style={styles.interestChipText}>{tag}</Text></View>)}</View> : null}
-		{fetching && profile == null ? <ActivityIndicator color={colors.primary} size="small" style={{alignSelf: 'flex-start'}} /> : null}
+		<View style={styles.userHeader}><View style={styles.userHeaderMain}><IdentityBlock name={displayName} avatarUrl={meta.avatarUrl ?? null} verification={meta.verification ?? profile?.verification ?? 'none'} idVerified={idVerified} online={meta.online} subtitle={subtitle} ringVariant={ringVariant} size={104} layout="centered" onPress={handleOpenProfile} /></View></View>
+		{!fetching && profile != null ? <View style={styles.identityLineWrap}><ProfileIdentityLine mode="other" align="center" identityLine={identityLine} hometownLine={hometownLine} /></View> : null}
+		{!fetching && sharedInterests.length > 0 ? (
+			<View style={styles.interestChips} accessibilityLabel="Shared interests">
+				{sharedInterests.slice(0, 6).map((tag) => <View key={tag} style={styles.interestChip}><Text style={styles.interestChipText}>{interestLabel(tag)}</Text></View>)}
+			</View>
+		) : null}
+		{!fetching && purposes.length > 0 ? (
+			<View style={styles.purposeSection}>
+				<Text style={styles.sectionLabel}>Purpose</Text>
+				<View style={styles.interestChips}>
+					{purposes.map((purpose) => <View key={purpose} style={styles.interestChip}><Text style={styles.interestChipText}>{PURPOSE_OPTIONS.find((option) => option.value === purpose)?.label ?? purpose}</Text></View>)}
+				</View>
+			</View>
+		) : null}
+		{!fetching && profile != null && (compatibility != null || sharedInterests.length > 0 || mutualCount > 0) ? (
+			<View style={styles.compatRow}>
+				{compatibility != null ? <View style={styles.compatStat}><Text style={styles.compatValue}>{compatibility}%</Text><Text style={styles.compatLabel}>Compatibility</Text></View> : null}
+				{sharedInterests.length > 0 ? <View style={styles.compatStat}><Text style={styles.compatValue}>{sharedInterests.length}</Text><Text style={styles.compatLabel}>Mutual interests</Text></View> : null}
+				{mutualCount > 0 ? <TouchableOpacity style={styles.compatStat} onPress={openMutualFriends} accessibilityRole="button" accessibilityLabel={`${mutualCount} mutual friends`}><Text style={styles.compatValue}>{mutualCount}</Text><Text style={styles.compatLabel}>Mutual friends</Text></TouchableOpacity> : null}
+			</View>
+		) : null}
+		{fetching && profile == null ? <ActivityIndicator color={colors.primary} size="small" style={{alignSelf: 'center'}} /> : null}
 		{fetchError && profile == null ? <View style={styles.fetchErrorRow}><Text style={styles.fetchErrorText}>Could not load profile</Text><TouchableOpacity onPress={onRetryProfile} accessibilityRole="button" accessibilityLabel={retryProfileLabel} hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}><Text style={styles.fetchErrorRetry}>{retryProfileLabel}</Text></TouchableOpacity></View> : null}
-		{!fetching && mutualCount > 0 ? <TouchableOpacity style={styles.mutualRow} onPress={openMutualFriends} accessibilityRole="button" accessibilityLabel={`${mutualCount} mutual friends`}><View style={styles.mutualAvatars}>{mutualPreview.map((f, i) => <View key={f.userId} style={[styles.mutualAvatarWrap, i > 0 ? styles.mutualAvatarOverlap : undefined]}>{f.avatarUrl ? <Image source={{uri: f.avatarUrl}} style={styles.mutualAvatar} /> : <View style={[styles.mutualAvatar, styles.mutualAvatarPlaceholder]}><Text style={styles.mutualInitial}>{(f.displayName[0] ?? '?').toUpperCase()}</Text></View>}</View>)}</View><Text style={styles.mutualText}>{mutualCount} mutual friend{mutualCount === 1 ? '' : 's'}</Text></TouchableOpacity> : null}
 		<View style={styles.actions}>{actionOrder}</View>
 		{!fetching && profile != null ? <TouchableOpacity style={styles.trustBlock} onPress={() => openProfile('trust')} accessibilityRole="button" accessibilityLabel="View trust on profile" activeOpacity={0.85}><ProfileTrustBlock verification={profile.verification} idVerified={profile.idVerified} verificationScore={profile.verificationScore} /></TouchableOpacity> : null}
 		{!fetching && profile != null && (profile.status?.level != null || profile.status?.allTimeRank != null || (profile.status?.achievementIcons?.length ?? 0) > 0) ? <TouchableOpacity style={styles.statsBlock} onPress={() => openProfile('stats')} accessibilityRole="button" accessibilityLabel="View activity on profile" activeOpacity={0.85}><ProfileStatsRow {...(profile.status?.level != null ? {level: profile.status.level} : {})} {...(profile.status?.allTimeRank != null ? {allTimeRank: profile.status.allTimeRank} : {})} {...(profile.status?.achievementIcons != null ? {achievementIcons: profile.status.achievementIcons} : {})} /></TouchableOpacity> : null}
