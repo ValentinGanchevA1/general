@@ -12,14 +12,29 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Query open Sonar bugs and vulnerabilities on master new code
+      - name: Query Sonar master analysis and quality gate
         shell: bash
         run: |
           set -euo pipefail
-          url='https://sonarcloud.io/api/issues/search?componentKeys=ValentinGanchevA1_general&branch=master&issueStatuses=OPEN%2CCONFIRMED&sinceLeakPeriod=true&types=BUG%2CVULNERABILITY&ps=500'
-          response="$(curl --fail --silent --show-error --location --retry 2 "$url")"
-          printf '%s' "$response" | jq -r '
-            "total=\(.total)",
+          project='ValentinGanchevA1_general'
+
+          analyses="$(curl --fail --silent --show-error --location --retry 2 \
+            "https://sonarcloud.io/api/project_analyses/search?project=${project}&branch=master&ps=5")"
+          printf '%s' "$analyses" | jq -r '
+            .analyses[0] | "latest-analysis revision=\(.revision // "unknown") date=\(.date // "unknown") key=\(.key // "unknown")"
+          '
+
+          gate="$(curl --fail --silent --show-error --location --retry 2 \
+            "https://sonarcloud.io/api/qualitygates/project_status?projectKey=${project}&branch=master")"
+          printf '%s' "$gate" | jq -r '
+            "quality-gate status=\(.projectStatus.status)",
+            (.projectStatus.conditions[]? | select(.status != "OK") | "failed metric=\(.metricKey) status=\(.status) actual=\(.actualValue // "n/a") threshold=\(.errorThreshold // "n/a")")
+          '
+
+          issues="$(curl --fail --silent --show-error --location --retry 2 \
+            "https://sonarcloud.io/api/issues/search?componentKeys=${project}&branch=master&issueStatuses=OPEN%2CCONFIRMED&sinceLeakPeriod=true&types=BUG%2CVULNERABILITY&ps=500")"
+          printf '%s' "$issues" | jq -r '
+            "bug-vulnerability-total=\(.total)",
             (.issues[] | [
               .key,
               .rule,
