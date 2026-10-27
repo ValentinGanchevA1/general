@@ -4,9 +4,6 @@ on:
   issues:
     types: [opened]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   summary:
     runs-on: ubuntu-latest
@@ -21,6 +18,7 @@ jobs:
 
       - name: Run AI inference
         id: inference
+        continue-on-error: true
         uses: actions/ai-inference@v1
         with:
           prompt: |
@@ -30,8 +28,9 @@ jobs:
             Body: ${{ github.event.issue.body }}
 
       - name: Comment with AI summary
+        if: steps.inference.outcome == 'success' && steps.inference.outputs.response != ''
         run: |
-          gh issue comment $ISSUE_NUMBER --body "$RESPONSE"
+          gh issue comment "$ISSUE_NUMBER" --body "$RESPONSE"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
