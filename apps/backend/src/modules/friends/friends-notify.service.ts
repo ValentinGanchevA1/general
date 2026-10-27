@@ -88,7 +88,7 @@ export class FriendsNotifyService {
   }
 
   private friendshipSourceId(userA: string, userB: string): string {
-    return [userA, userB].sort().join(':');
+    return [userA, userB].sort((left, right) => left.localeCompare(right)).join(':');
   }
 
   private async loadUser(
