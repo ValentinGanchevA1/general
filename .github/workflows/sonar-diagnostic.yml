@@ -1,0 +1,32 @@
+name: Sonar master issue diagnostic
+
+on:
+  push:
+    branches:
+      - diag/sonar-master-issues
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query open Sonar issues on master new code
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://sonarcloud.io/api/issues/search?componentKeys=ValentinGanchevA1_general&branch=master&issueStatuses=OPEN%2CCONFIRMED&sinceLeakPeriod=true&ps=100'
+          response="$(curl --fail --silent --show-error --location --retry 2 "$url")"
+          printf '%s' "$response" | jq -r '
+            "total=\(.total)",
+            (.issues[] | [
+              .key,
+              .rule,
+              .severity,
+              .type,
+              .component,
+              (.line // 0 | tostring),
+              .message
+            ] | @tsv)
+          '
