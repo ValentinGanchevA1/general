@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -41,12 +41,6 @@ export function CheckInSheet({
   const insets = useSafeAreaInsets();
   const [placeLabel, setPlaceLabel] = useState('');
   const [audience, setAudience] = useState<CheckInAudience>('friends');
-
-  useEffect(() => {
-    if (!visible) return;
-    setPlaceLabel('');
-    setAudience('friends');
-  }, [visible]);
 
   const normalizedLabel = placeLabel.trim();
   const canSubmit = normalizedLabel.length >= 2 && locationReady && !submitting;
