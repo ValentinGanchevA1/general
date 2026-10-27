@@ -39,12 +39,21 @@ function toAvailability(response: SocialProvidersResponse): ProviderAvailability
   return availability;
 }
 
+function isSafeOAuthUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function SocialLinkingScreen(): React.JSX.Element {
   const { colors } = useAppTheme();
   const dispatch = useAppDispatch();
   const links = useAppSelector((state) => state.profile.profile?.socialLinks ?? []);
   const [busy, setBusy] = useState<SocialProvider | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ provider: SocialProvider; message: string } | null>(null);
   const [availability, setAvailability] = useState<ProviderAvailability>({});
 
   useFocusEffect(
@@ -57,7 +66,6 @@ export function SocialLinkingScreen(): React.JSX.Element {
           const response = await getJson<SocialProvidersResponse>('/social/providers');
           if (active) setAvailability(toAvailability(response));
         } catch {
-          // Availability is progressive enhancement. Preserve the Connect fallback if this probe fails.
           if (active) setAvailability({});
         }
       };
@@ -79,14 +87,13 @@ export function SocialLinkingScreen(): React.JSX.Element {
     setError(null);
     try {
       const response = await getJson<SocialAuthorizeResponse>(`/social/${provider}/start`);
-      const canOpen = await Linking.canOpenURL(response.url);
-      if (canOpen) {
-        await Linking.openURL(response.url);
-      } else {
-        setError('Could not open the provider login.');
+      if (!isSafeOAuthUrl(response.url)) {
+        setError({ provider, message: 'The provider returned an invalid login URL.' });
+        return;
       }
+      await Linking.openURL(response.url);
     } catch (e: unknown) {
-      setError(extractMessage(e, `${provider} linking is unavailable right now.`));
+      setError({ provider, message: extractMessage(e, `${provider} linking is unavailable right now.`) });
     } finally {
       setBusy(null);
     }
@@ -105,7 +112,7 @@ export function SocialLinkingScreen(): React.JSX.Element {
             await deleteJson<UserProfile>(`/social/${provider}`);
             await dispatch(fetchProfile());
           } catch (e: unknown) {
-            setError(extractMessage(e, 'Could not disconnect.'));
+            setError({ provider, message: extractMessage(e, 'Could not disconnect.') });
           } finally {
             setBusy(null);
           }
@@ -136,7 +143,11 @@ export function SocialLinkingScreen(): React.JSX.Element {
           </View>
         </View>
 
-        {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
+        {error ? (
+          <Text style={[styles.error, { color: colors.danger }]}>
+            {SOCIAL_PROVIDER_CONFIG[error.provider].label}: {error.message}
+          </Text>
+        ) : null}
 
         <View style={styles.list}>
           {PROVIDERS.map((provider) => {
