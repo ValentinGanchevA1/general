@@ -19,6 +19,11 @@ const mobileRoot = path.resolve(scriptDir, '..');
 const iosRoot = path.join(mobileRoot, 'ios');
 const tempRoot = mkdtempSync(path.join(os.tmpdir(), 'nexa-ios-bootstrap-'));
 const generatedRoot = path.join(tempRoot, APP_NAME);
+const npxPath = path.join(path.dirname(process.execPath), 'npx');
+
+if (!existsSync(npxPath)) {
+  throw new Error(`[ios-bootstrap] npx was not found next to the active Node executable: ${npxPath}`);
+}
 
 try {
   console.log(
@@ -26,7 +31,7 @@ try {
   );
 
   const result = spawnSync(
-    'npx',
+    npxPath,
     [
       '--yes',
       `@react-native-community/cli@${CLI_VERSION}`,

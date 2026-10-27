@@ -244,8 +244,11 @@ function appendHeader(lines, name, rawValue) {
 }
 
 function safeHeader(rawValue) {
-  if (typeof rawValue !== 'string') return null;
-  if (rawValue.length === 0 || /[\r\n\u0000]/u.test(rawValue)) return null;
+  if (typeof rawValue !== 'string' || rawValue.length === 0) return null;
+  for (const character of rawValue) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint === 0 || codePoint === 10 || codePoint === 13) return null;
+  }
   return rawValue;
 }
 
