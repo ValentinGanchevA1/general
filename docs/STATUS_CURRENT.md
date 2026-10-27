@@ -54,7 +54,14 @@ This snapshot intentionally does not restate every historical feature/PR. `packa
 
 Event reviews are merged, including the repeat-safe migration recovery in #823.
 Do not describe #816 as unimplemented because its device QA issue remains open.
-This check did not verify the current Render deployment or authenticated live review behavior.
+Render workspace `g88` reports production `g88-api` deployment
+`dep-dbft1ojbdu5s73d87r40` as `live` on commit
+`303439b9cb3e46db5aefa29ff18b28f5a0c53606` (finished 2026-10-26T22:17:27Z).
+Runtime logs from 2026-10-27T00:35:23Z confirm registration of EventReviewsController
+and GET/POST/PATCH review routes. This establishes deployed controller presence,
+not authenticated review behavior or independently inspected database schema.
+Direct `/health` probing from the checking environment timed out; current HTTP
+reachability and the full authenticated review flow remain unverified.
 
 As of this reconciliation, #828 (avatar pins) and #829 (PostHog privacy deletion)
 remain open and are not part of the merged feature baseline.
