@@ -6,9 +6,9 @@ import type { ClusterPoint, EntityPoint } from '@g88/shared';
  *   - useTracksViewChanges deps (re-open native snapshot when paint changes)
  *   - React.memo comparators (skip React work when paint is unchanged)
  *
- * NEXA v2 entity markers are geometry-first and intentionally do not paint
- * avatar / cover / thumbnail media, so media URL changes must not re-snapshot
- * every native map marker.
+ * Person markers now paint avatar media at standard/selected density, so avatar
+ * URL changes must invalidate the native map-marker snapshot. Event/listing
+ * media remains intentionally excluded because those markers stay geometry-first.
  */
 
 export function clusterVisualKey(point: ClusterPoint): string {
@@ -26,6 +26,7 @@ export function entityVisualKey(point: EntityPoint): string {
     return [
       point.id,
       point.meta.displayName,
+      point.meta.avatarUrl ?? '',
       point.meta.verification,
       point.meta.verifiedBadge === true ? '1' : '0',
       point.meta.online === true ? 'on' : 'off',
