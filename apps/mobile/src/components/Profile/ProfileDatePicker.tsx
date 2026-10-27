@@ -59,11 +59,7 @@ export function ProfileDatePicker({ visible, value, onClose, onChange }: Props):
   const [year, setYear] = useState(initial.getFullYear());
 
   const maxDate = maxAdultDate();
-  const years = useMemo(() => {
-    const newest = maxDate.getFullYear();
-    return Array.from({ length: 100 }, (_, index) => newest - index);
-  }, [maxDate]);
-
+  const years = Array.from({ length: 100 }, (_, index) => maxDate.getFullYear() - index);
   const dayCount = daysInMonth(year, month);
   const safeDay = Math.min(day, dayCount);
   const days = Array.from({ length: dayCount }, (_, index) => index + 1);
@@ -125,15 +121,7 @@ export function ProfileDatePicker({ visible, value, onClose, onChange }: Props):
   );
 }
 
-interface PickerColumnStyles {
-  column: object;
-  columnLabel: object;
-  columnScroll: object;
-  pickerItem: object;
-  pickerItemSelected: object;
-  pickerText: object;
-  pickerTextSelected: object;
-}
+type PickerStyles = ReturnType<typeof createStyles>;
 
 function PickerColumn({
   label,
@@ -142,7 +130,7 @@ function PickerColumn({
 }: {
   label: string;
   values: ReadonlyArray<{ key: string; label: string; selected: boolean; onPress: () => void }>;
-  styles: PickerColumnStyles;
+  styles: PickerStyles;
 }): React.JSX.Element {
   return (
     <View style={styles.column}>
