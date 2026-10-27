@@ -358,7 +358,7 @@ describe('UsersService — public profile trust fields', () => {
     expect(hasBlocked).not.toHaveBeenCalled();
   });
 
-  it('includes distanceMeters when ST_Distance returns a value for the viewer pair', async () => {
+  it('buckets distanceMeters when ST_Distance returns a value for the viewer pair', async () => {
     const VIEWER = '99999999-9999-4999-9999-999999999999';
     query
       .mockResolvedValueOnce([
@@ -382,10 +382,14 @@ describe('UsersService — public profile trust fields', () => {
       .mockResolvedValueOnce([]); // photos
 
     const profile = await service.getPublicProfile(USER, VIEWER);
-    expect(profile.distanceMeters).toBe(342);
+    expect(profile.distanceMeters).toBe(0);
     const distanceCall = query.mock.calls.find((c) => /ST_Distance/.test(String(c[0])));
     expect(distanceCall).toBeDefined();
     expect(distanceCall?.[1]).toEqual([VIEWER, USER]);
+    const pinCall = query.mock.calls.find((c) => /ST_SnapToGrid/.test(String(c[0])));
+    expect(pinCall).toBeDefined();
+    expect(String(pinCall?.[0])).not.toMatch(/ST_Y\(location::geometry\)|ST_X\(location::geometry\)/);
+    expect(pinCall?.[1]).toEqual([USER]);
   });
 
   it('omits distanceMeters when either user has no location', async () => {
