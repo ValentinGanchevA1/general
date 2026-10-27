@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -10,7 +11,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import type Redis from 'ioredis';
 import { DataSource } from 'typeorm';
 
-import type { SocialProvider, UserProfile } from '@g88/shared';
+import type { SocialProvider, SocialProvidersResponse, UserProfile } from '@g88/shared';
 
 import { REDIS_CLIENT } from '../../config/redis.provider';
 import { UsersService } from '../users/users.service';
@@ -28,6 +29,15 @@ interface StatePayload {
   n: string;
 }
 
+interface LinkedProviderOwner {
+  user_id: string;
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return false;
+  return (error as { code?: unknown }).code === '23505';
+}
+
 @Injectable()
 export class SocialService {
   private readonly logger = new Logger(SocialService.name);
@@ -37,6 +47,15 @@ export class SocialService {
     private readonly users: UsersService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
+
+  /** Safe client-facing provider state. Never exposes ids, secrets, or scopes. */
+  getProviderAvailability(): SocialProvidersResponse {
+    const providers = (Object.keys(PROVIDERS) as SocialProvider[]).map((provider) => ({
+      provider,
+      available: providerCreds(provider) !== null,
+    }));
+    return { providers };
+  }
 
   /**
    * Authorize URL to open in the system browser.
@@ -142,7 +161,7 @@ export class SocialService {
       throw new BadRequestException({ code: 'social.token_exchange_failed', message: 'No access token' });
     }
 
-    // 2. fetch the user's handle
+    // 2. Fetch the provider-owned identity. The access token is intentionally not persisted.
     const url = cfg.tokenInQuery
       ? `${cfg.userInfoUrl}${cfg.userInfoUrl.includes('?') ? '&' : '?'}access_token=${accessToken}`
       : cfg.userInfoUrl;
@@ -153,16 +172,55 @@ export class SocialService {
       this.logger.warn(`[social] ${provider} userinfo failed: ${infoRes.status}`);
       throw new BadRequestException({ code: 'social.userinfo_failed', message: 'Could not read account' });
     }
-    const { username } = cfg.parseUser((await infoRes.json()) as Record<string, unknown>);
-
-    // 3. upsert the verified link
-    await this.db.query(
-      `INSERT INTO social_links (user_id, provider, username, url, verified)
-            VALUES ($1, $2, $3, $4, true)
-       ON CONFLICT (user_id, provider)
-       DO UPDATE SET username = EXCLUDED.username, url = EXCLUDED.url, verified = true`,
-      [userId, provider, username, this.profileUrl(provider, username)],
+    const { id: providerUserId, username } = cfg.parseUser(
+      (await infoRes.json()) as Record<string, unknown>,
     );
+    if (!providerUserId) {
+      throw new BadRequestException({
+        code: 'social.provider_identity_missing',
+        message: 'Could not verify account identity',
+      });
+    }
+
+    // 3. A provider account may support only one NEXA identity.
+    const linkedElsewhere = (await this.db.query(
+      `SELECT user_id
+         FROM social_links
+        WHERE provider = $1
+          AND provider_user_id = $2
+          AND user_id <> $3
+        LIMIT 1`,
+      [provider, providerUserId, userId],
+    )) as LinkedProviderOwner[];
+    if (linkedElsewhere.length > 0) {
+      throw new ConflictException({
+        code: 'social.account_already_linked',
+        message: 'This social account is already linked to another NEXA account',
+      });
+    }
+
+    // 4. Upsert the verified ownership link. The DB unique index also closes race conditions.
+    try {
+      await this.db.query(
+        `INSERT INTO social_links (user_id, provider, provider_user_id, username, url, verified)
+              VALUES ($1, $2, $3, $4, $5, true)
+         ON CONFLICT (user_id, provider)
+         DO UPDATE SET provider_user_id = EXCLUDED.provider_user_id,
+                       username = EXCLUDED.username,
+                       url = EXCLUDED.url,
+                       verified = true`,
+        [userId, provider, providerUserId, username, this.profileUrl(provider, username)],
+      );
+    } catch (error: unknown) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException({
+          code: 'social.account_already_linked',
+          message: 'This social account is already linked to another NEXA account',
+        });
+      }
+      throw error;
+    }
+
     this.logger.log(`[social] linked ${provider} for user=${userId} handle=${username ?? '?'}`);
     return provider;
   }

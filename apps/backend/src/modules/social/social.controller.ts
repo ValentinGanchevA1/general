@@ -11,7 +11,12 @@ import {
 import type { Response } from 'express';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 
-import type { SocialAuthorizeResponse, SocialProvider, UserProfile } from '@g88/shared';
+import type {
+  SocialAuthorizeResponse,
+  SocialProvider,
+  SocialProvidersResponse,
+  UserProfile,
+} from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -28,6 +33,13 @@ function assertProvider(p: string): SocialProvider {
 @Controller('social')
 export class SocialController {
   constructor(private readonly social: SocialService) {}
+
+  /** GET /api/v1/social/providers — safe availability state for the mobile UI. */
+  @Get('providers')
+  @UseGuards(JwtAuthGuard)
+  getProviders(): SocialProvidersResponse {
+    return this.social.getProviderAvailability();
+  }
 
   /** GET /api/v1/social/:provider/start — authorize URL (with PKCE) to open in the browser. */
   @Get(':provider/start')

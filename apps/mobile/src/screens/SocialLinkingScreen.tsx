@@ -15,6 +15,7 @@ import type {
   SocialAuthorizeResponse,
   SocialLink,
   SocialProvider,
+  SocialProvidersResponse,
   UserProfile,
 } from '@g88/shared';
 import { deleteJson, getJson } from '@/api/client';
@@ -28,16 +29,43 @@ import { extractMessage } from '@/utils/extractMessage';
 
 const PROVIDERS = Object.keys(SOCIAL_PROVIDER_CONFIG) as SocialProvider[];
 
+type ProviderAvailability = Partial<Record<SocialProvider, boolean>>;
+
+function toAvailability(response: SocialProvidersResponse): ProviderAvailability {
+  const availability: ProviderAvailability = {};
+  for (const item of response.providers) {
+    availability[item.provider] = item.available;
+  }
+  return availability;
+}
+
 export function SocialLinkingScreen(): React.JSX.Element {
   const { colors } = useAppTheme();
   const dispatch = useAppDispatch();
   const links = useAppSelector((state) => state.profile.profile?.socialLinks ?? []);
   const [busy, setBusy] = useState<SocialProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [availability, setAvailability] = useState<ProviderAvailability>({});
 
   useFocusEffect(
     useCallback(() => {
+      let active = true;
       void dispatch(fetchProfile());
+
+      const loadAvailability = async (): Promise<void> => {
+        try {
+          const response = await getJson<SocialProvidersResponse>('/social/providers');
+          if (active) setAvailability(toAvailability(response));
+        } catch {
+          // Availability is progressive enhancement. Preserve the Connect fallback if this probe fails.
+          if (active) setAvailability({});
+        }
+      };
+      void loadAvailability();
+
+      return () => {
+        active = false;
+      };
     }, [dispatch]),
   );
 
@@ -45,6 +73,8 @@ export function SocialLinkingScreen(): React.JSX.Element {
     links.find((link) => link.provider === provider);
 
   const connect = async (provider: SocialProvider): Promise<void> => {
+    if (availability[provider] === false) return;
+
     setBusy(provider);
     setError(null);
     try {
@@ -100,7 +130,7 @@ export function SocialLinkingScreen(): React.JSX.Element {
           <Icon name="account-link-outline" size={22} color={colors.discovery} />
           <View style={styles.identityNoteBody}>
             <Text style={[styles.identityNoteTitle, { color: colors.textPrimary }]}>Supporting signal</Text>
-            <Text style={[styles.identityNoteText, { color: colors.textSecondary }]}> 
+            <Text style={[styles.identityNoteText, { color: colors.textSecondary }]}>
               Connected profiles can strengthen identity context, but they are optional and never replace government ID verification.
             </Text>
           </View>
@@ -113,6 +143,7 @@ export function SocialLinkingScreen(): React.JSX.Element {
             const config = SOCIAL_PROVIDER_CONFIG[provider];
             const link = linkFor(provider);
             const connected = link != null;
+            const unavailable = !connected && availability[provider] === false;
 
             return (
               <View
@@ -131,16 +162,16 @@ export function SocialLinkingScreen(): React.JSX.Element {
                 <View style={styles.info}>
                   <View style={styles.nameRow}>
                     <Text style={[styles.name, { color: colors.textPrimary }]}>{config.label}</Text>
-                    {connected ? (
-                      <Icon name="check-circle" size={15} color={colors.verified} />
-                    ) : null}
+                    {connected ? <Icon name="check-circle" size={15} color={colors.verified} /> : null}
                   </View>
                   {connected && link.username ? (
                     <Text style={[styles.username, { color: colors.textSecondary }]}>
                       @{link.username}
                     </Text>
                   ) : (
-                    <Text style={[styles.notLinked, { color: colors.textTertiary }]}>Not connected</Text>
+                    <Text style={[styles.notLinked, { color: colors.textTertiary }]}>
+                      {unavailable ? 'Not available yet' : 'Not connected'}
+                    </Text>
                   )}
                 </View>
                 {busy === provider ? (
@@ -156,12 +187,20 @@ export function SocialLinkingScreen(): React.JSX.Element {
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
-                    style={[styles.connectButton, { backgroundColor: colors.actionPrimary }]}
+                    style={[
+                      styles.connectButton,
+                      { backgroundColor: colors.actionPrimary },
+                      unavailable ? styles.disabledButton : null,
+                    ]}
+                    disabled={unavailable}
                     onPress={() => void connect(provider)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Connect ${config.label}`}
+                    accessibilityLabel={`${unavailable ? 'Unavailable' : 'Connect'} ${config.label}`}
+                    accessibilityState={{ disabled: unavailable }}
                   >
-                    <Text style={[styles.connectText, { color: colors.onPrimary }]}>Connect</Text>
+                    <Text style={[styles.connectText, { color: colors.onPrimary }]}>
+                      {unavailable ? 'Unavailable' : 'Connect'}
+                    </Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -246,6 +285,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  disabledButton: {
+    opacity: 0.45,
   },
   connectText: {
     fontWeight: '700',

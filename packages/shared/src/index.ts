@@ -18,6 +18,7 @@ export * from './identity';
 export * from './dating';
 export * from './analytics';
 export * from './mapRendererPolicy';
+export * from './social';
 
 export interface PendingVerificationSummary {
   id: string;
