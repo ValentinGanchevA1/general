@@ -33,11 +33,20 @@ interface SessionRow {
   end_reason: LocationShareEndReason | null;
 }
 
+type SweepEndReason = Extract<LocationShareEndReason, 'expired' | 'timeout'>;
+
+interface SweepRow {
+  id: string;
+  conversation_id: string;
+  ended_at: Date | string;
+  end_reason: SweepEndReason;
+}
+
 /** One session closed by the sweep job. */
 export interface SweptLocationSession {
   id: string;
   conversationId: string;
-  reason: Extract<LocationShareEndReason, 'expired' | 'timeout'>;
+  reason: SweepEndReason;
   endedAt: string;
 }
 
@@ -49,6 +58,8 @@ export class LocationShareService {
   static readonly STALE_MS = 90_000;
   /** Minimum gap between accepted updates from the same session. */
   static readonly MIN_UPDATE_INTERVAL_MS = 5_000;
+  /** Bound DB work and socket fan-out per sweep tick under abuse/data anomalies. */
+  static readonly SWEEP_BATCH_SIZE = 200;
 
   constructor(
     @InjectDataSource() private readonly db: DataSource,
@@ -168,54 +179,68 @@ export class LocationShareService {
   }
 
   /**
-   * End sessions past ends_at or with stale last_updated_at.
-   * Returns closed sessions so the caller can fan-out socket events.
+   * Atomically claim and end a bounded batch of expired/stale sessions.
+   * Row locks plus the final active-state guard prevent duplicate closure across
+   * concurrent backend instances. Expiry wins when a row is both expired and stale,
+   * preserving the previous two-step sweep semantics.
    */
   async sweepExpired(): Promise<SweptLocationSession[]> {
     const staleCutoff = new Date(Date.now() - LocationShareService.STALE_MS).toISOString();
-
-    const expired = await this.db.query<
-      Array<{ id: string; conversation_id: string; ended_at: Date | string }>
-    >(
-      `UPDATE chat_location_sessions
-          SET status = 'ended', ended_at = NOW(), end_reason = 'expired'
-        WHERE status = 'active'
-          AND ends_at IS NOT NULL
-          AND ends_at <= NOW()
-        RETURNING id, conversation_id, ended_at`,
+    const rows = await this.db.query<SweepRow[]>(
+      `WITH candidates AS (
+         SELECT id
+           FROM chat_location_sessions
+          WHERE status = 'active'
+            AND (
+              (ends_at IS NOT NULL AND ends_at <= NOW())
+              OR last_updated_at < $1::timestamptz
+            )
+          ORDER BY
+            CASE
+              WHEN ends_at IS NOT NULL AND ends_at <= NOW() THEN ends_at
+              ELSE last_updated_at
+            END ASC,
+            id ASC
+          LIMIT $2
+          FOR UPDATE SKIP LOCKED
+       )
+       UPDATE chat_location_sessions AS s
+          SET status = 'ended',
+              ended_at = NOW(),
+              end_reason = CASE
+                WHEN s.ends_at IS NOT NULL AND s.ends_at <= NOW() THEN 'expired'
+                ELSE 'timeout'
+              END
+         FROM candidates AS c
+        WHERE s.id = c.id
+          AND s.status = 'active'
+       RETURNING s.id, s.conversation_id, s.ended_at, s.end_reason`,
+      [staleCutoff, LocationShareService.SWEEP_BATCH_SIZE],
     );
 
-    const timedOut = await this.db.query<
-      Array<{ id: string; conversation_id: string; ended_at: Date | string }>
-    >(
-      `UPDATE chat_location_sessions
-          SET status = 'ended', ended_at = NOW(), end_reason = 'timeout'
-        WHERE status = 'active'
-          AND last_updated_at < $1::timestamptz
-        RETURNING id, conversation_id, ended_at`,
-      [staleCutoff],
-    );
-
-    const closed: SweptLocationSession[] = [
-      ...expired.map((r) => ({
-        id: r.id,
-        conversationId: r.conversation_id,
-        reason: 'expired' as const,
-        endedAt: this.toIso(r.ended_at),
-      })),
-      ...timedOut.map((r) => ({
-        id: r.id,
-        conversationId: r.conversation_id,
-        reason: 'timeout' as const,
-        endedAt: this.toIso(r.ended_at),
-      })),
-    ];
+    const closed = rows.map((row): SweptLocationSession => ({
+      id: row.id,
+      conversationId: row.conversation_id,
+      reason: row.end_reason,
+      endedAt: this.toIso(row.ended_at),
+    }));
 
     if (closed.length > 0) {
-      this.logger.log(
-        `sweepExpired closed ${closed.length} sessions (${expired.length} expired, ${timedOut.length} timeout)`,
+      const expiredCount = closed.reduce(
+        (count, session) => count + (session.reason === 'expired' ? 1 : 0),
+        0,
       );
+      const timeoutCount = closed.length - expiredCount;
+      this.logger.log(
+        `sweepExpired closed ${closed.length} sessions (${expiredCount} expired, ${timeoutCount} timeout)`,
+      );
+      if (closed.length === LocationShareService.SWEEP_BATCH_SIZE) {
+        this.logger.warn(
+          `sweepExpired reached the ${LocationShareService.SWEEP_BATCH_SIZE}-session batch limit; remaining stale sessions will be retried on the next tick`,
+        );
+      }
     }
+
     return closed;
   }
 
