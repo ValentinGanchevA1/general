@@ -12,11 +12,11 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Query open Sonar issues on master new code
+      - name: Query open Sonar bugs and vulnerabilities on master new code
         shell: bash
         run: |
           set -euo pipefail
-          url='https://sonarcloud.io/api/issues/search?componentKeys=ValentinGanchevA1_general&branch=master&issueStatuses=OPEN%2CCONFIRMED&sinceLeakPeriod=true&ps=100'
+          url='https://sonarcloud.io/api/issues/search?componentKeys=ValentinGanchevA1_general&branch=master&issueStatuses=OPEN%2CCONFIRMED&sinceLeakPeriod=true&types=BUG%2CVULNERABILITY&ps=500'
           response="$(curl --fail --silent --show-error --location --retry 2 "$url")"
           printf '%s' "$response" | jq -r '
             "total=\(.total)",
