@@ -5,12 +5,17 @@ import {
   type NexaEntityShape as NexaIdentityShape,
 } from '@/product/nexaEntityIdentity';
 
-export const NEXA_MARKER_TOUCH_SIZE = 44;
+/**
+ * Keep the native Marker hit target independent from its visual density.
+ * 48dp is intentionally larger than compact pins so Android taps remain
+ * reliable when several people are close together.
+ */
+export const NEXA_MARKER_TOUCH_SIZE = 48;
 
 export const NEXA_MARKER_VISUAL_SIZE = {
   compact: 18,
   standard: 24,
-  selected: 32,
+  selected: 34,
 } as const;
 
 export type NexaMarkerDensity = keyof typeof NEXA_MARKER_VISUAL_SIZE;
