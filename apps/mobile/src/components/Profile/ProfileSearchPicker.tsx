@@ -56,9 +56,10 @@ export function ProfileSearchPicker({
       .slice(0, 40);
   }, [normalized, options]);
 
-  const customOption = allowCustom && query.trim() && !filtered.some((option) => option.label.toLocaleLowerCase() === normalized)
+  const customOption: ProfileSearchOption | null = allowCustom && query.trim() && !filtered.some((option) => option.label.toLocaleLowerCase() === normalized)
     ? { value: query.trim(), label: customLabel(query.trim()) }
     : null;
+  const listData: ProfileSearchOption[] = customOption ? [customOption, ...filtered] : filtered;
 
   const close = (): void => {
     setQuery('');
@@ -97,7 +98,7 @@ export function ProfileSearchPicker({
 
         <FlatList
           keyboardShouldPersistTaps="handled"
-          data={customOption ? [customOption, ...filtered] : filtered}
+          data={listData}
           keyExtractor={(item, index) => `${item.value}:${index}`}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
