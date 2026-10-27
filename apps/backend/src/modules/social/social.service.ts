@@ -19,13 +19,15 @@ import { PROVIDERS, providerCreds } from './providers';
 
 const STATE_TTL_MS = 10 * 60 * 1000; // 10 min
 const STATE_TTL_SEC = Math.ceil(STATE_TTL_MS / 1000);
+// Keep the existing prefix so OAuth flows started before a deploy can still complete.
+// For providers without PKCE, the stored value acts only as a one-time flow secret/replay marker.
 const PKCE_KEY_PREFIX = 'social:pkce:';
 
 interface StatePayload {
   uid: string;
   p: SocialProvider;
   exp: number;
-  /** Random nonce used as Redis key for the code_verifier. */
+  /** Random nonce used as Redis key for the one-time OAuth flow secret. */
   n: string;
 }
 
@@ -59,7 +61,8 @@ export class SocialService {
 
   /**
    * Authorize URL to open in the system browser.
-   * Includes PKCE (S256) code_challenge + HMAC-signed state (CSRF).
+   * Always includes HMAC-signed state (CSRF); adds PKCE (S256) only when the
+   * provider contract supports it.
    */
   async buildStartUrl(userId: string, provider: SocialProvider): Promise<string> {
     const creds = providerCreds(provider);
@@ -71,8 +74,7 @@ export class SocialService {
     }
     const cfg = PROVIDERS[provider];
 
-    const codeVerifier = this.generateCodeVerifier();
-    const codeChallenge = this.generateCodeChallenge(codeVerifier);
+    const flowSecret = this.generateCodeVerifier();
     const nonce = randomBytes(16).toString('base64url');
 
     const state = this.signState({
@@ -82,8 +84,9 @@ export class SocialService {
       n: nonce,
     });
 
-    // Store verifier server-side; single-use, short TTL
-    await this.redis.set(`${PKCE_KEY_PREFIX}${nonce}`, codeVerifier, 'EX', STATE_TTL_SEC);
+    // Store a single-use flow secret. It is the PKCE verifier for providers
+    // that support PKCE and a replay marker for providers that do not.
+    await this.redis.set(`${PKCE_KEY_PREFIX}${nonce}`, flowSecret, 'EX', STATE_TTL_SEC);
 
     const clientIdParam = cfg.clientIdParam ?? 'client_id';
     const params = new URLSearchParams({
@@ -92,14 +95,18 @@ export class SocialService {
       redirect_uri: this.redirectUri(),
       scope: cfg.scope,
       state,
-      code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
       ...(cfg.extraAuthParams ?? {}),
     });
+
+    if (cfg.usePkce !== false) {
+      params.set('code_challenge', this.generateCodeChallenge(flowSecret));
+      params.set('code_challenge_method', 'S256');
+    }
+
     return `${cfg.authorizeUrl}?${params.toString()}`;
   }
 
-  /** Exchange the code + PKCE verifier, fetch the handle, and link the account. */
+  /** Exchange the code, fetch the provider-owned identity, and link the account. */
   async handleCallback(code: string, state: string): Promise<SocialProvider> {
     const decoded = this.verifyState(state);
     const { uid: userId, p: provider, n: nonce } = decoded;
@@ -109,20 +116,22 @@ export class SocialService {
     }
     const cfg = PROVIDERS[provider];
 
-    // Retrieve and consume the code_verifier (one-time use)
+    // Retrieve and consume the one-time flow secret.
     const key = `${PKCE_KEY_PREFIX}${nonce}`;
-    const codeVerifier = await this.redis.get(key);
-    if (codeVerifier) {
+    const flowSecret = await this.redis.get(key);
+    if (flowSecret) {
       await this.redis.del(key);
     }
-    if (!codeVerifier) {
+    if (!flowSecret) {
+      // Preserve the existing error code for client compatibility even though
+      // some providers use this value only as a replay marker, not PKCE.
       throw new BadRequestException({
         code: 'social.pkce_missing',
         message: 'Link request expired or already used',
       });
     }
 
-    return this.finishCallback(code, provider, userId, creds, cfg, codeVerifier);
+    return this.finishCallback(code, provider, userId, creds, cfg, flowSecret);
   }
 
   private async finishCallback(
@@ -131,19 +140,21 @@ export class SocialService {
     userId: string,
     creds: { clientId: string; clientSecret: string },
     cfg: (typeof PROVIDERS)[SocialProvider],
-    codeVerifier: string,
+    flowSecret: string,
   ): Promise<SocialProvider> {
     const clientIdParam = cfg.clientIdParam ?? 'client_id';
 
-    // 1. authorization_code + code_verifier → access_token
+    // 1. authorization_code (+ code_verifier when supported) → access_token
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
       code,
       redirect_uri: this.redirectUri(),
       [clientIdParam]: creds.clientId,
       client_secret: creds.clientSecret,
-      code_verifier: codeVerifier,
     });
+    if (cfg.usePkce !== false) {
+      body.set('code_verifier', flowSecret);
+    }
 
     const tokenRes = await fetch(cfg.tokenUrl, {
       method: 'POST',

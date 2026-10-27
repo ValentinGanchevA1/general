@@ -93,8 +93,8 @@ describe('SocialService', () => {
     });
   });
 
-  describe('buildStartUrl — PKCE', () => {
-    it('stores code_verifier in Redis and returns authorize URL with challenge', async () => {
+  describe('buildStartUrl — provider OAuth contract', () => {
+    it('stores code_verifier in Redis and returns PKCE challenge for providers that support it', async () => {
       process.env.TWITTER_CLIENT_ID = 'tw-id';
       process.env.TWITTER_CLIENT_SECRET = 'tw-secret';
 
@@ -113,6 +113,21 @@ describe('SocialService', () => {
       expect(url).toContain('code_challenge_method=S256');
       expect(url).toContain('client_id=tw-id');
       expect(url).toContain('scope=');
+    });
+
+    it('uses Instagram Business Login without PKCE authorization params', async () => {
+      process.env.INSTAGRAM_CLIENT_ID = 'ig-id';
+      process.env.INSTAGRAM_CLIENT_SECRET = 'ig-secret';
+
+      const url = new URL(await service.buildStartUrl('u1', 'instagram'));
+
+      expect(`${url.origin}${url.pathname}`).toBe('https://www.instagram.com/oauth/authorize');
+      expect(url.searchParams.get('client_id')).toBe('ig-id');
+      expect(url.searchParams.get('scope')).toBe('instagram_business_basic');
+      expect(url.searchParams.get('response_type')).toBe('code');
+      expect(url.searchParams.get('code_challenge')).toBeNull();
+      expect(url.searchParams.get('code_challenge_method')).toBeNull();
+      expect(redis.set).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -142,7 +157,7 @@ describe('SocialService', () => {
       });
     });
 
-    it('rejects when PKCE verifier is missing from Redis', async () => {
+    it('rejects when the one-time flow secret is missing from Redis', async () => {
       process.env.INSTAGRAM_CLIENT_ID = 'ig-id';
       process.env.INSTAGRAM_CLIENT_SECRET = 'ig-secret';
       const state = signedState({
@@ -156,6 +171,46 @@ describe('SocialService', () => {
       await expect(service.handleCallback('code', state)).rejects.toMatchObject({
         response: expect.objectContaining({ code: 'social.pkce_missing' }),
       });
+    });
+  });
+
+  describe('Instagram Business Login callback', () => {
+    it('omits code_verifier and binds the Instagram-scoped user_id', async () => {
+      process.env.INSTAGRAM_CLIENT_ID = 'ig-id';
+      process.env.INSTAGRAM_CLIENT_SECRET = 'ig-secret';
+      redis.get.mockResolvedValue('one-time-flow-secret');
+      const fetchMock = jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(jsonResponse({ access_token: 'provider-token' }))
+        .mockResolvedValueOnce(jsonResponse({ user_id: 'ig-user-42', username: 'alice' }));
+      const state = signedState({
+        uid: 'u1',
+        p: 'instagram',
+        exp: Date.now() + 1e6,
+        n: 'ig-nonce',
+      });
+
+      await expect(service.handleCallback('code', state)).resolves.toBe('instagram');
+
+      const tokenInit = fetchMock.mock.calls[0]![1];
+      const tokenBody = new URLSearchParams(String(tokenInit?.body ?? ''));
+      expect(tokenBody.get('grant_type')).toBe('authorization_code');
+      expect(tokenBody.get('client_id')).toBe('ig-id');
+      expect(tokenBody.get('client_secret')).toBe('ig-secret');
+      expect(tokenBody.get('code')).toBe('code');
+      expect(tokenBody.get('code_verifier')).toBeNull();
+
+      expect(String(fetchMock.mock.calls[1]![0])).toContain(
+        'https://graph.instagram.com/me?fields=user_id,username&access_token=provider-token',
+      );
+      expect(query.mock.calls[0]![1]).toEqual(['instagram', 'ig-user-42', 'u1']);
+      expect(query.mock.calls[1]![1]).toEqual([
+        'u1',
+        'instagram',
+        'ig-user-42',
+        'alice',
+        'https://instagram.com/alice',
+      ]);
     });
   });
 

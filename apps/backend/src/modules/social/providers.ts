@@ -5,8 +5,8 @@ import type { SocialProvider } from '@g88/shared';
  * "active" only when both its client id and secret env vars are set — otherwise
  * the start endpoint 503s.
  *
- * All providers use Authorization Code + PKCE (S256). The code_verifier is
- * stored in Redis for the lifetime of the signed state (see SocialService).
+ * Providers use Authorization Code. PKCE (S256) is enabled by default and can
+ * be disabled for provider contracts that do not accept PKCE parameters.
  */
 export interface ProviderConfig {
   authorizeUrl: string;
@@ -15,9 +15,11 @@ export interface ProviderConfig {
   scope: string;
   clientIdEnv: string;
   clientSecretEnv: string;
+  /** Disable only when the provider's documented authorization-code flow does not support PKCE. */
+  usePkce?: boolean;
   /** Some providers (Instagram/Facebook) take the token as a query param, not a Bearer header. */
   tokenInQuery?: boolean;
-  /** Extra static params appended to the authorize URL (beyond PKCE). */
+  /** Extra static params appended to the authorize URL. */
   extraAuthParams?: Record<string, string>;
   /** TikTok uses client_key instead of client_id on some endpoints. */
   clientIdParam?: 'client_id' | 'client_key';
@@ -29,14 +31,19 @@ const str = (v: unknown): string | null => (typeof v === 'string' && v.length > 
 
 export const PROVIDERS: Record<SocialProvider, ProviderConfig> = {
   instagram: {
-    authorizeUrl: 'https://api.instagram.com/oauth/authorize',
+    // Instagram API with Instagram Login (professional Business/Creator accounts).
+    authorizeUrl: 'https://www.instagram.com/oauth/authorize',
     tokenUrl: 'https://api.instagram.com/oauth/access_token',
-    userInfoUrl: 'https://graph.instagram.com/me?fields=id,username',
-    scope: 'user_profile',
+    userInfoUrl: 'https://graph.instagram.com/me?fields=user_id,username',
+    scope: 'instagram_business_basic',
     clientIdEnv: 'INSTAGRAM_CLIENT_ID',
     clientSecretEnv: 'INSTAGRAM_CLIENT_SECRET',
+    usePkce: false,
     tokenInQuery: true,
-    parseUser: (j) => ({ id: str(j.id) ?? '', username: str(j.username) }),
+    parseUser: (j) => ({
+      id: str(j.user_id) ?? str(j.id) ?? '',
+      username: str(j.username),
+    }),
   },
   twitter: {
     // X rebrand: authorize lives on x.com; token on api.x.com
