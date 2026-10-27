@@ -151,25 +151,34 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
   });
 
   const previewProps = useMemo(() => {
-    if (interactionState !== 'quick_peek' || !ctx.pinId) return null;
+    // Keep the selected marker/chrome in quick-peek while loading, but do not
+    // mount PinInteractionHost until the peer is actually loaded. Otherwise the
+    // host sends OPEN_DETAIL during loadingPin, where the machine intentionally
+    // has no OPEN_DETAIL transition, and the one-shot handoff is lost.
+    if (
+      !state.matches('preview') ||
+      interactionState !== 'quick_peek' ||
+      !ctx.pinId ||
+      activeProfile == null
+    ) {
+      return null;
+    }
     const profile = activeProfile;
     const name =
-      profile && 'displayName' in profile && typeof profile.displayName === 'string'
+      'displayName' in profile && typeof profile.displayName === 'string'
         ? profile.displayName
         : 'User';
-    const distanceLabel = formatNexaSpatialDistance(
-      profile ? ctx.distanceMeters : undefined,
-    );
+    const distanceLabel = formatNexaSpatialDistance(ctx.distanceMeters);
     const peerAllowsDating =
       ctx.peerMode === 'dating' || ctx.peerMode === 'both';
 
     const rawAvatar =
-      profile && 'avatarUrl' in profile
+      'avatarUrl' in profile
         ? (profile.avatarUrl as string | null | undefined)
         : null;
 
     const online =
-      profile && 'online' in profile && typeof profile.online === 'boolean'
+      'online' in profile && typeof profile.online === 'boolean'
         ? profile.online
         : undefined;
 
@@ -178,16 +187,16 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
       avatarUrl: rawAvatar ?? null,
       distanceLabel,
       age:
-        profile && 'age' in profile && typeof profile.age === 'number'
+        'age' in profile && typeof profile.age === 'number'
           ? profile.age
           : null,
       ...(online !== undefined ? {online} : {}),
       idVerified:
-        profile && 'idVerified' in profile
+        'idVerified' in profile
           ? Boolean(profile.idVerified)
           : false,
       verification: asVerificationLevel(
-        profile && 'verification' in profile ? profile.verification : undefined,
+        'verification' in profile ? profile.verification : undefined,
       ),
       viewerMode: ctx.viewerMode,
       peerAllowsDating,
@@ -196,7 +205,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
       likeSent: ctx.likeSent,
       blocked: ctx.blockedByViewer || ctx.blockedByPeer,
     };
-  }, [interactionState, ctx, activeProfile, pending, waveOptimistic]);
+  }, [state, interactionState, ctx, activeProfile, pending, waveOptimistic]);
 
   /** Display name for seeding EntityBottomSheet when pin left the viewport. */
   const seedDisplayName = useMemo(() => {
