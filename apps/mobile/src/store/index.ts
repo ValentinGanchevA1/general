@@ -12,6 +12,7 @@ import friendsReducer from '@/features/friends/friendsSlice';
 import mapNoveltyReducer from '@/features/map/mapNoveltySlice';
 import mapRendererPolicyReducer from '@/features/map/mapRendererPolicySlice';
 import placesReducer from '@/features/places/placeDetailSlice';
+import { savedPlaceMapFocusStore } from '@/features/places/savedPlaceMapFocus.store';
 import {
   savedPlacesMapLayerStore,
   shouldResetSavedPlacesMapLayer,
@@ -43,13 +44,14 @@ export const store = configureStore({
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
 
-// ─── Session-scoped private map-layer state ──────────────────────────────────
+// ─── Session-scoped private map state ────────────────────────────────────────
 
 let previousAuthUserId = store.getState().auth.user?.id ?? null;
 store.subscribe(() => {
   const nextAuthUserId = store.getState().auth.user?.id ?? null;
   if (shouldResetSavedPlacesMapLayer(previousAuthUserId, nextAuthUserId)) {
     savedPlacesMapLayerStore.reset();
+    savedPlaceMapFocusStore.clear();
   }
   previousAuthUserId = nextAuthUserId;
 });
