@@ -61,7 +61,7 @@ export class EventPulseShareService {
                 e.title,
                 e.host_id,
                 e.location_h3_r7,
-                a.pulse_shared_at`,
+                a.pulse_shared_at::timestamptz AS pulse_shared_at`,
       [eventId, userId],
     );
 
@@ -89,7 +89,7 @@ export class EventPulseShareService {
               e.starts_at,
               e.deleted_at,
               a.status,
-              a.pulse_shared_at
+              a.pulse_shared_at::timestamptz AS pulse_shared_at
          FROM events e
          LEFT JOIN event_attendees a
            ON a.event_id = e.id
