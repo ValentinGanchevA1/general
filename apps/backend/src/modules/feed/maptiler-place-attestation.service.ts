@@ -7,6 +7,7 @@ import {
 } from '@g88/shared';
 
 const MAPTILER_FEATURE_ID_PATTERN = /^\S+\.[0-9]+$/;
+const OSM_REF_PATTERN = /^osm:([nwr][0-9]+)$/;
 const MAX_FEATURE_ID_LENGTH = 200;
 const MAX_RESPONSE_BYTES = 256 * 1024;
 const REQUEST_TIMEOUT_MS = 2_500;
@@ -21,6 +22,16 @@ interface LatLng {
   lng: number;
 }
 
+export interface AttestedPlaceExternalRef {
+  namespace: 'osm';
+  externalId: string;
+}
+
+export interface AttestedPlace {
+  identity: PlaceIdentity;
+  stableExternalRef: AttestedPlaceExternalRef | null;
+}
+
 /**
  * Resolves client-selected MapTiler feature IDs on the backend before a
  * check-in may be treated as canonical. Client-supplied labels/coordinates are
@@ -32,7 +43,7 @@ interface LatLng {
  */
 @Injectable()
 export class MapTilerPlaceAttestationService {
-  async attest(input: PlaceIdentity, userCellH3R7: string): Promise<PlaceIdentity | null> {
+  async attest(input: PlaceIdentity, userCellH3R7: string): Promise<AttestedPlace | null> {
     if (input.provider !== 'maptiler') return null;
 
     const providerPlaceId = input.providerPlaceId.trim();
@@ -52,10 +63,13 @@ export class MapTilerPlaceAttestationService {
     if (!this.isNearby(userCellH3R7, providerCellH3R7)) return null;
 
     return {
-      provider: 'maptiler',
-      providerPlaceId,
-      canonicalLabel,
-      providerCellH3R7,
+      identity: {
+        provider: 'maptiler',
+        providerPlaceId,
+        canonicalLabel,
+        providerCellH3R7,
+      },
+      stableExternalRef: this.readStableExternalRef(feature),
     };
   }
 
@@ -107,6 +121,13 @@ export class MapTilerPlaceAttestationService {
       return null;
     }
     return normalized;
+  }
+
+  private readStableExternalRef(feature: Record<string, unknown>): AttestedPlaceExternalRef | null {
+    if (!this.isRecord(feature.properties) || typeof feature.properties.ref !== 'string') return null;
+    const match = OSM_REF_PATTERN.exec(feature.properties.ref.trim());
+    if (!match?.[1]) return null;
+    return { namespace: 'osm', externalId: match[1] };
   }
 
   private readCenter(feature: Record<string, unknown>): LatLng | null {
