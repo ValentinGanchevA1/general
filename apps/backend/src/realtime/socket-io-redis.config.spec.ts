@@ -43,15 +43,32 @@ describe('Socket.IO Redis adapter config', () => {
     ).not.toThrow();
   });
 
-  it('namespaces Pub/Sub channels by environment', () => {
+  it('namespaces Pub/Sub channels by environment outside Render', () => {
     expect(socketIoRedisChannelKey({ NODE_ENV: 'Preview / QA' })).toBe(
       'nexa:preview-qa:socket.io',
     );
   });
 
+  it('isolates Render services and pull-request previews that share Redis', () => {
+    expect(
+      socketIoRedisChannelKey({ NODE_ENV: 'production', RENDER_SERVICE_ID: 'srv-production' }),
+    ).toBe('nexa:production:srv-production:socket.io');
+    expect(
+      socketIoRedisChannelKey({
+        NODE_ENV: 'production',
+        IS_PULL_REQUEST: 'true',
+        RENDER_SERVICE_ID: 'srv-preview-902',
+      }),
+    ).toBe('nexa:production:srv-preview-902:socket.io');
+  });
+
   it('supports an explicit Pub/Sub channel prefix', () => {
     expect(
-      socketIoRedisChannelKey({ SOCKET_IO_REDIS_CHANNEL_PREFIX: 'nexa:prod:realtime' }),
+      socketIoRedisChannelKey({
+        NODE_ENV: 'production',
+        RENDER_SERVICE_ID: 'srv-production',
+        SOCKET_IO_REDIS_CHANNEL_PREFIX: 'nexa:prod:realtime',
+      }),
     ).toBe('nexa:prod:realtime');
   });
 });
