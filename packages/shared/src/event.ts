@@ -71,8 +71,6 @@ export interface EventDetail extends EventSummary {
   description: string | null;
   hostDisplayName: string;
   hostAvatarUrl: string | null;
-  /** When the caller explicitly shared their going RSVP to Pulse. */
-  myJoinSharedAt: string | null;
   /** First page of attendees (status = 'going'), capped server-side. */
   attendees: EventAttendee[];
 }
