@@ -73,7 +73,8 @@ function deletionListItems(payload: unknown): PostHogDeletionResponse[] | null {
 
   if (!Array.isArray(candidate)) return null;
   return candidate.filter(
-    (item): item is PostHogDeletionResponse => typeof item === 'object' && item !== null,
+    (item): item is PostHogDeletionResponse =>
+      typeof item === 'object' && item !== null && !Array.isArray(item),
   );
 }
 
@@ -151,7 +152,8 @@ export class PostHogPrivacyService {
           FOR UPDATE SKIP LOCKED
        )
        UPDATE analytics_external_deletion_requests AS request
-          SET next_attempt_at = NOW() + ($2::int * INTERVAL '1 millisecond'),
+          SET attempts = request.attempts + 1,
+              next_attempt_at = NOW() + ($2::int * INTERVAL '1 millisecond'),
               updated_at = NOW()
          FROM candidates
         WHERE request.id = candidates.id
@@ -248,19 +250,18 @@ export class PostHogPrivacyService {
       await this.scheduleRetry(
         row.id,
         error instanceof Error ? error.message : 'invalid deletion request',
-        false,
       );
       return;
     }
 
-    if (row.attempts > 0) {
+    if (row.attempts > 1) {
       const reconciliation = await this.reconcileSubmission(row.submission_id, config);
       if (reconciliation.state === 'found' && reconciliation.request.id) {
-        await this.markSubmitted(row.id, reconciliation.request.id, false);
+        await this.markSubmitted(row.id, reconciliation.request.id);
         return;
       }
       if (reconciliation.state === 'unavailable') {
-        await this.scheduleRetry(row.id, 'PostHog deletion retry reconciliation is unavailable.', false);
+        await this.scheduleRetry(row.id, 'PostHog deletion retry reconciliation is unavailable.');
         return;
       }
     }
@@ -285,7 +286,6 @@ export class PostHogPrivacyService {
         await this.scheduleRetry(
           row.id,
           `PostHog deletion request rejected with HTTP ${response.status}`,
-          true,
         );
         return;
       }
@@ -295,40 +295,38 @@ export class PostHogPrivacyService {
         await this.scheduleRetry(
           row.id,
           'PostHog deletion response did not include a valid request id.',
-          true,
         );
         return;
       }
 
-      await this.markSubmitted(row.id, body.id, true);
+      await this.markSubmitted(row.id, body.id);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'unknown PostHog deletion error';
-      await this.scheduleRetry(row.id, message, true);
+      await this.scheduleRetry(row.id, message);
     } finally {
       clearTimeout(timeout);
     }
   }
 
-  private async markSubmitted(id: string, providerRequestId: string, attempted: boolean): Promise<void> {
+  private async markSubmitted(id: string, providerRequestId: string): Promise<void> {
     await this.db.query(
       `UPDATE analytics_external_deletion_requests
           SET status = 'submitted', provider_request_id = $2::uuid,
-              attempts = attempts + $3::int,
               submitted_at = COALESCE(submitted_at, NOW()), updated_at = NOW(), last_error = NULL
         WHERE id = $1`,
-      [id, providerRequestId, attempted ? 1 : 0],
+      [id, providerRequestId],
     );
   }
 
-  private async scheduleRetry(id: string, message: string, attempted: boolean): Promise<void> {
+  private async scheduleRetry(id: string, message: string): Promise<void> {
     const safeMessage = message.slice(0, 300);
     await this.db.query(
       `UPDATE analytics_external_deletion_requests
-          SET status = 'failed', attempts = attempts + $2::int,
-              next_attempt_at = NOW() + ($3::int * INTERVAL '1 millisecond'),
-              last_error = $4, updated_at = NOW()
+          SET status = 'failed',
+              next_attempt_at = NOW() + ($2::int * INTERVAL '1 millisecond'),
+              last_error = $3, updated_at = NOW()
         WHERE id = $1`,
-      [id, attempted ? 1 : 0, RETRY_DELAY_MS, safeMessage],
+      [id, RETRY_DELAY_MS, safeMessage],
     );
   }
 }
