@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, forwardRef } from '@nestjs/com
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
+import { RealtimeEmitterService } from '../../realtime/realtime-emitter.service';
 import { FriendsService } from '../friends/friends.service';
 
 export interface BlockedUserRow {
@@ -27,6 +28,8 @@ export class BlocksService {
     @InjectDataSource() private readonly db: DataSource,
     @Inject(forwardRef(() => FriendsService))
     private readonly friends: FriendsService,
+    @Inject(forwardRef(() => RealtimeEmitterService))
+    private readonly realtime: RealtimeEmitterService,
   ) {}
 
   async block(blockerId: string, blockedId: string): Promise<void> {
@@ -41,6 +44,20 @@ export class BlocksService {
     );
     // Hard-delete social graph edges (follows, friendships, pending requests).
     await this.friends.onBlock(blockerId, blockedId);
+
+    const conversations = await this.db.query<Array<{ id: string }>>(
+      `SELECT id
+         FROM conversations
+        WHERE participant_ids @> ARRAY[$1, $2]::uuid[]
+          AND COALESCE(status, 'accepted') = 'accepted'`,
+      [blockerId, blockedId],
+    );
+    for (const conversation of conversations) {
+      this.realtime.leaveRoomForUsers(
+        [blockerId, blockedId],
+        `convo:${conversation.id}`,
+      );
+    }
   }
 
   async unblock(blockerId: string, blockedId: string): Promise<void> {
