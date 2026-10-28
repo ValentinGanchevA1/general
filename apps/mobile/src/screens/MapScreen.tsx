@@ -116,6 +116,7 @@ export function MapScreen(): React.JSX.Element {
 	const { coords: myCoords, requestPermission } = useUserLocation();
 	const [region, setRegion] = useState<Region | null>(null);
 	const [selected, setSelected] = useState<EntityPoint | null>(null);
+	const [placePreviewOpen, setPlacePreviewOpen] = useState(false);
 	const [waveToast, setWaveToast] = useState<string | null>(null);
 	const reduceMotion = useNexaReducedMotion();
 	const markMapSurfaceReady = useNexaMapSurfaceReady();
@@ -220,7 +221,7 @@ export function MapScreen(): React.JSX.Element {
 		onCreateNearbySelect,
 	} = useCreateNearby(
 		navigation,
-		selected != null || pinInteractionState !== 'idle',
+		selected != null || pinInteractionState !== 'idle' || placePreviewOpen,
 	);
 
 	useMapFocus({
@@ -641,7 +642,7 @@ export function MapScreen(): React.JSX.Element {
 		return () => clearTimeout(t);
 	}, [waveToast]);
 
-	const sheetOpen = selected != null || pinInteractionState !== 'idle';
+	const sheetOpen = placePreviewOpen || selected != null || pinInteractionState !== 'idle';
 	const selectedMarkerKey = useMemo(() => {
 		if (selected != null) return nexaEntitySelectionKey(selected);
 		if (pinInteractionState !== 'idle' && activePinId != null) {
@@ -837,6 +838,7 @@ export function MapScreen(): React.JSX.Element {
 					scheme={scheme}
 					onReady={markMapSurfaceReady}
 					onRegionChangeComplete={onRegionChangeComplete}
+					onPlacePreviewVisibilityChange={setPlacePreviewOpen}
 					onLongPress={onMapLongPress}
 					onEntityPress={onEntityPress}
 					onClusterPress={onClusterPress}
