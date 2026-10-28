@@ -15,7 +15,7 @@ import { RealtimeEmitterService } from '../../realtime/realtime-emitter.service'
 
 const PULSE_ACTIVITY_CHANNEL = 'pulse:activity:v1';
 const PUBLISHED_DEDUPE_TTL_SECONDS = 120;
-const CHECK_IN_CELL_RADIUS = 8;
+const PULSE_CELL_RADIUS = 8;
 const MAX_DISTANCE_M = 10_000;
 const MAX_RECIPIENTS = 1_000;
 
@@ -30,11 +30,25 @@ interface PulseActivityEnvelope {
   recipients: PulseActivityRecipient[];
 }
 
+interface RecipientLocationRow {
+  id: string;
+  location_h3_r7: string;
+}
+
 export interface PublishCheckInActivityInput {
   checkInId: string;
   actorId: string;
   placeLabel: string;
   audience: CheckInAudience;
+  locationH3R7: string;
+  createdAt: string;
+}
+
+export interface PublishEventJoinActivityInput {
+  eventId: string;
+  actorId: string;
+  eventTitle: string;
+  eventHostId: string;
   locationH3R7: string;
   createdAt: string;
 }
@@ -73,30 +87,106 @@ export class PulseActivityRealtimeService implements OnModuleInit, OnModuleDestr
   }
 
   async publishCheckIn(input: PublishCheckInActivityInput): Promise<void> {
-    const dedupeKey = `pulse:activity:published:${input.checkInId}`;
+    const claimed = await this.claimOnce(`pulse:activity:published:${input.checkInId}`);
+    if (!claimed) return;
+
+    const actorName = await this.actorName(input.actorId);
+    if (!actorName) return;
+
+    const recipients = await this.checkInRecipients(
+      input.actorId,
+      input.audience,
+      input.locationH3R7,
+    );
+    if (recipients.length === 0) return;
+
+    await this.publishEnvelope({
+      id: `place:${input.checkInId}`,
+      type: 'place',
+      category: null,
+      title: input.placeLabel,
+      preview: input.audience === 'friends' ? 'Shared with friends' : 'Shared nearby',
+      actorId: input.actorId,
+      actorName,
+      distanceM: null,
+      createdAt: input.createdAt,
+      unread: false,
+      narrative: {
+        kind: 'place_visit',
+        verb: 'visited',
+        objectLabel: input.placeLabel,
+        placeLabel: null,
+      },
+      deepLink: { screen: 'Main', params: { screen: 'Map' } },
+    }, recipients);
+  }
+
+  async publishEventJoin(input: PublishEventJoinActivityInput): Promise<void> {
+    const claimed = await this.claimOnce(
+      `pulse:activity:published:event_join:${input.eventId}:${input.actorId}`,
+    );
+    if (!claimed) return;
+
+    const actorName = await this.actorName(input.actorId);
+    if (!actorName) return;
+
+    const recipients = await this.eventJoinRecipients(
+      input.actorId,
+      input.eventHostId,
+      input.locationH3R7,
+    );
+    if (recipients.length === 0) return;
+
+    await this.publishEnvelope({
+      id: `event_join:${input.eventId}:${input.actorId}`,
+      type: 'event',
+      category: null,
+      title: input.eventTitle,
+      preview: 'Shared an event RSVP',
+      actorId: input.actorId,
+      actorName,
+      distanceM: null,
+      createdAt: input.createdAt,
+      unread: false,
+      narrative: {
+        kind: 'event_joined',
+        verb: 'joined',
+        objectLabel: input.eventTitle,
+        placeLabel: null,
+      },
+      deepLink: { screen: 'EventDetail', params: { eventId: input.eventId } },
+    }, recipients);
+  }
+
+  private async claimOnce(key: string): Promise<boolean> {
     const claimed = await this.redis.set(
-      dedupeKey,
+      key,
       '1',
       'EX',
       PUBLISHED_DEDUPE_TTL_SECONDS,
       'NX',
     );
-    if (claimed !== 'OK') return;
+    return claimed === 'OK';
+  }
 
+  private async actorName(actorId: string): Promise<string | null> {
     const [actor] = await this.db.query<Array<{ display_name: string }>>(
       `SELECT display_name
          FROM users
         WHERE id = $1
           AND deleted_at IS NULL`,
-      [input.actorId],
+      [actorId],
     );
-    if (!actor) return;
+    return actor?.display_name ?? null;
+  }
 
-    const cells = h3.gridDisk(input.locationH3R7, CHECK_IN_CELL_RADIUS);
-    const rows = await this.db.query<Array<{
-      id: string;
-      location_h3_r7: string;
-    }>>(
+  private async checkInRecipients(
+    actorId: string,
+    audience: CheckInAudience,
+    locationH3R7: string,
+  ): Promise<PulseActivityRecipient[]> {
+    const cells = h3.gridDisk(locationH3R7, PULSE_CELL_RADIUS);
+    const rows = await this.db.query<RecipientLocationRow[]>(
       `SELECT u.id, u.location_h3_r7
          FROM users u
         WHERE u.deleted_at IS NULL
@@ -118,38 +208,56 @@ export class PulseActivityRealtimeService implements OnModuleInit, OnModuleDestr
             )
           )
         LIMIT $4`,
-      [input.actorId, input.audience, cells, MAX_RECIPIENTS],
+      [actorId, audience, cells, MAX_RECIPIENTS],
     );
+    return this.toRecipients(rows, locationH3R7);
+  }
 
-    const recipients = rows
+  private async eventJoinRecipients(
+    actorId: string,
+    eventHostId: string,
+    locationH3R7: string,
+  ): Promise<PulseActivityRecipient[]> {
+    const cells = h3.gridDisk(locationH3R7, PULSE_CELL_RADIUS);
+    const rows = await this.db.query<RecipientLocationRow[]>(
+      `SELECT u.id, u.location_h3_r7
+         FROM users u
+        WHERE u.deleted_at IS NULL
+          AND u.location_h3_r7 = ANY($3::text[])
+          AND NOT EXISTS (
+            SELECT 1
+              FROM user_blocks b
+             WHERE (b.blocker_id = $1 AND b.blocked_id = u.id)
+                OR (b.blocker_id = u.id AND b.blocked_id = $1)
+          )
+          AND NOT EXISTS (
+            SELECT 1
+              FROM user_blocks hb
+             WHERE (hb.blocker_id = $2 AND hb.blocked_id = u.id)
+                OR (hb.blocker_id = u.id AND hb.blocked_id = $2)
+          )
+        LIMIT $4`,
+      [actorId, eventHostId, cells, MAX_RECIPIENTS],
+    );
+    return this.toRecipients(rows, locationH3R7);
+  }
+
+  private toRecipients(
+    rows: RecipientLocationRow[],
+    originCell: string,
+  ): PulseActivityRecipient[] {
+    return rows
       .map((row): PulseActivityRecipient => ({
         userId: row.id,
-        distanceM: this.distanceBetweenCellsM(input.locationH3R7, row.location_h3_r7),
+        distanceM: this.distanceBetweenCellsM(originCell, row.location_h3_r7),
       }))
       .filter((recipient) => recipient.distanceM <= MAX_DISTANCE_M);
+  }
 
-    if (recipients.length === 0) return;
-
-    const item: ActivityItem = {
-      id: `place:${input.checkInId}`,
-      type: 'place',
-      category: null,
-      title: input.placeLabel,
-      preview: input.audience === 'friends' ? 'Shared with friends' : 'Shared nearby',
-      actorId: input.actorId,
-      actorName: actor.display_name,
-      distanceM: null,
-      createdAt: input.createdAt,
-      unread: false,
-      narrative: {
-        kind: 'place_visit',
-        verb: 'visited',
-        objectLabel: input.placeLabel,
-        placeLabel: null,
-      },
-      deepLink: { screen: 'Main', params: { screen: 'Map' } },
-    };
-
+  private async publishEnvelope(
+    item: ActivityItem,
+    recipients: PulseActivityRecipient[],
+  ): Promise<void> {
     const envelope: PulseActivityEnvelope = {
       item,
       emittedAt: new Date().toISOString(),
@@ -196,7 +304,7 @@ export class PulseActivityRealtimeService implements OnModuleInit, OnModuleDestr
     const record = value as Record<string, unknown>;
     return (
       typeof record.id === 'string'
-      && record.type === 'place'
+      && (record.type === 'place' || record.type === 'event')
       && typeof record.title === 'string'
       && typeof record.createdAt === 'string'
       && typeof record.deepLink === 'object'
