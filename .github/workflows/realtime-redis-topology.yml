@@ -1,0 +1,53 @@
+name: Realtime Redis Topology
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - apps/backend/package.json
+      - apps/backend/src/config/redis-client.ts
+      - apps/backend/src/realtime/redis-io.adapter.ts
+      - apps/backend/src/realtime/realtime-emitter.service.ts
+      - apps/backend/src/realtime/realtime.redis-adapter.integration.spec.ts
+      - apps/backend/src/realtime/socket-io-redis.config.ts
+      - pnpm-lock.yaml
+      - .github/workflows/realtime-redis-topology.yml
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  redis-topology:
+    name: two-node fanout and room revocation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      REDIS_ADAPTER_TEST: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build shared types
+        run: pnpm --filter @g88/shared build
+      - name: Run Redis multi-instance topology regression
+        run: >-
+          pnpm --filter @g88/backend exec jest
+          src/realtime/realtime.redis-adapter.integration.spec.ts
+          --ci --runInBand
