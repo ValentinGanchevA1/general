@@ -37,6 +37,7 @@ type CameraRef = React.ElementRef<typeof Camera>;
 
 const DISCOVERY_SOURCE_ID = 'nexa-discovery';
 const DISCOVERY_LAYER_ID = 'nexa-discovery-points';
+const DISCOVERY_SAVED_PLACE_HALO_LAYER_ID = 'nexa-discovery-saved-place-halo';
 const DISCOVERY_SELECTED_HALO_LAYER_ID = 'nexa-discovery-selected-halo';
 const DISCOVERY_SELECTED_LAYER_ID = 'nexa-discovery-selected';
 const SELECTION_TRANSITION = { duration: 180, delay: 0 } as const;
@@ -60,6 +61,9 @@ const DISCOVERY_MARKER_RADIUS: CircleRadius = [
   ['match', ['get', 'kind'], 'cluster', 13, 'event', 8, 'listing', 8, 'place', 8.5, 7],
   17,
   ['match', ['get', 'kind'], 'cluster', 16, 'event', 10, 'listing', 10, 'place', 10.5, 9],
+];
+const DISCOVERY_SAVED_PLACE_HALO_RADIUS: CircleRadius = [
+  'interpolate', ['linear'], ['zoom'], 9, 9.5, 13, 13.5, 17, 16,
 ];
 const DISCOVERY_SELECTED_RADIUS: CircleRadius = [
   'interpolate', ['linear'], ['zoom'], 9, 8, 13, 11, 17, 13,
@@ -166,6 +170,15 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
       () => ['==', ['id'], selectedKey ?? '__nexa-no-selection__'],
       [selectedKey],
     );
+    const savedPlaceFilter = React.useMemo<CircleLayerFilter>(
+      () => [
+        'all',
+        ['==', ['get', 'kind'], 'place'],
+        ['==', ['get', 'saved'], true],
+        ['!=', ['id'], selectedKey ?? '__nexa-no-selection__'],
+      ],
+      [selectedKey],
+    );
     const baseOpacity = React.useMemo<CircleOpacity>(
       () => (dimUnselected && selectedKey !== null
         ? ['case', ['==', ['id'], selectedKey], 0, 0.28]
@@ -197,6 +210,19 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
               'circle-radius': DISCOVERY_MARKER_RADIUS,
               'circle-stroke-color': '#FFFFFF',
               'circle-stroke-width': 1.5,
+            }}
+          />
+          <Layer
+            id={DISCOVERY_SAVED_PLACE_HALO_LAYER_ID}
+            type="circle"
+            filter={savedPlaceFilter}
+            paint={{
+              'circle-color': '#27D3F2',
+              'circle-opacity': 0.12,
+              'circle-radius': DISCOVERY_SAVED_PLACE_HALO_RADIUS,
+              'circle-stroke-color': '#27D3F2',
+              'circle-stroke-opacity': 0.88,
+              'circle-stroke-width': 2.5,
             }}
           />
           <Layer
