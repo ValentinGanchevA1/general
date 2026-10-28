@@ -58,6 +58,7 @@ export type NexaMapScreenSurfaceProps = Omit<
   onEntityPress: (point: EntityPoint) => void;
   onClusterPress: (point: ClusterPoint) => void;
   onRegionChangeComplete: (region: Region) => void;
+  onPlacePreviewVisibilityChange?: (visible: boolean) => void;
 };
 
 const MAPLIBRE_STYLE_RUNTIME = resolveMapLibreStyleRuntime({
@@ -96,6 +97,7 @@ export const NexaMapScreenSurface = React.forwardRef<
     onEntityPress,
     onClusterPress,
     onRegionChangeComplete,
+    onPlacePreviewVisibilityChange,
     selectedEntityKey,
     dimUnselected,
     ...props
@@ -142,6 +144,10 @@ export const NexaMapScreenSurface = React.forwardRef<
       runtimeMapRef.current?.fitViewport(targetViewport, options);
     },
   }), []);
+
+  React.useEffect(() => () => {
+    onPlacePreviewVisibilityChange?.(false);
+  }, [onPlacePreviewVisibilityChange]);
 
   const placeDiscovery = usePlaceMapDiscovery({
     viewport,
@@ -201,8 +207,13 @@ export const NexaMapScreenSurface = React.forwardRef<
   const openPlacePreview = useCallback((point: PlaceMapEntityPoint): void => {
     privateSelectedPlaceIdRef.current = point.meta.saved === true ? point.id : null;
     setSelectedPlace(point);
-    requestAnimationFrame(() => placeSheetRef.current?.present());
-  }, []);
+    requestAnimationFrame(() => {
+      const sheet = placeSheetRef.current;
+      if (sheet == null) return;
+      sheet.present();
+      onPlacePreviewVisibilityChange?.(true);
+    });
+  }, [onPlacePreviewVisibilityChange]);
 
   useFocusEffect(useCallback(() => {
     if (savedPlaceFocusRequest == null) return;
@@ -344,6 +355,7 @@ export const NexaMapScreenSurface = React.forwardRef<
         enableDynamicSizing={false}
         enablePanDownToClose
         onDismiss={() => {
+          onPlacePreviewVisibilityChange?.(false);
           privateSelectedPlaceIdRef.current = null;
           setSelectedPlace(null);
           savedPlaceMapFocusStore.clear();
