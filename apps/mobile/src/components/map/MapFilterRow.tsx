@@ -1,7 +1,7 @@
-// NEXA primary map chrome: search + locate, semantic layers + advanced filters.
+// NEXA primary map chrome: search + locate, semantic layers + private saved overlay.
 // Keep high-frequency controls visible without horizontal scrolling or duplicate floating actions.
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import {
 	Modal,
 	Pressable,
@@ -17,6 +17,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { DiscoveryRankBy, EntityKind, ListingMode } from '@g88/shared';
 import { NexaEntityGlyph } from '@/components/Brand/NexaEntityGlyph';
+import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 import { MAP_LAYER_ROW_HEIGHT, MAP_SEARCH_BAR_HEIGHT } from './mapChromeLayout';
@@ -87,6 +88,11 @@ export function MapFilterRow({
 	const styles = useMemo(() => createStyles(colors), [colors]);
 	const [moreOpen, setMoreOpen] = useState(false);
 	const [searchFocused, setSearchFocused] = useState(false);
+	const savedPlacesEnabled = useSyncExternalStore(
+		savedPlacesMapLayerStore.subscribe,
+		savedPlacesMapLayerStore.getSnapshot,
+		savedPlacesMapLayerStore.getSnapshot,
+	);
 	const showPeople = layers.includes('user');
 	const showListings = layers.includes('listing');
 
@@ -204,6 +210,24 @@ export function MapFilterRow({
 							</Pressable>
 						);
 					})}
+
+					<Pressable
+						onPress={() => savedPlacesMapLayerStore.setEnabled(!savedPlacesEnabled)}
+						style={({ pressed }) => [
+							styles.layerChip,
+							{
+								backgroundColor: savedPlacesEnabled ? colors.actionSoft : colors.surfacePrimary,
+								borderColor: savedPlacesEnabled ? colors.actionPrimary : colors.borderDefault,
+							},
+							pressed && styles.pressed,
+						]}
+						accessibilityRole="button"
+						accessibilityState={{ selected: savedPlacesEnabled }}
+						accessibilityLabel="Saved places layer"
+					>
+						<Icon name={savedPlacesEnabled ? 'bookmark' : 'bookmark-outline'} size={15} color={savedPlacesEnabled ? colors.actionPrimary : colors.textSecondary} />
+						<Text numberOfLines={1} style={[styles.layerText, { color: savedPlacesEnabled ? colors.actionPrimary : colors.textSecondary }]}>Saved</Text>
+					</Pressable>
 				</View>
 
 				<Pressable
@@ -326,9 +350,9 @@ function createStyles(colors: ThemeColors) {
 		clearButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17 },
 		locateButton: { width: MAP_SEARCH_BAR_HEIGHT, height: MAP_SEARCH_BAR_HEIGHT, borderRadius: MAP_SEARCH_BAR_HEIGHT / 2, borderWidth: 1, borderColor: colors.discoveryBorder, backgroundColor: colors.discoverySoft, alignItems: 'center', justifyContent: 'center' },
 		controlRow: { height: MAP_LAYER_ROW_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 8 },
-		layers: { flex: 1, height: MAP_LAYER_ROW_HEIGHT, flexDirection: 'row', gap: 6 },
-		layerChip: { flex: 1, minWidth: 0, height: MAP_LAYER_ROW_HEIGHT, paddingHorizontal: 6, borderRadius: radius.pill, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-		layerText: { flexShrink: 1, fontSize: 12, fontWeight: '700' },
+		layers: { flex: 1, height: MAP_LAYER_ROW_HEIGHT, flexDirection: 'row', gap: 5 },
+		layerChip: { flex: 1, minWidth: 0, height: MAP_LAYER_ROW_HEIGHT, paddingHorizontal: 4, borderRadius: radius.pill, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+		layerText: { flexShrink: 1, fontSize: 11, fontWeight: '700' },
 		filterButton: { width: MAP_LAYER_ROW_HEIGHT, height: MAP_LAYER_ROW_HEIGHT, borderRadius: MAP_LAYER_ROW_HEIGHT / 2, borderWidth: 1, borderColor: colors.borderDefault, backgroundColor: colors.surfacePrimary, alignItems: 'center', justifyContent: 'center', position: 'relative' },
 		filterButtonActive: { borderColor: colors.actionPrimary, backgroundColor: colors.actionSoft },
 		filterBadge: { position: 'absolute', right: -2, top: -2, minWidth: 16, height: 16, paddingHorizontal: 3, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.actionPrimary },
