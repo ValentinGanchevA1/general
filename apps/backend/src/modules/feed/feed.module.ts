@@ -9,6 +9,7 @@ import { MapTilerPlaceAttestationService } from './maptiler-place-attestation.se
 import { PlaceActivityLinkService } from './place-activity-link.service';
 import { PlaceCatalogService } from './place-catalog.service';
 import { PlaceController } from './place.controller';
+import { PlaceSaveService } from './place-save.service';
 import { PulseActivityRealtimeService } from './pulse-activity-realtime.service';
 import { PulseCheckInService } from './pulse-check-in.service';
 import { PulseDiscoveryFeedService } from './pulse-discovery-feed.service';
@@ -22,6 +23,7 @@ import { PulsePlaceTrendingService } from './pulse-place-trending.service';
     MapTilerPlaceAttestationService,
     PlaceActivityLinkService,
     PlaceCatalogService,
+    PlaceSaveService,
     PulseActivityRealtimeService,
     PulseCheckInService,
     PulseDiscoveryFeedService,
