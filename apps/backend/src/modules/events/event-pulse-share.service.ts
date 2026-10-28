@@ -14,7 +14,7 @@ interface ShareableJoinRow {
   title: string;
   host_id: string;
   location_h3_r7: string;
-  pulse_shared_at: Date;
+  pulse_shared_at_iso: string;
 }
 
 interface JoinShareStateRow {
@@ -22,10 +22,10 @@ interface JoinShareStateRow {
   host_id: string;
   location_h3_r7: string;
   visibility: 'public' | 'private';
-  starts_at: Date;
+  is_upcoming: boolean;
   deleted_at: Date | null;
   status: 'going' | 'maybe' | 'declined' | null;
-  pulse_shared_at: Date | null;
+  pulse_shared_at_iso: string | null;
 }
 
 interface RevocableJoinRow {
@@ -62,14 +62,17 @@ export class EventPulseShareService {
                 e.title,
                 e.host_id,
                 e.location_h3_r7,
-                a.pulse_shared_at
+                to_char(
+                  a.pulse_shared_at AT TIME ZONE 'UTC',
+                  'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+                ) AS pulse_shared_at_iso
       )
       SELECT * FROM updated`,
       [eventId, userId],
     );
 
     if (created) {
-      const sharedAt = new Date(created.pulse_shared_at).toISOString();
+      const sharedAt = created.pulse_shared_at_iso;
       void this.pulseRealtime.publishEventJoin({
         eventId: created.event_id,
         actorId: userId,
@@ -89,10 +92,16 @@ export class EventPulseShareService {
               e.host_id,
               e.location_h3_r7,
               e.visibility,
-              e.starts_at,
+              e.starts_at > NOW() AS is_upcoming,
               e.deleted_at,
               a.status,
-              a.pulse_shared_at
+              CASE
+                WHEN a.pulse_shared_at IS NULL THEN NULL
+                ELSE to_char(
+                  a.pulse_shared_at AT TIME ZONE 'UTC',
+                  'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+                )
+              END AS pulse_shared_at_iso
          FROM events e
          LEFT JOIN event_attendees a
            ON a.event_id = e.id
@@ -116,16 +125,16 @@ export class EventPulseShareService {
         message: 'RSVP Going before sharing this event to Pulse.',
       });
     }
-    if (new Date(state.starts_at).getTime() <= Date.now()) {
+    if (!state.is_upcoming) {
       throw new ConflictException({
         code: 'event.pulse_not_upcoming',
         message: 'Only upcoming events can be shared to Pulse.',
       });
     }
-    if (state.pulse_shared_at) {
+    if (state.pulse_shared_at_iso) {
       return {
         eventId,
-        sharedAt: new Date(state.pulse_shared_at).toISOString(),
+        sharedAt: state.pulse_shared_at_iso,
         alreadyShared: true,
       };
     }
