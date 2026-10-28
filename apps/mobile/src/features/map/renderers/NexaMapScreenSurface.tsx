@@ -64,7 +64,7 @@ const MAPLIBRE_STYLE_RUNTIME = resolveMapLibreStyleRuntime({
   region: Config.MAPTILER_REGION,
 });
 
-const PLACE_PREVIEW_SNAP_POINTS = ['34%'] as const;
+const PLACE_PREVIEW_SNAP_POINTS: Array<string | number> = ['34%'];
 
 function regionToViewport(region: Region | null): Viewport | null {
   if (region == null) return null;
