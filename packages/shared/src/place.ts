@@ -18,6 +18,12 @@ export interface PlaceSuggestion extends PlaceIdentity {
   center: LatLng;
 }
 
+/** Authenticated user's private bookmark state for a canonical NEXA place. */
+export interface NexaPlaceSaveState {
+  placeId: string;
+  saved: boolean;
+}
+
 /** Public NEXA-owned place entity. Provider aliases and raw H3 never leave the backend. */
 export interface NexaPlaceDetail {
   id: string;
@@ -29,6 +35,8 @@ export interface NexaPlaceDetail {
   trending: boolean;
   /** Present only for an active thresholded trend. */
   recentActivityAt: string | null;
+  /** Private per-viewer bookmark state; never a public popularity count. */
+  saved: boolean;
 }
 
 /**
