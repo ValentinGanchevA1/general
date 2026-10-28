@@ -2,7 +2,6 @@ import { Logger } from '@nestjs/common';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import Redis from 'ioredis';
-import { Server, type ServerOptions } from 'socket.io';
 import { createRedisClient, type RedisEnvironment } from '../config/redis-client';
 import {
   assertSocketIoRedisConfiguration,
@@ -52,13 +51,16 @@ export class RedisIoAdapter extends IoAdapter {
     }
   }
 
-  createIOServer(port: number, options?: ServerOptions): Server {
+  override createIOServer(
+    port: Parameters<IoAdapter['createIOServer']>[0],
+    options?: Parameters<IoAdapter['createIOServer']>[1],
+  ): ReturnType<IoAdapter['createIOServer']> {
     const adapterConstructor = this.adapterConstructor;
     if (!adapterConstructor) {
       throw new Error('RedisIoAdapter.connectToRedis() must succeed before creating Socket.IO');
     }
 
-    const server = super.createIOServer(port, options) as Server;
+    const server = super.createIOServer(port, options);
     server.adapter(adapterConstructor);
     return server;
   }
