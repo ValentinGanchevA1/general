@@ -17,6 +17,7 @@ import type { NexaSavedPlaceSummary } from '@g88/shared';
 import { EmptyState } from '@/components/EmptyState';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { loadSavedPlaces } from '@/features/places/placeDetailSlice';
+import { savedPlaceMapFocusStore } from '@/features/places/savedPlaceMapFocus.store';
 import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
@@ -61,31 +62,59 @@ export function SavedPlacesScreen(): React.JSX.Element {
     navigation.navigate('Main', { screen: 'Map' });
   }, [navigation]);
 
+  const showPlaceOnMap = useCallback((place: NexaSavedPlaceSummary) => {
+    savedPlacesMapLayerStore.setEnabled(true);
+    savedPlaceMapFocusStore.request(place);
+    navigation.navigate('Main', { screen: 'Map' });
+  }, [navigation]);
+
   const renderItem = useCallback(({ item }: { item: NexaSavedPlaceSummary }) => (
-    <Pressable
-      style={styles.row}
-      onPress={() => openPlace(item.id)}
-      accessibilityRole="button"
-      accessibilityLabel={`${item.canonicalLabel}. ${item.trending ? 'Getting active nearby.' : 'Saved place.'}`}
-    >
-      <View style={styles.iconWrap}>
-        <Icon name="map-marker-radius-outline" size={22} color={colors.discovery} />
-      </View>
-      <View style={styles.rowBody}>
-        <Text style={styles.rowTitle} numberOfLines={1}>{item.canonicalLabel}</Text>
-        <View style={styles.metaRow}>
-          {item.trending ? <>
-            <View style={styles.activeDot} />
-            <Text style={styles.activeText}>Getting active nearby</Text>
-          </> : <>
-            <Icon name="shield-map-outline" size={14} color={colors.textTertiary} />
-            <Text style={styles.metaText}>Saved place · approximate area</Text>
-          </>}
+    <View style={styles.row}>
+      <Pressable
+        style={({ pressed }) => [styles.rowMain, pressed ? styles.rowMainPressed : null]}
+        onPress={() => openPlace(item.id)}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.canonicalLabel}. ${item.trending ? 'Getting active nearby.' : 'Saved place.'} Open details.`}
+      >
+        <View style={styles.iconWrap}>
+          <Icon name="map-marker-radius-outline" size={22} color={colors.discovery} />
         </View>
-      </View>
-      <Icon name="chevron-right" size={22} color={colors.textMuted} />
-    </Pressable>
-  ), [colors.discovery, colors.textMuted, colors.textTertiary, openPlace, styles]);
+        <View style={styles.rowBody}>
+          <Text style={styles.rowTitle} numberOfLines={1}>{item.canonicalLabel}</Text>
+          <View style={styles.metaRow}>
+            {item.trending ? <>
+              <View style={styles.activeDot} />
+              <Text style={styles.activeText}>Getting active nearby</Text>
+            </> : <>
+              <Icon name="shield-map-outline" size={14} color={colors.textTertiary} />
+              <Text style={styles.metaText}>Saved place · approximate area</Text>
+            </>}
+          </View>
+        </View>
+        <Icon name="chevron-right" size={22} color={colors.textMuted} />
+      </Pressable>
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.rowMapButton,
+          pressed ? styles.mapActionPressed : null,
+        ]}
+        onPress={() => showPlaceOnMap(item)}
+        accessibilityRole="button"
+        accessibilityLabel={`Show ${item.canonicalLabel} on map`}
+        hitSlop={4}
+      >
+        <Icon name="map-marker-outline" size={22} color={colors.discovery} />
+      </Pressable>
+    </View>
+  ), [
+    colors.discovery,
+    colors.textMuted,
+    colors.textTertiary,
+    openPlace,
+    showPlaceOnMap,
+    styles,
+  ]);
 
   const mapAction = collection.items.length > 0 ? (
     <Pressable
@@ -171,13 +200,34 @@ function createStyles(colors: ThemeColors) {
       minHeight: 76,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
+      paddingRight: 8,
       borderRadius: 16,
       backgroundColor: colors.surfacePrimary,
       borderWidth: 1,
       borderColor: colors.borderSubtle,
+      overflow: 'hidden',
+    },
+    rowMain: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 74,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingLeft: 14,
+      paddingRight: 8,
+      paddingVertical: 12,
+    },
+    rowMainPressed: { opacity: 0.74 },
+    rowMapButton: {
+      width: 42,
+      height: 42,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.discoveryMutedBg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.discoveryBorderSoft,
     },
     iconWrap: {
       width: 42,
