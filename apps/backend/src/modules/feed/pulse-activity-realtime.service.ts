@@ -52,6 +52,13 @@ export interface PublishCheckInActivityInput {
   createdAt: string;
 }
 
+export interface PublishPlaceTrendActivityInput {
+  trendId: string;
+  placeLabel: string;
+  locationH3R7: string;
+  createdAt: string;
+}
+
 export interface PublishEventJoinActivityInput {
   eventId: string;
   actorId: string;
@@ -134,6 +141,36 @@ export class PulseActivityRealtimeService implements OnModuleInit, OnModuleDestr
       narrative: {
         kind: 'place_visit',
         verb: 'visited',
+        objectLabel: input.placeLabel,
+        placeLabel: null,
+      },
+      deepLink: { screen: 'Main', params: { screen: 'Map' } },
+    }, recipients);
+  }
+
+  async publishPlaceTrend(input: PublishPlaceTrendActivityInput): Promise<void> {
+    const claimed = await this.claimOnce(
+      `pulse:activity:published:place_trending:${input.trendId}:${input.createdAt}`,
+    );
+    if (!claimed) return;
+
+    const recipients = await this.nearbyRecipients(input.locationH3R7);
+    if (recipients.length === 0) return;
+
+    await this.publishEnvelope({
+      id: `place_trending:${input.trendId}`,
+      type: 'place',
+      category: null,
+      title: input.placeLabel,
+      preview: 'Recent nearby check-ins are picking up',
+      actorId: null,
+      actorName: null,
+      distanceM: null,
+      createdAt: input.createdAt,
+      unread: false,
+      narrative: {
+        kind: 'place_trending',
+        verb: 'is active at',
         objectLabel: input.placeLabel,
         placeLabel: null,
       },
@@ -230,6 +267,19 @@ export class PulseActivityRealtimeService implements OnModuleInit, OnModuleDestr
       [actorId],
     );
     return actor?.display_name ?? null;
+  }
+
+  private async nearbyRecipients(locationH3R7: string): Promise<PulseActivityRecipient[]> {
+    const cells = h3.gridDisk(locationH3R7, PULSE_CELL_RADIUS);
+    const rows = await this.db.query<RecipientLocationRow[]>(
+      `SELECT u.id, u.location_h3_r7
+         FROM users u
+        WHERE u.deleted_at IS NULL
+          AND u.location_h3_r7 = ANY($1::text[])
+        LIMIT $2`,
+      [cells, MAX_RECIPIENTS],
+    );
+    return this.toRecipients(rows, locationH3R7);
   }
 
   private async checkInRecipients(

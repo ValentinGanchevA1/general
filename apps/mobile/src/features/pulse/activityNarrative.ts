@@ -3,7 +3,7 @@ import type { ActivityItem } from '@g88/shared';
 export interface ActivitySentenceParts {
   actor: string;
   verb: string;
-  objectLabel: string;
+  objectLabel: string | null;
   placeLabel: string | null;
 }
 
@@ -15,6 +15,15 @@ export interface ActivitySentenceParts {
 export function getActivitySentence(item: ActivityItem): ActivitySentenceParts | null {
   const narrative = item.narrative;
   if (!narrative) return null;
+
+  if (narrative.kind === 'place_trending') {
+    return {
+      actor: narrative.objectLabel,
+      verb: 'is getting active',
+      objectLabel: null,
+      placeLabel: null,
+    };
+  }
 
   return {
     actor: item.actorName?.trim() || 'Someone',

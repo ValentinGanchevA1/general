@@ -10,6 +10,7 @@ import {
 } from '@g88/shared';
 
 import { PulseActivityRealtimeService } from './pulse-activity-realtime.service';
+import { PulsePlaceTrendingService } from './pulse-place-trending.service';
 
 const CHECK_IN_TTL_MS = 6 * 60 * 60 * 1000;
 const CHECK_IN_COOLDOWN_MINUTES = 15;
@@ -19,6 +20,7 @@ export class PulseCheckInService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly realtime: PulseActivityRealtimeService,
+    private readonly trending: PulsePlaceTrendingService,
   ) {}
 
   async create(userId: string, input: CreatePulseCheckInRequest): Promise<PulseCheckInResult> {
@@ -65,6 +67,15 @@ export class PulseCheckInService {
       locationH3R7: cell,
       createdAt: createdAt.toISOString(),
     }).catch(() => undefined);
+
+    // Friends-only check-ins are deliberately excluded: using them to create a
+    // Nearby aggregate would broaden visibility beyond the user's chosen audience.
+    if (input.audience === 'nearby') {
+      void this.trending.evaluateAfterCheckIn({
+        placeLabel,
+        locationH3R7: cell,
+      }).catch(() => undefined);
+    }
 
     return {
       id,

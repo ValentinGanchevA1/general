@@ -104,6 +104,55 @@ describe('PulseActivityRealtimeService', () => {
     );
   });
 
+  it('fans out a place trend without actor, count, participant, or H3 metadata', async () => {
+    const cell = h3.latLngToCell(43.2047, 27.9105, 7);
+    set.mockResolvedValueOnce('OK');
+    query.mockResolvedValueOnce([{ id: 'viewer-1', location_h3_r7: cell }]);
+    publish.mockResolvedValueOnce(1);
+
+    await service.onModuleInit();
+    await service.publishPlaceTrend({
+      trendId: 'trend-1',
+      placeLabel: 'Sea Garden',
+      locationH3R7: cell,
+      createdAt: '2026-10-28T09:00:00.000Z',
+    });
+
+    expect(set).toHaveBeenCalledWith(
+      'pulse:activity:published:place_trending:trend-1:2026-10-28T09:00:00.000Z',
+      '1',
+      'EX',
+      120,
+      'NX',
+    );
+    const recipientSql = query.mock.calls[0]?.[0] as string;
+    expect(recipientSql).toContain('location_h3_r7 = ANY');
+    expect(publish).toHaveBeenCalledTimes(1);
+
+    const payload = publish.mock.calls[0]?.[1] as string;
+    expect(payload).not.toContain('locationH3R7');
+    expect(payload).not.toContain('distinctUserCount');
+    expect(payload).not.toContain('participant');
+    expect(payload).not.toContain('actorId":"user');
+
+    expect(messageHandler).not.toBeNull();
+    messageHandler?.('pulse:activity:v1', payload);
+
+    expect(to).toHaveBeenCalledWith('user:viewer-1');
+    expect(emit).toHaveBeenCalledWith(
+      'pulse:activity',
+      expect.objectContaining({
+        item: expect.objectContaining({
+          id: 'place_trending:trend-1',
+          actorId: null,
+          actorName: null,
+          distanceM: 0,
+          narrative: expect.objectContaining({ kind: 'place_trending' }),
+        }),
+      }),
+    );
+  });
+
   it('publishes an explicit event join with actor and host block gates', async () => {
     const cell = h3.latLngToCell(43.2047, 27.9105, 7);
     set.mockResolvedValueOnce('OK');

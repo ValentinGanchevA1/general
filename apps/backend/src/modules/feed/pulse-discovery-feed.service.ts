@@ -27,13 +27,14 @@ export class PulseDiscoveryFeedService {
     const wants = (type: ActivityType): boolean => types.includes(type);
     const legacyTypes = types.filter((type) => type === 'alert' || type === 'listing');
 
-    const [base, events, eventJoins, checkIns] = await Promise.all([
+    const [base, events, eventJoins, checkIns, placeTrends] = await Promise.all([
       legacyTypes.length > 0
         ? this.feed.aggregate(userId, since, legacyTypes, limit)
         : Promise.resolve<FeedResponse>({ items: [], nextSince: new Date().toISOString() }),
       wants('event') ? this.selectEvents(userId, limit) : Promise.resolve<ActivityItem[]>([]),
       wants('event') ? this.selectEventJoins(userId, since, limit) : Promise.resolve<ActivityItem[]>([]),
       wants('place') ? this.selectCheckIns(userId, since, limit) : Promise.resolve<ActivityItem[]>([]),
+      wants('place') ? this.selectPlaceTrends(userId, since, limit) : Promise.resolve<ActivityItem[]>([]),
     ]);
 
     const items = [
@@ -41,6 +42,7 @@ export class PulseDiscoveryFeedService {
       ...events,
       ...eventJoins,
       ...checkIns,
+      ...placeTrends,
     ]
       .sort((a, b) => this.score(b) - this.score(a))
       .slice(0, limit);
@@ -178,6 +180,58 @@ export class PulseDiscoveryFeedService {
           deepLink: { screen: 'Main', params: { screen: 'Map' } },
         };
       })
+      .filter((item) => item.distanceM != null && item.distanceM <= MAX_DISTANCE_M)
+      .slice(0, limit);
+  }
+
+  private async selectPlaceTrends(
+    userId: string,
+    since: Date,
+    limit: number,
+  ): Promise<ActivityItem[]> {
+    const [viewer] = await this.db.query<Array<{ location_h3_r7: string | null }>>(
+      `SELECT location_h3_r7 FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      [userId],
+    );
+    if (!viewer?.location_h3_r7) return [];
+
+    const cells = h3.gridDisk(viewer.location_h3_r7, CHECK_IN_CELL_RADIUS);
+    const rows = await this.db.query<Array<{
+      id: string;
+      place_label: string;
+      location_h3_r7: string;
+      last_emitted_at: Date;
+    }>>(
+      `SELECT id, place_label, location_h3_r7, last_emitted_at
+         FROM pulse_place_trends
+        WHERE expires_at > NOW()
+          AND last_emitted_at > $1
+          AND location_h3_r7 = ANY($2::text[])
+        ORDER BY last_emitted_at DESC
+        LIMIT $3`,
+      [since.toISOString(), cells, Math.min(limit * 2, 200)],
+    );
+
+    return rows
+      .map((row): ActivityItem => ({
+        id: `place_trending:${row.id}`,
+        type: 'place',
+        category: null,
+        title: row.place_label,
+        preview: 'Recent nearby check-ins are picking up',
+        actorId: null,
+        actorName: null,
+        distanceM: this.distanceBetweenCellsM(viewer.location_h3_r7!, row.location_h3_r7),
+        createdAt: new Date(row.last_emitted_at).toISOString(),
+        unread: false,
+        narrative: {
+          kind: 'place_trending',
+          verb: 'is active at',
+          objectLabel: row.place_label,
+          placeLabel: null,
+        },
+        deepLink: { screen: 'Main', params: { screen: 'Map' } },
+      }))
       .filter((item) => item.distanceM != null && item.distanceM <= MAX_DISTANCE_M)
       .slice(0, limit);
   }

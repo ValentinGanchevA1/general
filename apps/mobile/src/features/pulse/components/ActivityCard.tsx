@@ -76,8 +76,8 @@ export function ActivityCard({ item, onPress, onView }: Props): React.JSX.Elemen
 						{sentence ? (
 							<Text style={styles.narrative} numberOfLines={2}>
 								<Text style={styles.narrativeActor}>{sentence.actor}</Text>
-								{' '}{sentence.verb}{' '}
-								<Text style={styles.narrativeObject}>{sentence.objectLabel}</Text>
+								{' '}{sentence.verb}
+								{sentence.objectLabel ? <Text>{' '}<Text style={styles.narrativeObject}>{sentence.objectLabel}</Text></Text> : null}
 								{sentence.placeLabel ? <Text>{' at '}<Text style={styles.narrativeObject}>{sentence.placeLabel}</Text></Text> : null}
 							</Text>
 						) : (
