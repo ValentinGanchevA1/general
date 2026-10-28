@@ -13,11 +13,14 @@ import { getJson, postJson } from '@/api/client';
 import { logout } from '@/features/auth/authSlice';
 import { extractMessage } from '@/utils/extractMessage';
 
+const MAX_PULSE_ITEMS = 100;
+
 export interface PulseState {
   items: ActivityItem[];
   loading: boolean;
   error: string | null;
   lastFetchedAt: string | null;
+  realtimeIdsDuringFetch: string[];
   pendingFilter: string | null;
   checkInSubmitting: boolean;
   checkInError: string | null;
@@ -28,6 +31,7 @@ const initialState: PulseState = {
   loading: false,
   error: null,
   lastFetchedAt: null,
+  realtimeIdsDuringFetch: [],
   pendingFilter: null,
   checkInSubmitting: false,
   checkInError: null,
@@ -76,14 +80,35 @@ const slice = createSlice({
     setPendingFilter: (s, a: PayloadAction<string>) => { s.pendingFilter = a.payload; },
     clearPendingFilter: (s) => { s.pendingFilter = null; },
     clearCheckInError: (s) => { s.checkInError = null; },
+    activityReceived: (s, a: PayloadAction<ActivityItem>) => {
+      s.items = [a.payload, ...s.items.filter((item) => item.id !== a.payload.id)]
+        .slice(0, MAX_PULSE_ITEMS);
+      if (s.loading && !s.realtimeIdsDuringFetch.includes(a.payload.id)) {
+        s.realtimeIdsDuringFetch.push(a.payload.id);
+      }
+    },
   },
   extraReducers: (b) => {
-    b.addCase(fetchFeed.pending, (s) => { s.loading = true; s.error = null; });
+    b.addCase(fetchFeed.pending, (s) => {
+      s.loading = true;
+      s.error = null;
+      s.realtimeIdsDuringFetch = [];
+    });
     b.addCase(fetchFeed.fulfilled, (s, a: PayloadAction<FeedResponse>) => {
-      s.loading = false; s.items = a.payload.items; s.lastFetchedAt = new Date().toISOString();
+      const fetchedIds = new Set(a.payload.items.map((item) => item.id));
+      const realtimeIds = new Set(s.realtimeIdsDuringFetch);
+      const arrivedDuringFetch = s.items.filter((item) => (
+        realtimeIds.has(item.id)
+        && !fetchedIds.has(item.id)
+      ));
+      s.loading = false;
+      s.items = [...arrivedDuringFetch, ...a.payload.items].slice(0, MAX_PULSE_ITEMS);
+      s.lastFetchedAt = new Date().toISOString();
+      s.realtimeIdsDuringFetch = [];
     });
     b.addCase(fetchFeed.rejected, (s, a) => {
       s.loading = false;
+      s.realtimeIdsDuringFetch = [];
       s.error = typeof a.payload === 'string' ? a.payload : 'Failed to load Pulse';
     });
     b.addCase(createPulseCheckIn.pending, (s) => {
@@ -103,5 +128,11 @@ const slice = createSlice({
   },
 });
 
-export const { clearPulse, setPendingFilter, clearPendingFilter, clearCheckInError } = slice.actions;
+export const {
+  activityReceived,
+  clearPulse,
+  setPendingFilter,
+  clearPendingFilter,
+  clearCheckInError,
+} = slice.actions;
 export default slice.reducer;

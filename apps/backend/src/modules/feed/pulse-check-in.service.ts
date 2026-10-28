@@ -9,12 +9,17 @@ import {
   type PulseCheckInResult,
 } from '@g88/shared';
 
+import { PulseActivityRealtimeService } from './pulse-activity-realtime.service';
+
 const CHECK_IN_TTL_MS = 6 * 60 * 60 * 1000;
 const CHECK_IN_COOLDOWN_MINUTES = 15;
 
 @Injectable()
 export class PulseCheckInService {
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    private readonly realtime: PulseActivityRealtimeService,
+  ) {}
 
   async create(userId: string, input: CreatePulseCheckInRequest): Promise<PulseCheckInResult> {
     const placeLabel = this.normalizePlaceLabel(input.placeLabel);
@@ -48,6 +53,18 @@ export class PulseCheckInService {
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [id, userId, placeLabel, input.audience, cell, createdAt, expiresAt],
     );
+
+    // Realtime is best-effort. Persistence succeeded already, so a Redis/socket
+    // outage must not turn a successful check-in into an API failure; REST /feed
+    // remains the source-of-truth recovery path.
+    void this.realtime.publishCheckIn({
+      checkInId: id,
+      actorId: userId,
+      placeLabel,
+      audience: input.audience,
+      locationH3R7: cell,
+      createdAt: createdAt.toISOString(),
+    }).catch(() => undefined);
 
     return {
       id,
