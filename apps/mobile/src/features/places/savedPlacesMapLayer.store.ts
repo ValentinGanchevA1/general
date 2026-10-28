@@ -7,6 +7,18 @@ function emit(): void {
   listeners.forEach((listener) => listener());
 }
 
+/**
+ * Private map-layer UI state must never carry across authenticated identities.
+ * A transition from no user -> user is a fresh login and starts from the default
+ * disabled state, while logout and direct account switches clear any prior choice.
+ */
+export function shouldResetSavedPlacesMapLayer(
+  previousUserId: string | null,
+  nextUserId: string | null,
+): boolean {
+  return previousUserId !== null && previousUserId !== nextUserId;
+}
+
 export const savedPlacesMapLayerStore = {
   getSnapshot(): boolean {
     return enabled;

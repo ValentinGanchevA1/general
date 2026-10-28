@@ -17,6 +17,7 @@ import type { NexaSavedPlaceSummary } from '@g88/shared';
 import { EmptyState } from '@/components/EmptyState';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { loadSavedPlaces } from '@/features/places/placeDetailSlice';
+import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { spacing, useAppTheme, type ThemeColors } from '@/theme';
@@ -51,7 +52,12 @@ export function SavedPlacesScreen(): React.JSX.Element {
     navigation.navigate('PlaceDetail', { placeId });
   }, [navigation]);
 
-  const openMap = useCallback(() => {
+  const exploreMap = useCallback(() => {
+    navigation.navigate('Main', { screen: 'Map' });
+  }, [navigation]);
+
+  const showSavedOnMap = useCallback(() => {
+    savedPlacesMapLayerStore.setEnabled(true);
     navigation.navigate('Main', { screen: 'Map' });
   }, [navigation]);
 
@@ -81,9 +87,21 @@ export function SavedPlacesScreen(): React.JSX.Element {
     </Pressable>
   ), [colors.discovery, colors.textMuted, colors.textTertiary, openPlace, styles]);
 
+  const mapAction = collection.items.length > 0 ? (
+    <Pressable
+      style={({ pressed }) => [styles.mapAction, pressed ? styles.mapActionPressed : null]}
+      onPress={showSavedOnMap}
+      accessibilityRole="button"
+      accessibilityLabel="Show saved places on map"
+      hitSlop={8}
+    >
+      <Icon name="map-marker-multiple-outline" size={22} color={colors.discovery} />
+    </Pressable>
+  ) : null;
+
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Saved places" />
+      <ScreenHeader title="Saved places" right={mapAction} />
       {initialLoading ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.discovery} />
@@ -98,7 +116,7 @@ export function SavedPlacesScreen(): React.JSX.Element {
               ? collection.error
               : 'Save places from NEXA Place Detail to keep a private local collection.'}
             actionLabel={collection.error ? 'Retry' : 'Explore map'}
-            onAction={collection.error ? refresh : openMap}
+            onAction={collection.error ? refresh : exploreMap}
           />
         </View>
       ) : (
@@ -138,6 +156,17 @@ function createStyles(colors: ThemeColors) {
     container: { flex: 1, backgroundColor: colors.canvas },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl },
     listContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.md },
+    mapAction: {
+      width: 42,
+      height: 42,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.discoveryMutedBg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.discoveryBorderSoft,
+    },
+    mapActionPressed: { opacity: 0.72 },
     row: {
       minHeight: 76,
       flexDirection: 'row',
