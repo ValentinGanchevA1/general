@@ -6,6 +6,7 @@ export * from './event';
 export * from './listing';
 export * from './notifications';
 export * from './activity';
+export * from './place';
 export * from './pulse-events';
 export * from './gamification';
 export * from './challenges';

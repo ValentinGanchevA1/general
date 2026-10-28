@@ -3,6 +3,8 @@
 // Activity-feed types shared between backend (aggregator) and mobile (Pulse + FAB).
 // Surface-agnostic: same shape powers REST /feed, the Pulse list, future socket push.
 
+import type { PlaceIdentity } from './place';
+
 export type ActivityType = 'chat' | 'wave' | 'listing' | 'alert' | 'match' | 'event' | 'place';
 
 export type AreaCategory =
@@ -48,6 +50,8 @@ export type CheckInAudience = 'friends' | 'nearby';
 /** Explicit user-authored Pulse check-in. Exact coordinates are transport-only. */
 export interface CreatePulseCheckInRequest {
   placeLabel: string;
+  /** Provider-backed canonical identity. Null keeps the free-text fallback. */
+  placeIdentity: PlaceIdentity | null;
   audience: CheckInAudience;
   lat: number;
   lng: number;
@@ -56,6 +60,7 @@ export interface CreatePulseCheckInRequest {
 export interface PulseCheckInResult {
   id: string;
   placeLabel: string;
+  placeIdentity: PlaceIdentity | null;
   audience: CheckInAudience;
   createdAt: string;
   expiresAt: string;

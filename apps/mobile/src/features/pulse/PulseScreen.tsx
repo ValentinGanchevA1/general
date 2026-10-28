@@ -57,14 +57,7 @@ export function PulseScreen(): React.JSX.Element {
 	const dispatch = useAppDispatch();
 	const navigation = useNavigation<Nav>();
 	const route = useRoute<R>();
-	const {
-		items,
-		loading,
-		error,
-		pendingFilter,
-		checkInSubmitting,
-		checkInError,
-	} = useAppSelector((state) => state.pulse);
+	const { items, loading, error, pendingFilter, checkInSubmitting, checkInError } = useAppSelector((state) => state.pulse);
 	const discoveryPoints = useAppSelector((state) => state.discovery.points);
 	const nearbyStories = useAppSelector((state) => state.stories.nearby);
 	const profile = useAppSelector((state) => state.profile.profile);
@@ -92,30 +85,19 @@ export function PulseScreen(): React.JSX.Element {
 	const storyEligibility = useMemo(() => { if (!profile) return { allowed: false as const, reason: 'email_unverified' as const }; return canPostStory({ verification: profile.verification, createdAt: profile.createdAt, strikePoints: profile.strikePoints ?? 0, storySuspendedUntil: profile.storySuspendedUntil ?? null }); }, [profile]);
 	const onOpenStory = useCallback((story: StoryCard, index: number) => { setViewerIndex(index); setViewerOpen(true); track('story.open', { storyId: story.id, index, surface: 'pulse' }); }, []);
 	const onCreatePress = useCallback(() => { if (!storyEligibility.allowed) { const reason = storyEligibility.reason; track('story.gate_tap', { reason, surface: 'pulse' }); if (reason === 'email_unverified') { openRootScreen(navigation, 'EmailVerification'); return; } if (reason === 'phone_required') { openRootScreen(navigation, 'Verification', { initialPhone: profile?.phone ?? undefined }); return; } appAlert('Stories', storyGateMessage(reason), [{ text: 'OK' }]); return; } setCreateOpen(true); track('story.create_open', { surface: 'pulse' }); }, [storyEligibility, navigation, profile?.phone]);
-	const onOpenCheckIn = useCallback(() => {
-		dispatch(clearCheckInError());
-		setCheckInOpen(true);
-		void requestPermission();
-		track('pulse.check_in_open', { surface: 'pulse' });
-	}, [dispatch, requestPermission]);
-	const onCloseCheckIn = useCallback(() => {
-		if (checkInSubmitting) return;
-		setCheckInOpen(false);
-		dispatch(clearCheckInError());
-	}, [checkInSubmitting, dispatch]);
+	const onOpenCheckIn = useCallback(() => { dispatch(clearCheckInError()); setCheckInOpen(true); void requestPermission(); track('pulse.check_in_open', { surface: 'pulse' }); }, [dispatch, requestPermission]);
+	const onCloseCheckIn = useCallback(() => { if (checkInSubmitting) return; setCheckInOpen(false); dispatch(clearCheckInError()); }, [checkInSubmitting, dispatch]);
 	const onSubmitCheckIn = useCallback((draft: CheckInDraft): void => {
-		if (!myCoords) {
-			void requestPermission();
-			return;
-		}
+		if (!myCoords) { void requestPermission(); return; }
 		void dispatch(createPulseCheckIn({
 			placeLabel: draft.placeLabel,
+			placeIdentity: draft.placeIdentity,
 			audience: draft.audience,
 			lat: myCoords.lat,
 			lng: myCoords.lng,
 		})).unwrap().then(() => {
 			setCheckInOpen(false);
-			track('pulse.check_in_created', { audience: draft.audience });
+			track('pulse.check_in_created', { audience: draft.audience, canonicalPlace: draft.placeIdentity != null });
 			load();
 		}).catch(() => undefined);
 	}, [dispatch, load, myCoords, requestPermission]);
@@ -124,7 +106,7 @@ export function PulseScreen(): React.JSX.Element {
 
 	const Header = <View><View style={[S.headerBar, { paddingTop: Math.max(insets.top, 8) + 8 }]}><Text style={S.headerTitle}>Pulse</Text><TouchableOpacity style={S.checkInButton} onPress={onOpenCheckIn} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Check in nearby"><Text style={S.checkInButtonText}>Check in</Text></TouchableOpacity></View><PulseStrip onOpenStory={onOpenStory} onCreatePress={onCreatePress} canCreate={storyEligibility.allowed} {...(!storyEligibility.allowed ? { gateReason: storyEligibility.reason } : {})} /><ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.chips} contentContainerStyle={S.chipsContent}>{FILTERS.map((definition) => <AppChip key={definition.key} label={definition.label} selected={filter === definition.key} onPress={() => setFilter(definition.key)} accessibilityLabel={`Filter ${definition.label}`} style={S.chip} />)}</ScrollView><NearbyPeopleStrip points={discoveryPoints} onTapUser={(userId) => navigation.navigate('UserProfile', { userId })} /></View>;
 	const Footer = <View style={S.footer}><TrendingStrip topics={trendingTopics} collapsed={trendingCollapsed && filtered.length > 0} onToggleCollapse={() => setTrendingCollapsed((collapsed) => !collapsed)} onTapTopic={(topic) => navigation.navigate('AlertComposer', { presetCategory: 'general', presetTag: topic })} /></View>;
-	const overlays = <><StoryViewer stories={nearbyStories} initialIndex={viewerIndex} visible={viewerOpen} onClose={() => setViewerOpen(false)} /><StoryCreateSheet visible={createOpen} onClose={() => setCreateOpen(false)} location={myCoords} pickAndUpload={pickAndUploadStoryMedia} />{checkInOpen ? <CheckInSheet visible submitting={checkInSubmitting} error={checkInError} locationReady={myCoords != null} onClose={onCloseCheckIn} onSubmit={onSubmitCheckIn} /> : null}</>;
+	const overlays = <><StoryViewer stories={nearbyStories} initialIndex={viewerIndex} visible={viewerOpen} onClose={() => setViewerOpen(false)} /><StoryCreateSheet visible={createOpen} onClose={() => setCreateOpen(false)} location={myCoords} pickAndUpload={pickAndUploadStoryMedia} />{checkInOpen ? <CheckInSheet visible submitting={checkInSubmitting} error={checkInError} location={myCoords} onClose={onCloseCheckIn} onSubmit={onSubmitCheckIn} /> : null}</>;
 
 	if (loading && items.length === 0) return <View style={S.container}>{Header}<View style={S.center}><ActivityIndicator color={colors.primary} /></View>{overlays}</View>;
 	if (error && items.length === 0) return <View style={S.container}>{Header}<View style={S.center}><Text style={S.errorText}>{error}</Text><TouchableOpacity onPress={load} style={S.retry}><Text style={S.retryText}>Retry</Text></TouchableOpacity></View>{overlays}</View>;

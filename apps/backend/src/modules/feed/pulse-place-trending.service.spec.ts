@@ -1,7 +1,16 @@
 import { DataSource } from 'typeorm';
 
+import type { PlaceIdentity } from '@g88/shared';
+
 import { PulseActivityRealtimeService } from './pulse-activity-realtime.service';
 import { PulsePlaceTrendingService } from './pulse-place-trending.service';
+
+const placeIdentity: PlaceIdentity = {
+  provider: 'maptiler',
+  providerPlaceId: 'poi.sea-garden',
+  canonicalLabel: 'Sea Garden',
+  providerCellH3R7: '871ec91a5ffffff',
+};
 
 describe('PulsePlaceTrendingService', () => {
   let query: jest.Mock;
@@ -20,24 +29,24 @@ describe('PulsePlaceTrendingService', () => {
   it('does not emit below the five-distinct-user threshold', async () => {
     query.mockResolvedValueOnce([{ distinct_users: 4 }]);
 
-    await service.evaluateAfterCheckIn({
-      placeLabel: 'Sea Garden',
-      locationH3R7: '871ec91a5ffffff',
-    });
+    await service.evaluateAfterCheckIn({ placeIdentity });
 
     expect(query).toHaveBeenCalledTimes(1);
     const countSql = query.mock.calls[0]?.[0] as string;
     expect(countSql).toContain('COUNT(DISTINCT ci.user_id)');
     expect(countSql).toContain("ci.audience = 'nearby'");
+    expect(countSql).toContain('ci.place_provider = $1');
+    expect(countSql).toContain('ci.place_provider_id = $2');
     expect(query.mock.calls[0]?.[1]).toEqual([
-      'Sea Garden',
+      'maptiler',
+      'poi.sea-garden',
       '871ec91a5ffffff',
       30,
     ]);
     expect(publishPlaceTrend).not.toHaveBeenCalled();
   });
 
-  it('persists and publishes only a threshold-passed anonymous aggregate', async () => {
+  it('persists canonical provider identity and publishes an anonymous aggregate', async () => {
     const emittedAt = new Date('2026-10-28T09:00:00.000Z');
     query
       .mockResolvedValueOnce([{ distinct_users: 5 }])
@@ -48,18 +57,18 @@ describe('PulsePlaceTrendingService', () => {
         last_emitted_at: emittedAt,
       }]);
 
-    await service.evaluateAfterCheckIn({
-      placeLabel: 'Sea Garden',
-      locationH3R7: '871ec91a5ffffff',
-    });
+    await service.evaluateAfterCheckIn({ placeIdentity });
 
     const upsertSql = query.mock.calls[1]?.[0] as string;
     expect(upsertSql).toContain('INSERT INTO pulse_place_trends');
-    expect(upsertSql).toContain('ON CONFLICT (place_key, location_h3_r7)');
+    expect(upsertSql).toContain('place_provider, place_provider_id');
     expect(query.mock.calls[1]?.[1]).toEqual([
+      'maptiler:poi.sea-garden',
       'Sea Garden',
       '871ec91a5ffffff',
       5,
+      'maptiler',
+      'poi.sea-garden',
       90,
       120,
     ]);
@@ -69,22 +78,11 @@ describe('PulsePlaceTrendingService', () => {
       locationH3R7: '871ec91a5ffffff',
       createdAt: emittedAt.toISOString(),
     });
-
-    const publishInput = publishPlaceTrend.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(publishInput).not.toHaveProperty('distinctUserCount');
-    expect(publishInput).not.toHaveProperty('participantIds');
   });
 
   it('does not republish while the durable cooldown suppresses the upsert', async () => {
-    query
-      .mockResolvedValueOnce([{ distinct_users: 8 }])
-      .mockResolvedValueOnce([]);
-
-    await service.evaluateAfterCheckIn({
-      placeLabel: 'Sea Garden',
-      locationH3R7: '871ec91a5ffffff',
-    });
-
+    query.mockResolvedValueOnce([{ distinct_users: 8 }]).mockResolvedValueOnce([]);
+    await service.evaluateAfterCheckIn({ placeIdentity });
     expect(publishPlaceTrend).not.toHaveBeenCalled();
   });
 });
