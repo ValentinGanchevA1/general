@@ -15,9 +15,8 @@ CREATE TABLE IF NOT EXISTS pulse_place_trends (
   UNIQUE (place_key, location_h3_r7)
 );
 
-CREATE INDEX IF NOT EXISTS pulse_place_trends_active_idx
-  ON pulse_place_trends (last_emitted_at DESC)
-  WHERE expires_at > NOW();
+CREATE INDEX IF NOT EXISTS pulse_place_trends_emitted_idx
+  ON pulse_place_trends (last_emitted_at DESC, expires_at DESC);
 
 CREATE INDEX IF NOT EXISTS pulse_place_trends_h3_idx
   ON pulse_place_trends (location_h3_r7, last_emitted_at DESC);
