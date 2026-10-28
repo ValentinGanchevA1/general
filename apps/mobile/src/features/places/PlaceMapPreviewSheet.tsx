@@ -1,18 +1,27 @@
 import React, { useMemo } from 'react';
+import { StyleSheet, Text } from 'react-native';
 import type { PlaceMapEntityPoint } from '@g88/shared';
 
 import { NexaPlaceSheet } from '@/components/map/NexaSpatialEntitySheets';
 import type { NexaSpatialMetaItem } from '@/components/map/NexaSpatialSheet';
+import { useAppTheme } from '@/theme';
 
 export function PlaceMapPreviewSheet({
   point,
   onCheckIn,
+  onToggleSaved,
   onViewDetails,
+  saveLoading,
+  saveError,
 }: {
   point: PlaceMapEntityPoint;
   onCheckIn: () => void;
+  onToggleSaved: () => void;
   onViewDetails: () => void;
+  saveLoading: boolean;
+  saveError: string | null;
 }): React.JSX.Element {
+  const { colors } = useAppTheme();
   const meta = useMemo<NexaSpatialMetaItem[]>(() => {
     const items: NexaSpatialMetaItem[] = [
       {
@@ -41,6 +50,8 @@ export function PlaceMapPreviewSheet({
     return items;
   }, [point.meta.saved, point.meta.trending]);
 
+  const saved = point.meta.saved === true;
+
   return (
     <NexaPlaceSheet
       title={point.meta.canonicalLabel}
@@ -55,6 +66,18 @@ export function PlaceMapPreviewSheet({
       }}
       secondaryActions={[
         {
+          id: 'save',
+          label: saved ? 'Saved' : 'Save',
+          icon: saved ? 'bookmark' : 'bookmark-outline',
+          onPress: onToggleSaved,
+          disabled: saveLoading,
+          loading: saveLoading,
+          variant: saved ? 'quiet' : 'secondary',
+          accessibilityLabel: saved
+            ? `Remove ${point.meta.canonicalLabel} from saved places`
+            : `Save ${point.meta.canonicalLabel}`,
+        },
+        {
           id: 'details',
           label: 'Details',
           icon: 'arrow-expand',
@@ -62,8 +85,25 @@ export function PlaceMapPreviewSheet({
           accessibilityLabel: `View details for ${point.meta.canonicalLabel}`,
         },
       ]}
-      accessibilityLabel={`${point.meta.canonicalLabel}, place, approximate location${point.meta.trending ? ', getting active nearby' : ''}${point.meta.saved === true ? ', saved' : ''}`}
+      accessibilityLabel={`${point.meta.canonicalLabel}, place, approximate location${point.meta.trending ? ', getting active nearby' : ''}${saved ? ', saved' : ''}`}
       testID="place-map-preview-sheet"
-    />
+    >
+      {saveError ? (
+        <Text
+          style={[styles.saveError, { color: colors.danger }]}
+          accessibilityLiveRegion="polite"
+        >
+          {saveError}
+        </Text>
+      ) : null}
+    </NexaPlaceSheet>
   );
 }
+
+const styles = StyleSheet.create({
+  saveError: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 17,
+  },
+});
