@@ -130,7 +130,7 @@ export class PostHogPrivacyService implements OnModuleInit, OnModuleDestroy {
       this.workerTimer = null;
       void this.runScheduledWorker();
     }, delayMs);
-    if (typeof this.workerTimer.unref === 'function') this.workerTimer.unref();
+    this.workerTimer.unref();
   }
 
   private async runScheduledWorker(): Promise<void> {
