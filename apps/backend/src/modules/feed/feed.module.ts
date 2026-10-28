@@ -6,6 +6,7 @@ import { AuthModule } from '../auth/auth.module';
 import { FeedController } from './feed.controller';
 import { FeedService } from './feed.service';
 import { MapTilerPlaceAttestationService } from './maptiler-place-attestation.service';
+import { PlaceActivityLinkService } from './place-activity-link.service';
 import { PlaceCatalogService } from './place-catalog.service';
 import { PlaceController } from './place.controller';
 import { PulseActivityRealtimeService } from './pulse-activity-realtime.service';
@@ -19,6 +20,7 @@ import { PulsePlaceTrendingService } from './pulse-place-trending.service';
   providers: [
     FeedService,
     MapTilerPlaceAttestationService,
+    PlaceActivityLinkService,
     PlaceCatalogService,
     PulseActivityRealtimeService,
     PulseCheckInService,
