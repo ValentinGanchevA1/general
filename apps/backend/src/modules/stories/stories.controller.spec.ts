@@ -1,4 +1,4 @@
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { ServiceUnavailableException } from '@nestjs/common';
 
 import type { S3Service } from '../../common/s3.service';
 import { StoriesController } from './stories.controller';
@@ -64,8 +64,9 @@ describe('StoriesController presigned object validation', () => {
       contentType: 'image/jpeg',
     });
 
-    await expect(controller.create(USER, videoDto())).rejects.toBeInstanceOf(BadRequestException);
-    await expect(controller.create(USER, videoDto())).rejects.toBeDefined();
+    await expect(controller.create(USER, videoDto())).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'story.media_type_unsupported' }),
+    });
 
     expect(deleteObjectsByKeys).toHaveBeenCalledWith([`stories/${USER}/clip.mp4`]);
     expect(create).not.toHaveBeenCalled();
