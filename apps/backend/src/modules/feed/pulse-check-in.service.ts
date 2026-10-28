@@ -1,4 +1,4 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
@@ -6,23 +6,33 @@ import { DataSource } from 'typeorm';
 import {
   computeH3Cells,
   type CreatePulseCheckInRequest,
+  type PlaceIdentity,
   type PulseCheckInResult,
 } from '@g88/shared';
 
 import { MapTilerPlaceAttestationService } from './maptiler-place-attestation.service';
+import { PlaceCatalogService } from './place-catalog.service';
 import { PulseActivityRealtimeService } from './pulse-activity-realtime.service';
 import { PulsePlaceTrendingService } from './pulse-place-trending.service';
 
 const CHECK_IN_TTL_MS = 6 * 60 * 60 * 1000;
 const CHECK_IN_COOLDOWN_MINUTES = 15;
 
+interface ResolvedCatalogIdentity {
+  placeId: string;
+  placeIdentity: PlaceIdentity;
+}
+
 @Injectable()
 export class PulseCheckInService {
+  private readonly logger = new Logger(PulseCheckInService.name);
+
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly realtime: PulseActivityRealtimeService,
     private readonly trending: PulsePlaceTrendingService,
     private readonly placeAttestation: MapTilerPlaceAttestationService,
+    private readonly placeCatalog: PlaceCatalogService,
   ) {}
 
   async create(userId: string, input: CreatePulseCheckInRequest): Promise<PulseCheckInResult> {
@@ -49,17 +59,18 @@ export class PulseCheckInService {
     const createdAt = new Date();
     const expiresAt = new Date(createdAt.getTime() + CHECK_IN_TTL_MS);
     const cell = computeH3Cells(input.lat, input.lng).r7;
-    const placeIdentity = input.placeIdentity
-      ? await this.placeAttestation.attest(input.placeIdentity, cell)
-      : null;
+    const resolved = await this.resolveCatalogIdentity(input, cell);
+    const placeIdentity = resolved?.placeIdentity ?? null;
+    const placeId = resolved?.placeId ?? null;
     const placeLabel = placeIdentity?.canonicalLabel ?? fallbackPlaceLabel;
 
     // Exact user/provider coordinates are deliberately discarded. Only server-derived coarse H3 r7 cells remain.
     await this.db.query(
       `INSERT INTO pulse_check_ins
          (id, user_id, place_label, audience, location_h3_r7,
-          place_provider, place_provider_id, place_h3_r7, created_at, expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          place_provider, place_provider_id, place_h3_r7, place_id,
+          created_at, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         id,
         userId,
@@ -69,6 +80,7 @@ export class PulseCheckInService {
         placeIdentity?.provider ?? null,
         placeIdentity?.providerPlaceId ?? null,
         placeIdentity?.providerCellH3R7 ?? null,
+        placeId,
         createdAt,
         expiresAt,
       ],
@@ -83,9 +95,10 @@ export class PulseCheckInService {
       createdAt: createdAt.toISOString(),
     }).catch(() => undefined);
 
-    // Only server-attested provider-backed Nearby check-ins may contribute to public aggregate trends.
-    if (input.audience === 'nearby' && placeIdentity) {
+    // Only server-attested, catalog-resolved Nearby check-ins may contribute to public aggregate trends.
+    if (input.audience === 'nearby' && placeIdentity && placeId) {
       void this.trending.evaluateAfterCheckIn({
+        placeId,
         placeIdentity,
       }).catch(() => undefined);
     }
@@ -98,6 +111,25 @@ export class PulseCheckInService {
       createdAt: createdAt.toISOString(),
       expiresAt: expiresAt.toISOString(),
     };
+  }
+
+  private async resolveCatalogIdentity(
+    input: CreatePulseCheckInRequest,
+    userCellH3R7: string,
+  ): Promise<ResolvedCatalogIdentity | null> {
+    if (!input.placeIdentity) return null;
+
+    const attested = await this.placeAttestation.attest(input.placeIdentity, userCellH3R7);
+    if (!attested) return null;
+
+    try {
+      const place = await this.placeCatalog.resolve(attested);
+      return { placeId: place.id, placeIdentity: attested.identity };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'unknown catalog error';
+      this.logger.warn(`Place catalog resolution failed; downgrading check-in: ${message}`);
+      return null;
+    }
   }
 
   private normalizePlaceLabel(input: string): string {
