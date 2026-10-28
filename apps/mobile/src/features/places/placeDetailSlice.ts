@@ -16,6 +16,7 @@ interface PlaceDetailEntry {
   loadId: string | null;
   saveId: string | null;
   error: string | null;
+  saveError: string | null;
   receivedAt: number;
 }
 
@@ -54,6 +55,7 @@ function entry(state: PlaceDetailsState, placeId: string): PlaceDetailEntry {
     loadId: null,
     saveId: null,
     error: null,
+    saveError: null,
     receivedAt: 0,
   };
 }
@@ -129,7 +131,7 @@ export const setPlaceSaved = createAsyncThunk<
   {
     condition: ({ placeId }, { getState }) => {
       const current = getState().places.entries[placeId];
-      return current?.saveId == null && current?.detail != null;
+      return current?.saveId == null;
     },
   },
 );
@@ -191,6 +193,7 @@ const slice = createSlice({
       const current = entry(state, action.meta.arg.placeId);
       current.saveId = action.meta.requestId;
       current.error = null;
+      current.saveError = null;
     });
     builder.addCase(setPlaceSaved.fulfilled, (state, action) => {
       const current = state.entries[action.meta.arg.placeId];
@@ -204,12 +207,14 @@ const slice = createSlice({
         state.saved.items = state.saved.items.filter((item) => item.id !== action.payload.placeId);
       }
       current.error = null;
+      current.saveError = null;
     });
     builder.addCase(setPlaceSaved.rejected, (state, action) => {
       const current = state.entries[action.meta.arg.placeId];
       if (!current || current.saveId !== action.meta.requestId) return;
       current.saveId = null;
       current.error = action.payload ?? 'Could not update saved place.';
+      current.saveError = action.payload ?? 'Could not update saved place.';
     });
   },
 });
