@@ -2,7 +2,7 @@
 // Root mounts each as a single Stack.Screen; use openRootScreen() from outside.
 
 import type { NavigatorScreenParams } from '@react-navigation/native';
-import type { LatLng } from '@g88/shared';
+import type { LatLng, MarketplaceKind } from '@g88/shared';
 
 export type GamificationStackParamList = {
   Challenges: undefined;
@@ -16,6 +16,7 @@ export type CommerceStackParamList = {
   ListingCreate:
     | {
         mode?: 'sell' | 'buy';
+        marketplaceKind?: MarketplaceKind;
         initialLocation?: LatLng;
       }
     | undefined;
