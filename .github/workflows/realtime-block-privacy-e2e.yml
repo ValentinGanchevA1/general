@@ -1,0 +1,29 @@
+name: Realtime Block Privacy E2E
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  privacy-e2e:
+    name: pre-joined block and reconnect privacy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '22'
+
+      - name: Install Socket.IO client for the isolated runner
+        run: npm install --no-save --ignore-scripts socket.io-client@4.8.4
+
+      - name: Verify live-location revocation on real Socket.IO clients
+        run: node scripts/realtime-block-privacy-e2e.mjs
