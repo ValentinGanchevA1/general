@@ -40,6 +40,7 @@ describe('EventPulseShareService', () => {
     expect(updateSql).toContain("a.status = 'going'");
     expect(updateSql).toContain("e.visibility = 'public'");
     expect(updateSql).toContain('e.starts_at > NOW()');
+    expect(updateSql).toContain('a.pulse_shared_at::timestamptz AS pulse_shared_at');
     expect(publishEventJoin).toHaveBeenCalledWith({
       eventId: 'event-1',
       actorId: 'user-1',
@@ -70,6 +71,8 @@ describe('EventPulseShareService', () => {
       sharedAt: sharedAt.toISOString(),
       alreadyShared: true,
     });
+    const stateSql = query.mock.calls[1]?.[0] as string;
+    expect(stateSql).toContain('a.pulse_shared_at::timestamptz AS pulse_shared_at');
     expect(publishEventJoin).not.toHaveBeenCalled();
   });
 
