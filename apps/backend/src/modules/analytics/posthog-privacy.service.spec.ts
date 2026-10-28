@@ -104,7 +104,7 @@ describe('PostHogPrivacyService worker coordination', () => {
       ])
       .mockResolvedValueOnce([]);
     const db = { query } as unknown as DataSource;
-    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({
         results: [
@@ -148,7 +148,7 @@ describe('PostHogPrivacyService worker coordination', () => {
       ])
       .mockResolvedValueOnce([]);
     const db = { query } as unknown as DataSource;
-    jest.spyOn(global, 'fetch').mockResolvedValue({
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => [
         {
@@ -183,7 +183,9 @@ describe('PostHogPrivacyService worker coordination', () => {
       ])
       .mockResolvedValueOnce([]);
     const db = { query } as unknown as DataSource;
-    const fetchSpy = jest.spyOn(global, 'fetch').mockRejectedValue(new Error('network unavailable'));
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('network unavailable'));
     const service = new PostHogPrivacyService(db);
 
     await service.processPending();
@@ -216,7 +218,7 @@ describe('PostHogPrivacyService worker coordination', () => {
       ])
       .mockResolvedValueOnce([]);
     const db = { query } as unknown as DataSource;
-    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({ items: [] }),
     } as Response);
