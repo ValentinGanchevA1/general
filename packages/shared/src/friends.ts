@@ -19,6 +19,19 @@ export interface FriendCard {
   createdAt: string;
 }
 
+/** Supplemental metadata for dense friend-list rows. */
+export interface FriendListMetaItem {
+  userId: string;
+  /** Mutual close friends shared by the viewer and this user. */
+  mutualFriendsCount: number;
+  /** Privacy-rounded distance; null when either side has no location. */
+  distanceMeters: number | null;
+}
+
+export interface FriendListMetaResponse {
+  items: FriendListMetaItem[];
+}
+
 export interface FriendRequestCard {
   id: string;
   fromUserId: string;
