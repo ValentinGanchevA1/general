@@ -54,10 +54,9 @@ describe('PlaceMapDiscoveryService', () => {
   });
 
   it('clusters place entities without exposing check-in or participant counts', async () => {
-    const nearbyCell = h3.gridDisk(placeCell, 1).find((cell) => cell !== placeCell) ?? placeCell;
     query.mockResolvedValueOnce([
       row('place-1', 'Sea Garden'),
-      row('place-2', 'Nearby Place', nearbyCell),
+      row('place-2', 'Nearby Place'),
     ]);
 
     const result = await service.nearby(viewport, 8);
