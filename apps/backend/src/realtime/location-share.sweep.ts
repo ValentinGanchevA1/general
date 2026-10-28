@@ -5,7 +5,7 @@ import { RealtimeGateway } from './realtime.gateway';
 
 /**
  * Periodically closes expired / stale live-location sessions and fans out
- * `location:share:ended` on the conversation room.
+ * `location:share:ended` only to currently authorized participant user rooms.
  *
  * In-process interval (no @nestjs/schedule) — same pattern as other live
  * work that must touch Socket.IO. Interval is short enough for UX countdown
@@ -47,7 +47,7 @@ export class LocationShareSweepService implements OnModuleInit, OnModuleDestroy 
     try {
       const closed = await this.locationShare.sweepExpired();
       for (const s of closed) {
-        this.gateway.emitLocationShareEnded(s.conversationId, s.id, s.reason, s.endedAt);
+        await this.gateway.emitLocationShareEnded(s.conversationId, s.id, s.reason, s.endedAt);
       }
     } catch (err) {
       this.logger.error(`location share sweep failed: ${err}`);
