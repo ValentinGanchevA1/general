@@ -1,5 +1,6 @@
 import {
   computeH3Cells,
+  fuzzLocation,
   type LatLng,
   type PlaceSuggestion,
 } from '@g88/shared';
@@ -79,7 +80,8 @@ export async function searchPlaces(
     'types=poi,address,place',
   ];
   if (proximity) {
-    params.push(`proximity=${encodeURIComponent(`${proximity.lng},${proximity.lat}`)}`);
+    const coarse = fuzzLocation(proximity, 7);
+    params.push(`proximity=${encodeURIComponent(`${coarse.lng},${coarse.lat}`)}`);
   }
 
   const response = await fetch(
