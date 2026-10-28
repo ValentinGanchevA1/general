@@ -22,6 +22,7 @@ import {
   takePendingPlaceCheckIn,
 } from '@/features/places/pendingPlaceCheckIn';
 import { loadPlaceDetail, setPlaceSaved } from '@/features/places/placeDetailSlice';
+import { sharePlace } from '@/features/places/sharePlace';
 import {
   clearCheckInError,
   createPlacePulseCheckIn,
@@ -74,6 +75,11 @@ export function PlaceDetailScreen(): React.JSX.Element {
     if (!place || saving) return;
     void dispatch(setPlaceSaved({ placeId, saved: !place.saved }));
   }, [dispatch, place, placeId, saving]);
+
+  const shareCurrentPlace = useCallback(() => {
+    if (!place) return;
+    void sharePlace({ id: place.id, canonicalLabel: place.canonicalLabel }).catch(() => undefined);
+  }, [place]);
 
   const openMap = useCallback(() => {
     if (!place) return;
@@ -140,7 +146,19 @@ export function PlaceDetailScreen(): React.JSX.Element {
   }
 
   return <View style={styles.container}>
-    <ScreenHeader title="Place" />
+    <ScreenHeader
+      title="Place"
+      right={
+        <TouchableOpacity
+          onPress={shareCurrentPlace}
+          style={styles.headerAction}
+          accessibilityRole="button"
+          accessibilityLabel={`Share ${place.canonicalLabel}`}
+        >
+          <Icon name="share-variant-outline" size={22} color={colors.textPrimary} />
+        </TouchableOpacity>
+      }
+    />
     <View style={styles.content}>
       <View style={styles.heroIcon}>
         <Icon name="map-marker-radius" size={34} color={colors.discovery} />
@@ -323,6 +341,12 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
+    headerAction: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     content: { paddingHorizontal: 20, paddingTop: 24 },
     heroIcon: {
       width: 64,
