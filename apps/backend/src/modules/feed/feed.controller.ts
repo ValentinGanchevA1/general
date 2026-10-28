@@ -5,6 +5,7 @@ import type { ActivityType, FeedResponse, PulseCheckInResult } from '@g88/shared
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { PlaceActivityLinkService } from './place-activity-link.service';
 import { PulseCheckInService } from './pulse-check-in.service';
 import { CreatePulseCheckInDto } from './pulse-check-in.dto';
 import { PulseDiscoveryFeedService } from './pulse-discovery-feed.service';
@@ -15,6 +16,7 @@ export class FeedController {
   constructor(
     private readonly feed: PulseDiscoveryFeedService,
     private readonly checkIns: PulseCheckInService,
+    private readonly placeLinks: PlaceActivityLinkService,
   ) {}
 
   @Get()
@@ -37,7 +39,8 @@ export class FeedController {
       return { items: [], nextSince: new Date().toISOString() };
     }
 
-    return this.feed.aggregate(userId, sinceDate, typeList, cap);
+    const response = await this.feed.aggregate(userId, sinceDate, typeList, cap);
+    return this.placeLinks.enrich(response);
   }
 
   @Post('check-ins')
