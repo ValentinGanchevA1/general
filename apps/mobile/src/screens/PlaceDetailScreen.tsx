@@ -56,11 +56,12 @@ export function PlaceDetailScreen(): React.JSX.Element {
   }, [dispatch, placeId]);
 
   useEffect(() => {
-    if (place == null || consumedMapIntentRef.current) return;
-    if (!takePendingPlaceCheckIn(placeId)) return;
+    if (place == null || consumedMapIntentRef.current) return undefined;
+    if (!takePendingPlaceCheckIn(placeId)) return undefined;
     consumedMapIntentRef.current = true;
     dispatch(clearCheckInError());
-    setCheckInOpen(true);
+    const frame = requestAnimationFrame(() => setCheckInOpen(true));
+    return () => cancelAnimationFrame(frame);
   }, [dispatch, place, placeId]);
 
   useEffect(() => () => clearPendingPlaceCheckIn(), []);
