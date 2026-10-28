@@ -16,6 +16,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { DismissSuggestionDto, TargetUserDto } from './dto';
 import { FriendsService } from './friends.service';
 import { FriendsSuggestionsService } from './friends-suggestions.service';
+import { FriendsListMetaService } from './friends-list-meta.service';
 
 @Controller('friends')
 @UseGuards(JwtAuthGuard)
@@ -23,6 +24,7 @@ export class FriendsController {
   constructor(
     private readonly friends: FriendsService,
     private readonly suggestions: FriendsSuggestionsService,
+    private readonly listMeta: FriendsListMetaService,
   ) {}
 
   @Post('follow')
@@ -86,6 +88,15 @@ export class FriendsController {
   ) {
     const limit = limitRaw ? Number(limitRaw) : undefined;
     return this.friends.listPendingIncoming(userId, cursor, limit);
+  }
+
+  /** Batched row metadata for Friends / Following / Followers lists. */
+  @Get('list-meta')
+  listMetadata(
+    @CurrentUser('id') userId: string,
+    @Query('userIds') userIds?: string,
+  ) {
+    return this.listMeta.getListMeta(userId, userIds ?? '');
   }
 
   @Get()
