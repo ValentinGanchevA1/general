@@ -6,14 +6,16 @@ import { EventPulseShareService } from './event-pulse-share.service';
 describe('EventPulseShareService', () => {
   let query: jest.Mock;
   let publishEventJoin: jest.Mock;
+  let removeEventJoin: jest.Mock;
   let service: EventPulseShareService;
 
   beforeEach(() => {
     query = jest.fn();
     publishEventJoin = jest.fn().mockResolvedValue(undefined);
+    removeEventJoin = jest.fn().mockResolvedValue(undefined);
     service = new EventPulseShareService(
       { query } as unknown as DataSource,
-      { publishEventJoin } as unknown as PulseActivityRealtimeService,
+      { publishEventJoin, removeEventJoin } as unknown as PulseActivityRealtimeService,
     );
   });
 
@@ -103,5 +105,35 @@ describe('EventPulseShareService', () => {
       eventId: 'event-1',
       alreadyShared: false,
     });
+  });
+
+  it('prepares revocation only when the Going RSVP was explicitly shared', async () => {
+    query.mockResolvedValueOnce([{
+      event_id: 'event-1',
+      host_id: 'host-1',
+      location_h3_r7: '871ec91a5ffffff',
+    }]);
+
+    await expect(service.prepareJoinRevocation('user-1', 'event-1')).resolves.toEqual({
+      eventId: 'event-1',
+      actorId: 'user-1',
+      eventHostId: 'host-1',
+      locationH3R7: '871ec91a5ffffff',
+    });
+    const sql = query.mock.calls[0]?.[0] as string;
+    expect(sql).toContain("a.status = 'going'");
+    expect(sql).toContain('a.pulse_shared_at IS NOT NULL');
+    expect(sql).toContain("e.visibility = 'public'");
+  });
+
+  it('publishes a prepared revocation without making RSVP success depend on realtime', () => {
+    removeEventJoin.mockRejectedValueOnce(new Error('redis unavailable'));
+    expect(() => service.revokePreparedJoin({
+      eventId: 'event-1',
+      actorId: 'user-1',
+      eventHostId: 'host-1',
+      locationH3R7: '871ec91a5ffffff',
+    })).not.toThrow();
+    expect(removeEventJoin).toHaveBeenCalledTimes(1);
   });
 });
