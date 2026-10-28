@@ -52,6 +52,18 @@ describe('RealtimeGateway persisted text-message fanout', () => {
     expect(push).toHaveBeenCalledWith(conversationId, senderId, message.body);
   });
 
+  it('does not deliver to a previously joined but newly blocked recipient', async () => {
+    const { send, to, emit, dbQuery } = setup();
+    // SQL recipient authorization excludes the blocked peer even if their socket
+    // is still joined to the old conversation room on another device.
+    dbQuery.mockResolvedValue([{ user_id: senderId }]);
+    await expect(send()).resolves.toEqual({ ok: true, data: message });
+    expect(to).toHaveBeenCalledTimes(1);
+    expect(to).toHaveBeenCalledWith(`user:${senderId}`);
+    expect(to).not.toHaveBeenCalledWith(`user:${recipientId}`);
+    expect(emit).toHaveBeenCalledTimes(1);
+  });
+
   it('does not broadcast or query recipients when the socket has not joined', async () => {
     const { send, persist, dbQuery, emit } = setup(false);
     await expect(send()).resolves.toMatchObject({ ok: false, code: 'chat.forbidden' });
