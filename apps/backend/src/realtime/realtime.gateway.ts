@@ -548,16 +548,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   private async emitChatMessageToParticipants(message: ChatMessageEvent): Promise<void> {
-    const rooms = [this.conversationRoom(message.conversationId)];
-    try {
-      const participantIds = await this.chat.getParticipantIds(message.conversationId);
-      rooms.push(...participantIds.map((id) => this.userRoom(id)));
-    } catch {
-      // Persistence already succeeded: preserve room delivery and the successful ack.
-      this.logger.warn('Chat participant fanout unavailable; using conversation room');
+    // Never fall back to a stale conversation room after authorization lookup fails.
+    const recipients = await this.authorizedConversationRecipients(message.conversationId);
+    for (const userId of recipients) {
+      this.server.to(this.userRoom(userId)).emit('chat:message', message);
     }
-    // Socket.IO unions rooms, so sockets in both rooms receive the event once.
-    this.server.to(rooms).emit('chat:message', message);
   }
 
   private async pushToOfflineParticipants(
@@ -566,7 +561,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     body: string,
   ): Promise<void> {
     try {
-      const participantIds = await this.chat.getParticipantIds(conversationId);
+      const participantIds = await this.authorizedConversationRecipients(conversationId);
       for (const recipientId of participantIds) {
         if (recipientId === senderId) continue;
         const sockets = await this.server.in(this.userRoom(recipientId)).fetchSockets();
