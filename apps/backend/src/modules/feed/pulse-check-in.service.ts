@@ -2,21 +2,19 @@ import { BadRequestException, HttpException, HttpStatus, Injectable } from '@nes
 import { InjectDataSource } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
-import * as h3 from 'h3-js';
 
 import {
   computeH3Cells,
   type CreatePulseCheckInRequest,
-  type PlaceIdentity,
   type PulseCheckInResult,
 } from '@g88/shared';
 
+import { MapTilerPlaceAttestationService } from './maptiler-place-attestation.service';
 import { PulseActivityRealtimeService } from './pulse-activity-realtime.service';
 import { PulsePlaceTrendingService } from './pulse-place-trending.service';
 
 const CHECK_IN_TTL_MS = 6 * 60 * 60 * 1000;
 const CHECK_IN_COOLDOWN_MINUTES = 15;
-const MAX_PLACE_CELL_DISTANCE = 2;
 
 @Injectable()
 export class PulseCheckInService {
@@ -24,6 +22,7 @@ export class PulseCheckInService {
     @InjectDataSource() private readonly db: DataSource,
     private readonly realtime: PulseActivityRealtimeService,
     private readonly trending: PulsePlaceTrendingService,
+    private readonly placeAttestation: MapTilerPlaceAttestationService,
   ) {}
 
   async create(userId: string, input: CreatePulseCheckInRequest): Promise<PulseCheckInResult> {
@@ -50,10 +49,12 @@ export class PulseCheckInService {
     const createdAt = new Date();
     const expiresAt = new Date(createdAt.getTime() + CHECK_IN_TTL_MS);
     const cell = computeH3Cells(input.lat, input.lng).r7;
-    const placeIdentity = this.normalizePlaceIdentity(input.placeIdentity, cell);
+    const placeIdentity = input.placeIdentity
+      ? await this.placeAttestation.attest(input.placeIdentity, cell)
+      : null;
     const placeLabel = placeIdentity?.canonicalLabel ?? fallbackPlaceLabel;
 
-    // Exact user and venue coordinates are deliberately discarded. Only coarse H3 r7 cells remain.
+    // Exact user/provider coordinates are deliberately discarded. Only server-derived coarse H3 r7 cells remain.
     await this.db.query(
       `INSERT INTO pulse_check_ins
          (id, user_id, place_label, audience, location_h3_r7,
@@ -82,7 +83,7 @@ export class PulseCheckInService {
       createdAt: createdAt.toISOString(),
     }).catch(() => undefined);
 
-    // Only provider-backed Nearby check-ins may contribute to public aggregate trends.
+    // Only server-attested provider-backed Nearby check-ins may contribute to public aggregate trends.
     if (input.audience === 'nearby' && placeIdentity) {
       void this.trending.evaluateAfterCheckIn({
         placeIdentity,
@@ -96,41 +97,6 @@ export class PulseCheckInService {
       audience: input.audience,
       createdAt: createdAt.toISOString(),
       expiresAt: expiresAt.toISOString(),
-    };
-  }
-
-  private normalizePlaceIdentity(input: PlaceIdentity | null, userCellH3R7: string): PlaceIdentity | null {
-    if (!input) return null;
-    if (input.provider !== 'maptiler') {
-      throw new BadRequestException('Unsupported place provider.');
-    }
-
-    const providerPlaceId = input.providerPlaceId.trim();
-    if (!providerPlaceId || providerPlaceId.length > 200 || this.hasControlCharacters(providerPlaceId)) {
-      throw new BadRequestException('Invalid place identity.');
-    }
-
-    const canonicalLabel = this.normalizePlaceLabel(input.canonicalLabel);
-    const providerCellH3R7 = input.providerCellH3R7.trim();
-    if (!h3.isValidCell(providerCellH3R7) || h3.getResolution(providerCellH3R7) !== 7) {
-      throw new BadRequestException('Invalid place area.');
-    }
-
-    let distance: number;
-    try {
-      distance = h3.gridDistance(userCellH3R7, providerCellH3R7);
-    } catch {
-      throw new BadRequestException('Invalid place area.');
-    }
-    if (distance > MAX_PLACE_CELL_DISTANCE) {
-      throw new BadRequestException('Selected place is too far from your current area.');
-    }
-
-    return {
-      provider: 'maptiler',
-      providerPlaceId,
-      canonicalLabel,
-      providerCellH3R7,
     };
   }
 
