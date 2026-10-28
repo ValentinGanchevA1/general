@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { PRODUCT_ANALYTICS_EVENTS } from '@g88/shared';
@@ -7,6 +7,8 @@ const DEFAULT_APP_HOST = 'https://eu.posthog.com';
 const REQUEST_TIMEOUT_MS = 5_000;
 const RETRY_DELAY_MS = 60 * 60 * 1_000;
 const CLAIM_LEASE_MS = 10 * 60 * 1_000;
+const INITIAL_WORKER_DELAY_MS = 60 * 1_000;
+const WORKER_INTERVAL_MS = 15 * 60 * 1_000;
 const MAX_BATCH_SIZE = 50;
 const RECONCILIATION_PAGE_SIZE = 100;
 const MAX_RECONCILIATION_PAGES = 20;
@@ -100,10 +102,45 @@ export function buildPostHogRetentionDeletionQuery(cutoff: Date): string {
 }
 
 @Injectable()
-export class PostHogPrivacyService {
+export class PostHogPrivacyService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PostHogPrivacyService.name);
+  private workerTimer: ReturnType<typeof setTimeout> | null = null;
+  private processing = false;
+  private destroyed = false;
 
   constructor(@InjectDataSource() private readonly db: DataSource) {}
+
+  onModuleInit(): void {
+    this.destroyed = false;
+    this.scheduleWorker(INITIAL_WORKER_DELAY_MS);
+  }
+
+  onModuleDestroy(): void {
+    this.destroyed = true;
+    if (this.workerTimer) {
+      clearTimeout(this.workerTimer);
+      this.workerTimer = null;
+    }
+  }
+
+  private scheduleWorker(delayMs: number): void {
+    if (this.destroyed) return;
+    this.workerTimer = setTimeout(() => {
+      this.workerTimer = null;
+      void this.runScheduledWorker();
+    }, delayMs);
+    if (typeof this.workerTimer.unref === 'function') this.workerTimer.unref();
+  }
+
+  private async runScheduledWorker(): Promise<void> {
+    try {
+      await this.processPending();
+    } catch {
+      this.logger.error('PostHog privacy deletion worker failed; retrying on the next interval.');
+    } finally {
+      this.scheduleWorker(WORKER_INTERVAL_MS);
+    }
+  }
 
   async enqueueSubjectDeletion(subjectHash: string): Promise<void> {
     if (!SUBJECT_HASH_RE.test(subjectHash)) {
@@ -129,6 +166,16 @@ export class PostHogPrivacyService {
   }
 
   async processPending(limit = 10): Promise<void> {
+    if (this.processing) return;
+    this.processing = true;
+    try {
+      await this.processPendingBatch(limit);
+    } finally {
+      this.processing = false;
+    }
+  }
+
+  private async processPendingBatch(limit: number): Promise<void> {
     if (!enabled()) return;
     if (!queryVerified()) {
       this.logger.error(
