@@ -142,9 +142,8 @@ export class PulseActivityRealtimeService implements OnModuleInit, OnModuleDestr
   }
 
   async publishEventJoin(input: PublishEventJoinActivityInput): Promise<void> {
-    const claimed = await this.claimOnce(
-      `pulse:activity:published:event_join:${input.eventId}:${input.actorId}`,
-    );
+    await this.redis.del(this.eventJoinRemovedKey(input.eventId, input.actorId));
+    const claimed = await this.claimOnce(this.eventJoinPublishedKey(input.eventId, input.actorId));
     if (!claimed) return;
 
     const actorName = await this.actorName(input.actorId);
@@ -179,9 +178,8 @@ export class PulseActivityRealtimeService implements OnModuleInit, OnModuleDestr
   }
 
   async removeEventJoin(input: RemoveEventJoinActivityInput): Promise<void> {
-    const claimed = await this.claimOnce(
-      `pulse:activity:removed:event_join:${input.eventId}:${input.actorId}`,
-    );
+    await this.redis.del(this.eventJoinPublishedKey(input.eventId, input.actorId));
+    const claimed = await this.claimOnce(this.eventJoinRemovedKey(input.eventId, input.actorId));
     if (!claimed) return;
 
     const recipients = await this.eventJoinRecipients(
@@ -202,6 +200,14 @@ export class PulseActivityRealtimeService implements OnModuleInit, OnModuleDestr
 
   private eventJoinActivityId(eventId: string, actorId: string): string {
     return `event_join:${eventId}:${actorId}`;
+  }
+
+  private eventJoinPublishedKey(eventId: string, actorId: string): string {
+    return `pulse:activity:published:event_join:${eventId}:${actorId}`;
+  }
+
+  private eventJoinRemovedKey(eventId: string, actorId: string): string {
+    return `pulse:activity:removed:event_join:${eventId}:${actorId}`;
   }
 
   private async claimOnce(key: string): Promise<boolean> {
