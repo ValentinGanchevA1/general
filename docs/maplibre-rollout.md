@@ -20,6 +20,18 @@ The repository must provide:
 
 The MapTiler key is a public client credential embedded in app builds. Storing it as a GitHub secret is pipeline hygiene, not the security boundary. Provider-side restrictions, rotation, and quota controls remain required.
 
+## Server-side place attestation
+
+Canonical Pulse check-ins use a separate backend-only MapTiler credential:
+
+- `NEXA_MAPTILER_SERVER_API_KEY` is used only by the backend to resolve a client-selected MapTiler feature ID before the check-in may contribute to canonical place trends.
+- Do not reuse the public mobile/web `NEXA_MAPTILER_API_KEY` for this purpose in production; restrict the server key separately according to the backend deployment/network model.
+- `NEXA_MAPTILER_REGION` selects the same `eu` or `global` API origin used by the client rollout.
+- The backend never sends device coordinates to the feature-ID endpoint. It resolves the provider feature, derives an H3 r7 cell server-side, and persists only the coarse cell plus provider ID/label.
+- Client-supplied `canonicalLabel` and `providerCellH3R7` are advisory only and are never trusted for canonical persistence.
+- Missing server key, stale/reindexed provider ID, provider timeout/error, malformed response, or coarse-area mismatch fail soft: the check-in remains a normal free-text check-in and cannot contribute to `place_trending`.
+- MapTiler documents feature IDs as non-stable across database re-indexing. NEXA therefore treats the provider feature ID as a short-lived attestation handle for check-in/trend aggregation, not as a permanent NEXA place identifier.
+
 ## Remote renderer policy
 
 The backend exposes `GET /api/v1/runtime-config/map-renderer` with the shared `MapRendererPolicyDto` contract.
