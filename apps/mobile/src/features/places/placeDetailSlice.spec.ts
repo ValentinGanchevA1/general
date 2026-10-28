@@ -90,6 +90,79 @@ describe('placeDetailSlice', () => {
     expect(state.entries[placeId]?.receivedAt).toBe(20);
   });
 
+  it('hydrates the canonical cache when an alias resolves to canonical detail', () => {
+    let state = reducer(undefined, loadPlaceDetail.pending('alias-load', { placeId: aliasPlaceId }));
+    state = reducer(
+      state,
+      loadPlaceDetail.fulfilled(
+        { detail, receivedAt: 20 },
+        'alias-load',
+        { placeId: aliasPlaceId },
+      ),
+    );
+
+    expect(state.entries[aliasPlaceId]?.detail).toEqual(detail);
+    expect(state.entries[aliasPlaceId]?.receivedAt).toBe(20);
+    expect(state.entries[placeId]?.detail).toEqual(detail);
+    expect(state.entries[placeId]?.receivedAt).toBe(20);
+    expect(state.entries[aliasPlaceId]?.detail).not.toBe(state.entries[placeId]?.detail);
+  });
+
+  it('does not overwrite a newer canonical cache entry with an alias response', () => {
+    const freshDetail: NexaPlaceDetail = { ...detail, canonicalLabel: 'Fresh canonical place' };
+    const staleAliasDetail: NexaPlaceDetail = { ...detail, canonicalLabel: 'Stale alias label' };
+    let state = loadedState(false);
+    state.entries[placeId] = {
+      ...state.entries[placeId]!,
+      detail: freshDetail,
+      receivedAt: 30,
+    };
+    state = reducer(state, loadPlaceDetail.pending('alias-stale', { placeId: aliasPlaceId }));
+    state = reducer(
+      state,
+      loadPlaceDetail.fulfilled(
+        { detail: staleAliasDetail, receivedAt: 20 },
+        'alias-stale',
+        { placeId: aliasPlaceId },
+      ),
+    );
+
+    expect(state.entries[aliasPlaceId]?.detail).toEqual(staleAliasDetail);
+    expect(state.entries[placeId]?.detail).toEqual(freshDetail);
+    expect(state.entries[placeId]?.receivedAt).toBe(30);
+  });
+
+  it('joins a late alias entry to an in-flight canonical save lifecycle', () => {
+    let state = reducer(undefined, setPlaceSaved.pending('save-live', { placeId, saved: true }));
+    state = reducer(state, loadPlaceDetail.pending('alias-live', { placeId: aliasPlaceId }));
+    state = reducer(
+      state,
+      loadPlaceDetail.fulfilled(
+        { detail, receivedAt: 20 },
+        'alias-live',
+        { placeId: aliasPlaceId },
+      ),
+    );
+
+    expect(state.entries[aliasPlaceId]).toMatchObject({
+      detail,
+      saveId: 'save-live',
+    });
+    expect(state.entries[placeId]).toMatchObject({
+      detail: null,
+      saveId: 'save-live',
+    });
+
+    state = reducer(
+      state,
+      setPlaceSaved.fulfilled({ placeId, saved: true }, 'save-live', { placeId, saved: true }),
+    );
+
+    expect(state.entries[aliasPlaceId]?.detail?.saved).toBe(true);
+    expect(state.entries[aliasPlaceId]?.saveId).toBeNull();
+    expect(state.entries[placeId]?.saveId).toBeNull();
+  });
+
   it('resolves a loaded alias to its canonical place id for mutations', () => {
     const state = aliasLoadedState(false);
 

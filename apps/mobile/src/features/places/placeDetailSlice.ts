@@ -60,6 +60,19 @@ function entry(state: PlaceDetailsState, placeId: string): PlaceDetailEntry {
   };
 }
 
+function applyLoadedDetail(
+  current: PlaceDetailEntry,
+  detail: NexaPlaceDetail,
+  receivedAt: number,
+): void {
+  current.detail = {
+    ...detail,
+    approximateLocation: { ...detail.approximateLocation },
+  };
+  current.receivedAt = receivedAt;
+  current.error = null;
+}
+
 function matchesPlaceId(
   entryKey: string,
   current: PlaceDetailEntry,
@@ -185,12 +198,23 @@ const slice = createSlice({
       current.error = null;
     });
     builder.addCase(loadPlaceDetail.fulfilled, (state, action) => {
-      const current = state.entries[action.meta.arg.placeId];
+      const requestedPlaceId = action.meta.arg.placeId;
+      const current = state.entries[requestedPlaceId];
       if (!current || current.loadId !== action.meta.requestId) return;
       current.loadId = null;
-      current.detail = action.payload.detail;
-      current.receivedAt = action.payload.receivedAt;
-      current.error = null;
+      applyLoadedDetail(current, action.payload.detail, action.payload.receivedAt);
+
+      const canonicalPlaceId = action.payload.detail.id;
+      if (canonicalPlaceId === requestedPlaceId) return;
+
+      const canonical = entry(state, canonicalPlaceId);
+      if (canonical.saveId != null && current.saveId == null) {
+        current.saveId = canonical.saveId;
+        current.saveError = null;
+      }
+      if (canonical.loadId != null || canonical.saveId != null) return;
+      if (canonical.receivedAt > action.payload.receivedAt) return;
+      applyLoadedDetail(canonical, action.payload.detail, action.payload.receivedAt);
     });
     builder.addCase(loadPlaceDetail.rejected, (state, action) => {
       const current = state.entries[action.meta.arg.placeId];
