@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -26,7 +27,7 @@ function resolveBase(raw) {
 
 const BASE = resolveBase(process.env.REALTIME_PRIVACY_API_URL);
 const API = `${BASE}/api/v1`;
-const RUN_ID = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+const RUN_ID = `${Date.now()}-${randomBytes(4).toString('hex')}`;
 const SHARED_INTEREST = `privacy-e2e-${RUN_ID}`;
 const TEST_PASSWORD = `Realtime_${RUN_ID.slice(-4)}Aa1!`;
 const TEST_LOCATION = Object.freeze({ lat: 52.52, lng: 13.405 });
