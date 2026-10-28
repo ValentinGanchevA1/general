@@ -3,6 +3,7 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3';
@@ -49,6 +50,46 @@ export class S3Service {
     contentType: string,
   ): Promise<{ uploadUrl: string; publicUrl: string }> {
     return this.presignStory(userId, contentType);
+  }
+
+  async storyObjectMetadata(
+    userId: string,
+    publicUrl: string,
+  ): Promise<{
+    key: string;
+    contentLength: number;
+    contentType: string | null;
+  } | null> {
+    if (!this.bucket) throw new Error('AWS_S3_BUCKET not configured');
+
+    let url: URL;
+    try {
+      url = new URL(publicUrl);
+    } catch {
+      return null;
+    }
+
+    const expectedHost = `${this.bucket}.s3.${this.region}.amazonaws.com`;
+    const key = url.pathname.replace(/^\//, '');
+    if (
+      url.protocol !== 'https:' ||
+      url.hostname !== expectedHost ||
+      !key.startsWith(`stories/${userId}/`)
+    ) {
+      return null;
+    }
+
+    const result = await this.client.send(
+      new HeadObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      }),
+    );
+    return {
+      key,
+      contentLength: result.ContentLength ?? 0,
+      contentType: result.ContentType ?? null,
+    };
   }
 
   /**
