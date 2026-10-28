@@ -16,3 +16,16 @@ export interface PlaceSuggestion extends PlaceIdentity {
   secondaryLabel: string | null;
   center: LatLng;
 }
+
+/** Public NEXA-owned place entity. Provider aliases and raw H3 never leave the backend. */
+export interface NexaPlaceDetail {
+  id: string;
+  canonicalLabel: string;
+  /** H3 r7 centroid for map focus only; this is intentionally approximate. */
+  approximateLocation: LatLng;
+  locationPrecision: 'coarse';
+  /** True only while a k-anonymous place trend is active. */
+  trending: boolean;
+  /** Present only for an active thresholded trend. */
+  recentActivityAt: string | null;
+}
