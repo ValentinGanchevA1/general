@@ -8,12 +8,14 @@ import type {
   ActivityItem,
   CheckInAudience,
   PulseActivityEvent,
+  PulseActivityRemoveEvent,
 } from '@g88/shared';
 
 import { REDIS_CLIENT } from '../../config/redis.provider';
 import { RealtimeEmitterService } from '../../realtime/realtime-emitter.service';
 
 const PULSE_ACTIVITY_CHANNEL = 'pulse:activity:v1';
+const PULSE_ACTIVITY_REMOVE_CHANNEL = 'pulse:activity:remove:v1';
 const PUBLISHED_DEDUPE_TTL_SECONDS = 120;
 const PULSE_CELL_RADIUS = 8;
 const MAX_DISTANCE_M = 10_000;
@@ -28,6 +30,12 @@ interface PulseActivityEnvelope {
   item: ActivityItem;
   emittedAt: string;
   recipients: PulseActivityRecipient[];
+}
+
+interface PulseActivityRemoveEnvelope {
+  activityId: string;
+  emittedAt: string;
+  recipientIds: string[];
 }
 
 interface RecipientLocationRow {
@@ -53,6 +61,13 @@ export interface PublishEventJoinActivityInput {
   createdAt: string;
 }
 
+export interface RemoveEventJoinActivityInput {
+  eventId: string;
+  actorId: string;
+  eventHostId: string;
+  locationH3R7: string;
+}
+
 /**
  * Redis-backed process-independent delivery for Pulse activity.
  * Postgres remains authoritative; socket events only accelerate an already
@@ -73,16 +88,21 @@ export class PulseActivityRealtimeService implements OnModuleInit, OnModuleDestr
 
   async onModuleInit(): Promise<void> {
     this.subscriber.on('message', (channel, payload) => {
-      if (channel !== PULSE_ACTIVITY_CHANNEL) return;
-      const envelope = this.parseEnvelope(payload);
-      if (envelope == null) return;
-      this.deliverLocal(envelope);
+      if (channel === PULSE_ACTIVITY_CHANNEL) {
+        const envelope = this.parseEnvelope(payload);
+        if (envelope != null) this.deliverLocal(envelope);
+        return;
+      }
+      if (channel === PULSE_ACTIVITY_REMOVE_CHANNEL) {
+        const envelope = this.parseRemoveEnvelope(payload);
+        if (envelope != null) this.deliverRemovalLocal(envelope);
+      }
     });
-    await this.subscriber.subscribe(PULSE_ACTIVITY_CHANNEL);
+    await this.subscriber.subscribe(PULSE_ACTIVITY_CHANNEL, PULSE_ACTIVITY_REMOVE_CHANNEL);
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.subscriber.unsubscribe(PULSE_ACTIVITY_CHANNEL);
+    await this.subscriber.unsubscribe(PULSE_ACTIVITY_CHANNEL, PULSE_ACTIVITY_REMOVE_CHANNEL);
     this.subscriber.disconnect();
   }
 
@@ -138,7 +158,7 @@ export class PulseActivityRealtimeService implements OnModuleInit, OnModuleDestr
     if (recipients.length === 0) return;
 
     await this.publishEnvelope({
-      id: `event_join:${input.eventId}:${input.actorId}`,
+      id: this.eventJoinActivityId(input.eventId, input.actorId),
       type: 'event',
       category: null,
       title: input.eventTitle,
@@ -156,6 +176,32 @@ export class PulseActivityRealtimeService implements OnModuleInit, OnModuleDestr
       },
       deepLink: { screen: 'EventDetail', params: { eventId: input.eventId } },
     }, recipients);
+  }
+
+  async removeEventJoin(input: RemoveEventJoinActivityInput): Promise<void> {
+    const claimed = await this.claimOnce(
+      `pulse:activity:removed:event_join:${input.eventId}:${input.actorId}`,
+    );
+    if (!claimed) return;
+
+    const recipients = await this.eventJoinRecipients(
+      input.actorId,
+      input.eventHostId,
+      input.locationH3R7,
+    );
+    const recipientIds = new Set(recipients.map((recipient) => recipient.userId));
+    recipientIds.add(input.actorId);
+
+    const envelope: PulseActivityRemoveEnvelope = {
+      activityId: this.eventJoinActivityId(input.eventId, input.actorId),
+      emittedAt: new Date().toISOString(),
+      recipientIds: [...recipientIds],
+    };
+    await this.redis.publish(PULSE_ACTIVITY_REMOVE_CHANNEL, JSON.stringify(envelope));
+  }
+
+  private eventJoinActivityId(eventId: string, actorId: string): string {
+    return `event_join:${eventId}:${actorId}`;
   }
 
   private async claimOnce(key: string): Promise<boolean> {
@@ -276,6 +322,16 @@ export class PulseActivityRealtimeService implements OnModuleInit, OnModuleDestr
     }
   }
 
+  private deliverRemovalLocal(envelope: PulseActivityRemoveEnvelope): void {
+    const event: PulseActivityRemoveEvent = {
+      activityId: envelope.activityId,
+      emittedAt: envelope.emittedAt,
+    };
+    for (const userId of envelope.recipientIds) {
+      this.emitter.to(`user:${userId}`).emit('pulse:activity:remove', event);
+    }
+  }
+
   private parseEnvelope(payload: string): PulseActivityEnvelope | null {
     try {
       const parsed: unknown = JSON.parse(payload);
@@ -290,6 +346,20 @@ export class PulseActivityRealtimeService implements OnModuleInit, OnModuleDestr
     }
   }
 
+  private parseRemoveEnvelope(payload: string): PulseActivityRemoveEnvelope | null {
+    try {
+      const parsed: unknown = JSON.parse(payload);
+      if (!this.isRemoveEnvelope(parsed)) {
+        this.logger.warn('ignored invalid pulse activity removal payload');
+        return null;
+      }
+      return parsed;
+    } catch {
+      this.logger.warn('ignored malformed pulse activity removal payload');
+      return null;
+    }
+  }
+
   private isEnvelope(value: unknown): value is PulseActivityEnvelope {
     if (typeof value !== 'object' || value == null) return false;
     const record = value as Record<string, unknown>;
@@ -297,6 +367,17 @@ export class PulseActivityRealtimeService implements OnModuleInit, OnModuleDestr
     if (!this.isActivityItem(record.item)) return false;
     if (!Array.isArray(record.recipients)) return false;
     return record.recipients.every((recipient) => this.isRecipient(recipient));
+  }
+
+  private isRemoveEnvelope(value: unknown): value is PulseActivityRemoveEnvelope {
+    if (typeof value !== 'object' || value == null) return false;
+    const record = value as Record<string, unknown>;
+    return (
+      typeof record.activityId === 'string'
+      && typeof record.emittedAt === 'string'
+      && Array.isArray(record.recipientIds)
+      && record.recipientIds.every((id) => typeof id === 'string')
+    );
   }
 
   private isActivityItem(value: unknown): value is ActivityItem {
