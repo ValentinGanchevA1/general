@@ -18,6 +18,7 @@ import type {
   PollResult,
   RsvpResponse,
   RsvpStatus,
+  ShareEventJoinResponse,
 } from '@g88/shared';
 import { getJson, postJson, putJson } from '@/api/client';
 import { useSocket } from '@/realtime/useSocket';
@@ -169,6 +170,17 @@ export function createEvent(req: CreateEventRequest): Promise<EventSummary> {
 export function rsvpToEvent(eventId: string, status: RsvpStatus): Promise<RsvpResponse> {
   return withNexaMutationFeedback(
     () => putJson<{ status: RsvpStatus }, RsvpResponse>(`/events/${eventId}/rsvp`, { status }),
+    'commit',
+  );
+}
+
+/** Explicit opt-in: RSVP alone never publishes attendance into Pulse. */
+export function shareEventJoinToPulse(eventId: string): Promise<ShareEventJoinResponse> {
+  return withNexaMutationFeedback(
+    () => postJson<Record<string, never>, ShareEventJoinResponse>(
+      `/events/${eventId}/share-join`,
+      {},
+    ),
     'commit',
   );
 }

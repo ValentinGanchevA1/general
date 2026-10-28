@@ -27,17 +27,19 @@ export class PulseDiscoveryFeedService {
     const wants = (type: ActivityType): boolean => types.includes(type);
     const legacyTypes = types.filter((type) => type === 'alert' || type === 'listing');
 
-    const [base, events, checkIns] = await Promise.all([
+    const [base, events, eventJoins, checkIns] = await Promise.all([
       legacyTypes.length > 0
         ? this.feed.aggregate(userId, since, legacyTypes, limit)
         : Promise.resolve<FeedResponse>({ items: [], nextSince: new Date().toISOString() }),
       wants('event') ? this.selectEvents(userId, limit) : Promise.resolve<ActivityItem[]>([]),
+      wants('event') ? this.selectEventJoins(userId, since, limit) : Promise.resolve<ActivityItem[]>([]),
       wants('place') ? this.selectCheckIns(userId, since, limit) : Promise.resolve<ActivityItem[]>([]),
     ]);
 
     const items = [
       ...base.items.map((item) => this.withNarrative(item)),
       ...events,
+      ...eventJoins,
       ...checkIns,
     ]
       .sort((a, b) => this.score(b) - this.score(a))
@@ -178,6 +180,89 @@ export class PulseDiscoveryFeedService {
       })
       .filter((item) => item.distanceM != null && item.distanceM <= MAX_DISTANCE_M)
       .slice(0, limit);
+  }
+
+  private async selectEventJoins(
+    userId: string,
+    since: Date,
+    limit: number,
+  ): Promise<ActivityItem[]> {
+    const [viewer] = await this.db.query<Array<{ location_h3_r7: string | null }>>(
+      `SELECT location_h3_r7 FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      [userId],
+    );
+    if (!viewer?.location_h3_r7) return [];
+
+    const [lat, lng] = h3.cellToLatLng(viewer.location_h3_r7);
+    const rows = await this.db.query<Array<{
+      event_id: string;
+      event_title: string;
+      host_id: string;
+      user_id: string;
+      display_name: string;
+      pulse_shared_at: Date;
+      distance_m: number;
+    }>>(
+      `SELECT e.id AS event_id,
+              e.title AS event_title,
+              e.host_id,
+              a.user_id,
+              u.display_name,
+              a.pulse_shared_at,
+              ST_Distance(
+                e.location,
+                ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography
+              ) AS distance_m
+         FROM event_attendees a
+         JOIN events e ON e.id = a.event_id
+         JOIN users u ON u.id = a.user_id AND u.deleted_at IS NULL
+        WHERE a.status = 'going'
+          AND a.pulse_shared_at IS NOT NULL
+          AND a.pulse_shared_at > $4
+          AND e.deleted_at IS NULL
+          AND e.visibility = 'public'
+          AND e.starts_at > NOW()
+          AND NOT EXISTS (
+            SELECT 1
+              FROM user_blocks b
+             WHERE (b.blocker_id = $1 AND b.blocked_id = a.user_id)
+                OR (b.blocker_id = a.user_id AND b.blocked_id = $1)
+          )
+          AND NOT EXISTS (
+            SELECT 1
+              FROM user_blocks hb
+             WHERE (hb.blocker_id = $1 AND hb.blocked_id = e.host_id)
+                OR (hb.blocker_id = e.host_id AND hb.blocked_id = $1)
+          )
+          AND ST_DWithin(
+                e.location,
+                ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
+                $5
+              )
+        ORDER BY a.pulse_shared_at DESC
+        LIMIT $6`,
+      [userId, lng, lat, since.toISOString(), MAX_DISTANCE_M, Math.min(limit * 3, 300)],
+    );
+
+    return rows.map((row): ActivityItem => ({
+      id: `event_join:${row.event_id}:${row.user_id}`,
+      type: 'event',
+      category: null,
+      title: row.event_title,
+      preview: 'Shared an event RSVP',
+      actorId: row.user_id,
+      actorName: row.display_name,
+      distanceM: Math.round(Number(row.distance_m)),
+      createdAt: new Date(row.pulse_shared_at).toISOString(),
+      unread: false,
+      narrative: {
+        kind: 'event_joined',
+        verb: 'joined',
+        objectLabel: row.event_title,
+        placeLabel: null,
+      },
+      deepLink: { screen: 'EventDetail', params: { eventId: row.event_id } },
+    }));
   }
 
   private distanceBetweenCellsM(leftCell: string, rightCell: string): number {

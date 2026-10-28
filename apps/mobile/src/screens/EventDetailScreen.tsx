@@ -30,6 +30,7 @@ import {
   askQuestion,
   createPoll,
   rsvpToEvent,
+  shareEventJoinToPulse,
   upvoteQuestion,
   useEvent,
   votePoll,
@@ -40,6 +41,7 @@ import {
   resolveNexaRetryActionLabel,
   resolveNexaRsvpActionLabel,
 } from '@/product/nexaActionLanguage';
+import { extractMessage } from '@/utils/extractMessage';
 
 type R = RouteProp<EventsStackParamList, 'EventDetail'>;
 type Styles = ReturnType<typeof createStyles>;
@@ -64,11 +66,15 @@ export function EventDetailScreen(): React.JSX.Element {
   const myId = useAppSelector((s) => s.auth.user?.id);
   const { event, polls, questions, loading, error, refresh, refreshPolls, refreshQuestions } = useEvent(eventId);
   const [rsvpBusy, setRsvpBusy] = useState(false);
+  const [pulseShareBusy, setPulseShareBusy] = useState(false);
+  const [pulseShared, setPulseShared] = useState(false);
+  const [pulseShareError, setPulseShareError] = useState<string | null>(null);
 
   const onRsvp = useCallback(async (status: RsvpStatus) => {
     setRsvpBusy(true);
     try {
       await rsvpToEvent(eventId, status);
+      if (status !== 'going') setPulseShared(false);
       refresh();
     } catch {
       /* detail refresh keeps state truthful */
@@ -76,6 +82,20 @@ export function EventDetailScreen(): React.JSX.Element {
       setRsvpBusy(false);
     }
   }, [eventId, refresh]);
+
+  const onShareToPulse = useCallback(async (): Promise<void> => {
+    if (pulseShareBusy || pulseShared) return;
+    setPulseShareBusy(true);
+    setPulseShareError(null);
+    try {
+      await shareEventJoinToPulse(eventId);
+      setPulseShared(true);
+    } catch (err) {
+      setPulseShareError(extractMessage(err, 'Could not share this RSVP to Pulse.'));
+    } finally {
+      setPulseShareBusy(false);
+    }
+  }, [eventId, pulseShareBusy, pulseShared]);
 
   if (!event) {
     return (
@@ -139,6 +159,39 @@ export function EventDetailScreen(): React.JSX.Element {
         })}
       </View>
       {full && event.myRsvp !== 'going' ? <Text style={styles.fullNote}>This event is at capacity.</Text> : null}
+
+      {event.visibility === 'public' && event.myRsvp === 'going' ? (
+        <View style={styles.pulseShareCard}>
+          <View style={styles.pulseShareHeader}>
+            <Icon name="pulse" size={20} color={colors.primary} />
+            <Text style={styles.pulseShareTitle}>Share to Pulse</Text>
+          </View>
+          <Text style={styles.pulseShareBody}>
+            Post “You joined {event.title}” to nearby Pulse. RSVP alone never publishes this.
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.pulseShareBtn,
+              (pulseShareBusy || pulseShared) && styles.pulseShareBtnDisabled,
+            ]}
+            disabled={pulseShareBusy || pulseShared}
+            onPress={() => void onShareToPulse()}
+            accessibilityRole="button"
+            accessibilityLabel={pulseShared ? 'Shared to Pulse' : 'Share event RSVP to Pulse'}
+            accessibilityState={{ disabled: pulseShareBusy || pulseShared }}
+          >
+            {pulseShareBusy ? (
+              <ActivityIndicator size="small" color={colors.onPrimary} />
+            ) : (
+              <>
+                <Icon name={pulseShared ? 'check' : 'broadcast'} size={17} color={colors.onPrimary} />
+                <Text style={styles.pulseShareBtnText}>{pulseShared ? 'Shared to Pulse' : 'Share to Pulse'}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          {pulseShareError ? <Text style={styles.pulseShareError}>{pulseShareError}</Text> : null}
+        </View>
+      ) : null}
 
       {event.attendees.length > 0 ? <>
         <Text style={styles.sectionTitle}>Going ({event.attendeeCount})</Text>
@@ -283,6 +336,14 @@ function createStyles(colors: ThemeColors) {
     rsvpText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
     rsvpTextActive: { color: colors.onPrimary },
     fullNote: { color: colors.warning, fontSize: 13, paddingHorizontal: 20, marginTop: 8 },
+    pulseShareCard: { marginHorizontal: 20, marginTop: 14, padding: 14, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    pulseShareHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    pulseShareTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
+    pulseShareBody: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 7, marginBottom: 12 },
+    pulseShareBtn: { minHeight: 42, borderRadius: 11, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 14 },
+    pulseShareBtnDisabled: { opacity: 0.65 },
+    pulseShareBtnText: { color: colors.onPrimary, fontSize: 14, fontWeight: '700' },
+    pulseShareError: { color: colors.danger, fontSize: 12, marginTop: 8 },
     attendeeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, marginBottom: 10 },
     attendeeAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface },
     attendeeAvatarPlaceholder: { alignItems: 'center', justifyContent: 'center' },

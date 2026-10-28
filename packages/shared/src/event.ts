@@ -95,6 +95,13 @@ export interface RsvpResponse {
   attendeeCount: number;
 }
 
+/** Result of the explicit "Share to Pulse" action after a public Going RSVP. */
+export interface ShareEventJoinResponse {
+  eventId: string;
+  sharedAt: string;
+  alreadyShared: boolean;
+}
+
 // ─── Polls ────────────────────────────────────────────────────────────────
 
 export interface CreatePollRequest {

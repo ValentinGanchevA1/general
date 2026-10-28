@@ -9,8 +9,15 @@ export interface PulseActivityEvent {
   emittedAt: string;
 }
 
+/** Remove a previously delivered activity after server-side visibility/consent revocation. */
+export interface PulseActivityRemoveEvent {
+  activityId: string;
+  emittedAt: string;
+}
+
 declare module './events' {
   interface ServerToClientEvents {
     'pulse:activity': (e: PulseActivityEvent) => void;
+    'pulse:activity:remove': (e: PulseActivityRemoveEvent) => void;
   }
 }

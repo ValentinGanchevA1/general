@@ -21,6 +21,7 @@ export interface PulseState {
   error: string | null;
   lastFetchedAt: string | null;
   realtimeIdsDuringFetch: string[];
+  realtimeRemovedIdsDuringFetch: string[];
   pendingFilter: string | null;
   checkInSubmitting: boolean;
   checkInError: string | null;
@@ -32,6 +33,7 @@ const initialState: PulseState = {
   error: null,
   lastFetchedAt: null,
   realtimeIdsDuringFetch: [],
+  realtimeRemovedIdsDuringFetch: [],
   pendingFilter: null,
   checkInSubmitting: false,
   checkInError: null,
@@ -83,8 +85,17 @@ const slice = createSlice({
     activityReceived: (s, a: PayloadAction<ActivityItem>) => {
       s.items = [a.payload, ...s.items.filter((item) => item.id !== a.payload.id)]
         .slice(0, MAX_PULSE_ITEMS);
+      s.realtimeRemovedIdsDuringFetch = s.realtimeRemovedIdsDuringFetch
+        .filter((id) => id !== a.payload.id);
       if (s.loading && !s.realtimeIdsDuringFetch.includes(a.payload.id)) {
         s.realtimeIdsDuringFetch.push(a.payload.id);
+      }
+    },
+    activityRemoved: (s, a: PayloadAction<string>) => {
+      s.items = s.items.filter((item) => item.id !== a.payload);
+      s.realtimeIdsDuringFetch = s.realtimeIdsDuringFetch.filter((id) => id !== a.payload);
+      if (s.loading && !s.realtimeRemovedIdsDuringFetch.includes(a.payload)) {
+        s.realtimeRemovedIdsDuringFetch.push(a.payload);
       }
     },
   },
@@ -93,22 +104,28 @@ const slice = createSlice({
       s.loading = true;
       s.error = null;
       s.realtimeIdsDuringFetch = [];
+      s.realtimeRemovedIdsDuringFetch = [];
     });
     b.addCase(fetchFeed.fulfilled, (s, a: PayloadAction<FeedResponse>) => {
-      const fetchedIds = new Set(a.payload.items.map((item) => item.id));
+      const removedIds = new Set(s.realtimeRemovedIdsDuringFetch);
+      const fetchedItems = a.payload.items.filter((item) => !removedIds.has(item.id));
+      const fetchedIds = new Set(fetchedItems.map((item) => item.id));
       const realtimeIds = new Set(s.realtimeIdsDuringFetch);
       const arrivedDuringFetch = s.items.filter((item) => (
         realtimeIds.has(item.id)
         && !fetchedIds.has(item.id)
+        && !removedIds.has(item.id)
       ));
       s.loading = false;
-      s.items = [...arrivedDuringFetch, ...a.payload.items].slice(0, MAX_PULSE_ITEMS);
+      s.items = [...arrivedDuringFetch, ...fetchedItems].slice(0, MAX_PULSE_ITEMS);
       s.lastFetchedAt = new Date().toISOString();
       s.realtimeIdsDuringFetch = [];
+      s.realtimeRemovedIdsDuringFetch = [];
     });
     b.addCase(fetchFeed.rejected, (s, a) => {
       s.loading = false;
       s.realtimeIdsDuringFetch = [];
+      s.realtimeRemovedIdsDuringFetch = [];
       s.error = typeof a.payload === 'string' ? a.payload : 'Failed to load Pulse';
     });
     b.addCase(createPulseCheckIn.pending, (s) => {
@@ -130,6 +147,7 @@ const slice = createSlice({
 
 export const {
   activityReceived,
+  activityRemoved,
   clearPulse,
   setPendingFilter,
   clearPendingFilter,
