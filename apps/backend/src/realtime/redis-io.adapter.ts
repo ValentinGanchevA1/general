@@ -63,7 +63,7 @@ export class RedisIoAdapter extends IoAdapter {
     return server;
   }
 
-  override async close(server: Server): Promise<void> {
+  override async close(server: Parameters<IoAdapter['close']>[0]): Promise<void> {
     try {
       await super.close(server);
     } finally {
