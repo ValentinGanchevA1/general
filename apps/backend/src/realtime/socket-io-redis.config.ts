@@ -44,6 +44,11 @@ export function socketIoRedisChannelKey(env: RedisEnvironment = process.env): st
   if (explicitPrefix) return explicitPrefix;
 
   const environment = normalizeSegment(env.NODE_ENV ?? 'development');
+  const renderServiceId = env.RENDER_SERVICE_ID?.trim();
+  if (renderServiceId) {
+    return `nexa:${environment}:${normalizeSegment(renderServiceId)}:socket.io`;
+  }
+
   return `nexa:${environment}:socket.io`;
 }
 
