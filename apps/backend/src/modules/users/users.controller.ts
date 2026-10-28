@@ -44,6 +44,11 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { UsersService } from './users.service';
 import { S3Service } from '../../common/s3.service';
 
+// Slightly above the exact base64 length for a 10 MiB image. The decoded-byte
+// check below remains authoritative; this prevents obviously oversized input
+// from allocating a second large Buffer before validation rejects it.
+const MAX_10_MIB_BASE64_CHARS = 14_100_000;
+
 class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @IsString() displayName?: string;
   @IsOptional() @IsString() bio?: string;
@@ -109,6 +114,7 @@ class AddPhotoDto implements AddPhotoRequest {
 class UploadPhotoBase64Dto implements UploadPhotoBase64Request {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(MAX_10_MIB_BASE64_CHARS)
   data!: string;
 
   @IsString()
