@@ -67,19 +67,30 @@ function quoteLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function deletionResponse(payload: unknown): PostHogDeletionResponse | null {
+  if (!isRecord(payload)) return null;
+  const response: PostHogDeletionResponse = {};
+  if (typeof payload.id === 'string') response.id = payload.id;
+  if (typeof payload.status === 'string') response.status = payload.status;
+  if (typeof payload.submission_id === 'string') response.submission_id = payload.submission_id;
+  if (typeof payload.query === 'string') response.query = payload.query;
+  return response;
+}
+
 function deletionListItems(payload: unknown): PostHogDeletionResponse[] | null {
   let candidate: unknown = null;
   if (Array.isArray(payload)) {
     candidate = payload;
-  } else if (typeof payload === 'object' && payload !== null && 'results' in payload) {
-    candidate = (payload as { results?: unknown }).results;
+  } else if (isRecord(payload) && 'results' in payload) {
+    candidate = payload.results;
   }
 
   if (!Array.isArray(candidate)) return null;
-  return candidate.filter(
-    (item): item is PostHogDeletionResponse =>
-      typeof item === 'object' && item !== null && !Array.isArray(item),
-  );
+  return candidate.map(deletionResponse).filter((item): item is PostHogDeletionResponse => item !== null);
 }
 
 function matchesDeletionRequest(
@@ -257,7 +268,7 @@ export class PostHogPrivacyService implements OnModuleInit, OnModuleDestroy {
         { headers: { Authorization: `Bearer ${config.apiKey}` }, signal: controller.signal },
       );
       if (!response.ok) return null;
-      return (await response.json()) as PostHogDeletionResponse;
+      return deletionResponse(await response.json());
     } catch {
       return null;
     } finally {
@@ -347,8 +358,8 @@ export class PostHogPrivacyService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      const body = (await response.json()) as PostHogDeletionResponse;
-      if (!body.id || !UUID_RE.test(body.id)) {
+      const body = deletionResponse(await response.json());
+      if (!body?.id || !UUID_RE.test(body.id)) {
         await this.scheduleRetry(
           row.id,
           'PostHog deletion response did not include a valid request id.',
