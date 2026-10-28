@@ -31,6 +31,7 @@ type Leaf =
   | 'GiftsInbox'
   | 'Interactions'
   | 'UserProfile'
+  | 'PlaceDetail'
   | 'Chat'
   | 'AlertComposer';
 
