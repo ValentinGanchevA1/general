@@ -13,11 +13,14 @@ import { getJson, postJson } from '@/api/client';
 import { logout } from '@/features/auth/authSlice';
 import { extractMessage } from '@/utils/extractMessage';
 
+const MAX_PULSE_ITEMS = 100;
+
 export interface PulseState {
   items: ActivityItem[];
   loading: boolean;
   error: string | null;
   lastFetchedAt: string | null;
+  fetchStartedAt: string | null;
   pendingFilter: string | null;
   checkInSubmitting: boolean;
   checkInError: string | null;
@@ -28,6 +31,7 @@ const initialState: PulseState = {
   loading: false,
   error: null,
   lastFetchedAt: null,
+  fetchStartedAt: null,
   pendingFilter: null,
   checkInSubmitting: false,
   checkInError: null,
@@ -76,14 +80,32 @@ const slice = createSlice({
     setPendingFilter: (s, a: PayloadAction<string>) => { s.pendingFilter = a.payload; },
     clearPendingFilter: (s) => { s.pendingFilter = null; },
     clearCheckInError: (s) => { s.checkInError = null; },
+    activityReceived: (s, a: PayloadAction<ActivityItem>) => {
+      s.items = [a.payload, ...s.items.filter((item) => item.id !== a.payload.id)]
+        .slice(0, MAX_PULSE_ITEMS);
+    },
   },
   extraReducers: (b) => {
-    b.addCase(fetchFeed.pending, (s) => { s.loading = true; s.error = null; });
+    b.addCase(fetchFeed.pending, (s) => {
+      s.loading = true;
+      s.error = null;
+      s.fetchStartedAt = new Date().toISOString();
+    });
     b.addCase(fetchFeed.fulfilled, (s, a: PayloadAction<FeedResponse>) => {
-      s.loading = false; s.items = a.payload.items; s.lastFetchedAt = new Date().toISOString();
+      const startedAtMs = s.fetchStartedAt == null ? 0 : Date.parse(s.fetchStartedAt);
+      const fetchedIds = new Set(a.payload.items.map((item) => item.id));
+      const arrivedDuringFetch = s.items.filter((item) => (
+        !fetchedIds.has(item.id)
+        && Date.parse(item.createdAt) >= startedAtMs
+      ));
+      s.loading = false;
+      s.items = [...arrivedDuringFetch, ...a.payload.items].slice(0, MAX_PULSE_ITEMS);
+      s.lastFetchedAt = new Date().toISOString();
+      s.fetchStartedAt = null;
     });
     b.addCase(fetchFeed.rejected, (s, a) => {
       s.loading = false;
+      s.fetchStartedAt = null;
       s.error = typeof a.payload === 'string' ? a.payload : 'Failed to load Pulse';
     });
     b.addCase(createPulseCheckIn.pending, (s) => {
@@ -103,5 +125,11 @@ const slice = createSlice({
   },
 });
 
-export const { clearPulse, setPendingFilter, clearPendingFilter, clearCheckInError } = slice.actions;
+export const {
+  activityReceived,
+  clearPulse,
+  setPendingFilter,
+  clearPendingFilter,
+  clearCheckInError,
+} = slice.actions;
 export default slice.reducer;
