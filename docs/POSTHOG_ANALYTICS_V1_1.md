@@ -60,7 +60,7 @@ Production rule: do not rotate `ANALYTICS_HMAC_KEY` while the PostHog mirror con
 
 PostHog Cloud retention is plan-controlled and cannot be shortened to NEXA's 90-day product analytics contract. NEXA therefore maintains its own durable external deletion queue in Postgres.
 
-Migration `0054_posthog_deletion_queue.sql` adds `analytics_external_deletion_requests` and a `BEFORE DELETE` trigger on `analytics_subjects`.
+Migration `0062_posthog_deletion_queue.sql` adds `analytics_external_deletion_requests` and a `BEFORE DELETE` trigger on `analytics_subjects`.
 
 The trigger preserves the pseudonymous `subject_hash` as a deletion intent before the local identity bridge disappears. It covers both:
 
@@ -73,11 +73,15 @@ The PostHog privacy worker:
 
 - receives only `subject_hash` or a retention cutoff
 - never receives raw `users.id`, email, phone, coordinates, message content, or verification data
+- atomically claims due queue rows with `FOR UPDATE SKIP LOCKED` plus a short database lease so multiple API replicas cannot submit the same due row concurrently
 - persists retries and provider request IDs for auditability
+- reconciles a previous `submission_id` against PostHog before retrying an ambiguous destructive POST, and defers instead of resubmitting if reconciliation is unavailable
 - polls submitted deletion requests until PostHog reports completion
 - remains disabled unless explicit private-API configuration is present
 
 PostHog event deletion is asynchronous, so a locally completed account deletion does not imply immediate physical removal from PostHog. The durable queue preserves the request and retry state independently of the deleted account.
+
+Current PostHog Data Deletion API documentation explicitly defines the create endpoint as a one-column HogQL event-deletion query and documents `query`, `variables`, and `submission_id` request fields. This removes the earlier API-shape ambiguity, but it does not replace NEXA's staging validation gate: preview scope, controlled deletion completion, status behavior, retention cutoff behavior, and environment separation must still be verified against a dedicated staging project before production capture is enabled.
 
 ## Configuration
 
@@ -99,7 +103,7 @@ POSTHOG_DELETION_QUERY_VERIFIED=false
 
 `POSTHOG_PERSONAL_API_KEY` is server-only and must use least privilege with `data_deletion:read` and `data_deletion:write`. It must never be shipped to mobile or web clients.
 
-Use separate PostHog projects, project tokens, project IDs, and private deletion credentials for staging and production.
+Use separate PostHog projects, project tokens, project IDs, and private deletion credentials for staging and production. An unlabeled/default project is not sufficient evidence of staging/production separation.
 
 The capture mirror and privacy worker are independently disabled by default. Production capture must not be enabled unless the privacy worker configuration is complete and the staging deletion query has been verified.
 
@@ -121,21 +125,22 @@ PostHog dashboards and funnels must use these canonical events rather than inven
 
 Before enabling in production or closed testing:
 
-1. Apply migrations `0050_product_analytics.sql` and `0054_posthog_deletion_queue.sql`.
+1. Apply migrations `0050_product_analytics.sql` and `0062_posthog_deletion_queue.sql`.
 2. Configure a stable `ANALYTICS_HMAC_KEY` independent from JWT secrets.
 3. Create a dedicated staging PostHog project and configure its capture token.
 4. Configure a server-only PostHog private API key with `data_deletion:read` and `data_deletion:write`.
 5. Keep `POSTHOG_HOST=https://eu.i.posthog.com` and `POSTHOG_APP_HOST=https://eu.posthog.com` for EU Cloud.
 6. With `POSTHOG_DELETION_QUERY_VERIFIED=false`, preview/verify the one-column deletion query against staging and confirm it targets only expected NEXA events.
 7. Set `POSTHOG_DELETION_QUERY_VERIFIED=true` only after that staging verification is recorded.
-8. Enable `POSTHOG_PRIVACY_ENABLED=true` and verify a controlled subject deletion reaches `completed` in the local audit queue.
+8. Enable `POSTHOG_PRIVACY_ENABLED=true` and verify a controlled subject deletion reaches the provider terminal-success state and `completed` in the local audit queue.
 9. Verify a cutoff deletion removes only canonical NEXA event names older than the configured retention window.
 10. Produce one controlled capture event and verify PostHog receives the canonical event name and HMAC subject only.
 11. Confirm no raw IDs, coordinates, free text, contact data, prices, verification data, or tokens are present in the captured event.
-12. Only then enable `POSTHOG_ENABLED=true` for the matching environment.
-13. Keep session replay and mobile autocapture disabled until a separate privacy review explicitly approves them.
+12. Verify the staging and production project IDs/tokens/credentials are distinct.
+13. Only then enable `POSTHOG_ENABLED=true` for the matching environment.
+14. Keep session replay and mobile autocapture disabled until a separate privacy review explicitly approves them.
 
-Until steps 1–12 pass, `POSTHOG_ENABLED=false` remains the production-safe setting.
+Until steps 1–13 pass, `POSTHOG_ENABLED=false` remains the production-safe setting.
 
 ## Future reliability upgrade
 
