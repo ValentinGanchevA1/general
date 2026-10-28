@@ -24,14 +24,16 @@ const placeRow = {
 
 describe('PlaceCatalogService', () => {
   let query: jest.Mock;
+  let dbQuery: jest.Mock;
   let transaction: jest.Mock;
   let service: PlaceCatalogService;
 
   beforeEach(() => {
     query = jest.fn();
+    dbQuery = jest.fn();
     const manager = { query } as unknown as EntityManager;
     transaction = jest.fn(async (callback: (value: EntityManager) => Promise<unknown>) => callback(manager));
-    service = new PlaceCatalogService({ transaction } as unknown as DataSource);
+    service = new PlaceCatalogService({ transaction, query: dbQuery } as unknown as DataSource);
   });
 
   it('reuses the stable OSM ref when a MapTiler feature ID changes', async () => {
@@ -119,5 +121,50 @@ describe('PlaceCatalogService', () => {
       expect.stringContaining('WHERE r.namespace = $1'),
       ['maptiler', 'poi.22222'],
     );
+  });
+
+  it('returns a privacy-safe public detail with only coarse map focus and thresholded trend state', async () => {
+    const emittedAt = new Date('2026-10-28T03:30:00.000Z');
+    dbQuery
+      .mockResolvedValueOnce([placeRow])
+      .mockResolvedValueOnce([{ last_emitted_at: emittedAt }]);
+
+    const result = await service.getPublicDetail('place-1');
+
+    expect(result).toMatchObject({
+      id: 'place-1',
+      canonicalLabel: 'Sea Garden',
+      locationPrecision: 'coarse',
+      trending: true,
+      recentActivityAt: emittedAt.toISOString(),
+      approximateLocation: { lat: expect.any(Number), lng: expect.any(Number) },
+    });
+    expect(JSON.stringify(result)).not.toContain('maptiler');
+    expect(JSON.stringify(result)).not.toContain('871e85992ffffff');
+    expect(JSON.stringify(result)).not.toContain('distinct_user');
+  });
+
+  it('follows a merged place ID to the active target', async () => {
+    dbQuery
+      .mockResolvedValueOnce([{
+        ...placeRow,
+        id: 'place-old',
+        status: 'merged',
+        merged_into_place_id: 'place-1',
+      }])
+      .mockResolvedValueOnce([placeRow])
+      .mockResolvedValueOnce([]);
+
+    await expect(service.getPublicDetail('place-old')).resolves.toMatchObject({
+      id: 'place-1',
+      canonicalLabel: 'Sea Garden',
+      trending: false,
+      recentActivityAt: null,
+    });
+  });
+
+  it('fails closed when stored coarse location is invalid', async () => {
+    dbQuery.mockResolvedValueOnce([{ ...placeRow, location_h3_r7: 'invalid' }]);
+    await expect(service.getPublicDetail('place-1')).resolves.toBeNull();
   });
 });
