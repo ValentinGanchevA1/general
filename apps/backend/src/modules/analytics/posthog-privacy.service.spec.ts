@@ -7,13 +7,17 @@ import {
   buildPostHogSubjectDeletionQuery,
 } from './posthog-privacy.service';
 
+const SUBJECT_HASH = 'a'.repeat(64);
+const ROW_ID = '11111111-1111-4111-8111-111111111111';
+const SUBMISSION_ID = '22222222-2222-4222-8222-222222222222';
+const PROVIDER_REQUEST_ID = '33333333-3333-4333-8333-333333333333';
+const RECONCILIATION_UNAVAILABLE = 'PostHog deletion retry reconciliation is unavailable.';
+
 describe('PostHog privacy deletion queries', () => {
-  const subjectHash = 'a'.repeat(64);
-
   it('targets a pseudonymous distinct_id without raw account identifiers', () => {
-    const query = buildPostHogSubjectDeletionQuery(subjectHash);
+    const query = buildPostHogSubjectDeletionQuery(SUBJECT_HASH);
 
-    expect(query).toContain(`distinct_id = '${subjectHash}'`);
+    expect(query).toContain(`distinct_id = '${SUBJECT_HASH}'`);
     expect(query).toContain('SELECT uuid FROM events');
     expect(query).not.toMatch(/email|phone|location|verification|user_id/i);
   });
@@ -86,19 +90,16 @@ describe('PostHogPrivacyService worker coordination', () => {
 
   it('reconciles a previously claimed submission before retrying a destructive POST', async () => {
     enableWorker();
-    const rowId = '11111111-1111-4111-8111-111111111111';
-    const submissionId = '22222222-2222-4222-8222-222222222222';
-    const providerRequestId = '33333333-3333-4333-8333-333333333333';
     const query = jest
       .fn()
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
-          id: rowId,
+          id: ROW_ID,
           kind: 'subject',
-          subject_hash: 'a'.repeat(64),
+          subject_hash: SUBJECT_HASH,
           cutoff_at: null,
-          submission_id: submissionId,
+          submission_id: SUBMISSION_ID,
           attempts: 2,
         },
       ])
@@ -109,8 +110,8 @@ describe('PostHogPrivacyService worker coordination', () => {
       json: async () => ({
         results: [
           {
-            id: providerRequestId,
-            submission_id: submissionId,
+            id: PROVIDER_REQUEST_ID,
+            submission_id: SUBMISSION_ID,
             status: 'draft',
           },
         ],
@@ -124,25 +125,21 @@ describe('PostHogPrivacyService worker coordination', () => {
     expect(fetchSpy.mock.calls[0]![1]?.method).toBeUndefined();
     const [updateSql, updateParams] = query.mock.calls[2]!;
     expect(String(updateSql)).toContain("SET status = 'submitted'");
-    expect(updateParams).toEqual([rowId, providerRequestId]);
+    expect(updateParams).toEqual([ROW_ID, PROVIDER_REQUEST_ID]);
   });
 
   it('accepts a raw-array response and reconciles by exact query when submission_id is absent', async () => {
     enableWorker();
-    const rowId = '11111111-1111-4111-8111-111111111111';
-    const submissionId = '22222222-2222-4222-8222-222222222222';
-    const providerRequestId = '33333333-3333-4333-8333-333333333333';
-    const subjectHash = 'a'.repeat(64);
     const query = jest
       .fn()
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
-          id: rowId,
+          id: ROW_ID,
           kind: 'subject',
-          subject_hash: subjectHash,
+          subject_hash: SUBJECT_HASH,
           cutoff_at: null,
-          submission_id: submissionId,
+          submission_id: SUBMISSION_ID,
           attempts: 2,
         },
       ])
@@ -152,8 +149,8 @@ describe('PostHogPrivacyService worker coordination', () => {
       ok: true,
       json: async () => [
         {
-          id: providerRequestId,
-          query: buildPostHogSubjectDeletionQuery(subjectHash),
+          id: PROVIDER_REQUEST_ID,
+          query: buildPostHogSubjectDeletionQuery(SUBJECT_HASH),
           status: 'draft',
         },
       ],
@@ -162,22 +159,21 @@ describe('PostHogPrivacyService worker coordination', () => {
 
     await service.processPending();
 
-    expect(query.mock.calls[2]![1]).toEqual([rowId, providerRequestId]);
+    expect(query.mock.calls[2]![1]).toEqual([ROW_ID, PROVIDER_REQUEST_ID]);
   });
 
   it('defers a retry when reconciliation is unavailable instead of risking a duplicate POST', async () => {
     enableWorker();
-    const rowId = '11111111-1111-4111-8111-111111111111';
     const query = jest
       .fn()
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
-          id: rowId,
+          id: ROW_ID,
           kind: 'subject',
-          subject_hash: 'a'.repeat(64),
+          subject_hash: SUBJECT_HASH,
           cutoff_at: null,
-          submission_id: '22222222-2222-4222-8222-222222222222',
+          submission_id: SUBMISSION_ID,
           attempts: 2,
         },
       ])
@@ -193,26 +189,21 @@ describe('PostHogPrivacyService worker coordination', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [retrySql, retryParams] = query.mock.calls[2]!;
     expect(String(retrySql)).toContain("SET status = 'failed'");
-    expect(retryParams).toEqual([
-      rowId,
-      60 * 60 * 1_000,
-      'PostHog deletion retry reconciliation is unavailable.',
-    ]);
+    expect(retryParams).toEqual([ROW_ID, 60 * 60 * 1_000, RECONCILIATION_UNAVAILABLE]);
   });
 
   it('fails closed on an unknown deletion-list response envelope', async () => {
     enableWorker();
-    const rowId = '11111111-1111-4111-8111-111111111111';
     const query = jest
       .fn()
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
-          id: rowId,
+          id: ROW_ID,
           kind: 'subject',
-          subject_hash: 'a'.repeat(64),
+          subject_hash: SUBJECT_HASH,
           cutoff_at: null,
-          submission_id: '22222222-2222-4222-8222-222222222222',
+          submission_id: SUBMISSION_ID,
           attempts: 2,
         },
       ])
@@ -227,10 +218,6 @@ describe('PostHogPrivacyService worker coordination', () => {
     await service.processPending();
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(query.mock.calls[2]![1]).toEqual([
-      rowId,
-      60 * 60 * 1_000,
-      'PostHog deletion retry reconciliation is unavailable.',
-    ]);
+    expect(query.mock.calls[2]![1]).toEqual([ROW_ID, 60 * 60 * 1_000, RECONCILIATION_UNAVAILABLE]);
   });
 });
