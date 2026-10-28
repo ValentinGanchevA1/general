@@ -106,6 +106,7 @@ export class PulseCheckInService {
     return {
       id,
       placeLabel,
+      placeId,
       placeIdentity,
       audience: input.audience,
       createdAt: createdAt.toISOString(),

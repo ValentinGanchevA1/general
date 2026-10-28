@@ -60,6 +60,8 @@ export interface CreatePulseCheckInRequest {
 export interface PulseCheckInResult {
   id: string;
   placeLabel: string;
+  /** NEXA-owned durable place ID. Null for free-text or safely downgraded check-ins. */
+  placeId: string | null;
   placeIdentity: PlaceIdentity | null;
   audience: CheckInAudience;
   createdAt: string;
@@ -78,6 +80,9 @@ export interface ActivityItem {
 
   actorId: string | null;
   actorName: string | null;
+
+  /** NEXA-owned place entity referenced by canonical place activity. */
+  placeId?: string | null;
 
   /** Server-computed from fuzzed/coarsened locations. Null when source has no geo. */
   distanceM: number | null;
