@@ -227,7 +227,7 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
       await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 150));
 
       expect(leakedLocations).toEqual([]);
-      expect(remoteSocket?.rooms.has(userRoom)).toBe(true);
+      expect((remoteSocket as RealtimeServerSocket | null)?.rooms.has(userRoom)).toBe(true);
 
       emitter.to(userRoom).emit('friend:presence', { userId, online: false });
       await waitFor(() => presenceEvents.length === 2);
