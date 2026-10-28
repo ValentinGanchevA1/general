@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -11,11 +11,10 @@ import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { NexaPlaceDetail } from '@g88/shared';
-
-import { getJson } from '@/api/client';
 import { EmptyState } from '@/components/EmptyState';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { loadPlaceDetail, setPlaceSaved } from '@/features/places/placeDetailSlice';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppTheme, type ThemeColors } from '@/theme';
 
@@ -27,35 +26,26 @@ export function PlaceDetailScreen(): React.JSX.Element {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const route = useRoute<R>();
   const navigation = useNavigation<Nav>();
-  const [place, setPlace] = useState<NexaPlaceDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [reloadToken, setReloadToken] = useState(0);
+  const dispatch = useAppDispatch();
   const { placeId } = route.params;
+  const state = useAppSelector((root) => root.places.entries[placeId]);
+  const place = state?.detail ?? null;
+  const loading = state == null || state.loadId != null || (state.detail == null && state.error == null);
+  const saving = state?.saveId != null;
+  const error = state?.error ?? null;
 
   useEffect(() => {
-    let active = true;
-    void getJson<NexaPlaceDetail>(`/places/${encodeURIComponent(placeId)}`)
-      .then((next) => {
-        if (active) setPlace(next);
-      })
-      .catch(() => {
-        if (active) {
-          setPlace(null);
-          setError(true);
-        }
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => { active = false; };
-  }, [placeId, reloadToken]);
+    void dispatch(loadPlaceDetail({ placeId }));
+  }, [dispatch, placeId]);
 
   const retry = useCallback(() => {
-    setLoading(true);
-    setError(false);
-    setReloadToken((value) => value + 1);
-  }, []);
+    void dispatch(loadPlaceDetail({ placeId, force: true }));
+  }, [dispatch, placeId]);
+
+  const toggleSaved = useCallback(() => {
+    if (!place || saving) return;
+    void dispatch(setPlaceSaved({ placeId, saved: !place.saved }));
+  }, [dispatch, place, placeId, saving]);
 
   const openMap = useCallback(() => {
     if (!place) return;
@@ -77,7 +67,7 @@ export function PlaceDetailScreen(): React.JSX.Element {
             variant="plain"
             icon="map-marker-alert-outline"
             title="Couldn't load place"
-            body="Check your connection and try again."
+            body={error}
             actionLabel="Retry"
             onAction={retry}
           /> :
@@ -117,15 +107,44 @@ export function PlaceDetailScreen(): React.JSX.Element {
         </View>
       </View>
 
-      <TouchableOpacity
-        style={styles.primaryButton}
-        onPress={openMap}
-        accessibilityRole="button"
-        accessibilityLabel={`View ${place.canonicalLabel} on map`}
-      >
-        <Icon name="map-outline" size={20} color={colors.onPrimary} />
-        <Text style={styles.primaryButtonText}>View on map</Text>
-      </TouchableOpacity>
+      {error ? (
+        <View style={styles.inlineError} accessibilityRole="alert">
+          <Icon name="alert-circle-outline" size={17} color={colors.danger} />
+          <Text style={styles.inlineErrorText}>{error}</Text>
+        </View>
+      ) : null}
+
+      <View style={styles.actionRow}>
+        <TouchableOpacity
+          style={[styles.secondaryButton, place.saved && styles.secondaryButtonActive]}
+          onPress={toggleSaved}
+          disabled={saving}
+          accessibilityRole="button"
+          accessibilityLabel={place.saved ? `Remove ${place.canonicalLabel} from saved places` : `Save ${place.canonicalLabel}`}
+          accessibilityState={{ busy: saving, selected: place.saved }}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color={colors.discovery} />
+          ) : (
+            <Icon
+              name={place.saved ? 'bookmark' : 'bookmark-outline'}
+              size={20}
+              color={colors.discovery}
+            />
+          )}
+          <Text style={styles.secondaryButtonText}>{place.saved ? 'Saved' : 'Save'}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={openMap}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${place.canonicalLabel} on map`}
+        >
+          <Icon name="map-outline" size={20} color={colors.onPrimary} />
+          <Text style={styles.primaryButtonText}>View on map</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   </View>;
 }
@@ -174,9 +193,38 @@ function createStyles(colors: ThemeColors) {
     cardText: { flex: 1 },
     cardTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
     cardBody: { marginTop: 4, color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
-    primaryButton: {
-      marginTop: 20,
+    inlineError: {
+      marginTop: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: colors.dangerSurface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.dangerBorder,
+    },
+    inlineErrorText: { flex: 1, color: colors.danger, fontSize: 13, lineHeight: 18 },
+    actionRow: { flexDirection: 'row', gap: 10, marginTop: 20 },
+    secondaryButton: {
       minHeight: 50,
+      minWidth: 112,
+      paddingHorizontal: 16,
+      borderRadius: 15,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.discovery,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    secondaryButtonActive: { backgroundColor: colors.discoveryGhost },
+    secondaryButtonText: { color: colors.discovery, fontSize: 15, fontWeight: '800' },
+    primaryButton: {
+      minHeight: 50,
+      flex: 1,
       borderRadius: 15,
       backgroundColor: colors.actionPrimary,
       flexDirection: 'row',
