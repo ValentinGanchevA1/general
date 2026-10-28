@@ -1,0 +1,69 @@
+import React, { useMemo } from 'react';
+import type { PlaceMapEntityPoint } from '@g88/shared';
+
+import { NexaPlaceSheet } from '@/components/map/NexaSpatialEntitySheets';
+import type { NexaSpatialMetaItem } from '@/components/map/NexaSpatialSheet';
+
+export function PlaceMapPreviewSheet({
+  point,
+  onCheckIn,
+  onViewDetails,
+}: {
+  point: PlaceMapEntityPoint;
+  onCheckIn: () => void;
+  onViewDetails: () => void;
+}): React.JSX.Element {
+  const meta = useMemo<NexaSpatialMetaItem[]>(() => {
+    const items: NexaSpatialMetaItem[] = [
+      {
+        id: 'precision',
+        label: 'Approximate area',
+        icon: 'shield-map-outline',
+      },
+    ];
+    if (point.meta.trending) {
+      items.unshift({
+        id: 'activity',
+        label: 'Getting active nearby',
+        icon: 'pulse',
+        emphasis: true,
+      });
+    } else {
+      items.unshift({
+        id: 'activity',
+        label: 'Local place',
+        icon: 'map-marker-outline',
+      });
+    }
+    if (point.meta.saved === true) {
+      items.push({ id: 'saved', label: 'Saved', icon: 'bookmark' });
+    }
+    return items;
+  }, [point.meta.saved, point.meta.trending]);
+
+  return (
+    <NexaPlaceSheet
+      title={point.meta.canonicalLabel}
+      subtitle="NEXA shows only a coarse map area for this place."
+      meta={meta}
+      primaryAction={{
+        id: 'check-in',
+        label: 'Check in',
+        icon: 'map-marker-check-outline',
+        onPress: onCheckIn,
+        accessibilityLabel: `Check in at ${point.meta.canonicalLabel}`,
+      }}
+      secondaryActions={[
+        {
+          id: 'details',
+          label: 'Details',
+          icon: 'arrow-expand',
+          onPress: onViewDetails,
+          accessibilityLabel: `View details for ${point.meta.canonicalLabel}`,
+        },
+      ]}
+      accessibilityLabel={`${point.meta.canonicalLabel}, place, approximate location${point.meta.trending ? ', getting active nearby' : ''}${point.meta.saved === true ? ', saved' : ''}`}
+      testID="place-map-preview-sheet"
+    />
+  );
+}
