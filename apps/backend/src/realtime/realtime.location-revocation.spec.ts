@@ -11,6 +11,26 @@ interface Delivered {
 }
 
 describe('RealtimeGateway live location multi-socket revocation', () => {
+  it('rejects conversation rejoin after a block or participant removal', async () => {
+    const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
+    const join = jest.fn();
+    const client = { data: { userId: peerId, rooms: new Set<string>() }, join };
+    const query = jest.fn().mockResolvedValue([{ user_id: sharerId }]);
+    Object.assign(gateway, { db: { query }, logger: { error: jest.fn() } });
+
+    await expect(gateway.onConversationJoin(client as never, { conversationId }))
+      .resolves.toMatchObject({ ok: false, code: 'chat.forbidden' });
+    expect(join).not.toHaveBeenCalled();
+    expect(client.data.rooms.size).toBe(0);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('user_blocks'), [conversationId]);
+
+    // After removal, the authoritative participant query returns no recipients.
+    query.mockResolvedValue([]);
+    await expect(gateway.onConversationJoin(client as never, { conversationId }))
+      .resolves.toMatchObject({ ok: false, code: 'chat.forbidden' });
+    expect(join).not.toHaveBeenCalled();
+  });
+
   it('does not deliver precise updates to blocked peer sockets retaining stale conversation rooms', async () => {
     const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
     const received = new Map<string, Delivered[]>();
