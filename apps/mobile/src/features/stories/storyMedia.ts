@@ -1,10 +1,9 @@
-// Pick story photo or video and upload to Nest → S3.
+// Pick story photo or video and upload it without routing large video bytes through Nest.
 // Returns publicUrl + mediaType for POST /stories.
 //
 // Photos: image-picker includeBase64 → POST /stories/media/base64.
-// Videos: image-picker never returns base64 (PHOTO ONLY). fetch/XHR cannot
-// read Android content:// or many file:// paths → Network / "could not read".
-// Use react-native-blob-util (ContentResolver-backed) → base64 → same endpoint.
+// Videos: image-picker local URI → presigned S3 PUT via react-native-blob-util.
+// This keeps large video payloads out of the 512 MiB API process and avoids JS base64 copies.
 //
 // Android: if CAMERA is declared in the app manifest, image-picker requires
 // the host to request the runtime permission before launchCamera.
@@ -29,18 +28,16 @@ import { postJson } from '@/api/client';
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime']);
 const MAX_BYTES = 18 * 1024 * 1024;
+const UPLOAD_TIMEOUT_MS = 120_000;
 
 export type StoryPresignFn = (contentType: string) => Promise<{
   uploadUrl: string;
   publicUrl: string;
 }>;
 
-/**
- * Shows source chooser, picks media, uploads, returns create fields.
- * `getPresign` kept for StoryCreateSheet API compatibility (unused).
- */
+/** Shows source chooser, picks media, uploads, and returns create fields. */
 export async function pickAndUploadStoryMedia(
-  _getPresign?: StoryPresignFn,
+  getPresign: StoryPresignFn,
 ): Promise<{ mediaUrl: string; mediaType: 'image' | 'video' } | null> {
   const source = await chooseSource();
   if (!source) return null;
@@ -51,17 +48,14 @@ export async function pickAndUploadStoryMedia(
   const classified = classifyAsset(asset);
   if (classified.mediaType === 'video') {
     assertVideoDuration(asset);
+    assertKnownMediaSize(asset.fileSize);
+    const { uploadUrl, publicUrl } = await getPresign(classified.contentType);
+    await uploadVideoToPresignedUrl(asset, uploadUrl, classified.contentType);
+    return { mediaUrl: publicUrl, mediaType: 'video' };
   }
 
-  const base64 =
-    classified.mediaType === 'video'
-      ? await readVideoAsBase64(asset)
-      : requireImageBase64(asset);
-
-  const approxBytes = Math.floor((base64.length * 3) / 4);
-  if (approxBytes > MAX_BYTES) {
-    throw new Error('Media is too large. Use a shorter clip or lower quality.');
-  }
+  const base64 = requireImageBase64(asset);
+  assertBase64Size(base64);
 
   const res = await postJson<
     { data: string; contentType: string },
@@ -69,7 +63,7 @@ export async function pickAndUploadStoryMedia(
   >(
     '/stories/media/base64',
     { data: base64, contentType: classified.contentType },
-    { timeout: 120_000 },
+    { timeout: UPLOAD_TIMEOUT_MS },
   );
 
   return { mediaUrl: res.publicUrl, mediaType: res.mediaType };
@@ -82,11 +76,59 @@ function requireImageBase64(asset: Asset): string {
   return asset.base64;
 }
 
+function mediaTooLargeError(): Error {
+  return new Error('Media is too large. Use a shorter clip or lower quality.');
+}
+
+function assertKnownMediaSize(bytes: number | null | undefined): void {
+  if (bytes == null || !Number.isFinite(bytes)) return;
+  if (bytes > MAX_BYTES) throw mediaTooLargeError();
+}
+
+function assertBase64Size(base64: string): void {
+  const approxBytes = Math.floor((base64.length * 3) / 4);
+  if (approxBytes > MAX_BYTES) throw mediaTooLargeError();
+}
+
+async function assertPathSizeIfAvailable(path: string): Promise<void> {
+  let size: number;
+  try {
+    const stat = await ReactNativeBlobUtil.fs.stat(path);
+    size = Number(stat.size);
+  } catch {
+    return;
+  }
+  assertKnownMediaSize(size);
+}
+
+async function putPresignedFile(
+  path: string,
+  uploadUrl: string,
+  contentType: string,
+): Promise<void> {
+  await assertPathSizeIfAvailable(path);
+  const response = await ReactNativeBlobUtil.config({ timeout: UPLOAD_TIMEOUT_MS }).fetch(
+    'PUT',
+    uploadUrl,
+    { 'Content-Type': contentType },
+    ReactNativeBlobUtil.wrap(path),
+  );
+  const status = response.info().status;
+  if (status < 200 || status >= 300) {
+    throw new Error(`Story upload failed with HTTP ${status}`);
+  }
+}
+
 /**
- * Read local video bytes via native FS / ContentResolver.
- * Tries originalPath, then uri (content:// supported by blob-util on Android).
+ * Streams a local video directly to its presigned S3 URL.
+ * content:// is supported by blob-util; Android cache-copy remains a fallback for providers
+ * that refuse direct reads. We never fall back to JS base64 because that recreates the API OOM risk.
  */
-async function readVideoAsBase64(asset: Asset): Promise<string> {
+async function uploadVideoToPresignedUrl(
+  asset: Asset,
+  uploadUrl: string,
+  contentType: string,
+): Promise<void> {
   const candidates = uniquePaths([
     (asset as Asset & { originalPath?: string }).originalPath,
     asset.uri,
@@ -99,37 +141,39 @@ async function readVideoAsBase64(asset: Asset): Promise<string> {
   let lastError: Error | null = null;
   for (const path of candidates) {
     try {
-      const base64 = await ReactNativeBlobUtil.fs.readFile(path, 'base64');
-      if (base64 && base64.length > 0) return base64;
+      await putPresignedFile(path, uploadUrl, contentType);
+      return;
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
+      if (lastError.message.includes('too large')) throw lastError;
     }
   }
 
-  // Last resort: copy content:// into app cache, then read.
   if (Platform.OS === 'android') {
     for (const path of candidates) {
       if (!path.startsWith('content://')) continue;
+      const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/story_${Date.now()}.mp4`;
       try {
-        const dest = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/story_${Date.now()}.mp4`;
         await ReactNativeBlobUtil.fs.cp(path, dest);
-        const base64 = await ReactNativeBlobUtil.fs.readFile(dest, 'base64');
+        await putPresignedFile(dest, uploadUrl, contentType);
+        return;
+      } catch (e) {
+        lastError = e instanceof Error ? e : new Error(String(e));
+        if (lastError.message.includes('too large')) throw lastError;
+      } finally {
         try {
           await ReactNativeBlobUtil.fs.unlink(dest);
         } catch {
           // best-effort cleanup
         }
-        if (base64 && base64.length > 0) return base64;
-      } catch (e) {
-        lastError = e instanceof Error ? e : new Error(String(e));
       }
     }
   }
 
   if (lastError) {
-    Sentry.captureException(lastError, { tags: { resource: 'stories.media.read' } });
+    Sentry.captureException(lastError, { tags: { resource: 'stories.media.upload' } });
   }
-  throw new Error('Could not read the video file. Try again or pick from Library.');
+  throw new Error('Could not upload the video file. Try again or pick from Library.');
 }
 
 function uniquePaths(paths: Array<string | undefined | null>): string[] {
