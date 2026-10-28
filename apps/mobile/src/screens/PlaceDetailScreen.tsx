@@ -22,6 +22,7 @@ import {
   takePendingPlaceCheckIn,
 } from '@/features/places/pendingPlaceCheckIn';
 import { loadPlaceDetail, setPlaceSaved } from '@/features/places/placeDetailSlice';
+import { savedPlaceMapFocusStore } from '@/features/places/savedPlaceMapFocus.store';
 import { sharePlace } from '@/features/places/sharePlace';
 import {
   clearCheckInError,
@@ -83,13 +84,8 @@ export function PlaceDetailScreen(): React.JSX.Element {
 
   const openMap = useCallback(() => {
     if (!place) return;
-    navigation.navigate('Main', {
-      screen: 'Map',
-      params: {
-        focusLat: place.approximateLocation.lat,
-        focusLng: place.approximateLocation.lng,
-      },
-    });
+    savedPlaceMapFocusStore.requestDetail(place);
+    navigation.navigate('Main', { screen: 'Map' });
   }, [navigation, place]);
 
   const openCheckIn = useCallback(() => {
