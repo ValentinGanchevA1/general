@@ -6,8 +6,8 @@ import { PlaceMapDiscoveryService } from './place-map-discovery.service';
 const placeCell = '871e85992ffffff';
 const [placeLat, placeLng] = h3.cellToLatLng(placeCell);
 const viewport = {
-  sw: { lat: placeLat - 0.2, lng: placeLng - 0.2 },
-  ne: { lat: placeLat + 0.2, lng: placeLng + 0.2 },
+  sw: { lat: placeLat - 0.04, lng: placeLng - 0.04 },
+  ne: { lat: placeLat + 0.04, lng: placeLng + 0.04 },
 };
 
 function row(id: string, label: string, cell = placeCell) {
@@ -68,6 +68,18 @@ describe('PlaceMapDiscoveryService', () => {
     for (const cluster of clusters) {
       expect(Object.keys(cluster.by)).toEqual(['place']);
     }
+  });
+
+  it('fails closed before querying places for an oversized high-zoom viewport', async () => {
+    const oversizedViewport = {
+      sw: { lat: placeLat - 0.2, lng: placeLng - 0.2 },
+      ne: { lat: placeLat + 0.2, lng: placeLng + 0.2 },
+    };
+
+    const result = await service.nearby(oversizedViewport, 15);
+
+    expect(result.points).toEqual([]);
+    expect(query).not.toHaveBeenCalled();
   });
 
   it('fails closed for malformed or non-r7 stored cells', async () => {
