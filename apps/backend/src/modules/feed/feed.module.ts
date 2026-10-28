@@ -18,5 +18,6 @@ import { PulseDiscoveryFeedService } from './pulse-discovery-feed.service';
     PulseCheckInService,
     PulseDiscoveryFeedService,
   ],
+  exports: [PulseActivityRealtimeService],
 })
 export class FeedModule {}
