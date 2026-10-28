@@ -134,13 +134,14 @@ function EntityMarkerImpl({
   }
 
   if (point.kind === 'place') {
+    const saved = point.meta.saved === true;
     return (
       <NexaEntityMarker
         entityType="place"
         density={density}
         {...(showCaption ? { caption: point.meta.canonicalLabel.slice(0, 16) } : {})}
-        state={{ selected, live: point.meta.trending, isNew, dimmed, unavailable }}
-        accessibilityLabel={`${point.meta.canonicalLabel}, active place, approximate location`}
+        state={{ selected, live: point.meta.trending, isNew, own: own || saved, dimmed, unavailable }}
+        accessibilityLabel={`${point.meta.canonicalLabel}, ${saved ? 'saved place' : point.meta.trending ? 'active place' : 'place'}, approximate location`}
         reduceMotion={reduceMotion}
       />
     );

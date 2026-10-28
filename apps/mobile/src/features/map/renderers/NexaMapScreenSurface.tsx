@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import type { Region } from 'react-native-maps';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -7,7 +7,9 @@ import type { ClusterPoint, DiscoveryPoint, EntityPoint, Viewport } from '@g88/s
 import { Config } from '@/config';
 import { useAppSelector } from '@/hooks/redux';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
 import { usePlaceMapDiscovery } from '@/features/places/usePlaceMapDiscovery';
+import { useSavedPlacesMapOverlay } from '@/features/places/useSavedPlacesMapOverlay';
 import { mergeMapDiscoveryPoints } from '@/features/map/mergeMapDiscoveryPoints';
 import type { NexaMapController } from '../contracts/mapRenderer';
 import {
@@ -79,14 +81,28 @@ export const NexaMapScreenSurface = React.forwardRef<
   const [settledRegion, setSettledRegion] = useState<Region | null>(null);
   const viewport = useMemo(() => regionToViewport(settledRegion), [settledRegion]);
   const zoom = useMemo(() => approxZoom(settledRegion), [settledRegion]);
+  const savedPlacesEnabled = useSyncExternalStore(
+    savedPlacesMapLayerStore.subscribe,
+    savedPlacesMapLayerStore.getSnapshot,
+    savedPlacesMapLayerStore.getSnapshot,
+  );
+
   const placeDiscovery = usePlaceMapDiscovery({
     viewport,
     zoom,
     enabled: viewport != null,
   });
+  const savedPlacePoints = useSavedPlacesMapOverlay({
+    enabled: savedPlacesEnabled,
+    viewport,
+  });
   const mergedPoints = useMemo(
-    () => mergeMapDiscoveryPoints(points, placeDiscovery.data?.points ?? []),
-    [placeDiscovery.data?.points, points],
+    () => mergeMapDiscoveryPoints(
+      points,
+      placeDiscovery.data?.points ?? [],
+      savedPlacePoints,
+    ),
+    [placeDiscovery.data?.points, points, savedPlacePoints],
   );
 
   const mapLibreEnabled = useAppSelector(

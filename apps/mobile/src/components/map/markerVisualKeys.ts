@@ -39,7 +39,8 @@ export function entityVisualKey(point: MapEntityPoint): string {
       point.kind,
       point.meta.canonicalLabel,
       point.meta.trending ? 'active' : 'idle',
-      point.meta.recentActivityAt,
+      point.meta.saved === true ? 'saved' : 'public',
+      point.meta.recentActivityAt ?? '',
     ].join('|');
   }
 
