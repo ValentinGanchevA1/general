@@ -55,42 +55,62 @@ export function CheckInSheet({
   const normalizedLabel = placeLabel.trim();
   const locationReady = location != null;
   const canSubmit = normalizedLabel.length >= 2 && locationReady && !submitting;
+  const searchEligible = visible
+    && normalizedLabel.length >= 2
+    && selectedPlace?.canonicalLabel !== normalizedLabel;
+  const visibleSuggestions = searchEligible ? suggestions : [];
+  const showSearching = searchEligible && searching;
 
   useEffect(() => {
-    if (!visible || normalizedLabel.length < 2 || selectedPlace?.canonicalLabel === normalizedLabel) {
-      setSuggestions([]);
-      setSearching(false);
-      return;
-    }
+    if (!searchEligible) return undefined;
 
+    let active = true;
     const controller = new AbortController();
     const timer = setTimeout(() => {
+      if (!active) return;
       setSearching(true);
       void searchPlaces(normalizedLabel, location, controller.signal)
-        .then((items) => setSuggestions(items))
+        .then((items) => {
+          if (active) setSuggestions(items);
+        })
         .catch((searchError: unknown) => {
-          if (!(searchError instanceof Error && searchError.name === 'AbortError')) {
+          if (
+            active
+            && !(searchError instanceof Error && searchError.name === 'AbortError')
+          ) {
             setSuggestions([]);
           }
         })
-        .finally(() => setSearching(false));
+        .finally(() => {
+          if (active) setSearching(false);
+        });
     }, 250);
 
     return () => {
+      active = false;
       clearTimeout(timer);
       controller.abort();
     };
-  }, [location, normalizedLabel, selectedPlace?.canonicalLabel, visible]);
+  }, [location, normalizedLabel, searchEligible]);
 
   const onChangePlace = (value: string): void => {
     setPlaceLabel(value);
     setSelectedPlace(null);
+    setSuggestions([]);
+    setSearching(false);
   };
 
   const choosePlace = (place: PlaceSuggestion): void => {
     setPlaceLabel(place.canonicalLabel);
     setSelectedPlace(place);
     setSuggestions([]);
+    setSearching(false);
+  };
+
+  const close = (): void => {
+    setSuggestions([]);
+    setSearching(false);
+    onClose();
   };
 
   const submit = (): void => {
@@ -106,8 +126,8 @@ export function CheckInSheet({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={styles.backdrop} onPress={submitting ? undefined : onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
+      <Pressable style={styles.backdrop} onPress={submitting ? undefined : close}>
         <Pressable
           style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.sm }]}
           onPress={(event) => event.stopPropagation()}
@@ -132,12 +152,14 @@ export function CheckInSheet({
               style={styles.input}
               accessibilityLabel="Place name"
             />
-            {searching ? <ActivityIndicator size="small" color={colors.actionPrimary} style={styles.searchSpinner} /> : null}
+            {showSearching ? (
+              <ActivityIndicator size="small" color={colors.actionPrimary} style={styles.searchSpinner} />
+            ) : null}
           </View>
 
-          {suggestions.length > 0 ? (
+          {visibleSuggestions.length > 0 ? (
             <View style={styles.suggestions}>
-              {suggestions.map((place) => (
+              {visibleSuggestions.map((place) => (
                 <TouchableOpacity
                   key={`${place.provider}:${place.providerPlaceId}`}
                   style={styles.suggestion}
@@ -199,7 +221,7 @@ export function CheckInSheet({
             {submitting ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.submitText}>Check in</Text>}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.cancel} disabled={submitting} onPress={onClose} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.cancel} disabled={submitting} onPress={close} activeOpacity={0.8}>
             <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>
         </Pressable>
