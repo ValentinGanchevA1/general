@@ -43,23 +43,27 @@ describe('MapTilerPlaceAttestationService', () => {
     else process.env.NEXA_MAPTILER_REGION = originalRegion;
   });
 
-  it('resolves the feature by ID and derives canonical label and coarse H3 only from provider data', async () => {
+  it('derives canonical identity and a stable OSM ref only from provider data', async () => {
     fetchSpy.mockResolvedValueOnce(responseWith({
       type: 'FeatureCollection',
       features: [{
         id: 'poi.12345',
         text: 'Sea Garden',
         center: [userLng, userLat],
+        properties: { ref: 'osm:r71525' },
       }],
     }));
 
     const result = await service.attest(clientIdentity, userCell);
 
     expect(result).toEqual({
-      provider: 'maptiler',
-      providerPlaceId: 'poi.12345',
-      canonicalLabel: 'Sea Garden',
-      providerCellH3R7: userCell,
+      identity: {
+        provider: 'maptiler',
+        providerPlaceId: 'poi.12345',
+        canonicalLabel: 'Sea Garden',
+        providerCellH3R7: userCell,
+      },
+      stableExternalRef: { namespace: 'osm', externalId: 'r71525' },
     });
     const [url, init] = fetchSpy.mock.calls[0] ?? [];
     expect(String(url)).toContain('https://api.maptiler.eu/geocoding/poi.12345.json');
@@ -69,27 +73,38 @@ describe('MapTilerPlaceAttestationService', () => {
     expect(init).toEqual(expect.objectContaining({ method: 'GET', redirect: 'error' }));
   });
 
+  it('ignores unsupported provider refs instead of treating them as stable identity', async () => {
+    fetchSpy.mockResolvedValueOnce(responseWith({
+      features: [{
+        id: 'poi.12345',
+        text: 'Sea Garden',
+        center: [userLng, userLat],
+        properties: { ref: 'vendor:temporary-123' },
+      }],
+    }));
+
+    await expect(service.attest(clientIdentity, userCell)).resolves.toEqual({
+      identity: expect.objectContaining({ canonicalLabel: 'Sea Garden' }),
+      stableExternalRef: null,
+    });
+  });
+
   it('uses the global MapTiler origin only when configured', async () => {
     process.env.NEXA_MAPTILER_REGION = 'global';
     fetchSpy.mockResolvedValueOnce(responseWith({ features: [] }));
-
     await service.attest(clientIdentity, userCell);
-
     expect(String(fetchSpy.mock.calls[0]?.[0])).toContain('https://api.maptiler.com/');
   });
 
   it('does not call the provider when the server key is missing', async () => {
     delete process.env.NEXA_MAPTILER_SERVER_API_KEY;
-
     await expect(service.attest(clientIdentity, userCell)).resolves.toBeNull();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('rejects malformed or stale feature IDs without promoting them to canonical places', async () => {
-    await expect(service.attest({
-      ...clientIdentity,
-      providerPlaceId: 'poi.not-a-number',
-    }, userCell)).resolves.toBeNull();
+    await expect(service.attest({ ...clientIdentity, providerPlaceId: 'poi.not-a-number' }, userCell))
+      .resolves.toBeNull();
     expect(fetchSpy).not.toHaveBeenCalled();
 
     fetchSpy.mockResolvedValueOnce(responseWith({ features: [] }, 404));
@@ -98,31 +113,20 @@ describe('MapTilerPlaceAttestationService', () => {
 
   it('fails soft when the provider is unavailable', async () => {
     fetchSpy.mockRejectedValueOnce(new Error('provider unavailable'));
-
     await expect(service.attest(clientIdentity, userCell)).resolves.toBeNull();
   });
 
   it('rejects a provider-resolved feature outside the allowed coarse area', async () => {
     fetchSpy.mockResolvedValueOnce(responseWith({
-      features: [{
-        id: 'poi.12345',
-        text: 'Far away venue',
-        center: [23.3219, 42.6977],
-      }],
+      features: [{ id: 'poi.12345', text: 'Far away venue', center: [23.3219, 42.6977] }],
     }));
-
     await expect(service.attest(clientIdentity, userCell)).resolves.toBeNull();
   });
 
   it('requires the returned feature ID to exactly match the requested ID', async () => {
     fetchSpy.mockResolvedValueOnce(responseWith({
-      features: [{
-        id: 'poi.67890',
-        text: 'Different place',
-        center: [userLng, userLat],
-      }],
+      features: [{ id: 'poi.67890', text: 'Different place', center: [userLng, userLat] }],
     }));
-
     await expect(service.attest(clientIdentity, userCell)).resolves.toBeNull();
   });
 
@@ -132,7 +136,6 @@ describe('MapTilerPlaceAttestationService', () => {
       200,
       { 'content-length': String(300 * 1024) },
     ));
-
     await expect(service.attest(clientIdentity, userCell)).resolves.toBeNull();
   });
 });
