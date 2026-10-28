@@ -71,7 +71,12 @@ describe('PulseCheckInService', () => {
 
     const result = await service.create('user-1', request);
 
-    expect(result).toMatchObject({ placeLabel: 'Sea Garden', placeIdentity: null, audience: 'friends' });
+    expect(result).toMatchObject({
+      placeLabel: 'Sea Garden',
+      placeId: null,
+      placeIdentity: null,
+      audience: 'friends',
+    });
     const insertParams = query.mock.calls[1]?.[1] as unknown[];
     expect(insertParams).not.toContain(request.lat);
     expect(insertParams).not.toContain(request.lng);
@@ -93,6 +98,7 @@ describe('PulseCheckInService', () => {
 
     expect(attest).toHaveBeenCalledWith(clientIdentity, expect.any(String));
     expect(resolvePlace).toHaveBeenCalledWith(attestedPlace);
+    expect(result.placeId).toBe('place-1');
     expect(result.placeIdentity).toEqual(attestedIdentity);
     expect(result.placeLabel).toBe('Sea Garden');
     const insertParams = query.mock.calls[1]?.[1] as unknown[];
@@ -119,6 +125,7 @@ describe('PulseCheckInService', () => {
       placeIdentity: clientIdentity,
     });
 
+    expect(result.placeId).toBeNull();
     expect(result.placeIdentity).toBeNull();
     expect(result.placeLabel).toBe('My custom Sea Garden label');
     const insertParams = query.mock.calls[1]?.[1] as unknown[];
@@ -138,7 +145,7 @@ describe('PulseCheckInService', () => {
       placeIdentity: clientIdentity,
     });
 
-    expect(result).toMatchObject({ placeLabel: 'Fallback label', placeIdentity: null });
+    expect(result).toMatchObject({ placeLabel: 'Fallback label', placeId: null, placeIdentity: null });
     const insertParams = query.mock.calls[1]?.[1] as unknown[];
     expect(insertParams.slice(5, 9)).toEqual([null, null, null, null]);
     expect(evaluateAfterCheckIn).not.toHaveBeenCalled();
@@ -167,6 +174,9 @@ describe('PulseCheckInService', () => {
   it('keeps the API successful when realtime delivery fails after persistence', async () => {
     query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     publishCheckIn.mockRejectedValueOnce(new Error('redis unavailable'));
-    await expect(service.create('user-1', request)).resolves.toMatchObject({ placeLabel: 'Sea Garden' });
+    await expect(service.create('user-1', request)).resolves.toMatchObject({
+      placeLabel: 'Sea Garden',
+      placeId: null,
+    });
   });
 });
