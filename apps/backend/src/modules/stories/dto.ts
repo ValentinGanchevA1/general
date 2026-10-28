@@ -13,6 +13,11 @@ import { Type } from 'class-transformer';
 
 import { STORY_LIMITS } from '@g88/shared';
 
+// Slightly above the exact base64 length for an 18 MiB payload. The service's
+// decoded-byte guard remains authoritative while malformed oversized strings
+// are rejected before Buffer.from() duplicates them in process memory.
+const MAX_STORY_BASE64_CHARS = 25_200_000;
+
 class LatLngDto {
   @IsNumber()
   @Min(-90)
@@ -77,6 +82,7 @@ export class ReactStoryDto {
 export class UploadStoryBase64Dto {
   /** Raw base64 payload (no data: prefix). */
   @IsString()
+  @MaxLength(MAX_STORY_BASE64_CHARS)
   data!: string;
 
   @IsIn(['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/quicktime'])
