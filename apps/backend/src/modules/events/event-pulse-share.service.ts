@@ -45,23 +45,26 @@ export class EventPulseShareService {
 
   async shareJoin(userId: string, eventId: string): Promise<ShareEventJoinResponse> {
     const [created] = await this.db.query<ShareableJoinRow[]>(
-      `UPDATE event_attendees a
-          SET pulse_shared_at = NOW(),
-              updated_at = NOW()
-         FROM events e
-        WHERE a.event_id = $1
-          AND a.user_id = $2
-          AND a.status = 'going'
-          AND a.pulse_shared_at IS NULL
-          AND e.id = a.event_id
-          AND e.deleted_at IS NULL
-          AND e.visibility = 'public'
-          AND e.starts_at > NOW()
+      `WITH updated AS (
+        UPDATE event_attendees a
+           SET pulse_shared_at = NOW(),
+               updated_at = NOW()
+          FROM events e
+         WHERE a.event_id = $1
+           AND a.user_id = $2
+           AND a.status = 'going'
+           AND a.pulse_shared_at IS NULL
+           AND e.id = a.event_id
+           AND e.deleted_at IS NULL
+           AND e.visibility = 'public'
+           AND e.starts_at > NOW()
       RETURNING e.id AS event_id,
                 e.title,
                 e.host_id,
                 e.location_h3_r7,
-                a.pulse_shared_at`,
+                a.pulse_shared_at
+      )
+      SELECT * FROM updated`,
       [eventId, userId],
     );
 
