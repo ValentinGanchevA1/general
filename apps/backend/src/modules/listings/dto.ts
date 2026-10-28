@@ -25,6 +25,11 @@ import {
   type UploadListingImageRequest,
 } from '@g88/shared';
 
+// Slightly above the exact base64 length for a 10 MiB payload; the decoded-byte
+// guard remains authoritative. This prevents grossly oversized strings from
+// allocating an additional Buffer before rejection.
+const MAX_10_MIB_BASE64_CHARS = 14_100_000;
+
 class LatLngDto {
   @IsLatitude()
   lat!: number;
@@ -142,6 +147,7 @@ export class CounterOfferDto {
 export class UploadListingImageDto implements UploadListingImageRequest {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(MAX_10_MIB_BASE64_CHARS)
   data!: string;
 
   @IsString()
