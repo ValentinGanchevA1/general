@@ -23,11 +23,12 @@ interface EmittedTrendRow {
 }
 
 export interface EvaluatePlaceTrendInput {
+  placeId: string;
   placeIdentity: PlaceIdentity;
 }
 
 /**
- * Produces anonymous place-level Pulse activity only for provider-backed places
+ * Produces anonymous place-level Pulse activity only for NEXA-catalog places
  * after a k-anonymity threshold is reached by explicit Nearby check-ins.
  */
 @Injectable()
@@ -46,36 +47,36 @@ export class PulsePlaceTrendingService {
         WHERE ci.deleted_at IS NULL
           AND ci.expires_at > NOW()
           AND ci.audience = 'nearby'
-          AND ci.place_provider = $1
-          AND ci.place_provider_id = $2
-          AND ci.place_h3_r7 = $3
-          AND ci.created_at > NOW() - ($4 * interval '1 minute')`,
-      [place.provider, place.providerPlaceId, place.providerCellH3R7, TREND_WINDOW_MINUTES],
+          AND ci.place_id = $1
+          AND ci.created_at > NOW() - ($2 * interval '1 minute')`,
+      [input.placeId, TREND_WINDOW_MINUTES],
     );
 
     const distinctUsers = Number(countRow?.distinct_users ?? 0);
     if (distinctUsers < TREND_MIN_DISTINCT_USERS) return;
 
-    const placeKey = `${place.provider}:${place.providerPlaceId}`;
+    const placeKey = `nexa:${input.placeId}`;
     const [trend] = await this.db.query<EmittedTrendRow[]>(
       `INSERT INTO pulse_place_trends
          (place_key, place_label, location_h3_r7, distinct_user_count,
-          place_provider, place_provider_id,
+          place_provider, place_provider_id, place_id,
           last_emitted_at, expires_at, updated_at)
        VALUES
-         ($1, $2, $3, $4, $5, $6, NOW(),
-          NOW() + ($7 * interval '1 minute'), NOW())
-       ON CONFLICT (place_key, location_h3_r7)
+         ($1, $2, $3, $4, $5, $6, $7, NOW(),
+          NOW() + ($8 * interval '1 minute'), NOW())
+       ON CONFLICT (place_id) WHERE place_id IS NOT NULL
        DO UPDATE SET
+         place_key = EXCLUDED.place_key,
          place_label = EXCLUDED.place_label,
+         location_h3_r7 = EXCLUDED.location_h3_r7,
          distinct_user_count = EXCLUDED.distinct_user_count,
          place_provider = EXCLUDED.place_provider,
          place_provider_id = EXCLUDED.place_provider_id,
          last_emitted_at = NOW(),
-         expires_at = NOW() + ($7 * interval '1 minute'),
+         expires_at = NOW() + ($8 * interval '1 minute'),
          updated_at = NOW()
        WHERE pulse_place_trends.last_emitted_at
-             <= NOW() - ($8 * interval '1 minute')
+             <= NOW() - ($9 * interval '1 minute')
        RETURNING id, place_label, location_h3_r7, last_emitted_at`,
       [
         placeKey,
@@ -84,6 +85,7 @@ export class PulsePlaceTrendingService {
         distinctUsers,
         place.provider,
         place.providerPlaceId,
+        input.placeId,
         TREND_TTL_MINUTES,
         TREND_COOLDOWN_MINUTES,
       ],
