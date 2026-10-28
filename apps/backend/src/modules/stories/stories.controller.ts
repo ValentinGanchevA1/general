@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  ServiceUnavailableException,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -74,7 +75,7 @@ export class StoriesController {
 
   /**
    * POST /api/v1/stories/media/base64 — upload story media via base64 JSON.
-   * Preferred mobile path for photos (Android cannot fetch(local video uri)).
+   * Kept for photo compatibility; large video clients should use presigned upload.
    */
   @Post('media/base64')
   @HttpCode(HttpStatus.OK)
@@ -87,9 +88,8 @@ export class StoriesController {
   }
 
   /**
-   * POST /api/v1/stories/media/upload — multipart file upload (video preferred).
-   * RN image-picker does not return base64 for video; FormData streams the file.
-   * FileInterceptor defaults to memory storage (no direct multer import).
+   * POST /api/v1/stories/media/upload — bounded multipart compatibility path.
+   * FileInterceptor uses memory storage, so presigned upload is preferred for large media.
    */
   @Post('media/upload')
   @HttpCode(HttpStatus.OK)
@@ -207,9 +207,10 @@ export class StoriesController {
     try {
       metadata = await this.s3.storyObjectMetadata(key);
     } catch {
-      throw new BadRequestException({
-        code: 'story.media_not_uploaded',
-        message: 'Story media upload is incomplete or unavailable. Upload it again.',
+      // Fail closed, but preserve the presign token so a transient S3 outage can be retried.
+      throw new ServiceUnavailableException({
+        code: 'story.media_check_unavailable',
+        message: 'Story media could not be verified. Try again.',
       });
     }
 
