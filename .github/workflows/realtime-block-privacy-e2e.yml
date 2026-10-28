@@ -2,6 +2,12 @@ name: Realtime Block Privacy E2E
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/realtime-block-privacy-e2e.yml
+      - scripts/realtime-block-privacy-e2e.mjs
 
 permissions:
   contents: read
