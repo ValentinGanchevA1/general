@@ -86,12 +86,17 @@ export class EventsController {
   /** PUT /api/v1/events/:id/rsvp — set/update the caller's RSVP. */
   @Put(':id/rsvp')
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
-  rsvp(
+  async rsvp(
     @CurrentUser('id') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: RsvpDto,
   ): Promise<RsvpResponse> {
-    return this.events.rsvp(userId, id, dto);
+    const revocation = dto.status === 'going'
+      ? null
+      : await this.eventPulse.prepareJoinRevocation(userId, id);
+    const response = await this.events.rsvp(userId, id, dto);
+    if (revocation) this.eventPulse.revokePreparedJoin(revocation);
+    return response;
   }
 
   /** POST /api/v1/events/:id/share-join — explicitly publish Going to Pulse. */
