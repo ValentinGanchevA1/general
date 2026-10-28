@@ -2,6 +2,7 @@ import { DataSource } from 'typeorm';
 
 import type { CreatePulseCheckInRequest } from '@g88/shared';
 
+import { PulseActivityRealtimeService } from './pulse-activity-realtime.service';
 import { PulseCheckInService } from './pulse-check-in.service';
 
 const request: CreatePulseCheckInRequest = {
@@ -13,11 +14,14 @@ const request: CreatePulseCheckInRequest = {
 
 describe('PulseCheckInService', () => {
   let query: jest.Mock;
+  let publishCheckIn: jest.Mock;
   let service: PulseCheckInService;
 
   beforeEach(() => {
     query = jest.fn();
-    service = new PulseCheckInService({ query } as unknown as DataSource);
+    publishCheckIn = jest.fn().mockResolvedValue(undefined);
+    const realtime = { publishCheckIn } as unknown as PulseActivityRealtimeService;
+    service = new PulseCheckInService({ query } as unknown as DataSource, realtime);
   });
 
   it('stores a coarse H3 cell instead of exact coordinates', async () => {
@@ -34,6 +38,12 @@ describe('PulseCheckInService', () => {
     expect(insertParams).not.toContain(request.lat);
     expect(insertParams).not.toContain(request.lng);
     expect(typeof insertParams[4]).toBe('string');
+    expect(publishCheckIn).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: 'user-1',
+      placeLabel: 'Sea Garden',
+      audience: 'friends',
+      locationH3R7: insertParams[4],
+    }));
   });
 
   it('rejects another check-in during the cooldown window', async () => {
@@ -41,6 +51,7 @@ describe('PulseCheckInService', () => {
 
     await expect(service.create('user-1', request)).rejects.toMatchObject({ status: 429 });
     expect(query).toHaveBeenCalledTimes(1);
+    expect(publishCheckIn).not.toHaveBeenCalled();
   });
 
   it('rejects control characters in user-authored place labels', async () => {
@@ -49,5 +60,15 @@ describe('PulseCheckInService', () => {
       placeLabel: 'Sea\nGarden',
     })).rejects.toMatchObject({ status: 400 });
     expect(query).not.toHaveBeenCalled();
+    expect(publishCheckIn).not.toHaveBeenCalled();
+  });
+
+  it('keeps the API successful when realtime delivery fails after persistence', async () => {
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    publishCheckIn.mockRejectedValueOnce(new Error('redis unavailable'));
+
+    await expect(service.create('user-1', request)).resolves.toMatchObject({
+      placeLabel: 'Sea Garden',
+    });
   });
 });
