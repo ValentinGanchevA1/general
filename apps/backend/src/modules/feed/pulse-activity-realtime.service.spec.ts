@@ -75,6 +75,10 @@ describe('PulseActivityRealtimeService', () => {
       120,
       'NX',
     );
+    const recipientSql = query.mock.calls[1]?.[0] as string;
+    expect(recipientSql).toContain('user_blocks');
+    expect(recipientSql).toContain('friendships');
+    expect(recipientSql).toContain("$2 = 'nearby'");
     expect(publish).toHaveBeenCalledTimes(1);
     const payload = publish.mock.calls[0]?.[1] as string;
     expect(payload).not.toContain('43.2047');
