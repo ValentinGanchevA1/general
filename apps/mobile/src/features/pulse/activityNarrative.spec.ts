@@ -56,4 +56,23 @@ describe('getActivitySentence', () => {
       placeLabel: 'Varna',
     });
   });
+
+  it('renders place trends without inventing an actor identity', () => {
+    expect(getActivitySentence(item({
+      type: 'place',
+      actorId: null,
+      actorName: null,
+      narrative: {
+        kind: 'place_trending',
+        verb: 'is active at',
+        objectLabel: 'Sea Garden',
+        placeLabel: null,
+      },
+    }))).toEqual({
+      actor: 'Sea Garden',
+      verb: 'is getting active',
+      objectLabel: null,
+      placeLabel: null,
+    });
+  });
 });
