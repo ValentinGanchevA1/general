@@ -6,7 +6,7 @@ import React, {
   useSyncExternalStore,
 } from 'react';
 import type { Region } from 'react-native-maps';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   BottomSheetModal,
@@ -26,6 +26,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useSheetBackdrop, useSheetChrome } from '@/components/sheets';
 import { PlaceMapPreviewSheet } from '@/features/places/PlaceMapPreviewSheet';
 import { setPendingPlaceCheckIn } from '@/features/places/pendingPlaceCheckIn';
+import { savedPlaceMapFocusStore } from '@/features/places/savedPlaceMapFocus.store';
 import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
 import { usePlaceMapDiscovery } from '@/features/places/usePlaceMapDiscovery';
 import { useSavedPlacesMapOverlay } from '@/features/places/useSavedPlacesMapOverlay';
@@ -65,6 +66,8 @@ const MAPLIBRE_STYLE_RUNTIME = resolveMapLibreStyleRuntime({
 });
 
 const PLACE_PREVIEW_SNAP_POINTS: Array<string | number> = ['34%'];
+const SAVED_PLACE_FOCUS_ZOOM = 15;
+const SAVED_PLACE_FOCUS_DURATION_MS = 360;
 
 function regionToViewport(region: Region | null): Viewport | null {
   if (region == null) return null;
@@ -103,7 +106,9 @@ export const NexaMapScreenSurface = React.forwardRef<
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const sheetChrome = useSheetChrome();
   const renderBackdrop = useSheetBackdrop(0.35);
+  const runtimeMapRef = useRef<NexaMapController | null>(null);
   const placeSheetRef = useRef<BottomSheetModal>(null);
+  const handledFocusRequestIdRef = useRef<number | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<PlaceMapEntityPoint | null>(null);
   const [settledRegion, setSettledRegion] = useState<Region | null>(null);
   const viewport = useMemo(() => regionToViewport(settledRegion), [settledRegion]);
@@ -113,6 +118,20 @@ export const NexaMapScreenSurface = React.forwardRef<
     savedPlacesMapLayerStore.getSnapshot,
     savedPlacesMapLayerStore.getSnapshot,
   );
+  const savedPlaceFocusRequest = useSyncExternalStore(
+    savedPlaceMapFocusStore.subscribe,
+    savedPlaceMapFocusStore.getSnapshot,
+    savedPlaceMapFocusStore.getSnapshot,
+  );
+
+  React.useImperativeHandle(ref, () => ({
+    flyTo(target, options) {
+      runtimeMapRef.current?.flyTo(target, options);
+    },
+    fitViewport(targetViewport, options) {
+      runtimeMapRef.current?.fitViewport(targetViewport, options);
+    },
+  }), []);
 
   const placeDiscovery = usePlaceMapDiscovery({
     viewport,
@@ -123,13 +142,21 @@ export const NexaMapScreenSurface = React.forwardRef<
     enabled: savedPlacesEnabled,
     viewport,
   });
+  const privateSavedPlacePoints = useMemo(() => {
+    const focused = savedPlaceFocusRequest?.point;
+    if (focused == null) return savedPlacePoints;
+    return [
+      focused,
+      ...savedPlacePoints.filter((point) => point.id !== focused.id),
+    ];
+  }, [savedPlaceFocusRequest, savedPlacePoints]);
   const mergedPoints = useMemo(
     () => mergeMapDiscoveryPoints(
       points,
       placeDiscovery.data?.points ?? [],
-      savedPlacePoints,
+      privateSavedPlacePoints,
     ),
-    [placeDiscovery.data?.points, points, savedPlacePoints],
+    [placeDiscovery.data?.points, points, privateSavedPlacePoints],
   );
 
   const mapLibreEnabled = useAppSelector(
@@ -158,6 +185,28 @@ export const NexaMapScreenSurface = React.forwardRef<
     requestAnimationFrame(() => placeSheetRef.current?.present());
   }, []);
 
+  useFocusEffect(useCallback(() => {
+    if (savedPlaceFocusRequest == null) return;
+    if (handledFocusRequestIdRef.current === savedPlaceFocusRequest.requestId) return;
+    handledFocusRequestIdRef.current = savedPlaceFocusRequest.requestId;
+
+    const frame = requestAnimationFrame(() => {
+      runtimeMapRef.current?.flyTo(
+        {
+          center: {
+            latitude: savedPlaceFocusRequest.point.lat,
+            longitude: savedPlaceFocusRequest.point.lng,
+          },
+          zoom: SAVED_PLACE_FOCUS_ZOOM,
+        },
+        { durationMs: SAVED_PLACE_FOCUS_DURATION_MS },
+      );
+      openPlacePreview(savedPlaceFocusRequest.point);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [openPlacePreview, savedPlaceFocusRequest]));
+
   const openPlaceDetails = useCallback((): void => {
     if (selectedPlace == null) return;
     const placeId = selectedPlace.id;
@@ -181,7 +230,7 @@ export const NexaMapScreenSurface = React.forwardRef<
   return (
     <>
       <NexaMapRuntimeSurface
-        ref={ref}
+        ref={runtimeMapRef}
         {...props}
         selectedEntityKey={activeSelectionKey}
         dimUnselected={shouldDimUnselected}
@@ -214,7 +263,10 @@ export const NexaMapScreenSurface = React.forwardRef<
         snapPoints={PLACE_PREVIEW_SNAP_POINTS}
         enableDynamicSizing={false}
         enablePanDownToClose
-        onDismiss={() => setSelectedPlace(null)}
+        onDismiss={() => {
+          setSelectedPlace(null);
+          savedPlaceMapFocusStore.clear();
+        }}
         backdropComponent={renderBackdrop}
         backgroundStyle={sheetChrome.background}
         handleIndicatorStyle={sheetChrome.handle}
