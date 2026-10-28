@@ -1,6 +1,6 @@
 import type { ActivityItem, FeedResponse } from '@g88/shared';
 
-import pulseReducer, { activityReceived, fetchFeed } from './pulseSlice';
+import pulseReducer, { activityReceived, activityRemoved, fetchFeed } from './pulseSlice';
 
 const activity = (id: string, createdAt: string): ActivityItem => ({
   id,
@@ -68,5 +68,26 @@ describe('pulse realtime activity', () => {
     );
 
     expect(fulfilled.items.map((item) => item.id)).toEqual(['place:live', 'place:rest']);
+  });
+
+  it('does not resurrect activity removed while a REST fetch is in flight', () => {
+    const id = 'event_join:event-1:user-2';
+    const existing = pulseReducer(undefined, activityReceived(activity(
+      id,
+      '2026-10-28T01:10:00.000Z',
+    )));
+    const pending = pulseReducer(existing, fetchFeed.pending('request-2', undefined));
+    const removed = pulseReducer(pending, activityRemoved(id));
+    const staleResponse: FeedResponse = {
+      items: [activity(id, '2026-10-28T01:10:00.000Z')],
+      nextSince: '2026-10-28T01:10:00.000Z',
+    };
+
+    const fulfilled = pulseReducer(
+      removed,
+      fetchFeed.fulfilled(staleResponse, 'request-2', undefined),
+    );
+
+    expect(fulfilled.items).toHaveLength(0);
   });
 });
