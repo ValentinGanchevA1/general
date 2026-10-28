@@ -190,22 +190,11 @@ export class StoriesController {
   }
 
   private async assertUploadedStoryObject(userId: string, dto: CreateStoryDto): Promise<void> {
-    let key: string;
+    let metadata:
+      | { key: string; contentLength: number; contentType: string | null }
+      | null;
     try {
-      key = new URL(dto.mediaUrl).pathname.replace(/^\//, '');
-    } catch {
-      // StoriesService owns canonical URL/trust validation and error copy.
-      return;
-    }
-
-    if (!key.startsWith(`stories/${userId}/`)) {
-      // Do not probe S3 for an untrusted path; StoriesService will reject it.
-      return;
-    }
-
-    let metadata: { contentLength: number; contentType: string | null };
-    try {
-      metadata = await this.s3.storyObjectMetadata(key);
+      metadata = await this.s3.storyObjectMetadata(userId, dto.mediaUrl);
     } catch {
       // Fail closed, but preserve the presign token so a transient S3 outage can be retried.
       throw new ServiceUnavailableException({
@@ -214,6 +203,13 @@ export class StoriesController {
       });
     }
 
+    if (!metadata) {
+      // Do not probe or make trust decisions for non-canonical URLs. StoriesService
+      // owns the Redis-bound URL validation and canonical public error copy.
+      return;
+    }
+
+    const { key } = metadata;
     const contentType = metadata.contentType?.toLowerCase() ?? '';
     const actualMediaType = contentType.startsWith('video/') ? 'video' : 'image';
     const invalid =
