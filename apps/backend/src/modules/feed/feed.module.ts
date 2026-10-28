@@ -7,6 +7,7 @@ import { FeedController } from './feed.controller';
 import { FeedService } from './feed.service';
 import { MapTilerPlaceAttestationService } from './maptiler-place-attestation.service';
 import { PlaceCatalogService } from './place-catalog.service';
+import { PlaceController } from './place.controller';
 import { PulseActivityRealtimeService } from './pulse-activity-realtime.service';
 import { PulseCheckInService } from './pulse-check-in.service';
 import { PulseDiscoveryFeedService } from './pulse-discovery-feed.service';
@@ -14,7 +15,7 @@ import { PulsePlaceTrendingService } from './pulse-place-trending.service';
 
 @Module({
   imports: [AuthModule, RealtimeModule],
-  controllers: [FeedController],
+  controllers: [FeedController, PlaceController],
   providers: [
     FeedService,
     MapTilerPlaceAttestationService,
