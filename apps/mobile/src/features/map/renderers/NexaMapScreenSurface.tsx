@@ -1,12 +1,31 @@
-import React, { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
+import React, {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import type { Region } from 'react-native-maps';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { ClusterPoint, DiscoveryPoint, EntityPoint, Viewport } from '@g88/shared';
+import {
+  BottomSheetModal,
+  BottomSheetView,
+} from '@gorhom/bottom-sheet';
+import type {
+  ClusterPoint,
+  DiscoveryPoint,
+  EntityPoint,
+  PlaceMapEntityPoint,
+  Viewport,
+} from '@g88/shared';
 
 import { Config } from '@/config';
 import { useAppSelector } from '@/hooks/redux';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { useSheetBackdrop, useSheetChrome } from '@/components/sheets';
+import { PlaceMapPreviewSheet } from '@/features/places/PlaceMapPreviewSheet';
+import { setPendingPlaceCheckIn } from '@/features/places/pendingPlaceCheckIn';
 import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
 import { usePlaceMapDiscovery } from '@/features/places/usePlaceMapDiscovery';
 import { useSavedPlacesMapOverlay } from '@/features/places/useSavedPlacesMapOverlay';
@@ -45,6 +64,8 @@ const MAPLIBRE_STYLE_RUNTIME = resolveMapLibreStyleRuntime({
   region: Config.MAPTILER_REGION,
 });
 
+const PLACE_PREVIEW_SNAP_POINTS = ['34%'] as const;
+
 function regionToViewport(region: Region | null): Viewport | null {
   if (region == null) return null;
   const halfLat = region.latitudeDelta / 2;
@@ -71,6 +92,8 @@ export const NexaMapScreenSurface = React.forwardRef<
     onEntityPress,
     onClusterPress,
     onRegionChangeComplete,
+    selectedEntityKey,
+    dimUnselected,
     ...props
   },
   ref,
@@ -78,6 +101,10 @@ export const NexaMapScreenSurface = React.forwardRef<
   useMapRendererPolicyLifecycle();
 
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const sheetChrome = useSheetChrome();
+  const renderBackdrop = useSheetBackdrop(0.35);
+  const placeSheetRef = useRef<BottomSheetModal>(null);
+  const [selectedPlace, setSelectedPlace] = useState<PlaceMapEntityPoint | null>(null);
   const [settledRegion, setSettledRegion] = useState<Region | null>(null);
   const viewport = useMemo(() => regionToViewport(settledRegion), [settledRegion]);
   const zoom = useMemo(() => approxZoom(settledRegion), [settledRegion]);
@@ -122,27 +149,86 @@ export const NexaMapScreenSurface = React.forwardRef<
     onRegionChangeComplete(region);
   }, [onRegionChangeComplete]);
 
+  const dismissPlacePreview = useCallback((): void => {
+    placeSheetRef.current?.dismiss();
+  }, []);
+
+  const openPlacePreview = useCallback((point: PlaceMapEntityPoint): void => {
+    setSelectedPlace(point);
+    requestAnimationFrame(() => placeSheetRef.current?.present());
+  }, []);
+
+  const openPlaceDetails = useCallback((): void => {
+    if (selectedPlace == null) return;
+    const placeId = selectedPlace.id;
+    dismissPlacePreview();
+    navigation.navigate('PlaceDetail', { placeId });
+  }, [dismissPlacePreview, navigation, selectedPlace]);
+
+  const openPlaceCheckIn = useCallback((): void => {
+    if (selectedPlace == null) return;
+    const placeId = selectedPlace.id;
+    setPendingPlaceCheckIn(placeId);
+    dismissPlacePreview();
+    navigation.navigate('PlaceDetail', { placeId });
+  }, [dismissPlacePreview, navigation, selectedPlace]);
+
+  const activeSelectionKey = selectedPlace == null
+    ? selectedEntityKey
+    : `place:${selectedPlace.id}`;
+  const shouldDimUnselected = selectedPlace != null || dimUnselected;
+
   return (
-    <NexaMapRuntimeSurface
-      ref={ref}
-      {...props}
-      points={mergedPoints}
-      onRegionChangeComplete={handleRegionChangeComplete}
-      onClusterPress={(point) => onClusterPress(point)}
-      onEntityPress={(point) => {
-        if (point.kind === 'place') {
-          navigation.navigate('PlaceDetail', { placeId: point.id });
-          return;
+    <>
+      <NexaMapRuntimeSurface
+        ref={ref}
+        {...props}
+        selectedEntityKey={activeSelectionKey}
+        dimUnselected={shouldDimUnselected}
+        points={mergedPoints}
+        onRegionChangeComplete={handleRegionChangeComplete}
+        onClusterPress={(point) => {
+          if (selectedPlace != null) dismissPlacePreview();
+          onClusterPress(point);
+        }}
+        onEntityPress={(point) => {
+          if (point.kind === 'place') {
+            openPlacePreview(point);
+            return;
+          }
+          if (selectedPlace != null) dismissPlacePreview();
+          onEntityPress(point);
+        }}
+        requestedRenderer={requestedRenderer}
+        mapLibreAvailable={NEXA_MAP_RENDERER_ROLLOUT.mapLibreAvailable}
+        mapLibreStyle={
+          MAPLIBRE_STYLE_RUNTIME.status === 'ready'
+            ? MAPLIBRE_STYLE_RUNTIME.styleUrl
+            : null
         }
-        onEntityPress(point);
-      }}
-      requestedRenderer={requestedRenderer}
-      mapLibreAvailable={NEXA_MAP_RENDERER_ROLLOUT.mapLibreAvailable}
-      mapLibreStyle={
-        MAPLIBRE_STYLE_RUNTIME.status === 'ready'
-          ? MAPLIBRE_STYLE_RUNTIME.styleUrl
-          : null
-      }
-    />
+      />
+
+      <BottomSheetModal
+        ref={placeSheetRef}
+        index={0}
+        snapPoints={PLACE_PREVIEW_SNAP_POINTS}
+        enableDynamicSizing={false}
+        enablePanDownToClose
+        onDismiss={() => setSelectedPlace(null)}
+        backdropComponent={renderBackdrop}
+        backgroundStyle={sheetChrome.background}
+        handleIndicatorStyle={sheetChrome.handle}
+      >
+        <BottomSheetView style={sheetChrome.content}>
+          {selectedPlace != null ? (
+            <PlaceMapPreviewSheet
+              point={selectedPlace}
+              onCheckIn={openPlaceCheckIn}
+              onViewDetails={openPlaceDetails}
+            />
+          ) : null}
+        </BottomSheetView>
+      </BottomSheetModal>
+    </>
   );
 });
