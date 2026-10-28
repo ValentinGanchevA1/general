@@ -449,18 +449,21 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(this.cellRoom(evt.cellId)).emit('story:new', evt);
   }
 
-  emitLocationShareEnded(
+  async emitLocationShareEnded(
     conversationId: string,
     sessionId: string,
     reason: 'expired' | 'timeout' | 'blocked' | 'conversation_closed' | 'stopped',
     endedAt: string,
-  ): void {
-    this.server.to(this.conversationRoom(conversationId)).emit('location:share:ended', {
-      sessionId,
-      conversationId,
-      reason,
-      endedAt,
-    });
+  ): Promise<void> {
+    const recipients = await this.authorizedConversationRecipients(conversationId);
+    for (const userId of recipients) {
+      this.server.to(this.userRoom(userId)).emit('location:share:ended', {
+        sessionId,
+        conversationId,
+        reason,
+        endedAt,
+      });
+    }
   }
 
   async emitFriendRequest(toUserId: string, evt: FriendRequestEvent): Promise<void> {
