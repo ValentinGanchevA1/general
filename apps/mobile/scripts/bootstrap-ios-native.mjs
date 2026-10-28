@@ -101,6 +101,39 @@ try {
     writeFileSync(infoPlistPath, infoPlist, 'utf8');
   }
 
+  if (!readFileSync(infoPlistPath, 'utf8').includes(schemeMarker)) {
+    throw new Error('[ios-bootstrap] NEXA URL scheme registration is missing from Info.plist.');
+  }
+
+  const appDelegatePath = path.join(iosRoot, APP_NAME, 'AppDelegate.swift');
+  let appDelegate = readFileSync(appDelegatePath, 'utf8');
+  const linkingForwarderMarker = 'RCTLinkingManager.application(app, open: url, options: options)';
+  if (!appDelegate.includes(linkingForwarderMarker)) {
+    const reactNativeDelegateMarker = '\n}\n\nclass ReactNativeDelegate:';
+    if (!appDelegate.includes(reactNativeDelegateMarker)) {
+      throw new Error('[ios-bootstrap] could not locate the AppDelegate class boundary.');
+    }
+    const linkingForwarder = [
+      '',
+      '  func application(',
+      '    _ app: UIApplication,',
+      '    open url: URL,',
+      '    options: [UIApplication.OpenURLOptionsKey: Any] = [:]',
+      '  ) -> Bool {',
+      '    RCTLinkingManager.application(app, open: url, options: options)',
+      '  }',
+    ].join('\n');
+    appDelegate = appDelegate.replace(
+      reactNativeDelegateMarker,
+      `${linkingForwarder}\n}\n\nclass ReactNativeDelegate:`,
+    );
+    writeFileSync(appDelegatePath, appDelegate, 'utf8');
+  }
+
+  if (!readFileSync(appDelegatePath, 'utf8').includes(linkingForwarderMarker)) {
+    throw new Error('[ios-bootstrap] NEXA deep-link forwarding is missing from AppDelegate.swift.');
+  }
+
   console.log(`[ios-bootstrap] native iOS shell ready at ${iosRoot}`);
 } finally {
   rmSync(tempRoot, {recursive: true, force: true});
