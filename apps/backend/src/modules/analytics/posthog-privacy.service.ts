@@ -33,10 +33,6 @@ interface PostHogDeletionResponse {
   submission_id?: string;
 }
 
-interface PostHogDeletionListResponse {
-  results?: PostHogDeletionResponse[];
-}
-
 type ReconciliationResult =
   | { state: 'found'; request: PostHogDeletionResponse }
   | { state: 'not_found' }
@@ -66,6 +62,19 @@ function boundedLimit(limit: number): number {
 
 function quoteLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
+}
+
+function deletionListItems(payload: unknown): PostHogDeletionResponse[] | null {
+  const candidate = Array.isArray(payload)
+    ? payload
+    : typeof payload === 'object' && payload !== null && 'results' in payload
+      ? (payload as { results?: unknown }).results
+      : null;
+
+  if (!Array.isArray(candidate)) return null;
+  return candidate.filter(
+    (item): item is PostHogDeletionResponse => typeof item === 'object' && item !== null,
+  );
 }
 
 export function buildPostHogSubjectDeletionQuery(subjectHash: string): string {
@@ -211,8 +220,8 @@ export class PostHogPrivacyService {
         );
         if (!response.ok) return { state: 'unavailable' };
 
-        const body = (await response.json()) as PostHogDeletionListResponse;
-        const results = Array.isArray(body.results) ? body.results : [];
+        const results = deletionListItems(await response.json());
+        if (results == null) return { state: 'unavailable' };
         const match = results.find(
           (request) => request.submission_id === submissionId && request.id != null && UUID_RE.test(request.id),
         );
