@@ -157,6 +157,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.logger.log(`socket disconnected: user=${userId} sid=${client.id}`);
   }
 
+  getConnectedSocketCount(): number {
+    return this.server?.engine?.clientsCount ?? 0;
+  }
+
   @SubscribeMessage('presence:update')
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onPresenceUpdate(
