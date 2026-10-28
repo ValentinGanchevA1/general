@@ -12,6 +12,7 @@ import type { PulseFilter, RootStackParamList, TabParamList } from '@/navigation
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {
+	activityReceived,
 	clearCheckInError,
 	clearPendingFilter,
 	createPulseCheckIn,
@@ -83,6 +84,7 @@ export function PulseScreen(): React.JSX.Element {
 	const loadStories = useCallback(() => { if (!myCoords) return; void dispatch(fetchNearbyStories({ viewport: viewportAround(myCoords.lat, myCoords.lng), zoom: 14 })); }, [dispatch, myCoords]);
 	useFocusEffect(useCallback(() => { void requestPermission(); load(); loadStories(); }, [requestPermission, load, loadStories]));
 	useEffect(() => on('story:new', (event) => { dispatch(storyReceived(event)); }), [on, dispatch]);
+	useEffect(() => on('pulse:activity', (event) => { dispatch(activityReceived(event.item)); }), [on, dispatch]);
 	const filtered = useMemo(() => { const definition = FILTERS.find((candidate) => candidate.key === filter); let next = definition?.type ? items.filter((item) => item.type === definition.type) : items; if (filter === 'nearby') next = [...next].sort((left, right) => (left.distanceM ?? Number.POSITIVE_INFINITY) - (right.distanceM ?? Number.POSITIVE_INFINITY) || Date.parse(right.createdAt) - Date.parse(left.createdAt)); return next; }, [items, filter]);
 	const onTap = useCallback((item: ActivityItem): void => { const { screen, params } = item.deepLink; if (screen === 'ListingDetail') { openRootScreen(navigation, 'ListingDetail', params); return; } if (screen === 'EventDetail') { openRootScreen(navigation, 'EventDetail', params); return; } if (screen === 'Main') { navigation.navigate('Main', params as never); return; } (navigation.navigate as (screenName: string, screenParams?: object) => void)(screen, params); }, [navigation]);
 	const storyEligibility = useMemo(() => { if (!profile) return { allowed: false as const, reason: 'email_unverified' as const }; return canPostStory({ verification: profile.verification, createdAt: profile.createdAt, strikePoints: profile.strikePoints ?? 0, storySuspendedUntil: profile.storySuspendedUntil ?? null }); }, [profile]);
