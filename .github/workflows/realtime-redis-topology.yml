@@ -46,6 +46,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build shared types
         run: pnpm --filter @g88/shared build
+      - name: Typecheck backend adapter integration
+        run: pnpm --filter @g88/backend typecheck
       - name: Run Redis multi-instance topology regression
         run: >-
           pnpm --filter @g88/backend exec jest
