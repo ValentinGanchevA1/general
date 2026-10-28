@@ -7,8 +7,6 @@ const { io } = require('socket.io-client');
 const ALLOWED_ORIGINS = new Set([
   'https://g88-api.onrender.com',
   'https://api.g88.app',
-  'http://127.0.0.1:3000',
-  'http://localhost:3000',
 ]);
 
 function resolveBase(raw) {
