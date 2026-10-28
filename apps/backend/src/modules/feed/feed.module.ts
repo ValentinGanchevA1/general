@@ -8,6 +8,7 @@ import { FeedService } from './feed.service';
 import { PulseActivityRealtimeService } from './pulse-activity-realtime.service';
 import { PulseCheckInService } from './pulse-check-in.service';
 import { PulseDiscoveryFeedService } from './pulse-discovery-feed.service';
+import { PulsePlaceTrendingService } from './pulse-place-trending.service';
 
 @Module({
   imports: [AuthModule, RealtimeModule],
@@ -17,6 +18,7 @@ import { PulseDiscoveryFeedService } from './pulse-discovery-feed.service';
     PulseActivityRealtimeService,
     PulseCheckInService,
     PulseDiscoveryFeedService,
+    PulsePlaceTrendingService,
   ],
   exports: [PulseActivityRealtimeService],
 })
