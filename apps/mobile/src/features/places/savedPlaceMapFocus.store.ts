@@ -1,4 +1,8 @@
-import type { NexaSavedPlaceSummary, PlaceMapEntityPoint } from '@g88/shared';
+import type {
+  NexaPlaceDetail,
+  NexaSavedPlaceSummary,
+  PlaceMapEntityPoint,
+} from '@g88/shared';
 
 type Listener = () => void;
 
@@ -15,7 +19,15 @@ function emit(): void {
   listeners.forEach((listener) => listener());
 }
 
-function toMapPoint(place: NexaSavedPlaceSummary): PlaceMapEntityPoint {
+function setPoint(point: PlaceMapEntityPoint): void {
+  request = {
+    requestId: nextRequestId++,
+    point,
+  };
+  emit();
+}
+
+function savedSummaryToMapPoint(place: NexaSavedPlaceSummary): PlaceMapEntityPoint {
   return {
     kind: 'place',
     id: place.id,
@@ -31,9 +43,25 @@ function toMapPoint(place: NexaSavedPlaceSummary): PlaceMapEntityPoint {
   };
 }
 
+function placeDetailToMapPoint(place: NexaPlaceDetail): PlaceMapEntityPoint {
+  return {
+    kind: 'place',
+    id: place.id,
+    lat: place.approximateLocation.lat,
+    lng: place.approximateLocation.lng,
+    meta: {
+      canonicalLabel: place.canonicalLabel,
+      trending: place.trending,
+      recentActivityAt: place.recentActivityAt,
+      locationPrecision: 'coarse',
+      saved: place.saved,
+    },
+  };
+}
+
 /**
- * Session-scoped, viewer-private handoff from Saved Places to Map.
- * The payload is intentionally limited to the existing coarse place summary.
+ * Session-scoped, viewer-private handoff to Map.
+ * Payloads are intentionally limited to existing coarse NEXA place data.
  */
 export const savedPlaceMapFocusStore = {
   getSnapshot(): SavedPlaceMapFocusRequest | null {
@@ -46,11 +74,11 @@ export const savedPlaceMapFocusStore = {
   },
 
   request(place: NexaSavedPlaceSummary): void {
-    request = {
-      requestId: nextRequestId++,
-      point: toMapPoint(place),
-    };
-    emit();
+    setPoint(savedSummaryToMapPoint(place));
+  },
+
+  requestDetail(place: NexaPlaceDetail): void {
+    setPoint(placeDetailToMapPoint(place));
   },
 
   clear(): void {
