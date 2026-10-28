@@ -42,6 +42,9 @@ type ReconciliationResult =
   | { state: 'unavailable' };
 
 type PostHogConfig = { apiKey: string; projectId: string; appHost: string };
+type PostHogRequestInit = Omit<RequestInit, 'headers' | 'signal'> & {
+  headers?: Record<string, string>;
+};
 
 function enabled(): boolean {
   return process.env.POSTHOG_PRIVACY_ENABLED?.trim().toLowerCase() === 'true';
@@ -256,24 +259,39 @@ export class PostHogPrivacyService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private async postHogFetch(
+    config: PostHogConfig,
+    url: string,
+    init: PostHogRequestInit = {},
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const { headers = {}, ...requestInit } = init;
+    try {
+      return await fetch(url, {
+        ...requestInit,
+        headers: { Authorization: `Bearer ${config.apiKey}`, ...headers },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   private async fetchRequest(
     requestId: string,
     config: PostHogConfig,
   ): Promise<PostHogDeletionResponse | null> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(
+      const response = await this.postHogFetch(
+        config,
         `${config.appHost}/api/projects/${encodeURIComponent(config.projectId)}/data_deletion_requests/${encodeURIComponent(requestId)}/`,
-        { headers: { Authorization: `Bearer ${config.apiKey}` }, signal: controller.signal },
       );
       if (!response.ok) return null;
       return deletionResponse(await response.json());
     } catch {
       this.logger.warn('Could not read PostHog deletion status; the submitted request will be polled again.');
       return null;
-    } finally {
-      clearTimeout(timeout);
     }
   }
 
@@ -284,12 +302,10 @@ export class PostHogPrivacyService implements OnModuleInit, OnModuleDestroy {
   ): Promise<ReconciliationResult> {
     for (let page = 0; page < MAX_RECONCILIATION_PAGES; page += 1) {
       const offset = page * RECONCILIATION_PAGE_SIZE;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
       try {
-        const response = await fetch(
+        const response = await this.postHogFetch(
+          config,
           `${config.appHost}/api/projects/${encodeURIComponent(config.projectId)}/data_deletion_requests/?limit=${RECONCILIATION_PAGE_SIZE}&offset=${offset}`,
-          { headers: { Authorization: `Bearer ${config.apiKey}` }, signal: controller.signal },
         );
         if (!response.ok) return { state: 'unavailable' };
 
@@ -301,8 +317,6 @@ export class PostHogPrivacyService implements OnModuleInit, OnModuleDestroy {
       } catch {
         this.logger.warn('Could not reconcile a PostHog deletion retry; destructive resubmission is deferred.');
         return { state: 'unavailable' };
-      } finally {
-        clearTimeout(timeout);
       }
     }
 
@@ -336,19 +350,14 @@ export class PostHogPrivacyService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(
+      const response = await this.postHogFetch(
+        config,
         `${config.appHost}/api/projects/${encodeURIComponent(config.projectId)}/data_deletion_requests/`,
         {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${config.apiKey}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query, submission_id: row.submission_id }),
-          signal: controller.signal,
         },
       );
 
@@ -373,8 +382,6 @@ export class PostHogPrivacyService implements OnModuleInit, OnModuleDestroy {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'unknown PostHog deletion error';
       await this.scheduleRetry(row.id, message);
-    } finally {
-      clearTimeout(timeout);
     }
   }
 
