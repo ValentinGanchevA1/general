@@ -35,6 +35,7 @@ function loadedState(saved = false): PlaceDetailsState {
         loadId: null,
         saveId: null,
         error: null,
+        saveError: null,
         receivedAt: 10,
       },
     },
@@ -113,6 +114,27 @@ describe('placeDetailSlice', () => {
     expect(state.saved.items.map((item) => item.id)).toEqual([placeId, other.id]);
   });
 
+  it('tracks a save mutation without requiring loaded place detail', () => {
+    let state = reducer(undefined, setPlaceSaved.pending('map-save', { placeId, saved: true }));
+
+    expect(state.entries[placeId]).toMatchObject({
+      detail: null,
+      saveId: 'map-save',
+      saveError: null,
+    });
+
+    state = reducer(
+      state,
+      setPlaceSaved.fulfilled({ placeId, saved: true }, 'map-save', { placeId, saved: true }),
+    );
+
+    expect(state.entries[placeId]).toMatchObject({
+      detail: null,
+      saveId: null,
+      saveError: null,
+    });
+  });
+
   it('updates only the private saved flag after a successful mutation', () => {
     let state = reducer(loadedState(false), setPlaceSaved.pending('save-1', { placeId, saved: true }));
     state = reducer(
@@ -122,6 +144,7 @@ describe('placeDetailSlice', () => {
 
     expect(state.entries[placeId]?.detail).toMatchObject({ id: placeId, saved: true });
     expect(state.entries[placeId]?.saveId).toBeNull();
+    expect(state.entries[placeId]?.saveError).toBeNull();
     expect(state.entries[placeId]?.error).toBeNull();
   });
 
@@ -144,6 +167,7 @@ describe('placeDetailSlice', () => {
 
     expect(state.entries[placeId]?.detail?.saved).toBe(true);
     expect(state.saved.items).toEqual([savedItem]);
+    expect(state.entries[placeId]?.saveError).toBe('Could not remove this saved place.');
     expect(state.entries[placeId]?.error).toBe('Could not remove this saved place.');
   });
 });

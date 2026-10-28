@@ -21,10 +21,11 @@ import type {
 } from '@g88/shared';
 
 import { Config } from '@/config';
-import { useAppSelector } from '@/hooks/redux';
+import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useSheetBackdrop, useSheetChrome } from '@/components/sheets';
 import { PlaceMapPreviewSheet } from '@/features/places/PlaceMapPreviewSheet';
+import { loadSavedPlaces, setPlaceSaved } from '@/features/places/placeDetailSlice';
 import { setPendingPlaceCheckIn } from '@/features/places/pendingPlaceCheckIn';
 import { savedPlaceMapFocusStore } from '@/features/places/savedPlaceMapFocus.store';
 import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
@@ -103,13 +104,17 @@ export const NexaMapScreenSurface = React.forwardRef<
 ): React.JSX.Element {
   useMapRendererPolicyLifecycle();
 
+  const dispatch = useAppDispatch();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const sheetChrome = useSheetChrome();
   const renderBackdrop = useSheetBackdrop(0.35);
   const runtimeMapRef = useRef<NexaMapController | null>(null);
   const placeSheetRef = useRef<BottomSheetModal>(null);
   const handledFocusRequestIdRef = useRef<number | null>(null);
+  const privateSelectedPlaceIdRef = useRef<string | null>(null);
+  const selectedPlaceIdRef = useRef<string | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<PlaceMapEntityPoint | null>(null);
+  selectedPlaceIdRef.current = selectedPlace?.id ?? null;
   const [settledRegion, setSettledRegion] = useState<Region | null>(null);
   const viewport = useMemo(() => regionToViewport(settledRegion), [settledRegion]);
   const zoom = useMemo(() => approxZoom(settledRegion), [settledRegion]);
@@ -123,6 +128,11 @@ export const NexaMapScreenSurface = React.forwardRef<
     savedPlaceMapFocusStore.getSnapshot,
     savedPlaceMapFocusStore.getSnapshot,
   );
+  const selectedPlaceEntry = useAppSelector((state) => (
+    selectedPlace == null ? undefined : state.places.entries[selectedPlace.id]
+  ));
+  const saveLoading = selectedPlaceEntry?.saveId != null;
+  const saveError = selectedPlaceEntry?.saveError ?? null;
 
   React.useImperativeHandle(ref, () => ({
     flyTo(target, options) {
@@ -143,13 +153,21 @@ export const NexaMapScreenSurface = React.forwardRef<
     viewport,
   });
   const privateSavedPlacePoints = useMemo(() => {
+    const candidates: PlaceMapEntityPoint[] = [];
     const focused = savedPlaceFocusRequest?.point;
-    if (focused == null) return savedPlacePoints;
+    if (focused != null) candidates.push(focused);
+    if (
+      selectedPlace?.meta.saved === true &&
+      selectedPlace.id !== focused?.id
+    ) {
+      candidates.push(selectedPlace);
+    }
+    const candidateIds = new Set(candidates.map((point) => point.id));
     return [
-      focused,
-      ...savedPlacePoints.filter((point) => point.id !== focused.id),
+      ...candidates,
+      ...savedPlacePoints.filter((point) => !candidateIds.has(point.id)),
     ];
-  }, [savedPlaceFocusRequest, savedPlacePoints]);
+  }, [savedPlaceFocusRequest, savedPlacePoints, selectedPlace]);
   const mergedPoints = useMemo(
     () => mergeMapDiscoveryPoints(
       points,
@@ -181,6 +199,7 @@ export const NexaMapScreenSurface = React.forwardRef<
   }, []);
 
   const openPlacePreview = useCallback((point: PlaceMapEntityPoint): void => {
+    privateSelectedPlaceIdRef.current = point.meta.saved === true ? point.id : null;
     setSelectedPlace(point);
     requestAnimationFrame(() => placeSheetRef.current?.present());
   }, []);
@@ -208,10 +227,11 @@ export const NexaMapScreenSurface = React.forwardRef<
   }, [openPlacePreview, savedPlaceFocusRequest]));
 
   React.useEffect(() => {
-    if (savedPlacesEnabled || selectedPlace?.meta.saved !== true) return;
+    if (savedPlacesEnabled || selectedPlace == null) return;
+    if (privateSelectedPlaceIdRef.current !== selectedPlace.id) return;
     const frame = requestAnimationFrame(() => placeSheetRef.current?.dismiss());
     return () => cancelAnimationFrame(frame);
-  }, [savedPlacesEnabled, selectedPlace?.meta.saved]);
+  }, [savedPlacesEnabled, selectedPlace]);
 
   const openPlaceDetails = useCallback((): void => {
     if (selectedPlace == null) return;
@@ -227,6 +247,60 @@ export const NexaMapScreenSurface = React.forwardRef<
     dismissPlacePreview();
     navigation.navigate('PlaceDetail', { placeId });
   }, [dismissPlacePreview, navigation, selectedPlace]);
+
+  const togglePlaceSaved = useCallback(async (): Promise<void> => {
+    const point = selectedPlace;
+    if (point == null || saveLoading) return;
+    const nextSaved = point.meta.saved !== true;
+
+    const result = await dispatch(setPlaceSaved({ placeId: point.id, saved: nextSaved }));
+    if (!setPlaceSaved.fulfilled.match(result)) return;
+
+    const currentSelectedId = selectedPlaceIdRef.current;
+    if (
+      currentSelectedId !== point.id &&
+      currentSelectedId !== result.payload.placeId
+    ) {
+      return;
+    }
+
+    const wasPrivateSelected = privateSelectedPlaceIdRef.current === point.id;
+    const updatedPoint: PlaceMapEntityPoint = {
+      ...point,
+      id: result.payload.placeId,
+      meta: {
+        ...point.meta,
+        saved: result.payload.saved,
+      },
+    };
+
+    if (wasPrivateSelected) {
+      privateSelectedPlaceIdRef.current = result.payload.saved
+        ? result.payload.placeId
+        : null;
+    }
+    setSelectedPlace(updatedPoint);
+
+    if (result.payload.saved) {
+      if (savedPlacesEnabled) {
+        void dispatch(loadSavedPlaces({ reset: true }));
+      }
+      return;
+    }
+
+    savedPlaceMapFocusStore.clear();
+    if (point.meta.trending) return;
+
+    requestAnimationFrame(() => {
+      const selectedId = selectedPlaceIdRef.current;
+      if (
+        selectedId === point.id ||
+        selectedId === result.payload.placeId
+      ) {
+        placeSheetRef.current?.dismiss();
+      }
+    });
+  }, [dispatch, saveLoading, savedPlacesEnabled, selectedPlace]);
 
   const activeSelectionKey = selectedPlace == null
     ? selectedEntityKey
@@ -270,6 +344,7 @@ export const NexaMapScreenSurface = React.forwardRef<
         enableDynamicSizing={false}
         enablePanDownToClose
         onDismiss={() => {
+          privateSelectedPlaceIdRef.current = null;
           setSelectedPlace(null);
           savedPlaceMapFocusStore.clear();
         }}
@@ -282,7 +357,12 @@ export const NexaMapScreenSurface = React.forwardRef<
             <PlaceMapPreviewSheet
               point={selectedPlace}
               onCheckIn={openPlaceCheckIn}
+              onToggleSaved={() => {
+                void togglePlaceSaved();
+              }}
               onViewDetails={openPlaceDetails}
+              saveLoading={saveLoading}
+              saveError={saveError}
             />
           ) : null}
         </BottomSheetView>
