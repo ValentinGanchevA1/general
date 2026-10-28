@@ -4,7 +4,10 @@ import { DataSource } from 'typeorm';
 
 import type { ShareEventJoinResponse } from '@g88/shared';
 
-import { PulseActivityRealtimeService } from '../feed/pulse-activity-realtime.service';
+import {
+  PulseActivityRealtimeService,
+  type RemoveEventJoinActivityInput,
+} from '../feed/pulse-activity-realtime.service';
 
 interface ShareableJoinRow {
   event_id: string;
@@ -23,6 +26,12 @@ interface JoinShareStateRow {
   deleted_at: Date | null;
   status: 'going' | 'maybe' | 'declined' | null;
   pulse_shared_at: Date | null;
+}
+
+interface RevocableJoinRow {
+  event_id: string;
+  host_id: string;
+  location_h3_r7: string;
 }
 
 @Injectable()
@@ -121,6 +130,39 @@ export class EventPulseShareService {
     throw new ConflictException({
       code: 'event.pulse_unavailable',
       message: 'This event cannot be shared to Pulse right now.',
+    });
+  }
+
+  async prepareJoinRevocation(
+    userId: string,
+    eventId: string,
+  ): Promise<RemoveEventJoinActivityInput | null> {
+    const [row] = await this.db.query<RevocableJoinRow[]>(
+      `SELECT e.id AS event_id,
+              e.host_id,
+              e.location_h3_r7
+         FROM event_attendees a
+         JOIN events e ON e.id = a.event_id
+        WHERE a.event_id = $1
+          AND a.user_id = $2
+          AND a.status = 'going'
+          AND a.pulse_shared_at IS NOT NULL
+          AND e.deleted_at IS NULL
+          AND e.visibility = 'public'`,
+      [eventId, userId],
+    );
+    if (!row) return null;
+    return {
+      eventId: row.event_id,
+      actorId: userId,
+      eventHostId: row.host_id,
+      locationH3R7: row.location_h3_r7,
+    };
+  }
+
+  revokePreparedJoin(input: RemoveEventJoinActivityInput): void {
+    void this.pulseRealtime.removeEventJoin(input).catch((error: unknown) => {
+      this.logger.warn(`event join realtime removal failed: ${String(error)}`);
     });
   }
 }
