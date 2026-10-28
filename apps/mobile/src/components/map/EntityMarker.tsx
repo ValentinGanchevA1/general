@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import type { EntityPoint } from '@g88/shared';
+import type { MapEntityPoint } from '@g88/shared';
 
 import { mapSelectionVisibility } from '@/features/map/mapSelectionVisibility';
 import { NexaEntityMarker } from './NexaEntityMarker';
@@ -7,7 +7,7 @@ import type { NexaMarkerDensity } from './nexaEntityMarkerVisuals';
 import { entityVisualKey } from './markerVisualKeys';
 
 interface Props {
-  point: EntityPoint;
+  point: MapEntityPoint;
   density?: NexaMarkerDensity;
   showCaption?: boolean;
   selected?: boolean;
@@ -128,6 +128,19 @@ function EntityMarkerImpl({
         {...(showCaption ? { caption: formatEventBadge(point.meta.startsAt) } : {})}
         state={{ selected, isNew, own, dimmed, unavailable }}
         accessibilityLabel={`${point.meta.title}, event`}
+        reduceMotion={reduceMotion}
+      />
+    );
+  }
+
+  if (point.kind === 'place') {
+    return (
+      <NexaEntityMarker
+        entityType="place"
+        density={density}
+        {...(showCaption ? { caption: point.meta.canonicalLabel.slice(0, 16) } : {})}
+        state={{ selected, live: point.meta.trending, isNew, dimmed, unavailable }}
+        accessibilityLabel={`${point.meta.canonicalLabel}, active place, approximate location`}
         reduceMotion={reduceMotion}
       />
     );
