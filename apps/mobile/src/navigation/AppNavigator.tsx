@@ -1,6 +1,6 @@
 // apps/mobile/src/navigation/AppNavigator.tsx
-import React, { useEffect, useMemo, useRef } from 'react';
-import { View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Linking, View } from 'react-native';
 import { BrandLogo } from '@/components/Brand/BrandLogo';
 import { useNexaLaunchInteractionsReady } from '@/components/Brand/NexaLaunchSurfaceContext';
 import {
@@ -57,6 +57,7 @@ import type { AreaCategory, VerificationLevel } from '@g88/shared';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { restoreSession } from '@/features/auth/authSlice';
+import { placeDeepLinkQueue } from '@/features/places/placeDeepLink';
 import { registerPushToken, setupNotificationHandlers } from '@/lib/pushNotifications';
 import { pingGamification } from '@/features/gamification/useGamification';
 import { AmbientToastHost } from '@/components/AmbientToastHost';
@@ -196,13 +197,38 @@ export function AppNavigator(): React.JSX.Element {
 	const profileSetupComplete = useAppSelector((s) => s.auth.profileSetupComplete);
 	const launchInteractionsReady = useNexaLaunchInteractionsReady();
 	const prevUserRef = useRef<string | null>(null);
+	const [navigationReady, setNavigationReady] = useState(false);
+	const pendingPlaceDeepLinkId = useSyncExternalStore(
+		placeDeepLinkQueue.subscribe,
+		placeDeepLinkQueue.getSnapshot,
+		placeDeepLinkQueue.getSnapshot,
+	);
 	const navigationTheme = useMemo(() => buildNavigationTheme(themeColors, scheme === 'dark'), [themeColors, scheme]);
+
 	useEffect(() => { void dispatch(restoreSession()); }, [dispatch]);
+	useEffect(() => {
+		let active = true;
+		const acceptUrl = (url: string | null): void => {
+			if (!active || url == null) return;
+			placeDeepLinkQueue.enqueueUrl(url);
+		};
+		void Linking.getInitialURL().then(acceptUrl).catch(() => undefined);
+		const subscription = Linking.addEventListener('url', ({ url }) => acceptUrl(url));
+		return () => {
+			active = false;
+			subscription.remove();
+		};
+	}, []);
+	useEffect(() => {
+		if (!navigationReady || !userId || !profileSetupComplete || pendingPlaceDeepLinkId == null) return;
+		openViaRef('PlaceDetail', { placeId: pendingPlaceDeepLinkId });
+		placeDeepLinkQueue.clear(pendingPlaceDeepLinkId);
+	}, [navigationReady, pendingPlaceDeepLinkId, profileSetupComplete, userId]);
 	useEffect(() => { if (!userId) return; return setupNotificationHandlers((screen, params) => { openViaRef(screen as Parameters<typeof openViaRef>[0], params); }); }, [userId]);
 	useEffect(() => { if (!launchInteractionsReady) return; if (userId && prevUserRef.current !== userId) { prevUserRef.current = userId; void registerPushToken(); void pingGamification(); } if (!userId) prevUserRef.current = null; }, [launchInteractionsReady, userId]);
 	useEffect(() => { if (!launchInteractionsReady || !userId || restoring) return; let cancelled = false; const t = setTimeout(() => { void (async () => { const phone = await takePendingPhoneVerify(); if (cancelled || !phone) return; openViaRef('Verification', { initialPhone: phone }); })(); }, 700); return () => { cancelled = true; clearTimeout(t); }; }, [launchInteractionsReady, userId, restoring]);
 	if (restoring && user === null) return <View style={{ flex: 1, backgroundColor: themeColors.bg, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Loading" accessibilityRole="progressbar"><BrandLogo size={120} /></View>;
-	return <NavigationContainer ref={navigationRef} theme={navigationTheme} onReady={() => { navigationIntegration.registerNavigationContainer(navigationRef); }}><BottomSheetModalProvider>
+	return <NavigationContainer ref={navigationRef} theme={navigationTheme} onReady={() => { setNavigationReady(true); navigationIntegration.registerNavigationContainer(navigationRef); }}><BottomSheetModalProvider>
 		<Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themeColors.bg } }}>
 			{user ? <>{!profileSetupComplete && <Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} />}<Stack.Screen name="Main" component={MainTabs} /><Stack.Screen name="Chat" component={ChatScreen} /><Stack.Screen name="AlertComposer" component={AlertComposerScreen} /><Stack.Screen name="UserProfile" component={UserProfileScreen} /><Stack.Screen name="MutualFriends" component={MutualFriendsScreen} options={{ headerShown: false }} /><Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} /><Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} /><Stack.Screen name="Interactions" component={InteractionsScreen} options={{ headerShown: false }} /><Stack.Screen name="Gamification" component={GamificationNavigator} options={{ headerShown: false }} /><Stack.Screen name="Commerce" component={CommerceNavigator} options={{ headerShown: false }} /><Stack.Screen name="Account" component={AccountNavigator} options={{ headerShown: false }} /><Stack.Screen name="Social" component={SocialNavigator} options={{ headerShown: false }} /><Stack.Screen name="Events" component={EventsNavigator} options={{ headerShown: false }} /></> : <Stack.Screen name="Auth" component={AuthScreen} />}
 		</Stack.Navigator>{user ? <AmbientToastHost /> : null}<AppAlertHost />

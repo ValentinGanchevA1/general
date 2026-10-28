@@ -4,6 +4,7 @@ import type { PlaceMapEntityPoint } from '@g88/shared';
 
 import { NexaPlaceSheet } from '@/components/map/NexaSpatialEntitySheets';
 import type { NexaSpatialMetaItem } from '@/components/map/NexaSpatialSheet';
+import { sharePlace } from '@/features/places/sharePlace';
 import { useAppTheme } from '@/theme';
 
 export function PlaceMapPreviewSheet({
@@ -51,6 +52,9 @@ export function PlaceMapPreviewSheet({
   }, [point.meta.saved, point.meta.trending]);
 
   const saved = point.meta.saved === true;
+  const share = (): void => {
+    void sharePlace({ id: point.id, canonicalLabel: point.meta.canonicalLabel }).catch(() => undefined);
+  };
 
   return (
     <NexaPlaceSheet
@@ -76,6 +80,14 @@ export function PlaceMapPreviewSheet({
           accessibilityLabel: saved
             ? `Remove ${point.meta.canonicalLabel} from saved places`
             : `Save ${point.meta.canonicalLabel}`,
+        },
+        {
+          id: 'share',
+          label: 'Share',
+          icon: 'share-variant-outline',
+          onPress: share,
+          variant: 'quiet',
+          accessibilityLabel: `Share ${point.meta.canonicalLabel}`,
         },
         {
           id: 'details',
