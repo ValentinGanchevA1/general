@@ -29,6 +29,13 @@ describe('runtime diagnostics', () => {
     expect(readConnectedSocketCount({ server: { sockets: {} } })).toBe(0);
   });
 
+  it('returns zero for invalid socket count values', () => {
+    expect(
+      readConnectedSocketCount({ server: { sockets: { sockets: { size: Number.NaN } } } }),
+    ).toBe(0);
+    expect(readConnectedSocketCount({ server: { sockets: { sockets: { size: -1 } } } })).toBe(0);
+  });
+
   it('returns the connected Socket.IO map size once initialized', () => {
     expect(
       readConnectedSocketCount({
