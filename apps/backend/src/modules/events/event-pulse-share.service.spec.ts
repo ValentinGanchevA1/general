@@ -37,9 +37,11 @@ describe('EventPulseShareService', () => {
       alreadyShared: false,
     });
     const updateSql = query.mock.calls[0]?.[0] as string;
+    expect(updateSql).toContain('WITH updated AS (');
     expect(updateSql).toContain("a.status = 'going'");
     expect(updateSql).toContain("e.visibility = 'public'");
     expect(updateSql).toContain('e.starts_at > NOW()');
+    expect(updateSql).toContain('SELECT * FROM updated');
     expect(publishEventJoin).toHaveBeenCalledWith({
       eventId: 'event-1',
       actorId: 'user-1',
