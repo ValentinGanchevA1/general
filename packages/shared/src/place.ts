@@ -66,10 +66,13 @@ export type MapEntityKind = EntityKind | 'place';
 
 export interface PlaceMapMeta {
   canonicalLabel: string;
-  /** Place pins are discoverable only while a k-anonymous trend is active. */
-  trending: true;
-  recentActivityAt: string;
+  /** True only when the existing k-anonymous public trend is active. */
+  trending: boolean;
+  /** Null for inactive private saved-place pins. */
+  recentActivityAt: string | null;
   locationPrecision: 'coarse';
+  /** Private viewer-only marker state. Never a public popularity signal. */
+  saved?: boolean;
 }
 
 export interface PlaceMapEntityPoint {
