@@ -50,7 +50,7 @@ describe('PulseActivityRealtimeService', () => {
     );
   });
 
-  it('publishes once and fans out a recipient-specific distance without coordinates', async () => {
+  it('publishes once and fans out a recipient-specific check-in distance without coordinates', async () => {
     const cell = h3.latLngToCell(43.2047, 27.9105, 7);
     set.mockResolvedValueOnce('OK');
     query
@@ -96,6 +96,55 @@ describe('PulseActivityRealtimeService', () => {
           id: 'place:check-in-1',
           actorName: 'Valentin',
           distanceM: 0,
+        }),
+      }),
+    );
+  });
+
+  it('publishes an explicit event join with actor and host block gates', async () => {
+    const cell = h3.latLngToCell(43.2047, 27.9105, 7);
+    set.mockResolvedValueOnce('OK');
+    query
+      .mockResolvedValueOnce([{ display_name: 'Maria' }])
+      .mockResolvedValueOnce([{ id: 'viewer-2', location_h3_r7: cell }]);
+    publish.mockResolvedValueOnce(1);
+
+    await service.onModuleInit();
+    await service.publishEventJoin({
+      eventId: 'event-1',
+      actorId: 'user-2',
+      eventTitle: 'Sunset Meetup',
+      eventHostId: 'host-1',
+      locationH3R7: cell,
+      createdAt: '2026-10-28T01:05:00.000Z',
+    });
+
+    expect(set).toHaveBeenCalledWith(
+      'pulse:activity:published:event_join:event-1:user-2',
+      '1',
+      'EX',
+      120,
+      'NX',
+    );
+    const recipientSql = query.mock.calls[1]?.[0] as string;
+    expect(recipientSql.match(/user_blocks/g)).toHaveLength(2);
+    expect(publish).toHaveBeenCalledTimes(1);
+
+    const payload = publish.mock.calls[0]?.[1] as string;
+    expect(payload).not.toContain('locationH3R7');
+    expect(messageHandler).not.toBeNull();
+    messageHandler?.('pulse:activity:v1', payload);
+
+    expect(to).toHaveBeenCalledWith('user:viewer-2');
+    expect(emit).toHaveBeenCalledWith(
+      'pulse:activity',
+      expect.objectContaining({
+        item: expect.objectContaining({
+          id: 'event_join:event-1:user-2',
+          actorName: 'Maria',
+          type: 'event',
+          distanceM: 0,
+          narrative: expect.objectContaining({ kind: 'event_joined', verb: 'joined' }),
         }),
       }),
     );
