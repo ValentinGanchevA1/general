@@ -10,6 +10,8 @@ import helmet from 'helmet';
 import { scrubSentryPayload } from '@g88/shared';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { assertProductionCorsOrigins, corsOrigins } from './common/cors-origins';
+import { RedisIoAdapter } from './realtime/redis-io.adapter';
+import { shouldUseSocketIoRedisAdapter } from './realtime/socket-io-redis.config';
 
 loadEnv({ path: join(process.cwd(), '../../.env') });
 assertProductionCorsOrigins();
@@ -44,6 +46,18 @@ async function bootstrap(): Promise<void> {
   // configured allowlist as REST when CORS_ORIGINS comes from the repo .env.
   const { AppModule } = await import('./app.module');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+  app.enableShutdownHooks();
+
+  if (shouldUseSocketIoRedisAdapter()) {
+    const redisIoAdapter = new RedisIoAdapter(app);
+    await redisIoAdapter.connectToRedis();
+    app.useWebSocketAdapter(redisIoAdapter);
+    logger.log('Socket.IO Redis adapter enabled');
+  } else {
+    const message = 'Socket.IO Redis adapter disabled; realtime rooms are process-local';
+    if (process.env.NODE_ENV === 'production') logger.warn(message);
+    else logger.log(message);
+  }
 
   // Story video base64 (15s) + photos
   app.useBodyParser('json', { limit: '25mb' });
