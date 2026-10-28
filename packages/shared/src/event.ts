@@ -71,6 +71,8 @@ export interface EventDetail extends EventSummary {
   description: string | null;
   hostDisplayName: string;
   hostAvatarUrl: string | null;
+  /** When the caller explicitly shared their going RSVP to Pulse. */
+  myJoinSharedAt: string | null;
   /** First page of attendees (status = 'going'), capped server-side. */
   attendees: EventAttendee[];
 }
@@ -93,6 +95,13 @@ export interface RsvpResponse {
   eventId: string;
   status: RsvpStatus;
   attendeeCount: number;
+}
+
+/** Result of the explicit "Share to Pulse" action after a public Going RSVP. */
+export interface ShareEventJoinResponse {
+  eventId: string;
+  sharedAt: string;
+  alreadyShared: boolean;
 }
 
 // ─── Polls ────────────────────────────────────────────────────────────────
