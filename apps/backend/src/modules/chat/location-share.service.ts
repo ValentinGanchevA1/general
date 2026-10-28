@@ -138,6 +138,10 @@ export class LocationShareService {
       });
     }
 
+    // Re-check access on every update: membership and block state may change mid-session.
+    await this.assertParticipant(userId, session.conversation_id);
+    await this.assertNotBlockedInConversation(userId, session.conversation_id);
+
     await this.assertUpdateAllowed(session, location);
 
     const updatedAt = new Date().toISOString();
