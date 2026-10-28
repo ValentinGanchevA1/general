@@ -8,6 +8,7 @@ import { FriendsController } from './friends.controller';
 import { FriendsService } from './friends.service';
 import { FriendsSuggestionsService } from './friends-suggestions.service';
 import { FriendsNotifyService } from './friends-notify.service';
+import { FriendsListMetaService } from './friends-list-meta.service';
 
 @Module({
   imports: [
@@ -17,7 +18,12 @@ import { FriendsNotifyService } from './friends-notify.service';
     forwardRef(() => RealtimeModule),
   ],
   controllers: [FriendsController],
-  providers: [FriendsService, FriendsSuggestionsService, FriendsNotifyService],
+  providers: [
+    FriendsService,
+    FriendsSuggestionsService,
+    FriendsNotifyService,
+    FriendsListMetaService,
+  ],
   exports: [FriendsService, FriendsSuggestionsService],
 })
 export class FriendsModule {}
