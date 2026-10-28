@@ -214,7 +214,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     @MessageBody() payload: ConversationJoinDto,
   ): Promise<AckResult<{ joined: true }>> {
     try {
-      const ok = await this.chat.isParticipant(payload.conversationId, client.data.userId);
+      const ok = (await this.authorizedConversationRecipients(payload.conversationId)).includes(client.data.userId);
       if (!ok) {
         return { ok: false, code: 'chat.forbidden', message: 'Not a participant' };
       }
@@ -316,9 +316,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         payload.location,
       );
 
-      const room = this.conversationRoom(payload.conversationId);
-      this.server.to(room).emit('location:share:started', { session, message });
-      this.server.to(room).emit('chat:message', message);
+      const recipients = await this.authorizedConversationRecipients(payload.conversationId);
+      for (const userId of recipients) {
+        this.server.to(this.userRoom(userId)).emit('location:share:started', { session, message });
+        this.server.to(this.userRoom(userId)).emit('chat:message', message);
+      }
       void this.pushToOfflineParticipants(
         payload.conversationId,
         client.data.userId,
@@ -346,12 +348,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         payload.sessionId,
         payload.location,
       );
-      this.server.to(this.conversationRoom(conversationId)).emit('location:share:update', {
-        sessionId: payload.sessionId,
-        conversationId,
-        location: payload.location,
-        updatedAt,
-      });
+      for (const userId of await this.authorizedConversationRecipients(conversationId)) {
+        this.server.to(this.userRoom(userId)).emit('location:share:update', {
+          sessionId: payload.sessionId,
+          conversationId,
+          location: payload.location,
+          updatedAt,
+        });
+      }
       return { ok: true, data: { updatedAt } };
     } catch (err) {
       const { code, message } = extractApiError(err);
@@ -373,12 +377,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         client.data.userId,
         payload.sessionId,
       );
-      this.server.to(this.conversationRoom(conversationId)).emit('location:share:ended', {
+      for (const userId of await this.authorizedConversationRecipients(conversationId)) {
+        this.server.to(this.userRoom(userId)).emit('location:share:ended', {
         sessionId: payload.sessionId,
         conversationId,
         reason: 'stopped',
         endedAt,
-      });
+        });
+      }
       return { ok: true, data: { ended: true } };
     } catch (err) {
       const { code, message } = extractApiError(err);
@@ -522,17 +528,31 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+  /** Recipient authorization is checked at emission time, not at room join time. */
+  private async authorizedConversationRecipients(conversationId: string): Promise<string[]> {
+    const rows = await this.db.query<Array<{ user_id: string }>>(
+      `SELECT p.user_id
+         FROM conversations c
+         CROSS JOIN LATERAL unnest(c.participant_ids) AS p(user_id)
+        WHERE c.id = $1
+          AND NOT EXISTS (
+            SELECT 1 FROM user_blocks b
+             WHERE b.blocker_id = p.user_id
+               AND b.blocked_id = ANY(c.participant_ids)
+                OR b.blocked_id = p.user_id
+               AND b.blocker_id = ANY(c.participant_ids)
+          )`,
+      [conversationId],
+    );
+    return rows.map((row) => row.user_id);
+  }
+
   private async emitChatMessageToParticipants(message: ChatMessageEvent): Promise<void> {
-    const rooms = [this.conversationRoom(message.conversationId)];
-    try {
-      const participantIds = await this.chat.getParticipantIds(message.conversationId);
-      rooms.push(...participantIds.map((id) => this.userRoom(id)));
-    } catch {
-      // Persistence already succeeded: preserve room delivery and the successful ack.
-      this.logger.warn('Chat participant fanout unavailable; using conversation room');
+    // Never fall back to a stale conversation room after authorization lookup fails.
+    const recipients = await this.authorizedConversationRecipients(message.conversationId);
+    for (const userId of recipients) {
+      this.server.to(this.userRoom(userId)).emit('chat:message', message);
     }
-    // Socket.IO unions rooms, so sockets in both rooms receive the event once.
-    this.server.to(rooms).emit('chat:message', message);
   }
 
   private async pushToOfflineParticipants(
@@ -541,7 +561,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     body: string,
   ): Promise<void> {
     try {
-      const participantIds = await this.chat.getParticipantIds(conversationId);
+      const participantIds = await this.authorizedConversationRecipients(conversationId);
       for (const recipientId of participantIds) {
         if (recipientId === senderId) continue;
         const sockets = await this.server.in(this.userRoom(recipientId)).fetchSockets();
