@@ -60,6 +60,36 @@ function entry(state: PlaceDetailsState, placeId: string): PlaceDetailEntry {
   };
 }
 
+function matchesPlaceId(
+  entryKey: string,
+  current: PlaceDetailEntry,
+  placeIds: ReadonlySet<string>,
+): boolean {
+  return placeIds.has(entryKey) || (current.detail != null && placeIds.has(current.detail.id));
+}
+
+function forEachMatchingPlaceEntry(
+  state: PlaceDetailsState,
+  placeIds: readonly string[],
+  visit: (current: PlaceDetailEntry) => void,
+): void {
+  const ids = new Set(placeIds);
+  Object.entries(state.entries).forEach(([entryKey, current]) => {
+    if (matchesPlaceId(entryKey, current, ids)) visit(current);
+  });
+}
+
+function hasSaveInFlight(state: PlaceDetailsState, placeId: string): boolean {
+  const ids = new Set([placeId]);
+  return Object.entries(state.entries).some(
+    ([entryKey, current]) => matchesPlaceId(entryKey, current, ids) && current.saveId != null,
+  );
+}
+
+export function resolvePlaceMutationId(state: PlaceDetailsState, placeId: string): string {
+  return state.entries[placeId]?.detail?.id ?? placeId;
+}
+
 export const loadPlaceDetail = createAsyncThunk<
   { detail: NexaPlaceDetail; receivedAt: number },
   { placeId: string; force?: boolean },
@@ -113,15 +143,18 @@ export const setPlaceSaved = createAsyncThunk<
   ThunkConfig
 >(
   'places/setSaved',
-  async ({ placeId, saved }, { rejectWithValue }) => {
+  async ({ placeId, saved }, { getState, rejectWithValue }) => {
+    const canonicalPlaceId = resolvePlaceMutationId(getState().places, placeId);
     try {
       if (saved) {
         return await postJson<Record<string, never>, NexaPlaceSaveState>(
-          `/places/${encodeURIComponent(placeId)}/save`,
+          `/places/${encodeURIComponent(canonicalPlaceId)}/save`,
           {},
         );
       }
-      return await deleteJson<NexaPlaceSaveState>(`/places/${encodeURIComponent(placeId)}/save`);
+      return await deleteJson<NexaPlaceSaveState>(
+        `/places/${encodeURIComponent(canonicalPlaceId)}/save`,
+      );
     } catch (error) {
       return rejectWithValue(
         extractMessage(error, saved ? 'Could not save this place.' : 'Could not remove this saved place.'),
@@ -130,8 +163,9 @@ export const setPlaceSaved = createAsyncThunk<
   },
   {
     condition: ({ placeId }, { getState }) => {
-      const current = getState().places.entries[placeId];
-      return current?.saveId == null;
+      const state = getState().places;
+      const canonicalPlaceId = resolvePlaceMutationId(state, placeId);
+      return !hasSaveInFlight(state, canonicalPlaceId);
     },
   },
 );
@@ -190,31 +224,48 @@ const slice = createSlice({
     });
 
     builder.addCase(setPlaceSaved.pending, (state, action) => {
-      const current = entry(state, action.meta.arg.placeId);
-      current.saveId = action.meta.requestId;
-      current.error = null;
-      current.saveError = null;
+      const canonicalPlaceId = resolvePlaceMutationId(state, action.meta.arg.placeId);
+      entry(state, canonicalPlaceId);
+      forEachMatchingPlaceEntry(
+        state,
+        [action.meta.arg.placeId, canonicalPlaceId],
+        (current) => {
+          current.saveId = action.meta.requestId;
+          current.error = null;
+          current.saveError = null;
+        },
+      );
     });
     builder.addCase(setPlaceSaved.fulfilled, (state, action) => {
-      const current = state.entries[action.meta.arg.placeId];
-      if (!current || current.saveId !== action.meta.requestId) return;
-      current.saveId = null;
-      if (current.detail) {
-        current.detail.saved = action.payload.saved;
-        current.detail.id = action.payload.placeId;
-      }
+      forEachMatchingPlaceEntry(
+        state,
+        [action.meta.arg.placeId, action.payload.placeId],
+        (current) => {
+          if (current.saveId !== action.meta.requestId) return;
+          current.saveId = null;
+          if (current.detail?.id === action.payload.placeId) {
+            current.detail.saved = action.payload.saved;
+          }
+          current.error = null;
+          current.saveError = null;
+        },
+      );
       if (!action.payload.saved) {
         state.saved.items = state.saved.items.filter((item) => item.id !== action.payload.placeId);
       }
-      current.error = null;
-      current.saveError = null;
     });
     builder.addCase(setPlaceSaved.rejected, (state, action) => {
-      const current = state.entries[action.meta.arg.placeId];
-      if (!current || current.saveId !== action.meta.requestId) return;
-      current.saveId = null;
-      current.error = action.payload ?? 'Could not update saved place.';
-      current.saveError = action.payload ?? 'Could not update saved place.';
+      const canonicalPlaceId = resolvePlaceMutationId(state, action.meta.arg.placeId);
+      forEachMatchingPlaceEntry(
+        state,
+        [action.meta.arg.placeId, canonicalPlaceId],
+        (current) => {
+          if (current.saveId !== action.meta.requestId) return;
+          current.saveId = null;
+          current.error = action.payload ?? 'Could not update saved place.';
+          current.saveError = action.payload ?? 'Could not update saved place.';
+        },
+      );
     });
   },
 });
