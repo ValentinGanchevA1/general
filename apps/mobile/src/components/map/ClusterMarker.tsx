@@ -7,7 +7,7 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
-import type { ClusterPoint, EntityKind } from '@g88/shared';
+import type { MapClusterPoint, MapEntityKind } from '@g88/shared';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { useAppTheme } from '@/theme';
@@ -25,7 +25,7 @@ import {
 import { clusterVisualKey } from './markerVisualKeys';
 
 interface Props {
-  point: ClusterPoint;
+  point: MapClusterPoint;
   selected?: boolean;
   showComposition?: boolean;
   reduceMotion?: boolean;
@@ -50,7 +50,9 @@ function ClusterMarkerImpl({
         ? colors.entityEvent
         : visual.mode === 'listing'
           ? colors.entityListing
-          : colors.borderStrong;
+          : visual.mode === 'place'
+            ? colors.discovery
+            : colors.borderStrong;
   const pulseColor = visual.mode === 'mixed' ? colors.actionPrimary : semanticColor;
 
   useEffect(() => {
@@ -73,7 +75,7 @@ function ClusterMarkerImpl({
   const fillColor =
     visual.mode === 'user'
       ? colors.actionSoft
-      : visual.mode === 'event'
+      : visual.mode === 'event' || visual.mode === 'place'
         ? colors.discoverySoft
         : visual.mode === 'listing'
           ? colors.surfacePrimary
@@ -201,11 +203,12 @@ function ClusterMarkerImpl({
 }
 
 function clusterKindColor(
-  kind: EntityKind,
+  kind: MapEntityKind,
   colors: ReturnType<typeof useAppTheme>['colors'],
 ): string {
   if (kind === 'user') return colors.entityPerson;
   if (kind === 'event') return colors.entityEvent;
+  if (kind === 'place') return colors.discovery;
   return colors.entityListing;
 }
 
@@ -239,18 +242,21 @@ function CompositionGlyph({
   kind,
   color,
 }: {
-  kind: EntityKind;
+  kind: MapEntityKind;
   color: string;
 }): React.JSX.Element {
   if (kind === 'event') {
     return <Icon name="star-four-points" size={7} color={color} />;
+  }
+  if (kind === 'place') {
+    return <Icon name="map-marker-radius-outline" size={8} color={color} />;
   }
 
   const style = compositionGlyphStyle(kind, color);
   return <View style={[styles.compositionGlyph, style]} />;
 }
 
-function compositionGlyphStyle(kind: EntityKind, color: string): ViewStyle {
+function compositionGlyphStyle(kind: MapEntityKind, color: string): ViewStyle {
   if (kind === 'listing') {
     return {
       width: 6,
@@ -281,15 +287,11 @@ function clusterMarkerPropsEqual(prev: Props, next: Props): boolean {
 
 export const ClusterMarker = React.memo(ClusterMarkerImpl, clusterMarkerPropsEqual);
 
-/**
- * Kept exported for tests / future provider-specific native marker rendering.
- * Mixed clusters are intentionally neutral: composition is shown by micro geometry,
- * not by inventing a fourth entity color.
- */
 export function clusterModeLabel(mode: NexaClusterMode): string {
   if (mode === 'user') return 'People';
   if (mode === 'event') return 'Events';
   if (mode === 'listing') return 'Listings';
+  if (mode === 'place') return 'Active places';
   return 'Mixed';
 }
 
