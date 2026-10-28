@@ -3,6 +3,7 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3';
@@ -49,6 +50,24 @@ export class S3Service {
     contentType: string,
   ): Promise<{ uploadUrl: string; publicUrl: string }> {
     return this.presignStory(userId, contentType);
+  }
+
+  async storyObjectMetadata(
+    key: string,
+  ): Promise<{ contentLength: number; contentType: string | null }> {
+    if (!this.bucket) throw new Error('AWS_S3_BUCKET not configured');
+    if (!key.startsWith('stories/')) throw new Error('Invalid story object key');
+
+    const result = await this.client.send(
+      new HeadObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      }),
+    );
+    return {
+      contentLength: result.ContentLength ?? 0,
+      contentType: result.ContentType ?? null,
+    };
   }
 
   /**
