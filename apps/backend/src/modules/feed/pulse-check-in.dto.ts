@@ -5,6 +5,7 @@ import {
   IsLongitude,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
   ValidateNested,
@@ -12,6 +13,7 @@ import {
 
 import type {
   CheckInAudience,
+  CreatePlacePulseCheckInRequest,
   CreatePulseCheckInRequest,
   PlaceIdentity,
   PlaceProvider,
@@ -47,6 +49,20 @@ export class CreatePulseCheckInDto implements CreatePulseCheckInRequest {
   @ValidateNested()
   @Type(() => PlaceIdentityDto)
   placeIdentity!: PlaceIdentity | null;
+
+  @IsIn(['friends', 'nearby'])
+  audience!: CheckInAudience;
+
+  @IsLatitude()
+  lat!: number;
+
+  @IsLongitude()
+  lng!: number;
+}
+
+export class CreatePlacePulseCheckInDto implements CreatePlacePulseCheckInRequest {
+  @IsUUID()
+  placeId!: string;
 
   @IsIn(['friends', 'nearby'])
   audience!: CheckInAudience;

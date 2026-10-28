@@ -7,7 +7,10 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { PlaceActivityLinkService } from './place-activity-link.service';
 import { PulseCheckInService } from './pulse-check-in.service';
-import { CreatePulseCheckInDto } from './pulse-check-in.dto';
+import {
+  CreatePlacePulseCheckInDto,
+  CreatePulseCheckInDto,
+} from './pulse-check-in.dto';
 import { PulseDiscoveryFeedService } from './pulse-discovery-feed.service';
 
 @Controller('feed')
@@ -49,5 +52,13 @@ export class FeedController {
     @Body() dto: CreatePulseCheckInDto,
   ): Promise<PulseCheckInResult> {
     return this.checkIns.create(userId, dto);
+  }
+
+  @Post('check-ins/by-place')
+  createPlaceCheckIn(
+    @CurrentUser('id') userId: string,
+    @Body() dto: CreatePlacePulseCheckInDto,
+  ): Promise<PulseCheckInResult> {
+    return this.checkIns.createForPlace(userId, dto);
   }
 }

@@ -1,6 +1,11 @@
 import { DataSource } from 'typeorm';
 
-import { computeH3Cells, type CreatePulseCheckInRequest, type PlaceIdentity } from '@g88/shared';
+import {
+  computeH3Cells,
+  type CreatePlacePulseCheckInRequest,
+  type CreatePulseCheckInRequest,
+  type PlaceIdentity,
+} from '@g88/shared';
 
 import { MapTilerPlaceAttestationService } from './maptiler-place-attestation.service';
 import { PlaceCatalogService } from './place-catalog.service';
@@ -16,6 +21,17 @@ const request: CreatePulseCheckInRequest = {
   lng: 27.9105,
 };
 
+const canonicalPlaceId = '11111111-1111-4111-8111-111111111111';
+const oldMergedPlaceId = '22222222-2222-4222-8222-222222222222';
+const userCellH3R7 = computeH3Cells(request.lat, request.lng).r7;
+
+const placeRequest: CreatePlacePulseCheckInRequest = {
+  placeId: canonicalPlaceId,
+  audience: 'nearby',
+  lat: request.lat,
+  lng: request.lng,
+};
+
 const clientIdentity: PlaceIdentity = {
   provider: 'maptiler',
   providerPlaceId: 'poi.12345',
@@ -27,7 +43,7 @@ const attestedIdentity: PlaceIdentity = {
   provider: 'maptiler',
   providerPlaceId: 'poi.12345',
   canonicalLabel: 'Sea Garden',
-  providerCellH3R7: computeH3Cells(request.lat, request.lng).r7,
+  providerCellH3R7: userCellH3R7,
 };
 
 const attestedPlace = {
@@ -41,6 +57,7 @@ describe('PulseCheckInService', () => {
   let evaluateAfterCheckIn: jest.Mock;
   let attest: jest.Mock;
   let resolvePlace: jest.Mock;
+  let getActivePlace: jest.Mock;
   let service: PulseCheckInService;
 
   beforeEach(() => {
@@ -49,14 +66,22 @@ describe('PulseCheckInService', () => {
     evaluateAfterCheckIn = jest.fn().mockResolvedValue(undefined);
     attest = jest.fn().mockResolvedValue(attestedPlace);
     resolvePlace = jest.fn().mockResolvedValue({
-      id: 'place-1',
+      id: canonicalPlaceId,
       canonicalLabel: 'Sea Garden',
       locationH3R7: attestedIdentity.providerCellH3R7,
+    });
+    getActivePlace = jest.fn().mockResolvedValue({
+      id: canonicalPlaceId,
+      canonicalLabel: 'Sea Garden',
+      locationH3R7: userCellH3R7,
     });
     const realtime = { publishCheckIn } as unknown as PulseActivityRealtimeService;
     const trending = { evaluateAfterCheckIn } as unknown as PulsePlaceTrendingService;
     const placeAttestation = { attest } as unknown as MapTilerPlaceAttestationService;
-    const placeCatalog = { resolve: resolvePlace } as unknown as PlaceCatalogService;
+    const placeCatalog = {
+      resolve: resolvePlace,
+      getActivePlace,
+    } as unknown as PlaceCatalogService;
     service = new PulseCheckInService(
       { query } as unknown as DataSource,
       realtime,
@@ -98,7 +123,7 @@ describe('PulseCheckInService', () => {
 
     expect(attest).toHaveBeenCalledWith(clientIdentity, expect.any(String));
     expect(resolvePlace).toHaveBeenCalledWith(attestedPlace);
-    expect(result.placeId).toBe('place-1');
+    expect(result.placeId).toBe(canonicalPlaceId);
     expect(result.placeIdentity).toEqual(attestedIdentity);
     expect(result.placeLabel).toBe('Sea Garden');
     const insertParams = query.mock.calls[1]?.[1] as unknown[];
@@ -106,12 +131,89 @@ describe('PulseCheckInService', () => {
       'maptiler',
       'poi.12345',
       attestedIdentity.providerCellH3R7,
-      'place-1',
+      canonicalPlaceId,
     ]);
     expect(evaluateAfterCheckIn).toHaveBeenCalledWith({
-      placeId: 'place-1',
+      placeId: canonicalPlaceId,
+      canonicalLabel: 'Sea Garden',
+      locationH3R7: attestedIdentity.providerCellH3R7,
       placeIdentity: attestedIdentity,
     });
+  });
+
+  it('checks in directly to a nearby canonical NEXA place without provider metadata', async () => {
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    const result = await service.createForPlace('user-1', placeRequest);
+
+    expect(getActivePlace).toHaveBeenCalledWith(canonicalPlaceId);
+    expect(result).toMatchObject({
+      placeLabel: 'Sea Garden',
+      placeId: canonicalPlaceId,
+      placeIdentity: null,
+      audience: 'nearby',
+    });
+    const insertParams = query.mock.calls[1]?.[1] as unknown[];
+    expect(insertParams).not.toContain(placeRequest.lat);
+    expect(insertParams).not.toContain(placeRequest.lng);
+    expect(insertParams[4]).toBe(userCellH3R7);
+    expect(insertParams.slice(5, 9)).toEqual([null, null, null, canonicalPlaceId]);
+    expect(evaluateAfterCheckIn).toHaveBeenCalledWith({
+      placeId: canonicalPlaceId,
+      canonicalLabel: 'Sea Garden',
+      locationH3R7: userCellH3R7,
+      placeIdentity: null,
+    });
+  });
+
+  it('follows a merged place alias and persists only the active canonical place ID', async () => {
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    getActivePlace.mockResolvedValueOnce({
+      id: canonicalPlaceId,
+      canonicalLabel: 'Sea Garden',
+      locationH3R7: userCellH3R7,
+    });
+
+    const result = await service.createForPlace('user-1', {
+      ...placeRequest,
+      placeId: oldMergedPlaceId,
+    });
+
+    expect(getActivePlace).toHaveBeenCalledWith(oldMergedPlaceId);
+    expect(result.placeId).toBe(canonicalPlaceId);
+    const insertParams = query.mock.calls[1]?.[1] as unknown[];
+    expect(insertParams[8]).toBe(canonicalPlaceId);
+  });
+
+  it('rejects a canonical place check-in when the current coarse location is too far away', async () => {
+    query.mockResolvedValueOnce([]);
+    getActivePlace.mockResolvedValueOnce({
+      id: canonicalPlaceId,
+      canonicalLabel: 'Far Place',
+      locationH3R7: computeH3Cells(42.7, 25.3).r7,
+    });
+
+    await expect(service.createForPlace('user-1', placeRequest))
+      .rejects.toMatchObject({ status: 400 });
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(publishCheckIn).not.toHaveBeenCalled();
+    expect(evaluateAfterCheckIn).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the requested NEXA place is inactive or cannot be resolved', async () => {
+    query.mockResolvedValueOnce([]);
+    getActivePlace.mockResolvedValueOnce(null);
+
+    await expect(service.createForPlace('user-1', placeRequest))
+      .rejects.toMatchObject({ status: 400 });
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(publishCheckIn).not.toHaveBeenCalled();
+  });
+
+  it('does not evaluate public trends for friends-only canonical place check-ins', async () => {
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    await service.createForPlace('user-1', { ...placeRequest, audience: 'friends' });
+    expect(evaluateAfterCheckIn).not.toHaveBeenCalled();
   });
 
   it('downgrades an unattested canonical request to free text without contributing to trends', async () => {
@@ -151,15 +253,11 @@ describe('PulseCheckInService', () => {
     expect(evaluateAfterCheckIn).not.toHaveBeenCalled();
   });
 
-  it('rejects another check-in during the cooldown window before provider attestation', async () => {
+  it('rejects another check-in during the cooldown window before provider or place resolution', async () => {
     query.mockResolvedValueOnce([{ id: 'recent-check-in' }]);
-    await expect(service.create('user-1', {
-      ...request,
-      placeIdentity: clientIdentity,
-    })).rejects.toMatchObject({ status: 429 });
+    await expect(service.createForPlace('user-1', placeRequest)).rejects.toMatchObject({ status: 429 });
     expect(query).toHaveBeenCalledTimes(1);
-    expect(attest).not.toHaveBeenCalled();
-    expect(resolvePlace).not.toHaveBeenCalled();
+    expect(getActivePlace).not.toHaveBeenCalled();
     expect(publishCheckIn).not.toHaveBeenCalled();
     expect(evaluateAfterCheckIn).not.toHaveBeenCalled();
   });
