@@ -103,12 +103,12 @@ function matchesDeletionRequest(
 }
 
 export function buildPostHogSubjectDeletionQuery(subjectHash: string): string {
-  if (!SUBJECT_HASH_RE.test(subjectHash)) throw new Error('Invalid analytics subject hash.');
+  if (!SUBJECT_HASH_RE.test(subjectHash)) throw new TypeError('Invalid analytics subject hash.');
   return `SELECT uuid FROM events WHERE distinct_id = ${quoteLiteral(subjectHash)}`;
 }
 
 export function buildPostHogRetentionDeletionQuery(cutoff: Date): string {
-  if (Number.isNaN(cutoff.getTime())) throw new Error('Invalid analytics retention cutoff.');
+  if (Number.isNaN(cutoff.getTime())) throw new TypeError('Invalid analytics retention cutoff.');
   const eventNames = PRODUCT_ANALYTICS_EVENTS.map((event) => quoteLiteral(event)).join(', ');
   return `SELECT uuid FROM events WHERE timestamp < toDateTime(${quoteLiteral(cutoff.toISOString())}) AND event IN (${eventNames})`;
 }
@@ -270,6 +270,7 @@ export class PostHogPrivacyService implements OnModuleInit, OnModuleDestroy {
       if (!response.ok) return null;
       return deletionResponse(await response.json());
     } catch {
+      this.logger.warn('Could not read PostHog deletion status; the submitted request will be polled again.');
       return null;
     } finally {
       clearTimeout(timeout);
@@ -298,6 +299,7 @@ export class PostHogPrivacyService implements OnModuleInit, OnModuleDestroy {
         if (match) return { state: 'found', request: match };
         if (results.length < RECONCILIATION_PAGE_SIZE) return { state: 'not_found' };
       } catch {
+        this.logger.warn('Could not reconcile a PostHog deletion retry; destructive resubmission is deferred.');
         return { state: 'unavailable' };
       } finally {
         clearTimeout(timeout);
