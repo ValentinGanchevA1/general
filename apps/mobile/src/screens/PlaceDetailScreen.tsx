@@ -30,12 +30,11 @@ export function PlaceDetailScreen(): React.JSX.Element {
   const [place, setPlace] = useState<NexaPlaceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
   const { placeId } = route.params;
 
-  const load = useCallback((): (() => void) => {
+  useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(false);
     void getJson<NexaPlaceDetail>(`/places/${encodeURIComponent(placeId)}`)
       .then((next) => {
         if (active) setPlace(next);
@@ -50,9 +49,13 @@ export function PlaceDetailScreen(): React.JSX.Element {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [placeId]);
+  }, [placeId, reloadToken]);
 
-  useEffect(() => load(), [load]);
+  const retry = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    setReloadToken((value) => value + 1);
+  }, []);
 
   const openMap = useCallback(() => {
     if (!place) return;
@@ -76,7 +79,7 @@ export function PlaceDetailScreen(): React.JSX.Element {
             title="Couldn't load place"
             body="Check your connection and try again."
             actionLabel="Retry"
-            onAction={() => { load(); }}
+            onAction={retry}
           /> :
           <EmptyState
             variant="plain"
