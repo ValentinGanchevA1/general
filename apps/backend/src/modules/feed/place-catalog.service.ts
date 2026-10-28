@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, type EntityManager } from 'typeorm';
+import * as h3 from 'h3-js';
+
+import type { NexaPlaceDetail } from '@g88/shared';
 
 import type { AttestedPlace } from './maptiler-place-attestation.service';
 
@@ -10,6 +13,10 @@ interface PlaceRow {
   location_h3_r7: string;
   status: 'active' | 'merged';
   merged_into_place_id: string | null;
+}
+
+interface TrendRow {
+  last_emitted_at: Date;
 }
 
 export interface CatalogPlace {
@@ -75,6 +82,57 @@ export class PlaceCatalogService {
         locationH3R7: place.location_h3_r7,
       };
     });
+  }
+
+  /** Public place view. Never exposes provider aliases, raw H3 or participant counts. */
+  async getPublicDetail(placeId: string): Promise<NexaPlaceDetail | null> {
+    const [initial] = await this.db.query<PlaceRow[]>(
+      `SELECT id, canonical_label, location_h3_r7, status, merged_into_place_id
+         FROM nexa_places
+        WHERE id = $1
+        LIMIT 1`,
+      [placeId],
+    );
+    if (!initial) return null;
+
+    let place = initial;
+    for (let depth = 0; place.status === 'merged' && place.merged_into_place_id; depth += 1) {
+      if (depth >= 5) return null;
+      const [next] = await this.db.query<PlaceRow[]>(
+        `SELECT id, canonical_label, location_h3_r7, status, merged_into_place_id
+           FROM nexa_places
+          WHERE id = $1
+          LIMIT 1`,
+        [place.merged_into_place_id],
+      );
+      if (!next) return null;
+      place = next;
+    }
+
+    if (place.status !== 'active') return null;
+    if (!h3.isValidCell(place.location_h3_r7) || h3.getResolution(place.location_h3_r7) !== 7) {
+      return null;
+    }
+
+    const [lat, lng] = h3.cellToLatLng(place.location_h3_r7);
+    const [trend] = await this.db.query<TrendRow[]>(
+      `SELECT last_emitted_at
+         FROM pulse_place_trends
+        WHERE place_id = $1
+          AND expires_at > NOW()
+        ORDER BY last_emitted_at DESC
+        LIMIT 1`,
+      [place.id],
+    );
+
+    return {
+      id: place.id,
+      canonicalLabel: place.canonical_label,
+      approximateLocation: { lat, lng },
+      locationPrecision: 'coarse',
+      trending: trend != null,
+      recentActivityAt: trend ? new Date(trend.last_emitted_at).toISOString() : null,
+    };
   }
 
   private async findByRef(
