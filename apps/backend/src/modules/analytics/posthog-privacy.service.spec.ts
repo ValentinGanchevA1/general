@@ -67,7 +67,7 @@ describe('PostHogPrivacyService worker coordination', () => {
     }
   });
 
-  it('claims due rows atomically with a replica-safe lease', async () => {
+  it('claims due rows atomically and persists attempt intent before external I/O', async () => {
     enableWorker();
     const query = jest.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     const db = { query } as unknown as DataSource;
@@ -79,11 +79,12 @@ describe('PostHogPrivacyService worker coordination', () => {
     const [claimSql, claimParams] = query.mock.calls[1]!;
     expect(String(claimSql)).toContain('FOR UPDATE SKIP LOCKED');
     expect(String(claimSql)).toContain('UPDATE analytics_external_deletion_requests AS request');
+    expect(String(claimSql)).toContain('attempts = request.attempts + 1');
     expect(String(claimSql)).toContain('RETURNING request.id');
     expect(claimParams).toEqual([10, 10 * 60 * 1_000]);
   });
 
-  it('reconciles an ambiguous prior submission before retrying a destructive POST', async () => {
+  it('reconciles a previously claimed submission before retrying a destructive POST', async () => {
     enableWorker();
     const rowId = '11111111-1111-4111-8111-111111111111';
     const submissionId = '22222222-2222-4222-8222-222222222222';
@@ -98,7 +99,7 @@ describe('PostHogPrivacyService worker coordination', () => {
           subject_hash: 'a'.repeat(64),
           cutoff_at: null,
           submission_id: submissionId,
-          attempts: 1,
+          attempts: 2,
         },
       ])
       .mockResolvedValueOnce([]);
@@ -123,7 +124,44 @@ describe('PostHogPrivacyService worker coordination', () => {
     expect(fetchSpy.mock.calls[0]![1]?.method).toBeUndefined();
     const [updateSql, updateParams] = query.mock.calls[2]!;
     expect(String(updateSql)).toContain("SET status = 'submitted'");
-    expect(updateParams).toEqual([rowId, providerRequestId, 0]);
+    expect(updateParams).toEqual([rowId, providerRequestId]);
+  });
+
+  it('accepts a raw-array deletion-list response during retry reconciliation', async () => {
+    enableWorker();
+    const rowId = '11111111-1111-4111-8111-111111111111';
+    const submissionId = '22222222-2222-4222-8222-222222222222';
+    const providerRequestId = '33333333-3333-4333-8333-333333333333';
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: rowId,
+          kind: 'subject',
+          subject_hash: 'a'.repeat(64),
+          cutoff_at: null,
+          submission_id: submissionId,
+          attempts: 2,
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    const db = { query } as unknown as DataSource;
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: providerRequestId,
+          submission_id: submissionId,
+          status: 'draft',
+        },
+      ],
+    } as Response);
+    const service = new PostHogPrivacyService(db);
+
+    await service.processPending();
+
+    expect(query.mock.calls[2]![1]).toEqual([rowId, providerRequestId]);
   });
 
   it('defers a retry when reconciliation is unavailable instead of risking a duplicate POST', async () => {
@@ -139,7 +177,7 @@ describe('PostHogPrivacyService worker coordination', () => {
           subject_hash: 'a'.repeat(64),
           cutoff_at: null,
           submission_id: '22222222-2222-4222-8222-222222222222',
-          attempts: 1,
+          attempts: 2,
         },
       ])
       .mockResolvedValueOnce([]);
@@ -154,7 +192,40 @@ describe('PostHogPrivacyService worker coordination', () => {
     expect(String(retrySql)).toContain("SET status = 'failed'");
     expect(retryParams).toEqual([
       rowId,
-      0,
+      60 * 60 * 1_000,
+      'PostHog deletion retry reconciliation is unavailable.',
+    ]);
+  });
+
+  it('fails closed on an unknown deletion-list response envelope', async () => {
+    enableWorker();
+    const rowId = '11111111-1111-4111-8111-111111111111';
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: rowId,
+          kind: 'subject',
+          subject_hash: 'a'.repeat(64),
+          cutoff_at: null,
+          submission_id: '22222222-2222-4222-8222-222222222222',
+          attempts: 2,
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    const db = { query } as unknown as DataSource;
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
+    const service = new PostHogPrivacyService(db);
+
+    await service.processPending();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[2]![1]).toEqual([
+      rowId,
       60 * 60 * 1_000,
       'PostHog deletion retry reconciliation is unavailable.',
     ]);
