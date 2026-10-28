@@ -286,7 +286,7 @@ export const NexaMapScreenSurface = React.forwardRef<
     savedPlaceMapFocusStore.clear();
     if (point.meta.trending) return;
 
-    const frame = requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
       const selectedId = selectedPlaceIdRef.current;
       if (
         selectedId === point.id ||
@@ -295,7 +295,6 @@ export const NexaMapScreenSurface = React.forwardRef<
         placeSheetRef.current?.dismiss();
       }
     });
-    return () => cancelAnimationFrame(frame);
   }, [dispatch, saveLoading, selectedPlace]);
 
   const activeSelectionKey = selectedPlace == null
