@@ -64,6 +64,8 @@ function entityTone(
       return colors.entityEvent;
     case 'listing':
       return colors.entityListing;
+    case 'place':
+      return colors.discovery;
     case 'opportunity':
       return colors.entityOpportunity;
   }
@@ -110,11 +112,17 @@ export function NexaSpatialSheetGlyph({
               height: diamondSide,
               borderRadius: Math.max(3, Math.round(diamondSide * 0.15)),
               borderColor: tone,
-              backgroundColor: colors.actionSoft,
+              backgroundColor: kind === 'place' ? colors.discoverySoft : colors.actionSoft,
               transform: [{ rotate: '45deg' }],
             },
           ]}
-        />
+        >
+          {kind === 'place' ? (
+            <View style={styles.diamondIconCounterRotate}>
+              <Icon name="map-marker-radius-outline" size={14} color={tone} />
+            </View>
+          ) : null}
+        </View>
       </View>
     );
   }
@@ -452,6 +460,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  diamondIconCounterRotate: {
+    transform: [{ rotate: '-45deg' }],
   },
   starInner: {
     position: 'absolute',
