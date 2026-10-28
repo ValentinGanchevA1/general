@@ -67,21 +67,27 @@ The trigger preserves the pseudonymous `subject_hash` as a deletion intent befor
 - account deletion through the existing `DELETE /users/me` cascade
 - first-party analytics subject pruning after the retention window
 
-The analytics retention sweep also queues a cutoff-based PostHog deletion request before pruning canonical Postgres events.
+The analytics retention sweep also queues a cutoff-based PostHog deletion request before pruning canonical Postgres events and can trigger immediate queue processing after enqueue.
 
 The PostHog privacy worker:
 
 - receives only `subject_hash` or a retention cutoff
 - never receives raw `users.id`, email, phone, coordinates, message content, or verification data
+- starts independently of the six-hour analytics retention sweep after a one-minute initial delay and polls every 15 minutes, so account-deletion propagation and one-hour retry eligibility are not gated by the retention cadence
+- uses a single-flight guard within each API replica
 - atomically claims due queue rows with `FOR UPDATE SKIP LOCKED` plus a short database lease so multiple API replicas cannot submit the same due row concurrently
+- increments the durable attempt counter in the same atomic claim, before any external request, so a crash after provider acceptance cannot erase evidence that reconciliation is required on the next claim
 - persists retries and provider request IDs for auditability
-- reconciles a previous `submission_id` against PostHog before retrying an ambiguous destructive POST, and defers instead of resubmitting if reconciliation is unavailable
+- reconciles ambiguous retries against PostHog by `submission_id` or the exact one-column query before any repeat destructive POST
+- accepts both paginated `results` and raw-array list responses; an unknown response envelope or unavailable reconciliation fails closed and defers the retry rather than risking a duplicate submission
 - polls submitted deletion requests until PostHog reports completion
 - remains disabled unless explicit private-API configuration is present
 
 PostHog event deletion is asynchronous, so a locally completed account deletion does not imply immediate physical removal from PostHog. The durable queue preserves the request and retry state independently of the deleted account.
 
 Current PostHog Data Deletion API documentation explicitly defines the create endpoint as a one-column HogQL event-deletion query and documents `query`, `variables`, and `submission_id` request fields. This removes the earlier API-shape ambiguity, but it does not replace NEXA's staging validation gate: preview scope, controlled deletion completion, status behavior, retention cutoff behavior, and environment separation must still be verified against a dedicated staging project before production capture is enabled.
+
+Read-only parser/schema checks against the connected EU PostHog project confirm that the live `events` schema exposes `uuid`, `distinct_id`, `timestamp`, and `event`, and that the subject-query shape plus the retention query's `toDateTime(...)` and canonical event allow-list compile successfully. This is parser compatibility evidence only; it is not a destructive deletion preview and does not satisfy the staging rollout gate.
 
 ## Configuration
 
