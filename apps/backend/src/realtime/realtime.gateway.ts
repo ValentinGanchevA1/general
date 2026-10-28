@@ -68,6 +68,12 @@ import { corsOrigins } from '../common/cors-origins';
 type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 type G88Socket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 
+/** Match the 0.02-degree public discovery grid for legacy cell presence deltas. */
+export function approximatePublicLocation(lat: number, lng: number): { lat: number; lng: number } {
+  const snap = (value: number): number => Math.round(value / 0.02) * 0.02;
+  return { lat: snap(lat), lng: snap(lng) };
+}
+
 function extractApiError(err: unknown): { code: string; message: string } {
   if (
     err instanceof ForbiddenException ||
@@ -183,7 +189,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         });
         this.server.to(newRoom).emit('presence:delta', {
           cellId: result.cellId,
-          added: [{ userId: client.data.userId, lat: result.lat, lng: result.lng }],
+          added: [{ userId: client.data.userId, ...approximatePublicLocation(result.lat, result.lng) }],
           removed: [],
         });
       }
