@@ -20,7 +20,7 @@ export interface PulseState {
   loading: boolean;
   error: string | null;
   lastFetchedAt: string | null;
-  fetchStartedAt: string | null;
+  realtimeIdsDuringFetch: string[];
   pendingFilter: string | null;
   checkInSubmitting: boolean;
   checkInError: string | null;
@@ -31,7 +31,7 @@ const initialState: PulseState = {
   loading: false,
   error: null,
   lastFetchedAt: null,
-  fetchStartedAt: null,
+  realtimeIdsDuringFetch: [],
   pendingFilter: null,
   checkInSubmitting: false,
   checkInError: null,
@@ -83,29 +83,32 @@ const slice = createSlice({
     activityReceived: (s, a: PayloadAction<ActivityItem>) => {
       s.items = [a.payload, ...s.items.filter((item) => item.id !== a.payload.id)]
         .slice(0, MAX_PULSE_ITEMS);
+      if (s.loading && !s.realtimeIdsDuringFetch.includes(a.payload.id)) {
+        s.realtimeIdsDuringFetch.push(a.payload.id);
+      }
     },
   },
   extraReducers: (b) => {
     b.addCase(fetchFeed.pending, (s) => {
       s.loading = true;
       s.error = null;
-      s.fetchStartedAt = new Date().toISOString();
+      s.realtimeIdsDuringFetch = [];
     });
     b.addCase(fetchFeed.fulfilled, (s, a: PayloadAction<FeedResponse>) => {
-      const startedAtMs = s.fetchStartedAt == null ? 0 : Date.parse(s.fetchStartedAt);
       const fetchedIds = new Set(a.payload.items.map((item) => item.id));
+      const realtimeIds = new Set(s.realtimeIdsDuringFetch);
       const arrivedDuringFetch = s.items.filter((item) => (
-        !fetchedIds.has(item.id)
-        && Date.parse(item.createdAt) >= startedAtMs
+        realtimeIds.has(item.id)
+        && !fetchedIds.has(item.id)
       ));
       s.loading = false;
       s.items = [...arrivedDuringFetch, ...a.payload.items].slice(0, MAX_PULSE_ITEMS);
       s.lastFetchedAt = new Date().toISOString();
-      s.fetchStartedAt = null;
+      s.realtimeIdsDuringFetch = [];
     });
     b.addCase(fetchFeed.rejected, (s, a) => {
       s.loading = false;
-      s.fetchStartedAt = null;
+      s.realtimeIdsDuringFetch = [];
       s.error = typeof a.payload === 'string' ? a.payload : 'Failed to load Pulse';
     });
     b.addCase(createPulseCheckIn.pending, (s) => {
