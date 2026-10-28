@@ -105,6 +105,10 @@ export function NexaListingSheet(props: NexaSpatialEntitySheetProps): React.JSX.
   return <EntitySheet {...props} kind="listing" />;
 }
 
+export function NexaPlaceSheet(props: NexaSpatialEntitySheetProps): React.JSX.Element {
+  return <EntitySheet {...props} kind="place" />;
+}
+
 export function NexaOpportunitySheet(props: NexaSpatialEntitySheetProps): React.JSX.Element {
   return <EntitySheet {...props} kind="opportunity" />;
 }
