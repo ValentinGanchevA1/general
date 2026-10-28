@@ -31,6 +31,7 @@ interface PostHogDeletionResponse {
   id?: string;
   status?: string;
   submission_id?: string;
+  query?: string;
 }
 
 type ReconciliationResult =
@@ -76,6 +77,15 @@ function deletionListItems(payload: unknown): PostHogDeletionResponse[] | null {
     (item): item is PostHogDeletionResponse =>
       typeof item === 'object' && item !== null && !Array.isArray(item),
   );
+}
+
+function matchesDeletionRequest(
+  request: PostHogDeletionResponse,
+  submissionId: string,
+  query: string,
+): boolean {
+  if (!request.id || !UUID_RE.test(request.id)) return false;
+  return request.submission_id === submissionId || request.query === query;
 }
 
 export function buildPostHogSubjectDeletionQuery(subjectHash: string): string {
@@ -209,6 +219,7 @@ export class PostHogPrivacyService {
 
   private async reconcileSubmission(
     submissionId: string,
+    query: string,
     config: PostHogConfig,
   ): Promise<ReconciliationResult> {
     for (let page = 0; page < MAX_RECONCILIATION_PAGES; page += 1) {
@@ -224,9 +235,7 @@ export class PostHogPrivacyService {
 
         const results = deletionListItems(await response.json());
         if (results == null) return { state: 'unavailable' };
-        const match = results.find(
-          (request) => request.submission_id === submissionId && request.id != null && UUID_RE.test(request.id),
-        );
+        const match = results.find((request) => matchesDeletionRequest(request, submissionId, query));
         if (match) return { state: 'found', request: match };
         if (results.length < RECONCILIATION_PAGE_SIZE) return { state: 'not_found' };
       } catch {
@@ -255,7 +264,7 @@ export class PostHogPrivacyService {
     }
 
     if (row.attempts > 1) {
-      const reconciliation = await this.reconcileSubmission(row.submission_id, config);
+      const reconciliation = await this.reconcileSubmission(row.submission_id, query, config);
       if (reconciliation.state === 'found' && reconciliation.request.id) {
         await this.markSubmitted(row.id, reconciliation.request.id);
         return;
