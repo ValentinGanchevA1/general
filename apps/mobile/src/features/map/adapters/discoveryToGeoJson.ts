@@ -8,6 +8,7 @@ export interface NexaMapFeatureProperties {
   count: number | null;
   online: boolean;
   live: boolean;
+  saved: boolean;
   verification: string | null;
   listingMode: string | null;
 }
@@ -30,6 +31,7 @@ export interface NexaMapFeatureCollection {
 function entityMeta(point: MapEntityPoint): {
   online: boolean;
   live: boolean;
+  saved: boolean;
   verification: string | null;
   listingMode: string | null;
 } {
@@ -38,15 +40,23 @@ function entityMeta(point: MapEntityPoint): {
       return {
         online: point.meta.online === true,
         live: false,
+        saved: false,
         verification: point.meta.verification ?? null,
         listingMode: null,
       };
     case 'event':
-      return { online: false, live: false, verification: null, listingMode: null };
+      return {
+        online: false,
+        live: false,
+        saved: false,
+        verification: null,
+        listingMode: null,
+      };
     case 'listing':
       return {
         online: false,
         live: false,
+        saved: false,
         verification: null,
         listingMode: point.meta.mode ?? null,
       };
@@ -54,6 +64,7 @@ function entityMeta(point: MapEntityPoint): {
       return {
         online: false,
         live: point.meta.trending,
+        saved: point.meta.saved === true,
         verification: null,
         listingMode: null,
       };
@@ -63,7 +74,13 @@ function entityMeta(point: MapEntityPoint): {
 export function discoveryPointToMapFeature(point: MapDiscoveryPoint): NexaMapPointFeature {
   const key = getMapDiscoveryPointKey(point);
   const state = point.kind === 'cluster'
-    ? { online: false, live: false, verification: null, listingMode: null }
+    ? {
+      online: false,
+      live: false,
+      saved: false,
+      verification: null,
+      listingMode: null,
+    }
     : entityMeta(point);
 
   return {
