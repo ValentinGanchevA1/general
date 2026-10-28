@@ -11,3 +11,7 @@ CREATE TABLE IF NOT EXISTS nexa_place_saves (
 
 CREATE INDEX IF NOT EXISTS nexa_place_saves_user_created_idx
   ON nexa_place_saves (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS nexa_places_merged_into_idx
+  ON nexa_places (merged_into_place_id)
+  WHERE status = 'merged' AND merged_into_place_id IS NOT NULL;
