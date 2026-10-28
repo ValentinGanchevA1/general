@@ -435,8 +435,10 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
         socket = io(`${Config.API_BASE_URL}/realtime`, {
           // Foreground lifecycle owns the first connect as well as reconnects.
           autoConnect: false,
-          // Polling fallback when pure WS is blocked (strict mobile networks).
-          transports: ['websocket', 'polling'],
+          // Render distributes WebSocket connections across replicas. Keep the
+          // transport WebSocket-only so a Socket.IO session never depends on
+          // load-balancer stickiness for HTTP long-polling requests.
+          transports: ['websocket'],
           auth: async (cb) => {
             const fresh = await tokenStore.getAccessToken();
             cb({ token: fresh });
