@@ -39,6 +39,24 @@ export interface NexaPlaceDetail {
   saved: boolean;
 }
 
+/** Private collection row for the authenticated user's saved NEXA places. */
+export interface NexaSavedPlaceSummary {
+  id: string;
+  canonicalLabel: string;
+  /** Coarse H3 r7 centroid only; never an exact venue coordinate. */
+  approximateLocation: LatLng;
+  locationPrecision: 'coarse';
+  trending: boolean;
+  recentActivityAt: string | null;
+  savedAt: string;
+}
+
+/** Offset pagination is sufficient for the private, user-owned bookmark collection. */
+export interface NexaSavedPlacesPage {
+  items: NexaSavedPlaceSummary[];
+  nextOffset: number | null;
+}
+
 /**
  * Map-only extension of the legacy discovery kinds.
  * Core discovery/realtime remains user/event/listing while the map can opt into

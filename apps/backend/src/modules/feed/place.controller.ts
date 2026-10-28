@@ -8,16 +8,18 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
-import type { NexaPlaceDetail, NexaPlaceSaveState } from '@g88/shared';
+import type { NexaPlaceDetail, NexaPlaceSaveState, NexaSavedPlacesPage } from '@g88/shared';
 
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlaceCatalogService } from './place-catalog.service';
 import { PlaceSaveService } from './place-save.service';
+import { SavedPlacesQueryDto } from './saved-places-query.dto';
 
 @Controller('places')
 @UseGuards(JwtAuthGuard)
@@ -26,6 +28,15 @@ export class PlaceController {
     private readonly places: PlaceCatalogService,
     private readonly saves: PlaceSaveService,
   ) {}
+
+  @Get('saved')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  listSaved(
+    @CurrentUser('id') userId: string,
+    @Query() query: SavedPlacesQueryDto,
+  ): Promise<NexaSavedPlacesPage> {
+    return this.saves.listSaved(userId, query.limit, query.offset);
+  }
 
   @Get(':placeId')
   async detail(

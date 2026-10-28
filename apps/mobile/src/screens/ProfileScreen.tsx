@@ -173,6 +173,7 @@ export function ProfileScreen(): React.JSX.Element {
   const openTrust = useCallback(() => openTrustCenter(navigation), [navigation]);
   const openSettings = useCallback(() => openRootScreen(navigation, 'Settings'), [navigation]);
   const openEdit = useCallback(() => openRootScreen(navigation, 'ProfileEdit'), [navigation]);
+  const openSavedPlaces = useCallback(() => navigation.navigate('Account', { screen: 'SavedPlaces' }), [navigation]);
 
   if (loading && !derived) return <ProfileLoadingState />;
   if (!derived) return <ProfileErrorState message={error ?? 'Could not load profile'} onRetry={() => void dispatch(fetchProfile())} />;
@@ -262,6 +263,9 @@ export function ProfileScreen(): React.JSX.Element {
       {myUserId ? <View style={S.storylineWrap}><ProfileStoryline userId={myUserId} isSelf /></View> : null}
       <ProfileListRow icon="storefront-outline" title="Marketplace" subtitle="Your local listings and offers" tone="discovery" onPress={() => openRootScreen(navigation, 'Marketplace')} />
       {activityLine ? <ProfileListRow icon="medal-outline" title="Achievements" subtitle={activityLine} tone="action" onPress={() => openRootScreen(navigation, 'Achievements')} /> : null}
+
+      <Text style={S.sectionLabel}>Places</Text>
+      <ProfileListRow icon="bookmark-multiple-outline" title="Saved places" subtitle="Your private local bookmarks" tone="discovery" onPress={openSavedPlaces} />
 
       <Text style={S.sectionLabel}>Connections</Text>
       <ProfileListRow icon="account-group-outline" title="Friends" subtitle={pendingCount > 0 ? `${friendsCount} friends · ${pendingCount} request${pendingCount === 1 ? '' : 's'}` : `${friendsCount} friends`} tone="action" onPress={() => openRootScreen(navigation, 'FriendsList')} />

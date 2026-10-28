@@ -45,6 +45,59 @@ describe('PlaceSaveService', () => {
     expect(sql).not.toContain('COUNT(');
   });
 
+  it('lists canonical private bookmarks with only coarse location and thresholded trend state', async () => {
+    const savedAt = new Date('2026-10-28T04:30:00.000Z');
+    const emittedAt = new Date('2026-10-28T04:40:00.000Z');
+    dbQuery.mockResolvedValueOnce([{
+      id: canonicalPlace.id,
+      canonical_label: canonicalPlace.canonicalLabel,
+      location_h3_r7: canonicalPlace.locationH3R7,
+      saved_at: savedAt,
+      last_emitted_at: emittedAt,
+    }]);
+
+    const page = await service.listSaved('user-1', 30, 0);
+
+    expect(page).toEqual({
+      items: [{
+        id: canonicalPlace.id,
+        canonicalLabel: canonicalPlace.canonicalLabel,
+        approximateLocation: { lat: expect.any(Number), lng: expect.any(Number) },
+        locationPrecision: 'coarse',
+        trending: true,
+        recentActivityAt: emittedAt.toISOString(),
+        savedAt: savedAt.toISOString(),
+      }],
+      nextOffset: null,
+    });
+    const sql = String(dbQuery.mock.calls[0]?.[0]);
+    expect(sql).toContain('GROUP BY place_id');
+    expect(sql).toContain('c.depth < 5');
+    expect(sql).toContain('LIMIT $2 OFFSET $3');
+    expect(dbQuery).toHaveBeenCalledWith(expect.any(String), ['user-1', 31, 0]);
+    const serialized = JSON.stringify(page);
+    expect(serialized).not.toContain('maptiler');
+    expect(serialized).not.toContain(canonicalPlace.locationH3R7);
+    expect(serialized).not.toContain('count');
+  });
+
+  it('returns a bounded next offset and drops malformed stored place cells', async () => {
+    const rows = Array.from({ length: 3 }, (_, index) => ({
+      id: `place-${index}`,
+      canonical_label: `Place ${index}`,
+      location_h3_r7: index === 0 ? canonicalPlace.locationH3R7 : 'invalid',
+      saved_at: new Date(`2026-10-28T04:3${index}:00.000Z`),
+      last_emitted_at: null,
+    }));
+    dbQuery.mockResolvedValueOnce(rows);
+
+    const page = await service.listSaved('user-1', 2, 5);
+
+    expect(page.items).toHaveLength(1);
+    expect(page.nextOffset).toBe(7);
+    expect(dbQuery).toHaveBeenCalledWith(expect.any(String), ['user-1', 3, 5]);
+  });
+
   it('saves only the canonical place id and removes obsolete merged-alias bookmarks', async () => {
     managerQuery.mockResolvedValue([]);
 

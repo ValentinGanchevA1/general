@@ -21,7 +21,7 @@ export type CommerceStackParamList = {
     | undefined;
 };
 
-/** Settings / verification / legal — not the social graph. */
+/** Settings / verification / legal + self-owned private collections. */
 export type AccountStackParamList = {
   Settings: undefined;
   Privacy: undefined;
@@ -37,6 +37,7 @@ export type AccountStackParamList = {
   SocialLinking: undefined;
   ProfileEdit: { focus?: 'dating' } | undefined;
   Photos: undefined;
+  SavedPlaces: undefined;
 };
 
 /** Friends graph — Profile / map CTAs, not Settings. */
