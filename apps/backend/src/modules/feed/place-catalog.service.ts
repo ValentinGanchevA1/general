@@ -25,6 +25,8 @@ export interface CatalogPlace {
   locationH3R7: string;
 }
 
+export type NexaPlacePublicDetail = Omit<NexaPlaceDetail, 'saved'>;
+
 /**
  * Converts short-lived provider identities into NEXA-owned durable place IDs.
  *
@@ -76,16 +78,12 @@ export class PlaceCatalogService {
         await this.attachRef(manager, place.id, ref.namespace, ref.externalId);
       }
 
-      return {
-        id: place.id,
-        canonicalLabel: place.canonical_label,
-        locationH3R7: place.location_h3_r7,
-      };
+      return this.toCatalogPlace(place);
     });
   }
 
-  /** Public place view. Never exposes provider aliases, raw H3 or participant counts. */
-  async getPublicDetail(placeId: string): Promise<NexaPlaceDetail | null> {
+  /** Resolve merged aliases to the current active NEXA place and fail closed on invalid coarse location. */
+  async getActivePlace(placeId: string): Promise<CatalogPlace | null> {
     const [initial] = await this.db.query<PlaceRow[]>(
       `SELECT id, canonical_label, location_h3_r7, status, merged_into_place_id
          FROM nexa_places
@@ -114,7 +112,15 @@ export class PlaceCatalogService {
       return null;
     }
 
-    const [lat, lng] = h3.cellToLatLng(place.location_h3_r7);
+    return this.toCatalogPlace(place);
+  }
+
+  /** Public place view. Never exposes provider aliases, raw H3 or participant counts. */
+  async getPublicDetail(placeId: string): Promise<NexaPlacePublicDetail | null> {
+    const place = await this.getActivePlace(placeId);
+    if (!place) return null;
+
+    const [lat, lng] = h3.cellToLatLng(place.locationH3R7);
     const [trend] = await this.db.query<TrendRow[]>(
       `SELECT last_emitted_at
          FROM pulse_place_trends
@@ -127,11 +133,19 @@ export class PlaceCatalogService {
 
     return {
       id: place.id,
-      canonicalLabel: place.canonical_label,
+      canonicalLabel: place.canonicalLabel,
       approximateLocation: { lat, lng },
       locationPrecision: 'coarse',
       trending: trend != null,
       recentActivityAt: trend ? new Date(trend.last_emitted_at).toISOString() : null,
+    };
+  }
+
+  private toCatalogPlace(place: PlaceRow): CatalogPlace {
+    return {
+      id: place.id,
+      canonicalLabel: place.canonical_label,
+      locationH3R7: place.location_h3_r7,
     };
   }
 
