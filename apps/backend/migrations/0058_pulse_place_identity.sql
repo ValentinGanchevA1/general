@@ -34,6 +34,24 @@ BEGIN
 END;
 $$;
 
+-- Rolling deploy hard gate: old app instances may briefly run the previous
+-- free-text evaluator after this migration. NOT VALID avoids scanning legacy
+-- rows while still enforcing provider identity for every new/updated trend row.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'pulse_place_trends_provider_required'
+  ) THEN
+    ALTER TABLE pulse_place_trends
+      ADD CONSTRAINT pulse_place_trends_provider_required
+      CHECK (
+        place_provider IS NOT NULL
+        AND place_provider_id IS NOT NULL
+      ) NOT VALID;
+  END IF;
+END;
+$$;
+
 CREATE INDEX IF NOT EXISTS pulse_check_ins_place_identity_idx
   ON pulse_check_ins (place_provider, place_provider_id, place_h3_r7, created_at DESC)
   WHERE place_provider IS NOT NULL AND place_provider_id IS NOT NULL;
