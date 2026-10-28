@@ -3,11 +3,13 @@ import type { NexaPlaceDetail, NexaSavedPlaceSummary } from '@g88/shared';
 import reducer, {
   loadPlaceDetail,
   loadSavedPlaces,
+  resolvePlaceMutationId,
   setPlaceSaved,
   type PlaceDetailsState,
 } from './placeDetailSlice';
 
 const placeId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const aliasPlaceId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const detail: NexaPlaceDetail = {
   id: placeId,
   canonicalLabel: 'Sea Garden',
@@ -49,6 +51,28 @@ function loadedState(saved = false): PlaceDetailsState {
   };
 }
 
+function aliasLoadedState(saved = false): PlaceDetailsState {
+  return {
+    entries: {
+      [aliasPlaceId]: {
+        detail: { ...detail, saved },
+        loadId: null,
+        saveId: null,
+        error: null,
+        saveError: null,
+        receivedAt: 10,
+      },
+    },
+    saved: {
+      items: saved ? [savedItem] : [],
+      loadId: null,
+      error: null,
+      nextOffset: null,
+      receivedAt: 10,
+    },
+  };
+}
+
 describe('placeDetailSlice', () => {
   it('stores canonical detail and ignores a stale load response', () => {
     let state = reducer(undefined, loadPlaceDetail.pending('req-new', { placeId }));
@@ -64,6 +88,13 @@ describe('placeDetailSlice', () => {
     );
     expect(state.entries[placeId]?.detail).toEqual(detail);
     expect(state.entries[placeId]?.receivedAt).toBe(20);
+  });
+
+  it('resolves a loaded alias to its canonical place id for mutations', () => {
+    const state = aliasLoadedState(false);
+
+    expect(resolvePlaceMutationId(state, aliasPlaceId)).toBe(placeId);
+    expect(resolvePlaceMutationId(state, 'unknown-place')).toBe('unknown-place');
   });
 
   it('replaces the saved collection on authoritative refresh and ignores stale responses', () => {
@@ -148,6 +179,29 @@ describe('placeDetailSlice', () => {
     expect(state.entries[placeId]?.error).toBeNull();
   });
 
+  it('fans canonical save lifecycle out to an alias-keyed detail entry', () => {
+    let state = reducer(
+      aliasLoadedState(false),
+      setPlaceSaved.pending('alias-save', { placeId: aliasPlaceId, saved: true }),
+    );
+
+    expect(state.entries[aliasPlaceId]?.saveId).toBe('alias-save');
+    expect(state.entries[placeId]).toMatchObject({ detail: null, saveId: 'alias-save' });
+
+    state = reducer(
+      state,
+      setPlaceSaved.fulfilled(
+        { placeId, saved: true },
+        'alias-save',
+        { placeId: aliasPlaceId, saved: true },
+      ),
+    );
+
+    expect(state.entries[aliasPlaceId]?.detail).toMatchObject({ id: placeId, saved: true });
+    expect(state.entries[aliasPlaceId]?.saveId).toBeNull();
+    expect(state.entries[placeId]?.saveId).toBeNull();
+  });
+
   it('removes an unsaved canonical place from the private collection', () => {
     let state = reducer(loadedState(true), setPlaceSaved.pending('save-2', { placeId, saved: false }));
     state = reducer(
@@ -169,5 +223,28 @@ describe('placeDetailSlice', () => {
     expect(state.saved.items).toEqual([savedItem]);
     expect(state.entries[placeId]?.saveError).toBe('Could not remove this saved place.');
     expect(state.entries[placeId]?.error).toBe('Could not remove this saved place.');
+  });
+
+  it('clears alias and canonical mutation state when a canonical save request fails', () => {
+    let state = reducer(
+      aliasLoadedState(true),
+      setPlaceSaved.pending('alias-fail', { placeId: aliasPlaceId, saved: false }),
+    );
+
+    state = reducer(
+      state,
+      setPlaceSaved.rejected(
+        new Error('offline'),
+        'alias-fail',
+        { placeId: aliasPlaceId, saved: false },
+        'Could not remove this saved place.',
+      ),
+    );
+
+    expect(state.entries[aliasPlaceId]?.detail?.saved).toBe(true);
+    expect(state.entries[aliasPlaceId]?.saveId).toBeNull();
+    expect(state.entries[aliasPlaceId]?.saveError).toBe('Could not remove this saved place.');
+    expect(state.entries[placeId]?.saveId).toBeNull();
+    expect(state.entries[placeId]?.saveError).toBe('Could not remove this saved place.');
   });
 });
