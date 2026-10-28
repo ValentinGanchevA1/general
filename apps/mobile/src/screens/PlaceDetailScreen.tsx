@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -17,6 +17,10 @@ import type { CheckInAudience } from '@g88/shared';
 import { EmptyState } from '@/components/EmptyState';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useUserLocation } from '@/features/location/useUserLocation';
+import {
+  clearPendingPlaceCheckIn,
+  takePendingPlaceCheckIn,
+} from '@/features/places/pendingPlaceCheckIn';
 import { loadPlaceDetail, setPlaceSaved } from '@/features/places/placeDetailSlice';
 import {
   clearCheckInError,
@@ -45,10 +49,22 @@ export function PlaceDetailScreen(): React.JSX.Element {
   const error = state?.error ?? null;
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [checkedIn, setCheckedIn] = useState(false);
+  const consumedMapIntentRef = useRef(false);
 
   useEffect(() => {
     void dispatch(loadPlaceDetail({ placeId }));
   }, [dispatch, placeId]);
+
+  useEffect(() => {
+    if (place == null || consumedMapIntentRef.current) return undefined;
+    if (!takePendingPlaceCheckIn(placeId)) return undefined;
+    consumedMapIntentRef.current = true;
+    dispatch(clearCheckInError());
+    const frame = requestAnimationFrame(() => setCheckInOpen(true));
+    return () => cancelAnimationFrame(frame);
+  }, [dispatch, place, placeId]);
+
+  useEffect(() => () => clearPendingPlaceCheckIn(), []);
 
   const retry = useCallback(() => {
     void dispatch(loadPlaceDetail({ placeId, force: true }));
