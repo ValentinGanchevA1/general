@@ -69,7 +69,7 @@ type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<strin
 type G88Socket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 
 /** Match the 0.02-degree public discovery grid for legacy cell presence deltas. */
-function approximatePublicLocation(lat: number, lng: number): { lat: number; lng: number } {
+export function approximatePublicLocation(lat: number, lng: number): { lat: number; lng: number } {
   const snap = (value: number): number => Math.round(value / 0.02) * 0.02;
   return { lat: snap(lat), lng: snap(lng) };
 }
