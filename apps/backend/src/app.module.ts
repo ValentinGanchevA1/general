@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { resolveRateLimitTracker } from './common/rate-limit-tracker';
+import { RuntimeDiagnosticsService } from './common/runtime-diagnostics.service';
 import { BlocksModule } from './modules/blocks/blocks.module';
 import { FriendsModule } from './modules/friends/friends.module';
 import { RedisModule } from './config/redis.module';
@@ -94,6 +95,9 @@ import { RuntimeConfigModule } from './modules/runtime-config/runtime-config.mod
     DatingModule,
     AnalyticsModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    RuntimeDiagnosticsService,
+  ],
 })
 export class AppModule {}
