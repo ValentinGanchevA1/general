@@ -18,6 +18,16 @@ export interface RuntimeResourceSnapshot {
   uptimeSec: number;
 }
 
+interface SocketCountSource {
+  server?: {
+    sockets?: {
+      sockets?: {
+        size?: number;
+      };
+    };
+  };
+}
+
 const BYTES_PER_MIB = 1024 * 1024;
 const KIB_PER_MIB = 1024;
 
@@ -27,6 +37,11 @@ function round(value: number): number {
 
 function bytesToMiB(value: number): number {
   return round(value / BYTES_PER_MIB);
+}
+
+export function readConnectedSocketCount(source: SocketCountSource): number {
+  const size = source.server?.sockets?.sockets?.size;
+  return typeof size === 'number' && Number.isFinite(size) && size >= 0 ? size : 0;
 }
 
 export function formatRuntimeResourceSnapshot(snapshot: RuntimeResourceSnapshot): string {
@@ -77,7 +92,7 @@ export class RuntimeDiagnosticsService implements OnApplicationBootstrap, OnAppl
   private logSnapshot(): void {
     const memory = process.memoryUsage();
     const usage = process.resourceUsage();
-    const sockets = this.realtime.server?.sockets.sockets.size ?? 0;
+    const sockets = readConnectedSocketCount(this.realtime);
 
     const snapshot: RuntimeResourceSnapshot = {
       rssMiB: bytesToMiB(memory.rss),
