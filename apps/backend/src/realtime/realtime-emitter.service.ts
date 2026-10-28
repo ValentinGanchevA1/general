@@ -22,7 +22,22 @@ export class RealtimeEmitterService {
   constructor(private readonly moduleRef: ModuleRef) {}
 
   to(roomOrSocketId: string): ReturnType<G88RealtimeServer['to']> {
+    return this.server.to(roomOrSocketId);
+  }
+
+  /**
+   * Remove every socket for the supplied users from one room.
+   * `socketsLeave()` is adapter-aware, so this applies across Socket.IO nodes
+   * when the configured adapter supports cluster-wide room operations.
+   */
+  leaveRoomForUsers(userIds: readonly string[], room: string): void {
+    for (const userId of new Set(userIds)) {
+      this.server.in(`user:${userId}`).socketsLeave(room);
+    }
+  }
+
+  private get server(): G88RealtimeServer {
     const gateway = this.moduleRef.get(RealtimeGateway, { strict: false });
-    return gateway.server.to(roomOrSocketId);
+    return gateway.server;
   }
 }
