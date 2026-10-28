@@ -46,7 +46,9 @@ export function useVerificationSocket() {
       auth: { token },
       reconnection: true,
       withCredentials: true,
-      transports: ['websocket', 'polling'],
+      // Multi-instance Render deployments do not rely on HTTP polling affinity.
+      // Redis handles cross-instance fanout; each WebSocket remains on one replica.
+      transports: ['websocket'],
     });
 
     socket.on('connect', () => setIsConnected(true));
