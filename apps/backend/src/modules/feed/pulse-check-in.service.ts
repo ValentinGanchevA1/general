@@ -89,6 +89,7 @@ export class PulseCheckInService {
     void this.realtime.publishCheckIn({
       checkInId: id,
       actorId: userId,
+      placeId,
       placeLabel,
       audience: input.audience,
       locationH3R7: cell,
@@ -106,6 +107,7 @@ export class PulseCheckInService {
     return {
       id,
       placeLabel,
+      placeId,
       placeIdentity,
       audience: input.audience,
       createdAt: createdAt.toISOString(),
