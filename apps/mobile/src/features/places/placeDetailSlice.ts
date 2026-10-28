@@ -208,6 +208,10 @@ const slice = createSlice({
       if (canonicalPlaceId === requestedPlaceId) return;
 
       const canonical = entry(state, canonicalPlaceId);
+      if (canonical.saveId != null && current.saveId == null) {
+        current.saveId = canonical.saveId;
+        current.saveError = null;
+      }
       if (canonical.loadId != null || canonical.saveId != null) return;
       if (canonical.receivedAt > action.payload.receivedAt) return;
       applyLoadedDetail(canonical, action.payload.detail, action.payload.receivedAt);
