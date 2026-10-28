@@ -6,6 +6,10 @@ import { PRODUCT_ANALYTICS_EVENTS } from '@g88/shared';
 const DEFAULT_APP_HOST = 'https://eu.posthog.com';
 const REQUEST_TIMEOUT_MS = 5_000;
 const RETRY_DELAY_MS = 60 * 60 * 1_000;
+const CLAIM_LEASE_MS = 10 * 60 * 1_000;
+const MAX_BATCH_SIZE = 50;
+const RECONCILIATION_PAGE_SIZE = 100;
+const MAX_RECONCILIATION_PAGES = 20;
 const SUBJECT_HASH_RE = /^[a-f0-9]{64}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -26,7 +30,19 @@ interface SubmittedRow {
 interface PostHogDeletionResponse {
   id?: string;
   status?: string;
+  submission_id?: string;
 }
+
+interface PostHogDeletionListResponse {
+  results?: PostHogDeletionResponse[];
+}
+
+type ReconciliationResult =
+  | { state: 'found'; request: PostHogDeletionResponse }
+  | { state: 'not_found' }
+  | { state: 'unavailable' };
+
+type PostHogConfig = { apiKey: string; projectId: string; appHost: string };
 
 function enabled(): boolean {
   return process.env.POSTHOG_PRIVACY_ENABLED?.trim().toLowerCase() === 'true';
@@ -36,12 +52,16 @@ function queryVerified(): boolean {
   return process.env.POSTHOG_DELETION_QUERY_VERIFIED?.trim().toLowerCase() === 'true';
 }
 
-function configuration(): { apiKey: string; projectId: string; appHost: string } | null {
+function configuration(): PostHogConfig | null {
   const apiKey = process.env.POSTHOG_PERSONAL_API_KEY?.trim();
   const projectId = process.env.POSTHOG_PROJECT_ID?.trim();
   if (!apiKey || !projectId) return null;
   const appHost = (process.env.POSTHOG_APP_HOST?.trim() || DEFAULT_APP_HOST).replace(/\/$/, '');
   return { apiKey, projectId, appHost };
+}
+
+function boundedLimit(limit: number): number {
+  return Math.max(1, Math.min(MAX_BATCH_SIZE, limit));
 }
 
 function quoteLiteral(value: string): string {
@@ -105,31 +125,41 @@ export class PostHogPrivacyService {
 
     await this.syncSubmitted(config, limit);
 
-    const rows = await this.db.query<DeletionRow[]>(
-      `SELECT id, kind, subject_hash, cutoff_at, submission_id, attempts
-         FROM analytics_external_deletion_requests
-        WHERE provider = 'posthog'
-          AND status IN ('queued', 'failed')
-          AND next_attempt_at <= NOW()
-        ORDER BY created_at ASC
-        LIMIT $1`,
-      [Math.max(1, Math.min(50, limit))],
-    );
-
+    const rows = await this.claimPending(limit);
     for (const row of rows) await this.submit(row, config);
   }
 
-  private async syncSubmitted(
-    config: { apiKey: string; projectId: string; appHost: string },
-    limit: number,
-  ): Promise<void> {
+  private async claimPending(limit: number): Promise<DeletionRow[]> {
+    return this.db.query<DeletionRow[]>(
+      `WITH candidates AS (
+         SELECT id
+           FROM analytics_external_deletion_requests
+          WHERE provider = 'posthog'
+            AND status IN ('queued', 'failed')
+            AND next_attempt_at <= NOW()
+          ORDER BY created_at ASC
+          LIMIT $1
+          FOR UPDATE SKIP LOCKED
+       )
+       UPDATE analytics_external_deletion_requests AS request
+          SET next_attempt_at = NOW() + ($2::int * INTERVAL '1 millisecond'),
+              updated_at = NOW()
+         FROM candidates
+        WHERE request.id = candidates.id
+       RETURNING request.id, request.kind, request.subject_hash, request.cutoff_at,
+                 request.submission_id, request.attempts`,
+      [boundedLimit(limit), CLAIM_LEASE_MS],
+    );
+  }
+
+  private async syncSubmitted(config: PostHogConfig, limit: number): Promise<void> {
     const rows = await this.db.query<SubmittedRow[]>(
       `SELECT id, provider_request_id
          FROM analytics_external_deletion_requests
         WHERE provider = 'posthog' AND status = 'submitted' AND provider_request_id IS NOT NULL
         ORDER BY updated_at ASC
         LIMIT $1`,
-      [Math.max(1, Math.min(50, limit))],
+      [boundedLimit(limit)],
     );
 
     for (const row of rows) {
@@ -148,7 +178,7 @@ export class PostHogPrivacyService {
 
   private async fetchRequest(
     requestId: string,
-    config: { apiKey: string; projectId: string; appHost: string },
+    config: PostHogConfig,
   ): Promise<PostHogDeletionResponse | null> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -166,18 +196,64 @@ export class PostHogPrivacyService {
     }
   }
 
-  private async submit(
-    row: DeletionRow,
-    config: { apiKey: string; projectId: string; appHost: string },
-  ): Promise<void> {
+  private async reconcileSubmission(
+    submissionId: string,
+    config: PostHogConfig,
+  ): Promise<ReconciliationResult> {
+    for (let page = 0; page < MAX_RECONCILIATION_PAGES; page += 1) {
+      const offset = page * RECONCILIATION_PAGE_SIZE;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      try {
+        const response = await fetch(
+          `${config.appHost}/api/projects/${encodeURIComponent(config.projectId)}/data_deletion_requests/?limit=${RECONCILIATION_PAGE_SIZE}&offset=${offset}`,
+          { headers: { Authorization: `Bearer ${config.apiKey}` }, signal: controller.signal },
+        );
+        if (!response.ok) return { state: 'unavailable' };
+
+        const body = (await response.json()) as PostHogDeletionListResponse;
+        const results = Array.isArray(body.results) ? body.results : [];
+        const match = results.find(
+          (request) => request.submission_id === submissionId && request.id != null && UUID_RE.test(request.id),
+        );
+        if (match) return { state: 'found', request: match };
+        if (results.length < RECONCILIATION_PAGE_SIZE) return { state: 'not_found' };
+      } catch {
+        return { state: 'unavailable' };
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    this.logger.error('PostHog deletion reconciliation exceeded the pagination safety limit.');
+    return { state: 'unavailable' };
+  }
+
+  private async submit(row: DeletionRow, config: PostHogConfig): Promise<void> {
     let query: string;
     try {
       query = row.kind === 'subject'
         ? buildPostHogSubjectDeletionQuery(row.subject_hash ?? '')
         : buildPostHogRetentionDeletionQuery(new Date(row.cutoff_at ?? ''));
     } catch (error: unknown) {
-      await this.markFailed(row.id, error instanceof Error ? error.message : 'invalid deletion request');
+      await this.scheduleRetry(
+        row.id,
+        error instanceof Error ? error.message : 'invalid deletion request',
+        false,
+      );
       return;
+    }
+
+    if (row.attempts > 0) {
+      const reconciliation = await this.reconcileSubmission(row.submission_id, config);
+      if (reconciliation.state === 'found' && reconciliation.request.id) {
+        await this.markSubmitted(row.id, reconciliation.request.id, false);
+        return;
+      }
+      if (reconciliation.state === 'unavailable') {
+        await this.scheduleRetry(row.id, 'PostHog deletion retry reconciliation is unavailable.', false);
+        return;
+      }
     }
 
     const controller = new AbortController();
@@ -197,40 +273,53 @@ export class PostHogPrivacyService {
       );
 
       if (!response.ok) {
-        await this.markFailed(row.id, `PostHog deletion request rejected with HTTP ${response.status}`);
+        await this.scheduleRetry(
+          row.id,
+          `PostHog deletion request rejected with HTTP ${response.status}`,
+          true,
+        );
         return;
       }
 
       const body = (await response.json()) as PostHogDeletionResponse;
       if (!body.id || !UUID_RE.test(body.id)) {
-        await this.markFailed(row.id, 'PostHog deletion response did not include a valid request id.');
+        await this.scheduleRetry(
+          row.id,
+          'PostHog deletion response did not include a valid request id.',
+          true,
+        );
         return;
       }
 
-      await this.db.query(
-        `UPDATE analytics_external_deletion_requests
-            SET status = 'submitted', provider_request_id = $2::uuid,
-                attempts = attempts + 1, submitted_at = NOW(), updated_at = NOW(), last_error = NULL
-          WHERE id = $1`,
-        [row.id, body.id],
-      );
+      await this.markSubmitted(row.id, body.id, true);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'unknown PostHog deletion error';
-      await this.markFailed(row.id, message);
+      await this.scheduleRetry(row.id, message, true);
     } finally {
       clearTimeout(timeout);
     }
   }
 
-  private async markFailed(id: string, message: string): Promise<void> {
+  private async markSubmitted(id: string, providerRequestId: string, attempted: boolean): Promise<void> {
+    await this.db.query(
+      `UPDATE analytics_external_deletion_requests
+          SET status = 'submitted', provider_request_id = $2::uuid,
+              attempts = attempts + $3::int,
+              submitted_at = COALESCE(submitted_at, NOW()), updated_at = NOW(), last_error = NULL
+        WHERE id = $1`,
+      [id, providerRequestId, attempted ? 1 : 0],
+    );
+  }
+
+  private async scheduleRetry(id: string, message: string, attempted: boolean): Promise<void> {
     const safeMessage = message.slice(0, 300);
     await this.db.query(
       `UPDATE analytics_external_deletion_requests
-          SET status = 'failed', attempts = attempts + 1,
-              next_attempt_at = NOW() + ($2::int * INTERVAL '1 millisecond'),
-              last_error = $3, updated_at = NOW()
+          SET status = 'failed', attempts = attempts + $2::int,
+              next_attempt_at = NOW() + ($3::int * INTERVAL '1 millisecond'),
+              last_error = $4, updated_at = NOW()
         WHERE id = $1`,
-      [id, RETRY_DELAY_MS, safeMessage],
+      [id, attempted ? 1 : 0, RETRY_DELAY_MS, safeMessage],
     );
   }
 }
