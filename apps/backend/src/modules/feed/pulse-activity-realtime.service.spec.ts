@@ -8,6 +8,7 @@ import { PulseActivityRealtimeService } from './pulse-activity-realtime.service'
 describe('PulseActivityRealtimeService', () => {
   let query: jest.Mock;
   let set: jest.Mock;
+  let del: jest.Mock;
   let publish: jest.Mock;
   let subscribe: jest.Mock;
   let unsubscribe: jest.Mock;
@@ -21,6 +22,7 @@ describe('PulseActivityRealtimeService', () => {
     messageHandler = null;
     query = jest.fn();
     set = jest.fn();
+    del = jest.fn().mockResolvedValue(1);
     publish = jest.fn();
     subscribe = jest.fn().mockResolvedValue(2);
     unsubscribe = jest.fn().mockResolvedValue(2);
@@ -39,6 +41,7 @@ describe('PulseActivityRealtimeService', () => {
     const redis = {
       duplicate: jest.fn(() => subscriber),
       set,
+      del,
       publish,
     } as unknown as Redis;
     const emitter = { to } as unknown as RealtimeEmitterService;
@@ -119,6 +122,7 @@ describe('PulseActivityRealtimeService', () => {
       createdAt: '2026-10-28T01:05:00.000Z',
     });
 
+    expect(del).toHaveBeenCalledWith('pulse:activity:removed:event_join:event-1:user-2');
     expect(set).toHaveBeenCalledWith(
       'pulse:activity:published:event_join:event-1:user-2',
       '1',
@@ -164,6 +168,7 @@ describe('PulseActivityRealtimeService', () => {
       locationH3R7: cell,
     });
 
+    expect(del).toHaveBeenCalledWith('pulse:activity:published:event_join:event-1:user-2');
     expect(set).toHaveBeenCalledWith(
       'pulse:activity:removed:event_join:event-1:user-2',
       '1',
@@ -187,7 +192,7 @@ describe('PulseActivityRealtimeService', () => {
     );
   });
 
-  it('suppresses duplicate publish attempts before querying recipients', async () => {
+  it('suppresses duplicate check-in publish attempts before querying recipients', async () => {
     set.mockResolvedValueOnce(null);
 
     await service.publishCheckIn({
