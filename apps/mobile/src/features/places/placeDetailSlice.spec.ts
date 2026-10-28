@@ -105,6 +105,7 @@ describe('placeDetailSlice', () => {
     expect(state.entries[aliasPlaceId]?.receivedAt).toBe(20);
     expect(state.entries[placeId]?.detail).toEqual(detail);
     expect(state.entries[placeId]?.receivedAt).toBe(20);
+    expect(state.entries[aliasPlaceId]?.detail).not.toBe(state.entries[placeId]?.detail);
   });
 
   it('does not overwrite a newer canonical cache entry with an alias response', () => {
@@ -131,7 +132,7 @@ describe('placeDetailSlice', () => {
     expect(state.entries[placeId]?.receivedAt).toBe(30);
   });
 
-  it('does not overwrite canonical detail state while a save mutation is in flight', () => {
+  it('joins a late alias entry to an in-flight canonical save lifecycle', () => {
     let state = reducer(undefined, setPlaceSaved.pending('save-live', { placeId, saved: true }));
     state = reducer(state, loadPlaceDetail.pending('alias-live', { placeId: aliasPlaceId }));
     state = reducer(
@@ -143,11 +144,23 @@ describe('placeDetailSlice', () => {
       ),
     );
 
-    expect(state.entries[aliasPlaceId]?.detail).toEqual(detail);
+    expect(state.entries[aliasPlaceId]).toMatchObject({
+      detail,
+      saveId: 'save-live',
+    });
     expect(state.entries[placeId]).toMatchObject({
       detail: null,
       saveId: 'save-live',
     });
+
+    state = reducer(
+      state,
+      setPlaceSaved.fulfilled({ placeId, saved: true }, 'save-live', { placeId, saved: true }),
+    );
+
+    expect(state.entries[aliasPlaceId]?.detail?.saved).toBe(true);
+    expect(state.entries[aliasPlaceId]?.saveId).toBeNull();
+    expect(state.entries[placeId]?.saveId).toBeNull();
   });
 
   it('resolves a loaded alias to its canonical place id for mutations', () => {
