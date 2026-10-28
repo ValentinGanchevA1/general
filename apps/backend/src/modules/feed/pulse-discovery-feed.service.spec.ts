@@ -23,16 +23,18 @@ describe('PulseDiscoveryFeedService check-ins', () => {
     const db = { query } as unknown as DataSource;
     const legacyFeed = { aggregate: jest.fn() } as unknown as FeedService;
     const service = new PulseDiscoveryFeedService(db, legacyFeed);
+    const internal = service as unknown as {
+      selectCheckIns: (userId: string, since: Date, limit: number) => Promise<ActivityItem[]>;
+    };
 
-    const result = await service.aggregate(
+    const items = await internal.selectCheckIns(
       'viewer-1',
       new Date('2026-10-27T17:00:00.000Z'),
-      ['place'],
       20,
     );
 
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0]).toMatchObject({
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
       id: 'place:check-in-1',
       type: 'place',
       actorName: 'Valentin',
@@ -48,6 +50,51 @@ describe('PulseDiscoveryFeedService check-ins', () => {
     expect(checkInSql).toContain('friendships');
     expect(checkInSql).toContain("ci.audience = 'nearby'");
     expect(checkInSql).toContain("ci.audience = 'friends'");
+  });
+});
+
+describe('PulseDiscoveryFeedService place trends', () => {
+  it('returns active anonymous trends without selecting threshold counts', async () => {
+    const viewerCell = h3.latLngToCell(43.2047, 27.9105, 7);
+    const query = jest.fn()
+      .mockResolvedValueOnce([{ location_h3_r7: viewerCell }])
+      .mockResolvedValueOnce([{
+        id: 'trend-1',
+        place_label: 'Sea Garden',
+        location_h3_r7: viewerCell,
+        last_emitted_at: new Date('2026-10-28T09:00:00.000Z'),
+      }]);
+    const service = new PulseDiscoveryFeedService(
+      { query } as unknown as DataSource,
+      { aggregate: jest.fn() } as unknown as FeedService,
+    );
+    const internal = service as unknown as {
+      selectPlaceTrends: (userId: string, since: Date, limit: number) => Promise<ActivityItem[]>;
+    };
+
+    const items = await internal.selectPlaceTrends(
+      'viewer-1',
+      new Date('2026-10-28T08:00:00.000Z'),
+      20,
+    );
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      id: 'place_trending:trend-1',
+      type: 'place',
+      actorId: null,
+      actorName: null,
+      narrative: {
+        kind: 'place_trending',
+        objectLabel: 'Sea Garden',
+      },
+    });
+
+    const sql = query.mock.calls[1]?.[0] as string;
+    expect(sql).toContain('FROM pulse_place_trends');
+    expect(sql).toContain('expires_at > NOW()');
+    expect(sql).not.toContain('distinct_user_count');
+    expect(sql).not.toContain('pulse_check_ins');
   });
 });
 
