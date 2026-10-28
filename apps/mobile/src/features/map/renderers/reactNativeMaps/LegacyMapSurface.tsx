@@ -5,14 +5,14 @@ import MapView, {
   type LongPressEvent,
   type Region,
 } from 'react-native-maps';
-import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
+import type { MapClusterPoint, MapDiscoveryPoint, MapEntityPoint } from '@g88/shared';
 
 import { resolveMapStyle } from '@/components/map/mapStyle';
 import type { MapCoordinate, NexaMapController } from '../../contracts/mapRenderer';
 import { LegacyDiscoveryLayer } from './LegacyDiscoveryLayer';
 
 export interface LegacyMapSurfaceProps {
-  points: DiscoveryPoint[];
+  points: MapDiscoveryPoint[];
   selectedEntityKey: string | null;
   dimUnselected: boolean;
   mode: Parameters<typeof resolveMapStyle>[0];
@@ -20,15 +20,10 @@ export interface LegacyMapSurfaceProps {
   onReady: () => void;
   onRegionChangeComplete: (region: Region) => void;
   onLongPress: (coordinate: MapCoordinate) => void;
-  onClusterPress: (point: ClusterPoint) => void;
-  onEntityPress: (point: EntityPoint) => void;
+  onClusterPress: (point: MapClusterPoint) => void;
+  onEntityPress: (point: MapEntityPoint) => void;
 }
 
-/**
- * Runtime boundary for the current react-native-maps implementation.
- * Product/domain state stays outside this component and camera commands are
- * exposed only through the renderer-neutral NexaMapController contract.
- */
 export const LegacyMapSurface = React.forwardRef<NexaMapController, LegacyMapSurfaceProps>(
   function LegacyMapSurface(
     {
