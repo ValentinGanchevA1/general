@@ -11,6 +11,13 @@ ALTER TABLE pulse_place_trends
   ADD COLUMN IF NOT EXISTS place_provider text,
   ADD COLUMN IF NOT EXISTS place_provider_id text;
 
+-- Legacy free-text aggregates are no longer eligible once canonical place identity ships.
+-- Individual free-text check-ins remain untouched and visible according to their original audience.
+UPDATE pulse_place_trends
+   SET expires_at = LEAST(expires_at, NOW()),
+       updated_at = NOW()
+ WHERE place_provider IS NULL OR place_provider_id IS NULL;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
