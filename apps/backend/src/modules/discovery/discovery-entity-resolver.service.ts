@@ -114,8 +114,8 @@ export class DiscoveryEntityResolver {
 
     const rows = await this.db.query<EntityRow[]>(
       `SELECT id, kind,
-              ST_Y(location::geometry) AS lat,
-              ST_X(location::geometry) AS lng,
+              ST_Y(CASE WHEN kind = 'user' THEN ST_SnapToGrid(location::geometry, 0.02) ELSE location::geometry END) AS lat,
+              ST_X(CASE WHEN kind = 'user' THEN ST_SnapToGrid(location::geometry, 0.02) ELSE location::geometry END) AS lng,
               meta
          FROM v_discoverable_entity
         WHERE id = $1
