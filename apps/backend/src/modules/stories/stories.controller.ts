@@ -26,6 +26,7 @@ import type {
   StoryPresignResponse,
 } from '@g88/shared';
 
+import { S3Service } from '../../common/s3.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { StoriesService } from './stories.service';
@@ -43,10 +44,22 @@ interface UploadedMediaFile {
   mimetype?: string;
 }
 
+const MAX_STORY_MEDIA_BYTES = 18 * 1024 * 1024;
+const ALLOWED_STORY_CONTENT_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'video/mp4',
+  'video/quicktime',
+]);
+
 @Controller('stories')
 @UseGuards(JwtAuthGuard)
 export class StoriesController {
-  constructor(private readonly stories: StoriesService) {}
+  constructor(
+    private readonly stories: StoriesService,
+    private readonly s3: S3Service,
+  ) {}
 
   /** POST /api/v1/stories/presign — get S3 PUT URL for media. */
   @Post('presign')
@@ -83,7 +96,7 @@ export class StoriesController {
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @UseInterceptors(
     FileInterceptor('file', {
-      limits: { fileSize: 18 * 1024 * 1024 },
+      limits: { fileSize: MAX_STORY_MEDIA_BYTES },
     }),
   )
   uploadMediaFile(
@@ -108,6 +121,7 @@ export class StoriesController {
     @CurrentUser('id') userId: string,
     @Body() dto: CreateStoryDto,
   ): Promise<CreateStoryResponse> {
+    await this.assertUploadedStoryObject(userId, dto);
     const story = await this.stories.create(userId, dto);
     return { story };
   }
@@ -173,5 +187,65 @@ export class StoriesController {
     @Param('id', ParseUUIDPipe) storyId: string,
   ): Promise<void> {
     await this.stories.remove(userId, storyId);
+  }
+
+  private async assertUploadedStoryObject(userId: string, dto: CreateStoryDto): Promise<void> {
+    let key: string;
+    try {
+      key = new URL(dto.mediaUrl).pathname.replace(/^\//, '');
+    } catch {
+      // StoriesService owns canonical URL/trust validation and error copy.
+      return;
+    }
+
+    if (!key.startsWith(`stories/${userId}/`)) {
+      // Do not probe S3 for an untrusted path; StoriesService will reject it.
+      return;
+    }
+
+    let metadata: { contentLength: number; contentType: string | null };
+    try {
+      metadata = await this.s3.storyObjectMetadata(key);
+    } catch {
+      throw new BadRequestException({
+        code: 'story.media_not_uploaded',
+        message: 'Story media upload is incomplete or unavailable. Upload it again.',
+      });
+    }
+
+    const contentType = metadata.contentType?.toLowerCase() ?? '';
+    const actualMediaType = contentType.startsWith('video/') ? 'video' : 'image';
+    const invalid =
+      metadata.contentLength <= 0 ||
+      metadata.contentLength > MAX_STORY_MEDIA_BYTES ||
+      !ALLOWED_STORY_CONTENT_TYPES.has(contentType) ||
+      actualMediaType !== dto.mediaType;
+
+    if (!invalid) return;
+
+    // Best-effort removal prevents an invalid presigned object from becoming an
+    // unbounded orphan. Failure to clean up must not make the object trusted.
+    try {
+      await this.s3.deleteObjectsByKeys([key]);
+    } catch {
+      // cleanup is best effort; create remains rejected
+    }
+
+    if (metadata.contentLength > MAX_STORY_MEDIA_BYTES) {
+      throw new BadRequestException({
+        code: 'story.media_too_large',
+        message: 'Media is too large. Use a shorter clip or lower quality.',
+      });
+    }
+    if (!ALLOWED_STORY_CONTENT_TYPES.has(contentType) || actualMediaType !== dto.mediaType) {
+      throw new BadRequestException({
+        code: 'story.media_type_unsupported',
+        message: 'Uploaded media type does not match the story.',
+      });
+    }
+    throw new BadRequestException({
+      code: 'story.media_invalid',
+      message: 'Uploaded media is empty.',
+    });
   }
 }
