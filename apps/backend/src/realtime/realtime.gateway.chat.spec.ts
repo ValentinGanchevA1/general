@@ -11,11 +11,15 @@ function setup(joined = true) {
   const emit = jest.fn();
   const to = jest.fn().mockReturnValue({ emit });
   const persist = jest.fn().mockResolvedValue(message);
-  const getParticipantIds = jest.fn().mockResolvedValue([senderId, recipientId]);
+  const dbQuery = jest.fn().mockResolvedValue([
+    { user_id: senderId },
+    { user_id: recipientId },
+  ]);
   const push = jest.fn().mockResolvedValue(undefined);
   Object.assign(gateway, {
     server: { to },
-    chat: { persist, getParticipantIds },
+    db: { query: dbQuery },
+    chat: { persist },
     logger: { warn: jest.fn(), error: jest.fn() },
     challenges: { increment: jest.fn().mockResolvedValue(undefined) },
     pushToOfflineParticipants: push,
@@ -24,44 +28,55 @@ function setup(joined = true) {
     rooms: new Set(joined ? [`convo:${conversationId}`] : []),
     data: { userId: senderId },
   };
-  const send = () => gateway.onChatSend(client as never, { conversationId, body: 'hello', clientMessageId: 'client-1' });
-  return { send, to, emit, persist, getParticipantIds, push };
+  const send = () =>
+    gateway.onChatSend(client as never, {
+      conversationId,
+      body: 'hello',
+      clientMessageId: 'client-1',
+    });
+  return { send, to, emit, persist, dbQuery, push };
 }
 
 describe('RealtimeGateway persisted text-message fanout', () => {
-  it('uses one union broadcast to the conversation and every participant session', async () => {
-    const { send, to, emit, push } = setup();
+  it('reauthorizes recipients and emits only to their user rooms', async () => {
+    const { send, to, emit, dbQuery, push } = setup();
     await expect(send()).resolves.toEqual({ ok: true, data: message });
-    expect(to).toHaveBeenCalledTimes(1);
-    expect(to).toHaveBeenCalledWith([
-      `convo:${conversationId}`, `user:${senderId}`, `user:${recipientId}`,
-    ]);
-    expect(emit).toHaveBeenCalledTimes(1);
-    expect(emit).toHaveBeenCalledWith('chat:message', message);
+    expect(dbQuery).toHaveBeenCalledTimes(1);
+    expect(dbQuery).toHaveBeenCalledWith(expect.stringContaining('user_blocks'), [conversationId]);
+    expect(to).toHaveBeenCalledTimes(2);
+    expect(to).toHaveBeenNthCalledWith(1, `user:${senderId}`);
+    expect(to).toHaveBeenNthCalledWith(2, `user:${recipientId}`);
+    expect(emit).toHaveBeenCalledTimes(2);
+    expect(emit).toHaveBeenNthCalledWith(1, 'chat:message', message);
+    expect(emit).toHaveBeenNthCalledWith(2, 'chat:message', message);
     expect(push).toHaveBeenCalledWith(conversationId, senderId, message.body);
   });
 
-  it('does not broadcast or query participants when the socket has not joined', async () => {
-    const { send, persist, getParticipantIds, emit } = setup(false);
+  it('does not broadcast or query recipients when the socket has not joined', async () => {
+    const { send, persist, dbQuery, emit } = setup(false);
     await expect(send()).resolves.toMatchObject({ ok: false, code: 'chat.forbidden' });
     expect(persist).not.toHaveBeenCalled();
-    expect(getParticipantIds).not.toHaveBeenCalled();
+    expect(dbQuery).not.toHaveBeenCalled();
     expect(emit).not.toHaveBeenCalled();
   });
 
   it('does not fan out when authoritative persistence rejects the send', async () => {
-    const { send, persist, getParticipantIds, emit } = setup();
+    const { send, persist, dbQuery, emit } = setup();
     persist.mockRejectedValue(new ForbiddenException({ code: 'chat.forbidden', message: 'Denied' }));
     await expect(send()).resolves.toMatchObject({ ok: false, code: 'chat.forbidden' });
-    expect(getParticipantIds).not.toHaveBeenCalled();
+    expect(dbQuery).not.toHaveBeenCalled();
     expect(emit).not.toHaveBeenCalled();
   });
 
-  it('preserves successful delivery and ack if participant lookup fails after persistence', async () => {
-    const { send, getParticipantIds, to, emit } = setup();
-    getParticipantIds.mockRejectedValue(new Error('database unavailable'));
-    await expect(send()).resolves.toEqual({ ok: true, data: message });
-    expect(to).toHaveBeenCalledWith([`convo:${conversationId}`]);
-    expect(emit).toHaveBeenCalledTimes(1);
+  it('fails closed when recipient reauthorization fails after persistence', async () => {
+    const { send, dbQuery, to, emit } = setup();
+    dbQuery.mockRejectedValue(new Error('database unavailable'));
+    await expect(send()).resolves.toMatchObject({
+      ok: false,
+      code: 'chat.failed',
+      message: 'database unavailable',
+    });
+    expect(to).not.toHaveBeenCalled();
+    expect(emit).not.toHaveBeenCalled();
   });
 });
