@@ -1,17 +1,14 @@
-import { getDiscoveryPointKey, type DiscoveryPoint, type DiscoveryPointKey } from '@g88/shared';
+import type { MapDiscoveryPoint } from '@g88/shared';
+
+import { getMapDiscoveryPointKey } from './mapDiscoveryKeys';
 
 export interface RenderableMapSelection {
   selectedEntityKey: string | null;
   interactionFocused: boolean;
 }
 
-/**
- * Reconciles product selection with the points the renderer can currently draw.
- * A QuickPeek may intentionally survive viewport movement, but a missing marker
- * must not leave the renderer in a ghost selected/dimmed state.
- */
 export function resolveRenderableMapSelection(
-  points: readonly DiscoveryPoint[],
+  points: readonly MapDiscoveryPoint[],
   selectedEntityKey: string | null,
   dimUnselected: boolean,
 ): RenderableMapSelection {
@@ -22,9 +19,8 @@ export function resolveRenderableMapSelection(
     };
   }
 
-  const selectedKey = selectedEntityKey as DiscoveryPointKey;
   const selectionIsRenderable = points.some(
-    (point) => getDiscoveryPointKey(point) === selectedKey,
+    (point) => getMapDiscoveryPointKey(point) === selectedEntityKey,
   );
 
   if (!selectionIsRenderable) {
