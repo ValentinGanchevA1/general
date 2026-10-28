@@ -56,6 +56,24 @@ describe('RealtimeGateway live location multi-socket revocation', () => {
     expect(received.get('peer-tablet')).toEqual([]);
   });
 
+  it('emits no precise location when all recipients lose conversation access', async () => {
+    const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
+    const to = jest.fn().mockReturnValue({ emit: jest.fn() });
+    const query = jest.fn().mockResolvedValue([]);
+    Object.assign(gateway, {
+      db: { query },
+      locationShare: { update: jest.fn().mockResolvedValue({ conversationId, updatedAt: 'now' }) },
+      server: { to },
+      logger: { error: jest.fn() },
+    });
+    await expect(gateway.onLocationShareUpdate(
+      { data: { userId: sharerId } } as never,
+      { sessionId: 'session-1', location },
+    )).resolves.toMatchObject({ ok: true });
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(to).not.toHaveBeenCalled();
+  });
+
   it('delivers to both devices of an authorized peer without using conversation rooms', async () => {
     const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
     const to = jest.fn().mockReturnValue({ emit: jest.fn() });
