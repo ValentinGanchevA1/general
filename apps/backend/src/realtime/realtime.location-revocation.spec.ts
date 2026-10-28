@@ -112,6 +112,31 @@ describe('RealtimeGateway live location multi-socket revocation', () => {
     expect(to).not.toHaveBeenCalled();
   });
 
+  it('does not leak ended-session metadata to a revoked peer via stale rooms', async () => {
+    const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
+    const to = jest.fn().mockReturnValue({ emit: jest.fn() });
+    const query = jest.fn().mockResolvedValue([{ user_id: sharerId }]);
+    Object.assign(gateway, { db: { query }, server: { to } });
+
+    await gateway.emitLocationShareEnded(conversationId, 'session-1', 'blocked', 'now');
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('user_blocks'), [conversationId]);
+    expect(to).toHaveBeenCalledTimes(1);
+    expect(to).toHaveBeenCalledWith(`user:${sharerId}`);
+    expect(to).not.toHaveBeenCalledWith(`user:${peerId}`);
+  });
+
+  it('fails closed on ended-session recipient authorization failure', async () => {
+    const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
+    const to = jest.fn().mockReturnValue({ emit: jest.fn() });
+    Object.assign(gateway, {
+      db: { query: jest.fn().mockRejectedValue(new Error('database unavailable')) },
+      server: { to },
+    });
+    await expect(gateway.emitLocationShareEnded(conversationId, 'session-1', 'expired', 'now'))
+      .rejects.toThrow('database unavailable');
+    expect(to).not.toHaveBeenCalled();
+  });
+
   it('delivers to both devices of an authorized peer without using conversation rooms', async () => {
     const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
     const to = jest.fn().mockReturnValue({ emit: jest.fn() });
