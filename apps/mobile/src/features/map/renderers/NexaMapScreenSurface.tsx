@@ -207,6 +207,12 @@ export const NexaMapScreenSurface = React.forwardRef<
     return () => cancelAnimationFrame(frame);
   }, [openPlacePreview, savedPlaceFocusRequest]));
 
+  React.useEffect(() => {
+    if (savedPlacesEnabled || selectedPlace?.meta.saved !== true) return;
+    const frame = requestAnimationFrame(() => placeSheetRef.current?.dismiss());
+    return () => cancelAnimationFrame(frame);
+  }, [savedPlacesEnabled, selectedPlace?.meta.saved]);
+
   const openPlaceDetails = useCallback((): void => {
     if (selectedPlace == null) return;
     const placeId = selectedPlace.id;
