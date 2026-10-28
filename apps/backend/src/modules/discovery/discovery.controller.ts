@@ -8,17 +8,21 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
-import type { DiscoveryResponse } from '@g88/shared';
+import type { DiscoveryResponse, MapDiscoveryResponse } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { DiscoveryService } from './discovery.service';
-import { DiscoveryQueryDto } from './dto';
+import { PlaceMapDiscoveryService } from './place-map-discovery.service';
+import { DiscoveryQueryDto, PlaceDiscoveryQueryDto } from './dto';
 
 @Controller('discovery')
 @UseGuards(JwtAuthGuard)
 export class DiscoveryController {
-  constructor(private readonly discovery: DiscoveryService) {}
+  constructor(
+    private readonly discovery: DiscoveryService,
+    private readonly placeDiscovery: PlaceMapDiscoveryService,
+  ) {}
 
   /**
    * POST /api/v1/discovery/nearby
@@ -46,5 +50,16 @@ export class DiscoveryController {
       datingOnly: dto.datingOnly === true,
       rankBy: dto.rankBy,
     });
+  }
+
+  /**
+   * Place pins are a separate full-snapshot lane because they are derived from
+   * thresholded aggregate trends, not realtime entity presence.
+   */
+  @Post('places')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  nearbyPlaces(@Body() dto: PlaceDiscoveryQueryDto): Promise<MapDiscoveryResponse> {
+    return this.placeDiscovery.nearby(dto.viewport, dto.zoom);
   }
 }

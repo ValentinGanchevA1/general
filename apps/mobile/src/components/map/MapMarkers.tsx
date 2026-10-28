@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image } from 'react-native';
 import { Marker } from 'react-native-maps';
-import type { ClusterPoint, DiscoveryPoint, EntityPoint } from '@g88/shared';
+import type { MapClusterPoint, MapDiscoveryPoint, MapEntityPoint } from '@g88/shared';
 
 import { nexaHaptics } from '@/haptics/nexaHaptics';
 import { useAppSelector } from '@/hooks/redux';
@@ -29,20 +29,16 @@ import { clusterVisualKey, entityVisualKey } from './markerVisualKeys';
 import { useTracksViewChanges } from './useTracksViewChanges';
 
 interface MapMarkersProps {
-  points: DiscoveryPoint[];
-  /** Optional override for previews/tests. Runtime normally follows discovery.zoom. */
+  points: MapDiscoveryPoint[];
   zoomPolicy?: NexaMapZoomPolicy;
-  /** Optional controlled entity selection. When omitted, the last tapped entity is tracked locally. */
   selectedEntityKey?: string | null;
-  /** Optional controlled cluster selection. When omitted, the last tapped cluster is tracked locally. */
   selectedClusterCellId?: string | null;
-  /** Optional semantic state inputs for map orchestration without changing marker internals. */
   newEntityKeys?: ReadonlySet<string>;
   ownEntityKey?: string | null;
   unavailableEntityKeys?: ReadonlySet<string>;
   dimUnselected?: boolean;
-  onClusterPress: (p: ClusterPoint) => void;
-  onEntityPress: (p: EntityPoint) => void;
+  onClusterPress: (p: MapClusterPoint) => void;
+  onEntityPress: (p: MapEntityPoint) => void;
 }
 
 interface RevealState {
@@ -51,20 +47,14 @@ interface RevealState {
   pointKeys: readonly string[];
 }
 
-function entityKey(point: EntityPoint): string {
+function entityKey(point: MapEntityPoint): string {
   return `${point.kind}:${point.id}`;
 }
 
-function discoveryPointRevealKey(point: DiscoveryPoint): string {
-  return point.kind === 'cluster'
-    ? `cluster:${point.cellId}`
-    : entityKey(point);
+function discoveryPointRevealKey(point: MapDiscoveryPoint): string {
+  return point.kind === 'cluster' ? `cluster:${point.cellId}` : entityKey(point);
 }
 
-/**
- * Isolated marker layer so MapScreen chrome state (sheet, FAB, loading)
- * does not re-reconcile every Marker when points/handlers are unchanged.
- */
 function MapMarkersImpl({
   points,
   zoomPolicy,
@@ -81,12 +71,8 @@ function MapMarkersImpl({
   const reduceMotion = useNexaReducedMotion();
   const { scheme, mode } = useAppTheme();
   const markerThemeKey = mode === 'protos-nexus' ? mode : scheme;
-  const effectiveZoomPolicy =
-    zoomPolicy ?? resolveNexaMapZoomPolicy(committedDiscoveryZoom);
-  const pointKeys = useMemo(
-    () => points.map(discoveryPointRevealKey),
-    [points],
-  );
+  const effectiveZoomPolicy = zoomPolicy ?? resolveNexaMapZoomPolicy(committedDiscoveryZoom);
+  const pointKeys = useMemo(() => points.map(discoveryPointRevealKey), [points]);
 
   const [localSelectedEntityKey, setLocalSelectedEntityKey] = useState<string | null>(null);
   const [localSelectedClusterCellId, setLocalSelectedClusterCellId] = useState<string | null>(null);
@@ -95,85 +81,55 @@ function MapMarkersImpl({
     count: NEXA_INITIAL_MARKER_REVEAL_COUNT,
     pointKeys,
   }));
-  const replacementReset = shouldResetNexaRevealForReplacement(
-    revealState.pointKeys,
-    pointKeys,
-  );
+  const replacementReset = shouldResetNexaRevealForReplacement(revealState.pointKeys, pointKeys);
   const bandRevealCount = resolveNexaMarkerRevealCountForBand(
     revealState.band,
     effectiveZoomPolicy.band,
     revealState.count,
   );
-  const revealCount = replacementReset
-    ? NEXA_INITIAL_MARKER_REVEAL_COUNT
-    : bandRevealCount;
+  const revealCount = replacementReset ? NEXA_INITIAL_MARKER_REVEAL_COUNT : bandRevealCount;
 
-  const effectiveSelectedEntityKey =
-    selectedEntityKey === undefined ? localSelectedEntityKey : selectedEntityKey;
-  const effectiveSelectedClusterCellId =
-    selectedClusterCellId === undefined
-      ? localSelectedClusterCellId
-      : selectedClusterCellId;
+  const effectiveSelectedEntityKey = selectedEntityKey === undefined ? localSelectedEntityKey : selectedEntityKey;
+  const effectiveSelectedClusterCellId = selectedClusterCellId === undefined
+    ? localSelectedClusterCellId
+    : selectedClusterCellId;
 
   useEffect(() => {
     if (selectedEntityKey !== undefined || localSelectedEntityKey == null) return;
     const stillVisible = points.some(
       (point) => point.kind !== 'cluster' && entityKey(point) === localSelectedEntityKey,
     );
-    if (!stillVisible) {
-      void Promise.resolve().then(() => setLocalSelectedEntityKey(null));
-    }
+    if (!stillVisible) void Promise.resolve().then(() => setLocalSelectedEntityKey(null));
   }, [localSelectedEntityKey, points, selectedEntityKey]);
 
   useEffect(() => {
-    if (
-      selectedClusterCellId !== undefined ||
-      localSelectedClusterCellId == null
-    ) {
-      return;
-    }
+    if (selectedClusterCellId !== undefined || localSelectedClusterCellId == null) return;
     const stillVisible = points.some(
-      (point) =>
-        point.kind === 'cluster' &&
-        point.cellId === localSelectedClusterCellId,
+      (point) => point.kind === 'cluster' && point.cellId === localSelectedClusterCellId,
     );
-    if (!stillVisible) {
-      void Promise.resolve().then(() => setLocalSelectedClusterCellId(null));
-    }
+    if (!stillVisible) void Promise.resolve().then(() => setLocalSelectedClusterCellId(null));
   }, [localSelectedClusterCellId, points, selectedClusterCellId]);
 
   const visiblePoints = useMemo(
-    () =>
-      limitVisibleMapPoints(points, effectiveZoomPolicy.maxVisiblePoints, {
-        selectedEntityKey: effectiveSelectedEntityKey,
-        selectedClusterCellId: effectiveSelectedClusterCellId,
-        ownEntityKey,
-      }),
-    [
-      points,
-      effectiveZoomPolicy.maxVisiblePoints,
-      effectiveSelectedEntityKey,
-      effectiveSelectedClusterCellId,
+    () => limitVisibleMapPoints(points, effectiveZoomPolicy.maxVisiblePoints, {
+      selectedEntityKey: effectiveSelectedEntityKey,
+      selectedClusterCellId: effectiveSelectedClusterCellId,
       ownEntityKey,
-    ],
+    }),
+    [points, effectiveZoomPolicy.maxVisiblePoints, effectiveSelectedEntityKey, effectiveSelectedClusterCellId, ownEntityKey],
   );
 
   useEffect(() => {
     const bandChanged = revealState.band !== effectiveZoomPolicy.band;
     const identitiesChanged = revealState.pointKeys !== pointKeys;
     if (!bandChanged && !identitiesChanged) return;
-
     const nextBand = effectiveZoomPolicy.band;
     void Promise.resolve().then(() => {
       setRevealState((current) => {
-        const shouldReset =
-          current.band !== nextBand ||
-          shouldResetNexaRevealForReplacement(current.pointKeys, pointKeys);
+        const shouldReset = current.band !== nextBand || shouldResetNexaRevealForReplacement(current.pointKeys, pointKeys);
         return {
           band: nextBand,
-          count: shouldReset
-            ? NEXA_INITIAL_MARKER_REVEAL_COUNT
-            : current.count,
+          count: shouldReset ? NEXA_INITIAL_MARKER_REVEAL_COUNT : current.count,
           pointKeys,
         };
       });
@@ -185,35 +141,19 @@ function MapMarkersImpl({
     const activeBand = effectiveZoomPolicy.band;
     const timer = setTimeout(() => {
       setRevealState((current) => {
-        const shouldReset =
-          current.band !== activeBand ||
-          shouldResetNexaRevealForReplacement(current.pointKeys, pointKeys);
+        const shouldReset = current.band !== activeBand || shouldResetNexaRevealForReplacement(current.pointKeys, pointKeys);
         const currentCount = shouldReset
           ? NEXA_INITIAL_MARKER_REVEAL_COUNT
-          : resolveNexaMarkerRevealCountForBand(
-              current.band,
-              activeBand,
-              current.count,
-            );
+          : resolveNexaMarkerRevealCountForBand(current.band, activeBand, current.count);
         return {
           band: activeBand,
-          count: nextNexaMarkerRevealCount(
-            currentCount,
-            visiblePoints.length,
-            false,
-          ),
+          count: nextNexaMarkerRevealCount(currentCount, visiblePoints.length, false),
           pointKeys,
         };
       });
     }, NEXA_MARKER_REVEAL_INTERVAL_MS);
     return () => clearTimeout(timer);
-  }, [
-    effectiveZoomPolicy.band,
-    pointKeys,
-    reduceMotion,
-    revealCount,
-    visiblePoints.length,
-  ]);
+  }, [effectiveZoomPolicy.band, pointKeys, reduceMotion, revealCount, visiblePoints.length]);
 
   const revealedPoints = useMemo(() => {
     if (reduceMotion || visiblePoints.length <= revealCount) return visiblePoints;
@@ -222,40 +162,21 @@ function MapMarkersImpl({
       selectedClusterCellId: effectiveSelectedClusterCellId,
       ownEntityKey,
     });
-  }, [
-    effectiveSelectedClusterCellId,
-    effectiveSelectedEntityKey,
-    ownEntityKey,
-    reduceMotion,
-    revealCount,
-    visiblePoints,
-  ]);
+  }, [effectiveSelectedClusterCellId, effectiveSelectedEntityKey, ownEntityKey, reduceMotion, revealCount, visiblePoints]);
 
-  const handleEntityPress = useCallback(
-    (point: EntityPoint) => {
-      nexaHaptics.select();
-      if (selectedEntityKey === undefined) {
-        setLocalSelectedEntityKey(entityKey(point));
-      }
-      if (selectedClusterCellId === undefined) {
-        setLocalSelectedClusterCellId(null);
-      }
-      onEntityPress(point);
-    }, [onEntityPress, selectedClusterCellId, selectedEntityKey],
-  );
+  const handleEntityPress = useCallback((point: MapEntityPoint) => {
+    nexaHaptics.select();
+    if (selectedEntityKey === undefined) setLocalSelectedEntityKey(entityKey(point));
+    if (selectedClusterCellId === undefined) setLocalSelectedClusterCellId(null);
+    onEntityPress(point);
+  }, [onEntityPress, selectedClusterCellId, selectedEntityKey]);
 
-  const handleClusterPress = useCallback(
-    (point: ClusterPoint) => {
-      nexaHaptics.discover();
-      if (selectedClusterCellId === undefined) {
-        setLocalSelectedClusterCellId(point.cellId);
-      }
-      if (selectedEntityKey === undefined) {
-        setLocalSelectedEntityKey(null);
-      }
-      onClusterPress(point);
-    }, [onClusterPress, selectedClusterCellId, selectedEntityKey],
-  );
+  const handleClusterPress = useCallback((point: MapClusterPoint) => {
+    nexaHaptics.discover();
+    if (selectedClusterCellId === undefined) setLocalSelectedClusterCellId(point.cellId);
+    if (selectedEntityKey === undefined) setLocalSelectedEntityKey(null);
+    onClusterPress(point);
+  }, [onClusterPress, selectedClusterCellId, selectedEntityKey]);
 
   return (
     <>
@@ -276,9 +197,8 @@ function MapMarkersImpl({
 
         const key = entityKey(point);
         const selected = key === effectiveSelectedEntityKey;
-        const showCaption =
-          effectiveZoomPolicy.captionMode === 'all' ||
-          (effectiveZoomPolicy.captionMode === 'selected' && selected);
+        const showCaption = effectiveZoomPolicy.captionMode === 'all'
+          || (effectiveZoomPolicy.captionMode === 'selected' && selected);
 
         return (
           <EntityMarkerItem
@@ -290,11 +210,7 @@ function MapMarkersImpl({
             isNew={newEntityKeys?.has(key) === true}
             own={key === ownEntityKey}
             unavailable={unavailableEntityKeys?.has(key) === true}
-            dimmed={
-              dimUnselected &&
-              effectiveSelectedEntityKey != null &&
-              !selected
-            }
+            dimmed={dimUnselected && effectiveSelectedEntityKey != null && !selected}
             reduceMotion={reduceMotion}
             themeVisualKey={markerThemeKey}
             onPress={handleEntityPress}
@@ -306,91 +222,57 @@ function MapMarkersImpl({
 }
 
 function mapMarkersPropsEqual(prev: MapMarkersProps, next: MapMarkersProps): boolean {
-  return (
-    prev.points === next.points &&
-    prev.zoomPolicy === next.zoomPolicy &&
-    prev.selectedEntityKey === next.selectedEntityKey &&
-    prev.selectedClusterCellId === next.selectedClusterCellId &&
-    prev.newEntityKeys === next.newEntityKeys &&
-    prev.ownEntityKey === next.ownEntityKey &&
-    prev.unavailableEntityKeys === next.unavailableEntityKeys &&
-    prev.dimUnselected === next.dimUnselected &&
-    prev.onClusterPress === next.onClusterPress &&
-    prev.onEntityPress === next.onEntityPress
-  );
+  return prev.points === next.points
+    && prev.zoomPolicy === next.zoomPolicy
+    && prev.selectedEntityKey === next.selectedEntityKey
+    && prev.selectedClusterCellId === next.selectedClusterCellId
+    && prev.newEntityKeys === next.newEntityKeys
+    && prev.ownEntityKey === next.ownEntityKey
+    && prev.unavailableEntityKeys === next.unavailableEntityKeys
+    && prev.dimUnselected === next.dimUnselected
+    && prev.onClusterPress === next.onClusterPress
+    && prev.onEntityPress === next.onEntityPress;
 }
 
 export const MapMarkers = React.memo(MapMarkersImpl, mapMarkersPropsEqual);
 
 interface ClusterItemProps {
-  point: ClusterPoint;
+  point: MapClusterPoint;
   selected: boolean;
   showComposition: boolean;
   reduceMotion: boolean;
   themeVisualKey: string;
-  onPress: (p: ClusterPoint) => void;
+  onPress: (p: MapClusterPoint) => void;
 }
 
-function ClusterMarkerItemImpl({
-  point,
-  selected,
-  showComposition,
-  reduceMotion,
-  themeVisualKey,
-  onPress,
-}: ClusterItemProps): React.JSX.Element {
-  const renderKey = [
-    clusterVisualKey(point),
-    selected ? 'selected' : 'default',
-    showComposition ? 'composition' : 'minimal',
-    themeVisualKey,
-  ].join('|');
+function ClusterMarkerItemImpl({ point, selected, showComposition, reduceMotion, themeVisualKey, onPress }: ClusterItemProps): React.JSX.Element {
+  const renderKey = [clusterVisualKey(point), selected ? 'selected' : 'default', showComposition ? 'composition' : 'minimal', themeVisualKey].join('|');
   const tracksViewChanges = useTracksViewChanges([renderKey], selected);
-  const coordinate = useMemo(
-    () => ({ latitude: point.lat, longitude: point.lng }),
-    [point.lat, point.lng],
-  );
-
-  // Do NOT call e.stopPropagation() — on Android Google Maps that can native-crash.
-  const handlePress = useCallback(() => {
-    onPress(point);
-  }, [onPress, point]);
+  const coordinate = useMemo(() => ({ latitude: point.lat, longitude: point.lng }), [point.lat, point.lng]);
+  const handlePress = useCallback(() => { onPress(point); }, [onPress, point]);
 
   return (
-    <Marker
-      coordinate={coordinate}
-      onPress={handlePress}
-      tracksViewChanges={tracksViewChanges}
-      anchor={{ x: 0.5, y: 0.5 }}
-      zIndex={selected ? 35 : 5}
-    >
-      <ClusterMarker
-        point={point}
-        selected={selected}
-        showComposition={showComposition}
-        reduceMotion={reduceMotion}
-      />
+    <Marker coordinate={coordinate} onPress={handlePress} tracksViewChanges={tracksViewChanges} anchor={{ x: 0.5, y: 0.5 }} zIndex={selected ? 35 : 5}>
+      <ClusterMarker point={point} selected={selected} showComposition={showComposition} reduceMotion={reduceMotion} />
     </Marker>
   );
 }
 
 function clusterItemPropsEqual(prev: ClusterItemProps, next: ClusterItemProps): boolean {
-  return (
-    prev.onPress === next.onPress &&
-    prev.selected === next.selected &&
-    prev.showComposition === next.showComposition &&
-    prev.reduceMotion === next.reduceMotion &&
-    prev.themeVisualKey === next.themeVisualKey &&
-    clusterVisualKey(prev.point) === clusterVisualKey(next.point) &&
-    prev.point.lat === next.point.lat &&
-    prev.point.lng === next.point.lng
-  );
+  return prev.onPress === next.onPress
+    && prev.selected === next.selected
+    && prev.showComposition === next.showComposition
+    && prev.reduceMotion === next.reduceMotion
+    && prev.themeVisualKey === next.themeVisualKey
+    && clusterVisualKey(prev.point) === clusterVisualKey(next.point)
+    && prev.point.lat === next.point.lat
+    && prev.point.lng === next.point.lng;
 }
 
 const ClusterMarkerItem = React.memo(ClusterMarkerItemImpl, clusterItemPropsEqual);
 
 interface EntityItemProps {
-  point: EntityPoint;
+  point: MapEntityPoint;
   density: NexaMapZoomPolicy['markerDensity'];
   showCaption: boolean;
   selected: boolean;
@@ -400,7 +282,7 @@ interface EntityItemProps {
   unavailable: boolean;
   reduceMotion: boolean;
   themeVisualKey: string;
-  onPress: (p: EntityPoint) => void;
+  onPress: (p: MapEntityPoint) => void;
 }
 
 function EntityMarkerItemImpl({
@@ -416,31 +298,19 @@ function EntityMarkerItemImpl({
   themeVisualKey,
   onPress,
 }: EntityItemProps): React.JSX.Element {
-  const candidateAvatarUrl = resolvePersonMarkerAvatarUrl(point, density, selected);
+  const candidateAvatarUrl = point.kind === 'user'
+    ? resolvePersonMarkerAvatarUrl(point, density, selected)
+    : null;
   const [personAvatarUri, setPersonAvatarUri] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-
-    void Promise.resolve().then(() => {
-      if (active) setPersonAvatarUri(null);
-    });
-
-    if (candidateAvatarUrl == null) {
-      return () => {
-        active = false;
-      };
-    }
-
+    void Promise.resolve().then(() => { if (active) setPersonAvatarUri(null); });
+    if (candidateAvatarUrl == null) return () => { active = false; };
     void Image.prefetch(candidateAvatarUrl)
-      .then((loaded) => {
-        if (active && loaded) setPersonAvatarUri(candidateAvatarUrl);
-      })
+      .then((loaded) => { if (active && loaded) setPersonAvatarUri(candidateAvatarUrl); })
       .catch(() => undefined);
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [candidateAvatarUrl]);
 
   const baseVisualKey = entityVisualKey(point);
@@ -457,20 +327,10 @@ function EntityMarkerItemImpl({
     themeVisualKey,
   ].join('|');
   const tracksViewChanges = useTracksViewChanges([renderKey], selected);
-  const coordinate = useMemo(
-    () => ({ latitude: point.lat, longitude: point.lng }),
-    [point.lat, point.lng],
-  );
+  const coordinate = useMemo(() => ({ latitude: point.lat, longitude: point.lng }), [point.lat, point.lng]);
   const isLive = point.kind === 'user' && point.meta.online === true;
-
-  // Do NOT call e.stopPropagation() — on Android Google Maps MarkerPress can native-crash.
-  const handlePress = useCallback(() => {
-    onPress(point);
-  }, [onPress, point]);
-
-  const handlePersonAvatarRenderError = useCallback(() => {
-    setPersonAvatarUri(null);
-  }, []);
+  const handlePress = useCallback(() => { onPress(point); }, [onPress, point]);
+  const handlePersonAvatarRenderError = useCallback(() => { setPersonAvatarUri(null); }, []);
 
   return (
     <Marker
@@ -498,21 +358,19 @@ function EntityMarkerItemImpl({
 }
 
 function entityItemPropsEqual(prev: EntityItemProps, next: EntityItemProps): boolean {
-  return (
-    prev.onPress === next.onPress &&
-    prev.density === next.density &&
-    prev.showCaption === next.showCaption &&
-    prev.selected === next.selected &&
-    prev.isNew === next.isNew &&
-    prev.own === next.own &&
-    prev.dimmed === next.dimmed &&
-    prev.unavailable === next.unavailable &&
-    prev.reduceMotion === next.reduceMotion &&
-    prev.themeVisualKey === next.themeVisualKey &&
-    entityVisualKey(prev.point) === entityVisualKey(next.point) &&
-    prev.point.lat === next.point.lat &&
-    prev.point.lng === next.point.lng
-  );
+  return prev.onPress === next.onPress
+    && prev.density === next.density
+    && prev.showCaption === next.showCaption
+    && prev.selected === next.selected
+    && prev.isNew === next.isNew
+    && prev.own === next.own
+    && prev.dimmed === next.dimmed
+    && prev.unavailable === next.unavailable
+    && prev.reduceMotion === next.reduceMotion
+    && prev.themeVisualKey === next.themeVisualKey
+    && entityVisualKey(prev.point) === entityVisualKey(next.point)
+    && prev.point.lat === next.point.lat
+    && prev.point.lng === next.point.lng;
 }
 
 const EntityMarkerItem = React.memo(EntityMarkerItemImpl, entityItemPropsEqual);

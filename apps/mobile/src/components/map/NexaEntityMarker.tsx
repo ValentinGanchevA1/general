@@ -93,12 +93,14 @@ export function NexaEntityMarker({
         ? colors.entityEvent
         : entityType === 'listing'
           ? colors.entityListing
-          : colors.entityOpportunity;
+          : entityType === 'place'
+            ? colors.discovery
+            : colors.entityOpportunity;
 
   const subtleFill =
     entityType === 'person'
       ? colors.actionSoft
-      : entityType === 'event'
+      : entityType === 'event' || entityType === 'place'
         ? colors.discoverySoft
         : entityType === 'opportunity'
           ? colors.actionSoft
@@ -257,6 +259,8 @@ export function NexaEntityMarker({
               <View pointerEvents="none" style={styles.iconLayer}>
                 {entityType === 'listing' ? (
                   <Icon name="tag-outline" size={iconSize} color={colors.entityListing} />
+                ) : entityType === 'place' ? (
+                  <Icon name="map-marker-radius-outline" size={iconSize} color={colors.discovery} />
                 ) : null}
               </View>
             </>

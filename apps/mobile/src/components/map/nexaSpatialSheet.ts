@@ -23,6 +23,7 @@ const PRIMARY_LABEL_BY_KIND: Record<NexaSpatialSheetKind, string> = {
   person: 'Connect',
   event: 'Join',
   listing: 'View',
+  place: 'View place',
   opportunity: 'Explore',
 };
 
@@ -42,13 +43,17 @@ export function resolveNexaSpatialSheetVisual(
 }
 
 /**
- * Current discovery contract has user/event/listing only.
- * Opportunity stays presentational until it is introduced in @g88/shared.
+ * Legacy discovery currently passes user/event/listing only. The map-specific
+ * place lane can use `resolveNexaSpatialSheetVisual('place')` directly without
+ * widening the identity-bearing realtime discovery contract.
  */
 export function spatialSheetKindFromEntityKind(
   kind: EntityKind,
-): Exclude<NexaSpatialSheetKind, 'opportunity'> {
-  return nexaEntityIdentityKindFromEntityKind(kind);
+): Exclude<NexaSpatialSheetKind, 'opportunity' | 'place'> {
+  return nexaEntityIdentityKindFromEntityKind(kind) as Exclude<
+    NexaSpatialSheetKind,
+    'opportunity' | 'place'
+  >;
 }
 
 /**

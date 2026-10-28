@@ -1,13 +1,10 @@
-import {
-  getDiscoveryPointKey,
-  type DiscoveryPoint,
-  type DiscoveryPointKey,
-  type EntityKind,
-} from '@g88/shared';
+import type { MapDiscoveryPoint, MapEntityKind, MapEntityPoint } from '@g88/shared';
+
+import { getMapDiscoveryPointKey, type MapDiscoveryPointKey } from '../mapDiscoveryKeys';
 
 export interface NexaMapFeatureProperties {
-  key: DiscoveryPointKey;
-  kind: DiscoveryPoint['kind'];
+  key: MapDiscoveryPointKey;
+  kind: MapDiscoveryPoint['kind'];
   count: number | null;
   online: boolean;
   live: boolean;
@@ -17,7 +14,7 @@ export interface NexaMapFeatureProperties {
 
 export interface NexaMapPointFeature {
   type: 'Feature';
-  id: DiscoveryPointKey;
+  id: MapDiscoveryPointKey;
   geometry: {
     type: 'Point';
     coordinates: [longitude: number, latitude: number];
@@ -30,7 +27,7 @@ export interface NexaMapFeatureCollection {
   features: NexaMapPointFeature[];
 }
 
-function entityMeta(point: Exclude<DiscoveryPoint, { kind: 'cluster' }>): {
+function entityMeta(point: MapEntityPoint): {
   online: boolean;
   live: boolean;
   verification: string | null;
@@ -45,12 +42,7 @@ function entityMeta(point: Exclude<DiscoveryPoint, { kind: 'cluster' }>): {
         listingMode: null,
       };
     case 'event':
-      return {
-        online: false,
-        live: false,
-        verification: null,
-        listingMode: null,
-      };
+      return { online: false, live: false, verification: null, listingMode: null };
     case 'listing':
       return {
         online: false,
@@ -58,11 +50,18 @@ function entityMeta(point: Exclude<DiscoveryPoint, { kind: 'cluster' }>): {
         verification: null,
         listingMode: point.meta.mode ?? null,
       };
+    case 'place':
+      return {
+        online: false,
+        live: point.meta.trending,
+        verification: null,
+        listingMode: null,
+      };
   }
 }
 
-export function discoveryPointToMapFeature(point: DiscoveryPoint): NexaMapPointFeature {
-  const key = getDiscoveryPointKey(point);
+export function discoveryPointToMapFeature(point: MapDiscoveryPoint): NexaMapPointFeature {
+  const key = getMapDiscoveryPointKey(point);
   const state = point.kind === 'cluster'
     ? { online: false, live: false, verification: null, listingMode: null }
     : entityMeta(point);
@@ -84,7 +83,7 @@ export function discoveryPointToMapFeature(point: DiscoveryPoint): NexaMapPointF
 }
 
 export function discoveryToMapFeatureCollection(
-  points: readonly DiscoveryPoint[],
+  points: readonly MapDiscoveryPoint[],
 ): NexaMapFeatureCollection {
   return {
     type: 'FeatureCollection',
@@ -92,28 +91,22 @@ export function discoveryToMapFeatureCollection(
   };
 }
 
-/**
- * Reprojects a discovery snapshot while preserving GeoJSON feature identity for
- * unchanged DiscoveryPoint objects. applyDiscoveryDiff already preserves those
- * point references, so MapLibre updates can avoid rebuilding unchanged feature
- * objects when a viewport diff touches only a subset of entities.
- */
 export function updateMapFeatureCollection(
-  previousPoints: readonly DiscoveryPoint[],
+  previousPoints: readonly MapDiscoveryPoint[],
   previousCollection: NexaMapFeatureCollection,
-  points: readonly DiscoveryPoint[],
+  points: readonly MapDiscoveryPoint[],
 ): NexaMapFeatureCollection {
   const snapshotUnchanged =
     previousPoints.length === points.length &&
     points.every((point, index) => previousPoints[index] === point);
   if (snapshotUnchanged) return previousCollection;
 
-  const previousPointByKey = new Map<DiscoveryPointKey, DiscoveryPoint>();
+  const previousPointByKey = new Map<MapDiscoveryPointKey, MapDiscoveryPoint>();
   for (const point of previousPoints) {
-    previousPointByKey.set(getDiscoveryPointKey(point), point);
+    previousPointByKey.set(getMapDiscoveryPointKey(point), point);
   }
 
-  const previousFeatureByKey = new Map<DiscoveryPointKey, NexaMapPointFeature>();
+  const previousFeatureByKey = new Map<MapDiscoveryPointKey, NexaMapPointFeature>();
   for (const feature of previousCollection.features) {
     previousFeatureByKey.set(feature.id, feature);
   }
@@ -121,7 +114,7 @@ export function updateMapFeatureCollection(
   return {
     type: 'FeatureCollection',
     features: points.map((point) => {
-      const key = getDiscoveryPointKey(point);
+      const key = getMapDiscoveryPointKey(point);
       if (previousPointByKey.get(key) === point) {
         const previousFeature = previousFeatureByKey.get(key);
         if (previousFeature !== undefined) return previousFeature;
@@ -131,4 +124,4 @@ export function updateMapFeatureCollection(
   };
 }
 
-export const MAP_ENTITY_KINDS: readonly EntityKind[] = ['user', 'event', 'listing'];
+export const MAP_ENTITY_KINDS: readonly MapEntityKind[] = ['user', 'event', 'listing', 'place'];

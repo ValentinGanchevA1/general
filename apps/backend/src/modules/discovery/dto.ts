@@ -81,3 +81,15 @@ export class DiscoveryQueryDto {
   @IsIn(['relevance', 'distance', 'newest'])
   rankBy?: DiscoveryRankBy;
 }
+
+/** Place map discovery is intentionally narrower than general discovery. */
+export class PlaceDiscoveryQueryDto {
+  @ValidateNested()
+  @Type(() => ViewportDto)
+  viewport!: ViewportDto;
+
+  @IsNumber()
+  @Min(0)
+  @Max(22)
+  zoom!: number;
+}

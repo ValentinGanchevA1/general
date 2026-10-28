@@ -1,9 +1,10 @@
-import type { EntityKind } from '@g88/shared';
+import type { MapEntityKind } from '@g88/shared';
 
 export const NEXA_ENTITY_IDENTITY_KINDS = [
   'person',
   'event',
   'listing',
+  'place',
   'opportunity',
 ] as const;
 
@@ -37,6 +38,12 @@ const IDENTITY_BY_KIND: Record<NexaEntityIdentityKind, NexaEntityIdentity> = {
     shape: 'square',
     tone: 'neutral',
   },
+  place: {
+    kind: 'place',
+    label: 'Place',
+    shape: 'diamond',
+    tone: 'discovery',
+  },
   opportunity: {
     kind: 'opportunity',
     label: 'Opportunity',
@@ -51,12 +58,9 @@ export function resolveNexaEntityIdentity(
   return IDENTITY_BY_KIND[kind];
 }
 
-/**
- * The shared discovery DTO currently exposes user/event/listing.
- * Opportunity remains a product identity until the shared API contract adds it.
- */
+/** Map discovery adds place while opportunity remains a product-only identity. */
 export function nexaEntityIdentityKindFromEntityKind(
-  kind: EntityKind,
+  kind: MapEntityKind,
 ): Exclude<NexaEntityIdentityKind, 'opportunity'> {
   switch (kind) {
     case 'user':
@@ -65,5 +69,7 @@ export function nexaEntityIdentityKindFromEntityKind(
       return 'event';
     case 'listing':
       return 'listing';
+    case 'place':
+      return 'place';
   }
 }
