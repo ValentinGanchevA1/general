@@ -18,11 +18,13 @@ import type {
   EventSummary,
   PollResult,
   RsvpResponse,
+  ShareEventJoinResponse,
 } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { DiscoveryRealtimePublisher } from '../../realtime/discovery-realtime.publisher';
+import { EventPulseShareService } from './event-pulse-share.service';
 import { EventsService } from './events.service';
 import {
   CreateEventDto,
@@ -38,6 +40,7 @@ import {
 export class EventsController {
   constructor(
     private readonly events: EventsService,
+    private readonly eventPulse: EventPulseShareService,
     private readonly discovery: DiscoveryRealtimePublisher,
   ) {}
 
@@ -89,6 +92,17 @@ export class EventsController {
     @Body() dto: RsvpDto,
   ): Promise<RsvpResponse> {
     return this.events.rsvp(userId, id, dto);
+  }
+
+  /** POST /api/v1/events/:id/share-join — explicitly publish Going to Pulse. */
+  @Post(':id/share-join')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  shareJoinToPulse(
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ShareEventJoinResponse> {
+    return this.eventPulse.shareJoin(userId, id);
   }
 
   // ─── Polls ──────────────────────────────────────────────────────────────────
