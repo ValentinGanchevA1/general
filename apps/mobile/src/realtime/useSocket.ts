@@ -435,8 +435,10 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
         socket = io(`${Config.API_BASE_URL}/realtime`, {
           // Foreground lifecycle owns the first connect as well as reconnects.
           autoConnect: false,
-          // Polling fallback when pure WS is blocked (strict mobile networks).
-          transports: ['websocket', 'polling'],
+          // Render distributes WebSocket connections across replicas. Keep the
+          // transport WebSocket-only so a Socket.IO session never depends on
+          // load-balancer stickiness for HTTP long-polling requests.
+          transports: ['websocket'],
           auth: async (cb) => {
             const fresh = await tokenStore.getAccessToken();
             cb({ token: fresh });
@@ -462,32 +464,25 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
       };
       socket.on('connect', onConnect);
       socket.on('disconnect', onDisconnect);
-
-      // Cleanup only this hook's connect/disconnect flags — not the shared socket.
-      handlersRef.current.add(() => {
-        socket.off('connect', onConnect);
-        socket.off('disconnect', onDisconnect);
-      });
+      handlersRef.current.add(() => socket.off('connect', onConnect));
+      handlersRef.current.add(() => socket.off('disconnect', onDisconnect));
 
       bindAppStateLifecycle();
       applySocketAppState(AppState.currentState);
-      // If we raced into an already-open socket, sync state.
-      if (socket.connected && !cancelled) setConnected(true);
+      if (!cancelled) setConnected(socket.connected);
     };
 
     void ensureSocket();
 
-    const handlers = handlersRef.current;
-    const conversationIntents = conversationIntentsRef.current;
     return () => {
       cancelled = true;
-      handlers.forEach((unsub) => unsub());
-      handlers.clear();
-      for (const conversationId of conversationIntents) {
-        const releasedFinal = roomRegistry.untrackConversation(conversationId);
-        if (releasedFinal) void socketLeaveConversation(conversationId);
-      }
-      conversationIntents.clear();
+      handlersRef.current.forEach((fn) => fn());
+      handlersRef.current.clear();
+      conversationIntentsRef.current.forEach((conversationId) => {
+        roomRegistry.removeConversation(conversationId);
+        void socketLeaveConversation(conversationId);
+      });
+      conversationIntentsRef.current.clear();
     };
   }, [autoConnect]);
 
@@ -498,75 +493,64 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
     ): (() => void) => {
       let set = eventHandlers.get(event);
       if (!set) {
-        set = new Set();
+        set = new Set<ServerToClientEvents[keyof ServerToClientEvents]>();
         eventHandlers.set(event, set);
       }
       set.add(handler as ServerToClientEvents[keyof ServerToClientEvents]);
-
-      if (sharedSocket) {
-        attachHandlerToSocket(sharedSocket, event, handler);
-      }
-
-      const unsub = (): void => {
-        eventHandlers.get(event)?.delete(handler as ServerToClientEvents[keyof ServerToClientEvents]);
-        if (sharedSocket) {
-          detachHandlerFromSocket(sharedSocket, event, handler);
-        }
+      const s = sharedSocket;
+      if (s) attachHandlerToSocket(s, event, handler);
+      return () => {
+        set?.delete(handler as ServerToClientEvents[keyof ServerToClientEvents]);
+        if (s) detachHandlerFromSocket(s, event, handler);
       };
-      handlersRef.current.add(unsub);
-      return unsub;
     },
     [],
   );
 
   const sendPresence = useCallback(
-    (payload: PresenceUpdatePayload): Promise<{ cellId: string } | null> => {
-      // Cache only foreground observations. Background timers cannot overwrite the
-      // last legitimate active location used for the next reconnect replay.
-      if (AppState.currentState === 'active') {
-        lastPresencePayload = payload;
-      }
+    async (payload: PresenceUpdatePayload): Promise<{ cellId: string } | null> => {
+      lastPresencePayload = payload;
       return socketSendPresence(payload);
     },
     [],
   );
 
-  const joinConversation = useCallback(
-    (conversationId: string): Promise<boolean> => {
-      // Retain this hook's room intent exactly once. The hook cleanup releases it,
-      // so reconnect cost follows active consumers instead of navigation history.
-      if (!conversationIntentsRef.current.has(conversationId)) {
-        conversationIntentsRef.current.add(conversationId);
-        roomRegistry.trackConversation(conversationId);
-      }
-      return socketJoinConversation(conversationId);
-    },
-    [],
-  );
+  const joinConversation = useCallback(async (conversationId: string): Promise<boolean> => {
+    roomRegistry.addConversation(conversationId);
+    conversationIntentsRef.current.add(conversationId);
+    const joined = await socketJoinConversation(conversationId);
+    if (!joined) {
+      roomRegistry.removeConversation(conversationId);
+      conversationIntentsRef.current.delete(conversationId);
+    }
+    return joined;
+  }, []);
 
   const sendMessage = useCallback(
-    (conversationId: string, body: string, clientMessageId?: string): Promise<ChatMessageEvent | null> =>
-      socketSendMessage(conversationId, body, clientMessageId ?? nextClientMessageId()),
+    async (
+      conversationId: string,
+      body: string,
+      clientMessageId?: string,
+    ): Promise<ChatMessageEvent | null> =>
+      socketSendMessage(
+        conversationId,
+        body,
+        clientMessageId ?? nextClientMessageId(),
+      ),
     [],
   );
 
-  const joinEvent = useCallback(
-    (eventId: string): Promise<boolean> => {
-      roomRegistry.trackEvent(eventId);
-      return socketJoinEvent(eventId);
-    },
-    [],
-  );
+  const joinEvent = useCallback(async (eventId: string): Promise<boolean> => {
+    roomRegistry.addEvent(eventId);
+    const joined = await socketJoinEvent(eventId);
+    if (!joined) roomRegistry.removeEvent(eventId);
+    return joined;
+  }, []);
 
-  const leaveEvent = useCallback(
-    (eventId: string): Promise<boolean> => {
-      // Remove intent even while offline; otherwise a closed event screen would
-      // be rejoined when the foreground connection comes back.
-      roomRegistry.untrackEvent(eventId);
-      return socketLeaveEvent(eventId);
-    },
-    [],
-  );
+  const leaveEvent = useCallback(async (eventId: string): Promise<boolean> => {
+    roomRegistry.removeEvent(eventId);
+    return socketLeaveEvent(eventId);
+  }, []);
 
   return {
     socket: sharedSocket,
@@ -580,15 +564,12 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
   };
 }
 
-export function disconnectSocket(): void {
-  unbindAppStateLifecycle();
+/** Explicit teardown for logout — clears all user-scoped singleton state. */
+export function disconnectSharedSocket(): void {
+  sharedSocket?.disconnect();
+  sharedSocket = null;
+  lifecycleBound = false;
   lastPresencePayload = null;
   roomRegistry.clear();
-  if (sharedSocket) {
-    sharedSocket.removeAllListeners();
-    sharedSocket.disconnect();
-    sharedSocket = null;
-  }
-  lifecycleBound = false;
-  // Keep eventHandlers + connectListeners so the next login re-attaches the same UI subs.
+  unbindAppStateLifecycle();
 }
