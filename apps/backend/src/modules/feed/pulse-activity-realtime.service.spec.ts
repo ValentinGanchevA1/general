@@ -22,8 +22,8 @@ describe('PulseActivityRealtimeService', () => {
     query = jest.fn();
     set = jest.fn();
     publish = jest.fn();
-    subscribe = jest.fn().mockResolvedValue(1);
-    unsubscribe = jest.fn().mockResolvedValue(1);
+    subscribe = jest.fn().mockResolvedValue(2);
+    unsubscribe = jest.fn().mockResolvedValue(2);
     disconnect = jest.fn();
     emit = jest.fn();
     to = jest.fn(() => ({ emit }));
@@ -150,6 +150,43 @@ describe('PulseActivityRealtimeService', () => {
     );
   });
 
+  it('fans out a revocation over the multi-instance removal channel', async () => {
+    const cell = h3.latLngToCell(43.2047, 27.9105, 7);
+    set.mockResolvedValueOnce('OK');
+    query.mockResolvedValueOnce([{ id: 'viewer-2', location_h3_r7: cell }]);
+    publish.mockResolvedValueOnce(1);
+
+    await service.onModuleInit();
+    await service.removeEventJoin({
+      eventId: 'event-1',
+      actorId: 'user-2',
+      eventHostId: 'host-1',
+      locationH3R7: cell,
+    });
+
+    expect(set).toHaveBeenCalledWith(
+      'pulse:activity:removed:event_join:event-1:user-2',
+      '1',
+      'EX',
+      120,
+      'NX',
+    );
+    expect(publish).toHaveBeenCalledWith(
+      'pulse:activity:remove:v1',
+      expect.any(String),
+    );
+    const payload = publish.mock.calls[0]?.[1] as string;
+    expect(messageHandler).not.toBeNull();
+    messageHandler?.('pulse:activity:remove:v1', payload);
+
+    expect(to).toHaveBeenCalledWith('user:viewer-2');
+    expect(to).toHaveBeenCalledWith('user:user-2');
+    expect(emit).toHaveBeenCalledWith(
+      'pulse:activity:remove',
+      expect.objectContaining({ activityId: 'event_join:event-1:user-2' }),
+    );
+  });
+
   it('suppresses duplicate publish attempts before querying recipients', async () => {
     set.mockResolvedValueOnce(null);
 
@@ -170,8 +207,8 @@ describe('PulseActivityRealtimeService', () => {
     await service.onModuleInit();
     await service.onModuleDestroy();
 
-    expect(subscribe).toHaveBeenCalledWith('pulse:activity:v1');
-    expect(unsubscribe).toHaveBeenCalledWith('pulse:activity:v1');
+    expect(subscribe).toHaveBeenCalledWith('pulse:activity:v1', 'pulse:activity:remove:v1');
+    expect(unsubscribe).toHaveBeenCalledWith('pulse:activity:v1', 'pulse:activity:remove:v1');
     expect(disconnect).toHaveBeenCalledTimes(1);
   });
 });
