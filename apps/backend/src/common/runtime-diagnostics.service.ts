@@ -7,7 +7,7 @@ import {
 
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 
-interface RuntimeResourceSnapshot {
+export interface RuntimeResourceSnapshot {
   rssMiB: number;
   heapUsedMiB: number;
   heapTotalMiB: number;
