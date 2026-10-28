@@ -45,6 +45,7 @@ import { MarketplaceScreen } from '@/screens/MarketplaceScreen';
 import { ListingDetailScreen } from '@/screens/ListingDetailScreen';
 import { ListingCreateScreen } from '@/screens/ListingCreateScreen';
 import { PlaceDetailScreen } from '@/screens/PlaceDetailScreen';
+import { SavedPlacesScreen } from '@/screens/SavedPlacesScreen';
 import { NotificationSettingsScreen } from '@/screens/NotificationSettingsScreen';
 import { BlockedUsersScreen } from '@/screens/BlockedUsersScreen';
 import { PrivacyScreen } from '@/screens/PrivacyScreen';
@@ -127,6 +128,7 @@ function AccountNavigator(): React.JSX.Element {
 		<AccountStack.Screen name="VerificationId" options={{ headerShown: false, title: 'ID Verification', presentation: 'modal' }}>{() => <VerificationIdScreen />}</AccountStack.Screen>
 		<AccountStack.Screen name="Subscription" component={SubscriptionScreen} /><AccountStack.Screen name="SocialLinking" component={SocialLinkingScreen} />
 		<AccountStack.Screen name="ProfileEdit" component={ProfileEditScreen} options={{ headerShown: false, title: 'Edit profile' }} /><AccountStack.Screen name="Photos" component={PhotosScreen} />
+		<AccountStack.Screen name="SavedPlaces" component={SavedPlacesScreen} options={{ headerShown: false, title: 'Saved places' }} />
 	</AccountStack.Navigator>;
 }
 function SocialNavigator(): React.JSX.Element {
