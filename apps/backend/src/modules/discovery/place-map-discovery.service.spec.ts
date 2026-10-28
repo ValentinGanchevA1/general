@@ -5,7 +5,11 @@ import { PlaceMapDiscoveryService } from './place-map-discovery.service';
 
 const placeCell = '871e85992ffffff';
 const [placeLat, placeLng] = h3.cellToLatLng(placeCell);
-const viewport = {
+const entityViewport = {
+  sw: { lat: placeLat - 0.04, lng: placeLng - 0.04 },
+  ne: { lat: placeLat + 0.04, lng: placeLng + 0.04 },
+};
+const clusterViewport = {
   sw: { lat: placeLat - 0.2, lng: placeLng - 0.2 },
   ne: { lat: placeLat + 0.2, lng: placeLng + 0.2 },
 };
@@ -31,7 +35,7 @@ describe('PlaceMapDiscoveryService', () => {
   it('returns active thresholded places as coarse entity pins at entity zoom', async () => {
     query.mockResolvedValueOnce([row('place-1', 'Sea Garden')]);
 
-    const result = await service.nearby(viewport, 15);
+    const result = await service.nearby(entityViewport, 15);
 
     expect(result.points).toEqual([
       expect.objectContaining({
@@ -54,13 +58,12 @@ describe('PlaceMapDiscoveryService', () => {
   });
 
   it('clusters place entities without exposing check-in or participant counts', async () => {
-    const nearbyCell = h3.gridDisk(placeCell, 1).find((cell) => cell !== placeCell) ?? placeCell;
     query.mockResolvedValueOnce([
       row('place-1', 'Sea Garden'),
-      row('place-2', 'Nearby Place', nearbyCell),
+      row('place-2', 'Nearby Place'),
     ]);
 
-    const result = await service.nearby(viewport, 8);
+    const result = await service.nearby(clusterViewport, 8);
     const clusters = result.points.filter((point) => point.kind === 'cluster');
 
     expect(clusters.length).toBeGreaterThan(0);
@@ -70,12 +73,19 @@ describe('PlaceMapDiscoveryService', () => {
     }
   });
 
+  it('fails closed before querying places for an oversized high-zoom viewport', async () => {
+    const result = await service.nearby(clusterViewport, 15);
+
+    expect(result.points).toEqual([]);
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it('fails closed for malformed or non-r7 stored cells', async () => {
     query.mockResolvedValueOnce([
       row('bad-1', 'Malformed', 'not-a-cell'),
       row('bad-2', 'Wrong resolution', h3.cellToParent(placeCell, 6)),
     ]);
 
-    await expect(service.nearby(viewport, 15)).resolves.toMatchObject({ points: [] });
+    await expect(service.nearby(entityViewport, 15)).resolves.toMatchObject({ points: [] });
   });
 });
