@@ -4,6 +4,7 @@ export * from './discovery';
 export * from './events';
 export * from './event';
 export * from './listing';
+export * from './marketplace';
 export * from './notifications';
 export * from './activity';
 export * from './place';
