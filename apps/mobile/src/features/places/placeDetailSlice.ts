@@ -65,7 +65,10 @@ function applyLoadedDetail(
   detail: NexaPlaceDetail,
   receivedAt: number,
 ): void {
-  current.detail = detail;
+  current.detail = {
+    ...detail,
+    approximateLocation: { ...detail.approximateLocation },
+  };
   current.receivedAt = receivedAt;
   current.error = null;
 }
