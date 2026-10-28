@@ -138,6 +138,10 @@ export class LocationShareService {
       });
     }
 
+    // Authorization is dynamic: participant membership or block state can change
+    // after the share starts. Re-check both before accepting another precise point.
+    await this.assertParticipant(userId, session.conversation_id);
+    await this.assertNotBlockedInConversation(userId, session.conversation_id);
     await this.assertUpdateAllowed(session, location);
 
     const updatedAt = new Date().toISOString();
@@ -170,17 +174,13 @@ export class LocationShareService {
     return { conversationId: session.conversation_id, endedAt };
   }
 
-  /** Active session in a conversation visible to a participant (any sharer). */
+  /** Active session in a conversation visible to an authorized participant (any sharer). */
   async findActiveForConversation(
     conversationId: string,
     userId: string,
   ): Promise<LocationShareSession | null> {
-    if (!(await this.chat.isParticipant(conversationId, userId))) {
-      throw new ForbiddenException({
-        code: 'location.not_participant',
-        message: 'Not a participant',
-      });
-    }
+    await this.assertParticipant(userId, conversationId);
+    await this.assertNotBlockedInConversation(userId, conversationId);
 
     const [row] = await this.db.query<SessionRow[]>(
       `SELECT * FROM chat_location_sessions
