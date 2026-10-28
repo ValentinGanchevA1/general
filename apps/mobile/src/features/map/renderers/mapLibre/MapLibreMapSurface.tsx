@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import type { DiscoveryPoint, DiscoveryPointKey } from '@g88/shared';
+import type { MapDiscoveryPoint } from '@g88/shared';
 import {
   Camera,
   GeoJSONSource,
@@ -10,19 +10,7 @@ import {
   type MapRef,
 } from '@maplibre/maplibre-react-native';
 
-type GeoJSONSourcePressHandler = NonNullable<
-  React.ComponentProps<typeof GeoJSONSource>['onPress']
->;
-type MapLongPressHandler = NonNullable<React.ComponentProps<typeof Map>['onLongPress']>;
-type MapStyle = React.ComponentProps<typeof Map>['mapStyle'];
-type CircleLayerSpecification = Extract<LayerSpecification, { type: 'circle' }>;
-type CircleLayerFilter = NonNullable<CircleLayerSpecification['filter']>;
-type CircleLayerPaint = NonNullable<CircleLayerSpecification['paint']>;
-type CircleOpacity = NonNullable<CircleLayerPaint['circle-opacity']>;
-type CircleColor = NonNullable<CircleLayerPaint['circle-color']>;
-type CircleRadius = NonNullable<CircleLayerPaint['circle-radius']>;
-type CameraRef = React.ElementRef<typeof Camera>;
-
+import { type MapDiscoveryPointKey } from '../../mapDiscoveryKeys';
 import {
   discoveryToMapFeatureCollection,
   updateMapFeatureCollection,
@@ -36,6 +24,17 @@ import type {
 import type { MapLibreBoundsSnapshot, MapLibreViewStateSnapshot } from '../../mapLibreAdapter';
 import { mapLibreSnapshotToViewportChange } from '../../mapLibreAdapter';
 
+type GeoJSONSourcePressHandler = NonNullable<React.ComponentProps<typeof GeoJSONSource>['onPress']>;
+type MapLongPressHandler = NonNullable<React.ComponentProps<typeof Map>['onLongPress']>;
+type MapStyle = React.ComponentProps<typeof Map>['mapStyle'];
+type CircleLayerSpecification = Extract<LayerSpecification, { type: 'circle' }>;
+type CircleLayerFilter = NonNullable<CircleLayerSpecification['filter']>;
+type CircleLayerPaint = NonNullable<CircleLayerSpecification['paint']>;
+type CircleOpacity = NonNullable<CircleLayerPaint['circle-opacity']>;
+type CircleColor = NonNullable<CircleLayerPaint['circle-color']>;
+type CircleRadius = NonNullable<CircleLayerPaint['circle-radius']>;
+type CameraRef = React.ElementRef<typeof Camera>;
+
 const DISCOVERY_SOURCE_ID = 'nexa-discovery';
 const DISCOVERY_LAYER_ID = 'nexa-discovery-points';
 const DISCOVERY_SELECTED_HALO_LAYER_ID = 'nexa-discovery-selected-halo';
@@ -48,6 +47,7 @@ const DISCOVERY_KIND_COLOR: CircleColor = [
   'user', '#8B5CF6',
   'event', '#F59E0B',
   'listing', '#22C55E',
+  'place', '#27D3F2',
   '#8B5CF6',
 ];
 const DISCOVERY_MARKER_RADIUS: CircleRadius = [
@@ -55,11 +55,11 @@ const DISCOVERY_MARKER_RADIUS: CircleRadius = [
   ['linear'],
   ['zoom'],
   9,
-  ['match', ['get', 'kind'], 'cluster', 10, 'event', 5, 'listing', 5, 4.5],
+  ['match', ['get', 'kind'], 'cluster', 10, 'event', 5, 'listing', 5, 'place', 5.5, 4.5],
   13,
-  ['match', ['get', 'kind'], 'cluster', 13, 'event', 8, 'listing', 8, 7],
+  ['match', ['get', 'kind'], 'cluster', 13, 'event', 8, 'listing', 8, 'place', 8.5, 7],
   17,
-  ['match', ['get', 'kind'], 'cluster', 16, 'event', 10, 'listing', 10, 9],
+  ['match', ['get', 'kind'], 'cluster', 16, 'event', 10, 'listing', 10, 'place', 10.5, 9],
 ];
 const DISCOVERY_SELECTED_RADIUS: CircleRadius = [
   'interpolate', ['linear'], ['zoom'], 9, 8, 13, 11, 17, 13,
@@ -70,20 +70,19 @@ const DISCOVERY_SELECTED_HALO_RADIUS: CircleRadius = [
 
 export interface MapLibreMapSurfaceProps {
   mapStyle: MapStyle;
-  points: readonly DiscoveryPoint[];
-  selectedKey: DiscoveryPointKey | null;
+  points: readonly MapDiscoveryPoint[];
+  selectedKey: MapDiscoveryPointKey | null;
   dimUnselected: boolean;
   onReady: () => void;
-  onPointPress: (key: DiscoveryPointKey) => void;
+  onPointPress: (key: MapDiscoveryPointKey) => void;
   onViewportSettled: (change: NexaMapViewportChange) => void;
   onLongPress: (coordinate: MapCoordinate) => void;
 }
 
-function isDiscoveryPointKey(value: unknown): value is DiscoveryPointKey {
-  return typeof value === 'string' && /^(cluster|user|event|listing):.+$/.test(value);
+function isMapDiscoveryPointKey(value: unknown): value is MapDiscoveryPointKey {
+  return typeof value === 'string' && /^(cluster|user|event|listing|place):.+$/.test(value);
 }
 
-/** Native MapLibre surface behind the guarded renderer path. */
 export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMapSurfaceProps>(
   function MapLibreMapSurface(
     {
@@ -100,16 +99,10 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
   ): React.JSX.Element {
     const mapRef = React.useRef<MapRef>(null);
     const cameraRef = React.useRef<CameraRef>(null);
-    const previousPointsRef = React.useRef<readonly DiscoveryPoint[]>([]);
-    const featureCollectionRef = React.useRef<NexaMapFeatureCollection>(
-      discoveryToMapFeatureCollection([]),
-    );
+    const previousPointsRef = React.useRef<readonly MapDiscoveryPoint[]>([]);
+    const featureCollectionRef = React.useRef<NexaMapFeatureCollection>(discoveryToMapFeatureCollection([]));
     const data = React.useMemo(() => {
-      const next = updateMapFeatureCollection(
-        previousPointsRef.current,
-        featureCollectionRef.current,
-        points,
-      );
+      const next = updateMapFeatureCollection(previousPointsRef.current, featureCollectionRef.current, points);
       previousPointsRef.current = points;
       featureCollectionRef.current = next;
       return next;
@@ -145,7 +138,6 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
     const handleRegionDidChange = React.useCallback(async (): Promise<void> => {
       const map = mapRef.current;
       if (map === null) return;
-
       const [viewState, bounds] = await Promise.all([map.getViewState(), map.getBounds()]);
       const viewStateSnapshot: MapLibreViewStateSnapshot = {
         center: [viewState.center[0], viewState.center[1]],
@@ -160,21 +152,15 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
       onViewportSettled(mapLibreSnapshotToViewportChange(viewStateSnapshot, boundsSnapshot));
     }, [onViewportSettled]);
 
-    const handlePress = React.useCallback<GeoJSONSourcePressHandler>(
-      (event): void => {
-        const key = event.nativeEvent.features?.[0]?.id;
-        if (isDiscoveryPointKey(key)) onPointPress(key);
-      },
-      [onPointPress],
-    );
+    const handlePress = React.useCallback<GeoJSONSourcePressHandler>((event): void => {
+      const key = event.nativeEvent.features?.[0]?.id;
+      if (isMapDiscoveryPointKey(key)) onPointPress(key);
+    }, [onPointPress]);
 
-    const handleLongPress = React.useCallback<MapLongPressHandler>(
-      (event): void => {
-        const [longitude, latitude] = event.nativeEvent.lngLat;
-        onLongPress({ latitude, longitude });
-      },
-      [onLongPress],
-    );
+    const handleLongPress = React.useCallback<MapLongPressHandler>((event): void => {
+      const [longitude, latitude] = event.nativeEvent.lngLat;
+      onLongPress({ latitude, longitude });
+    }, [onLongPress]);
 
     const selectedFilter = React.useMemo<CircleLayerFilter>(
       () => ['==', ['id'], selectedKey ?? '__nexa-no-selection__'],
