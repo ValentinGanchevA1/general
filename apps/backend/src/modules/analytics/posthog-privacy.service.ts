@@ -68,11 +68,12 @@ function quoteLiteral(value: string): string {
 }
 
 function deletionListItems(payload: unknown): PostHogDeletionResponse[] | null {
-  const candidate = Array.isArray(payload)
-    ? payload
-    : typeof payload === 'object' && payload !== null && 'results' in payload
-      ? (payload as { results?: unknown }).results
-      : null;
+  let candidate: unknown = null;
+  if (Array.isArray(payload)) {
+    candidate = payload;
+  } else if (typeof payload === 'object' && payload !== null && 'results' in payload) {
+    candidate = (payload as { results?: unknown }).results;
+  }
 
   if (!Array.isArray(candidate)) return null;
   return candidate.filter(
