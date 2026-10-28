@@ -1,6 +1,8 @@
 import React from 'react';
-import { getDiscoveryPointKey, type DiscoveryPointKey } from '@g88/shared';
 
+import type { MapDiscoveryPoint } from '@g88/shared';
+
+import { getMapDiscoveryPointKey, type MapDiscoveryPointKey } from '../mapDiscoveryKeys';
 import type { NexaMapController } from '../contracts/mapRenderer';
 import type { MapRendererKind } from '../mapRenderer';
 import { resolveAvailableMapRenderer } from '../mapRendererRuntime';
@@ -17,7 +19,6 @@ export interface NexaMapRuntimeSurfaceProps extends LegacyMapSurfaceProps {
   mapLibreStyle: MapLibreMapSurfaceProps['mapStyle'] | null;
 }
 
-/** Single runtime entry point for NEXA map rendering. */
 export const NexaMapRuntimeSurface = React.forwardRef<
   NexaMapController,
   NexaMapRuntimeSurfaceProps
@@ -50,8 +51,8 @@ export const NexaMapRuntimeSurface = React.forwardRef<
   );
 
   if (renderer === 'maplibre' && mapLibreStyle !== null) {
-    const pointsByKey = new Map<DiscoveryPointKey, (typeof points)[number]>(
-      points.map((point) => [getDiscoveryPointKey(point), point]),
+    const pointsByKey = new Map<MapDiscoveryPointKey, MapDiscoveryPoint>(
+      points.map((point) => [getMapDiscoveryPointKey(point), point]),
     );
 
     return (
@@ -59,7 +60,7 @@ export const NexaMapRuntimeSurface = React.forwardRef<
         ref={ref}
         mapStyle={mapLibreStyle}
         points={points}
-        selectedKey={renderableSelection.selectedEntityKey as DiscoveryPointKey | null}
+        selectedKey={renderableSelection.selectedEntityKey}
         dimUnselected={renderableSelection.interactionFocused}
         onReady={onReady}
         onPointPress={(key) => {
