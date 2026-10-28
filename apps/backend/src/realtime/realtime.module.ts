@@ -7,6 +7,7 @@ import { DiscoveryRealtimePublisher } from './discovery-realtime.publisher';
 import { DiscoveryMutationBusService } from './discovery-mutation-bus.service';
 import { DiscoveryPresencePublisher } from './discovery-presence.publisher';
 import { DiscoverySubscriptionStore } from './discovery-subscription.store';
+import { RuntimeMemoryDiagnosticsService } from './runtime-memory-diagnostics.service';
 import { DiscoverySubscriptionGateway } from './discovery-subscription.gateway';
 import { PresenceModule } from '../modules/presence/presence.module';
 import { AuthModule } from '../modules/auth/auth.module';
@@ -37,6 +38,7 @@ import { DiscoveryModule } from '../modules/discovery/discovery.module';
     DiscoveryMutationBusService,
     DiscoveryPresencePublisher,
     DiscoverySubscriptionStore,
+    RuntimeMemoryDiagnosticsService,
   ],
   exports: [
     RealtimeGateway,
