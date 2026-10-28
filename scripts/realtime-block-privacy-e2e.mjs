@@ -27,9 +27,10 @@ function resolveBase(raw) {
 
 const BASE = resolveBase(process.env.REALTIME_PRIVACY_API_URL);
 const API = `${BASE}/api/v1`;
-const RUN_ID = `${Date.now()}-${randomBytes(4).toString('hex')}`;
+const RUN_SECRET = randomBytes(16).toString('hex');
+const RUN_ID = `${Date.now()}-${RUN_SECRET.slice(0, 12)}`;
 const SHARED_INTEREST = `privacy-e2e-${RUN_ID}`;
-const TEST_PASSWORD = `Realtime_${RUN_ID.slice(-4)}Aa1!`;
+const TEST_PASSWORD = `Realtime_${RUN_SECRET}Aa1!`;
 const TEST_LOCATION = Object.freeze({ lat: 52.52, lng: 13.405 });
 const UPDATED_LOCATION = Object.freeze({ lat: 52.5205, lng: 13.4055 });
 const RECONNECTED_LOCATION = Object.freeze({ lat: 52.521, lng: 13.406 });
