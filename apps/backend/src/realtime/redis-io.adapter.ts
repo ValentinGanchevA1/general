@@ -10,7 +10,7 @@ import {
 } from './socket-io-redis.config';
 
 export class RedisIoAdapter extends IoAdapter {
-  private readonly logger = new Logger(RedisIoAdapter.name);
+  private readonly redisLogger = new Logger(RedisIoAdapter.name);
   private adapterConstructor: ReturnType<typeof createAdapter> | null = null;
   private publisher: Redis | null = null;
   private subscriber: Redis | null = null;
@@ -44,7 +44,7 @@ export class RedisIoAdapter extends IoAdapter {
       });
       this.publisher = publisher;
       this.subscriber = subscriber;
-      this.logger.log(`Socket.IO Redis Pub/Sub connected (channel prefix: ${channelKey})`);
+      this.redisLogger.log(`Socket.IO Redis Pub/Sub connected (channel prefix: ${channelKey})`);
     } catch (error: unknown) {
       publisher.disconnect();
       subscriber.disconnect();
@@ -73,7 +73,7 @@ export class RedisIoAdapter extends IoAdapter {
 
   private attachErrorLogging(client: Redis, role: 'publisher' | 'subscriber'): void {
     client.on('error', (error: Error) => {
-      this.logger.error(`Socket.IO Redis ${role} error: ${error.message}`);
+      this.redisLogger.error(`Socket.IO Redis ${role} error: ${error.message}`);
     });
   }
 
