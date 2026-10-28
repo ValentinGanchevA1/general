@@ -25,7 +25,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useSheetBackdrop, useSheetChrome } from '@/components/sheets';
 import { PlaceMapPreviewSheet } from '@/features/places/PlaceMapPreviewSheet';
-import { setPlaceSaved } from '@/features/places/placeDetailSlice';
+import { loadSavedPlaces, setPlaceSaved } from '@/features/places/placeDetailSlice';
 import { setPendingPlaceCheckIn } from '@/features/places/pendingPlaceCheckIn';
 import { savedPlaceMapFocusStore } from '@/features/places/savedPlaceMapFocus.store';
 import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
@@ -281,7 +281,12 @@ export const NexaMapScreenSurface = React.forwardRef<
     }
     setSelectedPlace(updatedPoint);
 
-    if (result.payload.saved) return;
+    if (result.payload.saved) {
+      if (savedPlacesEnabled) {
+        void dispatch(loadSavedPlaces({ reset: true }));
+      }
+      return;
+    }
 
     savedPlaceMapFocusStore.clear();
     if (point.meta.trending) return;
@@ -295,7 +300,7 @@ export const NexaMapScreenSurface = React.forwardRef<
         placeSheetRef.current?.dismiss();
       }
     });
-  }, [dispatch, saveLoading, selectedPlace]);
+  }, [dispatch, saveLoading, savedPlacesEnabled, selectedPlace]);
 
   const activeSelectionKey = selectedPlace == null
     ? selectedEntityKey
