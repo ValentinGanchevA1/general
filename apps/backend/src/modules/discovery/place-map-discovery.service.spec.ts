@@ -5,9 +5,13 @@ import { PlaceMapDiscoveryService } from './place-map-discovery.service';
 
 const placeCell = '871e85992ffffff';
 const [placeLat, placeLng] = h3.cellToLatLng(placeCell);
-const viewport = {
+const entityViewport = {
   sw: { lat: placeLat - 0.04, lng: placeLng - 0.04 },
   ne: { lat: placeLat + 0.04, lng: placeLng + 0.04 },
+};
+const clusterViewport = {
+  sw: { lat: placeLat - 0.2, lng: placeLng - 0.2 },
+  ne: { lat: placeLat + 0.2, lng: placeLng + 0.2 },
 };
 
 function row(id: string, label: string, cell = placeCell) {
@@ -31,7 +35,7 @@ describe('PlaceMapDiscoveryService', () => {
   it('returns active thresholded places as coarse entity pins at entity zoom', async () => {
     query.mockResolvedValueOnce([row('place-1', 'Sea Garden')]);
 
-    const result = await service.nearby(viewport, 15);
+    const result = await service.nearby(entityViewport, 15);
 
     expect(result.points).toEqual([
       expect.objectContaining({
@@ -59,7 +63,7 @@ describe('PlaceMapDiscoveryService', () => {
       row('place-2', 'Nearby Place'),
     ]);
 
-    const result = await service.nearby(viewport, 8);
+    const result = await service.nearby(clusterViewport, 8);
     const clusters = result.points.filter((point) => point.kind === 'cluster');
 
     expect(clusters.length).toBeGreaterThan(0);
@@ -70,12 +74,7 @@ describe('PlaceMapDiscoveryService', () => {
   });
 
   it('fails closed before querying places for an oversized high-zoom viewport', async () => {
-    const oversizedViewport = {
-      sw: { lat: placeLat - 0.2, lng: placeLng - 0.2 },
-      ne: { lat: placeLat + 0.2, lng: placeLng + 0.2 },
-    };
-
-    const result = await service.nearby(oversizedViewport, 15);
+    const result = await service.nearby(clusterViewport, 15);
 
     expect(result.points).toEqual([]);
     expect(query).not.toHaveBeenCalled();
@@ -87,6 +86,6 @@ describe('PlaceMapDiscoveryService', () => {
       row('bad-2', 'Wrong resolution', h3.cellToParent(placeCell, 6)),
     ]);
 
-    await expect(service.nearby(viewport, 15)).resolves.toMatchObject({ points: [] });
+    await expect(service.nearby(entityViewport, 15)).resolves.toMatchObject({ points: [] });
   });
 });
