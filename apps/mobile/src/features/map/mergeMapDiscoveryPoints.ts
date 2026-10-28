@@ -3,13 +3,19 @@ import type {
   MapClusterPoint,
   MapDiscoveryPoint,
   MapEntityKind,
+  PlaceMapEntityPoint,
 } from '@g88/shared';
 
 const MAX_MAP_POINTS = 500;
 const MAX_PLACE_ENTITY_POINTS = 80;
+const MAX_PRIVATE_SAVED_POINTS = 120;
 
 function isCluster(point: MapDiscoveryPoint): point is MapClusterPoint {
   return point.kind === 'cluster';
+}
+
+function isPlace(point: MapDiscoveryPoint): point is PlaceMapEntityPoint {
+  return point.kind === 'place';
 }
 
 function addComposition(
@@ -22,17 +28,48 @@ function addComposition(
   }
 }
 
+function mergePlaceEntities(
+  publicPlaces: readonly PlaceMapEntityPoint[],
+  savedPlaces: readonly PlaceMapEntityPoint[],
+): PlaceMapEntityPoint[] {
+  const byId = new Map<string, PlaceMapEntityPoint>();
+
+  for (const point of publicPlaces.slice(0, MAX_PLACE_ENTITY_POINTS)) {
+    byId.set(point.id, point);
+  }
+  for (const saved of savedPlaces.slice(0, MAX_PRIVATE_SAVED_POINTS)) {
+    const publicPoint = byId.get(saved.id);
+    if (publicPoint) {
+      byId.set(saved.id, {
+        ...saved,
+        meta: {
+          ...saved.meta,
+          trending: publicPoint.meta.trending || saved.meta.trending,
+          recentActivityAt: publicPoint.meta.recentActivityAt ?? saved.meta.recentActivityAt,
+          saved: true,
+        },
+      });
+      continue;
+    }
+    byId.set(saved.id, saved);
+  }
+
+  return [...byId.values()];
+}
+
 /**
- * Combines legacy discovery with the separate thresholded place lane.
- * Cluster counts represent entity counts only; place user/check-in counts never
- * enter this function or the map payload.
+ * Combines legacy discovery, the thresholded public place lane, and the viewer's
+ * private saved-place overlay. Saved pins never contribute to public cluster
+ * counts because a bookmark is not presence or popularity.
  */
 export function mergeMapDiscoveryPoints(
   basePoints: DiscoveryPoint[],
   placePoints: MapDiscoveryPoint[],
+  savedPlacePoints: MapDiscoveryPoint[] = [],
 ): MapDiscoveryPoint[] {
   const baseClusters = basePoints.filter((point) => point.kind === 'cluster');
   const placeClusters = placePoints.filter(isCluster);
+  const savedPlaces = savedPlacePoints.filter(isPlace);
   const clusterMode = baseClusters.length > 0 || placeClusters.length > 0;
 
   if (clusterMode) {
@@ -55,14 +92,17 @@ export function mergeMapDiscoveryPoints(
       addComposition(existing.by, cluster.by);
     }
 
-    return [...byCell.values()]
-      .sort((left, right) => right.count - left.count)
-      .slice(0, MAX_MAP_POINTS);
+    const privatePins = savedPlaces.slice(0, MAX_PRIVATE_SAVED_POINTS);
+    const remaining = Math.max(0, MAX_MAP_POINTS - privatePins.length);
+    return [
+      ...[...byCell.values()]
+        .sort((left, right) => right.count - left.count)
+        .slice(0, remaining),
+      ...privatePins,
+    ];
   }
 
-  const places = placePoints
-    .filter((point) => point.kind === 'place')
-    .slice(0, MAX_PLACE_ENTITY_POINTS);
+  const places = mergePlaceEntities(placePoints.filter(isPlace), savedPlaces);
   const remaining = Math.max(0, MAX_MAP_POINTS - places.length);
   return [...places, ...basePoints.slice(0, remaining)];
 }
