@@ -1,10 +1,13 @@
 // apps/mobile/src/screens/MarketplaceScreen.tsx
-//
-// Marketplace browse surface: reference-style category tabs + thumbnail grid.
-// Existing listing DTOs remain the source of truth; service/job/deal sections
-// are derived from listing category/title until the marketplace domain is split.
+// Reference-style Marketplace backed by first-class marketplace kinds.
 
-import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   FlatList,
   Image,
@@ -21,85 +24,39 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { ListingSummary } from '@g88/shared';
+import type { MarketplaceKind, MarketplaceListingSummary } from '@g88/shared';
 import type { CommerceStackParamList } from '@/navigation/stacks';
-import { useUserLocation } from '@/features/location/useUserLocation';
-import { toggleFavorite, useBrowseListings } from '@/features/trading/useTrading';
-import { formatPrice } from '@/features/trading/formatPrice';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonMarketGrid } from '@/components/Skeleton';
-import { spacing, radius, fontSize, useAppTheme, type ThemeColors } from '@/theme';
+import { useUserLocation } from '@/features/location/useUserLocation';
+import { useBrowseMarketplace } from '@/features/trading/useMarketplace';
+import { formatPrice } from '@/features/trading/formatPrice';
+import { toggleFavorite } from '@/features/trading/useTrading';
+import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 type Nav = NativeStackNavigationProp<CommerceStackParamList>;
-type MarketplaceSection = 'for-sale' | 'services' | 'jobs' | 'local-deals';
 
 type MarketTab = {
-  key: MarketplaceSection;
+  key: MarketplaceKind;
   label: string;
 };
 
 const MARKET_TABS: readonly MarketTab[] = [
-  { key: 'for-sale', label: 'For Sale' },
-  { key: 'services', label: 'Services' },
-  { key: 'jobs', label: 'Jobs' },
-  { key: 'local-deals', label: 'Local Deals' },
+  { key: 'for_sale', label: 'For Sale' },
+  { key: 'service', label: 'Services' },
+  { key: 'job', label: 'Jobs' },
+  { key: 'local_deal', label: 'Local Deals' },
 ];
 
-const SERVICE_TERMS = [
-  'service',
-  'services',
-  'cleaning',
-  'electrician',
-  'plumber',
-  'repair',
-  'tutor',
-  'beauty',
-  'web development',
-  'development service',
-] as const;
-
-const JOB_TERMS = [
-  'job',
-  'jobs',
-  'hiring',
-  'employment',
-  'vacancy',
-  'freelance',
-  'gig',
-] as const;
-
-const DEAL_TERMS = [
-  'deal',
-  'deals',
-  'local deal',
-  'promotion',
-  'discount',
-  'special offer',
-] as const;
-
-function includesAny(value: string, terms: readonly string[]): boolean {
-  return terms.some((term) => value.includes(term));
-}
-
-function sectionForListing(listing: ListingSummary): MarketplaceSection | null {
-  if (listing.mode !== 'sell') return null;
-
-  const searchable = `${listing.category} ${listing.title}`.toLowerCase();
-  if (includesAny(searchable, JOB_TERMS)) return 'jobs';
-  if (includesAny(searchable, SERVICE_TERMS)) return 'services';
-  if (includesAny(searchable, DEAL_TERMS)) return 'local-deals';
-  return 'for-sale';
-}
-
-function fallbackIcon(section: MarketplaceSection): string {
-  switch (section) {
-    case 'services':
+function fallbackIcon(kind: MarketplaceKind): string {
+  switch (kind) {
+    case 'service':
       return 'tools';
-    case 'jobs':
+    case 'job':
       return 'briefcase-outline';
-    case 'local-deals':
+    case 'local_deal':
       return 'sale-outline';
-    case 'for-sale':
+    case 'for_sale':
     default:
       return 'shopping-outline';
   }
@@ -127,29 +84,29 @@ function formatDistance(meters: number): string {
   return `${km < 10 ? km.toFixed(1) : Math.round(km)} km`;
 }
 
-function priceLabel(item: ListingSummary, section: MarketplaceSection): string {
+function priceLabel(item: MarketplaceListingSummary): string {
   const price = formatPrice(item.priceCents, item.currency);
-  return section === 'services' ? `From ${price}` : price;
+  return item.marketplaceKind === 'service' ? `From ${price}` : price;
 }
 
-function emptyCopy(section: MarketplaceSection): { title: string; body: string } {
-  switch (section) {
-    case 'services':
+function emptyCopy(kind: MarketplaceKind): { title: string; body: string } {
+  switch (kind) {
+    case 'service':
       return {
         title: 'No services nearby yet',
         body: 'Local service offers will appear here as they are posted.',
       };
-    case 'jobs':
+    case 'job':
       return {
         title: 'No jobs nearby yet',
         body: 'Local jobs and gigs will appear here as they are posted.',
       };
-    case 'local-deals':
+    case 'local_deal':
       return {
         title: 'No local deals nearby yet',
         body: 'Nearby promotions and local offers will appear here.',
       };
-    case 'for-sale':
+    case 'for_sale':
     default:
       return {
         title: 'Nothing for sale nearby',
@@ -163,13 +120,22 @@ export function MarketplaceScreen(): React.JSX.Element {
   const S = useMemo(() => createStyles(colors), [colors]);
   const nav = useNavigation<Nav>();
   const { coords } = useUserLocation();
-  const [section, setSection] = useState<MarketplaceSection>('for-sale');
+  const [marketplaceKind, setMarketplaceKind] = useState<MarketplaceKind>('for_sale');
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [favoriteOverrides, setFavoriteOverrides] = useState<Record<string, boolean>>({});
   const [favoriteBusy, setFavoriteBusy] = useState<Set<string>>(new Set());
 
-  const browse = useBrowseListings(coords ?? null);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const browse = useBrowseMarketplace(coords ?? null, {
+    marketplaceKind,
+    ...(debouncedQuery ? { query: debouncedQuery } : {}),
+  });
 
   useLayoutEffect(() => {
     nav.setOptions({
@@ -182,6 +148,7 @@ export function MarketplaceScreen(): React.JSX.Element {
           onPress={() => {
             if (searchOpen) {
               setQuery('');
+              setDebouncedQuery('');
               setSearchOpen(false);
             } else {
               setSearchOpen(true);
@@ -202,16 +169,16 @@ export function MarketplaceScreen(): React.JSX.Element {
     });
   }, [S.headerIconButton, colors.textPrimary, nav, searchOpen]);
 
-  const filteredData = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+  const visibleListings = useMemo(() => {
+    const immediateQuery = query.trim().toLowerCase();
     return browse.listings.filter((item) => {
-      if (sectionForListing(item) !== section) return false;
-      if (!normalizedQuery) return true;
-      return `${item.title} ${item.category}`.toLowerCase().includes(normalizedQuery);
+      if (item.marketplaceKind !== marketplaceKind) return false;
+      if (!immediateQuery) return true;
+      return `${item.title} ${item.category}`.toLowerCase().includes(immediateQuery);
     });
-  }, [browse.listings, query, section]);
+  }, [browse.listings, marketplaceKind, query]);
 
-  const handleFavorite = useCallback(async (item: ListingSummary): Promise<void> => {
+  const handleFavorite = useCallback(async (item: MarketplaceListingSummary): Promise<void> => {
     if (favoriteBusy.has(item.id)) return;
     const previous = favoriteOverrides[item.id] ?? item.favoritedByMe;
 
@@ -231,12 +198,13 @@ export function MarketplaceScreen(): React.JSX.Element {
     }
   }, [favoriteBusy, favoriteOverrides]);
 
-  const renderItem = useCallback(({ item }: { item: ListingSummary }) => {
-    const itemSection = sectionForListing(item) ?? 'for-sale';
+  const renderItem = useCallback(({ item }: { item: MarketplaceListingSummary }) => {
     const favorited = favoriteOverrides[item.id] ?? item.favoritedByMe;
     const favoriteIsBusy = favoriteBusy.has(item.id);
-    const distance = coords ? formatDistance(distanceMeters(coords, item.location)) : item.category;
-    const meta = itemSection === 'for-sale' ? distance : `${item.category} · ${distance}`;
+    const distance = coords ? formatDistance(distanceMeters(coords, item.location)) : null;
+    const meta = [item.marketplaceKind === 'for_sale' ? null : item.category, distance]
+      .filter((value): value is string => Boolean(value))
+      .join(' · ');
 
     return (
       <TouchableOpacity
@@ -252,8 +220,8 @@ export function MarketplaceScreen(): React.JSX.Element {
           ) : (
             <View style={[S.thumb, S.thumbPlaceholder]}>
               <Icon
-                name={fallbackIcon(itemSection)}
-                size={40}
+                name={fallbackIcon(item.marketplaceKind)}
+                size={42}
                 color={colors.textTertiary}
               />
             </View>
@@ -269,7 +237,7 @@ export function MarketplaceScreen(): React.JSX.Element {
           >
             <Icon
               name={favorited ? 'heart' : 'heart-outline'}
-              size={24}
+              size={23}
               color={favorited ? colors.actionPrimary : colors.textPrimary}
             />
           </Pressable>
@@ -277,16 +245,17 @@ export function MarketplaceScreen(): React.JSX.Element {
 
         <View style={S.cardBody}>
           <Text style={S.cardTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={S.cardPrice} numberOfLines={1}>{priceLabel(item, itemSection)}</Text>
-          <Text style={S.cardMeta} numberOfLines={1}>{meta}</Text>
+          <Text style={S.cardPrice} numberOfLines={1}>{priceLabel(item)}</Text>
+          {meta ? <Text style={S.cardMeta} numberOfLines={1}>{meta}</Text> : null}
         </View>
       </TouchableOpacity>
     );
   }, [S, colors.actionPrimary, colors.textPrimary, colors.textTertiary, coords, favoriteBusy, favoriteOverrides, handleFavorite, nav]);
 
-  const empty = emptyCopy(section);
-  const showErrorEmpty = browse.error != null && filteredData.length === 0 && !browse.loading;
-  const showSearchEmpty = query.trim().length > 0 && filteredData.length === 0 && !browse.loading;
+  const empty = emptyCopy(marketplaceKind);
+  const showErrorEmpty = browse.error != null && visibleListings.length === 0 && !browse.loading;
+  const showSearchEmpty = query.trim().length > 0 && visibleListings.length === 0 && !browse.loading;
+  const activeLabel = MARKET_TABS.find((tab) => tab.key === marketplaceKind)?.label ?? 'Marketplace';
 
   return (
     <View style={S.root}>
@@ -297,12 +266,12 @@ export function MarketplaceScreen(): React.JSX.Element {
         style={S.marketTabsScroll}
       >
         {MARKET_TABS.map((tab) => {
-          const active = section === tab.key;
+          const active = marketplaceKind === tab.key;
           return (
             <Pressable
               key={tab.key}
               style={[S.marketTab, active && S.marketTabActive]}
-              onPress={() => setSection(tab.key)}
+              onPress={() => setMarketplaceKind(tab.key)}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               accessibilityLabel={tab.label}
@@ -320,13 +289,13 @@ export function MarketplaceScreen(): React.JSX.Element {
             autoFocus
             value={query}
             onChangeText={setQuery}
-            placeholder="Search Marketplace"
+            placeholder={`Search ${activeLabel}`}
             placeholderTextColor={colors.textTertiary}
             style={S.searchInput}
             returnKeyType="search"
             autoCapitalize="none"
             autoCorrect={false}
-            accessibilityLabel="Search marketplace listings"
+            accessibilityLabel={`Search ${activeLabel}`}
           />
           {query.length > 0 ? (
             <Pressable
@@ -342,7 +311,7 @@ export function MarketplaceScreen(): React.JSX.Element {
       ) : null}
 
       <FlatList
-        data={filteredData}
+        data={visibleListings}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         numColumns={2}
@@ -374,16 +343,16 @@ export function MarketplaceScreen(): React.JSX.Element {
               variant="plain"
               icon="magnify"
               title="No matching results"
-              body={`No ${MARKET_TABS.find((tab) => tab.key === section)?.label.toLowerCase() ?? 'marketplace'} results match “${query.trim()}”.`}
+              body={`No ${activeLabel.toLowerCase()} match “${query.trim()}”.`}
             />
           ) : (
             <EmptyState
               variant="plain"
-              icon={fallbackIcon(section)}
+              icon={fallbackIcon(marketplaceKind)}
               title={empty.title}
               body={empty.body}
-              actionLabel="Create listing"
-              onAction={() => nav.navigate('ListingCreate', { mode: 'sell' })}
+              actionLabel="Create"
+              onAction={() => nav.navigate('ListingCreate', { mode: 'sell', marketplaceKind })}
             />
           )
         }
@@ -413,14 +382,14 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       gap: spacing.sm,
       paddingHorizontal: spacing.lg,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.md,
+      paddingVertical: spacing.md,
     },
     marketTab: {
       minHeight: 42,
       justifyContent: 'center',
-      paddingHorizontal: 14,
-      borderRadius: 12,
+      paddingHorizontal: 17,
+      borderRadius: radius.pill,
+      backgroundColor: 'transparent',
     },
     marketTabActive: {
       backgroundColor: colors.actionPrimary,
@@ -441,28 +410,29 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
-      borderRadius: radius.md,
-      backgroundColor: colors.surfaceSecondary,
-      borderWidth: StyleSheet.hairlineWidth,
+      borderRadius: radius.pill,
+      borderWidth: 1,
       borderColor: colors.borderDefault,
+      backgroundColor: colors.surfaceSecondary,
     },
     searchInput: {
       flex: 1,
-      paddingVertical: 10,
       color: colors.textPrimary,
       fontSize: fontSize.md,
+      paddingVertical: 8,
     },
     grid: {
+      flexGrow: 1,
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.md,
-      paddingBottom: spacing.xl,
-      flexGrow: 1,
+      paddingBottom: 40,
     },
     row: {
-      justifyContent: 'space-between',
+      gap: spacing.md,
     },
     card: {
-      width: '48.5%',
+      flex: 1,
+      minWidth: 0,
       marginBottom: spacing.lg,
     },
     thumbnailWrap: {
@@ -471,50 +441,48 @@ function createStyles(colors: ThemeColors) {
     },
     thumb: {
       width: '100%',
-      aspectRatio: 1.36,
+      height: 132,
       borderRadius: radius.lg,
-      backgroundColor: colors.surfaceAlt,
+      backgroundColor: colors.surfaceSecondary,
     },
     thumbPlaceholder: {
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.borderDefault,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
     },
     favoriteButton: {
       position: 'absolute',
       top: 8,
       right: 8,
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceRaised,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.borderDefault,
     },
     cardBody: {
-      paddingTop: 8,
-      gap: 2,
+      paddingTop: spacing.sm,
+      gap: 3,
     },
     cardTitle: {
       color: colors.textPrimary,
       fontSize: fontSize.md,
-      lineHeight: 20,
       fontWeight: '800',
+      lineHeight: 20,
     },
     cardPrice: {
       color: colors.textPrimary,
       fontSize: fontSize.sm,
-      lineHeight: 19,
       fontWeight: '700',
     },
     cardMeta: {
       color: colors.textTertiary,
       fontSize: fontSize.xs,
       lineHeight: 17,
-      fontWeight: '500',
     },
   });
 }
