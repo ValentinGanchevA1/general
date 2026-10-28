@@ -8,6 +8,7 @@ import {
   sanitizeProductAnalyticsProperties,
 } from './analytics.service';
 import type { PostHogAnalyticsSink } from './posthog-analytics.sink';
+import type { PostHogPrivacyService } from './posthog-privacy.service';
 
 const HMAC_KEY = 'analytics-test-key-that-is-at-least-32-bytes-long';
 
@@ -16,13 +17,21 @@ describe('AnalyticsService', () => {
   const db = { query } as unknown as DataSource;
   const posthogCapture = jest.fn(() => Promise.resolve());
   const posthog = { capture: posthogCapture } as unknown as PostHogAnalyticsSink;
-  const service = new AnalyticsService(db, posthog);
+  const enqueueRetentionDeletion = jest.fn(() => Promise.resolve());
+  const processPending = jest.fn(() => Promise.resolve());
+  const posthogPrivacy = {
+    enqueueRetentionDeletion,
+    processPending,
+  } as unknown as PostHogPrivacyService;
+  const service = new AnalyticsService(db, posthog, posthogPrivacy);
   const originalKey = process.env.ANALYTICS_HMAC_KEY;
 
   beforeEach(() => {
     query.mockReset();
     query.mockResolvedValue([]);
     posthogCapture.mockClear();
+    enqueueRetentionDeletion.mockClear();
+    processPending.mockClear();
     process.env.ANALYTICS_HMAC_KEY = HMAC_KEY;
   });
 

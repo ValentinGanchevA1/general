@@ -21,6 +21,7 @@ import {
 } from '@g88/shared';
 
 import { PostHogAnalyticsSink } from './posthog-analytics.sink';
+import { PostHogPrivacyService } from './posthog-privacy.service';
 
 const EVENT_SET = new Set<string>(PRODUCT_ANALYTICS_EVENTS);
 const ENTITY_TYPE_SET = new Set<string>(PRODUCT_ANALYTICS_ENTITY_TYPES);
@@ -35,6 +36,7 @@ const MAX_RETENTION_DAYS = 365;
 const PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 const INITIAL_PRUNE_DELAY_MS = 15 * 60 * 1_000;
 const PRUNE_RETRY_DELAY_MS = 60 * 60 * 1_000;
+const DAY_MS = 24 * 60 * 60 * 1_000;
 
 function pickString(
   props: ProductAnalyticsProperties,
@@ -136,6 +138,7 @@ export class AnalyticsService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly posthog: PostHogAnalyticsSink,
+    private readonly posthogPrivacy: PostHogPrivacyService,
   ) {}
 
   onModuleInit(): void {
@@ -187,7 +190,10 @@ export class AnalyticsService implements OnModuleInit, OnModuleDestroy {
     this.pruneRunning = true;
     try {
       const retentionDays = resolveRetentionDays(process.env.ANALYTICS_RETENTION_DAYS);
+      const cutoff = new Date(Date.now() - retentionDays * DAY_MS);
+      await this.posthogPrivacy.enqueueRetentionDeletion(cutoff);
       await pruneExpiredAnalytics(this.db, retentionDays);
+      await this.posthogPrivacy.processPending();
     } finally {
       this.pruneRunning = false;
     }
