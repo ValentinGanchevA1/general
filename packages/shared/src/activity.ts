@@ -57,6 +57,18 @@ export interface CreatePulseCheckInRequest {
   lng: number;
 }
 
+/**
+ * Explicit check-in against an existing NEXA-owned place entity.
+ * Exact current coordinates are transport-only and are discarded after the
+ * backend derives the user's coarse H3 r7 cell for proximity verification.
+ */
+export interface CreatePlacePulseCheckInRequest {
+  placeId: string;
+  audience: CheckInAudience;
+  lat: number;
+  lng: number;
+}
+
 export interface PulseCheckInResult {
   id: string;
   placeLabel: string;

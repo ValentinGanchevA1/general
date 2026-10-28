@@ -24,7 +24,10 @@ interface EmittedTrendRow {
 
 export interface EvaluatePlaceTrendInput {
   placeId: string;
-  placeIdentity: PlaceIdentity;
+  canonicalLabel: string;
+  locationH3R7: string;
+  /** Optional legacy provider metadata. NEXA placeId is authoritative. */
+  placeIdentity: PlaceIdentity | null;
 }
 
 /**
@@ -39,7 +42,6 @@ export class PulsePlaceTrendingService {
   ) {}
 
   async evaluateAfterCheckIn(input: EvaluatePlaceTrendInput): Promise<void> {
-    const place = input.placeIdentity;
     const [countRow] = await this.db.query<TrendCountRow[]>(
       `SELECT COUNT(DISTINCT ci.user_id)::int AS distinct_users
          FROM pulse_check_ins ci
@@ -70,8 +72,8 @@ export class PulsePlaceTrendingService {
          place_label = EXCLUDED.place_label,
          location_h3_r7 = EXCLUDED.location_h3_r7,
          distinct_user_count = EXCLUDED.distinct_user_count,
-         place_provider = EXCLUDED.place_provider,
-         place_provider_id = EXCLUDED.place_provider_id,
+         place_provider = COALESCE(EXCLUDED.place_provider, pulse_place_trends.place_provider),
+         place_provider_id = COALESCE(EXCLUDED.place_provider_id, pulse_place_trends.place_provider_id),
          last_emitted_at = NOW(),
          expires_at = NOW() + ($8 * interval '1 minute'),
          updated_at = NOW()
@@ -80,11 +82,11 @@ export class PulsePlaceTrendingService {
        RETURNING id, place_label, location_h3_r7, last_emitted_at`,
       [
         placeKey,
-        place.canonicalLabel,
-        place.providerCellH3R7,
+        input.canonicalLabel,
+        input.locationH3R7,
         distinctUsers,
-        place.provider,
-        place.providerPlaceId,
+        input.placeIdentity?.provider ?? null,
+        input.placeIdentity?.providerPlaceId ?? null,
         input.placeId,
         TREND_TTL_MINUTES,
         TREND_COOLDOWN_MINUTES,

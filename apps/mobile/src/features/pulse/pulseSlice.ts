@@ -4,6 +4,7 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import type {
   ActivityItem,
   ActivityType,
+  CreatePlacePulseCheckInRequest,
   CreatePulseCheckInRequest,
   FeedResponse,
   PulseCheckInResult,
@@ -74,6 +75,24 @@ export const createPulseCheckIn = createAsyncThunk<
   },
 );
 
+export const createPlacePulseCheckIn = createAsyncThunk<
+  PulseCheckInResult,
+  CreatePlacePulseCheckInRequest,
+  { rejectValue: string }
+>(
+  'pulse/createPlaceCheckIn',
+  async (input, { rejectWithValue }) => {
+    try {
+      return await postJson<CreatePlacePulseCheckInRequest, PulseCheckInResult>(
+        '/feed/check-ins/by-place',
+        input,
+      );
+    } catch (e) {
+      return rejectWithValue(extractMessage(e, 'Could not check in here'));
+    }
+  },
+);
+
 const slice = createSlice({
   name: 'pulse',
   initialState,
@@ -139,6 +158,18 @@ const slice = createSlice({
     b.addCase(createPulseCheckIn.rejected, (s, a) => {
       s.checkInSubmitting = false;
       s.checkInError = a.payload ?? 'Could not check in';
+    });
+    b.addCase(createPlacePulseCheckIn.pending, (s) => {
+      s.checkInSubmitting = true;
+      s.checkInError = null;
+    });
+    b.addCase(createPlacePulseCheckIn.fulfilled, (s) => {
+      s.checkInSubmitting = false;
+      s.checkInError = null;
+    });
+    b.addCase(createPlacePulseCheckIn.rejected, (s, a) => {
+      s.checkInSubmitting = false;
+      s.checkInError = a.payload ?? 'Could not check in here';
     });
     b.addCase(logout.fulfilled, () => initialState);
     b.addCase(logout.rejected, () => initialState);

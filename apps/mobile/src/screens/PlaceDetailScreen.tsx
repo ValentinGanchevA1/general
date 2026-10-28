@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -10,10 +12,16 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import type { CheckInAudience } from '@g88/shared';
 
 import { EmptyState } from '@/components/EmptyState';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useUserLocation } from '@/features/location/useUserLocation';
 import { loadPlaceDetail, setPlaceSaved } from '@/features/places/placeDetailSlice';
+import {
+  clearCheckInError,
+  createPlacePulseCheckIn,
+} from '@/features/pulse/pulseSlice';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppTheme, type ThemeColors } from '@/theme';
@@ -27,12 +35,16 @@ export function PlaceDetailScreen(): React.JSX.Element {
   const route = useRoute<R>();
   const navigation = useNavigation<Nav>();
   const dispatch = useAppDispatch();
+  const { getCurrentLocation } = useUserLocation();
   const { placeId } = route.params;
   const state = useAppSelector((root) => root.places.entries[placeId]);
+  const { checkInSubmitting, checkInError } = useAppSelector((root) => root.pulse);
   const place = state?.detail ?? null;
   const loading = state == null || state.loadId != null || (state.detail == null && state.error == null);
   const saving = state?.saveId != null;
   const error = state?.error ?? null;
+  const [checkInOpen, setCheckInOpen] = useState(false);
+  const [checkedIn, setCheckedIn] = useState(false);
 
   useEffect(() => {
     void dispatch(loadPlaceDetail({ placeId }));
@@ -57,6 +69,36 @@ export function PlaceDetailScreen(): React.JSX.Element {
       },
     });
   }, [navigation, place]);
+
+  const openCheckIn = useCallback(() => {
+    if (checkedIn || checkInSubmitting) return;
+    dispatch(clearCheckInError());
+    setCheckInOpen(true);
+  }, [checkedIn, checkInSubmitting, dispatch]);
+
+  const closeCheckIn = useCallback(() => {
+    if (checkInSubmitting) return;
+    dispatch(clearCheckInError());
+    setCheckInOpen(false);
+  }, [checkInSubmitting, dispatch]);
+
+  const submitCheckIn = useCallback(async (audience: CheckInAudience): Promise<void> => {
+    if (!place || checkInSubmitting) return;
+    try {
+      const coords = await getCurrentLocation({ requestPermission: true });
+      if (!coords) return;
+      await dispatch(createPlacePulseCheckIn({
+        placeId: place.id,
+        audience,
+        lat: coords.lat,
+        lng: coords.lng,
+      })).unwrap();
+      setCheckedIn(true);
+      setCheckInOpen(false);
+    } catch {
+      // Redux owns the user-visible API error state.
+    }
+  }, [checkInSubmitting, dispatch, getCurrentLocation, place]);
 
   if (!place) {
     return <View style={styles.container}>
@@ -114,6 +156,22 @@ export function PlaceDetailScreen(): React.JSX.Element {
         </View>
       ) : null}
 
+      <TouchableOpacity
+        style={[styles.checkInButton, checkedIn && styles.checkInButtonDone]}
+        onPress={openCheckIn}
+        disabled={checkedIn || checkInSubmitting}
+        accessibilityRole="button"
+        accessibilityLabel={checkedIn ? `Checked in at ${place.canonicalLabel}` : `Check in at ${place.canonicalLabel}`}
+        accessibilityState={{ disabled: checkedIn || checkInSubmitting }}
+      >
+        <Icon
+          name={checkedIn ? 'check-circle' : 'map-marker-check-outline'}
+          size={21}
+          color={colors.onPrimary}
+        />
+        <Text style={styles.checkInButtonText}>{checkedIn ? 'Checked in' : 'Check in here'}</Text>
+      </TouchableOpacity>
+
       <View style={styles.actionRow}>
         <TouchableOpacity
           style={[styles.secondaryButton, place.saved && styles.secondaryButtonActive]}
@@ -146,7 +204,103 @@ export function PlaceDetailScreen(): React.JSX.Element {
         </TouchableOpacity>
       </View>
     </View>
+
+    <Modal
+      visible={checkInOpen}
+      transparent
+      animationType="fade"
+      onRequestClose={closeCheckIn}
+    >
+      <Pressable style={styles.modalBackdrop} onPress={closeCheckIn}>
+        <Pressable style={styles.modalCard} onPress={(event) => event.stopPropagation()}>
+          <View style={styles.modalIcon}>
+            <Icon name="map-marker-check-outline" size={26} color={colors.discovery} />
+          </View>
+          <Text style={styles.modalTitle}>Check in at {place.canonicalLabel}</Text>
+          <Text style={styles.modalBody}>
+            Choose who can see this explicit check-in. NEXA uses your current location only to verify that you're near this place; exact coordinates are not stored.
+          </Text>
+
+          {checkInError ? (
+            <View style={styles.modalError} accessibilityRole="alert">
+              <Icon name="alert-circle-outline" size={17} color={colors.danger} />
+              <Text style={styles.modalErrorText}>{checkInError}</Text>
+            </View>
+          ) : null}
+
+          <AudienceButton
+            label="Friends"
+            description="Visible only to your friends."
+            icon="account-group-outline"
+            loading={checkInSubmitting}
+            onPress={() => void submitCheckIn('friends')}
+            colors={colors}
+            styles={styles}
+          />
+          <AudienceButton
+            label="Nearby"
+            description="Visible in local Pulse; may contribute to anonymous place trends."
+            icon="radar"
+            loading={checkInSubmitting}
+            onPress={() => void submitCheckIn('nearby')}
+            colors={colors}
+            styles={styles}
+          />
+
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={closeCheckIn}
+            disabled={checkInSubmitting}
+            accessibilityRole="button"
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
   </View>;
+}
+
+function AudienceButton({
+  label,
+  description,
+  icon,
+  loading,
+  onPress,
+  colors,
+  styles,
+}: {
+  label: string;
+  description: string;
+  icon: string;
+  loading: boolean;
+  onPress: () => void;
+  colors: ThemeColors;
+  styles: ReturnType<typeof createStyles>;
+}): React.JSX.Element {
+  return (
+    <TouchableOpacity
+      style={styles.audienceButton}
+      onPress={onPress}
+      disabled={loading}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}. ${description}`}
+      accessibilityState={{ busy: loading }}
+    >
+      <View style={styles.audienceIcon}>
+        <Icon name={icon} size={21} color={colors.discovery} />
+      </View>
+      <View style={styles.audienceText}>
+        <Text style={styles.audienceLabel}>{label}</Text>
+        <Text style={styles.audienceDescription}>{description}</Text>
+      </View>
+      {loading ? (
+        <ActivityIndicator size="small" color={colors.discovery} />
+      ) : (
+        <Icon name="chevron-right" size={20} color={colors.textTertiary} />
+      )}
+    </TouchableOpacity>
+  );
 }
 
 function createStyles(colors: ThemeColors) {
@@ -206,7 +360,19 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.dangerBorder,
     },
     inlineErrorText: { flex: 1, color: colors.danger, fontSize: 13, lineHeight: 18 },
-    actionRow: { flexDirection: 'row', gap: 10, marginTop: 20 },
+    checkInButton: {
+      marginTop: 20,
+      minHeight: 52,
+      borderRadius: 15,
+      backgroundColor: colors.actionPrimary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 9,
+    },
+    checkInButtonDone: { opacity: 0.72 },
+    checkInButtonText: { color: colors.onPrimary, fontSize: 15, fontWeight: '800' },
+    actionRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
     secondaryButton: {
       minHeight: 50,
       minWidth: 112,
@@ -233,5 +399,66 @@ function createStyles(colors: ThemeColors) {
       gap: 9,
     },
     primaryButtonText: { color: colors.onPrimary, fontSize: 15, fontWeight: '800' },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.62)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 22,
+    },
+    modalCard: {
+      width: '100%',
+      maxWidth: 460,
+      borderRadius: 22,
+      padding: 20,
+      backgroundColor: colors.surface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.borderStrong,
+    },
+    modalIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.discoveryGhost,
+    },
+    modalTitle: { marginTop: 14, color: colors.textPrimary, fontSize: 20, fontWeight: '800' },
+    modalBody: { marginTop: 7, color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
+    modalError: {
+      marginTop: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      padding: 10,
+      borderRadius: 12,
+      backgroundColor: colors.dangerSurface,
+    },
+    modalErrorText: { flex: 1, color: colors.danger, fontSize: 13, lineHeight: 18 },
+    audienceButton: {
+      minHeight: 62,
+      marginTop: 12,
+      paddingHorizontal: 12,
+      borderRadius: 15,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.borderSubtle,
+      backgroundColor: colors.surfaceRaised,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    audienceIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.discoveryGhost,
+    },
+    audienceText: { flex: 1 },
+    audienceLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
+    audienceDescription: { marginTop: 2, color: colors.textSecondary, fontSize: 12, lineHeight: 16 },
+    cancelButton: { minHeight: 44, marginTop: 10, alignItems: 'center', justifyContent: 'center' },
+    cancelButtonText: { color: colors.textSecondary, fontSize: 14, fontWeight: '700' },
   });
 }

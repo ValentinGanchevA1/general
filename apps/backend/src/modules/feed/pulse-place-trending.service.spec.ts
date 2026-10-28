@@ -12,6 +12,11 @@ const placeIdentity: PlaceIdentity = {
   providerCellH3R7: '871ec91a5ffffff',
 };
 const placeId = '11111111-1111-4111-8111-111111111111';
+const baseInput = {
+  placeId,
+  canonicalLabel: 'Sea Garden',
+  locationH3R7: '871ec91a5ffffff',
+};
 
 describe('PulsePlaceTrendingService', () => {
   let query: jest.Mock;
@@ -30,7 +35,7 @@ describe('PulsePlaceTrendingService', () => {
   it('does not emit below the five-distinct-user threshold', async () => {
     query.mockResolvedValueOnce([{ distinct_users: 4 }]);
 
-    await service.evaluateAfterCheckIn({ placeId, placeIdentity });
+    await service.evaluateAfterCheckIn({ ...baseInput, placeIdentity });
 
     expect(query).toHaveBeenCalledTimes(1);
     const countSql = query.mock.calls[0]?.[0] as string;
@@ -42,7 +47,7 @@ describe('PulsePlaceTrendingService', () => {
     expect(publishPlaceTrend).not.toHaveBeenCalled();
   });
 
-  it('persists NEXA place identity and publishes an anonymous aggregate', async () => {
+  it('persists NEXA place identity and optional provider metadata', async () => {
     const emittedAt = new Date('2026-10-28T09:00:00.000Z');
     query
       .mockResolvedValueOnce([{ distinct_users: 5 }])
@@ -53,7 +58,7 @@ describe('PulsePlaceTrendingService', () => {
         last_emitted_at: emittedAt,
       }]);
 
-    await service.evaluateAfterCheckIn({ placeId, placeIdentity });
+    await service.evaluateAfterCheckIn({ ...baseInput, placeIdentity });
 
     const upsertSql = query.mock.calls[1]?.[0] as string;
     expect(upsertSql).toContain('INSERT INTO pulse_place_trends');
@@ -78,9 +83,37 @@ describe('PulsePlaceTrendingService', () => {
     });
   });
 
+  it('emits a NEXA-native trend without requiring provider aliases', async () => {
+    const emittedAt = new Date('2026-10-28T09:05:00.000Z');
+    query
+      .mockResolvedValueOnce([{ distinct_users: 5 }])
+      .mockResolvedValueOnce([{
+        id: 'trend-2',
+        place_label: 'Sea Garden',
+        location_h3_r7: '871ec91a5ffffff',
+        last_emitted_at: emittedAt,
+      }]);
+
+    await service.evaluateAfterCheckIn({ ...baseInput, placeIdentity: null });
+
+    const params = query.mock.calls[1]?.[1] as unknown[];
+    expect(params.slice(0, 7)).toEqual([
+      `nexa:${placeId}`,
+      'Sea Garden',
+      '871ec91a5ffffff',
+      5,
+      null,
+      null,
+      placeId,
+    ]);
+    const upsertSql = query.mock.calls[1]?.[0] as string;
+    expect(upsertSql).toContain('COALESCE(EXCLUDED.place_provider');
+    expect(publishPlaceTrend).toHaveBeenCalledTimes(1);
+  });
+
   it('does not republish while the durable cooldown suppresses the upsert', async () => {
     query.mockResolvedValueOnce([{ distinct_users: 8 }]).mockResolvedValueOnce([]);
-    await service.evaluateAfterCheckIn({ placeId, placeIdentity });
+    await service.evaluateAfterCheckIn({ ...baseInput, placeIdentity });
     expect(publishPlaceTrend).not.toHaveBeenCalled();
   });
 });
