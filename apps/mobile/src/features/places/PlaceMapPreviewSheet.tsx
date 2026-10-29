@@ -4,6 +4,7 @@ import type { PlaceMapEntityPoint } from '@g88/shared';
 
 import { NexaPlaceSheet } from '@/components/map/NexaSpatialEntitySheets';
 import type { NexaSpatialMetaItem } from '@/components/map/NexaSpatialSheet';
+import { formatPlaceActivityRecency } from '@/features/places/placeActivityRecency';
 import { sharePlace } from '@/features/places/sharePlace';
 import { useAppTheme } from '@/theme';
 
@@ -34,7 +35,11 @@ export function PlaceMapPreviewSheet({
     if (point.meta.trending) {
       items.unshift({
         id: 'activity',
-        label: 'Getting active nearby',
+        label:
+          formatPlaceActivityRecency(
+            point.meta.trending,
+            point.meta.recentActivityAt,
+          ) ?? 'Getting active nearby',
         icon: 'pulse',
         emphasis: true,
       });
@@ -49,7 +54,7 @@ export function PlaceMapPreviewSheet({
       items.push({ id: 'saved', label: 'Saved', icon: 'bookmark' });
     }
     return items;
-  }, [point.meta.saved, point.meta.trending]);
+  }, [point.meta.recentActivityAt, point.meta.saved, point.meta.trending]);
 
   const saved = point.meta.saved === true;
   const share = (): void => {
@@ -97,7 +102,7 @@ export function PlaceMapPreviewSheet({
           accessibilityLabel: `View details for ${point.meta.canonicalLabel}`,
         },
       ]}
-      accessibilityLabel={`${point.meta.canonicalLabel}, place, approximate location${point.meta.trending ? ', getting active nearby' : ''}${saved ? ', saved' : ''}`}
+      accessibilityLabel={`${point.meta.canonicalLabel}, place, approximate location${point.meta.trending ? ', recent anonymous local activity' : ''}${saved ? ', saved' : ''}`}
       testID="place-map-preview-sheet"
     >
       {saveError ? (
