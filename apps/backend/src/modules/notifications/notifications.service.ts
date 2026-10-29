@@ -1,8 +1,7 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import * as h3 from 'h3-js';
-import type Redis from 'ioredis';
 
 import {
   type AreaCategory,
@@ -11,7 +10,6 @@ import {
   NOTIFICATION_CHANNELS,
 } from '@g88/shared';
 
-import { REDIS_CLIENT } from '../../config/redis.provider';
 import { buildNexaPushData, nexaLockScreenCopy } from './notificationIdentity';
 
 // firebase-admin is initialized once on module load if credentials are present.
@@ -31,7 +29,7 @@ async function getMessaging(): Promise<import('firebase-admin/messaging').Messag
   return getMessaging(firebaseApp);
 }
 
-/** Per-channel frequency caps (sends per rolling window). Bounds push spam. */
+/** Per-channel frequency caps (sends per epoch-aligned window). Bounds push spam. */
 const CHANNEL_CAPS: Record<NotificationChannel, { limit: number; windowSec: number }> = {
   waves: { limit: 12, windowSec: 3600 },
   messages: { limit: 40, windowSec: 3600 },
@@ -47,10 +45,7 @@ const CHANNEL_CAPS: Record<NotificationChannel, { limit: number; windowSec: numb
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(
-    @InjectDataSource() private readonly db: DataSource,
-    @Inject(REDIS_CLIENT) private readonly redis: Redis,
-  ) {}
+  constructor(@InjectDataSource() private readonly db: DataSource) {}
 
   async registerToken(userId: string, token: string, platform: 'ios' | 'android'): Promise<void> {
     await this.db.query(
@@ -111,10 +106,25 @@ export class NotificationsService {
 
     const cap = CHANNEL_CAPS[channel];
     const bucket = Math.floor(Date.now() / 1000 / cap.windowSec);
-    const key = `notif:cap:${userId}:${channel}:${bucket}`;
-    const n = await this.redis.incr(key);
-    if (n === 1) await this.redis.expire(key, cap.windowSec);
-    return n <= cap.limit;
+    const rows = await this.db.query<Array<{ allowed: boolean }>>(
+      `WITH pruned AS (
+         DELETE FROM notification_frequency_caps
+          WHERE expires_at <= NOW()
+          RETURNING 1
+       ), consumed AS (
+         INSERT INTO notification_frequency_caps
+           (user_id, channel, window_bucket, send_count, expires_at, updated_at)
+         VALUES ($1, $2, $3, 1, NOW() + ($5 * INTERVAL '1 second'), NOW())
+         ON CONFLICT (user_id, channel, window_bucket) DO UPDATE SET
+           send_count = LEAST(notification_frequency_caps.send_count + 1, $4 + 1),
+           expires_at = GREATEST(notification_frequency_caps.expires_at, EXCLUDED.expires_at),
+           updated_at = NOW()
+         RETURNING send_count
+       )
+       SELECT send_count <= $4 AS allowed FROM consumed`,
+      [userId, channel, bucket, cap.limit, cap.windowSec * 2],
+    );
+    return rows[0]?.allowed === true;
   }
 
   async notifyWave(
