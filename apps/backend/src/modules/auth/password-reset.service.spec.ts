@@ -1,6 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import type Redis from 'ioredis';
 import * as bcrypt from 'bcrypt';
 import { PasswordResetMailer } from './password-reset-mailer';
 import { PasswordResetService } from './password-reset.service';
@@ -15,7 +14,6 @@ let mailer: PasswordResetMailer;
 let service: PasswordResetService;
 let db: { query: jest.Mock; transaction: jest.Mock };
 let tx: { query: jest.Mock };
-let redis: { eval: jest.Mock };
 
 beforeEach(() => {
   process.env.PASSWORD_RESET_SECRET = 'test-recovery-secret-at-least-32-characters';
@@ -23,9 +21,14 @@ beforeEach(() => {
   process.env.SENDGRID_FROM_EMAIL = 'nexa@example.com';
   mailer = new PasswordResetMailer();
   tx = { query: jest.fn() };
-  db = { query: jest.fn().mockResolvedValue([]), transaction: jest.fn(async (work: (manager: typeof tx) => Promise<unknown>) => work(tx)) };
-  redis = { eval: jest.fn().mockResolvedValue(1) };
-  service = new PasswordResetService(db as unknown as DataSource, redis as unknown as Redis, mailer);
+  db = {
+    query: jest.fn().mockImplementation((sql: string) => {
+      if (sql.includes('password_reset_rate_limits')) return Promise.resolve([{ allowed: true }]);
+      return Promise.resolve([]);
+    }),
+    transaction: jest.fn(async (work: (manager: typeof tx) => Promise<unknown>) => work(tx)),
+  };
+  service = new PasswordResetService(db as unknown as DataSource, mailer);
 });
 afterEach(() => { process.env = { ...savedEnv }; jest.restoreAllMocks(); });
 
@@ -38,19 +41,36 @@ it('returns the same public response for eligible and unknown accounts, without 
   const unknown = await service.request('unknown@example.com');
   expect(known).toEqual(unknown);
   expect(known).not.toHaveProperty('resetCode');
-  const params = db.query.mock.calls[0]?.[1] as string[];
+  const insertCall = db.query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO password_reset_requests')) as [string, string[]] | undefined;
+  expect(insertCall).toBeDefined();
+  const params = insertCall?.[1] ?? [];
   expect(params[2]).toMatch(/^[a-f0-9]{64}$/);
   const recovered = mailer.decrypt(params[3]!, params[1]!);
   expect(recovered).toMatch(/^\d{8}$/);
   expect(params).not.toContain(recovered);
   expect(params[2]).toBe(mailer.digest(`code:${params[1]}:${recovered}`));
-  expect(redis.eval.mock.calls[0]?.slice(2).join(' ')).not.toContain(email);
+
+  const limiterCalls = db.query.mock.calls.filter(([sql]) => String(sql).includes('password_reset_rate_limits'));
+  expect(limiterCalls).toHaveLength(2);
+  expect(limiterCalls[0]?.[1]).toEqual([mailer.digest(`rate:${email}`)]);
+  expect(limiterCalls[0]?.[1]).not.toContain(email);
 });
 
-it('does not enqueue another email during the cooldown or hourly limit', async () => {
-  redis.eval.mockResolvedValue(0);
+it('does not enqueue another email during the durable cooldown or hourly limit', async () => {
+  db.query.mockResolvedValueOnce([{ allowed: false }]);
   expect(await service.request(email)).toHaveProperty('retryAfterSeconds', 60);
-  expect(db.query).not.toHaveBeenCalled();
+  expect(db.query).toHaveBeenCalledTimes(1);
+  expect(db.query.mock.calls[0]?.[0]).toContain('password_reset_rate_limits');
+});
+
+it('keeps the request limiter in shared Postgres state instead of restart-sensitive Redis state', async () => {
+  await service.request(email);
+  const limiterSql = String(db.query.mock.calls[0]?.[0]);
+  expect(limiterSql).toContain('ON CONFLICT (subject_hash) DO UPDATE');
+  expect(limiterSql).toContain("INTERVAL '1 hour'");
+  expect(limiterSql).toContain('request_count < 5');
+  expect(limiterSql).toContain("INTERVAL '60 seconds'");
+  expect(limiterSql).toContain("updated_at < NOW() - INTERVAL '2 hours'");
 });
 
 it('fails closed for every account when recovery delivery is not configured', async () => {
