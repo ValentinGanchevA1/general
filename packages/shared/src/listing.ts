@@ -6,6 +6,7 @@
 //  the trading *feature* — listings CRUD, offers, favorites.)
 
 import type { LatLng } from './geo';
+import type { MarketplaceKind } from './marketplace';
 
 export const LISTING_STATUSES = ['active', 'sold', 'withdrawn'] as const;
 export type ListingStatus = (typeof LISTING_STATUSES)[number];
@@ -95,6 +96,8 @@ export interface ListingDetail extends ListingSummary {
   sellerDisplayName: string;
   sellerAvatarUrl: string | null;
   favoriteCount: number;
+  /** First-class sell-side Marketplace taxonomy. Wanted/buy posts return null. */
+  marketplaceKind: MarketplaceKind | null;
   /** The caller's own offer on this listing, if any. */
   myOffer: ListingOffer | null;
   /** Open offer count — visible to the seller only (0 for non-sellers). */
