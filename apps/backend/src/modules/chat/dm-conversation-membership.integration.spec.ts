@@ -1,5 +1,5 @@
 /**
- * PostgreSQL integration coverage for the normalized DM membership invariant.
+ * PostgreSQL integration coverage for normalized conversation membership.
  * CI reuses its disposable PostgreSQL service; local runs may provide the
  * dedicated CHAT_MEMBERSHIP_TEST_DATABASE_URL instead.
  */
@@ -13,15 +13,16 @@ const url =
   process.env.EVENT_REVIEWS_TEST_DATABASE_URL;
 const suite = url ? describe : describe.skip;
 
-suite('DM conversation membership PostgreSQL integration', () => {
+suite('Conversation membership PostgreSQL integration', () => {
   let db: DataSource;
   let bootstrap: DataSource;
-  const schema = `dm_members_${randomUUID().replaceAll('-', '')}`;
+  const schema = `conversation_members_${randomUUID().replaceAll('-', '')}`;
 
   const userA = randomUUID();
   const userB = randomUUID();
   const userC = randomUUID();
   const preRepairConversation = randomUUID();
+  const legacyGroupId = randomUUID();
 
   beforeAll(async () => {
     bootstrap = await new DataSource({ type: 'postgres', url, entities: [] }).initialize();
@@ -70,6 +71,19 @@ suite('DM conversation membership PostgreSQL integration', () => {
       ),
     ).toEqual([]);
 
+    // Model a prep-era group created before 0067. Group membership already lives
+    // in conversation_members and must survive legacy array normalization.
+    await db.query(
+      `INSERT INTO conversations (id, participant_ids, status, kind, title, created_by)
+       VALUES ($1, $2::uuid[], 'accepted', 'group', 'Legacy group', $3)`,
+      [legacyGroupId, [userA, userB, userC], userA],
+    );
+    await db.query(
+      `INSERT INTO conversation_members (conversation_id, user_id, role)
+       VALUES ($1, $2, 'owner'), ($1, $3, 'member'), ($1, $4, 'member')`,
+      [legacyGroupId, userA, userB, userC],
+    );
+
     const membershipSync = readFileSync(
       join(__dirname, '../../..', 'migrations/0066_dm_conversation_membership_sync.sql'),
       'utf8',
@@ -77,6 +91,14 @@ suite('DM conversation membership PostgreSQL integration', () => {
     await db.query(membershipSync);
     // Release retries must remain safe.
     await db.query(membershipSync);
+
+    const groupIsolation = readFileSync(
+      join(__dirname, '../../..', 'migrations/0067_group_conversation_legacy_participant_isolation.sql'),
+      'utf8',
+    );
+    await db.query(groupIsolation);
+    // Release retries must remain safe.
+    await db.query(groupIsolation);
   }, 30_000);
 
   afterAll(async () => {
@@ -121,7 +143,7 @@ suite('DM conversation membership PostgreSQL integration', () => {
     expect(rows.every((row) => row.left_at === null)).toBe(true);
   });
 
-  it('soft-leaves stale members and activates the replacement pair on update', async () => {
+  it('soft-leaves stale DM members and activates the replacement pair on update', async () => {
     const conversationId = randomUUID();
     await db.query(
       `INSERT INTO conversations (id, participant_ids, status)
@@ -146,12 +168,32 @@ suite('DM conversation membership PostgreSQL integration', () => {
     expect(activeByUser.get(userC)).toBe(true);
   });
 
-  it('does not apply the DM invariant to future group conversations', async () => {
+  it('normalizes legacy group participant_ids without changing normalized membership', async () => {
+    const [conversation] = await db.query<Array<{ participant_ids: string[] }>>(
+      `SELECT participant_ids FROM conversations WHERE id = $1`,
+      [legacyGroupId],
+    );
+    expect(conversation?.participant_ids).toEqual([]);
+
+    const members = await db.query<Array<{ user_id: string; role: string; left_at: Date | null }>>(
+      `SELECT user_id, role, left_at
+         FROM conversation_members
+        WHERE conversation_id = $1`,
+      [legacyGroupId],
+    );
+    expect(members).toEqual(expect.arrayContaining([
+      { user_id: userA, role: 'owner', left_at: null },
+      { user_id: userB, role: 'member', left_at: null },
+      { user_id: userC, role: 'member', left_at: null },
+    ]));
+  });
+
+  it('does not apply the DM mirror to future normalized group conversations', async () => {
     const conversationId = randomUUID();
     await db.query(
       `INSERT INTO conversations (id, participant_ids, status, kind, title, created_by)
-       VALUES ($1, $2::uuid[], 'accepted', 'group', 'Test group', $3)`,
-      [conversationId, [userA, userB, userC], userA],
+       VALUES ($1, ARRAY[]::uuid[], 'accepted', 'group', 'Test group', $2)`,
+      [conversationId, userA],
     );
 
     expect(
@@ -160,6 +202,24 @@ suite('DM conversation membership PostgreSQL integration', () => {
         [conversationId],
       ),
     ).toEqual([]);
+  });
+
+  it('fails closed when a future group tries to populate the legacy participant array', async () => {
+    await expect(
+      db.query(
+        `INSERT INTO conversations (id, participant_ids, status, kind, title, created_by)
+         VALUES ($1, $2::uuid[], 'accepted', 'group', 'Invalid group', $3)`,
+        [randomUUID(), [userA, userB], userA],
+      ),
+    ).rejects.toMatchObject({ driverError: { code: '23514' } });
+  });
+
+  it('keeps legacy participant-array cleanup from matching normalized groups', async () => {
+    const rows = await db.query<Array<{ id: string }>>(
+      `SELECT id FROM conversations WHERE $1 = ANY(participant_ids)`,
+      [userA],
+    );
+    expect(rows.some((row) => row.id === legacyGroupId)).toBe(false);
   });
 
   it('fails closed when a DM row does not contain exactly two participants', async () => {
