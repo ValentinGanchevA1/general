@@ -46,6 +46,7 @@ export class DiscoveryController {
       prevViewportHash: dto.prevViewportHash,
       topic: dto.topic,
       listingMode: dto.listingMode,
+      marketplaceKind: dto.marketplaceKind,
       friendsOnly: dto.friendsOnly === true,
       datingOnly: dto.datingOnly === true,
       rankBy: dto.rankBy,
