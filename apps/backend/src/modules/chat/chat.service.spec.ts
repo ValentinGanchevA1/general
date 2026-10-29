@@ -55,7 +55,7 @@ describe('ChatService', () => {
 
     it('forbids a non-participant', async () => {
       txQuery.mockResolvedValueOnce([
-        { participant_ids: ['a', 'b'], status: 'accepted', initiated_by: null },
+        { kind: 'dm', participant_ids: ['a', 'b'], status: 'accepted', initiated_by: null },
       ]);
       await expect(service.persist('c1', 'me', 'hi')).rejects.toBeInstanceOf(ForbiddenException);
     });
@@ -63,7 +63,7 @@ describe('ChatService', () => {
     it('caps the initiator at one message while the request is pending', async () => {
       txQuery
         .mockResolvedValueOnce([
-          { participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'me' },
+          { kind: 'dm', participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'me' },
         ])
         .mockResolvedValueOnce([{ count: 1 }]); // already sent a message
 
@@ -75,7 +75,7 @@ describe('ChatService', () => {
     it('allows the initiator the first request message', async () => {
       txQuery
         .mockResolvedValueOnce([
-          { participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'me' },
+          { kind: 'dm', participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'me' },
         ])
         .mockResolvedValueOnce([{ count: 0 }]) // no prior message
         .mockResolvedValueOnce(MSG) // INSERT
@@ -90,7 +90,7 @@ describe('ChatService', () => {
     it('promotes the conversation to accepted when the recipient replies', async () => {
       txQuery
         .mockResolvedValueOnce([
-          { participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'other' },
+          { kind: 'dm', participant_ids: ['me', 'other'], status: 'pending', initiated_by: 'other' },
         ])
         .mockResolvedValueOnce([]) // UPDATE status → accepted (before insert)
         .mockResolvedValueOnce(MSG) // INSERT
@@ -107,7 +107,7 @@ describe('ChatService', () => {
     it('allows free messaging once the conversation is accepted', async () => {
       txQuery
         .mockResolvedValueOnce([
-          { participant_ids: ['me', 'other'], status: 'accepted', initiated_by: null },
+          { kind: 'dm', participant_ids: ['me', 'other'], status: 'accepted', initiated_by: null },
         ])
         .mockResolvedValueOnce(MSG)
         .mockResolvedValueOnce([]) // UPDATE last_message_at
@@ -115,6 +115,70 @@ describe('ChatService', () => {
 
       const res = await service.persist('c1', 'me', 'hi');
       expect(res.body).toBe('hi');
+    });
+
+    it('allows an active normalized group member without applying DM request semantics', async () => {
+      txQuery
+        .mockResolvedValueOnce([
+          {
+            kind: 'group',
+            participant_ids: [],
+            status: 'pending',
+            initiated_by: 'other',
+            active_group_member: true,
+          },
+        ])
+        .mockResolvedValueOnce(MSG)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      await expect(service.persist('c1', 'me', 'hi')).resolves.toMatchObject({ id: 'm1' });
+      expect(txQuery.mock.calls.some(([sql]) => String(sql).includes('COUNT(*)::int'))).toBe(false);
+      expect(txQuery.mock.calls.some(([sql]) => String(sql).includes("status = 'accepted'"))).toBe(false);
+      expect(String(txQuery.mock.calls[0]?.[0])).toContain('conversation_members');
+      expect(String(txQuery.mock.calls[0]?.[0])).toContain('cm.left_at IS NULL');
+    });
+
+    it('forbids a group member whose normalized membership is no longer active', async () => {
+      txQuery.mockResolvedValueOnce([
+        {
+          kind: 'group',
+          participant_ids: ['me'],
+          status: 'accepted',
+          initiated_by: null,
+          active_group_member: false,
+        },
+      ]);
+
+      await expect(service.persist('c1', 'me', 'hi')).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'chat.forbidden' }),
+      });
+      expect(txQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it('fails closed if a location-session message is attempted for a group', async () => {
+      txQuery.mockResolvedValueOnce([
+        {
+          kind: 'group',
+          participant_ids: [],
+          status: 'accepted',
+          initiated_by: null,
+          active_group_member: true,
+        },
+      ]);
+
+      await expect(
+        service.persistLocationSession(
+          'c1',
+          'me',
+          'session-1',
+          'Started sharing live location',
+          { lat: 43.2, lng: 27.9 },
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'chat.forbidden' }),
+      });
+      expect(txQuery).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -226,6 +290,7 @@ describe('ChatService', () => {
       expect(list[0]!.lastMessage).toBeNull();
       expect(list[0]!.participants.find((p) => p.id === 'other')?.displayName).toBe('Other');
       expect(list[0]!.unreadCount).toBe(0);
+      expect(String(query.mock.calls[0]?.[0])).toContain("c.kind = 'dm'");
     });
 
     it('builds lastMessage from the latest body/sender', async () => {
@@ -257,18 +322,38 @@ describe('ChatService', () => {
   });
 
   describe('membership helpers', () => {
-    it('isParticipant reflects the row presence', async () => {
+    it('isParticipant reflects active DM or normalized group membership', async () => {
       query.mockResolvedValueOnce([{ exists: true }]);
       await expect(service.isParticipant('c1', 'me')).resolves.toBe(true);
+      const sql = String(query.mock.calls[0]?.[0]);
+      expect(sql).toContain("c.kind = 'dm'");
+      expect(sql).toContain("c.kind = 'group'");
+      expect(sql).toContain('conversation_members');
+      expect(sql).toContain('cm.left_at IS NULL');
+
       query.mockResolvedValueOnce([]);
       await expect(service.isParticipant('c1', 'me')).resolves.toBe(false);
     });
 
-    it('getParticipantIds returns the array or [] when missing', async () => {
+    it('getParticipantIds returns active normalized members for groups or the DM array', async () => {
       query.mockResolvedValueOnce([{ participant_ids: ['a', 'b'] }]);
       await expect(service.getParticipantIds('c1')).resolves.toEqual(['a', 'b']);
+      const sql = String(query.mock.calls[0]?.[0]);
+      expect(sql).toContain("c.kind = 'group'");
+      expect(sql).toContain('conversation_members');
+      expect(sql).toContain('cm.left_at IS NULL');
+
       query.mockResolvedValueOnce([]);
       await expect(service.getParticipantIds('c1')).resolves.toEqual([]);
+    });
+
+    it('isDmParticipant rejects groups by requiring kind=dm', async () => {
+      query.mockResolvedValueOnce([{ exists: true }]);
+      await expect(service.isDmParticipant('c1', 'me')).resolves.toBe(true);
+      expect(String(query.mock.calls[0]?.[0])).toContain("c.kind = 'dm'");
+
+      query.mockResolvedValueOnce([]);
+      await expect(service.isDmParticipant('group-1', 'me')).resolves.toBe(false);
     });
   });
 });
