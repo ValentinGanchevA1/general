@@ -15,6 +15,7 @@ import {useAppSelector} from '@/hooks/redux';
 import {postJson} from '@/api/client';
 import {bumpListing, counterOffer, makeOffer, respondToOffer, toggleFavorite, updateListingStatus, useListing, withdrawOffer} from '@/features/trading/useTrading';
 import {formatListingExpiry, formatPrice} from '@/features/trading/formatPrice';
+import {marketplaceKindLabel, marketplacePricePrefix} from '@/features/trading/marketplaceDetailPresentation';
 import {openRootScreen} from '@/navigation/openRootScreen';
 import {signalPostSocialActivation} from '@/features/nudges/postSocialActivation';
 import {extractMessage} from '@/utils/extractMessage';
@@ -64,15 +65,18 @@ export function ListingDetailScreen(): React.JSX.Element {
 	}
 
 	const isSeller = listing.sellerId === myId;
+	const marketplaceLabel = marketplaceKindLabel(listing.marketplaceKind);
+	const displayedPrice = `${marketplacePricePrefix(listing.marketplaceKind)}${formatPrice(listing.priceCents, listing.currency)}`;
 	return <ScrollView style={S.container} contentContainerStyle={S.content} refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} progressBackgroundColor={colors.surfaceRaised}/> }>
-		<ScreenHeader title="Listing" right={<TouchableOpacity onPress={() => void onToggleFav()} disabled={favBusy} hitSlop={8} accessibilityRole="button" accessibilityLabel={listing.favoritedByMe ? 'Remove from saved' : 'Save listing'}>
+		<ScreenHeader title={marketplaceLabel == null ? 'Listing' : 'Marketplace'} right={<TouchableOpacity onPress={() => void onToggleFav()} disabled={favBusy} hitSlop={8} accessibilityRole="button" accessibilityLabel={listing.favoritedByMe ? 'Remove from saved' : 'Save listing'}>
 			<Icon name={listing.favoritedByMe ? 'heart' : 'heart-outline'} size={24} color={listing.favoritedByMe ? colors.danger : colors.textPrimary}/>
 		</TouchableOpacity>}/>
 		{listing.thumbnailUrl ? <Image source={{uri: listing.thumbnailUrl}} style={S.image}/> : <View style={[S.image, S.imagePlaceholder]}><Icon name="image-off-outline" size={40} color={colors.borderStrong}/></View>}
 		<View style={S.body}>
 			<Text style={S.title}>{listing.title}</Text>
-			<Text style={S.price}>{formatPrice(listing.priceCents, listing.currency)}</Text>
+			<Text style={S.price}>{displayedPrice}</Text>
 			<View style={S.metaRow}>
+				{marketplaceLabel != null ? <View style={S.marketplacePill}><Text style={S.marketplaceText}>{marketplaceLabel}</Text></View> : null}
 				<View style={S.categoryPill}><Text style={S.categoryText}>{listing.category}</Text></View>
 				{listing.status !== 'active' ? <View style={S.statusPill}><Text style={S.statusText}>{listing.status}</Text></View> : null}
 				{formatListingExpiry(listing.expiresAt) ? <Text style={S.favCount}>{formatListingExpiry(listing.expiresAt)}</Text> : null}
@@ -197,7 +201,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
 	container: {flex: 1, backgroundColor: colors.bg}, content: {paddingBottom: 48}, center: {alignItems: 'center', justifyContent: 'center'}, body: {padding: 20},
 	image: {width: '100%', height: 220, backgroundColor: colors.surface}, imagePlaceholder: {alignItems: 'center', justifyContent: 'center'},
 	title: {color: colors.textPrimary, fontSize: 22, fontWeight: '800'}, price: {color: colors.primary, fontSize: 20, fontWeight: '700', marginTop: 6},
-	metaRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12, alignItems: 'center'}, categoryPill: {backgroundColor: colors.surfaceAlt, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4}, categoryText: {color: colors.textSecondary, fontSize: 12, fontWeight: '600'}, statusPill: {backgroundColor: colors.warning, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4}, statusText: {color: colors.textInverse, fontSize: 12, fontWeight: '700'}, favCount: {color: colors.textMuted, fontSize: 12},
+	metaRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12, alignItems: 'center'}, marketplacePill: {backgroundColor: colors.surfaceRaised, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.primary, paddingHorizontal: 10, paddingVertical: 4}, marketplaceText: {color: colors.primary, fontSize: 12, fontWeight: '700'}, categoryPill: {backgroundColor: colors.surfaceAlt, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4}, categoryText: {color: colors.textSecondary, fontSize: 12, fontWeight: '600'}, statusPill: {backgroundColor: colors.warning, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4}, statusText: {color: colors.textInverse, fontSize: 12, fontWeight: '700'}, favCount: {color: colors.textMuted, fontSize: 12},
 	sellerRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16}, sellerIdentity: {flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1}, sellerAvatar: {width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface}, sellerAvatarPlaceholder: {alignItems: 'center', justifyContent: 'center'}, sellerInitial: {color: colors.primary, fontWeight: '700'}, sellerName: {color: colors.textSecondary, fontSize: 15, fontWeight: '600'}, description: {color: colors.textSecondary, fontSize: 15, lineHeight: 22, marginTop: 16},
 	contactRow: {flexDirection: 'row', gap: 8}, messageBtn: {flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8}, waveBtn: {flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.action, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8}, waveText: {color: colors.onPrimary, fontWeight: '700', fontSize: 13},
 	card: {marginTop: 16, padding: 16, backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border}, cardTitle: {color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginBottom: 8}, sectionTitle: {color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginTop: 24, marginBottom: 8}, counterHint: {color: colors.textMuted, fontSize: 13, marginBottom: 8}, offerLine: {color: colors.textSecondary, fontSize: 15, fontWeight: '600'}, offerStatus: {color: colors.textMuted, fontWeight: '500'}, offerMsg: {color: colors.textMuted, fontSize: 13, marginTop: 6}, emptyHint: {color: colors.textFaint, fontSize: 14},
