@@ -15,20 +15,18 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import type {
-	DiscoveryRankBy,
-	EntityKind,
-	ListingMode,
-	MarketplaceKind,
-} from '@g88/shared';
+import type { DiscoveryRankBy, EntityKind, ListingMode } from '@g88/shared';
 import { NexaEntityGlyph } from '@/components/Brand/NexaEntityGlyph';
+import {
+	marketplaceKindMapFilterStore,
+	type MarketplaceKindMapFilterValue,
+} from '@/features/map/marketplaceKindMapFilter.store';
 import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 import { MAP_LAYER_ROW_HEIGHT, MAP_SEARCH_BAR_HEIGHT } from './mapChromeLayout';
 
 export type ListingModeFilterValue = 'all' | ListingMode;
-export type MarketplaceKindFilterValue = 'all' | MarketplaceKind;
 export const DEFAULT_MAP_LAYERS: EntityKind[] = ['user'];
 
 type LayerOption = { id: EntityKind; label: string; a11y: string };
@@ -48,7 +46,7 @@ const LISTING_OPTIONS: Choice<ListingModeFilterValue>[] = [
 	{ id: 'buy', label: 'Wanted' },
 ];
 
-const MARKETPLACE_KIND_OPTIONS: Choice<MarketplaceKindFilterValue>[] = [
+const MARKETPLACE_KIND_OPTIONS: Choice<MarketplaceKindMapFilterValue>[] = [
 	{ id: 'all', label: 'All types' },
 	{ id: 'for_sale', label: 'For sale items' },
 	{ id: 'service', label: 'Services' },
@@ -69,8 +67,6 @@ export interface MapFilterRowProps {
 	onLayersChange: (next: EntityKind[]) => void;
 	listingMode: ListingModeFilterValue;
 	onListingModeChange: (next: ListingModeFilterValue) => void;
-	marketplaceKind: MarketplaceKindFilterValue;
-	onMarketplaceKindChange: (next: MarketplaceKindFilterValue) => void;
 	friendsOnly: boolean;
 	onFriendsOnlyChange: (next: boolean) => void;
 	datingOnly: boolean;
@@ -90,8 +86,6 @@ export function MapFilterRow({
 	onLayersChange,
 	listingMode,
 	onListingModeChange,
-	marketplaceKind,
-	onMarketplaceKindChange,
 	friendsOnly,
 	onFriendsOnlyChange,
 	datingOnly,
@@ -111,6 +105,11 @@ export function MapFilterRow({
 		savedPlacesMapLayerStore.getSnapshot,
 		savedPlacesMapLayerStore.getSnapshot,
 	);
+	const marketplaceKind = useSyncExternalStore(
+		marketplaceKindMapFilterStore.subscribe,
+		marketplaceKindMapFilterStore.getSnapshot,
+		marketplaceKindMapFilterStore.getSnapshot,
+	);
 	const showPeople = layers.includes('user');
 	const showListings = layers.includes('listing');
 
@@ -127,16 +126,16 @@ export function MapFilterRow({
 	const changeListingMode = useCallback((next: ListingModeFilterValue): void => {
 		onListingModeChange(next);
 		// Mode choices are broad; clear any narrower sell-side taxonomy.
-		onMarketplaceKindChange('all');
-	}, [onListingModeChange, onMarketplaceKindChange]);
+		marketplaceKindMapFilterStore.reset();
+	}, [onListingModeChange]);
 
-	const changeMarketplaceKind = useCallback((next: MarketplaceKindFilterValue): void => {
-		onMarketplaceKindChange(next);
+	const changeMarketplaceKind = useCallback((next: MarketplaceKindMapFilterValue): void => {
+		marketplaceKindMapFilterStore.set(next);
 		if (next !== 'all') {
 			// Marketplace kinds are sell-side taxonomy; Wanted is a separate buy intent.
 			onListingModeChange('sell');
 		}
-	}, [onListingModeChange, onMarketplaceKindChange]);
+	}, [onListingModeChange]);
 
 	const toggleLayer = useCallback((id: EntityKind): void => {
 		if (layers.includes(id)) {
@@ -318,8 +317,8 @@ interface FilterModalProps {
 	showListings: boolean;
 	listingMode: ListingModeFilterValue;
 	onListingModeChange: (next: ListingModeFilterValue) => void;
-	marketplaceKind: MarketplaceKindFilterValue;
-	onMarketplaceKindChange: (next: MarketplaceKindFilterValue) => void;
+	marketplaceKind: MarketplaceKindMapFilterValue;
+	onMarketplaceKindChange: (next: MarketplaceKindMapFilterValue) => void;
 	onOpenAlerts: () => void;
 }
 
