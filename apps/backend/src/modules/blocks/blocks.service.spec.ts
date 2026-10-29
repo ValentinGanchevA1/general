@@ -37,7 +37,7 @@ describe('BlocksService', () => {
     expect(leaveRoomForUsers).not.toHaveBeenCalled();
   });
 
-  it('block() upserts, cascades graph delete, then prunes both users from shared conversation rooms', async () => {
+  it('block() upserts, cascades graph delete, then prunes both users from shared DM rooms', async () => {
     query
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ id: 'conversation-1' }, { id: 'conversation-2' }]);
@@ -50,6 +50,7 @@ describe('BlocksService', () => {
     expect(onBlock).toHaveBeenCalledWith(A, B);
 
     const [conversationSql, conversationParams] = query.mock.calls[1]!;
+    expect(conversationSql).toContain("kind = 'dm'");
     expect(conversationSql).toContain('participant_ids @> ARRAY[$1, $2]::uuid[]');
     expect(conversationSql).toContain("COALESCE(status, 'accepted') = 'accepted'");
     expect(conversationParams).toEqual([A, B]);
