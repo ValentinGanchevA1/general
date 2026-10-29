@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import axios from 'axios';
 
 import {
@@ -27,6 +27,7 @@ import {
 } from '@/features/discovery/discoverySlice';
 import { createDiscoveryMutationLog } from '@/features/discovery/discoveryMutationLog';
 import { replayDiscoveryMutations } from '@/features/discovery/discoveryMutationReplay';
+import { marketplaceKindMapFilterStore } from '@/features/map/marketplaceKindMapFilter.store';
 import { useSocket } from '@/realtime/useSocket';
 import { extractMessage } from '@/utils/extractMessage';
 
@@ -36,7 +37,6 @@ interface UseDiscoveryArgs {
   kinds?: EntityKind[];
   topic?: string | null;
   listingMode?: ListingMode | undefined;
-  marketplaceKind?: MarketplaceKind | undefined;
   friendsOnly?: boolean;
   datingOnly?: boolean;
   rankBy?: DiscoveryRankBy;
@@ -105,7 +105,6 @@ export function useDiscovery({
   kinds,
   topic,
   listingMode,
-  marketplaceKind,
   friendsOnly = false,
   datingOnly = false,
   rankBy = 'relevance',
@@ -115,6 +114,13 @@ export function useDiscovery({
   const dispatch = useAppDispatch();
   const points = useAppSelector((state) => state.discovery.points);
   const { on } = useSocket();
+  const marketplaceKindFilter = useSyncExternalStore(
+    marketplaceKindMapFilterStore.subscribe,
+    marketplaceKindMapFilterStore.getSnapshot,
+    marketplaceKindMapFilterStore.getSnapshot,
+  );
+  const marketplaceKind: MarketplaceKind | undefined =
+    marketplaceKindFilter === 'all' ? undefined : marketplaceKindFilter;
   const [data, setData] = useState<DiscoveryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
