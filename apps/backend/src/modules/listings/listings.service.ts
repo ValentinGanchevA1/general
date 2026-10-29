@@ -14,6 +14,7 @@ import {
   type ListingOffer,
   type ListingStatus,
   type ListingSummary,
+  type MarketplaceKind,
   type OfferStatus,
   type ToggleFavoriteResponse,
   type UploadListingImageResponse,
@@ -42,6 +43,7 @@ interface ListingRow {
   category: string;
   status: ListingStatus;
   mode: 'sell' | 'buy';
+  marketplace_kind?: MarketplaceKind;
   lat: number;
   lng: number;
   created_at: Date;
@@ -164,7 +166,7 @@ export class ListingsService {
   async detail(userId: string, listingId: string): Promise<ListingDetail> {
     const [row] = (await this.db.query(
       `SELECT l.id, l.seller_id, l.title, l.description, l.thumbnail_url, l.price_cents,
-              l.currency, l.category, l.status, l.mode, l.visibility, l.created_at,
+              l.currency, l.category, l.status, l.mode, l.marketplace_kind, l.visibility, l.created_at,
               l.expires_at, l.bumped_at,
               ST_Y(l.location::geometry) AS lat, ST_X(l.location::geometry) AS lng,
               s.display_name AS seller_display_name, s.avatar_url AS seller_avatar_url,
@@ -229,6 +231,7 @@ export class ListingsService {
       sellerDisplayName: row.seller_display_name,
       sellerAvatarUrl: row.seller_avatar_url,
       favoriteCount: row.favorite_count,
+      marketplaceKind: row.mode === 'sell' ? row.marketplace_kind ?? 'for_sale' : null,
       myOffer: mine ? this.toOffer(mine) : null,
       offerCount: openOffers,
     };
