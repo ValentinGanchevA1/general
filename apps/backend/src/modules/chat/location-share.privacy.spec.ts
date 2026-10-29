@@ -30,17 +30,17 @@ function activeSessionRow(): Record<string, unknown> {
 function makeHarness(options: { participant?: boolean; blocked?: boolean } = {}): {
   service: LocationShareService;
   query: jest.Mock;
-  isParticipant: jest.Mock;
+  isDmParticipant: jest.Mock;
   getParticipantIds: jest.Mock;
 } {
   const participant = options.participant ?? true;
   const blocked = options.blocked ?? false;
   const query = jest.fn();
-  const isParticipant = jest.fn(async () => participant);
+  const isDmParticipant = jest.fn(async () => participant);
   const getParticipantIds = jest.fn(async () => [sharerId, peerId]);
 
   const db = { query } as unknown as DataSource;
-  const chat = { isParticipant, getParticipantIds } as unknown as ChatService;
+  const chat = { isDmParticipant, getParticipantIds } as unknown as ChatService;
   const service = new LocationShareService(db, chat);
 
   query.mockImplementation(async (sql: string) => {
@@ -59,7 +59,7 @@ function makeHarness(options: { participant?: boolean; blocked?: boolean } = {})
     throw new Error(`Unexpected query: ${sql}`);
   });
 
-  return { service, query, isParticipant, getParticipantIds };
+  return { service, query, isDmParticipant, getParticipantIds };
 }
 
 describe('LocationShareService dynamic privacy authorization', () => {
@@ -78,7 +78,7 @@ describe('LocationShareService dynamic privacy authorization', () => {
     expect(query.mock.calls[1]?.[0]).toContain('SELECT EXISTS');
   });
 
-  it('rejects a precise update when the sharer is no longer a participant', async () => {
+  it('rejects a precise update when the sharer is no longer an eligible DM participant', async () => {
     const { service, query, getParticipantIds } = makeHarness({ participant: false });
 
     await expect(
@@ -106,13 +106,13 @@ describe('LocationShareService dynamic privacy authorization', () => {
     expect(query.mock.calls[0]?.[0]).toContain('SELECT EXISTS');
   });
 
-  it('continues to accept updates for an authorized active session', async () => {
-    const { service, query, isParticipant, getParticipantIds } = makeHarness();
+  it('continues to accept updates for an authorized active DM session', async () => {
+    const { service, query, isDmParticipant, getParticipantIds } = makeHarness();
 
     const result = await service.update(sharerId, sessionId, { lat: 43.22, lng: 27.94 });
 
     expect(result.conversationId).toBe(conversationId);
-    expect(isParticipant).toHaveBeenCalledWith(conversationId, sharerId);
+    expect(isDmParticipant).toHaveBeenCalledWith(conversationId, sharerId);
     expect(getParticipantIds).toHaveBeenCalledWith(conversationId);
     expect(query).toHaveBeenCalledTimes(3);
     expect(query.mock.calls[2]?.[0]).toContain('UPDATE chat_location_sessions');

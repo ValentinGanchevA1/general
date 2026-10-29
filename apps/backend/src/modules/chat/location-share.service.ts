@@ -302,10 +302,13 @@ export class LocationShareService {
   }
 
   private async assertParticipant(userId: string, conversationId: string): Promise<void> {
-    if (!(await this.chat.isParticipant(conversationId, userId))) {
+    // Precise live location remains intentionally limited to 1:1 DMs while
+    // group-chat membership is introduced. Group location requires a separate
+    // consent/recipient policy and must fail closed until then.
+    if (!(await this.chat.isDmParticipant(conversationId, userId))) {
       throw new ForbiddenException({
         code: 'location.not_participant',
-        message: 'Not a participant',
+        message: 'Not an eligible direct-conversation participant',
       });
     }
   }
