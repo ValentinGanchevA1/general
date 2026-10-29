@@ -4,26 +4,17 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { io } = require('socket.io-client');
 
-const ALLOWED_ORIGINS = new Set([
-  'https://g88-api.onrender.com',
-  'https://api.g88.app',
-]);
-
-function resolveBase(raw) {
-  const trimmed = (raw ?? 'https://g88-api.onrender.com').replace(/\/$/, '');
-  let origin;
-  try {
-    origin = new URL(trimmed).origin;
-  } catch {
-    throw new Error(`Invalid REALTIME_PRIVACY_API_URL: ${raw}`);
+function resolveBase(target) {
+  if (target == null || target === '' || target === 'render') {
+    return 'https://g88-api.onrender.com';
   }
-  if (!ALLOWED_ORIGINS.has(origin) && !ALLOWED_ORIGINS.has(trimmed)) {
-    throw new Error(`REALTIME_PRIVACY_API_URL origin not allowlisted: ${origin}`);
+  if (target === 'api') {
+    return 'https://api.g88.app';
   }
-  return trimmed;
+  throw new Error('Unsupported REALTIME_PRIVACY_TARGET');
 }
 
-const BASE = resolveBase(process.env.REALTIME_PRIVACY_API_URL);
+const BASE = resolveBase(process.env.REALTIME_PRIVACY_TARGET);
 const API = `${BASE}/api/v1`;
 const RUN_SECRET = randomBytes(16).toString('hex');
 const RUN_ID = `${Date.now()}-${RUN_SECRET.slice(0, 12)}`;
