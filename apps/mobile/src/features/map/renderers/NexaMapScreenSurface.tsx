@@ -24,6 +24,7 @@ import { Config } from '@/config';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useSheetBackdrop, useSheetChrome } from '@/components/sheets';
+import { filterPlaceMapSearch } from '@/features/places/filterPlaceMapSearch';
 import { PlaceMapPreviewSheet } from '@/features/places/PlaceMapPreviewSheet';
 import { loadSavedPlaces, setPlaceSaved } from '@/features/places/placeDetailSlice';
 import { shouldDismissPrivatePlacePreview } from '@/features/places/placePreviewLifecycle';
@@ -56,6 +57,7 @@ export type NexaMapScreenSurfaceProps = Omit<
   | 'onRegionChangeComplete'
 > & {
   points: DiscoveryPoint[];
+  searchQuery?: string;
   onEntityPress: (point: EntityPoint) => void;
   onClusterPress: (point: ClusterPoint) => void;
   onRegionChangeComplete: (region: Region) => void;
@@ -95,6 +97,7 @@ export const NexaMapScreenSurface = React.forwardRef<
 >(function NexaMapScreenSurface(
   {
     points,
+    searchQuery = '',
     onEntityPress,
     onClusterPress,
     onRegionChangeComplete,
@@ -182,6 +185,17 @@ export const NexaMapScreenSurface = React.forwardRef<
       privateSavedPlacePoints,
     ),
     [placeDiscovery.data?.points, points, privateSavedPlacePoints],
+  );
+  const preservedPlaceIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (selectedPlace != null) ids.add(selectedPlace.id);
+    const focusedPlaceId = savedPlaceFocusRequest?.point.id;
+    if (focusedPlaceId != null) ids.add(focusedPlaceId);
+    return ids;
+  }, [savedPlaceFocusRequest, selectedPlace]);
+  const visiblePoints = useMemo(
+    () => filterPlaceMapSearch(mergedPoints, searchQuery, preservedPlaceIds),
+    [mergedPoints, preservedPlaceIds, searchQuery],
   );
 
   const mapLibreEnabled = useAppSelector(
@@ -332,7 +346,7 @@ export const NexaMapScreenSurface = React.forwardRef<
         {...props}
         selectedEntityKey={activeSelectionKey}
         dimUnselected={shouldDimUnselected}
-        points={mergedPoints}
+        points={visiblePoints}
         onRegionChangeComplete={handleRegionChangeComplete}
         onClusterPress={(point) => {
           if (selectedPlace != null) dismissPlacePreview();
