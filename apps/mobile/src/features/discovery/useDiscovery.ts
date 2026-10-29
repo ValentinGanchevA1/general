@@ -6,12 +6,14 @@ import {
   getDiscoveryPointKey,
   isEntityZoom,
   type DiscoveryResponse,
-  type DiscoveryQuery,
   type DiscoveryPoint,
   type DiscoveryRankBy,
   type EntityKind,
   type EntityPoint,
   type ListingMode,
+  type MarketplaceDiscoveryQuery,
+  type MarketplaceKind,
+  type MarketplaceListingMeta,
   type Viewport,
 } from '@g88/shared';
 
@@ -34,6 +36,7 @@ interface UseDiscoveryArgs {
   kinds?: EntityKind[];
   topic?: string | null;
   listingMode?: ListingMode | undefined;
+  marketplaceKind?: MarketplaceKind | undefined;
   friendsOnly?: boolean;
   datingOnly?: boolean;
   rankBy?: DiscoveryRankBy;
@@ -73,6 +76,7 @@ function matchesRealtimeQuery(
   viewport: Viewport,
   kinds: readonly EntityKind[] | undefined,
   listingMode: ListingMode | undefined,
+  marketplaceKind: MarketplaceKind | undefined,
   friendsOnly: boolean,
 ): boolean {
   if (!isPointInViewport(point, viewport)) return false;
@@ -83,7 +87,13 @@ function matchesRealtimeQuery(
   }
 
   if (listingMode != null && point.kind === 'listing') {
-    return (point.meta.mode ?? 'sell') === listingMode;
+    if ((point.meta.mode ?? 'sell') !== listingMode) return false;
+  }
+
+  if (marketplaceKind != null && point.kind === 'listing') {
+    const meta = point.meta as MarketplaceListingMeta;
+    if ((meta.mode ?? 'sell') !== 'sell') return false;
+    if ((meta.marketplaceKind ?? 'for_sale') !== marketplaceKind) return false;
   }
 
   return true;
@@ -95,6 +105,7 @@ export function useDiscovery({
   kinds,
   topic,
   listingMode,
+  marketplaceKind,
   friendsOnly = false,
   datingOnly = false,
   rankBy = 'relevance',
@@ -119,6 +130,7 @@ export function useDiscovery({
   const mutationLogRef = useRef(createDiscoveryMutationLog());
   const lastTopicRef = useRef<string | null>(null);
   const lastListingModeRef = useRef<string | null>(null);
+  const lastMarketplaceKindRef = useRef<MarketplaceKind | null>(null);
   const lastFriendsOnlyRef = useRef(false);
   const lastDatingOnlyRef = useRef(false);
   const lastRankByRef = useRef<DiscoveryRankBy>('relevance');
@@ -130,6 +142,7 @@ export function useDiscovery({
       k?: EntityKind[],
       t?: string | null,
       lm?: ListingMode,
+      mk?: MarketplaceKind,
       fo?: boolean,
       dating?: boolean,
       rb?: DiscoveryRankBy,
@@ -163,6 +176,7 @@ export function useDiscovery({
         k,
         t,
         lm: lm ?? null,
+        mk: mk ?? null,
         fo: fo === true,
         dating: dating === true,
         rb: effectiveRank,
@@ -171,15 +185,24 @@ export function useDiscovery({
 
       const topicChanged = lastTopicRef.current !== (t ?? null);
       const modeChanged = lastListingModeRef.current !== (lm ?? null);
+      const marketplaceKindChanged = lastMarketplaceKindRef.current !== (mk ?? null);
       const friendsChanged = lastFriendsOnlyRef.current !== (fo === true);
       const datingChanged = lastDatingOnlyRef.current !== (dating === true);
       const rankChanged = lastRankByRef.current !== effectiveRank;
-      if (topicChanged || modeChanged || friendsChanged || datingChanged || rankChanged) {
+      if (
+        topicChanged ||
+        modeChanged ||
+        marketplaceKindChanged ||
+        friendsChanged ||
+        datingChanged ||
+        rankChanged
+      ) {
         prevHashRef.current = null;
         cachedPointsRef.current = [];
         mutationLogRef.current.reset();
         lastTopicRef.current = t ?? null;
         lastListingModeRef.current = lm ?? null;
+        lastMarketplaceKindRef.current = mk ?? null;
         lastFriendsOnlyRef.current = fo === true;
         lastDatingOnlyRef.current = dating === true;
         lastRankByRef.current = effectiveRank;
@@ -195,19 +218,20 @@ export function useDiscovery({
       setError(null);
 
       try {
-        const body: DiscoveryQuery = {
+        const body: MarketplaceDiscoveryQuery = {
           viewport: vp,
           zoom: z,
           ...(k ? { kinds: k } : {}),
           ...(t ? { topic: t } : {}),
           ...(lm ? { listingMode: lm } : {}),
+          ...(mk ? { marketplaceKind: mk } : {}),
           ...(fo ? { friendsOnly: true } : {}),
           ...(dating ? { datingOnly: true } : {}),
           ...(effectiveRank !== 'relevance' ? { rankBy: effectiveRank } : {}),
           ...(prevHashRef.current ? { prevViewportHash: prevHashRef.current } : {}),
         };
 
-        const res = await postJson<DiscoveryQuery, DiscoveryResponse>(
+        const res = await postJson<MarketplaceDiscoveryQuery, DiscoveryResponse>(
           '/discovery/nearby',
           body,
           { signal: ctrl.signal },
@@ -261,12 +285,35 @@ export function useDiscovery({
 
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
-      void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly, datingOnly, rankBy);
+      void fetchNow(
+        viewport,
+        zoom,
+        kinds,
+        topic,
+        listingMode,
+        marketplaceKind,
+        friendsOnly,
+        datingOnly,
+        rankBy,
+      );
     }, debounceMs);
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [enabled, viewport, zoom, kinds, topic, listingMode, friendsOnly, datingOnly, rankBy, debounceMs, fetchNow]);
+  }, [
+    enabled,
+    viewport,
+    zoom,
+    kinds,
+    topic,
+    listingMode,
+    marketplaceKind,
+    friendsOnly,
+    datingOnly,
+    rankBy,
+    debounceMs,
+    fetchNow,
+  ]);
 
   useEffect(() => {
     return () => abortRef.current?.abort();
@@ -288,7 +335,16 @@ export function useDiscovery({
 
     const applyRealtimePoint = (point: EntityPoint): void => {
       const key = getDiscoveryPointKey(point);
-      if (matchesRealtimeQuery(point, viewport, kinds, listingMode, friendsOnly)) {
+      if (
+        matchesRealtimeQuery(
+          point,
+          viewport,
+          kinds,
+          listingMode,
+          marketplaceKind,
+          friendsOnly,
+        )
+      ) {
         mutationLogRef.current.recordUpsert(point);
         dispatch(upsertPoint(point));
       } else {
@@ -320,6 +376,7 @@ export function useDiscovery({
     kinds,
     topic,
     listingMode,
+    marketplaceKind,
     friendsOnly,
     datingOnly,
     on,
@@ -332,8 +389,29 @@ export function useDiscovery({
     prevHashRef.current = null;
     cachedPointsRef.current = [];
     mutationLogRef.current.reset();
-    void fetchNow(viewport, zoom, kinds, topic, listingMode, friendsOnly, datingOnly, rankBy);
-  }, [viewport, zoom, kinds, topic, listingMode, friendsOnly, datingOnly, rankBy, fetchNow]);
+    void fetchNow(
+      viewport,
+      zoom,
+      kinds,
+      topic,
+      listingMode,
+      marketplaceKind,
+      friendsOnly,
+      datingOnly,
+      rankBy,
+    );
+  }, [
+    viewport,
+    zoom,
+    kinds,
+    topic,
+    listingMode,
+    marketplaceKind,
+    friendsOnly,
+    datingOnly,
+    rankBy,
+    fetchNow,
+  ]);
 
   const canonicalData = useMemo<DiscoveryResponse | null>(() => {
     if (data == null) return null;
