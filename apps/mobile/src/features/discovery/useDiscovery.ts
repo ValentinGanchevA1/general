@@ -12,6 +12,7 @@ import {
   type EntityPoint,
   type ListingMode,
   type MarketplaceDiscoveryQuery,
+  type MarketplaceDiscoverySubscriptionPayload,
   type MarketplaceKind,
   type MarketplaceListingMeta,
   type Viewport,
@@ -113,7 +114,7 @@ export function useDiscovery({
 }: UseDiscoveryArgs): UseDiscoveryResult {
   const dispatch = useAppDispatch();
   const points = useAppSelector((state) => state.discovery.points);
-  const { on } = useSocket();
+  const { on, socket, connected } = useSocket();
   const marketplaceKindFilter = useSyncExternalStore(
     marketplaceKindMapFilterStore.subscribe,
     marketplaceKindMapFilterStore.getSnapshot,
@@ -326,6 +327,54 @@ export function useDiscovery({
   useEffect(() => {
     return () => abortRef.current?.abort();
   }, []);
+
+  useEffect(() => {
+    if (
+      !enabled ||
+      viewport == null ||
+      !connected ||
+      socket == null ||
+      isViewportTooLarge(viewport)
+    ) {
+      return;
+    }
+
+    const payload: MarketplaceDiscoverySubscriptionPayload = {
+      viewport,
+      zoom,
+      ...(kinds ? { kinds } : {}),
+      ...(topic ? { topic } : {}),
+      ...(listingMode ? { listingMode } : {}),
+      ...(marketplaceKind ? { marketplaceKind } : {}),
+      ...(friendsOnly ? { friendsOnly: true } : {}),
+      ...(datingOnly ? { datingOnly: true } : {}),
+      ...(rankBy !== 'relevance' ? { rankBy } : {}),
+    };
+
+    // The extended shared payload is structurally compatible with the legacy
+    // socket event type; the server DTO owns validation/whitelisting of the new
+    // marketplaceKind field. Re-runs on reconnect because `connected` changes.
+    socket.emit('discovery:subscribe', payload, () => undefined);
+
+    return () => {
+      if (socket.connected) {
+        socket.emit('discovery:unsubscribe', () => undefined);
+      }
+    };
+  }, [
+    connected,
+    datingOnly,
+    enabled,
+    friendsOnly,
+    kinds,
+    listingMode,
+    marketplaceKind,
+    rankBy,
+    socket,
+    topic,
+    viewport,
+    zoom,
+  ]);
 
   useEffect(() => {
     // Clusters remain HTTP-authoritative. Topic and dating filters cannot be
