@@ -33,7 +33,7 @@ describe('LocationShareService mutation result handling', () => {
       .mockResolvedValueOnce([[sessionRow], 1]);
     const persistLocationSession = jest.fn().mockResolvedValue({ id: 'message-a' });
     const chat = {
-      isParticipant: jest.fn().mockResolvedValue(true),
+      isDmParticipant: jest.fn().mockResolvedValue(true),
       getParticipantIds: jest.fn().mockResolvedValue(['user-a']),
       persistLocationSession,
     } as unknown as ChatService;
@@ -54,6 +54,27 @@ describe('LocationShareService mutation result handling', () => {
       'Started sharing live location for 15 minutes',
       { lat: 43.2, lng: 27.9 },
     );
+  });
+
+  it('fails before persistence when the conversation is not an eligible DM', async () => {
+    const query = jest.fn();
+    const persistLocationSession = jest.fn();
+    const chat = {
+      isDmParticipant: jest.fn().mockResolvedValue(false),
+      getParticipantIds: jest.fn(),
+      persistLocationSession,
+    } as unknown as ChatService;
+    const service = new LocationShareService({ query } as unknown as DataSource, chat);
+
+    await expect(
+      service.start('user-a', 'group-a', '15m', { lat: 43.2, lng: 27.9 }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'location.not_participant' }),
+    });
+
+    expect(query).not.toHaveBeenCalled();
+    expect(chat.getParticipantIds).not.toHaveBeenCalled();
+    expect(persistLocationSession).not.toHaveBeenCalled();
   });
 });
 
