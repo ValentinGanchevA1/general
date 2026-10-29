@@ -120,7 +120,9 @@ export function useDiscovery({
     marketplaceKindMapFilterStore.getSnapshot,
   );
   const marketplaceKind: MarketplaceKind | undefined =
-    marketplaceKindFilter === 'all' ? undefined : marketplaceKindFilter;
+    listingMode === 'buy' || friendsOnly || datingOnly || marketplaceKindFilter === 'all'
+      ? undefined
+      : marketplaceKindFilter;
   const [data, setData] = useState<DiscoveryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
