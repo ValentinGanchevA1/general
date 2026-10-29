@@ -11,6 +11,7 @@ import {
   type DiscoveryPoint,
   type EntityKind,
   type ListingMode,
+  type MarketplaceKind,
   type UserMeta,
   type EventMeta,
   type ListingMeta,
@@ -44,6 +45,22 @@ function listingModeSql(mode: ListingMode | undefined): string {
   if (mode === 'buy') return `AND (kind <> 'listing' OR meta->>'mode' = 'buy')`;
   if (mode === 'sell') return `AND (kind <> 'listing' OR COALESCE(meta->>'mode', 'sell') = 'sell')`;
   return '';
+}
+
+function marketplaceKindSql(kind: MarketplaceKind | undefined): string {
+  if (kind === undefined) return '';
+  const literal = (() => {
+    switch (kind) {
+      case 'for_sale': return 'for_sale';
+      case 'service': return 'service';
+      case 'job': return 'job';
+      case 'local_deal': return 'local_deal';
+    }
+  })();
+  return `AND (kind <> 'listing' OR (
+    COALESCE(meta->>'mode', 'sell') = 'sell'
+    AND COALESCE(meta->>'marketplaceKind', 'for_sale') = '${literal}'
+  ))`;
 }
 
 const TOPIC_MATCH_SQL = (param: string): string =>
@@ -87,6 +104,7 @@ export class DiscoveryService {
     prevViewportHash?: string;
     topic?: string;
     listingMode?: ListingMode;
+    marketplaceKind?: MarketplaceKind;
     friendsOnly?: boolean;
     datingOnly?: boolean;
     rankBy?: DiscoveryRankBy;
@@ -111,6 +129,10 @@ export class DiscoveryService {
         : params.listingMode === 'buy' || params.listingMode === 'sell'
           ? params.listingMode
           : undefined;
+    const marketplaceKind: MarketplaceKind | undefined =
+      friendsOnly || datingOnly || listingMode === 'buy'
+        ? undefined
+        : params.marketplaceKind;
     const friendIds = friendsOnly
       ? await this.friends.listFriendIds(params.requesterId)
       : null;
@@ -128,6 +150,7 @@ export class DiscoveryService {
           kinds,
           '',
           undefined,
+          undefined,
           false,
           rankBy,
           true,
@@ -137,7 +160,17 @@ export class DiscoveryService {
     const resolution = h3ResolutionForZoom(params.zoom);
 
     if (friendsOnly && (friendIds == null || friendIds.length === 0)) {
-      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, true, rankBy, datingOnly);
+      return this.empty(
+        resolution,
+        params.viewport,
+        kinds,
+        topicSlug,
+        listingMode,
+        marketplaceKind,
+        true,
+        rankBy,
+        datingOnly,
+      );
     }
 
     const estimate = this.estimateCellCount(params.viewport, resolution);
@@ -145,16 +178,46 @@ export class DiscoveryService {
       this.logger.warn(
         `Viewport estimate ${estimate} cells at r${resolution} — refusing before polygonToCells`,
       );
-      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly, rankBy, datingOnly);
+      return this.empty(
+        resolution,
+        params.viewport,
+        kinds,
+        topicSlug,
+        listingMode,
+        marketplaceKind,
+        friendsOnly,
+        rankBy,
+        datingOnly,
+      );
     }
 
     const cells = cellsForViewport(params.viewport, resolution);
     if (cells.length === 0 || (topicSlug && kinds.length === 0)) {
-      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly, rankBy, datingOnly);
+      return this.empty(
+        resolution,
+        params.viewport,
+        kinds,
+        topicSlug,
+        listingMode,
+        marketplaceKind,
+        friendsOnly,
+        rankBy,
+        datingOnly,
+      );
     }
     if (cells.length > MAX_CELLS_PER_VIEWPORT) {
       this.logger.warn(`Viewport produced ${cells.length} cells at r${resolution} — refusing`);
-      return this.empty(resolution, params.viewport, kinds, topicSlug, listingMode, friendsOnly, rankBy, datingOnly);
+      return this.empty(
+        resolution,
+        params.viewport,
+        kinds,
+        topicSlug,
+        listingMode,
+        marketplaceKind,
+        friendsOnly,
+        rankBy,
+        datingOnly,
+      );
     }
 
     const points = isEntityZoom(params.zoom)
@@ -165,17 +228,34 @@ export class DiscoveryService {
           params.requesterId,
           topicSlug,
           listingMode,
+          marketplaceKind,
           friendIds,
           datingOnly,
           params.viewport,
           rankBy,
         )
       : await this.clusterByCell(
-          cells, resolution, kinds, params.requesterId, topicSlug, listingMode, friendIds, datingOnly,
+          cells,
+          resolution,
+          kinds,
+          params.requesterId,
+          topicSlug,
+          listingMode,
+          marketplaceKind,
+          friendIds,
+          datingOnly,
         );
 
     const viewportHash = this.hashViewport(
-      params.viewport, params.zoom, kinds, topicSlug, listingMode, friendsOnly, rankBy, datingOnly,
+      params.viewport,
+      params.zoom,
+      kinds,
+      topicSlug,
+      listingMode,
+      marketplaceKind,
+      friendsOnly,
+      rankBy,
+      datingOnly,
     );
     await this.storeSnapshot(params.requesterId, viewportHash, points);
 
@@ -230,11 +310,13 @@ export class DiscoveryService {
     requesterId: string,
     topicSlug: string,
     listingMode?: ListingMode,
+    marketplaceKind?: MarketplaceKind,
     friendIds: string[] | null = null,
     datingOnly = false,
   ): Promise<DiscoveryPoint[]> {
     const cellCol = this.cellColumn(resolution);
     const listingClause = listingModeSql(listingMode);
+    const marketplaceClause = marketplaceKindSql(marketplaceKind);
     const queryParams: unknown[] = [cells, kinds, requesterId];
     let friendsClause = '';
     if (friendIds != null) {
@@ -266,6 +348,7 @@ export class DiscoveryService {
          ${blockIsolationSql('$3')}
          ${topicClause}
          ${listingClause}
+         ${marketplaceClause}
          ${friendsClause}
          ${datingClause}
        GROUP BY ${cellCol}, kind
@@ -299,6 +382,7 @@ export class DiscoveryService {
     requesterId: string,
     topicSlug: string,
     listingMode: ListingMode | undefined,
+    marketplaceKind: MarketplaceKind | undefined,
     friendIds: string[] | null,
     datingOnly: boolean,
     viewport: Viewport,
@@ -306,6 +390,7 @@ export class DiscoveryService {
   ): Promise<DiscoveryPoint[]> {
     const cellCol = this.cellColumn(resolution);
     const listingClause = listingModeSql(listingMode);
+    const marketplaceClause = marketplaceKindSql(marketplaceKind);
     const centreLat = (viewport.ne.lat + viewport.sw.lat) / 2;
     const centreLng = (viewport.ne.lng + viewport.sw.lng) / 2;
     const queryParams: unknown[] = [cells, kinds, requesterId, MAX_POINTS_PER_RESPONSE];
@@ -349,6 +434,7 @@ export class DiscoveryService {
          ${blockIsolationSql('$3')}
          ${topicClause}
          ${listingClause}
+         ${marketplaceClause}
          ${friendsClause}
          ${datingClause}
        ${orderClause}
@@ -559,6 +645,7 @@ export class DiscoveryService {
     kinds: EntityKind[],
     topicSlug: string,
     listingMode?: ListingMode,
+    marketplaceKind?: MarketplaceKind,
     friendsOnly = false,
     rankBy: DiscoveryRankBy = 'relevance',
     datingOnly = false,
@@ -571,6 +658,7 @@ export class DiscoveryService {
           kinds: [...kinds].sort((a, b) => a.localeCompare(b)),
           topicSlug,
           listingMode: listingMode ?? null,
+          marketplaceKind: marketplaceKind ?? null,
           friendsOnly,
           datingOnly,
           rankBy,
@@ -586,6 +674,7 @@ export class DiscoveryService {
     kinds: EntityKind[],
     topicSlug: string,
     listingMode?: ListingMode,
+    marketplaceKind?: MarketplaceKind,
     friendsOnly = false,
     rankBy: DiscoveryRankBy = 'relevance',
     datingOnly = false,
@@ -595,7 +684,15 @@ export class DiscoveryService {
       resolution,
       generatedAt: new Date().toISOString(),
       viewportHash: this.hashViewport(
-        viewport, 0, kinds, topicSlug, listingMode, friendsOnly, rankBy, datingOnly,
+        viewport,
+        0,
+        kinds,
+        topicSlug,
+        listingMode,
+        marketplaceKind,
+        friendsOnly,
+        rankBy,
+        datingOnly,
       ),
       diff: null,
     };

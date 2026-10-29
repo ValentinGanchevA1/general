@@ -13,7 +13,13 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import type { DiscoveryRankBy, EntityKind, ListingMode } from '@g88/shared';
+import {
+  MARKETPLACE_KINDS,
+  type DiscoveryRankBy,
+  type EntityKind,
+  type ListingMode,
+  type MarketplaceKind,
+} from '@g88/shared';
 
 class LatLngDto {
   @IsLatitude()
@@ -62,6 +68,11 @@ export class DiscoveryQueryDto {
   @IsOptional()
   @IsIn(['sell', 'buy'])
   listingMode?: ListingMode;
+
+  /** Sell-side first-class Marketplace taxonomy. Ignored when listingMode=buy. */
+  @IsOptional()
+  @IsIn([...MARKETPLACE_KINDS])
+  marketplaceKind?: MarketplaceKind;
 
   /** Close-friend user pins only (events/listings omitted). */
   @IsOptional()

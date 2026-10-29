@@ -80,6 +80,34 @@ describe('DiscoveryEntityResolver', () => {
     expect(params).toEqual(['l1', 'listing', 'viewer', 'bikes', 'buy']);
   });
 
+  it('applies the sell-side marketplace kind to realtime listing resolution', async () => {
+    await resolver.resolveForViewer({
+      viewerId: 'viewer',
+      kind: 'listing',
+      entityId: 'l1',
+      context: { ...context, listingMode: 'sell', marketplaceKind: 'service' },
+    });
+
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("COALESCE(meta->>'mode', 'sell') = $4");
+    expect(sql).toContain("COALESCE(meta->>'marketplaceKind', 'for_sale') = $5");
+    expect(params).toEqual(['l1', 'listing', 'viewer', 'sell', 'service']);
+  });
+
+  it('ignores stale marketplace kind state for Wanted realtime subscriptions', async () => {
+    await resolver.resolveForViewer({
+      viewerId: 'viewer',
+      kind: 'listing',
+      entityId: 'l1',
+      context: { ...context, listingMode: 'buy', marketplaceKind: 'job' },
+    });
+
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("COALESCE(meta->>'mode', 'sell') = $4");
+    expect(sql).not.toContain('marketplaceKind');
+    expect(params).toEqual(['l1', 'listing', 'viewer', 'buy']);
+  });
+
   it('rejects non-friends in friends-only mode without entity query', async () => {
     listFriendIds.mockResolvedValueOnce(['other']);
     await expect(

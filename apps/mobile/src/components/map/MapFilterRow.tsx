@@ -17,6 +17,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import type { DiscoveryRankBy, EntityKind, ListingMode } from '@g88/shared';
 import { NexaEntityGlyph } from '@/components/Brand/NexaEntityGlyph';
+import {
+	marketplaceKindMapFilterStore,
+	type MarketplaceKindMapFilterValue,
+} from '@/features/map/marketplaceKindMapFilter.store';
 import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
@@ -40,6 +44,14 @@ const LISTING_OPTIONS: Choice<ListingModeFilterValue>[] = [
 	{ id: 'all', label: 'All listings' },
 	{ id: 'sell', label: 'For sale' },
 	{ id: 'buy', label: 'Wanted' },
+];
+
+const MARKETPLACE_KIND_OPTIONS: Choice<MarketplaceKindMapFilterValue>[] = [
+	{ id: 'all', label: 'All types' },
+	{ id: 'for_sale', label: 'For sale items' },
+	{ id: 'service', label: 'Services' },
+	{ id: 'job', label: 'Jobs' },
+	{ id: 'local_deal', label: 'Local deals' },
 ];
 
 const SORT_OPTIONS: Choice<DiscoveryRankBy>[] = [
@@ -93,6 +105,11 @@ export function MapFilterRow({
 		savedPlacesMapLayerStore.getSnapshot,
 		savedPlacesMapLayerStore.getSnapshot,
 	);
+	const marketplaceKind = useSyncExternalStore(
+		marketplaceKindMapFilterStore.subscribe,
+		marketplaceKindMapFilterStore.getSnapshot,
+		marketplaceKindMapFilterStore.getSnapshot,
+	);
 	const showPeople = layers.includes('user');
 	const showListings = layers.includes('listing');
 
@@ -101,9 +118,24 @@ export function MapFilterRow({
 		if (friendsOnly) count += 1;
 		if (datingOnly) count += 1;
 		if (rankBy !== 'relevance') count += 1;
-		if (showListings && listingMode !== 'all') count += 1;
+		if (showListings && marketplaceKind !== 'all') count += 1;
+		else if (showListings && listingMode !== 'all') count += 1;
 		return count;
-	}, [datingOnly, friendsOnly, listingMode, rankBy, showListings]);
+	}, [datingOnly, friendsOnly, listingMode, marketplaceKind, rankBy, showListings]);
+
+	const changeListingMode = useCallback((next: ListingModeFilterValue): void => {
+		onListingModeChange(next);
+		// Mode choices are broad; clear any narrower sell-side taxonomy.
+		marketplaceKindMapFilterStore.reset();
+	}, [onListingModeChange]);
+
+	const changeMarketplaceKind = useCallback((next: MarketplaceKindMapFilterValue): void => {
+		marketplaceKindMapFilterStore.set(next);
+		if (next !== 'all') {
+			// Marketplace kinds are sell-side taxonomy; Wanted is a separate buy intent.
+			onListingModeChange('sell');
+		}
+	}, [onListingModeChange]);
 
 	const toggleLayer = useCallback((id: EntityKind): void => {
 		if (layers.includes(id)) {
@@ -261,7 +293,9 @@ export function MapFilterRow({
 				onDatingOnlyChange={onDatingOnlyChange}
 				showListings={showListings}
 				listingMode={listingMode}
-				onListingModeChange={onListingModeChange}
+				onListingModeChange={changeListingMode}
+				marketplaceKind={marketplaceKind}
+				onMarketplaceKindChange={changeMarketplaceKind}
 				onOpenAlerts={openAlerts}
 			/>
 		</View>
@@ -283,6 +317,8 @@ interface FilterModalProps {
 	showListings: boolean;
 	listingMode: ListingModeFilterValue;
 	onListingModeChange: (next: ListingModeFilterValue) => void;
+	marketplaceKind: MarketplaceKindMapFilterValue;
+	onMarketplaceKindChange: (next: MarketplaceKindMapFilterValue) => void;
 	onOpenAlerts: () => void;
 }
 
@@ -310,6 +346,10 @@ function FilterModal(props: FilterModalProps): React.JSX.Element {
 							<SectionLabel styles={styles}>Listings</SectionLabel>
 							{LISTING_OPTIONS.map((option) => (
 								<ChoiceRow key={option.id} styles={styles} colors={colors} label={option.label} active={props.listingMode === option.id} onPress={() => props.onListingModeChange(option.id)} />
+							))}
+							<SectionLabel styles={styles}>Marketplace type</SectionLabel>
+							{MARKETPLACE_KIND_OPTIONS.map((option) => (
+								<ChoiceRow key={option.id} styles={styles} colors={colors} label={option.label} active={props.marketplaceKind === option.id} onPress={() => props.onMarketplaceKindChange(option.id)} />
 							))}
 						</> : null}
 

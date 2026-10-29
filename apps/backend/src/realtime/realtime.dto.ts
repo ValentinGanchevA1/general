@@ -14,7 +14,13 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import type { DiscoveryRankBy, EntityKind, ListingMode } from '@g88/shared';
+import {
+  MARKETPLACE_KINDS,
+  type DiscoveryRankBy,
+  type EntityKind,
+  type ListingMode,
+  type MarketplaceKind,
+} from '@g88/shared';
 
 class LocationDto {
   @IsNumber() @IsLatitude() lat!: number;
@@ -39,6 +45,8 @@ export class DiscoverySubscriptionDto {
   @IsOptional() @IsString() @MaxLength(40) topic?: string;
 
   @IsOptional() @IsIn(['sell', 'buy']) listingMode?: ListingMode;
+
+  @IsOptional() @IsIn([...MARKETPLACE_KINDS]) marketplaceKind?: MarketplaceKind;
 
   @IsOptional() @IsBoolean() friendsOnly?: boolean;
 

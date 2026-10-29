@@ -5,6 +5,7 @@ export * from './events';
 export * from './event';
 export * from './listing';
 export * from './marketplace';
+export * from './marketplaceDiscovery';
 export * from './notifications';
 export * from './activity';
 export * from './place';
