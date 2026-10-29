@@ -4,8 +4,8 @@ import { DataSource } from 'typeorm';
 
 import type {
   DiscoveryPoint,
-  DiscoverySubscriptionPayload,
   EntityKind,
+  MarketplaceDiscoverySubscriptionPayload,
   UserMeta,
 } from '@g88/shared';
 
@@ -30,7 +30,7 @@ const OWNER_ID_SQL = `CASE v_discoverable_entity.kind
 END`;
 
 function contextAllowsKind(
-  context: DiscoverySubscriptionPayload,
+  context: MarketplaceDiscoverySubscriptionPayload,
   kind: DiscoverableKind,
 ): boolean {
   if (context.topic !== undefined && kind === 'user') return false;
@@ -47,6 +47,13 @@ function topicSql(param: string): string {
 
 function listingModeSql(param: string): string {
   return `AND (kind <> 'listing' OR COALESCE(meta->>'mode', 'sell') = ${param})`;
+}
+
+function marketplaceKindSql(param: string): string {
+  return `AND (kind <> 'listing' OR (
+    COALESCE(meta->>'mode', 'sell') = 'sell'
+    AND COALESCE(meta->>'marketplaceKind', 'for_sale') = ${param}
+  ))`;
 }
 
 /**
@@ -66,7 +73,7 @@ export class DiscoveryEntityResolver {
     viewerId: string;
     kind: DiscoverableKind;
     entityId: string;
-    context?: DiscoverySubscriptionPayload;
+    context?: MarketplaceDiscoverySubscriptionPayload;
   }): Promise<DiscoveryPoint | null> {
     const context = params.context;
     if (context !== undefined && !contextAllowsKind(context, params.kind)) return null;
@@ -102,6 +109,15 @@ export class DiscoveryEntityResolver {
     if (!friendsOnly && !datingOnly && context?.listingMode !== undefined) {
       values.push(context.listingMode);
       filters += `\n          ${listingModeSql(`$${values.length}`)}`;
+    }
+    if (
+      !friendsOnly &&
+      !datingOnly &&
+      context?.listingMode !== 'buy' &&
+      context?.marketplaceKind !== undefined
+    ) {
+      values.push(context.marketplaceKind);
+      filters += `\n          ${marketplaceKindSql(`$${values.length}`)}`;
     }
     if (datingOnly) {
       filters += `\n          AND kind = 'user' AND EXISTS (
