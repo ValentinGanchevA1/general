@@ -26,6 +26,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useSheetBackdrop, useSheetChrome } from '@/components/sheets';
 import { PlaceMapPreviewSheet } from '@/features/places/PlaceMapPreviewSheet';
 import { loadSavedPlaces, setPlaceSaved } from '@/features/places/placeDetailSlice';
+import { shouldDismissPrivatePlacePreview } from '@/features/places/placePreviewLifecycle';
 import { setPendingPlaceCheckIn } from '@/features/places/pendingPlaceCheckIn';
 import { savedPlaceMapFocusStore } from '@/features/places/savedPlaceMapFocus.store';
 import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
@@ -238,11 +239,17 @@ export const NexaMapScreenSurface = React.forwardRef<
   }, [openPlacePreview, savedPlaceFocusRequest]));
 
   React.useEffect(() => {
-    if (savedPlacesEnabled || selectedPlace == null) return;
-    if (privateSelectedPlaceIdRef.current !== selectedPlace.id) return;
+    if (!shouldDismissPrivatePlacePreview({
+      savedPlacesEnabled,
+      selectedPlaceId: selectedPlace?.id ?? null,
+      privateSelectedPlaceId: privateSelectedPlaceIdRef.current,
+      focusedPlaceId: savedPlaceFocusRequest?.point.id ?? null,
+    })) {
+      return;
+    }
     const frame = requestAnimationFrame(() => placeSheetRef.current?.dismiss());
     return () => cancelAnimationFrame(frame);
-  }, [savedPlacesEnabled, selectedPlace]);
+  }, [savedPlaceFocusRequest, savedPlacesEnabled, selectedPlace]);
 
   const openPlaceDetails = useCallback((): void => {
     if (selectedPlace == null) return;
