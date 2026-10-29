@@ -17,6 +17,7 @@ import type { CheckInAudience } from '@g88/shared';
 import { EmptyState } from '@/components/EmptyState';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useUserLocation } from '@/features/location/useUserLocation';
+import { formatPlaceActivityRecency } from '@/features/places/placeActivityRecency';
 import {
   clearPendingPlaceCheckIn,
   takePendingPlaceCheckIn,
@@ -49,6 +50,9 @@ export function PlaceDetailScreen(): React.JSX.Element {
   const loading = state == null || state.loadId != null || (state.detail == null && state.error == null);
   const saving = state?.saveId != null;
   const error = state?.error ?? null;
+  const activityLabel = place?.trending === true
+    ? formatPlaceActivityRecency(true, place.recentActivityAt) ?? 'Getting active nearby'
+    : 'Local place';
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [checkedIn, setCheckedIn] = useState(false);
   const consumedMapIntentRef = useRef(false);
@@ -161,10 +165,14 @@ export function PlaceDetailScreen(): React.JSX.Element {
       </View>
       <Text style={styles.title}>{place.canonicalLabel}</Text>
       <View style={styles.statusRow}>
-        <View style={[styles.statusPill, place.trending && styles.statusPillActive]}>
+        <View
+          style={[styles.statusPill, place.trending && styles.statusPillActive]}
+          accessible
+          accessibilityLabel={place.trending ? 'Recent anonymous local activity' : 'Local place'}
+        >
           <View style={[styles.statusDot, place.trending && styles.statusDotActive]} />
           <Text style={[styles.statusText, place.trending && styles.statusTextActive]}>
-            {place.trending ? 'Getting active nearby' : 'Local place'}
+            {activityLabel}
           </Text>
         </View>
       </View>
