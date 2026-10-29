@@ -152,6 +152,42 @@ describe('DiscoveryService', () => {
     });
   });
 
+  describe('marketplace kind filtering', () => {
+    it('filters entity results to sell-side listings of the requested first-class kind', async () => {
+      await call({ kinds: ['listing'], marketplaceKind: 'job' });
+
+      const [sql] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain("COALESCE(meta->>'mode', 'sell') = 'sell'");
+      expect(sql).toContain("COALESCE(meta->>'marketplaceKind', 'for_sale') = 'job'");
+    });
+
+    it('applies the marketplace kind filter before cluster counts are computed', async () => {
+      (isEntityZoom as jest.Mock).mockReturnValue(false);
+
+      await call({ kinds: ['listing'], marketplaceKind: 'local_deal' });
+
+      const [sql] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain("COALESCE(meta->>'mode', 'sell') = 'sell'");
+      expect(sql).toContain("COALESCE(meta->>'marketplaceKind', 'for_sale') = 'local_deal'");
+      expect(sql).toContain('GROUP BY');
+    });
+
+    it('keeps Wanted authoritative and ignores a stale sell-side marketplace kind', async () => {
+      await call({ kinds: ['listing'], listingMode: 'buy', marketplaceKind: 'service' });
+
+      const [sql] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain("meta->>'mode' = 'buy'");
+      expect(sql).not.toContain('marketplaceKind');
+    });
+
+    it('uses marketplace kind in the viewport hash so diff snapshots cannot cross filter state', async () => {
+      const jobs = await call({ kinds: ['listing'], marketplaceKind: 'job' });
+      const services = await call({ kinds: ['listing'], marketplaceKind: 'service' });
+
+      expect(jobs.viewportHash).not.toBe(services.viewportHash);
+    });
+  });
+
   describe('presence enrichment', () => {
     const userMeta = {
       displayName: 'A',
