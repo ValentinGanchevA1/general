@@ -45,10 +45,14 @@ export class BlocksService {
     // Hard-delete social graph edges (follows, friendships, pending requests).
     await this.friends.onBlock(blockerId, blockedId);
 
+    // Legacy participant_ids is a DM-only compatibility key. Group block/removal
+    // semantics must be handled through normalized conversation_members rather
+    // than accidentally treating a group row as a 1:1 conversation.
     const conversations = await this.db.query<Array<{ id: string }>>(
       `SELECT id
          FROM conversations
-        WHERE participant_ids @> ARRAY[$1, $2]::uuid[]
+        WHERE kind = 'dm'
+          AND participant_ids @> ARRAY[$1, $2]::uuid[]
           AND COALESCE(status, 'accepted') = 'accepted'`,
       [blockerId, blockedId],
     );
