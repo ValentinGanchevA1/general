@@ -6,6 +6,17 @@ This document inventories the Redis state used by the NEXA backend and defines w
 
 It is intentionally **not** a request to persist the current mixed Redis keyspace wholesale. Some keys contain short-lived verification or OAuth flow secrets that are intentionally ephemeral. The production topology must preserve that boundary.
 
+## Implementation status — 2026-10-29
+
+The two A1 abuse-control gaps identified by the original inventory are now remediated:
+
+- #919 moved password-reset request throttling to short-retention shared Postgres state (`password_reset_rate_limits`, migration `0064_password_reset_rate_limits.sql`).
+- #920 moved notification frequency caps to short-retention shared Postgres state (`notification_frequency_caps`, migration `0065_notification_frequency_caps.sql`).
+
+Neither remediation makes OTPs, OAuth PKCE material, Story presign bindings or other E1 secrets durable. Redis remains the ephemeral/realtime coordination tier; Postgres now carries the two restart-sensitive abuse-control budgets.
+
+Remaining #906 work is infrastructure and verification: repair the #847 `checksPass` release gate, move API/Redis off Free with explicit cost approval, restrict Redis connectivity to the intended least-privilege/private path, execute the restart/failover matrix and record rollback evidence. See `docs/RENDER_PRODUCTION_CUTOVER.md`.
+
 ## Current production finding — 2026-10-29
 
 Read-only Render inspection of workspace `g88` shows:
@@ -160,45 +171,55 @@ Loss behavior:
 
 Decision: **safe to lose; fail closed and reissue.**
 
-### 7. Password reset — split A1 + durable Postgres
+### 7. Password reset abuse control — A1 remediated in Postgres
 
 Source:
 - `apps/backend/src/modules/auth/password-reset.service.ts`
 
-Redis keys:
-- `reset:cooldown:{hmacDigest}` — 60s request cooldown
-- `reset:hour:{hmacDigest}` — max 5 requests/hour
+Durable abuse-control state:
+- `password_reset_rate_limits`, introduced by migration `0064_password_reset_rate_limits.sql` in #919.
+- identity is an HMAC digest of the normalized email, never the raw email.
+- cooldown: 60 seconds.
+- request cap: 5 requests per one-hour window.
+- rows are short-retention abuse-control metadata and are opportunistically pruned after the active window is irrelevant.
 
-Durable Postgres state:
+Other durable Postgres state:
 - `password_reset_requests` contains the reset challenge hash, expiry, attempt count and encrypted delivery outbox.
 - Password mutation, refresh-token revocation and challenge consumption are transactional in Postgres.
 
+Redis relationship:
+- password-reset request throttling no longer depends on Redis.
+- Reset codes and encrypted delivery payloads were **not** moved into Redis or into the limiter table.
+
 Loss behavior:
 - A valid already-issued reset challenge remains intact because it is in Postgres.
-- **The Redis request counters reset**, allowing a new request burst earlier than intended.
+- A Redis restart does not reopen the password-reset request budget.
 
-Decision: **A1 blocker.** Before treating total Redis loss as production-safe, password-reset request limiting must either:
-1. gain a durable/shared rate-limit fallback (preferred), or
-2. move only non-secret abuse-control counters to a restart-survivable store.
+Decision: **A1 remediated by #919.** Keep the abuse-control table shared/durable and keep reset secrets out of Redis persistence.
 
-Do not move reset codes or encrypted reset payloads from their current Postgres design into Redis.
-
-### 8. Notification frequency caps — A1
+### 8. Notification frequency caps — A1 remediated in Postgres
 
 Source:
 - `apps/backend/src/modules/notifications/notifications.service.ts`
 
-Key space:
-- `notif:cap:{userId}:{channel}:{bucket}` — TTL equals the channel window (1h for most channels, 24h for digest)
+Durable abuse-control state:
+- `notification_frequency_caps`, introduced by migration `0065_notification_frequency_caps.sql` in #920.
+- stores only user id, notification channel, epoch-aligned window bucket, bounded send count and short expiry metadata.
+- existing channel limits remain unchanged: Waves 12/h, Messages 40/h, Gifts 12/h, Friends 20/h, Nearby 6/h, Events 6/h, Listings 6/h and Digest 1/day.
+- opted-out channels still short-circuit before cap consumption; exhausted caps still short-circuit before device-token lookup/delivery.
 
 Authoritative state:
-- Device tokens and notification preferences are in Postgres.
+- Device tokens and notification preferences remain in Postgres.
+- Notification body/message text, device tokens and location payloads are not added to the cap table.
+
+Redis relationship:
+- notification frequency-cap enforcement no longer depends on Redis.
 
 Loss behavior:
-- User preferences remain enforced.
-- Frequency counters reset, temporarily allowing more pushes than configured.
+- Preferences remain enforced.
+- A Redis restart does not reset the notification frequency budgets.
 
-Decision: **restart-sensitive abuse-control.** Preserve these counters across infrastructure restart or provide a durable/shared cap fallback before production restart testing is signed off.
+Decision: **A1 remediated by #920.** Keep frequency caps shared/durable while leaving realtime/transient Redis state ephemeral.
 
 ### 9. Wave idempotency — C1
 
@@ -260,25 +281,30 @@ Decision: **safe to lose for correctness; duplicate publication must remain harm
 
 ## Production topology decision
 
-### Preferred path: keep sensitive/transient Redis ephemeral; make abuse controls durable elsewhere
+### Preferred path: keep sensitive/transient Redis ephemeral; keep abuse controls durable in Postgres
 
 Do **not** enable persistence on the current mixed Redis database as a shortcut. The same database currently contains OTPs and OAuth flow secrets that are intentionally short-lived.
 
 Preferred sequence:
 
-1. Move `g88-api` to an always-on production compute plan only after #846 observation evidence remains healthy; keep runtime diagnostics enabled through the cutover window.
-2. Move Redis off Free so it is not subject to the Free-tier restart/loss model and production Socket.IO availability is predictable.
-3. Keep E0/E1 state explicitly ephemeral.
-4. Add restart-survivable storage/fallback for A1 abuse controls (`reset:*`, `notif:cap:*`) before claiming total Redis loss is safe.
-5. Re-run the restart matrix below.
-6. Restrict network access to the intended private/internal path; do not use public Redis exposure as a workaround.
+1. Repair #847 so the intended `checksPass` deployment gate works normally; do not bypass it with `On Commit` or a fake Cloud Build file.
+2. Keep #846 runtime diagnostics and observation evidence intact while selecting API capacity; do not treat a paid plan as the OOM root-cause fix.
+3. Move `g88-api` to an explicitly approved always-on production compute plan.
+4. Move Redis off Free so production Socket.IO/realtime availability is predictable while keeping the mixed keyspace ephemeral (`persistenceMode=off`).
+5. Keep the #919/#920 A1 abuse controls in shared Postgres; do not move reset codes, notification payloads or transient E1 secrets into durable Redis.
+6. Restrict Redis network access to the intended private/internal path; do not use public exposure as a workaround.
+7. Re-run the restart/failover matrix below and record rollback evidence.
+
+Detailed execution and stop/rollback gates are in `docs/RENDER_PRODUCTION_CUTOVER.md`.
 
 ### Alternative: split Redis roles
 
-If managed persistence is required for rate/cap counters, use separate logical infrastructure:
+If a future requirement calls for Redis-backed durable control state, use separate logical infrastructure:
 
 - **ephemeral Redis:** Socket.IO Pub/Sub, presence, discovery cache, OTP/PKCE/presign bindings, transient coordination;
-- **durable control store:** only restart-sensitive non-secret abuse counters.
+- **durable control store:** only explicitly reviewed restart-sensitive non-secret state.
+
+The current #919/#920 design already uses Postgres for A1 controls, so a durable Redis role is **not required** for those two budgets.
 
 Do not place precise live-location payloads, OTP values, OAuth verifiers, access tokens, message content or verification media into a durable Redis tier.
 
@@ -294,12 +320,12 @@ These are required before #906 can close.
 | Discovery/trending after Redis loss | first request recomputes from Postgres/PostGIS; no stale public cluster counts |
 | Active Socket.IO conversation | reconnect/rejoin is reauthorized from current DB membership/block state |
 | Live location + block/removal | revoked peer receives no `location:share:*` precise payload before or after reconnect |
-| Password reset challenge | already-issued Postgres challenge remains usable until expiry; request-rate protection does not silently reset after A1 remediation |
+| Password reset challenge | already-issued Postgres challenge remains usable until expiry; 60s/5-per-hour request protection remains enforced from `password_reset_rate_limits` |
 | Verification OTP | missing Redis OTP fails closed; user can request a new code; no automatic verification |
 | OAuth linking | missing PKCE/replay marker fails closed; user restarts link flow |
 | Story presign | lost binding invalidates create; user must request/re-upload; arbitrary S3 URL remains rejected |
 | Wave retry | durable interaction is not duplicated even if Redis result/lock was lost |
-| Notification caps | preference remains enforced and cap does not reset after A1 remediation |
+| Notification caps | preference remains enforced and channel frequency budgets remain enforced from `notification_frequency_caps` |
 | Event/listing lifecycle | duplicate realtime publication is harmless; HTTP/Postgres discoverability remains authoritative |
 
 ## Logging/privacy rules for restart tests
@@ -325,26 +351,31 @@ Before changing Render plans/configuration, record in #906:
 - selected target API plan;
 - selected Redis topology and persistence mode;
 - network-access model;
-- whether A1 remediation is complete;
+- confirmation that #919/#920 A1 remediation is present on the deployment target;
+- #847 `checksPass` repair evidence;
 - deployment sequence;
 - health/reconnect/restart checks;
 - rollback target and rollback trigger;
-- #846 diagnostics observation window.
+- #846 diagnostics observation window;
+- explicit approval for recurring-cost changes.
 
 No plan or persistence change is authorized by this document alone.
 
-## #906 status after this inventory
+## #906 status after A1 remediation
 
-This document satisfies the design/evidence portion of:
+Completed design/code acceptance:
 
-- Redis key-class inventory by durability requirement;
-- explicit decision on safe-to-lose vs restart-sensitive state.
+- Redis key-class inventory by durability requirement (#918);
+- explicit safe-loss vs fail-closed vs restart-sensitive decision (#918);
+- password-reset request-budget durability (#919);
+- notification frequency-cap durability (#920).
 
 Still open:
 
-- A1 abuse-control remediation or a deliberately separated restart-survivable control store;
-- move API off Free;
-- move Redis off the Free in-memory-only topology;
-- least-privilege/private connectivity verification;
+- repair and verify the #847 normal `checksPass` release path;
+- select/approve and move API off Free;
+- select/approve and move Redis off the Free topology while keeping transient secrets ephemeral;
+- least-privilege/private Redis connectivity verification;
+- preserve #846 diagnostics and justify capacity independently from the OOM investigation;
 - intentional API + Redis restart/failover QA;
-- final plan/configuration + rollback record.
+- final plan/configuration/live-SHA + rollback record.
