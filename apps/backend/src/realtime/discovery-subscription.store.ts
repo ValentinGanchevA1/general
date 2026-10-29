@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import {
   isEntityZoom,
-  type DiscoverySubscriptionPayload,
   type EntityKind,
   type LatLng,
+  type MarketplaceDiscoverySubscriptionPayload,
   type Viewport,
 } from '@g88/shared';
 
 export interface ActiveDiscoverySubscription {
   socketId: string;
   viewerId: string;
-  query: DiscoverySubscriptionPayload;
+  query: MarketplaceDiscoverySubscriptionPayload;
 }
 
 const SPATIAL_BUCKET_DEGREES = 1;
@@ -86,7 +86,7 @@ function viewportContains(viewport: Viewport, point: LatLng): boolean {
 }
 
 function subscriptionAllowsKind(
-  query: DiscoverySubscriptionPayload,
+  query: MarketplaceDiscoverySubscriptionPayload,
   kind: EntityKind,
 ): boolean {
   if (!isEntityZoom(query.zoom)) return false;
@@ -109,7 +109,11 @@ export class DiscoverySubscriptionStore {
   private readonly socketBucketKeys = new Map<string, Set<string>>();
   private readonly socketsByBucket = new Map<string, Set<string>>();
 
-  set(socketId: string, viewerId: string, query: DiscoverySubscriptionPayload): void {
+  set(
+    socketId: string,
+    viewerId: string,
+    query: MarketplaceDiscoverySubscriptionPayload,
+  ): void {
     this.removeFromSpatialIndex(socketId);
 
     const subscription = { socketId, viewerId, query };
