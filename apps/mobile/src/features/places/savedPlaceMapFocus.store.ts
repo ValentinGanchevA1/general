@@ -60,8 +60,9 @@ function placeDetailToMapPoint(place: NexaPlaceDetail): PlaceMapEntityPoint {
 }
 
 /**
- * Session-scoped, viewer-private handoff to Map.
- * Payloads are intentionally limited to existing coarse NEXA place data.
+ * Session-scoped coarse Place handoff to Map.
+ * Payloads are limited to existing NEXA Place map data; no exact coordinates,
+ * provider identifiers or raw H3 values belong in this store.
  */
 export const savedPlaceMapFocusStore = {
   getSnapshot(): SavedPlaceMapFocusRequest | null {
@@ -79,6 +80,10 @@ export const savedPlaceMapFocusStore = {
 
   requestDetail(place: NexaPlaceDetail): void {
     setPoint(placeDetailToMapPoint(place));
+  },
+
+  requestPoint(point: PlaceMapEntityPoint): void {
+    setPoint(point);
   },
 
   clearIfMatches(placeId: string): void {
