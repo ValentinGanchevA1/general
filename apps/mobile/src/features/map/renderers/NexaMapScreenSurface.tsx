@@ -42,6 +42,11 @@ import {
   hasContextualMapSelection,
   mapSelectionVisibility,
 } from '@/features/map/mapSelectionVisibility';
+import {
+  mapAnimationDuration,
+  regionForSelectedEntity,
+} from '@/components/map/nexaMapSheetChoreography';
+import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
 import type { NexaMapController } from '../contracts/mapRenderer';
 import {
   NEXA_MAP_RENDERER_ROLLOUT,
@@ -137,6 +142,7 @@ export const NexaMapScreenSurface = React.forwardRef<
 
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const reduceMotion = useNexaReducedMotion();
   const sheetChrome = useSheetChrome();
   const renderBackdrop = useSheetBackdrop(0.35);
   const runtimeMapRef = useRef<NexaMapController | null>(null);
@@ -145,6 +151,8 @@ export const NexaMapScreenSurface = React.forwardRef<
   const handledPlaceRefreshRequestIdRef = useRef(placeRefreshRequestId);
   const privateSelectedPlaceIdRef = useRef<string | null>(null);
   const selectedPlaceIdRef = useRef<string | null>(null);
+  const placeRestoreRegionRef = useRef<Region | null>(null);
+  const suppressPlaceRestoreRef = useRef(false);
   const [selectedPlace, setSelectedPlace] = useState<PlaceMapEntityPoint | null>(null);
   selectedPlaceIdRef.current = selectedPlace?.id ?? null;
   const [settledRegion, setSettledRegion] = useState<Region | null>(null);
@@ -275,12 +283,32 @@ export const NexaMapScreenSurface = React.forwardRef<
     onRegionChangeComplete(region);
   }, [onRegionChangeComplete]);
 
-  const dismissPlacePreview = useCallback((): void => {
+  const dismissPlacePreview = useCallback((restoreCamera = true): void => {
+    if (!restoreCamera) suppressPlaceRestoreRef.current = true;
     placeSheetRef.current?.dismiss();
   }, []);
 
-  const openPlacePreview = useCallback((point: PlaceMapEntityPoint): void => {
+  const openPlacePreview = useCallback((
+    point: PlaceMapEntityPoint,
+    options?: { adjustCamera?: boolean; restoreOnDismiss?: boolean },
+  ): void => {
     onPlacePreviewWillOpen?.();
+    const adjustCamera = options?.adjustCamera !== false;
+    const restoreOnDismiss = options?.restoreOnDismiss !== false;
+
+    if (restoreOnDismiss && placeRestoreRegionRef.current == null && settledRegion != null) {
+      placeRestoreRegionRef.current = settledRegion;
+    } else if (!restoreOnDismiss) {
+      placeRestoreRegionRef.current = null;
+    }
+
+    if (adjustCamera && settledRegion != null) {
+      const target = regionForSelectedEntity(settledRegion, point, 0);
+      runtimeMapRef.current?.fitViewport(regionToViewport(target), {
+        durationMs: mapAnimationDuration(0, reduceMotion),
+      });
+    }
+
     privateSelectedPlaceIdRef.current = point.meta.saved === true ? point.id : null;
     setSelectedPlace(point);
     requestAnimationFrame(() => {
@@ -289,7 +317,12 @@ export const NexaMapScreenSurface = React.forwardRef<
       sheet.present();
       onPlacePreviewVisibilityChange?.(true);
     });
-  }, [onPlacePreviewVisibilityChange, onPlacePreviewWillOpen]);
+  }, [
+    onPlacePreviewVisibilityChange,
+    onPlacePreviewWillOpen,
+    reduceMotion,
+    settledRegion,
+  ]);
 
   useFocusEffect(useCallback(() => {
     if (savedPlaceFocusRequest == null) return;
@@ -307,7 +340,10 @@ export const NexaMapScreenSurface = React.forwardRef<
         },
         { durationMs: SAVED_PLACE_FOCUS_DURATION_MS },
       );
-      openPlacePreview(savedPlaceFocusRequest.point);
+      openPlacePreview(savedPlaceFocusRequest.point, {
+        adjustCamera: false,
+        restoreOnDismiss: false,
+      });
     });
 
     return () => cancelAnimationFrame(frame);
@@ -329,7 +365,7 @@ export const NexaMapScreenSurface = React.forwardRef<
   const openPlaceDetails = useCallback((): void => {
     if (selectedPlace == null) return;
     const placeId = selectedPlace.id;
-    dismissPlacePreview();
+    dismissPlacePreview(false);
     navigation.navigate('PlaceDetail', { placeId });
   }, [dismissPlacePreview, navigation, selectedPlace]);
 
@@ -337,7 +373,7 @@ export const NexaMapScreenSurface = React.forwardRef<
     if (selectedPlace == null) return;
     const placeId = selectedPlace.id;
     setPendingPlaceCheckIn(placeId);
-    dismissPlacePreview();
+    dismissPlacePreview(false);
     navigation.navigate('PlaceDetail', { placeId });
   }, [dismissPlacePreview, navigation, selectedPlace]);
 
@@ -419,7 +455,7 @@ export const NexaMapScreenSurface = React.forwardRef<
         points={mergedPoints}
         onRegionChangeComplete={handleRegionChangeComplete}
         onClusterPress={(point) => {
-          if (selectedPlace != null) dismissPlacePreview();
+          if (selectedPlace != null) dismissPlacePreview(false);
           onClusterPress(point);
         }}
         onEntityPress={(point) => {
@@ -427,7 +463,7 @@ export const NexaMapScreenSurface = React.forwardRef<
             openPlacePreview(point);
             return;
           }
-          if (selectedPlace != null) dismissPlacePreview();
+          if (selectedPlace != null) dismissPlacePreview(false);
           onEntityPress(point);
         }}
         requestedRenderer={requestedRenderer}
@@ -446,10 +482,19 @@ export const NexaMapScreenSurface = React.forwardRef<
         enableDynamicSizing={false}
         enablePanDownToClose
         onDismiss={() => {
+          const restoreRegion = placeRestoreRegionRef.current;
+          const shouldRestore = !suppressPlaceRestoreRef.current;
+          suppressPlaceRestoreRef.current = false;
+          placeRestoreRegionRef.current = null;
           onPlacePreviewVisibilityChange?.(false);
           privateSelectedPlaceIdRef.current = null;
           setSelectedPlace(null);
           savedPlaceMapFocusStore.clear();
+          if (shouldRestore && restoreRegion != null) {
+            runtimeMapRef.current?.fitViewport(regionToViewport(restoreRegion), {
+              durationMs: mapAnimationDuration(0, reduceMotion),
+            });
+          }
         }}
         backdropComponent={renderBackdrop}
         backgroundStyle={sheetChrome.background}
