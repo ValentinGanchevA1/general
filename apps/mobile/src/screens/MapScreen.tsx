@@ -29,7 +29,10 @@ import { useSocket } from '@/realtime/useSocket';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import type { NexaMapController } from '@/features/map/contracts/mapRenderer';
-import { NexaMapScreenSurface } from '@/features/map/renderers/NexaMapScreenSurface';
+import {
+	NexaMapScreenSurface,
+	type NexaPlaceSpatialStatus,
+} from '@/features/map/renderers/NexaMapScreenSurface';
 import { prefetchAvatars } from '@/services/avatarCache';
 import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -101,6 +104,10 @@ import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
 import { useNexaMapSurfaceReady } from '@/components/Brand/NexaLaunchSurfaceContext';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
+const EMPTY_PLACE_SPATIAL_STATUS: NexaPlaceSpatialStatus = {
+	hasVisiblePoints: false,
+	loading: false,
+};
 
 export function MapScreen(): React.JSX.Element {
 	const dispatch = useAppDispatch();
@@ -117,6 +124,8 @@ export function MapScreen(): React.JSX.Element {
 	const [region, setRegion] = useState<Region | null>(null);
 	const [selected, setSelected] = useState<EntityPoint | null>(null);
 	const [placePreviewOpen, setPlacePreviewOpen] = useState(false);
+	const [placeSpatialStatus, setPlaceSpatialStatus] =
+		useState<NexaPlaceSpatialStatus>(EMPTY_PLACE_SPATIAL_STATUS);
 	const [waveToast, setWaveToast] = useState<string | null>(null);
 	const reduceMotion = useNexaReducedMotion();
 	const markMapSurfaceReady = useNexaMapSurfaceReady();
@@ -660,9 +669,11 @@ export function MapScreen(): React.JSX.Element {
 		hasRegion: region != null,
 		loading,
 		hasError: error != null,
-		pointCount: points.length,
+		pointCount: filteredPoints.length,
 		viewportHash: data?.viewportHash ?? null,
 		isCityScale,
+		placeLoading: placeSpatialStatus.loading,
+		hasPlacePoints: placeSpatialStatus.hasVisiblePoints,
 	});
 	const isEmpty = spatialState === 'empty';
 
@@ -840,6 +851,7 @@ export function MapScreen(): React.JSX.Element {
 					onReady={markMapSurfaceReady}
 					onRegionChangeComplete={onRegionChangeComplete}
 					onPlacePreviewVisibilityChange={setPlacePreviewOpen}
+					onPlaceSpatialStatusChange={setPlaceSpatialStatus}
 					onLongPress={onMapLongPress}
 					onEntityPress={onEntityPress}
 					onClusterPress={onClusterPress}
