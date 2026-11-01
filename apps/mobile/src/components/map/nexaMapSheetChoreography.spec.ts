@@ -1,4 +1,4 @@
-import type { EntityPoint } from '@g88/shared';
+import type { EntityPoint, PlaceMapEntityPoint } from '@g88/shared';
 import type { Region } from 'react-native-maps';
 
 import {
@@ -29,6 +29,19 @@ const point = {
   },
 } as EntityPoint;
 
+const placePoint: PlaceMapEntityPoint = {
+  kind: 'place',
+  id: 'place-1',
+  lat: 42.03,
+  lng: 25.04,
+  meta: {
+    canonicalLabel: 'Sea Garden',
+    trending: true,
+    recentActivityAt: '2026-11-01T18:00:00.000Z',
+    locationPrecision: 'coarse',
+  },
+};
+
 describe('NEXA sheet ↔ map choreography', () => {
   it('keeps two semantic snap points', () => {
     expect(NEXA_ENTITY_SHEET_SNAP_POINTS).toEqual(['36%', '62%']);
@@ -44,6 +57,15 @@ describe('NEXA sheet ↔ map choreography', () => {
     expect(compact.latitude).toBeLessThan(point.lat);
     expect(expanded.latitude).toBeLessThan(compact.latitude);
     expect(compact.latitudeDelta).toBe(region.latitudeDelta);
+  });
+
+  it('applies the same compact camera framing to coarse Place points', () => {
+    const compact = regionForSelectedEntity(region, placePoint, 0);
+
+    expect(compact.longitude).toBe(placePoint.lng);
+    expect(compact.latitude).toBeLessThan(placePoint.lat);
+    expect(compact.latitudeDelta).toBe(region.latitudeDelta);
+    expect(placePoint.meta.locationPrecision).toBe('coarse');
   });
 
   it('keeps marker selection keys deterministic', () => {
