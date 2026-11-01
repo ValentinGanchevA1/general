@@ -15,17 +15,19 @@ describe('RealtimeGateway live location multi-socket revocation', () => {
     const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
     const join = jest.fn();
     const client = { data: { userId: peerId, rooms: new Set<string>() }, join };
-    const query = jest.fn().mockResolvedValue([{ user_id: sharerId }]);
-    Object.assign(gateway, { db: { query }, logger: { error: jest.fn() } });
+    const getRecipientIds = jest.fn().mockResolvedValue([sharerId]);
+    Object.assign(gateway, {
+      chatRealtimeAccess: { getRecipientIds },
+      logger: { error: jest.fn() },
+    });
 
     await expect(gateway.onConversationJoin(client as never, { conversationId }))
       .resolves.toMatchObject({ ok: false, code: 'chat.forbidden' });
     expect(join).not.toHaveBeenCalled();
     expect(client.data.rooms.size).toBe(0);
-    expect(query).toHaveBeenCalledWith(expect.stringContaining('user_blocks'), [conversationId]);
+    expect(getRecipientIds).toHaveBeenCalledWith(conversationId, false);
 
-    // After removal, the authoritative participant query returns no recipients.
-    query.mockResolvedValue([]);
+    getRecipientIds.mockResolvedValue([]);
     await expect(gateway.onConversationJoin(client as never, { conversationId }))
       .resolves.toMatchObject({ ok: false, code: 'chat.forbidden' });
     expect(join).not.toHaveBeenCalled();
@@ -41,8 +43,7 @@ describe('RealtimeGateway live location multi-socket revocation', () => {
     ];
     for (const socket of sockets) received.set(socket.id, []);
 
-    // Simulate the current SQL recipient result after the peer blocks the sharer.
-    const query = jest.fn().mockResolvedValue([{ user_id: sharerId }]);
+    const getRecipientIds = jest.fn().mockResolvedValue([sharerId]);
     const update = jest.fn().mockResolvedValue({
       conversationId,
       updatedAt: '2026-10-28T10:00:00.000Z',
@@ -55,7 +56,7 @@ describe('RealtimeGateway live location multi-socket revocation', () => {
       },
     }));
     Object.assign(gateway, {
-      db: { query },
+      chatRealtimeAccess: { getRecipientIds },
       locationShare: { update },
       server: { to },
       logger: { error: jest.fn() },
@@ -66,7 +67,7 @@ describe('RealtimeGateway live location multi-socket revocation', () => {
       { sessionId: 'session-1', location },
     );
     expect(result).toEqual({ ok: true, data: { updatedAt: '2026-10-28T10:00:00.000Z' } });
-    expect(query).toHaveBeenCalledWith(expect.stringContaining('user_blocks'), [conversationId]);
+    expect(getRecipientIds).toHaveBeenCalledWith(conversationId, true);
     expect(to).toHaveBeenCalledTimes(1);
     expect(to).toHaveBeenCalledWith(`user:${sharerId}`);
     expect(received.get('sender-phone')).toEqual([
@@ -79,9 +80,9 @@ describe('RealtimeGateway live location multi-socket revocation', () => {
   it('emits no precise location when all recipients lose conversation access', async () => {
     const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
     const to = jest.fn().mockReturnValue({ emit: jest.fn() });
-    const query = jest.fn().mockResolvedValue([]);
+    const getRecipientIds = jest.fn().mockResolvedValue([]);
     Object.assign(gateway, {
-      db: { query },
+      chatRealtimeAccess: { getRecipientIds },
       locationShare: { update: jest.fn().mockResolvedValue({ conversationId, updatedAt: 'now' }) },
       server: { to },
       logger: { error: jest.fn() },
@@ -90,16 +91,16 @@ describe('RealtimeGateway live location multi-socket revocation', () => {
       { data: { userId: sharerId } } as never,
       { sessionId: 'session-1', location },
     )).resolves.toMatchObject({ ok: true });
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(getRecipientIds).toHaveBeenCalledWith(conversationId, true);
     expect(to).not.toHaveBeenCalled();
   });
 
-  it('fails closed without emitting GPS if the recipient authorization query fails', async () => {
+  it('fails closed without emitting GPS if recipient authorization fails', async () => {
     const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
     const to = jest.fn().mockReturnValue({ emit: jest.fn() });
-    const query = jest.fn().mockRejectedValue(new Error('authorization database unavailable'));
+    const getRecipientIds = jest.fn().mockRejectedValue(new Error('authorization database unavailable'));
     Object.assign(gateway, {
-      db: { query },
+      chatRealtimeAccess: { getRecipientIds },
       locationShare: { update: jest.fn().mockResolvedValue({ conversationId, updatedAt: 'now' }) },
       server: { to },
       logger: { error: jest.fn() },
@@ -108,18 +109,18 @@ describe('RealtimeGateway live location multi-socket revocation', () => {
       { data: { userId: sharerId } } as never,
       { sessionId: 'session-1', location },
     )).resolves.toMatchObject({ ok: false });
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(getRecipientIds).toHaveBeenCalledWith(conversationId, true);
     expect(to).not.toHaveBeenCalled();
   });
 
   it('does not leak ended-session metadata to a revoked peer via stale rooms', async () => {
     const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
     const to = jest.fn().mockReturnValue({ emit: jest.fn() });
-    const query = jest.fn().mockResolvedValue([{ user_id: sharerId }]);
-    Object.assign(gateway, { db: { query }, server: { to } });
+    const getRecipientIds = jest.fn().mockResolvedValue([sharerId]);
+    Object.assign(gateway, { chatRealtimeAccess: { getRecipientIds }, server: { to } });
 
     await gateway.emitLocationShareEnded(conversationId, 'session-1', 'blocked', 'now');
-    expect(query).toHaveBeenCalledWith(expect.stringContaining('user_blocks'), [conversationId]);
+    expect(getRecipientIds).toHaveBeenCalledWith(conversationId, true);
     expect(to).toHaveBeenCalledTimes(1);
     expect(to).toHaveBeenCalledWith(`user:${sharerId}`);
     expect(to).not.toHaveBeenCalledWith(`user:${peerId}`);
@@ -128,20 +129,23 @@ describe('RealtimeGateway live location multi-socket revocation', () => {
   it('fails closed on ended-session recipient authorization failure', async () => {
     const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
     const to = jest.fn().mockReturnValue({ emit: jest.fn() });
+    const getRecipientIds = jest.fn().mockRejectedValue(new Error('database unavailable'));
     Object.assign(gateway, {
-      db: { query: jest.fn().mockRejectedValue(new Error('database unavailable')) },
+      chatRealtimeAccess: { getRecipientIds },
       server: { to },
     });
     await expect(gateway.emitLocationShareEnded(conversationId, 'session-1', 'expired', 'now'))
       .rejects.toThrow('database unavailable');
+    expect(getRecipientIds).toHaveBeenCalledWith(conversationId, true);
     expect(to).not.toHaveBeenCalled();
   });
 
   it('delivers to both devices of an authorized peer without using conversation rooms', async () => {
     const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
     const to = jest.fn().mockReturnValue({ emit: jest.fn() });
+    const getRecipientIds = jest.fn().mockResolvedValue([sharerId, peerId]);
     Object.assign(gateway, {
-      db: { query: jest.fn().mockResolvedValue([{ user_id: sharerId }, { user_id: peerId }]) },
+      chatRealtimeAccess: { getRecipientIds },
       locationShare: { update: jest.fn().mockResolvedValue({ conversationId, updatedAt: 'now' }) },
       server: { to },
       logger: { error: jest.fn() },
@@ -150,6 +154,7 @@ describe('RealtimeGateway live location multi-socket revocation', () => {
       { data: { userId: sharerId } } as never,
       { sessionId: 'session-1', location },
     )).resolves.toMatchObject({ ok: true });
+    expect(getRecipientIds).toHaveBeenCalledWith(conversationId, true);
     expect(to.mock.calls.map(([room]: [string]) => room)).toEqual([
       `user:${sharerId}`,
       `user:${peerId}`,

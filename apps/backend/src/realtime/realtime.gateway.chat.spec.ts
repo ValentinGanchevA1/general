@@ -22,9 +22,10 @@ function setup(joined = true) {
     challenges: { increment: jest.fn().mockResolvedValue(undefined) },
     pushToOfflineParticipants: push,
   });
+  const rooms = new Set(joined ? [`convo:${conversationId}`] : []);
   const client = {
-    rooms: new Set(joined ? [`convo:${conversationId}`] : []),
-    data: { userId: senderId },
+    rooms,
+    data: { userId: senderId, rooms },
   };
   const send = () =>
     gateway.onChatSend(client as never, {

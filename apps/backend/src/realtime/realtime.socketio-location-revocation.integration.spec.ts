@@ -134,14 +134,12 @@ describe('RealtimeGateway Socket.IO location revocation integration', () => {
     const clients: TestSocketClient[] = [];
     let authorizedRecipientIds = [sharerId, peerId];
 
-    const query = jest.fn().mockImplementation(async () => (
-      authorizedRecipientIds.map((userId) => ({ user_id: userId }))
-    ));
+    const getRecipientIds = jest.fn(async () => authorizedRecipientIds);
     const update = jest.fn().mockResolvedValue({ conversationId, updatedAt });
     const verify = jest.fn((token: string) => ({ sub: token }));
 
     Object.assign(gateway, {
-      db: { query },
+      chatRealtimeAccess: { getRecipientIds },
       jwt: { verify },
       locationShare: { update },
       server: realtime,
@@ -186,8 +184,8 @@ describe('RealtimeGateway Socket.IO location revocation integration', () => {
       sharer.on('location:share:update', (event) => sharerUpdates.push(event));
       peer.on('location:share:update', (event) => peerUpdates.push(event));
 
-      // Simulate the authoritative post-block recipient query while deliberately
-      // leaving the peer subscribed to the old conversation room.
+      // Simulate post-block authorization while deliberately leaving the peer in
+      // the stale conversation room. Delivery must still use current user rooms.
       authorizedRecipientIds = [sharerId];
 
       await expect(updateLocation(sharer)).resolves.toEqual({
@@ -208,7 +206,7 @@ describe('RealtimeGateway Socket.IO location revocation integration', () => {
       expect(peerUpdates).toEqual([]);
       expect(peerServerSocket?.rooms.has(staleRoom)).toBe(true);
       expect(update).toHaveBeenCalledWith(sharerId, sessionId, location);
-      expect(query).toHaveBeenLastCalledWith(expect.stringContaining('user_blocks'), [conversationId]);
+      expect(getRecipientIds).toHaveBeenLastCalledWith(conversationId, true);
     } finally {
       for (const client of clients) client.close();
       await closeServer(io, httpServer);
