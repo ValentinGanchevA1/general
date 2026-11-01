@@ -17,8 +17,14 @@ import {
   useRoute,
 } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import type { ChatMessage, PublicUserProfile, VerificationLevel } from '@g88/shared';
+import type {
+  ChatMessage,
+  GroupConversationSummary,
+  PublicUserProfile,
+  VerificationLevel,
+} from '@g88/shared';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getJson } from '@/api/client';
 import { VerificationBadge } from '@/components/VerificationBadge';
@@ -34,6 +40,7 @@ import {
   failedMessageCleared,
   setActiveConversation,
 } from '@/features/chat/chatSlice';
+import { groupChatRouteStore } from '@/features/chat/groupChatRouteStore';
 import { socketSendMessage, useSocket } from '@/realtime/useSocket';
 import { SendGiftSheet } from '@/features/gifts/SendGiftSheet';
 import { useLiveLocationShare } from '@/features/chat/useLiveLocationShare';
@@ -49,28 +56,44 @@ function MessageBubble({
   isPending,
   isFailed,
   onRetry,
-  peerName,
-  peerAvatarUrl,
-  onOpenPeerProfile,
+  senderName,
+  senderAvatarUrl,
+  onOpenSenderProfile,
+  showSenderName,
+  allowLocationSession,
 }: {
   msg: ChatMessage;
   isMine: boolean;
   isPending: boolean;
   isFailed: boolean;
   onRetry: () => void;
-  peerName: string;
-  peerAvatarUrl: string | null;
-  onOpenPeerProfile: (() => void) | null;
+  senderName: string;
+  senderAvatarUrl: string | null;
+  onOpenSenderProfile: (() => void) | null;
+  showSenderName: boolean;
+  allowLocationSession: boolean;
 }): React.JSX.Element {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   if (msg.type === 'location_session') {
-    return <LocationSessionBubble msg={msg} isMine={isMine} />;
+    if (allowLocationSession) {
+      return <LocationSessionBubble msg={msg} isMine={isMine} />;
+    }
+    return (
+      <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
+        <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
+          Live location is unavailable in group chats.
+        </Text>
+      </View>
+    );
   }
 
   const bubble = (
     <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
+      {showSenderName && !isMine ? (
+        <Text style={styles.senderName} numberOfLines={1}>{senderName}</Text>
+      ) : null}
       <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
         {msg.body}
       </Text>
@@ -92,15 +115,15 @@ function MessageBubble({
   return (
     <View style={styles.peerRow}>
       <TouchableOpacity
-        onPress={onOpenPeerProfile ?? undefined}
-        disabled={!onOpenPeerProfile}
+        onPress={onOpenSenderProfile ?? undefined}
+        disabled={!onOpenSenderProfile}
         accessibilityRole="button"
-        accessibilityLabel={`Open profile for ${peerName}`}
+        accessibilityLabel={`Open profile for ${senderName}`}
         hitSlop={6}
         activeOpacity={0.7}
         style={styles.peerAvatarTap}
       >
-        <Avatar uri={peerAvatarUrl} name={peerName} size={28} />
+        <Avatar uri={senderAvatarUrl} name={senderName} size={28} />
       </TouchableOpacity>
       {bubble}
     </View>
@@ -122,6 +145,42 @@ export function ChatScreen(): React.JSX.Element {
     otherUserId: paramOtherUserId,
   } = params;
 
+  const [groupConversation, setGroupConversation] = useState<GroupConversationSummary | null>(
+    () => groupChatRouteStore.take(conversationId),
+  );
+  const [groupLookupDone, setGroupLookupDone] = useState(
+    paramOtherUserId != null || groupConversation != null,
+  );
+
+  useEffect(() => {
+    if (paramOtherUserId != null || groupConversation?.id === conversationId) return;
+
+    let cancelled = false;
+    void getJson<GroupConversationSummary[]>('/conversations/groups')
+      .then((groups) => {
+        if (cancelled) return;
+        setGroupConversation(groups.find((group) => group.id === conversationId) ?? null);
+      })
+      .catch(() => {
+        // The DM path can legitimately have no explicit peer id. Group detection
+        // is best-effort here; message authorization remains server-owned.
+      })
+      .finally(() => {
+        if (!cancelled) setGroupLookupDone(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId, groupConversation?.id, paramOtherUserId]);
+
+  const isGroup = groupConversation != null;
+  const groupResolutionPending = paramOtherUserId == null && !isGroup && !groupLookupDone;
+  const groupMemberById = useMemo(
+    () => new Map((groupConversation?.members ?? []).map((member) => [member.id, member])),
+    [groupConversation?.members],
+  );
+
   const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
   const messages = useAppSelector((s) => s.chat.messages[conversationId] ?? []);
   const nextCursor = useAppSelector((s) => s.chat.nextCursor[conversationId] ?? null);
@@ -139,7 +198,7 @@ export function ChatScreen(): React.JSX.Element {
 
   const theyReplied = messages.some((m) => m.senderId !== myUserId);
   const iSent = messages.some((m) => m.senderId === myUserId);
-  const showRequestBanner = !!requestPending && !theyReplied;
+  const showRequestBanner = !isGroup && !groupResolutionPending && !!requestPending && !theyReplied;
   const requestLocked = showRequestBanner && iSent;
 
   const [body, setBody] = useState('');
@@ -155,6 +214,7 @@ export function ChatScreen(): React.JSX.Element {
   } | null>(null);
   const { joinConversation, sendMessage } = useSocket();
 
+  const liveLocationEnabled = !isGroup && !groupResolutionPending;
   const {
     session: liveSession,
     starting: shareStarting,
@@ -162,9 +222,11 @@ export function ChatScreen(): React.JSX.Element {
     start: startShare,
     stop: stopShare,
     openInMaps,
-  } = useLiveLocationShare(conversationId);
+  } = useLiveLocationShare(conversationId, liveLocationEnabled);
 
-  const otherUserId = paramOtherUserId ?? messages.find((m) => m.senderId !== myUserId)?.senderId ?? null;
+  const otherUserId = isGroup || groupResolutionPending
+    ? null
+    : (paramOtherUserId ?? messages.find((m) => m.senderId !== myUserId)?.senderId ?? null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
@@ -189,15 +251,19 @@ export function ChatScreen(): React.JSX.Element {
   const peerBadge = fetchedPeer?.userId === otherUserId ? fetchedPeer : null;
   const badgeVerification = otherUserVerification ?? peerBadge?.verification ?? 'none';
   const badgeIdVerified = otherUserIdVerified ?? peerBadge?.idVerified;
-  const canGift = !!otherUserId && peerBadge != null && !peerBadge.blockedByViewer;
-  const canShareLocation = !requestLocked;
+  const canGift = !isGroup && !groupResolutionPending && !!otherUserId && peerBadge != null && !peerBadge.blockedByViewer;
+  const canShareLocation = liveLocationEnabled && !requestLocked;
   const peerDisplayName = otherUserName || 'User';
   const peerAvatarUrl = peerBadge?.avatarUrl ?? null;
 
+  const openUserProfile = useCallback((userId: string): void => {
+    navigation.navigate('UserProfile', { userId });
+  }, [navigation]);
+
   const openPeerProfile = useCallback(() => {
     if (!otherUserId) return;
-    navigation.navigate('UserProfile', { userId: otherUserId });
-  }, [navigation, otherUserId]);
+    openUserProfile(otherUserId);
+  }, [openUserProfile, otherUserId]);
 
   useEffect(() => {
     void dispatch(fetchMessages({ conversationId }));
@@ -268,9 +334,13 @@ export function ChatScreen(): React.JSX.Element {
   };
 
   const onShareDuration = useCallback(async (duration: '15m' | '60m' | 'until_off') => {
+    if (!liveLocationEnabled) return;
     await startShare(duration);
     setShareOpen(false);
-  }, [startShare]);
+  }, [liveLocationEnabled, startShare]);
+
+  const groupTitle = groupConversation?.title ?? otherUserName ?? 'Group chat';
+  const groupMemberCount = groupConversation?.members.length ?? 0;
 
   return (
     <KeyboardAvoidingView
@@ -280,7 +350,17 @@ export function ChatScreen(): React.JSX.Element {
     >
       <ScreenHeader
         bordered
-        center={
+        center={isGroup ? (
+          <View style={styles.groupHeader} accessibilityLabel={`${groupTitle}, ${groupMemberCount} members`}>
+            <View style={styles.groupHeaderIcon}>
+              <Icon name="account-group-outline" size={20} color={colors.action} />
+            </View>
+            <View style={styles.groupHeaderCopy}>
+              <Text style={styles.headerName} numberOfLines={1}>{groupTitle}</Text>
+              <Text style={styles.groupHeaderMeta}>{groupMemberCount} members</Text>
+            </View>
+          </View>
+        ) : (
           <TouchableOpacity
             style={styles.headerTitleTap}
             onPress={openPeerProfile}
@@ -293,7 +373,7 @@ export function ChatScreen(): React.JSX.Element {
             <Text style={styles.headerName} numberOfLines={1}>{otherUserName || 'Chat'}</Text>
             <VerificationBadge verification={badgeVerification} idVerified={badgeIdVerified} size={18} />
           </TouchableOpacity>
-        }
+        )}
       />
 
       {showRequestBanner ? (
@@ -306,7 +386,7 @@ export function ChatScreen(): React.JSX.Element {
         </View>
       ) : null}
 
-      {liveSession ? (
+      {liveLocationEnabled && liveSession ? (
         <LocationSessionBanner
           session={liveSession}
           isSharer={isSharer}
@@ -323,18 +403,36 @@ export function ChatScreen(): React.JSX.Element {
           ref={listRef}
           data={messages}
           keyExtractor={(m) => m.id}
-          renderItem={({ item }) => (
-            <MessageBubble
-              msg={item}
-              isMine={item.senderId === myUserId}
-              isPending={pendingIds.has(item.id)}
-              isFailed={failedIds.includes(item.id)}
-              onRetry={() => void retry(item.id, item.body)}
-              peerName={peerDisplayName}
-              peerAvatarUrl={peerAvatarUrl}
-              onOpenPeerProfile={otherUserId ? openPeerProfile : null}
-            />
-          )}
+          renderItem={({ item }) => {
+            const isMine = item.senderId === myUserId;
+            const groupMember = isGroup ? groupMemberById.get(item.senderId) : undefined;
+            const senderName = isGroup
+              ? (groupMember?.displayName ?? 'Group member')
+              : peerDisplayName;
+            const senderAvatarUrl = isGroup
+              ? (groupMember?.avatarUrl ?? null)
+              : peerAvatarUrl;
+            const onOpenSenderProfile = isMine
+              ? null
+              : isGroup
+                ? (groupMember ? () => openUserProfile(groupMember.id) : null)
+                : (otherUserId ? openPeerProfile : null);
+
+            return (
+              <MessageBubble
+                msg={item}
+                isMine={isMine}
+                isPending={pendingIds.has(item.id)}
+                isFailed={failedIds.includes(item.id)}
+                onRetry={() => void retry(item.id, item.body)}
+                senderName={senderName}
+                senderAvatarUrl={senderAvatarUrl}
+                onOpenSenderProfile={onOpenSenderProfile}
+                showSenderName={isGroup}
+                allowLocationSession={!isGroup}
+              />
+            );
+          }}
           inverted
           contentContainerStyle={styles.messageList}
           onEndReached={loadMore}
@@ -397,7 +495,7 @@ export function ChatScreen(): React.JSX.Element {
       ) : null}
 
       <LocationShareSheet
-        visible={shareOpen}
+        visible={liveLocationEnabled && shareOpen}
         starting={shareStarting}
         onClose={() => setShareOpen(false)}
         onShare={(d) => void onShareDuration(d)}
@@ -411,6 +509,19 @@ function createStyles(colors: ThemeColors) {
     root: { flex: 1, backgroundColor: colors.bg },
     headerTitleTap: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, maxWidth: '100%' },
     headerName: { flexShrink: 1, color: colors.textPrimary, fontSize: 17, fontWeight: '600' },
+    groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, maxWidth: '100%' },
+    groupHeaderIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+    },
+    groupHeaderCopy: { flexShrink: 1, minWidth: 0 },
+    groupHeaderMeta: { color: colors.textFaint, fontSize: 11, marginTop: 1 },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     requestBanner: {
       backgroundColor: colors.surface,
@@ -430,6 +541,7 @@ function createStyles(colors: ThemeColors) {
       alignSelf: 'flex-start',
     },
     peerAvatarTap: { marginBottom: 2 },
+    senderName: { color: colors.action, fontSize: 11, fontWeight: '700', marginBottom: 3 },
     locBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
     locBtnText: { fontSize: 20 },
     giftBtn: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6 },
