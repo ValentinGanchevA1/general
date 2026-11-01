@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
 import { RealtimeEmitterService } from '../../realtime/realtime-emitter.service';
+import { GroupConversationsService } from '../chat/group-conversations.service';
 import { FriendsService } from '../friends/friends.service';
 
 export interface BlockedUserRow {
@@ -21,6 +22,8 @@ export interface BlockedUserRow {
  *    keep the two in sync if this predicate ever changes.
  *  - FriendsService: follow/request create paths call isBlocked(); on block we
  *    hard-delete follows, friendships, and cancel pending friend_requests.
+ *  - GroupConversationsService: the blocker soft-leaves shared active groups so
+ *    a future group realtime fanout cannot keep the blocked pair co-members.
  */
 @Injectable()
 export class BlocksService {
@@ -28,6 +31,7 @@ export class BlocksService {
     @InjectDataSource() private readonly db: DataSource,
     @Inject(forwardRef(() => FriendsService))
     private readonly friends: FriendsService,
+    private readonly groups: GroupConversationsService,
     @Inject(forwardRef(() => RealtimeEmitterService))
     private readonly realtime: RealtimeEmitterService,
   ) {}
@@ -42,12 +46,17 @@ export class BlocksService {
        ON CONFLICT (blocker_id, blocked_id) DO NOTHING`,
       [blockerId, blockedId],
     );
+
+    // Blocking is a privacy boundary. Remove the blocker from shared groups before
+    // any future group realtime fanout can be activated. This is idempotent and
+    // transfers owner role atomically inside the group membership transaction.
+    await this.groups.leaveSharedGroupsForBlock(blockerId, blockedId);
+
     // Hard-delete social graph edges (follows, friendships, pending requests).
     await this.friends.onBlock(blockerId, blockedId);
 
-    // Legacy participant_ids is a DM-only compatibility key. Group block/removal
-    // semantics must be handled through normalized conversation_members rather
-    // than accidentally treating a group row as a 1:1 conversation.
+    // Legacy participant_ids is a DM-only compatibility key. Group membership has
+    // already been handled above through normalized conversation_members.
     const conversations = await this.db.query<Array<{ id: string }>>(
       `SELECT id
          FROM conversations

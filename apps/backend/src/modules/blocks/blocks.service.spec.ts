@@ -3,6 +3,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 
 import { RealtimeEmitterService } from '../../realtime/realtime-emitter.service';
+import { GroupConversationsService } from '../chat/group-conversations.service';
 import { FriendsService } from '../friends/friends.service';
 import { BlocksService } from './blocks.service';
 
@@ -10,6 +11,7 @@ describe('BlocksService', () => {
   let service: BlocksService;
   let query: jest.Mock;
   let onBlock: jest.Mock;
+  let leaveSharedGroupsForBlock: jest.Mock;
   let leaveRoomForUsers: jest.Mock;
 
   const A = '11111111-1111-1111-1111-111111111111';
@@ -18,12 +20,14 @@ describe('BlocksService', () => {
   beforeEach(async () => {
     query = jest.fn().mockResolvedValue([]);
     onBlock = jest.fn().mockResolvedValue(undefined);
+    leaveSharedGroupsForBlock = jest.fn().mockResolvedValue([]);
     leaveRoomForUsers = jest.fn();
     const mod = await Test.createTestingModule({
       providers: [
         BlocksService,
         { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
         { provide: FriendsService, useValue: { onBlock } },
+        { provide: GroupConversationsService, useValue: { leaveSharedGroupsForBlock } },
         { provide: RealtimeEmitterService, useValue: { leaveRoomForUsers } },
       ],
     }).compile();
@@ -34,20 +38,26 @@ describe('BlocksService', () => {
     await expect(service.block(A, A)).rejects.toThrow();
     expect(query).not.toHaveBeenCalled();
     expect(onBlock).not.toHaveBeenCalled();
+    expect(leaveSharedGroupsForBlock).not.toHaveBeenCalled();
     expect(leaveRoomForUsers).not.toHaveBeenCalled();
   });
 
-  it('block() upserts, cascades graph delete, then prunes both users from shared DM rooms', async () => {
+  it('block() upserts, leaves shared groups, deletes graph edges, then prunes shared DM rooms', async () => {
     query
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ id: 'conversation-1' }, { id: 'conversation-2' }]);
+    leaveSharedGroupsForBlock.mockResolvedValueOnce(['group-1']);
 
     await service.block(A, B);
 
     const [insertSql, insertParams] = query.mock.calls[0]!;
     expect(insertSql).toContain('ON CONFLICT (blocker_id, blocked_id) DO NOTHING');
     expect(insertParams).toEqual([A, B]);
+    expect(leaveSharedGroupsForBlock).toHaveBeenCalledWith(A, B);
     expect(onBlock).toHaveBeenCalledWith(A, B);
+    expect(leaveSharedGroupsForBlock.mock.invocationCallOrder[0]).toBeLessThan(
+      onBlock.mock.invocationCallOrder[0]!,
+    );
 
     const [conversationSql, conversationParams] = query.mock.calls[1]!;
     expect(conversationSql).toContain("kind = 'dm'");
@@ -58,20 +68,22 @@ describe('BlocksService', () => {
     expect(leaveRoomForUsers).toHaveBeenNthCalledWith(2, [A, B], 'convo:conversation-2');
   });
 
-  it('does not touch realtime rooms when the pair has no accepted conversation', async () => {
+  it('does not touch DM realtime rooms when the pair has no accepted DM', async () => {
     query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     await service.block(A, B);
 
+    expect(leaveSharedGroupsForBlock).toHaveBeenCalledWith(A, B);
     expect(onBlock).toHaveBeenCalledWith(A, B);
     expect(leaveRoomForUsers).not.toHaveBeenCalled();
   });
 
-  it('unblock() deletes the directional row', async () => {
+  it('unblock() deletes the directional row without restoring group membership', async () => {
     await service.unblock(A, B);
     const [sql, params] = query.mock.calls[0]!;
     expect(sql).toContain('DELETE FROM user_blocks');
     expect(params).toEqual([A, B]);
+    expect(leaveSharedGroupsForBlock).not.toHaveBeenCalled();
   });
 
   it('isBlocked() checks both directions and returns the EXISTS result', async () => {
