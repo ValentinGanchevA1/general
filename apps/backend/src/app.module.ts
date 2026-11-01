@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { resolveRateLimitTracker } from './common/rate-limit-tracker';
 import { RuntimeDiagnosticsService } from './common/runtime-diagnostics.service';
+import { RuntimeHttpDiagnosticsInterceptor } from './common/runtime-http-diagnostics.interceptor';
+import { RuntimeHttpDiagnosticsService } from './common/runtime-http-diagnostics.service';
 import { BlocksModule } from './modules/blocks/blocks.module';
 import { FriendsModule } from './modules/friends/friends.module';
 import { RedisModule } from './config/redis.module';
@@ -97,6 +99,8 @@ import { RuntimeConfigModule } from './modules/runtime-config/runtime-config.mod
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: RuntimeHttpDiagnosticsInterceptor },
+    RuntimeHttpDiagnosticsService,
     RuntimeDiagnosticsService,
   ],
 })
