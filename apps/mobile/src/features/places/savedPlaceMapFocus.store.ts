@@ -81,6 +81,12 @@ export const savedPlaceMapFocusStore = {
     setPoint(placeDetailToMapPoint(place));
   },
 
+  clearIfMatches(placeId: string): void {
+    if (request?.point.id !== placeId) return;
+    request = null;
+    emit();
+  },
+
   clear(): void {
     if (request === null) return;
     request = null;
