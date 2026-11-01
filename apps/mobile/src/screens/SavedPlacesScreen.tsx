@@ -72,11 +72,7 @@ export function SavedPlacesScreen(): React.JSX.Element {
   const removeSavedPlace = useCallback(async (placeId: string): Promise<void> => {
     const result = await dispatch(setPlaceSaved({ placeId, saved: false }));
     if (!setPlaceSaved.fulfilled.match(result)) return;
-
-    const focusRequest = savedPlaceMapFocusStore.getSnapshot();
-    if (focusRequest?.point.id === result.payload.placeId) {
-      savedPlaceMapFocusStore.clear();
-    }
+    savedPlaceMapFocusStore.clearIfMatches(result.payload.placeId);
   }, [dispatch]);
 
   const renderItem = useCallback(({ item }: { item: NexaSavedPlaceSummary }) => {
