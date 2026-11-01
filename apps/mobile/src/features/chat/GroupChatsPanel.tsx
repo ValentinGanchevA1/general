@@ -50,8 +50,8 @@ async function loadAllFriends(): Promise<FriendCard[]> {
   let cursor: string | null = null;
 
   for (let pageIndex = 0; pageIndex < 20; pageIndex += 1) {
-    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
-    const page = await getJson<FriendsPage>(`/friends${query}`);
+    const query: string = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+    const page: FriendsPage = await getJson<FriendsPage>(`/friends${query}`);
     for (const item of page.items) {
       if (!seen.has(item.userId)) {
         seen.add(item.userId);
