@@ -336,7 +336,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.actionSurfaceSoft,
+      backgroundColor: colors.actionGhost,
     },
     groupCopy: { flex: 1, minWidth: 0 },
     groupTitle: { color: colors.textPrimary, fontSize: fontSize.sm, fontWeight: '800' },
