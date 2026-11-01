@@ -13,6 +13,7 @@ import friendsReducer from '@/features/friends/friendsSlice';
 import mapNoveltyReducer from '@/features/map/mapNoveltySlice';
 import mapRendererPolicyReducer from '@/features/map/mapRendererPolicySlice';
 import placesReducer from '@/features/places/placeDetailSlice';
+import { publicPlacesMapLayerStore } from '@/features/places/publicPlacesMapLayer.store';
 import { savedPlaceMapFocusStore } from '@/features/places/savedPlaceMapFocus.store';
 import {
   savedPlacesMapLayerStore,
@@ -51,6 +52,7 @@ let previousAuthUserId = store.getState().auth.user?.id ?? null;
 store.subscribe(() => {
   const nextAuthUserId = store.getState().auth.user?.id ?? null;
   if (shouldResetSavedPlacesMapLayer(previousAuthUserId, nextAuthUserId)) {
+    publicPlacesMapLayerStore.reset();
     savedPlacesMapLayerStore.reset();
     savedPlaceMapFocusStore.clear();
     groupChatRouteStore.clear();
