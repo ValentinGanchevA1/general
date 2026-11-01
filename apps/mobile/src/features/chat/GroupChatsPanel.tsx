@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type {
@@ -20,6 +22,8 @@ import type {
 } from '@g88/shared';
 import { getJson, postJson } from '@/api/client';
 import { Avatar } from '@/components/Avatar';
+import { groupChatRouteStore } from '@/features/chat/groupChatRouteStore';
+import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 
 type CryptoWithRandomUuid = {
@@ -65,7 +69,13 @@ async function loadAllFriends(): Promise<FriendCard[]> {
   return items;
 }
 
-function GroupRow({ group }: { group: GroupConversationSummary }): React.JSX.Element {
+function GroupRow({
+  group,
+  onOpen,
+}: {
+  group: GroupConversationSummary;
+  onOpen: (group: GroupConversationSummary) => void;
+}): React.JSX.Element {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const memberCount = group.members.length;
@@ -74,7 +84,13 @@ function GroupRow({ group }: { group: GroupConversationSummary }): React.JSX.Ele
   const when = group.lastMessageAt ? timeAgo(group.lastMessageAt) : null;
 
   return (
-    <View style={styles.groupRow} accessibilityRole="summary" accessibilityLabel={`${group.title}, ${memberCount} members`}>
+    <TouchableOpacity
+      style={styles.groupRow}
+      onPress={() => onOpen(group)}
+      activeOpacity={0.75}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${group.title}, ${memberCount} members`}
+    >
       <View style={styles.groupIcon}>
         <Icon name="account-group-outline" size={22} color={colors.actionPrimary} />
       </View>
@@ -86,18 +102,21 @@ function GroupRow({ group }: { group: GroupConversationSummary }): React.JSX.Ele
       <View style={styles.groupState}>
         {group.unreadCount > 0 ? (
           <View style={styles.unreadBadge}>
-            <Text style={styles.unreadBadgeText}>{Math.min(group.unreadCount, 99)}{group.unreadCount > 99 ? '+' : ''}</Text>
+            <Text style={styles.unreadBadgeText}>
+              {Math.min(group.unreadCount, 99)}{group.unreadCount > 99 ? '+' : ''}
+            </Text>
           </View>
         ) : null}
-        <Text style={styles.groupStateText}>Setup</Text>
+        <Icon name="chevron-right" size={20} color={colors.textTertiary} />
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 export function GroupChatsPanel(): React.JSX.Element {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [groups, setGroups] = useState<GroupConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -135,9 +154,19 @@ export function GroupChatsPanel(): React.JSX.Element {
     return task;
   }, []);
 
-  useEffect(() => {
-    void loadGroups();
-  }, [loadGroups]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadGroups();
+    }, [loadGroups]),
+  );
+
+  const openGroup = useCallback((group: GroupConversationSummary): void => {
+    groupChatRouteStore.set(group);
+    navigation.navigate('Chat', {
+      conversationId: group.id,
+      otherUserName: group.title,
+    });
+  }, [navigation]);
 
   const resetCreateState = useCallback((): void => {
     setTitle('');
@@ -159,15 +188,9 @@ export function GroupChatsPanel(): React.JSX.Element {
     setFriendsLoading(true);
     setFriendsError(false);
     void loadAllFriends()
-      .then((items) => {
-        setFriends(items);
-      })
-      .catch(() => {
-        setFriendsError(true);
-      })
-      .finally(() => {
-        setFriendsLoading(false);
-      });
+      .then((items) => setFriends(items))
+      .catch(() => setFriendsError(true))
+      .finally(() => setFriendsLoading(false));
   }, [friends.length, friendsLoading]);
 
   const updateTitle = useCallback((value: string): void => {
@@ -255,7 +278,7 @@ export function GroupChatsPanel(): React.JSX.Element {
         </View>
       ) : (
         <View style={styles.groupsList}>
-          {groups.map((group) => <GroupRow key={group.id} group={group} />)}
+          {groups.map((group) => <GroupRow key={group.id} group={group} onOpen={openGroup} />)}
         </View>
       )}
 
@@ -417,7 +440,6 @@ function createStyles(colors: ThemeColors) {
     groupMeta: { color: colors.textTertiary, fontSize: fontSize.xs, marginTop: 2 },
     groupPreview: { color: colors.textSecondary, fontSize: fontSize.xs, marginTop: 3 },
     groupState: { alignItems: 'flex-end', gap: 6 },
-    groupStateText: { color: colors.textTertiary, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
     unreadBadge: {
       minWidth: 22,
       height: 22,

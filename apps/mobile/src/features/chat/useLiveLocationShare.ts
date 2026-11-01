@@ -33,7 +33,10 @@ interface UseLiveLocationShareResult {
   openInMaps: () => void;
 }
 
-export function useLiveLocationShare(conversationId: string): UseLiveLocationShareResult {
+export function useLiveLocationShare(
+  conversationId: string,
+  enabled = true,
+): UseLiveLocationShareResult {
   const dispatch = useAppDispatch();
   const myUserId = useAppSelector((s) => s.auth.user?.id ?? '');
   const { on, connected } = useSocket();
@@ -56,10 +59,13 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
     sessionRef.current = session;
   }, [session]);
 
-  const isSharer = !!session && session.sharerId === myUserId;
+  const isSharer = enabled && !!session && session.sharerId === myUserId;
 
-  // Cold-open hydrate
+  // Cold-open hydrate. Group conversations deliberately pass enabled=false so
+  // opening group chat never probes DM-only precise-location session state.
   useEffect(() => {
+    if (!enabled) return;
+
     let cancelled = false;
     void (async () => {
       try {
@@ -76,10 +82,13 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
     return () => {
       cancelled = true;
     };
-  }, [conversationId]);
+  }, [conversationId, enabled]);
 
-  // Socket listeners
+  // Socket listeners are also disabled for group conversations so precise
+  // location events never become part of the group-chat presentation layer.
   useEffect(() => {
+    if (!enabled) return;
+
     const unsubStarted = on('location:share:started', (e) => {
       if (e.session.conversationId !== conversationId) return;
       setSession(e.session);
@@ -106,16 +115,16 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
       unsubUpdate();
       unsubEnded();
     };
-  }, [on, conversationId, dispatch]);
+  }, [dispatch, enabled, on, conversationId]);
 
   const emitUpdate = useCallback(
     async (location: ChatLocation): Promise<void> => {
+      if (!enabled) return;
       const s = sessionRef.current;
       if (!s || s.sharerId !== myUserId || s.status !== 'active') return;
       const now = Date.now();
       if (now - lastEmitRef.current < MIN_EMIT_MS) return;
       lastEmitRef.current = now;
-      // Optimistic local pin before ack
       setSession((prev) =>
         prev && prev.id === s.id
           ? { ...prev, lastLocation: location, lastUpdatedAt: new Date().toISOString() }
@@ -130,13 +139,12 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
         );
       }
     },
-    [myUserId],
+    [enabled, myUserId],
   );
 
-  // The authenticated app owns the only continuous native GPS watcher in
-  // UserLocationProvider. Live sharing consumes that shared stream.
   useEffect(() => {
     if (
+      !enabled ||
       !isSharer ||
       session?.status !== 'active' ||
       !connected ||
@@ -150,6 +158,7 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
     latestCoordsRef.current = location;
     void emitUpdate(location);
   }, [
+    enabled,
     isSharer,
     session?.id,
     session?.status,
@@ -159,10 +168,8 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
     emitUpdate,
   ]);
 
-  // Preserve the existing heartbeat cadence for active live-share sessions even
-  // when the device has not moved enough to produce a new shared GPS fix.
   useEffect(() => {
-    if (!isSharer || session?.status !== 'active' || !connected) return;
+    if (!enabled || !isSharer || session?.status !== 'active' || !connected) return;
 
     const interval = setInterval(() => {
       const location = latestCoordsRef.current;
@@ -170,15 +177,13 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
     }, FALLBACK_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [isSharer, session?.id, session?.status, connected, emitUpdate]);
+  }, [enabled, isSharer, session?.id, session?.status, connected, emitUpdate]);
 
   const start = useCallback(
     async (duration: LocationShareDuration): Promise<void> => {
-      if (starting) return;
+      if (!enabled || starting) return;
       setStarting(true);
       try {
-        // Sharing is a direct user action, so the shared location owner may
-        // present native permission UI and wait for its provider-owned first fix.
         const location = await getCurrentLocation({ requestPermission: true });
         if (!location) {
           appAlert(
@@ -193,20 +198,19 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
           appAlert('Could not share location', 'Check your connection and try again.');
           return;
         }
-        // Server assigns session id — apply as soon as ack arrives (socket may also fan-out).
         setSession(result);
       } finally {
         setStarting(false);
       }
     },
-    [starting, getCurrentLocation, conversationId],
+    [enabled, starting, getCurrentLocation, conversationId],
   );
 
   const stop = useCallback(async (): Promise<void> => {
+    if (!enabled) return;
     const s = sessionRef.current;
     if (!s || s.sharerId !== myUserId || stopping) return;
 
-    // Optimistic: hide banner/session immediately; restore if stop fails.
     const snapshot = s;
     setSession(null);
     setStopping(true);
@@ -222,9 +226,10 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
     } finally {
       setStopping(false);
     }
-  }, [myUserId, stopping]);
+  }, [enabled, myUserId, stopping]);
 
   const openInMaps = useCallback((): void => {
+    if (!enabled) return;
     const loc = session?.lastLocation;
     if (!loc) return;
     const { lat, lng } = loc;
@@ -235,12 +240,12 @@ export function useLiveLocationShare(conversationId: string): UseLiveLocationSha
     void Linking.openURL(url).catch(() => {
       void Linking.openURL(`https://maps.google.com/?q=${lat},${lng}`);
     });
-  }, [session?.lastLocation]);
+  }, [enabled, session?.lastLocation]);
 
   return {
-    session,
-    starting,
-    stopping,
+    session: enabled ? session : null,
+    starting: enabled ? starting : false,
+    stopping: enabled ? stopping : false,
     isSharer,
     start,
     stop,

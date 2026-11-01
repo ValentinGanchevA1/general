@@ -4,6 +4,7 @@ import authReducer from '@/features/auth/authSlice';
 import passwordResetReducer from '@/features/auth/passwordResetSlice';
 import profileReducer from '@/features/profile/profileSlice';
 import chatReducer, { outboxHydrated } from '@/features/chat/chatSlice';
+import { groupChatRouteStore } from '@/features/chat/groupChatRouteStore';
 import pulseReducer from '@/features/pulse/pulseSlice';
 import discoveryReducer from '@/features/discovery/discoverySlice';
 import idVerificationReducer from '@/features/verification/idVerificationSlice';
@@ -44,7 +45,7 @@ export const store = configureStore({
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
 
-// ─── Session-scoped private map state ────────────────────────────────────────
+// ─── Session-scoped private UI state ─────────────────────────────────────────
 
 let previousAuthUserId = store.getState().auth.user?.id ?? null;
 store.subscribe(() => {
@@ -52,6 +53,7 @@ store.subscribe(() => {
   if (shouldResetSavedPlacesMapLayer(previousAuthUserId, nextAuthUserId)) {
     savedPlacesMapLayerStore.reset();
     savedPlaceMapFocusStore.clear();
+    groupChatRouteStore.clear();
   }
   previousAuthUserId = nextAuthUserId;
 });
