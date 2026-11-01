@@ -10,8 +10,6 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
 import {
   ConnectedSocket,
   MessageBody,
@@ -58,6 +56,7 @@ import {
 } from './realtime.dto';
 import { PresenceService } from '../modules/presence/presence.service';
 import { ChatService } from '../modules/chat/chat.service';
+import { ChatRealtimeAccessService } from '../modules/chat/chat-realtime-access.service';
 import { LocationShareService } from '../modules/chat/location-share.service';
 import { NotificationsService } from '../modules/notifications/notifications.service';
 import { ChallengesService } from '../modules/challenges/challenges.service';
@@ -112,13 +111,13 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly presence: PresenceService,
     private readonly discoveryPresence: DiscoveryPresencePublisher,
     private readonly chat: ChatService,
+    private readonly chatRealtimeAccess: ChatRealtimeAccessService,
     private readonly locationShare: LocationShareService,
     private readonly notifications: NotificationsService,
     @Inject(forwardRef(() => ChallengesService))
     private readonly challenges: ChallengesService,
     private readonly friends: FriendsService,
     private readonly jwt: JwtService,
-    @InjectDataSource() private readonly db: DataSource,
   ) {}
 
   async handleConnection(client: G88Socket): Promise<void> {
@@ -218,7 +217,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     @MessageBody() payload: ConversationJoinDto,
   ): Promise<AckResult<{ joined: true }>> {
     try {
-      const ok = (await this.authorizedConversationRecipients(payload.conversationId)).includes(client.data.userId);
+      const ok = (await this.authorizedConversationRecipients(payload.conversationId)).includes(
+        client.data.userId,
+      );
       if (!ok) {
         return { ok: false, code: 'chat.forbidden', message: 'Not a participant' };
       }
@@ -320,7 +321,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         payload.location,
       );
 
-      const recipients = await this.authorizedConversationRecipients(payload.conversationId);
+      const recipients = await this.authorizedConversationRecipients(
+        payload.conversationId,
+        true,
+      );
       for (const userId of recipients) {
         this.server.to(this.userRoom(userId)).emit('location:share:started', { session, message });
         this.server.to(this.userRoom(userId)).emit('chat:message', message);
@@ -329,6 +333,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         payload.conversationId,
         client.data.userId,
         message.body,
+        true,
       );
       return { ok: true, data: session };
     } catch (err) {
@@ -352,7 +357,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         payload.sessionId,
         payload.location,
       );
-      for (const userId of await this.authorizedConversationRecipients(conversationId)) {
+      for (const userId of await this.authorizedConversationRecipients(conversationId, true)) {
         this.server.to(this.userRoom(userId)).emit('location:share:update', {
           sessionId: payload.sessionId,
           conversationId,
@@ -381,12 +386,12 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         client.data.userId,
         payload.sessionId,
       );
-      for (const userId of await this.authorizedConversationRecipients(conversationId)) {
+      for (const userId of await this.authorizedConversationRecipients(conversationId, true)) {
         this.server.to(this.userRoom(userId)).emit('location:share:ended', {
-        sessionId: payload.sessionId,
-        conversationId,
-        reason: 'stopped',
-        endedAt,
+          sessionId: payload.sessionId,
+          conversationId,
+          reason: 'stopped',
+          endedAt,
         });
       }
       return { ok: true, data: { ended: true } };
@@ -459,7 +464,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     reason: 'expired' | 'timeout' | 'blocked' | 'conversation_closed' | 'stopped',
     endedAt: string,
   ): Promise<void> {
-    const recipients = await this.authorizedConversationRecipients(conversationId);
+    const recipients = await this.authorizedConversationRecipients(conversationId, true);
     for (const userId of recipients) {
       this.server.to(this.userRoom(userId)).emit('location:share:ended', {
         sessionId,
@@ -536,22 +541,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   /** Recipient authorization is checked at emission time, not at room join time. */
-  private async authorizedConversationRecipients(conversationId: string): Promise<string[]> {
-    const rows = await this.db.query<Array<{ user_id: string }>>(
-      `SELECT p.user_id
-         FROM conversations c
-         CROSS JOIN LATERAL unnest(c.participant_ids) AS p(user_id)
-        WHERE c.id = $1
-          AND NOT EXISTS (
-            SELECT 1 FROM user_blocks b
-             WHERE b.blocker_id = p.user_id
-               AND b.blocked_id = ANY(c.participant_ids)
-                OR b.blocked_id = p.user_id
-               AND b.blocker_id = ANY(c.participant_ids)
-          )`,
-      [conversationId],
-    );
-    return rows.map((row) => row.user_id);
+  private authorizedConversationRecipients(
+    conversationId: string,
+    dmOnly = false,
+  ): Promise<string[]> {
+    return this.chatRealtimeAccess.getRecipientIds(conversationId, dmOnly);
   }
 
   private async emitChatMessageToParticipants(message: ChatMessageEvent): Promise<void> {
@@ -566,9 +560,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     conversationId: string,
     senderId: string,
     body: string,
+    dmOnly = false,
   ): Promise<void> {
     try {
-      const participantIds = await this.authorizedConversationRecipients(conversationId);
+      const participantIds = await this.authorizedConversationRecipients(conversationId, dmOnly);
       for (const recipientId of participantIds) {
         if (recipientId === senderId) continue;
         const sockets = await this.server.in(this.userRoom(recipientId)).fetchSockets();
