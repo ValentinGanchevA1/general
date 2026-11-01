@@ -136,7 +136,7 @@ export class GroupConversationsService {
               AND blocked_member.left_at IS NULL
               AND blocked_member.user_id <> $1
          )
-       GROUP BY c.id, c.title, c.created_by, c.last_message_at,
+       GROUP BY c.id, c.title, c.created_by, c.last_message_at, viewer.user_id,
                 last_message.body, last_message.sender_id, c.created_at
        ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
        LIMIT 100`,
@@ -244,7 +244,7 @@ export class GroupConversationsService {
          AND c.title IS NOT NULL
          AND viewer.user_id = $2
          AND viewer.left_at IS NULL
-       GROUP BY c.id, c.title, c.created_by, c.last_message_at,
+       GROUP BY c.id, c.title, c.created_by, c.last_message_at, viewer.user_id,
                 last_message.body, last_message.sender_id, c.created_at
        LIMIT 1`,
       [conversationId, viewerId],
