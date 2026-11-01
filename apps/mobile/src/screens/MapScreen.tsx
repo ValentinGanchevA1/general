@@ -107,6 +107,7 @@ const EMPTY_POINTS: DiscoveryPoint[] = [];
 const EMPTY_PLACE_SPATIAL_STATUS: NexaPlaceSpatialStatus = {
 	hasVisiblePoints: false,
 	loading: false,
+	hasError: false,
 };
 
 export function MapScreen(): React.JSX.Element {
@@ -126,6 +127,7 @@ export function MapScreen(): React.JSX.Element {
 	const [placePreviewOpen, setPlacePreviewOpen] = useState(false);
 	const [placeSpatialStatus, setPlaceSpatialStatus] =
 		useState<NexaPlaceSpatialStatus>(EMPTY_PLACE_SPATIAL_STATUS);
+	const [placeRefreshRequestId, setPlaceRefreshRequestId] = useState(0);
 	const [waveToast, setWaveToast] = useState<string | null>(null);
 	const reduceMotion = useNexaReducedMotion();
 	const markMapSurfaceReady = useNexaMapSurfaceReady();
@@ -203,6 +205,10 @@ export function MapScreen(): React.JSX.Element {
 		datingOnly: peopleLayer && datingOnly && !friendsOnly,
 		rankBy,
 	});
+	const refreshSpatialDiscovery = useCallback(() => {
+		refreshDiscovery();
+		setPlaceRefreshRequestId((requestId) => requestId + 1);
+	}, [refreshDiscovery]);
 	const points = data?.points ?? EMPTY_POINTS;
 	const mapFocused = useIsFocused();
 	const seenKeysRef = useRef<Set<string>>(new Set());
@@ -673,6 +679,7 @@ export function MapScreen(): React.JSX.Element {
 		viewportHash: data?.viewportHash ?? null,
 		isCityScale,
 		placeLoading: placeSpatialStatus.loading,
+		placeHasError: placeSpatialStatus.hasError,
 		hasPlacePoints: placeSpatialStatus.hasVisiblePoints,
 	});
 	const isEmpty = spatialState === 'empty';
@@ -832,10 +839,10 @@ export function MapScreen(): React.JSX.Element {
 	useEffect(() => {
 		if (mapFocused || region == null) return;
 		const t = setInterval(() => {
-			refreshDiscovery();
+			refreshSpatialDiscovery();
 		}, 60_000);
 		return () => clearInterval(t);
-	}, [mapFocused, region, refreshDiscovery]);
+	}, [mapFocused, region, refreshSpatialDiscovery]);
 
 	return (
 		<View style={styles.root}>
@@ -844,6 +851,7 @@ export function MapScreen(): React.JSX.Element {
 					ref={mapRef}
 					points={filteredPoints}
 					placeSearchQuery={searchQuery}
+					placeRefreshRequestId={placeRefreshRequestId}
 					selectedEntityKey={selectedMarkerKey}
 					dimUnselected={selected != null}
 					mode={mode}
@@ -914,7 +922,7 @@ export function MapScreen(): React.JSX.Element {
 					(spatialState === 'empty' && (createNudgeVisible || nudge != null))
 				}
 				onEmptyAction={onSpatialEmptyAction}
-				onRetry={refreshDiscovery}
+				onRetry={refreshSpatialDiscovery}
 				onZoomIn={zoomInForDiscovery}
 			/>
 
