@@ -16,7 +16,7 @@ import type { NexaSavedPlaceSummary } from '@g88/shared';
 
 import { EmptyState } from '@/components/EmptyState';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { loadSavedPlaces } from '@/features/places/placeDetailSlice';
+import { loadSavedPlaces, setPlaceSaved } from '@/features/places/placeDetailSlice';
 import { savedPlaceMapFocusStore } from '@/features/places/savedPlaceMapFocus.store';
 import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
@@ -31,6 +31,7 @@ export function SavedPlacesScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const dispatch = useAppDispatch();
   const collection = useAppSelector((state) => state.places.saved);
+  const entries = useAppSelector((state) => state.places.entries);
   const loading = collection.loadId != null;
   const initialLoading = loading && collection.items.length === 0;
 
@@ -68,50 +69,100 @@ export function SavedPlacesScreen(): React.JSX.Element {
     navigation.navigate('Main', { screen: 'Map' });
   }, [navigation]);
 
-  const renderItem = useCallback(({ item }: { item: NexaSavedPlaceSummary }) => (
-    <View style={styles.row}>
-      <Pressable
-        style={({ pressed }) => [styles.rowMain, pressed ? styles.rowMainPressed : null]}
-        onPress={() => openPlace(item.id)}
-        accessibilityRole="button"
-        accessibilityLabel={`${item.canonicalLabel}. ${item.trending ? 'Getting active nearby.' : 'Saved place.'} Open details.`}
-      >
-        <View style={styles.iconWrap}>
-          <Icon name="map-marker-radius-outline" size={22} color={colors.discovery} />
-        </View>
-        <View style={styles.rowBody}>
-          <Text style={styles.rowTitle} numberOfLines={1}>{item.canonicalLabel}</Text>
-          <View style={styles.metaRow}>
-            {item.trending ? <>
-              <View style={styles.activeDot} />
-              <Text style={styles.activeText}>Getting active nearby</Text>
-            </> : <>
-              <Icon name="shield-map-outline" size={14} color={colors.textTertiary} />
-              <Text style={styles.metaText}>Saved place · approximate area</Text>
-            </>}
+  const removeSavedPlace = useCallback(async (placeId: string): Promise<void> => {
+    const result = await dispatch(setPlaceSaved({ placeId, saved: false }));
+    if (!setPlaceSaved.fulfilled.match(result)) return;
+
+    const focusRequest = savedPlaceMapFocusStore.getSnapshot();
+    if (focusRequest?.point.id === result.payload.placeId) {
+      savedPlaceMapFocusStore.clear();
+    }
+  }, [dispatch]);
+
+  const renderItem = useCallback(({ item }: { item: NexaSavedPlaceSummary }) => {
+    const placeEntry = entries[item.id];
+    const removing = placeEntry?.saveId != null;
+    const removeError = placeEntry?.saveError ?? null;
+
+    return (
+      <View style={styles.itemBlock}>
+        <View style={styles.row}>
+          <Pressable
+            style={({ pressed }) => [styles.rowMain, pressed ? styles.rowMainPressed : null]}
+            onPress={() => openPlace(item.id)}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.canonicalLabel}. ${item.trending ? 'Getting active nearby.' : 'Saved place.'} Open details.`}
+          >
+            <View style={styles.iconWrap}>
+              <Icon name="map-marker-radius-outline" size={22} color={colors.discovery} />
+            </View>
+            <View style={styles.rowBody}>
+              <Text style={styles.rowTitle} numberOfLines={1}>{item.canonicalLabel}</Text>
+              <View style={styles.metaRow}>
+                {item.trending ? <>
+                  <View style={styles.activeDot} />
+                  <Text style={styles.activeText}>Getting active nearby</Text>
+                </> : <>
+                  <Icon name="shield-map-outline" size={14} color={colors.textTertiary} />
+                  <Text style={styles.metaText}>Saved place · approximate area</Text>
+                </>}
+              </View>
+            </View>
+            <Icon name="chevron-right" size={22} color={colors.textMuted} />
+          </Pressable>
+
+          <View style={styles.rowActions}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.rowActionButton,
+                pressed ? styles.mapActionPressed : null,
+              ]}
+              onPress={() => showPlaceOnMap(item)}
+              accessibilityRole="button"
+              accessibilityLabel={`Show ${item.canonicalLabel} on map`}
+              hitSlop={2}
+            >
+              <Icon name="map-marker-outline" size={21} color={colors.discovery} />
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.rowActionButton,
+                styles.removeButton,
+                pressed && !removing ? styles.mapActionPressed : null,
+              ]}
+              onPress={() => { void removeSavedPlace(item.id); }}
+              disabled={removing}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove ${item.canonicalLabel} from saved places`}
+              accessibilityState={{ busy: removing, disabled: removing }}
+              hitSlop={2}
+            >
+              {removing ? (
+                <ActivityIndicator size="small" color={colors.danger} />
+              ) : (
+                <Icon name="bookmark-remove-outline" size={21} color={colors.danger} />
+              )}
+            </Pressable>
           </View>
         </View>
-        <Icon name="chevron-right" size={22} color={colors.textMuted} />
-      </Pressable>
 
-      <Pressable
-        style={({ pressed }) => [
-          styles.rowMapButton,
-          pressed ? styles.mapActionPressed : null,
-        ]}
-        onPress={() => showPlaceOnMap(item)}
-        accessibilityRole="button"
-        accessibilityLabel={`Show ${item.canonicalLabel} on map`}
-        hitSlop={4}
-      >
-        <Icon name="map-marker-outline" size={22} color={colors.discovery} />
-      </Pressable>
-    </View>
-  ), [
+        {removeError ? (
+          <View style={styles.rowError} accessibilityRole="alert">
+            <Icon name="alert-circle-outline" size={16} color={colors.danger} />
+            <Text style={styles.rowErrorText} numberOfLines={2}>{removeError}</Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  }, [
+    colors.danger,
     colors.discovery,
     colors.textMuted,
     colors.textTertiary,
+    entries,
     openPlace,
+    removeSavedPlace,
     showPlaceOnMap,
     styles,
   ]);
@@ -196,6 +247,7 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.discoveryBorderSoft,
     },
     mapActionPressed: { opacity: 0.72 },
+    itemBlock: { gap: 7 },
     row: {
       minHeight: 76,
       flexDirection: 'row',
@@ -215,19 +267,28 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       gap: 12,
       paddingLeft: 14,
-      paddingRight: 8,
+      paddingRight: 6,
       paddingVertical: 12,
     },
     rowMainPressed: { opacity: 0.74 },
-    rowMapButton: {
-      width: 42,
-      height: 42,
+    rowActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    rowActionButton: {
+      width: 44,
+      height: 44,
       borderRadius: 13,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.discoveryMutedBg,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.discoveryBorderSoft,
+    },
+    removeButton: {
+      backgroundColor: colors.dangerSurface,
+      borderColor: colors.dangerBorder,
     },
     iconWrap: {
       width: 42,
@@ -245,6 +306,19 @@ function createStyles(colors: ThemeColors) {
     activeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.discovery },
     activeText: { color: colors.discovery, fontSize: 12, fontWeight: '700' },
     metaText: { color: colors.textTertiary, fontSize: 12, fontWeight: '600' },
+    rowError: {
+      minHeight: 38,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      backgroundColor: colors.dangerSurface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.dangerBorder,
+    },
+    rowErrorText: { flex: 1, color: colors.danger, fontSize: 12, lineHeight: 16 },
     separator: { height: 10 },
     errorBanner: {
       minHeight: 48,
