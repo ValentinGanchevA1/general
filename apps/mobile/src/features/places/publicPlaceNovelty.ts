@@ -10,8 +10,7 @@ export function publicPlaceNoveltyPoints(
   return source.filter((point): point is PlaceMapEntityPoint => (
     point.kind === 'place' &&
     point.meta.trending === true &&
-    point.meta.locationPrecision === 'coarse' &&
-    point.meta.saved !== true
+    point.meta.locationPrecision === 'coarse'
   ));
 }
 
