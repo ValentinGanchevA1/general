@@ -57,6 +57,7 @@ import {
 export interface NexaPlaceSpatialStatus {
   hasVisiblePoints: boolean;
   loading: boolean;
+  hasError: boolean;
 }
 
 export type NexaMapScreenSurfaceProps = Omit<
@@ -76,6 +77,7 @@ export type NexaMapScreenSurfaceProps = Omit<
   onPlacePreviewVisibilityChange?: (visible: boolean) => void;
   onPlaceSpatialStatusChange?: (status: NexaPlaceSpatialStatus) => void;
   placeSearchQuery?: string;
+  placeRefreshRequestId?: number;
 };
 
 const MAPLIBRE_STYLE_RUNTIME = resolveMapLibreStyleRuntime({
@@ -90,6 +92,7 @@ const SAVED_PLACE_FOCUS_DURATION_MS = 360;
 const EMPTY_PLACE_SPATIAL_STATUS: NexaPlaceSpatialStatus = {
   hasVisiblePoints: false,
   loading: false,
+  hasError: false,
 };
 
 function regionToViewport(region: Region | null): Viewport | null {
@@ -121,6 +124,7 @@ export const NexaMapScreenSurface = React.forwardRef<
     onPlacePreviewVisibilityChange,
     onPlaceSpatialStatusChange,
     placeSearchQuery = '',
+    placeRefreshRequestId = 0,
     selectedEntityKey,
     dimUnselected,
     ...props
@@ -136,6 +140,7 @@ export const NexaMapScreenSurface = React.forwardRef<
   const runtimeMapRef = useRef<NexaMapController | null>(null);
   const placeSheetRef = useRef<BottomSheetModal>(null);
   const handledFocusRequestIdRef = useRef<number | null>(null);
+  const handledPlaceRefreshRequestIdRef = useRef(placeRefreshRequestId);
   const privateSelectedPlaceIdRef = useRef<string | null>(null);
   const selectedPlaceIdRef = useRef<string | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<PlaceMapEntityPoint | null>(null);
@@ -191,6 +196,13 @@ export const NexaMapScreenSurface = React.forwardRef<
     enabled: publicPlacesEnabled && viewport != null,
     query: placeSearchQuery,
   });
+
+  React.useEffect(() => {
+    if (handledPlaceRefreshRequestIdRef.current === placeRefreshRequestId) return;
+    handledPlaceRefreshRequestIdRef.current = placeRefreshRequestId;
+    placeDiscovery.refresh();
+  }, [placeDiscovery.refresh, placeRefreshRequestId]);
+
   const savedPlacePoints = useSavedPlacesMapOverlay({
     enabled: savedPlacesEnabled,
     viewport,
@@ -221,7 +233,14 @@ export const NexaMapScreenSurface = React.forwardRef<
   const placeSpatialStatus = useMemo<NexaPlaceSpatialStatus>(() => ({
     hasVisiblePoints: publicPlacePoints.length > 0 || privateSavedPlacePoints.length > 0,
     loading: publicPlacesEnabled && placeDiscovery.loading,
-  }), [placeDiscovery.loading, privateSavedPlacePoints.length, publicPlacePoints.length, publicPlacesEnabled]);
+    hasError: publicPlacesEnabled && placeDiscovery.error != null,
+  }), [
+    placeDiscovery.error,
+    placeDiscovery.loading,
+    privateSavedPlacePoints.length,
+    publicPlacePoints.length,
+    publicPlacesEnabled,
+  ]);
 
   React.useEffect(() => {
     onPlaceSpatialStatusChange?.(placeSpatialStatus);
