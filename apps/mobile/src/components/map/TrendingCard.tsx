@@ -1,10 +1,12 @@
 // Compact "Trending nearby" card from viewport points (client-only).
 // Collapsed: title + activity counters. Expanded: ranked entity rows.
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useSyncExternalStore } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import { publicPlaceTrendingStore } from '@/features/places/publicPlaceTrending.store';
+import { savedPlaceMapFocusStore } from '@/features/places/savedPlaceMapFocus.store';
 import { fontSize, useAppTheme, type ThemeColors } from '@/theme';
 
 import {
@@ -14,6 +16,10 @@ import {
 	WEATHER_WIDGET_WIDTH,
 } from './mapChromeLayout';
 import { type TrendingItem, formatDistanceM } from './buildTrending';
+import {
+	mergeTrendingWithPublicPlace,
+	type TrendingCardRow,
+} from './placeTrendingRows';
 
 export interface TrendingSummary {
 	people: number;
@@ -47,14 +53,32 @@ export function TrendingCard({ items, onPressItem, top, visible, collapsed = tru
 	const { colors, shadow } = useAppTheme();
 	const styles = useMemo(() => createStyles(colors), [colors]);
 	const summaryLine = useMemo(() => formatSummary(summary), [summary]);
-	const hasBody = items.length > 0;
+	const publicPlaces = useSyncExternalStore(
+		publicPlaceTrendingStore.subscribe,
+		publicPlaceTrendingStore.getSnapshot,
+		publicPlaceTrendingStore.getSnapshot,
+	);
+	const rows = useMemo(
+		() => mergeTrendingWithPublicPlace(items, publicPlaces, 3),
+		[items, publicPlaces],
+	);
+	const hasBody = rows.length > 0;
 	if (!visible || (!hasBody && summaryLine == null)) return null;
 
 	const canToggle = typeof onToggleCollapse === 'function' && hasBody;
-	const kindDot = (kind: TrendingItem['kind']): string => {
+	const kindDot = (kind: TrendingCardRow['kind']): string => {
 		if (kind === 'event') return colors.entityEvent;
 		if (kind === 'listing') return colors.entityListing;
+		if (kind === 'place') return colors.discovery;
 		return colors.entityUser;
+	};
+
+	const pressRow = (row: TrendingCardRow): void => {
+		if (row.kind === 'place') {
+			savedPlaceMapFocusStore.requestPoint(row.point);
+			return;
+		}
+		onPressItem(row);
 	};
 
 	return (
@@ -78,19 +102,38 @@ export function TrendingCard({ items, onPressItem, top, visible, collapsed = tru
 					{canToggle ? <Icon name={collapsed ? 'chevron-down' : 'chevron-up'} size={18} color={colors.textMuted} /> : null}
 				</Pressable>
 
-				{!collapsed && hasBody ? items.map((item, index) => (
-					<Pressable
-						key={`${item.kind}:${item.id}`}
-						onPress={() => onPressItem(item)}
-						style={({ pressed }) => [styles.row, index > 0 && styles.rowBorder, pressed && styles.pressed]}
-						accessibilityRole="button"
-						accessibilityLabel={`${item.title}, ${formatDistanceM(item.distanceM) || 'nearby'}`}
-					>
-						<View style={[styles.dot, { backgroundColor: kindDot(item.kind) }]} />
-						<Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-						{item.distanceM != null ? <Text style={styles.distance}>{formatDistanceM(item.distanceM)}</Text> : null}
-					</Pressable>
-				)) : null}
+				{!collapsed && hasBody ? rows.map((row, index) => {
+					const trailing = row.kind === 'place'
+						? row.activityLabel
+						: formatDistanceM(row.distanceM);
+					const accessibilityMeta = row.kind === 'place'
+						? row.activityLabel
+						: trailing || 'nearby';
+					return (
+						<Pressable
+							key={`${row.kind}:${row.id}`}
+							onPress={() => pressRow(row)}
+							style={({ pressed }) => [styles.row, index > 0 && styles.rowBorder, pressed && styles.pressed]}
+							accessibilityRole="button"
+							accessibilityLabel={`${row.title}, ${accessibilityMeta}`}
+						>
+							{row.kind === 'place' ? (
+								<Icon name="map-marker-radius" size={14} color={kindDot(row.kind)} />
+							) : (
+								<View style={[styles.dot, { backgroundColor: kindDot(row.kind) }]} />
+							)}
+							<Text style={styles.title} numberOfLines={1}>{row.title}</Text>
+							{trailing ? (
+								<Text
+									style={row.kind === 'place' ? styles.activity : styles.distance}
+									numberOfLines={1}
+								>
+									{trailing}
+								</Text>
+							) : null}
+						</Pressable>
+					);
+				}) : null}
 			</View>
 		</View>
 	);
@@ -110,6 +153,7 @@ function createStyles(colors: ThemeColors) {
 		dot: { width: 8, height: 8, borderRadius: 4 },
 		title: { flex: 1, color: colors.textPrimary, fontSize: fontSize.sm, fontWeight: '600' },
 		distance: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: '600' },
+		activity: { maxWidth: 116, color: colors.textMuted, fontSize: fontSize.xs, fontWeight: '600' },
 		pressed: { opacity: 0.72 },
 	});
 }
