@@ -138,8 +138,8 @@ const slice = createSlice({
     activityRemoved: (s, a: PayloadAction<string>) => {
       s.items = s.items.filter((item) => item.id !== a.payload);
       s.realtimeIdsDuringFetch = s.realtimeIdsDuringFetch.filter((id) => id !== a.payload);
-      if (s.loading && !s.realtimeRemovedIdsDuringFetch.includes(a.payload.id)) {
-        s.realtimeRemovedIdsDuringFetch.push(a.payload.id);
+      if (s.loading && !s.realtimeRemovedIdsDuringFetch.includes(a.payload)) {
+        s.realtimeRemovedIdsDuringFetch.push(a.payload);
       }
     },
   },
