@@ -59,8 +59,11 @@ export function GroupManagementPanel({ active }: GroupManagementPanelProps): Rea
   }, []);
 
   useEffect(() => {
-    if (!active) return;
-    void loadGroups();
+    if (!active) return undefined;
+    const frame = requestAnimationFrame(() => {
+      void loadGroups();
+    });
+    return () => cancelAnimationFrame(frame);
   }, [active, loadGroups]);
 
   const removeMember = useCallback(async (
