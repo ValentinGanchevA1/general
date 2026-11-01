@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { RuntimeHttpDiagnosticsService } from './runtime-http-diagnostics.service';
 
 export interface RuntimeResourceSnapshot {
   rssMiB: number;
@@ -15,6 +16,14 @@ export interface RuntimeResourceSnapshot {
   arrayBuffersMiB: number;
   maxRssMiB: number;
   sockets: number;
+  httpCompleted: number;
+  http2xx: number;
+  http3xx: number;
+  http4xx: number;
+  http5xx: number;
+  httpOther: number;
+  httpAborted: number;
+  httpInflight: number;
   uptimeSec: number;
 }
 
@@ -54,6 +63,14 @@ export function formatRuntimeResourceSnapshot(snapshot: RuntimeResourceSnapshot)
     `array_buffers_mib=${snapshot.arrayBuffersMiB}`,
     `max_rss_mib=${snapshot.maxRssMiB}`,
     `sockets=${snapshot.sockets}`,
+    `http_completed=${snapshot.httpCompleted}`,
+    `http_2xx=${snapshot.http2xx}`,
+    `http_3xx=${snapshot.http3xx}`,
+    `http_4xx=${snapshot.http4xx}`,
+    `http_5xx=${snapshot.http5xx}`,
+    `http_other=${snapshot.httpOther}`,
+    `http_aborted=${snapshot.httpAborted}`,
+    `http_inflight=${snapshot.httpInflight}`,
     `uptime_sec=${snapshot.uptimeSec}`,
   ].join(' ');
 }
@@ -65,7 +82,10 @@ export class RuntimeDiagnosticsService implements OnApplicationBootstrap, OnAppl
   private readonly logger = new Logger(RuntimeDiagnosticsService.name);
   private timer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private readonly realtime: RealtimeGateway) {}
+  constructor(
+    private readonly realtime: RealtimeGateway,
+    private readonly http: RuntimeHttpDiagnosticsService,
+  ) {}
 
   onApplicationBootstrap(): void {
     if (!this.isEnabled()) return;
@@ -93,6 +113,7 @@ export class RuntimeDiagnosticsService implements OnApplicationBootstrap, OnAppl
     const memory = process.memoryUsage();
     const usage = process.resourceUsage();
     const sockets = readConnectedSocketCount(this.realtime);
+    const http = this.http.snapshotAndReset();
 
     const snapshot: RuntimeResourceSnapshot = {
       rssMiB: bytesToMiB(memory.rss),
@@ -102,6 +123,14 @@ export class RuntimeDiagnosticsService implements OnApplicationBootstrap, OnAppl
       arrayBuffersMiB: bytesToMiB(memory.arrayBuffers),
       maxRssMiB: round(usage.maxRSS / KIB_PER_MIB),
       sockets,
+      httpCompleted: http.completed,
+      http2xx: http.status2xx,
+      http3xx: http.status3xx,
+      http4xx: http.status4xx,
+      http5xx: http.status5xx,
+      httpOther: http.statusOther,
+      httpAborted: http.aborted,
+      httpInflight: http.inflight,
       uptimeSec: Math.round(process.uptime()),
     };
 

@@ -14,12 +14,22 @@ describe('runtime diagnostics', () => {
       arrayBuffersMiB: 3.1,
       maxRssMiB: 131.2,
       sockets: 4,
+      httpCompleted: 12,
+      http2xx: 8,
+      http3xx: 1,
+      http4xx: 2,
+      http5xx: 1,
+      httpOther: 0,
+      httpAborted: 1,
+      httpInflight: 3,
       uptimeSec: 123,
     };
 
     expect(formatRuntimeResourceSnapshot(snapshot)).toBe(
       'runtime_resources rss_mib=126.7 heap_used_mib=48.2 heap_total_mib=67.5 ' +
-        'external_mib=8.4 array_buffers_mib=3.1 max_rss_mib=131.2 sockets=4 uptime_sec=123',
+        'external_mib=8.4 array_buffers_mib=3.1 max_rss_mib=131.2 sockets=4 ' +
+        'http_completed=12 http_2xx=8 http_3xx=1 http_4xx=2 http_5xx=1 ' +
+        'http_other=0 http_aborted=1 http_inflight=3 uptime_sec=123',
     );
   });
 
