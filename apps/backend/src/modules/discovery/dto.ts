@@ -103,4 +103,10 @@ export class PlaceDiscoveryQueryDto {
   @Min(0)
   @Max(22)
   zoom!: number;
+
+  /** Canonical-label substring search applied before public place clustering. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  query?: string;
 }
