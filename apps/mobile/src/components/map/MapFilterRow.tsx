@@ -1,4 +1,4 @@
-// NEXA primary map chrome: search + locate, semantic layers + private saved overlay.
+// NEXA primary map chrome: search + locate, semantic public layers + private overlays.
 // Keep high-frequency controls visible without horizontal scrolling or duplicate floating actions.
 
 import React, { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
@@ -21,6 +21,7 @@ import {
 	marketplaceKindMapFilterStore,
 	type MarketplaceKindMapFilterValue,
 } from '@/features/map/marketplaceKindMapFilter.store';
+import { publicPlacesMapLayerStore } from '@/features/places/publicPlacesMapLayer.store';
 import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
@@ -100,6 +101,11 @@ export function MapFilterRow({
 	const styles = useMemo(() => createStyles(colors), [colors]);
 	const [moreOpen, setMoreOpen] = useState(false);
 	const [searchFocused, setSearchFocused] = useState(false);
+	const publicPlacesEnabled = useSyncExternalStore(
+		publicPlacesMapLayerStore.subscribe,
+		publicPlacesMapLayerStore.getSnapshot,
+		publicPlacesMapLayerStore.getSnapshot,
+	);
 	const savedPlacesEnabled = useSyncExternalStore(
 		savedPlacesMapLayerStore.subscribe,
 		savedPlacesMapLayerStore.getSnapshot,
@@ -118,10 +124,11 @@ export function MapFilterRow({
 		if (friendsOnly) count += 1;
 		if (datingOnly) count += 1;
 		if (rankBy !== 'relevance') count += 1;
+		if (savedPlacesEnabled) count += 1;
 		if (showListings && marketplaceKind !== 'all') count += 1;
 		else if (showListings && listingMode !== 'all') count += 1;
 		return count;
-	}, [datingOnly, friendsOnly, listingMode, marketplaceKind, rankBy, showListings]);
+	}, [datingOnly, friendsOnly, listingMode, marketplaceKind, rankBy, savedPlacesEnabled, showListings]);
 
 	const changeListingMode = useCallback((next: ListingModeFilterValue): void => {
 		onListingModeChange(next);
@@ -244,21 +251,21 @@ export function MapFilterRow({
 					})}
 
 					<Pressable
-						onPress={() => savedPlacesMapLayerStore.setEnabled(!savedPlacesEnabled)}
+						onPress={() => publicPlacesMapLayerStore.setEnabled(!publicPlacesEnabled)}
 						style={({ pressed }) => [
 							styles.layerChip,
 							{
-								backgroundColor: savedPlacesEnabled ? colors.actionSoft : colors.surfacePrimary,
-								borderColor: savedPlacesEnabled ? colors.actionPrimary : colors.borderDefault,
+								backgroundColor: publicPlacesEnabled ? colors.discoverySoft : colors.surfacePrimary,
+								borderColor: publicPlacesEnabled ? colors.discovery : colors.borderDefault,
 							},
 							pressed && styles.pressed,
 						]}
 						accessibilityRole="button"
-						accessibilityState={{ selected: savedPlacesEnabled }}
-						accessibilityLabel="Saved places layer"
+						accessibilityState={{ selected: publicPlacesEnabled }}
+						accessibilityLabel="Places layer"
 					>
-						<Icon name={savedPlacesEnabled ? 'bookmark' : 'bookmark-outline'} size={15} color={savedPlacesEnabled ? colors.actionPrimary : colors.textSecondary} />
-						<Text numberOfLines={1} style={[styles.layerText, { color: savedPlacesEnabled ? colors.actionPrimary : colors.textSecondary }]}>Saved</Text>
+						<Icon name="map-marker-radius" size={15} color={publicPlacesEnabled ? colors.discovery : colors.textSecondary} />
+						<Text numberOfLines={1} style={[styles.layerText, { color: publicPlacesEnabled ? colors.discovery : colors.textSecondary }]}>Places</Text>
 					</Pressable>
 				</View>
 
@@ -296,6 +303,8 @@ export function MapFilterRow({
 				onListingModeChange={changeListingMode}
 				marketplaceKind={marketplaceKind}
 				onMarketplaceKindChange={changeMarketplaceKind}
+				savedPlacesEnabled={savedPlacesEnabled}
+				onSavedPlacesEnabledChange={savedPlacesMapLayerStore.setEnabled}
 				onOpenAlerts={openAlerts}
 			/>
 		</View>
@@ -319,6 +328,8 @@ interface FilterModalProps {
 	onListingModeChange: (next: ListingModeFilterValue) => void;
 	marketplaceKind: MarketplaceKindMapFilterValue;
 	onMarketplaceKindChange: (next: MarketplaceKindMapFilterValue) => void;
+	savedPlacesEnabled: boolean;
+	onSavedPlacesEnabledChange: (next: boolean) => void;
 	onOpenAlerts: () => void;
 }
 
@@ -352,6 +363,15 @@ function FilterModal(props: FilterModalProps): React.JSX.Element {
 								<ChoiceRow key={option.id} styles={styles} colors={colors} label={option.label} active={props.marketplaceKind === option.id} onPress={() => props.onMarketplaceKindChange(option.id)} />
 							))}
 						</> : null}
+
+						<SectionLabel styles={styles}>Private map</SectionLabel>
+						<ChoiceRow
+							styles={styles}
+							colors={colors}
+							label="Saved places"
+							active={props.savedPlacesEnabled}
+							onPress={() => props.onSavedPlacesEnabledChange(!props.savedPlacesEnabled)}
+						/>
 
 						<SectionLabel styles={styles}>Local</SectionLabel>
 						<Pressable onPress={props.onOpenAlerts} style={({ pressed }) => [styles.modalRow, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Create a local alert">
