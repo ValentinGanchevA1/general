@@ -10,6 +10,7 @@ interface Args {
   viewport: Viewport | null;
   zoom: number;
   enabled: boolean;
+  query?: string;
   debounceMs?: number;
 }
 
@@ -23,12 +24,14 @@ interface Result {
 interface PlaceDiscoveryRequest {
   viewport: Viewport;
   zoom: number;
+  query?: string;
 }
 
 export function usePlaceMapDiscovery({
   viewport,
   zoom,
   enabled,
+  query = '',
   debounceMs = 250,
 }: Args): Result {
   const [data, setData] = useState<MapDiscoveryResponse | null>(null);
@@ -37,9 +40,14 @@ export function usePlaceMapDiscovery({
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastKeyRef = useRef('');
+  const normalizedQuery = query.trim();
 
-  const fetchNow = useCallback(async (nextViewport: Viewport, nextZoom: number) => {
-    const key = JSON.stringify({ viewport: nextViewport, zoom: nextZoom });
+  const fetchNow = useCallback(async (
+    nextViewport: Viewport,
+    nextZoom: number,
+    nextQuery: string,
+  ) => {
+    const key = JSON.stringify({ viewport: nextViewport, zoom: nextZoom, query: nextQuery.toLocaleLowerCase() });
     if (key === lastKeyRef.current) return;
     lastKeyRef.current = key;
 
@@ -52,7 +60,11 @@ export function usePlaceMapDiscovery({
     try {
       const response = await postJson<PlaceDiscoveryRequest, MapDiscoveryResponse>(
         '/discovery/places',
-        { viewport: nextViewport, zoom: nextZoom },
+        {
+          viewport: nextViewport,
+          zoom: nextZoom,
+          ...(nextQuery !== '' ? { query: nextQuery } : {}),
+        },
         { signal: controller.signal },
       );
       if (!controller.signal.aborted) setData(response);
@@ -78,21 +90,21 @@ export function usePlaceMapDiscovery({
     abortRef.current = null;
     lastKeyRef.current = '';
     timerRef.current = setTimeout(() => {
-      void fetchNow(viewport, zoom);
+      void fetchNow(viewport, zoom, normalizedQuery);
     }, debounceMs);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [debounceMs, enabled, fetchNow, viewport, zoom]);
+  }, [debounceMs, enabled, fetchNow, normalizedQuery, viewport, zoom]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const refresh = useCallback(() => {
     if (!enabled || viewport == null) return;
     lastKeyRef.current = '';
-    void fetchNow(viewport, zoom);
-  }, [enabled, fetchNow, viewport, zoom]);
+    void fetchNow(viewport, zoom, normalizedQuery);
+  }, [enabled, fetchNow, normalizedQuery, viewport, zoom]);
 
   return {
     data: enabled ? data : null,
