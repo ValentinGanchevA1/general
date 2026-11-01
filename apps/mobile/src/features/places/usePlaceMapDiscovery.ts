@@ -5,6 +5,7 @@ import type { MapDiscoveryResponse, Viewport } from '@g88/shared';
 
 import { postJson } from '@/api/client';
 import { extractMessage } from '@/utils/extractMessage';
+import { normalizePlaceMapSearch } from './placeMapSearch';
 
 interface Args {
   viewport: Viewport | null;
@@ -40,14 +41,14 @@ export function usePlaceMapDiscovery({
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastKeyRef = useRef('');
-  const normalizedQuery = query.trim();
+  const normalizedQuery = normalizePlaceMapSearch(query);
 
   const fetchNow = useCallback(async (
     nextViewport: Viewport,
     nextZoom: number,
     nextQuery: string,
   ) => {
-    const key = JSON.stringify({ viewport: nextViewport, zoom: nextZoom, query: nextQuery.toLocaleLowerCase() });
+    const key = JSON.stringify({ viewport: nextViewport, zoom: nextZoom, query: nextQuery });
     if (key === lastKeyRef.current) return;
     lastKeyRef.current = key;
 
