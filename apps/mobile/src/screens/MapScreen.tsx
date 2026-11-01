@@ -260,6 +260,15 @@ export function MapScreen(): React.JSX.Element {
 		},
 	});
 
+	const prepareForPlacePreview = useCallback(() => {
+		preSheetRegionRef.current = null;
+		presentedIdRef.current = null;
+		selectedPointRef.current = null;
+		setSelected(null);
+		entitySheetRef.current?.dismiss();
+		dismissPinPreview();
+	}, [dismissPinPreview]);
+
 	const onSheetDismiss = useCallback(() => {
 		const restoreRegion = preSheetRegionRef.current;
 		presentedIdRef.current = null;
@@ -858,6 +867,7 @@ export function MapScreen(): React.JSX.Element {
 					scheme={scheme}
 					onReady={markMapSurfaceReady}
 					onRegionChangeComplete={onRegionChangeComplete}
+					onPlacePreviewWillOpen={prepareForPlacePreview}
 					onPlacePreviewVisibilityChange={setPlacePreviewOpen}
 					onPlaceSpatialStatusChange={setPlaceSpatialStatus}
 					onLongPress={onMapLongPress}
