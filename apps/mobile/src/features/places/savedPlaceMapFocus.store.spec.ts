@@ -1,4 +1,8 @@
-import type { NexaPlaceDetail, NexaSavedPlaceSummary } from '@g88/shared';
+import type {
+  NexaPlaceDetail,
+  NexaSavedPlaceSummary,
+  PlaceMapEntityPoint,
+} from '@g88/shared';
 
 import { savedPlaceMapFocusStore } from './savedPlaceMapFocus.store';
 
@@ -20,6 +24,19 @@ const DETAIL: NexaPlaceDetail = {
   trending: true,
   recentActivityAt: '2026-10-28T09:00:00.000Z',
   saved: false,
+};
+
+const PUBLIC_POINT: PlaceMapEntityPoint = {
+  kind: 'place',
+  id: 'place-3',
+  lat: 43.205,
+  lng: 27.925,
+  meta: {
+    canonicalLabel: 'Active Place',
+    trending: true,
+    recentActivityAt: '2026-11-01T17:00:00.000Z',
+    locationPrecision: 'coarse',
+  },
 };
 
 describe('savedPlaceMapFocusStore', () => {
@@ -67,6 +84,16 @@ describe('savedPlaceMapFocusStore', () => {
         },
       },
     });
+  });
+
+  it('preserves a public Place point without fabricating private saved state', () => {
+    savedPlaceMapFocusStore.requestPoint(PUBLIC_POINT);
+
+    expect(savedPlaceMapFocusStore.getSnapshot()).toEqual({
+      requestId: expect.any(Number),
+      point: PUBLIC_POINT,
+    });
+    expect(savedPlaceMapFocusStore.getSnapshot()?.point.meta.saved).toBeUndefined();
   });
 
   it('assigns a fresh request id even when focusing the same place twice', () => {

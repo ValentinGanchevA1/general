@@ -6,6 +6,7 @@ import type { MapDiscoveryResponse, Viewport } from '@g88/shared';
 import { postJson } from '@/api/client';
 import { extractMessage } from '@/utils/extractMessage';
 import { normalizePlaceMapSearch } from './placeMapSearch';
+import { publicPlaceTrendingStore } from './publicPlaceTrending.store';
 
 interface Args {
   viewport: Viewport | null;
@@ -84,6 +85,7 @@ export function usePlaceMapDiscovery({
       abortRef.current?.abort();
       abortRef.current = null;
       lastKeyRef.current = '';
+      publicPlaceTrendingStore.clear();
       return undefined;
     }
 
@@ -99,7 +101,18 @@ export function usePlaceMapDiscovery({
     };
   }, [debounceMs, enabled, fetchNow, normalizedQuery, viewport, zoom]);
 
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => {
+    if (!enabled || data == null) {
+      if (!enabled) publicPlaceTrendingStore.clear();
+      return;
+    }
+    publicPlaceTrendingStore.setFromDiscovery(data.points);
+  }, [data, enabled]);
+
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    publicPlaceTrendingStore.clear();
+  }, []);
 
   const refresh = useCallback(() => {
     if (!enabled || viewport == null) return;
