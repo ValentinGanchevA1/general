@@ -29,14 +29,8 @@ const CLUSTER: MapDiscoveryPoint = {
 };
 
 describe('publicPlaceNovelty', () => {
-  it('keeps only public coarse Place entity pins', () => {
-    const privateSaved: MapDiscoveryPoint = {
-      ...PUBLIC_PLACE,
-      id: 'place-private',
-      meta: { ...PUBLIC_PLACE.meta, saved: true },
-    };
-
-    expect(publicPlaceNoveltyPoints([CLUSTER, privateSaved, PUBLIC_PLACE])).toEqual([PUBLIC_PLACE]);
+  it('keeps only public coarse Place entity pins from the public discovery lane', () => {
+    expect(publicPlaceNoveltyPoints([CLUSTER, PUBLIC_PLACE])).toEqual([PUBLIC_PLACE]);
   });
 
   it('never turns cluster totals into novelty counts', () => {
