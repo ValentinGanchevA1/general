@@ -40,7 +40,7 @@ jest.mock('@/motion/useNexaReducedMotion', () => ({
 jest.mock('react-native-vector-icons/MaterialCommunityIcons', () => 'Icon');
 
 jest.mock('@/theme', () => {
-  const actual = jest.requireActual('@/theme');
+  const actual = jest.requireActual<typeof import('@/theme')>('@/theme');
   return {
     ...actual,
     useAppTheme: () => ({
