@@ -6,12 +6,25 @@ const mockDispatch = jest.fn();
 const mockGetCurrentLocation = jest.fn();
 let mockCheckInSubmitting = false;
 let mockCheckInError: string | null = null;
+let mockCheckInCooldownUntilMs: number | null = null;
+let mockLastCheckInPlaceId: string | null = null;
 
 jest.mock('@/hooks/redux', () => ({
   useAppDispatch: () => mockDispatch,
-  useAppSelector: () => ({
-    checkInSubmitting: mockCheckInSubmitting,
-    checkInError: mockCheckInError,
+  useAppSelector: (selector: (state: {
+    pulse: {
+      checkInSubmitting: boolean;
+      checkInError: string | null;
+      checkInCooldownUntilMs: number | null;
+      lastCheckInPlaceId: string | null;
+    };
+  }) => unknown) => selector({
+    pulse: {
+      checkInSubmitting: mockCheckInSubmitting,
+      checkInError: mockCheckInError,
+      checkInCooldownUntilMs: mockCheckInCooldownUntilMs,
+      lastCheckInPlaceId: mockLastCheckInPlaceId,
+    },
   }),
 }));
 
@@ -21,13 +34,19 @@ jest.mock('@/features/location/useUserLocation', () => ({
   }),
 }));
 
-jest.mock('@/features/pulse/pulseSlice', () => ({
-  clearCheckInError: jest.fn(() => ({ type: 'pulse/clearCheckInError' })),
-  createPlacePulseCheckIn: jest.fn((payload: unknown) => ({
-    type: 'pulse/createPlaceCheckIn',
-    payload,
-  })),
-}));
+jest.mock('@/features/pulse/pulseSlice', () => {
+  const actual = jest.requireActual<typeof import('@/features/pulse/pulseSlice')>(
+    '@/features/pulse/pulseSlice',
+  );
+  return {
+    ...actual,
+    clearCheckInError: jest.fn(() => ({ type: 'pulse/clearCheckInError' })),
+    createPlacePulseCheckIn: jest.fn((payload: unknown) => ({
+      type: 'pulse/createPlaceCheckIn',
+      payload,
+    })),
+  };
+});
 
 jest.mock('@/features/places/sharePlace', () => ({
   sharePlace: jest.fn(() => Promise.resolve()),
@@ -69,19 +88,23 @@ const PLACE: PlaceMapEntityPoint = {
   },
 };
 
+function previewElement(onCheckIn: () => void): React.JSX.Element {
+  return (
+    <PlaceMapPreviewSheet
+      point={PLACE}
+      onCheckIn={onCheckIn}
+      onToggleSaved={jest.fn()}
+      onViewDetails={jest.fn()}
+      saveLoading={false}
+      saveError={null}
+    />
+  );
+}
+
 function renderPreview(onCheckIn = jest.fn()) {
   return {
     onCheckIn,
-    ui: render(
-      <PlaceMapPreviewSheet
-        point={PLACE}
-        onCheckIn={onCheckIn}
-        onToggleSaved={jest.fn()}
-        onViewDetails={jest.fn()}
-        saveLoading={false}
-        saveError={null}
-      />,
-    ),
+    ui: render(previewElement(onCheckIn)),
   };
 }
 
@@ -90,11 +113,19 @@ describe('PlaceMapPreviewSheet map-local check-in', () => {
     jest.clearAllMocks();
     mockCheckInSubmitting = false;
     mockCheckInError = null;
+    mockCheckInCooldownUntilMs = null;
+    mockLastCheckInPlaceId = null;
     mockGetCurrentLocation.mockReset();
     mockDispatch.mockImplementation((action: unknown) => {
       const typed = action as { type?: string };
       if (typed.type === 'pulse/createPlaceCheckIn') {
-        return { unwrap: () => Promise.resolve({}) };
+        return {
+          unwrap: async () => {
+            mockCheckInCooldownUntilMs = Date.now() + 15 * 60 * 1000;
+            mockLastCheckInPlaceId = PLACE.id;
+            return {};
+          },
+        };
       }
       return action;
     });
@@ -125,8 +156,11 @@ describe('PlaceMapPreviewSheet map-local check-in', () => {
       });
     });
     await waitFor(() => {
-      expect(ui.getByLabelText('Checked in at Sea Garden')).toBeTruthy();
+      expect(mockLastCheckInPlaceId).toBe(PLACE.id);
     });
+
+    ui.rerender(previewElement(onCheckIn));
+    expect(ui.getByLabelText('Checked in at Sea Garden')).toBeTruthy();
     expect(onCheckIn).not.toHaveBeenCalled();
   });
 

@@ -6,6 +6,7 @@ import * as h3 from 'h3-js';
 
 import {
   computeH3Cells,
+  PULSE_CHECK_IN_COOLDOWN_MINUTES,
   type CheckInAudience,
   type CreatePlacePulseCheckInRequest,
   type CreatePulseCheckInRequest,
@@ -19,7 +20,6 @@ import { PulseActivityRealtimeService } from './pulse-activity-realtime.service'
 import { PulsePlaceTrendingService } from './pulse-place-trending.service';
 
 const CHECK_IN_TTL_MS = 6 * 60 * 60 * 1000;
-const CHECK_IN_COOLDOWN_MINUTES = 15;
 const MAX_PLACE_CELL_DISTANCE = 2;
 
 interface ResolvedCatalogIdentity {
@@ -162,12 +162,12 @@ export class PulseCheckInService {
           AND created_at > NOW() - ($2 * interval '1 minute')
         ORDER BY created_at DESC
         LIMIT 1`,
-      [userId, CHECK_IN_COOLDOWN_MINUTES],
+      [userId, PULSE_CHECK_IN_COOLDOWN_MINUTES],
     );
 
     if (recent) {
       throw new HttpException(
-        `You can check in again after ${CHECK_IN_COOLDOWN_MINUTES} minutes.`,
+        `You can check in again after ${PULSE_CHECK_IN_COOLDOWN_MINUTES} minutes.`,
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }

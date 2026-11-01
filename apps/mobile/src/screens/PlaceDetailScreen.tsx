@@ -12,7 +12,10 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import type { CheckInAudience } from '@g88/shared';
+import {
+  PULSE_CHECK_IN_COOLDOWN_MINUTES,
+  type CheckInAudience,
+} from '@g88/shared';
 
 import { EmptyState } from '@/components/EmptyState';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -29,6 +32,7 @@ import {
   clearCheckInError,
   createPlacePulseCheckIn,
 } from '@/features/pulse/pulseSlice';
+import { usePulseCheckInCooldown } from '@/features/pulse/usePulseCheckInCooldown';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppTheme, type ThemeColors } from '@/theme';
@@ -47,6 +51,8 @@ export function PlaceDetailScreen(): React.JSX.Element {
   const state = useAppSelector((root) => root.places.entries[placeId]);
   const { checkInSubmitting, checkInError } = useAppSelector((root) => root.pulse);
   const place = state?.detail ?? null;
+  const { active: checkInCooldownActive, checkedInHere: checkedIn } =
+    usePulseCheckInCooldown(place?.id ?? null);
   const loading = state == null || state.loadId != null || (state.detail == null && state.error == null);
   const saving = state?.saveId != null;
   const error = state?.error ?? null;
@@ -54,7 +60,6 @@ export function PlaceDetailScreen(): React.JSX.Element {
     ? formatPlaceActivityRecency(true, place.recentActivityAt) ?? 'Getting active nearby'
     : 'Local place';
   const [checkInOpen, setCheckInOpen] = useState(false);
-  const [checkedIn, setCheckedIn] = useState(false);
   const consumedMapIntentRef = useRef(false);
 
   useEffect(() => {
@@ -65,10 +70,11 @@ export function PlaceDetailScreen(): React.JSX.Element {
     if (place == null || consumedMapIntentRef.current) return undefined;
     if (!takePendingPlaceCheckIn(placeId)) return undefined;
     consumedMapIntentRef.current = true;
+    if (checkInCooldownActive) return undefined;
     dispatch(clearCheckInError());
     const frame = requestAnimationFrame(() => setCheckInOpen(true));
     return () => cancelAnimationFrame(frame);
-  }, [dispatch, place, placeId]);
+  }, [checkInCooldownActive, dispatch, place, placeId]);
 
   useEffect(() => () => clearPendingPlaceCheckIn(), []);
 
@@ -93,10 +99,10 @@ export function PlaceDetailScreen(): React.JSX.Element {
   }, [navigation, place]);
 
   const openCheckIn = useCallback(() => {
-    if (checkedIn || checkInSubmitting) return;
+    if (checkInCooldownActive || checkInSubmitting) return;
     dispatch(clearCheckInError());
     setCheckInOpen(true);
-  }, [checkedIn, checkInSubmitting, dispatch]);
+  }, [checkInCooldownActive, checkInSubmitting, dispatch]);
 
   const closeCheckIn = useCallback(() => {
     if (checkInSubmitting) return;
@@ -105,7 +111,7 @@ export function PlaceDetailScreen(): React.JSX.Element {
   }, [checkInSubmitting, dispatch]);
 
   const submitCheckIn = useCallback(async (audience: CheckInAudience): Promise<void> => {
-    if (!place || checkInSubmitting) return;
+    if (!place || checkInCooldownActive || checkInSubmitting) return;
     try {
       const coords = await getCurrentLocation({ requestPermission: true });
       if (!coords) return;
@@ -115,12 +121,11 @@ export function PlaceDetailScreen(): React.JSX.Element {
         lat: coords.lat,
         lng: coords.lng,
       })).unwrap();
-      setCheckedIn(true);
       setCheckInOpen(false);
     } catch {
       // Redux owns the user-visible API error state.
     }
-  }, [checkInSubmitting, dispatch, getCurrentLocation, place]);
+  }, [checkInCooldownActive, checkInSubmitting, dispatch, getCurrentLocation, place]);
 
   if (!place) {
     return <View style={styles.container}>
@@ -144,6 +149,17 @@ export function PlaceDetailScreen(): React.JSX.Element {
       </View>
     </View>;
   }
+
+  const checkInLabel = checkedIn
+    ? 'Checked in'
+    : checkInCooldownActive
+      ? 'Check in later'
+      : 'Check in here';
+  const checkInAccessibilityLabel = checkedIn
+    ? `Checked in at ${place.canonicalLabel}`
+    : checkInCooldownActive
+      ? `Check in unavailable during the ${PULSE_CHECK_IN_COOLDOWN_MINUTES}-minute cooldown after your last check-in`
+      : `Check in at ${place.canonicalLabel}`;
 
   return <View style={styles.container}>
     <ScreenHeader
@@ -195,20 +211,29 @@ export function PlaceDetailScreen(): React.JSX.Element {
       ) : null}
 
       <TouchableOpacity
-        style={[styles.checkInButton, checkedIn && styles.checkInButtonDone]}
+        style={[
+          styles.checkInButton,
+          checkInCooldownActive && styles.checkInButtonDone,
+        ]}
         onPress={openCheckIn}
-        disabled={checkedIn || checkInSubmitting}
+        disabled={checkInCooldownActive || checkInSubmitting}
         accessibilityRole="button"
-        accessibilityLabel={checkedIn ? `Checked in at ${place.canonicalLabel}` : `Check in at ${place.canonicalLabel}`}
-        accessibilityState={{ disabled: checkedIn || checkInSubmitting }}
+        accessibilityLabel={checkInAccessibilityLabel}
+        accessibilityState={{ disabled: checkInCooldownActive || checkInSubmitting }}
       >
         <Icon
-          name={checkedIn ? 'check-circle' : 'map-marker-check-outline'}
+          name={checkedIn ? 'check-circle' : checkInCooldownActive ? 'clock-outline' : 'map-marker-check-outline'}
           size={21}
           color={colors.onPrimary}
         />
-        <Text style={styles.checkInButtonText}>{checkedIn ? 'Checked in' : 'Check in here'}</Text>
+        <Text style={styles.checkInButtonText}>{checkInLabel}</Text>
       </TouchableOpacity>
+
+      {checkInCooldownActive && !checkedIn ? (
+        <Text style={styles.cooldownHint}>
+          Check-in becomes available after the {PULSE_CHECK_IN_COOLDOWN_MINUTES}-minute cooldown from your last check-in.
+        </Text>
+      ) : null}
 
       <View style={styles.actionRow}>
         <TouchableOpacity
@@ -416,6 +441,13 @@ function createStyles(colors: ThemeColors) {
     },
     checkInButtonDone: { opacity: 0.72 },
     checkInButtonText: { color: colors.onPrimary, fontSize: 15, fontWeight: '800' },
+    cooldownHint: {
+      marginTop: 7,
+      color: colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 17,
+      textAlign: 'center',
+    },
     actionRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
     secondaryButton: {
       minHeight: 50,

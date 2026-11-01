@@ -9,7 +9,11 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import type { CheckInAudience, PlaceMapEntityPoint } from '@g88/shared';
+import {
+  PULSE_CHECK_IN_COOLDOWN_MINUTES,
+  type CheckInAudience,
+  type PlaceMapEntityPoint,
+} from '@g88/shared';
 
 import { NexaPlaceSheet } from '@/components/map/NexaSpatialEntitySheets';
 import type { NexaSpatialMetaItem } from '@/components/map/NexaSpatialSheet';
@@ -19,6 +23,7 @@ import {
   clearCheckInError,
   createPlacePulseCheckIn,
 } from '@/features/pulse/pulseSlice';
+import { usePulseCheckInCooldown } from '@/features/pulse/usePulseCheckInCooldown';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { sharePlace } from '@/features/places/sharePlace';
 import { useAppTheme, type ThemeColors } from '@/theme';
@@ -44,9 +49,9 @@ export function PlaceMapPreviewSheet({
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { checkInSubmitting, checkInError } = useAppSelector((state) => state.pulse);
+  const { active: checkInCooldownActive, checkedInHere: checkedIn } =
+    usePulseCheckInCooldown(point.id);
   const [checkInOpen, setCheckInOpen] = useState(false);
-  const [checkedInPlaceId, setCheckedInPlaceId] = useState<string | null>(null);
-  const checkedIn = checkedInPlaceId === point.id;
 
   const meta = useMemo<NexaSpatialMetaItem[]>(() => {
     const items: NexaSpatialMetaItem[] = [
@@ -79,9 +84,21 @@ export function PlaceMapPreviewSheet({
     }
     if (checkedIn) {
       items.push({ id: 'checked-in', label: 'Checked in', icon: 'check-circle' });
+    } else if (checkInCooldownActive) {
+      items.push({
+        id: 'check-in-cooldown',
+        label: `Check-in cooldown: ${PULSE_CHECK_IN_COOLDOWN_MINUTES} min`,
+        icon: 'clock-outline',
+      });
     }
     return items;
-  }, [checkedIn, point.meta.recentActivityAt, point.meta.saved, point.meta.trending]);
+  }, [
+    checkInCooldownActive,
+    checkedIn,
+    point.meta.recentActivityAt,
+    point.meta.saved,
+    point.meta.trending,
+  ]);
 
   const saved = point.meta.saved === true;
   const share = (): void => {
@@ -89,10 +106,10 @@ export function PlaceMapPreviewSheet({
   };
 
   const openCheckIn = useCallback((): void => {
-    if (checkedIn || checkInSubmitting) return;
+    if (checkInCooldownActive || checkInSubmitting) return;
     dispatch(clearCheckInError());
     setCheckInOpen(true);
-  }, [checkInSubmitting, checkedIn, dispatch]);
+  }, [checkInCooldownActive, checkInSubmitting, dispatch]);
 
   const closeCheckIn = useCallback((): void => {
     if (checkInSubmitting) return;
@@ -101,7 +118,7 @@ export function PlaceMapPreviewSheet({
   }, [checkInSubmitting, dispatch]);
 
   const submitCheckIn = useCallback(async (audience: CheckInAudience): Promise<void> => {
-    if (checkedIn || checkInSubmitting) return;
+    if (checkInCooldownActive || checkInSubmitting) return;
     try {
       const coords = await getCurrentLocation({ requestPermission: true });
       if (coords == null) return;
@@ -111,12 +128,11 @@ export function PlaceMapPreviewSheet({
         lat: coords.lat,
         lng: coords.lng,
       })).unwrap();
-      setCheckedInPlaceId(point.id);
       setCheckInOpen(false);
     } catch {
       // Redux owns the user-visible API error state.
     }
-  }, [checkInSubmitting, checkedIn, dispatch, getCurrentLocation, point.id]);
+  }, [checkInCooldownActive, checkInSubmitting, dispatch, getCurrentLocation, point.id]);
 
   const continueInDetails = useCallback((): void => {
     if (checkInSubmitting) return;
@@ -124,6 +140,17 @@ export function PlaceMapPreviewSheet({
     setCheckInOpen(false);
     onCheckIn();
   }, [checkInSubmitting, dispatch, onCheckIn]);
+
+  const checkInLabel = checkedIn
+    ? 'Checked in'
+    : checkInCooldownActive
+      ? 'Check in later'
+      : 'Check in';
+  const checkInAccessibilityLabel = checkedIn
+    ? `Checked in at ${point.meta.canonicalLabel}`
+    : checkInCooldownActive
+      ? `Check in unavailable during the ${PULSE_CHECK_IN_COOLDOWN_MINUTES}-minute cooldown after your last check-in`
+      : `Check in at ${point.meta.canonicalLabel}`;
 
   return (
     <>
@@ -133,14 +160,12 @@ export function PlaceMapPreviewSheet({
         meta={meta}
         primaryAction={{
           id: 'check-in',
-          label: checkedIn ? 'Checked in' : 'Check in',
-          icon: checkedIn ? 'check-circle' : 'map-marker-check-outline',
+          label: checkInLabel,
+          icon: checkedIn ? 'check-circle' : checkInCooldownActive ? 'clock-outline' : 'map-marker-check-outline',
           onPress: openCheckIn,
-          disabled: checkedIn || checkInSubmitting,
+          disabled: checkInCooldownActive || checkInSubmitting,
           loading: checkInSubmitting,
-          accessibilityLabel: checkedIn
-            ? `Checked in at ${point.meta.canonicalLabel}`
-            : `Check in at ${point.meta.canonicalLabel}`,
+          accessibilityLabel: checkInAccessibilityLabel,
         }}
         secondaryActions={[
           {
@@ -171,7 +196,7 @@ export function PlaceMapPreviewSheet({
             accessibilityLabel: `View details for ${point.meta.canonicalLabel}`,
           },
         ]}
-        accessibilityLabel={`${point.meta.canonicalLabel}, place, approximate location${point.meta.trending ? ', recent anonymous local activity' : ''}${saved ? ', saved' : ''}${checkedIn ? ', checked in' : ''}`}
+        accessibilityLabel={`${point.meta.canonicalLabel}, place, approximate location${point.meta.trending ? ', recent anonymous local activity' : ''}${saved ? ', saved' : ''}${checkedIn ? ', checked in' : checkInCooldownActive ? ', check-in cooldown active' : ''}`}
         testID="place-map-preview-sheet"
       >
         {saveError ? (

@@ -1,13 +1,14 @@
 // apps/mobile/src/features/pulse/pulseSlice.ts
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import type {
-  ActivityItem,
-  ActivityType,
-  CreatePlacePulseCheckInRequest,
-  CreatePulseCheckInRequest,
-  FeedResponse,
-  PulseCheckInResult,
+import {
+  PULSE_CHECK_IN_COOLDOWN_MS,
+  type ActivityItem,
+  type ActivityType,
+  type CreatePlacePulseCheckInRequest,
+  type CreatePulseCheckInRequest,
+  type FeedResponse,
+  type PulseCheckInResult,
 } from '@g88/shared';
 
 import { getJson, postJson } from '@/api/client';
@@ -26,6 +27,8 @@ export interface PulseState {
   pendingFilter: string | null;
   checkInSubmitting: boolean;
   checkInError: string | null;
+  checkInCooldownUntilMs: number | null;
+  lastCheckInPlaceId: string | null;
 }
 
 const initialState: PulseState = {
@@ -38,11 +41,26 @@ const initialState: PulseState = {
   pendingFilter: null,
   checkInSubmitting: false,
   checkInError: null,
+  checkInCooldownUntilMs: null,
+  lastCheckInPlaceId: null,
 };
 
 export interface FetchFeedArgs {
   types?: ActivityType[];
   since?: string;
+}
+
+export function checkInCooldownUntilMs(result: PulseCheckInResult): number | null {
+  const createdAtMs = Date.parse(result.createdAt);
+  if (!Number.isFinite(createdAtMs)) return null;
+  return createdAtMs + PULSE_CHECK_IN_COOLDOWN_MS;
+}
+
+export function isCheckInCooldownActive(
+  cooldownUntilMs: number | null,
+  nowMs = Date.now(),
+): boolean {
+  return cooldownUntilMs != null && cooldownUntilMs > nowMs;
 }
 
 export const fetchFeed = createAsyncThunk<FeedResponse, FetchFeedArgs | undefined>(
@@ -92,6 +110,13 @@ export const createPlacePulseCheckIn = createAsyncThunk<
     }
   },
 );
+
+function applySuccessfulCheckIn(s: PulseState, result: PulseCheckInResult): void {
+  s.checkInSubmitting = false;
+  s.checkInError = null;
+  s.checkInCooldownUntilMs = checkInCooldownUntilMs(result);
+  s.lastCheckInPlaceId = result.placeId;
+}
 
 const slice = createSlice({
   name: 'pulse',
@@ -151,9 +176,8 @@ const slice = createSlice({
       s.checkInSubmitting = true;
       s.checkInError = null;
     });
-    b.addCase(createPulseCheckIn.fulfilled, (s) => {
-      s.checkInSubmitting = false;
-      s.checkInError = null;
+    b.addCase(createPulseCheckIn.fulfilled, (s, a) => {
+      applySuccessfulCheckIn(s, a.payload);
     });
     b.addCase(createPulseCheckIn.rejected, (s, a) => {
       s.checkInSubmitting = false;
@@ -163,9 +187,8 @@ const slice = createSlice({
       s.checkInSubmitting = true;
       s.checkInError = null;
     });
-    b.addCase(createPlacePulseCheckIn.fulfilled, (s) => {
-      s.checkInSubmitting = false;
-      s.checkInError = null;
+    b.addCase(createPlacePulseCheckIn.fulfilled, (s, a) => {
+      applySuccessfulCheckIn(s, a.payload);
     });
     b.addCase(createPlacePulseCheckIn.rejected, (s, a) => {
       s.checkInSubmitting = false;
