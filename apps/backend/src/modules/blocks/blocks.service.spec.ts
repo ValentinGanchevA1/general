@@ -42,11 +42,11 @@ describe('BlocksService', () => {
     expect(leaveRoomForUsers).not.toHaveBeenCalled();
   });
 
-  it('block() upserts, leaves shared groups, deletes graph edges, then prunes shared DM rooms', async () => {
+  it('block() evicts the blocker from shared groups, deletes graph edges, then prunes shared DM rooms', async () => {
     query
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ id: 'conversation-1' }, { id: 'conversation-2' }]);
-    leaveSharedGroupsForBlock.mockResolvedValueOnce(['group-1']);
+    leaveSharedGroupsForBlock.mockResolvedValueOnce(['group-1', 'group-2']);
 
     await service.block(A, B);
 
@@ -64,11 +64,14 @@ describe('BlocksService', () => {
     expect(conversationSql).toContain('participant_ids @> ARRAY[$1, $2]::uuid[]');
     expect(conversationSql).toContain("COALESCE(status, 'accepted') = 'accepted'");
     expect(conversationParams).toEqual([A, B]);
-    expect(leaveRoomForUsers).toHaveBeenNthCalledWith(1, [A, B], 'convo:conversation-1');
-    expect(leaveRoomForUsers).toHaveBeenNthCalledWith(2, [A, B], 'convo:conversation-2');
+
+    expect(leaveRoomForUsers).toHaveBeenNthCalledWith(1, [A], 'convo:group-1');
+    expect(leaveRoomForUsers).toHaveBeenNthCalledWith(2, [A], 'convo:group-2');
+    expect(leaveRoomForUsers).toHaveBeenNthCalledWith(3, [A, B], 'convo:conversation-1');
+    expect(leaveRoomForUsers).toHaveBeenNthCalledWith(4, [A, B], 'convo:conversation-2');
   });
 
-  it('does not touch DM realtime rooms when the pair has no accepted DM', async () => {
+  it('does not touch realtime rooms when there are no shared groups or accepted DM', async () => {
     query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     await service.block(A, B);
@@ -105,7 +108,7 @@ describe('BlocksService', () => {
     await expect(service.hasBlocked(A, B)).resolves.toBe(true);
     const [sql, params] = query.mock.calls[0]!;
     expect(sql).toContain('blocker_id = $1 AND blocked_id = $2');
-    expect(sql).not.toContain('blocker_id = $2'); // not symmetric
+    expect(sql).not.toContain('blocker_id = $2');
     expect(params).toEqual([A, B]);
   });
 
