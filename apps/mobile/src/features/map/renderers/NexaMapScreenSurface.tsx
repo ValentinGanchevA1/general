@@ -101,6 +101,8 @@ const EMPTY_PLACE_SPATIAL_STATUS: NexaPlaceSpatialStatus = {
   hasError: false,
 };
 
+function regionToViewport(region: Region): Viewport;
+function regionToViewport(region: Region | null): Viewport | null;
 function regionToViewport(region: Region | null): Viewport | null {
   if (region == null) return null;
   const halfLat = region.latitudeDelta / 2;
