@@ -23,6 +23,7 @@ export * from './dating';
 export * from './analytics';
 export * from './mapRendererPolicy';
 export * from './social';
+export * from './groupChat';
 
 export interface PendingVerificationSummary {
   id: string;
