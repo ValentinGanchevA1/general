@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
   ArrayMaxSize,
@@ -53,5 +63,19 @@ export class GroupConversationsController {
     @CurrentUser('id') userId: string,
   ): Promise<CreateGroupConversationResponse> {
     return this.groups.create(userId, dto);
+  }
+
+  /**
+   * Self-targeting means leave. Owners may remove admins/members; admins may
+   * remove members. Membership history is soft-left rather than deleted.
+   */
+  @Delete(':conversationId/members/:memberId')
+  @HttpCode(204)
+  async removeMember(
+    @Param('conversationId', new ParseUUIDPipe()) conversationId: string,
+    @Param('memberId', new ParseUUIDPipe()) memberId: string,
+    @CurrentUser('id') userId: string,
+  ): Promise<void> {
+    await this.groups.removeMember(userId, conversationId, memberId);
   }
 }
