@@ -81,6 +81,22 @@ describe('savedPlaceMapFocusStore', () => {
     expect(secondId).not.toBe(firstId);
   });
 
+  it('clears a focus request only when the canonical place id matches', () => {
+    savedPlaceMapFocusStore.request(PLACE);
+    savedPlaceMapFocusStore.clearIfMatches('place-1');
+
+    expect(savedPlaceMapFocusStore.getSnapshot()).toBeNull();
+  });
+
+  it('preserves an unrelated focus request when another place is unsaved', () => {
+    savedPlaceMapFocusStore.request(PLACE);
+    const before = savedPlaceMapFocusStore.getSnapshot();
+
+    savedPlaceMapFocusStore.clearIfMatches('place-2');
+
+    expect(savedPlaceMapFocusStore.getSnapshot()).toBe(before);
+  });
+
   it('clears the pending private focus request', () => {
     savedPlaceMapFocusStore.request(PLACE);
     savedPlaceMapFocusStore.clear();
