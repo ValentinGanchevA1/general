@@ -54,6 +54,11 @@ import {
   type NexaMapRuntimeSurfaceProps,
 } from './NexaMapRuntimeSurface';
 
+export interface NexaPlaceSpatialStatus {
+  hasVisiblePoints: boolean;
+  loading: boolean;
+}
+
 export type NexaMapScreenSurfaceProps = Omit<
   NexaMapRuntimeSurfaceProps,
   | 'requestedRenderer'
@@ -69,6 +74,7 @@ export type NexaMapScreenSurfaceProps = Omit<
   onClusterPress: (point: ClusterPoint) => void;
   onRegionChangeComplete: (region: Region) => void;
   onPlacePreviewVisibilityChange?: (visible: boolean) => void;
+  onPlaceSpatialStatusChange?: (status: NexaPlaceSpatialStatus) => void;
   placeSearchQuery?: string;
 };
 
@@ -81,6 +87,10 @@ const MAPLIBRE_STYLE_RUNTIME = resolveMapLibreStyleRuntime({
 const PLACE_PREVIEW_SNAP_POINTS: Array<string | number> = ['34%'];
 const SAVED_PLACE_FOCUS_ZOOM = 15;
 const SAVED_PLACE_FOCUS_DURATION_MS = 360;
+const EMPTY_PLACE_SPATIAL_STATUS: NexaPlaceSpatialStatus = {
+  hasVisiblePoints: false,
+  loading: false,
+};
 
 function regionToViewport(region: Region | null): Viewport | null {
   if (region == null) return null;
@@ -109,6 +119,7 @@ export const NexaMapScreenSurface = React.forwardRef<
     onClusterPress,
     onRegionChangeComplete,
     onPlacePreviewVisibilityChange,
+    onPlaceSpatialStatusChange,
     placeSearchQuery = '',
     selectedEntityKey,
     dimUnselected,
@@ -170,6 +181,10 @@ export const NexaMapScreenSurface = React.forwardRef<
     onPlacePreviewVisibilityChange?.(false);
   }, [onPlacePreviewVisibilityChange]);
 
+  React.useEffect(() => () => {
+    onPlaceSpatialStatusChange?.(EMPTY_PLACE_SPATIAL_STATUS);
+  }, [onPlaceSpatialStatusChange]);
+
   const placeDiscovery = usePlaceMapDiscovery({
     viewport,
     zoom,
@@ -199,13 +214,26 @@ export const NexaMapScreenSurface = React.forwardRef<
       )),
     ];
   }, [normalizedPlaceSearch, savedPlaceFocusRequest, savedPlacePoints, selectedPlace]);
+  const publicPlacePoints = useMemo(
+    () => publicPlacesEnabled ? (placeDiscovery.data?.points ?? []) : [],
+    [placeDiscovery.data?.points, publicPlacesEnabled],
+  );
+  const placeSpatialStatus = useMemo<NexaPlaceSpatialStatus>(() => ({
+    hasVisiblePoints: publicPlacePoints.length > 0 || privateSavedPlacePoints.length > 0,
+    loading: publicPlacesEnabled && placeDiscovery.loading,
+  }), [placeDiscovery.loading, privateSavedPlacePoints.length, publicPlacePoints.length, publicPlacesEnabled]);
+
+  React.useEffect(() => {
+    onPlaceSpatialStatusChange?.(placeSpatialStatus);
+  }, [onPlaceSpatialStatusChange, placeSpatialStatus]);
+
   const mergedPoints = useMemo(
     () => mergeMapDiscoveryPoints(
       points,
-      publicPlacesEnabled ? (placeDiscovery.data?.points ?? []) : [],
+      publicPlacePoints,
       privateSavedPlacePoints,
     ),
-    [placeDiscovery.data?.points, points, privateSavedPlacePoints, publicPlacesEnabled],
+    [points, privateSavedPlacePoints, publicPlacePoints],
   );
 
   const mapLibreEnabled = useAppSelector(
