@@ -12,6 +12,7 @@ import { WsJwtGuard } from './ws-jwt.guard';
 import { DiscoveryPresencePublisher } from './discovery-presence.publisher';
 import { PresenceService } from '../modules/presence/presence.service';
 import { ChatService } from '../modules/chat/chat.service';
+import { ChatRealtimeAccessService } from '../modules/chat/chat-realtime-access.service';
 import { GroupConversationsService } from '../modules/chat/group-conversations.service';
 import { LocationShareService } from '../modules/chat/location-share.service';
 import { NotificationsService } from '../modules/notifications/notifications.service';
@@ -251,13 +252,13 @@ describe('RealtimeGateway real Socket.IO revocation integration', () => {
 
   beforeAll(async () => {
     locationUpdate = jest.fn(async () => ({ conversationId, updatedAt }));
+    const getRecipientIds = jest.fn(async (): Promise<string[]> =>
+      blocked ? [] : [sharerId, peerId],
+    );
     const dbQuery = jest.fn(async (sql: string): Promise<unknown[]> => {
       if (sql.includes('INSERT INTO user_blocks')) {
         blocked = true;
         return [];
-      }
-      if (sql.includes('CROSS JOIN LATERAL unnest')) {
-        return blocked ? [] : [{ user_id: sharerId }, { user_id: peerId }];
       }
       if (sql.includes('COALESCE(status') && sql.includes('FROM conversations')) {
         return [{ id: conversationId }];
@@ -286,6 +287,7 @@ describe('RealtimeGateway real Socket.IO revocation integration', () => {
           useValue: { clear: jest.fn(), publishHeartbeat: jest.fn() },
         },
         { provide: ChatService, useValue: {} },
+        { provide: ChatRealtimeAccessService, useValue: { getRecipientIds } },
         {
           provide: GroupConversationsService,
           useValue: { leaveSharedGroupsForBlock: jest.fn(async (): Promise<string[]> => []) },
@@ -346,7 +348,7 @@ describe('RealtimeGateway real Socket.IO revocation integration', () => {
     await expect(roomUserIds(gateway, room)).resolves.toEqual([]);
 
     // Simulate a stale cross-instance room membership after the block eviction.
-    // Fanout must still depend on current DB authorization, never on convo:*.
+    // Fanout must still depend on current authorization, never on convo:*.
     gateway.server.in(`user:${peerId}`).socketsJoin(room);
     await expect(roomUserIds(gateway, room)).resolves.toEqual([peerId]);
 
