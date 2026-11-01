@@ -43,6 +43,7 @@ export function mergeTrendingWithPublicPlace(
     point: place,
   };
 
-  if (legacy.length === 0) return [placeRow];
-  return [legacy[0], placeRow, ...legacy.slice(1)].slice(0, limit);
+  const [firstLegacy, ...remainingLegacy] = legacy;
+  if (firstLegacy == null) return [placeRow];
+  return [firstLegacy, placeRow, ...remainingLegacy].slice(0, limit);
 }
