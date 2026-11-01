@@ -46,7 +46,7 @@ export const store = configureStore({
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
 
-// ─── Session-scoped private UI state ─────────────────────────────────────────
+// ─── Session-scoped UI state ─────────────────────────────────────────────────
 
 let previousAuthUserId = store.getState().auth.user?.id ?? null;
 store.subscribe(() => {
