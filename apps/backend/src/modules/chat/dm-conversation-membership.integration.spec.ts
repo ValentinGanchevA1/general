@@ -99,6 +99,14 @@ suite('Conversation membership PostgreSQL integration', () => {
     await db.query(groupIsolation);
     // Release retries must remain safe.
     await db.query(groupIsolation);
+
+    const groupCreationKey = readFileSync(
+      join(__dirname, '../../..', 'migrations/0068_group_conversation_creation_key.sql'),
+      'utf8',
+    );
+    await db.query(groupCreationKey);
+    // Release retries must remain safe.
+    await db.query(groupCreationKey);
   }, 30_000);
 
   afterAll(async () => {
@@ -212,6 +220,48 @@ suite('Conversation membership PostgreSQL integration', () => {
         [randomUUID(), [userA, userB], userA],
       ),
     ).rejects.toMatchObject({ driverError: { code: '23514' } });
+  });
+
+  it('enforces one group creation key per creator while allowing the same key for another creator', async () => {
+    const creationKey = randomUUID();
+    await db.query(
+      `INSERT INTO conversations
+         (participant_ids, status, kind, title, created_by, creation_key)
+       VALUES (ARRAY[]::uuid[], 'accepted', 'group', 'First group', $1, $2)`,
+      [userA, creationKey],
+    );
+
+    await expect(
+      db.query(
+        `INSERT INTO conversations
+           (participant_ids, status, kind, title, created_by, creation_key)
+         VALUES (ARRAY[]::uuid[], 'accepted', 'group', 'Retry duplicate', $1, $2)`,
+        [userA, creationKey],
+      ),
+    ).rejects.toMatchObject({ driverError: { code: '23505' } });
+
+    await expect(
+      db.query(
+        `INSERT INTO conversations
+           (participant_ids, status, kind, title, created_by, creation_key)
+         VALUES (ARRAY[]::uuid[], 'accepted', 'group', 'Other creator', $1, $2)`,
+        [userB, creationKey],
+      ),
+    ).resolves.toEqual(expect.any(Array));
+  });
+
+  it('keeps creation keys out of DM uniqueness semantics', async () => {
+    const creationKey = randomUUID();
+    await db.query(
+      `INSERT INTO conversations (participant_ids, status, kind, creation_key)
+       VALUES ($1::uuid[], 'accepted', 'dm', $2)`,
+      [[userA, userB].sort(), creationKey],
+    );
+    await db.query(
+      `INSERT INTO conversations (participant_ids, status, kind, creation_key)
+       VALUES ($1::uuid[], 'accepted', 'dm', $2)`,
+      [[userA, userC].sort(), creationKey],
+    );
   });
 
   it('keeps legacy participant-array cleanup from matching normalized groups', async () => {
