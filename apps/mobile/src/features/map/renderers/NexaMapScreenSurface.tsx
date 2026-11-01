@@ -74,6 +74,7 @@ export type NexaMapScreenSurfaceProps = Omit<
   onEntityPress: (point: EntityPoint) => void;
   onClusterPress: (point: ClusterPoint) => void;
   onRegionChangeComplete: (region: Region) => void;
+  onPlacePreviewWillOpen?: () => void;
   onPlacePreviewVisibilityChange?: (visible: boolean) => void;
   onPlaceSpatialStatusChange?: (status: NexaPlaceSpatialStatus) => void;
   placeSearchQuery?: string;
@@ -121,6 +122,7 @@ export const NexaMapScreenSurface = React.forwardRef<
     onEntityPress,
     onClusterPress,
     onRegionChangeComplete,
+    onPlacePreviewWillOpen,
     onPlacePreviewVisibilityChange,
     onPlaceSpatialStatusChange,
     placeSearchQuery = '',
@@ -278,6 +280,7 @@ export const NexaMapScreenSurface = React.forwardRef<
   }, []);
 
   const openPlacePreview = useCallback((point: PlaceMapEntityPoint): void => {
+    onPlacePreviewWillOpen?.();
     privateSelectedPlaceIdRef.current = point.meta.saved === true ? point.id : null;
     setSelectedPlace(point);
     requestAnimationFrame(() => {
@@ -286,7 +289,7 @@ export const NexaMapScreenSurface = React.forwardRef<
       sheet.present();
       onPlacePreviewVisibilityChange?.(true);
     });
-  }, [onPlacePreviewVisibilityChange]);
+  }, [onPlacePreviewVisibilityChange, onPlacePreviewWillOpen]);
 
   useFocusEffect(useCallback(() => {
     if (savedPlaceFocusRequest == null) return;
