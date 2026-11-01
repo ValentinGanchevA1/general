@@ -477,11 +477,29 @@ export function InteractionsScreen(): React.JSX.Element {
     navigation.navigate('Main', { screen: 'Map' });
   }, [navigation]);
 
+  const openGroups = useCallback((): void => {
+    navigation.navigate('GroupConversations');
+  }, [navigation]);
+
   const emptyCopy = connectionsEmptyCopy(tab);
 
   return (
     <View style={styles.root}>
-      <ScreenHeader title="Connections" bordered />
+      <ScreenHeader
+        title="Connections"
+        right={
+          <TouchableOpacity
+            style={styles.headerAction}
+            onPress={openGroups}
+            accessibilityRole="button"
+            accessibilityLabel="Groups"
+            hitSlop={8}
+          >
+            <Icon name="account-multiple-outline" size={22} color={colors.actionPrimary} />
+          </TouchableOpacity>
+        }
+        bordered
+      />
 
       <View style={styles.identityStrip} accessibilityRole="summary">
         <View style={styles.identityGlyph}>
@@ -595,6 +613,12 @@ export function InteractionsScreen(): React.JSX.Element {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.canvas },
+    headerAction: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     identityStrip: {
       marginHorizontal: spacing.lg,
       marginTop: spacing.md,
