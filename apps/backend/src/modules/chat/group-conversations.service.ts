@@ -12,6 +12,7 @@ import type {
   CreateGroupConversationRequest,
   CreateGroupConversationResponse,
   GroupConversationMember,
+  GroupConversationMemberRole,
   GroupConversationSummary,
 } from '@g88/shared';
 
@@ -32,6 +33,18 @@ interface EligibleMemberRow {
   id: string;
   is_friend: boolean;
   blocked: boolean;
+}
+
+interface ActiveGroupMemberRow {
+  user_id: string;
+  role: GroupConversationMemberRole;
+  joined_at: Date | string;
+}
+
+interface SharedGroupRow {
+  id: string;
+  blocker_role: GroupConversationMemberRole;
+  blocker_joined_at: Date | string;
 }
 
 @Injectable()
@@ -144,6 +157,159 @@ export class GroupConversationsService {
       [userId],
     );
     return rows.map((row) => this.mapSummary(row));
+  }
+
+  /**
+   * Removes one active group membership. Removing yourself means leave. Removing
+   * someone else means kick and is role-gated. Membership history is preserved
+   * with left_at; group rows are never rewritten into legacy participant_ids.
+   */
+  async removeMember(
+    actorId: string,
+    conversationId: string,
+    memberId: string,
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const [group] = await tx.query<Array<{ id: string }>>(
+        `SELECT id
+           FROM conversations
+          WHERE id = $1
+            AND kind = 'group'
+          LIMIT 1
+          FOR UPDATE`,
+        [conversationId],
+      );
+      if (group == null) {
+        throw new NotFoundException({ code: 'chat.not_found', message: 'Conversation not found' });
+      }
+
+      const memberIds = actorId === memberId ? [actorId] : [actorId, memberId];
+      const members = await tx.query<ActiveGroupMemberRow[]>(
+        `SELECT user_id, role, joined_at
+           FROM conversation_members
+          WHERE conversation_id = $1
+            AND user_id = ANY($2::uuid[])
+            AND left_at IS NULL
+          FOR UPDATE`,
+        [conversationId, memberIds],
+      );
+      const actor = members.find((member) => member.user_id === actorId);
+      if (actor == null) {
+        // Fail closed so a non-member cannot probe whether the group exists.
+        throw new NotFoundException({ code: 'chat.not_found', message: 'Conversation not found' });
+      }
+      const target = members.find((member) => member.user_id === memberId);
+      if (target == null) {
+        throw new NotFoundException({
+          code: 'chat.group_member_not_found',
+          message: 'Group member not found',
+        });
+      }
+
+      this.assertCanRemoveMember(actor, target);
+      await this.softLeaveMember(tx, conversationId, target);
+    });
+  }
+
+  /**
+   * Blocking someone is a hard privacy boundary for future group realtime. The
+   * blocker leaves every group where both users are still active members. The
+   * blocked user is not removed, and unblock never silently restores membership.
+   */
+  async leaveSharedGroupsForBlock(blockerId: string, blockedId: string): Promise<string[]> {
+    return this.db.transaction(async (tx) => {
+      const groups = await tx.query<SharedGroupRow[]>(
+        `SELECT c.id,
+                blocker_member.role AS blocker_role,
+                blocker_member.joined_at AS blocker_joined_at
+           FROM conversations c
+           JOIN conversation_members blocker_member
+             ON blocker_member.conversation_id = c.id
+            AND blocker_member.user_id = $1
+            AND blocker_member.left_at IS NULL
+           JOIN conversation_members blocked_member
+             ON blocked_member.conversation_id = c.id
+            AND blocked_member.user_id = $2
+            AND blocked_member.left_at IS NULL
+          WHERE c.kind = 'group'
+          ORDER BY c.id
+          FOR UPDATE OF c, blocker_member, blocked_member`,
+        [blockerId, blockedId],
+      );
+
+      for (const group of groups) {
+        await this.softLeaveMember(tx, group.id, {
+          user_id: blockerId,
+          role: group.blocker_role,
+          joined_at: group.blocker_joined_at,
+        });
+      }
+
+      return groups.map((group) => group.id);
+    });
+  }
+
+  private assertCanRemoveMember(
+    actor: ActiveGroupMemberRow,
+    target: ActiveGroupMemberRow,
+  ): void {
+    if (actor.user_id === target.user_id) return;
+
+    const allowed =
+      target.role !== 'owner' &&
+      (actor.role === 'owner' || (actor.role === 'admin' && target.role === 'member'));
+    if (allowed) return;
+
+    throw new ForbiddenException({
+      code: 'chat.group_remove_forbidden',
+      message: 'You cannot remove this group member',
+    });
+  }
+
+  private async softLeaveMember(
+    tx: QueryExecutor,
+    conversationId: string,
+    target: ActiveGroupMemberRow,
+  ): Promise<void> {
+    if (target.role === 'owner') {
+      const [successor] = await tx.query<ActiveGroupMemberRow[]>(
+        `SELECT user_id, role, joined_at
+           FROM conversation_members
+          WHERE conversation_id = $1
+            AND user_id <> $2
+            AND left_at IS NULL
+          ORDER BY CASE role
+                     WHEN 'owner' THEN 0
+                     WHEN 'admin' THEN 1
+                     ELSE 2
+                   END,
+                   joined_at ASC,
+                   user_id ASC
+          LIMIT 1
+          FOR UPDATE`,
+        [conversationId, target.user_id],
+      );
+
+      if (successor != null && successor.role !== 'owner') {
+        await tx.query(
+          `UPDATE conversation_members
+              SET role = 'owner'
+            WHERE conversation_id = $1
+              AND user_id = $2
+              AND left_at IS NULL`,
+          [conversationId, successor.user_id],
+        );
+      }
+    }
+
+    await tx.query(
+      `UPDATE conversation_members
+          SET left_at = NOW()
+        WHERE conversation_id = $1
+          AND user_id = $2
+          AND left_at IS NULL`,
+      [conversationId, target.user_id],
+    );
   }
 
   private async assertInviteesEligible(
