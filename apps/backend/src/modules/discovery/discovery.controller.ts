@@ -61,6 +61,6 @@ export class DiscoveryController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   nearbyPlaces(@Body() dto: PlaceDiscoveryQueryDto): Promise<MapDiscoveryResponse> {
-    return this.placeDiscovery.nearby(dto.viewport, dto.zoom);
+    return this.placeDiscovery.nearby(dto.viewport, dto.zoom, dto.query);
   }
 }

@@ -38,13 +38,18 @@ interface DiscoverablePlaceRow {
 export class PlaceMapDiscoveryService {
   constructor(@InjectDataSource() private readonly db: DataSource) {}
 
-  async nearby(viewport: Viewport, zoom: number): Promise<MapDiscoveryResponse> {
+  async nearby(
+    viewport: Viewport,
+    zoom: number,
+    query?: string,
+  ): Promise<MapDiscoveryResponse> {
+    const normalizedQuery = query?.trim() ?? '';
     const resolution = h3ResolutionForZoom(zoom);
     const viewportCells = cellsForViewport(viewport, resolution);
     const viewportCellSet = new Set(viewportCells);
 
     if (viewportCells.length === 0) {
-      return this.response([], resolution, viewport, zoom);
+      return this.response([], resolution, viewport, zoom, normalizedQuery);
     }
 
     const rows = await this.db.query<DiscoverablePlaceRow[]>(
@@ -57,9 +62,10 @@ export class PlaceMapDiscoveryService {
         WHERE t.expires_at > NOW()
           AND p.status = 'active'
           AND t.place_id IS NOT NULL
+          AND ($2 = '' OR STRPOS(LOWER(p.canonical_label), LOWER($2)) > 0)
         ORDER BY t.last_emitted_at DESC
         LIMIT $1`,
-      [MAX_DISCOVERABLE_PLACE_ROWS],
+      [MAX_DISCOVERABLE_PLACE_ROWS, normalizedQuery],
     );
 
     const places = rows
@@ -70,7 +76,7 @@ export class PlaceMapDiscoveryService {
       ? places.slice(0, MAX_POINTS_PER_RESPONSE)
       : this.cluster(places, resolution).slice(0, MAX_POINTS_PER_RESPONSE);
 
-    return this.response(points, resolution, viewport, zoom);
+    return this.response(points, resolution, viewport, zoom, normalizedQuery);
   }
 
   private toEntityPoint(
@@ -143,13 +149,20 @@ export class PlaceMapDiscoveryService {
     resolution: number,
     viewport: Viewport,
     zoom: number,
+    query: string,
   ): MapDiscoveryResponse {
     return {
       points,
       resolution,
       generatedAt: new Date().toISOString(),
       viewportHash: createHash('sha1')
-        .update(JSON.stringify({ viewport, zoom, kind: 'place', thresholded: true }))
+        .update(JSON.stringify({
+          viewport,
+          zoom,
+          kind: 'place',
+          thresholded: true,
+          query: query.toLocaleLowerCase(),
+        }))
         .digest('hex')
         .slice(0, 12),
       diff: null,

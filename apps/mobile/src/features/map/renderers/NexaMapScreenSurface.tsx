@@ -26,6 +26,10 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useSheetBackdrop, useSheetChrome } from '@/components/sheets';
 import { PlaceMapPreviewSheet } from '@/features/places/PlaceMapPreviewSheet';
 import { loadSavedPlaces, setPlaceSaved } from '@/features/places/placeDetailSlice';
+import {
+  normalizePlaceMapSearch,
+  placeLabelMatchesMapSearch,
+} from '@/features/places/placeMapSearch';
 import { shouldDismissPrivatePlacePreview } from '@/features/places/placePreviewLifecycle';
 import { setPendingPlaceCheckIn } from '@/features/places/pendingPlaceCheckIn';
 import { publicPlacesMapLayerStore } from '@/features/places/publicPlacesMapLayer.store';
@@ -65,6 +69,7 @@ export type NexaMapScreenSurfaceProps = Omit<
   onClusterPress: (point: ClusterPoint) => void;
   onRegionChangeComplete: (region: Region) => void;
   onPlacePreviewVisibilityChange?: (visible: boolean) => void;
+  placeSearchQuery?: string;
 };
 
 const MAPLIBRE_STYLE_RUNTIME = resolveMapLibreStyleRuntime({
@@ -104,6 +109,7 @@ export const NexaMapScreenSurface = React.forwardRef<
     onClusterPress,
     onRegionChangeComplete,
     onPlacePreviewVisibilityChange,
+    placeSearchQuery = '',
     selectedEntityKey,
     dimUnselected,
     ...props
@@ -126,6 +132,10 @@ export const NexaMapScreenSurface = React.forwardRef<
   const [settledRegion, setSettledRegion] = useState<Region | null>(null);
   const viewport = useMemo(() => regionToViewport(settledRegion), [settledRegion]);
   const zoom = useMemo(() => approxZoom(settledRegion), [settledRegion]);
+  const normalizedPlaceSearch = useMemo(
+    () => normalizePlaceMapSearch(placeSearchQuery),
+    [placeSearchQuery],
+  );
   const publicPlacesEnabled = useSyncExternalStore(
     publicPlacesMapLayerStore.subscribe,
     publicPlacesMapLayerStore.getSnapshot,
@@ -164,6 +174,7 @@ export const NexaMapScreenSurface = React.forwardRef<
     viewport,
     zoom,
     enabled: publicPlacesEnabled && viewport != null,
+    query: placeSearchQuery,
   });
   const savedPlacePoints = useSavedPlacesMapOverlay({
     enabled: savedPlacesEnabled,
@@ -182,9 +193,12 @@ export const NexaMapScreenSurface = React.forwardRef<
     const candidateIds = new Set(candidates.map((point) => point.id));
     return [
       ...candidates,
-      ...savedPlacePoints.filter((point) => !candidateIds.has(point.id)),
+      ...savedPlacePoints.filter((point) => (
+        !candidateIds.has(point.id) &&
+        placeLabelMatchesMapSearch(point.meta.canonicalLabel, normalizedPlaceSearch)
+      )),
     ];
-  }, [savedPlaceFocusRequest, savedPlacePoints, selectedPlace]);
+  }, [normalizedPlaceSearch, savedPlaceFocusRequest, savedPlacePoints, selectedPlace]);
   const mergedPoints = useMemo(
     () => mergeMapDiscoveryPoints(
       points,
