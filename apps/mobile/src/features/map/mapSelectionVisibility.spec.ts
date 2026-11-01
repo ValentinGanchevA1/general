@@ -1,4 +1,7 @@
-import { mapSelectionVisibility } from './mapSelectionVisibility';
+import {
+  hasContextualMapSelection,
+  mapSelectionVisibility,
+} from './mapSelectionVisibility';
 
 describe('mapSelectionVisibility', () => {
   beforeEach(() => {
@@ -22,5 +25,13 @@ describe('mapSelectionVisibility', () => {
     expect(listener).toHaveBeenCalledTimes(2);
 
     unsubscribe();
+  });
+
+  it('treats renderer-agnostic entity and place selections as contextual surfaces', () => {
+    expect(hasContextualMapSelection(null)).toBe(false);
+    expect(hasContextualMapSelection('user:user-1')).toBe(true);
+    expect(hasContextualMapSelection('event:event-1')).toBe(true);
+    expect(hasContextualMapSelection('listing:listing-1')).toBe(true);
+    expect(hasContextualMapSelection('place:place-1')).toBe(true);
   });
 });

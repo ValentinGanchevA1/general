@@ -1,7 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import type { MapEntityPoint } from '@g88/shared';
 
-import { mapSelectionVisibility } from '@/features/map/mapSelectionVisibility';
 import { NexaEntityMarker } from './NexaEntityMarker';
 import type { NexaMarkerDensity } from './nexaEntityMarkerVisuals';
 import { entityVisualKey } from './markerVisualKeys';
@@ -93,12 +92,6 @@ function EntityMarkerImpl({
   personAvatarUri = null,
   onPersonAvatarRenderError,
 }: Props): React.JSX.Element {
-  useEffect(() => {
-    if (!selected) return;
-    mapSelectionVisibility.setSelected(true);
-    return () => mapSelectionVisibility.setSelected(false);
-  }, [selected]);
-
   if (point.kind === 'user') {
     const verified =
       point.meta.verifiedBadge === true || point.meta.verification === 'id';

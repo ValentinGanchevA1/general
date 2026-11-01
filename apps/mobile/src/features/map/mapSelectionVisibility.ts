@@ -7,10 +7,15 @@ function emit(): void {
   for (const listener of listeners) listener();
 }
 
+/** Renderer-agnostic selection keys all represent one contextual map surface. */
+export function hasContextualMapSelection(selectionKey: string | null): boolean {
+  return selectionKey !== null;
+}
+
 /**
  * Tiny external store used only to coordinate sibling map overlays.
- * MapMarkers owns selected-entity truth; rails consume this snapshot so a
- * contextual entity surface never competes with nearby discovery surfaces.
+ * NexaMapScreenSurface owns selected-entity truth so Google/React Native Maps,
+ * MapLibre, and first-class Place previews publish the same visibility state.
  */
 export const mapSelectionVisibility = {
   setSelected(visible: boolean): void {

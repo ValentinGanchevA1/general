@@ -33,6 +33,10 @@ import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.
 import { usePlaceMapDiscovery } from '@/features/places/usePlaceMapDiscovery';
 import { useSavedPlacesMapOverlay } from '@/features/places/useSavedPlacesMapOverlay';
 import { mergeMapDiscoveryPoints } from '@/features/map/mergeMapDiscoveryPoints';
+import {
+  hasContextualMapSelection,
+  mapSelectionVisibility,
+} from '@/features/map/mapSelectionVisibility';
 import type { NexaMapController } from '../contracts/mapRenderer';
 import {
   NEXA_MAP_RENDERER_ROLLOUT,
@@ -323,7 +327,16 @@ export const NexaMapScreenSurface = React.forwardRef<
   const activeSelectionKey = selectedPlace == null
     ? selectedEntityKey
     : `place:${selectedPlace.id}`;
+  const contextualSelectionVisible = hasContextualMapSelection(activeSelectionKey);
   const shouldDimUnselected = selectedPlace != null || dimUnselected;
+
+  React.useEffect(() => {
+    mapSelectionVisibility.setSelected(contextualSelectionVisible);
+  }, [contextualSelectionVisible]);
+
+  React.useEffect(() => () => {
+    mapSelectionVisibility.setSelected(false);
+  }, []);
 
   return (
     <>
