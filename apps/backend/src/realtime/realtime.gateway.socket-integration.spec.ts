@@ -12,6 +12,7 @@ import { WsJwtGuard } from './ws-jwt.guard';
 import { DiscoveryPresencePublisher } from './discovery-presence.publisher';
 import { PresenceService } from '../modules/presence/presence.service';
 import { ChatService } from '../modules/chat/chat.service';
+import { GroupConversationsService } from '../modules/chat/group-conversations.service';
 import { LocationShareService } from '../modules/chat/location-share.service';
 import { NotificationsService } from '../modules/notifications/notifications.service';
 import { ChallengesService } from '../modules/challenges/challenges.service';
@@ -285,6 +286,10 @@ describe('RealtimeGateway real Socket.IO revocation integration', () => {
           useValue: { clear: jest.fn(), publishHeartbeat: jest.fn() },
         },
         { provide: ChatService, useValue: {} },
+        {
+          provide: GroupConversationsService,
+          useValue: { leaveSharedGroupsForBlock: jest.fn(async (): Promise<string[]> => []) },
+        },
         { provide: LocationShareService, useValue: { update: locationUpdate } },
         { provide: NotificationsService, useValue: {} },
         { provide: ChallengesService, useValue: { increment: jest.fn(async () => undefined) } },
