@@ -109,4 +109,9 @@ export class PlaceDiscoveryQueryDto {
   @IsString()
   @MaxLength(80)
   query?: string;
+
+  /** Sort mode for Place entity pins. Aggregate clusters remain density-ordered. */
+  @IsOptional()
+  @IsIn(['relevance', 'distance', 'newest'])
+  rankBy?: DiscoveryRankBy;
 }

@@ -1,9 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import axios from 'axios';
 
-import type { MapDiscoveryResponse, Viewport } from '@g88/shared';
+import type { DiscoveryRankBy, MapDiscoveryResponse, Viewport } from '@g88/shared';
 
 import { postJson } from '@/api/client';
+import { mapDiscoveryRankStore } from '@/features/map/mapDiscoveryRank.store';
 import { extractMessage } from '@/utils/extractMessage';
 import { normalizePlaceMapSearch } from './placeMapSearch';
 
@@ -26,6 +33,7 @@ interface PlaceDiscoveryRequest {
   viewport: Viewport;
   zoom: number;
   query?: string;
+  rankBy?: DiscoveryRankBy;
 }
 
 export function usePlaceMapDiscovery({
@@ -42,13 +50,24 @@ export function usePlaceMapDiscovery({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastKeyRef = useRef('');
   const normalizedQuery = normalizePlaceMapSearch(query);
+  const rankBy = useSyncExternalStore(
+    mapDiscoveryRankStore.subscribe,
+    mapDiscoveryRankStore.getSnapshot,
+    mapDiscoveryRankStore.getSnapshot,
+  );
 
   const fetchNow = useCallback(async (
     nextViewport: Viewport,
     nextZoom: number,
     nextQuery: string,
+    nextRankBy: DiscoveryRankBy,
   ) => {
-    const key = JSON.stringify({ viewport: nextViewport, zoom: nextZoom, query: nextQuery });
+    const key = JSON.stringify({
+      viewport: nextViewport,
+      zoom: nextZoom,
+      query: nextQuery,
+      rankBy: nextRankBy,
+    });
     if (key === lastKeyRef.current) return;
     lastKeyRef.current = key;
 
@@ -65,6 +84,7 @@ export function usePlaceMapDiscovery({
           viewport: nextViewport,
           zoom: nextZoom,
           ...(nextQuery !== '' ? { query: nextQuery } : {}),
+          ...(nextRankBy !== 'relevance' ? { rankBy: nextRankBy } : {}),
         },
         { signal: controller.signal },
       );
@@ -91,21 +111,21 @@ export function usePlaceMapDiscovery({
     abortRef.current = null;
     lastKeyRef.current = '';
     timerRef.current = setTimeout(() => {
-      void fetchNow(viewport, zoom, normalizedQuery);
+      void fetchNow(viewport, zoom, normalizedQuery, rankBy);
     }, debounceMs);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [debounceMs, enabled, fetchNow, normalizedQuery, viewport, zoom]);
+  }, [debounceMs, enabled, fetchNow, normalizedQuery, rankBy, viewport, zoom]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const refresh = useCallback(() => {
     if (!enabled || viewport == null) return;
     lastKeyRef.current = '';
-    void fetchNow(viewport, zoom, normalizedQuery);
-  }, [enabled, fetchNow, normalizedQuery, viewport, zoom]);
+    void fetchNow(viewport, zoom, normalizedQuery, rankBy);
+  }, [enabled, fetchNow, normalizedQuery, rankBy, viewport, zoom]);
 
   return {
     data: enabled ? data : null,

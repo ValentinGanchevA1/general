@@ -4,6 +4,8 @@ import * as h3 from 'h3-js';
 import { PlaceMapDiscoveryService } from './place-map-discovery.service';
 
 const placeCell = '871e85992ffffff';
+const neighbourCell = h3.gridDisk(placeCell, 1).find((cell) => cell !== placeCell);
+if (neighbourCell == null) throw new Error('Expected an r7 neighbour cell for Place discovery tests');
 const [placeLat, placeLng] = h3.cellToLatLng(placeCell);
 const entityViewport = {
   sw: { lat: placeLat - 0.04, lng: placeLng - 0.04 },
@@ -54,7 +56,22 @@ describe('PlaceMapDiscoveryService', () => {
     const sql = String(query.mock.calls[0]?.[0]);
     expect(sql).toContain('t.expires_at > NOW()');
     expect(sql).toContain("p.status = 'active'");
+    expect(sql).toContain('ORDER BY t.last_emitted_at DESC');
     expect(sql).not.toContain('distinct_user_count');
+  });
+
+  it('ranks Place entity pins nearest to the viewport centre in distance mode', async () => {
+    query.mockResolvedValueOnce([
+      row('farther', 'Neighbour Place', neighbourCell),
+      row('nearest', 'Viewport Centre Place'),
+    ]);
+
+    const result = await service.nearby(entityViewport, 15, undefined, 'distance');
+    const ids = result.points
+      .filter((point) => point.kind === 'place')
+      .map((point) => point.id);
+
+    expect(ids).toEqual(['nearest', 'farther']);
   });
 
   it('applies canonical-label search before ordering, limiting, and clustering', async () => {
@@ -69,15 +86,17 @@ describe('PlaceMapDiscoveryService', () => {
     expect(query.mock.calls[0]?.[1]).toEqual([1000, 'Sea Garden']);
   });
 
-  it('includes normalized search in the full-snapshot viewport hash', async () => {
+  it('includes normalized search and rank mode in the full-snapshot viewport hash', async () => {
     query.mockResolvedValue([]);
 
-    const first = await service.nearby(entityViewport, 15, ' Sea ');
-    const same = await service.nearby(entityViewport, 15, 'sea');
-    const different = await service.nearby(entityViewport, 15, 'park');
+    const first = await service.nearby(entityViewport, 15, ' Sea ', 'relevance');
+    const same = await service.nearby(entityViewport, 15, 'sea', 'relevance');
+    const differentQuery = await service.nearby(entityViewport, 15, 'park', 'relevance');
+    const differentRank = await service.nearby(entityViewport, 15, 'sea', 'distance');
 
     expect(first.viewportHash).toBe(same.viewportHash);
-    expect(first.viewportHash).not.toBe(different.viewportHash);
+    expect(first.viewportHash).not.toBe(differentQuery.viewportHash);
+    expect(first.viewportHash).not.toBe(differentRank.viewportHash);
   });
 
   it('clusters place entities without exposing check-in or participant counts', async () => {
@@ -86,7 +105,7 @@ describe('PlaceMapDiscoveryService', () => {
       row('place-2', 'Nearby Place'),
     ]);
 
-    const result = await service.nearby(clusterViewport, 8);
+    const result = await service.nearby(clusterViewport, 8, undefined, 'distance');
     const clusters = result.points.filter((point) => point.kind === 'cluster');
 
     expect(clusters.length).toBeGreaterThan(0);
