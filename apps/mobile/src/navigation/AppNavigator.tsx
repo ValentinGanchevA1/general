@@ -26,6 +26,7 @@ import { ProfileCreationScreen } from '@/screens/ProfileCreationScreen';
 import { ProfileEditScreen } from '@/screens/ProfileEditScreen';
 import { PhotosScreen } from '@/screens/PhotosScreen';
 import { ChatScreen } from '@/screens/ChatScreen';
+import { GroupConversationsScreen } from '@/screens/GroupConversationsScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { AlertComposerScreen } from '@/screens/AlertComposerScreen';
 import { VerificationScreen } from '@/screens/VerificationScreen';
@@ -83,6 +84,7 @@ export type RootStackParamList = {
 	ProfileCreation: undefined;
 	Main: NavigatorScreenParams<TabParamList> | undefined;
 	Chat: { conversationId: string; otherUserName: string; requestPending?: boolean; otherUserId?: string; otherUserVerification?: VerificationLevel; otherUserIdVerified?: boolean };
+	GroupConversations: undefined;
 	UserProfile: { userId: string; focus?: 'trust' | 'stats' | 'storyline' | 'photos' | 'bio' | 'mutual' };
 	MutualFriends: { peerUserId: string; peerName?: string };
 	PlaceDetail: { placeId: string };
@@ -230,7 +232,7 @@ export function AppNavigator(): React.JSX.Element {
 	if (restoring && user === null) return <View style={{ flex: 1, backgroundColor: themeColors.bg, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Loading" accessibilityRole="progressbar"><BrandLogo size={120} /></View>;
 	return <NavigationContainer ref={navigationRef} theme={navigationTheme} onReady={() => { setNavigationReady(true); navigationIntegration.registerNavigationContainer(navigationRef); }}><BottomSheetModalProvider>
 		<Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themeColors.bg } }}>
-			{user ? <>{!profileSetupComplete && <Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} />}<Stack.Screen name="Main" component={MainTabs} /><Stack.Screen name="Chat" component={ChatScreen} /><Stack.Screen name="AlertComposer" component={AlertComposerScreen} /><Stack.Screen name="UserProfile" component={UserProfileScreen} /><Stack.Screen name="MutualFriends" component={MutualFriendsScreen} options={{ headerShown: false }} /><Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} /><Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} /><Stack.Screen name="Interactions" component={InteractionsScreen} options={{ headerShown: false }} /><Stack.Screen name="Gamification" component={GamificationNavigator} options={{ headerShown: false }} /><Stack.Screen name="Commerce" component={CommerceNavigator} options={{ headerShown: false }} /><Stack.Screen name="Account" component={AccountNavigator} options={{ headerShown: false }} /><Stack.Screen name="Social" component={SocialNavigator} options={{ headerShown: false }} /><Stack.Screen name="Events" component={EventsNavigator} options={{ headerShown: false }} /></> : <Stack.Screen name="Auth" component={AuthScreen} />}
+			{user ? <>{!profileSetupComplete && <Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} />}<Stack.Screen name="Main" component={MainTabs} /><Stack.Screen name="Chat" component={ChatScreen} /><Stack.Screen name="GroupConversations" component={GroupConversationsScreen} options={{ headerShown: false }} /><Stack.Screen name="AlertComposer" component={AlertComposerScreen} /><Stack.Screen name="UserProfile" component={UserProfileScreen} /><Stack.Screen name="MutualFriends" component={MutualFriendsScreen} options={{ headerShown: false }} /><Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} /><Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} /><Stack.Screen name="Interactions" component={InteractionsScreen} options={{ headerShown: false }} /><Stack.Screen name="Gamification" component={GamificationNavigator} options={{ headerShown: false }} /><Stack.Screen name="Commerce" component={CommerceNavigator} options={{ headerShown: false }} /><Stack.Screen name="Account" component={AccountNavigator} options={{ headerShown: false }} /><Stack.Screen name="Social" component={SocialNavigator} options={{ headerShown: false }} /><Stack.Screen name="Events" component={EventsNavigator} options={{ headerShown: false }} /></> : <Stack.Screen name="Auth" component={AuthScreen} />}
 		</Stack.Navigator>{user ? <AmbientToastHost /> : null}<AppAlertHost />
 	</BottomSheetModalProvider></NavigationContainer>;
 }
