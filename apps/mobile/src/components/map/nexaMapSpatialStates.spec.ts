@@ -51,6 +51,29 @@ describe('resolveNexaMapSpatialState', () => {
     ).toBe('error');
   });
 
+  it('treats a Place-only discovery failure as a recoverable map error', () => {
+    expect(
+      resolveNexaMapSpatialState({ ...base, placeHasError: true }),
+    ).toBe('error');
+  });
+
+  it('keeps visible content when Place discovery refresh fails', () => {
+    expect(
+      resolveNexaMapSpatialState({
+        ...base,
+        placeHasError: true,
+        hasPlacePoints: true,
+      }),
+    ).toBe('stale-error');
+    expect(
+      resolveNexaMapSpatialState({
+        ...base,
+        placeHasError: true,
+        pointCount: 4,
+      }),
+    ).toBe('stale-error');
+  });
+
   it('distinguishes first load from background refresh', () => {
     expect(
       resolveNexaMapSpatialState({ ...base, loading: true }),
