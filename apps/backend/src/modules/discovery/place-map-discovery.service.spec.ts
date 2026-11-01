@@ -57,6 +57,29 @@ describe('PlaceMapDiscoveryService', () => {
     expect(sql).not.toContain('distinct_user_count');
   });
 
+  it('applies canonical-label search before ordering, limiting, and clustering', async () => {
+    query.mockResolvedValueOnce([row('place-1', 'Sea Garden')]);
+
+    await service.nearby(clusterViewport, 8, '  Sea Garden  ');
+
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain('STRPOS(LOWER(p.canonical_label), LOWER($2)) > 0');
+    expect(sql.indexOf('STRPOS')).toBeLessThan(sql.indexOf('ORDER BY'));
+    expect(sql.indexOf('STRPOS')).toBeLessThan(sql.indexOf('LIMIT $1'));
+    expect(query.mock.calls[0]?.[1]).toEqual([1000, 'Sea Garden']);
+  });
+
+  it('includes normalized search in the full-snapshot viewport hash', async () => {
+    query.mockResolvedValue([]);
+
+    const first = await service.nearby(entityViewport, 15, ' Sea ');
+    const same = await service.nearby(entityViewport, 15, 'sea');
+    const different = await service.nearby(entityViewport, 15, 'park');
+
+    expect(first.viewportHash).toBe(same.viewportHash);
+    expect(first.viewportHash).not.toBe(different.viewportHash);
+  });
+
   it('clusters place entities without exposing check-in or participant counts', async () => {
     query.mockResolvedValueOnce([
       row('place-1', 'Sea Garden'),
