@@ -4,6 +4,7 @@ import authReducer from '@/features/auth/authSlice';
 import passwordResetReducer from '@/features/auth/passwordResetSlice';
 import profileReducer from '@/features/profile/profileSlice';
 import chatReducer, { outboxHydrated } from '@/features/chat/chatSlice';
+import groupChatReducer from '@/features/chat/groupChatSlice';
 import pulseReducer from '@/features/pulse/pulseSlice';
 import discoveryReducer from '@/features/discovery/discoverySlice';
 import idVerificationReducer from '@/features/verification/idVerificationSlice';
@@ -30,6 +31,7 @@ export const store = configureStore({
     passwordReset: passwordResetReducer,
     profile: profileReducer,
     chat: chatReducer,
+    groupChat: groupChatReducer,
     pulse: pulseReducer,
     discovery: discoveryReducer,
     idVerification: idVerificationReducer,
