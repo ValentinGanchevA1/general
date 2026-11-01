@@ -49,6 +49,7 @@ describe('GroupConversationsService', () => {
         { id: MEMBER_A, is_friend: true, blocked: false },
         { id: MEMBER_B, is_friend: true, blocked: false },
       ])
+      .mockResolvedValueOnce([{ blocked: false }])
       .mockResolvedValueOnce([{ id: GROUP_ID }])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([SUMMARY_ROW]);
@@ -61,18 +62,42 @@ describe('GroupConversationsService', () => {
     expect(result.conversation.kind).toBe('group');
     expect(result.conversation.title).toBe('Varna builders');
 
-    const createSql = String(txQuery.mock.calls[2]?.[0]);
+    const createSql = String(txQuery.mock.calls[3]?.[0]);
     expect(createSql).toContain("ARRAY[]::uuid[]");
     expect(createSql).toContain("'group'");
     expect(createSql).toContain('creation_key');
 
-    const memberSql = String(txQuery.mock.calls[3]?.[0]);
+    const memberSql = String(txQuery.mock.calls[4]?.[0]);
     expect(memberSql).toContain("THEN 'owner' ELSE 'member'");
-    expect(txQuery.mock.calls[3]?.[1]).toEqual([
+    expect(txQuery.mock.calls[4]?.[1]).toEqual([
       GROUP_ID,
       CREATOR,
       [CREATOR, MEMBER_A, MEMBER_B],
     ]);
+  });
+
+  it('rejects group creation when invited members have blocked each other', async () => {
+    const txQuery = jest.fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: MEMBER_A, is_friend: true, blocked: false },
+        { id: MEMBER_B, is_friend: true, blocked: false },
+      ])
+      .mockResolvedValueOnce([{ blocked: true }]);
+    transaction.mockImplementation(async (work: (tx: EntityManager) => Promise<unknown>) =>
+      work({ query: txQuery } as unknown as EntityManager));
+
+    await expect(service.create(CREATOR, request())).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'chat.group_invite_forbidden' }),
+    });
+
+    const blockSql = String(txQuery.mock.calls[2]?.[0]);
+    expect(blockSql).toContain('b.blocker_id = ANY($1::uuid[])');
+    expect(blockSql).toContain('b.blocked_id = ANY($1::uuid[])');
+    expect(txQuery.mock.calls[2]?.[1]).toEqual([[CREATOR, MEMBER_A, MEMBER_B]]);
+    expect(
+      txQuery.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO conversations')),
+    ).toBe(false);
   });
 
   it('reuses an identical client request without inserting another group', async () => {
