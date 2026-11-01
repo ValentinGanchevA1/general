@@ -832,6 +832,7 @@ export function MapScreen(): React.JSX.Element {
 				<NexaMapScreenSurface
 					ref={mapRef}
 					points={filteredPoints}
+					placeSearchQuery={searchQuery}
 					selectedEntityKey={selectedMarkerKey}
 					dimUnselected={selected != null}
 					mode={mode}
