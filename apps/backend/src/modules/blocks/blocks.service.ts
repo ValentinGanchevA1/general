@@ -23,7 +23,7 @@ export interface BlockedUserRow {
  *  - FriendsService: follow/request create paths call isBlocked(); on block we
  *    hard-delete follows, friendships, and cancel pending friend_requests.
  *  - GroupConversationsService: the blocker soft-leaves shared active groups so
- *    a future group realtime fanout cannot keep the blocked pair co-members.
+ *    group realtime fanout cannot keep the blocked pair co-members.
  */
 @Injectable()
 export class BlocksService {
@@ -47,10 +47,12 @@ export class BlocksService {
       [blockerId, blockedId],
     );
 
-    // Blocking is a privacy boundary. Remove the blocker from shared groups before
-    // any future group realtime fanout can be activated. This is idempotent and
-    // transfers owner role atomically inside the group membership transaction.
-    await this.groups.leaveSharedGroupsForBlock(blockerId, blockedId);
+    // Blocking is a privacy boundary. Remove the blocker from shared groups and
+    // evict all of their sockets from those conversation rooms cluster-wide.
+    const sharedGroupIds = await this.groups.leaveSharedGroupsForBlock(blockerId, blockedId);
+    for (const conversationId of sharedGroupIds) {
+      this.realtime.leaveRoomForUsers([blockerId], `convo:${conversationId}`);
+    }
 
     // Hard-delete social graph edges (follows, friendships, pending requests).
     await this.friends.onBlock(blockerId, blockedId);
