@@ -47,6 +47,14 @@ export interface ActivityNarrative {
 
 export type CheckInAudience = 'friends' | 'nearby';
 
+/**
+ * Product-level cooldown after any explicit Pulse check-in.
+ * The backend remains authoritative; mobile uses the same value only to avoid
+ * offering a submit action that the server is guaranteed to reject.
+ */
+export const PULSE_CHECK_IN_COOLDOWN_MINUTES = 15;
+export const PULSE_CHECK_IN_COOLDOWN_MS = PULSE_CHECK_IN_COOLDOWN_MINUTES * 60 * 1000;
+
 /** Explicit user-authored Pulse check-in. Exact coordinates are transport-only. */
 export interface CreatePulseCheckInRequest {
   placeLabel: string;
