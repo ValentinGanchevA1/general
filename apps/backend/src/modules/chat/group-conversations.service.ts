@@ -76,6 +76,7 @@ export class GroupConversationsService {
       }
 
       await this.assertInviteesEligible(tx, creatorId, memberIds);
+      await this.assertNoBlockedMemberPair(tx, [creatorId, ...memberIds]);
 
       const [created] = await tx.query<Array<{ id: string }>>(
         `INSERT INTO conversations
@@ -174,6 +175,29 @@ export class GroupConversationsService {
       rows.length !== memberIds.length ||
       rows.some((row) => row.is_friend !== true || row.blocked === true)
     ) {
+      throw new ForbiddenException({
+        code: 'chat.group_invite_forbidden',
+        message: 'One or more selected members cannot be added to this group',
+      });
+    }
+  }
+
+  private async assertNoBlockedMemberPair(
+    tx: QueryExecutor,
+    memberIds: string[],
+  ): Promise<void> {
+    const [row] = await tx.query<Array<{ blocked: boolean }>>(
+      `SELECT EXISTS (
+         SELECT 1
+           FROM user_blocks b
+          WHERE b.blocker_id = ANY($1::uuid[])
+            AND b.blocked_id = ANY($1::uuid[])
+            AND b.blocker_id <> b.blocked_id
+       ) AS blocked`,
+      [memberIds],
+    );
+
+    if (row?.blocked !== false) {
       throw new ForbiddenException({
         code: 'chat.group_invite_forbidden',
         message: 'One or more selected members cannot be added to this group',
