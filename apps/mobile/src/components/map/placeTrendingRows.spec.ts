@@ -24,9 +24,10 @@ const EVENT_POINT: EntityPoint = {
   lng: 27.91,
   meta: {
     title: 'Sunset Meetup',
+    coverUrl: null,
     startsAt: '2026-11-01T18:00:00.000Z',
-    category: null,
-    participantCount: 8,
+    attendeeCount: 8,
+    capacity: null,
   },
 };
 
