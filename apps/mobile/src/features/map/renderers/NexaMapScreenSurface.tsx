@@ -196,12 +196,13 @@ export const NexaMapScreenSurface = React.forwardRef<
     enabled: publicPlacesEnabled && viewport != null,
     query: placeSearchQuery,
   });
+  const refreshPlaceDiscovery = placeDiscovery.refresh;
 
   React.useEffect(() => {
     if (handledPlaceRefreshRequestIdRef.current === placeRefreshRequestId) return;
     handledPlaceRefreshRequestIdRef.current = placeRefreshRequestId;
-    placeDiscovery.refresh();
-  }, [placeDiscovery.refresh, placeRefreshRequestId]);
+    refreshPlaceDiscovery();
+  }, [placeRefreshRequestId, refreshPlaceDiscovery]);
 
   const savedPlacePoints = useSavedPlacesMapOverlay({
     enabled: savedPlacesEnabled,
