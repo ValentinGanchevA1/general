@@ -4,6 +4,7 @@ import { RealtimeGateway } from './realtime.gateway';
 const conversationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const senderId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const recipientId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const memberCId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const message = { id: 'message-1', conversationId, senderId, body: 'hello', type: 'text' };
 
 function setup(joined = true) {
@@ -11,15 +12,12 @@ function setup(joined = true) {
   const emit = jest.fn();
   const to = jest.fn().mockReturnValue({ emit });
   const persist = jest.fn().mockResolvedValue(message);
-  const dbQuery = jest.fn().mockResolvedValue([
-    { user_id: senderId },
-    { user_id: recipientId },
-  ]);
+  const getRecipientIds = jest.fn().mockResolvedValue([senderId, recipientId]);
   const push = jest.fn().mockResolvedValue(undefined);
   Object.assign(gateway, {
     server: { to },
-    db: { query: dbQuery },
     chat: { persist },
+    chatRealtimeAccess: { getRecipientIds },
     logger: { warn: jest.fn(), error: jest.fn() },
     challenges: { increment: jest.fn().mockResolvedValue(undefined) },
     pushToOfflineParticipants: push,
@@ -34,15 +32,15 @@ function setup(joined = true) {
       body: 'hello',
       clientMessageId: 'client-1',
     });
-  return { send, to, emit, persist, dbQuery, push };
+  return { gateway, client, send, to, emit, persist, getRecipientIds, push };
 }
 
 describe('RealtimeGateway persisted text-message fanout', () => {
   it('reauthorizes recipients and emits only to their user rooms', async () => {
-    const { send, to, emit, dbQuery, push } = setup();
+    const { send, to, emit, getRecipientIds, push } = setup();
     await expect(send()).resolves.toEqual({ ok: true, data: message });
-    expect(dbQuery).toHaveBeenCalledTimes(1);
-    expect(dbQuery).toHaveBeenCalledWith(expect.stringContaining('user_blocks'), [conversationId]);
+    expect(getRecipientIds).toHaveBeenCalledTimes(1);
+    expect(getRecipientIds).toHaveBeenCalledWith(conversationId, false);
     expect(to).toHaveBeenCalledTimes(2);
     expect(to).toHaveBeenNthCalledWith(1, `user:${senderId}`);
     expect(to).toHaveBeenNthCalledWith(2, `user:${recipientId}`);
@@ -52,11 +50,21 @@ describe('RealtimeGateway persisted text-message fanout', () => {
     expect(push).toHaveBeenCalledWith(conversationId, senderId, message.body);
   });
 
-  it('does not deliver to a previously joined but newly blocked recipient', async () => {
-    const { send, to, emit, dbQuery } = setup();
-    // SQL recipient authorization excludes the blocked peer even if their socket
-    // is still joined to the old conversation room on another device.
-    dbQuery.mockResolvedValue([{ user_id: senderId }]);
+  it('fans a group message out to every currently authorized active member', async () => {
+    const { send, to, emit, getRecipientIds } = setup();
+    getRecipientIds.mockResolvedValue([senderId, recipientId, memberCId]);
+
+    await expect(send()).resolves.toEqual({ ok: true, data: message });
+    expect(to).toHaveBeenCalledTimes(3);
+    expect(to).toHaveBeenNthCalledWith(1, `user:${senderId}`);
+    expect(to).toHaveBeenNthCalledWith(2, `user:${recipientId}`);
+    expect(to).toHaveBeenNthCalledWith(3, `user:${memberCId}`);
+    expect(emit).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not deliver to a previously joined but newly unauthorized recipient', async () => {
+    const { send, to, emit, getRecipientIds } = setup();
+    getRecipientIds.mockResolvedValue([senderId]);
     await expect(send()).resolves.toEqual({ ok: true, data: message });
     expect(to).toHaveBeenCalledTimes(1);
     expect(to).toHaveBeenCalledWith(`user:${senderId}`);
@@ -64,25 +72,25 @@ describe('RealtimeGateway persisted text-message fanout', () => {
     expect(emit).toHaveBeenCalledTimes(1);
   });
 
-  it('does not broadcast or query recipients when the socket has not joined', async () => {
-    const { send, persist, dbQuery, emit } = setup(false);
+  it('does not broadcast or resolve recipients when the socket has not joined', async () => {
+    const { send, persist, getRecipientIds, emit } = setup(false);
     await expect(send()).resolves.toMatchObject({ ok: false, code: 'chat.forbidden' });
     expect(persist).not.toHaveBeenCalled();
-    expect(dbQuery).not.toHaveBeenCalled();
+    expect(getRecipientIds).not.toHaveBeenCalled();
     expect(emit).not.toHaveBeenCalled();
   });
 
   it('does not fan out when authoritative persistence rejects the send', async () => {
-    const { send, persist, dbQuery, emit } = setup();
+    const { send, persist, getRecipientIds, emit } = setup();
     persist.mockRejectedValue(new ForbiddenException({ code: 'chat.forbidden', message: 'Denied' }));
     await expect(send()).resolves.toMatchObject({ ok: false, code: 'chat.forbidden' });
-    expect(dbQuery).not.toHaveBeenCalled();
+    expect(getRecipientIds).not.toHaveBeenCalled();
     expect(emit).not.toHaveBeenCalled();
   });
 
   it('fails closed when recipient reauthorization fails after persistence', async () => {
-    const { send, dbQuery, to, emit } = setup();
-    dbQuery.mockRejectedValue(new Error('database unavailable'));
+    const { send, getRecipientIds, to, emit } = setup();
+    getRecipientIds.mockRejectedValue(new Error('database unavailable'));
     await expect(send()).resolves.toMatchObject({
       ok: false,
       code: 'chat.failed',
@@ -90,5 +98,34 @@ describe('RealtimeGateway persisted text-message fanout', () => {
     });
     expect(to).not.toHaveBeenCalled();
     expect(emit).not.toHaveBeenCalled();
+  });
+});
+
+describe('RealtimeGateway conversation join authorization', () => {
+  it('allows an active normalized group member to join the conversation room', async () => {
+    const { gateway, client, getRecipientIds } = setup(false);
+    const join = jest.fn();
+    Object.assign(client, { join });
+    getRecipientIds.mockResolvedValue([senderId, recipientId, memberCId]);
+
+    await expect(
+      gateway.onConversationJoin(client as never, { conversationId }),
+    ).resolves.toEqual({ ok: true, data: { joined: true } });
+    expect(getRecipientIds).toHaveBeenCalledWith(conversationId, false);
+    expect(join).toHaveBeenCalledWith(`convo:${conversationId}`);
+    expect(client.rooms.has(`convo:${conversationId}`)).toBe(true);
+  });
+
+  it('rejects a left or otherwise unauthorized group member', async () => {
+    const { gateway, client, getRecipientIds } = setup(false);
+    const join = jest.fn();
+    Object.assign(client, { join });
+    getRecipientIds.mockResolvedValue([recipientId, memberCId]);
+
+    await expect(
+      gateway.onConversationJoin(client as never, { conversationId }),
+    ).resolves.toMatchObject({ ok: false, code: 'chat.forbidden' });
+    expect(join).not.toHaveBeenCalled();
+    expect(client.rooms.has(`convo:${conversationId}`)).toBe(false);
   });
 });
