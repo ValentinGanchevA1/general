@@ -28,6 +28,7 @@ import {
 } from '@/features/discovery/discoverySlice';
 import { createDiscoveryMutationLog } from '@/features/discovery/discoveryMutationLog';
 import { replayDiscoveryMutations } from '@/features/discovery/discoveryMutationReplay';
+import { mapDiscoveryRankStore } from '@/features/map/mapDiscoveryRank.store';
 import { marketplaceKindMapFilterStore } from '@/features/map/marketplaceKindMapFilter.store';
 import { useSocket } from '@/realtime/useSocket';
 import { extractMessage } from '@/utils/extractMessage';
@@ -127,6 +128,14 @@ export function useDiscovery({
   const [data, setData] = useState<DiscoveryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    mapDiscoveryRankStore.set(rankBy);
+  }, [rankBy]);
+
+  useEffect(() => () => {
+    mapDiscoveryRankStore.reset();
+  }, []);
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);

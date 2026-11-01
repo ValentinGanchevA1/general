@@ -8,12 +8,15 @@ import {
   cellsForViewport,
   h3ResolutionForZoom,
   isEntityZoom,
+  type DiscoveryRankBy,
   type MapClusterPoint,
   type MapDiscoveryPoint,
   type MapDiscoveryResponse,
   type PlaceMapEntityPoint,
   type Viewport,
 } from '@g88/shared';
+
+import { haversineM } from './ranking/scoring';
 
 const MAX_DISCOVERABLE_PLACE_ROWS = 1_000;
 const MAX_POINTS_PER_RESPONSE = 500;
@@ -42,6 +45,7 @@ export class PlaceMapDiscoveryService {
     viewport: Viewport,
     zoom: number,
     query?: string,
+    rankBy: DiscoveryRankBy = 'relevance',
   ): Promise<MapDiscoveryResponse> {
     const normalizedQuery = query?.trim() ?? '';
     const resolution = h3ResolutionForZoom(zoom);
@@ -49,7 +53,7 @@ export class PlaceMapDiscoveryService {
     const viewportCellSet = new Set(viewportCells);
 
     if (viewportCells.length === 0) {
-      return this.response([], resolution, viewport, zoom, normalizedQuery);
+      return this.response([], resolution, viewport, zoom, normalizedQuery, rankBy);
     }
 
     const rows = await this.db.query<DiscoverablePlaceRow[]>(
@@ -71,12 +75,13 @@ export class PlaceMapDiscoveryService {
     const places = rows
       .map((row) => this.toEntityPoint(row, resolution, viewportCellSet))
       .filter((point): point is PlaceMapEntityPoint => point != null);
+    const rankedEntityPlaces = this.rankEntityPlaces(places, viewport, rankBy);
 
     const points = isEntityZoom(zoom)
-      ? places.slice(0, MAX_POINTS_PER_RESPONSE)
+      ? rankedEntityPlaces.slice(0, MAX_POINTS_PER_RESPONSE)
       : this.cluster(places, resolution).slice(0, MAX_POINTS_PER_RESPONSE);
 
-    return this.response(points, resolution, viewport, zoom, normalizedQuery);
+    return this.response(points, resolution, viewport, zoom, normalizedQuery, rankBy);
   }
 
   private toEntityPoint(
@@ -106,6 +111,21 @@ export class PlaceMapDiscoveryService {
         locationPrecision: 'coarse',
       },
     };
+  }
+
+  private rankEntityPlaces(
+    places: PlaceMapEntityPoint[],
+    viewport: Viewport,
+    rankBy: DiscoveryRankBy,
+  ): PlaceMapEntityPoint[] {
+    if (rankBy !== 'distance') return places;
+
+    const centreLat = (viewport.ne.lat + viewport.sw.lat) / 2;
+    const centreLng = (viewport.ne.lng + viewport.sw.lng) / 2;
+    return [...places].sort((left, right) => (
+      haversineM(centreLat, centreLng, left.lat, left.lng)
+      - haversineM(centreLat, centreLng, right.lat, right.lng)
+    ));
   }
 
   private cellAtResolution(
@@ -150,6 +170,7 @@ export class PlaceMapDiscoveryService {
     viewport: Viewport,
     zoom: number,
     query: string,
+    rankBy: DiscoveryRankBy,
   ): MapDiscoveryResponse {
     return {
       points,
@@ -162,6 +183,7 @@ export class PlaceMapDiscoveryService {
           kind: 'place',
           thresholded: true,
           query: query.toLocaleLowerCase(),
+          rankBy,
         }))
         .digest('hex')
         .slice(0, 12),
