@@ -28,6 +28,7 @@ import { PlaceMapPreviewSheet } from '@/features/places/PlaceMapPreviewSheet';
 import { loadSavedPlaces, setPlaceSaved } from '@/features/places/placeDetailSlice';
 import { shouldDismissPrivatePlacePreview } from '@/features/places/placePreviewLifecycle';
 import { setPendingPlaceCheckIn } from '@/features/places/pendingPlaceCheckIn';
+import { publicPlacesMapLayerStore } from '@/features/places/publicPlacesMapLayer.store';
 import { savedPlaceMapFocusStore } from '@/features/places/savedPlaceMapFocus.store';
 import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
 import { usePlaceMapDiscovery } from '@/features/places/usePlaceMapDiscovery';
@@ -121,6 +122,11 @@ export const NexaMapScreenSurface = React.forwardRef<
   const [settledRegion, setSettledRegion] = useState<Region | null>(null);
   const viewport = useMemo(() => regionToViewport(settledRegion), [settledRegion]);
   const zoom = useMemo(() => approxZoom(settledRegion), [settledRegion]);
+  const publicPlacesEnabled = useSyncExternalStore(
+    publicPlacesMapLayerStore.subscribe,
+    publicPlacesMapLayerStore.getSnapshot,
+    publicPlacesMapLayerStore.getSnapshot,
+  );
   const savedPlacesEnabled = useSyncExternalStore(
     savedPlacesMapLayerStore.subscribe,
     savedPlacesMapLayerStore.getSnapshot,
@@ -153,7 +159,7 @@ export const NexaMapScreenSurface = React.forwardRef<
   const placeDiscovery = usePlaceMapDiscovery({
     viewport,
     zoom,
-    enabled: viewport != null,
+    enabled: publicPlacesEnabled && viewport != null,
   });
   const savedPlacePoints = useSavedPlacesMapOverlay({
     enabled: savedPlacesEnabled,
@@ -178,10 +184,10 @@ export const NexaMapScreenSurface = React.forwardRef<
   const mergedPoints = useMemo(
     () => mergeMapDiscoveryPoints(
       points,
-      placeDiscovery.data?.points ?? [],
+      publicPlacesEnabled ? (placeDiscovery.data?.points ?? []) : [],
       privateSavedPlacePoints,
     ),
-    [placeDiscovery.data?.points, points, privateSavedPlacePoints],
+    [placeDiscovery.data?.points, points, privateSavedPlacePoints, publicPlacesEnabled],
   );
 
   const mapLibreEnabled = useAppSelector(
