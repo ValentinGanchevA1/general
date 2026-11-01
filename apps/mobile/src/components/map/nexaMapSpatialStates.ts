@@ -15,6 +15,10 @@ export interface ResolveNexaMapSpatialStateArgs {
   pointCount: number;
   viewportHash: string | null;
   isCityScale: boolean;
+  /** Renderer-local Place discovery can load independently from legacy discovery. */
+  placeLoading?: boolean;
+  /** True when at least one public/private/focused Place is currently visible. */
+  hasPlacePoints?: boolean;
 }
 
 /**
@@ -24,6 +28,7 @@ export interface ResolveNexaMapSpatialStateArgs {
  * - an oversized viewport needs a zoom hint instead of a false empty state;
  * - stale points stay visible when refresh fails;
  * - loading over existing data is a compact refresh state, not a blocker;
+ * - renderer-local Place points count as visible map content;
  * - true empty copy is only shown once the viewport is local enough to act on.
  */
 export function resolveNexaMapSpatialState({
@@ -33,18 +38,22 @@ export function resolveNexaMapSpatialState({
   pointCount,
   viewportHash,
   isCityScale,
+  placeLoading = false,
+  hasPlacePoints = false,
 }: ResolveNexaMapSpatialStateArgs): NexaMapSpatialState {
   if (!hasRegion) return 'starting';
   if (viewportHash === 'too-large') return 'zoom-in';
 
+  const hasAnyPoints = pointCount > 0 || hasPlacePoints;
+
   if (hasError) {
-    return pointCount > 0 ? 'stale-error' : 'error';
+    return hasAnyPoints ? 'stale-error' : 'error';
   }
 
-  if (loading) {
-    return pointCount > 0 ? 'refreshing' : 'loading';
+  if (loading || placeLoading) {
+    return hasAnyPoints ? 'refreshing' : 'loading';
   }
 
-  if (pointCount === 0 && isCityScale) return 'empty';
+  if (!hasAnyPoints && isCityScale) return 'empty';
   return 'ready';
 }

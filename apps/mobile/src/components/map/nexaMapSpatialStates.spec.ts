@@ -35,6 +35,16 @@ describe('resolveNexaMapSpatialState', () => {
     ).toBe('stale-error');
   });
 
+  it('treats visible Place points as stale content when legacy discovery fails', () => {
+    expect(
+      resolveNexaMapSpatialState({
+        ...base,
+        hasError: true,
+        hasPlacePoints: true,
+      }),
+    ).toBe('stale-error');
+  });
+
   it('uses a recoverable discovery error when no prior points exist', () => {
     expect(
       resolveNexaMapSpatialState({ ...base, hasError: true }),
@@ -54,10 +64,29 @@ describe('resolveNexaMapSpatialState', () => {
     ).toBe('refreshing');
   });
 
+  it('treats Place discovery as part of the same map loading surface', () => {
+    expect(
+      resolveNexaMapSpatialState({ ...base, placeLoading: true }),
+    ).toBe('loading');
+    expect(
+      resolveNexaMapSpatialState({
+        ...base,
+        placeLoading: true,
+        hasPlacePoints: true,
+      }),
+    ).toBe('refreshing');
+  });
+
   it('shows empty copy only at an actionable local scale', () => {
     expect(resolveNexaMapSpatialState(base)).toBe('empty');
     expect(
       resolveNexaMapSpatialState({ ...base, isCityScale: false }),
+    ).toBe('ready');
+  });
+
+  it('does not show empty copy while a Place point is visible', () => {
+    expect(
+      resolveNexaMapSpatialState({ ...base, hasPlacePoints: true }),
     ).toBe('ready');
   });
 
