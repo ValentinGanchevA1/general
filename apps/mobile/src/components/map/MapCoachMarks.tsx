@@ -2,7 +2,7 @@
 // Four steps: pin → create (+ / long-press) → wave → pulse. v2 key re-shows for users who finished v1.
 // Skip always available — never block power users.
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   Modal,
   Pressable,
@@ -15,6 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 import { track } from '@/lib/analytics';
+import { mapSelectionVisibility } from '@/features/map/mapSelectionVisibility';
+import { shouldPresentMapCoachMarks } from './mapCoachMarksVisibility';
 
 /** Persist key — v2 re-shows coach so users who finished v1 see create (+ / long-press). */
 const STORAGE_KEY = 'g88:map_coach_v2';
@@ -31,7 +33,7 @@ const STEPS: Step[] = [
     id: 'pin',
     emoji: '📍',
     title: 'You are on the map',
-    body: 'Your pin is your presence. Other pins are people, events, and listings nearby. Pan and zoom to explore the area.',
+    body: 'Your pin is your presence. Other pins are people, events, places, and listings nearby. Pan and zoom to explore the area.',
   },
   {
     id: 'create',
@@ -66,6 +68,12 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
   const [step, setStep] = useState(0);
   /** null = still loading; true = should show when map ready; false = already done */
   const [shouldShow, setShouldShow] = useState<boolean | null>(null);
+  const trackedShownRef = useRef(false);
+  const contextualSelectionVisible = useSyncExternalStore(
+    mapSelectionVisibility.subscribe,
+    mapSelectionVisibility.getSnapshot,
+    mapSelectionVisibility.getSnapshot,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -83,14 +91,28 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
   }, []);
 
   useEffect(() => {
-    if (shouldShow !== true || !mapReady) return;
-    // Defer so we do not call setState synchronously inside the effect body (eslint).
+    const canPresent = shouldPresentMapCoachMarks({
+      shouldShow,
+      mapReady,
+      contextualSelectionVisible,
+    });
+
+    if (!canPresent) {
+      if (!contextualSelectionVisible) return;
+      const t = setTimeout(() => setVisible(false), 0);
+      return () => clearTimeout(t);
+    }
+
+    // Defer so marker selection effects can claim the contextual surface first.
     const t = setTimeout(() => {
       setVisible(true);
-      track('map.coach_shown', { step: STEPS[0]!.id });
+      if (!trackedShownRef.current) {
+        trackedShownRef.current = true;
+        track('map.coach_shown', { step: STEPS[0]!.id });
+      }
     }, 0);
     return () => clearTimeout(t);
-  }, [shouldShow, mapReady]);
+  }, [shouldShow, mapReady, contextualSelectionVisible]);
 
   const persistDone = useCallback(async () => {
     try {
@@ -102,6 +124,7 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
 
   const onSkip = useCallback(() => {
     setVisible(false);
+    setShouldShow(false);
     void persistDone();
     track('map.coach_dismissed', {
       reason: 'skip',
@@ -112,6 +135,7 @@ export function MapCoachMarks({ mapReady }: Props): React.JSX.Element | null {
   const onNext = useCallback(() => {
     if (step >= STEPS.length - 1) {
       setVisible(false);
+      setShouldShow(false);
       void persistDone();
       track('map.coach_dismissed', { reason: 'complete', step: 'pulse' });
       return;
