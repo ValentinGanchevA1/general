@@ -63,14 +63,14 @@ async function completeProfile(user, sharedInterest) {
   assert(response.status === 200, `profile setup failed: HTTP ${response.status}`);
 }
 
-async function openConversation(a, b) {
+async function openConversation(owner, peer) {
   const { response, body } = await api('/conversations', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${a.accessToken}`,
+      Authorization: `Bearer ${owner.accessToken}`,
     },
-    body: JSON.stringify({ targetUserId: b.userId }),
+    body: JSON.stringify({ targetUserId: peer.userId }),
   });
   assert(response.status === 201, `open conversation failed: HTTP ${response.status}`);
   assert(typeof body?.conversationId === 'string', 'conversation id missing');
@@ -110,77 +110,84 @@ function emitAck(socket, event, payload, timeoutMs = 8_000) {
   });
 }
 
-async function promoteConversation(a, b, conversationId, runId) {
-  let socketA;
-  let socketB;
+async function promoteConversation(owner, peer, conversationId, runId, label) {
+  let ownerSocket;
+  let peerSocket;
   try {
-    [socketA, socketB] = await Promise.all([
-      connectSocket(a.accessToken),
-      connectSocket(b.accessToken),
+    [ownerSocket, peerSocket] = await Promise.all([
+      connectSocket(owner.accessToken),
+      connectSocket(peer.accessToken),
     ]);
-    const [joinA, joinB] = await Promise.all([
-      emitAck(socketA, 'conversation:join', { conversationId }),
-      emitAck(socketB, 'conversation:join', { conversationId }),
+    const [ownerJoin, peerJoin] = await Promise.all([
+      emitAck(ownerSocket, 'conversation:join', { conversationId }),
+      emitAck(peerSocket, 'conversation:join', { conversationId }),
     ]);
-    assert(joinA.ok && joinB.ok, 'conversation join failed during setup');
+    assert(ownerJoin.ok && peerJoin.ok, `${label} conversation join failed during setup`);
 
-    const first = await emitAck(socketA, 'chat:send', {
+    const first = await emitAck(ownerSocket, 'chat:send', {
       conversationId,
-      body: `device privacy setup ${runId}`,
-      clientMessageId: `device-a-${runId}`,
+      body: `device privacy setup ${label}`,
+      clientMessageId: `device-${label}-owner-${runId}`,
     });
-    assert(first.ok, 'A setup message failed');
+    assert(first.ok, `${label} owner setup message failed`);
 
-    const reply = await emitAck(socketB, 'chat:send', {
+    const reply = await emitAck(peerSocket, 'chat:send', {
       conversationId,
       body: 'device privacy ready',
-      clientMessageId: `device-b-${runId}`,
+      clientMessageId: `device-${label}-peer-${runId}`,
     });
-    assert(reply.ok, 'B setup reply failed');
+    assert(reply.ok, `${label} peer setup reply failed`);
   } finally {
-    socketA?.disconnect();
-    socketB?.disconnect();
+    ownerSocket?.disconnect();
+    peerSocket?.disconnect();
   }
+}
+
+async function createPair(firstLabel, secondLabel, runId, password) {
+  const sharedInterest = `device-privacy-${firstLabel.toLowerCase()}${secondLabel.toLowerCase()}-${runId}`;
+  const [first, second] = await Promise.all([
+    register(firstLabel, runId, password),
+    register(secondLabel, runId, password),
+  ]);
+  await Promise.all([
+    completeProfile(first, sharedInterest),
+    completeProfile(second, sharedInterest),
+  ]);
+  const conversationId = await openConversation(first, second);
+  await promoteConversation(first, second, conversationId, runId, `${firstLabel}${secondLabel}`);
+  return { first, second, conversationId };
 }
 
 async function prepare() {
   const secret = randomBytes(12).toString('hex');
   const runId = `${Date.now()}-${secret.slice(0, 8)}`;
   const password = `DevicePass${secret}Aa1`;
-  const sharedInterest = `device-privacy-${runId}`;
 
-  const [a, b] = await Promise.all([
-    register('A', runId, password),
-    register('B', runId, password),
+  const [revocationPair, authorizedPair] = await Promise.all([
+    createPair('A', 'B', runId, password),
+    createPair('C', 'D', runId, password),
   ]);
-  await Promise.all([
-    completeProfile(a, sharedInterest),
-    completeProfile(b, sharedInterest),
-  ]);
-  const conversationId = await openConversation(a, b);
-  await promoteConversation(a, b, conversationId, runId);
 
   await mkdir(dirname(STATE_FILE), { recursive: true });
   await writeFile(
     STATE_FILE,
-    JSON.stringify({ baseUrl: BASE, password, conversationId, a, b }, null, 2),
+    JSON.stringify({
+      baseUrl: BASE,
+      password,
+      a: revocationPair.first,
+      b: revocationPair.second,
+      abConversationId: revocationPair.conversationId,
+      c: authorizedPair.first,
+      d: authorizedPair.second,
+      cdConversationId: authorizedPair.conversationId,
+    }, null, 2),
     { mode: 0o600 },
   );
-  console.log(`[device-e2e] prepared isolated A/B accounts and accepted conversation (${runId})`);
+  console.log(`[device-e2e] prepared isolated A/B and C/D accepted conversations (${runId})`);
 }
 
 async function loadState() {
   return JSON.parse(await readFile(STATE_FILE, 'utf8'));
-}
-
-async function unblock() {
-  const state = await loadState();
-  const { response } = await api(`/blocks/${encodeURIComponent(state.b.userId)}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${state.a.accessToken}` },
-  });
-  assert(response.status === 200, `unblock failed: HTTP ${response.status}`);
-  console.log('[device-e2e] restored authorized A/B relationship');
 }
 
 async function deleteAccount(user, password) {
@@ -203,14 +210,14 @@ async function cleanup() {
   await Promise.allSettled([
     deleteAccount(state.a, state.password),
     deleteAccount(state.b, state.password),
+    deleteAccount(state.c, state.password),
+    deleteAccount(state.d, state.password),
   ]);
   console.log('[device-e2e] cleanup requested for synthetic accounts');
 }
 
 if (command === 'prepare') {
   await prepare();
-} else if (command === 'unblock') {
-  await unblock();
 } else if (command === 'cleanup') {
   await cleanup();
 } else {
