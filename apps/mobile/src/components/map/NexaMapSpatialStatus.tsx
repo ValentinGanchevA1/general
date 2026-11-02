@@ -79,7 +79,7 @@ export function NexaMapSpatialStatus({
   const borderColor = presentation.tone === 'action' ? colors.actionBorderSoft : presentation.tone === 'warning' ? colors.borderStrong : colors.discoveryBorderSoft;
   const tintedSurface = presentation.tone === 'action' ? colors.actionSoft : presentation.tone === 'warning' ? colors.surfaceSecondary : colors.discoverySoft;
   const onAction = presentation.action === 'empty' ? onEmptyAction : presentation.action === 'retry' ? onRetry : presentation.action === 'zoom' ? onZoomIn : null;
-  const liveRegionMode = state === 'error' || state === 'stale-error' ? 'assertive' : 'polite';
+  const liveRegionMode = state === 'error' || state === 'transient-error' || state === 'stale-error' ? 'assertive' : 'polite';
   const isEmpty = state === 'empty';
 
   return (
@@ -163,6 +163,7 @@ function presentationFor(state: NexaMapSpatialState, emptyCopy: MapEmptyCopy): S
     case 'refreshing': return { eyebrow: 'Nearby discovery', title: 'Refreshing this view', body: '', icon: 'sync', actionLabel: null, action: 'none', tone: 'discovery', compact: true };
     case 'empty': return { eyebrow: emptyCopy.eyebrow, title: emptyCopy.title, body: emptyCopy.body, icon: emptyCopy.icon, actionLabel: emptyCopy.actionLabel, action: 'empty', tone: 'action', compact: false };
     case 'error': return { eyebrow: 'Nearby signal interrupted', title: 'Discovery did not load', body: 'The map is still available. Retry nearby discovery without changing your filters.', icon: 'cloud-refresh-outline', actionLabel: resolveNexaRetryActionLabel('discovery'), action: 'retry', tone: 'warning', compact: false };
+    case 'transient-error': return { eyebrow: 'Nearby signal interrupted', title: 'Discovery temporarily unavailable', body: '', icon: 'cloud-refresh-outline', actionLabel: resolveNexaRetryActionLabel('discovery'), action: 'retry', tone: 'warning', compact: true };
     case 'stale-error': return { eyebrow: 'Nearby signal interrupted', title: 'Showing the last nearby view', body: '', icon: 'cloud-alert-outline', actionLabel: resolveNexaRetryActionLabel('discovery'), action: 'retry', tone: 'warning', compact: true };
     case 'zoom-in': return { eyebrow: 'Discovery range', title: 'Move closer to discover', body: 'Zoom in to reveal local people, events, listings and places with useful nearby context.', icon: 'magnify-plus-outline', actionLabel: 'Zoom in', action: 'zoom', tone: 'discovery', compact: false };
     case 'ready': return { eyebrow: '', title: '', body: '', icon: null, actionLabel: null, action: 'none', tone: 'discovery', compact: false };
