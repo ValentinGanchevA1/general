@@ -48,6 +48,14 @@ reset_app() {
   adb -s "$serial" shell pm grant "$PACKAGE" android.permission.ACCESS_FINE_LOCATION
 }
 
+dismiss_map_coachmark() {
+  local serial="$1"
+  if ui "$serial" wait --value 'Skip' --timeout 3 >/dev/null 2>&1; then
+    ui "$serial" tap --value 'Skip' --timeout 5
+    ui "$serial" wait --value 'Connections, chats and activity' --timeout 15
+  fi
+}
+
 login() {
   local serial="$1"
   local email="$2"
@@ -57,11 +65,13 @@ login() {
   ui "$serial" wait --value 'Email' --timeout 75
   ui "$serial" tap --value 'Email'
   ui "$serial" type --value "$email"
+  ui "$serial" wait --value "$email" --timeout 10
   ui "$serial" tap --value 'Password'
   ui "$serial" type --value "$password"
   ui "$serial" key --name back
   ui "$serial" tap --value 'Sign in' --timeout 15
   ui "$serial" wait --value 'Connections, chats and activity' --timeout 90
+  dismiss_map_coachmark "$serial"
 }
 
 open_chat() {
