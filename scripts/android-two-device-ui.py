@@ -8,6 +8,14 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 
 BOUNDS_RE = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
+SAFE_INPUT_RE = re.compile(r"[A-Za-z0-9@._%+\-]{1,160}")
+DEVICE_SERIALS = {
+    "a": "emulator-5554",
+    "b": "emulator-5556",
+}
+KEY_CODES = {
+    "back": "KEYCODE_BACK",
+}
 
 
 @dataclass(frozen=True)
@@ -18,21 +26,29 @@ class UiNode:
     bounds: tuple[int, int, int, int]
 
 
-def adb(serial: str, *args: str, capture: bool = False) -> str:
-    completed = subprocess.run(
-        ["adb", "-s", serial, *args],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE if capture else None,
-        stderr=subprocess.PIPE if capture else None,
-    )
-    return completed.stdout if capture else ""
+def serial_for(device: str) -> str:
+    try:
+        return DEVICE_SERIALS[device]
+    except KeyError as error:
+        raise ValueError(f"Unsupported device alias: {device}") from error
 
 
 def dump_nodes(serial: str) -> list[UiNode]:
-    adb(serial, "shell", "uiautomator", "dump", "/sdcard/window.xml", capture=True)
-    xml = adb(serial, "shell", "cat", "/sdcard/window.xml", capture=True)
-    root = ET.fromstring(xml)
+    subprocess.run(
+        ["adb", "-s", serial, "shell", "uiautomator", "dump", "/sdcard/window.xml"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    completed = subprocess.run(
+        ["adb", "-s", serial, "shell", "cat", "/sdcard/window.xml"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    root = ET.fromstring(completed.stdout)
     nodes: list[UiNode] = []
     for element in root.iter("node"):
         match = BOUNDS_RE.fullmatch(element.attrib.get("bounds", ""))
@@ -74,12 +90,42 @@ def find_node(serial: str, value: str, contains: bool, timeout: float) -> UiNode
 
 def click_node(serial: str, node: UiNode) -> None:
     x1, y1, x2, y2 = node.bounds
-    adb(serial, "shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
+    x = (x1 + x2) // 2
+    y = (y1 + y2) // 2
+    subprocess.run(
+        ["adb", "-s", serial, "shell", "input", "tap", str(x), str(y)],
+        check=True,
+        text=True,
+    )
+
+
+def type_safe_text(serial: str, value: str) -> None:
+    if SAFE_INPUT_RE.fullmatch(value) is None:
+        raise ValueError("Typed CI input contains unsupported characters")
+    encoded = value.replace("%", "%25")
+    subprocess.run(
+        ["adb", "-s", serial, "shell"],
+        check=True,
+        text=True,
+        input=f"input text {encoded}\n",
+    )
+
+
+def press_key(serial: str, key: str) -> None:
+    try:
+        key_code = KEY_CODES[key]
+    except KeyError as error:
+        raise ValueError(f"Unsupported key alias: {key}") from error
+    subprocess.run(
+        ["adb", "-s", serial, "shell", "input", "keyevent", key_code],
+        check=True,
+        text=True,
+    )
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Small deterministic UIAutomator helper for NEXA Android CI")
-    parser.add_argument("--serial", required=True)
+    parser = argparse.ArgumentParser(description="Deterministic UIAutomator helper for NEXA Android CI")
+    parser.add_argument("--device", required=True, choices=tuple(DEVICE_SERIALS))
     sub = parser.add_subparsers(dest="command", required=True)
 
     for name in ("wait", "tap", "assert-absent"):
@@ -92,35 +138,35 @@ def main() -> int:
     type_command.add_argument("--value", required=True)
 
     key_command = sub.add_parser("key")
-    key_command.add_argument("--code", required=True)
+    key_command.add_argument("--name", required=True, choices=tuple(KEY_CODES))
 
     args = parser.parse_args()
+    serial = serial_for(args.device)
 
     if args.command == "type":
-        encoded = args.value.replace("%", "%25").replace(" ", "%s")
-        adb(args.serial, "shell", "input", "text", encoded)
+        type_safe_text(serial, args.value)
         return 0
 
     if args.command == "key":
-        adb(args.serial, "shell", "input", "keyevent", args.code)
+        press_key(serial, args.name)
         return 0
 
-    node = find_node(args.serial, args.value, args.contains, args.timeout)
+    node = find_node(serial, args.value, args.contains, args.timeout)
     if args.command == "assert-absent":
         if node is None:
             return 0
         print(
-            f"[ui] unexpected node on {args.serial}: value={args.value!r} text={node.text!r} desc={node.desc!r}",
+            f"[ui] unexpected node on {args.device}: value={args.value!r} text={node.text!r} desc={node.desc!r}",
             file=sys.stderr,
         )
         return 1
 
     if node is None:
-        print(f"[ui] node not found on {args.serial}: {args.value!r}", file=sys.stderr)
+        print(f"[ui] node not found on {args.device}: {args.value!r}", file=sys.stderr)
         return 1
 
     if args.command == "tap":
-        click_node(args.serial, node)
+        click_node(serial, node)
     return 0
 
 
