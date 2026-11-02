@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { ChatMessage } from '@g88/shared';
-import { colors } from '@/theme';
+import { useAppTheme, type ThemeColors } from '@/theme';
 
 interface Props {
   msg: ChatMessage;
@@ -10,6 +10,9 @@ interface Props {
 }
 
 export function LocationSessionBubble({ msg, isMine }: Props): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={[styles.wrap, isMine ? styles.wrapMine : styles.wrapTheirs]}>
       <View style={[styles.card, isMine ? styles.cardMine : styles.cardTheirs]}>
@@ -25,31 +28,33 @@ export function LocationSessionBubble({ msg, isMine }: Props): React.JSX.Element
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { maxWidth: '85%', marginVertical: 4 },
-  wrapMine: { alignSelf: 'flex-end' },
-  wrapTheirs: { alignSelf: 'flex-start' },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-  },
-  cardMine: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  cardTheirs: {
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.borderStrong,
-  },
-  icon: { fontSize: 22 },
-  copy: { flexShrink: 1 },
-  title: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
-  titleMine: { color: colors.onPrimary },
-  body: { color: colors.textSecondary, fontSize: 13, marginTop: 2, lineHeight: 18 },
-  bodyMine: { color: 'rgba(10,10,15,0.67)' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrap: { maxWidth: '85%', marginVertical: 4 },
+    wrapMine: { alignSelf: 'flex-end' },
+    wrapTheirs: { alignSelf: 'flex-start' },
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderRadius: 16,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+    },
+    cardMine: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    cardTheirs: {
+      backgroundColor: colors.surfaceAlt,
+      borderColor: colors.borderStrong,
+    },
+    icon: { fontSize: 22 },
+    copy: { flexShrink: 1 },
+    title: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
+    titleMine: { color: colors.onPrimary },
+    body: { color: colors.textSecondary, fontSize: 13, marginTop: 2, lineHeight: 18 },
+    bodyMine: { color: colors.onPrimary },
+  });
+}

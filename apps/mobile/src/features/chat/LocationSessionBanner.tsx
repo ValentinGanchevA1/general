@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type { LocationShareSession } from '@g88/shared';
-import { colors } from '@/theme';
+import { useAppTheme, type ThemeColors } from '@/theme';
 
 interface Props {
   session: LocationShareSession;
@@ -29,6 +29,8 @@ export function LocationSessionBanner({
   onStop,
   onOpenMap,
 }: Props): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   // Tick clock drives re-renders; remaining is derived (no setState of label in effect).
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -62,11 +64,23 @@ export function LocationSessionBanner({
         </View>
       </View>
       {isSharer ? (
-        <TouchableOpacity style={styles.stopBtn} onPress={onStop} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={styles.stopBtn}
+          onPress={onStop}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Stop sharing live location"
+        >
           <Text style={styles.stopText}>Stop</Text>
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity style={styles.mapBtn} onPress={onOpenMap} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={styles.mapBtn}
+          onPress={onOpenMap}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Open shared live location on map"
+        >
           <Text style={styles.mapText}>Open map</Text>
         </TouchableOpacity>
       )}
@@ -74,39 +88,45 @@ export function LocationSessionBanner({
   );
 }
 
-const styles = StyleSheet.create({
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  left: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pin: { fontSize: 16 },
-  copy: { flex: 1 },
-  title: { color: colors.info, fontSize: 13, fontWeight: '600' },
-  time: { color: colors.primary, fontSize: 12, marginTop: 1 },
-  stopBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: colors.danger + '22',
-    borderWidth: 1,
-    borderColor: colors.danger + '55',
-  },
-  stopText: { color: colors.danger, fontSize: 13, fontWeight: '700' },
-  mapBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: colors.primary + '22',
-    borderWidth: 1,
-    borderColor: colors.primary + '55',
-  },
-  mapText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    banner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    left: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+    pin: { fontSize: 16 },
+    copy: { flex: 1 },
+    title: { color: colors.info, fontSize: 13, fontWeight: '600' },
+    time: { color: colors.primary, fontSize: 12, marginTop: 1 },
+    stopBtn: {
+      minHeight: 44,
+      minWidth: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      backgroundColor: `${colors.danger}22`,
+      borderWidth: 1,
+      borderColor: `${colors.danger}55`,
+    },
+    stopText: { color: colors.danger, fontSize: 13, fontWeight: '700' },
+    mapBtn: {
+      minHeight: 44,
+      justifyContent: 'center',
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      backgroundColor: `${colors.primary}22`,
+      borderWidth: 1,
+      borderColor: `${colors.primary}55`,
+    },
+    mapText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  });
+}
