@@ -166,7 +166,18 @@ block_peer() {
   local serial="$1"
   local peer_name="$2"
 
-  ui "$serial" tap --value "Open profile for ${peer_name}" --timeout 20
+  # React Native can temporarily drop the header TouchableOpacity's accessibility
+  # label after the live-location banner re-renders. Prefer the semantic label,
+  # but fall back to the exact visible peer title, whose bounds still hit the same
+  # header control. This keeps the security assertions strict while avoiding an
+  # accessibility-tree-only harness failure.
+  if ui "$serial" wait --value "Open profile for ${peer_name}" --timeout 4 >/dev/null 2>&1; then
+    ui "$serial" tap --value "Open profile for ${peer_name}" --timeout 5
+  else
+    echo "[device-e2e] profile accessibility label unavailable; tapping exact peer header text"
+    ui "$serial" tap --value "$peer_name" --timeout 10
+  fi
+
   ui "$serial" wait --value 'More options' --timeout 30
   ui "$serial" tap --value 'More options'
   ui "$serial" wait --value 'Block user' --timeout 20
