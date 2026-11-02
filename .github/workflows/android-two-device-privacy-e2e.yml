@@ -114,6 +114,25 @@ jobs:
 
       - name: Install Android 12 emulator image
         run: |
+          APK=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          test -f "$APK" || { echo "::error::probe APK missing before disk cleanup"; exit 1; }
+
+          echo '[device-e2e] disk before Android build cleanup'
+          df -h /
+
+          # The release APK and synthetic-account state are the only build outputs
+          # needed from this point on. Reclaim Gradle/NDK/CMake/intermediate space
+          # before downloading the Android 31 system image on the hosted runner.
+          sudo rm -rf "$ANDROID_HOME/ndk" "$ANDROID_HOME/cmake"
+          rm -rf "$HOME/.gradle/caches" "$HOME/.gradle/daemon" "$HOME/.gradle/native" "$HOME/.gradle/wrapper/dists"
+          rm -rf apps/mobile/android/.gradle apps/mobile/android/build
+          find apps/mobile/android/app/build -mindepth 1 -maxdepth 1 ! -name outputs -exec rm -rf {} +
+          find apps/mobile/android/app/build/outputs -mindepth 1 -maxdepth 1 ! -name apk -exec rm -rf {} +
+
+          test -f "$APK" || { echo "::error::probe APK removed during disk cleanup"; exit 1; }
+          echo '[device-e2e] disk after Android build cleanup'
+          df -h /
+
           SDKMANAGER="$(command -v sdkmanager || true)"
           if [ -z "$SDKMANAGER" ]; then
             SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit 2>/dev/null || true)"
