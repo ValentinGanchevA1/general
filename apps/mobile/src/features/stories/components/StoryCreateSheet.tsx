@@ -118,6 +118,7 @@ export function StoryCreateSheet({
   };
 
   const busy = posting || picking;
+  const disabledState = { disabled: busy } as const;
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -158,6 +159,9 @@ export function StoryCreateSheet({
                 onPress={onChangeMedia}
                 style={styles.changeMedia}
                 disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel="Change story media"
+                accessibilityState={disabledState}
               >
                 <Text style={styles.changeMediaText}>Change media</Text>
               </Pressable>
@@ -178,7 +182,14 @@ export function StoryCreateSheet({
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <View style={styles.row}>
-            <Pressable onPress={handleClose} style={styles.cancelBtn} disabled={busy}>
+            <Pressable
+              onPress={handleClose}
+              style={styles.cancelBtn}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel story creation"
+              accessibilityState={disabledState}
+            >
               <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
 
@@ -187,6 +198,9 @@ export function StoryCreateSheet({
                 onPress={() => void onPick()}
                 style={[styles.postBtn, busy && styles.postBtnDisabled]}
                 disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel="Pick story media"
+                accessibilityState={disabledState}
               >
                 {picking ? (
                   <ActivityIndicator color={colors.textPrimary} />
@@ -199,6 +213,9 @@ export function StoryCreateSheet({
                 onPress={() => void onPost()}
                 style={[styles.postBtn, busy && styles.postBtnDisabled]}
                 disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel="Post story"
+                accessibilityState={disabledState}
               >
                 {posting ? (
                   <ActivityIndicator color={colors.textPrimary} />
@@ -266,7 +283,13 @@ function createStyles(colors: ThemeColors) {
       borderRadius: 8,
     },
     previewVideoLabel: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
-    changeMedia: { alignSelf: 'flex-start', marginTop: 8, paddingVertical: 4 },
+    changeMedia: {
+      alignSelf: 'flex-start',
+      marginTop: 8,
+      minHeight: 44,
+      justifyContent: 'center',
+      paddingHorizontal: 8,
+    },
     changeMediaText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
     caption: {
       backgroundColor: colors.surfaceAlt,
@@ -279,15 +302,20 @@ function createStyles(colors: ThemeColors) {
     },
     error: { color: colors.danger, marginBottom: 8, fontSize: 13 },
     row: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 12 },
-    cancelBtn: { paddingVertical: 12, paddingHorizontal: 16 },
+    cancelBtn: {
+      minHeight: 44,
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+    },
     cancelText: { color: colors.textSecondary, fontSize: 15 },
     postBtn: {
       backgroundColor: colors.accent,
       borderRadius: 12,
-      paddingVertical: 12,
+      minHeight: 44,
       paddingHorizontal: 20,
       minWidth: 120,
       alignItems: 'center',
+      justifyContent: 'center',
     },
     postBtnDisabled: { opacity: 0.6 },
     postText: { color: colors.textPrimary, fontWeight: '700', fontSize: 15 },
