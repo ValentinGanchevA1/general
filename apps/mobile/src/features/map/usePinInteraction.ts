@@ -32,14 +32,20 @@ export interface UsePinInteractionOptions {
 export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
   const [state, send] = useMachine(pinInteractionMachine);
   const lastHapticErrorRef = useRef<string | null>(null);
+  const detailRequestedPinIdRef = useRef<string | null>(null);
 
-  // Layer switch must reset open preview / sheet context
+  // Layer switch must reset open preview / sheet context.
   useEffect(() => {
+    detailRequestedPinIdRef.current = null;
     send({type: 'LAYER_CHANGED', viewerMode});
   }, [viewerMode, send]);
 
   const openUserPin = useCallback(
     (point: EntityPoint & {kind: 'user'}) => {
+      // User-pin taps are a direct sheet interaction. Record the desired detail
+      // stage before starting profile hydration so sheet presentation never has
+      // to wait for /users/:id.
+      detailRequestedPinIdRef.current = point.id;
       send({
         type: 'PIN_TAP',
         pinId: point.id,
@@ -53,12 +59,20 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
   );
 
   const dismiss = useCallback(() => {
+    detailRequestedPinIdRef.current = null;
     send({type: 'DISMISS'});
   }, [send]);
 
   const openDetail = useCallback(() => {
+    const pinId = state.context.pinId;
+    if (!pinId) return;
+    if (state.matches('loadingPin')) {
+      detailRequestedPinIdRef.current = pinId;
+      return;
+    }
+    detailRequestedPinIdRef.current = null;
     send({type: 'OPEN_DETAIL'});
-  }, [send]);
+  }, [send, state]);
 
   /** Stage 3: sheet → full UserProfile (machine fullProfile + root handoff). */
   const openFull = useCallback(() => {
@@ -115,6 +129,16 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
   const activeProfile =
     ctx.profile?.id === ctx.pinId ? ctx.profile : undefined;
 
+  // Complete the machine transition after hydration, but do not couple the
+  // actual BottomSheetModal presentation to this network boundary.
+  useEffect(() => {
+    const pinId = ctx.pinId;
+    if (!pinId || detailRequestedPinIdRef.current !== pinId) return;
+    if (!state.matches('preview')) return;
+    detailRequestedPinIdRef.current = null;
+    send({type: 'OPEN_DETAIL'});
+  }, [ctx.pinId, send, state]);
+
   // Wave is a lightweight social signal. Reflect the intent immediately while
   // the durable command is in flight, then automatically roll back if the
   // machine returns to viewing after a failed request.
@@ -154,10 +178,6 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
   });
 
   const previewProps = useMemo(() => {
-    // Keep the selected marker/chrome in quick-peek while loading, but do not
-    // mount PinInteractionHost until the peer is actually loaded. Otherwise the
-    // host sends OPEN_DETAIL during loadingPin, where the machine intentionally
-    // has no OPEN_DETAIL transition, and the one-shot handoff is lost.
     if (
       !state.matches('preview') ||
       interactionState !== 'quick_peek' ||
