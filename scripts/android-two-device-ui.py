@@ -104,10 +104,11 @@ def type_safe_text(serial: str, value: str) -> None:
         raise ValueError("Typed CI input contains unsupported characters")
     encoded = value.replace("%", "%25")
     subprocess.run(
-        ["adb", "-s", serial, "shell"],
+        ["adb", "-s", serial, "shell", "input", "text", encoded],
         check=True,
         text=True,
-        input=f"input text {encoded}\n",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
 
 
