@@ -13,7 +13,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import type { StoryCard } from '@g88/shared';
 
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { colors } from '@/theme';
+import { useAppTheme, type ThemeColors } from '@/theme';
 import { fetchAuthorStories } from '../storiesSlice';
 import { StoryViewer } from './StoryViewer';
 
@@ -36,6 +36,8 @@ const EMPTY_STORIES: StoryCard[] = [];
  * when images scale or layout shifts.
  */
 export function ProfileStoryline({ userId, isSelf = false }: Props): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const dispatch = useAppDispatch();
   const stories = useAppSelector((s) => s.stories.byAuthor[userId] ?? EMPTY_STORIES);
   const [loading, setLoading] = useState(true);
@@ -140,75 +142,78 @@ export function ProfileStoryline({ userId, isSelf = false }: Props): React.JSX.E
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { marginTop: 8, marginBottom: 8 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 10,
-  },
-  title: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
-  hint: { color: colors.textMuted, fontSize: 12 },
-  loader: { marginVertical: 16 },
-  empty: {
-    color: colors.textMuted,
-    fontSize: 13,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    lineHeight: 18,
-  },
-  list: { paddingHorizontal: 12, gap: 10 },
-  card: { width: 112, marginHorizontal: 4 },
-  thumbWrap: {
-    width: 112,
-    height: 160,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceRaised,
-  },
-  thumb: {
-    width: 112,
-    height: 160,
-  },
-  liveBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: colors.primary,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    zIndex: 2,
-  },
-  liveText: { color: colors.onPrimary, fontSize: 10, fontWeight: '800' },
-  captionGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 8,
-    paddingTop: 28,
-    paddingBottom: 8,
-    justifyContent: 'flex-end',
-  },
-  caption: {
-    color: colors.textPrimary,
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '600',
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  captionMuted: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '500',
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrap: { marginTop: 8, marginBottom: 8 },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      marginBottom: 10,
+    },
+    title: { color: colors.textPrimary, fontSize: 16, fontWeight: '700' },
+    hint: { color: colors.textMuted, fontSize: 12 },
+    loader: { marginVertical: 16 },
+    empty: {
+      color: colors.textMuted,
+      fontSize: 13,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      lineHeight: 18,
+    },
+    list: { paddingHorizontal: 12, gap: 10 },
+    card: { width: 112, minHeight: 160, marginHorizontal: 4 },
+    thumbWrap: {
+      width: 112,
+      height: 160,
+      borderRadius: 12,
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceRaised,
+    },
+    thumb: {
+      width: 112,
+      height: 160,
+    },
+    liveBadge: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      backgroundColor: colors.primary,
+      borderRadius: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      zIndex: 2,
+    },
+    liveText: { color: colors.onPrimary, fontSize: 10, fontWeight: '800' },
+    captionGradient: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingHorizontal: 8,
+      paddingTop: 28,
+      paddingBottom: 8,
+      justifyContent: 'flex-end',
+    },
+    caption: {
+      color: colors.onPrimary,
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: '600',
+      textShadowColor: 'rgba(0,0,0,0.6)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
+    },
+    captionMuted: {
+      color: colors.onPrimary,
+      opacity: 0.85,
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: '500',
+      textShadowColor: 'rgba(0,0,0,0.6)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
+    },
+  });
+}
