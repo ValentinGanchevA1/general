@@ -20,10 +20,20 @@ state() {
   ' "$STATE_FILE" "$1"
 }
 
+device_alias() {
+  case "$1" in
+    "$SERIAL_A") printf 'a' ;;
+    "$SERIAL_B") printf 'b' ;;
+    *) echo "::error::Unsupported Android E2E serial" >&2; return 1 ;;
+  esac
+}
+
 ui() {
   local serial="$1"
+  local device
   shift
-  "${UI[@]}" --serial "$serial" "$@"
+  device="$(device_alias "$serial")"
+  "${UI[@]}" --device "$device" "$@"
 }
 
 launch_app() {
@@ -49,7 +59,7 @@ login() {
   ui "$serial" type --value "$email"
   ui "$serial" tap --value 'Password'
   ui "$serial" type --value "$password"
-  ui "$serial" key --code KEYCODE_BACK
+  ui "$serial" key --name back
   ui "$serial" tap --value 'Sign in' --timeout 15
   ui "$serial" wait --value 'Connections, chats and activity' --timeout 90
 }
@@ -64,6 +74,21 @@ open_chat() {
   ui "$serial" wait --value "Chat with ${peer_name}" --contains --timeout 45
   ui "$serial" tap --value "Chat with ${peer_name}" --contains --timeout 10
   ui "$serial" wait --value "Open profile for ${peer_name}" --timeout 30
+}
+
+login_pair_and_open_chats() {
+  local left_serial="$1"
+  local left_email="$2"
+  local left_name="$3"
+  local right_serial="$4"
+  local right_email="$5"
+  local right_name="$6"
+  local password="$7"
+
+  login "$left_serial" "$left_email" "$password"
+  login "$right_serial" "$right_email" "$password"
+  open_chat "$left_serial" "$right_name"
+  open_chat "$right_serial" "$left_name"
 }
 
 wait_probe() {
@@ -165,10 +190,7 @@ main() {
   reset_app "$SERIAL_B"
 
   echo '[device-e2e] logging in revocation pair A/B'
-  login "$SERIAL_A" "$a_email" "$password"
-  login "$SERIAL_B" "$b_email" "$password"
-  open_chat "$SERIAL_A" "$b_name"
-  open_chat "$SERIAL_B" "$a_name"
+  login_pair_and_open_chats "$SERIAL_A" "$a_email" "$a_name" "$SERIAL_B" "$b_email" "$b_name" "$password"
 
   echo '[device-e2e] proving authorized live-location delivery before block'
   start_share_and_prove_update "$SERIAL_A" "$SERIAL_B" "$a_name"
@@ -195,14 +217,9 @@ main() {
   assert_no_probe "$SERIAL_B" location_update 1
 
   echo '[device-e2e] switching to independent fresh authorized pair C/D'
-  adb -s "$SERIAL_A" shell pm clear "$PACKAGE" >/dev/null
-  adb -s "$SERIAL_B" shell pm clear "$PACKAGE" >/dev/null
   reset_app "$SERIAL_A"
   reset_app "$SERIAL_B"
-  login "$SERIAL_A" "$c_email" "$password"
-  login "$SERIAL_B" "$d_email" "$password"
-  open_chat "$SERIAL_A" "$d_name"
-  open_chat "$SERIAL_B" "$c_name"
+  login_pair_and_open_chats "$SERIAL_A" "$c_email" "$c_name" "$SERIAL_B" "$d_email" "$d_name" "$password"
   start_share_and_prove_update "$SERIAL_A" "$SERIAL_B" "$c_name"
   stop_share_if_visible "$SERIAL_A"
 
