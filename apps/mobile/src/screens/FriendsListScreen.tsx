@@ -162,7 +162,17 @@ export function FriendsListScreen(): React.JSX.Element {
   }, [dispatch, list.nextCursor, list.loadingMore, list.loading, searchQuery, tab]);
 
   const openProfile = useCallback(
-    (userId: string) => navigation.navigate('UserProfile', { userId }),
+    (userId: string) => {
+      // UserProfile is owned by the root stack. Push it explicitly from the
+      // nested Social stack so Back deterministically restores Friends rather
+      // than inheriting a stale map/profile navigation target.
+      const rootNavigation = navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
+      if (rootNavigation != null) {
+        rootNavigation.push('UserProfile', { userId });
+        return;
+      }
+      navigation.navigate('UserProfile', { userId });
+    },
     [navigation],
   );
   const openSuggestions = useCallback(() => navigation.navigate('Suggestions'), [navigation]);
