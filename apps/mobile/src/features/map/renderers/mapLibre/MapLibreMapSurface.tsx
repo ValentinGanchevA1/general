@@ -21,11 +21,7 @@ import { resolvePersonMarkerAvatarUrl } from '@/components/map/nexaPersonMarkerM
 import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
 import { resolveAvatarUri } from '@/services/avatarCache';
 import { getMapEntityKey, type MapDiscoveryPointKey } from '../../mapDiscoveryKeys';
-import {
-  discoveryToMapFeatureCollection,
-  updateMapFeatureCollection,
-  type NexaMapFeatureCollection,
-} from '../../adapters/discoveryToGeoJson';
+import { discoveryToMapFeatureCollection } from '../../adapters/discoveryToGeoJson';
 import type {
   MapCoordinate,
   NexaMapController,
@@ -204,18 +200,10 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
       }).filter((point): point is MapLibrePersonPoint => point.kind === 'user'),
       [personPoints, selectedKey, zoomPolicy.maxVisiblePoints],
     );
-    const previousPointsRef = React.useRef<readonly MapDiscoveryPoint[]>([]);
-    const featureCollectionRef = React.useRef<NexaMapFeatureCollection>(discoveryToMapFeatureCollection([]));
-    const data = React.useMemo(() => {
-      const next = updateMapFeatureCollection(
-        previousPointsRef.current,
-        featureCollectionRef.current,
-        layerPoints,
-      );
-      previousPointsRef.current = layerPoints;
-      featureCollectionRef.current = next;
-      return next;
-    }, [layerPoints]);
+    const data = React.useMemo(
+      () => discoveryToMapFeatureCollection(layerPoints),
+      [layerPoints],
+    );
 
     React.useImperativeHandle(ref, () => ({
       flyTo(target, options) {
