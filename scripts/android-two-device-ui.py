@@ -157,14 +157,17 @@ def type_safe_text(serial: str, value: str) -> None:
     # Long `adb shell input text` bursts can drop trailing characters on a busy AVD,
     # especially while React Native is handling TextInput updates. Send short,
     # validated chunks with a small pause so the existing exact-value assertion
-    # remains meaningful instead of masking input loss.
+    # remains meaningful instead of masking input loss. Keep dynamic text out of
+    # subprocess argv: the fixed adb shell command receives the allow-listed chunk
+    # through stdin, preserving the command-injection boundary established by #958.
     for start in range(0, len(value), INPUT_CHUNK_SIZE):
         chunk = value[start : start + INPUT_CHUNK_SIZE]
         encoded = chunk.replace("%", "%25")
         subprocess.run(
-            ["adb", "-s", serial, "shell", "input", "text", encoded],
+            ["adb", "-s", serial, "shell"],
             check=True,
             text=True,
+            input=f"input text {encoded}\n",
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
