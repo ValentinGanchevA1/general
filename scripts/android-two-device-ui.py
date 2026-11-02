@@ -16,6 +16,12 @@ DEVICE_SERIALS = {
 KEY_CODES = {
     "back": "KEYCODE_BACK",
 }
+MAP_COACHMARK_TITLE = "You are on the map"
+MAP_COACHMARK_SKIP = "Skip"
+MAP_NAV_TARGETS = {
+    "Connections, chats and activity",
+    "Connections",
+}
 
 
 @dataclass(frozen=True)
@@ -72,20 +78,14 @@ def matches(node: UiNode, value: str, contains: bool) -> bool:
     return any(value == candidate for candidate in candidates)
 
 
-def find_node(serial: str, value: str, contains: bool, timeout: float) -> UiNode | None:
-    deadline = time.monotonic() + timeout
-    last_error: Exception | None = None
-    while time.monotonic() < deadline:
-        try:
-            for node in dump_nodes(serial):
-                if matches(node, value, contains):
-                    return node
-        except (subprocess.CalledProcessError, ET.ParseError) as error:
-            last_error = error
-        time.sleep(0.75)
-    if last_error:
-        print(f"[ui] last dump error: {last_error}", file=sys.stderr)
-    return None
+def coachmark_skip(nodes: list[UiNode]) -> UiNode | None:
+    has_coachmark = any(matches(node, MAP_COACHMARK_TITLE, False) for node in nodes)
+    if not has_coachmark:
+        return None
+    return next(
+        (node for node in nodes if matches(node, MAP_COACHMARK_SKIP, False)),
+        None,
+    )
 
 
 def click_node(serial: str, node: UiNode) -> None:
@@ -97,6 +97,30 @@ def click_node(serial: str, node: UiNode) -> None:
         check=True,
         text=True,
     )
+
+
+def find_node(serial: str, value: str, contains: bool, timeout: float) -> UiNode | None:
+    deadline = time.monotonic() + timeout
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        try:
+            nodes = dump_nodes(serial)
+            if value in MAP_NAV_TARGETS:
+                skip = coachmark_skip(nodes)
+                if skip is not None:
+                    print(f"[ui] dismissing map coachmark on {serial}", file=sys.stderr)
+                    click_node(serial, skip)
+                    time.sleep(0.75)
+                    continue
+            for node in nodes:
+                if matches(node, value, contains):
+                    return node
+        except (subprocess.CalledProcessError, ET.ParseError) as error:
+            last_error = error
+        time.sleep(0.75)
+    if last_error:
+        print(f"[ui] last dump error: {last_error}", file=sys.stderr)
+    return None
 
 
 def type_safe_text(serial: str, value: str) -> None:
