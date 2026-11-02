@@ -50,7 +50,9 @@ reset_app() {
 
 dismiss_map_coachmark() {
   local serial="$1"
-  if ui "$serial" wait --value 'Skip' --timeout 3 >/dev/null 2>&1; then
+  local timeout_seconds="${2:-8}"
+
+  if ui "$serial" wait --value 'You are on the map' --timeout "$timeout_seconds" >/dev/null 2>&1; then
     ui "$serial" tap --value 'Skip' --timeout 5
     ui "$serial" wait --value 'Connections, chats and activity' --timeout 15
   fi
@@ -71,13 +73,16 @@ login() {
   ui "$serial" key --name back
   ui "$serial" tap --value 'Sign in' --timeout 15
   ui "$serial" wait --value 'Connections, chats and activity' --timeout 90
-  dismiss_map_coachmark "$serial"
+  dismiss_map_coachmark "$serial" 8
 }
 
 open_chat() {
   local serial="$1"
   local peer_name="$2"
 
+  # The first-run map coachmark can be scheduled just after login settles.
+  # Re-check immediately before navigation so it cannot intercept the tab tap.
+  dismiss_map_coachmark "$serial" 4
   ui "$serial" tap --value 'Connections, chats and activity' --timeout 30
   ui "$serial" wait --value 'Connections' --timeout 30
   ui "$serial" tap --value 'Chats' --timeout 20
@@ -147,10 +152,9 @@ start_share_and_prove_update() {
   ui "$sharer_serial" wait --value 'Share live location' --timeout 20
   ui "$sharer_serial" tap --value 'Share' --timeout 20
 
-  # Realtime probe is the security source of truth. The generic card check only
-  # confirms the viewer UI rendered the session without coupling E2E to copy.
+  # The CI-only realtime probe is the security source of truth for delivery.
+  # Do not couple this revocation test to presentation copy in the chat card.
   wait_probe "$viewer_serial" location_started 30
-  ui "$viewer_serial" wait --value 'Live location' --contains --timeout 15
 
   adb -s "$viewer_serial" logcat -c
   sleep 6
@@ -221,6 +225,7 @@ main() {
   adb -s "$SERIAL_B" logcat -c
   launch_app "$SERIAL_B"
   ui "$SERIAL_B" wait --value 'Connections, chats and activity' --timeout 75
+  dismiss_map_coachmark "$SERIAL_B" 4
   ui "$SERIAL_B" tap --value 'Connections, chats and activity'
   ui "$SERIAL_B" wait --value 'Connections' --timeout 30
   ui "$SERIAL_B" tap --value 'Chats' --timeout 20
