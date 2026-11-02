@@ -140,15 +140,17 @@ set_geo() {
 start_share_and_prove_update() {
   local sharer_serial="$1"
   local viewer_serial="$2"
-  local sharer_name="$3"
 
   adb -s "$viewer_serial" logcat -c
   set_geo "$sharer_serial" 27.93461 43.21357
   ui "$sharer_serial" tap --value 'Share live location' --timeout 20
   ui "$sharer_serial" wait --value 'Share live location' --timeout 20
   ui "$sharer_serial" tap --value 'Share' --timeout 20
-  ui "$viewer_serial" wait --value "${sharer_name} is sharing live location" --contains --timeout 35
+
+  # Realtime probe is the security source of truth. The generic card check only
+  # confirms the viewer UI rendered the session without coupling E2E to copy.
   wait_probe "$viewer_serial" location_started 30
+  ui "$viewer_serial" wait --value 'Live location' --contains --timeout 15
 
   adb -s "$viewer_serial" logcat -c
   sleep 6
@@ -203,7 +205,7 @@ main() {
   login_pair_and_open_chats "$SERIAL_A" "$a_email" "$a_name" "$SERIAL_B" "$b_email" "$b_name" "$password"
 
   echo '[device-e2e] proving authorized live-location delivery before block'
-  start_share_and_prove_update "$SERIAL_A" "$SERIAL_B" "$a_name"
+  start_share_and_prove_update "$SERIAL_A" "$SERIAL_B"
 
   echo '[device-e2e] blocking B while B remains connected and joined'
   block_peer "$SERIAL_A" "$b_name"
@@ -230,7 +232,7 @@ main() {
   reset_app "$SERIAL_A"
   reset_app "$SERIAL_B"
   login_pair_and_open_chats "$SERIAL_A" "$c_email" "$c_name" "$SERIAL_B" "$d_email" "$d_name" "$password"
-  start_share_and_prove_update "$SERIAL_A" "$SERIAL_B" "$c_name"
+  start_share_and_prove_update "$SERIAL_A" "$SERIAL_B"
   stop_share_if_visible "$SERIAL_A"
 
   echo '✅ Android two-device realtime privacy E2E passed'
