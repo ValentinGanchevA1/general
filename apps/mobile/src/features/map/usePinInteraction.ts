@@ -4,6 +4,7 @@ import {useMachine} from '@xstate/react';
 import type {EntityPoint, VerificationLevel} from '@g88/shared';
 import {formatNexaSpatialDistance} from '@/components/map/nexaSpatialSheet';
 import {nexaHaptics} from '@/haptics/nexaHaptics';
+import {openViaRef} from '@/navigation/openRootScreen';
 import {resolveMapInteractionState} from './mapInteractionState';
 import {pinInteractionMachine} from './pinInteraction.machine';
 import type {ViewerMode} from './pinInteraction.types';
@@ -59,10 +60,12 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     send({type: 'OPEN_DETAIL'});
   }, [send]);
 
-  /** Stage 3: sheet → full UserProfile (machine fullProfile). */
+  /** Stage 3: sheet → full UserProfile (machine fullProfile + root handoff). */
   const openFull = useCallback(() => {
+    const pinId = state.context.pinId;
     send({type: 'OPEN_FULL'});
-  }, [send]);
+    if (pinId) openViaRef('UserProfile', {userId: pinId});
+  }, [send, state.context.pinId]);
 
   /** Stage 3 back: fullProfile → detailSheet (re-present sheet). */
   const backFromFull = useCallback(() => {

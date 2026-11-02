@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image } from 'react-native';
 import { Marker } from 'react-native-maps';
 import type { MapClusterPoint, MapDiscoveryPoint, MapEntityPoint } from '@g88/shared';
 
 import { nexaHaptics } from '@/haptics/nexaHaptics';
 import { useAppSelector } from '@/hooks/redux';
 import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
+import { resolveAvatarUri } from '@/services/avatarCache';
 import { useAppTheme } from '@/theme';
 
 import { ClusterMarker } from './ClusterMarker';
@@ -45,6 +45,11 @@ interface RevealState {
   band: NexaMapZoomBand;
   count: number;
   pointKeys: readonly string[];
+}
+
+interface PersonAvatarState {
+  source: string | null;
+  uri: string | null;
 }
 
 function entityKey(point: MapEntityPoint): string {
@@ -301,15 +306,25 @@ function EntityMarkerItemImpl({
   const candidateAvatarUrl = point.kind === 'user'
     ? resolvePersonMarkerAvatarUrl(point, density, selected)
     : null;
-  const [personAvatarUri, setPersonAvatarUri] = useState<string | null>(null);
+  const [personAvatarState, setPersonAvatarState] = useState<PersonAvatarState>(() => ({
+    source: candidateAvatarUrl,
+    uri: candidateAvatarUrl,
+  }));
+  const personAvatarUri = personAvatarState.source === candidateAvatarUrl
+    ? personAvatarState.uri
+    : candidateAvatarUrl;
 
   useEffect(() => {
     let active = true;
-    void Promise.resolve().then(() => { if (active) setPersonAvatarUri(null); });
     if (candidateAvatarUrl == null) return () => { active = false; };
-    void Image.prefetch(candidateAvatarUrl)
-      .then((loaded) => { if (active && loaded) setPersonAvatarUri(candidateAvatarUrl); })
+
+    void resolveAvatarUri(candidateAvatarUrl)
+      .then((resolvedUri) => {
+        if (!active || resolvedUri == null) return;
+        setPersonAvatarState({ source: candidateAvatarUrl, uri: resolvedUri });
+      })
       .catch(() => undefined);
+
     return () => { active = false; };
   }, [candidateAvatarUrl]);
 
@@ -330,7 +345,9 @@ function EntityMarkerItemImpl({
   const coordinate = useMemo(() => ({ latitude: point.lat, longitude: point.lng }), [point.lat, point.lng]);
   const isLive = point.kind === 'user' && point.meta.online === true;
   const handlePress = useCallback(() => { onPress(point); }, [onPress, point]);
-  const handlePersonAvatarRenderError = useCallback(() => { setPersonAvatarUri(null); }, []);
+  const handlePersonAvatarRenderError = useCallback(() => {
+    setPersonAvatarState({ source: candidateAvatarUrl, uri: null });
+  }, [candidateAvatarUrl]);
 
   return (
     <Marker
