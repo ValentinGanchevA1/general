@@ -12,6 +12,7 @@ import type {
 import { getJson } from '@/api/client';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { messageReceived } from '@/features/chat/chatSlice';
+import { emitE2EDeviceProbe } from '@/features/chat/e2eDeviceProbe';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import {
   locationShareStart,
@@ -91,11 +92,13 @@ export function useLiveLocationShare(
 
     const unsubStarted = on('location:share:started', (e) => {
       if (e.session.conversationId !== conversationId) return;
+      emitE2EDeviceProbe('location_started');
       setSession(e.session);
       dispatch(messageReceived(e.message));
     });
     const unsubUpdate = on('location:share:update', (e) => {
       if (e.conversationId !== conversationId) return;
+      emitE2EDeviceProbe('location_update');
       setSession((prev) =>
         prev && prev.id === e.sessionId
           ? {
@@ -108,6 +111,7 @@ export function useLiveLocationShare(
     });
     const unsubEnded = on('location:share:ended', (e) => {
       if (e.conversationId !== conversationId) return;
+      emitE2EDeviceProbe('location_ended');
       setSession((prev) => (prev && prev.id === e.sessionId ? null : prev));
     });
     return () => {
