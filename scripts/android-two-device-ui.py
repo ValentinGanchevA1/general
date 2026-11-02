@@ -9,6 +9,8 @@ from dataclasses import dataclass
 
 BOUNDS_RE = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
 SAFE_INPUT_RE = re.compile(r"[A-Za-z0-9@._%+\-]{1,160}")
+INPUT_CHUNK_SIZE = 4
+INPUT_CHUNK_DELAY_SECONDS = 0.12
 DEVICE_SERIALS = {
     "a": "emulator-5554",
     "b": "emulator-5556",
@@ -126,14 +128,22 @@ def find_node(serial: str, value: str, contains: bool, timeout: float) -> UiNode
 def type_safe_text(serial: str, value: str) -> None:
     if SAFE_INPUT_RE.fullmatch(value) is None:
         raise ValueError("Typed CI input contains unsupported characters")
-    encoded = value.replace("%", "%25")
-    subprocess.run(
-        ["adb", "-s", serial, "shell", "input", "text", encoded],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+
+    # Long `adb shell input text` bursts can drop trailing characters on a busy AVD,
+    # especially while React Native is handling TextInput updates. Send short,
+    # validated chunks with a small pause so the existing exact-value assertion
+    # remains meaningful instead of masking input loss.
+    for start in range(0, len(value), INPUT_CHUNK_SIZE):
+        chunk = value[start : start + INPUT_CHUNK_SIZE]
+        encoded = chunk.replace("%", "%25")
+        subprocess.run(
+            ["adb", "-s", serial, "shell", "input", "text", encoded],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        time.sleep(INPUT_CHUNK_DELAY_SECONDS)
 
 
 def press_key(serial: str, key: str) -> None:
