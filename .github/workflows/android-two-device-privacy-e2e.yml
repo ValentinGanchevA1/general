@@ -156,11 +156,31 @@ jobs:
             >.tmp/emulators/b.log 2>&1 &
 
           for serial in emulator-5554 emulator-5556; do
-            adb -s "$serial" wait-for-device
+            if ! timeout 120s adb -s "$serial" wait-for-device; then
+              echo "::error::$serial was not discovered by adb within 120s"
+              adb devices -l || true
+              if [ "$serial" = "emulator-5554" ]; then
+                echo "--- nexa-a emulator log ---"
+                tail -n 200 .tmp/emulators/a.log || true
+              else
+                echo "--- nexa-b emulator log ---"
+                tail -n 200 .tmp/emulators/b.log || true
+              fi
+              exit 1
+            fi
+
             deadline=$((SECONDS + 180))
             while [ "$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ]; do
               if (( SECONDS >= deadline )); then
-                echo "::error::$serial did not boot within 180s"
+                echo "::error::$serial did not boot within 180s after adb discovery"
+                adb devices -l || true
+                if [ "$serial" = "emulator-5554" ]; then
+                  echo "--- nexa-a emulator log ---"
+                  tail -n 200 .tmp/emulators/a.log || true
+                else
+                  echo "--- nexa-b emulator log ---"
+                  tail -n 200 .tmp/emulators/b.log || true
+                fi
                 exit 1
               fi
               sleep 2
