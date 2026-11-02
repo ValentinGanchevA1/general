@@ -36,6 +36,24 @@ ui() {
   "${UI[@]}" --device "$device" "$@"
 }
 
+tap_chat_header() {
+  local serial="$1"
+  local display_size width height x y
+
+  display_size="$(adb -s "$serial" shell wm size 2>/dev/null | tr -d '\r' | awk '/Physical size:/ {print $3; exit}')"
+  if [[ ! "$display_size" =~ ^[0-9]+x[0-9]+$ ]]; then
+    echo "::error::Unable to resolve Android display size for chat-header fallback" >&2
+    return 1
+  fi
+
+  width="${display_size%x*}"
+  height="${display_size#*x}"
+  x=$(( width * 52 / 100 ))
+  y=$(( height * 8 / 100 ))
+  echo "[device-e2e] tapping bounded chat-header fallback" >&2
+  adb -s "$serial" shell input tap "$x" "$y"
+}
+
 launch_app() {
   local serial="$1"
   adb -s "$serial" shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 >/dev/null
@@ -166,16 +184,15 @@ block_peer() {
   local serial="$1"
   local peer_name="$2"
 
-  # React Native can temporarily drop the header TouchableOpacity's accessibility
-  # label after the live-location banner re-renders. Prefer the semantic label,
-  # but fall back to the exact visible peer title, whose bounds still hit the same
-  # header control. This keeps the security assertions strict while avoiding an
-  # accessibility-tree-only harness failure.
+  # React Native can temporarily drop the header TouchableOpacity from the
+  # accessibility tree after the live-location banner re-renders. Prefer the
+  # semantic label; if it disappears, use a bounded screen-relative tap that
+  # targets only the chat header region on the fixed CI AVD layout.
   if ui "$serial" wait --value "Open profile for ${peer_name}" --timeout 4 >/dev/null 2>&1; then
     ui "$serial" tap --value "Open profile for ${peer_name}" --timeout 5
   else
-    echo "[device-e2e] profile accessibility label unavailable; tapping exact peer header text"
-    ui "$serial" tap --value "$peer_name" --timeout 10
+    echo "[device-e2e] profile accessibility label unavailable; using bounded chat-header fallback"
+    tap_chat_header "$serial"
   fi
 
   ui "$serial" wait --value 'More options' --timeout 30
