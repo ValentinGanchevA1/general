@@ -25,20 +25,8 @@ export type PendingMapFocus = {
   thumbnailUrl?: string | null;
 };
 
-type PendingMapFocusListener = () => void;
-
 let pending: PendingMapFocus | null = null;
 let tokenSeq = 0;
-const listeners = new Set<PendingMapFocusListener>();
-
-function emitPendingMapFocusChanged(): void {
-  for (const listener of listeners) listener();
-}
-
-export function subscribePendingMapFocus(listener: PendingMapFocusListener): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
 
 export function setPendingMapFocus(input: {
   userId?: string;
@@ -80,7 +68,6 @@ export function setPendingMapFocus(input: {
     ...(input.category != null ? { category: input.category } : {}),
     ...(input.thumbnailUrl !== undefined ? { thumbnailUrl: input.thumbnailUrl } : {}),
   };
-  emitPendingMapFocusChanged();
   return tokenSeq;
 }
 
@@ -90,7 +77,5 @@ export function peekPendingMapFocus(): PendingMapFocus | null {
 
 export function clearPendingMapFocus(token?: number): void {
   if (token != null && pending != null && pending.token !== token) return;
-  if (pending == null) return;
   pending = null;
-  emitPendingMapFocusChanged();
 }
