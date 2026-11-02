@@ -29,6 +29,9 @@ export interface ResolveNexaMapSpatialStateArgs {
  * Priority matters:
  * - an oversized viewport needs a zoom hint instead of a false empty state;
  * - stale points stay visible when either discovery lane fails;
+ * - the legacy discovery lane is authoritative for a full blocking failure;
+ * - renderer-local Place discovery is supplementary, so a Place-only failure
+ *   stays compact and retryable instead of replacing the whole map surface;
  * - loading over existing data is a compact refresh state, not a blocker;
  * - renderer-local Place points count as visible map content;
  * - true empty copy is only shown once the viewport is local enough to act on.
@@ -49,8 +52,12 @@ export function resolveNexaMapSpatialState({
 
   const hasAnyPoints = pointCount > 0 || hasPlacePoints;
 
-  if (hasError || placeHasError) {
+  if (hasError) {
     return hasAnyPoints ? 'stale-error' : 'error';
+  }
+
+  if (placeHasError) {
+    return 'stale-error';
   }
 
   if (loading || placeLoading) {
