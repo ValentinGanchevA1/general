@@ -9,7 +9,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import type { DiscoveryPoint, EntityPoint, UserMeta } from '@g88/shared';
 
 import { Avatar } from '@/components/Avatar';
-import { colors } from '@/theme';
+import { useAppTheme, type ThemeColors } from '@/theme';
 
 interface Props {
   points: DiscoveryPoint[];
@@ -20,6 +20,8 @@ interface Props {
 
 export function NearbyPeopleStrip(props: Props): React.JSX.Element | null {
   const { points, onTapUser, maxVisible = 6 } = props;
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(false);
 
   const users = useMemo<EntityPoint[]>(
@@ -33,9 +35,9 @@ export function NearbyPeopleStrip(props: Props): React.JSX.Element | null {
   const overflow = expanded ? 0 : Math.max(0, users.length - maxVisible);
 
   return (
-    <View style={S.section}>
+    <View style={styles.section}>
       <TouchableOpacity
-        style={S.sectionHeader}
+        style={styles.sectionHeader}
         onPress={() => setExpanded((v) => !v)}
         accessibilityRole="button"
         accessibilityLabel={
@@ -44,17 +46,17 @@ export function NearbyPeopleStrip(props: Props): React.JSX.Element | null {
             : `Nearby ${users.length} people. Tap to expand.`
         }
       >
-        <Text style={S.sectionTitle}>⭐ Nearby</Text>
-        <Text style={S.sectionCount}>{users.length}</Text>
+        <Text style={styles.sectionTitle}>⭐ Nearby</Text>
+        <Text style={styles.sectionCount}>{users.length}</Text>
         {users.length > maxVisible ? (
-          <Text style={S.expandHint}>{expanded ? 'Show less' : 'See all'}</Text>
+          <Text style={styles.expandHint}>{expanded ? 'Show less' : 'See all'}</Text>
         ) : null}
       </TouchableOpacity>
 
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={S.scroll}
+        contentContainerStyle={styles.scroll}
       >
         {visible.map((u) => {
           const meta = u.meta as UserMeta;
@@ -63,7 +65,7 @@ export function NearbyPeopleStrip(props: Props): React.JSX.Element | null {
           return (
             <TouchableOpacity
               key={u.id}
-              style={S.userItem}
+              style={styles.userItem}
               onPress={() => onTapUser(u.id)}
               testID={`nearby-user-${u.id}`}
               accessibilityRole="button"
@@ -75,7 +77,7 @@ export function NearbyPeopleStrip(props: Props): React.JSX.Element | null {
                 size={48}
                 online={meta.online === true}
               />
-              <Text style={S.name} numberOfLines={1}>
+              <Text style={styles.name} numberOfLines={1}>
                 {first}
               </Text>
             </TouchableOpacity>
@@ -84,16 +86,16 @@ export function NearbyPeopleStrip(props: Props): React.JSX.Element | null {
 
         {overflow > 0 && (
           <TouchableOpacity
-            style={S.userItem}
+            style={styles.userItem}
             onPress={() => setExpanded(true)}
             testID="nearby-more"
             accessibilityRole="button"
             accessibilityLabel={`Show ${overflow} more nearby people`}
           >
-            <View style={[S.avatar, S.overflowAvatar]}>
-              <Text style={S.overflowText}>+{overflow}</Text>
+            <View style={[styles.avatar, styles.overflowAvatar]}>
+              <Text style={styles.overflowText}>+{overflow}</Text>
             </View>
-            <Text style={S.name}>more</Text>
+            <Text style={styles.name}>more</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -101,39 +103,48 @@ export function NearbyPeopleStrip(props: Props): React.JSX.Element | null {
   );
 }
 
-const S = StyleSheet.create({
-  section: { paddingTop: 2, paddingBottom: 2 },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    marginBottom: 4,
-  },
-  sectionTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
-  sectionCount: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: '700',
-    backgroundColor: colors.surfaceAlt,
-    paddingHorizontal: 8,
-    paddingVertical: 1,
-    borderRadius: 8,
-  },
-  expandHint: { color: colors.textFaint, fontSize: 12, marginLeft: 'auto' },
-  scroll: { paddingHorizontal: 12, paddingVertical: 4, gap: 12 },
-  userItem: { alignItems: 'center', width: 56 },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 2,
-    borderColor: colors.borderStrong,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  overflowAvatar: { backgroundColor: colors.bg },
-  overflowText: { color: colors.textSecondary, fontWeight: '700', fontSize: 13 },
-  name: { color: colors.textSecondary, fontSize: 11, marginTop: 4, maxWidth: 56, textAlign: 'center' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    section: { paddingTop: 2, paddingBottom: 2 },
+    sectionHeader: {
+      minHeight: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 16,
+      marginBottom: 4,
+    },
+    sectionTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
+    sectionCount: {
+      color: colors.primary,
+      fontSize: 12,
+      fontWeight: '700',
+      backgroundColor: colors.surfaceAlt,
+      paddingHorizontal: 8,
+      paddingVertical: 1,
+      borderRadius: 8,
+    },
+    expandHint: { color: colors.textFaint, fontSize: 12, marginLeft: 'auto' },
+    scroll: { paddingHorizontal: 12, paddingVertical: 4, gap: 12 },
+    userItem: { alignItems: 'center', width: 56, minHeight: 64 },
+    avatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 2,
+      borderColor: colors.borderStrong,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    overflowAvatar: { backgroundColor: colors.bg },
+    overflowText: { color: colors.textSecondary, fontWeight: '700', fontSize: 13 },
+    name: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      marginTop: 4,
+      maxWidth: 56,
+      textAlign: 'center',
+    },
+  });
+}
