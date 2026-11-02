@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import type { MutualPreviewFace } from '@g88/shared';
 
 import { Avatar } from '@/components/Avatar';
-import { colors } from '@/theme';
+import { useAppTheme } from '@/theme';
 
 type Props = {
   faces: readonly MutualPreviewFace[];
@@ -22,6 +22,7 @@ export function MutualPreviewStack({
   size = 22,
   max = 3,
 }: Props): React.JSX.Element | null {
+  const { colors } = useAppTheme();
   const slice = faces.slice(0, max);
   if (slice.length === 0) return null;
 
