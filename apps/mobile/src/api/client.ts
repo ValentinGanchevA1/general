@@ -7,6 +7,7 @@ import axios, {
 import type { AuthTokens, ApiError } from '@g88/shared';
 
 import { tokenStore } from './tokenStore';
+import { reportDiscoveryApiFailure } from './reportDiscoveryApiFailure';
 import { Config } from '@/config';
 import { trackSuccessfulProductApiCall } from '@/lib/analytics';
 
@@ -100,7 +101,9 @@ api.interceptors.response.use(
         // Await clear so any listener reading tokens after the event sees null.
         await tokenStore.clear();
         authEvents.emit('logout', 'refresh_failed');
-        return Promise.reject(toClientError(normalizeError(err)));
+        const normalized = normalizeError(err);
+        reportDiscoveryApiFailure(original.url, normalized);
+        return Promise.reject(toClientError(normalized));
       }
       // Transient refresh failure (timeout / offline / 5xx cold-start): keep the
       // tokens and surface a network-style error so callers (e.g. restoreSession)
@@ -110,9 +113,12 @@ api.interceptors.response.use(
         code: 'refresh_unavailable',
         message: 'Could not reach the server to refresh your session. Please try again.',
       };
+      reportDiscoveryApiFailure(original.url, transient);
       return Promise.reject(toClientError(transient));
     }
-    return Promise.reject(toClientError(normalizeError(err)));
+    const normalized = normalizeError(err);
+    reportDiscoveryApiFailure(original?.url, normalized, axios.isCancel(err));
+    return Promise.reject(toClientError(normalized));
   },
 );
 
