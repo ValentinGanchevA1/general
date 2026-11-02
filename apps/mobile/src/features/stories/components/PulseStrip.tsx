@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   FlatList,
   Image,
@@ -7,12 +7,12 @@ import {
   Text,
   View,
 } from 'react-native';
-import { colors } from '@/theme';
 
 import type { StoryCard, StoryGateReason } from '@g88/shared';
 import { storyGateMessage } from '@g88/shared';
 
 import { useAppSelector } from '@/hooks/redux';
+import { useAppTheme, type ThemeColors } from '@/theme';
 
 export type StoryGateLockReason = Exclude<StoryGateReason, 'ok'>;
 
@@ -54,6 +54,8 @@ export function PulseStrip({
   canCreate = true,
   gateReason,
 }: Props) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const stories = useAppSelector((s) => s.stories.nearby);
   const loading = useAppSelector((s) => s.stories.loading);
 
@@ -97,7 +99,7 @@ export function PulseStrip({
         </Pressable>
       );
     },
-    [onOpenStory],
+    [onOpenStory, styles],
   );
 
   return (
@@ -146,51 +148,53 @@ export function PulseStrip({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { paddingVertical: 8 },
-  list: { paddingHorizontal: 12, alignItems: 'flex-start' },
-  item: { width: 72, alignItems: 'center', marginRight: 10 },
-  ring: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    padding: 3,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  ringUnseen: { borderWidth: 2, borderColor: colors.accent },
-  ringSeen: { borderWidth: 2, borderColor: colors.textFaint },
-  ringCreate: { borderWidth: 2, borderColor: colors.textMuted, borderStyle: 'dashed' },
-  ringCreateLocked: { borderColor: colors.textFaint, opacity: 0.7 },
-  avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.surfaceRaised },
-  avatarFallback: { justifyContent: 'center', alignItems: 'center' },
-  avatarInitial: { color: colors.textPrimary, fontSize: 20, fontWeight: '600' },
-  videoBadge: {
-    position: 'absolute',
-    right: 2,
-    bottom: 2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  videoBadgeText: { color: colors.textPrimary, fontSize: 9, marginLeft: 1 },
-  plus: { color: colors.textPrimary, fontSize: 28, fontWeight: '300' },
-  plusLocked: { fontSize: 20 },
-  name: {
-    marginTop: 4,
-    fontSize: 11,
-    color: colors.textSecondary,
-    maxWidth: 72,
-    textAlign: 'center',
-  },
-  emptyWrap: {
-    justifyContent: 'center',
-    alignSelf: 'center',
-    paddingHorizontal: 8,
-    minHeight: 64,
-  },
-  empty: { color: colors.textMuted, fontSize: 13 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrap: { paddingVertical: 8 },
+    list: { paddingHorizontal: 12, alignItems: 'flex-start' },
+    item: { width: 72, minHeight: 82, alignItems: 'center', marginRight: 10 },
+    ring: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      padding: 3,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    ringUnseen: { borderWidth: 2, borderColor: colors.accent },
+    ringSeen: { borderWidth: 2, borderColor: colors.textFaint },
+    ringCreate: { borderWidth: 2, borderColor: colors.textMuted, borderStyle: 'dashed' },
+    ringCreateLocked: { borderColor: colors.textFaint, opacity: 0.7 },
+    avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.surfaceRaised },
+    avatarFallback: { justifyContent: 'center', alignItems: 'center' },
+    avatarInitial: { color: colors.textPrimary, fontSize: 20, fontWeight: '600' },
+    videoBadge: {
+      position: 'absolute',
+      right: 2,
+      bottom: 2,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: 'rgba(0,0,0,0.65)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    videoBadgeText: { color: colors.onPrimary, fontSize: 9, marginLeft: 1 },
+    plus: { color: colors.textPrimary, fontSize: 28, fontWeight: '300' },
+    plusLocked: { fontSize: 20 },
+    name: {
+      marginTop: 4,
+      fontSize: 11,
+      color: colors.textSecondary,
+      maxWidth: 72,
+      textAlign: 'center',
+    },
+    emptyWrap: {
+      justifyContent: 'center',
+      alignSelf: 'center',
+      paddingHorizontal: 8,
+      minHeight: 64,
+    },
+    empty: { color: colors.textMuted, fontSize: 13 },
+  });
+}
