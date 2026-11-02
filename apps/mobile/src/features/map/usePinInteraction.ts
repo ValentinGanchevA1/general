@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useMemo, useRef} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useMachine} from '@xstate/react';
 
 import type {EntityPoint, VerificationLevel} from '@g88/shared';
@@ -35,15 +35,15 @@ export interface UsePinInteractionOptions {
 
 export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
   const [state, send] = useMachine(pinInteractionMachine);
+  const [seedPoint, setSeedPoint] = useState<(EntityPoint & {kind: 'user'}) | null>(null);
   const lastHapticErrorRef = useRef<string | null>(null);
   const detailRequestedPinIdRef = useRef<string | null>(null);
-  const seedPointRef = useRef<(EntityPoint & {kind: 'user'}) | null>(null);
   const consumedMapFocusTokenRef = useRef<number | null>(null);
 
-  // Layer switch must reset open preview / sheet context.
+  // Layer switch must reset open preview / sheet context in the machine. The
+  // previous seed is harmless because it is only consumed when ids match.
   useEffect(() => {
     detailRequestedPinIdRef.current = null;
-    seedPointRef.current = null;
     send({type: 'LAYER_CHANGED', viewerMode});
   }, [viewerMode, send]);
 
@@ -51,7 +51,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     (point: EntityPoint & {kind: 'user'}) => {
       // User-pin taps are a direct sheet interaction. Keep privacy-safe
       // discovery metadata available immediately while the richer profile loads.
-      seedPointRef.current = point;
+      setSeedPoint(point);
       detailRequestedPinIdRef.current = point.id;
       send({
         type: 'PIN_TAP',
@@ -84,7 +84,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
         return;
       }
       consumedMapFocusTokenRef.current = pending.token;
-      openUserPin({
+      const point: EntityPoint & {kind: 'user'} = {
         kind: 'user',
         id: pending.userId,
         lat: pending.lat,
@@ -96,7 +96,10 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
           online: pending.online ?? false,
           lastSeenAt: pending.lastSeenAt ?? null,
         },
-      });
+      };
+      // Defer the render-state update out of the effect body. Subscription
+      // callbacks use the same path, which also coalesces rapid focus changes.
+      setTimeout(() => openUserPin(point), 0);
     };
 
     syncPendingUserFocus();
@@ -105,7 +108,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
 
   const dismiss = useCallback(() => {
     detailRequestedPinIdRef.current = null;
-    seedPointRef.current = null;
+    setSeedPoint(null);
     send({type: 'DISMISS'});
   }, [send]);
 
@@ -174,8 +177,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
   // Never render that stale identity under the newly selected marker.
   const activeProfile =
     ctx.profile?.id === ctx.pinId ? ctx.profile : undefined;
-  const seedPoint =
-    seedPointRef.current?.id === ctx.pinId ? seedPointRef.current : null;
+  const activeSeedPoint = seedPoint?.id === ctx.pinId ? seedPoint : null;
 
   // Complete the machine transition after hydration, but do not couple the
   // actual BottomSheetModal presentation to this network boundary.
@@ -233,7 +235,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     if (
       interactionState !== 'quick_peek' ||
       !ctx.pinId ||
-      (activeProfile == null && seedPoint == null)
+      (activeProfile == null && activeSeedPoint == null)
     ) {
       return null;
     }
@@ -242,24 +244,24 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
       'displayName' in activeProfile &&
       typeof activeProfile.displayName === 'string'
       ? activeProfile.displayName
-      : seedPoint?.meta.displayName ?? 'User';
+      : activeSeedPoint?.meta.displayName ?? 'User';
     const distanceLabel = formatNexaSpatialDistance(ctx.distanceMeters);
     const peerAllowsDating =
       ctx.peerMode === 'dating' || ctx.peerMode === 'both';
 
     const rawAvatar = activeProfile != null && 'avatarUrl' in activeProfile
       ? (activeProfile.avatarUrl as string | null | undefined)
-      : seedPoint?.meta.avatarUrl ?? null;
+      : activeSeedPoint?.meta.avatarUrl ?? null;
 
     const online = activeProfile != null &&
       'online' in activeProfile &&
       typeof activeProfile.online === 'boolean'
       ? activeProfile.online
-      : seedPoint?.meta.online;
+      : activeSeedPoint?.meta.online;
 
     const verification = activeProfile != null && 'verification' in activeProfile
       ? activeProfile.verification
-      : seedPoint?.meta.verification;
+      : activeSeedPoint?.meta.verification;
 
     return {
       name,
@@ -284,7 +286,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
       likeSent: ctx.likeSent,
       blocked: ctx.blockedByViewer || ctx.blockedByPeer,
     };
-  }, [interactionState, ctx, activeProfile, seedPoint, pending, waveOptimistic]);
+  }, [interactionState, ctx, activeProfile, activeSeedPoint, pending, waveOptimistic]);
 
   /** Display name for seeding EntityBottomSheet when pin left the viewport. */
   const seedDisplayName = useMemo(() => {
@@ -292,8 +294,8 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     if (profile && 'displayName' in profile && typeof profile.displayName === 'string') {
       return profile.displayName;
     }
-    return seedPoint?.meta.displayName ?? 'User';
-  }, [activeProfile, seedPoint]);
+    return activeSeedPoint?.meta.displayName ?? 'User';
+  }, [activeProfile, activeSeedPoint]);
 
   return {
     state,
