@@ -24,6 +24,8 @@ MAP_NAV_TARGETS = {
     "Connections, chats and activity",
     "Connections",
 }
+SYSTEM_UI_ANR_TITLE = "System UI isn't responding"
+SYSTEM_UI_ANR_WAIT = "Wait"
 
 
 @dataclass(frozen=True)
@@ -90,6 +92,16 @@ def coachmark_skip(nodes: list[UiNode]) -> UiNode | None:
     )
 
 
+def system_ui_wait(nodes: list[UiNode]) -> UiNode | None:
+    has_anr = any(matches(node, SYSTEM_UI_ANR_TITLE, False) for node in nodes)
+    if not has_anr:
+        return None
+    return next(
+        (node for node in nodes if matches(node, SYSTEM_UI_ANR_WAIT, False)),
+        None,
+    )
+
+
 def click_node(serial: str, node: UiNode) -> None:
     x1, y1, x2, y2 = node.bounds
     x = (x1 + x2) // 2
@@ -107,6 +119,19 @@ def find_node(serial: str, value: str, contains: bool, timeout: float) -> UiNode
     while time.monotonic() < deadline:
         try:
             nodes = dump_nodes(serial)
+
+            # Headless Android emulators can occasionally surface a SystemUI ANR
+            # while the app underneath is already responsive. Recover only by
+            # choosing "Wait"; never close the app. This is CI harness recovery,
+            # not a product assertion or a relaxation of the privacy checks.
+            if value != SYSTEM_UI_ANR_WAIT:
+                wait_node = system_ui_wait(nodes)
+                if wait_node is not None:
+                    print(f"[ui] dismissing System UI ANR with Wait on {serial}", file=sys.stderr)
+                    click_node(serial, wait_node)
+                    time.sleep(1.0)
+                    continue
+
             if value in MAP_NAV_TARGETS:
                 skip = coachmark_skip(nodes)
                 if skip is not None:
