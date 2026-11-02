@@ -6,16 +6,22 @@ import {
   GeoJSONSource,
   Layer,
   Map,
+  Marker,
   type LayerSpecification,
   type MapRef,
 } from '@maplibre/maplibre-react-native';
 
-import { type MapDiscoveryPointKey } from '../../mapDiscoveryKeys';
+import { EntityMarker } from '@/components/map/EntityMarker';
 import {
-  discoveryToMapFeatureCollection,
-  updateMapFeatureCollection,
-  type NexaMapFeatureCollection,
-} from '../../adapters/discoveryToGeoJson';
+  limitVisibleMapPoints,
+  resolveNexaMapZoomPolicy,
+  type NexaMapZoomPolicy,
+} from '@/components/map/nexaMapZoomDensity';
+import { resolvePersonMarkerAvatarUrl } from '@/components/map/nexaPersonMarkerMedia';
+import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
+import { resolveAvatarUri } from '@/services/avatarCache';
+import { getMapEntityKey, type MapDiscoveryPointKey } from '../../mapDiscoveryKeys';
+import { discoveryToMapFeatureCollection } from '../../adapters/discoveryToGeoJson';
 import type {
   MapCoordinate,
   NexaMapController,
@@ -23,6 +29,10 @@ import type {
 } from '../../contracts/mapRenderer';
 import type { MapLibreBoundsSnapshot, MapLibreViewStateSnapshot } from '../../mapLibreAdapter';
 import { mapLibreSnapshotToViewportChange } from '../../mapLibreAdapter';
+import {
+  partitionMapLibreDiscoveryPoints,
+  type MapLibrePersonPoint,
+} from './mapLibrePersonPins';
 
 type GeoJSONSourcePressHandler = NonNullable<React.ComponentProps<typeof GeoJSONSource>['onPress']>;
 type MapLongPressHandler = NonNullable<React.ComponentProps<typeof Map>['onLongPress']>;
@@ -35,6 +45,21 @@ type CircleColor = NonNullable<CircleLayerPaint['circle-color']>;
 type CircleRadius = NonNullable<CircleLayerPaint['circle-radius']>;
 type CameraRef = React.ElementRef<typeof Camera>;
 
+interface PersonAvatarState {
+  source: string | null;
+  uri: string | null;
+}
+
+interface MapLibrePersonMarkerProps {
+  point: MapLibrePersonPoint;
+  density: NexaMapZoomPolicy['markerDensity'];
+  showCaption: boolean;
+  selected: boolean;
+  dimmed: boolean;
+  reduceMotion: boolean;
+  onPress: () => void;
+}
+
 const DISCOVERY_SOURCE_ID = 'nexa-discovery';
 const DISCOVERY_LAYER_ID = 'nexa-discovery-points';
 const DISCOVERY_SAVED_PLACE_HALO_LAYER_ID = 'nexa-discovery-saved-place-halo';
@@ -45,7 +70,6 @@ const DISCOVERY_KIND_COLOR: CircleColor = [
   'match',
   ['get', 'kind'],
   'cluster', '#7C3AED',
-  'user', '#8B5CF6',
   'event', '#F59E0B',
   'listing', '#22C55E',
   'place', '#27D3F2',
@@ -87,6 +111,63 @@ function isMapDiscoveryPointKey(value: unknown): value is MapDiscoveryPointKey {
   return typeof value === 'string' && /^(cluster|user|event|listing|place):.+$/.test(value);
 }
 
+function MapLibrePersonMarker({
+  point,
+  density,
+  showCaption,
+  selected,
+  dimmed,
+  reduceMotion,
+  onPress,
+}: MapLibrePersonMarkerProps): React.JSX.Element {
+  const candidateAvatarUrl = resolvePersonMarkerAvatarUrl(point, density, selected);
+  const [avatarState, setAvatarState] = React.useState<PersonAvatarState>(() => ({
+    source: candidateAvatarUrl,
+    uri: candidateAvatarUrl,
+  }));
+  const personAvatarUri = avatarState.source === candidateAvatarUrl
+    ? avatarState.uri
+    : candidateAvatarUrl;
+
+  React.useEffect(() => {
+    let active = true;
+    if (candidateAvatarUrl == null) return () => { active = false; };
+
+    void resolveAvatarUri(candidateAvatarUrl)
+      .then((resolvedUri) => {
+        if (!active || resolvedUri == null) return;
+        setAvatarState({ source: candidateAvatarUrl, uri: resolvedUri });
+      })
+      .catch(() => undefined);
+
+    return () => { active = false; };
+  }, [candidateAvatarUrl]);
+
+  const handleAvatarRenderError = React.useCallback((): void => {
+    setAvatarState({ source: candidateAvatarUrl, uri: null });
+  }, [candidateAvatarUrl]);
+
+  return (
+    <Marker
+      id={getMapEntityKey(point)}
+      lngLat={[point.lng, point.lat]}
+      anchor="bottom"
+      onPress={onPress}
+    >
+      <EntityMarker
+        point={point}
+        density={density}
+        showCaption={showCaption}
+        selected={selected}
+        dimmed={dimmed}
+        reduceMotion={reduceMotion}
+        personAvatarUri={personAvatarUri}
+        onPersonAvatarRenderError={handleAvatarRenderError}
+      />
+    </Marker>
+  );
+}
+
 export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMapSurfaceProps>(
   function MapLibreMapSurface(
     {
@@ -103,14 +184,26 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
   ): React.JSX.Element {
     const mapRef = React.useRef<MapRef>(null);
     const cameraRef = React.useRef<CameraRef>(null);
-    const previousPointsRef = React.useRef<readonly MapDiscoveryPoint[]>([]);
-    const featureCollectionRef = React.useRef<NexaMapFeatureCollection>(discoveryToMapFeatureCollection([]));
-    const data = React.useMemo(() => {
-      const next = updateMapFeatureCollection(previousPointsRef.current, featureCollectionRef.current, points);
-      previousPointsRef.current = points;
-      featureCollectionRef.current = next;
-      return next;
-    }, [points]);
+    const reduceMotion = useNexaReducedMotion();
+    const [zoom, setZoom] = React.useState(12);
+    const zoomPolicy = React.useMemo(
+      () => resolveNexaMapZoomPolicy(Math.floor(zoom)),
+      [zoom],
+    );
+    const { personPoints, layerPoints } = React.useMemo(
+      () => partitionMapLibreDiscoveryPoints(points),
+      [points],
+    );
+    const visiblePersonPoints = React.useMemo(
+      () => limitVisibleMapPoints(personPoints, zoomPolicy.maxVisiblePoints, {
+        selectedEntityKey: selectedKey,
+      }).filter((point): point is MapLibrePersonPoint => point.kind === 'user'),
+      [personPoints, selectedKey, zoomPolicy.maxVisiblePoints],
+    );
+    const data = React.useMemo(
+      () => discoveryToMapFeatureCollection(layerPoints),
+      [layerPoints],
+    );
 
     React.useImperativeHandle(ref, () => ({
       flyTo(target, options) {
@@ -153,6 +246,7 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
         southWest: [bounds[0], bounds[1]],
         northEast: [bounds[2], bounds[3]],
       };
+      setZoom(viewState.zoom);
       onViewportSettled(mapLibreSnapshotToViewportChange(viewStateSnapshot, boundsSnapshot));
     }, [onViewportSettled]);
 
@@ -257,6 +351,26 @@ export const MapLibreMapSurface = React.forwardRef<NexaMapController, MapLibreMa
             }}
           />
         </GeoJSONSource>
+
+        {visiblePersonPoints.map((point) => {
+          const key = getMapEntityKey(point);
+          const selected = key === selectedKey;
+          const showCaption = zoomPolicy.captionMode === 'all'
+            || (zoomPolicy.captionMode === 'selected' && selected);
+
+          return (
+            <MapLibrePersonMarker
+              key={key}
+              point={point}
+              density={zoomPolicy.markerDensity}
+              showCaption={showCaption}
+              selected={selected}
+              dimmed={dimUnselected && selectedKey !== null && !selected}
+              reduceMotion={reduceMotion}
+              onPress={() => onPointPress(key)}
+            />
+          );
+        })}
       </Map>
     );
   },
