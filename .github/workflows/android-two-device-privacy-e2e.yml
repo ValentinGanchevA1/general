@@ -26,6 +26,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   DEVICE_E2E_STATE_FILE: .tmp/android-two-device-privacy.json
   DEVICE_E2E_BASE_URL: https://g88-api.onrender.com
+  ANDROID_AVD_HOME: ${{ github.workspace }}/.tmp/android-avd
 
 jobs:
   android-two-device-privacy:
@@ -113,6 +114,25 @@ jobs:
 
       - name: Install Android 12 emulator image
         run: |
+          APK=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          test -f "$APK" || { echo "::error::probe APK missing before disk cleanup"; exit 1; }
+
+          echo '[device-e2e] disk before Android build cleanup'
+          df -h /
+
+          # The release APK and synthetic-account state are the only build outputs
+          # needed from this point on. Reclaim Gradle/NDK/CMake/intermediate space
+          # before downloading the Android 31 system image on the hosted runner.
+          sudo rm -rf "$ANDROID_HOME/ndk" "$ANDROID_HOME/cmake"
+          rm -rf "$HOME/.gradle/caches" "$HOME/.gradle/daemon" "$HOME/.gradle/native" "$HOME/.gradle/wrapper/dists"
+          rm -rf apps/mobile/android/.gradle apps/mobile/android/build
+          find apps/mobile/android/app/build -mindepth 1 -maxdepth 1 ! -name outputs -exec rm -rf {} +
+          find apps/mobile/android/app/build/outputs -mindepth 1 -maxdepth 1 ! -name apk -exec rm -rf {} +
+
+          test -f "$APK" || { echo "::error::probe APK removed during disk cleanup"; exit 1; }
+          echo '[device-e2e] disk after Android build cleanup'
+          df -h /
+
           SDKMANAGER="$(command -v sdkmanager || true)"
           if [ -z "$SDKMANAGER" ]; then
             SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit 2>/dev/null || true)"
@@ -131,8 +151,22 @@ jobs:
 
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platform-tools" "emulator" "system-images;android-31;google_apis;x86_64"
+
+          ADB="$ANDROID_HOME/platform-tools/adb"
+          test -x "$ADB" || {
+            echo "::error::adb not found at $ADB after installing platform-tools"
+            exit 1
+          }
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+
+          mkdir -p "$ANDROID_AVD_HOME"
           echo no | "$AVDMANAGER" create avd --force --name nexa-a --package "system-images;android-31;google_apis;x86_64" --device pixel_4
           echo no | "$AVDMANAGER" create avd --force --name nexa-b --package "system-images;android-31;google_apis;x86_64" --device pixel_4
+
+          AVDS="$("$ANDROID_HOME/emulator/emulator" -list-avds)"
+          printf '%s\n' "$AVDS"
+          grep -qx 'nexa-a' <<< "$AVDS" || { echo "::error::nexa-a is not visible to emulator"; exit 1; }
+          grep -qx 'nexa-b' <<< "$AVDS" || { echo "::error::nexa-b is not visible to emulator"; exit 1; }
           sudo chmod 666 /dev/kvm || true
 
       - name: Boot two Android emulators
@@ -148,11 +182,31 @@ jobs:
             >.tmp/emulators/b.log 2>&1 &
 
           for serial in emulator-5554 emulator-5556; do
-            adb -s "$serial" wait-for-device
+            if ! timeout 120s adb -s "$serial" wait-for-device; then
+              echo "::error::$serial was not discovered by adb within 120s"
+              adb devices -l || true
+              if [ "$serial" = "emulator-5554" ]; then
+                echo "--- nexa-a emulator log ---"
+                tail -n 200 .tmp/emulators/a.log || true
+              else
+                echo "--- nexa-b emulator log ---"
+                tail -n 200 .tmp/emulators/b.log || true
+              fi
+              exit 1
+            fi
+
             deadline=$((SECONDS + 180))
             while [ "$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ]; do
               if (( SECONDS >= deadline )); then
-                echo "::error::$serial did not boot within 180s"
+                echo "::error::$serial did not boot within 180s after adb discovery"
+                adb devices -l || true
+                if [ "$serial" = "emulator-5554" ]; then
+                  echo "--- nexa-a emulator log ---"
+                  tail -n 200 .tmp/emulators/a.log || true
+                else
+                  echo "--- nexa-b emulator log ---"
+                  tail -n 200 .tmp/emulators/b.log || true
+                fi
                 exit 1
               fi
               sleep 2
@@ -160,6 +214,7 @@ jobs:
             adb -s "$serial" shell settings put global window_animation_scale 0
             adb -s "$serial" shell settings put global transition_animation_scale 0
             adb -s "$serial" shell settings put global animator_duration_scale 0
+            adb -s "$serial" shell settings put global hide_error_dialogs 1
           done
           adb devices -l
 
@@ -172,9 +227,12 @@ jobs:
         if: failure()
         run: |
           mkdir -p .tmp/device-evidence
+          cp .tmp/emulators/*.log .tmp/device-evidence/ 2>/dev/null || true
+          adb devices -l > .tmp/device-evidence/adb-devices.txt 2>&1 || true
           for serial in emulator-5554 emulator-5556; do
-            adb -s "$serial" exec-out screencap -p > ".tmp/device-evidence/${serial}.png" 2>/dev/null || true
-            adb -s "$serial" logcat -d 2>/dev/null \
+            timeout 10s adb -s "$serial" exec-out screencap -p \
+              > ".tmp/device-evidence/${serial}.png" 2>/dev/null || true
+            timeout 10s adb -s "$serial" logcat -d 2>/dev/null \
               | grep -E 'NEXA_E2E_DEVICE|AndroidRuntime' \
               > ".tmp/device-evidence/${serial}.log" || true
           done

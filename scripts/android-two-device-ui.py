@@ -9,6 +9,8 @@ from dataclasses import dataclass
 
 BOUNDS_RE = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
 SAFE_INPUT_RE = re.compile(r"[A-Za-z0-9@._%+\-]{1,160}")
+INPUT_CHUNK_SIZE = 4
+INPUT_CHUNK_DELAY_SECONDS = 0.12
 DEVICE_SERIALS = {
     "a": "emulator-5554",
     "b": "emulator-5556",
@@ -16,6 +18,14 @@ DEVICE_SERIALS = {
 KEY_CODES = {
     "back": "KEYCODE_BACK",
 }
+MAP_COACHMARK_TITLE = "You are on the map"
+MAP_COACHMARK_SKIP = "Skip"
+MAP_NAV_TARGETS = {
+    "Connections, chats and activity",
+    "Connections",
+}
+SYSTEM_UI_ANR_TITLE = "System UI isn't responding"
+SYSTEM_UI_ANR_WAIT = "Wait"
 
 
 @dataclass(frozen=True)
@@ -72,20 +82,24 @@ def matches(node: UiNode, value: str, contains: bool) -> bool:
     return any(value == candidate for candidate in candidates)
 
 
-def find_node(serial: str, value: str, contains: bool, timeout: float) -> UiNode | None:
-    deadline = time.monotonic() + timeout
-    last_error: Exception | None = None
-    while time.monotonic() < deadline:
-        try:
-            for node in dump_nodes(serial):
-                if matches(node, value, contains):
-                    return node
-        except (subprocess.CalledProcessError, ET.ParseError) as error:
-            last_error = error
-        time.sleep(0.75)
-    if last_error:
-        print(f"[ui] last dump error: {last_error}", file=sys.stderr)
-    return None
+def coachmark_skip(nodes: list[UiNode]) -> UiNode | None:
+    has_coachmark = any(matches(node, MAP_COACHMARK_TITLE, False) for node in nodes)
+    if not has_coachmark:
+        return None
+    return next(
+        (node for node in nodes if matches(node, MAP_COACHMARK_SKIP, False)),
+        None,
+    )
+
+
+def system_ui_wait(nodes: list[UiNode]) -> UiNode | None:
+    has_anr = any(matches(node, SYSTEM_UI_ANR_TITLE, False) for node in nodes)
+    if not has_anr:
+        return None
+    return next(
+        (node for node in nodes if matches(node, SYSTEM_UI_ANR_WAIT, False)),
+        None,
+    )
 
 
 def click_node(serial: str, node: UiNode) -> None:
@@ -99,16 +113,62 @@ def click_node(serial: str, node: UiNode) -> None:
     )
 
 
+def find_node(serial: str, value: str, contains: bool, timeout: float) -> UiNode | None:
+    deadline = time.monotonic() + timeout
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        try:
+            nodes = dump_nodes(serial)
+
+            # Headless Android emulators can occasionally surface a SystemUI ANR
+            # while the app underneath is already responsive. Recover only by
+            # choosing "Wait"; never close the app. This is CI harness recovery,
+            # not a product assertion or a relaxation of the privacy checks.
+            if value != SYSTEM_UI_ANR_WAIT:
+                wait_node = system_ui_wait(nodes)
+                if wait_node is not None:
+                    print(f"[ui] dismissing System UI ANR with Wait on {serial}", file=sys.stderr)
+                    click_node(serial, wait_node)
+                    time.sleep(1.0)
+                    continue
+
+            if value in MAP_NAV_TARGETS:
+                skip = coachmark_skip(nodes)
+                if skip is not None:
+                    print(f"[ui] dismissing map coachmark on {serial}", file=sys.stderr)
+                    click_node(serial, skip)
+                    time.sleep(0.75)
+                    continue
+            for node in nodes:
+                if matches(node, value, contains):
+                    return node
+        except (subprocess.CalledProcessError, ET.ParseError) as error:
+            last_error = error
+        time.sleep(0.75)
+    if last_error:
+        print(f"[ui] last dump error: {last_error}", file=sys.stderr)
+    return None
+
+
 def type_safe_text(serial: str, value: str) -> None:
     if SAFE_INPUT_RE.fullmatch(value) is None:
         raise ValueError("Typed CI input contains unsupported characters")
-    encoded = value.replace("%", "%25")
-    subprocess.run(
-        ["adb", "-s", serial, "shell"],
-        check=True,
-        text=True,
-        input=f"input text {encoded}\n",
-    )
+
+    # Long `adb shell input text` bursts can drop trailing characters on a busy AVD,
+    # especially while React Native is handling TextInput updates. Send short,
+    # validated chunks with a small pause so the existing exact-value assertion
+    # remains meaningful instead of masking input loss.
+    for start in range(0, len(value), INPUT_CHUNK_SIZE):
+        chunk = value[start : start + INPUT_CHUNK_SIZE]
+        encoded = chunk.replace("%", "%25")
+        subprocess.run(
+            ["adb", "-s", serial, "shell", "input", "text", encoded],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        time.sleep(INPUT_CHUNK_DELAY_SECONDS)
 
 
 def press_key(serial: str, key: str) -> None:
