@@ -5,6 +5,10 @@ import type {EntityPoint, VerificationLevel} from '@g88/shared';
 import {formatNexaSpatialDistance} from '@/components/map/nexaSpatialSheet';
 import {nexaHaptics} from '@/haptics/nexaHaptics';
 import {openViaRef} from '@/navigation/openRootScreen';
+import {
+  peekPendingMapFocus,
+  subscribePendingMapFocus,
+} from '@/navigation/pendingMapFocus';
 import {resolveMapInteractionState} from './mapInteractionState';
 import {pinInteractionMachine} from './pinInteraction.machine';
 import type {ViewerMode} from './pinInteraction.types';
@@ -33,18 +37,21 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
   const [state, send] = useMachine(pinInteractionMachine);
   const lastHapticErrorRef = useRef<string | null>(null);
   const detailRequestedPinIdRef = useRef<string | null>(null);
+  const seedPointRef = useRef<(EntityPoint & {kind: 'user'}) | null>(null);
+  const consumedMapFocusTokenRef = useRef<number | null>(null);
 
   // Layer switch must reset open preview / sheet context.
   useEffect(() => {
     detailRequestedPinIdRef.current = null;
+    seedPointRef.current = null;
     send({type: 'LAYER_CHANGED', viewerMode});
   }, [viewerMode, send]);
 
   const openUserPin = useCallback(
     (point: EntityPoint & {kind: 'user'}) => {
-      // User-pin taps are a direct sheet interaction. Record the desired detail
-      // stage before starting profile hydration so sheet presentation never has
-      // to wait for /users/:id.
+      // User-pin taps are a direct sheet interaction. Keep privacy-safe
+      // discovery metadata available immediately while the richer profile loads.
+      seedPointRef.current = point;
       detailRequestedPinIdRef.current = point.id;
       send({
         type: 'PIN_TAP',
@@ -58,8 +65,47 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     [send, viewerMode],
   );
 
+  // "View on map" uses the existing pending-focus handoff. Mirror that user
+  // focus into the pin machine so the sheet and its action state always target
+  // the same peer, even when Main/Map is already mounted under UserProfile.
+  useEffect(() => {
+    const syncPendingUserFocus = (): void => {
+      const pending = peekPendingMapFocus();
+      if (
+        pending == null ||
+        pending.userId == null ||
+        pending.userId === '' ||
+        pending.lat == null ||
+        pending.lng == null ||
+        !Number.isFinite(pending.lat) ||
+        !Number.isFinite(pending.lng) ||
+        consumedMapFocusTokenRef.current === pending.token
+      ) {
+        return;
+      }
+      consumedMapFocusTokenRef.current = pending.token;
+      openUserPin({
+        kind: 'user',
+        id: pending.userId,
+        lat: pending.lat,
+        lng: pending.lng,
+        meta: {
+          displayName: pending.displayName ?? 'User',
+          avatarUrl: pending.avatarUrl ?? null,
+          verification: pending.verification ?? 'none',
+          online: pending.online ?? false,
+          lastSeenAt: pending.lastSeenAt ?? null,
+        },
+      });
+    };
+
+    syncPendingUserFocus();
+    return subscribePendingMapFocus(syncPendingUserFocus);
+  }, [openUserPin]);
+
   const dismiss = useCallback(() => {
     detailRequestedPinIdRef.current = null;
+    seedPointRef.current = null;
     send({type: 'DISMISS'});
   }, [send]);
 
@@ -128,6 +174,8 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
   // Never render that stale identity under the newly selected marker.
   const activeProfile =
     ctx.profile?.id === ctx.pinId ? ctx.profile : undefined;
+  const seedPoint =
+    seedPointRef.current?.id === ctx.pinId ? seedPointRef.current : null;
 
   // Complete the machine transition after hydration, but do not couple the
   // actual BottomSheetModal presentation to this network boundary.
@@ -178,49 +226,57 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
   });
 
   const previewProps = useMemo(() => {
+    // PinInteractionHost is intentionally invisible; this object is its one-shot
+    // signal that the selected peer is safe to hand off to EntityBottomSheet.
+    // Seed metadata lets that handoff happen during loadingPin instead of waiting
+    // on the richer /users/:id response.
     if (
-      !state.matches('preview') ||
       interactionState !== 'quick_peek' ||
       !ctx.pinId ||
-      activeProfile == null
+      (activeProfile == null && seedPoint == null)
     ) {
       return null;
     }
-    const profile = activeProfile;
-    const name =
-      'displayName' in profile && typeof profile.displayName === 'string'
-        ? profile.displayName
-        : 'User';
+
+    const name = activeProfile != null &&
+      'displayName' in activeProfile &&
+      typeof activeProfile.displayName === 'string'
+      ? activeProfile.displayName
+      : seedPoint?.meta.displayName ?? 'User';
     const distanceLabel = formatNexaSpatialDistance(ctx.distanceMeters);
     const peerAllowsDating =
       ctx.peerMode === 'dating' || ctx.peerMode === 'both';
 
-    const rawAvatar =
-      'avatarUrl' in profile
-        ? (profile.avatarUrl as string | null | undefined)
-        : null;
+    const rawAvatar = activeProfile != null && 'avatarUrl' in activeProfile
+      ? (activeProfile.avatarUrl as string | null | undefined)
+      : seedPoint?.meta.avatarUrl ?? null;
 
-    const online =
-      'online' in profile && typeof profile.online === 'boolean'
-        ? profile.online
-        : undefined;
+    const online = activeProfile != null &&
+      'online' in activeProfile &&
+      typeof activeProfile.online === 'boolean'
+      ? activeProfile.online
+      : seedPoint?.meta.online;
+
+    const verification = activeProfile != null && 'verification' in activeProfile
+      ? activeProfile.verification
+      : seedPoint?.meta.verification;
 
     return {
       name,
       avatarUrl: rawAvatar ?? null,
       distanceLabel,
       age:
-        'age' in profile && typeof profile.age === 'number'
-          ? profile.age
+        activeProfile != null &&
+        'age' in activeProfile &&
+        typeof activeProfile.age === 'number'
+          ? activeProfile.age
           : null,
       ...(online !== undefined ? {online} : {}),
       idVerified:
-        'idVerified' in profile
-          ? Boolean(profile.idVerified)
+        activeProfile != null && 'idVerified' in activeProfile
+          ? Boolean(activeProfile.idVerified)
           : false,
-      verification: asVerificationLevel(
-        'verification' in profile ? profile.verification : undefined,
-      ),
+      verification: asVerificationLevel(verification),
       viewerMode: ctx.viewerMode,
       peerAllowsDating,
       pending,
@@ -228,7 +284,7 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
       likeSent: ctx.likeSent,
       blocked: ctx.blockedByViewer || ctx.blockedByPeer,
     };
-  }, [state, interactionState, ctx, activeProfile, pending, waveOptimistic]);
+  }, [interactionState, ctx, activeProfile, seedPoint, pending, waveOptimistic]);
 
   /** Display name for seeding EntityBottomSheet when pin left the viewport. */
   const seedDisplayName = useMemo(() => {
@@ -236,8 +292,8 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     if (profile && 'displayName' in profile && typeof profile.displayName === 'string') {
       return profile.displayName;
     }
-    return 'User';
-  }, [activeProfile]);
+    return seedPoint?.meta.displayName ?? 'User';
+  }, [activeProfile, seedPoint]);
 
   return {
     state,
