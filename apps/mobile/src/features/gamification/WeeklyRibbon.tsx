@@ -3,12 +3,12 @@
 // Compact "this week" standing strip under the daily challenge card.
 // Shows rank (when the user is ranked, matches the SUM window) and ticks the countdown each minute.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { LeaderboardEntry } from '@g88/shared';
-import { colors } from '@/theme';
+import { useAppTheme, type ThemeColors } from '@/theme';
 
 const MINUTE_MS = 60_000;
 
@@ -30,6 +30,8 @@ interface WeeklyRibbonProps {
 }
 
 export function WeeklyRibbon({ resetsAt, me }: WeeklyRibbonProps): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -65,22 +67,27 @@ export function WeeklyRibbon({ resetsAt, me }: WeeklyRibbonProps): React.JSX.Ele
   );
 }
 
-const styles = StyleSheet.create({
-  ribbon: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginHorizontal: 20,
-    marginBottom: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 212, 255, 0.33)',
-  },
-  ribbonLeader: { backgroundColor: colors.premiumSoft, borderColor: colors.premiumBorderMid },
-  body: { flex: 1 },
-  title: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
-  sub: { color: colors.info, fontSize: 12, marginTop: 2 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    ribbon: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginHorizontal: 20,
+      marginBottom: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      backgroundColor: colors.primarySoft,
+      borderWidth: 1,
+      borderColor: colors.primaryBorder,
+    },
+    ribbonLeader: {
+      backgroundColor: colors.premiumSoft,
+      borderColor: colors.premiumBorderMid,
+    },
+    body: { flex: 1 },
+    title: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
+    sub: { color: colors.info, fontSize: 12, marginTop: 2 },
+  });
+}
