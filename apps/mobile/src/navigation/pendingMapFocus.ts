@@ -37,7 +37,9 @@ function emitPendingMapFocusChanged(): void {
 
 export function subscribePendingMapFocus(listener: PendingMapFocusListener): () => void {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 export function setPendingMapFocus(input: {
