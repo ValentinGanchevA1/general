@@ -200,9 +200,12 @@ jobs:
         if: failure()
         run: |
           mkdir -p .tmp/device-evidence
+          cp .tmp/emulators/*.log .tmp/device-evidence/ 2>/dev/null || true
+          adb devices -l > .tmp/device-evidence/adb-devices.txt 2>&1 || true
           for serial in emulator-5554 emulator-5556; do
-            adb -s "$serial" exec-out screencap -p > ".tmp/device-evidence/${serial}.png" 2>/dev/null || true
-            adb -s "$serial" logcat -d 2>/dev/null \
+            timeout 10s adb -s "$serial" exec-out screencap -p \
+              > ".tmp/device-evidence/${serial}.png" 2>/dev/null || true
+            timeout 10s adb -s "$serial" logcat -d 2>/dev/null \
               | grep -E 'NEXA_E2E_DEVICE|AndroidRuntime' \
               > ".tmp/device-evidence/${serial}.log" || true
           done
