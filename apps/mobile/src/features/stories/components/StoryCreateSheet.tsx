@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { colors } from '@/theme';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -15,6 +14,7 @@ import Video from 'react-native-video';
 import { STORY_LIMITS } from '@g88/shared';
 
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
+import { useAppTheme, type ThemeColors } from '@/theme';
 import { extractMessage } from '@/utils/extractMessage';
 import { createStory, presignStory } from '../storiesSlice';
 
@@ -43,6 +43,8 @@ export function StoryCreateSheet({
   location,
   pickAndUpload,
 }: Props): React.JSX.Element {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const dispatch = useAppDispatch();
   const posting = useAppSelector((s) => s.stories.posting);
   const [caption, setCaption] = useState('');
@@ -230,62 +232,64 @@ function humanizeError(e: unknown, fallback: string): string {
   return raw.length > 120 ? fallback : raw;
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: colors.surfaceRaised,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 20,
-    paddingBottom: 32,
-  },
-  title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginBottom: 4 },
-  hint: { color: colors.textMuted, fontSize: 13, marginBottom: 12 },
-  previewWrap: { marginBottom: 12 },
-  preview: {
-    width: '100%',
-    height: 160,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceAlt,
-    overflow: 'hidden',
-  },
-  previewVideoBadge: {
-    position: 'absolute',
-    left: 10,
-    bottom: 10,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  previewVideoLabel: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
-  changeMedia: { alignSelf: 'flex-start', marginTop: 8, paddingVertical: 4 },
-  changeMediaText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
-  caption: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 12,
-    color: colors.textPrimary,
-    padding: 12,
-    minHeight: 72,
-    textAlignVertical: 'top',
-    marginBottom: 12,
-  },
-  error: { color: colors.danger, marginBottom: 8, fontSize: 13 },
-  row: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 12 },
-  cancelBtn: { paddingVertical: 12, paddingHorizontal: 16 },
-  cancelText: { color: colors.textSecondary, fontSize: 15 },
-  postBtn: {
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    minWidth: 120,
-    alignItems: 'center',
-  },
-  postBtnDisabled: { opacity: 0.6 },
-  postText: { color: colors.textPrimary, fontWeight: '700', fontSize: 15 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: colors.surfaceRaised,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      padding: 20,
+      paddingBottom: 32,
+    },
+    title: { color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginBottom: 4 },
+    hint: { color: colors.textMuted, fontSize: 13, marginBottom: 12 },
+    previewWrap: { marginBottom: 12 },
+    preview: {
+      width: '100%',
+      height: 160,
+      borderRadius: 12,
+      backgroundColor: colors.surfaceAlt,
+      overflow: 'hidden',
+    },
+    previewVideoBadge: {
+      position: 'absolute',
+      left: 10,
+      bottom: 10,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 8,
+    },
+    previewVideoLabel: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
+    changeMedia: { alignSelf: 'flex-start', marginTop: 8, paddingVertical: 4 },
+    changeMediaText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+    caption: {
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: 12,
+      color: colors.textPrimary,
+      padding: 12,
+      minHeight: 72,
+      textAlignVertical: 'top',
+      marginBottom: 12,
+    },
+    error: { color: colors.danger, marginBottom: 8, fontSize: 13 },
+    row: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 12 },
+    cancelBtn: { paddingVertical: 12, paddingHorizontal: 16 },
+    cancelText: { color: colors.textSecondary, fontSize: 15 },
+    postBtn: {
+      backgroundColor: colors.accent,
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      minWidth: 120,
+      alignItems: 'center',
+    },
+    postBtnDisabled: { opacity: 0.6 },
+    postText: { color: colors.textPrimary, fontWeight: '700', fontSize: 15 },
+  });
+}
