@@ -55,4 +55,8 @@ export const Config = {
     (process.env.NEXA_MAPTILER_MAP_ID as string | undefined) ?? 'streets-v4',
   MAPTILER_REGION:
     (process.env.NEXA_MAPTILER_REGION as string | undefined) ?? 'eu',
+  // CI-only device privacy probe. This is false in normal builds and, when enabled,
+  // emits only coarse event-type markers with no IDs or coordinates.
+  E2E_DEVICE_PROBE:
+    (process.env.NEXA_E2E_DEVICE_PROBE as string | undefined) === '1',
 } as const;
