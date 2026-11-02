@@ -45,16 +45,16 @@ describe('resolveNexaMapSpatialState', () => {
     ).toBe('stale-error');
   });
 
-  it('uses a recoverable discovery error when no prior points exist', () => {
+  it('uses a recoverable discovery error when the authoritative lane fails with no prior points', () => {
     expect(
       resolveNexaMapSpatialState({ ...base, hasError: true }),
     ).toBe('error');
   });
 
-  it('treats a Place-only discovery failure as a recoverable map error', () => {
+  it('keeps a Place-only discovery failure compact and retryable', () => {
     expect(
       resolveNexaMapSpatialState({ ...base, placeHasError: true }),
-    ).toBe('error');
+    ).toBe('stale-error');
   });
 
   it('keeps visible content when Place discovery refresh fails', () => {
@@ -72,6 +72,16 @@ describe('resolveNexaMapSpatialState', () => {
         pointCount: 4,
       }),
     ).toBe('stale-error');
+  });
+
+  it('still blocks when legacy discovery also fails and no usable content exists', () => {
+    expect(
+      resolveNexaMapSpatialState({
+        ...base,
+        hasError: true,
+        placeHasError: true,
+      }),
+    ).toBe('error');
   });
 
   it('distinguishes first load from background refresh', () => {
