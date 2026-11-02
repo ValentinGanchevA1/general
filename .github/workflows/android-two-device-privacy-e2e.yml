@@ -113,10 +113,26 @@ jobs:
 
       - name: Install Android 12 emulator image
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "emulator" "system-images;android-31;google_apis;x86_64"
-          echo no | avdmanager create avd --force --name nexa-a --package "system-images;android-31;google_apis;x86_64" --device pixel_4
-          echo no | avdmanager create avd --force --name nexa-b --package "system-images;android-31;google_apis;x86_64" --device pixel_4
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit 2>/dev/null || true)"
+          fi
+          test -x "$SDKMANAGER" || {
+            echo "::error::sdkmanager not found under ANDROID_HOME=$ANDROID_HOME"
+            find "$ANDROID_HOME" -maxdepth 4 -type f \( -name sdkmanager -o -name avdmanager \) -print 2>/dev/null || true
+            exit 1
+          }
+
+          AVDMANAGER="$(dirname "$SDKMANAGER")/avdmanager"
+          test -x "$AVDMANAGER" || {
+            echo "::error::avdmanager not found next to sdkmanager"
+            exit 1
+          }
+
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "emulator" "system-images;android-31;google_apis;x86_64"
+          echo no | "$AVDMANAGER" create avd --force --name nexa-a --package "system-images;android-31;google_apis;x86_64" --device pixel_4
+          echo no | "$AVDMANAGER" create avd --force --name nexa-b --package "system-images;android-31;google_apis;x86_64" --device pixel_4
           sudo chmod 666 /dev/kvm || true
 
       - name: Boot two Android emulators
