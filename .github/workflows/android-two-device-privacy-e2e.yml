@@ -26,6 +26,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   DEVICE_E2E_STATE_FILE: .tmp/android-two-device-privacy.json
   DEVICE_E2E_BASE_URL: https://g88-api.onrender.com
+  ANDROID_AVD_HOME: ${{ github.workspace }}/.tmp/android-avd
 
 jobs:
   android-two-device-privacy:
@@ -139,8 +140,14 @@ jobs:
           }
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
 
+          mkdir -p "$ANDROID_AVD_HOME"
           echo no | "$AVDMANAGER" create avd --force --name nexa-a --package "system-images;android-31;google_apis;x86_64" --device pixel_4
           echo no | "$AVDMANAGER" create avd --force --name nexa-b --package "system-images;android-31;google_apis;x86_64" --device pixel_4
+
+          AVDS="$("$ANDROID_HOME/emulator/emulator" -list-avds)"
+          printf '%s\n' "$AVDS"
+          grep -qx 'nexa-a' <<< "$AVDS" || { echo "::error::nexa-a is not visible to emulator"; exit 1; }
+          grep -qx 'nexa-b' <<< "$AVDS" || { echo "::error::nexa-b is not visible to emulator"; exit 1; }
           sudo chmod 666 /dev/kvm || true
 
       - name: Boot two Android emulators
