@@ -131,6 +131,13 @@ jobs:
 
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platform-tools" "emulator" "system-images;android-31;google_apis;x86_64"
+          ADB_DIR="$ANDROID_HOME/platform-tools"
+          test -x "$ADB_DIR/adb" || {
+            echo "::error::adb not found after platform-tools install"
+            find "$ANDROID_HOME" -maxdepth 3 -type f -name adb -print 2>/dev/null || true
+            exit 1
+          }
+          echo "$ADB_DIR" >> "$GITHUB_PATH"
           echo no | "$AVDMANAGER" create avd --force --name nexa-a --package "system-images;android-31;google_apis;x86_64" --device pixel_4
           echo no | "$AVDMANAGER" create avd --force --name nexa-b --package "system-images;android-31;google_apis;x86_64" --device pixel_4
           sudo chmod 666 /dev/kvm || true
