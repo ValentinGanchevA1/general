@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-two-device-realtime-privacy-e2e
+  group: android-two-device-realtime-privacy-e2e-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
