@@ -176,7 +176,7 @@ suite('Map Core PostGIS discovery benchmark — disposable database only', () =>
         const start = performance.now();
         const result = await database.query<T>(sql, params);
         queries.push({
-          sql, params,
+          sql, params: [...params], // The service appends more bind params after the candidate query.
           milliseconds: performance.now() - start,
           rows: Array.isArray(result) ? result.length : 0,
         });
