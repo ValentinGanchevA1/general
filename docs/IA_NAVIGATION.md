@@ -37,3 +37,17 @@ Legacy `Main → Pulse`, `Main → Discover` and `Main → You` route names rema
 - Old notifications that navigate to Pulse still open Pulse with their existing filters.
 - Connections unread badge and legacy Interactions re-entry are preserved.
 - Test accessibility on small Android displays and with enlarged system fonts.
+
+
+## Outstanding Android device QA (manual)
+
+The CI typecheck/unit tests and the web 320px emulator are necessary but do **not** prove the native Android tab bar or map gesture layout on a physical device. Before merge/release, run on the Android RC APK:
+
+1. Open Map, pan/zoom to a recognizable area, and switch Map → Experiences → Opportunities → Map. Verify same camera/viewport, filtered event/listing pins, and no remount/flash.
+2. In Opportunities, verify the nearby Events rail does not overlap or compete with listings. Select a listing and open the detail/action sheet.
+3. Verify TalkBack announces exactly one selected tab when a spatial lens is active; legacy Discover/Pulse/You must not be in the tab traversal. Try system font scale 1.3× and narrow widths (320–360dp).
+4. Open an older Pulse push/deep link and confirm the corresponding filter still works, without exposing private location details.
+5. Verify Connections unread badge, Identity → Trust Center, and map contextual Create remain reachable.
+6. Repeat with permissions denied or location unavailable: show a recoverable state, not a blank screen.
+
+Record device/Android version, test evidence and failures on this PR before release sign-off.
