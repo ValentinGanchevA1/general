@@ -293,6 +293,46 @@ describe('DiscoveryService', () => {
       expect(selectedKeys).toHaveLength(500);
     });
 
+    it('excludes incompatible dating candidates before relevance top-K', async () => {
+      const candidates = Array.from({ length: 650 }, (_, index) => ({
+        id: `u-${index}`,
+        kind: 'user' as const,
+        lat: 1.025,
+        lng: 1.025,
+        verification: 'id' as const,
+      }));
+      candidates.push({
+        id: 'compatible', kind: 'user', lat: 2, lng: 2, verification: 'id',
+      });
+      query.mockImplementation((sql: string, params: unknown[]) => {
+        if (sql.includes('SELECT COALESCE(open_to_dating')) {
+          return Promise.resolve([{ open_to_dating: true }]);
+        }
+        if (sql.includes('AS listing_mode')) return Promise.resolve(candidates);
+        if (sql.includes('SELECT id, gender')) {
+          const ids = params[0] as string[];
+          return Promise.resolve([
+            { id: 'me', gender: 'male', seeking_genders: ['female'] },
+            ...ids.map((id) => ({
+              id,
+              gender: id === 'compatible' ? 'female' : 'male',
+              seeking_genders: ['male'],
+            })),
+          ]);
+        }
+        const keys = params.find((arg): arg is string[] =>
+          Array.isArray(arg) && arg.includes('user:compatible')) ?? [];
+        return Promise.resolve(candidates
+          .filter((person) => keys.includes(`user:${person.id}`))
+          .map((person) => ({
+            ...person,
+            meta: { displayName: person.id, verification: 'id' },
+          })));
+      });
+      const result = await call({ datingOnly: true });
+      expect(asPoints(result.points).map((point) => point.id)).toEqual(['compatible']);
+    });
+
     it('orders newest in SQL before applying the hard LIMIT', async () => {
       const latest = {
         id: 'event-new',
