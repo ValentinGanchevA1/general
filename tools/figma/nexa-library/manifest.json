@@ -1,0 +1,10 @@
+{
+  "name": "NEXA · Component Library Sync",
+  "id": "nexa-component-library-local",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": [
+    "figma"
+  ],
+  "documentAccess": "dynamic-page"
+}
