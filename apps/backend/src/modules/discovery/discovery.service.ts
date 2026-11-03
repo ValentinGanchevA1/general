@@ -2,7 +2,6 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { createHash } from 'node:crypto';
-import * as h3 from 'h3-js';
 import type Redis from 'ioredis';
 
 import {
@@ -25,6 +24,7 @@ import { REDIS_CLIENT } from '../../config/redis.provider';
 import { PresenceService } from '../presence/presence.service';
 import { FriendsService } from '../friends/friends.service';
 import { buildDiscoveryDiffFromSnapshot } from './discoveryDiff';
+import { completeClusterCoverage, type ClusterCoverage } from './cluster-coverage';
 import {
   computeRankScore,
   haversineM,
@@ -220,8 +220,8 @@ export class DiscoveryService {
       );
     }
 
-    const points = isEntityZoom(params.zoom)
-      ? await this.entitiesInCells(
+    const discoveryResult: { points: DiscoveryPoint[]; resolution: number } = isEntityZoom(params.zoom)
+      ? { points: await this.entitiesInCells(
           cells,
           resolution,
           kinds,
@@ -233,7 +233,7 @@ export class DiscoveryService {
           datingOnly,
           params.viewport,
           rankBy,
-        )
+        ), resolution }
       : await this.clusterByCell(
           cells,
           resolution,
@@ -245,6 +245,7 @@ export class DiscoveryService {
           friendIds,
           datingOnly,
         );
+    const { points, resolution: responseResolution } = discoveryResult;
 
     const viewportHash = this.hashViewport(
       params.viewport,
@@ -269,7 +270,7 @@ export class DiscoveryService {
       if (diff) {
         return {
           points: [],
-          resolution,
+          responseResolution,
           generatedAt: new Date().toISOString(),
           viewportHash,
           diff,
@@ -279,7 +280,7 @@ export class DiscoveryService {
 
     return {
       points,
-      resolution,
+      responseResolution,
       generatedAt: new Date().toISOString(),
       viewportHash,
       diff: null,
@@ -313,7 +314,7 @@ export class DiscoveryService {
     marketplaceKind?: MarketplaceKind,
     friendIds: string[] | null = null,
     datingOnly = false,
-  ): Promise<DiscoveryPoint[]> {
+  ): Promise<ClusterCoverage> {
     const cellCol = this.cellColumn(resolution);
     const listingClause = listingModeSql(listingMode);
     const marketplaceClause = marketplaceKindSql(marketplaceKind);
@@ -356,23 +357,7 @@ export class DiscoveryService {
       queryParams,
     );
 
-    const byCell = new Map<string, { count: number; by: Partial<Record<EntityKind, number>> }>();
-    for (const row of rows) {
-      const n = Number(row.n);
-      const slot = byCell.get(row.cell) ?? { count: 0, by: {} };
-      slot.count += n;
-      slot.by[row.kind] = (slot.by[row.kind] ?? 0) + n;
-      byCell.set(row.cell, slot);
-    }
-
-    const sortedCells = [...byCell].sort((a, b) => b[1].count - a[1].count);
-    const points: DiscoveryPoint[] = [];
-    for (const [cellId, slot] of sortedCells) {
-      const [lat, lng] = h3.cellToLatLng(cellId);
-      points.push({ kind: 'cluster', cellId, lat, lng, count: slot.count, by: slot.by });
-      if (points.length >= MAX_POINTS_PER_RESPONSE) break;
-    }
-    return points;
+    return completeClusterCoverage(rows, resolution, MAX_POINTS_PER_RESPONSE);
   }
 
   private async entitiesInCells(
