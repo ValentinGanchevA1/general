@@ -1,137 +1,39 @@
-# NEXA Mobile — Information Architecture & Navigation
+# NEXA navigation v3 — canonical map-first information architecture
 
-> **Product IA reference.** Runtime source of truth is `apps/mobile/src/navigation/AppNavigator.tsx` plus `stacks.ts`.  
-> Tab identity/semantics are defined in `apps/mobile/src/navigation/NEXA_NAVIGATION_TABS.md`.  
-> **Reviewed:** 2026-10-26.  
-> Compatibility route names may remain technical identifiers; do not infer visible product copy from a legacy route name.
+> Runtime authority: `apps/mobile/src/navigation/AppNavigator.tsx`, `nexaTabIdentity.ts` and `nexaSpatialLens.store.ts`.
+> Updated: 2026-11-04.
 
----
+## Five visible destinations
 
-## 1. Canonical product model
+| Tab | Role | Interaction contract |
+|---|---|---|
+| Map | Primary live spatial home | People, places, events, listings and Pulse signals in the current viewport |
+| Experiences | Spatial lens | Opens **the existing Map** with event layer selected; map camera and gesture history are preserved |
+| Opportunities | Spatial lens | Opens **the existing Map** with listing layer selected; trading permissions and backend rules unchanged |
+| Connections | Private relationship work | Chats, waves, pending actions; only actionable unread badge |
+| Identity | Profile and trust | Verification, account, achievements, settings and map presence |
 
-NEXA is map-first. The authenticated primary navigation is fixed to five tabs:
+NEXA exposes five *navigation controls* and only **one live map instance**. On press, Experiences and Opportunities switch the active spatial lens and navigate to the Map route. The active lens is reflected in tab icon/label styling. Manually changing map layer chips switches to `custom` without overwriting the user's filters. Pulse is a contextual live signal and existing dedicated activity viewer, **not** a primary tab.
 
-| Order | Tab | Product role |
-|---:|---|---|
-| 1 | **Map** | Primary spatial surface: nearby people, events and listings; contextual actions and creation |
-| 2 | **Discover** | Navigation hub into people, events, marketplace and suggestions; not a second feed |
-| 3 | **Pulse** | Live/local activity interpretation and event/marketplace lanes |
-| 4 | **Connections** | Chats plus actionable relationship activity |
-| 5 | **You** | Signed-in identity, profile, activity and settings entry points |
+## Compatibility
 
-The old centered Create tab is not part of primary navigation. Creation stays contextual to the Map through existing create/FAB/long-press flows.
+Legacy `Main → Pulse`, `Main → Discover` and `Main → You` route names remain registered as hidden tabs to support existing push payloads, notifications, and source callers. They never appear as a sixth visible item. New UI must use `Map | Experiences | Opportunities | Connections | Identity`. Existing `Interactions` root re-entry stays routed to `Main → Connections`.
 
----
+## Invariants
 
-## 2. Navigator hierarchy
+- The map viewport is not reset by switching between the three spatial navigation controls.
+- Map discovery continues to rely on the existing server-authoritative viewport query, PostGIS filters, and Socket.IO privacy rules.
+- Spatial lens changes must not request additional permissions or introduce new location persistence.
+- Tab navigation is never an authorization boundary for chats, events, offers or verification.
+- Only Connections may show an actionable numeric badge. Map novelty is signaled on-map.
+- A11y: labels present, target width >= 44dp, text auto-shrinks rather than overflowing on narrow phones.
+- Do not rename existing backend endpoint names or older push payload route values as part of this visual IA migration.
 
-```text
-NavigationContainer
-└── Root Stack
-    ├── [guest] Auth
-    └── [authenticated]
-        ├── ProfileCreation                 profile-completion gate
-        ├── Main → Bottom Tabs
-        │   ├── Map
-        │   ├── Discover
-        │   ├── Pulse
-        │   ├── Connections
-        │   └── You
-        │
-        ├── Chat
-        ├── UserProfile
-        ├── MutualFriends
-        ├── AlertComposer
-        ├── GiftsInbox
-        ├── Interactions                    compatibility fallback only
-        ├── Gamification → Challenges | Leaderboard | Achievements
-        ├── Commerce → Marketplace | ListingDetail | ListingCreate
-        ├── Account → Settings | TrustCenter | Privacy | Help | About
-        │             NotificationSettings | BlockedUsers | Verification
-        │             EmailVerification | VerificationId | Subscription
-        │             SocialLinking | ProfileEdit | Photos
-        ├── Social → FriendsList | Suggestions
-        └── Events → EventDetail | EventCreate
-```
+## Regression tests
 
-`AppNavigator.tsx` and the typed param lists remain authoritative if this diagram and code ever diverge.
-
----
-
-## 3. Tab contracts
-
-### Map
-
-- Home/default product surface.
-- Accepts focus params for the signed-in user, another user, a listing, coordinates and contextual create entry.
-- Entity sheets/actions remain map-owned rather than becoming extra primary tabs.
-- Person sheets retain the discovery header, then center the avatar/identity and public origins, shared-interest chips and Purpose, followed by compatibility/mutual metrics. Mutual friends opens from its metric without a duplicate avatar row; View Full Profile occupies its own action row.
-- Map/discovery privacy precision remains server-authoritative.
-
-### Discover
-
-Discover is a lightweight routing hub, not another ranked content feed. Current lanes route into existing surfaces:
-
-- Nearby people → Map
-- Local events → Pulse / Events
-- Marketplace → Commerce / Marketplace
-- People you may know → Social / Suggestions
-
-Opening Discover itself does not introduce a new location-permission, persistence, REST or Socket.IO contract.
-
-### Pulse
-
-Pulse supports the current product filters (`for-you`, `nearby`, `events`, `marketplace`) and remains the local-activity interpretation surface.
-
-### Connections
-
-`Connections` renders the existing interactions/chats implementation as the canonical visible product destination.
-
-Badge policy is functional only: unread chats plus pending connection actions, capped at `99+`. It must not expose popularity or vanity counts.
-
-### You
-
-`You` is the signed-in profile/identity surface. Profile, verification, map presence and account-management flows fan out from here into the existing root/nested stacks.
-
----
-
-## 4. Compatibility re-entry
-
-`Interactions` is retained as a root route for source compatibility with older push/toast/map callers.
-
-New normal re-entry must resolve to:
-
-```text
-Main → Connections
-```
-
-Do not create a duplicate visible Interactions destination or reintroduce it as a sixth tab.
-
----
-
-## 5. Navigation identity & accessibility
-
-- Labels stay visible; navigation does not rely on icons alone.
-- Map / Discover / Pulse use discovery/live semantic treatment.
-- Connections / You use relationship/identity semantic treatment.
-- Interactive tab targets remain at least 44dp wide.
-- Connections is the only primary tab that may show an actionable numeric badge.
-- Keyboard-open behavior may hide the tab bar where configured.
-
----
-
-## 6. Privacy / abuse invariants
-
-Navigation is never the security boundary:
-
-- no route bypasses block, verification or messaging permissions;
-- Discover does not request fresh location merely by opening;
-- route params and UI copy must not expose hidden/exact location data;
-- push re-entry must not reveal additional lock-screen/private information;
-- no tab badge exposes follower count, popularity, trust score or nearby population.
-
----
-
-## 7. Historical note
-
-The pre-NEXA document described an older three-tab `Map / Pulse / Profile` model with a visible `Interactions` root surface. That model is historical and must not be used for new product or implementation decisions.
+- Five primary tabs appear in the correct order; no Discover/Pulse/You navigation items are visible.
+- Experiences selects events on the same Map; Opportunities selects listings; Map restores ordinary discovery.
+- Manual map layer choice is respected as a custom lens; tapping Experiences again filters events.
+- Old notifications that navigate to Pulse still open Pulse with their existing filters.
+- Connections unread badge and legacy Interactions re-entry are preserved.
+- Test accessibility on small Android displays and with enlarged system fonts.

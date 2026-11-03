@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
 	StyleSheet,
 	Text,
@@ -77,6 +77,7 @@ import {
 	entityPointKey,
 } from '@/features/map/mapNovelty';
 import { clearMapNewCount, setMapNewCount } from '@/features/map/mapNoveltySlice';
+import { nexaSpatialLensStore } from '@/features/map/nexaSpatialLens.store';
 import { MapCreateNudgeBanner } from '@/features/map/MapCreateNudgeBanner';
 import { useSheetChrome, useSheetBackdrop } from '@/components/sheets';
 import {
@@ -144,6 +145,12 @@ export function MapScreen(): React.JSX.Element {
 	const [listingModeFilter, setListingModeFilter] =
 		useState<ListingModeFilterValue>('all');
 	const [layers, setLayers] = useState<EntityKind[]>(DEFAULT_MAP_LAYERS);
+	const activeLens = useSyncExternalStore(nexaSpatialLensStore.subscribe, nexaSpatialLensStore.getSnapshot);
+	useEffect(() => {
+		if (activeLens === 'experiences') setLayers(['event']);
+		else if (activeLens === 'opportunities') setLayers(['listing']);
+		else if (activeLens === 'map') setLayers(DEFAULT_MAP_LAYERS);
+	}, [activeLens]);
 	const [friendsOnly, setFriendsOnly] = useState(false);
 	const [datingOnly, setDatingOnly] = useState(false);
 	const [rankBy, setRankBy] = useState<DiscoveryRankBy>('relevance');
@@ -883,7 +890,7 @@ export function MapScreen(): React.JSX.Element {
 				value={searchQuery}
 				onChangeText={setSearchQuery}
 				layers={layers}
-				onLayersChange={setLayers}
+				onLayersChange={(next) => { setLayers(next); nexaSpatialLensStore.set('custom'); }}
 				listingMode={listingModeFilter}
 				onListingModeChange={setListingModeFilter}
 				friendsOnly={friendsOnly}
