@@ -33,7 +33,7 @@ const STEPS: Step[] = [
     id: 'pin',
     emoji: '📍',
     title: 'You are on the map',
-    body: 'Your pin is your presence. Other pins are people, events, places, and listings nearby. Pan and zoom to explore the area.',
+    body: 'Your pin is your presence. Numbered bubbles are nearby clusters — tap one to reveal local people and their avatar pins. Pan and zoom to explore more.',
   },
   {
     id: 'create',
