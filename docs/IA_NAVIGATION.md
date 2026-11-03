@@ -26,7 +26,7 @@ Legacy `Main → Pulse`, `Main → Discover` and `Main → You` route names rema
 - Spatial lens changes must not request additional permissions or introduce new location persistence.
 - Tab navigation is never an authorization boundary for chats, events, offers or verification.
 - Only Connections may show an actionable numeric badge. Map novelty is signaled on-map.
-- A11y: labels present, target width >= 44dp, text auto-shrinks rather than overflowing on narrow phones.
+- A11y: labels present, target width >= 44dp, text auto-shrinks rather than overflowing on narrow phones. Spatial lens selection is explicitly reflected in accessibilityState.selected, not only icon colors.
 - Do not rename existing backend endpoint names or older push payload route values as part of this visual IA migration.
 
 ## Regression tests

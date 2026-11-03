@@ -2,6 +2,7 @@ import {
   NEXA_MAIN_TAB_ORDER,
   NEXA_TAB_VISUALS,
   isNexaMainTab,
+  isNexaTabSelected,
   resolveConnectionsTabBadge,
 } from './nexaTabIdentity';
 
@@ -26,6 +27,15 @@ describe('NEXA map-first navigation v3', () => {
     expect(NEXA_TAB_VISUALS.Opportunities.tone).toBe('discovery');
     expect(NEXA_TAB_VISUALS.Connections.tone).toBe('action');
     expect(NEXA_TAB_VISUALS.Identity.tone).toBe('action');
+  });
+
+  it('exposes the selected spatial lens to icons and screen readers', () => {
+    expect(isNexaTabSelected('Map', 'map', true, true)).toBe(true);
+    expect(isNexaTabSelected('Map', 'experiences', true, true)).toBe(false);
+    expect(isNexaTabSelected('Experiences', 'experiences', true, false)).toBe(true);
+    expect(isNexaTabSelected('Opportunities', 'opportunities', true, false)).toBe(true);
+    expect(isNexaTabSelected('Opportunities', 'opportunities', false, false)).toBe(false);
+    expect(isNexaTabSelected('Identity', 'experiences', false, true)).toBe(true);
   });
 
   it('limits Connections badges to actionable counts', () => {

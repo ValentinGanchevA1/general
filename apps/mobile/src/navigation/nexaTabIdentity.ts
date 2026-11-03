@@ -22,6 +22,19 @@ export function isNexaMainTab(name: string): name is NexaMainTab {
   return NEXA_MAIN_TAB_ORDER.some((tab) => tab === name);
 }
 
+/** Route focus and visual/a11y selection differ for spatial tabs sharing Map. */
+export function isNexaTabSelected(
+  tab: NexaMainTab,
+  lens: 'map' | 'experiences' | 'opportunities' | 'custom',
+  mapHostActive: boolean,
+  focused: boolean,
+): boolean {
+  if (tab === 'Map') return mapHostActive && (lens === 'map' || lens === 'custom');
+  if (tab === 'Experiences') return mapHostActive && lens === 'experiences';
+  if (tab === 'Opportunities') return mapHostActive && lens === 'opportunities';
+  return focused;
+}
+
 export const NEXA_TAB_VISUALS: Record<NexaMainTab, NexaTabVisual> = {
   Map: {
     label: 'Map',

@@ -1,6 +1,6 @@
 // apps/mobile/src/navigation/AppNavigator.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Linking, Text, View } from 'react-native';
+import { Linking, Text, TouchableOpacity, View } from 'react-native';
 import { BrandLogo } from '@/components/Brand/BrandLogo';
 import { useNexaLaunchInteractionsReady } from '@/components/Brand/NexaLaunchSurfaceContext';
 import {
@@ -11,7 +11,7 @@ import {
 	type Theme as NavigationTheme,
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator, type BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, type BottomTabBarButtonProps, type BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 
@@ -68,7 +68,7 @@ import { navigationRef } from './navigationRef';
 import { openViaRef } from './openRootScreen';
 import { takePendingPhoneVerify } from '@/services/pendingPhone';
 import { NexaTabIcon } from './NexaTabIcon';
-import { NEXA_TAB_VISUALS, isNexaMainTab, resolveConnectionsTabBadge, type NexaMainTab } from './nexaTabIdentity';
+import { NEXA_TAB_VISUALS, isNexaMainTab, isNexaTabSelected, resolveConnectionsTabBadge, type NexaMainTab } from './nexaTabIdentity';
 import { nexaSpatialLensStore, type NexaSpatialLens } from '@/features/map/nexaSpatialLens.store';
 import type { AccountStackParamList, CommerceStackParamList, EventsStackParamList, GamificationStackParamList, SocialStackParamList } from './stacks';
 
@@ -165,6 +165,33 @@ function OpportunitiesLens(): React.JSX.Element {
   return <MapLensRedirectScreen lens="opportunities" />;
 }
 
+/** Preserve a real selected-state for accessibility even when Map hosts the active lens. */
+function NexaTabBarButton({
+  selected,
+  accessibilityState,
+  accessibilityLabel,
+  children,
+  onPress,
+  onLongPress,
+  style,
+  testID,
+}: BottomTabBarButtonProps & { selected: boolean }): React.JSX.Element {
+  return (
+    <TouchableOpacity
+      accessibilityRole="tab"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ ...accessibilityState, selected }}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={style}
+      activeOpacity={0.85}
+      testID={testID}
+    >
+      {children}
+    </TouchableOpacity>
+  );
+}
+
 function MainTabs(): React.JSX.Element {
   const { colors: c } = useAppTheme();
   const selectedLens = useSyncExternalStore(nexaSpatialLensStore.subscribe, nexaSpatialLensStore.getSnapshot);
@@ -172,13 +199,6 @@ function MainTabs(): React.JSX.Element {
   const friendPending = useAppSelector((s) => s.friends.pendingCount);
   const connectionsBadge = resolveConnectionsTabBadge(chatUnread, friendPending);
   const badgeStyle = { backgroundColor: c.actionPrimary, color: c.onPrimary, fontSize: 10, fontWeight: '800' as const, minWidth: 18, height: 18, lineHeight: 18 };
-
-  const mapTabSelected = (tab: NexaMainTab, focused: boolean, mapHostActive: boolean): boolean => {
-    if (tab === 'Map') return mapHostActive && (selectedLens === 'map' || selectedLens === 'custom');
-    if (tab === 'Experiences') return mapHostActive && selectedLens === 'experiences';
-    if (tab === 'Opportunities') return mapHostActive && selectedLens === 'opportunities';
-    return focused;
-  };
 
   const openLens = (lens: Extract<NexaSpatialLens, 'experiences' | 'opportunities'>) =>
     ({ navigation }: { navigation: BottomTabNavigationProp<TabParamList> }) => ({
@@ -209,7 +229,14 @@ function MainTabs(): React.JSX.Element {
           paddingBottom: 4,
         },
         tabBarItemStyle: legacy ? { display: 'none' as const } : { minWidth: 44 },
-        ...(legacy ? { tabBarButton: () => null } : {}),
+        tabBarButton: legacy
+          ? () => null
+          : (props) => (
+            <NexaTabBarButton
+              {...props}
+              selected={isNexaTabSelected(tab, selectedLens, mapHostActive, props.accessibilityState?.selected === true)}
+            />
+          ),
         tabBarActiveTintColor: active,
         tabBarInactiveTintColor: c.textTertiary,
         tabBarAccessibilityLabel: visual.accessibilityLabel,
@@ -218,11 +245,11 @@ function MainTabs(): React.JSX.Element {
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.7}
-            style={{ color: mapTabSelected(tab, focused, mapHostActive) ? active : c.textTertiary, textAlign: 'center', fontSize: 10, fontWeight: '700' }}
+            style={{ color: isNexaTabSelected(tab, selectedLens, mapHostActive, focused) ? active : c.textTertiary, textAlign: 'center', fontSize: 10, fontWeight: '700' }}
           >{visual.label}</Text>
         ),
         tabBarIcon: ({ focused }: { focused: boolean }) => (
-          <NexaTabIcon tab={tab} focused={mapTabSelected(tab, focused, mapHostActive)} />
+          <NexaTabIcon tab={tab} focused={isNexaTabSelected(tab, selectedLens, mapHostActive, focused)} />
         ),
       };
     }}

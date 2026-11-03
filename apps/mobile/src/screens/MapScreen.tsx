@@ -1026,7 +1026,7 @@ export function MapScreen(): React.JSX.Element {
 				onPressUser={(p) => onEntityPress(p)}
 			/>
 
-			{myCoords ? <EventsRail location={myCoords} /> : null}
+			{myCoords && (activeLens === 'map' || layers.includes('event')) ? <EventsRail location={myCoords} /> : null}
 		</View>
 	);
 }
