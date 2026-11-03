@@ -9,7 +9,11 @@ jest.mock('@g88/shared', () => ({
   isEntityZoom: jest.fn(),
   cellsForViewport: jest.fn(),
 }));
-jest.mock('h3-js', () => ({ cellToLatLng: jest.fn(() => [1.5, 2.5]) }));
+jest.mock('h3-js', () => ({
+  cellToLatLng: jest.fn(() => [1.5, 2.5]),
+  cellToParent: jest.fn((cell: string, resolution: number) =>
+    `${resolution}:parent-${Math.floor(Number(cell.slice(1)) / 7)}`),
+}));
 
 import { h3ResolutionForZoom, isEntityZoom, cellsForViewport } from '@g88/shared';
 import type { Viewport } from '@g88/shared';
@@ -129,6 +133,45 @@ describe('DiscoveryService', () => {
       expectAuthorBlockPredicate(sql);
       expect(sql).toContain('GROUP BY');
       expect(params[2]).toBe('me');
+    });
+  });
+
+  describe('cluster coverage', () => {
+    it('retains counts across >500 authorized cells and returns the effective H3 resolution', async () => {
+      (isEntityZoom as jest.Mock).mockReturnValue(false);
+      const rows = Array.from({ length: 600 }, (_, index) => ({
+        cell: `c${index}`, kind: 'user', n: '20',
+      }));
+      query.mockResolvedValueOnce(rows);
+
+      const res = await call();
+      const clusters = asPoints(res.points);
+      expect(res.resolution).toBe(7);
+      expect(clusters).toHaveLength(86);
+      expect(clusters.reduce((total, point) => total + (point.count ?? 0), 0))
+        .toBe(12_000);
+      expect(clusters.reduce((total, point) => total + (point.by?.user ?? 0), 0))
+        .toBe(12_000);
+      expect(redisSet).toHaveBeenCalledTimes(1);
+      const snapshotJson = redisSet.mock.calls[0]?.[1] as string;
+      expect(JSON.parse(snapshotJson)).toHaveLength(86);
+      const [sql] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain("visibility = 'public'");
+      expect(sql).toContain('NOT EXISTS');
+      expect(sql).toContain('GROUP BY');
+    });
+
+    it('returns requested H3 resolution when source clusters fit the budget', async () => {
+      (isEntityZoom as jest.Mock).mockReturnValue(false);
+      query.mockResolvedValueOnce([
+        { cell: 'c0', kind: 'event', n: '10' },
+        { cell: 'c0', kind: 'listing', n: '5' },
+      ]);
+      const res = await call();
+      expect(res.resolution).toBe(8);
+      expect(asPoints(res.points)).toMatchObject([
+        { cellId: 'c0', count: 15, by: { event: 10, listing: 5 } },
+      ]);
     });
   });
 
