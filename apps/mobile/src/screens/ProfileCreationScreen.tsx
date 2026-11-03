@@ -14,7 +14,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { NexaDiscoveryHero } from '@/components/Brand/NexaDiscoveryHero';
-import { BirthDateField, CityAutocompleteField } from '@/components/profile/ProfileOriginFields';
+import { BirthDateField, CityAutocompleteField } from '@/components/Profile/ProfileOriginFields';
 import { FormField } from '@/components/FormField';
 import { INTEREST_OPTIONS } from '@/features/profile/interestOptions';
 import { PURPOSE_OPTIONS } from '@/features/profile/goalOptions';
@@ -376,7 +376,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
           <Text style={[styles.welcomeHeading, { color: colors.textPrimary }]}>Make the map yours.</Text>
           <Text style={[styles.welcomeSub, { color: colors.textSecondary }]}>Tell NEXA what you like, why you’re here, and how you want to appear nearby.</Text>
         </ScrollView>
-        <View style={[styles.welcomeFooter, { backgroundColor: colors.canvas, borderTopColor: colors.borderSubtle }]}> 
+        <View style={[styles.welcomeFooter, { backgroundColor: colors.canvas, borderTopColor: colors.borderSubtle }]}>
           <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.actionPrimary }]} onPress={() => setStep(1)} activeOpacity={0.82} accessibilityRole="button">
             <Text style={[styles.primaryButtonText, { color: colors.onPrimary }]}>Set up my profile</Text>
           </TouchableOpacity>
@@ -405,14 +405,28 @@ export function ProfileCreationScreen(): React.JSX.Element {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {step === 1 ? <StepName value={form.displayName} onChange={(displayName) => setForm((current) => ({ ...current, displayName }))} /> : null}
         {step === 2 ? <StepInterests selected={form.interests} onToggle={(value) => toggleArrayValue('interests', value)} /> : null}
-        {step === 3 ? <StepOrigin dateOfBirth={form.dateOfBirth} hometownCity={form.hometownCity} hometownCountry={form.hometownCountry} showAge={form.showAge} showHometown={form.showHometown} error={originError} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} /> : null}
+        {step === 3 ? (
+          <StepOrigin
+            dateOfBirth={form.dateOfBirth}
+            hometownCity={form.hometownCity}
+            hometownCountry={form.hometownCountry}
+            showAge={form.showAge}
+            showHometown={form.showHometown}
+            error={originError}
+            onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+          />
+        ) : null}
         {step === 4 ? <StepPurpose selected={form.goals} onToggle={(value) => toggleArrayValue('goals', value)} /> : null}
         {step === 5 ? <StepVisibility value={form.visibility} onChange={(visibility) => setForm((current) => ({ ...current, visibility }))} /> : null}
         {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
       </ScrollView>
 
       <View style={[styles.footer, { backgroundColor: colors.canvas, borderTopColor: colors.borderSubtle }]}>
-        <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderSubtle }]} onPress={() => setStep((current) => Math.max(0, current - 1))} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={[styles.backButton, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderSubtle }]}
+          onPress={() => setStep((current) => Math.max(0, current - 1))}
+          activeOpacity={0.8}
+        >
           <Icon name="arrow-left" size={24} color={colors.textSecondary} />
           <Text style={[styles.backText, { color: colors.textSecondary }]}>Back</Text>
         </TouchableOpacity>
@@ -422,10 +436,14 @@ export function ProfileCreationScreen(): React.JSX.Element {
           disabled={!allowAdvance || loading}
           activeOpacity={0.82}
         >
-          {loading ? <ActivityIndicator color={colors.onPrimary} /> : <>
-            <Text style={[styles.continueText, { color: colors.onPrimary }]}>{isLastStep ? 'Enter NEXA' : 'Continue'}</Text>
-            <Icon name="arrow-right" size={24} color={colors.onPrimary} />
-          </>}
+          {loading ? (
+            <ActivityIndicator color={colors.onPrimary} />
+          ) : (
+            <>
+              <Text style={[styles.continueText, { color: colors.onPrimary }]}>{isLastStep ? 'Enter NEXA' : 'Continue'}</Text>
+              <Icon name="arrow-right" size={24} color={colors.onPrimary} />
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -434,14 +452,30 @@ export function ProfileCreationScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  welcomeBody: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing.xl, paddingTop: 40, paddingBottom: 24 },
+  welcomeBody: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingTop: 40,
+    paddingBottom: 24,
+  },
   welcomeHeading: { marginTop: spacing.lg, fontSize: 32, fontWeight: '800', letterSpacing: -0.7 },
   welcomeSub: { marginTop: spacing.sm, fontSize: fontSize.md, lineHeight: 23 },
   welcomeFooter: { padding: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth },
-  primaryButton: { minHeight: 56, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  primaryButton: {
+    minHeight: 56,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   primaryButtonText: { fontSize: fontSize.md, fontWeight: '800' },
   progressWrap: { paddingHorizontal: spacing.xl, paddingTop: 52, paddingBottom: spacing.lg },
-  progressHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  progressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   progressLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 1.6 },
   progressCount: { fontSize: 14, fontWeight: '800' },
   progressRow: { flexDirection: 'row', gap: 8 },
@@ -454,24 +488,78 @@ const styles = StyleSheet.create({
   stepHeading: { fontSize: 32, lineHeight: 38, fontWeight: '700', letterSpacing: -0.6 },
   stepSub: { marginTop: 10, fontSize: fontSize.md, lineHeight: 23 },
   choiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  choiceChip: { width: '48%', minHeight: 54, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  choiceChip: {
+    width: '48%',
+    minHeight: 54,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
   choiceIcon: { fontSize: 20 },
-  choiceLabel: { flex: 1, fontSize: fontSize.md, fontWeight: '600' },
+  choiceLabel: { flex: 1, fontSize: fontSize.sm, fontWeight: '600' },
   selectionCount: { marginTop: spacing.md, fontSize: fontSize.sm },
-  originFields: { gap: spacing.sm },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: radius.md, padding: 14, marginTop: spacing.sm, gap: 12 },
+  originFields: { gap: spacing.sm, marginBottom: spacing.md },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginBottom: spacing.sm,
+  },
   toggleCopy: { flex: 1 },
   toggleLabel: { fontSize: fontSize.md, fontWeight: '600' },
   toggleHint: { marginTop: 2, fontSize: fontSize.xs },
-  visibilityCard: { minHeight: 86, borderWidth: 1, borderRadius: radius.lg, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 14 },
-  visibilityIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  visibilityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginBottom: spacing.sm,
+  },
+  visibilityIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   visibilityText: { flex: 1 },
-  visibilityTitle: { fontSize: fontSize.md, fontWeight: '800' },
-  visibilitySub: { marginTop: 3, fontSize: fontSize.sm, lineHeight: 19 },
+  visibilityTitle: { fontSize: fontSize.md, fontWeight: '700' },
+  visibilitySub: { marginTop: 4, fontSize: fontSize.sm, lineHeight: 20 },
   error: { marginTop: spacing.md, fontSize: fontSize.sm },
-  footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: spacing.xl, paddingVertical: 18, flexDirection: 'row', gap: 14 },
-  backButton: { minHeight: 56, width: 112, borderWidth: 1, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  backText: { fontSize: fontSize.md, fontWeight: '700' },
-  continueButton: { minHeight: 56, flex: 1, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  footer: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    minHeight: 52,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  backText: { fontSize: fontSize.md, fontWeight: '600' },
+  continueButton: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: radius.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
   continueText: { fontSize: fontSize.md, fontWeight: '800' },
 });
