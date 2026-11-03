@@ -71,13 +71,36 @@ async function main() {
   }
 
   const colorModes = Object.keys(NEXA_TOKENS.colors);
-  const colorCollection = collection('NEXA / Colors', colorModes);
   const colors = Object.keys(NEXA_TOKENS.colors.Dark);
+  let colorGroups;
+  counts.colorThemeStrategy = 'variable-modes';
+  try {
+    colorGroups = [{ group: collection('NEXA / Colors', colorModes), modes: colorModes }];
+  } catch (error) {
+    // Starter supports variables but not multiple modes in a collection.
+    // Preserve the default Dark collection and store the other palettes in
+    // dedicated single-mode collections instead of failing halfway through.
+    if (!/mode|limit|plan|upgrade/i.test(String(error))) throw error;
+    const primary = collections.find((item) => item.name === 'NEXA / Colors');
+    if (!primary || !primary.modes.some((mode) => mode.name === 'Dark')) throw error;
+    const presentModes = colorModes.filter((mode) =>
+      primary.modes.some((existingMode) => existingMode.name === mode));
+    colorGroups = [{ group: primary, modes: presentModes }];
+    for (const mode of colorModes.filter((name) => !presentModes.includes(name))) {
+      colorGroups.push({ group: collection('NEXA / Colors / ' + mode, [mode]), modes: [mode] });
+    }
+    counts.colorThemeStrategy = 'single-mode-collections';
+  }
   for (const name of colors) {
-    const modeValues = {};
-    for (const mode of colorModes) modeValues[mode] = NEXA_TOKENS.colors[mode][name];
-    upsert(name, colorCollection, 'COLOR', modeValues,
-      ['FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL', 'STROKE_COLOR'], 'color-' + name.replace(/[A-Z]/g, (char) => '-' + char.toLowerCase()));
+    for (const { group, modes } of colorGroups) {
+      const modeValues = {};
+      for (const mode of modes) modeValues[mode] = NEXA_TOKENS.colors[mode][name];
+      const cssPrefix = group.name === 'NEXA / Colors'
+        ? 'color-' : 'color-' + modes[0].toLowerCase().replace(/\s+/g, '-') + '-';
+      upsert(name, group, 'COLOR', modeValues,
+        ['FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL', 'STROKE_COLOR'],
+        cssPrefix + name.replace(/[A-Z]/g, (char) => '-' + char.toLowerCase()));
+    }
   }
 
   const numericSpecs = [
