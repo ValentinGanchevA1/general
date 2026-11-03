@@ -182,7 +182,7 @@ function NexaTabBarButton({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ ...accessibilityState, selected }}
       onPress={onPress}
-      onLongPress={onLongPress}
+      onLongPress={onLongPress ?? undefined}
       style={style}
       activeOpacity={0.85}
       testID={testID}
