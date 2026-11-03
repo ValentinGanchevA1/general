@@ -118,17 +118,22 @@ async function main() {
     counts.effects += 1;
   }
 
+  function pigment(name) {
+    const color = rgb(NEXA_TOKENS.colors.Dark[name]);
+    // Bound COLOR variables can contain alpha; the paint itself must contain RGB only.
+    return { type: 'SOLID', color: { r: color.r, g: color.g, b: color.b } };
+  }
   function fill(node, name) {
     const variable = variableByKey.get('NEXA / Colors/' + name);
     if (!variable) throw new Error('Unknown color: ' + name);
     node.fills = [figma.variables.setBoundVariableForPaint(
-      { type: 'SOLID', color: rgb(NEXA_TOKENS.colors.Dark[name]) }, 'color', variable,
+      pigment(name), 'color', variable,
     )];
   }
   function stroke(node, name, width) {
     const variable = variableByKey.get('NEXA / Colors/' + name);
     node.strokes = [figma.variables.setBoundVariableForPaint(
-      { type: 'SOLID', color: rgb(NEXA_TOKENS.colors.Dark[name]) }, 'color', variable,
+      pigment(name), 'color', variable,
     )];
     node.strokeWeight = width;
   }
