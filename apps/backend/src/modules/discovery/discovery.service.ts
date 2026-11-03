@@ -393,7 +393,9 @@ export class DiscoveryService {
     const marketplaceClause = marketplaceKindSql(marketplaceKind);
     const centreLat = (viewport.ne.lat + viewport.sw.lat) / 2;
     const centreLng = (viewport.ne.lng + viewport.sw.lng) / 2;
-    const queryParams: unknown[] = [cells, kinds, requesterId, MAX_POINTS_PER_RESPONSE];
+    // Rank candidate IDs before loading full metadata or applying the 500-point cap.
+    // Candidate projection deliberately excludes full profile/event/listing JSON.
+    const queryParams: unknown[] = [cells, kinds, requesterId];
     let friendsClause = '';
     if (friendIds != null) {
       queryParams.push(friendIds);
@@ -413,19 +415,8 @@ export class DiscoveryService {
       queryParams.push(topicSlug);
       topicClause = `AND ${TOPIC_MATCH_SQL('$' + String(queryParams.length))}`;
     }
-    let orderClause = 'ORDER BY v_discoverable_entity.id';
-    if (rankBy === 'distance') {
-      const lngIdx = queryParams.length + 1;
-      const latIdx = queryParams.length + 2;
-      queryParams.push(centreLng, centreLat);
-      orderClause = `ORDER BY location::geography <-> ST_SetSRID(ST_MakePoint($${lngIdx}, $${latIdx}), 4326)::geography`;
-    }
-    const rows: EntityRow[] = await this.db.query(
-      `
-      SELECT id, kind,
-             ST_Y(CASE WHEN kind = 'user' THEN ST_SnapToGrid(location::geometry, 0.02) ELSE location::geometry END) AS lat,
-             ST_X(CASE WHEN kind = 'user' THEN ST_SnapToGrid(location::geometry, 0.02) ELSE location::geometry END) AS lng,
-             meta
+
+    const baseWhere = `
         FROM v_discoverable_entity
        WHERE ${cellCol} = ANY($1::text[])
          AND kind = ANY($2::text[])
@@ -437,8 +428,106 @@ export class DiscoveryService {
          ${marketplaceClause}
          ${friendsClause}
          ${datingClause}
-       ${orderClause}
-       LIMIT $4
+    `;
+    const latSql = "ST_Y(CASE WHEN kind = 'user' THEN ST_SnapToGrid(location::geometry, 0.02) ELSE location::geometry END)";
+    const lngSql = "ST_X(CASE WHEN kind = 'user' THEN ST_SnapToGrid(location::geometry, 0.02) ELSE location::geometry END)";
+    let selectedFilter = '';
+
+    if (rankBy === 'relevance') {
+      const candidateRows = await this.db.query<RankingCandidateRow[]>(
+        `SELECT id, kind,
+                ${latSql} AS lat,
+                ${lngSql} AS lng,
+                meta->>'verification' AS verification,
+                meta->>'startsAt' AS starts_at,
+                meta->>'createdAt' AS created_at,
+                meta->>'mode' AS listing_mode
+           ${baseWhere}`,
+        queryParams,
+      );
+      const eligible = datingOnly
+        ? await this.filterMutualDatingRows(candidateRows, requesterId)
+        : candidateRows;
+      if (eligible.length === 0) return [];
+
+      // Presence is consulted only for friends who opted in to sharing it.
+      const candidateUsers = eligible.filter((row) => row.kind === 'user');
+      const allFriendIds = candidateUsers.length
+        ? (friendIds ?? await this.friends.listFriendIds(requesterId))
+        : [];
+      const friendSet = new Set(allFriendIds);
+      const eligibleFriendIds = candidateUsers
+        .filter((row) => friendSet.has(row.id))
+        .map((row) => row.id);
+      const permissioned = eligibleFriendIds.length
+        ? await this.friends.listWhoAllowFriendsOnline(eligibleFriendIds)
+        : new Set<string>();
+      const presenceIds = eligibleFriendIds.filter((id) => permissioned.has(id));
+      const online = presenceIds.length
+        ? await this.presence.whichAreOnline(presenceIds)
+        : new Set<string>();
+      const lastSeen = presenceIds.length
+        ? await this.presence.lastSeenMap(presenceIds)
+        : new Map<string, string>();
+
+      const ctx: RankContext = {
+        viewerLat: centreLat,
+        viewerLng: centreLng,
+        viewerId: requesterId,
+      };
+      const rankedKeys = eligible.map((row) => {
+        const isFriend = row.kind === 'user' && friendSet.has(row.id);
+        const canShowPresence = isFriend && permissioned.has(row.id);
+        const rankable: RankableEntity = {
+          id: row.id,
+          kind: row.kind,
+          lat: row.lat,
+          lng: row.lng,
+          verification: row.kind === 'user' ? (row.verification ?? undefined) : undefined,
+          isFriend,
+          online: canShowPresence && online.has(row.id),
+          lastSeenAt: canShowPresence ? (lastSeen.get(row.id) ?? null) : null,
+          startsAt: row.kind === 'event' ? row.starts_at : undefined,
+          createdAt: row.kind === 'listing' ? row.created_at : undefined,
+          mode: row.kind === 'listing' ? row.listing_mode : undefined,
+        };
+        return {
+          key: `${row.kind}:${row.id}`,
+          score: computeRankScore(rankable, ctx),
+        };
+      });
+      rankedKeys.sort((a, b) => b.score - a.score || a.key.localeCompare(b.key));
+      const selectedKeys = rankedKeys
+        .slice(0, MAX_POINTS_PER_RESPONSE)
+        .map((row) => row.key);
+      queryParams.push(selectedKeys);
+      selectedFilter = `AND (kind::text || ':' || id::text) = ANY($${queryParams.length}::text[])`;
+    }
+
+    let orderClause = 'ORDER BY kind ASC, id ASC';
+    if (rankBy === 'distance') {
+      const lngIdx = queryParams.length + 1;
+      const latIdx = queryParams.length + 2;
+      queryParams.push(centreLng, centreLat);
+      orderClause = `ORDER BY location::geography <-> ST_SetSRID(ST_MakePoint($${lngIdx}, $${latIdx}), 4326)::geography, kind ASC, id ASC`;
+    } else if (rankBy === 'newest') {
+      // Discoverable view timestamps originate from timestamptz columns.
+      orderClause = `ORDER BY CASE
+        WHEN kind = 'event' THEN (meta->>'startsAt')::timestamptz
+        WHEN kind = 'listing' THEN (meta->>'createdAt')::timestamptz
+        ELSE NULL END DESC NULLS LAST, kind ASC, id ASC`;
+    }
+    queryParams.push(MAX_POINTS_PER_RESPONSE);
+    const rows: EntityRow[] = await this.db.query(
+      `
+      SELECT id, kind,
+             ${latSql} AS lat,
+             ${lngSql} AS lng,
+             meta
+      ${baseWhere}
+        ${selectedFilter}
+      ${orderClause}
+       LIMIT $${queryParams.length}
       `,
       queryParams,
     );
@@ -567,6 +656,40 @@ export class DiscoveryService {
     }
 
     return points.slice(0, MAX_POINTS_PER_RESPONSE);
+  }
+
+  /**
+   * Mutual dating eligibility must be applied before relevance top-K; filtering
+   * only the hydrated 500 would hide valid lower-ranked matches.
+   */
+  private async filterMutualDatingRows<T extends { id: string; kind: EntityKind }>(
+    rows: T[],
+    requesterId: string,
+  ): Promise<T[]> {
+    const candidateIds = rows.filter((row) => row.kind === 'user').map((row) => row.id);
+    if (candidateIds.length === 0) return [];
+    const prefRows = await this.db.query<Array<{
+      id: string;
+      gender: string | null;
+      seeking_genders: string[] | null;
+    }>>(
+      `SELECT id, gender, COALESCE(seeking_genders, '{}') AS seeking_genders
+         FROM users
+        WHERE id = ANY($1::uuid[]) OR id = $2`,
+      [candidateIds, requesterId],
+    );
+    const byId = new Map(prefRows.map((person) => [person.id, person]));
+    const viewer = byId.get(requesterId);
+    const viewerGender = viewer?.gender ?? null;
+    const viewerSeeking = viewer?.seeking_genders ?? [];
+    return rows.filter((row) => {
+      if (row.kind !== 'user') return false;
+      const candidate = byId.get(row.id);
+      if (!candidate) return false;
+      const seeking = candidate.seeking_genders ?? [];
+      return (viewerSeeking.length === 0 || candidate.gender == null || viewerSeeking.includes(candidate.gender))
+        && (seeking.length === 0 || viewerGender == null || seeking.includes(viewerGender));
+    });
   }
 
   private toRankable(p: DiscoveryPoint): RankableEntity {
@@ -719,4 +842,16 @@ interface DiscoverableEntityViewRow {
 interface EntityRow extends Pick<DiscoverableEntityViewRow, 'id' | 'kind' | 'meta'> {
   lat: number;
   lng: number;
+}
+
+/** Small ranking projection fetched for every authorized candidate, not full meta. */
+interface RankingCandidateRow {
+  id: string;
+  kind: EntityKind;
+  lat: number;
+  lng: number;
+  verification: RankableEntity['verification'] | null;
+  starts_at: string | null;
+  created_at: string | null;
+  listing_mode: ListingMode | undefined;
 }
