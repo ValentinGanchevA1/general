@@ -84,8 +84,8 @@ function fakeFigma() {
       return set;
     },
     variables: {
-      async getLocalVariableCollectionsAsync() { return groups; },
-      async getLocalVariablesAsync() { return variables; },
+      async getLocalVariableCollectionsAsync() { return [...groups]; },
+      async getLocalVariablesAsync() { return [...variables]; },
       createVariableCollection(name) {
         const collection = {
           id: id(), name, modes: [{ modeId: id(), name: 'Mode 1' }],
@@ -108,9 +108,9 @@ function fakeFigma() {
         return { ...paint, boundVariables: { [field]: variable.id } };
       },
     },
-    async getLocalTextStylesAsync() { return textStyles; },
+    async getLocalTextStylesAsync() { return [...textStyles]; },
     createTextStyle() { const entry = style(); textStyles.push(entry); return entry; },
-    async getLocalEffectStylesAsync() { return effectStyles; },
+    async getLocalEffectStylesAsync() { return [...effectStyles]; },
     createEffectStyle() { const entry = style(); effectStyles.push(entry); return entry; },
     viewport: { scrollAndZoomIntoView() {} },
     closePlugin: (message) => close(message),
