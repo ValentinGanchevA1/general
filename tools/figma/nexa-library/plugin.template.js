@@ -37,7 +37,7 @@ async function main() {
     let found = collections.find((entry) => entry.name === name);
     if (!found) {
       found = figma.variables.createVariableCollection(name);
-      collections.push(found);
+      if (!collections.some((item) => item.id === found.id)) collections.push(found);
     }
     for (const [index, mode] of modes.entries()) {
       if (index === 0 && found.modes.length === 1 && found.modes[0].name === 'Mode 1') {
@@ -53,7 +53,7 @@ async function main() {
     let variable = existing.find((item) => item.variableCollectionId === group.id && item.name === name);
     if (!variable) {
       variable = figma.variables.createVariable(name, group, type);
-      existing.push(variable);
+      if (!existing.some((item) => item.id === variable.id)) existing.push(variable);
       counts.variablesCreated += 1;
     } else {
       if (variable.resolvedType !== type) throw new Error('Token type drift: ' + name);
@@ -98,7 +98,7 @@ async function main() {
   for (const [key, size] of Object.entries(NEXA_TOKENS.fontSize)) {
     const name = 'NEXA / Text / ' + key;
     let style = textStyles.find((candidate) => candidate.name === name);
-    if (!style) { style = figma.createTextStyle(); style.name = name; textStyles.push(style); }
+    if (!style) { style = figma.createTextStyle(); style.name = name; if (!textStyles.some((item) => item.id === style.id)) textStyles.push(style); }
     style.fontName = { family: 'Inter', style: key === 'xxl' || key === 'xl' ? 'Semi Bold' : 'Regular' };
     style.fontSize = size;
     style.lineHeight = { unit: 'PIXELS', value: Math.round(size * 1.35) };
@@ -109,7 +109,7 @@ async function main() {
   for (const [mode, effect] of Object.entries(NEXA_TOKENS.elevation)) {
     const name = 'NEXA / Elevation / ' + mode;
     let style = effectStyles.find((candidate) => candidate.name === name);
-    if (!style) { style = figma.createEffectStyle(); style.name = name; effectStyles.push(style); }
+    if (!style) { style = figma.createEffectStyle(); style.name = name; if (!effectStyles.some((item) => item.id === style.id)) effectStyles.push(style); }
     style.effects = [{
       type: 'DROP_SHADOW',
       color: Object.assign(rgb(effect.color), { a: effect.opacity }),
