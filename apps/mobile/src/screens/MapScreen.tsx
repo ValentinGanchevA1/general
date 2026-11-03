@@ -225,18 +225,18 @@ export function MapScreen(): React.JSX.Element {
 
 	const filteredPoints = useMemo(() => {
 		const q = searchQuery.trim().toLowerCase();
-		if (!q) return points;
+		// Hide stale entity kinds immediately while the viewport query for the
+		// newly selected spatial lens is still in flight.
 		return points.filter((p) => {
 			if (p.kind === 'cluster') return true;
+			if (!kinds.includes(p.kind)) return false;
+			if (!q) return true;
 			if (p.kind === 'user') {
 				return p.meta.displayName.toLowerCase().includes(q);
 			}
-			if (p.kind === 'event' || p.kind === 'listing') {
-				return p.meta.title.toLowerCase().includes(q);
-			}
-			return false;
+			return p.meta.title.toLowerCase().includes(q);
 		});
-	}, [points, searchQuery]);
+	}, [points, searchQuery, kinds]);
 
 	const {
 		createNearbyOpen,
@@ -909,6 +909,7 @@ export function MapScreen(): React.JSX.Element {
 				onPressItem={onTrendingPress}
 				top={trendingTop}
 				visible={
+					(activeLens === 'map' || activeLens === 'custom') &&
 					isCityScale &&
 					!sheetOpen &&
 					points.length > 0 &&
