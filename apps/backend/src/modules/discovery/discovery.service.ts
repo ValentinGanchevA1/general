@@ -511,10 +511,10 @@ export class DiscoveryService {
       queryParams.push(centreLng, centreLat);
       orderClause = `ORDER BY location::geography <-> ST_SetSRID(ST_MakePoint($${lngIdx}, $${latIdx}), 4326)::geography, kind ASC, id ASC`;
     } else if (rankBy === 'newest') {
-      // Creation/start timestamps in discovery meta are canonical ISO-8601 UTC strings.
+      // Discoverable view timestamps originate from timestamptz columns.
       orderClause = `ORDER BY CASE
-        WHEN kind = 'event' THEN meta->>'startsAt'
-        WHEN kind = 'listing' THEN meta->>'createdAt'
+        WHEN kind = 'event' THEN (meta->>'startsAt')::timestamptz
+        WHEN kind = 'listing' THEN (meta->>'createdAt')::timestamptz
         ELSE NULL END DESC NULLS LAST, kind ASC, id ASC`;
     }
     queryParams.push(MAX_POINTS_PER_RESPONSE);
