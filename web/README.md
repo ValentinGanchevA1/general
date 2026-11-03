@@ -4,7 +4,7 @@ Browser validation slice for the NEXA web/desktop client. `web/` is now a real p
 
 ## Implemented
 
-- Canonical **Map / Discover / Pulse / Connections / You** navigation.
+- Canonical **Map / Experiences / Opportunities / Connections / Identity** navigation. Experiences and Opportunities filter one persistent Map instance, preserving its viewport; Pulse signals are contextual instead of an additional feed tab.
 - Responsive desktop rail + mobile bottom navigation.
 - NEXA dark/light/system semantics: cyan for discovery/live and violet for action/identity.
 - Interactive Web Mercator loopback preview with pan/zoom, visible OSM raster tiles and required attribution.
@@ -71,7 +71,7 @@ The accepted production direction is **MapLibre GL JS + MapTiler Cloud** for bet
 
 The generated `/dist/map-config.js` contains only public browser map configuration. Arbitrary provider origins, path-like map IDs, whitespace/control characters in the key, and non-HTTPS public map activation are rejected.
 
-Opening Map, Discover or Connections does **not** request browser/device geolocation. The Varna default camera is product context, not the user's asserted position.
+Opening Map, Experiences, Opportunities or Connections does **not** request browser/device geolocation. The Varna default camera is product context, not the user's asserted position.
 
 ## Realtime build boundary
 

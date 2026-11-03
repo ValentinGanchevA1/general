@@ -115,29 +115,53 @@ try {
     'theme render replaced the map container',
   );
 
-  await evaluate(runtime.cdp, tab, "document.querySelector('[data-tab=\"discover\"]')?.click()");
+  await evaluate(runtime.cdp, tab, "document.querySelector('[data-tab=\"experiences\"]')?.click()");
+  assert(
+    await evaluate(runtime.cdp, tab, "document.querySelector('#nexa-map') === globalThis.__NEXA_MAP_NODE__"),
+    'Experiences created a duplicate map container',
+  );
+  assert(
+    await evaluate(runtime.cdp, tab, "document.querySelector('.slippy-surface') === globalThis.__NEXA_MAP_SURFACE__"),
+    'Experiences reset the shared map renderer',
+  );
+  assert(
+    await evaluate(runtime.cdp, tab, "document.querySelector('.chip.selected')?.textContent === 'Events'"),
+    'Experiences did not select the event lens',
+  );
+
+  await evaluate(runtime.cdp, tab, "document.querySelector('[data-tab=\"opportunities\"]')?.click()");
+  assert(
+    await evaluate(runtime.cdp, tab, "document.querySelector('#nexa-map') === globalThis.__NEXA_MAP_NODE__"),
+    'Opportunities created a duplicate map container',
+  );
+  assert(
+    await evaluate(runtime.cdp, tab, "document.querySelector('.chip.selected')?.textContent === 'Listings'"),
+    'Opportunities did not select the listing lens',
+  );
+
+  await evaluate(runtime.cdp, tab, "document.querySelector('[data-tab=\"connections\"]')?.click()");
   await waitFor(
     async () => await evaluate(runtime.cdp, tab, "document.querySelector('#nexa-map') === null"),
     2_000,
-    'map removal after leaving Map tab',
+    'map removal after leaving spatial navigation',
   );
   assert(
     await evaluate(runtime.cdp, tab, "globalThis.__NEXA_MAP_NODE__?.isConnected === false"),
-    'old map container remained connected after leaving Map tab',
+    'old map container remained connected after leaving spatial navigation',
   );
 
-  await evaluate(runtime.cdp, tab, "document.querySelector('[data-target=\"map\"]')?.click()");
+  await evaluate(runtime.cdp, tab, "document.querySelector('[data-tab=\"map\"]')?.click()");
   await waitFor(
     async () => await evaluate(runtime.cdp, tab, "document.querySelector('.slippy-surface') !== null"),
     2_000,
-    'fresh map after returning from Discover',
+    'fresh map after returning from Connections',
   );
   assert(
     await evaluate(runtime.cdp, tab, "document.querySelector('#nexa-map') !== globalThis.__NEXA_MAP_NODE__"),
     'returning to Map reused a detached container instead of creating one fresh map lifecycle',
   );
 
-  console.log('NEXA map shell lifecycle E2E passed: same node/controller across Map renders, fresh lifecycle after tab exit.');
+  console.log('NEXA map shell lifecycle E2E passed: one renderer across spatial lenses; fresh lifecycle after leaving the map.');
 } catch (error) {
   const chromeErrors = runtime.errors();
   if (chromeErrors) console.error(chromeErrors);
