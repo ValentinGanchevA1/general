@@ -1,5 +1,5 @@
 # PostgreSQL/PostGIS Map Core performance baseline.
-# PR runs a deterministic 10k smoke; manual run covers 10k / 50k / 100k.
+# PR and manual runs cover 10k / 50k / 100k on benchmark-related changes.
 # Never targets a staging or production database.
 name: Discovery PostGIS Benchmark
 
@@ -36,7 +36,7 @@ jobs:
     env:
       DISCOVERY_BENCH_DATABASE_URL: postgresql://nexa_bench:nexa_bench@localhost:5432/nexa_bench
       DISCOVERY_BENCH_ACK_DISPOSABLE: 'YES'
-      DISCOVERY_BENCH_QUICK: ${{ github.event_name == 'pull_request' && 'YES' || 'NO' }}
+      DISCOVERY_BENCH_QUICK: 'NO'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
