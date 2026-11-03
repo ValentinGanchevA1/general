@@ -1,0 +1,38 @@
+name: NEXA Figma Library QA
+
+on:
+  pull_request:
+    paths:
+      - "tools/figma/nexa-library/**"
+      - "apps/mobile/src/theme/**"
+      - ".github/workflows/nexa-figma-library.yml"
+  push:
+    branches: [master]
+    paths:
+      - "tools/figma/nexa-library/**"
+      - "apps/mobile/src/theme/**"
+      - ".github/workflows/nexa-figma-library.yml"
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  figma-library:
+    name: Figma token snapshot and component smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check NEXA Figma bundle against mobile theme
+        run: node tools/figma/nexa-library/build.mjs --check
+      - name: Validate component families and idempotent token sync
+        run: node --test tools/figma/nexa-library/test.mjs
