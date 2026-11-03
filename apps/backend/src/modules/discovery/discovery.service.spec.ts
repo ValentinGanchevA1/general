@@ -346,8 +346,8 @@ describe('DiscoveryService', () => {
       expect(asPoints(response.points)[0]?.id).toBe('event-new');
       expect(query).toHaveBeenCalledTimes(1);
       const [sql] = query.mock.calls[0] as [string, unknown[]];
-      expect(sql).toContain("WHEN kind = 'event' THEN meta->>'startsAt'");
-      expect(sql).toContain("WHEN kind = 'listing' THEN meta->>'createdAt'");
+      expect(sql).toContain("WHEN kind = 'event' THEN (meta->>'startsAt')::timestamptz");
+      expect(sql).toContain("WHEN kind = 'listing' THEN (meta->>'createdAt')::timestamptz");
       expect(sql).toContain('DESC NULLS LAST');
       expect(sql.indexOf('ORDER BY')).toBeLessThan(sql.indexOf('LIMIT'));
     });
