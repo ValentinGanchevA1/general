@@ -65,6 +65,17 @@ describe('completeClusterCoverage', () => {
     }
   });
 
+  it('returns exactly stable cluster coordinates for reordered SQL aggregates', () => {
+    const cells = makeCells(42.1, 23.0, 40, 30);
+    const rows: ClusterCountRow[] = cells.map((cell, index) => ({
+      cell, kind: index % 2 === 0 ? 'user' : 'listing', n: String(index % 5 + 1),
+    }));
+    expect(cells.length).toBeGreaterThan(500);
+    const forward = completeClusterCoverage(rows, 8, 500);
+    const backward = completeClusterCoverage([...rows].reverse(), 8, 500);
+    expect(backward).toEqual(forward);
+  });
+
   it('preserves sparse cells instead of returning only a dense hotspot', () => {
     const cells = makeCells(42.1, 23.0, 40, 30);
     const hotspot = cells[0];
