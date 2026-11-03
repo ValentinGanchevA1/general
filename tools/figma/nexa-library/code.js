@@ -137,6 +137,12 @@ async function main() {
     )];
     node.strokeWeight = width;
   }
+  function space(node, field, key) {
+    const variable = variableByKey.get('NEXA / Spacing/' + key);
+    if (!variable) throw new Error('Missing spacing token: ' + key);
+    node[field] = NEXA_TOKENS.spacing[key];
+    node.setBoundVariable(field, variable);
+  }
   function bindRadius(node, name) {
     const variable = variableByKey.get('NEXA / Radius/' + name);
     if (variable) node.setBoundVariable('cornerRadius', variable);
@@ -185,7 +191,7 @@ async function main() {
     if (autoLayout && autoLayout !== 'NONE') {
       component.primaryAxisAlignItems = 'CENTER';
       component.counterAxisAlignItems = 'CENTER';
-      component.itemSpacing = 8;
+      space(component, 'itemSpacing', 'sm');
     }
     component.fills = [];
     return component;
@@ -225,7 +231,7 @@ async function main() {
       make(name) {
         const c = base(230, 50, name, 'HORIZONTAL');
         bindRadius(c, 'md');
-        c.paddingLeft = 16; c.paddingRight = 16;
+        space(c, 'paddingLeft', 'lg'); space(c, 'paddingRight', 'lg');
         fill(c, state === 'Disabled' ? 'surfaceTertiary' : style === 'Primary' ? 'actionPrimary' : style === 'Secondary' ? 'surfaceSecondary' : 'surfacePrimary');
         if (state === 'Pressed') c.opacity = 0.75;
         if (style !== 'Primary') stroke(c, 'borderDefault', 1);
@@ -240,7 +246,7 @@ async function main() {
     make(name) {
       const c = base(316, 52, name, 'HORIZONTAL');
       bindRadius(c, 'md');
-      c.paddingLeft = 16; c.paddingRight = 16;
+      space(c, 'paddingLeft', 'lg'); space(c, 'paddingRight', 'lg');
       fill(c, state === 'Disabled' ? 'surfaceTertiary' : 'surfaceSecondary');
       stroke(c, state === 'Error' ? 'danger' : state === 'Focused' ? 'actionPrimary' : 'borderDefault', state === 'Focused' ? 2 : 1);
       const t = label(c, 'Email or phone', 15, 'textTertiary');
@@ -271,20 +277,54 @@ async function main() {
     },
   })), 'Verification level: Partial / ID verified. None is intentionally rendered as no badge. ID glyph is schematic; mobile uses check-decagram.');
 
+  // Mirror native NexaEntityMarker: 48dp hit zone and 18/24/34dp visual sizes.
+  // No decorative teardrop: users are avatar circles, events four-point stars,
+  // listings are square. The map layer owns position and tap behavior.
   setFamily('MapPin', ['Person', 'Event', 'Listing'].flatMap((entity) =>
-    ['Default', 'Selected'].map((state) => ({
-      name: 'Entity=' + entity + ', State=' + state,
+    ['Compact', 'Standard', 'Selected'].map((density) => ({
+      name: 'Entity=' + entity + ', Density=' + density,
       make(name) {
-        const c = base(68, 80, name, 'NONE');
+        const c = base(88, 62, name, 'NONE');
         const color = entity === 'Person' ? 'entityPerson' : entity === 'Event' ? 'entityEvent' : 'entityListing';
-        if (state === 'Selected') circle(c, 65, 'surfaceHover', 2, 1);
-        circle(c, 54, color, 7, 6);
-        circle(c, 46, 'surfacePrimary', 11, 10);
-        label(c, entity === 'Person' ? '👤' : entity === 'Event' ? '★' : '▣', 21, 'textPrimary', true, 23, 20);
-        rect(c, 9, 9, color, 'sm', 30, 63);
+        const size = density === 'Compact' ? 18 : density === 'Selected' ? 34 : 24;
+        const cx = 44;
+        const cy = 24;
+        if (density === 'Selected') {
+          const ring = figma.createEllipse();
+          c.appendChild(ring);
+          ring.resize(42, 42);
+          ring.x = cx - 21;
+          ring.y = cy - 21;
+          ring.fills = [];
+          stroke(ring, 'actionPrimary', 1.5);
+        }
+        if (entity === 'Person') {
+          const avatar = circle(c, size, 'actionSoft', cx - size / 2, cy - size / 2);
+          stroke(avatar, color, 2);
+          const textSize = Math.max(9, Math.round(size * 0.38));
+          const initials = label(c, 'MA', textSize, color, true);
+          initials.x = cx - initials.width / 2;
+          initials.y = cy - initials.height / 2;
+          textProp(c, initials, 'MA', 'Initials');
+        } else if (entity === 'Event') {
+          const star = figma.createStar();
+          c.appendChild(star);
+          star.pointCount = 4;
+          star.innerRadius = 0.38;
+          star.resize(size, size);
+          star.x = cx - size / 2;
+          star.y = cy - size / 2;
+          fill(star, color);
+        } else {
+          const side = Math.round(size * 0.82);
+          const square = rect(c, side, side, 'surfacePrimary', null, cx - side / 2, cy - side / 2);
+          square.cornerRadius = Math.max(3, Math.round(size * 0.16));
+          stroke(square, color, 2);
+          circle(c, 3, color, cx + side / 4 - 1.5, cy - side / 4 - 1.5);
+        }
         return c;
       },
-    }))), 'Map-discovery pins for person/event/listing and selected state. Never imply exact private user location.');
+    }))), 'Matches native map marker: compact 18dp, standard 24dp, selected 34dp, 48dp hit target. Avatar-first people pins; no private precise location.');
 
   setFamily('BottomSheet', ['Peek', 'Expanded'].map((state) => ({
     name: 'State=' + state,
@@ -292,8 +332,8 @@ async function main() {
       const c = base(330, state === 'Peek' ? 146 : 270, name, 'VERTICAL');
       fill(c, 'surfacePrimary'); stroke(c, 'borderSubtle', 1);
       bindRadius(c, 'xl');
-      c.paddingTop = 10; c.paddingLeft = 20; c.paddingRight = 20;
-      c.itemSpacing = 13; c.primaryAxisAlignItems = 'MIN';
+      space(c, 'paddingTop', 'sm'); space(c, 'paddingLeft', 'xl'); space(c, 'paddingRight', 'xl');
+      space(c, 'itemSpacing', 'md'); c.primaryAxisAlignItems = 'MIN';
       rect(c, 46, 5, 'borderStrong', 'pill');
       label(c, 'Nearby activity', 18, 'textPrimary', true);
       label(c, state === 'Peek' ? 'Explore what is happening around you.' : 'People, events and listings in your current map viewport.', 13, 'textSecondary');
@@ -311,8 +351,8 @@ async function main() {
       const c = base(318, 138, name, 'VERTICAL');
       fill(c, 'surfacePrimary'); stroke(c, 'borderDefault', 1);
       bindRadius(c, 'card');
-      c.paddingLeft = 16; c.paddingRight = 16; c.paddingTop = 16;
-      c.itemSpacing = 12; c.primaryAxisAlignItems = 'MIN';
+      space(c, 'paddingLeft', 'lg'); space(c, 'paddingRight', 'lg'); space(c, 'paddingTop', 'lg');
+      space(c, 'itemSpacing', 'md'); c.primaryAxisAlignItems = 'MIN';
       const t = label(c, kind === 'Person' ? 'Someone nearby' : kind === 'Event' ? 'Coffee meetup' : 'Local listing', 18, 'textPrimary', true);
       textProp(c, t, t.characters, 'Title');
       label(c, kind === 'Person' ? 'Shared interests · Wave' : kind === 'Event' ? 'Today · View details' : 'Offer · Message seller', 13, 'textSecondary');
@@ -337,7 +377,7 @@ async function main() {
     name: 'State=' + state,
     make(name) {
       const c = base(320, 52, name, 'HORIZONTAL');
-      c.paddingLeft = 14; c.paddingRight = 14;
+      space(c, 'paddingLeft', 'md'); space(c, 'paddingRight', 'md');
       bindRadius(c, 'pill');
       fill(c, 'surfaceSecondary');
       stroke(c, state === 'Focused' ? 'actionPrimary' : 'borderDefault', state === 'Focused' ? 2 : 1);
