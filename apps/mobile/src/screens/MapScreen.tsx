@@ -106,6 +106,8 @@ import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
 import { useNexaMapSurfaceReady } from '@/components/Brand/NexaLaunchSurfaceContext';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
+const EXPERIENCES_LAYERS: EntityKind[] = ['event'];
+const OPPORTUNITIES_LAYERS: EntityKind[] = ['listing'];
 const EMPTY_PLACE_SPATIAL_STATUS: NexaPlaceSpatialStatus = {
 	hasVisiblePoints: false,
 	loading: false,
@@ -144,13 +146,12 @@ export function MapScreen(): React.JSX.Element {
 
 	const [listingModeFilter, setListingModeFilter] =
 		useState<ListingModeFilterValue>('all');
-	const [layers, setLayers] = useState<EntityKind[]>(DEFAULT_MAP_LAYERS);
+	const [customLayers, setCustomLayers] = useState<EntityKind[]>(DEFAULT_MAP_LAYERS);
 	const activeLens = useSyncExternalStore(nexaSpatialLensStore.subscribe, nexaSpatialLensStore.getSnapshot);
-	useEffect(() => {
-		if (activeLens === 'experiences') setLayers(['event']);
-		else if (activeLens === 'opportunities') setLayers(['listing']);
-		else if (activeLens === 'map') setLayers(DEFAULT_MAP_LAYERS);
-	}, [activeLens]);
+	// Derive the lens synchronously: effects that call setState here cause cascading renders.
+	const layers = activeLens === 'experiences' ? EXPERIENCES_LAYERS
+		: activeLens === 'opportunities' ? OPPORTUNITIES_LAYERS
+			: activeLens === 'map' ? DEFAULT_MAP_LAYERS : customLayers;
 	const [friendsOnly, setFriendsOnly] = useState(false);
 	const [datingOnly, setDatingOnly] = useState(false);
 	const [rankBy, setRankBy] = useState<DiscoveryRankBy>('relevance');
@@ -890,7 +891,7 @@ export function MapScreen(): React.JSX.Element {
 				value={searchQuery}
 				onChangeText={setSearchQuery}
 				layers={layers}
-				onLayersChange={(next) => { setLayers(next); nexaSpatialLensStore.set('custom'); }}
+				onLayersChange={(next) => { setCustomLayers(next); nexaSpatialLensStore.set('custom'); }}
 				listingMode={listingModeFilter}
 				onListingModeChange={setListingModeFilter}
 				friendsOnly={friendsOnly}
