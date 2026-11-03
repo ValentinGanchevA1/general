@@ -36,7 +36,9 @@ const VIEWPORT: Viewport = {
   sw: { lat: 43.175, lng: 27.885 },
   ne: { lat: 43.235, lng: 27.945 },
 };
-const SIZES = [10_000, 50_000, 100_000] as const;
+const SIZES = process.env.DISCOVERY_BENCH_QUICK === 'YES'
+  ? [10_000] as const
+  : [10_000, 50_000, 100_000] as const;
 const SAMPLE_RUNS = 5;
 
 interface TimedQuery {
