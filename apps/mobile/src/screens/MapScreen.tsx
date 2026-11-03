@@ -29,6 +29,7 @@ import { useSocket } from '@/realtime/useSocket';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import type { NexaMapController } from '@/features/map/contracts/mapRenderer';
+import { regionForEntityReveal } from '@/features/map/mapEntityRevealRegion';
 import {
 	NexaMapScreenSurface,
 	type NexaPlaceSpatialStatus,
@@ -623,26 +624,20 @@ export function MapScreen(): React.JSX.Element {
 
 	const onClusterPress = useCallback(
 		(c: ClusterPoint) => {
-			const target: Region = {
-				latitude: c.lat,
-				longitude: c.lng,
-				latitudeDelta: Math.max(0.005, (region?.latitudeDelta ?? 0.05) / 2.5),
-				longitudeDelta: Math.max(0.005, (region?.longitudeDelta ?? 0.05) / 2.5),
-			};
+			const target = regionForEntityReveal(region, { lat: c.lat, lng: c.lng });
 			mapRef.current?.fitViewport(regionToViewport(target), {
 				durationMs: reduceMotion ? 0 : NEXA_MOTION_MS.map,
 			});
 		},
-		[reduceMotion, region?.latitudeDelta, region?.longitudeDelta],
+		[reduceMotion, region],
 	);
 
 	const zoomInForDiscovery = useCallback(() => {
 		if (region == null) return;
-		const target: Region = {
-			...region,
-			latitudeDelta: Math.max(0.005, region.latitudeDelta / 2.5),
-			longitudeDelta: Math.max(0.005, region.longitudeDelta / 2.5),
-		};
+		const target = regionForEntityReveal(region, {
+			lat: region.latitude,
+			lng: region.longitude,
+		});
 		mapRef.current?.fitViewport(regionToViewport(target), {
 			durationMs: reduceMotion ? 0 : NEXA_MOTION_MS.map,
 		});
