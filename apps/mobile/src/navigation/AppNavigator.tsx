@@ -173,10 +173,10 @@ function MainTabs(): React.JSX.Element {
   const connectionsBadge = resolveConnectionsTabBadge(chatUnread, friendPending);
   const badgeStyle = { backgroundColor: c.actionPrimary, color: c.onPrimary, fontSize: 10, fontWeight: '800' as const, minWidth: 18, height: 18, lineHeight: 18 };
 
-  const mapTabSelected = (tab: NexaMainTab, focused: boolean): boolean => {
-    if (tab === 'Map') return selectedLens === 'map' || selectedLens === 'custom';
-    if (tab === 'Experiences') return selectedLens === 'experiences';
-    if (tab === 'Opportunities') return selectedLens === 'opportunities';
+  const mapTabSelected = (tab: NexaMainTab, focused: boolean, mapHostActive: boolean): boolean => {
+    if (tab === 'Map') return mapHostActive && (selectedLens === 'map' || selectedLens === 'custom');
+    if (tab === 'Experiences') return mapHostActive && selectedLens === 'experiences';
+    if (tab === 'Opportunities') return mapHostActive && selectedLens === 'opportunities';
     return focused;
   };
 
@@ -190,7 +190,8 @@ function MainTabs(): React.JSX.Element {
     });
 
   return <Tab.Navigator
-    screenOptions={({ route }) => {
+    screenOptions={({ route, navigation }) => {
+      const mapHostActive = navigation.getState().routes[navigation.getState().index]?.name === 'Map';
       const legacy = !isNexaMainTab(route.name);
       const tab: NexaMainTab = legacy ? 'Map' : route.name;
       const visual = NEXA_TAB_VISUALS[tab];
@@ -217,11 +218,11 @@ function MainTabs(): React.JSX.Element {
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.7}
-            style={{ color: mapTabSelected(tab, focused) ? active : c.textTertiary, textAlign: 'center', fontSize: 10, fontWeight: '700' }}
+            style={{ color: mapTabSelected(tab, focused, mapHostActive) ? active : c.textTertiary, textAlign: 'center', fontSize: 10, fontWeight: '700' }}
           >{visual.label}</Text>
         ),
         tabBarIcon: ({ focused }: { focused: boolean }) => (
-          <NexaTabIcon tab={tab} focused={mapTabSelected(tab, focused)} />
+          <NexaTabIcon tab={tab} focused={mapTabSelected(tab, focused, mapHostActive)} />
         ),
       };
     }}
