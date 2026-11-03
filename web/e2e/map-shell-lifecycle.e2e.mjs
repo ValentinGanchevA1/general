@@ -89,6 +89,31 @@ try {
   );
   assert(initialUpdateCount >= 0, `invalid initial map update count ${initialUpdateCount}`);
 
+  // Emulate a compact phone viewport and assert all five destinations remain accessible.
+  await runtime.cdp.send('Emulation.setDeviceMetricsOverride', {
+    width: 320, height: 700, deviceScaleFactor: 2, mobile: true,
+  }, tab);
+  await waitFor(
+    async () => await evaluate(runtime.cdp, tab, "getComputedStyle(document.querySelector('.mobile-nav')).display === 'grid'"),
+    2_000,
+    'compact mobile tab bar',
+  );
+  const mobileTabs = await evaluate(runtime.cdp, tab, `(() => Array.from(document.querySelectorAll('.mobile-nav .nav')).map((button) => ({
+    label: button.getAttribute('aria-label'),
+    width: button.getBoundingClientRect().width,
+    textWidth: button.querySelector('small')?.getBoundingClientRect().width ?? 0,
+    current: button.getAttribute('aria-current'),
+  })))()`);
+  assert(
+    mobileTabs.map((item) => item.label).join('/') === 'Map/Experiences/Opportunities/Connections/Identity',
+    'mobile destination order or accessible names changed',
+  );
+  assert(
+    mobileTabs.every((item) => item.width >= 44 && item.textWidth <= item.width + 1),
+    'mobile tab touch target or label overflow on 320px viewport',
+  );
+  assert(mobileTabs.filter((item) => item.current === 'page').length === 1, 'exactly one spatial tab should be current');
+
   await evaluate(runtime.cdp, tab, "document.querySelector('[data-kind=\"event\"]')?.click()");
   await waitFor(
     async () => await evaluate(runtime.cdp, tab, "document.querySelector('#nexa-map') === globalThis.__NEXA_MAP_NODE__"),

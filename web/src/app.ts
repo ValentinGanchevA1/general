@@ -507,7 +507,7 @@ function switchTab(tab: Tab): void {
 }
 function nav(tab: Tab, icon: string, tone: 'discovery' | 'action'): string {
   const label = tab[0]?.toUpperCase() + tab.slice(1);
-  return `<button type="button" class="nav ${state.tab === tab ? 'active' : ''}" data-tab="${tab}" data-tone="${tone}" aria-label="${label}"><span aria-hidden="true">${icon}</span><small>${label}</small></button>`;
+  return `<button type="button" class="nav ${state.tab === tab ? 'active' : ''}" data-tab="${tab}" data-tone="${tone}" aria-label="${label}" aria-current="${state.tab === tab ? 'page' : 'false'}"><span aria-hidden="true">${icon}</span><small>${label}</small></button>`;
 }
 function shell(): string {
   const tabs = nav('map','⌖','discovery')
