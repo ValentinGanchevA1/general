@@ -53,6 +53,19 @@ Generated outputs are tokens.json (machine-readable snapshot) and code.js (ready
 
 Each family is a Figma Component Set. Matching sets are preserved rather than duplicated on repeated runs; variables and text/effect styles are refreshed from the codebase.
 
+## Figma Starter compatibility
+
+The plugin automatically chooses a theme-storage strategy at runtime:
+
+| Figma plan capability | Color storage | Variable count | Theme switching |
+|---|---|---:|---|
+| Multiple variable modes available | One `NEXA / Colors` collection with Dark, Light and Protos Nexus modes | 105 | Apply a mode to the page or container |
+| Starter / single-mode collections | `NEXA / Colors` (Dark), `NEXA / Colors / Light`, and `NEXA / Colors / Protos Nexus` | 267 | Manual reassignment of color variables; no one-click mode switch |
+
+The fallback runs only when Figma rejects adding a color mode. Existing Dark bindings remain on the default `NEXA / Colors` collection, and Light/Protos palettes remain available as separate variable collections. The plugin **does not** fake three modes or create extra duplicate component families on Starter.
+
+A successful Node.js smoke test is not confirmation that the plugin ran inside Figma. After importing, verify all nine component sets visually, confirm palette variable counts and review Dark/Light/Protos colors. Starter plans also cannot publish shared team libraries.
+
 ## Quality and security boundaries
 
 - Design specimens are not production React Native components. Native gestures, animations, loading, validation and accessibility still require device QA.
@@ -62,7 +75,7 @@ Each family is a Figma Component Set. Matching sets are preserved rather than du
 - Figma elevation styles cannot dynamically switch modes, so there are separate named styles. Android elevation values are retained as JSON metadata.
 - Existing Figma pages and nodes are never deleted. Existing component sets with the same names are skipped; visual revisions require a specific design review.
 - No team library publishing or Code Connect mappings are performed.
-- Acceptance: all three color modes use identical semantic keys; nine component families appear after first run; reruns add no duplicate sets; tokens are driven directly by mobile source files.
+- Acceptance: all three theme palettes use identical semantic keys; nine component families appear after first run; reruns add no duplicate sets; tokens are driven directly by mobile source files. Paid plans use three modes; Starter uses three single-mode collections.
 
 ## Figma connector limitation
 
