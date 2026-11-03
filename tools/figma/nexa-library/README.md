@@ -11,6 +11,17 @@ This is a local Figma development plugin. It reads the production React Native t
 
 React Native is the source of truth. Never hand-edit generated code.js or tokens.json. Figma's generated CSS code syntax names are intended as future export names, not proof of existing CSS variables in the mobile application.
 
+## Fastest import: use the CI-built package (no Node.js required)
+
+1. Open the [NEXA Figma Library QA workflow](https://github.com/ValentinGanchevA1/general/actions/workflows/nexa-figma-library.yml) and select the latest successful run for this PR.
+2. Under **Artifacts**, download `nexa-figma-plugin` and extract its ZIP to a local directory. Keep `manifest.json` and `code.js` side by side.
+3. Open the [NEXA design](https://www.figma.com/design/RMlHX3o4P7tHraj0tIGeGv) in **Figma Desktop** (Windows/macOS), then choose Plugins → Development → Import plugin from manifest.
+4. Select the extracted `manifest.json`. If Figma requests an ID for a development plugin, use the ID issued by Figma's **New Plugin** flow rather than inventing a shared/repository ID.
+5. Run **NEXA · Component Library Sync** from Plugins → Development and inspect the page **NEXA · Component Library**.
+6. Run a second time to confirm the success message reports `components: 0` and `skippedComponents: 9`. Inspect the color collections and at least one variant from every family.
+
+The artifact is built **only after** the token snapshot and structural smoke tests pass. It includes the compiled script, manifest, token snapshot and this README; no source checkout, credentials or network requests are required by the plugin itself.
+
 ## Build and run
 
 From the repository root, with pnpm dependencies installed:
