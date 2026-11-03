@@ -36,3 +36,17 @@ jobs:
         run: node tools/figma/nexa-library/build.mjs --check
       - name: Validate component families and idempotent token sync
         run: node --test tools/figma/nexa-library/test.mjs
+      - name: Package Figma Desktop import files
+        run: |
+          mkdir -p .tmp/nexa-figma-plugin
+          cp tools/figma/nexa-library/manifest.json .tmp/nexa-figma-plugin/
+          cp tools/figma/nexa-library/code.js .tmp/nexa-figma-plugin/
+          cp tools/figma/nexa-library/README.md .tmp/nexa-figma-plugin/
+          cp tools/figma/nexa-library/tokens.json .tmp/nexa-figma-plugin/
+      - name: Upload offline Figma plugin package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: nexa-figma-plugin
+          path: .tmp/nexa-figma-plugin/
+          retention-days: 14
+          if-no-files-found: error
