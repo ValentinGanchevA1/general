@@ -198,13 +198,12 @@ describe('DiscoveryService', () => {
     };
 
     it('sets online + lastSeenAt for friends who allow presence', async () => {
-      query.mockResolvedValueOnce([
-        { id: 'u1', kind: 'user', lat: 1.02, lng: 1.02, meta: { ...userMeta } },
-      ]);
-      listFriendIds.mockResolvedValueOnce(['u1']);
-      listWhoAllowFriendsOnline.mockResolvedValueOnce(new Set(['u1']));
-      whichAreOnline.mockResolvedValueOnce(new Set(['u1']));
-      lastSeenMap.mockResolvedValueOnce(
+      const person = { id: 'u1', kind: 'user', lat: 1.02, lng: 1.02, meta: { ...userMeta } };
+      query.mockResolvedValueOnce([person]).mockResolvedValueOnce([person]);
+      listFriendIds.mockResolvedValue(['u1']);
+      listWhoAllowFriendsOnline.mockResolvedValue(new Set(['u1']));
+      whichAreOnline.mockResolvedValue(new Set(['u1']));
+      lastSeenMap.mockResolvedValue(
         new Map([['u1', '2026-09-19T12:00:00.000Z']]),
       );
 
@@ -220,11 +219,10 @@ describe('DiscoveryService', () => {
     });
 
     it('hides online and lastSeen when friend disallows friends_see_online_status', async () => {
-      query.mockResolvedValueOnce([
-        { id: 'u1', kind: 'user', lat: 1.02, lng: 1.02, meta: { ...userMeta } },
-      ]);
-      listFriendIds.mockResolvedValueOnce(['u1']);
-      listWhoAllowFriendsOnline.mockResolvedValueOnce(new Set());
+      const person = { id: 'u1', kind: 'user', lat: 1.02, lng: 1.02, meta: { ...userMeta } };
+      query.mockResolvedValueOnce([person]).mockResolvedValueOnce([person]);
+      listFriendIds.mockResolvedValue(['u1']);
+      listWhoAllowFriendsOnline.mockResolvedValue(new Set());
 
       const res = await call();
       const pts = asPoints(res.points);
@@ -237,4 +235,82 @@ describe('DiscoveryService', () => {
       expect(lastSeenMap).not.toHaveBeenCalled();
     });
   });
+  describe('global ranking before response cap', () => {
+    it('ranks all 10k light candidates and hydrates only the best 500', async () => {
+      const candidates = Array.from({ length: 10_000 }, (_, index) => ({
+        id: `u-${String(index).padStart(5, '0')}`,
+        kind: 'user' as const,
+        lat: 2.0,
+        lng: 2.0,
+        verification: 'none' as const,
+        starts_at: null,
+        created_at: null,
+        listing_mode: undefined,
+      }));
+      const top = candidates[9_999]!;
+      top.lat = 1.025;
+      top.lng = 1.025;
+      // Verification is part of the lightweight ranking projection.
+      const candidateRows = candidates.map((row) =>
+        row.id === top.id ? { ...row, verification: 'id' as const } : row,
+      );
+
+      query.mockImplementation((sql: string, params: unknown[]) => {
+        if (sql.includes('AS listing_mode')) return Promise.resolve(candidateRows);
+        const selected = params.find(
+          (arg): arg is string[] =>
+            Array.isArray(arg) && arg.some((item: unknown) =>
+              typeof item === 'string' && item.startsWith('user:')),
+        ) ?? [];
+        return Promise.resolve(candidateRows
+          .filter((row) => selected.includes(`user:${row.id}`))
+          .map((row) => ({
+            id: row.id, kind: row.kind, lat: row.lat, lng: row.lng,
+            meta: {
+              displayName: row.id,
+              verification: row.verification,
+              online: false,
+              lastSeenAt: null,
+            },
+          })));
+      });
+
+      const response = await call({ rankBy: 'relevance' });
+      const points = asPoints(response.points);
+      expect(points).toHaveLength(500);
+      expect(points.some((point) => point.id === top.id)).toBe(true);
+      expect(query).toHaveBeenCalledTimes(2);
+      const [candidateSql] = query.mock.calls[0] as [string, unknown[]];
+      const [hydrateSql, hydrateParams] = query.mock.calls[1] as [string, unknown[]];
+      expect(candidateSql).not.toContain('LIMIT');
+      expect(candidateSql).not.toContain('SELECT id, kind,\n             ST_Y');
+      expect(hydrateSql).toContain('LIMIT');
+      expect(hydrateSql).toContain("visibility = 'public'");
+      expect(hydrateSql).toContain('NOT EXISTS');
+      const selectedKeys = hydrateParams.find(
+        (arg): arg is string[] => Array.isArray(arg) && arg.includes(`user:${top.id}`),
+      ) ?? [];
+      expect(selectedKeys).toHaveLength(500);
+    });
+
+    it('orders newest in SQL before applying the hard LIMIT', async () => {
+      const latest = {
+        id: 'event-new',
+        kind: 'event',
+        lat: 1.025,
+        lng: 1.025,
+        meta: { title: 'New event', startsAt: '2026-11-05T12:00:00.000Z' },
+      };
+      query.mockResolvedValueOnce([latest]);
+      const response = await call({ rankBy: 'newest', kinds: ['event', 'listing'] });
+      expect(asPoints(response.points)[0]?.id).toBe('event-new');
+      expect(query).toHaveBeenCalledTimes(1);
+      const [sql] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain("WHEN kind = 'event' THEN meta->>'startsAt'");
+      expect(sql).toContain("WHEN kind = 'listing' THEN meta->>'createdAt'");
+      expect(sql).toContain('DESC NULLS LAST');
+      expect(sql.indexOf('ORDER BY')).toBeLessThan(sql.indexOf('LIMIT'));
+    });
+  });
+
 });
