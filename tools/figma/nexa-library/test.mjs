@@ -17,7 +17,7 @@ const bundle = readFileSync(join(here, 'code.js'), 'utf8');
 const tokens = JSON.parse(readFileSync(join(here, 'tokens.json'), 'utf8'));
 const marker = '/*__NEXA_TOKEN_PAYLOAD__*/';
 
-function fakeFigma() {
+function fakeFigma({ maxModes = Number.POSITIVE_INFINITY } = {}) {
   let counter = 0;
   const id = () => 'node:' + (++counter);
   const pages = [];
@@ -90,7 +90,7 @@ function fakeFigma() {
         const collection = {
           id: id(), name, modes: [{ modeId: id(), name: 'Mode 1' }],
           renameMode(modeId, newName) { this.modes.find((x) => x.modeId === modeId).name = newName; },
-          addMode(newName) { const modeId = id(); this.modes.push({ modeId, name: newName }); return modeId; },
+          addMode(newName) { if (this.modes.length >= maxModes) throw new Error('Mode limit reached on Starter plan'); const modeId = id(); this.modes.push({ modeId, name: newName }); return modeId; },
         };
         groups.push(collection);
         return collection;
@@ -165,4 +165,38 @@ test('creates nine component families, binds tokens, then reruns without duplica
   assert.equal(second.skippedComponents, 9);
   assert.equal(ctx.variables.length, first.variablesCreated);
   assert.equal(page.children.filter((item) => item.type === 'COMPONENT_SET').length, 9);
+});
+
+test('Starter plan uses three single-mode theme palettes and reruns idempotently', async () => {
+  const ctx = fakeFigma({ maxModes: 1 });
+  const first = await runOnce(ctx.figma);
+  assert.equal(first.components, 9);
+  assert.equal(first.colorThemeStrategy, 'single-mode-collections');
+  assert.equal(ctx.groups.length, 7);
+  assert.equal(ctx.variables.length, 3 * 81 + 6 + 7 + 6 + 5);
+
+  const collections = ['NEXA / Colors', 'NEXA / Colors / Light', 'NEXA / Colors / Protos Nexus'];
+  const modes = ['Dark', 'Light', 'Protos Nexus'];
+  for (const [index, collectionName] of collections.entries()) {
+    const group = ctx.groups.find((entry) => entry.name === collectionName);
+    assert.ok(group, collectionName);
+    assert.deepEqual(group.modes.map((entry) => entry.name), [modes[index]]);
+    const inGroup = ctx.variables.filter((entry) => entry.variableCollectionId === group.id);
+    assert.equal(inGroup.length, 81);
+    const example = inGroup.find((entry) => entry.name === 'actionPrimary');
+    assert.ok(example);
+    const colorValue = example.valuesByMode[group.modes[0].modeId];
+    assert.equal(typeof colorValue.r, 'number');
+    assert.equal(typeof colorValue.g, 'number');
+    assert.equal(typeof colorValue.b, 'number');
+  }
+
+  const second = await runOnce(ctx.figma);
+  assert.equal(second.components, 0);
+  assert.equal(second.skippedComponents, 9);
+  assert.equal(second.variablesCreated, 0);
+  assert.equal(ctx.groups.length, 7);
+  assert.equal(ctx.variables.length, first.variablesCreated);
+  assert.equal(ctx.pages.find((page) => page.name === 'NEXA · Component Library')
+    .children.filter((node) => node.type === 'COMPONENT_SET').length, 9);
 });
