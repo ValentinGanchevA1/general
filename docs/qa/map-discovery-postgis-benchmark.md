@@ -4,8 +4,8 @@
 
 ## Run modes
 
-- Pull-request workflow `Discovery PostGIS Benchmark`: 10,000 deterministic synthetic map entities (4k people / 3k events / 3k listings). Uses a disposable `postgis/postgis:16-3.4` GitHub Actions service.
-- Manual `workflow_dispatch` of the same workflow: incremental 10,000 → 50,000 → 100,000 synthetic entities. Runs relevance, distance and newest queries with five measurements each; queries are executed against the actual `DiscoveryService`.
+- Pull-request workflow `Discovery PostGIS Benchmark`: 10,000 → 50,000 → 100,000 deterministic synthetic map entities (40% people / 30% events / 30% listings). Runs only when benchmark code/workflow changes and uses disposable `postgis/postgis:16-3.4` service.
+- Manual `workflow_dispatch` of the same workflow: repeatable full-size profile (10,000 → 50,000 → 100,000). Runs relevance, distance and newest queries with five measurements each; queries are executed against the actual `DiscoveryService`.
 - Offline/local: provision PostgreSQL 16 + PostGIS 3.4 on **localhost**, create a disposable database with a name ending in `_bench`, build shared types, then run:
 
 ```sh
