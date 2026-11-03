@@ -71,10 +71,14 @@ export function completeClusterCoverage(
 
   if (bySourceCell.size === 0) return { points: [], resolution: sourceResolution };
 
-  const originals: CellCounts[] = [...bySourceCell.entries()].map(([cellId, slot]) => {
-    const [lat, lng] = h3.cellToLatLng(cellId);
-    return { cellId, count: slot.count, by: slot.by, lat, lng };
-  });
+  // SQL GROUP BY does not guarantee row order. Fix accumulation order so
+  // floating-point weighted centers do not jitter across equivalent refreshes.
+  const originals: CellCounts[] = [...bySourceCell.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([cellId, slot]) => {
+      const [lat, lng] = h3.cellToLatLng(cellId);
+      return { cellId, count: slot.count, by: slot.by, lat, lng };
+    });
 
   for (let resolution = sourceResolution; resolution >= 0; resolution -= 1) {
     const grouped = new Map<string, ProjectedCluster>();
