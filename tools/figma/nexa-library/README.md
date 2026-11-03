@@ -17,9 +17,10 @@ From the repository root, with pnpm dependencies installed:
 
 1. Run: node tools/figma/nexa-library/build.mjs
 2. Check synchronization: node tools/figma/nexa-library/build.mjs --check
-3. In Figma Desktop select Plugins → Development → Import plugin from manifest.
-4. Select tools/figma/nexa-library/manifest.json.
-5. Open the NEXA design and execute NEXA · Component Library Sync.
+3. Run structural smoke tests: node --test tools/figma/nexa-library/test.mjs
+4. In Figma Desktop select Plugins → Development → Import plugin from manifest.
+5. Select tools/figma/nexa-library/manifest.json.
+6. Open the NEXA design and execute NEXA · Component Library Sync.
 
 Target: https://www.figma.com/design/RMlHX3o4P7tHraj0tIGeGv
 
@@ -44,7 +45,7 @@ Generated outputs are tokens.json (machine-readable snapshot) and code.js (ready
 | Input | Default / Focused / Error / Disabled |
 | Avatar | None / Brand / Friend / Verified rings |
 | VerificationBadge | Partial / ID (none is intentionally not rendered) |
-| MapPin | Person / Event / Listing × Default / Selected |
+| MapPin | Person / Event / Listing × Compact (18dp) / Standard (24dp) / Selected (34dp) |
 | BottomSheet | Peek / Expanded |
 | Card | Person / Event / Listing |
 | Tabs | Active / Inactive |
@@ -66,3 +67,9 @@ Each family is a Figma Component Set. Matching sets are preserved rather than du
 ## Figma connector limitation
 
 Direct Figma synchronization was blocked by a Starter plan MCP call limit. This plugin is a local alternative until access is available again. Do not describe the Figma canvas as already updated before the plugin runs successfully.
+
+## Structural QA
+
+The Node.js smoke test uses a deterministic, non-networked Figma API mock. It checks the generated JS bundle against token snapshots, creates all nine component sets, tests all three color modes, and re-runs the plugin to confirm there are no duplicate sets, collections, variables or styles. It does not prove real Figma Plugin API compatibility, legibility, accessibility, or screenshot appearance. Those remain manual Figma Desktop acceptance gates.
+
+MapPin specimens now reflect the actual mobile map contract: person avatar circles, four-point event stars, square listings, 48dp tap stage, and compact/standard/selected visual sizes. Exact runtime icon/vector parity still needs device comparison.
