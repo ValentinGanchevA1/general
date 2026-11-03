@@ -4,6 +4,7 @@
 > **Verified source baseline:** `master` at `303439b9cb3e46db5aefa29ff18b28f5a0c53606` (#827). Merged code is not evidence of deployed backend state or physical-device sign-off.
 > **Migration allocation:** inspect `apps/backend/migrations` and the CI prefix guard before allocating a number. Merged changes include password recovery (0051), event reviews (0052), and profile occupation (0053); deployment application is not verified by this snapshot.
 > Root `STATUS.md` is a historical progress log and may lag. This file is the live status pointer from `README.md`.
+> Early super-app MVP drafts are historical only — see `docs/HISTORICAL-SUPERAPP-PLANS.md`.
 
 ---
 
