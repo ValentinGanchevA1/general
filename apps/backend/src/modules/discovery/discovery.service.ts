@@ -270,7 +270,7 @@ export class DiscoveryService {
       if (diff) {
         return {
           points: [],
-          responseResolution,
+          resolution: responseResolution,
           generatedAt: new Date().toISOString(),
           viewportHash,
           diff,
@@ -280,7 +280,7 @@ export class DiscoveryService {
 
     return {
       points,
-      responseResolution,
+      resolution: responseResolution,
       generatedAt: new Date().toISOString(),
       viewportHash,
       diff: null,
