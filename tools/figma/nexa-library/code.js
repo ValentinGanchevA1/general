@@ -146,6 +146,11 @@ async function main() {
     parent.appendChild(item);
     item.fontName = { family: 'Inter', style: bold ? 'Semi Bold' : 'Regular' };
     item.fontSize = fontSize;
+    const sizeToken = Object.entries(NEXA_TOKENS.fontSize).find((entry) => entry[1] === fontSize);
+    if (sizeToken) {
+      const variable = variableByKey.get('NEXA / Typography/' + sizeToken[0]);
+      if (variable) item.setBoundVariable('fontSize', variable);
+    }
     item.characters = value;
     item.textAutoResize = 'WIDTH_AND_HEIGHT';
     fill(item, colorName || 'textPrimary');
