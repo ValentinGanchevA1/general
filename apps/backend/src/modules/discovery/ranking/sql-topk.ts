@@ -65,17 +65,20 @@ export function buildRelevanceTopKSql(
                END
                ELSE 0.15
              END AS trust_score,
+             -- Clamp exponent input to float8-safe range. JS Math.exp()
+             -- underflows to zero / overflows to Infinity, then the rank is
+             -- clamped to [0,1]; PostgreSQL EXP() throws on such values.
              CASE
                WHEN kind = 'event' AND starts_at IS NOT NULL THEN
-                 EXP(-ABS((
+                 EXP(GREATEST(-700.0, -ABS((
                    ${p(bind.nowMs)}::double precision
                    - EXTRACT(EPOCH FROM starts_at::timestamptz) * 1000.0
-                 ) / 3600000.0) / 48.0)
+                 ) / 3600000.0) / 48.0))
                WHEN kind = 'listing' AND created_at IS NOT NULL THEN
-                 EXP(-((
+                 EXP(LEAST(700.0, GREATEST(-700.0, -((
                    ${p(bind.nowMs)}::double precision
                    - EXTRACT(EPOCH FROM created_at::timestamptz) * 1000.0
-                 ) / 3600000.0) / 36.0)
+                 ) / 3600000.0) / 36.0)))
                ELSE 0.5
              END AS freshness_score,
              CASE
