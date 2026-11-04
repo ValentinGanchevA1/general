@@ -13,7 +13,8 @@ async function main() {
       // Starter team files can reach their page limit. Work inside an isolated
       // section on the currently open page instead of altering other designs.
       if (!/page|limit|starter|maximum|upgrade/i.test(String(error))) throw error;
-      page = figma.currentPage;
+      // A deterministic fallback page prevents duplicates when users change tabs.
+      page = pages[0] || figma.currentPage;
       if (!page) throw error;
       useExistingPage = true;
     }
