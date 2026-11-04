@@ -341,13 +341,20 @@ export function MapScreen(): React.JSX.Element {
 				presentEntitySheet(fromViewport);
 				return;
 			}
-			// Never fabricate a (0, 0) marker when a profile returns before
-			// the viewport or pin coordinates are available.
-			const lat = pinLat ?? region?.latitude;
-			const lng = pinLng ?? region?.longitude;
-			if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+			// A viewport center is not the selected user's location. Restore
+			// only an actual pin coordinate pair; never mix pin and map axes.
+			if (
+				pinLat == null ||
+				pinLng == null ||
+				!Number.isFinite(pinLat) ||
+				!Number.isFinite(pinLng) ||
+				Math.abs(pinLat) > 90 ||
+				Math.abs(pinLng) > 180
+			) {
 				return;
 			}
+			const lat = pinLat;
+			const lng = pinLng;
 			presentEntitySheet({
 				kind: 'user',
 				id: activePinId,
@@ -370,8 +377,6 @@ export function MapScreen(): React.JSX.Element {
 			pinLat,
 			pinLng,
 			seedDisplayName,
-			region?.latitude,
-			region?.longitude,
 		]),
 	);
 
