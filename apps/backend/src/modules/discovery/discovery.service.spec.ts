@@ -376,7 +376,6 @@ describe('DiscoveryService', () => {
       expect(asPoints(result.points).map((point) => point.id)).toEqual(['compatible']);
     });
 
-    // A UUID belongs to its entity kind: user and event IDs can collide in the UNION view.
     it('preserves canonical entity kind when a user and event share a UUID', async () => {
       const sharedId = '00000000-0000-4000-8000-000000000001';
       const users = Array.from({ length: 520 }, (_, index) => ({
@@ -433,6 +432,64 @@ describe('DiscoveryService', () => {
       expect(sql).toContain("kind = 'listing' AND id = ANY($7::uuid[])");
       expect(params[4]).toContain(sharedId);
       expect(params[5]).not.toContain(sharedId);
+    });
+
+    it('uses SQL top-K with bounded rows and retains typed hydration privacy filters when opted in', async () => {
+      const previous = process.env.DISCOVERY_SQL_TOPK;
+      process.env.DISCOVERY_SQL_TOPK = '1';
+      try {
+        const id = '00000000-0000-4000-8000-000000000007';
+        query.mockImplementation((sql: string) => {
+          if (sql.includes('WITH candidates AS MATERIALIZED')) {
+            return Promise.resolve([{ id, kind: 'user' }]);
+          }
+          return Promise.resolve([{
+            id, kind: 'user', lat: 1.025, lng: 1.025,
+            meta: { displayName: 'Safe user', verification: 'id', online: false },
+          }]);
+        });
+        const result = await call({ rankBy: 'relevance' });
+        expect(result.points).toHaveLength(1);
+        expect(result.points[0]).toMatchObject({ kind: 'user', id });
+        expect(query).toHaveBeenCalledTimes(2);
+        const [sqlRank, rankParams] = query.mock.calls[0] as [string, unknown[]];
+        expect(sqlRank).toContain('WITH candidates AS MATERIALIZED');
+        expect(sqlRank).toContain("visibility = 'public'");
+        expect(sqlRank).toContain('NOT EXISTS');
+        expect(sqlRank).toContain('ORDER BY rank_score DESC');
+        expect(sqlRank).toContain('LIMIT $10::integer');
+        expect(rankParams).toHaveLength(10);
+        expect(rankParams[3]).toBe(1.025);
+        expect(rankParams[4]).toBe(1.025);
+        expect(rankParams[6]).toEqual([]);
+        expect(rankParams[7]).toEqual([]);
+        expect(rankParams[9]).toBe(500);
+        const [hydrateSql, hydrateParams] = query.mock.calls[1] as [string, unknown[]];
+        expect(hydrateSql).toContain('AND id = ANY($4::uuid[])');
+        expect(hydrateSql).toContain("kind = 'user' AND id = ANY($5::uuid[])");
+        expect(hydrateSql).toContain("visibility = 'public'");
+        expect(hydrateSql).toContain('NOT EXISTS');
+        expect(hydrateParams[3]).toEqual([id]);
+      } finally {
+        if (previous === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+        else process.env.DISCOVERY_SQL_TOPK = previous;
+      }
+    });
+
+    it('keeps mutual dating eligibility on the existing filtered relevance path', async () => {
+      const previous = process.env.DISCOVERY_SQL_TOPK;
+      process.env.DISCOVERY_SQL_TOPK = '1';
+      try {
+        query.mockResolvedValue([]);
+        query.mockResolvedValueOnce([{ open_to_dating: true }]);
+        await call({ datingOnly: true, rankBy: 'relevance' });
+        const [sql] = query.mock.calls[1] as [string, unknown[]];
+        expect(sql).not.toContain('WITH candidates AS MATERIALIZED');
+        expect(sql).toContain('AS listing_mode');
+      } finally {
+        if (previous === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+        else process.env.DISCOVERY_SQL_TOPK = previous;
+      }
     });
 
     it('orders newest in SQL before applying the hard LIMIT', async () => {

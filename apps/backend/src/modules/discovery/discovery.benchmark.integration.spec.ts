@@ -85,6 +85,11 @@ suite('Map Core PostGIS discovery benchmark — disposable database only', () =>
   let database: DataSource;
   let service: DiscoveryService;
   let queries: TimedQuery[] = [];
+  let testFriendIds: string[] = [];
+  let testAllowed = new Set<string>();
+  let testOnline = new Set<string>();
+  let testLastSeen = new Map<string, string>();
+  let onlineRequested: string[][] = [];
   const schema = `map_bench_${randomUUID().replaceAll('-', '')}`;
   let lastSize = 0;
 
@@ -186,12 +191,18 @@ suite('Map Core PostGIS discovery benchmark — disposable database only', () =>
       },
     } as unknown as DataSource;
     const presence = {
-      whichAreOnline: async (): Promise<Set<string>> => new Set<string>(),
-      lastSeenMap: async (): Promise<Map<string, string>> => new Map<string, string>(),
+      whichAreOnline: async (ids: string[]): Promise<Set<string>> => {
+        onlineRequested.push([...ids]);
+        return new Set(ids.filter((id) => testOnline.has(id)));
+      },
+      lastSeenMap: async (ids: string[]): Promise<Map<string, string>> =>
+        new Map(ids.filter((id) => testLastSeen.has(id)).map((id) =>
+          [id, testLastSeen.get(id)!] as const)),
     } as unknown as PresenceService;
     const friends = {
-      listFriendIds: async (): Promise<string[]> => [],
-      listWhoAllowFriendsOnline: async (): Promise<Set<string>> => new Set<string>(),
+      listFriendIds: async (): Promise<string[]> => [...testFriendIds],
+      listWhoAllowFriendsOnline: async (ids: string[]): Promise<Set<string>> =>
+        new Set(ids.filter((id) => testAllowed.has(id))),
     } as unknown as FriendsService;
     const redis = {
       set: async (): Promise<'OK'> => 'OK',
@@ -277,39 +288,62 @@ suite('Map Core PostGIS discovery benchmark — disposable database only', () =>
       );
       expect(Number(count?.n)).toBe(size);
 
-      for (const rankBy of ['relevance', 'distance', 'newest'] as const) {
-        const latencies: number[] = [];
-        let representativeQueries: TimedQuery[] = [];
-        for (let run = 0; run <= SAMPLE_RUNS; run += 1) {
-          queries = [];
-          const start = performance.now();
-          const response = await service.nearby({
-            viewport: VIEWPORT, zoom: 16, requesterId: VIEWER, rankBy,
-          });
-          const totalMs = performance.now() - start;
-          expect(response.points.length).toBe(500);
-          expect(response.points.every((point) => point.kind !== 'cluster')).toBe(true);
-          // This is a DB/Node elapsed time, not an HTTP or network p95.
-          if (run > 0) latencies.push(totalMs);
-          if (run === 1) representativeQueries = [...queries];
-        }
+      // Compare the new SQL shortlist against the exact JS-ranking baseline
+      // on the same seeded data; fail the benchmark if top-500 membership drifts.
+      const previousTopK = process.env.DISCOVERY_SQL_TOPK;
+      try {
+        for (const rankBy of ['relevance', 'distance', 'newest'] as const) {
+          let baselineKeys: string[] | null = null;
+          const implementations = rankBy === 'relevance'
+            ? ['js', 'sql'] as const
+            : ['unchanged'] as const;
+          for (const variant of implementations) {
+            process.env.DISCOVERY_SQL_TOPK = variant === 'sql' ? '1' : '0';
+            const latencies: number[] = [];
+            let representativeQueries: TimedQuery[] = [];
+            for (let run = 0; run <= SAMPLE_RUNS; run += 1) {
+              queries = [];
+              const start = performance.now();
+              const response = await service.nearby({
+                viewport: VIEWPORT, zoom: 16, requesterId: VIEWER, rankBy,
+              });
+              const totalMs = performance.now() - start;
+              expect(response.points.length).toBe(500);
+              expect(response.points.every((point) => point.kind !== 'cluster')).toBe(true);
+              if (run === 1 && rankBy === 'relevance') {
+                const keys = response.points
+                  .filter((point) => point.kind !== 'cluster')
+                  .map((point) => point.kind + ':' + point.id).sort();
+                if (variant === 'js') baselineKeys = keys;
+                else expect(keys).toEqual(baselineKeys);
+              }
+              // Five samples per variant, after one warm-up.
+              if (run > 0) latencies.push(totalMs);
+              if (run === 1) representativeQueries = [...queries];
+            }
 
-        const plans = [];
-        for (const call of representativeQueries.filter((q) => q.sql.includes('FROM v_discoverable_entity'))) {
-          plans.push({
-            rowsReturned: call.rows,
-            queryMs: Number(call.milliseconds.toFixed(2)),
-            explain: await explain(call),
-          });
+            const plans = [];
+            for (const call of representativeQueries.filter((q) =>
+              q.sql.includes('FROM v_discoverable_entity'))) {
+              plans.push({
+                rowsReturned: call.rows,
+                queryMs: Number(call.milliseconds.toFixed(2)),
+                explain: await explain(call),
+              });
+            }
+            console.info('DISCOVERY_POSTGIS_BENCH', JSON.stringify({
+              datasetSize: size, rankBy, variant, samples: SAMPLE_RUNS,
+              p50Ms: Number(percentile(latencies, 0.5).toFixed(2)),
+              p95Ms: Number(percentile(latencies, 0.95).toFixed(2)),
+              maxMs: Number(Math.max(...latencies).toFixed(2)),
+              plans,
+              scope: 'isolated indexed view; service + DB only; not production SLA',
+            }));
+          }
         }
-        console.info('DISCOVERY_POSTGIS_BENCH', JSON.stringify({
-          datasetSize: size, rankBy, samples: SAMPLE_RUNS,
-          p50Ms: Number(percentile(latencies, 0.5).toFixed(2)),
-          p95Ms: Number(percentile(latencies, 0.95).toFixed(2)),
-          maxMs: Number(Math.max(...latencies).toFixed(2)),
-          plans,
-          scope: 'isolated indexed view; service + DB only; not production SLA',
-        }));
+      } finally {
+        if (previousTopK === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+        else process.env.DISCOVERY_SQL_TOPK = previousTopK;
       }
 
       const cluster = await service.nearby({
@@ -341,8 +375,9 @@ suite('Map Core PostGIS discovery benchmark — disposable database only', () =>
   // This test uses PostgreSQL, not mocks. The production view UNIONs separate
   // tables, so the same UUID can belong to a user AND an event simultaneously.
   it('retains only selected kinds when UUIDs collide across entity types', async () => {
-    // The final dataset (100k in full mode, 10k in quick mode) was seeded above.
-    const duplicateId = randomUUID();
+    // Lexically earliest UUID makes the selected user deterministic when many
+    // H3-snapped users have identical scores at the 500-point boundary.
+    const duplicateId = '00000000-0000-4000-8000-000000000001';
     await database.query(`
       INSERT INTO bench_entities (
         id, kind, location, location_h3_r4, location_h3_r5,
@@ -372,20 +407,72 @@ suite('Map Core PostGIS discovery benchmark — disposable database only', () =>
       FROM bench_positions p WHERE p.idx = 0
     `, [duplicateId]);
 
+    const previous = process.env.DISCOVERY_SQL_TOPK;
     try {
-      const response = await service.nearby({
-        viewport: VIEWPORT, zoom: 16, requesterId: VIEWER,
-        rankBy: 'relevance', kinds: ['user', 'event'],
-      });
-      expect(response.points.length).toBe(500);
-      expect(response.points.some((p) => p.kind === 'user' && p.id === duplicateId))
-        .toBe(true);
-      expect(response.points.some((p) => p.kind === 'event' && p.id === duplicateId))
-        .toBe(false);
+      for (const variant of ['0', '1'] as const) {
+        process.env.DISCOVERY_SQL_TOPK = variant;
+        const response = await service.nearby({
+          viewport: VIEWPORT, zoom: 16, requesterId: VIEWER,
+          rankBy: 'relevance', kinds: ['user', 'event'],
+        });
+        expect(response.points.length).toBe(500);
+        expect(response.points.some((p) => p.kind === 'user' && p.id === duplicateId))
+          .toBe(true);
+        expect(response.points.some((p) => p.kind === 'event' && p.id === duplicateId))
+          .toBe(false);
+      }
     } finally {
+      if (previous === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+      else process.env.DISCOVERY_SQL_TOPK = previous;
       await database.query('DELETE FROM bench_entities WHERE id = $1', [duplicateId]);
     }
   }, 90_000);
 
+
+  it('matches JS relevance with permissioned friends, online and last-seen signals', async () => {
+    const rows = await database.query<Array<{ id: string }>>(
+      `SELECT md5(n::text)::uuid AS id FROM unnest(ARRAY[312,313,320]) AS n`,
+    );
+    const [a, b, c] = rows.map((row) => row.id);
+    expect([a, b, c].every((id) => typeof id === 'string')).toBe(true);
+    const previous = process.env.DISCOVERY_SQL_TOPK;
+    testFriendIds = [a!, b!, c!];
+    testAllowed = new Set([a!, b!]);
+    testOnline = new Set([a!, c!]);
+    testLastSeen = new Map([[b!, new Date(Date.now() - 30 * 60_000).toISOString()]]);
+    onlineRequested = [];
+    try {
+      process.env.DISCOVERY_SQL_TOPK = '0';
+      const fromJs = await service.nearby({
+        viewport: VIEWPORT, zoom: 16, requesterId: VIEWER, rankBy: 'relevance',
+      });
+      process.env.DISCOVERY_SQL_TOPK = '1';
+      const fromSql = await service.nearby({
+        viewport: VIEWPORT, zoom: 16, requesterId: VIEWER, rankBy: 'relevance',
+      });
+      const keys = (points: typeof fromJs.points): string[] => points
+        .filter((point) => point.kind !== 'cluster')
+        .map((point) => point.kind + ':' + point.id).sort();
+      expect(keys(fromSql.points)).toEqual(keys(fromJs.points));
+      expect(onlineRequested.every((ids) => !ids.includes(c!))).toBe(true);
+      const user = fromSql.points.find((point) => point.kind === 'user' && point.id === a);
+      expect(user).toMatchObject({ kind: 'user', meta: { isFriend: true, online: true } });
+      const recent = fromSql.points.find((point) => point.kind === 'user' && point.id === b);
+      expect(recent).toMatchObject({ kind: 'user', meta: { isFriend: true, online: false } });
+      const hiddenPresence = fromSql.points.find((point) => point.kind === 'user' && point.id === c);
+      if (hiddenPresence?.kind === 'user') {
+        expect(hiddenPresence.meta.online).toBe(false);
+        expect(hiddenPresence.meta.lastSeenAt).toBeNull();
+      }
+    } finally {
+      if (previous === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+      else process.env.DISCOVERY_SQL_TOPK = previous;
+      testFriendIds = [];
+      testAllowed = new Set<string>();
+      testOnline = new Set<string>();
+      testLastSeen = new Map<string, string>();
+      onlineRequested = [];
+    }
+  }, 90_000);
 
 });
