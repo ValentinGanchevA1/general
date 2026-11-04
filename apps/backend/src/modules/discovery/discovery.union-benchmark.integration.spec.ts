@@ -290,9 +290,11 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
       expect(Number(totals?.total)).toBe(size);
       let oldKeys: string[]=[];
       const previous=process.env.DISCOVERY_SQL_TOPK;
+      const previousThin=process.env.DISCOVERY_THIN_SQL_TOPK;
       try {
-        for (const variant of ['js','sql'] as const) {
-          process.env.DISCOVERY_SQL_TOPK=variant==='sql'?'1':'0';
+        for (const variant of ['js','sql','thin'] as const) {
+          process.env.DISCOVERY_SQL_TOPK=variant==='js'?'0':'1';
+          process.env.DISCOVERY_THIN_SQL_TOPK=variant==='thin'?'1':'0';
           const elapsed: number[]=[];
           let representative: TimedQuery[]=[];
           for (let run=0;run<=RUNS;run+=1) {
@@ -315,7 +317,8 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
           }
           const plans=[];
           for (const call of representative.filter((q)=>
-            q.sql.includes('FROM v_discoverable_entity'))) {
+            q.sql.includes('FROM v_discoverable_entity') ||
+            q.sql.includes('WITH candidates AS MATERIALIZED'))) {
             plans.push({rows:call.rows,queryMs:Number(call.elapsedMs.toFixed(2)),
               explain:await explain(call)});
           }
@@ -327,6 +330,8 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
       } finally {
         if (previous===undefined) delete process.env.DISCOVERY_SQL_TOPK;
         else process.env.DISCOVERY_SQL_TOPK=previous;
+        if (previousThin===undefined) delete process.env.DISCOVERY_THIN_SQL_TOPK;
+        else process.env.DISCOVERY_THIN_SQL_TOPK=previousThin;
       }
 
       // Map cluster count must represent ONLY rows allowed for this viewer:
