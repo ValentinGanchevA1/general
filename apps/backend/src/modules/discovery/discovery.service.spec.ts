@@ -303,10 +303,10 @@ describe('DiscoveryService', () => {
         const selected = params.find(
           (arg): arg is string[] =>
             Array.isArray(arg) && arg.some((item: unknown) =>
-              typeof item === 'string' && item.startsWith('user:')),
+              typeof item === 'string' && item === top.id),
         ) ?? [];
         return Promise.resolve(candidateRows
-          .filter((row) => selected.includes(`user:${row.id}`))
+          .filter((row) => selected.includes(row.id))
           .map((row) => ({
             id: row.id, kind: row.kind, lat: row.lat, lng: row.lng,
             meta: {
@@ -331,7 +331,7 @@ describe('DiscoveryService', () => {
       expect(hydrateSql).toContain("visibility = 'public'");
       expect(hydrateSql).toContain('NOT EXISTS');
       const selectedKeys = hydrateParams.find(
-        (arg): arg is string[] => Array.isArray(arg) && arg.includes(`user:${top.id}`),
+        (arg): arg is string[] => Array.isArray(arg) && arg.includes(top.id),
       ) ?? [];
       expect(selectedKeys).toHaveLength(500);
     });
@@ -364,9 +364,9 @@ describe('DiscoveryService', () => {
           ]);
         }
         const keys = params.find((arg): arg is string[] =>
-          Array.isArray(arg) && arg.includes('user:compatible')) ?? [];
+          Array.isArray(arg) && arg.includes('compatible')) ?? [];
         return Promise.resolve(candidates
-          .filter((person) => keys.includes(`user:${person.id}`))
+          .filter((person) => keys.includes(person.id))
           .map((person) => ({
             ...person,
             meta: { displayName: person.id, verification: 'id' },
@@ -374,6 +374,66 @@ describe('DiscoveryService', () => {
       });
       const result = await call({ datingOnly: true });
       expect(asPoints(result.points).map((point) => point.id)).toEqual(['compatible']);
+    });
+
+    it('preserves canonical entity kind when a user and event share a UUID', async () => {
+      const sharedId = '00000000-0000-4000-8000-000000000001';
+      const users = Array.from({ length: 520 }, (_, index) => ({
+        id: index === 0
+          ? sharedId
+          : `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+        kind: 'user' as const,
+        lat: 1.025,
+        lng: 1.025,
+        verification: 'id' as const,
+        starts_at: null,
+        created_at: null,
+        listing_mode: undefined,
+      }));
+      const event = {
+        id: sharedId,
+        kind: 'event' as const,
+        lat: 1.025,
+        lng: 1.025,
+        verification: null,
+        starts_at: '2100-01-01T00:00:00.000Z',
+        created_at: null,
+        listing_mode: undefined,
+      };
+      const candidates = [...users, event];
+      query.mockImplementation((sql: string, params: unknown[]) => {
+        if (sql.includes('AS listing_mode')) return Promise.resolve(candidates);
+        const selectedUuids = params[3] as string[];
+        const userIds = params[4] as string[];
+        const eventIds = params[5] as string[];
+        const listingIds = params[6] as string[];
+        return Promise.resolve(candidates
+          .filter((row) =>
+            selectedUuids.includes(row.id) &&
+            (row.kind === 'user' ? userIds.includes(row.id) : eventIds.includes(row.id)) &&
+            (row.kind !== 'listing' || listingIds.includes(row.id)),
+          )
+          .slice(0, 500)
+          .map((row) => ({
+            id: row.id, kind: row.kind, lat: row.lat, lng: row.lng,
+            meta: row.kind === 'user'
+              ? { displayName: row.id, verification: 'id' }
+              : { startsAt: event.starts_at, title: 'Unselected event' },
+          })));
+      });
+      const response = await call({ rankBy: 'relevance' });
+      expect(response.points).toHaveLength(500);
+      expect(response.points.some((point) =>
+        point.kind === 'user' && point.id === sharedId)).toBe(true);
+      expect(response.points.some((point) =>
+        point.kind === 'event' && point.id === sharedId)).toBe(false);
+      const [sql, params] = query.mock.calls[1] as [string, unknown[]];
+      expect(sql).toContain('AND id = ANY($4::uuid[])');
+      expect(sql).toContain("kind = 'user' AND id = ANY($5::uuid[])");
+      expect(sql).toContain("kind = 'event' AND id = ANY($6::uuid[])");
+      expect(sql).toContain("kind = 'listing' AND id = ANY($7::uuid[])");
+      expect(params[4]).toContain(sharedId);
+      expect(params[5]).not.toContain(sharedId);
     });
 
     it('orders newest in SQL before applying the hard LIMIT', async () => {
