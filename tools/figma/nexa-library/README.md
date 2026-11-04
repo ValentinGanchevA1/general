@@ -77,6 +77,20 @@ The fallback runs only when Figma rejects adding a color mode. Existing Dark bin
 
 A successful Node.js smoke test is not confirmation that the plugin ran inside Figma. After importing, verify all nine component sets visually, confirm palette variable counts and review Dark/Light/Protos colors. Starter plans also cannot publish shared team libraries.
 
+## Starter file-page limit fallback
+
+Some Starter team files are capped at three pages. If Figma rejects creating the dedicated library page, the plugin uses a **NEXA · Component Library** section on the file's **first existing page**. It places the section to the right of existing content and preserves other elements; a second run reuses the same section, even after changing the currently selected page.
+
+If a dedicated page is allowed, the plugin uses that page instead. In both cases, inspect the resulting page or section before treating the design library as published or complete.
+
+### Real Figma acceptance checklist
+
+- Open the success message and verify the right storage strategy (105 variables with modes, or 267 variables with Starter single-mode palettes).
+- Confirm nine component sets, including nine MapPin variants and the selected 34dp avatar ring.
+- Verify all text remains visible, fonts load, fills/strokes and spacing bindings are present, and the component sets do not overlap.
+- Run sync a second time; it should report `components: 0`, `skippedComponents: 9`, and `variablesCreated: 0`.
+- On Starter with a full team-page limit, verify the library is isolated in one section and existing design content is untouched.
+
 ## Quality and security boundaries
 
 - Design specimens are not production React Native components. Native gestures, animations, loading, validation and accessibility still require device QA.
