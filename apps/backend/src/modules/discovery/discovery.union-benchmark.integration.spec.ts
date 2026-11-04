@@ -816,7 +816,7 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
               try {
                 await runner.connect();
                 const connected = performance.now();
-                const value = await runner.query<T>(sql, params);
+                const value = await runner.query(sql, params) as T;
                 return {
                   value, acquireMs: connected - start,
                   executionMs: performance.now() - connected,
