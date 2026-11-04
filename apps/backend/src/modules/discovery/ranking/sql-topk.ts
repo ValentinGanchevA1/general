@@ -21,6 +21,7 @@ export function buildRelevanceTopKSql(
   lngSql: string,
   bind: SqlTopKBindings,
   thinCandidateSql?: string,
+  inlineCandidates = false,
 ): string {
   const p = (idx: number): string => '$' + String(idx);
   const candidateSql = thinCandidateSql ?? `
@@ -35,7 +36,7 @@ export function buildRelevanceTopKSql(
   `;
 
   return `
-    WITH candidates AS MATERIALIZED (
+    WITH candidates AS ${inlineCandidates ? 'NOT MATERIALIZED' : 'MATERIALIZED'} (
       ${candidateSql}
     ),
     signals AS (
