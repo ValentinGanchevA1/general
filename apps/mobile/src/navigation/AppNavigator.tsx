@@ -68,7 +68,7 @@ import { navigationRef } from './navigationRef';
 import { openViaRef } from './openRootScreen';
 import { takePendingPhoneVerify } from '@/services/pendingPhone';
 import { NexaTabIcon } from './NexaTabIcon';
-import { NEXA_TAB_VISUALS, isNexaMainTab, isNexaTabSelected, resolveConnectionsTabBadge, type NexaMainTab } from './nexaTabIdentity';
+import { NEXA_TAB_VISUALS, isNexaMainTab, isNexaTabSelected, resolveConnectionsTabBadge } from './nexaTabIdentity';
 import { nexaSpatialLensStore, type NexaSpatialLens } from '@/features/map/nexaSpatialLens.store';
 import type { AccountStackParamList, CommerceStackParamList, EventsStackParamList, GamificationStackParamList, SocialStackParamList } from './stacks';
 
