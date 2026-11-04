@@ -64,6 +64,8 @@ Generated outputs are tokens.json (machine-readable snapshot) and code.js (ready
 
 Each family is a Figma Component Set. Matching sets are preserved rather than duplicated on repeated runs; variables and text/effect styles are refreshed from the codebase.
 
+**Safe reruns:** Existing component sets are validated against the exact expected variant names and counts before they are skipped. A missing, renamed, extra or duplicate component set causes an explicit error rather than a false success. The plugin never automatically replaces or deletes an existing family: inspect and repair the Figma canvas before retrying.
+
 ## Figma Starter compatibility
 
 The plugin automatically chooses a theme-storage strategy at runtime:
