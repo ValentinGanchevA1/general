@@ -375,8 +375,9 @@ suite('Map Core PostGIS discovery benchmark — disposable database only', () =>
   // This test uses PostgreSQL, not mocks. The production view UNIONs separate
   // tables, so the same UUID can belong to a user AND an event simultaneously.
   it('retains only selected kinds when UUIDs collide across entity types', async () => {
-    // The final dataset (100k in full mode, 10k in quick mode) was seeded above.
-    const duplicateId = randomUUID();
+    // Lexically earliest UUID makes the selected user deterministic when many
+    // H3-snapped users have identical scores at the 500-point boundary.
+    const duplicateId = '00000000-0000-4000-8000-000000000001';
     await database.query(`
       INSERT INTO bench_entities (
         id, kind, location, location_h3_r4, location_h3_r5,
@@ -406,17 +407,23 @@ suite('Map Core PostGIS discovery benchmark — disposable database only', () =>
       FROM bench_positions p WHERE p.idx = 0
     `, [duplicateId]);
 
+    const previous = process.env.DISCOVERY_SQL_TOPK;
     try {
-      const response = await service.nearby({
-        viewport: VIEWPORT, zoom: 16, requesterId: VIEWER,
-        rankBy: 'relevance', kinds: ['user', 'event'],
-      });
-      expect(response.points.length).toBe(500);
-      expect(response.points.some((p) => p.kind === 'user' && p.id === duplicateId))
-        .toBe(true);
-      expect(response.points.some((p) => p.kind === 'event' && p.id === duplicateId))
-        .toBe(false);
+      for (const variant of ['0', '1'] as const) {
+        process.env.DISCOVERY_SQL_TOPK = variant;
+        const response = await service.nearby({
+          viewport: VIEWPORT, zoom: 16, requesterId: VIEWER,
+          rankBy: 'relevance', kinds: ['user', 'event'],
+        });
+        expect(response.points.length).toBe(500);
+        expect(response.points.some((p) => p.kind === 'user' && p.id === duplicateId))
+          .toBe(true);
+        expect(response.points.some((p) => p.kind === 'event' && p.id === duplicateId))
+          .toBe(false);
+      }
     } finally {
+      if (previous === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+      else process.env.DISCOVERY_SQL_TOPK = previous;
       await database.query('DELETE FROM bench_entities WHERE id = $1', [duplicateId]);
     }
   }, 90_000);
