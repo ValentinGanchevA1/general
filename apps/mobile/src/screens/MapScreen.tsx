@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+	BackHandler,
 	StyleSheet,
 	Text,
 	View,
@@ -291,6 +292,25 @@ export function MapScreen(): React.JSX.Element {
 	const closeSheet = useCallback(() => {
 		entitySheetRef.current?.dismiss();
 	}, []);
+
+	// Handle Android Back only for map-owned overlays. Gorhom's modal
+	// retains control of its own dismissal and the navigator handles routes.
+	useFocusEffect(
+		useCallback(() => {
+			const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+				if (createNearbyOpen) {
+					setCreateNearbyOpen(false);
+					return true;
+				}
+				if (pinInteractionState === 'quick_peek') {
+					dismissPinPreview();
+					return true;
+				}
+				return false;
+			});
+			return () => subscription.remove();
+		}, [createNearbyOpen, pinInteractionState, dismissPinPreview, setCreateNearbyOpen]),
+	);
 
 	const presentEntitySheet = useCallback((point: EntityPoint) => {
 		if (preSheetRegionRef.current == null && region != null) {
