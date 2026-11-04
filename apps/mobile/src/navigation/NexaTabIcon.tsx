@@ -1,11 +1,14 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { useAppSelector } from '@/hooks/redux';
 import { useAppTheme } from '@/theme';
 import { NEXA_TAB_VISUALS, type NexaMainTab } from './nexaTabIdentity';
 
+/**
+ * Neon Iris navigation treatment. All five tabs retain their existing routes,
+ * semantic colors and accessible labels. No map novelty/vanity badges.
+ */
 export function NexaTabIcon({
   tab,
   focused,
@@ -14,64 +17,100 @@ export function NexaTabIcon({
   focused: boolean;
 }): React.JSX.Element {
   const { colors } = useAppTheme();
-  const mapNewCount = useAppSelector((state) => state.mapNovelty.newCount);
+  // React Native Animated.Value is intentionally read as an animated style input
+  // during JSX render; only its mutable value is changed inside effects.
+  // react-hooks/refs treats this Animated driver as a React ref and flags the
+  // supported Animated.View style pattern. Keep the exception scoped here.
+  /* eslint-disable react-hooks/refs -- React Native Animated.Value style driver, not React ref.current */
+  const [reduceMotion, setReduceMotion] = useState(true);
+  const [emphasis] = useState(() => new Animated.Value(focused ? 1 : 0));
+
+  useEffect(() => {
+    let mounted = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduceMotion(enabled);
+    }).catch(() => undefined);
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => { mounted = false; subscription.remove(); };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      emphasis.stopAnimation();
+      emphasis.setValue(focused ? 1 : 0);
+      return;
+    }
+    const animation = Animated.timing(emphasis, {
+      toValue: focused ? 1 : 0,
+      duration: 190,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [emphasis, focused, reduceMotion]);
   const visual = NEXA_TAB_VISUALS[tab];
   const accent = visual.tone === 'discovery' ? colors.discovery : colors.actionPrimary;
   const soft = visual.tone === 'discovery' ? colors.discoverySoft : colors.actionSoft;
   const border = visual.tone === 'discovery' ? colors.discoveryBorderSoft : colors.actionBorderSoft;
-  const badgeCount = tab === 'Map' && !focused ? mapNewCount : 0;
 
   return (
     <View
+      pointerEvents="none"
       style={[
         styles.stage,
         focused
           ? { backgroundColor: soft, borderColor: border }
-          : { backgroundColor: 'transparent', borderColor: 'transparent' },
+          : styles.inactive,
       ]}
-      pointerEvents="none"
     >
+      <Animated.View
+        style={[styles.halo, { backgroundColor: accent, opacity: emphasis.interpolate({
+          inputRange: [0, 1], outputRange: [0, 0.12],
+        }) }]}
+      />
       <MaterialCommunityIcons
         name={focused ? visual.activeIcon : visual.icon}
-        size={22}
+        size={24}
         color={focused ? accent : colors.textTertiary}
       />
-      {badgeCount > 0 ? (
-        <View style={[styles.badge, { backgroundColor: accent }]}>
-          <Text style={[styles.badgeText, { color: colors.canvas }]}>
-            {badgeCount}
-          </Text>
-        </View>
-      ) : null}
+      <Animated.View
+        style={[styles.indicator, {
+          backgroundColor: accent,
+          opacity: emphasis,
+          transform: [{ scaleX: emphasis }],
+        }]}
+      />
     </View>
   );
 }
 
+/* eslint-enable react-hooks/refs */
 const styles = StyleSheet.create({
   stage: {
-    width: 38,
-    height: 30,
-    borderRadius: 15,
+    width: 44,
+    height: 34,
+    borderRadius: 17,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'visible',
+    overflow: 'hidden',
   },
-  badge: {
+  inactive: {
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
+  },
+  halo: {
     position: 'absolute',
-    top: -5,
-    right: -7,
-    minWidth: 17,
-    height: 17,
-    paddingHorizontal: 4,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 34,
+    height: 30,
+    borderRadius: 15,
   },
-  badgeText: {
-    fontSize: 10,
-    lineHeight: 12,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
+  indicator: {
+    position: 'absolute',
+    bottom: 1,
+    width: 14,
+    height: 2,
+    borderRadius: 1,
   },
 });
