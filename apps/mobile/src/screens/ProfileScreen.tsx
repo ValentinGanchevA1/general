@@ -201,8 +201,8 @@ export function ProfileScreen(): React.JSX.Element {
         <View style={[S.heroHeader, { paddingTop: insets.top + 14 }]}>
           <View style={S.heroCopy}>
             <Text style={S.eyebrow}>NEXA</Text>
-            <Text style={S.heroTitle}>You</Text>
-            <Text style={S.heroSub}>Your profile in your local world</Text>
+            <Text style={S.heroTitle}>Identity</Text>
+            <Text style={S.heroSub}>Your verified presence in your local world</Text>
           </View>
           <Pressable style={S.settingsBtn} onPress={openSettings} accessibilityRole="button" accessibilityLabel="Settings" hitSlop={8}>
             <MCI name="cog-outline" size={22} color={colors.textSecondary} />

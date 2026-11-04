@@ -14,7 +14,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { NexaDiscoveryHero } from '@/components/Brand/NexaDiscoveryHero';
-import { BirthDateField, CityAutocompleteField } from '@/components/profile/ProfileOriginFields';
+import { BirthDateField, CityAutocompleteField } from '@/components/Profile/ProfileOriginFields';
 import { FormField } from '@/components/FormField';
 import { INTEREST_OPTIONS } from '@/features/profile/interestOptions';
 import { PURPOSE_OPTIONS } from '@/features/profile/goalOptions';

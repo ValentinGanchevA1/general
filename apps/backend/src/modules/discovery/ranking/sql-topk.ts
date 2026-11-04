@@ -20,19 +20,24 @@ export function buildRelevanceTopKSql(
   latSql: string,
   lngSql: string,
   bind: SqlTopKBindings,
+  thinCandidateSql?: string,
+  inlineCandidates = false,
 ): string {
   const p = (idx: number): string => '$' + String(idx);
+  const candidateSql = thinCandidateSql ?? `
+    SELECT id, kind,
+           ${latSql} AS lat,
+           ${lngSql} AS lng,
+           meta->>'verification' AS verification,
+           meta->>'startsAt' AS starts_at,
+           meta->>'createdAt' AS created_at,
+           meta->>'mode' AS listing_mode
+      ${baseWhere}
+  `;
 
   return `
-    WITH candidates AS MATERIALIZED (
-      SELECT id, kind,
-             ${latSql} AS lat,
-             ${lngSql} AS lng,
-             meta->>'verification' AS verification,
-             meta->>'startsAt' AS starts_at,
-             meta->>'createdAt' AS created_at,
-             meta->>'mode' AS listing_mode
-        ${baseWhere}
+    WITH candidates AS ${inlineCandidates ? 'NOT MATERIALIZED' : 'MATERIALIZED'} (
+      ${candidateSql}
     ),
     signals AS (
       SELECT id, kind, verification, starts_at, created_at, listing_mode,

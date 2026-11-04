@@ -7,6 +7,7 @@ import {
   nexaEntitySelectionKey,
   regionForSelectedEntity,
   resolveNexaSheetChoreography,
+  shouldReframeForSheetSnap,
 } from './nexaMapSheetChoreography';
 
 const region: Region = {
@@ -72,6 +73,27 @@ describe('NEXA sheet ↔ map choreography', () => {
     expect(point.lng).toBe(25.03);
   });
 
+  it('does not accumulate camera drift across repeated compact/expanded snaps', () => {
+    const initialCompact = regionForSelectedEntity(region, point, 0);
+    let current = initialCompact;
+
+    for (let iteration = 0; iteration < 20; iteration += 1) {
+      const expanded = regionForSelectedEntity(current, point, 1);
+      expect(expanded.latitude).toBeLessThan(initialCompact.latitude);
+      current = regionForSelectedEntity(expanded, point, 0);
+      expect(current).toEqual(initialCompact);
+    }
+  });
+
+  it('keeps zoom and marker longitude stable for both snap positions', () => {
+    for (const snapIndex of [0, 1]) {
+      const result = regionForSelectedEntity(region, point, snapIndex);
+      expect(result.longitude).toBe(point.lng);
+      expect(result.latitudeDelta).toBe(region.latitudeDelta);
+      expect(result.longitudeDelta).toBe(region.longitudeDelta);
+    }
+  });
+
   it('keeps all sheet motion disabled for reduced-motion users', () => {
     expect(mapAnimationDuration(0, true)).toBe(0);
     expect(mapAnimationDuration(1, true)).toBe(0);
@@ -88,6 +110,25 @@ describe('NEXA sheet ↔ map choreography', () => {
 
   it('keeps marker selection keys deterministic', () => {
     expect(nexaEntitySelectionKey(point)).toBe('event:event-1');
+  });
+
+  it('ignores duplicate callbacks but preserves compact and expanded transitions', () => {
+    const compact = { selectionKey: 'event:event-1', index: 0 } as const;
+    const expanded = { selectionKey: 'event:event-1', index: 1 } as const;
+    expect(shouldReframeForSheetSnap(null, compact)).toBe(true);
+    expect(shouldReframeForSheetSnap(compact, compact)).toBe(false);
+    expect(shouldReframeForSheetSnap(compact, expanded)).toBe(true);
+    expect(shouldReframeForSheetSnap(expanded, compact)).toBe(true);
+    expect(shouldReframeForSheetSnap(expanded, expanded)).toBe(false);
+  });
+
+  it('reframes after changing pins or reopening the same sheet', () => {
+    const first = { selectionKey: 'user:peer-1', index: 0 } as const;
+    const another = { selectionKey: 'user:peer-2', index: 0 } as const;
+    const otherKind = { selectionKey: 'event:peer-1', index: 0 } as const;
+    expect(shouldReframeForSheetSnap(first, another)).toBe(true);
+    expect(shouldReframeForSheetSnap(first, otherKind)).toBe(true);
+    expect(shouldReframeForSheetSnap(null, first)).toBe(true);
   });
 
   it('removes camera animation when reduced motion is enabled', () => {

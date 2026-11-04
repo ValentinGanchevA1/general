@@ -36,6 +36,23 @@ export function nexaEntitySelectionKey(point: EntityPoint): string {
   return `${point.kind}:${point.id}`;
 }
 
+/** The last camera framing actually requested for a selected sheet entity. */
+export interface NexaEntitySheetCameraSnap {
+  readonly selectionKey: string;
+  readonly index: number;
+}
+
+/**
+ * Ignore repeated native sheet callbacks for the same selection and snap.
+ * Selection changes, compact/expanded transitions and reopens must reframe.
+ */
+export function shouldReframeForSheetSnap(
+  previous: NexaEntitySheetCameraSnap | null,
+  next: NexaEntitySheetCameraSnap,
+): boolean {
+  return previous?.selectionKey !== next.selectionKey || previous.index !== next.index;
+}
+
 /**
  * Offsets the camera center so the selected map entity sits in the visible map
  * area above the sheet. No entity coordinates are changed or persisted.
