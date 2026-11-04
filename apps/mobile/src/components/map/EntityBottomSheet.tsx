@@ -223,10 +223,14 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull, onLik
 		try {
 			if (blocked) {
 				await deleteJson<{ blocked: boolean }>(`/blocks/${point.id}`);
-				setProfile((p) => { if (!p) return p; const next = {...p, blockedByViewer: false}; setCachedProfile(point.id, next); return next; });
+				setProfile((p) => p == null ? p : {...p, blockedByViewer: false});
+				const cachedProfile = getCachedProfile(point.id);
+				if (cachedProfile != null) setCachedProfile(point.id, {...cachedProfile, blockedByViewer: false});
 			} else {
 				await postJson<undefined, { blocked: boolean }>(`/blocks/${point.id}`, undefined);
-				setProfile((p) => { if (!p) return p; const next = {...p, blockedByViewer: true}; setCachedProfile(point.id, next); return next; });
+				setProfile((p) => p == null ? p : {...p, blockedByViewer: true});
+				const cachedProfile = getCachedProfile(point.id);
+				if (cachedProfile != null) setCachedProfile(point.id, {...cachedProfile, blockedByViewer: true});
 				onClose();
 			}
 		} catch { appAlert('Could not update block', 'Try again in a moment.'); } finally { setBlocking(false); }
