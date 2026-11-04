@@ -85,6 +85,11 @@ suite('Map Core PostGIS discovery benchmark — disposable database only', () =>
   let database: DataSource;
   let service: DiscoveryService;
   let queries: TimedQuery[] = [];
+  let testFriendIds: string[] = [];
+  let testAllowed = new Set<string>();
+  let testOnline = new Set<string>();
+  let testLastSeen = new Map<string, string>();
+  let onlineRequested: string[][] = [];
   const schema = `map_bench_${randomUUID().replaceAll('-', '')}`;
   let lastSize = 0;
 
@@ -186,12 +191,18 @@ suite('Map Core PostGIS discovery benchmark — disposable database only', () =>
       },
     } as unknown as DataSource;
     const presence = {
-      whichAreOnline: async (): Promise<Set<string>> => new Set<string>(),
-      lastSeenMap: async (): Promise<Map<string, string>> => new Map<string, string>(),
+      whichAreOnline: async (ids: string[]): Promise<Set<string>> => {
+        onlineRequested.push([...ids]);
+        return new Set(ids.filter((id) => testOnline.has(id)));
+      },
+      lastSeenMap: async (ids: string[]): Promise<Map<string, string>> =>
+        new Map(ids.filter((id) => testLastSeen.has(id)).map((id) =>
+          [id, testLastSeen.get(id)!] as const)),
     } as unknown as PresenceService;
     const friends = {
-      listFriendIds: async (): Promise<string[]> => [],
-      listWhoAllowFriendsOnline: async (): Promise<Set<string>> => new Set<string>(),
+      listFriendIds: async (): Promise<string[]> => [...testFriendIds],
+      listWhoAllowFriendsOnline: async (ids: string[]): Promise<Set<string>> =>
+        new Set(ids.filter((id) => testAllowed.has(id))),
     } as unknown as FriendsService;
     const redis = {
       set: async (): Promise<'OK'> => 'OK',
@@ -410,5 +421,51 @@ suite('Map Core PostGIS discovery benchmark — disposable database only', () =>
     }
   }, 90_000);
 
+
+  it('matches JS relevance with permissioned friends, online and last-seen signals', async () => {
+    const rows = await database.query<Array<{ id: string }>>(
+      `SELECT md5(n::text)::uuid AS id FROM unnest(ARRAY[312,313,320]) AS n`,
+    );
+    const [a, b, c] = rows.map((row) => row.id);
+    expect([a, b, c].every((id) => typeof id === 'string')).toBe(true);
+    const previous = process.env.DISCOVERY_SQL_TOPK;
+    testFriendIds = [a!, b!, c!];
+    testAllowed = new Set([a!, b!]);
+    testOnline = new Set([a!, c!]);
+    testLastSeen = new Map([[b!, new Date(Date.now() - 30 * 60_000).toISOString()]]);
+    onlineRequested = [];
+    try {
+      process.env.DISCOVERY_SQL_TOPK = '0';
+      const fromJs = await service.nearby({
+        viewport: VIEWPORT, zoom: 16, requesterId: VIEWER, rankBy: 'relevance',
+      });
+      process.env.DISCOVERY_SQL_TOPK = '1';
+      const fromSql = await service.nearby({
+        viewport: VIEWPORT, zoom: 16, requesterId: VIEWER, rankBy: 'relevance',
+      });
+      const keys = (points: typeof fromJs.points): string[] => points
+        .filter((point) => point.kind !== 'cluster')
+        .map((point) => point.kind + ':' + point.id).sort();
+      expect(keys(fromSql.points)).toEqual(keys(fromJs.points));
+      expect(onlineRequested.every((ids) => !ids.includes(c!))).toBe(true);
+      const user = fromSql.points.find((point) => point.kind === 'user' && point.id === a);
+      expect(user).toMatchObject({ kind: 'user', meta: { isFriend: true, online: true } });
+      const recent = fromSql.points.find((point) => point.kind === 'user' && point.id === b);
+      expect(recent).toMatchObject({ kind: 'user', meta: { isFriend: true, online: false } });
+      const hiddenPresence = fromSql.points.find((point) => point.kind === 'user' && point.id === c);
+      if (hiddenPresence?.kind === 'user') {
+        expect(hiddenPresence.meta.online).toBe(false);
+        expect(hiddenPresence.meta.lastSeenAt).toBeNull();
+      }
+    } finally {
+      if (previous === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+      else process.env.DISCOVERY_SQL_TOPK = previous;
+      testFriendIds = [];
+      testAllowed = new Set<string>();
+      testOnline = new Set<string>();
+      testLastSeen = new Map<string, string>();
+      onlineRequested = [];
+    }
+  }, 90_000);
 
 });
