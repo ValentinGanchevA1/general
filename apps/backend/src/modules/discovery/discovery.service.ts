@@ -500,11 +500,11 @@ export class DiscoveryService {
       const allIds = [...new Set(selected.map((row) => row.id))];
       queryParams.push(allIds, byKind.user, byKind.event, byKind.listing);
       const allIdx = queryParams.length - 3;
-      selectedFilter = `AND id = ANY(${allIdx}::uuid[])
+      selectedFilter = `AND id = ANY($${allIdx}::uuid[])
         AND (
-          (kind = 'user' AND id = ANY(${allIdx + 1}::uuid[]))
-          OR (kind = 'event' AND id = ANY(${allIdx + 2}::uuid[]))
-          OR (kind = 'listing' AND id = ANY(${allIdx + 3}::uuid[]))
+          (kind = 'user' AND id = ANY($${allIdx + 1}::uuid[]))
+          OR (kind = 'event' AND id = ANY($${allIdx + 2}::uuid[]))
+          OR (kind = 'listing' AND id = ANY($${allIdx + 3}::uuid[]))
         )`;
     }
 
