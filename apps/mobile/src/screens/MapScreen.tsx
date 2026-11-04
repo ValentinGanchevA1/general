@@ -293,23 +293,17 @@ export function MapScreen(): React.JSX.Element {
 		entitySheetRef.current?.dismiss();
 	}, []);
 
-	// Handle Android Back only for map-owned overlays. Gorhom's modal
-	// retains control of its own dismissal and the navigator handles routes.
+	// CreateNearbySheet is a native Modal and owns Back via onRequestClose.
+	// Only intercept quick peek when no modal is covering the map.
 	useFocusEffect(
 		useCallback(() => {
+			if (createNearbyOpen || pinInteractionState !== 'quick_peek') return;
 			const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-				if (createNearbyOpen) {
-					setCreateNearbyOpen(false);
-					return true;
-				}
-				if (pinInteractionState === 'quick_peek') {
-					dismissPinPreview();
-					return true;
-				}
-				return false;
+				dismissPinPreview();
+				return true;
 			});
 			return () => subscription.remove();
-		}, [createNearbyOpen, pinInteractionState, dismissPinPreview, setCreateNearbyOpen]),
+		}, [createNearbyOpen, pinInteractionState, dismissPinPreview]),
 	);
 
 	const presentEntitySheet = useCallback((point: EntityPoint) => {
