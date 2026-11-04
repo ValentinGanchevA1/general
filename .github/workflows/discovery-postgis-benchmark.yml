@@ -9,6 +9,7 @@ on:
     branches: [master]
     paths:
       - 'apps/backend/src/modules/discovery/discovery.benchmark.integration.spec.ts'
+      - 'apps/backend/src/modules/discovery/discovery.union-benchmark.integration.spec.ts'
       - '.github/workflows/discovery-postgis-benchmark.yml'
 
 permissions:
@@ -52,4 +53,5 @@ jobs:
         run: >-
           pnpm --filter @g88/backend exec jest --ci --runInBand
           --runTestsByPath src/modules/discovery/discovery.benchmark.integration.spec.ts
+          src/modules/discovery/discovery.union-benchmark.integration.spec.ts
           --verbose
