@@ -11,7 +11,7 @@ import {
 	type Theme as NavigationTheme,
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator, type BottomTabBarButtonProps, type BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, type BottomTabBarButtonProps, type BottomTabNavigationOptions, type BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 
@@ -192,83 +192,157 @@ function NexaTabBarButton({
   );
 }
 
+type SpatialLensTab = Extract<NexaSpatialLens, 'experiences' | 'opportunities'>;
+
+/** Prevent hidden compatibility routes from occupying accessible tab targets. */
+function hiddenTabBarButton(): null {
+  return null;
+}
+
+/** A lens selects content on the existing Map instead of mounting another map. */
+function createLensTabListeners(lens: SpatialLensTab) {
+  return ({ navigation }: { navigation: BottomTabNavigationProp<TabParamList> }) => ({
+    tabPress: (event: { preventDefault: () => void }): void => {
+      event.preventDefault();
+      nexaSpatialLensStore.set(lens);
+      navigation.navigate('Map');
+    },
+  });
+}
+
+const experiencesListeners = createLensTabListeners('experiences');
+const opportunitiesListeners = createLensTabListeners('opportunities');
+
+/** Build a separate accessibility/visual contract for visible and legacy routes. */
+function createMainTabOptions(
+  routeName: keyof TabParamList,
+  colors: ThemeColors,
+  selectedLens: NexaSpatialLens,
+  mapHostActive: boolean,
+): BottomTabNavigationOptions {
+  const common: BottomTabNavigationOptions = {
+    headerShown: false,
+    lazy: true,
+    freezeOnBlur: true,
+    tabBarHideOnKeyboard: true,
+    tabBarStyle: {
+      backgroundColor: colors.canvas,
+      borderTopColor: colors.borderSubtle,
+      borderTopWidth: 1,
+      minHeight: 68,
+      paddingTop: 6,
+      paddingBottom: 6,
+      elevation: 8,
+    },
+    tabBarInactiveTintColor: colors.textTertiary,
+  };
+
+  if (!isNexaMainTab(routeName)) {
+    return {
+      ...common,
+      tabBarItemStyle: { display: 'none' },
+      tabBarButton: hiddenTabBarButton,
+    };
+  }
+
+  const visual = NEXA_TAB_VISUALS[routeName];
+  const activeTint = visual.tone === 'discovery' ? colors.discovery : colors.actionPrimary;
+  const isSelected = (focused: boolean): boolean =>
+    isNexaTabSelected(routeName, selectedLens, mapHostActive, focused);
+
+  return {
+    ...common,
+    tabBarItemStyle: { minWidth: 44 },
+    tabBarButton: (props) => (
+      <NexaTabBarButton
+        {...props}
+        selected={isSelected(props.accessibilityState?.selected === true)}
+      />
+    ),
+    tabBarActiveTintColor: activeTint,
+    tabBarAccessibilityLabel: visual.accessibilityLabel,
+    tabBarLabel: ({ focused }) => (
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        style={{
+          color: isSelected(focused) ? activeTint : colors.textTertiary,
+          textAlign: 'center',
+          fontSize: 10,
+          fontWeight: '700',
+          marginTop: 2,
+        }}
+      >
+        {visual.label}
+      </Text>
+    ),
+    tabBarIcon: ({ focused }) => (
+      <NexaTabIcon tab={routeName} focused={isSelected(focused)} />
+    ),
+  };
+}
+
 function MainTabs(): React.JSX.Element {
-  const { colors: c } = useAppTheme();
-  const selectedLens = useSyncExternalStore(nexaSpatialLensStore.subscribe, nexaSpatialLensStore.getSnapshot);
-  const chatUnread = useAppSelector((s) => s.chat.conversations.reduce((sum, conv) => sum + (conv.unreadCount ?? 0), 0));
-  const friendPending = useAppSelector((s) => s.friends.pendingCount);
+  const { colors } = useAppTheme();
+  const selectedLens = useSyncExternalStore(
+    nexaSpatialLensStore.subscribe,
+    nexaSpatialLensStore.getSnapshot,
+  );
+  const chatUnread = useAppSelector((state) =>
+    state.chat.conversations.reduce((sum, conv) => sum + (conv.unreadCount ?? 0), 0),
+  );
+  const friendPending = useAppSelector((state) => state.friends.pendingCount);
   const connectionsBadge = resolveConnectionsTabBadge(chatUnread, friendPending);
-  const badgeStyle = { backgroundColor: c.actionPrimary, color: c.onPrimary, fontSize: 10, fontWeight: '800' as const, minWidth: 18, height: 18, lineHeight: 18 };
+  const connectionsBadgeStyle = {
+    backgroundColor: colors.actionPrimary,
+    color: colors.onPrimary,
+    fontSize: 10,
+    fontWeight: '800' as const,
+    minWidth: 18,
+    height: 18,
+    lineHeight: 18,
+  };
 
-  const openLens = (lens: Extract<NexaSpatialLens, 'experiences' | 'opportunities'>) =>
-    ({ navigation }: { navigation: BottomTabNavigationProp<TabParamList> }) => ({
-      tabPress: (event: { preventDefault: () => void }): void => {
-        event.preventDefault();
-        nexaSpatialLensStore.set(lens);
-        navigation.navigate('Map');
-      },
-    });
-
-  return <Tab.Navigator
-    screenOptions={({ route, navigation }) => {
-      const mapHostActive = navigation.getState().routes[navigation.getState().index]?.name === 'Map';
-      const legacy = !isNexaMainTab(route.name);
-      const tab: NexaMainTab = legacy ? 'Map' : route.name;
-      const visual = NEXA_TAB_VISUALS[tab];
-      const active = visual.tone === 'discovery' ? c.discovery : c.actionPrimary;
-      return {
-        headerShown: false,
-        lazy: true,
-        freezeOnBlur: true,
-        tabBarHideOnKeyboard: true,
-        tabBarStyle: {
-          backgroundColor: c.canvas,
-          borderTopColor: c.borderSubtle,
-          borderTopWidth: 1,
-          minHeight: 68,
-          paddingTop: 6,
-          paddingBottom: 6,
-          elevation: 8,
-        },
-        tabBarItemStyle: legacy ? { display: 'none' as const } : { minWidth: 44 },
-        tabBarButton: legacy
-          ? () => null
-          : (props) => (
-            <NexaTabBarButton
-              {...props}
-              selected={isNexaTabSelected(tab, selectedLens, mapHostActive, props.accessibilityState?.selected === true)}
-            />
-          ),
-        tabBarActiveTintColor: active,
-        tabBarInactiveTintColor: c.textTertiary,
-        tabBarAccessibilityLabel: visual.accessibilityLabel,
-        tabBarLabel: ({ focused }: { focused: boolean }) => (
-          <Text
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}
-            style={{ color: isNexaTabSelected(tab, selectedLens, mapHostActive, focused) ? active : c.textTertiary, textAlign: 'center', fontSize: 10, fontWeight: '700', marginTop: 2 }}
-          >{visual.label}</Text>
-        ),
-        tabBarIcon: ({ focused }: { focused: boolean }) => (
-          <NexaTabIcon tab={tab} focused={isNexaTabSelected(tab, selectedLens, mapHostActive, focused)} />
-        ),
-      };
-    }}
-  >
-    <Tab.Screen name="Map" component={MapScreen} listeners={{ tabPress: () => nexaSpatialLensStore.set('map') }} />
-    <Tab.Screen name="Experiences" component={ExperiencesLens} listeners={openLens('experiences')} />
-    <Tab.Screen name="Opportunities" component={OpportunitiesLens} listeners={openLens('opportunities')} />
-    <Tab.Screen
-      name="Connections"
-      component={InteractionsScreen}
-      options={connectionsBadge != null ? { tabBarBadge: connectionsBadge, tabBarBadgeStyle: badgeStyle } : {}}
-    />
-    <Tab.Screen name="Identity" component={ProfileScreen} />
-    <Tab.Screen name="Discover" component={DiscoverScreen} />
-    <Tab.Screen name="Pulse" component={PulseScreen} />
-    <Tab.Screen name="You" component={ProfileScreen} />
-  </Tab.Navigator>;
+  return (
+    <Tab.Navigator
+      screenOptions={({ route, navigation }) => {
+        const navigationState = navigation.getState();
+        const mapHostActive =
+          navigationState.routes[navigationState.index]?.name === 'Map';
+        return createMainTabOptions(route.name, colors, selectedLens, mapHostActive);
+      }}
+    >
+      <Tab.Screen
+        name="Map"
+        component={MapScreen}
+        listeners={{ tabPress: () => nexaSpatialLensStore.set('map') }}
+      />
+      <Tab.Screen
+        name="Experiences"
+        component={ExperiencesLens}
+        listeners={experiencesListeners}
+      />
+      <Tab.Screen
+        name="Opportunities"
+        component={OpportunitiesLens}
+        listeners={opportunitiesListeners}
+      />
+      <Tab.Screen
+        name="Connections"
+        component={InteractionsScreen}
+        options={
+          connectionsBadge == null
+            ? {}
+            : { tabBarBadge: connectionsBadge, tabBarBadgeStyle: connectionsBadgeStyle }
+        }
+      />
+      <Tab.Screen name="Identity" component={ProfileScreen} />
+      <Tab.Screen name="Discover" component={DiscoverScreen} />
+      <Tab.Screen name="Pulse" component={PulseScreen} />
+      <Tab.Screen name="You" component={ProfileScreen} />
+    </Tab.Navigator>
+  );
 }
 
 function buildNavigationTheme(colors: ThemeColors, dark: boolean): NavigationTheme {
