@@ -102,6 +102,10 @@ If a dedicated page is allowed, the plugin uses that page instead. In both cases
 - No team library publishing or Code Connect mappings are performed.
 - Acceptance: all three theme palettes use identical semantic keys; nine component families appear after first run; reruns add no duplicate sets; tokens are driven directly by mobile source files. Paid plans use three modes; Starter uses three single-mode collections.
 
+## Post-merge visual acceptance gate
+
+Real Figma Desktop import, screenshot comparison, accessibility checks, and optional team-library publication are tracked separately in [NEXA Figma visual QA issue #996](https://github.com/ValentinGanchevA1/general/issues/996). This development plugin is opt-in and is **not** run by GitHub CI. Merging the plugin source is not evidence that Figma canvas was updated; keep #996 open until manual QA evidence is attached.
+
 ## Figma connector limitation
 
 Direct Figma synchronization was blocked by a Starter plan MCP call limit. This plugin is a local alternative until access is available again. Do not describe the Figma canvas as already updated before the plugin runs successfully.
