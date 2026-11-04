@@ -9,13 +9,15 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
-import vm from 'node:vm';
+import { createRequire } from 'node:module';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(join(here, 'plugin.template.js'), 'utf8');
 const bundle = readFileSync(join(here, 'code.js'), 'utf8');
 const tokens = JSON.parse(readFileSync(join(here, 'tokens.json'), 'utf8'));
 const marker = '/*__NEXA_TOKEN_PAYLOAD__*/';
+const requireLocal = createRequire(import.meta.url);
+const pluginPath = join(here, 'code.js');
 
 function fakeFigma({ maxModes = Number.POSITIVE_INFINITY, maxPages = Number.POSITIVE_INFINITY } = {}) {
   let counter = 0;
@@ -130,11 +132,18 @@ function fakeFigma({ maxModes = Number.POSITIVE_INFINITY, maxPages = Number.POSI
 
 async function runOnce(figma) {
   const finished = new Promise((resolve) => { figma.closePlugin = resolve; });
-  vm.runInNewContext(bundle, { figma, console }, { timeout: 5000, filename: 'nexa-figma-plugin.js' });
+  // Execute only the committed, fixed-path local plugin module (not arbitrary source text).
+  // Clear the Node module cache so repeated runs exercise the real entrypoint.
+  const moduleId = requireLocal.resolve(pluginPath);
+  delete requireLocal.cache[moduleId];
+  const previousFigma = globalThis.figma;
+  globalThis.figma = figma;
+  requireLocal(moduleId);
   const message = await Promise.race([
     finished,
     new Promise((_, reject) => setTimeout(() => reject(new Error('Plugin did not finish')), 5000)),
   ]);
+  globalThis.figma = previousFigma;
   assert.match(message, /^NEXA design library synced:/);
   return JSON.parse(message.slice(message.indexOf('{')));
 }
