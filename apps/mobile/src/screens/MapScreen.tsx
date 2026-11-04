@@ -99,6 +99,8 @@ import {
 	mapAnimationDuration,
 	nexaEntitySelectionKey,
 	regionForSelectedEntity,
+	shouldReframeForSheetSnap,
+	type NexaEntitySheetCameraSnap,
 } from '@/components/map/nexaMapSheetChoreography';
 import { NexaMapSpatialStatus } from '@/components/map/NexaMapSpatialStatus';
 import { resolveNexaMapSpatialState } from '@/components/map/nexaMapSpatialStates';
@@ -153,6 +155,7 @@ export function MapScreen(): React.JSX.Element {
 	const entitySheetRef = useRef<BottomSheetModal>(null);
 	const presentedIdRef = useRef<string | null>(null);
 	const selectedPointRef = useRef<EntityPoint | null>(null);
+	const lastSheetCameraSnapRef = useRef<NexaEntitySheetCameraSnap | null>(null);
 	const preSheetRegionRef = useRef<Region | null>(null);
 	const entitySnapPoints = useMemo(() => [...NEXA_ENTITY_SHEET_SNAP_POINTS], []);
 	const renderBackdrop = useSheetBackdrop(0.5);
@@ -285,6 +288,7 @@ export function MapScreen(): React.JSX.Element {
 		preSheetRegionRef.current = null;
 		presentedIdRef.current = null;
 		selectedPointRef.current = null;
+		lastSheetCameraSnapRef.current = null;
 		setSelected(null);
 		entitySheetRef.current?.dismiss();
 		dismissPinPreview();
@@ -300,6 +304,7 @@ export function MapScreen(): React.JSX.Element {
 		const restoreRegion = preSheetRegionRef.current;
 		presentedIdRef.current = null;
 		selectedPointRef.current = null;
+		lastSheetCameraSnapRef.current = null;
 		setSelected(null);
 		preSheetRegionRef.current = null;
 		if (restoreRegion != null) {
@@ -332,6 +337,7 @@ export function MapScreen(): React.JSX.Element {
 			preSheetRegionRef.current = region;
 		}
 		selectedPointRef.current = point;
+		lastSheetCameraSnapRef.current = null;
 		presentedIdRef.current = null;
 		setSelected(point);
 	}, [region]);
@@ -340,9 +346,16 @@ export function MapScreen(): React.JSX.Element {
 		(index: number) => {
 			if (index < 0 || region == null) return;
 			const point = selectedPointRef.current;
-			if (point == null) return;
+			const map = mapRef.current;
+			if (point == null || map == null) return;
+			const nextSnap: NexaEntitySheetCameraSnap = {
+				selectionKey: nexaEntitySelectionKey(point),
+				index,
+			};
+			if (!shouldReframeForSheetSnap(lastSheetCameraSnapRef.current, nextSnap)) return;
+			lastSheetCameraSnapRef.current = nextSnap;
 			const target = regionForSelectedEntity(region, point, index);
-			mapRef.current?.fitViewport(regionToViewport(target), {
+			map.fitViewport(regionToViewport(target), {
 				durationMs: mapAnimationDuration(index, reduceMotion),
 			});
 		},
