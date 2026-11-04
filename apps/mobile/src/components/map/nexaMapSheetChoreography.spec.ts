@@ -72,6 +72,27 @@ describe('NEXA sheet ↔ map choreography', () => {
     expect(point.lng).toBe(25.03);
   });
 
+  it('does not accumulate camera drift across repeated compact/expanded snaps', () => {
+    const initialCompact = regionForSelectedEntity(region, point, 0);
+    let current = initialCompact;
+
+    for (let iteration = 0; iteration < 20; iteration += 1) {
+      const expanded = regionForSelectedEntity(current, point, 1);
+      expect(expanded.latitude).toBeLessThan(initialCompact.latitude);
+      current = regionForSelectedEntity(expanded, point, 0);
+      expect(current).toEqual(initialCompact);
+    }
+  });
+
+  it('keeps zoom and marker longitude stable for both snap positions', () => {
+    for (const snapIndex of [0, 1]) {
+      const result = regionForSelectedEntity(region, point, snapIndex);
+      expect(result.longitude).toBe(point.lng);
+      expect(result.latitudeDelta).toBe(region.latitudeDelta);
+      expect(result.longitudeDelta).toBe(region.longitudeDelta);
+    }
+  });
+
   it('keeps all sheet motion disabled for reduced-motion users', () => {
     expect(mapAnimationDuration(0, true)).toBe(0);
     expect(mapAnimationDuration(1, true)).toBe(0);
