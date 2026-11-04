@@ -99,7 +99,15 @@ function fakeFigma({ maxModes = Number.POSITIVE_INFINITY } = {}) {
         const variable = {
           id: id(), name, variableCollectionId: group.id, resolvedType: type, valuesByMode: {}, scopes: [],
           setVariableCodeSyntax(platform, syntax) { this.codeSyntax ??= {}; this.codeSyntax[platform] = syntax; },
-          setValueForMode(mode, value) { this.valuesByMode[mode] = value; },
+          setValueForMode(mode, value) {
+            if (type === 'COLOR') {
+              for (const channel of ['r', 'g', 'b', 'a']) {
+                assert.equal(typeof value[channel], 'number', 'Figma COLOR values require RGBA channel ' + channel);
+                assert.ok(value[channel] >= 0 && value[channel] <= 1, 'RGBA channel is outside 0..1: ' + channel);
+              }
+            }
+            this.valuesByMode[mode] = value;
+          },
         };
         variables.push(variable);
         return variable;
@@ -150,6 +158,12 @@ test('creates nine component families, binds tokens, then reruns without duplica
   const colorCollection = ctx.groups.find((entry) => entry.name === 'NEXA / Colors');
   assert.deepEqual(colorCollection.modes.map((entry) => entry.name), ['Dark', 'Light', 'Protos Nexus']);
   assert.equal(ctx.textStyles.length, 6);
+  const primaryVar = ctx.variables.find((entry) => entry.name === 'actionPrimary' &&
+    entry.variableCollectionId === colorCollection.id);
+  assert.ok(primaryVar);
+  for (const value of Object.values(primaryVar.valuesByMode)) {
+    assert.equal(typeof value.a, 'number', 'COLOR variables must be RGBA, not RGB');
+  }
   assert.equal(ctx.effectStyles.length, 4);
   const page = ctx.pages.find((candidate) => candidate.name === 'NEXA · Component Library');
   const families = page.children.filter((candidate) => candidate.type === 'COMPONENT_SET');
@@ -189,6 +203,7 @@ test('Starter plan uses three single-mode theme palettes and reruns idempotently
     assert.equal(typeof colorValue.r, 'number');
     assert.equal(typeof colorValue.g, 'number');
     assert.equal(typeof colorValue.b, 'number');
+    assert.equal(typeof colorValue.a, 'number');
   }
 
   const second = await runOnce(ctx.figma);
