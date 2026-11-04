@@ -1,0 +1,55 @@
+# PostgreSQL/PostGIS Map Core performance baseline.
+# PR and manual runs cover 10k / 50k / 100k on benchmark-related changes.
+# Never targets a staging or production database.
+name: Discovery PostGIS Benchmark
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'apps/backend/src/modules/discovery/discovery.benchmark.integration.spec.ts'
+      - '.github/workflows/discovery-postgis-benchmark.yml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  postgis-benchmark:
+    name: PostGIS discovery 10k+
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: nexa_bench
+          POSTGRES_PASSWORD: nexa_bench
+          POSTGRES_DB: nexa_bench
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U nexa_bench -d nexa_bench"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+    env:
+      DISCOVERY_BENCH_DATABASE_URL: postgresql://nexa_bench:nexa_bench@localhost:5432/nexa_bench
+      DISCOVERY_BENCH_ACK_DISPOSABLE: 'YES'
+      DISCOVERY_BENCH_QUICK: 'NO'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build shared contracts
+        run: pnpm --filter @g88/shared build
+      - name: Run isolated PostGIS discovery queries and EXPLAIN ANALYZE
+        run: >-
+          pnpm --filter @g88/backend exec jest --ci --runInBand
+          --runTestsByPath src/modules/discovery/discovery.benchmark.integration.spec.ts
+          --verbose
