@@ -295,10 +295,12 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
       let oldKeys: string[]=[];
       const previous=process.env.DISCOVERY_SQL_TOPK;
       const previousThin=process.env.DISCOVERY_THIN_SQL_TOPK;
+      const previousBlock=process.env.DISCOVERY_THIN_BLOCKSET;
       try {
-        for (const variant of ['js','sql','thin'] as const) {
+        for (const variant of ['js','sql','thin','blockset'] as const) {
           process.env.DISCOVERY_SQL_TOPK=variant==='js'?'0':'1';
-          process.env.DISCOVERY_THIN_SQL_TOPK=variant==='thin'?'1':'0';
+          process.env.DISCOVERY_THIN_SQL_TOPK=variant==='js'||variant==='sql'?'0':'1';
+          process.env.DISCOVERY_THIN_BLOCKSET=variant==='blockset'?'1':'0';
           const elapsed: number[]=[];
           let representative: TimedQuery[]=[];
           for (let run=0;run<=RUNS;run+=1) {
@@ -336,6 +338,8 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
         else process.env.DISCOVERY_SQL_TOPK=previous;
         if (previousThin===undefined) delete process.env.DISCOVERY_THIN_SQL_TOPK;
         else process.env.DISCOVERY_THIN_SQL_TOPK=previousThin;
+        if (previousBlock===undefined) delete process.env.DISCOVERY_THIN_BLOCKSET;
+        else process.env.DISCOVERY_THIN_BLOCKSET=previousBlock;
       }
 
       // Map cluster count must represent ONLY rows allowed for this viewer:
@@ -376,6 +380,7 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
   it('keeps source-kind, marketplace and buy/sell filters identical in JS, SQL and thin paths', async () => {
     const previous = process.env.DISCOVERY_SQL_TOPK;
     const previousThin = process.env.DISCOVERY_THIN_SQL_TOPK;
+    const previousBlock = process.env.DISCOVERY_THIN_BLOCKSET;
     const scenarios = [
       { kinds: ['user'] as const },
       { kinds: ['event'] as const },
@@ -386,9 +391,10 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
     try {
       for (const scenario of scenarios) {
         let expected: string[] = [];
-        for (const variant of ['js', 'sql', 'thin'] as const) {
+        for (const variant of ['js', 'sql', 'thin', 'blockset'] as const) {
           process.env.DISCOVERY_SQL_TOPK = variant === 'js' ? '0' : '1';
-          process.env.DISCOVERY_THIN_SQL_TOPK = variant === 'thin' ? '1' : '0';
+          process.env.DISCOVERY_THIN_SQL_TOPK = variant === 'js' || variant === 'sql' ? '0' : '1';
+          process.env.DISCOVERY_THIN_BLOCKSET = variant === 'blockset' ? '1' : '0';
           const response = await service.nearby({
             viewport: VIEWPORT,
             zoom: 16,
@@ -411,6 +417,8 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
       else process.env.DISCOVERY_SQL_TOPK = previous;
       if (previousThin === undefined) delete process.env.DISCOVERY_THIN_SQL_TOPK;
       else process.env.DISCOVERY_THIN_SQL_TOPK = previousThin;
+      if (previousBlock === undefined) delete process.env.DISCOVERY_THIN_BLOCKSET;
+      else process.env.DISCOVERY_THIN_BLOCKSET = previousBlock;
     }
   }, 90_000);
 
@@ -418,6 +426,7 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
   it('preserves topic matches and blocks in both directions through JS, SQL and thin shortlist', async () => {
     const previous = process.env.DISCOVERY_SQL_TOPK;
     const previousThin = process.env.DISCOVERY_THIN_SQL_TOPK;
+    const previousBlock = process.env.DISCOVERY_THIN_BLOCKSET;
     const [event] = await db.query<Array<{ id: string; host_id: string }>>(
       "SELECT id, host_id FROM events WHERE title = 'Event 42' LIMIT 1",
     );
@@ -431,9 +440,10 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
       topic: '#event-42',
     };
     const check = async (expected: string[]): Promise<void> => {
-      for (const variant of ['js', 'sql', 'thin'] as const) {
+      for (const variant of ['js', 'sql', 'thin', 'blockset'] as const) {
         process.env.DISCOVERY_SQL_TOPK = variant === 'js' ? '0' : '1';
-        process.env.DISCOVERY_THIN_SQL_TOPK = variant === 'thin' ? '1' : '0';
+        process.env.DISCOVERY_THIN_SQL_TOPK = variant === 'js' || variant === 'sql' ? '0' : '1';
+          process.env.DISCOVERY_THIN_BLOCKSET = variant === 'blockset' ? '1' : '0';
         const result = await service.nearby(eventQuery);
         const keys = result.points
           .filter((p) => p.kind !== 'cluster')
@@ -466,9 +476,10 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
       await check(['event:' + candidate.id]);
       // Also verify listing-category topic binds for a broad, 500-capped result.
       let expectedListingKeys: string[] = [];
-      for (const variant of ['js', 'sql', 'thin'] as const) {
+      for (const variant of ['js', 'sql', 'thin', 'blockset'] as const) {
         process.env.DISCOVERY_SQL_TOPK = variant === 'js' ? '0' : '1';
-        process.env.DISCOVERY_THIN_SQL_TOPK = variant === 'thin' ? '1' : '0';
+        process.env.DISCOVERY_THIN_SQL_TOPK = variant === 'js' || variant === 'sql' ? '0' : '1';
+          process.env.DISCOVERY_THIN_BLOCKSET = variant === 'blockset' ? '1' : '0';
         const result = await service.nearby({
           viewport: VIEWPORT, zoom: 16, requesterId: VIEWER,
           rankBy: 'relevance', topic: '#general',
@@ -487,12 +498,15 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
       else process.env.DISCOVERY_SQL_TOPK = previous;
       if (previousThin === undefined) delete process.env.DISCOVERY_THIN_SQL_TOPK;
       else process.env.DISCOVERY_THIN_SQL_TOPK = previousThin;
+      if (previousBlock === undefined) delete process.env.DISCOVERY_THIN_BLOCKSET;
+      else process.env.DISCOVERY_THIN_BLOCKSET = previousBlock;
     }
   }, 180_000);
 
   it('reports ten concurrent thin-SQL viewport requests against JS reference sets', async () => {
     const previous = process.env.DISCOVERY_SQL_TOPK;
     const previousThin = process.env.DISCOVERY_THIN_SQL_TOPK;
+    const previousBlock = process.env.DISCOVERY_THIN_BLOCKSET;
     // Include the original blocked viewer plus nine distinct synthetic viewers.
     // These are service-level requests, not ten authenticated HTTP clients.
     const viewers = [VIEWER, ...Array.from({ length: 9 }, (_, i) =>
@@ -546,6 +560,8 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
       else process.env.DISCOVERY_SQL_TOPK = previous;
       if (previousThin === undefined) delete process.env.DISCOVERY_THIN_SQL_TOPK;
       else process.env.DISCOVERY_THIN_SQL_TOPK = previousThin;
+      if (previousBlock === undefined) delete process.env.DISCOVERY_THIN_BLOCKSET;
+      else process.env.DISCOVERY_THIN_BLOCKSET = previousBlock;
     }
   }, 240_000);
 
