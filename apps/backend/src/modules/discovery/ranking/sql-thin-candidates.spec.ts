@@ -53,4 +53,25 @@ describe('source-specific thin discovery candidates', () => {
       ...base, cellColumn: "location_h3_r8; DROP TABLE users",
     })).toThrow('Unsupported discovery H3 resolution');
   });
+  it('materializes bilateral blocked accounts exactly once for all three entity kinds', () => {
+    const sql = buildThinCandidateSql({ ...base, blockedSetCte: true });
+    expect(sql).toContain('WITH blocked_users AS MATERIALIZED');
+    expect(sql).toContain('SELECT blocked_id AS user_id FROM user_blocks WHERE blocker_id = $3::uuid');
+    expect(sql).toContain('SELECT blocker_id AS user_id FROM user_blocks WHERE blocked_id = $3::uuid');
+    expect(sql.match(/SELECT 1 FROM blocked_users bu WHERE bu.user_id = /g)).toHaveLength(3);
+    expect(sql).toContain('bu.user_id = u.id');
+    expect(sql).toContain('bu.user_id = e.host_id');
+    expect(sql).toContain('bu.user_id = l.seller_id');
+    expect(sql.match(/WHERE blocker_id = \$3::uuid/g)).toHaveLength(1);
+    expect(sql.match(/WHERE blocked_id = \$3::uuid/g)).toHaveLength(1);
+    expect(sql).not.toContain('jsonb_build_object');
+  });
+
+  it('leaves the original per-entity bilateral guard untouched when the flag is off', () => {
+    const baseline = buildThinCandidateSql(base);
+    expect(buildThinCandidateSql({ ...base, blockedSetCte: false })).toBe(baseline);
+    expect(baseline).not.toContain('blocked_users AS MATERIALIZED');
+    expect(baseline.match(/FROM user_blocks ub/g)).toHaveLength(3);
+  });
+
 });
