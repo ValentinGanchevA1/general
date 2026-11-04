@@ -341,8 +341,13 @@ export function MapScreen(): React.JSX.Element {
 				presentEntitySheet(fromViewport);
 				return;
 			}
-			const lat = pinLat ?? region?.latitude ?? 0;
-			const lng = pinLng ?? region?.longitude ?? 0;
+			// Never fabricate a (0, 0) marker when a profile returns before
+			// the viewport or pin coordinates are available.
+			const lat = pinLat ?? region?.latitude;
+			const lng = pinLng ?? region?.longitude;
+			if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+				return;
+			}
 			presentEntitySheet({
 				kind: 'user',
 				id: activePinId,
