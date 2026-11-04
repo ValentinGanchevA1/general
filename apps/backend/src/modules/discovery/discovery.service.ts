@@ -477,16 +477,35 @@ export class DiscoveryService {
           mode: row.kind === 'listing' ? row.listing_mode : undefined,
         };
         return {
-          key: `${row.kind}:${row.id}`,
+          id: row.id,
+          kind: row.kind,
           score: computeRankScore(rankable, ctx),
         };
       });
-      rankedKeys.sort((a, b) => b.score - a.score || a.key.localeCompare(b.key));
-      const selectedKeys = rankedKeys
-        .slice(0, MAX_POINTS_PER_RESPONSE)
-        .map((row) => row.key);
-      queryParams.push(selectedKeys);
-      selectedFilter = `AND (kind::text || ':' || id::text) = ANY($${queryParams.length}::text[])`;
+      rankedKeys.sort((a, b) =>
+        b.score - a.score || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id),
+      );
+
+      // A canonical entity is (kind, UUID), not UUID alone: user/event/listing
+      // can legitimately share an ID across the production UNION view.
+      // Filter by UUID first so Postgres can use each source table's PK index,
+      // then constrain by kind to exclude cross-kind UUID collisions.
+      const selected = rankedKeys.slice(0, MAX_POINTS_PER_RESPONSE);
+      const byKind: Record<EntityKind, string[]> = {
+        user: [],
+        event: [],
+        listing: [],
+      };
+      for (const row of selected) byKind[row.kind].push(row.id);
+      const allIds = [...new Set(selected.map((row) => row.id))];
+      queryParams.push(allIds, byKind.user, byKind.event, byKind.listing);
+      const allIdx = queryParams.length - 3;
+      selectedFilter = `AND id = ANY(${allIdx}::uuid[])
+        AND (
+          (kind = 'user' AND id = ANY(${allIdx + 1}::uuid[]))
+          OR (kind = 'event' AND id = ANY(${allIdx + 2}::uuid[]))
+          OR (kind = 'listing' AND id = ANY(${allIdx + 3}::uuid[]))
+        )`;
     }
 
     let orderClause = 'ORDER BY kind ASC, id ASC';
