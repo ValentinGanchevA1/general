@@ -474,6 +474,9 @@ export class DiscoveryService {
             topicParam,
             listingMode,
             marketplaceKind,
+            // Three-way gating prevents this experimental rewrite affecting
+            // the default JS path or the existing guarded SQL shortlist.
+            blockedSetCte: process.env.DISCOVERY_THIN_BLOCKSET === '1',
           })
           : undefined;
         selected = await this.db.query<Array<{ id: string; kind: EntityKind }>>(
