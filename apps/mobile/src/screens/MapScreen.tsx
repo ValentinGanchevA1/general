@@ -853,7 +853,7 @@ export function MapScreen(): React.JSX.Element {
 			case 'create':
 				openCreateNearby();
 		}
-	}, [emptyCopy.actionKind, navigation, openCreateNearby]);
+	}, [emptyCopy.actionKind, navigation, openCreateNearby, setFriendsOnly, setDatingOnly]);
 
 	useEffect(() => {
 		let cancelled = false;
