@@ -406,12 +406,10 @@ describe('DiscoveryService', () => {
         const selectedUuids = params[3] as string[];
         const userIds = params[4] as string[];
         const eventIds = params[5] as string[];
-        const listingIds = params[6] as string[];
         return Promise.resolve(candidates
           .filter((row) =>
             selectedUuids.includes(row.id) &&
-            (row.kind === 'user' ? userIds.includes(row.id) : eventIds.includes(row.id)) &&
-            (row.kind !== 'listing' || listingIds.includes(row.id)),
+            (row.kind === 'user' ? userIds.includes(row.id) : eventIds.includes(row.id)),
           )
           .slice(0, 500)
           .map((row) => ({
