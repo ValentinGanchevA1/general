@@ -302,27 +302,47 @@ async function main() {
     },
   })), 'Single-line field · Default, Focused, Error, Disabled. Error is a local visual state; validation remains in the app.');
 
-  setFamily('Avatar', ['None', 'Brand', 'Friend', 'Verified'].map((ring) => ({
+  setFamily('Avatar', ['None', 'Brand', 'Friend', 'Story', 'Verified'].map((ring) => ({
     name: 'Ring=' + ring,
     make(name) {
       const c = base(72, 72, name, 'NONE');
-      if (ring !== 'None') circle(c, 72, ring === 'Friend' ? 'entityFriend' : ring === 'Verified' ? 'verified' : 'primary', 0, 0);
-      circle(c, ring === 'None' ? 72 : 64, 'surfaceTertiary', ring === 'None' ? 0 : 4, ring === 'None' ? 0 : 4);
-      const t = label(c, 'MA', 22, 'textPrimary', true, 17, 22);
-      textProp(c, t, 'MA', 'Initials');
+      const ringColor = ring === 'Friend' ? 'entityFriend'
+        : ring === 'Story' || ring === 'Verified' ? 'accent' : 'primary';
+      const ringWidth = ring === 'None' ? 0 : 3;
+      if (ringWidth > 0) circle(c, 72, ringColor, 0, 0);
+      circle(c, 72 - ringWidth * 2, 'bg', ringWidth, ringWidth);
+      const initials = label(c, 'MA', 26, 'primary', true);
+      initials.x = (72 - initials.width) / 2;
+      initials.y = (72 - initials.height) / 2;
+      textProp(c, initials, 'MA', 'Initials');
       return c;
     },
-  })), 'Avatar ring variants match apps/mobile/src/components/Avatar.tsx. Initials-only specimen; runtime avatar URI remains private.');
+  })), 'All native Avatar ring variants: None / Brand / Friend / Story / Verified. Story and Verified both use accent. Initials-only preview; image URI stays private.');
 
   setFamily('VerificationBadge', ['Partial', 'ID'].map((level) => ({
     name: 'Level=' + level,
     make(name) {
       const c = base(32, 32, name, 'NONE');
-      circle(c, 27, 'primary', 2, 2);
-      label(c, '✓', 18, 'onPrimary', true, 7, 3);
+      if (level === 'ID') {
+        // Native idVerified uses MaterialCommunityIcons check-decagram.
+        const emblem = figma.createStar();
+        c.appendChild(emblem);
+        emblem.pointCount = 10;
+        emblem.innerRadius = 0.8;
+        emblem.resize(30, 30);
+        emblem.x = 1;
+        emblem.y = 1;
+        fill(emblem, 'primary');
+      } else {
+        // Partial verification is a simple rounded check chip.
+        circle(c, 26, 'primary', 3, 3);
+      }
+      const check = label(c, '✓', 18, 'onPrimary', true);
+      check.x = (32 - check.width) / 2;
+      check.y = (32 - check.height) / 2;
       return c;
     },
-  })), 'Verification level: Partial / ID verified. None is intentionally rendered as no badge. ID glyph is schematic; mobile uses check-decagram.');
+  })), 'Partial verification: round check chip. ID-verified: 10-point check-decagram silhouette. None: no rendered badge. Icons are illustrative specimens.');
 
   // Mirror native NexaEntityMarker: 48dp hit zone and 18/24/34dp visual sizes.
   // No decorative teardrop: users are avatar circles, events four-point stars,
