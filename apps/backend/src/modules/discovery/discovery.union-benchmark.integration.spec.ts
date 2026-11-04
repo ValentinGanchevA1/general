@@ -575,4 +575,150 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
     }
   }, 240_000);
 
+
+  it('profiles connection acquisition versus SQL time under 2/5/10 connection pools', async () => {
+    // Pure service/Postgres contention experiment. Never use a real user or a
+    // production database, and never log SQL text, bound values or identities.
+    const oldTopK = process.env.DISCOVERY_SQL_TOPK;
+    const oldThin = process.env.DISCOVERY_THIN_SQL_TOPK;
+    const oldInline = process.env.DISCOVERY_THIN_INLINE_CANDIDATES;
+    const viewers = [VIEWER, ...Array.from({ length: 9 }, (_, i) =>
+      '00000000-0000-4000-8000-' + String(i + 1).padStart(12, '0'))];
+    const request = (requesterId: string) => ({
+      viewport: VIEWPORT, zoom: 16, requesterId, rankBy: 'relevance' as const,
+    });
+    const keys = (response: Awaited<ReturnType<typeof service.nearby>>): string[] =>
+      response.points.filter((point) => point.kind !== 'cluster')
+        .map((point) => point.kind + ':' + point.id).sort();
+    type SqlPhase = 'ranking' | 'hydration' | 'other';
+    interface PoolSample {
+      phase: SqlPhase;
+      acquireMs: number;
+      executeMs: number;
+    }
+    const summary = (values: number[]): {
+      count: number; p50Ms: number; p95Ms: number; maxMs: number;
+    } => {
+      const sorted = [...values].sort((a, b) => a - b);
+      const nth = (fraction: number): number =>
+        sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)] ?? 0;
+      return {
+        count: values.length,
+        p50Ms: Number(nth(0.5).toFixed(2)),
+        p95Ms: Number(nth(0.95).toFixed(2)),
+        maxMs: Number((sorted.at(-1) ?? 0).toFixed(2)),
+      };
+    };
+    try {
+      process.env.DISCOVERY_SQL_TOPK = '0';
+      process.env.DISCOVERY_THIN_SQL_TOPK = '0';
+      delete process.env.DISCOVERY_THIN_INLINE_CANDIDATES;
+      // Each request is authorized against a per-viewer JS reference, not
+      // merely checked for a 500-item result count.
+      const reference = new Map<string, string[]>();
+      for (const viewer of viewers) {
+        reference.set(viewer, keys(await service.nearby(request(viewer))));
+      }
+      process.env.DISCOVERY_SQL_TOPK = '1';
+      process.env.DISCOVERY_THIN_SQL_TOPK = '1';
+      process.env.DISCOVERY_THIN_INLINE_CANDIDATES = '1';
+
+      for (const poolSize of [2, 5, 10] as const) {
+        const source = await new DataSource({
+          type: 'postgres', url, entities: [], poolSize,
+          extra: { options: `-c search_path=${schema},public` },
+        }).initialize();
+        const samples: PoolSample[] = [];
+        // QueryRunner.connect() measures the wait to acquire a pg pool client.
+        // QueryRunner.query() then measures the SQL/driver portion separately.
+        const measured = {
+          query: async <T>(sql: string, params: unknown[] = []): Promise<T> => {
+            const runner = source.createQueryRunner();
+            const started = performance.now();
+            let acquired = started;
+            try {
+              await runner.connect();
+              acquired = performance.now();
+              const result = await runner.query(sql, params) as T;
+              const finished = performance.now();
+              const phase: SqlPhase = sql.includes('WITH candidates AS')
+                ? 'ranking'
+                : sql.includes('FROM v_discoverable_entity')
+                  ? 'hydration'
+                  : 'other';
+              samples.push({
+                phase,
+                acquireMs: acquired - started,
+                executeMs: finished - acquired,
+              });
+              return result;
+            } finally {
+              await runner.release();
+            }
+          },
+        } as unknown as DataSource;
+        const friends = {
+          listFriendIds: async (): Promise<string[]> => [],
+          listWhoAllowFriendsOnline: async (): Promise<Set<string>> => new Set<string>(),
+        } as unknown as FriendsService;
+        const presence = {
+          whichAreOnline: async (): Promise<Set<string>> => new Set<string>(),
+          lastSeenMap: async (): Promise<Map<string, string>> => new Map<string, string>(),
+        } as unknown as PresenceService;
+        const redis = {
+          get: async (): Promise<null> => null,
+          set: async (): Promise<'OK'> => 'OK',
+        } as unknown as Redis;
+        const profiled = new DiscoveryService(measured, presence, friends, redis);
+
+        try {
+          // Warm the query path and connection pool; exclude warmup probes.
+          expect(keys(await profiled.nearby(request(VIEWER)))).toEqual(reference.get(VIEWER));
+          samples.length = 0;
+          const started = performance.now();
+          const settled = await Promise.allSettled(viewers.map(async (viewer) => {
+            const t = performance.now();
+            const response = await profiled.nearby(request(viewer));
+            return { viewer, durationMs: performance.now() - t, keys: keys(response) };
+          }));
+          const wallMs = performance.now() - started;
+          const durations: number[] = [];
+          for (const entry of settled) {
+            if (entry.status === 'rejected') throw entry.reason;
+            expect(entry.value.keys).toHaveLength(500);
+            expect(entry.value.keys).toEqual(reference.get(entry.value.viewer));
+            durations.push(entry.value.durationMs);
+          }
+          expect(samples.length).toBeGreaterThanOrEqual(viewers.length * 2);
+          const phases: SqlPhase[] = ['ranking', 'hydration', 'other'];
+          const byPhase = Object.fromEntries(phases.map((phase) => {
+            const phaseSamples = samples.filter((item) => item.phase === phase);
+            return [phase, {
+              acquire: summary(phaseSamples.map((item) => item.acquireMs)),
+              execute: summary(phaseSamples.map((item) => item.executeMs)),
+            }];
+          }));
+          console.info('DISCOVERY_POOL_PROFILE', JSON.stringify({
+            datasetSize: lastSize, concurrency: viewers.length, poolSize,
+            request: summary(durations),
+            wallMs: Number(wallMs.toFixed(2)),
+            allAcquire: summary(samples.map((item) => item.acquireMs)),
+            allExecute: summary(samples.map((item) => item.executeMs)),
+            byPhase,
+            source: 'QueryRunner.connect vs query; synthetic DB; mocked Redis/Friends/Presence; no HTTP',
+          }));
+        } finally {
+          await source.destroy();
+        }
+      }
+    } finally {
+      if (oldTopK === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+      else process.env.DISCOVERY_SQL_TOPK = oldTopK;
+      if (oldThin === undefined) delete process.env.DISCOVERY_THIN_SQL_TOPK;
+      else process.env.DISCOVERY_THIN_SQL_TOPK = oldThin;
+      if (oldInline === undefined) delete process.env.DISCOVERY_THIN_INLINE_CANDIDATES;
+      else process.env.DISCOVERY_THIN_INLINE_CANDIDATES = oldInline;
+    }
+  }, 300_000);
+
 });
