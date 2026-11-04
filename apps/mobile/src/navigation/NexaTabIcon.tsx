@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -18,7 +18,7 @@ export function NexaTabIcon({
 }): React.JSX.Element {
   const { colors } = useAppTheme();
   const [reduceMotion, setReduceMotion] = useState(true);
-  const emphasis = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  const [emphasis] = useState(() => new Animated.Value(focused ? 1 : 0));
 
   useEffect(() => {
     let mounted = true;
