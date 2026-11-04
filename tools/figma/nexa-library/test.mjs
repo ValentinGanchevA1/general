@@ -17,7 +17,7 @@ const bundle = readFileSync(join(here, 'code.js'), 'utf8');
 const tokens = JSON.parse(readFileSync(join(here, 'tokens.json'), 'utf8'));
 const marker = '/*__NEXA_TOKEN_PAYLOAD__*/';
 
-function fakeFigma({ maxModes = Number.POSITIVE_INFINITY } = {}) {
+function fakeFigma({ maxModes = Number.POSITIVE_INFINITY, maxPages = Number.POSITIVE_INFINITY } = {}) {
   let counter = 0;
   const id = () => 'node:' + (++counter);
   const pages = [];
@@ -65,6 +65,7 @@ function fakeFigma({ maxModes = Number.POSITIVE_INFINITY } = {}) {
     root: { children: pages },
     get currentPage() { return currentPage; },
     createPage() {
+      if (pages.length >= maxPages) throw new Error('Starter plan page limit reached');
       const page = node('PAGE');
       pages.push(page);
       currentPage ??= page;
@@ -73,6 +74,7 @@ function fakeFigma({ maxModes = Number.POSITIVE_INFINITY } = {}) {
     async setCurrentPageAsync(page) { currentPage = page; },
     async loadFontAsync() {},
     createComponent: () => node('COMPONENT'),
+    createSection: () => node('SECTION'),
     createRectangle: () => node('RECTANGLE'),
     createEllipse: () => node('ELLIPSE'),
     createText: () => node('TEXT'),
@@ -214,4 +216,38 @@ test('Starter plan uses three single-mode theme palettes and reruns idempotently
   assert.equal(ctx.variables.length, first.variablesCreated);
   assert.equal(ctx.pages.find((page) => page.name === 'NEXA · Component Library')
     .children.filter((node) => node.type === 'COMPONENT_SET').length, 9);
+});
+
+test('full Starter page limit preserves existing work in an isolated section', async () => {
+  const ctx = fakeFigma({ maxModes: 1, maxPages: 1 });
+  const page = ctx.figma.createPage();
+  page.name = 'NEXA — Existing Map';
+  const existing = ctx.figma.createRectangle();
+  existing.name = 'Existing content — do not modify';
+  existing.x = 300; existing.y = 200;
+  const originalRight = existing.x + existing.width;
+
+  const first = await runOnce(ctx.figma);
+  assert.equal(first.components, 9);
+  assert.equal(ctx.pages.length, 1, 'Starter should not need an additional page');
+
+  const section = page.children.find((entry) =>
+    entry.type === 'SECTION' && entry.name === 'NEXA · Component Library');
+  assert.ok(section);
+  assert.ok(section.x > originalRight, 'fallback section should be placed beside existing content');
+  assert.equal(section.children.filter((entry) => entry.type === 'COMPONENT_SET').length, 9);
+  assert.equal(existing.parent, page);
+  assert.equal(existing.name, 'Existing content — do not modify');
+  const sectionId = section.id;
+
+  const second = await runOnce(ctx.figma);
+  assert.equal(second.components, 0);
+  assert.equal(second.skippedComponents, 9);
+  assert.equal(second.variablesCreated, 0);
+  assert.equal(ctx.pages.length, 1);
+  const matchingSections = page.children.filter((entry) =>
+    entry.type === 'SECTION' && entry.name === 'NEXA · Component Library');
+  assert.equal(matchingSections.length, 1);
+  assert.equal(matchingSections[0].id, sectionId);
+  assert.equal(section.children.filter((entry) => entry.type === 'COMPONENT_SET').length, 9);
 });
