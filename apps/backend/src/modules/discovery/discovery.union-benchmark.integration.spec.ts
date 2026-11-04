@@ -43,6 +43,12 @@ interface TimedQuery { sql: string; params: unknown[]; elapsedMs: number; rows: 
 interface ExplainPlan {
   'Node Type'?: string;
   'Index Name'?: string;
+  'Actual Total Time'?: number;
+  'Actual Rows'?: number;
+  'Actual Loops'?: number;
+  'Shared Hit Blocks'?: number;
+  'Shared Read Blocks'?: number;
+  'Temp Written Blocks'?: number;
   Plans?: ExplainPlan[];
 }
 interface ExplainRecord {
@@ -63,16 +69,38 @@ function p95(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.ceil(sorted.length * 0.95) - 1] ?? 0;
 }
-function planDetails(root: ExplainPlan): { nodes: string[]; indexes: string[] } {
+function planDetails(root: ExplainPlan): {
+  nodes: string[];
+  indexes: string[];
+  expensive: Array<{
+    node: string; totalMs: number; rows: number; loops: number;
+    sharedHit: number; sharedRead: number; tempWritten: number;
+  }>;
+} {
   const nodes: string[] = [];
   const indexes: string[] = [];
-  const visit = (p: ExplainPlan): void => {
-    nodes.push(p['Node Type'] ?? '?');
-    if (p['Index Name']) indexes.push(p['Index Name']);
-    for (const child of p.Plans ?? []) visit(child);
+  const expensive: Array<{
+    node: string; totalMs: number; rows: number; loops: number;
+    sharedHit: number; sharedRead: number; tempWritten: number;
+  }> = [];
+  const visit = (plan: ExplainPlan): void => {
+    const node = plan['Node Type'] ?? '?';
+    nodes.push(node);
+    if (plan['Index Name']) indexes.push(plan['Index Name']);
+    expensive.push({
+      node, totalMs: Number((plan['Actual Total Time'] ?? 0).toFixed(2)),
+      rows: plan['Actual Rows'] ?? 0, loops: plan['Actual Loops'] ?? 0,
+      sharedHit: plan['Shared Hit Blocks'] ?? 0,
+      sharedRead: plan['Shared Read Blocks'] ?? 0,
+      tempWritten: plan['Temp Written Blocks'] ?? 0,
+    });
+    for (const child of plan.Plans ?? []) visit(child);
   };
   visit(root);
-  return { nodes, indexes };
+  // PostgreSQL timings are inclusive of child operators. Do not sum these
+  // values: report only the slowest plan nodes to identify bottlenecks.
+  expensive.sort((a, b) => b.totalMs - a.totalMs);
+  return { nodes, indexes, expensive: expensive.slice(0, 8) };
 }
 
 suite('Discovery on actual 0063 user/event/listing UNION view', () => {
@@ -503,7 +531,7 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
     }
   }, 180_000);
 
-  it('reports ten concurrent thin-SQL viewport requests against JS reference sets', async () => {
+  it('compares ten concurrent thin and shared-blockset requests against JS reference sets', async () => {
     const previous = process.env.DISCOVERY_SQL_TOPK;
     const previousThin = process.env.DISCOVERY_THIN_SQL_TOPK;
     const previousBlock = process.env.DISCOVERY_THIN_BLOCKSET;
@@ -529,32 +557,34 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
         const baseline = await service.nearby(request(viewer));
         expected.set(viewer, ids(baseline));
       }
-      process.env.DISCOVERY_SQL_TOPK = '1';
-      process.env.DISCOVERY_THIN_SQL_TOPK = '1';
-      const batchStarted = performance.now();
-      const completed = await Promise.allSettled(viewers.map(async (viewer) => {
-        const started = performance.now();
-        const response = await service.nearby(request(viewer));
-        return { viewer, keys: ids(response), elapsedMs: performance.now() - started };
-      }));
-      // Wait until all requests settle before assertions and flag restoration.
-      const samples: number[] = [];
-      for (const result of completed) {
-        if (result.status === 'rejected') throw result.reason;
-        const { viewer, keys, elapsedMs } = result.value;
-        expect(keys).toHaveLength(500);
-        expect(keys).toEqual(expected.get(viewer));
-        samples.push(elapsedMs);
+      for (const mode of ['thin', 'blockset'] as const) {
+        process.env.DISCOVERY_SQL_TOPK = '1';
+        process.env.DISCOVERY_THIN_SQL_TOPK = '1';
+        process.env.DISCOVERY_THIN_BLOCKSET = mode === 'blockset' ? '1' : '0';
+        const batchStarted = performance.now();
+        const completed = await Promise.allSettled(viewers.map(async (viewer) => {
+          const started = performance.now();
+          const response = await service.nearby(request(viewer));
+          return { viewer, keys: ids(response), elapsedMs: performance.now() - started };
+        }));
+        // Complete all active queries before toggling feature flags.
+        const samples: number[] = [];
+        for (const result of completed) {
+          if (result.status === 'rejected') throw result.reason;
+          const { viewer, keys, elapsedMs } = result.value;
+          expect(keys).toHaveLength(500);
+          expect(keys).toEqual(expected.get(viewer));
+          samples.push(elapsedMs);
+        }
+        const wallMs = performance.now() - batchStarted;
+        const sorted = [...samples].sort((a,b) => a-b);
+        console.info('DISCOVERY_UNION_CONCURRENT', JSON.stringify({
+          datasetSize: lastSize, mode, concurrentSyntheticViewers: viewers.length,
+          sampleCount: samples.length, p50Ms: Number((sorted[4] ?? 0).toFixed(2)),
+          p95Ms: Number(p95(samples).toFixed(2)), wallMs: Number(wallMs.toFixed(2)),
+          scope: 'PostGIS and DiscoveryService only, mock Friends/Presence/Redis, no HTTP',
+        }));
       }
-      const wallMs = performance.now() - batchStarted;
-      const sorted = [...samples].sort((a,b) => a-b);
-      console.info('DISCOVERY_UNION_CONCURRENT', JSON.stringify({
-        datasetSize: lastSize,
-        mode: 'thin', concurrentSyntheticViewers: viewers.length,
-        sampleCount: samples.length, p50Ms: Number((sorted[4] ?? 0).toFixed(2)),
-        p95Ms: Number(p95(samples).toFixed(2)), wallMs: Number(wallMs.toFixed(2)),
-        scope: 'PostGIS and DiscoveryService only, mock Friends/Presence/Redis, no HTTP',
-      }));
     } finally {
       if (previous === undefined) delete process.env.DISCOVERY_SQL_TOPK;
       else process.env.DISCOVERY_SQL_TOPK = previous;
