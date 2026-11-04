@@ -174,6 +174,22 @@ test('creates nine component families, binds tokens, then reruns without duplica
   assert.equal(mapPins.children.length, 9);
   assert.ok(mapPins.children.some((variant) => variant.name === 'Entity=Person, Density=Compact'));
   assert.ok(mapPins.children.some((variant) => variant.name === 'Entity=Event, Density=Selected'));
+  const avatars = families.find((entry) => entry.name === 'Avatar');
+  assert.equal(avatars.children.length, 5);
+  for (const ring of ['None', 'Brand', 'Friend', 'Story', 'Verified']) {
+    assert.ok(avatars.children.some((component) => component.name === 'Ring=' + ring));
+  }
+  const badges = families.find((entry) => entry.name === 'VerificationBadge');
+  assert.equal(badges.children.length, 2);
+  const partial = badges.children.find((component) => component.name === 'Level=Partial');
+  const verified = badges.children.find((component) => component.name === 'Level=ID');
+  assert.ok(partial);
+  assert.ok(verified);
+  assert.equal(partial.children.filter((node) => node.type === 'STAR').length, 0);
+  const decagram = verified.children.find((node) => node.type === 'STAR');
+  assert.ok(decagram, 'ID verification must have a decagram silhouette');
+  assert.equal(decagram.pointCount, 10);
+  assert.equal(decagram.innerRadius, 0.8);
   const components = families.flatMap((family) => family.children);
   assert.ok(components.some((component) => Object.hasOwn(component.variables, 'paddingLeft')));
   const second = await runOnce(ctx.figma);
