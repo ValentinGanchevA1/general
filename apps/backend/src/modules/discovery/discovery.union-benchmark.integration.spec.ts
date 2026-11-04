@@ -721,4 +721,182 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
     }
   }, 300_000);
 
+
+  it('A/B profiles ranking-only FIFO scheduling under 10 viewers and a fixed pool of 10', async () => {
+    // A diagnostic ONLY: this test does not install a limiter in the running app.
+    // The final hydration query always executes independently for its viewer.
+    const oldTopK = process.env.DISCOVERY_SQL_TOPK;
+    const oldThin = process.env.DISCOVERY_THIN_SQL_TOPK;
+    const oldInline = process.env.DISCOVERY_THIN_INLINE_CANDIDATES;
+    const viewers = [VIEWER, ...Array.from({ length: 9 }, (_, i) =>
+      '00000000-0000-4000-8000-' + String(i + 1).padStart(12, '0'))];
+    const query = (requesterId: string) => ({
+      viewport: VIEWPORT, zoom: 16, requesterId, rankBy: 'relevance' as const,
+    });
+    const ids = (response: Awaited<ReturnType<typeof service.nearby>>): string[] =>
+      response.points.filter((p) => p.kind !== 'cluster')
+        .map((p) => p.kind + ':' + p.id).sort();
+    const percentile = (values: number[], fraction: number): number => {
+      const sorted = [...values].sort((a, b) => a - b);
+      return Number((sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)] ?? 0).toFixed(2));
+    };
+
+    // A FIFO gate with reserved permits: new requests cannot jump the queue
+    // while a previously waiting SQL statement is resuming on the microtask queue.
+    class RankingGate {
+      private available: number;
+      private readonly pending: Array<() => void> = [];
+      active = 0;
+      peak = 0;
+
+      constructor(readonly capacity: number) {
+        if (!Number.isInteger(capacity) || capacity < 1) {
+          throw new Error('Ranking gate capacity must be a positive integer');
+        }
+        this.available = capacity;
+      }
+
+      async run<T>(task: () => Promise<T>): Promise<{ result: T; waitMs: number }> {
+        const enqueued = performance.now();
+        if (this.available > 0 && this.pending.length === 0) {
+          this.available -= 1;
+        } else {
+          await new Promise<void>((resolve) => { this.pending.push(resolve); });
+        }
+        const waitMs = performance.now() - enqueued;
+        this.active += 1;
+        this.peak = Math.max(this.peak, this.active);
+        try {
+          return { result: await task(), waitMs };
+        } finally {
+          this.active -= 1;
+          const next = this.pending.shift();
+          if (next) next();
+          else this.available += 1;
+        }
+      }
+    }
+
+    interface QueryTiming {
+      phase: 'ranking' | 'hydration';
+      queueMs: number;
+      acquireMs: number;
+      executionMs: number;
+    }
+
+    try {
+      process.env.DISCOVERY_SQL_TOPK = '0';
+      process.env.DISCOVERY_THIN_SQL_TOPK = '0';
+      delete process.env.DISCOVERY_THIN_INLINE_CANDIDATES;
+      const references = new Map<string, string[]>();
+      for (const viewer of viewers) {
+        references.set(viewer, ids(await service.nearby(query(viewer))));
+      }
+
+      process.env.DISCOVERY_SQL_TOPK = '1';
+      process.env.DISCOVERY_THIN_SQL_TOPK = '1';
+      process.env.DISCOVERY_THIN_INLINE_CANDIDATES = '1';
+      // Keep TypeORM pg pool fixed; change only ranking query concurrency.
+      for (const limit of [1, 2, 4, 6, 10] as const) {
+        const source = await new DataSource({
+          type: 'postgres', url, entities: [], poolSize: 10,
+          extra: { options: `-c search_path=${schema},public` },
+        }).initialize();
+        const gate = new RankingGate(limit);
+        const samples: QueryTiming[] = [];
+        const measured = {
+          query: async <T>(sql: string, params: unknown[] = []): Promise<T> => {
+            const phase: QueryTiming['phase'] =
+              sql.includes('WITH candidates AS') ? 'ranking' : 'hydration';
+            const execute = async (): Promise<{
+              value: T; acquireMs: number; executionMs: number;
+            }> => {
+              const runner = source.createQueryRunner();
+              const start = performance.now();
+              try {
+                await runner.connect();
+                const connected = performance.now();
+                const value = await runner.query<T>(sql, params);
+                return {
+                  value, acquireMs: connected - start,
+                  executionMs: performance.now() - connected,
+                };
+              } finally {
+                await runner.release();
+              }
+            };
+            const outcome = phase === 'ranking'
+              ? await gate.run(execute)
+              : { result: await execute(), waitMs: 0 };
+            samples.push({
+              phase, queueMs: outcome.waitMs,
+              acquireMs: outcome.result.acquireMs,
+              executionMs: outcome.result.executionMs,
+            });
+            return outcome.result.value;
+          },
+        } as unknown as DataSource;
+        const friends = {
+          listFriendIds: async (): Promise<string[]> => [],
+          listWhoAllowFriendsOnline: async (): Promise<Set<string>> => new Set<string>(),
+        } as unknown as FriendsService;
+        const presence = {
+          whichAreOnline: async (): Promise<Set<string>> => new Set<string>(),
+          lastSeenMap: async (): Promise<Map<string,string>> => new Map<string,string>(),
+        } as unknown as PresenceService;
+        const redis = {
+          get: async (): Promise<null> => null,
+          set: async (): Promise<'OK'> => 'OK',
+        } as unknown as Redis;
+        const measuredService = new DiscoveryService(measured, presence, friends, redis);
+        try {
+          // Exclude pool warmup from the A/B samples.
+          expect(ids(await measuredService.nearby(query(VIEWER)))).toEqual(references.get(VIEWER));
+          samples.length = 0;
+          const batchStarted = performance.now();
+          const result = await Promise.allSettled(viewers.map(async (viewer) => {
+            const started = performance.now();
+            const response = await measuredService.nearby(query(viewer));
+            return { viewer, durationMs: performance.now() - started, keys: ids(response) };
+          }));
+          const wallMs = performance.now() - batchStarted;
+          const durations: number[] = [];
+          for (const entry of result) {
+            if (entry.status === 'rejected') throw entry.reason;
+            expect(entry.value.keys).toHaveLength(500);
+            expect(entry.value.keys).toEqual(references.get(entry.value.viewer));
+            durations.push(entry.value.durationMs);
+          }
+          const rank = samples.filter((item) => item.phase === 'ranking');
+          const hydrate = samples.filter((item) => item.phase === 'hydration');
+          expect(rank).toHaveLength(10);
+          expect(hydrate).toHaveLength(10);
+          expect(gate.active).toBe(0);
+          expect(gate.peak).toBeLessThanOrEqual(limit);
+          console.info('DISCOVERY_RANK_GATE_PROFILE', JSON.stringify({
+            datasetSize: lastSize, viewers: viewers.length,
+            poolSize: 10, rankConcurrency: limit, rankPeak: gate.peak,
+            requestP50Ms: percentile(durations, 0.5),
+            requestP95Ms: percentile(durations, 0.95),
+            batchWallMs: Number(wallMs.toFixed(2)),
+            rankQueueP95Ms: percentile(rank.map((item) => item.queueMs), 0.95),
+            rankAcquireP95Ms: percentile(rank.map((item) => item.acquireMs), 0.95),
+            rankSqlP95Ms: percentile(rank.map((item) => item.executionMs), 0.95),
+            hydrateSqlP95Ms: percentile(hydrate.map((item) => item.executionMs), 0.95),
+            scope: 'isolated PostGIS/DiscoveryService; mocked Redis/Friends/Presence; no HTTP',
+          }));
+        } finally {
+          await source.destroy();
+        }
+      }
+    } finally {
+      if (oldTopK === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+      else process.env.DISCOVERY_SQL_TOPK = oldTopK;
+      if (oldThin === undefined) delete process.env.DISCOVERY_THIN_SQL_TOPK;
+      else process.env.DISCOVERY_THIN_SQL_TOPK = oldThin;
+      if (oldInline === undefined) delete process.env.DISCOVERY_THIN_INLINE_CANDIDATES;
+      else process.env.DISCOVERY_THIN_INLINE_CANDIDATES = oldInline;
+    }
+  }, 300_000);
+
 });
