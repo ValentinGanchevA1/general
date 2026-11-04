@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
 	BackHandler,
 	StyleSheet,
@@ -78,6 +78,7 @@ import {
 	entityPointKey,
 } from '@/features/map/mapNovelty';
 import { clearMapNewCount, setMapNewCount } from '@/features/map/mapNoveltySlice';
+import { nexaSpatialLensStore, type NexaSpatialLens } from '@/features/map/nexaSpatialLens.store';
 import { MapCreateNudgeBanner } from '@/features/map/MapCreateNudgeBanner';
 import { useSheetChrome, useSheetBackdrop } from '@/components/sheets';
 import {
@@ -106,6 +107,21 @@ import { useNexaReducedMotion } from '@/motion/useNexaReducedMotion';
 import { useNexaMapSurfaceReady } from '@/components/Brand/NexaLaunchSurfaceContext';
 
 const EMPTY_POINTS: DiscoveryPoint[] = [];
+const EXPERIENCES_LAYERS: EntityKind[] = ['event'];
+const OPPORTUNITIES_LAYERS: EntityKind[] = ['listing'];
+
+function resolveLensLayers(lens: NexaSpatialLens, customLayers: EntityKind[]): EntityKind[] {
+  switch (lens) {
+    case 'experiences':
+      return EXPERIENCES_LAYERS;
+    case 'opportunities':
+      return OPPORTUNITIES_LAYERS;
+    case 'custom':
+      return customLayers;
+    case 'map':
+      return DEFAULT_MAP_LAYERS;
+  }
+}
 const EMPTY_PLACE_SPATIAL_STATUS: NexaPlaceSpatialStatus = {
 	hasVisiblePoints: false,
 	loading: false,
@@ -144,7 +160,10 @@ export function MapScreen(): React.JSX.Element {
 
 	const [listingModeFilter, setListingModeFilter] =
 		useState<ListingModeFilterValue>('all');
-	const [layers, setLayers] = useState<EntityKind[]>(DEFAULT_MAP_LAYERS);
+	const [customLayers, setCustomLayers] = useState<EntityKind[]>(DEFAULT_MAP_LAYERS);
+	const activeLens = useSyncExternalStore(nexaSpatialLensStore.subscribe, nexaSpatialLensStore.getSnapshot);
+	// Derive the lens synchronously: effects that call setState here cause cascading renders.
+	const layers = resolveLensLayers(activeLens, customLayers);
 	const [friendsOnly, setFriendsOnly] = useState(false);
 	const [datingOnly, setDatingOnly] = useState(false);
 	const [rankBy, setRankBy] = useState<DiscoveryRankBy>('relevance');
@@ -218,18 +237,18 @@ export function MapScreen(): React.JSX.Element {
 
 	const filteredPoints = useMemo(() => {
 		const q = searchQuery.trim().toLowerCase();
-		if (!q) return points;
+		// Hide stale entity kinds immediately while the viewport query for the
+		// newly selected spatial lens is still in flight.
 		return points.filter((p) => {
 			if (p.kind === 'cluster') return true;
+			if (!kinds.includes(p.kind)) return false;
+			if (!q) return true;
 			if (p.kind === 'user') {
 				return p.meta.displayName.toLowerCase().includes(q);
 			}
-			if (p.kind === 'event' || p.kind === 'listing') {
-				return p.meta.title.toLowerCase().includes(q);
-			}
-			return false;
+			return p.meta.title.toLowerCase().includes(q);
 		});
-	}, [points, searchQuery]);
+	}, [points, searchQuery, kinds]);
 
 	const {
 		createNearbyOpen,
@@ -834,7 +853,7 @@ export function MapScreen(): React.JSX.Element {
 			case 'create':
 				openCreateNearby();
 		}
-	}, [emptyCopy.actionKind, navigation, openCreateNearby]);
+	}, [emptyCopy.actionKind, navigation, openCreateNearby, setFriendsOnly, setDatingOnly]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -909,7 +928,7 @@ export function MapScreen(): React.JSX.Element {
 				value={searchQuery}
 				onChangeText={setSearchQuery}
 				layers={layers}
-				onLayersChange={setLayers}
+				onLayersChange={(next) => { setCustomLayers(next); nexaSpatialLensStore.set('custom'); }}
 				listingMode={listingModeFilter}
 				onListingModeChange={setListingModeFilter}
 				friendsOnly={friendsOnly}
@@ -927,6 +946,7 @@ export function MapScreen(): React.JSX.Element {
 				onPressItem={onTrendingPress}
 				top={trendingTop}
 				visible={
+					(activeLens === 'map' || activeLens === 'custom') &&
 					isCityScale &&
 					!sheetOpen &&
 					points.length > 0 &&
@@ -1044,7 +1064,7 @@ export function MapScreen(): React.JSX.Element {
 				onPressUser={(p) => onEntityPress(p)}
 			/>
 
-			{myCoords ? <EventsRail location={myCoords} /> : null}
+			{myCoords && (activeLens === 'map' || layers.includes('event')) ? <EventsRail location={myCoords} /> : null}
 		</View>
 	);
 }

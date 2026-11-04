@@ -1,4 +1,5 @@
-export type NexaMainTab = 'Map' | 'Discover' | 'Pulse' | 'Connections' | 'You';
+/** Canonical visible product destinations; old route identifiers remain compatibility-only. */
+export type NexaMainTab = 'Map' | 'Experiences' | 'Opportunities' | 'Connections' | 'Identity';
 export type NexaTabTone = 'discovery' | 'action';
 
 export interface NexaTabVisual {
@@ -11,11 +12,28 @@ export interface NexaTabVisual {
 
 export const NEXA_MAIN_TAB_ORDER = [
   'Map',
-  'Discover',
-  'Pulse',
+  'Experiences',
+  'Opportunities',
   'Connections',
-  'You',
+  'Identity',
 ] as const satisfies readonly NexaMainTab[];
+
+export function isNexaMainTab(name: string): name is NexaMainTab {
+  return (NEXA_MAIN_TAB_ORDER as readonly string[]).includes(name);
+}
+
+/** Route focus and visual/a11y selection differ for spatial tabs sharing Map. */
+export function isNexaTabSelected(
+  tab: NexaMainTab,
+  lens: 'map' | 'experiences' | 'opportunities' | 'custom',
+  mapHostActive: boolean,
+  focused: boolean,
+): boolean {
+  if (tab === 'Map') return mapHostActive && (lens === 'map' || lens === 'custom');
+  if (tab === 'Experiences') return mapHostActive && lens === 'experiences';
+  if (tab === 'Opportunities') return mapHostActive && lens === 'opportunities';
+  return focused;
+}
 
 export const NEXA_TAB_VISUALS: Record<NexaMainTab, NexaTabVisual> = {
   Map: {
@@ -23,39 +41,39 @@ export const NEXA_TAB_VISUALS: Record<NexaMainTab, NexaTabVisual> = {
     icon: 'map-outline',
     activeIcon: 'map',
     tone: 'discovery',
-    accessibilityLabel: 'Map, nearby discovery',
+    accessibilityLabel: 'Map, explore people and activity nearby',
   },
-  Discover: {
-    label: 'Discover',
-    icon: 'compass-outline',
-    activeIcon: 'compass',
+  Experiences: {
+    label: 'Experiences',
+    icon: 'calendar-month-outline',
+    activeIcon: 'calendar-month',
     tone: 'discovery',
-    accessibilityLabel: 'Discover people, events and marketplace',
+    accessibilityLabel: 'Experiences, events on the map',
   },
-  Pulse: {
-    label: 'Pulse',
-    icon: 'pulse',
-    activeIcon: 'pulse',
+  Opportunities: {
+    label: 'Opportunities',
+    icon: 'handshake-outline',
+    activeIcon: 'handshake',
     tone: 'discovery',
-    accessibilityLabel: 'Pulse, live local activity',
+    accessibilityLabel: 'Opportunities, offers and requests on the map',
   },
   Connections: {
     label: 'Connections',
     icon: 'account-multiple-outline',
     activeIcon: 'account-multiple',
     tone: 'action',
-    accessibilityLabel: 'Connections, chats and activity',
+    accessibilityLabel: 'Connections, chats and relationship activity',
   },
-  You: {
-    label: 'You',
-    icon: 'account-circle-outline',
-    activeIcon: 'account-circle',
+  Identity: {
+    label: 'Identity',
+    icon: 'shield-account-outline',
+    activeIcon: 'shield-account',
     tone: 'action',
-    accessibilityLabel: 'You, your profile',
+    accessibilityLabel: 'Identity, profile verification and privacy',
   },
 };
 
-/** Actionable/unread connection state only. This is never a vanity metric. */
+/** Actionable/unread connection state only; never popularity or trust vanity. */
 export function resolveConnectionsTabBadge(
   unreadChats: number,
   pendingConnections: number,
