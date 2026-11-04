@@ -247,12 +247,34 @@ async function main() {
     const key = component.addComponentProperty(name || 'Label', 'TEXT', defaultValue);
     text.componentPropertyReferences = { characters: key };
   }
+  function assertVariantIntegrity(set, variants) {
+    const expected = variants.map((variant) => variant.name).sort();
+    const actual = set.children.filter((child) => child.type === 'COMPONENT')
+      .map((child) => child.name).sort();
+    if (set.children.length !== expected.length || actual.length !== expected.length ||
+        expected.some((name, index) => name !== actual[index])) {
+      throw new Error('NEXA component family "' + set.name + '" variant mismatch. ' +
+        'Expected [' + expected.join(', ') + '], found [' + actual.join(', ') + ']. ' +
+        'Inspect the existing Figma component set before retrying; no automatic overwrite.');
+    }
+  }
   function setFamily(name, variants, description) {
-    const found = target.children.find((node) => node.type === 'COMPONENT_SET' && node.name === name);
-    if (found) { counts.skippedComponents += 1; return found; }
+    const matches = target.children.filter((node) =>
+      node.type === 'COMPONENT_SET' && node.name === name);
+    if (matches.length > 1) {
+      throw new Error('Duplicate NEXA component family "' + name +
+        '" found. Resolve duplicate component sets manually before retrying.');
+    }
+    const found = matches[0];
+    if (found) {
+      assertVariantIntegrity(found, variants);
+      counts.skippedComponents += 1;
+      return found;
+    }
     const components = variants.map((variant) => variant.make(variant.name));
     const set = figma.combineAsVariants(components, target);
     set.name = name;
+    assertVariantIntegrity(set, variants);
     set.description = description;
     let right = 0; let bottom = 0;
     for (let index = 0; index < set.children.length; index += 1) {
