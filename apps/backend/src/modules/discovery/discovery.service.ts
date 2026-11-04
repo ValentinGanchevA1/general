@@ -2,7 +2,6 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { createHash } from 'node:crypto';
-import * as h3 from 'h3-js';
 import type Redis from 'ioredis';
 
 import {
@@ -25,6 +24,8 @@ import { REDIS_CLIENT } from '../../config/redis.provider';
 import { PresenceService } from '../presence/presence.service';
 import { FriendsService } from '../friends/friends.service';
 import { buildDiscoveryDiffFromSnapshot } from './discoveryDiff';
+import { completeClusterCoverage, type ClusterCoverage } from './cluster-coverage';
+import { buildRelevanceTopKSql } from './ranking/sql-topk';
 import {
   computeRankScore,
   haversineM,
@@ -220,8 +221,8 @@ export class DiscoveryService {
       );
     }
 
-    const points = isEntityZoom(params.zoom)
-      ? await this.entitiesInCells(
+    const discoveryResult: { points: DiscoveryPoint[]; resolution: number } = isEntityZoom(params.zoom)
+      ? { points: await this.entitiesInCells(
           cells,
           resolution,
           kinds,
@@ -233,7 +234,7 @@ export class DiscoveryService {
           datingOnly,
           params.viewport,
           rankBy,
-        )
+        ), resolution }
       : await this.clusterByCell(
           cells,
           resolution,
@@ -245,6 +246,7 @@ export class DiscoveryService {
           friendIds,
           datingOnly,
         );
+    const { points, resolution: responseResolution } = discoveryResult;
 
     const viewportHash = this.hashViewport(
       params.viewport,
@@ -269,7 +271,7 @@ export class DiscoveryService {
       if (diff) {
         return {
           points: [],
-          resolution,
+          resolution: responseResolution,
           generatedAt: new Date().toISOString(),
           viewportHash,
           diff,
@@ -279,7 +281,7 @@ export class DiscoveryService {
 
     return {
       points,
-      resolution,
+      resolution: responseResolution,
       generatedAt: new Date().toISOString(),
       viewportHash,
       diff: null,
@@ -313,7 +315,7 @@ export class DiscoveryService {
     marketplaceKind?: MarketplaceKind,
     friendIds: string[] | null = null,
     datingOnly = false,
-  ): Promise<DiscoveryPoint[]> {
+  ): Promise<ClusterCoverage> {
     const cellCol = this.cellColumn(resolution);
     const listingClause = listingModeSql(listingMode);
     const marketplaceClause = marketplaceKindSql(marketplaceKind);
@@ -356,23 +358,7 @@ export class DiscoveryService {
       queryParams,
     );
 
-    const byCell = new Map<string, { count: number; by: Partial<Record<EntityKind, number>> }>();
-    for (const row of rows) {
-      const n = Number(row.n);
-      const slot = byCell.get(row.cell) ?? { count: 0, by: {} };
-      slot.count += n;
-      slot.by[row.kind] = (slot.by[row.kind] ?? 0) + n;
-      byCell.set(row.cell, slot);
-    }
-
-    const sortedCells = [...byCell].sort((a, b) => b[1].count - a[1].count);
-    const points: DiscoveryPoint[] = [];
-    for (const [cellId, slot] of sortedCells) {
-      const [lat, lng] = h3.cellToLatLng(cellId);
-      points.push({ kind: 'cluster', cellId, lat, lng, count: slot.count, by: slot.by });
-      if (points.length >= MAX_POINTS_PER_RESPONSE) break;
-    }
-    return points;
+    return completeClusterCoverage(rows, resolution, MAX_POINTS_PER_RESPONSE);
   }
 
   private async entitiesInCells(
@@ -393,7 +379,9 @@ export class DiscoveryService {
     const marketplaceClause = marketplaceKindSql(marketplaceKind);
     const centreLat = (viewport.ne.lat + viewport.sw.lat) / 2;
     const centreLng = (viewport.ne.lng + viewport.sw.lng) / 2;
-    const queryParams: unknown[] = [cells, kinds, requesterId, MAX_POINTS_PER_RESPONSE];
+    // Rank candidate IDs before loading full metadata or applying the 500-point cap.
+    // Candidate projection deliberately excludes full profile/event/listing JSON.
+    const queryParams: unknown[] = [cells, kinds, requesterId];
     let friendsClause = '';
     if (friendIds != null) {
       queryParams.push(friendIds);
@@ -413,19 +401,8 @@ export class DiscoveryService {
       queryParams.push(topicSlug);
       topicClause = `AND ${TOPIC_MATCH_SQL('$' + String(queryParams.length))}`;
     }
-    let orderClause = 'ORDER BY v_discoverable_entity.id';
-    if (rankBy === 'distance') {
-      const lngIdx = queryParams.length + 1;
-      const latIdx = queryParams.length + 2;
-      queryParams.push(centreLng, centreLat);
-      orderClause = `ORDER BY location::geography <-> ST_SetSRID(ST_MakePoint($${lngIdx}, $${latIdx}), 4326)::geography`;
-    }
-    const rows: EntityRow[] = await this.db.query(
-      `
-      SELECT id, kind,
-             ST_Y(CASE WHEN kind = 'user' THEN ST_SnapToGrid(location::geometry, 0.02) ELSE location::geometry END) AS lat,
-             ST_X(CASE WHEN kind = 'user' THEN ST_SnapToGrid(location::geometry, 0.02) ELSE location::geometry END) AS lng,
-             meta
+
+    const baseWhere = `
         FROM v_discoverable_entity
        WHERE ${cellCol} = ANY($1::text[])
          AND kind = ANY($2::text[])
@@ -437,8 +414,172 @@ export class DiscoveryService {
          ${marketplaceClause}
          ${friendsClause}
          ${datingClause}
-       ${orderClause}
-       LIMIT $4
+    `;
+    const latSql = "ST_Y(CASE WHEN kind = 'user' THEN ST_SnapToGrid(location::geometry, 0.02) ELSE location::geometry END)";
+    const lngSql = "ST_X(CASE WHEN kind = 'user' THEN ST_SnapToGrid(location::geometry, 0.02) ELSE location::geometry END)";
+    let selectedFilter = '';
+
+    if (rankBy === 'relevance') {
+      let selected: Array<{ id: string; kind: EntityKind }> = [];
+      if (process.env.DISCOVERY_SQL_TOPK === '1' && !datingOnly) {
+        // Opt-in until parity is verified on the production UNION schema.
+        // Never request friends' online data without sharing permission.
+        const allFriendIds = friendIds ?? (kinds.includes('user')
+          ? await this.friends.listFriendIds(requesterId)
+          : []);
+        const allowed = allFriendIds.length
+          ? await this.friends.listWhoAllowFriendsOnline(allFriendIds)
+          : new Set<string>();
+        const permissionedIds = allFriendIds.filter((id) => allowed.has(id));
+        const onlineSet = permissionedIds.length
+          ? await this.presence.whichAreOnline(permissionedIds)
+          : new Set<string>();
+        const lastSeenMap = permissionedIds.length
+          ? await this.presence.lastSeenMap(permissionedIds)
+          : new Map<string, string>();
+        const lastSeenMs: Record<string, number> = {};
+        for (const id of permissionedIds) {
+          const raw = lastSeenMap.get(id);
+          const ms = raw ? Date.parse(raw) : NaN;
+          if (Number.isFinite(ms)) lastSeenMs[id] = ms;
+        }
+        const onlineIds = permissionedIds.filter((id) => onlineSet.has(id));
+        const next = queryParams.length + 1;
+        const bindings = {
+          viewerLat: next,
+          viewerLng: next + 1,
+          nowMs: next + 2,
+          friends: next + 3,
+          online: next + 4,
+          lastSeen: next + 5,
+          limit: next + 6,
+        };
+        const sqlParams = [
+          ...queryParams,
+          centreLat, centreLng, Date.now(),
+          allFriendIds, onlineIds, JSON.stringify(lastSeenMs),
+          MAX_POINTS_PER_RESPONSE,
+        ];
+        selected = await this.db.query<Array<{ id: string; kind: EntityKind }>>(
+          buildRelevanceTopKSql(baseWhere, latSql, lngSql, bindings),
+          sqlParams,
+        );
+        if (selected.length === 0) return [];
+      } else {
+        const candidateRows = await this.db.query<RankingCandidateRow[]>(
+          `SELECT id, kind,
+                  ${latSql} AS lat,
+                  ${lngSql} AS lng,
+                  meta->>'verification' AS verification,
+                  meta->>'startsAt' AS starts_at,
+                  meta->>'createdAt' AS created_at,
+                  meta->>'mode' AS listing_mode
+             ${baseWhere}`,
+          queryParams,
+        );
+        const eligible = datingOnly
+          ? await this.filterMutualDatingRows(candidateRows, requesterId)
+          : candidateRows;
+        if (eligible.length === 0) return [];
+
+        // Presence is consulted only for friends who opted in to sharing it.
+        const candidateUsers = eligible.filter((row) => row.kind === 'user');
+        const allFriendIds = candidateUsers.length
+          ? (friendIds ?? await this.friends.listFriendIds(requesterId))
+          : [];
+        const friendSet = new Set(allFriendIds);
+        const eligibleFriendIds = candidateUsers
+          .filter((row) => friendSet.has(row.id))
+          .map((row) => row.id);
+        const permissioned = eligibleFriendIds.length
+          ? await this.friends.listWhoAllowFriendsOnline(eligibleFriendIds)
+          : new Set<string>();
+        const presenceIds = eligibleFriendIds.filter((id) => permissioned.has(id));
+        const online = presenceIds.length
+          ? await this.presence.whichAreOnline(presenceIds)
+          : new Set<string>();
+        const lastSeen = presenceIds.length
+          ? await this.presence.lastSeenMap(presenceIds)
+          : new Map<string, string>();
+
+        const ctx: RankContext = {
+          viewerLat: centreLat,
+          viewerLng: centreLng,
+          viewerId: requesterId,
+        };
+        const rankedKeys = eligible.map((row) => {
+          const isFriend = row.kind === 'user' && friendSet.has(row.id);
+          const canShowPresence = isFriend && permissioned.has(row.id);
+          const rankable: RankableEntity = {
+            id: row.id,
+            kind: row.kind,
+            lat: row.lat,
+            lng: row.lng,
+            verification: row.kind === 'user' ? (row.verification ?? undefined) : undefined,
+            isFriend,
+            online: canShowPresence && online.has(row.id),
+            lastSeenAt: canShowPresence ? (lastSeen.get(row.id) ?? null) : null,
+            startsAt: row.kind === 'event' ? row.starts_at : undefined,
+            createdAt: row.kind === 'listing' ? row.created_at : undefined,
+            mode: row.kind === 'listing' ? row.listing_mode : undefined,
+          };
+          return {
+            id: row.id,
+            kind: row.kind,
+            score: computeRankScore(rankable, ctx),
+          };
+        });
+        rankedKeys.sort((a, b) =>
+          b.score - a.score || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id),
+        );
+
+        // A canonical entity is (kind, UUID), not UUID alone: user/event/listing
+        // can legitimately share an ID across the production UNION view.
+        // Filter by UUID first so Postgres can use each source table's PK index,
+        // then constrain by kind to exclude cross-kind UUID collisions.
+        selected = rankedKeys.slice(0, MAX_POINTS_PER_RESPONSE);
+      }
+      const byKind: Record<EntityKind, string[]> = {
+        user: [],
+        event: [],
+        listing: [],
+      };
+      for (const row of selected) byKind[row.kind].push(row.id);
+      const allIds = [...new Set(selected.map((row) => row.id))];
+      queryParams.push(allIds, byKind.user, byKind.event, byKind.listing);
+      const allIdx = queryParams.length - 3;
+      selectedFilter = `AND id = ANY($${allIdx}::uuid[])
+        AND (
+          (kind = 'user' AND id = ANY($${allIdx + 1}::uuid[]))
+          OR (kind = 'event' AND id = ANY($${allIdx + 2}::uuid[]))
+          OR (kind = 'listing' AND id = ANY($${allIdx + 3}::uuid[]))
+        )`;
+    }
+
+    let orderClause = 'ORDER BY kind ASC, id ASC';
+    if (rankBy === 'distance') {
+      const lngIdx = queryParams.length + 1;
+      const latIdx = queryParams.length + 2;
+      queryParams.push(centreLng, centreLat);
+      orderClause = `ORDER BY location::geography <-> ST_SetSRID(ST_MakePoint($${lngIdx}, $${latIdx}), 4326)::geography, kind ASC, id ASC`;
+    } else if (rankBy === 'newest') {
+      // Discoverable view timestamps originate from timestamptz columns.
+      orderClause = `ORDER BY CASE
+        WHEN kind = 'event' THEN (meta->>'startsAt')::timestamptz
+        WHEN kind = 'listing' THEN (meta->>'createdAt')::timestamptz
+        ELSE NULL END DESC NULLS LAST, kind ASC, id ASC`;
+    }
+    queryParams.push(MAX_POINTS_PER_RESPONSE);
+    const rows: EntityRow[] = await this.db.query(
+      `
+      SELECT id, kind,
+             ${latSql} AS lat,
+             ${lngSql} AS lng,
+             meta
+      ${baseWhere}
+        ${selectedFilter}
+      ${orderClause}
+       LIMIT $${queryParams.length}
       `,
       queryParams,
     );
@@ -567,6 +708,40 @@ export class DiscoveryService {
     }
 
     return points.slice(0, MAX_POINTS_PER_RESPONSE);
+  }
+
+  /**
+   * Mutual dating eligibility must be applied before relevance top-K; filtering
+   * only the hydrated 500 would hide valid lower-ranked matches.
+   */
+  private async filterMutualDatingRows<T extends { id: string; kind: EntityKind }>(
+    rows: T[],
+    requesterId: string,
+  ): Promise<T[]> {
+    const candidateIds = rows.filter((row) => row.kind === 'user').map((row) => row.id);
+    if (candidateIds.length === 0) return [];
+    const prefRows = await this.db.query<Array<{
+      id: string;
+      gender: string | null;
+      seeking_genders: string[] | null;
+    }>>(
+      `SELECT id, gender, COALESCE(seeking_genders, '{}') AS seeking_genders
+         FROM users
+        WHERE id = ANY($1::uuid[]) OR id = $2`,
+      [candidateIds, requesterId],
+    );
+    const byId = new Map(prefRows.map((person) => [person.id, person]));
+    const viewer = byId.get(requesterId);
+    const viewerGender = viewer?.gender ?? null;
+    const viewerSeeking = viewer?.seeking_genders ?? [];
+    return rows.filter((row) => {
+      if (row.kind !== 'user') return false;
+      const candidate = byId.get(row.id);
+      if (!candidate) return false;
+      const seeking = candidate.seeking_genders ?? [];
+      return (viewerSeeking.length === 0 || candidate.gender == null || viewerSeeking.includes(candidate.gender))
+        && (seeking.length === 0 || viewerGender == null || seeking.includes(viewerGender));
+    });
   }
 
   private toRankable(p: DiscoveryPoint): RankableEntity {
@@ -719,4 +894,16 @@ interface DiscoverableEntityViewRow {
 interface EntityRow extends Pick<DiscoverableEntityViewRow, 'id' | 'kind' | 'meta'> {
   lat: number;
   lng: number;
+}
+
+/** Small ranking projection fetched for every authorized candidate, not full meta. */
+interface RankingCandidateRow {
+  id: string;
+  kind: EntityKind;
+  lat: number;
+  lng: number;
+  verification: RankableEntity['verification'] | null;
+  starts_at: string | null;
+  created_at: string | null;
+  listing_mode: ListingMode | undefined;
 }

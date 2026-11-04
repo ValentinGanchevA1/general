@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
+	BackHandler,
 	StyleSheet,
 	Text,
 	View,
@@ -279,14 +280,16 @@ export function MapScreen(): React.JSX.Element {
 	}, [dismissPinPreview]);
 
 	const onSheetDismiss = useCallback(() => {
-		const restoreRegion = preSheetRegionRef.current;
-		presentedIdRef.current = null;
-		selectedPointRef.current = null;
-		setSelected(null);
+		// A sheet dismissed for full-profile navigation must not clear a
+		// selection restored when the user returns before dismissal completes.
 		if (suppressPinDismissRef.current) {
 			suppressPinDismissRef.current = false;
 			return;
 		}
+		const restoreRegion = preSheetRegionRef.current;
+		presentedIdRef.current = null;
+		selectedPointRef.current = null;
+		setSelected(null);
 		preSheetRegionRef.current = null;
 		if (restoreRegion != null) {
 			mapRef.current?.fitViewport(regionToViewport(restoreRegion), {
@@ -299,6 +302,19 @@ export function MapScreen(): React.JSX.Element {
 	const closeSheet = useCallback(() => {
 		entitySheetRef.current?.dismiss();
 	}, []);
+
+	// CreateNearbySheet is a native Modal and owns Back via onRequestClose.
+	// Only intercept quick peek when no modal is covering the map.
+	useFocusEffect(
+		useCallback(() => {
+			if (createNearbyOpen || pinInteractionState !== 'quick_peek') return;
+			const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+				dismissPinPreview();
+				return true;
+			});
+			return () => subscription.remove();
+		}, [createNearbyOpen, pinInteractionState, dismissPinPreview]),
+	);
 
 	const presentEntitySheet = useCallback((point: EntityPoint) => {
 		if (preSheetRegionRef.current == null && region != null) {
@@ -349,8 +365,20 @@ export function MapScreen(): React.JSX.Element {
 				presentEntitySheet(fromViewport);
 				return;
 			}
-			const lat = pinLat ?? region?.latitude ?? 0;
-			const lng = pinLng ?? region?.longitude ?? 0;
+			// A viewport center is not the selected user's location. Restore
+			// only an actual pin coordinate pair; never mix pin and map axes.
+			if (
+				pinLat == null ||
+				pinLng == null ||
+				!Number.isFinite(pinLat) ||
+				!Number.isFinite(pinLng) ||
+				Math.abs(pinLat) > 90 ||
+				Math.abs(pinLng) > 180
+			) {
+				return;
+			}
+			const lat = pinLat;
+			const lng = pinLng;
 			presentEntitySheet({
 				kind: 'user',
 				id: activePinId,
@@ -373,8 +401,6 @@ export function MapScreen(): React.JSX.Element {
 			pinLat,
 			pinLng,
 			seedDisplayName,
-			region?.latitude,
-			region?.longitude,
 		]),
 	);
 

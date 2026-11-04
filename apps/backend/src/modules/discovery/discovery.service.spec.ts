@@ -9,7 +9,11 @@ jest.mock('@g88/shared', () => ({
   isEntityZoom: jest.fn(),
   cellsForViewport: jest.fn(),
 }));
-jest.mock('h3-js', () => ({ cellToLatLng: jest.fn(() => [1.5, 2.5]) }));
+jest.mock('h3-js', () => ({
+  cellToLatLng: jest.fn(() => [1.5, 2.5]),
+  cellToParent: jest.fn((cell: string, resolution: number) =>
+    `${resolution}:parent-${Math.floor(Number(cell.slice(1)) / 7)}`),
+}));
 
 import { h3ResolutionForZoom, isEntityZoom, cellsForViewport } from '@g88/shared';
 import type { Viewport } from '@g88/shared';
@@ -132,6 +136,45 @@ describe('DiscoveryService', () => {
     });
   });
 
+  describe('cluster coverage', () => {
+    it('retains counts across >500 authorized cells and returns the effective H3 resolution', async () => {
+      (isEntityZoom as jest.Mock).mockReturnValue(false);
+      const rows = Array.from({ length: 600 }, (_, index) => ({
+        cell: `c${index}`, kind: 'user', n: '20',
+      }));
+      query.mockResolvedValueOnce(rows);
+
+      const res = await call();
+      const clusters = asPoints(res.points);
+      expect(res.resolution).toBe(7);
+      expect(clusters).toHaveLength(86);
+      expect(clusters.reduce((total, point) => total + (point.count ?? 0), 0))
+        .toBe(12_000);
+      expect(clusters.reduce((total, point) => total + (point.by?.user ?? 0), 0))
+        .toBe(12_000);
+      expect(redisSet).toHaveBeenCalledTimes(1);
+      const snapshotJson = redisSet.mock.calls[0]?.[1] as string;
+      expect(JSON.parse(snapshotJson)).toHaveLength(86);
+      const [sql] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain("visibility = 'public'");
+      expect(sql).toContain('NOT EXISTS');
+      expect(sql).toContain('GROUP BY');
+    });
+
+    it('returns requested H3 resolution when source clusters fit the budget', async () => {
+      (isEntityZoom as jest.Mock).mockReturnValue(false);
+      query.mockResolvedValueOnce([
+        { cell: 'c0', kind: 'event', n: '10' },
+        { cell: 'c0', kind: 'listing', n: '5' },
+      ]);
+      const res = await call();
+      expect(res.resolution).toBe(8);
+      expect(asPoints(res.points)).toMatchObject([
+        { cellId: 'c0', count: 15, by: { event: 10, listing: 5 } },
+      ]);
+    });
+  });
+
   describe('snapshot isolation', () => {
     it('namespaces Redis snapshots by requester even when viewport hashes match', async () => {
       const first = await call({ requesterId: 'viewer-a' });
@@ -198,13 +241,12 @@ describe('DiscoveryService', () => {
     };
 
     it('sets online + lastSeenAt for friends who allow presence', async () => {
-      query.mockResolvedValueOnce([
-        { id: 'u1', kind: 'user', lat: 1.02, lng: 1.02, meta: { ...userMeta } },
-      ]);
-      listFriendIds.mockResolvedValueOnce(['u1']);
-      listWhoAllowFriendsOnline.mockResolvedValueOnce(new Set(['u1']));
-      whichAreOnline.mockResolvedValueOnce(new Set(['u1']));
-      lastSeenMap.mockResolvedValueOnce(
+      const person = { id: 'u1', kind: 'user', lat: 1.02, lng: 1.02, meta: { ...userMeta } };
+      query.mockResolvedValueOnce([person]).mockResolvedValueOnce([person]);
+      listFriendIds.mockResolvedValue(['u1']);
+      listWhoAllowFriendsOnline.mockResolvedValue(new Set(['u1']));
+      whichAreOnline.mockResolvedValue(new Set(['u1']));
+      lastSeenMap.mockResolvedValue(
         new Map([['u1', '2026-09-19T12:00:00.000Z']]),
       );
 
@@ -220,11 +262,10 @@ describe('DiscoveryService', () => {
     });
 
     it('hides online and lastSeen when friend disallows friends_see_online_status', async () => {
-      query.mockResolvedValueOnce([
-        { id: 'u1', kind: 'user', lat: 1.02, lng: 1.02, meta: { ...userMeta } },
-      ]);
-      listFriendIds.mockResolvedValueOnce(['u1']);
-      listWhoAllowFriendsOnline.mockResolvedValueOnce(new Set());
+      const person = { id: 'u1', kind: 'user', lat: 1.02, lng: 1.02, meta: { ...userMeta } };
+      query.mockResolvedValueOnce([person]).mockResolvedValueOnce([person]);
+      listFriendIds.mockResolvedValue(['u1']);
+      listWhoAllowFriendsOnline.mockResolvedValue(new Set());
 
       const res = await call();
       const pts = asPoints(res.points);
@@ -237,4 +278,238 @@ describe('DiscoveryService', () => {
       expect(lastSeenMap).not.toHaveBeenCalled();
     });
   });
+  describe('global ranking before response cap', () => {
+    it('ranks all 10k light candidates and hydrates only the best 500', async () => {
+      const candidates = Array.from({ length: 10_000 }, (_, index) => ({
+        id: `u-${String(index).padStart(5, '0')}`,
+        kind: 'user' as const,
+        lat: 2.0,
+        lng: 2.0,
+        verification: 'none' as const,
+        starts_at: null,
+        created_at: null,
+        listing_mode: undefined,
+      }));
+      const top = candidates[9_999]!;
+      top.lat = 1.025;
+      top.lng = 1.025;
+      // Verification is part of the lightweight ranking projection.
+      const candidateRows = candidates.map((row) =>
+        row.id === top.id ? { ...row, verification: 'id' as const } : row,
+      );
+
+      query.mockImplementation((sql: string, params: unknown[]) => {
+        if (sql.includes('AS listing_mode')) return Promise.resolve(candidateRows);
+        const selected = params.find(
+          (arg): arg is string[] =>
+            Array.isArray(arg) && arg.some((item: unknown) =>
+              typeof item === 'string' && item === top.id),
+        ) ?? [];
+        return Promise.resolve(candidateRows
+          .filter((row) => selected.includes(row.id))
+          .map((row) => ({
+            id: row.id, kind: row.kind, lat: row.lat, lng: row.lng,
+            meta: {
+              displayName: row.id,
+              verification: row.verification,
+              online: false,
+              lastSeenAt: null,
+            },
+          })));
+      });
+
+      const response = await call({ rankBy: 'relevance' });
+      const points = asPoints(response.points);
+      expect(points).toHaveLength(500);
+      expect(points.some((point) => point.id === top.id)).toBe(true);
+      expect(query).toHaveBeenCalledTimes(2);
+      const [candidateSql] = query.mock.calls[0] as [string, unknown[]];
+      const [hydrateSql, hydrateParams] = query.mock.calls[1] as [string, unknown[]];
+      expect(candidateSql).not.toContain('LIMIT');
+      expect(candidateSql).not.toContain('SELECT id, kind,\n             ST_Y');
+      expect(hydrateSql).toContain('LIMIT');
+      expect(hydrateSql).toContain("visibility = 'public'");
+      expect(hydrateSql).toContain('NOT EXISTS');
+      const selectedKeys = hydrateParams.find(
+        (arg): arg is string[] => Array.isArray(arg) && arg.includes(top.id),
+      ) ?? [];
+      expect(selectedKeys).toHaveLength(500);
+    });
+
+    it('excludes incompatible dating candidates before relevance top-K', async () => {
+      const candidates = Array.from({ length: 650 }, (_, index) => ({
+        id: `u-${index}`,
+        kind: 'user' as const,
+        lat: 1.025,
+        lng: 1.025,
+        verification: 'id' as const,
+      }));
+      candidates.push({
+        id: 'compatible', kind: 'user', lat: 2, lng: 2, verification: 'id',
+      });
+      query.mockImplementation((sql: string, params: unknown[]) => {
+        if (sql.includes('SELECT COALESCE(open_to_dating')) {
+          return Promise.resolve([{ open_to_dating: true }]);
+        }
+        if (sql.includes('AS listing_mode')) return Promise.resolve(candidates);
+        if (sql.includes('SELECT id, gender')) {
+          const ids = params[0] as string[];
+          return Promise.resolve([
+            { id: 'me', gender: 'male', seeking_genders: ['female'] },
+            ...ids.map((id) => ({
+              id,
+              gender: id === 'compatible' ? 'female' : 'male',
+              seeking_genders: ['male'],
+            })),
+          ]);
+        }
+        const keys = params.find((arg): arg is string[] =>
+          Array.isArray(arg) && arg.includes('compatible')) ?? [];
+        return Promise.resolve(candidates
+          .filter((person) => keys.includes(person.id))
+          .map((person) => ({
+            ...person,
+            meta: { displayName: person.id, verification: 'id' },
+          })));
+      });
+      const result = await call({ datingOnly: true });
+      expect(asPoints(result.points).map((point) => point.id)).toEqual(['compatible']);
+    });
+
+    it('preserves canonical entity kind when a user and event share a UUID', async () => {
+      const sharedId = '00000000-0000-4000-8000-000000000001';
+      const users = Array.from({ length: 520 }, (_, index) => ({
+        id: index === 0
+          ? sharedId
+          : `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+        kind: 'user' as const,
+        lat: 1.025,
+        lng: 1.025,
+        verification: 'id' as const,
+        starts_at: null,
+        created_at: null,
+        listing_mode: undefined,
+      }));
+      const event = {
+        id: sharedId,
+        kind: 'event' as const,
+        lat: 1.025,
+        lng: 1.025,
+        verification: null,
+        starts_at: '2100-01-01T00:00:00.000Z',
+        created_at: null,
+        listing_mode: undefined,
+      };
+      const candidates = [...users, event];
+      query.mockImplementation((sql: string, params: unknown[]) => {
+        if (sql.includes('AS listing_mode')) return Promise.resolve(candidates);
+        const selectedUuids = params[3] as string[];
+        const userIds = params[4] as string[];
+        const eventIds = params[5] as string[];
+        return Promise.resolve(candidates
+          .filter((row) =>
+            selectedUuids.includes(row.id) &&
+            (row.kind === 'user' ? userIds.includes(row.id) : eventIds.includes(row.id)),
+          )
+          .slice(0, 500)
+          .map((row) => ({
+            id: row.id, kind: row.kind, lat: row.lat, lng: row.lng,
+            meta: row.kind === 'user'
+              ? { displayName: row.id, verification: 'id' }
+              : { startsAt: event.starts_at, title: 'Unselected event' },
+          })));
+      });
+      const response = await call({ rankBy: 'relevance' });
+      expect(response.points).toHaveLength(500);
+      expect(response.points.some((point) =>
+        point.kind === 'user' && point.id === sharedId)).toBe(true);
+      expect(response.points.some((point) =>
+        point.kind === 'event' && point.id === sharedId)).toBe(false);
+      const [sql, params] = query.mock.calls[1] as [string, unknown[]];
+      expect(sql).toContain('AND id = ANY($4::uuid[])');
+      expect(sql).toContain("kind = 'user' AND id = ANY($5::uuid[])");
+      expect(sql).toContain("kind = 'event' AND id = ANY($6::uuid[])");
+      expect(sql).toContain("kind = 'listing' AND id = ANY($7::uuid[])");
+      expect(params[4]).toContain(sharedId);
+      expect(params[5]).not.toContain(sharedId);
+    });
+
+    it('uses SQL top-K with bounded rows and retains typed hydration privacy filters when opted in', async () => {
+      const previous = process.env.DISCOVERY_SQL_TOPK;
+      process.env.DISCOVERY_SQL_TOPK = '1';
+      try {
+        const id = '00000000-0000-4000-8000-000000000007';
+        query.mockImplementation((sql: string) => {
+          if (sql.includes('WITH candidates AS MATERIALIZED')) {
+            return Promise.resolve([{ id, kind: 'user' }]);
+          }
+          return Promise.resolve([{
+            id, kind: 'user', lat: 1.025, lng: 1.025,
+            meta: { displayName: 'Safe user', verification: 'id', online: false },
+          }]);
+        });
+        const result = await call({ rankBy: 'relevance' });
+        expect(result.points).toHaveLength(1);
+        expect(result.points[0]).toMatchObject({ kind: 'user', id });
+        expect(query).toHaveBeenCalledTimes(2);
+        const [sqlRank, rankParams] = query.mock.calls[0] as [string, unknown[]];
+        expect(sqlRank).toContain('WITH candidates AS MATERIALIZED');
+        expect(sqlRank).toContain("visibility = 'public'");
+        expect(sqlRank).toContain('NOT EXISTS');
+        expect(sqlRank).toContain('ORDER BY rank_score DESC');
+        expect(sqlRank).toContain('LIMIT $10::integer');
+        expect(rankParams).toHaveLength(10);
+        expect(rankParams[3]).toBe(1.025);
+        expect(rankParams[4]).toBe(1.025);
+        expect(rankParams[6]).toEqual([]);
+        expect(rankParams[7]).toEqual([]);
+        expect(rankParams[9]).toBe(500);
+        const [hydrateSql, hydrateParams] = query.mock.calls[1] as [string, unknown[]];
+        expect(hydrateSql).toContain('AND id = ANY($4::uuid[])');
+        expect(hydrateSql).toContain("kind = 'user' AND id = ANY($5::uuid[])");
+        expect(hydrateSql).toContain("visibility = 'public'");
+        expect(hydrateSql).toContain('NOT EXISTS');
+        expect(hydrateParams[3]).toEqual([id]);
+      } finally {
+        if (previous === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+        else process.env.DISCOVERY_SQL_TOPK = previous;
+      }
+    });
+
+    it('keeps mutual dating eligibility on the existing filtered relevance path', async () => {
+      const previous = process.env.DISCOVERY_SQL_TOPK;
+      process.env.DISCOVERY_SQL_TOPK = '1';
+      try {
+        query.mockResolvedValue([]);
+        query.mockResolvedValueOnce([{ open_to_dating: true }]);
+        await call({ datingOnly: true, rankBy: 'relevance' });
+        const [sql] = query.mock.calls[1] as [string, unknown[]];
+        expect(sql).not.toContain('WITH candidates AS MATERIALIZED');
+        expect(sql).toContain('AS listing_mode');
+      } finally {
+        if (previous === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+        else process.env.DISCOVERY_SQL_TOPK = previous;
+      }
+    });
+
+    it('orders newest in SQL before applying the hard LIMIT', async () => {
+      const latest = {
+        id: 'event-new',
+        kind: 'event',
+        lat: 1.025,
+        lng: 1.025,
+        meta: { title: 'New event', startsAt: '2026-11-05T12:00:00.000Z' },
+      };
+      query.mockResolvedValueOnce([latest]);
+      const response = await call({ rankBy: 'newest', kinds: ['event', 'listing'] });
+      expect(asPoints(response.points)[0]?.id).toBe('event-new');
+      expect(query).toHaveBeenCalledTimes(1);
+      const [sql] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain("WHEN kind = 'event' THEN (meta->>'startsAt')::timestamptz");
+      expect(sql).toContain("WHEN kind = 'listing' THEN (meta->>'createdAt')::timestamptz");
+      expect(sql).toContain('DESC NULLS LAST');
+      expect(sql.indexOf('ORDER BY')).toBeLessThan(sql.indexOf('LIMIT'));
+    });
+  });
+
 });

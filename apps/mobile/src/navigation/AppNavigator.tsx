@@ -224,9 +224,11 @@ function MainTabs(): React.JSX.Element {
         tabBarStyle: {
           backgroundColor: c.canvas,
           borderTopColor: c.borderSubtle,
-          minHeight: 64,
-          paddingTop: 4,
-          paddingBottom: 4,
+          borderTopWidth: 1,
+          minHeight: 68,
+          paddingTop: 6,
+          paddingBottom: 6,
+          elevation: 8,
         },
         tabBarItemStyle: legacy ? { display: 'none' as const } : { minWidth: 44 },
         tabBarButton: legacy
@@ -245,7 +247,7 @@ function MainTabs(): React.JSX.Element {
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.7}
-            style={{ color: isNexaTabSelected(tab, selectedLens, mapHostActive, focused) ? active : c.textTertiary, textAlign: 'center', fontSize: 10, fontWeight: '700' }}
+            style={{ color: isNexaTabSelected(tab, selectedLens, mapHostActive, focused) ? active : c.textTertiary, textAlign: 'center', fontSize: 10, fontWeight: '700', marginTop: 2 }}
           >{visual.label}</Text>
         ),
         tabBarIcon: ({ focused }: { focused: boolean }) => (
