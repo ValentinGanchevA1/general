@@ -59,6 +59,24 @@ describe('NEXA sheet ↔ map choreography', () => {
     expect(compact.latitudeDelta).toBe(region.latitudeDelta);
   });
 
+  it('returns to identical compact framing after expanding the sheet', () => {
+    const compact = regionForSelectedEntity(region, point, 0);
+    const expanded = regionForSelectedEntity(compact, point, 1);
+    const collapsed = regionForSelectedEntity(expanded, point, 0);
+
+    expect(collapsed).toEqual(compact);
+    expect(expanded.latitude).toBeLessThan(compact.latitude);
+    expect(collapsed.latitudeDelta).toBe(region.latitudeDelta);
+    expect(collapsed.longitudeDelta).toBe(region.longitudeDelta);
+    expect(point.lat).toBe(42.02);
+    expect(point.lng).toBe(25.03);
+  });
+
+  it('keeps all sheet motion disabled for reduced-motion users', () => {
+    expect(mapAnimationDuration(0, true)).toBe(0);
+    expect(mapAnimationDuration(1, true)).toBe(0);
+  });
+
   it('applies the same compact camera framing to coarse Place points', () => {
     const compact = regionForSelectedEntity(region, placePoint, 0);
 
