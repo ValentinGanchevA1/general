@@ -17,6 +17,11 @@ export function NexaTabIcon({
   focused: boolean;
 }): React.JSX.Element {
   const { colors } = useAppTheme();
+  // React Native Animated.Value is intentionally read as an animated style input
+  // during JSX render; only its mutable value is changed inside effects.
+  // react-hooks/refs treats this Animated driver as a React ref and flags the
+  // supported Animated.View style pattern. Keep the exception scoped here.
+  /* eslint-disable react-hooks/refs -- React Native Animated.Value style driver, not React ref.current */
   const [reduceMotion, setReduceMotion] = useState(true);
   const [emphasis] = useState(() => new Animated.Value(focused ? 1 : 0));
 
@@ -80,6 +85,7 @@ export function NexaTabIcon({
   );
 }
 
+/* eslint-enable react-hooks/refs */
 const styles = StyleSheet.create({
   stage: {
     width: 44,
