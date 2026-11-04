@@ -19,12 +19,11 @@ async function main() {
     if (input.startsWith('#')) {
       const raw = input.slice(1);
       if (!/^[0-9a-fA-F]{6}$/.test(raw)) throw new Error('Invalid hex: ' + input);
-      return { r: parseInt(raw.slice(0, 2), 16) / 255, g: parseInt(raw.slice(2, 4), 16) / 255, b: parseInt(raw.slice(4, 6), 16) / 255 };
+      return { r: parseInt(raw.slice(0, 2), 16) / 255, g: parseInt(raw.slice(2, 4), 16) / 255, b: parseInt(raw.slice(4, 6), 16) / 255, a: 1 };
     }
     const parsed = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(0(?:\.\d+)?|1(?:\.0+)?))?\s*\)$/.exec(input);
     if (!parsed) throw new Error('Unsupported color value: ' + input);
-    const result = { r: Number(parsed[1]) / 255, g: Number(parsed[2]) / 255, b: Number(parsed[3]) / 255 };
-    if (parsed[4] !== undefined) result.a = Number(parsed[4]);
+    const result = { r: Number(parsed[1]) / 255, g: Number(parsed[2]) / 255, b: Number(parsed[3]) / 255, a: parsed[4] === undefined ? 1 : Number(parsed[4]) };
     return result;
   }
 
