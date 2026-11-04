@@ -4,11 +4,35 @@ const NEXA_TOKENS = {"source":"apps/mobile/src/theme","colors":{"Dark":{"canvas"
 async function main() {
   const pages = figma.root.children;
   let page = pages.find((candidate) => candidate.name === 'NEXA · Component Library');
+  let useExistingPage = false;
   if (!page) {
-    page = figma.createPage();
-    page.name = 'NEXA · Component Library';
+    try {
+      page = figma.createPage();
+      page.name = 'NEXA · Component Library';
+    } catch (error) {
+      // Starter team files can reach their page limit. Work inside an isolated
+      // section on the currently open page instead of altering other designs.
+      if (!/page|limit|starter|maximum|upgrade/i.test(String(error))) throw error;
+      page = figma.currentPage;
+      if (!page) throw error;
+      useExistingPage = true;
+    }
   }
   await figma.setCurrentPageAsync(page);
+  let target = page;
+  if (useExistingPage) {
+    let section = page.children.find((candidate) =>
+      candidate.type === 'SECTION' && candidate.name === 'NEXA · Component Library');
+    if (!section) {
+      const rightmost = Math.max(0, ...page.children.map((node) => node.x + node.width));
+      section = figma.createSection();
+      section.name = 'NEXA · Component Library';
+      section.x = rightmost + 240;
+      section.y = 160;
+      section.resizeWithoutConstraints(2460, 4800);
+    }
+    target = section;
+  }
   await Promise.all([
     figma.loadFontAsync({ family: 'Inter', style: 'Regular' }),
     figma.loadFontAsync({ family: 'Inter', style: 'Semi Bold' }),
@@ -223,10 +247,10 @@ async function main() {
     text.componentPropertyReferences = { characters: key };
   }
   function setFamily(name, variants, description) {
-    const found = page.children.find((node) => node.type === 'COMPONENT_SET' && node.name === name);
+    const found = target.children.find((node) => node.type === 'COMPONENT_SET' && node.name === name);
     if (found) { counts.skippedComponents += 1; return found; }
     const components = variants.map((variant) => variant.make(variant.name));
-    const set = figma.combineAsVariants(components, page);
+    const set = figma.combineAsVariants(components, target);
     set.name = name;
     set.description = description;
     let right = 0; let bottom = 0;
@@ -410,7 +434,7 @@ async function main() {
     },
   })), 'Viewport-aware discovery search visual. Debounced querying and filter policies belong to application code.');
 
-  figma.viewport.scrollAndZoomIntoView(page.children.filter((node) => node.type === 'COMPONENT_SET'));
+  figma.viewport.scrollAndZoomIntoView(target.children.filter((node) => node.type === 'COMPONENT_SET'));
   return counts;
 }
 
