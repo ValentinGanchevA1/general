@@ -995,6 +995,7 @@ export function MapScreen(): React.JSX.Element {
 				<BottomSheetView style={sheetChrome.content}>
 					{selected ? (
 						<EntityBottomSheet
+							key={nexaEntitySelectionKey(selected)}
 							point={selected}
 							waving={pinActionPending && activePinId === selected.id}
 							onClose={closeSheet}
