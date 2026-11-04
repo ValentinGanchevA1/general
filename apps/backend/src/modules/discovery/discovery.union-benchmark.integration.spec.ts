@@ -43,6 +43,10 @@ interface TimedQuery { sql: string; params: unknown[]; elapsedMs: number; rows: 
 interface ExplainPlan {
   'Node Type'?: string;
   'Index Name'?: string;
+  'Shared Hit Blocks'?: number;
+  'Shared Read Blocks'?: number;
+  'Temp Read Blocks'?: number;
+  'Temp Written Blocks'?: number;
   Plans?: ExplainPlan[];
 }
 interface ExplainRecord {
@@ -277,6 +281,11 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
     return {
       planningMs:first['Planning Time'],
       executionMs:first['Execution Time'],
+      // Root plan includes its children; do not sum buffer counts per node.
+      sharedHitBlocks:first.Plan['Shared Hit Blocks'] ?? 0,
+      sharedReadBlocks:first.Plan['Shared Read Blocks'] ?? 0,
+      tempReadBlocks:first.Plan['Temp Read Blocks'] ?? 0,
+      tempWrittenBlocks:first.Plan['Temp Written Blocks'] ?? 0,
       ...planDetails(first.Plan),
     };
   }
