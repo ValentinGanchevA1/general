@@ -22,7 +22,9 @@ describe('NexaWordmark', () => {
 
     // The central pupil is distinct from the surrounding iris rings and glow.
     expect(circles).toHaveLength(5);
-    expect(circles[4].props.fill).toMatch(/^url\(#nexa-wordmark-pupil-/);
+    const pupil = circles[4];
+    if (!pupil) throw new Error('Expected NEXA central pupil circle');
+    expect(pupil.props.fill).toMatch(/^url\(#nexa-wordmark-pupil-/);
     expect(ui.UNSAFE_getAllByType(RadialGradient)).toHaveLength(1);
   });
 });
