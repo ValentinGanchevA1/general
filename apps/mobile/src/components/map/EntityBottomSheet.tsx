@@ -173,7 +173,12 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull, onLik
 
 	useEffect(() => {
 		let cancelled = false;
-		void loadProfile(point.id, () => !cancelled);
+		// Start the fetch in a microtask so synchronous cache/loading state changes
+		// cannot cascade from this effect. Cleanup still invalidates stale replies.
+		void Promise.resolve().then(() => {
+			if (cancelled) return;
+			return loadProfile(point.id, () => !cancelled);
+		});
 		void (async () => {
 			try {
 				const rel = await getJson<RelationshipSummary>(`/friends/relationship/${point.id}`);
