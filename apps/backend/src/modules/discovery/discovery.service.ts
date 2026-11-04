@@ -25,6 +25,7 @@ import { PresenceService } from '../presence/presence.service';
 import { FriendsService } from '../friends/friends.service';
 import { buildDiscoveryDiffFromSnapshot } from './discoveryDiff';
 import { completeClusterCoverage, type ClusterCoverage } from './cluster-coverage';
+import { buildRelevanceTopKSql } from './ranking/sql-topk';
 import {
   computeRankScore,
   haversineM,
@@ -419,78 +420,125 @@ export class DiscoveryService {
     let selectedFilter = '';
 
     if (rankBy === 'relevance') {
-      const candidateRows = await this.db.query<RankingCandidateRow[]>(
-        `SELECT id, kind,
-                ${latSql} AS lat,
-                ${lngSql} AS lng,
-                meta->>'verification' AS verification,
-                meta->>'startsAt' AS starts_at,
-                meta->>'createdAt' AS created_at,
-                meta->>'mode' AS listing_mode
-           ${baseWhere}`,
-        queryParams,
-      );
-      const eligible = datingOnly
-        ? await this.filterMutualDatingRows(candidateRows, requesterId)
-        : candidateRows;
-      if (eligible.length === 0) return [];
-
-      // Presence is consulted only for friends who opted in to sharing it.
-      const candidateUsers = eligible.filter((row) => row.kind === 'user');
-      const allFriendIds = candidateUsers.length
-        ? (friendIds ?? await this.friends.listFriendIds(requesterId))
-        : [];
-      const friendSet = new Set(allFriendIds);
-      const eligibleFriendIds = candidateUsers
-        .filter((row) => friendSet.has(row.id))
-        .map((row) => row.id);
-      const permissioned = eligibleFriendIds.length
-        ? await this.friends.listWhoAllowFriendsOnline(eligibleFriendIds)
-        : new Set<string>();
-      const presenceIds = eligibleFriendIds.filter((id) => permissioned.has(id));
-      const online = presenceIds.length
-        ? await this.presence.whichAreOnline(presenceIds)
-        : new Set<string>();
-      const lastSeen = presenceIds.length
-        ? await this.presence.lastSeenMap(presenceIds)
-        : new Map<string, string>();
-
-      const ctx: RankContext = {
-        viewerLat: centreLat,
-        viewerLng: centreLng,
-        viewerId: requesterId,
-      };
-      const rankedKeys = eligible.map((row) => {
-        const isFriend = row.kind === 'user' && friendSet.has(row.id);
-        const canShowPresence = isFriend && permissioned.has(row.id);
-        const rankable: RankableEntity = {
-          id: row.id,
-          kind: row.kind,
-          lat: row.lat,
-          lng: row.lng,
-          verification: row.kind === 'user' ? (row.verification ?? undefined) : undefined,
-          isFriend,
-          online: canShowPresence && online.has(row.id),
-          lastSeenAt: canShowPresence ? (lastSeen.get(row.id) ?? null) : null,
-          startsAt: row.kind === 'event' ? row.starts_at : undefined,
-          createdAt: row.kind === 'listing' ? row.created_at : undefined,
-          mode: row.kind === 'listing' ? row.listing_mode : undefined,
+      let selected: Array<{ id: string; kind: EntityKind }> = [];
+      if (process.env.DISCOVERY_SQL_TOPK === '1' && !datingOnly) {
+        // Opt-in until parity is verified on the production UNION schema.
+        // Never request friends' online data without sharing permission.
+        const allFriendIds = friendIds ?? (kinds.includes('user')
+          ? await this.friends.listFriendIds(requesterId)
+          : []);
+        const allowed = allFriendIds.length
+          ? await this.friends.listWhoAllowFriendsOnline(allFriendIds)
+          : new Set<string>();
+        const permissionedIds = allFriendIds.filter((id) => allowed.has(id));
+        const onlineSet = permissionedIds.length
+          ? await this.presence.whichAreOnline(permissionedIds)
+          : new Set<string>();
+        const lastSeenMap = permissionedIds.length
+          ? await this.presence.lastSeenMap(permissionedIds)
+          : new Map<string, string>();
+        const lastSeenMs: Record<string, number> = {};
+        for (const id of permissionedIds) {
+          const raw = lastSeenMap.get(id);
+          const ms = raw ? Date.parse(raw) : NaN;
+          if (Number.isFinite(ms)) lastSeenMs[id] = ms;
+        }
+        const onlineIds = permissionedIds.filter((id) => onlineSet.has(id));
+        const next = queryParams.length + 1;
+        const bindings = {
+          viewerLat: next,
+          viewerLng: next + 1,
+          nowMs: next + 2,
+          friends: next + 3,
+          online: next + 4,
+          lastSeen: next + 5,
+          limit: next + 6,
         };
-        return {
-          id: row.id,
-          kind: row.kind,
-          score: computeRankScore(rankable, ctx),
-        };
-      });
-      rankedKeys.sort((a, b) =>
-        b.score - a.score || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id),
-      );
+        const sqlParams = [
+          ...queryParams,
+          centreLat, centreLng, Date.now(),
+          allFriendIds, onlineIds, JSON.stringify(lastSeenMs),
+          MAX_POINTS_PER_RESPONSE,
+        ];
+        selected = await this.db.query<Array<{ id: string; kind: EntityKind }>>(
+          buildRelevanceTopKSql(baseWhere, latSql, lngSql, bindings),
+          sqlParams,
+        );
+        if (selected.length === 0) return [];
+      } else {
+        const candidateRows = await this.db.query<RankingCandidateRow[]>(
+          `SELECT id, kind,
+                  ${latSql} AS lat,
+                  ${lngSql} AS lng,
+                  meta->>'verification' AS verification,
+                  meta->>'startsAt' AS starts_at,
+                  meta->>'createdAt' AS created_at,
+                  meta->>'mode' AS listing_mode
+             ${baseWhere}`,
+          queryParams,
+        );
+        const eligible = datingOnly
+          ? await this.filterMutualDatingRows(candidateRows, requesterId)
+          : candidateRows;
+        if (eligible.length === 0) return [];
 
-      // A canonical entity is (kind, UUID), not UUID alone: user/event/listing
-      // can legitimately share an ID across the production UNION view.
-      // Filter by UUID first so Postgres can use each source table's PK index,
-      // then constrain by kind to exclude cross-kind UUID collisions.
-      const selected = rankedKeys.slice(0, MAX_POINTS_PER_RESPONSE);
+        // Presence is consulted only for friends who opted in to sharing it.
+        const candidateUsers = eligible.filter((row) => row.kind === 'user');
+        const allFriendIds = candidateUsers.length
+          ? (friendIds ?? await this.friends.listFriendIds(requesterId))
+          : [];
+        const friendSet = new Set(allFriendIds);
+        const eligibleFriendIds = candidateUsers
+          .filter((row) => friendSet.has(row.id))
+          .map((row) => row.id);
+        const permissioned = eligibleFriendIds.length
+          ? await this.friends.listWhoAllowFriendsOnline(eligibleFriendIds)
+          : new Set<string>();
+        const presenceIds = eligibleFriendIds.filter((id) => permissioned.has(id));
+        const online = presenceIds.length
+          ? await this.presence.whichAreOnline(presenceIds)
+          : new Set<string>();
+        const lastSeen = presenceIds.length
+          ? await this.presence.lastSeenMap(presenceIds)
+          : new Map<string, string>();
+
+        const ctx: RankContext = {
+          viewerLat: centreLat,
+          viewerLng: centreLng,
+          viewerId: requesterId,
+        };
+        const rankedKeys = eligible.map((row) => {
+          const isFriend = row.kind === 'user' && friendSet.has(row.id);
+          const canShowPresence = isFriend && permissioned.has(row.id);
+          const rankable: RankableEntity = {
+            id: row.id,
+            kind: row.kind,
+            lat: row.lat,
+            lng: row.lng,
+            verification: row.kind === 'user' ? (row.verification ?? undefined) : undefined,
+            isFriend,
+            online: canShowPresence && online.has(row.id),
+            lastSeenAt: canShowPresence ? (lastSeen.get(row.id) ?? null) : null,
+            startsAt: row.kind === 'event' ? row.starts_at : undefined,
+            createdAt: row.kind === 'listing' ? row.created_at : undefined,
+            mode: row.kind === 'listing' ? row.listing_mode : undefined,
+          };
+          return {
+            id: row.id,
+            kind: row.kind,
+            score: computeRankScore(rankable, ctx),
+          };
+        });
+        rankedKeys.sort((a, b) =>
+          b.score - a.score || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id),
+        );
+
+        // A canonical entity is (kind, UUID), not UUID alone: user/event/listing
+        // can legitimately share an ID across the production UNION view.
+        // Filter by UUID first so Postgres can use each source table's PK index,
+        // then constrain by kind to exclude cross-kind UUID collisions.
+        selected = rankedKeys.slice(0, MAX_POINTS_PER_RESPONSE);
+      }
       const byKind: Record<EntityKind, string[]> = {
         user: [],
         event: [],
