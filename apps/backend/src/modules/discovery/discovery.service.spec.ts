@@ -376,6 +376,7 @@ describe('DiscoveryService', () => {
       expect(asPoints(result.points).map((point) => point.id)).toEqual(['compatible']);
     });
 
+    // A UUID belongs to its entity kind: user and event IDs can collide in the UNION view.
     it('preserves canonical entity kind when a user and event share a UUID', async () => {
       const sharedId = '00000000-0000-4000-8000-000000000001';
       const users = Array.from({ length: 520 }, (_, index) => ({
