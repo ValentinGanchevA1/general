@@ -13,6 +13,8 @@ export interface ThinCandidateOptions {
   topicParam: number | null;
   listingMode: ListingMode | undefined;
   marketplaceKind: MarketplaceKind | undefined;
+  /** Optional opt-in: evaluate the requester's block set once per shortlist. */
+  blockedSetCte?: boolean;
 }
 
 const H3_CELL_COLUMNS = new Set([
@@ -28,7 +30,14 @@ const MARKETPLACE_KINDS: Record<MarketplaceKind, string> = {
   local_deal: 'local_deal',
 };
 
-function blockGuard(ownerId: string): string {
+function blockGuard(ownerId: string, batched: boolean): string {
+  if (batched) {
+    // One shared two-way blocked-identity set per query instead of checking
+    // both directions against user_blocks for every visible entity.
+    return `AND NOT EXISTS (
+      SELECT 1 FROM blocked_users bu WHERE bu.user_id = ${ownerId}
+    )`;
+  }
   return `AND NOT EXISTS (
     SELECT 1 FROM user_blocks ub
      WHERE (ub.blocker_id = $3::uuid AND ub.blocked_id = ${ownerId})
@@ -38,6 +47,7 @@ function blockGuard(ownerId: string): string {
 
 export function buildThinCandidateSql(options: ThinCandidateOptions): string {
   const { cellColumn, friendParam, topicParam, listingMode, marketplaceKind } = options;
+  const batched = options.blockedSetCte === true;
   if (!H3_CELL_COLUMNS.has(cellColumn)) {
     throw new Error('Unsupported discovery H3 resolution');
   }
@@ -60,7 +70,14 @@ export function buildThinCandidateSql(options: ThinCandidateOptions): string {
     : `AND COALESCE(l.mode, 'sell') = 'sell'
        AND COALESCE(l.marketplace_kind, 'for_sale') = '${MARKETPLACE_KINDS[marketplaceKind]}'`;
 
+  const blockCte = batched ? `WITH blocked_users AS MATERIALIZED (
+      SELECT blocked_id AS user_id FROM user_blocks WHERE blocker_id = $3::uuid
+      UNION
+      SELECT blocker_id AS user_id FROM user_blocks WHERE blocked_id = $3::uuid
+    )` : '';
+
   return `
+    ${blockCte}
     SELECT u.id, 'user'::text AS kind,
            ST_Y(ST_SnapToGrid(u.location::geometry, 0.02)) AS lat,
            ST_X(ST_SnapToGrid(u.location::geometry, 0.02)) AS lng,
@@ -73,7 +90,7 @@ export function buildThinCandidateSql(options: ThinCandidateOptions): string {
        AND u.visibility = 'public'
        AND u.id <> $3::uuid
        AND u.deleted_at IS NULL AND u.location IS NOT NULL
-       ${blockGuard('u.id')}
+       ${blockGuard('u.id', batched)}
        ${friendFilter('u')}
 
     UNION ALL
@@ -91,7 +108,7 @@ export function buildThinCandidateSql(options: ThinCandidateOptions): string {
        AND e.deleted_at IS NULL
        AND e.starts_at > NOW() - interval '1 day'
        AND EXISTS (SELECT 1 FROM users host WHERE host.id = e.host_id)
-       ${blockGuard('e.host_id')}
+       ${blockGuard('e.host_id', batched)}
        ${friendFilter('e')}
        ${topicFilter('e.title')}
 
@@ -111,7 +128,7 @@ export function buildThinCandidateSql(options: ThinCandidateOptions): string {
        AND l.deleted_at IS NULL AND l.status = 'active'
        AND (l.expires_at IS NULL OR l.expires_at > NOW())
        AND EXISTS (SELECT 1 FROM users seller WHERE seller.id = l.seller_id)
-       ${blockGuard('l.seller_id')}
+       ${blockGuard('l.seller_id', batched)}
        ${friendFilter('l')}
        ${topicFilter('l.category')}
        ${listingModeFilter}
