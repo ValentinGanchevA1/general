@@ -8,14 +8,22 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
+import type { AddressInfo } from 'node:net';
+import { JwtModule, JwtService } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import * as h3 from 'h3-js';
-import type Redis from 'ioredis';
+import Redis from 'ioredis';
 import { DataSource } from 'typeorm';
-import { cellsForViewport, type Viewport } from '@g88/shared';
+import { cellsForViewport, type DiscoveryResponse, type Viewport } from '@g88/shared';
 
 import { DiscoveryService } from './discovery.service';
 import { FriendsService } from '../friends/friends.service';
 import { PresenceService } from '../presence/presence.service';
+import { DiscoveryController } from './discovery.controller';
+import { PlaceMapDiscoveryService } from './place-map-discovery.service';
+import { JwtStrategy } from '../auth/jwt.strategy';
 
 const url = process.env.DISCOVERY_BENCH_DATABASE_URL;
 const safe = (() => {
@@ -29,6 +37,21 @@ const safe = (() => {
 })();
 const enabled = safe && process.env.DISCOVERY_BENCH_ACK_DISPOSABLE === 'YES';
 const suite = enabled ? describe : describe.skip;
+// Real Redis is optional but must be a disposable, loopback-only Redis DB 15.
+const httpRedisUrl = process.env.DISCOVERY_BENCH_REDIS_URL;
+const httpRedisSafe = (() => {
+  try {
+    const parsed = new URL(httpRedisUrl ?? '');
+    return parsed.protocol === 'redis:'
+      && ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)
+      && parsed.pathname === '/15'
+      && !parsed.username && !parsed.password;
+  } catch {
+    return false;
+  }
+})();
+const httpTest = enabled && httpRedisSafe && process.env.DISCOVERY_BENCH_ACK_REDIS === 'YES'
+  ? it : it.skip;
 const VIEWER = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 const VIEWPORT: Viewport = {
   sw: { lat: 43.175, lng: 27.885 },
@@ -898,5 +921,187 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
       else process.env.DISCOVERY_THIN_INLINE_CANDIDATES = oldInline;
     }
   }, 300_000);
+
+
+  httpTest('measures ten authenticated HTTP clients with actual JWT strategy, Redis snapshot and presence', async () => {
+    // The database is the exact 0063 UNION VIEW over benchmark-only minimal
+    // physical tables. This is real Nest/Passport HTTP and Redis I/O, not a
+    // fully migrated AppModule nor a production traffic reproduction.
+    if (!httpRedisUrl) throw new Error('Missing disposable benchmark Redis URL');
+    const oldJwtSecret = process.env.JWT_SECRET;
+    const oldTopK = process.env.DISCOVERY_SQL_TOPK;
+    const oldThin = process.env.DISCOVERY_THIN_SQL_TOPK;
+    const oldInline = process.env.DISCOVERY_THIN_INLINE_CANDIDATES;
+    const secret = randomUUID().replaceAll('-', '') + randomUUID().replaceAll('-', '');
+    const viewers = [VIEWER, ...Array.from({ length: 9 }, (_, i) =>
+      '00000000-0000-4000-8000-' + String(i + 1).padStart(12, '0'))];
+    const request = {
+      viewport: VIEWPORT, zoom: 16, rankBy: 'relevance' as const,
+    };
+    const keys = (response: DiscoveryResponse): string[] =>
+      response.points.filter((point) => point.kind !== 'cluster')
+        .map((point) => point.kind + ':' + point.id).sort();
+    const percentile = (durations: number[], fraction: number): number => {
+      const sorted = [...durations].sort((a, b) => a - b);
+      return Number((sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)] ?? 0).toFixed(2));
+    };
+
+    let redis: Redis | undefined;
+    let app: INestApplication | undefined;
+    const snapshots = new Set<string>();
+    let insertedViewers = false;
+    let friendId: string | undefined;
+    try {
+      process.env.JWT_SECRET = secret;
+      // Benchmark modes stay request-specific, never enabled in production.
+      process.env.DISCOVERY_SQL_TOPK = '0';
+      process.env.DISCOVERY_THIN_SQL_TOPK = '0';
+      process.env.DISCOVERY_THIN_INLINE_CANDIDATES = '0';
+      redis = new Redis(httpRedisUrl, {
+        lazyConnect: true, maxRetriesPerRequest: 1, connectTimeout: 3_000,
+      });
+      await redis.connect();
+      expect(await redis.ping()).toBe('PONG');
+
+      // The ten token subjects exist as test users but have NO discoverable
+      // location. No real user identifiers or credentials are involved.
+      await db.query(`
+        INSERT INTO users(id,display_name,verification_level,visibility,location)
+        SELECT v.id, 'HTTP Load Viewer', 'none', 'private', NULL
+          FROM unnest($1::uuid[]) AS v(id)
+        ON CONFLICT (id) DO NOTHING
+      `, [viewers]);
+      insertedViewers = true;
+      const [friend] = await db.query<Array<{ id: string }>>(
+        "SELECT id FROM users WHERE display_name = 'User 1' LIMIT 1",
+      );
+      if (!friend) throw new Error('Benchmark fixture has no friend candidate');
+      friendId = friend.id;
+      await redis.set('presence:user:' + friendId, '1', 'EX', 120);
+      await redis.set('presence:last_seen:' + friendId, String(Date.now()), 'EX', 120);
+      const presence = new PresenceService(redis, db);
+      expect(await presence.whichAreOnline([friendId])).toEqual(new Set([friendId]));
+      expect((await presence.lastSeenMap([friendId])).has(friendId)).toBe(true);
+
+      // Friends remains a permission-only fixture; online and last-seen values
+      // are fetched by REAL PresenceService methods over REAL Redis.
+      const friends = {
+        listFriendIds: async (): Promise<string[]> => [friendId!],
+        listWhoAllowFriendsOnline: async (): Promise<Set<string>> => new Set([friendId!]),
+      } as unknown as FriendsService;
+      const live = new DiscoveryService(db, presence, friends, redis);
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          PassportModule.register({ defaultStrategy: 'jwt' }),
+          JwtModule.register({ secret, signOptions: { expiresIn: '5m' } }),
+        ],
+        controllers: [DiscoveryController],
+        providers: [
+          JwtStrategy,
+          { provide: DiscoveryService, useValue: live },
+          { provide: PlaceMapDiscoveryService, useValue: { nearby: async () => ({}) } },
+        ],
+      }).compile();
+      app = moduleRef.createNestApplication();
+      app.setGlobalPrefix('api/v1');
+      app.useGlobalPipes(new ValidationPipe({
+        whitelist: true, transform: true, forbidNonWhitelisted: true,
+      }));
+      await app.listen(0, '127.0.0.1');
+      const address = app.getHttpServer() as { address(): AddressInfo | string | null };
+      const port = address.address();
+      if (typeof port === 'string' || !port) throw new Error('No HTTP test port');
+      const url = `http://127.0.0.1:${port.port}/api/v1/discovery/nearby`;
+      const jwtService = moduleRef.get(JwtService);
+      const post = (token?: string): Promise<Response> =>
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            ...(token ? { authorization: 'Bearer ' + token } : {}),
+          },
+          body: JSON.stringify(request),
+          signal: AbortSignal.timeout(60_000),
+        });
+      // The actual JwtAuthGuard must reject unauthenticated HTTP requests.
+      const unauthenticated = await post();
+      expect(unauthenticated.status).toBe(401);
+      const invalid = await post('not-a-real-jwt');
+      expect(invalid.status).toBe(401);
+
+      const baseline = new Map<string, string[]>();
+      for (const viewer of viewers) {
+        const expected = await live.nearby({ ...request, requesterId: viewer });
+        baseline.set(viewer, keys(expected));
+        expect(keys(expected)).toHaveLength(500);
+        snapshots.add('discovery:snap:' + viewer + ':' + expected.viewportHash);
+      }
+      process.env.DISCOVERY_SQL_TOPK = '1';
+      process.env.DISCOVERY_THIN_SQL_TOPK = '1';
+      process.env.DISCOVERY_THIN_INLINE_CANDIDATES = '1';
+
+      const startBatch = performance.now();
+      const completed = await Promise.allSettled(viewers.map(async (viewer) => {
+        const token = jwtService.sign({ sub: viewer, email: 'load@invalid.example' });
+        const started = performance.now();
+        const response = await post(token);
+        const elapsedMs = performance.now() - started;
+        // Only parse 200 responses: do not log JWTs or user-specific payloads.
+        if (response.status !== 200) {
+          throw new Error('Authenticated discovery HTTP response was not 200');
+        }
+        const body = await response.json() as DiscoveryResponse;
+        return { viewer, body, elapsedMs };
+      }));
+      const wallMs = performance.now() - startBatch;
+      const elapsed: number[] = [];
+      for (const result of completed) {
+        if (result.status === 'rejected') throw result.reason;
+        const { viewer, body, elapsedMs } = result.value;
+        expect(keys(body)).toHaveLength(500);
+        expect(keys(body)).toEqual(baseline.get(viewer));
+        // A live Redis snapshot was saved under the authenticated identity.
+        const key = 'discovery:snap:' + viewer + ':' + body.viewportHash;
+        snapshots.add(key);
+        const stored = await redis.get(key);
+        expect(stored).not.toBeNull();
+        elapsed.push(elapsedMs);
+      }
+      console.info('DISCOVERY_AUTH_HTTP_REDIS_BENCH', JSON.stringify({
+        fixtureEntities: lastSize, distinctJwtSubjects: viewers.length,
+        requests: elapsed.length, p50Ms: percentile(elapsed, 0.5),
+        p95Ms: percentile(elapsed, 0.95),
+        batchWallMs: Number(wallMs.toFixed(2)),
+        authorizedTop500Parity: true, unauthenticatedRejected: true,
+        postgres: '0063 view on minimal benchmark physical tables',
+        redis: 'real DB 15', presence: 'real Redis-backed PresenceService',
+        friends: 'permission-stubbed', jwt: 'real JwtStrategy',
+        scope: 'in-process Nest HTTP; no production AppModule, full schema or mobile network',
+      }));
+    } finally {
+      // Never flush a Redis database: clean only test-owned keys.
+      if (redis) {
+        const cleanup = [...snapshots];
+        if (friendId) {
+          cleanup.push('presence:user:' + friendId);
+          cleanup.push('presence:last_seen:' + friendId);
+        }
+        if (cleanup.length > 0) await redis.del(...cleanup);
+      }
+      if (app) await app.close();
+      if (redis) redis.disconnect();
+      if (insertedViewers) {
+        await db.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [viewers]);
+      }
+      if (oldJwtSecret === undefined) delete process.env.JWT_SECRET;
+      else process.env.JWT_SECRET = oldJwtSecret;
+      if (oldTopK === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+      else process.env.DISCOVERY_SQL_TOPK = oldTopK;
+      if (oldThin === undefined) delete process.env.DISCOVERY_THIN_SQL_TOPK;
+      else process.env.DISCOVERY_THIN_SQL_TOPK = oldThin;
+      if (oldInline === undefined) delete process.env.DISCOVERY_THIN_INLINE_CANDIDATES;
+      else process.env.DISCOVERY_THIN_INLINE_CANDIDATES = oldInline;
+    }
+  }, 240_000);
 
 });
