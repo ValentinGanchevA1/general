@@ -113,17 +113,19 @@ suite('Map Core PostGIS discovery benchmark — disposable database only', () =>
         r4 text, r5 text, r6 text, r7 text, r8 text, r9 text, r10 text
       );
       CREATE TABLE bench_entities (
-        id uuid PRIMARY KEY,
+        id uuid NOT NULL,
         kind text NOT NULL CHECK (kind IN ('user','event','listing')),
         location geography(Point,4326) NOT NULL,
         location_h3_r4 text, location_h3_r5 text, location_h3_r6 text,
         location_h3_r7 text, location_h3_r8 text, location_h3_r9 text,
         location_h3_r10 text,
         visibility text NOT NULL CHECK (visibility IN ('public','private')),
-        meta jsonb NOT NULL
+        meta jsonb NOT NULL,
+        PRIMARY KEY(kind,id)
       );
       CREATE VIEW v_discoverable_entity AS SELECT * FROM bench_entities;
       CREATE TABLE user_blocks (blocker_id uuid NOT NULL, blocked_id uuid NOT NULL);
+      CREATE INDEX bench_id_lookup ON bench_entities(id);
       CREATE INDEX bench_h3_r8 ON bench_entities(location_h3_r8);
       CREATE INDEX bench_h3_r9 ON bench_entities(location_h3_r9);
       CREATE INDEX bench_h3_r10 ON bench_entities(location_h3_r10);
@@ -336,4 +338,54 @@ suite('Map Core PostGIS discovery benchmark — disposable database only', () =>
       }));
     }, 900_000);
   }
+  // This test uses PostgreSQL, not mocks. The production view UNIONs separate
+  // tables, so the same UUID can belong to a user AND an event simultaneously.
+  it('retains only selected kinds when UUIDs collide across entity types', async () => {
+    // The final dataset (100k in full mode, 10k in quick mode) was seeded above.
+    const duplicateId = randomUUID();
+    await database.query(`
+      INSERT INTO bench_entities (
+        id, kind, location, location_h3_r4, location_h3_r5,
+        location_h3_r6, location_h3_r7, location_h3_r8, location_h3_r9,
+        location_h3_r10, visibility, meta
+      )
+      SELECT $1::uuid, 'user',
+        ST_SetSRID(ST_MakePoint(p.lng, p.lat),4326)::geography,
+        p.r4,p.r5,p.r6,p.r7,p.r8,p.r9,p.r10,
+        'public', '{"displayName":"Top user","verification":"id"}'::jsonb
+      FROM bench_positions p WHERE p.idx = 312
+    `, [duplicateId]);
+    await database.query(`
+      INSERT INTO bench_entities (
+        id, kind, location, location_h3_r4, location_h3_r5,
+        location_h3_r6, location_h3_r7, location_h3_r8, location_h3_r9,
+        location_h3_r10, visibility, meta
+      )
+      SELECT $1::uuid, 'event',
+        ST_SetSRID(ST_MakePoint(p.lng, p.lat),4326)::geography,
+        p.r4,p.r5,p.r6,p.r7,p.r8,p.r9,p.r10,
+        'public', jsonb_build_object(
+          'title','Unselected edge event',
+          'startsAt','2100-01-01T00:00:00.000Z',
+          'hostId',md5('owner70')::uuid
+        )
+      FROM bench_positions p WHERE p.idx = 0
+    `, [duplicateId]);
+
+    try {
+      const response = await service.nearby({
+        viewport: VIEWPORT, zoom: 16, requesterId: VIEWER,
+        rankBy: 'relevance', kinds: ['user', 'event'],
+      });
+      expect(response.points.length).toBe(500);
+      expect(response.points.some((p) => p.kind === 'user' && p.id === duplicateId))
+        .toBe(true);
+      expect(response.points.some((p) => p.kind === 'event' && p.id === duplicateId))
+        .toBe(false);
+    } finally {
+      await database.query('DELETE FROM bench_entities WHERE id = $1', [duplicateId]);
+    }
+  }, 90_000);
+
+
 });
