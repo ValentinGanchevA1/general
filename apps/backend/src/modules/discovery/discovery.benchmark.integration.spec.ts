@@ -277,39 +277,62 @@ suite('Map Core PostGIS discovery benchmark — disposable database only', () =>
       );
       expect(Number(count?.n)).toBe(size);
 
-      for (const rankBy of ['relevance', 'distance', 'newest'] as const) {
-        const latencies: number[] = [];
-        let representativeQueries: TimedQuery[] = [];
-        for (let run = 0; run <= SAMPLE_RUNS; run += 1) {
-          queries = [];
-          const start = performance.now();
-          const response = await service.nearby({
-            viewport: VIEWPORT, zoom: 16, requesterId: VIEWER, rankBy,
-          });
-          const totalMs = performance.now() - start;
-          expect(response.points.length).toBe(500);
-          expect(response.points.every((point) => point.kind !== 'cluster')).toBe(true);
-          // This is a DB/Node elapsed time, not an HTTP or network p95.
-          if (run > 0) latencies.push(totalMs);
-          if (run === 1) representativeQueries = [...queries];
-        }
+      // Compare the new SQL shortlist against the exact JS-ranking baseline
+      // on the same seeded data; fail the benchmark if top-500 membership drifts.
+      const previousTopK = process.env.DISCOVERY_SQL_TOPK;
+      try {
+        for (const rankBy of ['relevance', 'distance', 'newest'] as const) {
+          let baselineKeys: string[] | null = null;
+          const implementations = rankBy === 'relevance'
+            ? ['js', 'sql'] as const
+            : ['unchanged'] as const;
+          for (const variant of implementations) {
+            process.env.DISCOVERY_SQL_TOPK = variant === 'sql' ? '1' : '0';
+            const latencies: number[] = [];
+            let representativeQueries: TimedQuery[] = [];
+            for (let run = 0; run <= SAMPLE_RUNS; run += 1) {
+              queries = [];
+              const start = performance.now();
+              const response = await service.nearby({
+                viewport: VIEWPORT, zoom: 16, requesterId: VIEWER, rankBy,
+              });
+              const totalMs = performance.now() - start;
+              expect(response.points.length).toBe(500);
+              expect(response.points.every((point) => point.kind !== 'cluster')).toBe(true);
+              if (run === 1 && rankBy === 'relevance') {
+                const keys = response.points
+                  .filter((point) => point.kind !== 'cluster')
+                  .map((point) => point.kind + ':' + point.id).sort();
+                if (variant === 'js') baselineKeys = keys;
+                else expect(keys).toEqual(baselineKeys);
+              }
+              // Five samples per variant, after one warm-up.
+              if (run > 0) latencies.push(totalMs);
+              if (run === 1) representativeQueries = [...queries];
+            }
 
-        const plans = [];
-        for (const call of representativeQueries.filter((q) => q.sql.includes('FROM v_discoverable_entity'))) {
-          plans.push({
-            rowsReturned: call.rows,
-            queryMs: Number(call.milliseconds.toFixed(2)),
-            explain: await explain(call),
-          });
+            const plans = [];
+            for (const call of representativeQueries.filter((q) =>
+              q.sql.includes('FROM v_discoverable_entity'))) {
+              plans.push({
+                rowsReturned: call.rows,
+                queryMs: Number(call.milliseconds.toFixed(2)),
+                explain: await explain(call),
+              });
+            }
+            console.info('DISCOVERY_POSTGIS_BENCH', JSON.stringify({
+              datasetSize: size, rankBy, variant, samples: SAMPLE_RUNS,
+              p50Ms: Number(percentile(latencies, 0.5).toFixed(2)),
+              p95Ms: Number(percentile(latencies, 0.95).toFixed(2)),
+              maxMs: Number(Math.max(...latencies).toFixed(2)),
+              plans,
+              scope: 'isolated indexed view; service + DB only; not production SLA',
+            }));
+          }
         }
-        console.info('DISCOVERY_POSTGIS_BENCH', JSON.stringify({
-          datasetSize: size, rankBy, samples: SAMPLE_RUNS,
-          p50Ms: Number(percentile(latencies, 0.5).toFixed(2)),
-          p95Ms: Number(percentile(latencies, 0.95).toFixed(2)),
-          maxMs: Number(Math.max(...latencies).toFixed(2)),
-          plans,
-          scope: 'isolated indexed view; service + DB only; not production SLA',
-        }));
+      } finally {
+        if (previousTopK === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+        else process.env.DISCOVERY_SQL_TOPK = previousTopK;
       }
 
       const cluster = await service.nearby({
