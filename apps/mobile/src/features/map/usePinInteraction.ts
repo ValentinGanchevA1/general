@@ -4,7 +4,6 @@ import {useMachine} from '@xstate/react';
 import type {EntityPoint, VerificationLevel} from '@g88/shared';
 import {formatNexaSpatialDistance} from '@/components/map/nexaSpatialSheet';
 import {nexaHaptics} from '@/haptics/nexaHaptics';
-import {openViaRef} from '@/navigation/openRootScreen';
 import {
   peekPendingMapFocus,
   subscribePendingMapFocus,
@@ -125,12 +124,10 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
     send({type: 'OPEN_DETAIL'});
   }, [send, state]);
 
-  /** Stage 3: sheet → full UserProfile (machine fullProfile + root handoff). */
+  /** Stage 3: transition the pin machine; MapScreen owns the profile route. */
   const openFull = useCallback(() => {
-    const pinId = state.context.pinId;
     send({type: 'OPEN_FULL'});
-    if (pinId) openViaRef('UserProfile', {userId: pinId});
-  }, [send, state.context.pinId]);
+  }, [send]);
 
   /** Stage 3 back: fullProfile → detailSheet (re-present sheet). */
   const backFromFull = useCallback(() => {
