@@ -251,3 +251,25 @@ test('full Starter page limit preserves existing work in an isolated section', a
   assert.equal(matchingSections[0].id, sectionId);
   assert.equal(section.children.filter((entry) => entry.type === 'COMPONENT_SET').length, 9);
 });
+
+test('Starter page fallback remains idempotent after switching current editor page', async () => {
+  const ctx = fakeFigma({ maxModes: 1, maxPages: 2 });
+  const home = ctx.figma.createPage();
+  home.name = 'Home';
+  const map = ctx.figma.createPage();
+  map.name = 'Map';
+  await ctx.figma.setCurrentPageAsync(map);
+
+  const first = await runOnce(ctx.figma);
+  assert.equal(first.components, 9);
+  assert.equal(home.children.filter((node) => node.type === 'SECTION').length, 1);
+  assert.equal(map.children.filter((node) => node.type === 'SECTION').length, 0);
+
+  await ctx.figma.setCurrentPageAsync(map);
+  const second = await runOnce(ctx.figma);
+  assert.equal(second.components, 0);
+  assert.equal(second.skippedComponents, 9);
+  assert.equal(second.variablesCreated, 0);
+  assert.equal(home.children.filter((node) => node.type === 'SECTION').length, 1);
+  assert.equal(map.children.filter((node) => node.type === 'SECTION').length, 0);
+});
