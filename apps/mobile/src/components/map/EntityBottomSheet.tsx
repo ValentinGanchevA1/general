@@ -152,19 +152,28 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull, onLik
 	const liking = Boolean(actionPending && viewerMode === 'dating' && !likeSent);
 	const passing = Boolean(actionPending && viewerMode === 'dating');
 
-	const loadProfile = useCallback(async (userId: string): Promise<void> => {
+	const loadProfile = useCallback(async (userId: string, isCurrent: () => boolean): Promise<void> => {
 		const hit = getCachedProfile(userId);
-		if (hit) { setProfile(hit); setFetching(false); setFetchError(false); return; }
+		if (hit) {
+			if (isCurrent()) { setProfile(hit); setFetching(false); setFetchError(false); }
+			return;
+		}
+		if (!isCurrent()) return;
 		setFetching(true); setFetchError(false);
 		try {
 			const p = await getJson<PublicUserProfile>(`/users/${userId}`);
+			if (!isCurrent()) return;
 			setCachedProfile(userId, p); setProfile(p); setFetchError(false);
-		} catch { setFetchError(true); } finally { setFetching(false); }
+		} catch {
+			if (isCurrent()) setFetchError(true);
+		} finally {
+			if (isCurrent()) setFetching(false);
+		}
 	}, []);
 
 	useEffect(() => {
 		let cancelled = false;
-		void (async () => { if (!cancelled) await loadProfile(point.id); })();
+		void loadProfile(point.id, () => !cancelled);
 		void (async () => {
 			try {
 				const rel = await getJson<RelationshipSummary>(`/friends/relationship/${point.id}`);
