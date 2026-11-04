@@ -34,9 +34,17 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U nexa_bench -d nexa_bench"
           --health-interval 5s --health-timeout 5s --health-retries 15
+      redis:
+        image: redis:7.4-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 15
     env:
       DISCOVERY_BENCH_DATABASE_URL: postgresql://nexa_bench:nexa_bench@localhost:5432/nexa_bench
       DISCOVERY_BENCH_ACK_DISPOSABLE: 'YES'
+      DISCOVERY_BENCH_REDIS_URL: redis://127.0.0.1:6379/15
+      DISCOVERY_BENCH_ACK_REDIS: 'YES'
       DISCOVERY_BENCH_QUICK: 'NO'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
