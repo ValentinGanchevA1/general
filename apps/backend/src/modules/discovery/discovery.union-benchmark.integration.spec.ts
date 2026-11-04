@@ -162,6 +162,10 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
     const at = migration.lastIndexOf(marker);
     if (at < 0) throw new Error('Migration 0063 has no discovery view');
     await db.query(migration.slice(at));
+    // Topic parity must exercise the actual production slug function, too.
+    const slugifyMigration = readFileSync(
+      join(__dirname, '../../../migrations/0023_slugify.sql'), 'utf8');
+    await db.query(slugifyMigration);
 
     await db.query(`
       INSERT INTO user_blocks(blocker_id,blocked_id) VALUES
@@ -409,5 +413,140 @@ suite('Discovery on actual 0063 user/event/listing UNION view', () => {
       else process.env.DISCOVERY_THIN_SQL_TOPK = previousThin;
     }
   }, 90_000);
+
+
+  it('preserves topic matches and blocks in both directions through JS, SQL and thin shortlist', async () => {
+    const previous = process.env.DISCOVERY_SQL_TOPK;
+    const previousThin = process.env.DISCOVERY_THIN_SQL_TOPK;
+    const [event] = await db.query<Array<{ id: string; host_id: string }>>(
+      "SELECT id, host_id FROM events WHERE title = 'Event 42' LIMIT 1",
+    );
+    expect(event?.id).toBeTruthy();
+    const candidate = event!;
+    const eventQuery = {
+      viewport: VIEWPORT,
+      zoom: 16,
+      requesterId: VIEWER,
+      rankBy: 'relevance' as const,
+      topic: '#event-42',
+    };
+    const check = async (expected: string[]): Promise<void> => {
+      for (const variant of ['js', 'sql', 'thin'] as const) {
+        process.env.DISCOVERY_SQL_TOPK = variant === 'js' ? '0' : '1';
+        process.env.DISCOVERY_THIN_SQL_TOPK = variant === 'thin' ? '1' : '0';
+        const result = await service.nearby(eventQuery);
+        const keys = result.points
+          .filter((p) => p.kind !== 'cluster')
+          .map((p) => p.kind + ':' + p.id).sort();
+        expect(keys).toEqual(expected);
+      }
+    };
+    try {
+      await check(['event:' + candidate.id]);
+      const ownerDirections: Array<[string, string]> = [
+        [VIEWER, candidate.host_id],
+        [candidate.host_id, VIEWER],
+      ];
+      for (const [blocker, blocked] of ownerDirections) {
+        await db.query('INSERT INTO user_blocks(blocker_id,blocked_id) VALUES ($1,$2)',
+          [blocker,blocked]);
+        try {
+          await check([]);
+        } finally {
+          await db.query('DELETE FROM user_blocks WHERE blocker_id=$1 AND blocked_id=$2',
+            [blocker,blocked]);
+        }
+      }
+      await db.query("UPDATE events SET visibility='private' WHERE id=$1", [candidate.id]);
+      await check([]);
+      await db.query("UPDATE events SET visibility='public', deleted_at=NOW() WHERE id=$1",
+        [candidate.id]);
+      await check([]);
+      await db.query('UPDATE events SET deleted_at=NULL WHERE id=$1', [candidate.id]);
+      await check(['event:' + candidate.id]);
+      // Also verify listing-category topic binds for a broad, 500-capped result.
+      let expectedListingKeys: string[] = [];
+      for (const variant of ['js', 'sql', 'thin'] as const) {
+        process.env.DISCOVERY_SQL_TOPK = variant === 'js' ? '0' : '1';
+        process.env.DISCOVERY_THIN_SQL_TOPK = variant === 'thin' ? '1' : '0';
+        const result = await service.nearby({
+          viewport: VIEWPORT, zoom: 16, requesterId: VIEWER,
+          rankBy: 'relevance', topic: '#general',
+          kinds: ['listing'], listingMode: 'sell', marketplaceKind: 'for_sale',
+        });
+        const keys = result.points.filter((p) => p.kind !== 'cluster')
+          .map((p) => p.kind + ':' + p.id).sort();
+        expect(keys).toHaveLength(500);
+        if (variant === 'js') expectedListingKeys = keys;
+        else expect(keys).toEqual(expectedListingKeys);
+      }
+    } finally {
+      await db.query("UPDATE events SET visibility='public', deleted_at=NULL WHERE id=$1",
+        [candidate.id]);
+      if (previous === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+      else process.env.DISCOVERY_SQL_TOPK = previous;
+      if (previousThin === undefined) delete process.env.DISCOVERY_THIN_SQL_TOPK;
+      else process.env.DISCOVERY_THIN_SQL_TOPK = previousThin;
+    }
+  }, 180_000);
+
+  it('reports ten concurrent thin-SQL viewport requests against JS reference sets', async () => {
+    const previous = process.env.DISCOVERY_SQL_TOPK;
+    const previousThin = process.env.DISCOVERY_THIN_SQL_TOPK;
+    // Include the original blocked viewer plus nine distinct synthetic viewers.
+    // These are service-level requests, not ten authenticated HTTP clients.
+    const viewers = [VIEWER, ...Array.from({ length: 9 }, (_, i) =>
+      '00000000-0000-4000-8000-' + String(i + 1).padStart(12, '0'))];
+    const request = (requesterId: string) => ({
+      viewport: VIEWPORT,
+      zoom: 16,
+      requesterId,
+      rankBy: 'relevance' as const,
+    });
+    const ids = (result: Awaited<ReturnType<typeof service.nearby>>): string[] =>
+      result.points.filter((p) => p.kind !== 'cluster')
+        .map((p) => p.kind + ':' + p.id).sort();
+    try {
+      process.env.DISCOVERY_SQL_TOPK = '0';
+      process.env.DISCOVERY_THIN_SQL_TOPK = '0';
+      // Sequential references limit JS memory pressure on shared CI workers.
+      const expected = new Map<string, string[]>();
+      for (const viewer of viewers) {
+        const baseline = await service.nearby(request(viewer));
+        expected.set(viewer, ids(baseline));
+      }
+      process.env.DISCOVERY_SQL_TOPK = '1';
+      process.env.DISCOVERY_THIN_SQL_TOPK = '1';
+      const batchStarted = performance.now();
+      const completed = await Promise.allSettled(viewers.map(async (viewer) => {
+        const started = performance.now();
+        const response = await service.nearby(request(viewer));
+        return { viewer, keys: ids(response), elapsedMs: performance.now() - started };
+      }));
+      // Wait until all requests settle before assertions and flag restoration.
+      const samples: number[] = [];
+      for (const result of completed) {
+        if (result.status === 'rejected') throw result.reason;
+        const { viewer, keys, elapsedMs } = result.value;
+        expect(keys).toHaveLength(500);
+        expect(keys).toEqual(expected.get(viewer));
+        samples.push(elapsedMs);
+      }
+      const wallMs = performance.now() - batchStarted;
+      const sorted = [...samples].sort((a,b) => a-b);
+      console.info('DISCOVERY_UNION_CONCURRENT', JSON.stringify({
+        datasetSize: lastSize,
+        mode: 'thin', concurrentSyntheticViewers: viewers.length,
+        sampleCount: samples.length, p50Ms: Number((sorted[4] ?? 0).toFixed(2)),
+        p95Ms: Number(p95(samples).toFixed(2)), wallMs: Number(wallMs.toFixed(2)),
+        scope: 'PostGIS and DiscoveryService only, mock Friends/Presence/Redis, no HTTP',
+      }));
+    } finally {
+      if (previous === undefined) delete process.env.DISCOVERY_SQL_TOPK;
+      else process.env.DISCOVERY_SQL_TOPK = previous;
+      if (previousThin === undefined) delete process.env.DISCOVERY_THIN_SQL_TOPK;
+      else process.env.DISCOVERY_THIN_SQL_TOPK = previousThin;
+    }
+  }, 240_000);
 
 });
