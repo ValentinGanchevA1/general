@@ -137,6 +137,7 @@ export function MapScreen(): React.JSX.Element {
 	const entitySheetRef = useRef<BottomSheetModal>(null);
 	const presentedIdRef = useRef<string | null>(null);
 	const selectedPointRef = useRef<EntityPoint | null>(null);
+	const lastSheetCameraSnapRef = useRef<{ selectionKey: string; index: number } | null>(null);
 	const preSheetRegionRef = useRef<Region | null>(null);
 	const entitySnapPoints = useMemo(() => [...NEXA_ENTITY_SHEET_SNAP_POINTS], []);
 	const renderBackdrop = useSheetBackdrop(0.5);
@@ -266,6 +267,7 @@ export function MapScreen(): React.JSX.Element {
 		preSheetRegionRef.current = null;
 		presentedIdRef.current = null;
 		selectedPointRef.current = null;
+		lastSheetCameraSnapRef.current = null;
 		setSelected(null);
 		entitySheetRef.current?.dismiss();
 		dismissPinPreview();
@@ -313,6 +315,7 @@ export function MapScreen(): React.JSX.Element {
 			preSheetRegionRef.current = region;
 		}
 		selectedPointRef.current = point;
+		lastSheetCameraSnapRef.current = null;
 		presentedIdRef.current = null;
 		setSelected(point);
 	}, [region]);
@@ -322,6 +325,10 @@ export function MapScreen(): React.JSX.Element {
 			if (index < 0 || region == null) return;
 			const point = selectedPointRef.current;
 			if (point == null) return;
+			const selectionKey = nexaEntitySelectionKey(point);
+			const last = lastSheetCameraSnapRef.current;
+			if (last?.selectionKey === selectionKey && last.index === index) return;
+			lastSheetCameraSnapRef.current = { selectionKey, index };
 			const target = regionForSelectedEntity(region, point, index);
 			mapRef.current?.fitViewport(regionToViewport(target), {
 				durationMs: mapAnimationDuration(index, reduceMotion),
