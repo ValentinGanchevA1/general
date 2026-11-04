@@ -39,8 +39,6 @@ const SIZES = process.env.DISCOVERY_BENCH_QUICK === 'YES'
   : [10_000, 50_000, 100_000] as const;
 const RUNS = 5;
 
-type Kind = 'user' | 'event' | 'listing';
-interface ResultKey { id: string; kind: Kind }
 interface TimedQuery { sql: string; params: unknown[]; elapsedMs: number; rows: number }
 interface ExplainPlan {
   'Node Type'?: string;
