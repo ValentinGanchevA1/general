@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+	BackHandler,
 	StyleSheet,
 	Text,
 	View,
@@ -182,6 +183,21 @@ export function MapScreen(): React.JSX.Element {
 		machineError: pinMachineError,
 	} = usePinInteraction({ viewerMode });
 	const suppressPinDismissRef = useRef(false);
+
+	// Hardware Back dismisses the lightweight pin preview before leaving Map.
+	// Full profiles and modal sheets retain their own navigation/back handling.
+	useFocusEffect(
+		useCallback(() => {
+			if (pinInteractionState !== 'quick_peek' || selected != null || placePreviewOpen) {
+				return;
+			}
+			const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+				dismissPinPreview();
+				return true;
+			});
+			return () => subscription.remove();
+		}, [pinInteractionState, selected, placePreviewOpen, dismissPinPreview]),
+	);
 
 	const viewport = useMemo<Viewport | null>(() => regionToViewport(region), [region]);
 	const zoom = useMemo(() => (region ? approxZoomFromRegion(region) : 12), [region]);
