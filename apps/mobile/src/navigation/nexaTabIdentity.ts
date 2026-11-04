@@ -19,7 +19,7 @@ export const NEXA_MAIN_TAB_ORDER = [
 ] as const satisfies readonly NexaMainTab[];
 
 export function isNexaMainTab(name: string): name is NexaMainTab {
-  return NEXA_MAIN_TAB_ORDER.some((tab) => tab === name);
+  return (NEXA_MAIN_TAB_ORDER as readonly string[]).includes(name);
 }
 
 /** Route focus and visual/a11y selection differ for spatial tabs sharing Map. */

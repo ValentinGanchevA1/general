@@ -20,6 +20,12 @@ import {
 
 type Tab = 'map' | 'experiences' | 'opportunities' | 'connections' | 'identity';
 type ThemePreference = 'system' | 'dark' | 'light';
+
+const THEME_ICONS: Record<ThemePreference, string> = {
+  system: '◐',
+  dark: '☾',
+  light: '☀',
+};
 type ApiPath =
   | '/auth/web/login'
   | '/auth/web/refresh'
@@ -516,7 +522,14 @@ function shell(): string {
     + nav('opportunities','♧','discovery')
     + nav('connections','◎','action')
     + nav('identity','◉','action');
-  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXA</b></button><nav>${tabs}</nav><div class="rail-foot"><button id="theme">${state.theme === 'light' ? '☀' : state.theme === 'dark' ? '☾' : '◐'}</button>${state.user ? `<button class="avatar" data-tab="identity">${escapeHtml(initials(state.user.displayName))}</button>` : '<button id="auth">Sign in</button>'}</div></aside><main><header>${topbar()}</header><section class="content">${view()}</section></main><nav class="mobile-nav">${tabs}</nav>${state.notice ? `<div class="toast">${escapeHtml(state.notice)}</div>` : ''}${authPanel()}</div>`;
+  const accountControl = state.user
+    ? `<button class="avatar" data-tab="identity">${escapeHtml(initials(state.user.displayName))}</button>`
+    : '<button id="auth">Sign in</button>';
+  const notice = state.notice
+    ? `<div class="toast">${escapeHtml(state.notice)}</div>`
+    : '';
+
+  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXA</b></button><nav>${tabs}</nav><div class="rail-foot"><button id="theme">${THEME_ICONS[state.theme]}</button>${accountControl}</div></aside><main><header>${topbar()}</header><section class="content">${view()}</section></main><nav class="mobile-nav">${tabs}</nav>${notice}${authPanel()}</div>`;
 }
 function topbar(): string {
   const copy: Record<Tab, [string,string]> = {
@@ -533,20 +546,36 @@ function topbar(): string {
   return `<div><p class="eyebrow">NEXA / ${title.toUpperCase()}</p><h1>${title}</h1><p>${subtitle}</p></div><div class="header-actions"><span class="mode"><i></i>${liveLabel}</span>${state.user ? '<button id="refresh">Refresh</button>' : '<button class="primary" id="auth-top">Connect backend</button>'}</div>`;
 }
 function view(): string {
-  return isSpatialTab(state.tab) ? mapView() : state.tab === 'connections' ? connectionsView() : identityView();
+  if (isSpatialTab(state.tab)) return mapView();
+  if (state.tab === 'connections') return connectionsView();
+  return identityView();
 }
 function mapView(): string {
   const visible = state.points.filter((point) => point.kind === 'cluster' || state.kinds.has(point.kind));
-  const lens = state.tab === 'experiences' ? 'EXPERIENCES'
-    : state.tab === 'opportunities' ? 'OPPORTUNITIES' : 'DISCOVERY';
-  const title = state.tab === 'experiences' ? 'Events around you'
-    : state.tab === 'opportunities' ? 'Nearby offers and requests' : 'Local signals';
-  const filters = state.tab === 'map'
-    ? `<div class="chips">${chip('user','People')}${chip('event','Events')}${chip('listing','Listings')}</div>`
-    : `<div class="chips"><span class="chip selected">${state.tab === 'experiences' ? 'Events' : 'Listings'}</span></div>`;
-  const signals = state.feed.filter((item) => state.tab === 'experiences'
-    ? item.type === 'event' || item.type === 'alert'
-    : state.tab === 'opportunities' ? item.type === 'listing' : true).slice(0, 2);
+  let lens = 'DISCOVERY';
+  let title = 'Local signals';
+
+  if (state.tab === 'experiences') {
+    lens = 'EXPERIENCES';
+    title = 'Events around you';
+  } else if (state.tab === 'opportunities') {
+    lens = 'OPPORTUNITIES';
+    title = 'Nearby offers and requests';
+  }
+
+  let filters: string;
+  if (state.tab === 'map') {
+    filters = `<div class="chips">${chip('user','People')}${chip('event','Events')}${chip('listing','Listings')}</div>`;
+  } else {
+    const filterLabel = state.tab === 'experiences' ? 'Events' : 'Listings';
+    filters = `<div class="chips"><span class="chip selected">${filterLabel}</span></div>`;
+  }
+
+  const signals = state.feed.filter((item) => {
+    if (state.tab === 'experiences') return item.type === 'event' || item.type === 'alert';
+    if (state.tab === 'opportunities') return item.type === 'listing';
+    return true;
+  }).slice(0, 2);
   return `<div class="map-layout"><section class="map-card"><div class="toolbar"><div class="search">⌕ <span>Pan or zoom to search this area</span></div>${filters}</div><div class="map" id="nexa-map"></div></section><aside class="panel"><div class="section-head"><div><p class="eyebrow">NEXA / ${lens}</p><h2>${title}</h2></div><button id="refresh-map">Refresh</button></div>${visible.slice(0,8).map(row).join('') || '<p class="empty">No nearby results for this lens.</p>'}<div class="create"><b>≋</b><div><strong>Nearby Pulse</strong><p>Local activity signals, not a second feed.</p></div></div>${signals.map(activity).join('')}</aside></div>`;
 }
 function chip(kind: EntityKind, label: string): string {

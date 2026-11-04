@@ -78,7 +78,7 @@ import {
 	entityPointKey,
 } from '@/features/map/mapNovelty';
 import { clearMapNewCount, setMapNewCount } from '@/features/map/mapNoveltySlice';
-import { nexaSpatialLensStore } from '@/features/map/nexaSpatialLens.store';
+import { nexaSpatialLensStore, type NexaSpatialLens } from '@/features/map/nexaSpatialLens.store';
 import { MapCreateNudgeBanner } from '@/features/map/MapCreateNudgeBanner';
 import { useSheetChrome, useSheetBackdrop } from '@/components/sheets';
 import {
@@ -109,6 +109,19 @@ import { useNexaMapSurfaceReady } from '@/components/Brand/NexaLaunchSurfaceCont
 const EMPTY_POINTS: DiscoveryPoint[] = [];
 const EXPERIENCES_LAYERS: EntityKind[] = ['event'];
 const OPPORTUNITIES_LAYERS: EntityKind[] = ['listing'];
+
+function resolveLensLayers(lens: NexaSpatialLens, customLayers: EntityKind[]): EntityKind[] {
+  switch (lens) {
+    case 'experiences':
+      return EXPERIENCES_LAYERS;
+    case 'opportunities':
+      return OPPORTUNITIES_LAYERS;
+    case 'custom':
+      return customLayers;
+    case 'map':
+      return DEFAULT_MAP_LAYERS;
+  }
+}
 const EMPTY_PLACE_SPATIAL_STATUS: NexaPlaceSpatialStatus = {
 	hasVisiblePoints: false,
 	loading: false,
@@ -150,9 +163,7 @@ export function MapScreen(): React.JSX.Element {
 	const [customLayers, setCustomLayers] = useState<EntityKind[]>(DEFAULT_MAP_LAYERS);
 	const activeLens = useSyncExternalStore(nexaSpatialLensStore.subscribe, nexaSpatialLensStore.getSnapshot);
 	// Derive the lens synchronously: effects that call setState here cause cascading renders.
-	const layers = activeLens === 'experiences' ? EXPERIENCES_LAYERS
-		: activeLens === 'opportunities' ? OPPORTUNITIES_LAYERS
-			: activeLens === 'map' ? DEFAULT_MAP_LAYERS : customLayers;
+	const layers = resolveLensLayers(activeLens, customLayers);
 	const [friendsOnly, setFriendsOnly] = useState(false);
 	const [datingOnly, setDatingOnly] = useState(false);
 	const [rankBy, setRankBy] = useState<DiscoveryRankBy>('relevance');

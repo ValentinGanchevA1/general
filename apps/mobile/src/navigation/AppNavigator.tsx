@@ -148,7 +148,7 @@ function EventsNavigator(): React.JSX.Element {
 }
 
 /** Direct deep links to lens destinations resolve to the single existing Map surface. */
-function MapLensRedirectScreen({ lens }: { lens: 'experiences' | 'opportunities' }): React.JSX.Element {
+function MapLensRedirectScreen({ lens }: Readonly<{ lens: 'experiences' | 'opportunities' }>): React.JSX.Element {
   const navigation = useNavigation<BottomTabNavigationProp<TabParamList>>();
   useFocusEffect(useCallback(() => {
     nexaSpatialLensStore.set(lens);
@@ -175,7 +175,7 @@ function NexaTabBarButton({
   onLongPress,
   style,
   testID,
-}: BottomTabBarButtonProps & { selected: boolean }): React.JSX.Element {
+}: Readonly<BottomTabBarButtonProps & { selected: boolean }>): React.JSX.Element {
   return (
     <TouchableOpacity
       accessibilityRole="tab"
