@@ -26,6 +26,7 @@ import { FriendsService } from '../friends/friends.service';
 import { buildDiscoveryDiffFromSnapshot } from './discoveryDiff';
 import { completeClusterCoverage, type ClusterCoverage } from './cluster-coverage';
 import { buildRelevanceTopKSql } from './ranking/sql-topk';
+import { buildThinCandidateSql } from './ranking/sql-thin-candidates';
 import {
   computeRankScore,
   haversineM,
@@ -383,9 +384,11 @@ export class DiscoveryService {
     // Candidate projection deliberately excludes full profile/event/listing JSON.
     const queryParams: unknown[] = [cells, kinds, requesterId];
     let friendsClause = '';
+    let friendParam: number | null = null;
     if (friendIds != null) {
       queryParams.push(friendIds);
-      friendsClause = `AND id = ANY($${queryParams.length}::uuid[])`;
+      friendParam = queryParams.length;
+      friendsClause = `AND id = ANY($${friendParam}::uuid[])`;
     }
     let datingClause = '';
     if (datingOnly) {
@@ -397,9 +400,11 @@ export class DiscoveryService {
          )`;
     }
     let topicClause = '';
+    let topicParam: number | null = null;
     if (topicSlug) {
       queryParams.push(topicSlug);
-      topicClause = `AND ${TOPIC_MATCH_SQL('$' + String(queryParams.length))}`;
+      topicParam = queryParams.length;
+      topicClause = `AND ${TOPIC_MATCH_SQL('$' + String(topicParam))}`;
     }
 
     const baseWhere = `
@@ -460,8 +465,19 @@ export class DiscoveryService {
           allFriendIds, onlineIds, JSON.stringify(lastSeenMs),
           MAX_POINTS_PER_RESPONSE,
         ];
+        // Experimental source-specific shortlist. Fully authoritative hydration
+        // is unchanged and applies every filter again before data is returned.
+        const thinCandidateSql = process.env.DISCOVERY_THIN_SQL_TOPK === '1'
+          ? buildThinCandidateSql({
+            cellColumn: cellCol,
+            friendParam,
+            topicParam,
+            listingMode,
+            marketplaceKind,
+          })
+          : undefined;
         selected = await this.db.query<Array<{ id: string; kind: EntityKind }>>(
-          buildRelevanceTopKSql(baseWhere, latSql, lngSql, bindings),
+          buildRelevanceTopKSql(baseWhere, latSql, lngSql, bindings, thinCandidateSql),
           sqlParams,
         );
         if (selected.length === 0) return [];
