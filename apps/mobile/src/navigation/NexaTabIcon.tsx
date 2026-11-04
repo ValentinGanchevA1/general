@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { useAppTheme } from '@/theme';
@@ -17,6 +17,33 @@ export function NexaTabIcon({
   focused: boolean;
 }): React.JSX.Element {
   const { colors } = useAppTheme();
+  const [reduceMotion, setReduceMotion] = useState(true);
+  const emphasis = useRef(new Animated.Value(focused ? 1 : 0)).current;
+
+  useEffect(() => {
+    let mounted = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduceMotion(enabled);
+    }).catch(() => undefined);
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => { mounted = false; subscription.remove(); };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      emphasis.stopAnimation();
+      emphasis.setValue(focused ? 1 : 0);
+      return;
+    }
+    const animation = Animated.timing(emphasis, {
+      toValue: focused ? 1 : 0,
+      duration: 190,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [emphasis, focused, reduceMotion]);
   const visual = NEXA_TAB_VISUALS[tab];
   const accent = visual.tone === 'discovery' ? colors.discovery : colors.actionPrimary;
   const soft = visual.tone === 'discovery' ? colors.discoverySoft : colors.actionSoft;
@@ -32,17 +59,23 @@ export function NexaTabIcon({
           : styles.inactive,
       ]}
     >
-      {focused ? (
-        <View style={[styles.halo, { backgroundColor: accent, opacity: 0.12 }]} />
-      ) : null}
+      <Animated.View
+        style={[styles.halo, { backgroundColor: accent, opacity: emphasis.interpolate({
+          inputRange: [0, 1], outputRange: [0, 0.12],
+        }) }]}
+      />
       <MaterialCommunityIcons
         name={focused ? visual.activeIcon : visual.icon}
         size={24}
         color={focused ? accent : colors.textTertiary}
       />
-      {focused ? (
-        <View style={[styles.indicator, { backgroundColor: accent }]} />
-      ) : null}
+      <Animated.View
+        style={[styles.indicator, {
+          backgroundColor: accent,
+          opacity: emphasis,
+          transform: [{ scaleX: emphasis }],
+        }]}
+      />
     </View>
   );
 }
