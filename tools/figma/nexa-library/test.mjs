@@ -130,7 +130,7 @@ function fakeFigma({ maxModes = Number.POSITIVE_INFINITY, maxPages = Number.POSI
   return { figma, pages, groups, variables, textStyles, effectStyles, done };
 }
 
-async function runOnce(figma) {
+async function runOnce(figma, expectFailure = false) {
   const finished = new Promise((resolve) => { figma.closePlugin = resolve; });
   // Execute only the committed, fixed-path local plugin module (not arbitrary source text).
   // Clear the Node module cache so repeated runs exercise the real entrypoint.
@@ -144,6 +144,10 @@ async function runOnce(figma) {
     new Promise((_, reject) => setTimeout(() => reject(new Error('Plugin did not finish')), 5000)),
   ]);
   globalThis.figma = previousFigma;
+  if (expectFailure) {
+    assert.match(message, /^NEXA library failed:/);
+    return message;
+  }
   assert.match(message, /^NEXA design library synced:/);
   return JSON.parse(message.slice(message.indexOf('{')));
 }
@@ -297,4 +301,37 @@ test('Starter page fallback remains idempotent after switching current editor pa
   assert.equal(second.variablesCreated, 0);
   assert.equal(home.children.filter((node) => node.type === 'SECTION').length, 1);
   assert.equal(map.children.filter((node) => node.type === 'SECTION').length, 0);
+});
+
+test('rejects an incomplete existing component family instead of silently skipping it', async () => {
+  const ctx = fakeFigma();
+  const first = await runOnce(ctx.figma);
+  assert.equal(first.components, 9);
+  const page = ctx.pages.find((entry) => entry.name === 'NEXA · Component Library');
+  const buttonSet = page.children.find((entry) =>
+    entry.type === 'COMPONENT_SET' && entry.name === 'Button');
+  assert.ok(buttonSet);
+  const baseline = buttonSet.children.length;
+  buttonSet.children[0].name = 'Style=Unknown, State=Default';
+
+  const error = await runOnce(ctx.figma, true);
+  assert.match(error, /component family "Button" variant mismatch/);
+  assert.match(error, /no automatic overwrite/);
+  assert.equal(buttonSet.children.length, baseline);
+  assert.equal(page.children.filter((entry) => entry.type === 'COMPONENT_SET').length, 9);
+});
+
+test('rejects a duplicate component set rather than concealing conflicting library assets', async () => {
+  const ctx = fakeFigma();
+  await runOnce(ctx.figma);
+  const page = ctx.pages.find((entry) => entry.name === 'NEXA · Component Library');
+  const duplicateVariant = ctx.figma.createComponent();
+  duplicateVariant.name = 'State=Unrelated';
+  const duplicate = ctx.figma.combineAsVariants([duplicateVariant], page);
+  duplicate.name = 'Button';
+
+  const error = await runOnce(ctx.figma, true);
+  assert.match(error, /Duplicate NEXA component family "Button"/);
+  assert.equal(page.children.filter((entry) =>
+    entry.type === 'COMPONENT_SET' && entry.name === 'Button').length, 2);
 });
