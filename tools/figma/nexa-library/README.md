@@ -54,8 +54,8 @@ Generated outputs are tokens.json (machine-readable snapshot) and code.js (ready
 |---|---|
 | Button | Primary / Secondary / Ghost × Default / Pressed / Disabled |
 | Input | Default / Focused / Error / Disabled |
-| Avatar | None / Brand / Friend / Verified rings |
-| VerificationBadge | Partial / ID (none is intentionally not rendered) |
+| Avatar | None / Brand / Friend / Story / Verified rings |
+| VerificationBadge | Partial circular chip / ID decagram silhouette (none is intentionally not rendered) |
 | MapPin | Person / Event / Listing × Compact (18dp) / Standard (24dp) / Selected (34dp) |
 | BottomSheet | Peek / Expanded |
 | Card | Person / Event / Listing |
@@ -95,7 +95,7 @@ If a dedicated page is allowed, the plugin uses that page instead. In both cases
 
 - Design specimens are not production React Native components. Native gestures, animations, loading, validation and accessibility still require device QA.
 - Generic initials replace avatar photos. No real user GPS, identity records, token credentials or other personal data is exported.
-- The ID verification glyph is schematic; mobile uses the check-decagram icon. MapPin glyphs are representative, not production vector exports.
+- The ID verification badge has a distinct ten-point decagram silhouette, while partial verification uses a circular check chip. The badge glyph and MapPin glyphs are specimens, not production vector exports.
 - Inter is used in Figma prototypes; React Native continues to use system fonts. Numerical sizes match the mobile theme.
 - Figma elevation styles cannot dynamically switch modes, so there are separate named styles. Android elevation values are retained as JSON metadata.
 - Existing Figma pages and nodes are never deleted. Existing component sets with the same names are skipped; visual revisions require a specific design review.
