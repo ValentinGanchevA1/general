@@ -477,7 +477,10 @@ export class DiscoveryService {
           })
           : undefined;
         selected = await this.db.query<Array<{ id: string; kind: EntityKind }>>(
-          buildRelevanceTopKSql(baseWhere, latSql, lngSql, bindings, thinCandidateSql),
+          buildRelevanceTopKSql(
+            baseWhere, latSql, lngSql, bindings, thinCandidateSql,
+            thinCandidateSql != null && process.env.DISCOVERY_THIN_INLINE_CANDIDATES === '1',
+          ),
           sqlParams,
         );
         if (selected.length === 0) return [];
