@@ -79,6 +79,8 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
         pending.lng == null ||
         !Number.isFinite(pending.lat) ||
         !Number.isFinite(pending.lng) ||
+        Math.abs(pending.lat) > 90 ||
+        Math.abs(pending.lng) > 180 ||
         consumedMapFocusTokenRef.current === pending.token
       ) {
         return;
