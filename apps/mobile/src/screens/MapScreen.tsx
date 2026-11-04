@@ -272,14 +272,16 @@ export function MapScreen(): React.JSX.Element {
 	}, [dismissPinPreview]);
 
 	const onSheetDismiss = useCallback(() => {
-		const restoreRegion = preSheetRegionRef.current;
-		presentedIdRef.current = null;
-		selectedPointRef.current = null;
-		setSelected(null);
+		// A sheet dismissed for full-profile navigation must not clear a
+		// selection restored when the user returns before dismissal completes.
 		if (suppressPinDismissRef.current) {
 			suppressPinDismissRef.current = false;
 			return;
 		}
+		const restoreRegion = preSheetRegionRef.current;
+		presentedIdRef.current = null;
+		selectedPointRef.current = null;
+		setSelected(null);
 		preSheetRegionRef.current = null;
 		if (restoreRegion != null) {
 			mapRef.current?.fitViewport(regionToViewport(restoreRegion), {
