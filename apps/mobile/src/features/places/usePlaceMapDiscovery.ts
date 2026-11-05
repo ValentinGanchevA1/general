@@ -64,6 +64,7 @@ export function usePlaceMapDiscovery({
   const [data, setData] = useState<MapDiscoveryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [budgetRetryTick, setBudgetRetryTick] = useState(0);
   const [seenPlaceReady, setSeenPlaceReady] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -97,7 +98,7 @@ export function usePlaceMapDiscovery({
       if (budgetTimerRef.current) clearTimeout(budgetTimerRef.current);
       budgetTimerRef.current = setTimeout(() => {
         budgetTimerRef.current = null;
-        void fetchNow(nextViewport, nextZoom, nextQuery, nextRankBy);
+        setBudgetRetryTick((tick) => tick + 1);
       }, budgetDelayMs);
       return;
     }
@@ -166,7 +167,7 @@ export function usePlaceMapDiscovery({
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [debounceMs, dispatch, enabled, fetchNow, normalizedQuery, rankBy, viewport, zoom]);
+  }, [budgetRetryTick, debounceMs, dispatch, enabled, fetchNow, normalizedQuery, rankBy, viewport, zoom]);
 
   useEffect(() => {
     if (!enabled || data == null) {
