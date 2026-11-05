@@ -10,6 +10,7 @@ on:
       - 'apps/backend/migrations/**'
       - 'apps/backend/scripts/migrate.js'
       - 'apps/backend/scripts/verify-discovery-schema.mjs'
+      - 'apps/backend/src/modules/discovery/discovery.full-schema-http.integration.spec.ts'
       - '.github/workflows/discovery-full-schema-smoke.yml'
 
 permissions:
@@ -34,9 +35,17 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U nexa_schema -d nexa_schema_bench"
           --health-interval 5s --health-timeout 5s --health-retries 15
+      redis:
+        image: redis:7.4-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 15
     env:
       DATABASE_URL: postgresql://nexa_schema:nexa_schema@127.0.0.1:5432/nexa_schema_bench
       DISCOVERY_FULL_SCHEMA_ACK_DISPOSABLE: 'YES'
+      DISCOVERY_FULL_HTTP_ACK_DISPOSABLE: 'YES'
+      DISCOVERY_FULL_HTTP_REDIS_URL: redis://127.0.0.1:6379/15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
@@ -56,3 +65,10 @@ jobs:
         run: |
           pnpm --filter @g88/backend migration:run
           node apps/backend/scripts/verify-discovery-schema.mjs
+      - name: Build shared TypeScript contracts
+        run: pnpm --filter @g88/shared build
+      - name: Real JWT login and 10-client Discovery HTTP on full schema and Redis
+        run: >-
+          pnpm --filter @g88/backend exec jest --ci --runInBand
+          --runTestsByPath src/modules/discovery/discovery.full-schema-http.integration.spec.ts
+          --verbose
