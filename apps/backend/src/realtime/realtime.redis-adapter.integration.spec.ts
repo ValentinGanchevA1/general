@@ -27,7 +27,7 @@ import { ChatRealtimeAccessService } from '../modules/chat/chat-realtime-access.
 import { GroupConversationsService } from '../modules/chat/group-conversations.service';
 import { createRedisClient } from '../config/redis-client';
 import { RealtimeEmitterService } from './realtime-emitter.service';
-import type { RealtimeGateway } from './realtime.gateway';
+import { RealtimeGateway } from './realtime.gateway';
 
 const describeRedis = process.env.REDIS_ADAPTER_TEST === 'true' ? describe : describe.skip;
 
