@@ -5,6 +5,7 @@ import type { AddressInfo } from 'node:net';
 import type { ModuleRef } from '@nestjs/core';
 import { createAdapter } from '@socket.io/redis-adapter';
 import type Redis from 'ioredis';
+import type { DataSource, EntityManager } from 'typeorm';
 import { Server as SocketIoServer, type Socket as ServerSocket } from 'socket.io';
 import type {
   ClientToServerEvents,
@@ -14,6 +15,8 @@ import type {
   SocketData,
 } from '@g88/shared';
 
+import { GroupConversationsController } from '../modules/chat/group-conversations.controller';
+import { GroupConversationsService } from '../modules/chat/group-conversations.service';
 import { createRedisClient } from '../config/redis-client';
 import { RealtimeEmitterService } from './realtime-emitter.service';
 import type { RealtimeGateway } from './realtime.gateway';
@@ -297,8 +300,49 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
       const allowedEvents: LocationShareUpdateEvent[] = [];
       activeB.on('location:share:update', (event) => allowedEvents.push(event));
 
-      // Equivalent to the post-commit group membership eviction.
-      emitter.leaveRoomForUsers([userId], conversationRoom);
+      // Exercise the actual group service/controller path with a simulated
+      // committed transaction. Redis sockets/adapters above are real; PostgreSQL
+      // and the HTTP/JWT layer are deliberately not part of this regression.
+      let committed = false;
+      let memberSoftLeft = false;
+      const txQuery = jest.fn(async (sql: string): Promise<unknown[]> => {
+        if (sql.includes('FROM conversations')) return [{ id: conversationId }];
+        if (sql.includes('FROM conversation_members')) {
+          return [
+            { user_id: activeId, role: 'owner', joined_at: '2026-11-01T08:00:00Z' },
+            { user_id: userId, role: 'member', joined_at: '2026-11-01T09:00:00Z' },
+          ];
+        }
+        if (sql.includes('UPDATE conversation_members') && sql.includes('SET left_at = NOW()')) {
+          memberSoftLeft = true;
+          return [];
+        }
+        throw new Error('Unexpected query in group-removal integration regression');
+      });
+      const transaction = jest.fn(async (work: (tx: EntityManager) => Promise<void>): Promise<void> => {
+        await work({ query: txQuery } as unknown as EntityManager);
+        committed = true;
+      });
+      const groups = new GroupConversationsService({ transaction } as unknown as DataSource);
+      const groupController = new GroupConversationsController(
+        groups,
+        { get: (token: unknown): RealtimeEmitterService => {
+          expect(token).toBe(RealtimeEmitterService);
+          return emitter;
+        } } as unknown as ModuleRef,
+      );
+      const originalLeave = emitter.leaveRoomForUsers.bind(emitter);
+      const leaveSpy = jest.spyOn(emitter, 'leaveRoomForUsers')
+        .mockImplementation((memberIds, room) => {
+          expect(committed).toBe(true);
+          originalLeave(memberIds, room);
+        });
+
+      await groupController.removeMember(conversationId, userId, activeId);
+      expect(memberSoftLeft).toBe(true);
+      expect(transaction).toHaveBeenCalledTimes(1);
+      expect(txQuery).toHaveBeenCalledTimes(3);
+      expect(leaveSpy).toHaveBeenCalledWith([userId], conversationRoom);
       await waitFor(() =>
         revokedSockets.every((socket) => !socket.rooms.has(conversationRoom))
         && activeSockets.every((socket) => socket.rooms.has(conversationRoom)),
