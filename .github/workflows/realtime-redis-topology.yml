@@ -9,6 +9,10 @@ on:
       - apps/backend/src/realtime/redis-io.adapter.ts
       - apps/backend/src/realtime/realtime-emitter.service.ts
       - apps/backend/src/realtime/realtime.redis-adapter.integration.spec.ts
+      - apps/backend/src/modules/chat/group-conversations.controller.ts
+      - apps/backend/src/modules/chat/group-conversations.controller.spec.ts
+      - apps/backend/src/modules/chat/group-conversations.service.ts
+      - apps/backend/src/modules/blocks/blocks.service.ts
       - apps/backend/src/realtime/socket-io-redis.config.ts
       - pnpm-lock.yaml
       - .github/workflows/realtime-redis-topology.yml

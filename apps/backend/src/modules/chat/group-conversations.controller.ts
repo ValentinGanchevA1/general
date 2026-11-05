@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { ModuleRef } from '@nestjs/core';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -26,6 +27,7 @@ import type {
   GroupConversationSummary,
 } from '@g88/shared';
 
+import { RealtimeEmitterService } from '../../realtime/realtime-emitter.service';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GroupConversationsService } from './group-conversations.service';
@@ -49,7 +51,10 @@ class CreateGroupConversationDto implements CreateGroupConversationRequest {
 @Controller('conversations/groups')
 @UseGuards(JwtAuthGuard)
 export class GroupConversationsController {
-  constructor(private readonly groups: GroupConversationsService) {}
+  constructor(
+    private readonly groups: GroupConversationsService,
+    private readonly moduleRef: ModuleRef,
+  ) {}
 
   @Get()
   async list(@CurrentUser('id') userId: string): Promise<GroupConversationSummary[]> {
@@ -77,5 +82,9 @@ export class GroupConversationsController {
     @CurrentUser('id') userId: string,
   ): Promise<void> {
     await this.groups.removeMember(userId, conversationId, memberId);
+    // Remove all of the former member's devices from this room only after the
+    // membership transaction commits. The emitter uses adapter-aware eviction.
+    this.moduleRef.get(RealtimeEmitterService, { strict: false })
+      .leaveRoomForUsers([memberId], `convo:${conversationId}`);
   }
 }

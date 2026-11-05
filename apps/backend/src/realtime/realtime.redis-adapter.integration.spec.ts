@@ -120,10 +120,13 @@ async function createRedisBackedNode(channelKey: string, connectionSuffix: strin
   return { httpServer, io, publisher, subscriber, port };
 }
 
-function connectUser(uri: string): Promise<TestSocketClient> {
+function connectUser(
+  uri: string,
+  subjectId = userId,
+): Promise<TestSocketClient> {
   const client = socketIoClient.io(uri, {
     transports: ['websocket'],
-    auth: { userId, conversationId },
+    auth: { userId: subjectId, conversationId },
     forceNew: true,
     reconnection: false,
   });
@@ -237,4 +240,86 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
       await Promise.all([closeNode(nodeA), closeNode(nodeB)]);
     }
   });
+
+  it('evicts all revoked devices across two Redis adapter nodes, preserving active group members', async () => {
+    // Distinct authorized and revoked subjects, with two removed devices on node B
+    // and one on node A. This tests adapter room semantics, not Nest HTTP auth.
+    const activeId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+    const channelKey = `nexa:test:socket.io:multi-device:${process.pid}`;
+    const nodeA = await createRedisBackedNode(channelKey, 'multi-a');
+    const nodeB = await createRedisBackedNode(channelKey, 'multi-b');
+    const realTimeA = nodeA.io.of('/realtime');
+    const realTimeB = nodeB.io.of('/realtime');
+    const revokedSockets: RealtimeServerSocket[] = [];
+    const activeSockets: RealtimeServerSocket[] = [];
+    const clients: TestSocketClient[] = [];
+
+    const connectHandler = (socket: RealtimeServerSocket): void => {
+      const subject = socket.handshake.auth.userId;
+      if (subject !== userId && subject !== activeId) {
+        socket.disconnect(true);
+        return;
+      }
+      socket.data.userId = subject;
+      socket.data.rooms = new Set<string>();
+      void socket.join(`user:${subject}`);
+      void socket.join(conversationRoom);
+      if (subject === userId) revokedSockets.push(socket);
+      else activeSockets.push(socket);
+    };
+    realTimeA.on('connection', connectHandler);
+    realTimeB.on('connection', connectHandler);
+    const gateway = { server: realTimeA } as unknown as RealtimeGateway;
+    const moduleRef = {
+      get: (): RealtimeGateway => gateway,
+    } as unknown as ModuleRef;
+    const emitter = new RealtimeEmitterService(moduleRef);
+
+    try {
+      const revokedA = await connectUser(`http://127.0.0.1:${nodeA.port}/realtime`);
+      clients.push(revokedA);
+      const revokedB1 = await connectUser(`http://127.0.0.1:${nodeB.port}/realtime`);
+      clients.push(revokedB1);
+      const revokedB2 = await connectUser(`http://127.0.0.1:${nodeB.port}/realtime`);
+      clients.push(revokedB2);
+      const activeB = await connectUser(`http://127.0.0.1:${nodeB.port}/realtime`, activeId);
+      clients.push(activeB);
+      await waitFor(() =>
+        revokedSockets.length === 3 && activeSockets.length === 1
+        && revokedSockets.every((socket) => socket.rooms.has(conversationRoom))
+        && activeSockets.every((socket) => socket.rooms.has(conversationRoom)),
+      );
+
+      const revokedEvents: LocationShareUpdateEvent[][] = [[], [], []];
+      revokedA.on('location:share:update', (event) => revokedEvents[0]!.push(event));
+      revokedB1.on('location:share:update', (event) => revokedEvents[1]!.push(event));
+      revokedB2.on('location:share:update', (event) => revokedEvents[2]!.push(event));
+      const allowedEvents: LocationShareUpdateEvent[] = [];
+      activeB.on('location:share:update', (event) => allowedEvents.push(event));
+
+      // Equivalent to the post-commit group membership eviction.
+      emitter.leaveRoomForUsers([userId], conversationRoom);
+      await waitFor(() =>
+        revokedSockets.every((socket) => !socket.rooms.has(conversationRoom))
+        && activeSockets.every((socket) => socket.rooms.has(conversationRoom)),
+      );
+      expect(revokedSockets.every((socket) => socket.rooms.has(userRoom))).toBe(true);
+      expect(activeSockets.every((socket) => socket.rooms.has(`user:${activeId}`))).toBe(true);
+
+      const event: LocationShareUpdateEvent = {
+        sessionId, conversationId,
+        location: { lat: 43.214, lng: 27.935 },
+        updatedAt: '2026-10-28T20:00:00.000Z',
+      };
+      emitter.to(conversationRoom).emit('location:share:update', event);
+      await waitFor(() => allowedEvents.length === 1);
+      await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 150));
+      expect(allowedEvents).toEqual([event]);
+      expect(revokedEvents).toEqual([[], [], []]);
+    } finally {
+      for (const client of clients) client.close();
+      await Promise.all([closeNode(nodeA), closeNode(nodeB)]);
+    }
+  });
+
 });
