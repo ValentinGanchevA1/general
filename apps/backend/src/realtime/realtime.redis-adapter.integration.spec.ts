@@ -1,11 +1,17 @@
 import { createServer, type Server as HttpServer } from 'node:http';
+import { randomBytes } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import type { ModuleRef } from '@nestjs/core';
+import type { INestApplication } from '@nestjs/common';
+import { JwtModule, JwtService } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { Test } from '@nestjs/testing';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { createAdapter } from '@socket.io/redis-adapter';
 import type Redis from 'ioredis';
-import type { DataSource, EntityManager } from 'typeorm';
+import { DataSource, type EntityManager } from 'typeorm';
 import { Server as SocketIoServer, type Socket as ServerSocket } from 'socket.io';
 import type {
   ClientToServerEvents,
@@ -16,10 +22,12 @@ import type {
 } from '@g88/shared';
 
 import { GroupConversationsController } from '../modules/chat/group-conversations.controller';
+import { JwtStrategy } from '../modules/auth/jwt.strategy';
+import { ChatRealtimeAccessService } from '../modules/chat/chat-realtime-access.service';
 import { GroupConversationsService } from '../modules/chat/group-conversations.service';
 import { createRedisClient } from '../config/redis-client';
 import { RealtimeEmitterService } from './realtime-emitter.service';
-import type { RealtimeGateway } from './realtime.gateway';
+import { RealtimeGateway } from './realtime.gateway';
 
 const describeRedis = process.env.REDIS_ADAPTER_TEST === 'true' ? describe : describe.skip;
 
@@ -177,7 +185,8 @@ async function closeNode(node: RedisBackedNode): Promise<void> {
 }
 
 describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
-  jest.setTimeout(20_000);
+  jest.setTimeout(30_000);
+  const itPostgres = process.env.NEXA_ROOM_TEST_DATABASE_URL ? it : it.skip;
 
   it('fans out user events and remotely evicts a revoked conversation room', async () => {
     const channelKey = `nexa:test:socket.io:${process.pid}`;
@@ -362,6 +371,149 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
       expect(revokedEvents).toEqual([[], [], []]);
     } finally {
       for (const client of clients) client.close();
+      await Promise.all([closeNode(nodeA), closeNode(nodeB)]);
+    }
+  });
+
+
+  itPostgres('revokes remote group sockets after JWT HTTP kick and a real PostgreSQL commit', async () => {
+    const databaseUrl = process.env.NEXA_ROOM_TEST_DATABASE_URL;
+    if (!databaseUrl) throw new Error('Isolated PostgreSQL test URL is required');
+    const databaseTarget = new URL(databaseUrl);
+    if (databaseTarget.hostname !== '127.0.0.1' || databaseTarget.pathname !== '/nexa_room_test') {
+      throw new Error('Refusing to use a non-isolated group-room test database');
+    }
+    const actorId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+    const key = `nexa:test:socket.io:http-db:${process.pid}`;
+    const nodeA = await createRedisBackedNode(key, 'db-http-a');
+    const nodeB = await createRedisBackedNode(key, 'db-http-b');
+    const realtimeA = nodeA.io.of('/realtime');
+    const realtimeB = nodeB.io.of('/realtime');
+    const clients: TestSocketClient[] = [];
+    const revokedSockets: RealtimeServerSocket[] = [];
+    const activeSockets: RealtimeServerSocket[] = [];
+    const db = new DataSource({ type: 'postgres', url: databaseUrl, synchronize: false, entities: [] });
+    let app: INestApplication | null = null;
+    const oldSecret = process.env.JWT_SECRET;
+    process.env.JWT_SECRET = randomBytes(32).toString('hex');
+
+    try {
+      await db.initialize();
+      // These tables exist only in the isolated CI database, not production.
+      await db.query('CREATE TABLE users (id uuid PRIMARY KEY, deleted_at timestamptz)');
+      await db.query("CREATE TABLE conversations (id uuid PRIMARY KEY, kind text NOT NULL, participant_ids uuid[] NOT NULL DEFAULT ARRAY[]::uuid[])");
+      await db.query(
+        'CREATE TABLE conversation_members (conversation_id uuid NOT NULL REFERENCES conversations(id), '
+        + 'user_id uuid NOT NULL REFERENCES users(id), role text NOT NULL, '
+        + 'joined_at timestamptz NOT NULL DEFAULT NOW(), left_at timestamptz, '
+        + 'PRIMARY KEY (conversation_id, user_id))',
+      );
+      await db.query('CREATE TABLE user_blocks (blocker_id uuid NOT NULL, blocked_id uuid NOT NULL)');
+      await db.query('INSERT INTO users (id) VALUES ($1), ($2)', [actorId, userId]);
+      await db.query("INSERT INTO conversations (id, kind) VALUES ($1, 'group')", [conversationId]);
+      await db.query(
+        "INSERT INTO conversation_members (conversation_id, user_id, role) VALUES ($1, $2, 'owner'), ($1, $3, 'member')",
+        [conversationId, actorId, userId],
+      );
+
+      const joinSockets = (socket: RealtimeServerSocket): void => {
+        const subject = socket.handshake.auth.userId;
+        if (subject !== actorId && subject !== userId) {
+          socket.disconnect(true);
+          return;
+        }
+        socket.data.userId = subject;
+        socket.data.rooms = new Set<string>();
+        void socket.join(`user:${subject}`);
+        void socket.join(conversationRoom);
+        if (subject === userId) revokedSockets.push(socket);
+        else activeSockets.push(socket);
+      };
+      realtimeA.on('connection', joinSockets);
+      realtimeB.on('connection', joinSockets);
+
+      const moduleRef = await Test.createTestingModule({
+        imports: [PassportModule, JwtModule.register({ secret: process.env.JWT_SECRET })],
+        controllers: [GroupConversationsController],
+        providers: [
+          GroupConversationsService, ChatRealtimeAccessService,
+          RealtimeEmitterService, JwtStrategy,
+          { provide: getDataSourceToken(), useValue: db },
+          { provide: RealtimeGateway, useValue: { server: realtimeA } },
+        ],
+      }).compile();
+      app = moduleRef.createNestApplication();
+      await app.listen(0, '127.0.0.1');
+      const address = app.getHttpServer().address() as AddressInfo;
+      const path = `http://127.0.0.1:${address.port}/conversations/groups/${conversationId}/members`;
+      const jwt = app.get(JwtService);
+      const ownerToken = jwt.sign({ sub: actorId, email: 'owner@example.invalid' });
+      const memberToken = jwt.sign({ sub: userId, email: 'member@example.invalid' });
+
+      const removedA = await connectUser(`http://127.0.0.1:${nodeA.port}/realtime`);
+      const removedB1 = await connectUser(`http://127.0.0.1:${nodeB.port}/realtime`);
+      const removedB2 = await connectUser(`http://127.0.0.1:${nodeB.port}/realtime`);
+      const activeB = await connectUser(`http://127.0.0.1:${nodeB.port}/realtime`, actorId);
+      clients.push(removedA, removedB1, removedB2, activeB);
+      await waitFor(() =>
+        revokedSockets.length === 3 && activeSockets.length === 1
+        && revokedSockets.every((socket) => socket.rooms.has(conversationRoom))
+        && activeSockets.every((socket) => socket.rooms.has(conversationRoom)),
+      );
+
+      const recipients = app.get(ChatRealtimeAccessService);
+      const originalRecipients = await recipients.getRecipientIds(conversationId);
+      expect([...originalRecipients].sort()).toEqual([actorId, userId].sort());
+
+      const unauthenticated = await fetch(`${path}/${userId}`, { method: 'DELETE' });
+      expect(unauthenticated.status).toBe(401);
+      const forbidden = await fetch(`${path}/${actorId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${memberToken}` },
+      });
+      expect(forbidden.status).toBe(403);
+      expect(revokedSockets.every((socket) => socket.rooms.has(conversationRoom))).toBe(true);
+
+      const revokedEvents: LocationShareUpdateEvent[][] = [[], [], []];
+      removedA.on('location:share:update', (event) => revokedEvents[0]!.push(event));
+      removedB1.on('location:share:update', (event) => revokedEvents[1]!.push(event));
+      removedB2.on('location:share:update', (event) => revokedEvents[2]!.push(event));
+      const activeEvents: LocationShareUpdateEvent[] = [];
+      activeB.on('location:share:update', (event) => activeEvents.push(event));
+
+      const kick = await fetch(`${path}/${userId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+      });
+      expect(kick.status).toBe(204);
+      const membership = await db.query<Array<{ left_at: Date | null }>>(
+        'SELECT left_at FROM conversation_members WHERE conversation_id = $1 AND user_id = $2',
+        [conversationId, userId],
+      );
+      expect(membership[0]?.left_at).toBeInstanceOf(Date);
+      await expect(recipients.getRecipientIds(conversationId)).resolves.toEqual([actorId]);
+      await waitFor(() =>
+        revokedSockets.every((socket) => !socket.rooms.has(conversationRoom))
+        && activeSockets.every((socket) => socket.rooms.has(conversationRoom)),
+      );
+      expect(revokedSockets.every((socket) => socket.rooms.has(userRoom))).toBe(true);
+
+      const event: LocationShareUpdateEvent = {
+        sessionId, conversationId,
+        location: { lat: 43.214, lng: 27.935 },
+        updatedAt: '2026-10-28T20:00:00.000Z',
+      };
+      realtimeA.to(conversationRoom).emit('location:share:update', event);
+      await waitFor(() => activeEvents.length === 1);
+      await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 150));
+      expect(activeEvents).toEqual([event]);
+      expect(revokedEvents).toEqual([[], [], []]);
+    } finally {
+      for (const client of clients) client.close();
+      if (app) await app.close();
+      if (db.isInitialized) await db.destroy();
+      if (oldSecret === undefined) delete process.env.JWT_SECRET;
+      else process.env.JWT_SECRET = oldSecret;
       await Promise.all([closeNode(nodeA), closeNode(nodeB)]);
     }
   });
