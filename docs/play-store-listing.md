@@ -47,12 +47,13 @@ you in real time.
 
 Open the map to explore nearby people, events and listings. Wave to someone,
 connect, continue the conversation in 1:1 chat, join local events, or explore
-what is happening around you through Discover and Pulse.
+what is happening around you through map-based Experiences, Opportunities, and contextual Pulse activity.
 
 WHAT YOU CAN DO
 • Map-first discovery — explore nearby people, events and listings
-• Discover — jump into the local experiences that matter to you
-• Pulse — see live local activity and signals around you
+• Experiences — select nearby events directly on the Map
+• Opportunities — explore nearby listings and offers on the Map
+• Pulse — see contextual local activity and live signals
 • Connections — keep relationship activity and chats together
 • Waves and chat — lightweight interaction that can grow into conversation
 • Events — discover, join and follow local activity
@@ -80,9 +81,10 @@ instead of a single endless global feed.
 - [ ] **Feature graphic** — 1024×500 NEXA-branded artwork
 - [ ] **Phone screenshots** — use the current UI, not legacy G88 screens
   - [ ] Map + entity markers/sheet
-  - [ ] Discover / Pulse
+  - [ ] Experiences / event map lens
+  - [ ] Opportunities / listing map lens
   - [ ] Connections
-  - [ ] You / Trust Center
+  - [ ] Identity / Trust Center
   - [ ] Event or Marketplace surface
 - [ ] **Theme coverage** — screenshots should not mix obsolete and current visual systems
 - [ ] **Promo video** — optional; if used, show the current NEXA launch/map experience
@@ -198,7 +200,7 @@ if its URL or infrastructure still contains a legacy `g88` identifier.
 Before uploading screenshots / graphics:
 
 - [ ] no visible `G88` branding on active product surfaces;
-- [ ] canonical tabs are Map / Discover / Pulse / Connections / You;
+- [ ] current Android v3 tabs are Map / Experiences / Opportunities / Connections / Identity (see `docs/IA_NAVIGATION.md`);
 - [ ] people / events / listings use the current semantic marker grammar;
 - [ ] verification UI is score-free;
 - [ ] screenshots use the current NEXA symbol / wordmark;
