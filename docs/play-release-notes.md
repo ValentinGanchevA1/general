@@ -47,9 +47,9 @@ HOW TO JOIN
 WHAT TO TRY
 • Launch flow: native splash → NEXA animation → live app
 • Map discovery, marker selection and entity sheets
-• Discover and Pulse
+• Experiences and Opportunities map lenses; contextual Pulse activity
 • Connections → Activity / Chats
-• Profile / You and Trust Center
+• Identity, profile and Trust Center
 • Events and marketplace listings
 • Light, dark, system and PROTOS NEXUS themes when available
 • Reduced Motion and larger text if your device supports them

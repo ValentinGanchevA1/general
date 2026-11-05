@@ -142,7 +142,7 @@ form rather than weakening the privacy explanation.
 
 - [x] Data encrypted in transit
 - [x] In-app account deletion exists
-- [ ] Public web deletion-request path / current Play requirement verified before production
+- [ ] Publish and verify the external deletion-request path: `/delete-account/` (draft in `docs/legal/delete-account/index.html`); required in addition to in-app deletion
 - [ ] Current release build checked for analytics / diagnostics providers
 - [ ] Current identity-verification processors and retention disclosed accurately
 - [ ] No public numeric trust/popularity score is claimed
@@ -234,9 +234,11 @@ Current repo documentation records the implemented path:
 - **Mobile:** Settings → Delete account → confirmation flow
 - **Backend:** authenticated `DELETE /users/me` cleanup path
 
-Before production, verify the current Play Console requirement for an external
-web deletion-request URL and provide one if required. Do not regress the in-app
-flow or publish stale copy claiming that account deletion is unavailable.
+Google Play requires a functional **external account-deletion request URL even when
+in-app deletion is available**. The proposed NEXA `/delete-account/` page is in
+`docs/legal/delete-account/index.html`; verify the deployed HTTPS URL and actual
+request-processing workflow, then enter it in Play Console Data Safety. Do not
+regress Settings → Delete account or claim the external page is live before checking.
 
 ---
 

@@ -75,7 +75,7 @@ A grey/blank map on Play-installed builds is a release blocker until this restri
 ## 6. Store listing + policy declarations
 
 - [ ] **Main store listing** uses **NEXA** everywhere: app name, descriptions, icon, feature graphic and screenshots.
-- [ ] Screenshots show the current Map / Discover / Pulse / Connections / You UI and final NEXA entity grammar.
+- [ ] Screenshots show the current Android v3 Map / Experiences / Opportunities / Connections / Identity controls (see `docs/IA_NAVIGATION.md`) and final NEXA entity grammar. Older RC3 navigation is not current.
 - [ ] **Privacy policy** points to `https://g88-legal.onrender.com/privacy`; public page content must be NEXA-branded even though the infrastructure hostname is legacy.
 - [ ] Complete **Data Safety** from the release build and actual architecture, not from branding assumptions. Confirm at minimum the real handling of:
   - location;
@@ -85,7 +85,7 @@ A grey/blank map on Play-installed builds is a release blocker until this restri
   - diagnostics/analytics;
   - deletion behavior.
 - [ ] Confirm data-in-transit encryption declarations against production configuration.
-- [ ] Confirm account deletion is described consistently with the in-app delete flow.
+- [ ] Confirm account deletion is described consistently with the in-app delete flow and a **public external deletion-request URL** is deployed/verified (`docs/legal/delete-account/index.html` is draft source only).
 - [ ] Complete content rating, target audience, app access and any other Play declarations truthfully.
 
 ## 7. NEXA legal gate — production only
@@ -119,7 +119,7 @@ The exact candidate must verify:
 - logged-out and incomplete-profile launch paths do **not** show the map halo;
 - Reduced Motion behavior;
 - final entity identity: person=circle, event=four-point star, listing=square, opportunity/other=diamond;
-- Map / Discover / Pulse / Connections / You navigation;
+- Map / Experiences / Opportunities / Connections / Identity navigation, with Experiences and Opportunities as spatial lenses on the existing Map;
 - light / dark / system / PROTOS NEXUS theme behavior;
 - no visible legacy `G88` product branding;
 - no public numeric trust/popularity score or trust-booster language;

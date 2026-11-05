@@ -3,7 +3,7 @@
 **Public display name:** NEXA  
 **Android package / applicationId:** `com.g88` *(compatibility identifier; intentionally unchanged)*  
 **targetSdk:** 36 · **minSdk:** 24  
-**versionName (About):** 1.0.0 · **gradle versionName:** 1.0 · **versionCode:** CI `github.run_number`  
+**versionName (About):** 1.0.0 · **gradle versionName:** 1.0.0 · **versionCode:** CI `github.run_number`  
 **AAB workflow:** `.github/workflows/android-release.yml` (`workflow_dispatch` + `v*` tags)
 
 ## Verdict: **CONDITIONAL GO** for closed testing
