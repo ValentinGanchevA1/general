@@ -29,6 +29,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nexa_test
+          POSTGRES_PASSWORD: nexa_test
+          POSTGRES_DB: nexa_room_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U nexa_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
       redis:
         image: redis:7-alpine
         ports: ['6379:6379']
@@ -39,6 +51,7 @@ jobs:
           --health-retries 10
     env:
       REDIS_ADAPTER_TEST: 'true'
+      NEXA_ROOM_TEST_DATABASE_URL: postgresql://nexa_test:nexa_test@127.0.0.1:5432/nexa_room_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
