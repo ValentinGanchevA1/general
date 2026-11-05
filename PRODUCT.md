@@ -56,7 +56,7 @@ A map-first social app: see who and what is nearby, then act on it — wave, cha
 | Group chat / live streaming / paid gifts | 📋 Horizon — explicit go-ahead required |
 | Monetization (premium, Connect) | 📋 Horizon — gated on retention |
 
-The canonical primary navigation is **Map / Discover / Pulse / Connections / You**. Browser and mobile should converge on the same product language without assuming they share every implementation detail.
+The current **mobile navigation v3** is **Map / Experiences / Opportunities / Connections / Identity**. Experiences and Opportunities select spatial lenses on the same Map, while Pulse remains a contextual live activity surface. Legacy Discover, Pulse and You routes remain hidden for compatibility. The browser v1 navigation still uses **Map / Discover / Pulse / Connections / You**; do not present the two platform implementations as identical until a deliberate cross-platform IA decision is shipped. See `docs/IA_NAVIGATION.md` for the mobile runtime contract.
 
 ## Non-goals (explicit)
 
