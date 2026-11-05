@@ -9,6 +9,7 @@ import type { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import { scrubSentryPayload } from '@g88/shared';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
+import { DiscoveryHttpDiagnosticsService } from './common/discovery-http-diagnostics.service';
 import { assertProductionCorsOrigins, corsOrigins } from './common/cors-origins';
 import { RedisIoAdapter } from './realtime/redis-io.adapter';
 import { shouldUseSocketIoRedisAdapter } from './realtime/socket-io-redis.config';
@@ -63,6 +64,14 @@ async function bootstrap(): Promise<void> {
   app.useBodyParser('json', { limit: '25mb' });
 
   app.use(helmet());
+
+  // Observe exact Discovery POST routes before Nest guards so throttler 429s
+  // are counted. Only aggregate outcomes are retained (no URLs, IDs or GPS).
+  const discoveryHttpDiagnostics = app.get(DiscoveryHttpDiagnosticsService);
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    discoveryHttpDiagnostics.observe(req, res);
+    next();
+  });
 
   app.setGlobalPrefix('api/v1', {
     exclude: [{ path: 'health', method: RequestMethod.GET }],

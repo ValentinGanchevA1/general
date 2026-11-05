@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { resolveRateLimitTracker } from './common/rate-limit-tracker';
 import { RuntimeDiagnosticsService } from './common/runtime-diagnostics.service';
+import { DiscoveryHttpDiagnosticsService } from './common/discovery-http-diagnostics.service';
 import { RuntimeHttpDiagnosticsInterceptor } from './common/runtime-http-diagnostics.interceptor';
 import { RuntimeHttpDiagnosticsService } from './common/runtime-http-diagnostics.service';
 import { BlocksModule } from './modules/blocks/blocks.module';
@@ -102,6 +103,7 @@ import { RuntimeConfigModule } from './modules/runtime-config/runtime-config.mod
     { provide: APP_INTERCEPTOR, useClass: RuntimeHttpDiagnosticsInterceptor },
     RuntimeHttpDiagnosticsService,
     RuntimeDiagnosticsService,
+    DiscoveryHttpDiagnosticsService,
   ],
 })
 export class AppModule {}
