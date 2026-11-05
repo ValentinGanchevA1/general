@@ -46,7 +46,12 @@ const enabled = process.env.DISCOVERY_FULL_SCHEMA_ACK_DISPOSABLE === 'YES'
   && safeUrl(dbUrl, 'postgresql:', '_bench')
   && safeUrl(redisUrl, 'redis:', '/15');
 const suite = enabled ? describe : describe.skip;
-const TOTAL = 10_000;
+const STAGES = [
+  { entities: 10_000, users: 4_000, events: 3_000, listings: 3_000 },
+  { entities: 50_000, users: 20_000, events: 15_000, listings: 15_000 },
+  { entities: 100_000, users: 40_000, events: 30_000, listings: 30_000 },
+] as const;
+const INITIAL_USERS = STAGES[0].users;
 const VIEWPORT: Viewport = {
   sw: { lat: 43.175, lng: 27.885 },
   ne: { lat: 43.235, lng: 27.945 },
@@ -62,7 +67,7 @@ function percentile(values: number[], fraction: number): number {
 }
 
 suite('NEXA full migrated PostGIS + JWT login + real Friends + Redis/HTTP', () => {
-  jest.setTimeout(240_000);
+  jest.setTimeout(600_000);
   let db: DataSource | undefined;
   let redis: Redis | undefined;
   let app: INestApplication | undefined;
@@ -91,7 +96,7 @@ suite('NEXA full migrated PostGIS + JWT login + real Friends + Redis/HTTP', () =
     else process.env.DISCOVERY_THIN_INLINE_CANDIDATES = oldInline;
   });
 
-  it('authenticates 10 real accounts and compares HTTP SQL to JS under blocks and Redis presence', async () => {
+  it('profiles mixed entities at 10k/50k/100k under ten real JWT HTTP viewers and Redis presence', async () => {
     if (!dbUrl || !redisUrl) throw new Error('Disposable DB and Redis URLs required');
     process.env.JWT_SECRET = randomUUID().replaceAll('-', '') + randomUUID().replaceAll('-', '');
     process.env.DISCOVERY_SQL_TOPK = '0';
@@ -155,7 +160,7 @@ suite('NEXA full migrated PostGIS + JWT login + real Friends + Redis/HTTP', () =
              p.r4, p.r5, p.r6, p.r7, p.r8, p.r9, p.r10
         FROM generate_series(1, $2::integer) AS g(n)
         JOIN nexa_bench_positions p ON p.idx = (n - 1) % 625
-    `, [passwordHash, TOTAL]);
+    `, [passwordHash, INITIAL_USERS]);
     const subjects = await db.query<Array<{ id: string; email: string }>>(
       'SELECT id, email::text FROM users WHERE email::text = ANY($1::text[])',
       [Array.from({ length: 15 }, (_, i) => email(i + 1))],
@@ -253,55 +258,188 @@ suite('NEXA full migrated PostGIS + JWT login + real Friends + Redis/HTTP', () =
     expect((await realPresence.whichAreOnline([friend])).has(friend)).toBe(true);
     expect((await realPresence.lastSeenMap([friend])).has(friend)).toBe(true);
 
-    const discovery = moduleRef.get(DiscoveryService);
-    const expected = new Map<string, string[]>();
-    for (const viewer of viewers) {
-      const baseline = await discovery.nearby({ ...request, requesterId: viewer.id });
-      expected.set(viewer.id, pointIds(baseline));
-      expect(baseline.points.length).toBe(500);
-      createdSnapshotKeys.add('discovery:snap:' + viewer.id + ':' + baseline.viewportHash);
-    }
-    expect(expected.get(viewers[0]!.id)).not.toContain('user:' + blockedByViewer);
-    expect(expected.get(viewers[1]!.id)).not.toContain('user:' + blocksViewer);
 
-    // Opt-in only for this isolated test. Authoritative SQL hydration still
-    // enforces bilateral blocks/private/deleted viewers' restrictions.
-    process.env.DISCOVERY_SQL_TOPK = '1';
-    process.env.DISCOVERY_THIN_SQL_TOPK = '1';
-    process.env.DISCOVERY_THIN_INLINE_CANDIDATES = '1';
-    const started = performance.now();
-    const outcomes = await Promise.allSettled(viewers.map(async (viewer) => {
-      const begin = performance.now();
-      const response = await post('/discovery/nearby', request, tokens.get(viewer.id));
-      const elapsedMs = performance.now() - begin;
-      if (response.status !== 200) throw new Error('Authenticated Discovery HTTP status not 200');
-      const body = await response.json() as DiscoveryResponse;
-      return { viewer, body, elapsedMs };
-    }));
-    const wallMs = performance.now() - started;
-    const durations: number[] = [];
-    for (const outcome of outcomes) {
-      if (outcome.status === 'rejected') throw outcome.reason;
-      const { viewer, body, elapsedMs } = outcome.value;
-      expect(pointIds(body)).toEqual(expected.get(viewer.id));
-      expect(body.points.length).toBe(500);
-      expect(pointIds(body)).not.toContain('user:' + privateId);
-      expect(pointIds(body)).not.toContain('user:' + deletedId);
-      const key = 'discovery:snap:' + viewer.id + ':' + body.viewportHash;
-      createdSnapshotKeys.add(key);
-      expect(await redis.get(key)).not.toBeNull();
-      durations.push(elapsedMs);
+    // Preserve the production schema while growing synthetic content in three
+    // stages. Owner IDs are deterministic and reference already seeded users.
+    // The only new physical table is the disposable, benchmark-owned positions.
+    const database = db;
+    let seededUsers = INITIAL_USERS;
+    let seededEvents = 0;
+    let seededListings = 0;
+
+    async function expandTo(stage: typeof STAGES[number]): Promise<void> {
+      if (stage.users > seededUsers) {
+        await database.query(`
+          INSERT INTO users (
+            id,email,password_hash,display_name,verification_level,
+            visibility,location,location_h3_r4,location_h3_r5,
+            location_h3_r6,location_h3_r7,location_h3_r8,
+            location_h3_r9,location_h3_r10
+          )
+          SELECT md5('nexa-full-user-' || n::text)::uuid,
+                 'nexa-bench-' || n::text || '@invalid.example',$1,
+                 'Synthetic','phone','public',
+                 ST_SetSRID(ST_MakePoint(p.lng,p.lat),4326)::geography,
+                 p.r4,p.r5,p.r6,p.r7,p.r8,p.r9,p.r10
+            FROM generate_series($2::integer,$3::integer) AS g(n)
+            JOIN nexa_bench_positions p ON p.idx=(n-1)%625
+        `, [passwordHash, seededUsers + 1, stage.users]);
+        seededUsers = stage.users;
+      }
+      if (stage.events > seededEvents) {
+        await database.query(`
+          INSERT INTO events (
+            id,host_id,title,starts_at,visibility,location,
+            location_h3_r4,location_h3_r5,location_h3_r6,
+            location_h3_r7,location_h3_r8,location_h3_r9,location_h3_r10
+          )
+          SELECT md5('nexa-full-event-' || n::text)::uuid,
+                 md5('nexa-full-user-' || (1 + ((n - 1) % $3::integer))::text)::uuid,
+                 'Synthetic event ' || n,
+                 NOW() + interval '7 days',
+                 CASE WHEN n%37=0 THEN 'private' ELSE 'public' END,
+                 ST_SetSRID(ST_MakePoint(p.lng,p.lat),4326)::geography,
+                 p.r4,p.r5,p.r6,p.r7,p.r8,p.r9,p.r10
+            FROM generate_series($1::integer,$2::integer) AS g(n)
+            JOIN nexa_bench_positions p ON p.idx=(n-1)%625
+        `, [seededEvents + 1, stage.events, stage.users]);
+        seededEvents = stage.events;
+      }
+      if (stage.listings > seededListings) {
+        await database.query(`
+          INSERT INTO listings (
+            id,seller_id,title,price_cents,currency,category,
+            status,mode,marketplace_kind,expires_at,visibility,location,
+            location_h3_r4,location_h3_r5,location_h3_r6,
+            location_h3_r7,location_h3_r8,location_h3_r9,location_h3_r10
+          )
+          SELECT md5('nexa-full-listing-' || n::text)::uuid,
+                 md5('nexa-full-user-' || (1 + ((n - 1) % $3::integer))::text)::uuid,
+                 'Synthetic listing ' || n,1000+n,'EUR','general',
+                 'active','sell','for_sale',NOW()+interval '14 days',
+                 CASE WHEN n%41=0 THEN 'private' ELSE 'public' END,
+                 ST_SetSRID(ST_MakePoint(p.lng,p.lat),4326)::geography,
+                 p.r4,p.r5,p.r6,p.r7,p.r8,p.r9,p.r10
+            FROM generate_series($1::integer,$2::integer) AS g(n)
+            JOIN nexa_bench_positions p ON p.idx=(n-1)%625
+        `, [seededListings + 1, stage.listings, stage.users]);
+        seededListings = stage.listings;
+      }
+      for (const relation of ['users', 'events', 'listings']) {
+        await database.query('ANALYZE ' + relation);
+      }
+      const [counts] = await database.query<Array<{ n: string }>>(`
+        SELECT ((SELECT COUNT(*) FROM users) +
+                (SELECT COUNT(*) FROM events) +
+                (SELECT COUNT(*) FROM listings))::text AS n
+      `);
+      expect(Number(counts?.n)).toBe(stage.entities);
     }
-    console.info('DISCOVERY_FULL_SCHEMA_HTTP_PROFILE', JSON.stringify({
-      migratedSchema: true, entities: TOTAL, kinds: ['user'],
-      clients: viewers.length, jwtTokensFromAuthController: true,
-      realFriendsService: true, realRedisPresence: true,
-      authenticatedP50Ms: percentile(durations, 0.5),
-      authenticatedP95Ms: percentile(durations, 0.95),
-      batchWallMs: Number(wallMs.toFixed(2)),
-      parity: '10/10 viewer-specific top-500',
-      exclusions: 'bidirectional blocks, private, deleted',
-      limitations: '10k users only; isolated Nest module, not complete AppModule/4G',
-    }));
+
+    const discovery = moduleRef.get(DiscoveryService);
+    for (const stage of STAGES) {
+      await expandTo(stage);
+      process.env.DISCOVERY_SQL_TOPK = '0';
+      process.env.DISCOVERY_THIN_SQL_TOPK = '0';
+      process.env.DISCOVERY_THIN_INLINE_CANDIDATES = '0';
+      const expected = new Map<string, string[]>();
+      for (const viewer of viewers) {
+        const baseline = await discovery.nearby({ ...request, requesterId: viewer.id });
+        expected.set(viewer.id, pointIds(baseline));
+        expect(baseline.points.length).toBe(500);
+        createdSnapshotKeys.add('discovery:snap:' + viewer.id + ':' + baseline.viewportHash);
+      }
+      expect(expected.get(viewers[0]!.id)).not.toContain('user:' + blockedByViewer);
+      expect(expected.get(viewers[1]!.id)).not.toContain('user:' + blocksViewer);
+
+      // Opt-in shortlist only within the disposable test. Authoritative DB
+      // hydration continues enforcing bilateral block and owner visibility.
+      process.env.DISCOVERY_SQL_TOPK = '1';
+      process.env.DISCOVERY_THIN_SQL_TOPK = '1';
+      process.env.DISCOVERY_THIN_INLINE_CANDIDATES = '1';
+
+      // Observe database sessions through a separate pool, avoiding the ten
+      // request connections. This samples wait events, not CPU utilization;
+      // no SQL text, IPs, identity or query parameters are collected.
+      const observer = await new DataSource({
+        type: 'postgres', url: dbUrl, entities: [], poolSize: 1,
+      }).initialize();
+      const sampledWaits = new Map<string, number>();
+      let activePeak = 0;
+      let sampleCount = 0;
+      let stopSampling = false;
+      const sampling = (async (): Promise<void> => {
+        while (!stopSampling) {
+          const rows = await observer.query<Array<{
+            wait_event_type: string | null;
+            wait_event: string | null;
+          }>>(`
+            SELECT wait_event_type,wait_event
+              FROM pg_stat_activity
+             WHERE datname=current_database()
+               AND pid <> pg_backend_pid()
+               AND state='active'
+          `);
+          sampleCount += 1;
+          activePeak = Math.max(activePeak, rows.length);
+          for (const row of rows) {
+            const key = row.wait_event_type == null
+              ? 'no_pg_wait_event' : row.wait_event_type + ':' + (row.wait_event ?? 'unknown');
+            sampledWaits.set(key, (sampledWaits.get(key) ?? 0) + 1);
+          }
+          await new Promise<void>((resolve) => setTimeout(resolve, 35));
+        }
+      })();
+
+      const started = performance.now();
+      let outcomes: PromiseSettledResult<{
+        viewer: typeof viewers[number]; body: DiscoveryResponse; elapsedMs: number;
+      }>[];
+      try {
+        outcomes = await Promise.allSettled(viewers.map(async (viewer) => {
+          const begin = performance.now();
+          const response = await post('/discovery/nearby', request, tokens.get(viewer.id));
+          if (response.status !== 200) {
+            throw new Error('Authenticated discovery HTTP status was not 200');
+          }
+          const body = await response.json() as DiscoveryResponse;
+          // Include response body transfer/JSON parse, not headers alone.
+          return { viewer, body, elapsedMs: performance.now() - begin };
+        }));
+      } finally {
+        stopSampling = true;
+        await sampling;
+        await observer.destroy();
+      }
+      const wallMs = performance.now() - started;
+      const durations: number[] = [];
+      for (const outcome of outcomes) {
+        if (outcome.status === 'rejected') throw outcome.reason;
+        const { viewer, body, elapsedMs } = outcome.value;
+        expect(pointIds(body)).toEqual(expected.get(viewer.id));
+        expect(body.points.length).toBe(500);
+        expect(pointIds(body)).not.toContain('user:' + privateId);
+        expect(pointIds(body)).not.toContain('user:' + deletedId);
+        const key = 'discovery:snap:' + viewer.id + ':' + body.viewportHash;
+        createdSnapshotKeys.add(key);
+        expect(await redis.get(key)).not.toBeNull();
+        durations.push(elapsedMs);
+      }
+
+      console.info('DISCOVERY_FULL_SCHEMA_MIXED_HTTP_PROFILE', JSON.stringify({
+        entities: stage.entities, kinds: ['user', 'event', 'listing'],
+        sourceCounts: { users: stage.users, events: stage.events, listings: stage.listings },
+        clients: viewers.length, jwtTokensFromAuthController: true,
+        realFriendsService: true, realRedisPresence: true,
+        httpP50Ms: percentile(durations, 0.5),
+        httpP95Ms: percentile(durations, 0.95),
+        batchWallMs: Number(wallMs.toFixed(2)),
+        pgSampleCount: sampleCount, activeBackendPeak: activePeak,
+        sampledPgWaitEvents: Object.fromEntries([...sampledWaits].sort()),
+        parity: '10/10 viewer-specific top-500',
+        exclusions: 'bidirectional blocks, private, deleted',
+        limitations: 'isolated Nest module, not full AppModule or mobile network; one sample per size',
+      }));
+    }
   });
 });
