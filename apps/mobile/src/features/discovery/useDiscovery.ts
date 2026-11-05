@@ -27,6 +27,7 @@ import {
   upsertPoint,
 } from '@/features/discovery/discoverySlice';
 import { createDiscoveryMutationLog } from '@/features/discovery/discoveryMutationLog';
+import { DiscoveryRequestBudget } from '@/features/discovery/discoveryRequestBudget';
 import { replayDiscoveryMutations } from '@/features/discovery/discoveryMutationReplay';
 import { mapDiscoveryRankStore } from '@/features/map/mapDiscoveryRank.store';
 import { marketplaceKindMapFilterStore } from '@/features/map/marketplaceKindMapFilter.store';
@@ -128,6 +129,7 @@ export function useDiscovery({
   const [data, setData] = useState<DiscoveryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [budgetRetryTick, setBudgetRetryTick] = useState(0);
 
   useEffect(() => {
     mapDiscoveryRankStore.set(rankBy);
@@ -146,6 +148,8 @@ export function useDiscovery({
   // contaminate the next server diff baseline.
   const cachedPointsRef = useRef<DiscoveryPoint[]>([]);
   const mutationLogRef = useRef(createDiscoveryMutationLog());
+  const requestBudgetRef = useRef(new DiscoveryRequestBudget());
+  const budgetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTopicRef = useRef<string | null>(null);
   const lastListingModeRef = useRef<string | null>(null);
   const lastMarketplaceKindRef = useRef<MarketplaceKind | null>(null);
@@ -200,6 +204,21 @@ export function useDiscovery({
         rb: effectiveRank,
       });
       if (key === lastFetchKey.current) return;
+
+      // Each cancelled HTTP attempt may still reach the server. Keep a
+      // conservative rolling budget below the endpoint's 30/min tracker cap,
+      // coalescing pending gestures to the most recent settled viewport.
+      const budgetDelayMs = requestBudgetRef.current.tryAcquire(Date.now());
+      if (budgetDelayMs > 0) {
+        // Keep the map's existing refresh indicator truthful while pacing.
+        setLoading(true);
+        if (budgetTimerRef.current) clearTimeout(budgetTimerRef.current);
+        budgetTimerRef.current = setTimeout(() => {
+          budgetTimerRef.current = null;
+          setBudgetRetryTick((tick) => tick + 1);
+        }, budgetDelayMs);
+        return;
+      }
 
       const topicChanged = lastTopicRef.current !== (t ?? null);
       const modeChanged = lastListingModeRef.current !== (lm ?? null);
@@ -284,6 +303,8 @@ export function useDiscovery({
   );
 
   useEffect(() => {
+    if (budgetTimerRef.current) clearTimeout(budgetTimerRef.current);
+    budgetTimerRef.current = null;
     if (!enabled || !viewport) {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       abortRef.current?.abort();
@@ -331,10 +352,14 @@ export function useDiscovery({
     rankBy,
     debounceMs,
     fetchNow,
+    budgetRetryTick,
   ]);
 
   useEffect(() => {
-    return () => abortRef.current?.abort();
+    return () => {
+      abortRef.current?.abort();
+      if (budgetTimerRef.current) clearTimeout(budgetTimerRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -450,7 +475,9 @@ export function useDiscovery({
   ]);
 
   const refresh = useCallback(() => {
-    if (!viewport) return;
+    if (!enabled || !viewport) return;
+    if (budgetTimerRef.current) clearTimeout(budgetTimerRef.current);
+    budgetTimerRef.current = null;
     lastFetchKey.current = '';
     prevHashRef.current = null;
     cachedPointsRef.current = [];
@@ -467,6 +494,7 @@ export function useDiscovery({
       rankBy,
     );
   }, [
+    enabled,
     viewport,
     zoom,
     kinds,
