@@ -190,7 +190,13 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull, onLik
 		return () => { cancelled = true; };
 	}, [point.id, reloadToken, loadProfile]);
 
-	const onRetryProfile = (): void => { profileCache.delete(point.id); setReloadToken((t) => t + 1); };
+	const onRetryProfile = (): void => {
+		profileCache.delete(point.id);
+		setProfile(null);
+		setFetchError(false);
+		setFetching(true);
+		setReloadToken((t) => t + 1);
+	};
 	const meta = point.meta;
 	const displayName = meta.displayName?.trim() || 'User';
 	const canMessage = profile?.relationship?.canMessage ?? 'none';
@@ -281,7 +287,7 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull, onLik
 	const ctaSkeleton = <View key="cta-skeleton" style={[styles.primaryBtn, styles.ctaSkeleton, styles.ctaFlex]} accessibilityLabel="Loading actions" />;
 
 	let actionOrder: React.ReactNode[];
-	if (!relationshipKnown) actionOrder = [ctaSkeleton, profileButton];
+	if (!relationshipKnown) actionOrder = fetching ? [ctaSkeleton, profileButton] : [profileButton];
 	else if (blocked) actionOrder = [profileButton];
 	else if (isDating) actionOrder = datingMatched || preferMessagePrimary ? [messageButton, profileButton] : datingActionsAllowed ? [likeButton, passButton, profileButton] : [profileButton];
 	else if (preferMessagePrimary) actionOrder = [messageButton, profileButton];
@@ -315,7 +321,7 @@ function UserCard({point, waving, onWave, onClose, viewerMode, onOpenFull, onLik
 				{mutualCount > 0 ? <TouchableOpacity style={styles.compatStat} onPress={openMutualFriends} accessibilityRole="button" accessibilityLabel={`${mutualCount} mutual friends`}><Text style={styles.compatValue}>{mutualCount}</Text><Text style={styles.compatLabel}>Mutual friends</Text></TouchableOpacity> : null}
 			</View>
 		) : null}
-		{fetching && profile == null ? <ActivityIndicator color={colors.primary} size="small" style={{alignSelf: 'center'}} /> : null}
+		{fetching && profile == null ? <View accessibilityRole="progressbar" accessibilityLabel="Loading nearby profile"><ActivityIndicator color={colors.primary} size="small" style={{alignSelf: 'center'}} /><Text style={styles.fetchErrorText}>Loading profile…</Text></View> : null}
 		{fetchError && profile == null ? <View style={styles.fetchErrorRow}><Text style={styles.fetchErrorText}>Could not load profile</Text><TouchableOpacity onPress={onRetryProfile} accessibilityRole="button" accessibilityLabel={retryProfileLabel} hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}><Text style={styles.fetchErrorRetry}>{retryProfileLabel}</Text></TouchableOpacity></View> : null}
 		<View style={styles.actions}>{actionOrder}</View>
 		{!fetching && profile != null ? <TouchableOpacity style={styles.trustBlock} onPress={() => openProfile('trust')} accessibilityRole="button" accessibilityLabel="View trust on profile" activeOpacity={0.85}><ProfileTrustBlock verification={profile.verification} idVerified={profile.idVerified} verificationScore={profile.verificationScore} /></TouchableOpacity> : null}
