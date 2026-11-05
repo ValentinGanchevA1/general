@@ -13,10 +13,10 @@ on:
         required: false
         default: "alpha"
       publish:
-        description: "Upload the AAB to Play (requires PLAY_SERVICE_ACCOUNT_JSON secret)"
+        description: "Explicitly opt in to Play upload (default is safe build-only; requires PLAY_SERVICE_ACCOUNT_JSON)"
         type: boolean
         required: false
-        default: true
+        default: false
       status:
         description: "Release status on the track"
         type: choice
