@@ -1,0 +1,60 @@
+# Ensure NEXA discovery can compile against every real migration, not only
+# the minimal physical tables used by the 10k/50k/100k service benchmarks.
+name: Discovery Full-Schema PostGIS Smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'apps/backend/migrations/**'
+      - 'apps/backend/scripts/migrate.js'
+      - 'apps/backend/scripts/verify-discovery-schema.mjs'
+      - '.github/workflows/discovery-full-schema-smoke.yml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  full-schema:
+    name: all migrations and discoverable view
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: nexa_schema
+          POSTGRES_PASSWORD: nexa_schema
+          POSTGRES_DB: nexa_schema_bench
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U nexa_schema -d nexa_schema_bench"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://nexa_schema:nexa_schema@127.0.0.1:5432/nexa_schema_bench
+      DISCOVERY_FULL_SCHEMA_ACK_DISPOSABLE: 'YES'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate disposable localhost-only target BEFORE migration
+        run: node apps/backend/scripts/verify-discovery-schema.mjs --preflight
+      - name: Apply all production migrations to fresh disposable PostGIS
+        run: pnpm --filter @g88/backend migration:run
+      - name: Check exact migration tracker and Discovery/full-chat schema
+        run: node apps/backend/scripts/verify-discovery-schema.mjs
+        working-directory: apps/backend
+      - name: Confirm idempotent migration rerun
+        run: |
+          pnpm --filter @g88/backend migration:run
+          node apps/backend/scripts/verify-discovery-schema.mjs
+        working-directory: apps/backend
