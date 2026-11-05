@@ -52,9 +52,7 @@ jobs:
         run: pnpm --filter @g88/backend migration:run
       - name: Check exact migration tracker and Discovery/full-chat schema
         run: node apps/backend/scripts/verify-discovery-schema.mjs
-        working-directory: apps/backend
       - name: Confirm idempotent migration rerun
         run: |
           pnpm --filter @g88/backend migration:run
           node apps/backend/scripts/verify-discovery-schema.mjs
-        working-directory: apps/backend
