@@ -8,6 +8,7 @@ import type { AuthTokens, ApiError } from '@g88/shared';
 
 import { tokenStore } from './tokenStore';
 import { reportDiscoveryApiFailure } from './reportDiscoveryApiFailure';
+import { transportFailureCode } from './transportFailureCode';
 import { Config } from '@/config';
 import { trackSuccessfulProductApiCall } from '@/lib/analytics';
 
@@ -177,7 +178,7 @@ function normalizeError(err: unknown): ApiError {
   }
   return {
     statusCode: 0,
-    code: 'network',
+    code: transportFailureCode(err),
     message: err instanceof Error ? err.message : 'Network error',
   };
 }
