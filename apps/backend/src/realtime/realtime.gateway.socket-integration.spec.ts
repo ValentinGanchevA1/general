@@ -248,13 +248,15 @@ describe('RealtimeGateway real Socket.IO revocation integration', () => {
   let socketUrl: string;
   let blocked = false;
   let locationUpdate: jest.Mock;
+  let getRecipientIds: jest.Mock<Promise<string[]>, [string, boolean?]>;
   const clients: SocketIoWireClient[] = [];
 
   beforeAll(async () => {
     locationUpdate = jest.fn(async () => ({ conversationId, updatedAt }));
-    const getRecipientIds = jest.fn(async (): Promise<string[]> =>
-      blocked ? [] : [sharerId, peerId],
-    );
+    getRecipientIds = jest.fn(async (
+      _conversationId: string,
+      _dmOnly?: boolean,
+    ): Promise<string[]> => blocked ? [] : [sharerId, peerId]);
     const dbQuery = jest.fn(async (sql: string): Promise<unknown[]> => {
       if (sql.includes('INSERT INTO user_blocks')) {
         blocked = true;
@@ -371,6 +373,59 @@ describe('RealtimeGateway real Socket.IO revocation integration', () => {
     expect(peerUpdates).toEqual([]);
     await expect(roomUserIds(gateway, room)).resolves.toEqual([peerId]);
   });
+
+  it('rolls back a room join when membership is revoked between the two authorization checks', async () => {
+    blocked = false;
+    getRecipientIds.mockReset()
+      .mockResolvedValueOnce([sharerId, peerId])
+      .mockResolvedValueOnce([]);
+
+    const peer = new SocketIoWireClient(socketUrl);
+    clients.push(peer);
+    await peer.connect(peerId);
+    const room = `convo:${conversationId}`;
+    // Clear any intentionally stale room memberships from earlier scenarios.
+    gateway.server.in(`user:${peerId}`).socketsLeave(room);
+
+    try {
+      await expect(
+        peer.emitWithAck<AckResult<{ joined: true }>>('conversation:join', { conversationId }),
+      ).resolves.toEqual({ ok: false, code: 'chat.forbidden', message: 'Not a participant' });
+      await expect(roomUserIds(gateway, room)).resolves.not.toContain(peerId);
+      expect(getRecipientIds).toHaveBeenCalledTimes(2);
+    } finally {
+      getRecipientIds.mockImplementation(async (): Promise<string[]> =>
+        blocked ? [] : [sharerId, peerId],
+      );
+    }
+  });
+
+  it('cleans up room membership if the post-join authorization query fails', async () => {
+    blocked = false;
+    getRecipientIds.mockReset()
+      .mockResolvedValueOnce([sharerId, peerId])
+      .mockRejectedValueOnce(new Error('temporary authorization lookup failure'));
+
+    const peer = new SocketIoWireClient(socketUrl);
+    clients.push(peer);
+    await peer.connect(peerId);
+    const room = `convo:${conversationId}`;
+    gateway.server.in(`user:${peerId}`).socketsLeave(room);
+
+    try {
+      const response = await peer.emitWithAck<AckResult<{ joined: true }>>(
+        'conversation:join', { conversationId },
+      );
+      expect(response.ok).toBe(false);
+      await expect(roomUserIds(gateway, room)).resolves.not.toContain(peerId);
+      expect(getRecipientIds).toHaveBeenCalledTimes(2);
+    } finally {
+      getRecipientIds.mockImplementation(async (): Promise<string[]> =>
+        blocked ? [] : [sharerId, peerId],
+      );
+    }
+  });
+
 });
 
 async function roomUserIds(gateway: RealtimeGateway, room: string): Promise<string[]> {
