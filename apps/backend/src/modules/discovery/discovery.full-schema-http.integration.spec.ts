@@ -263,7 +263,7 @@ suite('NEXA full migrated PostGIS + JWT login + real Friends + Redis/HTTP', () =
     // stages. Owner IDs are deterministic and reference already seeded users.
     // The only new physical table is the disposable, benchmark-owned positions.
     const database = db;
-    let seededUsers = INITIAL_USERS;
+    let seededUsers: number = INITIAL_USERS;
     let seededEvents = 0;
     let seededListings = 0;
 
