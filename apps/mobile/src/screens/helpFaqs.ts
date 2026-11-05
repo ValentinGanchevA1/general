@@ -10,7 +10,7 @@ export const NEXA_HELP_FAQS: HelpFaq[] = [
   },
   {
     q: 'How do I hide myself from the map?',
-    a: 'Open You → My map presence and turn map presence off. You stay logged in and can still browse; others will not see you in nearby discovery.',
+    a: 'Open Identity → Settings → Appear on map and turn it off. You stay logged in and can still browse; others will not see you in nearby discovery.',
   },
   {
     q: 'What is Pulse?',
