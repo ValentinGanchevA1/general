@@ -129,6 +129,7 @@ export function useDiscovery({
   const [data, setData] = useState<DiscoveryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [budgetRetryTick, setBudgetRetryTick] = useState(0);
 
   useEffect(() => {
     mapDiscoveryRankStore.set(rankBy);
@@ -212,7 +213,7 @@ export function useDiscovery({
         if (budgetTimerRef.current) clearTimeout(budgetTimerRef.current);
         budgetTimerRef.current = setTimeout(() => {
           budgetTimerRef.current = null;
-          void fetchNow(vp, z, k, t, lm, mk, fo, dating, rb);
+          setBudgetRetryTick((tick) => tick + 1);
         }, budgetDelayMs);
         return;
       }
@@ -349,6 +350,7 @@ export function useDiscovery({
     rankBy,
     debounceMs,
     fetchNow,
+    budgetRetryTick,
   ]);
 
   useEffect(() => {
