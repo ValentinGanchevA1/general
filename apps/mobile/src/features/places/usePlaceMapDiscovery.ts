@@ -13,6 +13,7 @@ import type { DiscoveryRankBy, MapDiscoveryResponse, Viewport } from '@g88/share
 import { postJson } from '@/api/client';
 import { useAppDispatch } from '@/hooks/redux';
 import { mapDiscoveryRankStore } from '@/features/map/mapDiscoveryRank.store';
+import { DiscoveryRequestBudget } from '@/features/discovery/discoveryRequestBudget';
 import {
   clearPlaceMapNewCount,
   setPlaceMapNewCount,
@@ -67,6 +68,8 @@ export function usePlaceMapDiscovery({
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastKeyRef = useRef('');
+  const requestBudgetRef = useRef(new DiscoveryRequestBudget());
+  const budgetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seenPlaceKeysRef = useRef<Set<string>>(new Set());
   const normalizedQuery = normalizePlaceMapSearch(query);
   const rankBy = useSyncExternalStore(
@@ -88,6 +91,17 @@ export function usePlaceMapDiscovery({
       rankBy: nextRankBy,
     });
     if (key === lastKeyRef.current) return;
+
+    const budgetDelayMs = requestBudgetRef.current.tryAcquire(Date.now());
+    if (budgetDelayMs > 0) {
+      if (budgetTimerRef.current) clearTimeout(budgetTimerRef.current);
+      budgetTimerRef.current = setTimeout(() => {
+        budgetTimerRef.current = null;
+        void fetchNow(nextViewport, nextZoom, nextQuery, nextRankBy);
+      }, budgetDelayMs);
+      return;
+    }
+
     lastKeyRef.current = key;
 
     abortRef.current?.abort();
@@ -131,6 +145,8 @@ export function usePlaceMapDiscovery({
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    if (budgetTimerRef.current) clearTimeout(budgetTimerRef.current);
+    budgetTimerRef.current = null;
     if (!enabled || viewport == null) {
       abortRef.current?.abort();
       abortRef.current = null;
@@ -191,12 +207,15 @@ export function usePlaceMapDiscovery({
 
   useEffect(() => () => {
     abortRef.current?.abort();
+    if (budgetTimerRef.current) clearTimeout(budgetTimerRef.current);
     publicPlaceTrendingStore.clear();
     dispatch(clearPlaceMapNewCount());
   }, [dispatch]);
 
   const refresh = useCallback(() => {
     if (!enabled || viewport == null) return;
+    if (budgetTimerRef.current) clearTimeout(budgetTimerRef.current);
+    budgetTimerRef.current = null;
     lastKeyRef.current = '';
     void fetchNow(viewport, zoom, normalizedQuery, rankBy);
   }, [enabled, fetchNow, normalizedQuery, rankBy, viewport, zoom]);
