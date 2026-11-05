@@ -75,13 +75,15 @@ checked for:
 - native dark launch → NEXA eye/light-streak animation → spatial handoff with no white flash;
 - logged-out and incomplete-profile cold starts do not show the map halo;
 - Reduced Motion behavior;
-- Map / Discover / Pulse / Connections / You canonical navigation;
+- Current mobile navigation v3: Map / Experiences / Opportunities / Connections / Identity; Experiences and Opportunities are Map lenses, not separate maps; legacy Discover/Pulse/You routes remain hidden for compatibility;
 - person circle / event star / listing square / opportunity diamond identity where applicable;
 - light / dark / system / PROTOS NEXUS theme behavior;
 - no visible legacy `G88` product branding;
 - no public numeric trust/popularity score or trust-booster language;
 - privacy-safe map presence and no exact-coordinate exposure;
 - TalkBack, larger text and 44dp interaction targets.
+
+> **Navigation QA baseline note (2026-11-05):** Issue #580 documents the older, frozen RC3 navigation baseline (Map / Discover / Pulse / Connections / You). For any new Android v3 APK, follow [the v3 device regression matrix](IA_NAVIGATION.md) and record the exact build run, commit SHA, APK SHA-256, Android version and device evidence. Passing the RC3 checklist alone does not sign off navigation v3.
 
 ## Current residual risk
 
