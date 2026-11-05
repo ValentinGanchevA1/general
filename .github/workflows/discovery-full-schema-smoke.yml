@@ -23,7 +23,7 @@ jobs:
   full-schema:
     name: all migrations and discoverable view
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     services:
       postgres:
         image: postgis/postgis:16-3.4
@@ -67,7 +67,7 @@ jobs:
           node apps/backend/scripts/verify-discovery-schema.mjs
       - name: Build shared TypeScript contracts
         run: pnpm --filter @g88/shared build
-      - name: Real JWT login and 10-client Discovery HTTP on full schema and Redis
+      - name: Profile 10k 50k 100k mixed-kind JWT HTTP Redis + PostgreSQL waits
         run: >-
           pnpm --filter @g88/backend exec jest --ci --runInBand
           --runTestsByPath src/modules/discovery/discovery.full-schema-http.integration.spec.ts
