@@ -18,12 +18,14 @@ describe('DiscoveryRequestBudget', () => {
   it('resumes once the oldest attempt expires and preserves the sliding window', () => {
     const budget = new DiscoveryRequestBudget();
     for (let i = 0; i < DISCOVERY_REQUEST_BUDGET_LIMIT; i += 1) {
-      expect(budget.tryAcquire(i)).toBe(0);
+      expect(budget.tryAcquire(0)).toBe(0);
     }
     expect(budget.tryAcquire(500)).toBe(DISCOVERY_REQUEST_BUDGET_WINDOW_MS - 500 + 1);
-    expect(budget.tryAcquire(DISCOVERY_REQUEST_BUDGET_WINDOW_MS)).toBe(0);
-    expect(budget.tryAcquire(DISCOVERY_REQUEST_BUDGET_WINDOW_MS + 1)).toBe(0);
-    expect(budget.tryAcquire(DISCOVERY_REQUEST_BUDGET_WINDOW_MS + 10)).toBeGreaterThan(0);
+    expect(budget.tryAcquire(DISCOVERY_REQUEST_BUDGET_WINDOW_MS - 1)).toBeGreaterThan(0);
+    for (let i = 0; i < DISCOVERY_REQUEST_BUDGET_LIMIT; i += 1) {
+      expect(budget.tryAcquire(DISCOVERY_REQUEST_BUDGET_WINDOW_MS)).toBe(0);
+    }
+    expect(budget.tryAcquire(DISCOVERY_REQUEST_BUDGET_WINDOW_MS + 1)).toBeGreaterThan(0);
   });
 
   it('does not consume additional budget while a request is waiting', () => {
