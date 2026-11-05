@@ -75,8 +75,8 @@ suite('NEXA full migrated PostGIS + JWT login + real Friends + Redis/HTTP', () =
   afterAll(async () => {
     if (app) await app.close();
     if (redis) {
-      const keys = [...createdSnapshotKeys, 'presence:user:nexa-full-schema-not-used'];
-      // The two real presence keys use the synthetic friend ID, added below.
+      const keys = [...createdSnapshotKeys];
+      // Presence keys and every request snapshot are registered during the test.
       if (keys.length > 0) await redis.del(...keys);
       redis.disconnect();
     }
