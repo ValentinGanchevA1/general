@@ -15,6 +15,12 @@ describe('NEXA release-visible copy guard', () => {
     expect(helpCopy).not.toContain('Interactions is a focused inbox');
   });
 
+  it('directs users to the current Identity settings for map visibility', () => {
+    const entry = NEXA_HELP_FAQS.find(({ q }) => q === 'How do I hide myself from the map?');
+    expect(entry?.a).toContain('Identity → Settings → Appear on map');
+    expect(entry?.a).not.toContain('Open You');
+  });
+
   it('keeps verification factual and score-free', () => {
     expect(helpCopy).toContain(
       'They do not create a public trust or popularity score.',
