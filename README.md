@@ -1,4 +1,4 @@
-# NEXA
+# NEXUS
 
 Map-first, real-time social platform for discovering nearby people, events, local activity, and listings — then connecting through lightweight interactions, chat, events, and local trade.
 
@@ -46,8 +46,8 @@ pnpm workspaces. Import contracts only from `@g88/shared`. Never import from `le
 
 ### Compatibility identifiers
 
-NEXA is the public product identity. Existing technical identifiers such as `@g88/*`, Android package/application ID `com.g88`, storage keys, and legacy infrastructure host names are intentionally retained until/unless they receive a separately planned compatibility migration. Do not mechanically rename them as branding cleanup.
+NEXUS is the public product identity. Existing technical identifiers such as `@g88/*`, Android package/application ID `com.g88`, storage keys, and legacy infrastructure host names are intentionally retained until/unless they receive a separately planned compatibility migration. Do not mechanically rename them as branding cleanup.
 
 ## License / ops
 
-Internal product. Canonical public privacy policy: `https://g88-legal.onrender.com/privacy` (legacy-compatible infrastructure URL; hosted content is NEXA-branded).
+Internal product. Canonical public privacy policy: `https://g88-legal.onrender.com/privacy` (legacy-compatible infrastructure URL; hosted content is NEXUS-branded).
