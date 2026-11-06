@@ -113,6 +113,36 @@ describe('Portal Entry EventDetail integration', () => {
     expect(rsvpToEvent).not.toHaveBeenCalled();
   });
 
+  it('distinguishes backend ended conflicts and refreshes without claiming capacity is full', async () => {
+    jest.mocked(rsvpToEvent).mockRejectedValueOnce({
+      statusCode: 409,
+      code: 'event.ended',
+      message: 'internal event state',
+    });
+    const { screen, refresh } = setup();
+
+    fireEvent.press(screen.getByTestId('event-rsvp-going'));
+    await waitFor(() => expect(screen.getByTestId('portal-rsvp-error')).toBeTruthy());
+    expect(screen.getByText('This event has ended. RSVP changes are unavailable.')).toBeTruthy();
+    expect(screen.queryByText(/may be full/i)).toBeNull();
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides cached event data immediately when an RSVP returns access revoked', async () => {
+    jest.mocked(rsvpToEvent).mockRejectedValueOnce({
+      statusCode: 404,
+      code: 'event.not_found',
+      message: 'hidden private venue',
+    });
+    const { screen } = setup();
+
+    fireEvent.press(screen.getByTestId('event-rsvp-going'));
+    await waitFor(() => expect(screen.queryByText('Sea Garden Meet-up')).toBeNull());
+    const empty = screen.UNSAFE_getByType('EmptyState');
+    expect(empty.props.title).toBe('Portal unavailable');
+    expect(empty.props.body).not.toContain('hidden private venue');
+  });
+
   it('prevents changes to past events through a Portal entry', () => {
     const ended: EventDetail = {
       ...event,
