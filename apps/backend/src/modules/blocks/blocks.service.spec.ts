@@ -8,6 +8,7 @@ import { FriendsService } from '../friends/friends.service';
 import { BlocksService } from './blocks.service';
 
 describe('BlocksService', () => {
+  const previousFlag = process.env.ROOM_REVOCATION_OUTBOX_ENABLED;
   let service: BlocksService;
   let query: jest.Mock;
   let onBlock: jest.Mock;
@@ -18,6 +19,7 @@ describe('BlocksService', () => {
   const B = '22222222-2222-2222-2222-222222222222';
 
   beforeEach(async () => {
+    process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'true';
     query = jest.fn().mockResolvedValue([]);
     onBlock = jest.fn().mockResolvedValue(undefined);
     leaveSharedGroupsForBlock = jest.fn().mockResolvedValue([]);
@@ -32,6 +34,11 @@ describe('BlocksService', () => {
       ],
     }).compile();
     service = mod.get(BlocksService);
+  });
+
+  afterAll(() => {
+    if (previousFlag === undefined) delete process.env.ROOM_REVOCATION_OUTBOX_ENABLED;
+    else process.env.ROOM_REVOCATION_OUTBOX_ENABLED = previousFlag;
   });
 
   it('rejects blocking yourself without querying', async () => {
