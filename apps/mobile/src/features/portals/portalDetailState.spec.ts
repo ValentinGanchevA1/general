@@ -3,6 +3,7 @@ import {
   canSubmitPortalRsvp,
   resolvePortalDetailState,
   resolvePortalLoadPresentation,
+  resolvePortalRsvpFailure,
 } from './portalDetailState';
 
 const now = Date.parse('2026-11-06T11:00:00.000Z');
@@ -109,5 +110,48 @@ describe('Portal safe load copy', () => {
       body: 'Sign in to access this event.',
       canRetry: false,
     });
+  });
+});
+
+describe('Portal RSVP failure presentation', () => {
+  it('distinguishes event.ended from event.full even though both are HTTP 409', () => {
+    const ended = resolvePortalRsvpFailure({
+      statusCode: 409, code: 'event.ended', message: 'database detail',
+    });
+    const full = resolvePortalRsvpFailure({
+      statusCode: 409, code: 'event.full',
+    });
+    expect(ended.message).toBe('This event has ended. RSVP changes are unavailable.');
+    expect(full.message).toBe('This event is at capacity. Refresh to check availability.');
+    expect(ended.requiresRefresh).toBe(true);
+    expect(full.requiresRefresh).toBe(true);
+    expect(ended.message).not.toContain('database');
+  });
+
+  it('uses a neutral message for unrecognized conflicts', () => {
+    expect(resolvePortalRsvpFailure({ statusCode: 409, code: 'unknown' }).message)
+      .toBe('Event availability has changed. Refresh before responding.');
+  });
+
+  it.each([401, 403, 404])('immediately hides stale details on %i access loss', (statusCode) => {
+    const result = resolvePortalRsvpFailure({ statusCode, message: 'sensitive internals' });
+    expect(result.accessLost).toBe(true);
+    expect(result.statusCode).toBe(statusCode);
+    expect(result.requiresRefresh).toBe(false);
+    expect(result.message).not.toContain('sensitive');
+  });
+
+  it('prompts revalidation after transient or unrecognized failures', () => {
+    for (const err of [
+      { statusCode: 0, message: 'network error' },
+      { statusCode: 500, message: 'database error' },
+      new Error('transport error'),
+    ]) {
+      const result = resolvePortalRsvpFailure(err);
+      expect(result.accessLost).toBe(false);
+      expect(result.requiresRefresh).toBe(true);
+      expect(result.message).toContain('Refresh');
+      expect(result.message).not.toContain('database');
+    }
   });
 });
