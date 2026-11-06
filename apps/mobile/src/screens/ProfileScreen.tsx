@@ -30,6 +30,8 @@ import { fetchProfile } from '@/features/profile/profileSlice';
 import { useProfileScreenData } from '@/features/profile/useProfileScreenData';
 import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline';
 import { useAppSelector } from '@/hooks/redux';
+import { WORLD_MODES } from '@/features/worldModes/worldModes';
+import { useWorldModeVisuals } from '@/features/worldModes/useWorldModeVisuals';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { openTrustCenter } from '@/navigation/openTrust';
@@ -71,6 +73,9 @@ function createStyles(colors: ThemeColors) {
     content: { paddingBottom: spacing.xxl },
     hero: { height: 158, backgroundColor: colors.surfacePrimary, overflow: 'hidden', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderSubtle },
     heroGlowAction: { position: 'absolute', width: 220, height: 220, borderRadius: 110, right: -72, top: -100, backgroundColor: colors.actionGhost },
+    worldChip: { marginTop: spacing.md, marginHorizontal: spacing.xl, minHeight: 48, paddingHorizontal: spacing.lg, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    worldChipText: { color: colors.textPrimary, fontSize: 13, fontWeight: '800' },
+    worldChipAction: { color: colors.textSecondary, fontSize: 12, fontWeight: '700' },
     heroGlowDiscovery: { position: 'absolute', width: 170, height: 170, borderRadius: 85, left: -72, bottom: -118, backgroundColor: colors.discoverySoft },
     heroHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: spacing.xl },
     heroCopy: { flex: 1, paddingRight: spacing.md },
@@ -133,6 +138,7 @@ function useProfileStyles() {
 
 export function ProfileScreen(): React.JSX.Element {
   const { colors } = useAppTheme();
+  const worldVisuals = useWorldModeVisuals();
   const S = useProfileStyles();
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
@@ -172,6 +178,7 @@ export function ProfileScreen(): React.JSX.Element {
   const activityLine = useMemo(() => formatNexaProfileActivitySummary({ level: gamification?.level, currentStreak: gamification?.currentStreak }), [gamification]);
   const openTrust = useCallback(() => openTrustCenter(navigation), [navigation]);
   const openSettings = useCallback(() => openRootScreen(navigation, 'Settings'), [navigation]);
+  const openWorldModes = useCallback(() => navigation.navigate('Account', { screen: 'WorldModes' }), [navigation]);
   const openEdit = useCallback(() => openRootScreen(navigation, 'ProfileEdit'), [navigation]);
   const openSavedPlaces = useCallback(() => navigation.navigate('Account', { screen: 'SavedPlaces' }), [navigation]);
 
@@ -196,11 +203,11 @@ export function ProfileScreen(): React.JSX.Element {
       showsVerticalScrollIndicator={false}
     >
       <View style={S.hero}>
-        <View style={S.heroGlowAction} />
+        <View style={[S.heroGlowAction, worldVisuals.active ? { backgroundColor: worldVisuals.glow } : undefined]} />
         <View style={S.heroGlowDiscovery} />
         <View style={[S.heroHeader, { paddingTop: insets.top + 14 }]}>
           <View style={S.heroCopy}>
-            <Text style={S.eyebrow}>NEXA</Text>
+            <Text style={[S.eyebrow, worldVisuals.active ? { color: worldVisuals.accent } : undefined]}>NEXA</Text>
             <Text style={S.heroTitle}>Identity</Text>
             <Text style={S.heroSub}>Your verified presence in your local world</Text>
           </View>
@@ -229,6 +236,21 @@ export function ProfileScreen(): React.JSX.Element {
         <SummaryCell value={String(friendsCount)} label="Friends" divided />
         <SummaryCell value={levelValue} label="Level" divided />
       </View>
+
+      {worldVisuals.id ? (
+        <Pressable
+          testID="profile-world-mode-chip"
+          style={[S.worldChip, { borderColor: worldVisuals.accent, backgroundColor: worldVisuals.glow }]}
+          onPress={openWorldModes}
+          accessibilityRole="button"
+          accessibilityLabel={'World Mode ' + WORLD_MODES[worldVisuals.id].label + '. Change mode.'}
+        >
+          <Text style={[S.worldChipText, { color: worldVisuals.accent }]}>
+            {WORLD_MODES[worldVisuals.id].symbol + '  ' + WORLD_MODES[worldVisuals.id].label.toUpperCase()}
+          </Text>
+          <Text style={S.worldChipAction}>Change ›</Text>
+        </Pressable>
+      ) : null}
 
       <View style={S.sectionHeader}>
         <Text style={S.sectionTitle}>About me</Text>

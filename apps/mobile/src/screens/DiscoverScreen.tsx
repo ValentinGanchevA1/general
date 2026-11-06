@@ -9,6 +9,8 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
+import { WORLD_MODES } from '@/features/worldModes/worldModes';
+import { useWorldModeVisuals } from '@/features/worldModes/useWorldModeVisuals';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type DiscoverTone = 'discovery' | 'action' | 'neutral';
@@ -60,6 +62,7 @@ const LANES: readonly DiscoverLane[] = [
 
 export function DiscoverScreen(): React.JSX.Element {
   const { colors } = useAppTheme();
+  const worldVisuals = useWorldModeVisuals();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation<Nav>();
 
@@ -83,12 +86,14 @@ export function DiscoverScreen(): React.JSX.Element {
     <View style={styles.root}>
       <ScreenHeader title="Discover" bordered />
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.hero} accessibilityRole="summary">
-          <View style={styles.heroGlyph}>
+        <View style={[styles.hero, worldVisuals.active ? { borderColor: worldVisuals.accent } : undefined]} accessibilityRole="summary">
+          <View style={[styles.heroGlyph, worldVisuals.active ? { backgroundColor: worldVisuals.glow, borderColor: worldVisuals.accent } : undefined]}>
             <MaterialCommunityIcons name="compass-outline" size={24} color={colors.discovery} />
           </View>
           <View style={styles.heroCopy}>
-            <Text style={styles.eyebrow}>NEXA DISCOVERY</Text>
+            <Text style={[styles.eyebrow, worldVisuals.active ? { color: worldVisuals.accent } : undefined]}>
+              {worldVisuals.id ? 'NEXA // ' + WORLD_MODES[worldVisuals.id].label.toUpperCase() : 'NEXA DISCOVERY'}
+            </Text>
             <Text style={styles.heroTitle}>Choose a local discovery lane</Text>
             <Text style={styles.heroBody}>
               The map stays home. Discover gives you focused paths into people, events and local activity.

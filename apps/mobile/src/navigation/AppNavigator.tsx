@@ -16,6 +16,8 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 
 import { useAppTheme, type ThemeColors } from '@/theme';
+import { WORLD_MODES_ENABLED } from '@/features/worldModes/worldModes';
+import { hydrateWorldMode } from '@/features/worldModes/worldModesSlice';
 
 import { MapScreen } from '@/screens/MapScreen';
 import { DiscoverScreen } from '@/screens/DiscoverScreen';
@@ -28,6 +30,7 @@ import { ProfileEditScreen } from '@/screens/ProfileEditScreen';
 import { PhotosScreen } from '@/screens/PhotosScreen';
 import { ChatScreen } from '@/screens/ChatScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
+import { WorldModesScreen } from '@/features/worldModes/WorldModesScreen';
 import { AlertComposerScreen } from '@/screens/AlertComposerScreen';
 import { VerificationScreen } from '@/screens/VerificationScreen';
 import EmailVerificationScreen from '@/screens/EmailVerificationScreen';
@@ -129,6 +132,7 @@ function AccountNavigator(): React.JSX.Element {
 	const screenOptions = useStackScreenOptions();
 	return <AccountStack.Navigator screenOptions={screenOptions}>
 		<AccountStack.Screen name="Settings" component={SettingsScreen} />
+		<AccountStack.Screen name="WorldModes" component={WorldModesScreen} options={{ headerShown: false }} />
 		<AccountStack.Screen name="TrustCenter" component={TrustCenterScreen} options={{ headerShown: false, title: 'Trust' }} />
 		<AccountStack.Screen name="Privacy" component={PrivacyScreen} /><AccountStack.Screen name="Help" component={HelpScreen} /><AccountStack.Screen name="About" component={AboutScreen} /><AccountStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} /><AccountStack.Screen name="BlockedUsers" component={BlockedUsersScreen} /><AccountStack.Screen name="Verification" component={VerificationScreen} />
 		<AccountStack.Screen name="EmailVerification" component={EmailVerificationScreen} options={{ title: 'Verify email', presentation: 'modal' }} />
@@ -368,6 +372,11 @@ export function AppNavigator(): React.JSX.Element {
 	const navigationTheme = useMemo(() => buildNavigationTheme(themeColors, scheme === 'dark'), [themeColors, scheme]);
 
 	useEffect(() => { void dispatch(restoreSession()); }, [dispatch]);
+	useEffect(() => {
+		if (WORLD_MODES_ENABLED && userId && !restoring) {
+			void dispatch(hydrateWorldMode(userId));
+		}
+	}, [dispatch, userId, restoring]);
 	useEffect(() => {
 		let active = true;
 		const acceptUrl = (url: string | null): void => {
