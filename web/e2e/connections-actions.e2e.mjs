@@ -36,7 +36,7 @@ const html = `<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>NEXA Connections E2E</title>
+  <title>NEXUS Connections E2E</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/map.css">
   <link rel="stylesheet" href="/connections.css">
@@ -218,7 +218,7 @@ try {
     'ack + chat:message duplicate rendered the outgoing message twice',
   );
 
-  console.log('NEXA Connections E2E passed: friend accept, wave-back, history/read, room join, chat send, event dedupe and peer receive.');
+  console.log('NEXUS Connections E2E passed: friend accept, wave-back, history/read, room join, chat send, event dedupe and peer receive.');
 } catch (error) {
   const chromeErrors = runtime.errors();
   if (chromeErrors) console.error(chromeErrors);
