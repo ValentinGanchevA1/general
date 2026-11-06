@@ -50,4 +50,9 @@ NEXA is the public product identity. Existing technical identifiers such as `@g8
 
 ## License / ops
 
-Internal product. Canonical public privacy policy: `https://g88-legal.onrender.com/privacy` (legacy-compatible infrastructure URL; hosted content is NEXA-branded).
+Proprietary product. Copyright © 2026 Valentin Ganchev. All rights reserved.
+See [NOTICE.md](NOTICE.md). No open-source license is granted for original NEXA
+code owned by the rights holder; third-party dependencies retain their own
+licenses.
+
+Canonical public privacy policy: `https://g88-legal.onrender.com/privacy` (legacy-compatible infrastructure URL; hosted content is NEXA-branded).
