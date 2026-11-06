@@ -45,64 +45,23 @@ export function buildNexaPushData(
 }
 
 /** Privacy-safe lock-screen copy. Detail is revealed only after authenticated re-entry. */
+const lockScreenCopyByKind = {
+  'interaction.wave': ['A wave reached you', 'Open NEXUS to see the interaction.'],
+  'interaction.gift': ['You received a gift', 'Open NEXUS to see what arrived.'],
+  'interaction.message': ['New message', 'Open NEXUS to read it.'],
+  'interaction.connection-request': ['New connection request', 'Review it in NEXUS.'],
+  'interaction.connection-accepted': ['Connection updated', 'A connection request was accepted.'],
+  'live.nearby-alert': ['A live signal is nearby', "Open NEXUS to see what's happening."],
+  'event.nearby': ['An event surfaced nearby', 'Open NEXUS to view it.'],
+  'marketplace.nearby-listing': ['A marketplace listing surfaced nearby', 'Open NEXUS to view it.'],
+  'trust.id-verified': ['Trust status updated', 'Open NEXUS Trust Center to review your status.'],
+  'trust.id-rejected': ['Trust status needs attention', 'Open NEXUS Trust Center to review the next step.'],
+  'discovery.daily-recap': ['Your NEXUS recap is ready', "Open NEXUS to catch up on today's activity."],
+} as const satisfies Record<NexaNotificationKind, readonly [string, string]>;
+
 export function nexaLockScreenCopy(
   kind: NexaNotificationKind,
 ): { title: string; body: string } {
-  switch (kind) {
-    case 'interaction.wave':
-      return {
-        title: 'A wave reached you',
-        body: 'Open NEXUS to see the interaction.',
-      };
-    case 'interaction.gift':
-      return {
-        title: 'You received a gift',
-        body: 'Open NEXUS to see what arrived.',
-      };
-    case 'interaction.message':
-      return {
-        title: 'New message',
-        body: 'Open NEXUS to read it.',
-      };
-    case 'interaction.connection-request':
-      return {
-        title: 'New connection request',
-        body: 'Review it in NEXUS.',
-      };
-    case 'interaction.connection-accepted':
-      return {
-        title: 'Connection updated',
-        body: 'A connection request was accepted.',
-      };
-    case 'live.nearby-alert':
-      return {
-        title: 'A live signal is nearby',
-        body: "Open NEXUS to see what's happening.",
-      };
-    case 'event.nearby':
-      return {
-        title: 'An event surfaced nearby',
-        body: 'Open NEXUS to view it.',
-      };
-    case 'marketplace.nearby-listing':
-      return {
-        title: 'A marketplace listing surfaced nearby',
-        body: 'Open NEXUS to view it.',
-      };
-    case 'trust.id-verified':
-      return {
-        title: 'Trust status updated',
-        body: 'Open NEXUS Trust Center to review your status.',
-      };
-    case 'trust.id-rejected':
-      return {
-        title: 'Trust status needs attention',
-        body: 'Open NEXUS Trust Center to review the next step.',
-      };
-    case 'discovery.daily-recap':
-      return {
-        title: 'Your NEXUS recap is ready',
-        body: "Open NEXUS to catch up on today's activity.",
-      };
-  }
+  const [title, body] = lockScreenCopyByKind[kind];
+  return { title, body };
 }
