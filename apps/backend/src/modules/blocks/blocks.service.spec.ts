@@ -71,6 +71,18 @@ describe('BlocksService', () => {
     expect(leaveRoomForUsers).toHaveBeenNthCalledWith(4, [A, B], 'convo:conversation-2');
   });
 
+  it('continues social cleanup when queued group eviction dispatch throws', async () => {
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    leaveSharedGroupsForBlock.mockResolvedValueOnce(['group-1']);
+    leaveRoomForUsers.mockImplementationOnce(() => {
+      throw new Error('Redis publisher unavailable');
+    });
+
+    await expect(service.block(A, B)).resolves.toBeUndefined();
+    expect(onBlock).toHaveBeenCalledWith(A, B);
+    expect(leaveRoomForUsers).toHaveBeenCalledWith([A], 'convo:group-1');
+  });
+
   it('does not touch realtime rooms when there are no shared groups or accepted DM', async () => {
     query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
