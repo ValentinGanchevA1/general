@@ -1,7 +1,7 @@
-# NEXA — Specification
+# NEXUS — Specification
 
 > Feature contracts. Types of record: `packages/shared`. Live progress/release state: `docs/STATUS_CURRENT.md`. Sequence/gates: `ROADMAP.md`.  
-> **Compatibility note:** public product identity is **NEXA**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
+> **Compatibility note:** public product identity is **NEXUS**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
 > Last reconciled: **2026-10-26**.
 
 ---
