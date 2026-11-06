@@ -6,5 +6,5 @@ const LEGACY_PUBLIC_BRAND = /\bG88\b/g;
  * through user-facing message copy.
  */
 export function normalizePublicErrorMessage(message: string): string {
-  return message.replace(LEGACY_PUBLIC_BRAND, 'NEXA');
+  return message.replace(LEGACY_PUBLIC_BRAND, 'NEXUS');
 }
