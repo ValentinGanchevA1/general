@@ -195,6 +195,28 @@ describe('GroupConversationsService', () => {
     expect(txQuery.mock.calls.some(([sql]) => String(sql).includes("SET role = 'owner'"))).toBe(false);
   });
 
+  it('preserves old schema behavior with outbox disabled', async () => {
+    const txQuery = jest.fn()
+      .mockResolvedValueOnce([{ id: GROUP_ID }])
+      .mockResolvedValueOnce([{
+        user_id: MEMBER_A,
+        role: 'member',
+        joined_at: '2026-11-01T08:00:00.000Z',
+      }])
+      .mockResolvedValueOnce([]);
+    transaction.mockImplementation(async (work: (tx: EntityManager) => Promise<unknown>) =>
+      work({ query: txQuery } as unknown as EntityManager));
+    process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'false';
+    try {
+      await service.removeMember(MEMBER_A, GROUP_ID, MEMBER_A);
+      expect(txQuery).toHaveBeenCalledTimes(3);
+      expect(txQuery.mock.calls.some(([sql]) =>
+        String(sql).includes('INSERT INTO realtime_room_revocations'))).toBe(false);
+    } finally {
+      process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'true';
+    }
+  });
+
   it('transfers owner to an admin before the owner leaves', async () => {
     const txQuery = jest.fn()
       .mockResolvedValueOnce([{ id: GROUP_ID }])
