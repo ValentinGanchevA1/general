@@ -59,22 +59,61 @@ describe('World Mode async race protection', () => {
     storage.setItem.mockResolvedValue(undefined);
   });
 
-  it('ignores out-of-order hydration completion for the same account', async () => {
+  it('deduplicates hydration for the same signed-in account', async () => {
     const store = makeStore();
-    let resolveFirst: (mode: string | null) => void = () => undefined;
-    const first = new Promise<string | null>((resolve) => {
-      resolveFirst = resolve;
-    });
-    storage.getItem.mockImplementationOnce(() => first);
-    storage.getItem.mockResolvedValueOnce('bazaar');
+    let finishRead: (mode: string | null) => void = () => undefined;
+    storage.getItem.mockImplementationOnce(
+      () => new Promise<string | null>((resolve) => { finishRead = resolve; }),
+    );
 
-    const older = store.dispatch(hydrateWorldMode('user-a'));
-    const newer = store.dispatch(hydrateWorldMode('user-a'));
-    await newer;
-    expect(store.getState().worldModes.selectedId).toBe('bazaar');
-    resolveFirst('noir');
-    await older;
-    expect(store.getState().worldModes.selectedId).toBe('bazaar');
+    const original = store.dispatch(hydrateWorldMode('user-a'));
+    const duplicate = await store.dispatch(hydrateWorldMode('user-a'));
+    expect(duplicate.meta.requestStatus).toBe('rejected');
+    expect(storage.getItem).toHaveBeenCalledTimes(1);
+
+    finishRead('noir');
+    await original;
+    expect(store.getState().worldModes.selectedId).toBe('noir');
+    expect(store.getState().worldModes.hydrated).toBe(true);
+
+    const repeat = await store.dispatch(hydrateWorldMode('user-a'));
+    expect(repeat.meta.requestStatus).toBe('rejected');
+    expect(storage.getItem).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reset a pending activation when hydration is requested again', async () => {
+    const store = makeStore();
+    await store.dispatch(hydrateWorldMode('user-a'));
+    let finishSave: () => void = () => undefined;
+    storage.setItem.mockImplementationOnce(
+      () => new Promise<void>((resolve) => { finishSave = resolve; }),
+    );
+
+    const save = store.dispatch(activateWorldMode({ userId: 'user-a', id: 'nocturne' }));
+    expect(store.getState().worldModes.saving).toBe(true);
+    await store.dispatch(hydrateWorldMode('user-a'));
+    expect(store.getState().worldModes.saving).toBe(true);
+    finishSave();
+    await save;
+    expect(store.getState().worldModes.selectedId).toBe('nocturne');
+    expect(store.getState().worldModes.saving).toBe(false);
+    expect(storage.getItem).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a late hydration from a previous account', async () => {
+    const store = makeStore();
+    let resolveOld: (value: string | null) => void = () => undefined;
+    storage.getItem.mockImplementationOnce(
+      () => new Promise<string | null>((resolve) => { resolveOld = resolve; }),
+    );
+    storage.getItem.mockResolvedValueOnce('sanctuary');
+
+    const oldRead = store.dispatch(hydrateWorldMode('user-a'));
+    await store.dispatch(hydrateWorldMode('user-b'));
+    resolveOld('vanguard');
+    await oldRead;
+    expect(store.getState().worldModes.ownerId).toBe('user-b');
+    expect(store.getState().worldModes.selectedId).toBe('sanctuary');
   });
 
   it('does not write while loading or for a mismatched account', async () => {
