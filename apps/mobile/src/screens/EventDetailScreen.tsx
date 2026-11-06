@@ -2,9 +2,10 @@
 //
 // P3.5 event detail: RSVP + attendee list + live polls + Q&A.
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Image,
   RefreshControl,
   ScrollView,
@@ -87,6 +88,33 @@ export function EventDetailScreen(): React.JSX.Element {
     setRsvpError(null);
     refresh();
   }, [refresh]);
+
+  // A Portal left open across an event's start or end must update status
+  // without requiring the user to pull to refresh or attempting a mutation.
+  // A single bounded timer is active per Portal; no persistent animation.
+  useEffect(() => {
+    if (!portalEntry || event == null || error != null) return;
+    const now = Date.now();
+    const boundaries = [
+      Date.parse(event.startsAt),
+      event.endsAt == null ? Number.NaN : Date.parse(event.endsAt),
+    ].filter((timestamp) => Number.isFinite(timestamp) && timestamp > now);
+    const nearest = boundaries.length === 0 ? null : Math.min(...boundaries);
+    if (nearest === null) return;
+    const delay = Math.min(Math.max(nearest - now + 100, 1), 24 * 60 * 60 * 1000);
+    const timer = setTimeout(() => setPortalAsOf(Date.now()), delay);
+    return () => clearTimeout(timer);
+  }, [portalEntry, event?.startsAt, event?.endsAt, error, portalAsOf]);
+
+  // On foreground restore, revalidate event visibility and blocks as well as
+  // updating its clock. Never assume old event metadata is still authorized.
+  useEffect(() => {
+    if (!portalEntry) return;
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') refreshPortal();
+    });
+    return () => subscription.remove();
+  }, [portalEntry, refreshPortal]);
 
   const onRsvp = useCallback(async (status: RsvpStatus) => {
     if (rsvpBusy) return;
