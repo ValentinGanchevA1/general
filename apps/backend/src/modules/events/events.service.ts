@@ -215,7 +215,8 @@ export class EventsService {
     try {
       // Lock the event row so the access + capacity check + count update are race-free.
       const [event] = await qr.query(
-        `SELECT e.id, e.host_id, e.capacity, e.visibility
+        `SELECT e.id, e.host_id, e.capacity, e.visibility,
+                COALESCE(e.ends_at <= clock_timestamp(), false) AS is_ended
            FROM events e
           WHERE e.id = $1
             AND e.deleted_at IS NULL
@@ -230,6 +231,15 @@ export class EventsService {
       );
       if (!event) {
         throw new NotFoundException({ code: 'event.not_found', message: 'Event not found.' });
+      }
+      // Enforce the same Portal lifecycle rule for every API client,
+      // not only the mobile UI. Use database wall-clock time after row lock
+      // acquisition; an open-ended event (ends_at NULL) remains eligible.
+      if (event.is_ended) {
+        throw new ConflictException({
+          code: 'event.ended',
+          message: 'This event has ended. RSVP changes are unavailable.',
+        });
       }
 
       const [existing] = await qr.query(
