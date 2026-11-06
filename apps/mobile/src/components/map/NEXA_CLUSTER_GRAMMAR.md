@@ -1,4 +1,4 @@
-# NEXA Cluster Visual Grammar v3
+# NEXUS Cluster Visual Grammar v3
 
 Clusters are spatial summaries, not a fourth entity type. Their visual language must preserve the semantic geometry of the entities they contain without turning the map into a pie chart.
 
