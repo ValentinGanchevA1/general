@@ -3,6 +3,7 @@ import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from 'react-nat
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { useAppTheme } from '@/theme';
+import { useWorldModeVisuals } from '@/features/worldModes/useWorldModeVisuals';
 import { NEXA_TAB_VISUALS, type NexaMainTab } from './nexaTabIdentity';
 
 /**
@@ -17,6 +18,7 @@ export function NexaTabIcon({
   focused: boolean;
 }): React.JSX.Element {
   const { colors } = useAppTheme();
+  const worldVisuals = useWorldModeVisuals();
   // React Native Animated.Value is intentionally read as an animated style input
   // during JSX render; only its mutable value is changed inside effects.
   // react-hooks/refs treats this Animated driver as a React ref and flags the
@@ -53,6 +55,10 @@ export function NexaTabIcon({
   const accent = visual.tone === 'discovery' ? colors.discovery : colors.actionPrimary;
   const soft = visual.tone === 'discovery' ? colors.discoverySoft : colors.actionSoft;
   const border = visual.tone === 'discovery' ? colors.discoveryBorderSoft : colors.actionBorderSoft;
+  // Decorative World Mode aura only. Preserve semantic icon/label tones.
+  const haloColor = worldVisuals.active ? worldVisuals.accent : accent;
+  const focusBackground = worldVisuals.active ? worldVisuals.glow : soft;
+  const focusBorder = worldVisuals.active ? worldVisuals.accent : border;
 
   return (
     <View
@@ -60,12 +66,12 @@ export function NexaTabIcon({
       style={[
         styles.stage,
         focused
-          ? { backgroundColor: soft, borderColor: border }
+          ? { backgroundColor: focusBackground, borderColor: focusBorder }
           : styles.inactive,
       ]}
     >
       <Animated.View
-        style={[styles.halo, { backgroundColor: accent, opacity: emphasis.interpolate({
+        style={[styles.halo, { backgroundColor: haloColor, opacity: emphasis.interpolate({
           inputRange: [0, 1], outputRange: [0, 0.12],
         }) }]}
       />
@@ -76,7 +82,7 @@ export function NexaTabIcon({
       />
       <Animated.View
         style={[styles.indicator, {
-          backgroundColor: accent,
+          backgroundColor: haloColor,
           opacity: emphasis,
           transform: [{ scaleX: emphasis }],
         }]}

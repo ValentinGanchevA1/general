@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -23,7 +23,7 @@ import {
   type WorldModeCategory,
   type WorldModeId,
 } from './worldModes';
-import { activateWorldMode, clearWorldModeError, hydrateWorldMode } from './worldModesSlice';
+import { activateWorldMode, clearWorldModeError } from './worldModesSlice';
 
 type CategoryFilter = WorldModeCategory | 'all';
 
@@ -77,10 +77,6 @@ export function WorldModesScreen(): React.JSX.Element {
   const [filter, setFilter] = useState<CategoryFilter>('all');
   const [requestedPreviewId, setRequestedPreviewId] = useState<WorldModeId | null>(null);
   const previewId = requestedPreviewId ?? selectedId;
-
-  useEffect(() => {
-    if (userId && WORLD_MODES_ENABLED) void dispatch(hydrateWorldMode(userId));
-  }, [dispatch, userId]);
 
   const visibleIds = useMemo(
     () => WORLD_MODE_IDS.filter((id) => filter === 'all' || WORLD_MODES[id].category === filter),
