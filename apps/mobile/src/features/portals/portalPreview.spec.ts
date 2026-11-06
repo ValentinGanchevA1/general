@@ -1,6 +1,6 @@
 import type { EventMeta } from '@g88/shared';
 
-import { resolvePortalPreview } from './portalPreview';
+import { portalSheetInitialIndex, resolvePortalPreview } from './portalPreview';
 
 const meta: EventMeta = {
   title: 'Nearby meetup',
@@ -38,6 +38,13 @@ describe('resolvePortalPreview', () => {
     const result = resolvePortalPreview({ ...meta, startsAt: 'invalid-date', capacity: null }, now);
     expect(result.status).toBe('schedule-unavailable');
     expect(result.capacityLabel).toBeNull();
+  });
+
+  it('opens Portal events on the existing expanded sheet, not on a new map surface', () => {
+    expect(portalSheetInitialIndex('event')).toBe(1);
+    expect(portalSheetInitialIndex('user')).toBe(0);
+    expect(portalSheetInitialIndex('listing')).toBe(0);
+    expect(portalSheetInitialIndex(null)).toBe(0);
   });
 
   it('never shows a negative count for bad discovery data', () => {
