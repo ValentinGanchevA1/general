@@ -90,6 +90,21 @@ describe('BlocksService', () => {
     expect(leaveRoomForUsers).toHaveBeenCalledWith([A], 'convo:group-1');
   });
 
+  it('preserves existing dispatch failure behavior while outbox is disabled', async () => {
+    query.mockResolvedValueOnce([]);
+    leaveSharedGroupsForBlock.mockResolvedValueOnce(['group-1']);
+    leaveRoomForUsers.mockImplementationOnce(() => {
+      throw new Error('Redis adapter unavailable');
+    });
+    process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'false';
+    try {
+      await expect(service.block(A, B)).rejects.toThrow('Redis adapter unavailable');
+      expect(onBlock).not.toHaveBeenCalled();
+    } finally {
+      process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'true';
+    }
+  });
+
   it('does not touch realtime rooms when there are no shared groups or accepted DM', async () => {
     query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
