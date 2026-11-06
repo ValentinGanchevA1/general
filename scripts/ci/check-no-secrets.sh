@@ -42,9 +42,47 @@ if HITS=$(git grep -nEI "$PATTERN" -- \
   ':!**/package-lock.json' \
   ':!.env.example' \
   ':!**/.env.example' 2>&1); then
-  echo "✗ Possible secrets in tracked content:"
-  echo "$HITS"
+  # Keep this exact publicly documented AWS test fixture in its existing
+  # redaction test; re-check the line after masking it so a second token still fails.
+  FILTERED_HITS=""
+  while IFS= read -r hit; do
+    if [[ "$hit" == apps/backend/src/common/sentry-scrub.spec.ts:* ]]; then
+      knownAwsFixture='AKIA''IOSFODNN7EXAMPLE'
+      hit="${hit//$knownAwsFixture/[known-aws-test-fixture]}"
+    fi
+    if [[ "$hit" =~ $PATTERN ]]; then
+      FILTERED_HITS+="$hit"
+  GREP_STATUS=$?
+  if [[ "$GREP_STATUS" -ne 1 ]]; then
+    echo "✗ Secret content scan failed (git grep exit $GREP_STATUS):" >&2
+    echo "$HITS" >&2
+    FAIL=1
+  fi
+fi
+
+# 3) Detect any .env* files tracked in Git (except public .env.example).
+ENV_HITS=$(git ls-files | grep -E '(^|/)\.env(\.|$)' | grep -v '\.env\.example$' || true)
+if [[ -n "$ENV_HITS" ]]; then
+  echo "✗ Tracked .env files (use .env.example only):"
+  echo "$ENV_HITS"
   FAIL=1
+fi
+
+if [[ "$FAIL" -ne 0 ]]; then
+  echo
+  echo "Secret/env scan failed. Remove leaked values from code/history and rotate affected credentials."
+  exit 1
+fi
+
+echo "OK: no forbidden secrets / .env files detected in tracked files."
+\n'
+    fi
+  done <<< "$HITS"
+  if [[ -n "$FILTERED_HITS" ]]; then
+    echo "✗ Possible secrets in tracked content:"
+    printf '%s' "$FILTERED_HITS"
+    FAIL=1
+  fi
 else
   GREP_STATUS=$?
   if [[ "$GREP_STATUS" -ne 1 ]]; then
