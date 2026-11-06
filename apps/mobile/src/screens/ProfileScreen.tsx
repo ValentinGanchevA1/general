@@ -200,7 +200,7 @@ export function ProfileScreen(): React.JSX.Element {
         <View style={S.heroGlowDiscovery} />
         <View style={[S.heroHeader, { paddingTop: insets.top + 14 }]}>
           <View style={S.heroCopy}>
-            <Text style={S.eyebrow}>NEXA</Text>
+            <Text style={S.eyebrow}>NEXUS</Text>
             <Text style={S.heroTitle}>Identity</Text>
             <Text style={S.heroSub}>Your verified presence in your local world</Text>
           </View>
