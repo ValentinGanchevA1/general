@@ -183,6 +183,8 @@ describe('GroupConversationsService', () => {
     const leaveSql = String(txQuery.mock.calls[2]?.[0]);
     expect(leaveSql).toContain('SET left_at = NOW()');
     expect(txQuery.mock.calls[2]?.[1]).toEqual([GROUP_ID, MEMBER_A]);
+    expect(String(txQuery.mock.calls[3]?.[0])).toContain('INSERT INTO realtime_room_revocations');
+    expect(txQuery.mock.calls[3]?.[1]).toEqual([GROUP_ID, MEMBER_A]);
     expect(txQuery.mock.calls.some(([sql]) => String(sql).includes("SET role = 'owner'"))).toBe(false);
   });
 
@@ -212,6 +214,7 @@ describe('GroupConversationsService', () => {
     expect(txQuery.mock.calls[3]?.[1]).toEqual([GROUP_ID, MEMBER_A]);
     expect(String(txQuery.mock.calls[3]?.[0])).toContain("SET role = 'owner'");
     expect(txQuery.mock.calls[4]?.[1]).toEqual([GROUP_ID, CREATOR]);
+    expect(String(txQuery.mock.calls[5]?.[0])).toContain('INSERT INTO realtime_room_revocations');
   });
 
   it('allows an admin to remove a member but not an owner', async () => {
@@ -298,7 +301,11 @@ describe('GroupConversationsService', () => {
     expect(txQuery.mock.calls[2]?.[1]).toEqual([GROUP_ID, MEMBER_A]);
     expect(String(txQuery.mock.calls[2]?.[0])).toContain("SET role = 'owner'");
     expect(txQuery.mock.calls[3]?.[1]).toEqual([GROUP_ID, CREATOR]);
-    expect(txQuery.mock.calls[4]?.[1]).toEqual([GROUP_ID_2, CREATOR]);
+    expect(String(txQuery.mock.calls[4]?.[0])).toContain('INSERT INTO realtime_room_revocations');
+    expect(txQuery.mock.calls[4]?.[1]).toEqual([GROUP_ID, CREATOR]);
+    expect(txQuery.mock.calls[5]?.[1]).toEqual([GROUP_ID_2, CREATOR]);
+    expect(String(txQuery.mock.calls[6]?.[0])).toContain('INSERT INTO realtime_room_revocations');
+    expect(txQuery.mock.calls[6]?.[1]).toEqual([GROUP_ID_2, CREATOR]);
     expect(txQuery.mock.calls.slice(1).some(([, params]) =>
       Array.isArray(params) && params[1] === MEMBER_B)).toBe(false);
   });
