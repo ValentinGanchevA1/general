@@ -1,6 +1,6 @@
 import { buildNexaPushData, nexaLockScreenCopy } from './notificationIdentity';
 
-describe('NEXA notification identity v2', () => {
+describe('NEXUS notification identity v2', () => {
   it('builds a semantic envelope while retaining the legacy type', () => {
     expect(
       buildNexaPushData('event.nearby', {
@@ -38,7 +38,7 @@ describe('NEXA notification identity v2', () => {
     const message = nexaLockScreenCopy('interaction.message');
     const rejected = nexaLockScreenCopy('trust.id-rejected');
 
-    expect(message).toEqual({ title: 'New message', body: 'Open NEXA to read it.' });
+    expect(message).toEqual({ title: 'New message', body: 'Open NEXUS to read it.' });
     expect(rejected.body).not.toContain('rejected');
     expect(rejected.body).not.toContain('reason');
   });
