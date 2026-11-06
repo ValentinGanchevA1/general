@@ -12,7 +12,9 @@ runtime authorization tests or manual security review.
 
 - Runs `semgrep scan` locally in GitHub Actions without a Semgrep account.
 - Rules and fixtures are stored locally in `.semgrep/`. No Semgrep Registry
-  (`p/...`, `r/...`, `auto`) configuration is fetched.
+  (`p/...`, `r/...`, `auto`) configuration is fetched. `semgrep scan --validate`
+  is intentionally omitted because validation lint packs can require registry access;
+  `semgrep scan --test` parses the local rules and verifies the annotated cases.
 - `SEMGREP_SEND_METRICS=off` and `--metrics=off`; version checks are disabled.
 - `semgrep ci`, Semgrep Cloud uploads, telemetry and SARIF uploads are **not** used.
 - Installing the pinned Semgrep Python distribution from PyPI requires standard
@@ -39,8 +41,7 @@ Install Python 3.11+ and create a virtual environment, then:
 python3 -m venv .venv-semgrep
 .venv-semgrep/bin/python -m pip install 'semgrep==1.184.0'
 export SEMGREP_SEND_METRICS=off
-.venv-semgrep/bin/semgrep scan --validate --config .semgrep/rules/nexa-security.yml --metrics=off --disable-version-check
-.venv-semgrep/bin/semgrep scan --test --config .semgrep/rules/nexa-security.yml .semgrep/tests/nexa-security.ts --metrics=off --disable-version-check
+.venv-semgrep/bin/semgrep scan --test --config .semgrep/rules/ .semgrep/tests/ --metrics=off --disable-version-check
 .venv-semgrep/bin/semgrep scan --config .semgrep/rules/nexa-security.yml --error --strict --metrics=off --disable-version-check apps/backend/src apps/mobile/src packages/shared/src web/src
 ```
 
@@ -50,11 +51,11 @@ Never commit `.venv-semgrep/`. For CI, the venv is created under
 ## CI sign-off criteria
 
 1. The pinned Semgrep version installs successfully in a fresh runner.
-2. Local rule validation succeeds.
-3. All positive and negative fixtures pass under `--test`.
-4. The first-party SAST scan reports zero ERROR findings (or code is
+2. Rule syntax/parsing and positive/negative fixtures pass under `--test`
+   (with matching filename and mirrored `rules/` and `tests/` layouts).
+3. The first-party SAST scan reports zero ERROR findings (or code is
    reviewed/remediated before merge); scan/tool failure must fail the job.
-5. The workflow completes for the PR head. The user must explicitly review
+4. The workflow completes for the PR head. The user must explicitly review
    before merging; repository visibility is not changed by this PR.
 
 If the repository becomes private, verify branch protection required checks
