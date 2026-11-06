@@ -43,6 +43,7 @@ import type {
 } from '@g88/shared';
 
 import { WsJwtGuard } from './ws-jwt.guard';
+import { EventRoomAccessService } from './event-room-access.service';
 import { DiscoveryPresencePublisher } from './discovery-presence.publisher';
 import {
   ChatSendDto,
@@ -118,6 +119,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly challenges: ChallengesService,
     private readonly friends: FriendsService,
     private readonly jwt: JwtService,
+    private readonly eventRoomAccess: EventRoomAccessService,
   ) {}
 
   async handleConnection(client: G88Socket): Promise<void> {
@@ -267,18 +269,51 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('event:join')
+  @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onEventJoin(
     @ConnectedSocket() client: G88Socket,
     @MessageBody() payload: EventRoomDto,
   ): Promise<AckResult<{ joined: true }>> {
-    const room = this.eventRoom(payload.eventId);
-    client.join(room);
-    client.data.rooms.add(room);
-    return { ok: true, data: { joined: true } };
+    let pendingRoom: string | null = null;
+    try {
+      if (!(await this.eventRoomAccess.canView(client.data.userId, payload.eventId))) {
+        return { ok: false, code: 'event.not_found', message: 'Event unavailable' };
+      }
+
+      const room = this.eventRoom(payload.eventId);
+      pendingRoom = room;
+      await client.join(room);
+
+      // A block or event-visibility change can commit while the adapter joins.
+      // Recheck after join; never leave a rejected socket subscribed.
+      if (!(await this.eventRoomAccess.canView(client.data.userId, payload.eventId))) {
+        return { ok: false, code: 'event.not_found', message: 'Event unavailable' };
+      }
+
+      client.data.rooms.add(room);
+      pendingRoom = null;
+      return { ok: true, data: { joined: true } };
+    } catch (err) {
+      this.logger.error(`event:join access check failed: ${err}`);
+      return { ok: false, code: 'event.unavailable', message: 'Event unavailable' };
+    } finally {
+      if (pendingRoom !== null) {
+        try {
+          await client.leave(pendingRoom);
+        } catch (err) {
+          // If the adapter cannot remove the unauthorized room, terminate
+          // the socket rather than risk delivering private event deltas.
+          this.logger.error(`event:join rollback failed: ${err}`);
+          client.disconnect(true);
+        }
+        client.data.rooms.delete(pendingRoom);
+      }
+    }
   }
 
   @SubscribeMessage('event:leave')
+  @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onEventLeave(
     @ConnectedSocket() client: G88Socket,
