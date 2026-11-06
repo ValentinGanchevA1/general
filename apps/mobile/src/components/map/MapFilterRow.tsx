@@ -1,4 +1,4 @@
-// NEXA primary map chrome: search + locate, semantic public layers + private overlays.
+// NEXUS primary map chrome: search + locate, semantic public layers + private overlays.
 // Keep high-frequency controls visible without horizontal scrolling or duplicate floating actions.
 
 import React, { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
@@ -340,7 +340,7 @@ function FilterModal(props: FilterModalProps): React.JSX.Element {
 			<Pressable style={styles.modalBackdrop} onPress={props.onClose} accessibilityRole="button" accessibilityLabel="Dismiss filters">
 				<Pressable style={styles.modalCard} onPress={(event) => event.stopPropagation()}>
 					<Text style={styles.modalTitle}>Map filters</Text>
-					<Text style={styles.modalSubtitle}>Refine what NEXA shows in this area.</Text>
+					<Text style={styles.modalSubtitle}>Refine what NEXUS shows in this area.</Text>
 					<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
 						<SectionLabel styles={styles}>Sort</SectionLabel>
 						{SORT_OPTIONS.map((option) => (
