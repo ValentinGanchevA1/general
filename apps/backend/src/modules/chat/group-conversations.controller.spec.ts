@@ -9,6 +9,7 @@ const memberId = '22222222-2222-4222-8222-222222222222';
 const conversationId = '33333333-3333-4333-8333-333333333333';
 
 describe('GroupConversationsController realtime membership revocation', () => {
+  const previousFlag = process.env.ROOM_REVOCATION_OUTBOX_ENABLED;
   const removeMember = jest.fn<Promise<void>, [string, string, string]>();
   const leaveRoomForUsers = jest.fn<void, [readonly string[], string]>();
   const get = jest.fn().mockReturnValue({ leaveRoomForUsers });
@@ -18,8 +19,14 @@ describe('GroupConversationsController realtime membership revocation', () => {
   );
 
   beforeEach(() => {
+    process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'true';
     jest.clearAllMocks();
     removeMember.mockResolvedValue(undefined);
+  });
+
+  afterAll(() => {
+    if (previousFlag === undefined) delete process.env.ROOM_REVOCATION_OUTBOX_ENABLED;
+    else process.env.ROOM_REVOCATION_OUTBOX_ENABLED = previousFlag;
   });
 
   it('evicts only the removed member from the conversation on successful commit', async () => {
@@ -50,6 +57,29 @@ describe('GroupConversationsController realtime membership revocation', () => {
       .rejects.toThrow('forbidden');
     expect(get).not.toHaveBeenCalled();
     expect(leaveRoomForUsers).not.toHaveBeenCalled();
+  });
+
+  it('returns success after commit if realtime eviction dispatch throws', async () => {
+    leaveRoomForUsers.mockImplementationOnce(() => {
+      throw new Error('Redis adapter dispatch unavailable');
+    });
+    await expect(controller.removeMember(conversationId, memberId, actorId))
+      .resolves.toBeUndefined();
+    expect(removeMember).toHaveBeenCalledTimes(1);
+    expect(leaveRoomForUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not silently swallow an adapter failure before outbox activation', async () => {
+    process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'false';
+    leaveRoomForUsers.mockImplementationOnce(() => {
+      throw new Error('Redis adapter unavailable');
+    });
+    try {
+      await expect(controller.removeMember(conversationId, memberId, actorId))
+        .rejects.toThrow('Redis adapter unavailable');
+    } finally {
+      process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'true';
+    }
   });
 
   it('waits for transaction completion before evicting the former member', async () => {
