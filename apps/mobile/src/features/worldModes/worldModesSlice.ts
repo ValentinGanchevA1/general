@@ -8,6 +8,8 @@ export type WorldModeState = {
   ownerId: string | null;
   hydrated: boolean;
   saving: boolean;
+  hydrationRequestId: string | null;
+  activationRequestId: string | null;
   error: string | null;
 };
 
@@ -16,6 +18,8 @@ const initialState: WorldModeState = {
   ownerId: null,
   hydrated: false,
   saving: false,
+  hydrationRequestId: null,
+  activationRequestId: null,
   error: null,
 };
 
@@ -40,6 +44,13 @@ export const activateWorldMode = createAsyncThunk(
       return rejectWithValue('Could not save your World Mode. Try again.');
     }
   },
+  {
+    // Avoid writing an unrelated account's device preference or racing saves.
+    condition: ({ userId }, { getState }) => {
+      const state = (getState() as { worldModes: WorldModeState }).worldModes;
+      return state.ownerId === userId && state.hydrated && !state.saving;
+    },
+  },
 );
 
 const worldModesSlice = createSlice({
@@ -56,32 +67,43 @@ const worldModesSlice = createSlice({
         state.selectedId = 'nexus';
         state.hydrated = false;
         state.saving = false;
+        state.hydrationRequestId = action.meta.requestId;
+        state.activationRequestId = null;
         state.error = null;
       })
       .addCase(hydrateWorldMode.fulfilled, (state, action) => {
-        if (state.ownerId !== action.payload.userId || state.saving) return;
+        if (state.ownerId !== action.payload.userId ||
+          state.hydrationRequestId !== action.meta.requestId || state.saving) return;
         state.selectedId = action.payload.selectedId;
         state.hydrated = true;
+        state.hydrationRequestId = null;
       })
       .addCase(hydrateWorldMode.rejected, (state, action) => {
-        if (state.ownerId !== action.meta.arg) return;
+        if (state.ownerId !== action.meta.arg ||
+          state.hydrationRequestId !== action.meta.requestId) return;
         state.hydrated = true;
+        state.hydrationRequestId = null;
         state.error = typeof action.payload === 'string'
           ? action.payload : 'Could not load your World Mode preference.';
       })
       .addCase(activateWorldMode.pending, (state, action) => {
         if (state.ownerId !== action.meta.arg.userId) return;
         state.saving = true;
+        state.activationRequestId = action.meta.requestId;
         state.error = null;
       })
       .addCase(activateWorldMode.fulfilled, (state, action) => {
-        if (state.ownerId !== action.payload.userId) return;
+        if (state.ownerId !== action.payload.userId ||
+          state.activationRequestId !== action.meta.requestId) return;
         state.saving = false;
+        state.activationRequestId = null;
         state.selectedId = action.payload.id;
       })
       .addCase(activateWorldMode.rejected, (state, action) => {
-        if (state.ownerId !== action.meta.arg.userId) return;
+        if (state.ownerId !== action.meta.arg.userId ||
+          state.activationRequestId !== action.meta.requestId) return;
         state.saving = false;
+        state.activationRequestId = null;
         state.error = typeof action.payload === 'string'
           ? action.payload : 'Could not save your World Mode. Try again.';
       });
