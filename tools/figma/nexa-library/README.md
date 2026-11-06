@@ -1,4 +1,4 @@
-# NEXA — Figma component library and design-token sync
+# NEXUS — Figma component library and design-token sync
 
 This is a local Figma development plugin. It reads the production React Native theme and creates reusable Figma assets. It does not refactor existing mobile components or deploy to the backend.
 
@@ -13,11 +13,11 @@ React Native is the source of truth. Never hand-edit generated code.js or tokens
 
 ## Fastest import: use the CI-built package (no Node.js required)
 
-1. Open the [NEXA Figma Library QA workflow](https://github.com/ValentinGanchevA1/general/actions/workflows/nexa-figma-library.yml) and select the latest successful run for this PR.
+1. Open the [NEXUS Figma Library QA workflow](https://github.com/ValentinGanchevA1/general/actions/workflows/nexa-figma-library.yml) and select the latest successful run for this PR.
 2. Under **Artifacts**, download `nexa-figma-plugin` and extract its ZIP to a local directory. Keep `manifest.json` and `code.js` side by side.
-3. Open the [NEXA design](https://www.figma.com/design/RMlHX3o4P7tHraj0tIGeGv) in **Figma Desktop** (Windows/macOS), then choose Plugins → Development → Import plugin from manifest.
+3. Open the [NEXUS design](https://www.figma.com/design/RMlHX3o4P7tHraj0tIGeGv) in **Figma Desktop** (Windows/macOS), then choose Plugins → Development → Import plugin from manifest.
 4. Select the extracted `manifest.json`. If Figma requests an ID for a development plugin, use the ID issued by Figma's **New Plugin** flow rather than inventing a shared/repository ID.
-5. Run **NEXA · Component Library Sync** from Plugins → Development and inspect the page **NEXA · Component Library**.
+5. Run **NEXUS · Component Library Sync** from Plugins → Development and inspect the page **NEXUS · Component Library**.
 6. Run a second time to confirm the success message reports `components: 0` and `skippedComponents: 9`. Inspect the color collections and at least one variant from every family.
 
 The artifact is built **only after** the token snapshot and structural smoke tests pass. It includes the compiled script, manifest, token snapshot and this README; no source checkout, credentials or network requests are required by the plugin itself.
@@ -31,7 +31,7 @@ From the repository root, with pnpm dependencies installed:
 3. Run structural smoke tests: node --test tools/figma/nexa-library/test.mjs
 4. In Figma Desktop select Plugins → Development → Import plugin from manifest.
 5. Select tools/figma/nexa-library/manifest.json.
-6. Open the NEXA design and execute NEXA · Component Library Sync.
+6. Open the NEXUS design and execute NEXUS · Component Library Sync.
 
 Target: https://www.figma.com/design/RMlHX3o4P7tHraj0tIGeGv
 
@@ -41,12 +41,12 @@ Generated outputs are tokens.json (machine-readable snapshot) and code.js (ready
 
 | Foundation | Figma object | Source |
 |---|---|---|
-| Colors | NEXA / Colors collection, modes Dark, Light, Protos Nexus | colors.ts |
-| Spacing | NEXA / Spacing variables | spacing |
-| Typography | NEXA / Typography numeric variables and Text styles | fontSize |
-| Radius | NEXA / Radius variables | radius |
-| Elevation | NEXA / Elevation effect styles for Dark, Light, Protos Nexus and Fab | theme shadow |
-| Layout | NEXA / Layout variables | layout |
+| Colors | NEXUS / Colors collection, modes Dark, Light, Protos Nexus | colors.ts |
+| Spacing | NEXUS / Spacing variables | spacing |
+| Typography | NEXUS / Typography numeric variables and Text styles | fontSize |
+| Radius | NEXUS / Radius variables | radius |
+| Elevation | NEXUS / Elevation effect styles for Dark, Light, Protos Nexus and Fab | theme shadow |
+| Layout | NEXUS / Layout variables | layout |
 
 ## Component library inventory
 
@@ -72,16 +72,16 @@ The plugin automatically chooses a theme-storage strategy at runtime:
 
 | Figma plan capability | Color storage | Variable count | Theme switching |
 |---|---|---:|---|
-| Multiple variable modes available | One `NEXA / Colors` collection with Dark, Light and Protos Nexus modes | 105 | Apply a mode to the page or container |
-| Starter / single-mode collections | `NEXA / Colors` (Dark), `NEXA / Colors / Light`, and `NEXA / Colors / Protos Nexus` | 267 | Manual reassignment of color variables; no one-click mode switch |
+| Multiple variable modes available | One `NEXUS / Colors` collection with Dark, Light and Protos Nexus modes | 105 | Apply a mode to the page or container |
+| Starter / single-mode collections | `NEXUS / Colors` (Dark), `NEXUS / Colors / Light`, and `NEXUS / Colors / Protos Nexus` | 267 | Manual reassignment of color variables; no one-click mode switch |
 
-The fallback runs only when Figma rejects adding a color mode. Existing Dark bindings remain on the default `NEXA / Colors` collection, and Light/Protos palettes remain available as separate variable collections. The plugin **does not** fake three modes or create extra duplicate component families on Starter.
+The fallback runs only when Figma rejects adding a color mode. Existing Dark bindings remain on the default `NEXUS / Colors` collection, and Light/Protos palettes remain available as separate variable collections. The plugin **does not** fake three modes or create extra duplicate component families on Starter.
 
 A successful Node.js smoke test is not confirmation that the plugin ran inside Figma. After importing, verify all nine component sets visually, confirm palette variable counts and review Dark/Light/Protos colors. Starter plans also cannot publish shared team libraries.
 
 ## Starter file-page limit fallback
 
-Some Starter team files are capped at three pages. If Figma rejects creating the dedicated library page, the plugin uses a **NEXA · Component Library** section on the file's **first existing page**. It places the section to the right of existing content and preserves other elements; a second run reuses the same section, even after changing the currently selected page.
+Some Starter team files are capped at three pages. If Figma rejects creating the dedicated library page, the plugin uses a **NEXUS · Component Library** section on the file's **first existing page**. It places the section to the right of existing content and preserves other elements; a second run reuses the same section, even after changing the currently selected page.
 
 If a dedicated page is allowed, the plugin uses that page instead. In both cases, inspect the resulting page or section before treating the design library as published or complete.
 
@@ -106,7 +106,7 @@ If a dedicated page is allowed, the plugin uses that page instead. In both cases
 
 ## Post-merge visual acceptance gate
 
-Real Figma Desktop import, screenshot comparison, accessibility checks, and optional team-library publication are tracked separately in [NEXA Figma visual QA issue #996](https://github.com/ValentinGanchevA1/general/issues/996). This development plugin is opt-in and is **not** run by GitHub CI. Merging the plugin source is not evidence that Figma canvas was updated; keep #996 open until manual QA evidence is attached.
+Real Figma Desktop import, screenshot comparison, accessibility checks, and optional team-library publication are tracked separately in [NEXUS Figma visual QA issue #996](https://github.com/ValentinGanchevA1/general/issues/996). This development plugin is opt-in and is **not** run by GitHub CI. Merging the plugin source is not evidence that Figma canvas was updated; keep #996 open until manual QA evidence is attached.
 
 ## Figma connector limitation
 
