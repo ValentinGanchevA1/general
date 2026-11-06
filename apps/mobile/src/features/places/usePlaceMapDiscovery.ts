@@ -95,8 +95,9 @@ export function usePlaceMapDiscovery({
 
     const budgetDelayMs = requestBudgetRef.current.tryAcquire(Date.now());
     if (budgetDelayMs > 0) {
-      // Keep the map's existing refresh indicator truthful while pacing.
+      // The next viewport is queued; do not keep an old failure banner active.
       setLoading(true);
+      setError(null);
       if (budgetTimerRef.current) clearTimeout(budgetTimerRef.current);
       budgetTimerRef.current = setTimeout(() => {
         budgetTimerRef.current = null;
