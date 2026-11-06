@@ -137,7 +137,12 @@ export function WorldFusionScreen(): React.JSX.Element {
     nexaSpatialLensStore.getSnapshot,
   );
 
-  const [candidate, setCandidate] = useState<WorldModeId | null>(null);
+  // Keep an unsaved preview locally, scoped to its owner. A different account
+  // can never see a previous account's unconfirmed selection.
+  const [draft, setDraft] = useState<{
+    ownerId: string;
+    discoveryWorld: WorldModeId | null;
+  } | null>(null);
   const primaryReady = userId != null &&
     primary.ownerId === userId && primary.hydrated;
   const fusionReady = userId != null &&
@@ -150,10 +155,9 @@ export function WorldFusionScreen(): React.JSX.Element {
     void dispatch(hydrateWorldFusion(userId));
   }, [dispatch, userId]);
 
-  // A newly authenticated account must never inherit another account's draft.
-  useEffect(() => {
-    setCandidate(fusionReady ? fusion.discoveryWorld : null);
-  }, [fusionReady, fusion.discoveryWorld, userId]);
+  const candidate = fusionReady
+    ? draft?.ownerId === userId ? draft.discoveryWorld : fusion.discoveryWorld
+    : null;
 
   const appearanceWorld = primaryReady ? primary.selectedId : 'nexus';
   const preference = createWorldFusionPreference(appearanceWorld, candidate);
@@ -177,7 +181,7 @@ export function WorldFusionScreen(): React.JSX.Element {
   const selectWorld = (id: WorldModeId): void => {
     if (!ready || saving) return;
     dispatch(clearWorldFusionError());
-    setCandidate(id);
+    if (userId != null) setDraft({ ownerId: userId, discoveryWorld: id });
   };
 
   const apply = async (): Promise<void> => {
@@ -193,7 +197,7 @@ export function WorldFusionScreen(): React.JSX.Element {
     if (!canRemove || userId == null) return;
     try {
       await dispatch(saveWorldFusion({ userId, discoveryWorld: null })).unwrap();
-      setCandidate(null);
+      setDraft({ ownerId: userId, discoveryWorld: null });
     } catch {
       // Do not claim removal when local persistence failed.
     }
