@@ -1,4 +1,4 @@
-# NEXA Render production cutover runbook
+# NEXUS Render production cutover runbook
 
 Status: preparation / execution checklist for #906.
 
@@ -67,7 +67,7 @@ Required remediation is to disable the stale trigger first (reversible) or scope
 
 Cutover gate is green only when a harmless validated master commit proves:
 
-1. intended NEXA checks are green;
+1. intended NEXUS checks are green;
 2. the stale Google Cloud Build failure is absent/non-blocking;
 3. Render creates the `g88-api` deploy automatically through the checks-pass path.
 
