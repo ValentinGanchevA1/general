@@ -80,6 +80,7 @@ import {
 import { clearMapNewCount, setMapNewCount } from '@/features/map/mapNoveltySlice';
 import { nexaSpatialLensStore, type NexaSpatialLens } from '@/features/map/nexaSpatialLens.store';
 import { nexaMapFilterIntentStore } from '@/features/map/nexaMapFilterIntent.store';
+import { hasManualMapFilterChanges } from '@/features/map/nexaMapFilterIntent';
 import { marketplaceKindMapFilterStore } from '@/features/map/marketplaceKindMapFilter.store';
 import { publicPlacesMapLayerStore } from '@/features/places/publicPlacesMapLayer.store';
 import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
@@ -188,17 +189,19 @@ export function MapScreen(): React.JSX.Element {
 		savedPlacesMapLayerStore.getSnapshot,
 	);
 
-	const hasManualMapFilters =
-		activeLens === 'custom' ||
-		customLayers.length !== DEFAULT_MAP_LAYERS.length ||
-		customLayers.some((kind) => !DEFAULT_MAP_LAYERS.includes(kind)) ||
-		listingModeFilter !== 'all' ||
-		friendsOnly || datingOnly ||
-		rankBy !== 'relevance' ||
-		searchQuery.trim().length > 0 ||
-		marketplaceKind !== 'all' ||
-		publicPlacesVisible ||
-		savedPlacesVisible;
+	const hasManualMapFilters = hasManualMapFilterChanges({
+		activeLens,
+		customLayers,
+		defaultLayers: DEFAULT_MAP_LAYERS,
+		listingModeFilter,
+		friendsOnly,
+		datingOnly,
+		rankBy,
+		searchQuery,
+		marketplaceKind,
+		publicPlacesVisible,
+		savedPlacesVisible,
+	});
 
 	// Publish only one boolean, never location, contacts, map camera or search
 	// contents. Fusion can navigate to a lens only when known-clean.
