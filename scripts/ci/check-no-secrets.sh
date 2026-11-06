@@ -49,7 +49,13 @@ if HITS=$(git grep -nEI "$PATTERN" -- ':!pnpm-lock.yaml' ':!**/package-lock.json
   done <<< "$HITS"
   if ((${#FILTERED_HITS[@]} > 0)); then
     echo "✗ Possible secrets in tracked content:"
-    printf '%s\n' "${FILTERED_HITS[@]}"
+    # Do not print credential values into public GitHub Actions logs.
+    for hit in "${FILTERED_HITS[@]}"; do
+      file="${hit%%:*}"
+      remainder="${hit#*:}"
+      line="${remainder%%:*}"
+      printf '  %s:%s (matching content redacted)\n' "$file" "$line"
+    done
     FAIL=1
   fi
 else
