@@ -327,6 +327,11 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
           memberSoftLeft = true;
           return [];
         }
+        if (sql.includes('INSERT INTO realtime_room_revocations')) {
+          expect(memberSoftLeft).toBe(true);
+          expect(sql).toContain('VALUES ($1, $2)');
+          return [];
+        }
         throw new Error('Unexpected query in group-removal integration regression');
       });
       const transaction = jest.fn(async (work: (tx: EntityManager) => Promise<void>): Promise<void> => {
@@ -351,7 +356,7 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
       await groupController.removeMember(conversationId, userId, activeId);
       expect(memberSoftLeft).toBe(true);
       expect(transaction).toHaveBeenCalledTimes(1);
-      expect(txQuery).toHaveBeenCalledTimes(3);
+      expect(txQuery).toHaveBeenCalledTimes(4);
       expect(leaveSpy).toHaveBeenCalledWith([userId], conversationRoom);
       await waitFor(() =>
         revokedSockets.every((socket) => !socket.rooms.has(conversationRoom))
@@ -531,6 +536,17 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
         db, app.get(RealtimeEmitterService), recipients,
       );
       await worker.runOnce();
+      const [claim] = await db.query<Array<{
+        attempts: number;
+        completed_at: Date | null;
+        leased_until: Date | null;
+      }>>(
+        'SELECT attempts, completed_at, leased_until FROM realtime_room_revocations WHERE id = $1',
+        [pending?.id],
+      );
+      // A missing claim is a worker/SQL error, not a flaky Redis eviction.
+      expect(claim?.attempts).toBe(1);
+      expect(claim?.completed_at ?? claim?.leased_until).not.toBeUndefined();
       await waitFor(() => revokedSockets.every((socket) => !socket.rooms.has(failedRoom)));
       const [completed] = await db.query<Array<{ completed_at: Date | null }>>(
         'SELECT completed_at FROM realtime_room_revocations WHERE id = $1',
