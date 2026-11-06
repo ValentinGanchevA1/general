@@ -8,6 +8,9 @@ on:
       - apps/backend/src/config/redis-client.ts
       - apps/backend/src/realtime/redis-io.adapter.ts
       - apps/backend/src/realtime/realtime-emitter.service.ts
+      - apps/backend/src/realtime/room-revocation.sweep.ts
+      - apps/backend/src/realtime/room-revocation.sweep.spec.ts
+      - apps/backend/migrations/0069_realtime_room_revocation_outbox.sql
       - apps/backend/src/realtime/realtime.redis-adapter.integration.spec.ts
       - apps/backend/src/modules/chat/group-conversations.controller.ts
       - apps/backend/src/modules/chat/group-conversations.controller.spec.ts
