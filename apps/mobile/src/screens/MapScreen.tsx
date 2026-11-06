@@ -79,6 +79,10 @@ import {
 } from '@/features/map/mapNovelty';
 import { clearMapNewCount, setMapNewCount } from '@/features/map/mapNoveltySlice';
 import { nexaSpatialLensStore, type NexaSpatialLens } from '@/features/map/nexaSpatialLens.store';
+import { nexaMapFilterIntentStore } from '@/features/map/nexaMapFilterIntent.store';
+import { marketplaceKindMapFilterStore } from '@/features/map/marketplaceKindMapFilter.store';
+import { publicPlacesMapLayerStore } from '@/features/places/publicPlacesMapLayer.store';
+import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.store';
 import { MapCreateNudgeBanner } from '@/features/map/MapCreateNudgeBanner';
 import { useSheetChrome, useSheetBackdrop } from '@/components/sheets';
 import {
@@ -171,6 +175,37 @@ export function MapScreen(): React.JSX.Element {
 	const [datingOnly, setDatingOnly] = useState(false);
 	const [rankBy, setRankBy] = useState<DiscoveryRankBy>('relevance');
 	const [searchQuery, setSearchQuery] = useState('');
+	const marketplaceKind = useSyncExternalStore(
+		marketplaceKindMapFilterStore.subscribe,
+		marketplaceKindMapFilterStore.getSnapshot,
+	);
+	const publicPlacesVisible = useSyncExternalStore(
+		publicPlacesMapLayerStore.subscribe,
+		publicPlacesMapLayerStore.getSnapshot,
+	);
+	const savedPlacesVisible = useSyncExternalStore(
+		savedPlacesMapLayerStore.subscribe,
+		savedPlacesMapLayerStore.getSnapshot,
+	);
+
+	const hasManualMapFilters =
+		activeLens === 'custom' ||
+		customLayers.length !== DEFAULT_MAP_LAYERS.length ||
+		customLayers.some((kind) => !DEFAULT_MAP_LAYERS.includes(kind)) ||
+		listingModeFilter !== 'all' ||
+		friendsOnly || datingOnly ||
+		rankBy !== 'relevance' ||
+		searchQuery.trim().length > 0 ||
+		marketplaceKind !== 'all' ||
+		publicPlacesVisible ||
+		savedPlacesVisible;
+
+	// Publish only one boolean, never location, contacts, map camera or search
+	// contents. Fusion can navigate to a lens only when known-clean.
+	useEffect(() => {
+		nexaMapFilterIntentStore.publish(hasManualMapFilters);
+	}, [hasManualMapFilters]);
+	useEffect(() => () => nexaMapFilterIntentStore.reset(), []);
 	const [trendingCollapsed, setTrendingCollapsed] = useState(true);
 	const insets = useSafeAreaInsets();
 
