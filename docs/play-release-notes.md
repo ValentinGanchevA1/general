@@ -1,8 +1,8 @@
-# NEXA — Closed Testing Release Notes
+# NEXUS — Closed Testing Release Notes
 
 > For the Closed testing release of `com.g88`. The package/application ID is
 > intentionally retained for Android update continuity; the public product name
-> is **NEXA**. Paste section 1 into Play Console release notes and use section 2
+> is **NEXUS**. Paste section 1 into Play Console release notes and use section 2
 > for tester onboarding.
 
 ---
@@ -10,14 +10,14 @@
 ## 1. Play Console release notes (`<en-US>`, ≤ 500 chars)
 
 ```
-Welcome to the NEXA closed beta.
+Welcome to the NEXUS closed beta.
 
 • Map-first nearby discovery
 • Waves, Connections and 1:1 chat
 • Local events and marketplace listings
 • Identity verification and privacy-aware map presence
 
-Your exact location is never shown to other users; NEXA coarsens map presence before it is stored or displayed.
+Your exact location is never shown to other users; NEXUS coarsens map presence before it is stored or displayed.
 
 Please report bugs, crashes, confusing flows, or visual issues. Thanks for testing!
 ```
@@ -25,7 +25,7 @@ Please report bugs, crashes, confusing flows, or visual issues. Thanks for testi
 ### Shorter variant
 
 ```
-NEXA closed beta: map-first nearby discovery, waves, Connections, chat, events and marketplace. Map presence is privacy-coarsened and exact location is never shown to other users. Please report bugs or confusing flows — thanks for testing!
+NEXUS closed beta: map-first nearby discovery, waves, Connections, chat, events and marketplace. Map presence is privacy-coarsened and exact location is never shown to other users. Please report bugs or confusing flows — thanks for testing!
 ```
 
 ---
@@ -33,19 +33,19 @@ NEXA closed beta: map-first nearby discovery, waves, Connections, chat, events a
 ## 2. Tester opt-in email / onboarding
 
 ```
-You're in the NEXA closed beta — thanks for helping us test.
+You're in the NEXUS closed beta — thanks for helping us test.
 
-WHAT NEXA IS
-NEXA is a map-first way to discover people, local activity, events and listings
+WHAT NEXUS IS
+NEXUS is a map-first way to discover people, local activity, events and listings
 around you. Open the app, explore nearby activity, wave, connect and chat.
 
 HOW TO JOIN
 1. Open the Play testing opt-in link with the Google account registered as a tester.
-2. Accept the test, then install/update NEXA from the Play Store.
-3. Open NEXA, create your profile, and allow location only when prompted for nearby discovery.
+2. Accept the test, then install/update NEXUS from the Play Store.
+3. Open NEXUS, create your profile, and allow location only when prompted for nearby discovery.
 
 WHAT TO TRY
-• Launch flow: native splash → NEXA animation → live app
+• Launch flow: native splash → NEXUS animation → live app
 • Map discovery, marker selection and entity sheets
 • Experiences and Opportunities map lenses; contextual Pulse activity
 • Connections → Activity / Chats
@@ -55,7 +55,7 @@ WHAT TO TRY
 • Reduced Motion and larger text if your device supports them
 
 PRIVACY
-Other users never receive your exact location. NEXA uses your location for
+Other users never receive your exact location. NEXUS uses your location for
 nearby discovery and stores/displays privacy-coarsened map presence rather than
 your precise position.
 
@@ -74,7 +74,7 @@ screen recording when useful. Crashes are captured automatically, but tester
 context is still valuable.
 
 Thanks for testing,
-The NEXA team
+The NEXUS team
 ```
 
 ---

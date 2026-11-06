@@ -1,6 +1,6 @@
-# NEXA App-wide Action Language v2
+# NEXUS App-wide Action Language v2
 
-NEXA is a discovery product. Action copy must make the next user action obvious without promising an outcome that has not happened yet.
+NEXUS is a discovery product. Action copy must make the next user action obvious without promising an outcome that has not happened yet.
 
 ## Canonical intents
 

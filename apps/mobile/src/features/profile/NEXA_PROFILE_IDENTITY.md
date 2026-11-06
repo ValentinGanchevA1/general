@@ -1,6 +1,6 @@
-# NEXA You / Profile Identity v3
+# NEXUS You / Profile Identity v3
 
-`You` is the user's self-profile in NEXA. It should primarily answer **“How do I appear in my local world?”**, not behave like a second Settings screen.
+`You` is the user's self-profile in NEXUS. It should primarily answer **“How do I appear in my local world?”**, not behave like a second Settings screen.
 
 ## Product role
 
@@ -14,7 +14,7 @@
 1. **Hero** — avatar, display name, age when enabled, verification, compact origin line.
 2. **Summary** — factual trust signals, friends and level.
 3. **About me** — inline bio plus derived/opted-in profile facts such as age, zodiac, origin and nationality.
-4. **Interests & Purpose** — what the user likes and why they use NEXA.
+4. **Interests & Purpose** — what the user likes and why they use NEXUS.
 5. **Photos** — personal visual identity.
 6. **Activity** — own Storyline, marketplace participation and achievements.
 7. **Connections** — friends and map presence.
@@ -29,7 +29,7 @@ Interests describe persistent affinities such as Football, Music, Reading, Cinem
 
 ### Purpose
 
-Purpose describes core intent: why the user is using NEXA. The user-facing term is **Purpose**, while persistence intentionally remains the existing `goals[]` field so current messaging and recommendation logic stays compatible.
+Purpose describes core intent: why the user is using NEXUS. The user-facing term is **Purpose**, while persistence intentionally remains the existing `goals[]` field so current messaging and recommendation logic stays compatible.
 
 Interests and Purpose must not be collapsed into one concept.
 

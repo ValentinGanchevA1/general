@@ -1,6 +1,6 @@
 // packages/shared/src/notifications.ts
 //
-// Notification preferences and the NEXA v2 push identity contract shared by
+// Notification preferences and the NEXUS v2 push identity contract shared by
 // backend and mobile. FCM data values are strings by contract.
 
 export const NOTIFICATION_CHANNELS = [
@@ -28,7 +28,7 @@ export const NOTIFICATION_CHANNEL_META: Record<
   nearby: { label: 'Live nearby', description: 'Live signals in areas you watch' },
   events: { label: 'Events nearby', description: 'Events surfacing in watched areas' },
   listings: { label: 'Marketplace nearby', description: 'Local marketplace discoveries' },
-  digest: { label: 'NEXA recap', description: 'A private daily activity recap' },
+  digest: { label: 'NEXUS recap', description: 'A private daily activity recap' },
 };
 
 /** All channels with their on/off state for a user (defaults applied). */
@@ -39,7 +39,7 @@ export interface UpdateNotificationPreferencesRequest {
   preferences: Partial<NotificationPreferences>;
 }
 
-// ─── NEXA notification identity v2 ──────────────────────────────────────────
+// ─── NEXUS notification identity v2 ──────────────────────────────────────────
 
 export const NEXA_NOTIFICATION_SCHEMA_VERSION = '2' as const;
 

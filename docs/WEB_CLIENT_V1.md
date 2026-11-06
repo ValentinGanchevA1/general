@@ -1,4 +1,4 @@
-# NEXA Web Client v1 — implementation contract
+# NEXUS Web Client v1 — implementation contract
 
 ## Decision
 
@@ -58,7 +58,7 @@ No backend schema, PostGIS query or persistence change is introduced.
 - Entity-kind filters reuse the current viewport and query only for authenticated sessions.
 - Demo mode keeps the interactive map but issues no discovery requests.
 - Preview tiles are requested only for the visible viewport from `https://tile.openstreetmap.org/{z}/{x}/{y}.png`; no prefetch, offline download or background tile crawl is implemented.
-- OpenStreetMap attribution remains visible. Standard OSM tiles are preview-only; public NEXA requires a production provider or self-hosted/vector-tile stack with explicit SLA, privacy, caching and usage terms.
+- OpenStreetMap attribution remains visible. Standard OSM tiles are preview-only; public NEXUS requires a production provider or self-hosted/vector-tile stack with explicit SLA, privacy, caching and usage terms.
 
 ## Connections / realtime contract
 

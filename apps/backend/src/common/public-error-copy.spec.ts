@@ -3,7 +3,7 @@ import { normalizePublicErrorMessage } from './public-error-copy';
 describe('normalizePublicErrorMessage', () => {
   it('replaces the legacy public product name', () => {
     expect(normalizePublicErrorMessage('You must be at least 18 years old to use G88.')).toBe(
-      'You must be at least 18 years old to use NEXA.',
+      'You must be at least 18 years old to use NEXUS.',
     );
   });
 

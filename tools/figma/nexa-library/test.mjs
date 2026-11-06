@@ -1,5 +1,5 @@
 /**
- * Structural smoke-test of the generated NEXA Figma plugin.
+ * Structural smoke-test of the generated NEXUS Figma plugin.
  * Does NOT replace visual inspection in Figma Desktop.
  *
  * node --test tools/figma/nexa-library/test.mjs
@@ -145,10 +145,10 @@ async function runOnce(figma, expectFailure = false) {
   ]);
   globalThis.figma = previousFigma;
   if (expectFailure) {
-    assert.match(message, /^NEXA library failed:/);
+    assert.match(message, /^NEXUS library failed:/);
     return message;
   }
-  assert.match(message, /^NEXA design library synced:/);
+  assert.match(message, /^NEXUS design library synced:/);
   return JSON.parse(message.slice(message.indexOf('{')));
 }
 
@@ -170,7 +170,7 @@ test('creates nine component families, binds tokens, then reruns without duplica
     Object.keys(tokens.colors.Dark).length + Object.keys(tokens.spacing).length +
     Object.keys(tokens.radius).length + Object.keys(tokens.fontSize).length +
     Object.keys(tokens.layout).length);
-  const colorCollection = ctx.groups.find((entry) => entry.name === 'NEXA / Colors');
+  const colorCollection = ctx.groups.find((entry) => entry.name === 'NEXUS / Colors');
   assert.deepEqual(colorCollection.modes.map((entry) => entry.name), ['Dark', 'Light', 'Protos Nexus']);
   assert.equal(ctx.textStyles.length, 6);
   const primaryVar = ctx.variables.find((entry) => entry.name === 'actionPrimary' &&
@@ -180,7 +180,7 @@ test('creates nine component families, binds tokens, then reruns without duplica
     assert.equal(typeof value.a, 'number', 'COLOR variables must be RGBA, not RGB');
   }
   assert.equal(ctx.effectStyles.length, 4);
-  const page = ctx.pages.find((candidate) => candidate.name === 'NEXA · Component Library');
+  const page = ctx.pages.find((candidate) => candidate.name === 'NEXUS · Component Library');
   const families = page.children.filter((candidate) => candidate.type === 'COMPONENT_SET');
   assert.equal(families.length, 9);
   const mapPins = families.find((entry) => entry.name === 'MapPin');
@@ -212,6 +212,28 @@ test('creates nine component families, binds tokens, then reruns without duplica
   assert.equal(page.children.filter((item) => item.type === 'COMPONENT_SET').length, 9);
 });
 
+test('reuses and renames existing NEXA Figma libraries without duplicating assets', async () => {
+  const ctx = fakeFigma();
+  const initial = await runOnce(ctx.figma);
+  assert.equal(initial.components, 9);
+  const page = ctx.pages.find((item) => item.name === 'NEXUS · Component Library');
+  assert.ok(page);
+  page.name = 'NEXA · Component Library';
+  for (const group of ctx.groups) group.name = group.name.replace('NEXUS /', 'NEXA /');
+  for (const style of ctx.textStyles) style.name = style.name.replace('NEXUS /', 'NEXA /');
+  for (const style of ctx.effectStyles) style.name = style.name.replace('NEXUS /', 'NEXA /');
+
+  const result = await runOnce(ctx.figma);
+  assert.equal(result.components, 0);
+  assert.equal(result.skippedComponents, 9);
+  assert.equal(result.variablesCreated, 0);
+  assert.equal(page.name, 'NEXUS · Component Library');
+  assert.ok(ctx.groups.every((group) => group.name.startsWith('NEXUS /')));
+  assert.ok(ctx.textStyles.every((style) => style.name.startsWith('NEXUS /')));
+  assert.ok(ctx.effectStyles.every((style) => style.name.startsWith('NEXUS /')));
+  assert.equal(ctx.pages.length, 1);
+});
+
 test('Starter plan uses three single-mode theme palettes and reruns idempotently', async () => {
   const ctx = fakeFigma({ maxModes: 1 });
   const first = await runOnce(ctx.figma);
@@ -220,7 +242,7 @@ test('Starter plan uses three single-mode theme palettes and reruns idempotently
   assert.equal(ctx.groups.length, 7);
   assert.equal(ctx.variables.length, 3 * 81 + 6 + 7 + 6 + 5);
 
-  const collections = ['NEXA / Colors', 'NEXA / Colors / Light', 'NEXA / Colors / Protos Nexus'];
+  const collections = ['NEXUS / Colors', 'NEXUS / Colors / Light', 'NEXUS / Colors / Protos Nexus'];
   const modes = ['Dark', 'Light', 'Protos Nexus'];
   for (const [index, collectionName] of collections.entries()) {
     const group = ctx.groups.find((entry) => entry.name === collectionName);
@@ -243,14 +265,14 @@ test('Starter plan uses three single-mode theme palettes and reruns idempotently
   assert.equal(second.variablesCreated, 0);
   assert.equal(ctx.groups.length, 7);
   assert.equal(ctx.variables.length, first.variablesCreated);
-  assert.equal(ctx.pages.find((page) => page.name === 'NEXA · Component Library')
+  assert.equal(ctx.pages.find((page) => page.name === 'NEXUS · Component Library')
     .children.filter((node) => node.type === 'COMPONENT_SET').length, 9);
 });
 
 test('full Starter page limit preserves existing work in an isolated section', async () => {
   const ctx = fakeFigma({ maxModes: 1, maxPages: 1 });
   const page = ctx.figma.createPage();
-  page.name = 'NEXA — Existing Map';
+  page.name = 'NEXA — Existing Map'; // Preserve a legacy project page untouched
   const existing = ctx.figma.createRectangle();
   existing.name = 'Existing content — do not modify';
   existing.x = 300; existing.y = 200;
@@ -261,7 +283,7 @@ test('full Starter page limit preserves existing work in an isolated section', a
   assert.equal(ctx.pages.length, 1, 'Starter should not need an additional page');
 
   const section = page.children.find((entry) =>
-    entry.type === 'SECTION' && entry.name === 'NEXA · Component Library');
+    entry.type === 'SECTION' && entry.name === 'NEXUS · Component Library');
   assert.ok(section);
   assert.ok(section.x > originalRight, 'fallback section should be placed beside existing content');
   assert.equal(section.children.filter((entry) => entry.type === 'COMPONENT_SET').length, 9);
@@ -275,7 +297,7 @@ test('full Starter page limit preserves existing work in an isolated section', a
   assert.equal(second.variablesCreated, 0);
   assert.equal(ctx.pages.length, 1);
   const matchingSections = page.children.filter((entry) =>
-    entry.type === 'SECTION' && entry.name === 'NEXA · Component Library');
+    entry.type === 'SECTION' && entry.name === 'NEXUS · Component Library');
   assert.equal(matchingSections.length, 1);
   assert.equal(matchingSections[0].id, sectionId);
   assert.equal(section.children.filter((entry) => entry.type === 'COMPONENT_SET').length, 9);
@@ -307,7 +329,7 @@ test('rejects an incomplete existing component family instead of silently skippi
   const ctx = fakeFigma();
   const first = await runOnce(ctx.figma);
   assert.equal(first.components, 9);
-  const page = ctx.pages.find((entry) => entry.name === 'NEXA · Component Library');
+  const page = ctx.pages.find((entry) => entry.name === 'NEXUS · Component Library');
   const buttonSet = page.children.find((entry) =>
     entry.type === 'COMPONENT_SET' && entry.name === 'Button');
   assert.ok(buttonSet);
@@ -324,14 +346,14 @@ test('rejects an incomplete existing component family instead of silently skippi
 test('rejects a duplicate component set rather than concealing conflicting library assets', async () => {
   const ctx = fakeFigma();
   await runOnce(ctx.figma);
-  const page = ctx.pages.find((entry) => entry.name === 'NEXA · Component Library');
+  const page = ctx.pages.find((entry) => entry.name === 'NEXUS · Component Library');
   const duplicateVariant = ctx.figma.createComponent();
   duplicateVariant.name = 'State=Unrelated';
   const duplicate = ctx.figma.combineAsVariants([duplicateVariant], page);
   duplicate.name = 'Button';
 
   const error = await runOnce(ctx.figma, true);
-  assert.match(error, /Duplicate NEXA component family "Button"/);
+  assert.match(error, /Duplicate NEXUS component family "Button"/);
   assert.equal(page.children.filter((entry) =>
     entry.type === 'COMPONENT_SET' && entry.name === 'Button').length, 2);
 });

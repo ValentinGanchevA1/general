@@ -1,4 +1,4 @@
-# NEXA: Public → Private migration runbook (manual approval required)
+# NEXUS: Public → Private migration runbook (manual approval required)
 
 **Scope:** `ValentinGanchevA1/general` (`master`). This document is a plan only.
 It does not authorize or automatically change repository visibility, GitHub

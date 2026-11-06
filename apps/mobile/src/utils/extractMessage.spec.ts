@@ -57,11 +57,11 @@ describe('extractMessage', () => {
         {
           statusCode: 400,
           code: 'profile.underage',
-          message: 'You must be 18+ to use NEXA.',
+          message: 'You must be 18+ to use NEXUS.',
         },
         'Failed to update profile',
       ),
-    ).toBe('You must be 18+ to use NEXA.');
+    ).toBe('You must be 18+ to use NEXUS.');
   });
 
   it('keeps the existing transient-network copy', () => {

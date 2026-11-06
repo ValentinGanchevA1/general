@@ -103,7 +103,7 @@ jobs:
             sleep 1
           done
           curl --fail --silent http://127.0.0.1:4180/healthz | grep '"ok":true'
-          curl --fail --silent http://127.0.0.1:4180/ | grep 'NEXA'
+          curl --fail --silent http://127.0.0.1:4180/ | grep 'NEXUS'
           curl --fail --silent --head http://127.0.0.1:4180/dist/maplibre-worker.mjs | tr -d '\r' | grep -i '^content-type: text/javascript; charset=utf-8$'
           CSP="$(curl --fail --silent --head http://127.0.0.1:4180/ | tr -d '\r' | grep -i '^content-security-policy:')"
           echo "$CSP" | grep -F "worker-src 'self'"

@@ -71,7 +71,7 @@ function StepName({ value, onChange }: { value: string; onChange: (value: string
       <StepHeader
         eyebrow="IDENTITY"
         title="How should people know you?"
-        subtitle="This name appears with your profile across NEXA."
+        subtitle="This name appears with your profile across NEXUS."
       />
       <FormField
         value={value}
@@ -145,7 +145,7 @@ function StepInterests({ selected, onToggle }: { selected: string[]; onToggle: (
       <StepHeader
         eyebrow="INTERESTS"
         title="What are you into?"
-        subtitle="Pick at least 3. Shared interests help NEXA find better people, activities and conversations for you."
+        subtitle="Pick at least 3. Shared interests help NEXUS find better people, activities and conversations for you."
       />
       <SelectableGrid options={INTEREST_OPTIONS} selected={selected} onToggle={onToggle} tone="interest" />
       <Text style={[styles.selectionCount, { color: colors.textTertiary }]}>
@@ -180,7 +180,7 @@ function StepOrigin({
       <StepHeader
         eyebrow="ABOUT YOU"
         title="Age & origin"
-        subtitle="You must be 18+. Exact date of birth stays private; NEXA can derive your age and zodiac from it."
+        subtitle="You must be 18+. Exact date of birth stays private; NEXUS can derive your age and zodiac from it."
       />
       <View style={styles.originFields}>
         <BirthDateField
@@ -232,7 +232,7 @@ function StepPurpose({ selected, onToggle }: { selected: string[]; onToggle: (va
       <StepHeader
         eyebrow="PURPOSE"
         title="Why are you here?"
-        subtitle="Choose your core reasons for using NEXA. Purpose helps shape discovery without replacing your interests."
+        subtitle="Choose your core reasons for using NEXUS. Purpose helps shape discovery without replacing your interests."
       />
       <SelectableGrid options={PURPOSE_OPTIONS} selected={selected} onToggle={onToggle} tone="purpose" />
       <Text style={[styles.selectionCount, { color: colors.textTertiary }]}>
@@ -374,7 +374,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
         <ScrollView contentContainerStyle={styles.welcomeBody} showsVerticalScrollIndicator={false}>
           <NexaDiscoveryHero />
           <Text style={[styles.welcomeHeading, { color: colors.textPrimary }]}>Make the map yours.</Text>
-          <Text style={[styles.welcomeSub, { color: colors.textSecondary }]}>Tell NEXA what you like, why you’re here, and how you want to appear nearby.</Text>
+          <Text style={[styles.welcomeSub, { color: colors.textSecondary }]}>Tell NEXUS what you like, why you’re here, and how you want to appear nearby.</Text>
         </ScrollView>
         <View style={[styles.welcomeFooter, { backgroundColor: colors.canvas, borderTopColor: colors.borderSubtle }]}> 
           <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.actionPrimary }]} onPress={() => setStep(1)} activeOpacity={0.82} accessibilityRole="button">
@@ -423,7 +423,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
           activeOpacity={0.82}
         >
           {loading ? <ActivityIndicator color={colors.onPrimary} /> : <>
-            <Text style={[styles.continueText, { color: colors.onPrimary }]}>{isLastStep ? 'Enter NEXA' : 'Continue'}</Text>
+            <Text style={[styles.continueText, { color: colors.onPrimary }]}>{isLastStep ? 'Enter NEXUS' : 'Continue'}</Text>
             <Icon name="arrow-right" size={24} color={colors.onPrimary} />
           </>}
         </TouchableOpacity>

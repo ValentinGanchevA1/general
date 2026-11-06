@@ -1,4 +1,4 @@
-# NEXA Map Zoom & Density System v2
+# NEXUS Map Zoom & Density System v2
 
 This document is the implementation contract for progressive map detail.
 
@@ -16,7 +16,7 @@ This document is the implementation contract for progressive map detail.
 
 `useDiscovery` debounces viewport/zoom changes (250 ms by default). Only when that request is committed does it dispatch `setDiscoveryZoom(zoom)`. `MapMarkers` reads this committed value from Redux.
 
-This gives NEXA temporal hysteresis at zoom boundaries:
+This gives NEXUS temporal hysteresis at zoom boundaries:
 
 1. pinch/pan can oscillate around a threshold,
 2. intermediate values are cancelled by the discovery debounce,

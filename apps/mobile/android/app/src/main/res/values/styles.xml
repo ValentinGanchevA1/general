@@ -10,7 +10,7 @@
 
     <!--
       Keep the OS/native launch frame as a clean dark canvas. The RN overlay
-      starts from the exact same #08090D background and builds the NEXA mark
+      starts from the exact same #08090D background and builds the NEXUS mark
       from light, avoiding the previous fully-formed-logo flash before motion.
     -->
     <style name="BootTheme" parent="Theme.BootSplash">

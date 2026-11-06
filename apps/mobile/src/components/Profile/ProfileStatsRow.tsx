@@ -19,7 +19,7 @@ export type PublicProfileActivity = {
 /**
  * Visitor-safe activity presentation.
  *
- * Leaderboard rank is intentionally excluded: NEXA may use rank inside explicit
+ * Leaderboard rank is intentionally excluded: NEXUS may use rank inside explicit
  * leaderboard/gamification surfaces, but public identity/profile surfaces must
  * not turn it into a popularity signal.
  */

@@ -1,14 +1,15 @@
-/* NEXA Figma development plugin. Generated code.js embeds live mobile tokens. */
+/* NEXUS Figma development plugin. Generated code.js embeds live mobile tokens. */
 const NEXA_TOKENS = {"source":"apps/mobile/src/theme","colors":{"Dark":{"canvas":"#08090D","mapBase":"#0A0C11","surfacePrimary":"#101218","surfaceSecondary":"#151821","surfaceTertiary":"#1B1F29","surfaceHover":"#202530","borderSubtle":"rgba(255, 255, 255, 0.07)","borderDefault":"rgba(255, 255, 255, 0.11)","borderStrong":"rgba(255, 255, 255, 0.20)","bg":"#08090D","surface":"#101218","surfaceRaised":"#151821","surfaceAlt":"#1B1F29","border":"rgba(255, 255, 255, 0.07)","brandViolet":"#7C5CFC","brandVioletBright":"#9278FF","brandVioletMuted":"#5B45C8","brandCyan":"#27D3F2","brandCyanBright":"#62E6FF","brandCyanMuted":"#147E93","actionPrimary":"#7C5CFC","discovery":"#27D3F2","live":"#27D3F2","verified":"#27D3F2","onPrimary":"#F7F8FA","primary":"#7C5CFC","accent":"#27D3F2","info":"#27D3F2","action":"#7C5CFC","textPrimary":"#F7F8FA","textSecondary":"#B0B5C0","textTertiary":"#777E8D","textDisabled":"#555B67","textInverse":"#090A0E","textMuted":"#777E8D","textFaint":"#555B67","danger":"#FF647C","dangerMuted":"#FF8295","dangerSurface":"rgba(255, 100, 124, 0.10)","dangerBorder":"rgba(255, 100, 124, 0.28)","dangerSolid":"#D84C65","primaryTrack":"#5B45C8","warning":"#F6C453","success":"#42D392","entityPerson":"#7C5CFC","entityEvent":"#27D3F2","entityListing":"#F7F8FA","entityOpportunity":"#7C5CFC","entityUser":"#7C5CFC","entityFriend":"#62E6FF","entityWanted":"#9278FF","premium":"#FFD166","premiumBorder":"rgba(255, 209, 102, 0.32)","premiumTier":"#9278FF","toastXp":"#241C0E","toastSuccess":"#0D241A","toastAchievement":"#1A1530","toastRank":"#0C2028","toastWave":"#0B2229","toastGift":"#21142C","shadowInk":"#000000","actionSoft":"rgba(124, 92, 252, 0.07)","actionMutedBg":"rgba(124, 92, 252, 0.10)","actionGhost":"rgba(124, 92, 252, 0.14)","actionBorderSoft":"rgba(124, 92, 252, 0.25)","actionBorder":"rgba(124, 92, 252, 0.40)","discoverySoft":"rgba(39, 211, 242, 0.07)","discoveryMutedBg":"rgba(39, 211, 242, 0.10)","discoveryGhost":"rgba(39, 211, 242, 0.14)","discoveryBorderSoft":"rgba(39, 211, 242, 0.24)","discoveryBorder":"rgba(39, 211, 242, 0.38)","primarySoft":"rgba(124, 92, 252, 0.07)","primaryMutedBg":"rgba(124, 92, 252, 0.10)","primaryGhost":"rgba(124, 92, 252, 0.14)","primaryBorderSoft":"rgba(124, 92, 252, 0.25)","primaryBorder":"rgba(124, 92, 252, 0.40)","premiumSoft":"rgba(255, 209, 102, 0.07)","premiumMutedBg":"rgba(255, 209, 102, 0.10)","premiumBorderSoft":"rgba(255, 209, 102, 0.20)","premiumBorderMid":"rgba(255, 209, 102, 0.40)","dangerBorderSoft":"rgba(255, 100, 124, 0.40)"},"Light":{"canvas":"#F6F7FA","mapBase":"#EEF1F5","surfacePrimary":"#FFFFFF","surfaceSecondary":"#F0F2F7","surfaceTertiary":"#E7EAF0","surfaceHover":"#DFE3EA","borderSubtle":"rgba(9, 10, 14, 0.08)","borderDefault":"rgba(9, 10, 14, 0.13)","borderStrong":"rgba(9, 10, 14, 0.22)","bg":"#F6F7FA","surface":"#FFFFFF","surfaceRaised":"#F0F2F7","surfaceAlt":"#E7EAF0","border":"rgba(9, 10, 14, 0.08)","brandViolet":"#7C5CFC","brandVioletBright":"#9278FF","brandVioletMuted":"#5B45C8","brandCyan":"#27D3F2","brandCyanBright":"#62E6FF","brandCyanMuted":"#147E93","actionPrimary":"#6849DF","discovery":"#147E93","live":"#147E93","verified":"#147E93","onPrimary":"#FFFFFF","primary":"#6849DF","accent":"#147E93","info":"#147E93","action":"#6849DF","textPrimary":"#111318","textSecondary":"#4B515D","textTertiary":"#6E7582","textDisabled":"#9AA0AB","textInverse":"#F7F8FA","textMuted":"#6E7582","textFaint":"#9AA0AB","danger":"#C93650","dangerMuted":"#B52E46","dangerSurface":"#FFF0F3","dangerBorder":"#F2BEC8","dangerSolid":"#AE2B42","primaryTrack":"#9A87ED","warning":"#8A6500","success":"#147A4D","entityPerson":"#7C5CFC","entityEvent":"#27D3F2","entityListing":"#20242B","entityOpportunity":"#7C5CFC","entityUser":"#7C5CFC","entityFriend":"#147E93","entityWanted":"#9278FF","premium":"#9A7412","premiumBorder":"rgba(154, 116, 18, 0.30)","premiumTier":"#6E52E8","toastXp":"#FFF4E0","toastSuccess":"#E6F6EC","toastAchievement":"#F0E8FF","toastRank":"#E6F4FF","toastWave":"#E6F7FC","toastGift":"#FCE8FF","shadowInk":"#000000","actionSoft":"rgba(104, 73, 223, 0.07)","actionMutedBg":"rgba(104, 73, 223, 0.10)","actionGhost":"rgba(104, 73, 223, 0.14)","actionBorderSoft":"rgba(104, 73, 223, 0.23)","actionBorder":"rgba(104, 73, 223, 0.38)","discoverySoft":"rgba(20, 126, 147, 0.07)","discoveryMutedBg":"rgba(20, 126, 147, 0.10)","discoveryGhost":"rgba(20, 126, 147, 0.14)","discoveryBorderSoft":"rgba(20, 126, 147, 0.23)","discoveryBorder":"rgba(20, 126, 147, 0.38)","primarySoft":"rgba(104, 73, 223, 0.07)","primaryMutedBg":"rgba(104, 73, 223, 0.10)","primaryGhost":"rgba(104, 73, 223, 0.14)","primaryBorderSoft":"rgba(104, 73, 223, 0.23)","primaryBorder":"rgba(104, 73, 223, 0.38)","premiumSoft":"rgba(154, 116, 18, 0.07)","premiumMutedBg":"rgba(154, 116, 18, 0.10)","premiumBorderSoft":"rgba(154, 116, 18, 0.20)","premiumBorderMid":"rgba(154, 116, 18, 0.35)","dangerBorderSoft":"rgba(201, 54, 80, 0.35)"},"Protos Nexus":{"canvas":"#07050B","mapBase":"#0B0811","surfacePrimary":"#100B17","surfaceSecondary":"#171020","surfaceTertiary":"#20142A","surfaceHover":"#291733","borderSubtle":"rgba(255, 61, 172, 0.12)","borderDefault":"rgba(255, 61, 172, 0.22)","borderStrong":"rgba(255, 61, 172, 0.42)","bg":"#07050B","surface":"#100B17","surfaceRaised":"#171020","surfaceAlt":"#20142A","border":"rgba(255, 61, 172, 0.18)","brandViolet":"#A970FF","brandVioletBright":"#C69BFF","brandVioletMuted":"#8056B8","brandCyan":"#3DE7FF","brandCyanBright":"#83F1FF","brandCyanMuted":"#26A9BC","actionPrimary":"#FF3DAC","discovery":"#3DE7FF","live":"#3DE7FF","verified":"#3DE7FF","onPrimary":"#FFFFFF","primary":"#FF3DAC","accent":"#3DE7FF","info":"#3DE7FF","action":"#FF3DAC","textPrimary":"#FFF7FC","textSecondary":"#D9C8D5","textTertiary":"#A98FA3","textDisabled":"#725E6D","textInverse":"#120810","textMuted":"#A98FA3","textFaint":"#725E6D","danger":"#FF647C","dangerMuted":"#FF8295","dangerSurface":"rgba(255, 100, 124, 0.10)","dangerBorder":"rgba(255, 100, 124, 0.28)","dangerSolid":"#D84C65","primaryTrack":"#B51C78","warning":"#F6C453","success":"#42D392","entityPerson":"#FF3DAC","entityEvent":"#27D3F2","entityListing":"#F7F8FA","entityOpportunity":"#A970FF","entityUser":"#FF3DAC","entityFriend":"#3DE7FF","entityWanted":"#C69BFF","premium":"#FF3DAC","premiumBorder":"rgba(255, 61, 172, 0.55)","premiumTier":"#FF75C4","toastXp":"#241C0E","toastSuccess":"#0D241A","toastAchievement":"#1A1530","toastRank":"#0C2028","toastWave":"#0B2229","toastGift":"#21142C","shadowInk":"#FF3DAC","actionSoft":"rgba(255, 61, 172, 0.08)","actionMutedBg":"rgba(255, 61, 172, 0.12)","actionGhost":"rgba(255, 61, 172, 0.17)","actionBorderSoft":"rgba(255, 61, 172, 0.28)","actionBorder":"rgba(255, 61, 172, 0.52)","discoverySoft":"rgba(39, 211, 242, 0.07)","discoveryMutedBg":"rgba(39, 211, 242, 0.10)","discoveryGhost":"rgba(39, 211, 242, 0.14)","discoveryBorderSoft":"rgba(39, 211, 242, 0.24)","discoveryBorder":"rgba(39, 211, 242, 0.38)","primarySoft":"rgba(255, 61, 172, 0.08)","primaryMutedBg":"rgba(255, 61, 172, 0.12)","primaryGhost":"rgba(255, 61, 172, 0.17)","primaryBorderSoft":"rgba(255, 61, 172, 0.28)","primaryBorder":"rgba(255, 61, 172, 0.52)","premiumSoft":"rgba(255, 61, 172, 0.08)","premiumMutedBg":"rgba(255, 61, 172, 0.12)","premiumBorderSoft":"rgba(255, 61, 172, 0.28)","premiumBorderMid":"rgba(255, 61, 172, 0.52)","dangerBorderSoft":"rgba(255, 100, 124, 0.40)"}},"brand":{"violet":"#7C5CFC","violetBright":"#9278FF","violetMuted":"#5B45C8","cyan":"#27D3F2","cyanBright":"#62E6FF","cyanMuted":"#147E93","symbolCore":"#C8BEFF"},"spacing":{"xs":4,"sm":8,"md":12,"lg":16,"xl":20,"xxl":24},"radius":{"sm":8,"md":12,"lg":16,"xl":20,"card":14,"pill":24,"fab":28},"fontSize":{"xs":12,"sm":13,"md":15,"lg":18,"xl":22,"xxl":28},"layout":{"screenPaddingH":16,"buttonHeight":50,"minTouch":44,"listRowMinHeight":64,"cardRadius":14},"elevation":{"Dark":{"color":"#000000","opacity":0.25,"radius":12,"x":0,"y":4,"android":6},"Light":{"color":"#000000","opacity":0.08,"radius":12,"x":0,"y":4,"android":6},"Protos Nexus":{"color":"#FF3DAC","opacity":0.38,"radius":16,"x":0,"y":4,"android":8},"Fab":{"color":"#7C5CFC","opacity":0.38,"radius":12,"x":0,"y":4,"android":8}}};
 
 async function main() {
   const pages = figma.root.children;
-  let page = pages.find((candidate) => candidate.name === 'NEXA · Component Library');
+  let page = pages.find((candidate) => candidate.name === 'NEXUS · Component Library' || candidate.name === 'NEXA · Component Library');
+  if (page && page.name !== 'NEXUS · Component Library') page.name = 'NEXUS · Component Library';
   let useExistingPage = false;
   if (!page) {
     try {
       page = figma.createPage();
-      page.name = 'NEXA · Component Library';
+      page.name = 'NEXUS · Component Library';
     } catch (error) {
       // Starter team files can reach their page limit. Work inside an isolated
       // section on the currently open page instead of altering other designs.
@@ -23,11 +24,12 @@ async function main() {
   let target = page;
   if (useExistingPage) {
     let section = page.children.find((candidate) =>
-      candidate.type === 'SECTION' && candidate.name === 'NEXA · Component Library');
+      candidate.type === 'SECTION' && (candidate.name === 'NEXUS · Component Library' || candidate.name === 'NEXA · Component Library'));
+    if (section && section.name !== 'NEXUS · Component Library') section.name = 'NEXUS · Component Library';
     if (!section) {
       const rightmost = Math.max(0, ...page.children.map((node) => node.x + node.width));
       section = figma.createSection();
-      section.name = 'NEXA · Component Library';
+      section.name = 'NEXUS · Component Library';
       section.x = rightmost + 240;
       section.y = 160;
       section.resizeWithoutConstraints(2460, 4800);
@@ -59,6 +61,10 @@ async function main() {
 
   function collection(name, modes) {
     let found = collections.find((entry) => entry.name === name);
+    if (!found && name.startsWith('NEXUS /')) {
+      found = collections.find((entry) => entry.name === name.replace('NEXUS /', 'NEXA /'));
+      if (found) found.name = name;
+    }
     if (!found) {
       found = figma.variables.createVariableCollection(name);
       if (!collections.some((item) => item.id === found.id)) collections.push(found);
@@ -99,19 +105,19 @@ async function main() {
   let colorGroups;
   counts.colorThemeStrategy = 'variable-modes';
   try {
-    colorGroups = [{ group: collection('NEXA / Colors', colorModes), modes: colorModes }];
+    colorGroups = [{ group: collection('NEXUS / Colors', colorModes), modes: colorModes }];
   } catch (error) {
     // Starter supports variables but not multiple modes in a collection.
     // Preserve the default Dark collection and store the other palettes in
     // dedicated single-mode collections instead of failing halfway through.
     if (!/mode|limit|plan|upgrade/i.test(String(error))) throw error;
-    const primary = collections.find((item) => item.name === 'NEXA / Colors');
+    const primary = collections.find((item) => item.name === 'NEXUS / Colors');
     if (!primary || !primary.modes.some((mode) => mode.name === 'Dark')) throw error;
     const presentModes = colorModes.filter((mode) =>
       primary.modes.some((existingMode) => existingMode.name === mode));
     colorGroups = [{ group: primary, modes: presentModes }];
     for (const mode of colorModes.filter((name) => !presentModes.includes(name))) {
-      colorGroups.push({ group: collection('NEXA / Colors / ' + mode, [mode]), modes: [mode] });
+      colorGroups.push({ group: collection('NEXUS / Colors / ' + mode, [mode]), modes: [mode] });
     }
     counts.colorThemeStrategy = 'single-mode-collections';
   }
@@ -119,7 +125,7 @@ async function main() {
     for (const { group, modes } of colorGroups) {
       const modeValues = {};
       for (const mode of modes) modeValues[mode] = NEXA_TOKENS.colors[mode][name];
-      const cssPrefix = group.name === 'NEXA / Colors'
+      const cssPrefix = group.name === 'NEXUS / Colors'
         ? 'color-' : 'color-' + modes[0].toLowerCase().replace(/\s+/g, '-') + '-';
       upsert(name, group, 'COLOR', modeValues,
         ['FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL', 'STROKE_COLOR'],
@@ -128,10 +134,10 @@ async function main() {
   }
 
   const numericSpecs = [
-    ['NEXA / Spacing', NEXA_TOKENS.spacing, ['GAP']],
-    ['NEXA / Radius', NEXA_TOKENS.radius, ['CORNER_RADIUS']],
-    ['NEXA / Typography', NEXA_TOKENS.fontSize, ['FONT_SIZE']],
-    ['NEXA / Layout', NEXA_TOKENS.layout, ['WIDTH_HEIGHT']],
+    ['NEXUS / Spacing', NEXA_TOKENS.spacing, ['GAP']],
+    ['NEXUS / Radius', NEXA_TOKENS.radius, ['CORNER_RADIUS']],
+    ['NEXUS / Typography', NEXA_TOKENS.fontSize, ['FONT_SIZE']],
+    ['NEXUS / Layout', NEXA_TOKENS.layout, ['WIDTH_HEIGHT']],
   ];
   for (const [collectionName, entries, scopes] of numericSpecs) {
     const group = collection(collectionName, ['Base']);
@@ -143,8 +149,9 @@ async function main() {
 
   const textStyles = await figma.getLocalTextStylesAsync();
   for (const [key, size] of Object.entries(NEXA_TOKENS.fontSize)) {
-    const name = 'NEXA / Text / ' + key;
-    let style = textStyles.find((candidate) => candidate.name === name);
+    const name = 'NEXUS / Text / ' + key;
+    let style = textStyles.find((candidate) => candidate.name === name || candidate.name === name.replace('NEXUS /', 'NEXA /'));
+    if (style && style.name !== name) style.name = name;
     if (!style) { style = figma.createTextStyle(); style.name = name; if (!textStyles.some((item) => item.id === style.id)) textStyles.push(style); }
     style.fontName = { family: 'Inter', style: key === 'xxl' || key === 'xl' ? 'Semi Bold' : 'Regular' };
     style.fontSize = size;
@@ -154,8 +161,9 @@ async function main() {
 
   const effectStyles = await figma.getLocalEffectStylesAsync();
   for (const [mode, effect] of Object.entries(NEXA_TOKENS.elevation)) {
-    const name = 'NEXA / Elevation / ' + mode;
-    let style = effectStyles.find((candidate) => candidate.name === name);
+    const name = 'NEXUS / Elevation / ' + mode;
+    let style = effectStyles.find((candidate) => candidate.name === name || candidate.name === name.replace('NEXUS /', 'NEXA /'));
+    if (style && style.name !== name) style.name = name;
     if (!style) { style = figma.createEffectStyle(); style.name = name; if (!effectStyles.some((item) => item.id === style.id)) effectStyles.push(style); }
     style.effects = [{
       type: 'DROP_SHADOW',
@@ -171,27 +179,27 @@ async function main() {
     return { type: 'SOLID', color: { r: color.r, g: color.g, b: color.b } };
   }
   function fill(node, name) {
-    const variable = variableByKey.get('NEXA / Colors/' + name);
+    const variable = variableByKey.get('NEXUS / Colors/' + name);
     if (!variable) throw new Error('Unknown color: ' + name);
     node.fills = [figma.variables.setBoundVariableForPaint(
       pigment(name), 'color', variable,
     )];
   }
   function stroke(node, name, width) {
-    const variable = variableByKey.get('NEXA / Colors/' + name);
+    const variable = variableByKey.get('NEXUS / Colors/' + name);
     node.strokes = [figma.variables.setBoundVariableForPaint(
       pigment(name), 'color', variable,
     )];
     node.strokeWeight = width;
   }
   function space(node, field, key) {
-    const variable = variableByKey.get('NEXA / Spacing/' + key);
+    const variable = variableByKey.get('NEXUS / Spacing/' + key);
     if (!variable) throw new Error('Missing spacing token: ' + key);
     node[field] = NEXA_TOKENS.spacing[key];
     node.setBoundVariable(field, variable);
   }
   function bindRadius(node, name) {
-    const variable = variableByKey.get('NEXA / Radius/' + name);
+    const variable = variableByKey.get('NEXUS / Radius/' + name);
     if (variable) node.setBoundVariable('cornerRadius', variable);
   }
   function label(parent, value, fontSize, colorName, bold, x, y) {
@@ -201,7 +209,7 @@ async function main() {
     item.fontSize = fontSize;
     const sizeToken = Object.entries(NEXA_TOKENS.fontSize).find((entry) => entry[1] === fontSize);
     if (sizeToken) {
-      const variable = variableByKey.get('NEXA / Typography/' + sizeToken[0]);
+      const variable = variableByKey.get('NEXUS / Typography/' + sizeToken[0]);
       if (variable) item.setBoundVariable('fontSize', variable);
     }
     item.characters = value;
@@ -253,7 +261,7 @@ async function main() {
       .map((child) => child.name).sort();
     if (set.children.length !== expected.length || actual.length !== expected.length ||
         expected.some((name, index) => name !== actual[index])) {
-      throw new Error('NEXA component family "' + set.name + '" variant mismatch. ' +
+      throw new Error('NEXUS component family "' + set.name + '" variant mismatch. ' +
         'Expected [' + expected.join(', ') + '], found [' + actual.join(', ') + ']. ' +
         'Inspect the existing Figma component set before retrying; no automatic overwrite.');
     }
@@ -262,7 +270,7 @@ async function main() {
     const matches = target.children.filter((node) =>
       node.type === 'COMPONENT_SET' && node.name === name);
     if (matches.length > 1) {
-      throw new Error('Duplicate NEXA component family "' + name +
+      throw new Error('Duplicate NEXUS component family "' + name +
         '" found. Resolve duplicate component sets manually before retrying.');
     }
     const found = matches[0];
@@ -482,8 +490,8 @@ async function main() {
 }
 
 main().then((summary) => {
-  figma.closePlugin('NEXA design library synced: ' + JSON.stringify(summary));
+  figma.closePlugin('NEXUS design library synced: ' + JSON.stringify(summary));
 }).catch((error) => {
   console.error(error);
-  figma.closePlugin('NEXA library failed: ' + String(error));
+  figma.closePlugin('NEXUS library failed: ' + String(error));
 });

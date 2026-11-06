@@ -1,11 +1,11 @@
-# NEXA — Google Play first release gate (2026-11-05)
+# NEXUS — Google Play first release gate (2026-11-05)
 
-**Status: PREPARING / NOT READY TO SUBMIT.** This is an evidence-driven checklist, not a declaration that a signed AAB, Play listing, or on-device sign-off exists. Owner-side Play Console screenshots show a newly registered personal developer account **g88**: trader declaration and physical Android device verification complete; identity verification pending; contact-phone verification blocked until identity approval; Create app disabled.
+**Status: PREPARING / NOT READY TO SUBMIT.** Owner-side Play Console screenshots dated **2026-11-06** confirm the new **g88 Personal** developer account and **successful identity verification**; the **Create your first app** action is visible. The linked Google Payments bank account still requires proof-of-account documentation; the owner is obtaining it, and verification approval is **unknown**. Whether NEXUS has actually been created in Play Console, the contact phone was verified, or a Play track exists is **unknown**. No signed AAB, Play upload, or on-device QA sign-off is yet demonstrated.
 
 ## Verified repository baseline
 
 - Repo: `ValentinGanchevA1/general`, default `master`. Audit snapshot: `0d792e9c1b595fd161746586293a4a51263406a3`. Recheck HEAD and open PRs before freezing the release candidate.
-- Product display: **NEXA**; Android app ID / namespace: **`com.g88`** (retain intentionally); `versionName=1.0.0`; `versionCode` derived from GitHub Actions run number.
+- Product display: **NEXUS**; Android app ID / namespace: **`com.g88`** (retain intentionally); `versionName=1.0.0`; `versionCode` derived from GitHub Actions run number.
 - React Native 0.83.0; `minSdk=24`, `compileSdk=36`, `targetSdk=36`.
 - Signed AAB workflow: `.github/workflows/android-release.yml` → `g88-release-aab` → `apps/mobile/android/app/build/outputs/bundle/release/app-release.aab`.
 - Canonical current Android navigation (2026-11-04): **Map / Experiences / Opportunities / Connections / Identity** (`docs/IA_NAVIGATION.md`). Older RC3 Map/Discover/Pulse/Connections/You screenshots are NOT a valid substitute.
@@ -14,14 +14,25 @@
 - Optional external deletion request page proposed: `docs/legal/delete-account/index.html` → intended `https://g88-legal.onrender.com/delete-account/`; **not deployed/verified**.
 - Dedicated legal-reviewed Terms remain unimplemented: issue **#592**, `TERMS_OF_SERVICE_URL` still equals privacy URL. **Production NO-GO**.
 
+
+## 2026-11-06 NEXUS AAB preflight evidence
+
+- Branding PR: [#1045](https://github.com/ValentinGanchevA1/general/pull/1045), still **Draft**, not merged; Android + Backend + Figma QA on the PR passed, but Sonar duplication Quality Gate is **red** (5.6% new-code duplication versus a 3% maximum). Do not present the rebrand as shipped.
+- A safe build-only release candidate branch, `release/nexus-closed-alpha-aab-preflight-20261106`, combines NEXUS PR code with current master security changes. Its `android-release.yml` push path explicitly **does not publish to Google Play**.
+- [Run #42221845711](https://github.com/ValentinGanchevA1/general/actions/runs/42221845711) failed only the `Guard required release secrets` step, specifically `GOOGLE_WEB_CLIENT_ID` missing. Other required inputs were present, but not yet fully validated.
+- [Run #42222245425](https://github.com/ValentinGanchevA1/general/actions/runs/42222245425) uses the previously committed public Android CI OAuth Web Client ID as a safe fallback; it passed the secret, legal URL and MapLibre guards and injected Firebase/signing input. At the time of this record, **the bundle build and AAB artifact are not yet confirmed**. Verify final run status and retrieve artifact evidence before editing this line.
+- Before any Play upload, verify that the effective Web Client ID matches the backend `GOOGLE_CLIENT_ID`, that Play signing SHA certificates are whitelisted, and that Google Sign-In works from a **Play-installed** NEXUS build.
+- Google Payments bank-statement verification is separate from developer identity verification and must be tracked to approval; do not interpret the identity success notification as a completed bank review.
+
 ## 1. Developer account / Play bootstrap (owner-side)
 
 - [x] Developer account registration complete (personal, g88).
 - [x] Non-trader declaration submitted per Play Console evidence. Reassess if the actual business model changes; free alone does not determine trader status.
 - [x] Android device verification complete via Huawei Nova 11 (confirmed by Play Console disappearance of task).
-- [ ] Google identity verification APPROVED (not merely documents submitted).
-- [ ] Contact phone number verified after identity approval.
-- [ ] **Create app** enabled; create **NEXA**, type **App**, default language **en-US**, **Free** (initial plan), category **Social**.
+- [x] Google identity verification APPROVED — confirmed by Play Console notification screenshot on 2026-11-06.
+- [ ] Contact phone number verification — **unknown** after identity approval; inspect Play Console dashboard.
+- [x] **Create app** is offered on account home (screenshot, 2026-11-06).
+- [ ] Actually create **NEXUS**, type **App**, default language **en-US**, **Free** (initial plan), category **Social** — not yet evidenced.
 - [ ] Configure App access/reviewer test accounts without giving the reviewer a personal admin account.
 - [ ] Enter factual content rating (UGC, chat and dating/social features), intended 18+ audience, permissions, ads/financial-feature declarations based on the exact enabled build.
 - [ ] Play App Signing enrolled; record **app-signing SHA-1/SHA-256** and **upload-key SHA-1/SHA-256**.
@@ -39,8 +50,8 @@
 
 ## 3. Store listing / screenshots
 
-- [ ] Use the NEXA short/full copy in `docs/play-store-listing.md` after feature-by-feature review.
-- [ ] Provide actual **512x512 PNG** store icon based on current NEXA native launcher eye, and **1024x500 JPEG/24-bit PNG** feature graphic (no alpha).
+- [ ] Use the NEXUS short/full copy in `docs/play-store-listing.md` after feature-by-feature review.
+- [ ] Provide actual **512x512 PNG** store icon based on current NEXUS native launcher eye, and **1024x500 JPEG/24-bit PNG** feature graphic (no alpha).
 - [ ] Capture at least **2 genuine Android phone screenshots** from the **same release candidate**; target 5–6 high-quality portrait screens. See `docs/play-assets-capture-v3.md`. No generated or obsolete app UI.
 - [ ] Remove test names, private conversations, exact GPS, phone/email, ID images, debug banners, and credentials from captures.
 - [ ] Verify displayed tab labels are Map / Experiences / Opportunities / Connections / Identity, not RC3's old five-tab names.

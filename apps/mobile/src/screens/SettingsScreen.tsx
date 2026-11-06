@@ -354,7 +354,7 @@ export function SettingsScreen(): React.JSX.Element {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           <ListRow title="Privacy" subtitle="Policy and how we handle your data" onPress={() => navigation.navigate('Privacy')} />
-          <ListRow style={styles.rowSpaced} title="Terms of Service" subtitle="Rules for using NEXA" onPress={() => void Linking.openURL(TERMS_OF_SERVICE_URL)} />
+          <ListRow style={styles.rowSpaced} title="Terms of Service" subtitle="Rules for using NEXUS" onPress={() => void Linking.openURL(TERMS_OF_SERVICE_URL)} />
           <ListRow style={styles.rowSpaced} title="Help & Support" subtitle="FAQ and contact" onPress={() => navigation.navigate('Help')} />
           <ListRow style={styles.rowSpaced} title="About" subtitle="Version and product overview" onPress={() => navigation.navigate('About')} />
 

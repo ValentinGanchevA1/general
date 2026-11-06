@@ -33,8 +33,8 @@ const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const MIN_PASSWORD_LEN = 8;
 
 const MODE_LABELS = {
-  login: { primary: 'Sign in', prompt: 'New to NEXA?', switchMode: 'Create account', autoComplete: 'current-password' },
-  register: { primary: 'Join NEXA', prompt: 'Already on NEXA?', switchMode: 'Sign in', autoComplete: 'new-password' },
+  login: { primary: 'Sign in', prompt: 'New to NEXUS?', switchMode: 'Create account', autoComplete: 'current-password' },
+  register: { primary: 'Join NEXUS', prompt: 'Already on NEXUS?', switchMode: 'Sign in', autoComplete: 'new-password' },
 } as const;
 
 interface FieldErrors {
@@ -179,7 +179,7 @@ export function AuthScreen(): React.JSX.Element {
           <View style={styles.form}>
             {!isLogin ? (
               <Text accessibilityRole="header" style={[styles.title, { color: colors.textPrimary }]}>
-                Create your NEXA account
+                Create your NEXUS account
               </Text>
             ) : null}
 

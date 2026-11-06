@@ -150,7 +150,7 @@ export function TrustCenterScreen(): React.JSX.Element {
             accessibilityLabel={`${trust.label}. ${trust.detail}`}
           />
           <View style={styles.summaryBody}>
-            <Text style={[styles.eyebrow, { color: colors.discovery }]}>NEXA IDENTITY</Text>
+            <Text style={[styles.eyebrow, { color: colors.discovery }]}>NEXUS IDENTITY</Text>
             <Text style={[styles.summaryTitle, { color: colors.textPrimary }]}>
               {trust.label}
             </Text>
@@ -261,7 +261,7 @@ export function TrustCenterScreen(): React.JSX.Element {
           <View style={styles.explainerBody}>
             <Text style={[styles.explainerTitle, { color: colors.textPrimary }]}>What verification means</Text>
             <Text style={[styles.explainerText, { color: colors.textSecondary }]}> 
-              NEXA confirms specific identity signals. A verified or trusted profile is not a guarantee of a person’s behavior or safety.
+              NEXUS confirms specific identity signals. A verified or trusted profile is not a guarantee of a person’s behavior or safety.
             </Text>
           </View>
         </View>

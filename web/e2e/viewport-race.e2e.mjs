@@ -37,7 +37,7 @@ const html = `<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>NEXA viewport race E2E</title>
+  <title>NEXUS viewport race E2E</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/map.css">
   <link rel="stylesheet" href="/connections.css">
@@ -119,7 +119,7 @@ try {
   );
   assert(canceledDiscovery.includes(2), `slow request was not aborted by the superseding viewport: ${JSON.stringify(canceledDiscovery)}`);
 
-  console.log('NEXA viewport E2E passed: settled viewport bodies advance, slow discovery aborts, stale response cannot overwrite fresh results.');
+  console.log('NEXUS viewport E2E passed: settled viewport bodies advance, slow discovery aborts, stale response cannot overwrite fresh results.');
 } catch (error) {
   const chromeErrors = runtime.errors();
   if (chromeErrors) console.error(chromeErrors);

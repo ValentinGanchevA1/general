@@ -198,7 +198,7 @@ export function PlaceDetailScreen(): React.JSX.Element {
         <View style={styles.cardText}>
           <Text style={styles.cardTitle}>Approximate map location</Text>
           <Text style={styles.cardBody}>
-            NEXA focuses the coarse local area for this place. Exact venue coordinates are not stored in the place catalog.
+            NEXUS focuses the coarse local area for this place. Exact venue coordinates are not stored in the place catalog.
           </Text>
         </View>
       </View>
@@ -281,7 +281,7 @@ export function PlaceDetailScreen(): React.JSX.Element {
           </View>
           <Text style={styles.modalTitle}>Check in at {place.canonicalLabel}</Text>
           <Text style={styles.modalBody}>
-            Choose who can see this explicit check-in. NEXA uses your current location only to verify that you're near this place; exact coordinates are not stored.
+            Choose who can see this explicit check-in. NEXUS uses your current location only to verify that you're near this place; exact coordinates are not stored.
           </Text>
 
           {checkInError ? (

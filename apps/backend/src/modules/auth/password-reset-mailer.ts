@@ -45,9 +45,9 @@ export class PasswordResetMailer {
       headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY!}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         personalizations: [{ to: [{ email }] }],
-        from: { email: process.env.SENDGRID_FROM_EMAIL!, name: 'NEXA' },
-        subject: 'Reset your NEXA password',
-        content: [{ type: 'text/plain', value: `Your NEXA password reset code is ${resetCode}.\n\nReturn to NEXA and enter this code with your new password. It expires 15 minutes after your request. Only the latest code works. Never share it.\n\nIf you did not request this, ignore this email. Your password has not changed.` }],
+        from: { email: process.env.SENDGRID_FROM_EMAIL!, name: 'NEXUS' },
+        subject: 'Reset your NEXUS password',
+        content: [{ type: 'text/plain', value: `Your NEXUS password reset code is ${resetCode}.\n\nReturn to NEXUS and enter this code with your new password. It expires 15 minutes after your request. Only the latest code works. Never share it.\n\nIf you did not request this, ignore this email. Your password has not changed.` }],
         tracking_settings: { click_tracking: { enable: false }, open_tracking: { enable: false } },
       }),
     });

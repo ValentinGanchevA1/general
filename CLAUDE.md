@@ -1,7 +1,7 @@
-# NEXA — Project Instructions
+# NEXUS — Project Instructions
 
 > Repo: local monorepo under `apps/` plus repo-backed `web/`. Anything under `legacy/` is read-only reference.  
-> **Compatibility note:** public product identity is **NEXA**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
+> **Compatibility note:** public product identity is **NEXUS**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
 > **Live engineering/release authority:** `docs/STATUS_CURRENT.md`. Sequence/gates: `ROADMAP.md`.  
 > **Last reconciled:** 2026-10-26. Migrations **0001–0050**; next free **0051**.
 
@@ -26,7 +26,7 @@ Act as a **Senior Full-Stack Architect** specialized in high-performance mobile 
 
 ## Product Context
 
-NEXA is a **map-first, location-based social platform**. Users and local activity are discovered spatially, then converted into lightweight real-world interaction.
+NEXUS is a **map-first, location-based social platform**. Users and local activity are discovered spatially, then converted into lightweight real-world interaction.
 
 Canonical primary surfaces: **Map / Discover / Pulse / Connections / You**.
 
@@ -56,7 +56,7 @@ Do not equate merged capability, simulator CI or a canary workflow with producti
 | Realtime | Socket.IO `/realtime` for chat/presence/verification/interactions |
 | Cache / coordination | Redis for presence, auth/rate/discovery coordination and bounded ephemeral state |
 | Shared | `@g88/shared` DTOs + socket/geo/security helpers |
-| Admin | Vite + React verification/admin app; public identity `NEXA Admin` |
+| Admin | Vite + React verification/admin app; public identity `NEXUS Admin` |
 | Analytics | Canonical backend/Postgres pipeline; optional backend-only privacy-safe PostHog mirror |
 | Database | Migrations sequential through **0050**; next free **0051** |
 
@@ -107,7 +107,7 @@ Do not fabricate evidence for these:
 
 | Gate | Contract |
 |---|---|
-| `#592` | Legal-reviewed dedicated NEXA Terms of Service + public `/terms` |
+| `#592` | Legal-reviewed dedicated NEXUS Terms of Service + public `/terms` |
 | `#580` | Physical Android RC3 visual/interaction/privacy/accessibility audit |
 | `#669` | Physical-device launch recordings + telemetry calibration |
 | `#616` | Play Store visual set after approved physical-device sign-off |

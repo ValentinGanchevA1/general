@@ -1,10 +1,10 @@
-# NEXA Verification & Trust Visual System v2
+# NEXUS Verification & Trust Visual System v2
 
 ## Product rule
 
 Verification is a set of explicit identity signals, not a public vanity score.
 
-NEXA may continue to carry an internal/legacy numeric `verificationScore` in API models for compatibility, but mobile UI must not present that number as a public trust percentage.
+NEXUS may continue to carry an internal/legacy numeric `verificationScore` in API models for compatibility, but mobile UI must not present that number as a public trust percentage.
 
 ## Progressive states
 

@@ -190,7 +190,7 @@ export function SavedPlacesScreen(): React.JSX.Element {
             title={collection.error ? "Couldn't load saved places" : 'No saved places yet'}
             body={collection.error
               ? collection.error
-              : 'Save places from NEXA Place Detail to keep a private local collection.'}
+              : 'Save places from NEXUS Place Detail to keep a private local collection.'}
             actionLabel={collection.error ? 'Retry' : 'Explore map'}
             onAction={collection.error ? refresh : exploreMap}
           />

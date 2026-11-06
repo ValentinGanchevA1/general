@@ -18,10 +18,10 @@ type BrandLogoProps = {
 };
 
 /**
- * Compatibility wrapper for the canonical NEXA brand lockup.
+ * Compatibility wrapper for the canonical NEXUS brand lockup.
  * Existing screens can keep importing BrandLogo while all visible G88 artwork
  * is removed from the active UI. New brand surfaces should prefer NexaSymbol
- * (and the dedicated NEXA brand components introduced by the v2 design system).
+ * (and the dedicated NEXUS brand components introduced by the v2 design system).
  */
 export function BrandLogo({ size = 96, style }: BrandLogoProps): React.JSX.Element {
   const wordmarkSize = Math.max(16, Math.round(size * 0.27));
@@ -31,7 +31,7 @@ export function BrandLogo({ size = 96, style }: BrandLogoProps): React.JSX.Eleme
       style={[styles.base, style]}
       accessible
       accessibilityRole="image"
-      accessibilityLabel="NEXA"
+      accessibilityLabel="NEXUS"
     >
       <View
         accessibilityElementsHidden
@@ -50,7 +50,7 @@ export function BrandLogo({ size = 96, style }: BrandLogoProps): React.JSX.Eleme
         ]}
         accessibilityElementsHidden
       >
-        NEXA
+        NEXUS
       </Text>
     </View>
   );

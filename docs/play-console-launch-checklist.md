@@ -1,6 +1,6 @@
-# NEXA — Play Console closed-testing and production checklist
+# NEXUS — Play Console closed-testing and production checklist
 
-> **Scope:** owner-side Google Play Console steps for shipping **NEXA** while preserving the existing Android package `com.g88` for compatibility.
+> **Scope:** owner-side Google Play Console steps for shipping **NEXUS** while preserving the existing Android package `com.g88` for compatibility.
 > Core build/release automation is in place, but physical-device QA and the dedicated Terms requirement in #592 remain release gates.
 > Background + rationale: `DEPLOY.md` → "Mobile release". Paste-ready store copy:
 > `docs/play-store-listing.md` and `docs/play-release-notes.md`.
@@ -13,11 +13,11 @@ Work top to bottom. Do not treat a successful CI build as device or production s
 
 - [ ] Google account used as the **Play developer** (personal or organization).
 - [ ] **Google Cloud Console** project that owns `GOOGLE_MAPS_API_KEY_RELEASE`.
-- [ ] `docs/play-store-listing.md` (NEXA name, short/full description, Data Safety notes).
+- [ ] `docs/play-store-listing.md` (NEXUS name, short/full description, Data Safety notes).
 - [ ] `docs/play-release-notes.md` (tester-facing release notes).
-- [ ] Privacy policy URL: `https://g88-legal.onrender.com/privacy` — verify it loads and visibly says **NEXA**.
-- [ ] Issue #592 — dedicated NEXA Terms of Service. Closed testing may continue while reviewed, but production is **NO-GO** until a real `/terms` document is live and the app no longer routes Terms to Privacy.
-- [ ] Issue #580 — physical-device NEXA release audit.
+- [ ] Privacy policy URL: `https://g88-legal.onrender.com/privacy` — verify it loads and visibly says **NEXUS**.
+- [ ] Issue #592 — dedicated NEXUS Terms of Service. Closed testing may continue while reviewed, but production is **NO-GO** until a real `/terms` document is live and the app no longer routes Terms to Privacy.
+- [ ] Issue #580 — physical-device NEXUS release audit.
 - [ ] Tester email addresses (Google Group or explicit list).
 
 ---
@@ -31,7 +31,7 @@ Work top to bottom. Do not treat a successful CI build as device or production s
 ## 2. Create or verify the Play app identity
 
 - [ ] Play Console → **Create app** if the app does not already exist.
-  - App name: **NEXA**.
+  - App name: **NEXUS**.
   - Default language: choose the launch-market default.
   - App type: **App**.
   - Pricing: according to the actual launch model.
@@ -51,7 +51,7 @@ Work top to bottom. Do not treat a successful CI build as device or production s
 
 Play re-signs distributed builds with the **App signing key**, so the certificate on a tester device is not the upload/debug certificate.
 
-- [ ] Play Console → NEXA → **Test and release → Setup → App integrity → App signing** → copy the **App signing SHA-1**.
+- [ ] Play Console → NEXUS → **Test and release → Setup → App integrity → App signing** → copy the **App signing SHA-1**.
 - [ ] Also copy the **Upload key SHA-1** for sideload/release-build diagnostics.
 - [ ] Google Cloud Console → **APIs & Services → Credentials** → `GOOGLE_MAPS_API_KEY_RELEASE`:
   - Application restrictions = **Android apps**.
@@ -65,7 +65,7 @@ A grey/blank map on Play-installed builds is a release blocker until this restri
 ## 5. Build and upload the first AAB
 
 - [ ] GitHub Actions → **Android Release (AAB)** → produce a fresh release candidate.
-- [ ] Download the `g88-release-aab` artifact. The artifact name is a technical compatibility name; the public app remains NEXA.
+- [ ] Download the `g88-release-aab` artifact. The artifact name is a technical compatibility name; the public app remains NEXUS.
 - [ ] Play Console → **Closed testing → track → Create new release**.
 - [ ] Upload the `.aab`.
 - [ ] Paste release notes from `docs/play-release-notes.md`.
@@ -74,9 +74,9 @@ A grey/blank map on Play-installed builds is a release blocker until this restri
 
 ## 6. Store listing + policy declarations
 
-- [ ] **Main store listing** uses **NEXA** everywhere: app name, descriptions, icon, feature graphic and screenshots.
-- [ ] Screenshots show the current Android v3 Map / Experiences / Opportunities / Connections / Identity controls (see `docs/IA_NAVIGATION.md`) and final NEXA entity grammar. Older RC3 navigation is not current.
-- [ ] **Privacy policy** points to `https://g88-legal.onrender.com/privacy`; public page content must be NEXA-branded even though the infrastructure hostname is legacy.
+- [ ] **Main store listing** uses **NEXUS** everywhere: app name, descriptions, icon, feature graphic and screenshots.
+- [ ] Screenshots show the current Android v3 Map / Experiences / Opportunities / Connections / Identity controls (see `docs/IA_NAVIGATION.md`) and final NEXUS entity grammar. Older RC3 navigation is not current.
+- [ ] **Privacy policy** points to `https://g88-legal.onrender.com/privacy`; public page content must be NEXUS-branded even though the infrastructure hostname is legacy.
 - [ ] Complete **Data Safety** from the release build and actual architecture, not from branding assumptions. Confirm at minimum the real handling of:
   - location;
   - account/profile information;
@@ -88,13 +88,13 @@ A grey/blank map on Play-installed builds is a release blocker until this restri
 - [ ] Confirm account deletion is described consistently with the in-app delete flow and a **public external deletion-request URL** is deployed/verified (`docs/legal/delete-account/index.html` is draft source only).
 - [ ] Complete content rating, target audience, app access and any other Play declarations truthfully.
 
-## 7. NEXA legal gate — production only
+## 7. NEXUS legal gate — production only
 
 Closed testing may proceed while Terms are under review, but production must remain **NO-GO** until all items below pass:
 
-- [ ] #592 is resolved with legal-reviewed Terms content for the actual NEXA feature set.
+- [ ] #592 is resolved with legal-reviewed Terms content for the actual NEXUS feature set.
 - [ ] Dedicated public Terms URL is live (preferred compatibility path: `https://g88-legal.onrender.com/terms`).
-- [ ] Terms page title/header/footer visibly use **NEXA**.
+- [ ] Terms page title/header/footer visibly use **NEXUS**.
 - [ ] `TERMS_OF_SERVICE_URL` resolves to `/terms`, not `/privacy`.
 - [ ] Auth, Settings, Help and About open the dedicated Terms page.
 - [ ] Privacy and Terms are separate documents.
@@ -111,11 +111,11 @@ Do not ship production with a control labeled **Terms of Service** that opens Pr
 - [ ] Smoke-test sign-in, map discovery, entity sheets, Connections, Marketplace and account settings.
 - [ ] Record device/Android version and the exact release versionCode used for sign-off.
 
-## 9. Physical-device NEXA sign-off
+## 9. Physical-device NEXUS sign-off
 
 The exact candidate must verify:
 
-- native dark launch → NEXA launch animation → spatial handoff with no white flash or stale artwork;
+- native dark launch → NEXUS launch animation → spatial handoff with no white flash or stale artwork;
 - logged-out and incomplete-profile launch paths do **not** show the map halo;
 - Reduced Motion behavior;
 - final entity identity: person=circle, event=four-point star, listing=square, opportunity/other=diamond;
@@ -147,4 +147,4 @@ Production is **GO** only when all of the following are true:
 - [ ] Play App Signing + Maps restrictions are verified on a Play-installed build;
 - [ ] no P0/P1 product, privacy, trust, abuse-prevention or release regressions remain.
 
-Technical identifiers such as `com.g88`, `@g88/*`, storage keys, signing certificate OU and the `g88-legal` hostname are compatibility/infrastructure identifiers. They must not be mechanically renamed as part of the NEXA visual/release migration.
+Technical identifiers such as `com.g88`, `@g88/*`, storage keys, signing certificate OU and the `g88-legal` hostname are compatibility/infrastructure identifiers. They must not be mechanically renamed as part of the NEXUS visual/release migration.

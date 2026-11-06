@@ -5,7 +5,7 @@ export interface HelpFaq {
 
 export const NEXA_HELP_FAQS: HelpFaq[] = [
   {
-    q: 'How does NEXA know who is nearby?',
+    q: 'How does NEXUS know who is nearby?',
     a: 'While the app is open, your device shares an approximate location (coarsened to about a 120-meter area). We use it for the map, Pulse stories, and nearby activity. Your exact position is never stored.',
   },
   {
@@ -38,7 +38,7 @@ export const NEXA_HELP_FAQS: HelpFaq[] = [
   },
   {
     q: 'How does local trade work?',
-    a: 'Create a listing (for sale or wanted) from the map or Marketplace. Nearby people can message the seller, wave, or make an offer and counter. Meet in public places; NEXA does not process payments.',
+    a: 'Create a listing (for sale or wanted) from the map or Marketplace. Nearby people can message the seller, wave, or make an offer and counter. Meet in public places; NEXUS does not process payments.',
   },
   {
     q: 'I found a bug or something feels wrong.',

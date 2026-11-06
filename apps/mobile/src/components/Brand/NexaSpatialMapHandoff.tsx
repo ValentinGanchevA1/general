@@ -18,11 +18,11 @@ export interface NexaSpatialMapHandoffProps {
 }
 
 /**
- * Final NEXA launch handoff over the already-mounted application.
+ * Final NEXUS launch handoff over the already-mounted application.
  *
  * The launch eye has just dissolved. Two lightweight discovery fields continue
  * from the same optical centre and expand across the live surface, making the
- * transition read as the NEXA signal opening into spatial context rather than
+ * transition read as the NEXUS signal opening into spatial context rather than
  * as a logo screen cutting to the app.
  *
  * This layer never blocks input and never waits for location, networking or

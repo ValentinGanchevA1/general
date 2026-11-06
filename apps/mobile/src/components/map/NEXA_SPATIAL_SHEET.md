@@ -1,4 +1,4 @@
-# NEXA Bottom Sheet Identity v3
+# NEXUS Bottom Sheet Identity v3
 
 The map is the product. Entity sheets are the spatial continuation of a selected map marker, not generic modal cards.
 
@@ -49,7 +49,7 @@ Ranking, PostGIS queries, hit-testing, and viewport logic continue to use intern
 
 ## Opportunity contract boundary
 
-`Opportunity` is part of NEXA's visual grammar now, but it is **not** part of the current shared `EntityPoint` discovery DTO. The spatial-sheet primitives support `opportunity` so future surfaces use the same design system, but this phase does not add a fake `EntityPoint.kind`, backend response, database entity, or socket contract.
+`Opportunity` is part of NEXUS's visual grammar now, but it is **not** part of the current shared `EntityPoint` discovery DTO. The spatial-sheet primitives support `opportunity` so future surfaces use the same design system, but this phase does not add a fake `EntityPoint.kind`, backend response, database entity, or socket contract.
 
 When Opportunity becomes a discovery entity, extend `@g88/shared` first and then add the adapter. Do not cast opportunity data into another entity kind.
 

@@ -1,4 +1,4 @@
-# NEXA navigation v3 — canonical map-first information architecture
+# NEXUS navigation v3 — canonical map-first information architecture
 
 > Runtime authority: `apps/mobile/src/navigation/AppNavigator.tsx`, `nexaTabIdentity.ts` and `nexaSpatialLens.store.ts`.
 > Updated: 2026-11-04.
@@ -13,7 +13,7 @@
 | Connections | Private relationship work | Chats, waves, pending actions; only actionable unread badge |
 | Identity | Profile and trust | Verification, account, achievements, settings and map presence |
 
-NEXA exposes five *navigation controls* and only **one live map instance**. On press, Experiences and Opportunities switch the active spatial lens and navigate to the Map route. The active lens is reflected in tab icon/label styling. Manually changing map layer chips switches to `custom` without overwriting the user's filters. Pulse is a contextual live signal and existing dedicated activity viewer, **not** a primary tab.
+NEXUS exposes five *navigation controls* and only **one live map instance**. On press, Experiences and Opportunities switch the active spatial lens and navigate to the Map route. The active lens is reflected in tab icon/label styling. Manually changing map layer chips switches to `custom` without overwriting the user's filters. Pulse is a contextual live signal and existing dedicated activity viewer, **not** a primary tab.
 
 ## Compatibility
 

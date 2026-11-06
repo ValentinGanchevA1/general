@@ -39,7 +39,7 @@ function Point({
 }
 
 /**
- * Native summary of NEXA privacy posture. Legal text of record remains the
+ * Native summary of NEXUS privacy posture. Legal text of record remains the
  * hosted policy (PRIVACY_POLICY_URL) — this screen is product-aligned explainer only.
  */
 export function PrivacyScreen(): React.JSX.Element {
@@ -61,12 +61,12 @@ export function PrivacyScreen(): React.JSX.Element {
 
       <ScrollView contentContainerStyle={styles.body}>
         <Text style={styles.intro}>
-          Privacy is a core design constraint of NEXA. Here is what that means with
+          Privacy is a core design constraint of NEXUS. Here is what that means with
           the features we ship today.
         </Text>
 
         {point('map-marker-off', 'Your exact location is never stored', 'Precise GPS is coarsened to roughly a 120-meter area before anything is saved. Other users only ever see that coarsened neighborhood — never a point on your doorstep.')}
-        {point('map-clock', 'Foreground only', 'Location is used only while the app is open (map, Pulse stories, nearby feed). NEXA does not track you in the background.')}
+        {point('map-clock', 'Foreground only', 'Location is used only while the app is open (map, Pulse stories, nearby feed). NEXUS does not track you in the background.')}
         {point('eye-off', 'You control who sees you', 'Hide from discovery any time in Settings → Appear on map. You stay logged in and can still browse; others will not see you in discovery.')}
         {point('account-group', 'Friends stay intentional', 'Friend requests are explicit. Online presence is shown only to friends, and only if you allow it in Settings → Friends can see when I’m online. Your friends list is not sold or used for ads. Unfriending does not automatically tear down public follows.')}
         {point('circle-outline', 'Stories stay local and temporary', 'Stories are visible to people nearby and expire after 24 hours. Posting requires a verified email and a minimum account age (phone-verified accounts can post sooner). Media is not kept as a permanent public archive.')}

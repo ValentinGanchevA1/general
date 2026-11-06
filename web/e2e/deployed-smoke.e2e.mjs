@@ -20,7 +20,7 @@ if (email && password) {
 } else if (requireAuth) {
   throw new Error('Authenticated deployed smoke is required but WEB_SMOKE_EMAIL/WEB_SMOKE_PASSWORD are not configured.');
 } else {
-  console.log('NEXA deployed public smoke passed; authenticated browser flow skipped because staging credentials are not configured.');
+  console.log('NEXUS deployed public smoke passed; authenticated browser flow skipped because staging credentials are not configured.');
 }
 
 function parsePublicHttpsOrigin(value) {
@@ -65,7 +65,7 @@ async function validatePublicEdge(origin) {
   const root = await fetchStrict(`${origin}/`);
   assert(root.status === 200, `web root returned ${root.status}`);
   const html = await root.text();
-  assert(html.includes('NEXA'), 'web root does not contain NEXA shell');
+  assert(html.includes('NEXUS'), 'web root does not contain NEXUS shell');
 
   const csp = root.headers.get('content-security-policy') ?? '';
   const permissions = root.headers.get('permissions-policy') ?? '';
@@ -194,7 +194,7 @@ async function validateAuthenticatedBrowserFlow(origin, loginEmail, loginPasswor
       'deployed logout completion',
     );
 
-    console.log('NEXA deployed authenticated smoke passed: login, HttpOnly refresh rotation, realtime connection and logout.');
+    console.log('NEXUS deployed authenticated smoke passed: login, HttpOnly refresh rotation, realtime connection and logout.');
   } catch (error) {
     const chromeErrors = runtime.errors();
     if (chromeErrors) console.error(chromeErrors);
@@ -224,6 +224,6 @@ async function fetchStrict(url) {
   return fetch(url, {
     redirect: 'error',
     signal: AbortSignal.timeout(20_000),
-    headers: { 'User-Agent': 'NEXA-deployed-smoke/1.0' },
+    headers: { 'User-Agent': 'NEXUS-deployed-smoke/1.0' },
   });
 }

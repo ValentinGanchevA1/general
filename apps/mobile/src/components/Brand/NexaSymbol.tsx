@@ -8,12 +8,12 @@ export interface NexaSymbolProps {
 }
 
 /**
- * Final NEXA eye / discovery core.
+ * Final NEXUS eye / discovery core.
  *
  * The upper lid is intentionally shallow rather than a full semicircle, the
  * iris and luminous pupil share one optical center, and a restrained lower lid
  * closes the silhouette just enough to read as an eye without turning the mark
- * into a literal illustration. The splash can surround this core with the NEXA
+ * into a literal illustration. The splash can surround this core with the NEXUS
  * entity orbit without changing the reusable brand primitive.
  */
 export function NexaSymbol({ size = 96 }: NexaSymbolProps): React.JSX.Element {
@@ -39,7 +39,7 @@ export function NexaSymbol({ size = 96 }: NexaSymbolProps): React.JSX.Element {
       style={[styles.root, { width: size, height: size }]}
       accessible
       accessibilityRole="image"
-      accessibilityLabel="NEXA"
+      accessibilityLabel="NEXUS"
     >
       <View
         pointerEvents="none"

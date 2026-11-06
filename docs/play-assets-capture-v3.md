@@ -1,4 +1,4 @@
-# NEXA — genuine Google Play assets capture plan (Android navigation v3)
+# NEXUS — genuine Google Play assets capture plan (Android navigation v3)
 
 **Do not generate fake in-app UI screenshots.** Capture genuine screens of an exact, QA-approved Android release candidate. A static marketing poster is not a substitute for a Play screenshot. Current navigation source: `docs/IA_NAVIGATION.md` (2026-11-04), not the frozen older RC3 screenshot references in issue #616.
 
@@ -6,7 +6,7 @@
 
 | Deliverable | Format | Acceptance |
 |---|---|---|
-| Store icon `nexa-play-icon-512.png` | 512x512, 32-bit PNG with alpha, <=1024 KB | Match current NEXA launcher eye geometry, no legacy G88 UI |
+| Store icon `nexa-play-icon-512.png` | 512x512, 32-bit PNG with alpha, <=1024 KB | Match current NEXUS launcher eye geometry, no legacy G88 UI |
 | Feature graphic `nexa-play-feature-1024x500.png` | 1024x500, 24-bit PNG no alpha (or JPEG) | Premium graphite / violet / cyan spatial identity, restrained branding, no fake app screens |
 | Phone captures `nexa-v3-01-map.png` ... `06-identity.png` | Valid portrait JPEG/PNG (recommended 1080x1920; verify Play accepted range) | Minimum 2, target 5-6; all captured from the *same* release candidate |
 | Release proof `nexa-v3-capture-manifest.md` | Markdown | Build SHA, versionCode, device+Android, date, screenshot paths, privacy review, QA issue evidence |

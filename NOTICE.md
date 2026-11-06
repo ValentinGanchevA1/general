@@ -1,8 +1,8 @@
-# NEXA — Copyright and proprietary software notice
+# NEXUS — Copyright and proprietary software notice
 
 Copyright © 2026 Valentin Ganchev. All rights reserved.
 
-The original NEXA software and related materials owned by Valentin Ganchev are
+The original NEXUS software and related materials owned by Valentin Ganchev are
 proprietary. Publication of any part of this repository does **not** grant a
 license to use, reproduce, modify, distribute, sublicense, or commercially
 exploit that proprietary material, except where permitted by applicable law,

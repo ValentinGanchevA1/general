@@ -88,7 +88,7 @@ export function DiscoverScreen(): React.JSX.Element {
             <MaterialCommunityIcons name="compass-outline" size={24} color={colors.discovery} />
           </View>
           <View style={styles.heroCopy}>
-            <Text style={styles.eyebrow}>NEXA DISCOVERY</Text>
+            <Text style={styles.eyebrow}>NEXUS DISCOVERY</Text>
             <Text style={styles.heroTitle}>Choose a local discovery lane</Text>
             <Text style={styles.heroBody}>
               The map stays home. Discover gives you focused paths into people, events and local activity.

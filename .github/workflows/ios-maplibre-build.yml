@@ -165,7 +165,7 @@ jobs:
 
           sleep 5
           if ! xcrun simctl spawn "$SIM_UDID" ps -p "$PID" -o pid= >/dev/null 2>&1; then
-            echo "NEXA exited during the launch smoke window." >&2
+            echo "NEXUS exited during the launch smoke window." >&2
             xcrun simctl spawn "$SIM_UDID" log show \
               --last 2m \
               --style compact \
@@ -173,7 +173,7 @@ jobs:
             exit 1
           fi
 
-          echo "NEXA launch smoke passed with pid=$PID."
+          echo "NEXUS launch smoke passed with pid=$PID."
 
       - name: Rebuild with CI-only MapLibre smoke entry
         env:

@@ -59,12 +59,12 @@ it('toggles password visibility and restores hidden state when changing mode', (
 it('retains registration validation and submits the existing registration contract', () => {
   const screen = render(<AuthScreen />);
   fireEvent.press(screen.getByText('Create account'));
-  fireEvent.press(screen.getByLabelText('Join NEXA'));
+  fireEvent.press(screen.getByLabelText('Join NEXUS'));
   expect(screen.getByText('Display name is required')).toBeTruthy();
   fireEvent.changeText(screen.getByLabelText('Display name'), ' Person ');
   fireEvent.changeText(screen.getByLabelText('Email'), 'person@example.com');
   fireEvent.changeText(screen.getByLabelText('Password'), 'password123');
-  fireEvent.press(screen.getByLabelText('Join NEXA'));
+  fireEvent.press(screen.getByLabelText('Join NEXUS'));
   expect(register).toHaveBeenCalledWith({ email: 'person@example.com', password: 'password123', displayName: 'Person' });
 });
 

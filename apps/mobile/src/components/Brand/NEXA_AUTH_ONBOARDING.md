@@ -1,17 +1,17 @@
-# NEXA Auth + Onboarding v5
+# NEXUS Auth + Onboarding v5
 
 ## Product intent
 
-Auth and first-run setup introduce NEXA as a map-first local discovery product, not as a generic social network.
+Auth and first-run setup introduce NEXUS as a map-first local discovery product, not as a generic social network.
 
 The first-run sequence establishes two distinct matching signals:
 
 - **Interests** — what the user likes and does; normalized tags used for shared-interest discovery.
-- **Purpose** — the user's core reason for using NEXA. Purpose is persisted through the existing `goals` contract for backward compatibility.
+- **Purpose** — the user's core reason for using NEXUS. Purpose is persisted through the existing `goals` contract for backward compatibility.
 
 ## Auth screen
 
-- horizontal outlined-vector NEXA wordmark with filled eye/iris and the tagline “a gateway to your local world.”
+- horizontal outlined-vector NEXUS wordmark with filled eye/iris and the tagline “a gateway to your local world.”
 - uncluttered, theme-aware form; dark mode matches the approved dark/violet reference
 - no discovery hero, panel border, welcome heading or sign-in subtitle on login
 - email/password fields have leading icons; password visibility is an accessible 48dp control
@@ -31,7 +31,7 @@ The five user-facing setup steps are:
 1. **Identity** — display name
 2. **Interests** — choose at least 3 predefined normalized tags
 3. **About you** — date of birth + optional origin visibility
-4. **Purpose** — choose at least one core reason for using NEXA
+4. **Purpose** — choose at least one core reason for using NEXUS
 5. **Map visibility** — Discoverable or Private browsing
 
 ### Interests
@@ -92,7 +92,7 @@ Touched auth/onboarding UI uses `useAppTheme().colors` semantic tokens.
 ## Brand surface contract
 
 - `NexaSymbol`: compact eye/discovery core for launcher, notification, small navigation/system surfaces.
-- `BrandLogo`: canonical eye + NEXA wordmark lockup.
+- `BrandLogo`: canonical eye + NEXUS wordmark lockup.
 - `NexaEntityOrbit`: expanded ecosystem composition for splash and large hero surfaces only.
 
 ## Non-goals

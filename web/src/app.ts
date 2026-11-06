@@ -529,7 +529,7 @@ function shell(): string {
     ? `<div class="toast">${escapeHtml(state.notice)}</div>`
     : '';
 
-  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXA</b></button><nav>${tabs}</nav><div class="rail-foot"><button id="theme">${THEME_ICONS[state.theme]}</button>${accountControl}</div></aside><main><header>${topbar()}</header><section class="content">${view()}</section></main><nav class="mobile-nav">${tabs}</nav>${notice}${authPanel()}</div>`;
+  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXUS</b></button><nav>${tabs}</nav><div class="rail-foot"><button id="theme">${THEME_ICONS[state.theme]}</button>${accountControl}</div></aside><main><header>${topbar()}</header><section class="content">${view()}</section></main><nav class="mobile-nav">${tabs}</nav>${notice}${authPanel()}</div>`;
 }
 function topbar(): string {
   const copy: Record<Tab, [string,string]> = {
@@ -543,7 +543,7 @@ function topbar(): string {
   const liveLabel = state.tab === 'connections' && state.user
     ? (state.realtimeConnected ? 'Realtime live' : 'Realtime offline')
     : (state.user ? 'Live backend' : 'Demo mode');
-  return `<div><p class="eyebrow">NEXA / ${title.toUpperCase()}</p><h1>${title}</h1><p>${subtitle}</p></div><div class="header-actions"><span class="mode"><i></i>${liveLabel}</span>${state.user ? '<button id="refresh">Refresh</button>' : '<button class="primary" id="auth-top">Connect backend</button>'}</div>`;
+  return `<div><p class="eyebrow">NEXUS / ${title.toUpperCase()}</p><h1>${title}</h1><p>${subtitle}</p></div><div class="header-actions"><span class="mode"><i></i>${liveLabel}</span>${state.user ? '<button id="refresh">Refresh</button>' : '<button class="primary" id="auth-top">Connect backend</button>'}</div>`;
 }
 function view(): string {
   if (isSpatialTab(state.tab)) return mapView();
@@ -576,7 +576,7 @@ function mapView(): string {
     if (state.tab === 'opportunities') return item.type === 'listing';
     return true;
   }).slice(0, 2);
-  return `<div class="map-layout"><section class="map-card"><div class="toolbar"><div class="search">⌕ <span>Pan or zoom to search this area</span></div>${filters}</div><div class="map" id="nexa-map"></div></section><aside class="panel"><div class="section-head"><div><p class="eyebrow">NEXA / ${lens}</p><h2>${title}</h2></div><button id="refresh-map">Refresh</button></div>${visible.slice(0,8).map(row).join('') || '<p class="empty">No nearby results for this lens.</p>'}<div class="create"><b>≋</b><div><strong>Nearby Pulse</strong><p>Local activity signals, not a second feed.</p></div></div>${signals.map(activity).join('')}</aside></div>`;
+  return `<div class="map-layout"><section class="map-card"><div class="toolbar"><div class="search">⌕ <span>Pan or zoom to search this area</span></div>${filters}</div><div class="map" id="nexa-map"></div></section><aside class="panel"><div class="section-head"><div><p class="eyebrow">NEXUS / ${lens}</p><h2>${title}</h2></div><button id="refresh-map">Refresh</button></div>${visible.slice(0,8).map(row).join('') || '<p class="empty">No nearby results for this lens.</p>'}<div class="create"><b>≋</b><div><strong>Nearby Pulse</strong><p>Local activity signals, not a second feed.</p></div></div>${signals.map(activity).join('')}</aside></div>`;
 }
 function chip(kind: EntityKind, label: string): string {
   return `<button class="chip ${state.kinds.has(kind) ? 'selected' : ''}" data-kind="${kind}">${label}</button>`;
@@ -588,7 +588,7 @@ function row(point: DiscoveryPoint): string {
   return `<article class="row"><b class="entity listing">▣</b><div><strong>${escapeHtml(point.meta.title)}</strong><p>${escapeHtml(point.meta.currency)} ${(point.meta.priceCents / 100).toFixed(0)} · ${escapeHtml(point.meta.category)}</p></div></article>`;
 }
 function activity(item: ActivityItem): string {
-  return `<article class="activity"><div><span>${item.type.toUpperCase()}</span><span>${ago(item.createdAt)}</span></div><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.preview)}</p><footer><span>${distance(item.distanceM)}</span><span>${item.actorName ? escapeHtml(item.actorName) : 'NEXA local signal'}</span>${item.unread ? '<i></i>' : ''}</footer></article>`;
+  return `<article class="activity"><div><span>${item.type.toUpperCase()}</span><span>${ago(item.createdAt)}</span></div><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.preview)}</p><footer><span>${distance(item.distanceM)}</span><span>${item.actorName ? escapeHtml(item.actorName) : 'NEXUS local signal'}</span>${item.unread ? '<i></i>' : ''}</footer></article>`;
 }
 function connectionsView(): string {
   if (!state.user) {
@@ -649,12 +649,12 @@ function messageRow(message: ChatMessage): string {
   return `<article class="message ${mine ? 'mine' : 'peer'}"><p>${escapeHtml(body)}</p><small>${mine ? 'You' : 'Peer'} · ${ago(message.createdAt)}</small></article>`;
 }
 function identityView(): string {
-  if (!state.user) return `<div class="you-empty"><div class="identity"></div><p class="eyebrow">YOUR NEXA IDENTITY</p><h2>Connect the live backend to open your identity surface.</h2><p>Map presence, verification and privacy belong here—not in a vanity feed.</p><button class="primary" id="auth-you">Sign in</button></div>`;
+  if (!state.user) return `<div class="you-empty"><div class="identity"></div><p class="eyebrow">YOUR NEXUS IDENTITY</p><h2>Connect the live backend to open your identity surface.</h2><p>Map presence, verification and privacy belong here—not in a vanity feed.</p><button class="primary" id="auth-you">Sign in</button></div>`;
   const verification = verificationLabel(state.user.verification);
   return `<div class="you"><section class="identity-card"><div class="profile">${escapeHtml(initials(state.user.displayName))}</div><div><p class="eyebrow">SIGNED IN</p><h2>${escapeHtml(state.user.displayName)}</h2><p>${escapeHtml(state.user.email)}</p></div><span>${escapeHtml(verification)}</span></section><section class="trust"><div><p class="eyebrow">VERIFICATION SIGNAL</p><h2>${escapeHtml(verification)}</h2><p>Web v1 renders the factual verification level returned by the backend. It does not calculate or expose a public numeric trust score.</p></div></section><button class="danger" id="logout">Sign out of web preview</button></div>`;
 }
 function authPanel(): string {
-  return `<dialog class="auth-dialog" ${state.authOpen ? 'open' : ''}><form id="login"><button type="button" id="close">×</button><div class="logo auth-logo"><i></i><b>NEXA</b></div><p class="eyebrow">LIVE BACKEND</p><h2>Sign in to NEXA</h2><p>The access token stays in memory. The refresh credential is held by the backend in an HttpOnly SameSite cookie and is never exposed to browser JavaScript.</p><label>Email<input id="email" type="email" required autocomplete="email"></label><label>Password<input id="password" type="password" minlength="8" required autocomplete="current-password"></label><button class="primary" type="submit">Connect live backend</button><small>Local preview targets backend port 3001. Production uses same-origin <code>/api/v1</code> and <code>/socket.io</code> edge routes.</small></form></dialog>`;
+  return `<dialog class="auth-dialog" ${state.authOpen ? 'open' : ''}><form id="login"><button type="button" id="close">×</button><div class="logo auth-logo"><i></i><b>NEXUS</b></div><p class="eyebrow">LIVE BACKEND</p><h2>Sign in to NEXUS</h2><p>The access token stays in memory. The refresh credential is held by the backend in an HttpOnly SameSite cookie and is never exposed to browser JavaScript.</p><label>Email<input id="email" type="email" required autocomplete="email"></label><label>Password<input id="password" type="password" minlength="8" required autocomplete="current-password"></label><button class="primary" type="submit">Connect live backend</button><small>Local preview targets backend port 3001. Production uses same-origin <code>/api/v1</code> and <code>/socket.io</code> edge routes.</small></form></dialog>`;
 }
 
 function safeFragment(html: string): DocumentFragment {

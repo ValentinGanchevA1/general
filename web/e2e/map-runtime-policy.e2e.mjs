@@ -103,7 +103,7 @@ assert(invalidKey.status === 'blocked', 'keys with whitespace/control characters
 const nonWeb = runtime.resolveMapRuntime({ protocol: 'file:', hostname: '' }, validEuConfig);
 assert(nonWeb.status === 'blocked', 'non-HTTP browser contexts must fail closed');
 
-console.log('NEXA map runtime policy passed: loopback-only OSM preview, HTTPS-only MapLibre activation, exact MapTiler origins, same-origin worker.');
+console.log('NEXUS map runtime policy passed: loopback-only OSM preview, HTTPS-only MapLibre activation, exact MapTiler origins, same-origin worker.');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);

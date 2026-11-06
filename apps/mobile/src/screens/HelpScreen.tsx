@@ -54,7 +54,7 @@ export function HelpScreen(): React.JSX.Element {
 
   const emailSupport = async (): Promise<void> => {
     track('help.email_support');
-    const subject = encodeURIComponent('NEXA support');
+    const subject = encodeURIComponent('NEXUS support');
     const body = encodeURIComponent(
       `App version: ${APP_VERSION}\n\nPlease describe what happened above this line.`,
     );
@@ -99,7 +99,7 @@ export function HelpScreen(): React.JSX.Element {
           style={styles.rowSpaced}
           icon="file-document-outline"
           title="Terms of Service"
-          subtitle="Rules for using NEXA"
+          subtitle="Rules for using NEXUS"
           onPress={openTerms}
         />
       </ScrollView>

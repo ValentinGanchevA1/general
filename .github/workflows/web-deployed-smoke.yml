@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       web_origin:
-        description: 'Bare HTTPS NEXA web origin, e.g. https://staging.example.com'
+        description: 'Bare HTTPS NEXUS web origin, e.g. https://staging.example.com'
         required: true
         type: string
       mode:

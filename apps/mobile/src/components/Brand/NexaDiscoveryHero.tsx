@@ -12,7 +12,7 @@ interface NexaDiscoveryHeroProps {
 /**
  * Branded discovery hero for auth/onboarding surfaces.
  *
- * Keeps the NEXA identity, ecosystem orbit and motto in one responsive lockup
+ * Keeps the NEXUS identity, ecosystem orbit and motto in one responsive lockup
  * so onboarding never renders a duplicated symbol/wordmark above the hero.
  */
 export function NexaDiscoveryHero({
@@ -32,7 +32,7 @@ export function NexaDiscoveryHero({
       pointerEvents="none"
       accessible
       accessibilityRole="image"
-      accessibilityLabel="NEXA. Your local world."
+      accessibilityLabel="NEXUS. Your local world."
       style={[styles.root, compact ? styles.compactRoot : styles.defaultRoot]}
     >
       <View
@@ -74,7 +74,7 @@ export function NexaDiscoveryHero({
           { color: colors.textPrimary },
         ]}
       >
-        NEXA
+        NEXUS
       </Text>
       <Text
         accessibilityElementsHidden

@@ -1,4 +1,4 @@
-name: NEXA Figma Library QA
+name: NEXUS Figma Library QA
 
 on:
   pull_request:
@@ -32,7 +32,7 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Check NEXA Figma bundle against mobile theme
+      - name: Check NEXUS Figma bundle against mobile theme
         run: node tools/figma/nexa-library/build.mjs --check
       - name: Validate component families and idempotent token sync
         run: node --test tools/figma/nexa-library/test.mjs

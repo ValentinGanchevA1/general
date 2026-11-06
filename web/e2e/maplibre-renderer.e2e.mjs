@@ -131,7 +131,7 @@ const server = createServer((request, response) => {
       <html>
         <head>
           <meta charset="utf-8">
-          <title>NEXA MapLibre E2E</title>
+          <title>NEXUS MapLibre E2E</title>
           <link rel="stylesheet" href="/maplibre-gl.css">
           <link rel="stylesheet" href="/fixture.css">
         </head>
@@ -173,7 +173,7 @@ const server = createServer((request, response) => {
     response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     response.end(JSON.stringify({
       version: 8,
-      name: 'NEXA local renderer test',
+      name: 'NEXUS local renderer test',
       sources: {},
       layers: [{
         id: 'background',
@@ -273,7 +273,7 @@ try {
     'MapLibre viewport north/south bounds are inverted',
   );
 
-  console.log('NEXA MapLibre E2E passed: pinned renderer, same-origin worker, in-place GeoJSON update, one canvas and viewport callback.');
+  console.log('NEXUS MapLibre E2E passed: pinned renderer, same-origin worker, in-place GeoJSON update, one canvas and viewport callback.');
 } catch (error) {
   const chromeErrors = runtime.errors();
   if (chromeErrors) console.error(chromeErrors);

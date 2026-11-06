@@ -147,7 +147,7 @@ function SpatialGeometry({ tone }: { tone: SpatialTone }): React.JSX.Element {
   const listingColor = colors.textSecondary;
   const activeOutline = tone === 'warning' ? colors.warning : colors.discovery;
   return (
-    <View style={styles.geometry} accessible accessibilityRole="image" accessibilityLabel="NEXA nearby discovery">
+    <View style={styles.geometry} accessible accessibilityRole="image" accessibilityLabel="NEXUS nearby discovery">
       <View style={[styles.geometryRing, { borderColor: activeOutline + '66' }]} />
       <View style={[styles.circle, { backgroundColor: colors.entityPerson }]} />
       <View style={[styles.diamond, { backgroundColor: colors.entityEvent }]} />
@@ -158,7 +158,7 @@ function SpatialGeometry({ tone }: { tone: SpatialTone }): React.JSX.Element {
 
 function presentationFor(state: NexaMapSpatialState, emptyCopy: MapEmptyCopy): SpatialPresentation {
   switch (state) {
-    case 'starting': return { eyebrow: 'NEXA discovery', title: 'Preparing the map', body: 'Your map stays primary while nearby discovery becomes ready.', icon: null, actionLabel: null, action: 'none', tone: 'discovery', compact: false };
+    case 'starting': return { eyebrow: 'NEXUS discovery', title: 'Preparing the map', body: 'Your map stays primary while nearby discovery becomes ready.', icon: null, actionLabel: null, action: 'none', tone: 'discovery', compact: false };
     case 'loading': return { eyebrow: 'Nearby discovery', title: 'Reading nearby activity', body: 'People, events, listings and places will surface directly on the map.', icon: null, actionLabel: null, action: 'none', tone: 'discovery', compact: false };
     case 'refreshing': return { eyebrow: 'Nearby discovery', title: 'Refreshing this view', body: '', icon: 'sync', actionLabel: null, action: 'none', tone: 'discovery', compact: true };
     case 'empty': return { eyebrow: emptyCopy.eyebrow, title: emptyCopy.title, body: emptyCopy.body, icon: emptyCopy.icon, actionLabel: emptyCopy.actionLabel, action: 'empty', tone: 'action', compact: false };

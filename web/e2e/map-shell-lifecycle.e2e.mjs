@@ -34,7 +34,7 @@ const html = `<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>NEXA map shell lifecycle E2E</title>
+  <title>NEXUS map shell lifecycle E2E</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/map.css">
   <link rel="stylesheet" href="/connections.css">
@@ -186,7 +186,7 @@ try {
     'returning to Map reused a detached container instead of creating one fresh map lifecycle',
   );
 
-  console.log('NEXA map shell lifecycle E2E passed: one renderer across spatial lenses; fresh lifecycle after leaving the map.');
+  console.log('NEXUS map shell lifecycle E2E passed: one renderer across spatial lenses; fresh lifecycle after leaving the map.');
 } catch (error) {
   const chromeErrors = runtime.errors();
   if (chromeErrors) console.error(chromeErrors);

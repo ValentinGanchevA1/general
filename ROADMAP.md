@@ -1,8 +1,8 @@
-# NEXA — Roadmap
+# NEXUS — Roadmap
 
 > **Authoritative source for sequence and gates.**  
 > Sibling docs: `PRODUCT.md` (what/why), `SPECIFICATION.md` (contracts), `ARCHITECTURE.md` (how), `docs/STATUS_CURRENT.md` (live progress).  
-> **Compatibility note:** public product identity is **NEXA**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
+> **Compatibility note:** public product identity is **NEXUS**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
 > Last reconciled: **2026-10-27**.
 
 ---
@@ -46,7 +46,7 @@ Production sign-off remains gated by:
 
 1. **#580 physical Android release audit** — real-device installation, visual/interaction/privacy/accessibility smoke.
 2. **#669 launch calibration** — physical-device recording + telemetry before changing launch timing constants.
-3. **#592 dedicated NEXA Terms of Service** — legal-reviewed content + separate public `/terms` URL.
+3. **#592 dedicated NEXUS Terms of Service** — legal-reviewed content + separate public `/terms` URL.
 4. **#616 Play Store visual set** — final screenshot capture after physical-device sign-off.
 
 Do not collapse those external/product/legal gates into “engineering done.”
@@ -101,7 +101,7 @@ This is a controlled renderer migration, not a product-phase rewrite.
 | B2.2 Production style/provider gate | ✅ | validated MapTiler EU/global config; no arbitrary URL/demo fallback (#779) |
 | B2.3 Android release config injection/validation | ✅ code | release workflows require/validate MapTiler config (#780) |
 | B2.4 iOS native dependency + compile path | ✅ CI | targeted Firebase modular headers (#788), pinned Ruby/CocoaPods (#790), bounded pnpm-path workaround (#791), unsigned Release simulator compile and launch smoke (#792–#793) |
-| B2.5 iOS MapLibre runtime parity in CI | ✅ CI | native surface, NEXA discovery surface and runtime router exercised behind exact `NEXA_MAP_RENDERER=maplibre` opt-in (#794–#798) |
+| B2.5 iOS MapLibre runtime parity in CI | ✅ CI | native surface, NEXUS discovery surface and runtime router exercised behind exact `NEXA_MAP_RENDERER=maplibre` opt-in (#794–#798) |
 | B2.6 Real-provider canary infrastructure | ✅ code | manual iOS MapTiler provider canary (#799, hardened on current master) + Android provider-canary APK workflow (#800) |
 | B2.7 Remote renderer kill switch | ✅ code | backend policy contract + mobile fail-closed enforcement merged (#801–#802); server `true` cannot promote a build that did not explicitly request MapLibre |
 | B2.8 Live policy verification | 🟡 operational | read-only verifier merged (#803); complete documented `false → true → false` proof against deployed backend without treating it as renderer activation |
@@ -147,7 +147,7 @@ Do not introduce these because they are fashionable; require a measured product/
 
 - **2026-10-27** — Reconciled merged login/recovery, event reviews and migration recovery, Profile v3 and splash changes in `docs/STATUS_CURRENT.md`. #828/#829 remain open. RC3 does not certify newer features; a later candidate requires an exact commit/artifact and fresh device checks. Preserved legal, device, web and renderer gates; strengthened PostHog gating with #815.
 
-- **2026-10-26** — Reconciled roadmap to current NEXA master: migrations `0001–0050` / next `0051`; web foundation remains a gated public-release track; iOS native compile/launch and MapLibre runtime-router CI gates are green; real-provider iOS/Android canary workflows and remote renderer kill-switch are merged; remaining activation work is operational policy proof + physical-device/provider evidence + a separate production opt-in. Backend-only privacy-safe PostHog mirroring is also merged behind explicit enablement.
+- **2026-10-26** — Reconciled roadmap to current NEXUS master: migrations `0001–0050` / next `0051`; web foundation remains a gated public-release track; iOS native compile/launch and MapLibre runtime-router CI gates are green; real-provider iOS/Android canary workflows and remote renderer kill-switch are merged; remaining activation work is operational policy proof + physical-device/provider evidence + a separate production opt-in. Backend-only privacy-safe PostHog mirroring is also merged behind explicit enablement.
 - **2026-09-14** — P2/P3 engineering marked closed; Stories shipped; post-P3 friends/map/sheet/offers work documented.
 - **2026-09-12** — P2.B1 remaining-scope cleared (wave.blocked verified).
 - **2026-08–09** — Friends, Stories, profile origin, ID admin and offers moved ahead of their original placement.

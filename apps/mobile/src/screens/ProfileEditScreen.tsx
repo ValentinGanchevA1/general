@@ -344,7 +344,7 @@ export function ProfileEditScreen(): React.JSX.Element {
         <MultiSelectOptions options={INTEREST_OPTIONS} selected={interests} onToggle={(value) => toggle(setInterests, value)} />
 
         <Text style={styles.section}>PURPOSE</Text>
-        <Text style={styles.hint}>Your core reasons for using NEXA. Stored in the existing goals field for compatibility.</Text>
+        <Text style={styles.hint}>Your core reasons for using NEXUS. Stored in the existing goals field for compatibility.</Text>
         <MultiSelectOptions options={PURPOSE_OPTIONS} selected={goals} onToggle={(value) => toggle(setGoals, value)} />
 
         <Text style={styles.section}>ORIGIN</Text>

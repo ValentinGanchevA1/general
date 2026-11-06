@@ -1,6 +1,6 @@
-# NEXA Connections Identity v2
+# NEXUS Connections Identity v2
 
-Connections is the relationship-return surface for NEXA. It is not a social feed and it does not compete with the map as the discovery surface.
+Connections is the relationship-return surface for NEXUS. It is not a social feed and it does not compete with the map as the discovery surface.
 
 ## Product role
 

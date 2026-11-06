@@ -1,7 +1,7 @@
 # Historical super-app plans (superseded)
 
 > **Status:** Historical only. Do not use as product or engineering guidance.
-> **Superseded:** 2026-09-26 product reality check and subsequent NEXA focus.
+> **Superseded:** 2026-09-26 product reality check and subsequent NEXUS focus.
 
 ## Source files (attachments / early drafts)
 
@@ -31,4 +31,4 @@
 | `ARCHITECTURE.md` | System design + privacy invariants |
 | `SPECIFICATION.md` | Feature contracts |
 
-Public identity: **NEXA**. Compatibility package/app IDs remain `@g88/*` / `com.g88` until an explicit migration.
+Public identity: **NEXUS**. Compatibility package/app IDs remain `@g88/*` / `com.g88` until an explicit migration.

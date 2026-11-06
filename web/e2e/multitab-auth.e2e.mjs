@@ -120,7 +120,7 @@ try {
   );
 
   assert(await evaluate(runtime.cdp, tabA, 'localStorage.length') === 0, 'auth fixture persisted data in localStorage');
-  console.log('NEXA multitab auth E2E passed: replay control, Web Lock serialization, HttpOnly cookie, BroadcastChannel propagation.');
+  console.log('NEXUS multitab auth E2E passed: replay control, Web Lock serialization, HttpOnly cookie, BroadcastChannel propagation.');
 } catch (error) {
   const chromeErrors = runtime.errors();
   if (chromeErrors) console.error(chromeErrors);

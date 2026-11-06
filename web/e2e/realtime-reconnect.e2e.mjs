@@ -179,7 +179,7 @@ try {
 
   await evaluate(runtime.cdp, tab, 'window.nexaRealtimeE2E.disconnect()');
 
-  console.log('NEXA realtime E2E passed: token-v1 join, token-v2 reconnect, automatic room rejoin, post-rotation message delivery.');
+  console.log('NEXUS realtime E2E passed: token-v1 join, token-v2 reconnect, automatic room rejoin, post-rotation message delivery.');
 } catch (error) {
   const chromeErrors = runtime.errors();
   if (chromeErrors) console.error(chromeErrors);

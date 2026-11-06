@@ -1,11 +1,11 @@
 import { NEXA_LOCATION_PERMISSION_COPY } from '@/features/location/locationPermissionCopy';
 import { NEXA_HELP_FAQS } from '@/screens/helpFaqs';
 
-describe('NEXA release-visible copy guard', () => {
+describe('NEXUS release-visible copy guard', () => {
   const helpCopy = NEXA_HELP_FAQS.flatMap(({ q, a }) => [q, a]).join('\n');
 
-  it('keeps the Android location rationale on the NEXA brand', () => {
-    expect(NEXA_LOCATION_PERMISSION_COPY.message).toContain('NEXA uses your location');
+  it('keeps the Android location rationale on the NEXUS brand', () => {
+    expect(NEXA_LOCATION_PERMISSION_COPY.message).toContain('NEXUS uses your location');
     expect(NEXA_LOCATION_PERMISSION_COPY.message).not.toContain('G88');
   });
 
