@@ -20,7 +20,7 @@ export type NexaPushDataExtras = Partial<
 >;
 
 /**
- * Build the only data envelope the backend is allowed to send for NEXA v2.
+ * Build the only data envelope the backend is allowed to send for NEXUS v2.
  * Exact coordinates, addresses, message text and verification reasons are not
  * representable by this API.
  */
@@ -52,22 +52,22 @@ export function nexaLockScreenCopy(
     case 'interaction.wave':
       return {
         title: 'A wave reached you',
-        body: 'Open NEXA to see the interaction.',
+        body: 'Open NEXUS to see the interaction.',
       };
     case 'interaction.gift':
       return {
         title: 'You received a gift',
-        body: 'Open NEXA to see what arrived.',
+        body: 'Open NEXUS to see what arrived.',
       };
     case 'interaction.message':
       return {
         title: 'New message',
-        body: 'Open NEXA to read it.',
+        body: 'Open NEXUS to read it.',
       };
     case 'interaction.connection-request':
       return {
         title: 'New connection request',
-        body: 'Review it in NEXA.',
+        body: 'Review it in NEXUS.',
       };
     case 'interaction.connection-accepted':
       return {
@@ -77,32 +77,32 @@ export function nexaLockScreenCopy(
     case 'live.nearby-alert':
       return {
         title: 'A live signal is nearby',
-        body: "Open NEXA to see what's happening.",
+        body: "Open NEXUS to see what's happening.",
       };
     case 'event.nearby':
       return {
         title: 'An event surfaced nearby',
-        body: 'Open NEXA to view it.',
+        body: 'Open NEXUS to view it.',
       };
     case 'marketplace.nearby-listing':
       return {
         title: 'A marketplace listing surfaced nearby',
-        body: 'Open NEXA to view it.',
+        body: 'Open NEXUS to view it.',
       };
     case 'trust.id-verified':
       return {
         title: 'Trust status updated',
-        body: 'Open NEXA Trust Center to review your status.',
+        body: 'Open NEXUS Trust Center to review your status.',
       };
     case 'trust.id-rejected':
       return {
         title: 'Trust status needs attention',
-        body: 'Open NEXA Trust Center to review the next step.',
+        body: 'Open NEXUS Trust Center to review the next step.',
       };
     case 'discovery.daily-recap':
       return {
-        title: 'Your NEXA recap is ready',
-        body: "Open NEXA to catch up on today's activity.",
+        title: 'Your NEXUS recap is ready',
+        body: "Open NEXUS to catch up on today's activity.",
       };
   }
 }
