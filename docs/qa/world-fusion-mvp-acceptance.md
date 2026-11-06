@@ -57,9 +57,11 @@ A World B preview is not enough to enable it.
    Verify the single existing Map surface shows events. No second map mounts.
 3. With Bazaar saved, verify the shortcut is **Open Opportunities lens**,
    showing listings on the same Map surface.
-4. Enter custom layers, search text, Friends/Dating-only, listing-mode, sort,
-   marketplace-kind, public places or saved-places filters; re-enter Fusion.
+4. Enter custom layers, search text, Friends/Dating-only, listing-mode,
+   sort, marketplace-kind, *disable public Places* (public Places is ON by
+   default) or *enable saved Places* (OFF by default); re-enter Fusion.
    The shortcut must be disabled with a clear explanation. No filters cleared.
+   A fresh default map with public Places ON must **not** be blocked.
 5. With an active Experiences or Opportunities tab lens, the Fusion shortcut is
    disabled, even if World B suggests another lens.
 6. With MapScreen never loaded, unmounted or unverified, the shortcut is
