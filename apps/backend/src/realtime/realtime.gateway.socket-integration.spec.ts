@@ -7,6 +7,7 @@ import type { AddressInfo } from 'node:net';
 import type { AckResult, LocationShareUpdateEvent } from '@g88/shared';
 
 import { RealtimeGateway } from './realtime.gateway';
+import { EventRoomAccessService } from './event-room-access.service';
 import { RealtimeEmitterService } from './realtime-emitter.service';
 import { WsJwtGuard } from './ws-jwt.guard';
 import { DiscoveryPresencePublisher } from './discovery-presence.publisher';
@@ -277,6 +278,7 @@ describe('RealtimeGateway real Socket.IO revocation integration', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         RealtimeGateway,
+        { provide: EventRoomAccessService, useValue: { canView: jest.fn(async () => true) } },
         RealtimeEmitterService,
         WsJwtGuard,
         BlocksService,
