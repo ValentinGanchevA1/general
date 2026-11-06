@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { RealtimeGateway } from './realtime.gateway';
+import { EventRoomAccessService } from './event-room-access.service';
 import { RealtimeEmitterService } from './realtime-emitter.service';
 import { WsJwtGuard } from './ws-jwt.guard';
 import { LocationShareSweepService } from './location-share.sweep';
@@ -30,6 +31,7 @@ import { DiscoveryModule } from '../modules/discovery/discovery.module';
   ],
   providers: [
     RealtimeGateway,
+    EventRoomAccessService,
     RealtimeEmitterService,
     DiscoverySubscriptionGateway,
     WsJwtGuard,
