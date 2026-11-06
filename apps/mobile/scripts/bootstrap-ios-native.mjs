@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 const CLI_VERSION = '20.2.0';
 const REACT_NATIVE_VERSION = '0.83.0';
 const APP_NAME = 'G88';
-const APP_TITLE = 'NEXA';
+const APP_TITLE = 'NEXUS';
 const BUNDLE_ID = 'com.g88';
 const NEXA_URL_SCHEME = 'nexa';
 
@@ -102,7 +102,7 @@ try {
   }
 
   if (!readFileSync(infoPlistPath, 'utf8').includes(schemeMarker)) {
-    throw new Error('[ios-bootstrap] NEXA URL scheme registration is missing from Info.plist.');
+    throw new Error('[ios-bootstrap] NEXUS URL scheme registration is missing from Info.plist.');
   }
 
   const appDelegatePath = path.join(iosRoot, APP_NAME, 'AppDelegate.swift');
@@ -131,7 +131,7 @@ try {
   }
 
   if (!readFileSync(appDelegatePath, 'utf8').includes(linkingForwarderMarker)) {
-    throw new Error('[ios-bootstrap] NEXA deep-link forwarding is missing from AppDelegate.swift.');
+    throw new Error('[ios-bootstrap] NEXUS deep-link forwarding is missing from AppDelegate.swift.');
   }
 
   console.log(`[ios-bootstrap] native iOS shell ready at ${iosRoot}`);
