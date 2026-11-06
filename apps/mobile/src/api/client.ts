@@ -167,13 +167,15 @@ function isAuthEndpoint(url?: string): boolean {
 }
 
 function normalizeError(err: unknown): ApiError {
-  if (axios.isAxiosError(err) && err.response?.data) {
-    const data = err.response.data as Partial<ApiError>;
+  // An HTTP response can legitimately have an empty body (e.g. an edge 429 or
+  // upstream 503). Keep its HTTP status instead of misreporting it as offline.
+  if (axios.isAxiosError(err) && err.response) {
+    const data = err.response.data as Partial<ApiError> | null | undefined;
     return {
       statusCode: err.response.status,
-      code: data.code ?? 'unknown',
-      message: data.message ?? err.message,
-      ...(data.details !== undefined ? { details: data.details } : {}),
+      code: data?.code ?? 'unknown',
+      message: data?.message ?? err.message,
+      ...(data?.details !== undefined ? { details: data.details } : {}),
     };
   }
   return {

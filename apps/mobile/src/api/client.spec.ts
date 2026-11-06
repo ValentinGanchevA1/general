@@ -8,6 +8,7 @@
 // interceptor by swapping the axios adapter so we can simulate each outcome.
 
 import type { AuthTokens } from '@g88/shared';
+import { classifyDiscoveryFailure } from '@/features/discovery/discoveryFailureDiagnostics';
 import type { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
 /** What the simulated POST /auth/refresh does. */
@@ -132,5 +133,60 @@ describe('password recovery requests', () => {
     await expect(api.post(endpoint, {})).rejects.toMatchObject({ statusCode: 401 });
     expect(clear).not.toHaveBeenCalled();
     expect(onLogout).not.toHaveBeenCalled();
+  });
+});
+
+describe('discovery HTTP error normalization', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  it.each([
+    { status: 429, body: null },
+    { status: 503, body: undefined },
+    { status: 502, body: '' },
+  ])('retains HTTP $status when a response has no JSON body', async ({ status, body }) => {
+    const { api, clear } = freshClient({
+      kind: 'status',
+      status: 200,
+      data: NEW_TOKENS,
+    });
+    const axiosMod = require('axios');
+    const axios = axiosMod.default ?? axiosMod;
+
+    api.defaults.adapter = async (config: InternalAxiosRequestConfig): Promise<AxiosResponse> => {
+      const response: AxiosResponse = {
+        data: body,
+        status,
+        statusText: '',
+        headers: {},
+        config,
+        request: {},
+      };
+      throw new axios.AxiosError(
+        `HTTP ${status} without JSON`,
+        'ERR_BAD_RESPONSE',
+        config,
+        undefined,
+        response,
+      );
+    };
+
+    let actualFailure: unknown;
+    try {
+      await api.post('/discovery/nearby', {});
+    } catch (error: unknown) {
+      actualFailure = error;
+    }
+
+    expect(actualFailure).toMatchObject({
+      statusCode: status,
+      code: 'unknown',
+    });
+    expect(classifyDiscoveryFailure('legacy', actualFailure)).toEqual({
+      lane: 'legacy',
+      kind: 'http',
+      statusCode: status,
+      retryable: true,
+    });
+    expect(clear).not.toHaveBeenCalled();
   });
 });
