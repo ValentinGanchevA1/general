@@ -26,6 +26,40 @@ still uses its original presentation.
 | Return to map | Same map instance; selection and camera restoration verified |
 | Production bundle | `PORTAL_EVENT_PREVIEW_ENABLED` false; original event sheet remains |
 
+## Correct Android build for DEV-only Portal testing
+
+**Do not use** the successful `Release APK (sideload)` artifact from #1046 to
+test Portal. That workflow executes `assembleRelease`, whose embedded JS has
+`__DEV__ === false`; `PORTAL_EVENT_PREVIEW_ENABLED` is therefore off.
+An APK installing successfully does not establish Portal functional QA.
+
+Use the checked-out `feat/portal-event-detail-entry-states` branch and a
+local React Native **debug** build connected to Metro:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm --filter @g88/shared build
+adb devices
+adb reverse tcp:8081 tcp:8081
+# Terminal 1 (leave running):
+pnpm --filter @g88/mobile start
+# Terminal 2:
+pnpm --filter @g88/mobile android
+```
+
+This requires Node >=22.13, Android SDK, platform tools, an authorized USB
+debugging device and a reachable **development** API configured for that
+device. React Native debug builds rely on Metro; an independently installed
+release APK does not. Verify the app indicates development mode and the
+`NEXA / EVENT PORTAL` sheet is visible. Never put live credentials in test
+logs or commit device-specific `.env` files.
+
+On a Huawei device without Google Play Services, a Google-maps-backed surface
+can be a separate environment blocker. Log this explicitly rather than treating
+a blank map as a Portal regression; validate on a supported second Android
+device and iOS as well. Production builds must continue to render the legacy
+event sheet and unchanged map behavior.
+
 ## Physical-device smoke
 
 - Android: verify on a phone with small display, TalkBack, large font, and
