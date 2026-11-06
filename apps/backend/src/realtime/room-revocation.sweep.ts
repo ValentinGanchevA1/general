@@ -51,13 +51,15 @@ export class RoomRevocationSweepService implements OnModuleInit, OnModuleDestroy
            WHERE completed_at IS NULL AND available_at <= NOW()
              AND (leased_until IS NULL OR leased_until < NOW())
            ORDER BY id LIMIT 16 FOR UPDATE SKIP LOCKED
+        ), claimed AS (
+          UPDATE realtime_room_revocations AS r
+             SET attempts = r.attempts + 1,
+                 leased_until = NOW() + INTERVAL '60 seconds'
+            FROM pending WHERE r.id = pending.id
+          RETURNING r.id::text AS id, r.conversation_id AS "conversationId",
+                    r.user_id AS "userId", r.attempts AS attempts
         )
-        UPDATE realtime_room_revocations AS r
-           SET attempts = r.attempts + 1,
-               leased_until = NOW() + INTERVAL '60 seconds'
-          FROM pending WHERE r.id = pending.id
-        RETURNING r.id::text AS id, r.conversation_id AS "conversationId",
-                  r.user_id AS "userId", r.attempts AS attempts
+        SELECT id, "conversationId", "userId", attempts FROM claimed
       `);
       for (const item of items) await this.process(item);
     } catch (error) {
