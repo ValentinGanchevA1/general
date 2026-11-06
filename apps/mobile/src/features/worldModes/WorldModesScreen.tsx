@@ -75,15 +75,12 @@ export function WorldModesScreen(): React.JSX.Element {
   const userId = useAppSelector((state) => state.auth.user?.id ?? null);
   const { selectedId, hydrated, saving, error } = useAppSelector((state) => state.worldModes);
   const [filter, setFilter] = useState<CategoryFilter>('all');
-  const [previewId, setPreviewId] = useState<WorldModeId>('nexus');
+  const [requestedPreviewId, setRequestedPreviewId] = useState<WorldModeId | null>(null);
+  const previewId = requestedPreviewId ?? selectedId;
 
   useEffect(() => {
     if (userId && WORLD_MODES_ENABLED) void dispatch(hydrateWorldMode(userId));
   }, [dispatch, userId]);
-
-  useEffect(() => {
-    if (hydrated) setPreviewId(selectedId);
-  }, [hydrated, selectedId]);
 
   const visibleIds = useMemo(
     () => WORLD_MODE_IDS.filter((id) => filter === 'all' || WORLD_MODES[id].category === filter),
@@ -146,7 +143,7 @@ export function WorldModesScreen(): React.JSX.Element {
                 key={id}
                 testID={'world-mode-' + id}
                 disabled={!hydrated || !userId}
-                onPress={() => { dispatch(clearWorldModeError()); setPreviewId(id); }}
+                onPress={() => { dispatch(clearWorldModeError()); setRequestedPreviewId(id); }}
                 style={[styles.card, selected ? { borderColor: palette.accent, backgroundColor: palette.glow } : undefined]}
                 accessibilityRole="button"
                 accessibilityState={{ selected, disabled: !hydrated || !userId }}
