@@ -16,6 +16,8 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 
 import { useAppTheme, type ThemeColors } from '@/theme';
+import { WORLD_MODES_ENABLED } from '@/features/worldModes/worldModes';
+import { hydrateWorldMode } from '@/features/worldModes/worldModesSlice';
 
 import { MapScreen } from '@/screens/MapScreen';
 import { DiscoverScreen } from '@/screens/DiscoverScreen';
@@ -370,6 +372,11 @@ export function AppNavigator(): React.JSX.Element {
 	const navigationTheme = useMemo(() => buildNavigationTheme(themeColors, scheme === 'dark'), [themeColors, scheme]);
 
 	useEffect(() => { void dispatch(restoreSession()); }, [dispatch]);
+	useEffect(() => {
+		if (WORLD_MODES_ENABLED && userId && !restoring) {
+			void dispatch(hydrateWorldMode(userId));
+		}
+	}, [dispatch, userId, restoring]);
 	useEffect(() => {
 		let active = true;
 		const acceptUrl = (url: string | null): void => {
