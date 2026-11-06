@@ -1,0 +1,153 @@
+import React from 'react';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import type { EventDetail } from '@g88/shared';
+
+import { rsvpToEvent, useEvent } from '@/features/events/useEvents';
+import { EventDetailScreen } from './EventDetailScreen';
+
+let mockRoute: { params: { eventId: string; entry?: 'portal' } } = {
+  params: { eventId: 'portal-event', entry: 'portal' },
+};
+
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: () => ({ navigate: jest.fn() }),
+  useRoute: () => mockRoute,
+}));
+jest.mock('@/components/ScreenHeader', () => ({ ScreenHeader: 'ScreenHeader' }));
+jest.mock('@/components/EmptyState', () => ({ EmptyState: 'EmptyState' }));
+jest.mock('@/features/events/EventReviewsSection', () => ({
+  EventReviewsSection: 'EventReviewsSection',
+}));
+jest.mock('@/theme', () => ({
+  useAppTheme: () => ({
+    colors: jest.requireActual('@/theme/colors').darkColors,
+  }),
+}));
+jest.mock('@/hooks/redux', () => ({
+  useAppSelector: () => 'viewer-id',
+}));
+jest.mock('@/navigation/openRootScreen', () => ({
+  openRootScreen: jest.fn(),
+  openViaRef: jest.fn(),
+}));
+jest.mock('react-native-vector-icons/MaterialCommunityIcons', () => 'Icon');
+jest.mock('@/features/events/useEvents', () => ({
+  useEvent: jest.fn(),
+  rsvpToEvent: jest.fn(),
+  shareEventJoinToPulse: jest.fn(),
+  askQuestion: jest.fn(),
+  createPoll: jest.fn(),
+  upvoteQuestion: jest.fn(),
+  votePoll: jest.fn(),
+}));
+
+const event: EventDetail = {
+  id: 'portal-event',
+  hostId: 'host-id',
+  hostDisplayName: 'Host',
+  hostAvatarUrl: null,
+  title: 'Sea Garden Meet-up',
+  coverUrl: null,
+  startsAt: '2030-01-01T10:00:00.000Z',
+  endsAt: '2030-01-01T12:00:00.000Z',
+  location: { lat: 43.2, lng: 27.9 },
+  capacity: 10,
+  attendeeCount: 4,
+  visibility: 'public',
+  myRsvp: null,
+  attendees: [],
+  description: 'A local event.',
+};
+
+function setup(detail: EventDetail | null = event, error: unknown | null = null) {
+  const refresh = jest.fn();
+  jest.mocked(useEvent).mockReturnValue({
+    event: detail,
+    polls: [],
+    questions: [],
+    loading: false,
+    error,
+    refresh,
+    refreshPolls: jest.fn(),
+    refreshQuestions: jest.fn(),
+  });
+  return { screen: render(<EventDetailScreen />), refresh };
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockRoute = { params: { eventId: 'portal-event', entry: 'portal' } };
+});
+
+describe('Portal Entry EventDetail integration', () => {
+  it('shows authenticated Portal details but never RSVPs just from entering', () => {
+    const { screen } = setup();
+    expect(screen.getByTestId('portal-entry-banner')).toBeTruthy();
+    expect(screen.getByText('Sea Garden Meet-up')).toBeTruthy();
+    expect(screen.getByText('Viewing this Portal does not RSVP or share your activity.')).toBeTruthy();
+    expect(rsvpToEvent).not.toHaveBeenCalled();
+  });
+
+  it('uses an explicit Going press to call the existing RSVP API', async () => {
+    jest.mocked(rsvpToEvent).mockResolvedValueOnce({
+      eventId: 'portal-event',
+      status: 'going',
+      attendeeCount: 5,
+    });
+    const { screen, refresh } = setup();
+    expect(rsvpToEvent).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('event-rsvp-going'));
+    await waitFor(() => expect(rsvpToEvent).toHaveBeenCalledWith('portal-event', 'going'));
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+  });
+
+  it('prevents changes to past events through a Portal entry', () => {
+    const ended: EventDetail = {
+      ...event,
+      startsAt: '2020-01-01T10:00:00.000Z',
+      endsAt: '2020-01-01T12:00:00.000Z',
+    };
+    const { screen } = setup(ended);
+    expect(screen.getByText('Event ended')).toBeTruthy();
+    for (const status of ['going', 'maybe', 'declined']) {
+      expect(screen.getByTestId(`event-rsvp-${status}`).props.accessibilityState.disabled).toBe(true);
+    }
+    expect(rsvpToEvent).not.toHaveBeenCalled();
+  });
+
+  it('prevents new Going RSVPs when the event has reached capacity', () => {
+    const { screen } = setup({ ...event, attendeeCount: 10 });
+    expect(screen.getByText('At capacity')).toBeTruthy();
+    expect(screen.getByTestId('event-rsvp-going').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('event-rsvp-maybe').props.accessibilityState.disabled).toBe(false);
+  });
+
+  it('hides even previously loaded details after a 403/404 access revocation', () => {
+    for (const code of [403, 404]) {
+      const { screen } = setup(event, { statusCode: code, message: 'private event data' });
+      expect(screen.queryByText('Sea Garden Meet-up')).toBeNull();
+      expect(screen.queryByTestId('portal-entry-banner')).toBeNull();
+      const empty = screen.UNSAFE_getByType('EmptyState');
+      expect(empty.props.title).toBe('Portal unavailable');
+      expect(empty.props.body).not.toContain('private event data');
+      screen.unmount();
+    }
+  });
+
+  it('shows retry state without stale metadata when offline', () => {
+    const { screen } = setup(event, { statusCode: 0, message: 'Network Error' });
+    expect(screen.queryByText('Sea Garden Meet-up')).toBeNull();
+    const empty = screen.UNSAFE_getByType('EmptyState');
+    expect(empty.props.title).toBe('Could not load Portal');
+    expect(typeof empty.props.onAction).toBe('function');
+    expect(rsvpToEvent).not.toHaveBeenCalled();
+  });
+
+  it('preserves legacy EventDetail rendering when not entered as a Portal', () => {
+    mockRoute = { params: { eventId: 'portal-event' } };
+    const { screen } = setup();
+    expect(screen.queryByTestId('portal-entry-banner')).toBeNull();
+    expect(screen.getByText('Sea Garden Meet-up')).toBeTruthy();
+  });
+});
