@@ -26,6 +26,7 @@ import {
   canSubmitPortalRsvp,
   resolvePortalDetailState,
   resolvePortalLoadPresentation,
+  resolvePortalRsvpFailure,
 } from '@/features/portals/portalDetailState';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
@@ -76,6 +77,7 @@ export function EventDetailScreen(): React.JSX.Element {
   const [portalAsOf, setPortalAsOf] = useState(Date.now);
   const [rsvpBusy, setRsvpBusy] = useState(false);
   const [rsvpError, setRsvpError] = useState<string | null>(null);
+  const [portalAccessFailureCode, setPortalAccessFailureCode] = useState<number | null>(null);
   const [pulseShareBusy, setPulseShareBusy] = useState(false);
   const [pulseShared, setPulseShared] = useState(false);
   const [pulseShareError, setPulseShareError] = useState<string | null>(null);
@@ -101,10 +103,18 @@ export function EventDetailScreen(): React.JSX.Element {
       else refresh();
     } catch (err) {
       if (portalEntry) {
-        const statusCode = err != null && typeof err === 'object' && 'statusCode' in err ? err.statusCode : null;
-        setRsvpError(statusCode === 409
-          ? 'This event may be full. Refresh to check availability.'
-          : 'Could not change your RSVP. Please try again.');
+        const failure = resolvePortalRsvpFailure(err);
+        if (failure.accessLost) {
+          // Immediately hide cached event metadata when mutation authorization
+          // says the viewer no longer has access, not just on the next GET.
+          setPortalAccessFailureCode(failure.statusCode ?? 404);
+        } else {
+          setRsvpError(failure.message);
+          if (failure.requiresRefresh) {
+            setPortalAsOf(Date.now());
+            refresh();
+          }
+        }
       }
     } finally {
       setRsvpBusy(false);
@@ -127,13 +137,16 @@ export function EventDetailScreen(): React.JSX.Element {
 
   // Portal access must fail closed. If a detail refresh denies access or
   // cannot revalidate it, never keep rendering previously cached event data.
-  if (!event || (portalEntry && error != null)) {
-    const unavailable = resolvePortalLoadPresentation(error);
+  if (!event || (portalEntry && (error != null || portalAccessFailureCode != null))) {
+    const unavailable = resolvePortalLoadPresentation(
+      portalAccessFailureCode == null ? error : { statusCode: portalAccessFailureCode },
+    );
     return (
       <View style={styles.container}>
         <ScreenHeader title={portalEntry ? 'Portal' : 'Event'} />
         <View style={[styles.container, styles.center]}>
-          {loading || (portalEntry && error == null) ? <ActivityIndicator color={colors.primary} /> : portalEntry ? (
+          {portalAccessFailureCode == null && (loading || (portalEntry && !event && error == null))
+            ? <ActivityIndicator color={colors.primary} /> : portalEntry ? (
             <EmptyState
               variant="plain"
               icon="shield-alert-outline"
