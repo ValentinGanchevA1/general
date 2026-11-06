@@ -1,4 +1,4 @@
-# NEXA — Map Core: Interaction & Discovery Engine (10k+)
+# NEXUS — Map Core: Interaction & Discovery Engine (10k+)
 Status: **Proposed engineering contract; not yet 10k-validated**
 Priority: **Critical / P0 for map-first experience**
 Scope: Mobile (React Native; existing legacy renderer, gated MapLibre) + Web (MapLibre when production provider is approved) + NestJS/PostGIS/H3/Redis/Socket.IO
