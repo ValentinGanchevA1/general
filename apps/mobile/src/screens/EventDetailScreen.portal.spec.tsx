@@ -59,13 +59,13 @@ const event: EventDetail = {
   description: 'A local event.',
 };
 
-function setup(detail: EventDetail | null = event, error: unknown | null = null) {
+function setup(detail: EventDetail | null = event, error: unknown | null = null, loading = false) {
   const refresh = jest.fn();
   jest.mocked(useEvent).mockReturnValue({
     event: detail,
     polls: [],
     questions: [],
-    loading: false,
+    loading,
     error,
     refresh,
     refreshPolls: jest.fn(),
@@ -100,6 +100,17 @@ describe('Portal Entry EventDetail integration', () => {
     fireEvent.press(screen.getByTestId('event-rsvp-going'));
     await waitFor(() => expect(rsvpToEvent).toHaveBeenCalledWith('portal-event', 'going'));
     await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+  });
+
+  it('holds RSVP buttons while the authoritative Portal detail request is refreshing', () => {
+    const { screen } = setup(event, null, true);
+    expect(screen.getByText('Sea Garden Meet-up')).toBeTruthy();
+    for (const status of ['going', 'maybe', 'declined']) {
+      const button = screen.getByTestId(`event-rsvp-${status}`);
+      expect(button.props.accessibilityState.disabled).toBe(true);
+      fireEvent.press(button);
+    }
+    expect(rsvpToEvent).not.toHaveBeenCalled();
   });
 
   it('prevents changes to past events through a Portal entry', () => {
