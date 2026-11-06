@@ -1,5 +1,6 @@
 import eventReviewsReducer from '@/features/events/eventReviewsSlice';
 import worldModesReducer, { clearWorldMode } from '@/features/worldModes/worldModesSlice';
+import worldFusionReducer, { clearWorldFusion } from '@/features/worldModes/worldFusionSlice';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '@/features/auth/authSlice';
 import passwordResetReducer from '@/features/auth/passwordResetSlice';
@@ -30,6 +31,7 @@ export const store = configureStore({
   reducer: {
     auth: authReducer,
     worldModes: worldModesReducer,
+    worldFusion: worldFusionReducer,
     eventReviews: eventReviewsReducer,
     passwordReset: passwordResetReducer,
     profile: profileReducer,
@@ -64,6 +66,7 @@ store.subscribe(() => {
   }
   if (previousId !== nextAuthUserId) {
     store.dispatch(clearWorldMode());
+    store.dispatch(clearWorldFusion());
   }
 });
 
