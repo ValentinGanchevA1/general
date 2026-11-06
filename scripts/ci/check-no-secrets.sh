@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Fail-closed guard against committed credentials and private environment files.
+# scripts/ci/check-no-secrets.sh
+# Hard gate: fail if tracked files contain known secrets / private keys / env dumps.
 set -uo pipefail
 
 if ! ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"; then
@@ -10,42 +11,45 @@ cd "$ROOT" || exit 2
 
 FAIL=0
 FORBIDDEN_NAMES=(
-  ".env" ".env.local" ".env.production" ".env.development"
-  "credentials.json" "service-account.json" "id_rsa" "id_ed25519"
+  ".env"
+  ".env.local"
+  ".env.production"
+  ".env.development"
+  "credentials.json"
+  "service-account.json"
+  "id_rsa"
+  "id_ed25519"
 )
-
-while IFS= read -r file; do
-  base="${file##*/}"
+while IFS= read -r f; do
+  base=$(basename "$f")
   for bad in "${FORBIDDEN_NAMES[@]}"; do
     if [[ "$base" == "$bad" ]]; then
-      echo "✗ Forbidden tracked file: $file"
+      echo "✗ Forbidden tracked file: $f"
       FAIL=1
     fi
   done
 done < <(git ls-files)
 
-# git grep exits 0 for matches, 1 for no matches, >1 for errors.
+# Git grep: 0=matches, 1=no matches, >1=error. Errors MUST fail closed.
+# Scan docs, too. Exclude generated lockfiles and deliberately public env templates.
 PATTERN='AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY|xox[baprs]-[0-9A-Za-z-]{10,}|ghp_[0-9A-Za-z]{36}|sk_live_[0-9A-Za-z]{20,}|-----BEGIN PGP PRI[V]ATE KEY'
-if HITS="$(git grep -nEI "$PATTERN" -- \
-  ':!pnpm-lock.yaml' \
-  ':!**/package-lock.json' \
-  ':!.env.example' \
-  ':!**/.env.example' 2>&1)"; then
-  FILTERED_HITS=""
+
+if HITS=$(git grep -nEI "$PATTERN" -- ':!pnpm-lock.yaml' ':!**/package-lock.json' ':!.env.example' ':!**/.env.example' 2>&1); then
+  # Only the known public AWS test fixture in its redaction test is exempt.
+  # Recheck each line after masking it so a second token still fails.
+  FILTERED_HITS=()
   while IFS= read -r hit; do
-    # Exempt only the published AWS documentation fixture in its redaction test.
-    # Re-scan the line so any second credential remains a hard failure.
     if [[ "$hit" == apps/backend/src/common/sentry-scrub.spec.ts:* ]]; then
       knownAwsFixture='AKIA''IOSFODNN7EXAMPLE'
       hit="${hit//$knownAwsFixture/[known-aws-test-fixture]}"
     fi
     if [[ "$hit" =~ $PATTERN ]]; then
-      FILTERED_HITS+="$hit"$'\n'
+      FILTERED_HITS+=("$hit")
     fi
   done <<< "$HITS"
-  if [[ -n "$FILTERED_HITS" ]]; then
+  if ((${#FILTERED_HITS[@]} > 0)); then
     echo "✗ Possible secrets in tracked content:"
-    printf '%s' "$FILTERED_HITS"
+    printf '%s\n' "${FILTERED_HITS[@]}"
     FAIL=1
   fi
 else
@@ -57,7 +61,7 @@ else
   fi
 fi
 
-ENV_HITS="$(git ls-files | grep -E '(^|/)\.env(\.|$)' | grep -v '\.env\.example$' || true)"
+ENV_HITS=$(git ls-files | grep -E '(^|/)\.env(\.|$)' | grep -v '\.env\.example$' || true)
 if [[ -n "$ENV_HITS" ]]; then
   echo "✗ Tracked .env files (use .env.example only):"
   echo "$ENV_HITS"
@@ -65,7 +69,8 @@ if [[ -n "$ENV_HITS" ]]; then
 fi
 
 if [[ "$FAIL" -ne 0 ]]; then
-  echo "Secret/env scan failed. Remove leaked values and rotate affected credentials."
+  echo
+  echo "Secret/env scan failed. Remove leaked values from code/history and rotate affected credentials."
   exit 1
 fi
 
