@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
 import { RealtimeEmitterService } from '../../realtime/realtime-emitter.service';
+import { roomRevocationOutboxEnabled } from '../../realtime/room-revocation.config';
 import { GroupConversationsService } from '../chat/group-conversations.service';
 import { FriendsService } from '../friends/friends.service';
 
@@ -55,7 +56,8 @@ export class BlocksService {
     for (const conversationId of sharedGroupIds) {
       try {
         this.realtime.leaveRoomForUsers([blockerId], `convo:${conversationId}`);
-      } catch {
+      } catch (error) {
+        if (!roomRevocationOutboxEnabled()) throw error;
         // Shared group removals were durably queued in their transactions.
         // Continue graph cleanup even when the adapter dispatch fails.
         this.logger.warn('Group room eviction after block queued for retry');
