@@ -26,12 +26,12 @@ export interface NexaLaunchOverlayProps {
 }
 
 /**
- * NEXA v5 "Radiant Eye" launch sequence.
+ * NEXUS v5 "Radiant Eye" launch sequence.
  *
- * The native launch surface remains a blank NEXA canvas. Once React Native is
+ * The native launch surface remains a blank NEXUS canvas. Once React Native is
  * mounted, the pupil ignites, light constructs the eye from its optical center,
  * energy propagates into the surrounding network, entity nodes resolve, the
- * composition converges once, and the NEXA wordmark settles last.
+ * composition converges once, and the NEXUS wordmark settles last.
  *
  * Boot-time readiness never controls animation speed: the finished composition
  * simply holds until auth/map launch readiness allows the overlay to dissolve.
@@ -159,7 +159,7 @@ export function NexaLaunchOverlay({
       onLayout={hideNativeSplash}
       pointerEvents="auto"
       accessibilityViewIsModal
-      accessibilityLabel="NEXA"
+      accessibilityLabel="NEXUS"
     >
       <StatusBar
         barStyle="light-content"
