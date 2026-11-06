@@ -1,4 +1,4 @@
-# NEXA Empty / Loading / Error States v2
+# NEXUS Empty / Loading / Error States v2
 
 The map remains the primary product surface. Recoverable discovery states are overlays on top of the map, not replacement screens.
 
@@ -54,7 +54,7 @@ Recoverable discovery errors do not unmount `MapView`.
 
 ## Motion and accessibility
 
-- State entrance uses the canonical NEXA standard timing.
+- State entrance uses the canonical NEXUS standard timing.
 - Reduced Motion resolves to a short opacity-only transition.
 - Buttons keep 44dp+ effective targets.
 - Loading uses branded geometry and copy instead of a generic spinner.
@@ -63,7 +63,7 @@ Recoverable discovery errors do not unmount `MapView`.
 ## Acceptance criteria
 
 1. Initial discovery no longer renders a centered `ActivityIndicator`.
-2. Empty discovery keeps the map visible and shows contextual NEXA copy.
+2. Empty discovery keeps the map visible and shows contextual NEXUS copy.
 3. A failed first request exposes a retry action without raw backend error text.
 4. A failed refresh keeps existing markers and shows a compact warning.
 5. Oversized viewports explain that the user should zoom in rather than appearing empty.
