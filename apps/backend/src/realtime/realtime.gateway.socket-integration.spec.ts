@@ -339,10 +339,12 @@ describe('RealtimeGateway real Socket.IO revocation integration', () => {
 
   it('sends an event poll only to currently authorized sockets, not stale event room members', async () => {
     const eventId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    // Use a distinct viewer from the conversation revocation tests below.
+    const eventViewerId = '11111111-1111-4111-8111-111111111111';
     const host = new SocketIoWireClient(socketUrl);
     const revokedViewer = new SocketIoWireClient(socketUrl);
     clients.push(host, revokedViewer);
-    await Promise.all([host.connect(sharerId), revokedViewer.connect(peerId)]);
+    await Promise.all([host.connect(sharerId), revokedViewer.connect(eventViewerId)]);
 
     await expect(host.emitWithAck<AckResult<{ joined: true }>>(
       'event:join', { eventId },
@@ -353,7 +355,7 @@ describe('RealtimeGateway real Socket.IO revocation integration', () => {
 
     const room = `event:${eventId}`;
     await expect(roomUserIds(gateway, room))
-      .resolves.toEqual(expect.arrayContaining([sharerId, peerId]));
+      .resolves.toEqual(expect.arrayContaining([sharerId, eventViewerId]));
 
     const hostPolls: EventPollDelta[] = [];
     const revokedPolls: EventPollDelta[] = [];
@@ -378,10 +380,13 @@ describe('RealtimeGateway real Socket.IO revocation integration', () => {
       expect(revokedPolls).toEqual([]);
       // The revoked viewer remains in the room to prove the receiver filter,
       // not room eviction, prevented the forbidden delivery.
-      await expect(roomUserIds(gateway, room)).resolves.toContain(peerId);
+      await expect(roomUserIds(gateway, room)).resolves.toContain(eventViewerId);
     } finally {
       offHost();
       offRevoked();
+      host.close();
+      revokedViewer.close();
+      await sleep(40);
     }
   });
 
