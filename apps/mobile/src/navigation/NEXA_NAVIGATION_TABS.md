@@ -1,4 +1,4 @@
-# NEXA map-first navigation v3
+# NEXUS map-first navigation v3
 
 The five visible controls are **Map / Experiences / Opportunities / Connections / Identity**.
 
