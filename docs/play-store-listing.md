@@ -1,6 +1,6 @@
-# NEXA — Play Console Store Listing + Data Safety checklist
+# NEXUS — Play Console Store Listing + Data Safety checklist
 
-> Public product identity: **NEXA**. Android package/application ID remains
+> Public product identity: **NEXUS**. Android package/application ID remains
 > `com.g88` for compatibility and must not be renamed as part of store-copy work.
 > Privacy/data claims below are grounded in the current repo architecture; verify
 > the final declarations against the exact release build and current Play Console
@@ -12,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| App name | `NEXA` |
+| App name | `NEXUS` |
 | Package name | `com.g88` *(existing compatibility identifier)* |
 | Default language | English (United States) |
 | App or game | **App** |
@@ -21,7 +21,7 @@
 | Tags | Social, Local, Map |
 | Contact email | ⟨support email⟩ |
 | Website | ⟨landing page URL, optional⟩ |
-| Privacy policy URL | `https://g88-legal.onrender.com/privacy` *(legacy host name; hosted page itself must be current and NEXA-branded)* |
+| Privacy policy URL | `https://g88-legal.onrender.com/privacy` *(legacy host name; hosted page itself must be current and NEXUS-branded)* |
 
 ---
 
@@ -30,7 +30,7 @@
 ### App name
 
 ```text
-NEXA
+NEXUS
 ```
 
 ### Short description
@@ -42,7 +42,7 @@ Discover people and local activity nearby on a live, privacy-aware map.
 ### Full description
 
 ```text
-NEXA is a map-first social app for discovering people and local activity around
+NEXUS is a map-first social app for discovering people and local activity around
 you in real time.
 
 Open the map to explore nearby people, events and listings. Wave to someone,
@@ -62,14 +62,14 @@ WHAT YOU CAN DO
 • Map presence controls — choose whether you appear in nearby discovery
 
 BUILT FOR PRIVACY
-NEXA never shows your exact coordinates to other users. Location is used to
+NEXUS never shows your exact coordinates to other users. Location is used to
 compute nearby discovery and map presence, then privacy-coarsened before it is
 stored or displayed to others. Precise GPS is not persisted in precise form.
 
-Verification is factual and signal-based. NEXA does not expose a public numeric
+Verification is factual and signal-based. NEXUS does not expose a public numeric
 trust or popularity score.
 
-NEXA is designed around local context, direct interaction and spatial discovery
+NEXUS is designed around local context, direct interaction and spatial discovery
 instead of a single endless global feed.
 
 ⟨Add closed-beta support contact or tester-specific note if needed.⟩
@@ -77,8 +77,8 @@ instead of a single endless global feed.
 
 ### Graphics checklist
 
-- [ ] **App icon** — 512×512 current NEXA launcher artwork
-- [ ] **Feature graphic** — 1024×500 NEXA-branded artwork
+- [ ] **App icon** — 512×512 current NEXUS launcher artwork
+- [ ] **Feature graphic** — 1024×500 NEXUS-branded artwork
 - [ ] **Phone screenshots** — use the current UI, not legacy G88 screens
   - [ ] Map + entity markers/sheet
   - [ ] Experiences / event map lens
@@ -87,7 +87,7 @@ instead of a single endless global feed.
   - [ ] Identity / Trust Center
   - [ ] Event or Marketplace surface
 - [ ] **Theme coverage** — screenshots should not mix obsolete and current visual systems
-- [ ] **Promo video** — optional; if used, show the current NEXA launch/map experience
+- [ ] **Promo video** — optional; if used, show the current NEXUS launch/map experience
 
 ---
 
@@ -132,7 +132,7 @@ sends precise location for nearby-position computation, then coarsens it before
 persistence. Public copy should instead say:
 
 > Exact coordinates are never shown to other users, and precise GPS is not
-> persisted in precise form; NEXA stores/displays privacy-coarsened map presence.
+> persisted in precise form; NEXUS stores/displays privacy-coarsened map presence.
 
 If Play Console wording or reviewer interpretation classifies ephemeral precise
 location differently, use the conservative declaration required by the current
@@ -151,7 +151,7 @@ form rather than weakening the privacy explanation.
 
 ## 4. App content declarations
 
-- [ ] **Privacy policy** — hosted URL is public, current and NEXA-branded
+- [ ] **Privacy policy** — hosted URL is public, current and NEXUS-branded
 - [ ] **App access** — provide reviewer credentials and steps to reach Map / core flows
 - [ ] **Ads** — verify against the exact release build; do not infer from old docs
 - [ ] **Content rating** — complete the current Play questionnaire truthfully for UGC, user communication and location-aware social functionality
@@ -164,13 +164,13 @@ form rather than weakening the privacy explanation.
 
 ## 5. Location permission / prominent disclosure
 
-NEXA uses foreground location for nearby discovery and map presence. The product
+NEXUS uses foreground location for nearby discovery and map presence. The product
 must explain this before the OS permission prompt and must not imply that exact
 coordinates are publicly visible.
 
 - [ ] Confirm release manifest has no unintended background-location permission
 - [ ] Prominent in-app disclosure precedes the OS location prompt
-- [ ] Permission rationale is NEXA-branded
+- [ ] Permission rationale is NEXUS-branded
 - [ ] Denial leaves a usable privacy-safe fallback / recovery path
 - [ ] No exact-coordinate value or hidden-visibility reason leaks through UI/errors
 
@@ -190,7 +190,7 @@ The hosted policy should accurately cover at least:
 8. third-party processors;
 9. privacy/support contact information.
 
-The hosted policy page should use **NEXA** as the visible product identity even
+The hosted policy page should use **NEXUS** as the visible product identity even
 if its URL or infrastructure still contains a legacy `g88` identifier.
 
 ---
@@ -203,7 +203,7 @@ Before uploading screenshots / graphics:
 - [ ] current Android v3 tabs are Map / Experiences / Opportunities / Connections / Identity (see `docs/IA_NAVIGATION.md`);
 - [ ] people / events / listings use the current semantic marker grammar;
 - [ ] verification UI is score-free;
-- [ ] screenshots use the current NEXA symbol / wordmark;
+- [ ] screenshots use the current NEXUS symbol / wordmark;
 - [ ] launch material reflects the v3 eye/light-streak/spatial-handoff identity;
 - [ ] screenshots are captured from the same or equivalent release candidate being submitted;
 - [ ] issue #580 physical-device visual QA has no open P0/P1 blocker.
@@ -213,13 +213,13 @@ Before uploading screenshots / graphics:
 ## 8. Pre-submit gate
 
 - [ ] Privacy policy URL live and reachable
-- [ ] Hosted policy visibly says NEXA
+- [ ] Hosted policy visibly says NEXUS
 - [ ] Data Safety form completed from exact release behavior
 - [ ] Content rating completed
 - [ ] Target audience configured
 - [ ] Reviewer app-access credentials provided
-- [ ] NEXA store copy entered
-- [ ] Current NEXA graphics/screenshots uploaded
+- [ ] NEXUS store copy entered
+- [ ] Current NEXUS graphics/screenshots uploaded
 - [ ] Signed AAB uploaded to the intended closed-testing track
 - [ ] Tester list / group configured
 - [ ] Tester opt-in link verified
@@ -235,7 +235,7 @@ Current repo documentation records the implemented path:
 - **Backend:** authenticated `DELETE /users/me` cleanup path
 
 Google Play requires a functional **external account-deletion request URL even when
-in-app deletion is available**. The proposed NEXA `/delete-account/` page is in
+in-app deletion is available**. The proposed NEXUS `/delete-account/` page is in
 `docs/legal/delete-account/index.html`; verify the deployed HTTPS URL and actual
 request-processing workflow, then enter it in Play Console Data Safety. Do not
 regress Settings → Delete account or claim the external page is live before checking.
@@ -253,4 +253,4 @@ The following are intentionally **not** part of this public-branding cleanup:
 - legacy infrastructure host names where migration would affect continuity
 
 Those require a separate compatibility/migration plan. Public product identity
-is **NEXA** regardless of those technical identifiers.
+is **NEXUS** regardless of those technical identifiers.
