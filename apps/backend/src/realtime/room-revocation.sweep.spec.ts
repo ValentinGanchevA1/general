@@ -30,6 +30,11 @@ describe('RoomRevocationSweepService', () => {
     await worker.runOnce();
     expect(query.mock.calls[0]?.[0]).toContain('FOR UPDATE SKIP LOCKED');
     expect(query.mock.calls[0]?.[0]).toContain('LIMIT 16');
+    // TypeORM DataSource.query returns [rows, count] for UPDATE RETURNING.
+    // The outer SELECT forces the expected rows-only response shape.
+    expect(query.mock.calls[0]?.[0]).toContain(
+      'SELECT id, "conversationId", "userId", attempts FROM claimed',
+    );
     expect(evictAndVerify).toHaveBeenCalledWith(item.userId, `convo:${item.conversationId}`);
     expect(query.mock.calls[1]?.[0]).toContain('SET completed_at = NOW()');
     expect(query.mock.calls[1]?.[1]).toEqual([item.id, item.attempts]);
