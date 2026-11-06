@@ -79,7 +79,7 @@ describe('WorldFusionScreen interaction flow', () => {
 
   it('applies Fusion only after explicit confirmation, without mutating map lens', async () => {
     const { screen, store } = await setup();
-    nexaSpatialLensStore.set('opportunities');
+    act(() => nexaSpatialLensStore.set('opportunities'));
     fireEvent.press(screen.getByTestId('fusion-option-sanctuary'));
     expect(storage.setItem).not.toHaveBeenCalled();
 
@@ -135,7 +135,7 @@ describe('WorldFusionScreen interaction flow', () => {
 
   it('opens an existing lens only after saved Fusion and a second explicit tap', async () => {
     const { screen, store } = await setup();
-    nexaMapFilterIntentStore.publish(false);
+    act(() => nexaMapFilterIntentStore.publish(false));
     fireEvent.press(screen.getByTestId('fusion-option-nocturne'));
     expect(screen.queryByTestId('fusion-open-lens')).toBeNull();
     fireEvent.press(screen.getByTestId('fusion-apply'));
@@ -160,7 +160,7 @@ describe('WorldFusionScreen interaction flow', () => {
     expect(screen.getByTestId('fusion-open-lens').props.accessibilityState.disabled).toBe(true);
     expect(screen.getByText(/Open the Map once to verify/)).toBeTruthy();
 
-    nexaMapFilterIntentStore.publish(true);
+    act(() => nexaMapFilterIntentStore.publish(true));
     expect(screen.getByText(/Manual map filters are active/)).toBeTruthy();
     expect(screen.getByTestId('fusion-open-lens').props.accessibilityState.disabled).toBe(true);
     fireEvent.press(screen.getByTestId('fusion-open-lens'));
@@ -170,12 +170,12 @@ describe('WorldFusionScreen interaction flow', () => {
 
   it('respects an already selected spatial lens even without manual filters', async () => {
     const { screen, store } = await setup();
-    nexaMapFilterIntentStore.publish(false);
+    act(() => nexaMapFilterIntentStore.publish(false));
     fireEvent.press(screen.getByTestId('fusion-option-bazaar'));
     fireEvent.press(screen.getByTestId('fusion-apply'));
     await waitFor(() => expect(store.getState().worldFusion.discoveryWorld).toBe('bazaar'));
 
-    nexaSpatialLensStore.set('experiences');
+    act(() => nexaSpatialLensStore.set('experiences'));
     expect(screen.getByTestId('fusion-open-lens').props.accessibilityState.disabled).toBe(true);
     expect(screen.getByText(/Your selected map lens has priority/)).toBeTruthy();
     fireEvent.press(screen.getByTestId('fusion-open-lens'));
@@ -185,7 +185,7 @@ describe('WorldFusionScreen interaction flow', () => {
 
   it('does not offer a lens shortcut for unsupported World discovery filters', async () => {
     const { screen, store } = await setup();
-    nexaMapFilterIntentStore.publish(false);
+    act(() => nexaMapFilterIntentStore.publish(false));
     fireEvent.press(screen.getByTestId('fusion-option-sanctuary'));
     fireEvent.press(screen.getByTestId('fusion-apply'));
     await waitFor(() => expect(store.getState().worldFusion.discoveryWorld).toBe('sanctuary'));
@@ -196,7 +196,7 @@ describe('WorldFusionScreen interaction flow', () => {
 
   it('does not navigate when the root navigator is not ready', async () => {
     const { screen, store } = await setup();
-    nexaMapFilterIntentStore.publish(false);
+    act(() => nexaMapFilterIntentStore.publish(false));
     jest.mocked(navigationRef.isReady).mockReturnValue(false);
     fireEvent.press(screen.getByTestId('fusion-option-nocturne'));
     fireEvent.press(screen.getByTestId('fusion-apply'));
