@@ -210,8 +210,10 @@ export function useDiscovery({
       // coalescing pending gestures to the most recent settled viewport.
       const budgetDelayMs = requestBudgetRef.current.tryAcquire(Date.now());
       if (budgetDelayMs > 0) {
-        // Keep the map's existing refresh indicator truthful while pacing.
+        // A previous failure no longer describes the new queued viewport.
+        // Show the pending refresh, not a stale interruption banner.
         setLoading(true);
+        setError(null);
         if (budgetTimerRef.current) clearTimeout(budgetTimerRef.current);
         budgetTimerRef.current = setTimeout(() => {
           budgetTimerRef.current = null;
