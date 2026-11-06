@@ -26,6 +26,7 @@ export type CommerceStackParamList = {
 export type AccountStackParamList = {
   Settings: undefined;
   WorldModes: undefined;
+  WorldFusion: undefined;
   Privacy: undefined;
   Help: undefined;
   About: undefined;
