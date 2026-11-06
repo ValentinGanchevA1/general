@@ -10,7 +10,7 @@ function readPrivacyPolicy(): string {
   return readFileSync(privacyPolicyPath, 'utf8');
 }
 
-describe('NEXA legal/product contract', () => {
+describe('NEXUS legal/product contract', () => {
   it('keeps the Privacy Policy aligned with the enforced 18+ onboarding rule', () => {
     const policy = readPrivacyPolicy();
 
