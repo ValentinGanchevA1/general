@@ -171,10 +171,10 @@ export function NexaLaunchComposition({
           style={[styles.wordmark, styles.wordmarkBloom]}
           accessibilityElementsHidden
         >
-          NEXA
+          NEXUS
         </Text>
         <Text style={styles.wordmark} accessibilityElementsHidden>
-          NEXA
+          NEXUS
         </Text>
         <View style={styles.wordmarkFlare} />
       </Animated.View>
