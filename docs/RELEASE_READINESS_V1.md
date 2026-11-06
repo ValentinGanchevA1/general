@@ -1,4 +1,4 @@
-# NEXA Release Readiness v1
+# NEXUS Release Readiness v1
 
 Scope: Android closed/internal testing readiness. This document distinguishes code-level readiness from external Play Console, legal, credential, and physical-device gates.
 
@@ -41,7 +41,7 @@ There is no `ACCESS_BACKGROUND_LOCATION` permission in the application manifest.
 - [x] Sentry is disabled in development and enabled only when a production DSN is configured.
 - [x] `sendDefaultPii=false`.
 - [x] events and breadcrumbs pass through the shared scrubber.
-- [x] navigation tracing and NEXA launch performance spans are wired.
+- [x] navigation tracing and NEXUS launch performance spans are wired.
 - [x] Sentry release identity is aligned to Android `1.0.0` and CI `versionCode`.
 - [ ] Source-map/native-symbol upload hooks are not yet wired. `SENTRY_AUTH_TOKEN` alone is not proof of symbolication.
 
@@ -60,7 +60,7 @@ There is no `ACCESS_BACKGROUND_LOCATION` permission in the application manifest.
 
 - [x] Privacy Policy has a dedicated HTTPS URL.
 - [x] CI blocks the `production` Play track while Terms of Service resolves to the Privacy Policy.
-- [ ] Dedicated legal-reviewed NEXA Terms of Service remains issue #592.
+- [ ] Dedicated legal-reviewed NEXUS Terms of Service remains issue #592.
 
 Closed/internal testing may continue while #592 is open. Public production remains NO-GO until the dedicated Terms document is reviewed, published, reachable without authentication, and wired in the app.
 
@@ -71,7 +71,7 @@ Closed/internal testing may continue while #592 is open. Public production remai
 Android currently exposes only the launcher intent filter. Do not add a broad `https://g88.app/*` app-link filter until all of the following exist:
 
 1. canonical public URL patterns for people/events/listings/chat-safe destinations;
-2. an allow-listed URL parser that maps those URLs to typed NEXA navigation intents;
+2. an allow-listed URL parser that maps those URLs to typed NEXUS navigation intents;
 3. `https://g88.app/.well-known/assetlinks.json` containing the Play App Signing SHA-256 certificate;
 4. cold-start, warm-start, signed-out and deleted/private-entity fallback tests.
 
