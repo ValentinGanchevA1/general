@@ -1,8 +1,8 @@
-# NEXA Notification & Re-entry Identity v2
+# NEXUS Notification & Re-entry Identity v2
 
 ## Product rule
 
-A notification is a continuation of discovery, not a detached inbox event. Tapping it must return the user to the most useful NEXA context with a deterministic, privacy-safe fallback.
+A notification is a continuation of discovery, not a detached inbox event. Tapping it must return the user to the most useful NEXUS context with a deterministic, privacy-safe fallback.
 
 ## Semantic taxonomy
 
@@ -40,11 +40,11 @@ The payload must never contain exact coordinates, an address, H3 cells, a messag
 
 Lock-screen title/body intentionally reveal less than the authenticated destination. Examples:
 
-- message: `New message` / `Open NEXA to read it.`
-- nearby alert: `A live signal is nearby` / `Open NEXA to see what's happening.`
-- trust rejection: `Trust status needs attention` / `Open NEXA Trust Center to review the next step.`
+- message: `New message` / `Open NEXUS to read it.`
+- nearby alert: `A live signal is nearby` / `Open NEXUS to see what's happening.`
+- trust rejection: `Trust status needs attention` / `Open NEXUS Trust Center to review the next step.`
 
-Sensitive detail is revealed only after NEXA opens under the authenticated session.
+Sensitive detail is revealed only after NEXUS opens under the authenticated session.
 
 ## Re-entry safety
 
@@ -60,7 +60,7 @@ Socket.IO remains the owner of foreground interaction UI. FCM foreground deliver
 
 ## Acceptance criteria
 
-1. No NEXA push exposes precise location, message text or verification reason on the lock screen or in FCM data.
+1. No NEXUS push exposes precise location, message text or verification reason on the lock screen or in FCM data.
 2. Every v2 kind has a deterministic destination and a safe fallback.
 3. Unknown/malformed payloads never crash navigation and return to the Map.
 4. A wave or accepted connection returns to the peer's map context when a public pin can be resolved.
@@ -69,4 +69,4 @@ Socket.IO remains the owner of foreground interaction UI. FCM foreground deliver
 7. Trust decisions route to Trust Center without exposing review details in the push.
 8. Cold-start and background notification handlers cannot double-navigate the same FCM message.
 9. Existing pre-v2 `type` payloads continue to route during migration.
-10. Notification preference labels use NEXA product language and preserve existing backend channel keys.
+10. Notification preference labels use NEXUS product language and preserve existing backend channel keys.
