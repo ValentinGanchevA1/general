@@ -1,6 +1,6 @@
-# NEXA Motion + Interaction Feedback v2
+# NEXUS Motion + Interaction Feedback v2
 
-NEXA feedback should feel spatial, precise, and truthful. Motion and tactile response must reinforce the state the user actually changed; they must never become decorative noise, impersonate a successful server mutation, or interrupt map interaction.
+NEXUS feedback should feel spatial, precise, and truthful. Motion and tactile response must reinforce the state the user actually changed; they must never become decorative noise, impersonate a successful server mutation, or interrupt map interaction.
 
 ## Motion timing
 
@@ -54,7 +54,7 @@ Every tactile event has an origin:
 - `realtime` — foreground ambient / Socket.IO arrival. Only rare `success` celebrations are tactile; inbound Wave/Gift/discovery events remain visual-only.
 - `system` — passive or background state change. Always tactile-silent.
 
-All origins are silent while the app is inactive or backgrounded. This prevents incoming realtime activity from vibrating after NEXA is no longer the active interaction surface.
+All origins are silent while the app is inactive or backgrounded. This prevents incoming realtime activity from vibrating after NEXUS is no longer the active interaction surface.
 
 `triggerNexaHaptic()` defaults to the conservative `realtime` origin. Direct product controls should use the `nexaHaptics` facade (`nexaHaptics.select()`, `connect()`, `commit()`, etc.), which explicitly marks the feedback as direct.
 
