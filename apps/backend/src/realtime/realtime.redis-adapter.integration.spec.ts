@@ -187,6 +187,14 @@ async function closeNode(node: RedisBackedNode): Promise<void> {
 
 describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
   jest.setTimeout(30_000);
+  const previousFlag = process.env.ROOM_REVOCATION_OUTBOX_ENABLED;
+  beforeAll(() => {
+    process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'true';
+  });
+  afterAll(() => {
+    if (previousFlag === undefined) delete process.env.ROOM_REVOCATION_OUTBOX_ENABLED;
+    else process.env.ROOM_REVOCATION_OUTBOX_ENABLED = previousFlag;
+  });
   const itPostgres = process.env.NEXA_ROOM_TEST_DATABASE_URL ? it : it.skip;
 
   it('fans out user events and remotely evicts a revoked conversation room', async () => {
