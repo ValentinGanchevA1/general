@@ -1,14 +1,15 @@
-/* NEXA Figma development plugin. Generated code.js embeds live mobile tokens. */
+/* NEXUS Figma development plugin. Generated code.js embeds live mobile tokens. */
 /*__NEXA_TOKEN_PAYLOAD__*/
 
 async function main() {
   const pages = figma.root.children;
-  let page = pages.find((candidate) => candidate.name === 'NEXA · Component Library');
+  let page = pages.find((candidate) => candidate.name === 'NEXUS · Component Library' || candidate.name === 'NEXA · Component Library');
+  if (page && page.name !== 'NEXUS · Component Library') page.name = 'NEXUS · Component Library';
   let useExistingPage = false;
   if (!page) {
     try {
       page = figma.createPage();
-      page.name = 'NEXA · Component Library';
+      page.name = 'NEXUS · Component Library';
     } catch (error) {
       // Starter team files can reach their page limit. Work inside an isolated
       // section on the currently open page instead of altering other designs.
@@ -23,11 +24,12 @@ async function main() {
   let target = page;
   if (useExistingPage) {
     let section = page.children.find((candidate) =>
-      candidate.type === 'SECTION' && candidate.name === 'NEXA · Component Library');
+      candidate.type === 'SECTION' && (candidate.name === 'NEXUS · Component Library' || candidate.name === 'NEXA · Component Library'));
+    if (section && section.name !== 'NEXUS · Component Library') section.name = 'NEXUS · Component Library';
     if (!section) {
       const rightmost = Math.max(0, ...page.children.map((node) => node.x + node.width));
       section = figma.createSection();
-      section.name = 'NEXA · Component Library';
+      section.name = 'NEXUS · Component Library';
       section.x = rightmost + 240;
       section.y = 160;
       section.resizeWithoutConstraints(2460, 4800);
@@ -59,6 +61,10 @@ async function main() {
 
   function collection(name, modes) {
     let found = collections.find((entry) => entry.name === name);
+    if (!found && name.startsWith('NEXUS /')) {
+      found = collections.find((entry) => entry.name === name.replace(/^NEXUS \/, 'NEXA /'));
+      if (found) found.name = name;
+    }
     if (!found) {
       found = figma.variables.createVariableCollection(name);
       if (!collections.some((item) => item.id === found.id)) collections.push(found);
@@ -99,19 +105,19 @@ async function main() {
   let colorGroups;
   counts.colorThemeStrategy = 'variable-modes';
   try {
-    colorGroups = [{ group: collection('NEXA / Colors', colorModes), modes: colorModes }];
+    colorGroups = [{ group: collection('NEXUS / Colors', colorModes), modes: colorModes }];
   } catch (error) {
     // Starter supports variables but not multiple modes in a collection.
     // Preserve the default Dark collection and store the other palettes in
     // dedicated single-mode collections instead of failing halfway through.
     if (!/mode|limit|plan|upgrade/i.test(String(error))) throw error;
-    const primary = collections.find((item) => item.name === 'NEXA / Colors');
+    const primary = collections.find((item) => item.name === 'NEXUS / Colors');
     if (!primary || !primary.modes.some((mode) => mode.name === 'Dark')) throw error;
     const presentModes = colorModes.filter((mode) =>
       primary.modes.some((existingMode) => existingMode.name === mode));
     colorGroups = [{ group: primary, modes: presentModes }];
     for (const mode of colorModes.filter((name) => !presentModes.includes(name))) {
-      colorGroups.push({ group: collection('NEXA / Colors / ' + mode, [mode]), modes: [mode] });
+      colorGroups.push({ group: collection('NEXUS / Colors / ' + mode, [mode]), modes: [mode] });
     }
     counts.colorThemeStrategy = 'single-mode-collections';
   }
@@ -119,7 +125,7 @@ async function main() {
     for (const { group, modes } of colorGroups) {
       const modeValues = {};
       for (const mode of modes) modeValues[mode] = NEXA_TOKENS.colors[mode][name];
-      const cssPrefix = group.name === 'NEXA / Colors'
+      const cssPrefix = group.name === 'NEXUS / Colors'
         ? 'color-' : 'color-' + modes[0].toLowerCase().replace(/\s+/g, '-') + '-';
       upsert(name, group, 'COLOR', modeValues,
         ['FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL', 'STROKE_COLOR'],
@@ -128,10 +134,10 @@ async function main() {
   }
 
   const numericSpecs = [
-    ['NEXA / Spacing', NEXA_TOKENS.spacing, ['GAP']],
-    ['NEXA / Radius', NEXA_TOKENS.radius, ['CORNER_RADIUS']],
-    ['NEXA / Typography', NEXA_TOKENS.fontSize, ['FONT_SIZE']],
-    ['NEXA / Layout', NEXA_TOKENS.layout, ['WIDTH_HEIGHT']],
+    ['NEXUS / Spacing', NEXA_TOKENS.spacing, ['GAP']],
+    ['NEXUS / Radius', NEXA_TOKENS.radius, ['CORNER_RADIUS']],
+    ['NEXUS / Typography', NEXA_TOKENS.fontSize, ['FONT_SIZE']],
+    ['NEXUS / Layout', NEXA_TOKENS.layout, ['WIDTH_HEIGHT']],
   ];
   for (const [collectionName, entries, scopes] of numericSpecs) {
     const group = collection(collectionName, ['Base']);
@@ -143,8 +149,9 @@ async function main() {
 
   const textStyles = await figma.getLocalTextStylesAsync();
   for (const [key, size] of Object.entries(NEXA_TOKENS.fontSize)) {
-    const name = 'NEXA / Text / ' + key;
-    let style = textStyles.find((candidate) => candidate.name === name);
+    const name = 'NEXUS / Text / ' + key;
+    let style = textStyles.find((candidate) => candidate.name === name || candidate.name === name.replace(/^NEXUS \/, 'NEXA /'));
+    if (style && style.name !== name) style.name = name;
     if (!style) { style = figma.createTextStyle(); style.name = name; if (!textStyles.some((item) => item.id === style.id)) textStyles.push(style); }
     style.fontName = { family: 'Inter', style: key === 'xxl' || key === 'xl' ? 'Semi Bold' : 'Regular' };
     style.fontSize = size;
@@ -154,8 +161,9 @@ async function main() {
 
   const effectStyles = await figma.getLocalEffectStylesAsync();
   for (const [mode, effect] of Object.entries(NEXA_TOKENS.elevation)) {
-    const name = 'NEXA / Elevation / ' + mode;
-    let style = effectStyles.find((candidate) => candidate.name === name);
+    const name = 'NEXUS / Elevation / ' + mode;
+    let style = effectStyles.find((candidate) => candidate.name === name || candidate.name === name.replace(/^NEXUS \/, 'NEXA /'));
+    if (style && style.name !== name) style.name = name;
     if (!style) { style = figma.createEffectStyle(); style.name = name; if (!effectStyles.some((item) => item.id === style.id)) effectStyles.push(style); }
     style.effects = [{
       type: 'DROP_SHADOW',
@@ -171,27 +179,27 @@ async function main() {
     return { type: 'SOLID', color: { r: color.r, g: color.g, b: color.b } };
   }
   function fill(node, name) {
-    const variable = variableByKey.get('NEXA / Colors/' + name);
+    const variable = variableByKey.get('NEXUS / Colors/' + name);
     if (!variable) throw new Error('Unknown color: ' + name);
     node.fills = [figma.variables.setBoundVariableForPaint(
       pigment(name), 'color', variable,
     )];
   }
   function stroke(node, name, width) {
-    const variable = variableByKey.get('NEXA / Colors/' + name);
+    const variable = variableByKey.get('NEXUS / Colors/' + name);
     node.strokes = [figma.variables.setBoundVariableForPaint(
       pigment(name), 'color', variable,
     )];
     node.strokeWeight = width;
   }
   function space(node, field, key) {
-    const variable = variableByKey.get('NEXA / Spacing/' + key);
+    const variable = variableByKey.get('NEXUS / Spacing/' + key);
     if (!variable) throw new Error('Missing spacing token: ' + key);
     node[field] = NEXA_TOKENS.spacing[key];
     node.setBoundVariable(field, variable);
   }
   function bindRadius(node, name) {
-    const variable = variableByKey.get('NEXA / Radius/' + name);
+    const variable = variableByKey.get('NEXUS / Radius/' + name);
     if (variable) node.setBoundVariable('cornerRadius', variable);
   }
   function label(parent, value, fontSize, colorName, bold, x, y) {
@@ -201,7 +209,7 @@ async function main() {
     item.fontSize = fontSize;
     const sizeToken = Object.entries(NEXA_TOKENS.fontSize).find((entry) => entry[1] === fontSize);
     if (sizeToken) {
-      const variable = variableByKey.get('NEXA / Typography/' + sizeToken[0]);
+      const variable = variableByKey.get('NEXUS / Typography/' + sizeToken[0]);
       if (variable) item.setBoundVariable('fontSize', variable);
     }
     item.characters = value;
@@ -253,7 +261,7 @@ async function main() {
       .map((child) => child.name).sort();
     if (set.children.length !== expected.length || actual.length !== expected.length ||
         expected.some((name, index) => name !== actual[index])) {
-      throw new Error('NEXA component family "' + set.name + '" variant mismatch. ' +
+      throw new Error('NEXUS component family "' + set.name + '" variant mismatch. ' +
         'Expected [' + expected.join(', ') + '], found [' + actual.join(', ') + ']. ' +
         'Inspect the existing Figma component set before retrying; no automatic overwrite.');
     }
@@ -262,7 +270,7 @@ async function main() {
     const matches = target.children.filter((node) =>
       node.type === 'COMPONENT_SET' && node.name === name);
     if (matches.length > 1) {
-      throw new Error('Duplicate NEXA component family "' + name +
+      throw new Error('Duplicate NEXUS component family "' + name +
         '" found. Resolve duplicate component sets manually before retrying.');
     }
     const found = matches[0];
@@ -482,8 +490,8 @@ async function main() {
 }
 
 main().then((summary) => {
-  figma.closePlugin('NEXA design library synced: ' + JSON.stringify(summary));
+  figma.closePlugin('NEXUS design library synced: ' + JSON.stringify(summary));
 }).catch((error) => {
   console.error(error);
-  figma.closePlugin('NEXA library failed: ' + String(error));
+  figma.closePlugin('NEXUS library failed: ' + String(error));
 });
