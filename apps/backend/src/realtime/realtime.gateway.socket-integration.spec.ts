@@ -400,6 +400,39 @@ describe('RealtimeGateway real Socket.IO revocation integration', () => {
     }
   });
 
+  it('prunes a previously joined stale socket on denied rejoin after revocation', async () => {
+    blocked = false;
+    getRecipientIds.mockImplementation(async (): Promise<string[]> =>
+      blocked ? [] : [sharerId, peerId],
+    );
+    const peer = new SocketIoWireClient(socketUrl);
+    clients.push(peer);
+    await peer.connect(peerId);
+    const room = `convo:${conversationId}`;
+    // Earlier integration cases deliberately leave stale sockets in the room.
+    gateway.server.in(`user:${peerId}`).socketsLeave(room);
+
+    try {
+      await expect(
+        peer.emitWithAck<AckResult<{ joined: true }>>('conversation:join', { conversationId }),
+      ).resolves.toEqual({ ok: true, data: { joined: true } });
+      await expect(roomUserIds(gateway, room)).resolves.toContain(peerId);
+
+      // Simulate a failed remote eviction: DB authorization changes, but the
+      // already-connected socket stays subscribed until it tries to rejoin.
+      blocked = true;
+      await expect(
+        peer.emitWithAck<AckResult<{ joined: true }>>('conversation:join', { conversationId }),
+      ).resolves.toEqual({ ok: false, code: 'chat.forbidden', message: 'Not a participant' });
+
+      await expect(roomUserIds(gateway, room)).resolves.not.toContain(peerId);
+      const stillConnected = await gateway.server.in(`user:${peerId}`).fetchSockets();
+      expect(stillConnected.some((socket) => socket.id.length > 0)).toBe(true);
+    } finally {
+      blocked = false;
+    }
+  });
+
   it('cleans up room membership if the post-join authorization query fails', async () => {
     blocked = false;
     getRecipientIds.mockReset()
