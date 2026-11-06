@@ -361,8 +361,6 @@ export function WorldFusionScreen(): React.JSX.Element {
             Preview only: no live map data, new permissions, automatic RSVP, or hidden profiling.
           </Text>
         </View>
-      </ScrollView>
-      <View style={styles.footer}>
         {ready && unchanged && secondary !== null && preview.suggestedLens !== null ? (
           <View style={{ gap: 6 }}>
             <TouchableOpacity
@@ -397,6 +395,8 @@ export function WorldFusionScreen(): React.JSX.Element {
             ) : null}
           </View>
         ) : null}
+      </ScrollView>
+      <View style={styles.footer}>
         {fusion.error != null ? (
           <Text accessibilityRole="alert" style={styles.error} testID="fusion-error">
             {fusion.error}
