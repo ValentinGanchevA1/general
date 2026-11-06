@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 
 import { ChatRealtimeAccessService } from '../modules/chat/chat-realtime-access.service';
 import { RealtimeEmitterService } from './realtime-emitter.service';
+import { roomRevocationOutboxEnabled } from './room-revocation.config';
 
 interface ClaimedRevocation {
   id: string;
@@ -30,7 +31,7 @@ export class RoomRevocationSweepService implements OnModuleInit, OnModuleDestroy
   ) {}
 
   onModuleInit(): void {
-    if (process.env.NODE_ENV === 'test') return;
+    if (process.env.NODE_ENV === 'test' || !roomRevocationOutboxEnabled()) return;
     this.timer = setInterval(() => { void this.runOnce(); }, 10_000);
     this.timer.unref?.();
     void this.runOnce();
