@@ -168,22 +168,18 @@ describe('Portal Entry EventDetail integration', () => {
 
   it('revalidates event access on app foreground without auto-RSVPing', () => {
     const { AppState } = jest.requireActual('react-native') as typeof import('react-native');
-    const existing = AppState.addEventListener;
-    let foregroundHandler: ((status: 'active' | 'background' | 'inactive') => void) | null = null;
-    const spy = jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, handler) => {
-      foregroundHandler = handler as (status: 'active' | 'background' | 'inactive') => void;
-      return { remove: jest.fn() };
-    });
+    const spy = jest.spyOn(AppState, 'addEventListener');
     try {
       const { screen, refresh } = setup();
-      expect(foregroundHandler).not.toBeNull();
-      act(() => foregroundHandler?.('active'));
+      const changeCall = spy.mock.calls.find(([type]) => type === 'change');
+      expect(changeCall).toBeDefined();
+      const listener = changeCall?.[1] as ((state: 'active') => void) | undefined;
+      act(() => listener?.('active'));
       expect(refresh).toHaveBeenCalledTimes(1);
       expect(rsvpToEvent).not.toHaveBeenCalled();
       screen.unmount();
     } finally {
       spy.mockRestore();
-      void existing;
     }
   });
 
