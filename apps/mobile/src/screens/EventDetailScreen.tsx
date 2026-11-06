@@ -125,7 +125,9 @@ export function EventDetailScreen(): React.JSX.Element {
     }
   }, [eventId, pulseShareBusy, pulseShared]);
 
-  if (!event) {
+  // Portal access must fail closed. If a detail refresh denies access or
+  // cannot revalidate it, never keep rendering previously cached event data.
+  if (!event || (portalEntry && error != null)) {
     const unavailable = resolvePortalLoadPresentation(error);
     return (
       <View style={styles.container}>
@@ -170,21 +172,6 @@ export function EventDetailScreen(): React.JSX.Element {
       <Text style={styles.title}>{event.title}</Text>
       {portalState != null ? (
         <PortalEntryBanner state={portalState} currentRsvp={event.myRsvp} />
-      ) : null}
-      {portalEntry && error != null ? (
-        <View style={styles.portalStaleNotice}>
-          <Text style={styles.portalStaleText}>
-            Event details could not be refreshed. RSVP changes are temporarily unavailable.
-          </Text>
-          <TouchableOpacity
-            onPress={refreshPortal}
-            accessibilityRole="button"
-            accessibilityLabel="Retry loading Portal"
-            style={styles.portalStaleRetry}
-          >
-            <Text style={styles.portalStaleRetryText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
       ) : null}
       <View style={styles.metaRow}><Icon name="clock-outline" size={16} color={colors.primary} /><Text style={styles.metaText}>{formatEventWhen(event.startsAt, event.endsAt)}</Text></View>
       <View style={styles.metaRow}><Icon name="account-group" size={16} color={colors.primary} /><Text style={styles.metaText}>{event.attendeeCount} going{event.capacity != null ? ` · ${event.capacity} cap` : ''}</Text></View>
@@ -404,10 +391,6 @@ function createStyles(colors: ThemeColors) {
     rsvpTextActive: { color: colors.onPrimary },
     fullNote: { color: colors.warning, fontSize: 13, paddingHorizontal: 20, marginTop: 8 },
     portalRsvpError: { color: colors.danger, fontSize: 13, lineHeight: 19, paddingHorizontal: 20, marginTop: 10 },
-    portalStaleNotice: { marginHorizontal: 20, marginTop: 10, borderWidth: 1, borderColor: colors.warning, borderRadius: 12, padding: 12, gap: 8 },
-    portalStaleText: { color: colors.textSecondary, fontSize: 13, lineHeight: 20 },
-    portalStaleRetry: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: 12 },
-    portalStaleRetryText: { color: colors.actionPrimary, fontSize: 14, fontWeight: '700' },
     pulseShareCard: { marginHorizontal: 20, marginTop: 14, padding: 14, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     pulseShareHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     pulseShareTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
