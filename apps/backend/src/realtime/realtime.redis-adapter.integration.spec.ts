@@ -532,10 +532,12 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
         [failedConversationId],
       );
       expect(pending?.completed_at).toBeNull();
-      const worker = new RoomRevocationSweepService(
-        db, app.get(RealtimeEmitterService), recipients,
-      );
+      const emitter = app.get(RealtimeEmitterService);
+      const retryDispatch = jest.spyOn(emitter, 'evictAndVerify');
+      const worker = new RoomRevocationSweepService(db, emitter, recipients);
       await worker.runOnce();
+      expect(retryDispatch).toHaveBeenCalledWith(userId, failedRoom);
+      retryDispatch.mockRestore();
       const [claim] = await db.query<Array<{
         attempts: number;
         completed_at: Date | null;
@@ -546,7 +548,9 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
       );
       // A missing claim is a worker/SQL error, not a flaky Redis eviction.
       expect(claim?.attempts).toBe(1);
-      expect(claim?.completed_at ?? claim?.leased_until).not.toBeUndefined();
+      // A processed outbox item may only complete once adapter inspection has
+      // observed no revoked users in the room on currently reachable nodes.
+      expect(claim?.completed_at).toBeInstanceOf(Date);
       await waitFor(() => revokedSockets.every((socket) => !socket.rooms.has(failedRoom)));
       const [completed] = await db.query<Array<{ completed_at: Date | null }>>(
         'SELECT completed_at FROM realtime_room_revocations WHERE id = $1',
