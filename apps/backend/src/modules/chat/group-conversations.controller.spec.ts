@@ -52,6 +52,16 @@ describe('GroupConversationsController realtime membership revocation', () => {
     expect(leaveRoomForUsers).not.toHaveBeenCalled();
   });
 
+  it('returns success after commit if realtime eviction dispatch throws', async () => {
+    leaveRoomForUsers.mockImplementationOnce(() => {
+      throw new Error('Redis adapter dispatch unavailable');
+    });
+    await expect(controller.removeMember(conversationId, memberId, actorId))
+      .resolves.toBeUndefined();
+    expect(removeMember).toHaveBeenCalledTimes(1);
+    expect(leaveRoomForUsers).toHaveBeenCalledTimes(1);
+  });
+
   it('waits for transaction completion before evicting the former member', async () => {
     let commit: (() => void) | undefined;
     removeMember.mockImplementationOnce(() => new Promise<void>((resolve) => {
