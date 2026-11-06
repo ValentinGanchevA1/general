@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 
 /**
- * Horizontal NEXA lockup based on the approved magenta-to-violet artwork.
+ * Horizontal NEXUS lockup based on the approved magenta-to-violet artwork.
  * The eye is built from open, rounded arcs and a luminous iris rather than
  * a closed diamond; layered vector strokes give it a native-safe soft glow.
  */
@@ -18,7 +18,7 @@ export function NexaWordmark(): React.JSX.Element {
   const lowerRight = 'M326 64C337 61 348 56 359 47';
 
   return (
-    <View style={styles.root} accessible accessibilityRole="image" accessibilityLabel="NEXA">
+    <View style={styles.root} accessible accessibilityRole="image" accessibilityLabel="NEXUS">
       <Svg width="100%" height="100%" viewBox="0 0 378 72" accessible={false}>
         <Defs>
           <LinearGradient id={lettersId} x1="0%" y1="0%" x2="100%" y2="0%">
@@ -39,11 +39,11 @@ export function NexaWordmark(): React.JSX.Element {
           </RadialGradient>
         </Defs>
 
-        {/* Heavy geometric letters with the open counter in the A. */}
+        {/* Heavy geometric letters with the five-letter NEXUS wordmark. */}
         <Path
           fill={`url(#${lettersId})`}
           fillRule="evenodd"
-          d="M0 60V10H13L41 42V10H54V60H41L13 28V60Z M65 10H117V22H78V30H113V40H78V48H117V60H65Z M125 10H143L160 28L178 10H196L171 35L196 60H178L160 42L143 60H125L150 35Z M197 60L226 10H244L273 60H258L252 49H218L212 60Z M225 38H246L235.5 20Z"
+          d="M0 60V10H11L34 38V10H45V60H34L11 32V60Z M53 10H96V21H65V30H92V40H65V49H96V60H53Z M103 10H118L135 28L152 10H167L144 35L167 60H152L135 42L118 60H103L126 35Z M174 10H187V42C187 50 190 51 200 51C209 51 212 48 212 42V10H225V42C225 57 216 62 200 62C184 62 174 57 174 42Z M248 10H280V22H248C244 22 243 23 243 26C243 29 245 30 249 30H266C279 30 283 36 283 45C283 54 277 60 264 60H233V48H264C269 48 270 46 270 43C270 41 268 40 264 40H249C235 40 231 34 231 26C231 16 237 10 248 10Z"
         />
 
         {/* The two lid halves remain open at the optical center. */}
