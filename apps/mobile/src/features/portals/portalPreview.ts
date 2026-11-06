@@ -58,3 +58,12 @@ export function resolvePortalPreview(
     capacityLabel: capacity == null ? null : `${capacity} capacity`,
   };
 }
+
+/**
+ * The existing 36% map sheet can hide the Portal's primary action.
+ * Reuse its 62% snap only for DEV-enabled events; other entities and
+ * production continue to use the default compact 36% state.
+ */
+export function portalSheetInitialIndex(kind: string | null): 0 | 1 {
+  return PORTAL_EVENT_PREVIEW_ENABLED && kind === 'event' ? 1 : 0;
+}
