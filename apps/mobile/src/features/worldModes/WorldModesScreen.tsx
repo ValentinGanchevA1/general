@@ -169,6 +169,17 @@ export function WorldModesScreen(): React.JSX.Element {
             <Text key={highlight} style={styles.bullet}>✦  {highlight}</Text>
           ))}
         </View>
+        <TouchableOpacity
+          testID="world-fusion-open"
+          accessibilityRole="button"
+          accessibilityLabel="Open World Fusion"
+          accessibilityHint="Preview and save a second World for discovery without changing your map."
+          onPress={() => navigation.navigate('WorldFusion')}
+          disabled={!userId || !hydrated || saving}
+          style={[styles.filter, { marginTop: spacing.xl, alignSelf: 'stretch' }]}
+        >
+          <Text style={styles.filterLabel}>Explore World Fusion · Combine two Worlds</Text>
+        </TouchableOpacity>
         <Text style={styles.hint}>This mode changes only your saved World Mode preference. Theme and Premium controls remain independent.</Text>
       </ScrollView>
       <View style={styles.footer}>
