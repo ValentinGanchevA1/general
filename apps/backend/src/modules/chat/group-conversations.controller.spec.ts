@@ -69,6 +69,19 @@ describe('GroupConversationsController realtime membership revocation', () => {
     expect(leaveRoomForUsers).toHaveBeenCalledTimes(1);
   });
 
+  it('does not silently swallow an adapter failure before outbox activation', async () => {
+    process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'false';
+    leaveRoomForUsers.mockImplementationOnce(() => {
+      throw new Error('Redis adapter unavailable');
+    });
+    try {
+      await expect(controller.removeMember(conversationId, memberId, actorId))
+        .rejects.toThrow('Redis adapter unavailable');
+    } finally {
+      process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'true';
+    }
+  });
+
   it('waits for transaction completion before evicting the former member', async () => {
     let commit: (() => void) | undefined;
     removeMember.mockImplementationOnce(() => new Promise<void>((resolve) => {
