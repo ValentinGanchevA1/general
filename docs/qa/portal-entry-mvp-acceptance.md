@@ -19,6 +19,9 @@ still uses its original presentation.
 | 401 | Sign in required; no private metadata |
 | Offline or server timeout | Generic retry state; no stale detail rendered or mutation attempted |
 | Failed RSVP / capacity race | Safe error text; current confirmed RSVP unchanged; refresh available |
+| HTTP 409 `event.ended` / `event.full` | Distinct messages; re-fetch authoritative event details and status |
+| RSVP returns 401/403/404 after initial detail load | Cached title, organizer, and attendee metadata disappear immediately |
+| RSVP while event detail is refetching | Action disabled until the authoritative refresh completes |
 | Explicit Share to Pulse | Never triggered by Enter Portal or RSVP; remains separate opt-in |
 | Legacy EventDetail entry | No Portal banner or Portal-only restrictions |
 | Screen reader | Portal status is a header; RSVP buttons announce selected/disabled |
