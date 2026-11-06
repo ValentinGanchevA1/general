@@ -88,7 +88,7 @@ export function EventDetailScreen(): React.JSX.Element {
 
   const onRsvp = useCallback(async (status: RsvpStatus) => {
     if (rsvpBusy) return;
-    if (portalEntry && (event == null || error != null || !canSubmitPortalRsvp(event, status, Date.now()))) {
+    if (portalEntry && (loading || event == null || error != null || !canSubmitPortalRsvp(event, status, Date.now()))) {
       setRsvpError('RSVP unavailable. Refresh to check the latest event details.');
       return;
     }
@@ -109,7 +109,7 @@ export function EventDetailScreen(): React.JSX.Element {
     } finally {
       setRsvpBusy(false);
     }
-  }, [rsvpBusy, portalEntry, event, error, eventId, refresh, refreshPortal]);
+  }, [rsvpBusy, portalEntry, loading, event, error, eventId, refresh, refreshPortal]);
 
   const onShareToPulse = useCallback(async (): Promise<void> => {
     if (pulseShareBusy || pulseShared) return;
@@ -187,7 +187,7 @@ export function EventDetailScreen(): React.JSX.Element {
           const disabled = rsvpBusy
             || (status === 'going' && full && !active)
             || (portalState != null && (
-              error != null || !canSubmitPortalRsvp(event, status, portalAsOf)
+              loading || error != null || !canSubmitPortalRsvp(event, status, portalAsOf)
             ));
           const meta = RSVP_META[status];
           const label = resolveNexaRsvpActionLabel(status, active);
