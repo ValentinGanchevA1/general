@@ -1,11 +1,11 @@
-# NEXA — Google Play first release gate (2026-11-05)
+# NEXUS — Google Play first release gate (2026-11-05)
 
 **Status: PREPARING / NOT READY TO SUBMIT.** This is an evidence-driven checklist, not a declaration that a signed AAB, Play listing, or on-device sign-off exists. Owner-side Play Console screenshots show a newly registered personal developer account **g88**: trader declaration and physical Android device verification complete; identity verification pending; contact-phone verification blocked until identity approval; Create app disabled.
 
 ## Verified repository baseline
 
 - Repo: `ValentinGanchevA1/general`, default `master`. Audit snapshot: `0d792e9c1b595fd161746586293a4a51263406a3`. Recheck HEAD and open PRs before freezing the release candidate.
-- Product display: **NEXA**; Android app ID / namespace: **`com.g88`** (retain intentionally); `versionName=1.0.0`; `versionCode` derived from GitHub Actions run number.
+- Product display: **NEXUS**; Android app ID / namespace: **`com.g88`** (retain intentionally); `versionName=1.0.0`; `versionCode` derived from GitHub Actions run number.
 - React Native 0.83.0; `minSdk=24`, `compileSdk=36`, `targetSdk=36`.
 - Signed AAB workflow: `.github/workflows/android-release.yml` → `g88-release-aab` → `apps/mobile/android/app/build/outputs/bundle/release/app-release.aab`.
 - Canonical current Android navigation (2026-11-04): **Map / Experiences / Opportunities / Connections / Identity** (`docs/IA_NAVIGATION.md`). Older RC3 Map/Discover/Pulse/Connections/You screenshots are NOT a valid substitute.
@@ -21,7 +21,7 @@
 - [x] Android device verification complete via Huawei Nova 11 (confirmed by Play Console disappearance of task).
 - [ ] Google identity verification APPROVED (not merely documents submitted).
 - [ ] Contact phone number verified after identity approval.
-- [ ] **Create app** enabled; create **NEXA**, type **App**, default language **en-US**, **Free** (initial plan), category **Social**.
+- [ ] **Create app** enabled; create **NEXUS**, type **App**, default language **en-US**, **Free** (initial plan), category **Social**.
 - [ ] Configure App access/reviewer test accounts without giving the reviewer a personal admin account.
 - [ ] Enter factual content rating (UGC, chat and dating/social features), intended 18+ audience, permissions, ads/financial-feature declarations based on the exact enabled build.
 - [ ] Play App Signing enrolled; record **app-signing SHA-1/SHA-256** and **upload-key SHA-1/SHA-256**.
@@ -39,8 +39,8 @@
 
 ## 3. Store listing / screenshots
 
-- [ ] Use the NEXA short/full copy in `docs/play-store-listing.md` after feature-by-feature review.
-- [ ] Provide actual **512x512 PNG** store icon based on current NEXA native launcher eye, and **1024x500 JPEG/24-bit PNG** feature graphic (no alpha).
+- [ ] Use the NEXUS short/full copy in `docs/play-store-listing.md` after feature-by-feature review.
+- [ ] Provide actual **512x512 PNG** store icon based on current NEXUS native launcher eye, and **1024x500 JPEG/24-bit PNG** feature graphic (no alpha).
 - [ ] Capture at least **2 genuine Android phone screenshots** from the **same release candidate**; target 5–6 high-quality portrait screens. See `docs/play-assets-capture-v3.md`. No generated or obsolete app UI.
 - [ ] Remove test names, private conversations, exact GPS, phone/email, ID images, debug banners, and credentials from captures.
 - [ ] Verify displayed tab labels are Map / Experiences / Opportunities / Connections / Identity, not RC3's old five-tab names.
