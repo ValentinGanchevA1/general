@@ -41,7 +41,7 @@ describe('PortalEventPreview', () => {
   it('does not invent distance, host, or confirmed live state when metadata is missing', () => {
     const screen = render(
       <PortalEventPreview
-        meta={{ ...meta, startsAt: '2020-01-01T18:00:00.000Z', capacity: null, hostDisplayName: undefined }}
+        meta={{ ...meta, startsAt: '2020-01-01T18:00:00.000Z', capacity: null, hostDisplayName: '' }}
         distanceLabel={null}
         onEnter={jest.fn()}
       />,
