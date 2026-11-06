@@ -11,6 +11,8 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { nexaSpatialLensStore } from '@/features/map/nexaSpatialLens.store';
+import { nexaMapFilterIntentStore } from '@/features/map/nexaMapFilterIntent.store';
+import { navigationRef } from '@/navigation/navigationRef';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { useAppTheme, type ThemeColors } from '@/theme';
 import { worldModePalettes } from '@/theme/worldModePalettes';
@@ -136,6 +138,10 @@ export function WorldFusionScreen(): React.JSX.Element {
     nexaSpatialLensStore.subscribe,
     nexaSpatialLensStore.getSnapshot,
   );
+  const mapIntent = useSyncExternalStore(
+    nexaMapFilterIntentStore.subscribe,
+    nexaMapFilterIntentStore.getSnapshot,
+  );
 
   // Keep an unsaved preview locally, scoped to its owner. A different account
   // can never see a previous account's unconfirmed selection.
@@ -163,9 +169,9 @@ export function WorldFusionScreen(): React.JSX.Element {
   const preference = createWorldFusionPreference(appearanceWorld, candidate);
   const preview = resolveWorldFusionPreview(preference, {
     currentLens,
-    // We do not yet have a trustworthy "manual filter active" selector here.
-    // Fail conservatively: never suggest applying a lens automatically.
-    hasExplicitMapFilters: true,
+    // Manual filters are summarized by the existing MapScreen without
+    // exposing location or search contents. Unknown = fail closed.
+    hasExplicitMapFilters: !mapIntent.known || mapIntent.hasExplicitFilters,
   });
   const appearancePalette = preview.appearance;
   const secondary = preference.discoveryWorld;
@@ -177,6 +183,8 @@ export function WorldFusionScreen(): React.JSX.Element {
   const saving = fusion.saving;
   const canApply = ready && secondary !== null && !unchanged && !saving;
   const canRemove = ready && fusion.discoveryWorld !== null && !saving;
+  const canOpenLens = ready && !saving && unchanged && secondary !== null &&
+    preview.canOfferLensChange && navigationRef.isReady();
 
   const selectWorld = (id: WorldModeId): void => {
     if (!ready || saving) return;
@@ -200,6 +208,31 @@ export function WorldFusionScreen(): React.JSX.Element {
       setDraft({ ownerId: userId, discoveryWorld: null });
     } catch {
       // Do not claim removal when local persistence failed.
+    }
+  };
+
+  const openSuggestedLens = (): void => {
+    // Recheck current auth, saved selection, manual filters, and current lens
+    // synchronously when pressed; a preview alone never changes the map.
+    if (!ready || fusion.saving || secondary === null ||
+        secondary !== fusion.discoveryWorld || !navigationRef.isReady()) return;
+    const freshIntent = nexaMapFilterIntentStore.getSnapshot();
+    const next = resolveWorldFusionPreview(
+      createWorldFusionPreference(primary.selectedId, fusion.discoveryWorld),
+      {
+        currentLens: nexaSpatialLensStore.getSnapshot(),
+        hasExplicitMapFilters: !freshIntent.known || freshIntent.hasExplicitFilters,
+      },
+    );
+    if (!next.canOfferLensChange || next.suggestedLens == null) return;
+    const originalLens = nexaSpatialLensStore.getSnapshot();
+    try {
+      nexaSpatialLensStore.set(next.suggestedLens);
+      // Navigate into the existing Main/Map instance; no new map renderer.
+      navigationRef.navigate('Main', { screen: 'Map' });
+    } catch {
+      nexaSpatialLensStore.set(originalLens);
+      // No forced map state change if the navigation could not complete.
     }
   };
 
@@ -328,6 +361,40 @@ export function WorldFusionScreen(): React.JSX.Element {
             Preview only: no live map data, new permissions, automatic RSVP, or hidden profiling.
           </Text>
         </View>
+        {ready && unchanged && secondary !== null && preview.suggestedLens !== null ? (
+          <View style={{ gap: 6 }}>
+            <TouchableOpacity
+              testID="fusion-open-lens"
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${preview.suggestedLens === 'experiences'
+                ? 'Experiences' : 'Opportunities'} on the existing map`}
+              accessibilityHint="Explicitly switches the map lens. Does not change location permissions or saved filters."
+              accessibilityState={{ disabled: !canOpenLens }}
+              disabled={!canOpenLens}
+              onPress={openSuggestedLens}
+              style={[styles.secondaryButton, { opacity: canOpenLens ? 1 : 0.5 }]}
+            >
+              <Text style={styles.secondaryText}>
+                {preview.suggestedLens === 'experiences'
+                  ? 'Open Experiences lens'
+                  : 'Open Opportunities lens'}
+              </Text>
+            </TouchableOpacity>
+            {!mapIntent.known ? (
+              <Text testID="fusion-lens-blocked" style={styles.hint}>
+                Open the Map once to verify your manual filter settings before switching lenses.
+              </Text>
+            ) : mapIntent.hasExplicitFilters ? (
+              <Text testID="fusion-lens-blocked" style={styles.hint}>
+                Manual map filters are active. Review or clear them on Map before using this shortcut.
+              </Text>
+            ) : currentLens !== 'map' ? (
+              <Text testID="fusion-lens-blocked" style={styles.hint}>
+                Your selected map lens has priority. Return to Map first to use this shortcut.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
       </ScrollView>
       <View style={styles.footer}>
         {fusion.error != null ? (
