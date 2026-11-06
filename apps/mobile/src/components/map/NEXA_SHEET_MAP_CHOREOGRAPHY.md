@@ -1,4 +1,4 @@
-# NEXA Sheet ↔ Map Choreography v2
+# NEXUS Sheet ↔ Map Choreography v2
 
 The map remains the primary surface while a spatial entity sheet is open. The sheet must feel attached to the selected entity rather than like an unrelated modal.
 
