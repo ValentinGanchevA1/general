@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -118,7 +118,10 @@ export function PortalEventPreview({
 }: PortalEventPreviewProps): React.JSX.Element {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const preview = resolvePortalPreview(meta, Date.now());
+  // Capture the preview's reference time once, not as an impure call in render.
+  // The sheet is keyed by entity ID, so a newly selected event gets a new clock.
+  const [openedAtMs] = useState(Date.now);
+  const preview = resolvePortalPreview(meta, openedAtMs);
   const validStart = Number.isFinite(Date.parse(meta.startsAt));
   const when = validStart ? formatEventWhen(meta.startsAt, null) : 'Schedule unavailable';
 
