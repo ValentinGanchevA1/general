@@ -1,4 +1,4 @@
-# NEXA — current status
+# NEXUS — current status
 
 > **Synced:** 2026-10-27  
 > **Verified source baseline:** `master` at `303439b9cb3e46db5aefa29ff18b28f5a0c53606` (#827). Merged code is not evidence of deployed backend state or physical-device sign-off.
@@ -10,11 +10,11 @@
 
 ## 1. Product state
 
-**NEXA is a map-first, identity-verified, real-time social app.**
+**NEXUS is a map-first, identity-verified, real-time social app.**
 
 Canonical primary surfaces are **Map / Discover / Pulse / Connections / You**. Nearby people, events and listings lead into lightweight interactions, chat, friendship, attendance, stories and local trade. Launch-market context remains **Varna, BG**.
 
-Public product identity is **NEXA**. Compatibility identifiers such as `@g88/*`, Android package/application ID `com.g88`, storage keys and legacy infrastructure hostnames remain intentionally unchanged unless a separate compatibility migration is approved.
+Public product identity is **NEXUS**. Compatibility identifiers such as `@g88/*`, Android package/application ID `com.g88`, storage keys and legacy infrastructure hostnames remain intentionally unchanged unless a separate compatibility migration is approved.
 
 ---
 
@@ -26,13 +26,13 @@ Current high-signal slices:
 
 | Area | State | Current contract |
 |---|---|---|
-| **Mobile IA / identity** | ✅ | NEXA visual/product identity; Map / Discover / Pulse / Connections / You |
+| **Mobile IA / identity** | ✅ | NEXUS visual/product identity; Map / Discover / Pulse / Connections / You |
 | **Map interaction state** | ✅ | XState pin lifecycle is canonical; legacy parallel preview/reducer paths removed (#774–#777) |
 | **Discovery realtime** | ✅ | Distributed viewer-safe mutations, bounded resolver concurrency, movement/expiry lifecycle hardening; deterministic concurrency regression coverage (#783) |
 | **Error presentation** | ✅ | User-facing mobile transport/runtime errors route through the canonical sanitizer; raw transport/backend implementation strings must not reach UI (#704) |
 | **Conversation refresh diagnostics** | ✅ | Refresh failures collapse into a fixed privacy-safe class/status shape; no URL, token, conversation/user id, response body or free-text diagnostic is retained (#805) |
 | **Marketplace privacy** | ✅ | Bilateral block isolation covers discovery and direct listing/offer access paths |
-| **Admin** | ✅ | Vite verification queue; active browser-facing identity is `NEXA Admin` (#781) |
+| **Admin** | ✅ | Vite verification queue; active browser-facing identity is `NEXUS Admin` (#781) |
 | **Web v1 foundation** | ✅ code foundation | Browser Map / Discover / Pulse / Connections / You, hardened HttpOnly refresh flow, same-origin edge, realtime chat and Chromium browser E2E |
 | **Product analytics** | ✅ canonical pipeline | Backend/Postgres allow-listed event persistence is canonical; optional PostHog mirror is backend-only and disabled until explicitly configured/verified (#804) |
 | **Migrations** | ✅ source changes | Recovery 0051, reviews 0052 and occupation 0053 merged; verify deployed schema separately |
@@ -90,7 +90,7 @@ Merged/CI-proven:
 - Android release config injection/validation is wired (#780).
 - iOS React Native/CocoaPods integration, unsigned Release simulator compile and app launch are green after targeted Firebase module headers + pinned CocoaPods/Ruby + bounded pnpm-path handling (#788–#793).
 - Exact build-time opt-in `NEXA_MAP_RENDERER=maplibre` is fail-closed (#794).
-- CI exercises the native MapLibre view, NEXA discovery renderer and `NexaMapRuntimeSurface` routing path (#795–#798).
+- CI exercises the native MapLibre view, NEXUS discovery renderer and `NexaMapRuntimeSurface` routing path (#795–#798).
 - Manual real-provider canary workflows exist for iOS and Android (#799–#800); the current iOS canary runtime path is hardened for simulator selection, readiness timeout and diagnostics.
 - Backend remote renderer policy + mobile fail-closed enforcement are merged (#801–#802).
 - A read-only live policy verifier exists for the documented `false → true → false` operational proof (#803).
@@ -110,7 +110,7 @@ The existing discovery/H3/privacy/realtime contracts are independent of renderer
 
 ## 4. Browser/web state
 
-The first repo-backed NEXA browser foundation is merged (#578). Browser-specific regression evidence includes:
+The first repo-backed NEXUS browser foundation is merged (#578). Browser-specific regression evidence includes:
 
 - multi-tab HttpOnly refresh/Web Locks/BroadcastChannel behavior (#594);
 - Socket.IO token rotation, reconnect and active-room rejoin (#595);
@@ -134,7 +134,7 @@ Do not treat an old PR-scoped preview as authoritative production evidence.
 
 | Gate | State | Why it remains open |
 |---|---|---|
-| **#592 — dedicated NEXA Terms of Service** | 🔴 P1 | Requires legal-reviewed Terms content and a dedicated public `/terms` document. Do not invent final legal language. |
+| **#592 — dedicated NEXUS Terms of Service** | 🔴 P1 | Requires legal-reviewed Terms content and a dedicated public `/terms` document. Do not invent final legal language. |
 | **#580 — physical Android release audit** | 🟡 external/device | Requires RC3 installation and focused QA on a real Android device, including Friends/429, privacy, accessibility and visual/interaction checks. |
 | **#669 — launch calibration** | 🟡 external/device | Requires physical-device recordings + telemetry before changing launch timing constants. |
 | **#616 — Play Store visual set** | 🟡 sequenced | Final screenshots follow physical-device sign-off; live UI evidence must come from an approved audited RC/device capture. |
@@ -198,7 +198,7 @@ React Native mobile ── REST + Socket.IO ──► NestJS monolith
 
 Browser web ── same-origin edge ──► /api/v1 + /socket.io ──► same backend contracts
 
-Vite NEXA Admin ── JWT/AdminGuard ──► verification/admin API
+Vite NEXUS Admin ── JWT/AdminGuard ──► verification/admin API
 ```
 
 Shared DTO/socket/geo contracts live in `packages/shared` (`@g88/shared` remains the compatibility package namespace).
