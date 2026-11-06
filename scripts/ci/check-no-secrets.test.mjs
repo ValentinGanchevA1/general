@@ -61,6 +61,7 @@ test('detects a fake GitHub token in TypeScript', () => {
   const result = runGuard({ 'src/config.ts': `export const token = '${dummyToken}';\n` });
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /Possible secrets in tracked content/);
+  assert.ok(!result.stdout.includes(dummyToken), 'scanned secret must not be logged');
 });
 
 test('scans Markdown documentation, not only code', () => {
