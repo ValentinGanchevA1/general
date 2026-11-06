@@ -200,6 +200,7 @@ export function EventDetailScreen(): React.JSX.Element {
               accessibilityRole="button"
               accessibilityLabel={label}
               accessibilityState={{ selected: active, disabled }}
+              testID={`event-rsvp-${status}`}
             >
               <Icon name={meta.icon} size={18} color={active ? colors.onPrimary : colors.textSecondary} />
               <Text style={[styles.rsvpText, active && styles.rsvpTextActive]}>{label}</Text>
