@@ -1,12 +1,12 @@
-# NEXA web preview v1
+# NEXUS web preview v1
 
-Browser validation slice for the NEXA web/desktop client. `web/` is now a real pnpm workspace importer so browser runtime dependencies are explicit, pinned through the canonical lockfile and installed by the normal frozen workspace install.
+Browser validation slice for the NEXUS web/desktop client. `web/` is now a real pnpm workspace importer so browser runtime dependencies are explicit, pinned through the canonical lockfile and installed by the normal frozen workspace install.
 
 ## Implemented
 
 - Canonical **Map / Experiences / Opportunities / Connections / Identity** navigation. Experiences and Opportunities filter one persistent Map instance, preserving its viewport; Pulse signals are contextual instead of an additional feed tab.
 - Responsive desktop rail + mobile bottom navigation.
-- NEXA dark/light/system semantics: cyan for discovery/live and violet for action/identity.
+- NEXUS dark/light/system semantics: cyan for discovery/live and violet for action/identity.
 - Interactive Web Mercator loopback preview with pan/zoom, visible OSM raster tiles and required attribution.
 - Pinned **MapLibre GL JS 6.15.0** production renderer with a same-origin worker and bundled CSS.
 - Settled map bounds + zoom drive `POST /api/v1/discovery/nearby`; superseded requests are aborted.
@@ -63,11 +63,11 @@ The accepted production direction is **MapLibre GL JS + MapTiler Cloud** for bet
 
 `node web/build.mjs` reads:
 
-- `NEXA_MAPTILER_API_KEY` — browser-public MapTiler API key. Do **not** treat it as a server secret; protect/restrict it in MapTiler to the approved NEXA web origin before launch.
+- `NEXA_MAPTILER_API_KEY` — browser-public MapTiler API key. Do **not** treat it as a server secret; protect/restrict it in MapTiler to the approved NEXUS web origin before launch.
 - `NEXA_MAPTILER_MAP_ID` — simple map identifier; defaults to `streets-v4`.
 - `NEXA_MAPTILER_REGION` — `eu` (default) or `global`.
 
-`eu` produces `https://api.maptiler.eu/...` style requests and is the privacy-first NEXA default. MapTiler documents the EU endpoint as EU-only infrastructure for end-user personal data such as IP addresses, but it is available only on paid plans. `global` explicitly selects `https://api.maptiler.com/...` for a future global rollout policy.
+`eu` produces `https://api.maptiler.eu/...` style requests and is the privacy-first NEXUS default. MapTiler documents the EU endpoint as EU-only infrastructure for end-user personal data such as IP addresses, but it is available only on paid plans. `global` explicitly selects `https://api.maptiler.com/...` for a future global rollout policy.
 
 The generated `/dist/map-config.js` contains only public browser map configuration. Arbitrary provider origins, path-like map IDs, whitespace/control characters in the key, and non-HTTPS public map activation are rejected.
 
@@ -86,7 +86,7 @@ The web client now owns its browser runtime dependency explicitly through the `w
 - map viewport supersession, request abort and stale-response protection (#596);
 - Connections friend accept, wave-back, REST history/read, room join, chat send, ack/event dedupe and peer receive (#638);
 - map runtime policy: loopback-only OSM preview, HTTPS-only production activation, exact MapTiler origins and same-origin worker;
-- real MapLibre/WebGL initialization with the bundled worker, NEXA GeoJSON overlay and viewport callback using a local style so CI never depends on a paid provider key.
+- real MapLibre/WebGL initialization with the bundled worker, NEXUS GeoJSON overlay and viewport callback using a local style so CI never depends on a paid provider key.
 
 This is strong Chromium regression coverage, not a declaration that every browser engine is production-supported.
 
