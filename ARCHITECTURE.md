@@ -1,8 +1,8 @@
-# NEXA Architecture
+# NEXUS Architecture
 
 Map-first, real-time, identity-verified social + local marketplace monorepo.
 
-> **Compatibility note:** public product identity is **NEXA**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
+> **Compatibility note:** public product identity is **NEXUS**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
 > **Live implementation/release state:** `docs/STATUS_CURRENT.md`. This file owns durable architecture, not per-PR progress.
 
 ## 1. Monorepo layout
@@ -73,7 +73,7 @@ Browser auth has a distinct hardened boundary:
 - same-origin edge proxies `/api/v1` and `/socket.io` to the backend;
 - multi-tab coordination signals session changes without broadcasting credentials.
 
-Admin uses authenticated admin guards; browser-facing identity is NEXA Admin.
+Admin uses authenticated admin guards; browser-facing identity is NEXUS Admin.
 
 ### 3.7 Discovery query
 
