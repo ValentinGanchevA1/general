@@ -384,6 +384,8 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
       throw new Error('Refusing to use a non-isolated group-room test database');
     }
     const actorId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+    const failedConversationId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    const failedRoom = `convo:${failedConversationId}`;
     const key = `nexa:test:socket.io:http-db:${process.pid}`;
     const nodeA = await createRedisBackedNode(key, 'db-http-a');
     const nodeB = await createRedisBackedNode(key, 'db-http-b');
@@ -414,6 +416,13 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
       await db.query(
         "INSERT INTO conversation_members (conversation_id, user_id, role) VALUES ($1, $2, 'owner'), ($1, $3, 'member')",
         [conversationId, actorId, userId],
+      );
+      // Independent group used to simulate an eviction dispatch exception.
+      // This cannot trigger a database rollback after the transaction committed.
+      await db.query("INSERT INTO conversations (id, kind) VALUES ($1, 'group')", [failedConversationId]);
+      await db.query(
+        "INSERT INTO conversation_members (conversation_id, user_id, role) VALUES ($1, $2, 'owner'), ($1, $3, 'member')",
+        [failedConversationId, actorId, userId],
       );
 
       const joinSockets = (socket: RealtimeServerSocket): void => {
@@ -473,6 +482,36 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
       });
       expect(forbidden.status).toBe(403);
       expect(revokedSockets.every((socket) => socket.rooms.has(conversationRoom))).toBe(true);
+
+      // Fault injection at the production emitter boundary: PostgreSQL commits
+      // before the Socket.IO adapter revocation is attempted. This models a
+      // *throwing dispatch*, not a silent network drop or confirmed Redis outage.
+      realtimeA.in(userRoom).socketsJoin(failedRoom);
+      realtimeA.in(`user:${actorId}`).socketsJoin(failedRoom);
+      await waitFor(() => revokedSockets.every((socket) => socket.rooms.has(failedRoom))
+        && activeSockets.every((socket) => socket.rooms.has(failedRoom)));
+
+      const eviction = jest.spyOn(app.get(RealtimeEmitterService), 'leaveRoomForUsers')
+        .mockImplementationOnce((): void => {
+          throw new Error('Injected Socket.IO revocation dispatch failure');
+        });
+      const failedKick = await fetch(
+        `http://127.0.0.1:${address.port}/conversations/groups/${failedConversationId}/members/${userId}`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } },
+      );
+      eviction.mockRestore();
+      expect(failedKick.status).toBe(500);
+
+      const committedFailure = await db.query<Array<{ left_at: Date | null }>>(
+        'SELECT left_at FROM conversation_members WHERE conversation_id = $1 AND user_id = $2',
+        [failedConversationId, userId],
+      );
+      expect(committedFailure[0]?.left_at).toBeInstanceOf(Date);
+      await expect(recipients.getRecipientIds(failedConversationId)).resolves.toEqual([actorId]);
+      // This is the unresolved risk: a connected socket can still be in the
+      // stale room when adapter eviction fails, despite committed revocation.
+      expect(revokedSockets.every((socket) => socket.rooms.has(failedRoom))).toBe(true);
+      expect(activeSockets.every((socket) => socket.rooms.has(failedRoom))).toBe(true);
 
       const revokedEvents: LocationShareUpdateEvent[][] = [[], [], []];
       removedA.on('location:share:update', (event) => revokedEvents[0]!.push(event));
