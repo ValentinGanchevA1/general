@@ -75,3 +75,17 @@ test('fails closed if git grep fails', () => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Secret content scan failed.*128/);
 });
+
+test('allows only the known AWS public sample in its redaction test', () => {
+  const knownFixture = 'AKIA' + 'IOSFODNN7EXAMPLE';
+  const result = runGuard({ 'apps/backend/src/common/sentry-scrub.spec.ts': `const fixture = '${knownFixture}';\n` });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+test('still rejects another token on the known sample line', () => {
+  const knownFixture = 'AKIA' + 'IOSFODNN7EXAMPLE';
+  const dummyToken = 'ghp_' + 'A'.repeat(36);
+  const result = runGuard({ 'apps/backend/src/common/sentry-scrub.spec.ts': `const fixture = '${knownFixture}'; const leaked = '${dummyToken}';\n` });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /Possible secrets in tracked content/);
+});
