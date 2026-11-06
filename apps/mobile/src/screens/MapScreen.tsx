@@ -1088,10 +1088,10 @@ function MapUnavailableFallback(): React.JSX.Element {
 	const styles = useMemo(() => createStyles(colors), [colors]);
 	return (
 		<View style={styles.unavailable}>
-			<Text style={styles.unavailableEyebrow}>NEXA MAP</Text>
+			<Text style={styles.unavailableEyebrow}>NEXUS MAP</Text>
 			<Text style={styles.unavailableTitle}>Map view interrupted</Text>
 			<Text style={styles.unavailableBody}>
-				NEXA could not render the map surface. Reopen this screen or restart the app.
+				NEXUS could not render the map surface. Reopen this screen or restart the app.
 			</Text>
 		</View>
 	);
