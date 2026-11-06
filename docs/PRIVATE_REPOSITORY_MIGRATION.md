@@ -4,6 +4,36 @@
 It does not authorize or automatically change repository visibility, GitHub
 settings, Render services, Play Console, or any external system.
 
+## Confirmed Render `g88` services (2026-11-06)
+
+The user confirmed Render workspace `g88` (`tea-d87btoog4nts73domv40`).
+The Render API confirms **three live services** linked to
+`https://github.com/ValentinGanchevA1/general`:
+
+| Service | Render ID | Tracked branch | Auto deploy | Latest inspected deploy |
+|---|---|---|---|---|
+| `g88-api` | `srv-d8d8ujojs32c73fb1gfg` | `master` | `checksPass` | `dep-dbmob0tg1s2s73d6t250`, live |
+| `g88-legal` | `srv-d8ssj8mq1p3s738mnu50` | `master` | `commit` | `dep-dbmoa0vavr4c738vn1ng`, live |
+| `nexa-web-pr-578` | `srv-dbea678m7kps73d700og` | `feature/nexa-web-client-v1` | `commit` | `dep-dbft1l0n74is73frr04g`, live |
+
+The first two live deploys reference `7fb28d27a09acb835ca1c6e42c04adc6878ffb93`;
+the web preview currently uses `ac265f37c96056edb610bd28501049ede73581e5`.
+`g88-api` has automatic PR preview generation enabled. All three service
+configurations show the public Git repository URL, but their **private repo
+GitHub App permissions have NOT been independently verified**. Live deployment
+from a public repository does not prove future authorization after privacy
+changes. Public endpoint HTTP/HTTPS health and privacy-page reachability were
+not independently established by this audit.
+
+Before approving private conversion, verify the Render GitHub App installation
+under GitHub → Settings → Applications → Installed GitHub Apps → Render →
+Configure → Repository access. If using selected repositories, include
+`ValentinGanchevA1/general`. In Render, confirm linked Git credentials for
+each service. Record evidence for each service before and after conversion.
+Keep `g88-legal` externally accessible because Google Play needs public legal
+URLs. Do not assume `g88-api` PR previews are private just because GitHub
+source code becomes private.
+
 ## Before changing visibility
 
 1. Merge and verify the proprietary notice, secret-scan regression tests, and
@@ -65,4 +95,4 @@ assume changing back to public is a safe rollback (that would re-expose code).
 Restore service from verified backup or manually redeploy from a trusted source.
 
 Owner sign-off: **PENDING**. Repository visibility: **UNCHANGED**.
-Render workspace/service mapping: **UNVERIFIED** until owner selects workspace.
+Render workspace and three linked services: **VERIFIED** on 2026-11-06; Render GitHub App private-repository authorization: **UNVERIFIED**.
