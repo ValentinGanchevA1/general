@@ -73,13 +73,13 @@ export function NotificationSettingsScreen(): React.JSX.Element {
 
       <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
         <Text style={styles.intro}>
-          Choose which NEXA signals can reach you when the app is closed.
+          Choose which NEXUS signals can reach you when the app is closed.
         </Text>
 
         <View style={styles.privacyCard} accessibilityRole="summary">
           <Text style={styles.privacyEyebrow}>Private by default</Text>
           <Text style={styles.privacyBody}>
-            Lock-screen copy stays intentionally minimal. Open NEXA to reveal message,
+            Lock-screen copy stays intentionally minimal. Open NEXUS to reveal message,
             trust and nearby details.
           </Text>
         </View>
