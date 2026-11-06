@@ -1,4 +1,4 @@
-# Ensure NEXA discovery can compile against every real migration, not only
+# Ensure NEXUS discovery can compile against every real migration, not only
 # the minimal physical tables used by the 10k/50k/100k service benchmarks.
 name: Discovery Full-Schema PostGIS Smoke
 
