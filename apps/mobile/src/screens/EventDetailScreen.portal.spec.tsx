@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import type { EventDetail } from '@g88/shared';
 
 import { rsvpToEvent, useEvent } from '@/features/events/useEvents';
@@ -141,6 +141,50 @@ describe('Portal Entry EventDetail integration', () => {
     const empty = screen.UNSAFE_getByType('EmptyState');
     expect(empty.props.title).toBe('Portal unavailable');
     expect(empty.props.body).not.toContain('hidden private venue');
+  });
+
+  it('refreshes the visible lifecycle automatically at event start and end boundaries', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2030-01-01T09:59:59.000Z'));
+    try {
+      const { screen } = setup();
+      expect(screen.getByText('Upcoming')).toBeTruthy();
+
+      act(() => {
+        jest.advanceTimersByTime(1_500);
+      });
+      expect(screen.getByText('Started')).toBeTruthy();
+
+      act(() => {
+        jest.advanceTimersByTime(2 * 60 * 60 * 1000);
+      });
+      expect(screen.getByText('Event ended')).toBeTruthy();
+      expect(screen.getByTestId('event-rsvp-going').props.accessibilityState.disabled).toBe(true);
+      screen.unmount();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('revalidates event access on app foreground without auto-RSVPing', () => {
+    const { AppState } = jest.requireActual('react-native') as typeof import('react-native');
+    const existing = AppState.addEventListener;
+    let foregroundHandler: ((status: 'active' | 'background' | 'inactive') => void) | null = null;
+    const spy = jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, handler) => {
+      foregroundHandler = handler as (status: 'active' | 'background' | 'inactive') => void;
+      return { remove: jest.fn() };
+    });
+    try {
+      const { screen, refresh } = setup();
+      expect(foregroundHandler).not.toBeNull();
+      act(() => foregroundHandler?.('active'));
+      expect(refresh).toHaveBeenCalledTimes(1);
+      expect(rsvpToEvent).not.toHaveBeenCalled();
+      screen.unmount();
+    } finally {
+      spy.mockRestore();
+      void existing;
+    }
   });
 
   it('prevents changes to past events through a Portal entry', () => {
