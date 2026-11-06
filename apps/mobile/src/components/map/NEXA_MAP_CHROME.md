@@ -1,4 +1,4 @@
-# NEXA Map Chrome v3
+# NEXUS Map Chrome v3
 
 ## Purpose
 
