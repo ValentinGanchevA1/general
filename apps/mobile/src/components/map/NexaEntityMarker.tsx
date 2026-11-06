@@ -11,6 +11,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { useAppTheme } from '@/theme';
+import { PORTAL_EVENT_PREVIEW_ENABLED } from '@/features/portals/portalPreview';
 
 import {
   diamondSideForBoundingSize,
@@ -261,6 +262,8 @@ export function NexaEntityMarker({
                   <Icon name="tag-outline" size={iconSize} color={colors.entityListing} />
                 ) : entityType === 'place' ? (
                   <Icon name="map-marker-radius-outline" size={iconSize} color={colors.discovery} />
+                ) : entityType === 'event' && PORTAL_EVENT_PREVIEW_ENABLED ? (
+                  <Icon name="door-open" size={iconSize} color={colors.entityEvent} />
                 ) : null}
               </View>
             </>
