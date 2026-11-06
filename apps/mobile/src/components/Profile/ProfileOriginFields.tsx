@@ -240,7 +240,7 @@ export function BirthDateField({
             </View>
 
             <Text style={[styles.sheetHint, { color: colors.textTertiary }]}>
-              Your exact date stays private. NEXA stores it as {toIsoDate(draftDate)}.
+              Your exact date stays private. NEXUS stores it as {toIsoDate(draftDate)}.
             </Text>
 
             <View style={styles.pickerHeaderRow}>
