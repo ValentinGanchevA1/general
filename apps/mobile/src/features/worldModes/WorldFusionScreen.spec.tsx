@@ -1,7 +1,7 @@
 import React from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { configureStore } from '@reduxjs/toolkit';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 
 import { nexaSpatialLensStore } from '@/features/map/nexaSpatialLens.store';
@@ -83,6 +83,26 @@ describe('WorldFusionScreen interaction flow', () => {
     expect(screen.getByText('Saved: Nexus + Sanctuary')).toBeTruthy();
     expect(screen.getByTestId('fusion-apply').props.accessibilityState.disabled).toBe(true);
     expect(nexaSpatialLensStore.getSnapshot()).toBe('opportunities');
+  });
+
+  it('disables selection and repeated Apply while the storage write is pending', async () => {
+    const { screen, store } = await setup();
+    let finishSave: () => void = () => undefined;
+    storage.setItem.mockImplementationOnce(
+      () => new Promise<void>((resolve) => { finishSave = resolve; }),
+    );
+    fireEvent.press(screen.getByTestId('fusion-option-nocturne'));
+    fireEvent.press(screen.getByTestId('fusion-apply'));
+
+    await waitFor(() => expect(store.getState().worldFusion.saving).toBe(true));
+    expect(screen.getByTestId('fusion-apply').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('fusion-option-bazaar').props.accessibilityState.disabled).toBe(true);
+    fireEvent.press(screen.getByTestId('fusion-apply'));
+    fireEvent.press(screen.getByTestId('fusion-option-bazaar'));
+    expect(storage.setItem).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Nocturne discovery inspiration')).toBeTruthy();
+    await act(async () => { finishSave(); });
+    await waitFor(() => expect(store.getState().worldFusion.discoveryWorld).toBe('nocturne'));
   });
 
   it('removes Fusion without modifying the primary World', async () => {
