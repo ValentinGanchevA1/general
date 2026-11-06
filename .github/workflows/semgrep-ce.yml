@@ -1,0 +1,50 @@
+name: Semgrep CE SAST
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+  schedule:
+    - cron: "19 4 * * 2"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: semgrep-ce-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sast:
+    name: Local rules / fixtures / source scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SEMGREP_SEND_METRICS: "off"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install pinned Semgrep Community Edition
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/semgrep-ce"
+          "$RUNNER_TEMP/semgrep-ce/bin/python" -m pip install --no-input 'semgrep==1.184.0'
+          echo "$RUNNER_TEMP/semgrep-ce/bin" >> "$GITHUB_PATH"
+
+      - name: Validate local rules
+        run: semgrep scan --validate --config .semgrep/rules/nexa-security.yml --metrics=off --disable-version-check
+
+      - name: Run positive and negative rule fixtures
+        run: semgrep scan --test --config .semgrep/rules/nexa-security.yml .semgrep/tests/nexa-security.ts --metrics=off --disable-version-check
+
+      - name: Scan first-party NEXA sources (hard gate)
+        run: |
+          semgrep scan \
+            --config .semgrep/rules/nexa-security.yml \
+            --metrics=off --disable-version-check --error --strict \
+            apps/backend/src apps/mobile/src packages/shared/src web/src
