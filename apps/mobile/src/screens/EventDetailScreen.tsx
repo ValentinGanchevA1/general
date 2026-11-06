@@ -20,6 +20,13 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { EventReviewsSection } from '@/features/events/EventReviewsSection';
+import { PORTAL_EVENT_PREVIEW_ENABLED } from '@/features/portals/portalPreview';
+import { PortalEntryBanner } from '@/features/portals/PortalEntryBanner';
+import {
+  canSubmitPortalRsvp,
+  resolvePortalDetailState,
+  resolvePortalLoadPresentation,
+} from '@/features/portals/portalDetailState';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { useAppTheme, type ThemeColors } from '@/theme';
@@ -63,25 +70,46 @@ export function EventDetailScreen(): React.JSX.Element {
   const route = useRoute<R>();
   const navigation = useNavigation<NativeStackNavigationProp<EventsStackParamList>>();
   const { eventId } = route.params;
+  const portalEntry = PORTAL_EVENT_PREVIEW_ENABLED && route.params.entry === 'portal';
   const myId = useAppSelector((s) => s.auth.user?.id);
   const { event, polls, questions, loading, error, refresh, refreshPolls, refreshQuestions } = useEvent(eventId);
+  const [portalAsOf, setPortalAsOf] = useState(Date.now);
   const [rsvpBusy, setRsvpBusy] = useState(false);
+  const [rsvpError, setRsvpError] = useState<string | null>(null);
   const [pulseShareBusy, setPulseShareBusy] = useState(false);
   const [pulseShared, setPulseShared] = useState(false);
   const [pulseShareError, setPulseShareError] = useState<string | null>(null);
 
+  const refreshPortal = useCallback((): void => {
+    setPortalAsOf(Date.now());
+    setRsvpError(null);
+    refresh();
+  }, [refresh]);
+
   const onRsvp = useCallback(async (status: RsvpStatus) => {
+    if (rsvpBusy) return;
+    if (portalEntry && (event == null || error != null || !canSubmitPortalRsvp(event, status, Date.now()))) {
+      setRsvpError('RSVP unavailable. Refresh to check the latest event details.');
+      return;
+    }
+    setRsvpError(null);
     setRsvpBusy(true);
     try {
       await rsvpToEvent(eventId, status);
       if (status !== 'going') setPulseShared(false);
-      refresh();
-    } catch {
-      /* detail refresh keeps state truthful */
+      if (portalEntry) refreshPortal();
+      else refresh();
+    } catch (err) {
+      if (portalEntry) {
+        const statusCode = err != null && typeof err === 'object' && 'statusCode' in err ? err.statusCode : null;
+        setRsvpError(statusCode === 409
+          ? 'This event may be full. Refresh to check availability.'
+          : 'Could not change your RSVP. Please try again.');
+      }
     } finally {
       setRsvpBusy(false);
     }
-  }, [eventId, refresh]);
+  }, [rsvpBusy, portalEntry, event, error, eventId, refresh, refreshPortal]);
 
   const onShareToPulse = useCallback(async (): Promise<void> => {
     if (pulseShareBusy || pulseShared) return;
@@ -98,11 +126,22 @@ export function EventDetailScreen(): React.JSX.Element {
   }, [eventId, pulseShareBusy, pulseShared]);
 
   if (!event) {
+    const unavailable = resolvePortalLoadPresentation(error);
     return (
       <View style={styles.container}>
-        <ScreenHeader title="Event" />
+        <ScreenHeader title={portalEntry ? 'Portal' : 'Event'} />
         <View style={[styles.container, styles.center]}>
-          {loading ? <ActivityIndicator color={colors.primary} /> : error != null ? (
+          {loading || (portalEntry && error == null) ? <ActivityIndicator color={colors.primary} /> : portalEntry ? (
+            <EmptyState
+              variant="plain"
+              icon="shield-alert-outline"
+              title={unavailable.title}
+              body={unavailable.body}
+              {...(unavailable.canRetry
+                ? { actionLabel: resolveNexaRetryActionLabel('event'), onAction: refreshPortal }
+                : {})}
+            />
+          ) : error != null ? (
             <EmptyState variant="plain" icon="alert-circle-outline" title="Couldn't load event" body="Check your connection and try again." actionLabel={resolveNexaRetryActionLabel('event')} onAction={refresh} />
           ) : (
             <EmptyState variant="plain" icon="calendar-remove" title="Event not found" body="This event may have been removed or the link is invalid." />
@@ -112,6 +151,7 @@ export function EventDetailScreen(): React.JSX.Element {
     );
   }
 
+  const portalState = portalEntry ? resolvePortalDetailState(event, portalAsOf) : null;
   const isHost = event.hostId === myId;
   const full = event.capacity != null && event.attendeeCount >= event.capacity;
 
@@ -121,13 +161,31 @@ export function EventDetailScreen(): React.JSX.Element {
       automaticallyAdjustKeyboardInsets
       style={styles.container}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} progressBackgroundColor={colors.surfaceRaised} />}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={portalEntry ? refreshPortal : refresh} tintColor={colors.primary} colors={[colors.primary]} progressBackgroundColor={colors.surfaceRaised} />}
     >
-      <ScreenHeader title="Event" />
+      <ScreenHeader title={portalEntry ? 'Portal' : 'Event'} />
       {event.coverUrl ? <Image source={{ uri: event.coverUrl }} style={styles.cover} /> : (
         <View style={[styles.cover, styles.coverPlaceholder]}><Icon name="calendar-star" size={40} color={colors.primary} /></View>
       )}
       <Text style={styles.title}>{event.title}</Text>
+      {portalState != null ? (
+        <PortalEntryBanner state={portalState} currentRsvp={event.myRsvp} />
+      ) : null}
+      {portalEntry && error != null ? (
+        <View style={styles.portalStaleNotice}>
+          <Text style={styles.portalStaleText}>
+            Event details could not be refreshed. RSVP changes are temporarily unavailable.
+          </Text>
+          <TouchableOpacity
+            onPress={refreshPortal}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading Portal"
+            style={styles.portalStaleRetry}
+          >
+            <Text style={styles.portalStaleRetryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
       <View style={styles.metaRow}><Icon name="clock-outline" size={16} color={colors.primary} /><Text style={styles.metaText}>{formatEventWhen(event.startsAt, event.endsAt)}</Text></View>
       <View style={styles.metaRow}><Icon name="account-group" size={16} color={colors.primary} /><Text style={styles.metaText}>{event.attendeeCount} going{event.capacity != null ? ` · ${event.capacity} cap` : ''}</Text></View>
       <TouchableOpacity style={styles.metaRow} onPress={() => openRootScreen(navigation, 'UserProfile', { userId: event.hostId })} activeOpacity={0.7}>
@@ -139,7 +197,11 @@ export function EventDetailScreen(): React.JSX.Element {
       <View style={styles.rsvpRow}>
         {RSVP_STATUSES.map((status) => {
           const active = event.myRsvp === status;
-          const disabled = rsvpBusy || (status === 'going' && full && !active);
+          const disabled = rsvpBusy
+            || (status === 'going' && full && !active)
+            || (portalState != null && (
+              error != null || !canSubmitPortalRsvp(event, status, portalAsOf)
+            ));
           const meta = RSVP_META[status];
           const label = resolveNexaRsvpActionLabel(status, active);
           return (
@@ -158,7 +220,12 @@ export function EventDetailScreen(): React.JSX.Element {
           );
         })}
       </View>
-      {full && event.myRsvp !== 'going' ? <Text style={styles.fullNote}>This event is at capacity.</Text> : null}
+      {portalEntry && rsvpError != null ? (
+        <Text style={styles.portalRsvpError} accessibilityRole="alert" testID="portal-rsvp-error">{rsvpError}</Text>
+      ) : null}
+      {full && event.myRsvp !== 'going' && portalState?.status !== 'ended'
+        ? <Text style={styles.fullNote}>This event is at capacity.</Text>
+        : null}
 
       {event.visibility === 'public' && event.myRsvp === 'going' ? (
         <View style={styles.pulseShareCard}>
@@ -336,6 +403,11 @@ function createStyles(colors: ThemeColors) {
     rsvpText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
     rsvpTextActive: { color: colors.onPrimary },
     fullNote: { color: colors.warning, fontSize: 13, paddingHorizontal: 20, marginTop: 8 },
+    portalRsvpError: { color: colors.danger, fontSize: 13, lineHeight: 19, paddingHorizontal: 20, marginTop: 10 },
+    portalStaleNotice: { marginHorizontal: 20, marginTop: 10, borderWidth: 1, borderColor: colors.warning, borderRadius: 12, padding: 12, gap: 8 },
+    portalStaleText: { color: colors.textSecondary, fontSize: 13, lineHeight: 20 },
+    portalStaleRetry: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: 12 },
+    portalStaleRetryText: { color: colors.actionPrimary, fontSize: 14, fontWeight: '700' },
     pulseShareCard: { marginHorizontal: 20, marginTop: 14, padding: 14, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     pulseShareHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     pulseShareTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
