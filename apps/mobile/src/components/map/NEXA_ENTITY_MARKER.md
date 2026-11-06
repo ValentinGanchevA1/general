@@ -1,4 +1,4 @@
-# NEXA Entity Marker v3
+# NEXUS Entity Marker v3
 
 Canonical mobile map marker contract.
 
@@ -11,7 +11,7 @@ Canonical mobile map marker contract.
 | Listing | Square | Neutral |
 | Opportunity / other | Diamond | Violet / opportunity |
 
-This is the same circle / star / square / diamond vocabulary used by the NEXA launch and hero compositions.
+This is the same circle / star / square / diamond vocabulary used by the NEXUS launch and hero compositions.
 
 Visual bounding sizes are 18dp compact, 24dp standard, and 32dp selected. The marker interaction stage is never smaller than 44×44dp.
 
