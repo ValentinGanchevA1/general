@@ -1,0 +1,34 @@
+rules:
+  - id: nexa.security.no-dynamic-eval
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: "Do not evaluate dynamic JavaScript. Use an explicit parser or validated dispatch table."
+    metadata:
+      category: security
+      cwe: ["CWE-95"]
+      technology: [node, react-native]
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+
+  - id: nexa.security.no-shell-exec
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: "Do not run shell commands through exec/execSync. Prefer spawn/execFile with an argument array and shell disabled."
+    metadata:
+      category: security
+      cwe: ["CWE-78"]
+      technology: [node]
+    pattern-either:
+      - pattern: exec(...)
+      - pattern: execSync(...)
+
+  - id: nexa.security.tls-certificate-verification
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: "TLS certificate validation must not be disabled in NEXA."
+    metadata:
+      category: security
+      cwe: ["CWE-295"]
+      technology: [node]
+    pattern-regex: '\brejectUnauthorized\s*:\s*false\b'
