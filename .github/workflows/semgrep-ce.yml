@@ -36,11 +36,10 @@ jobs:
           "$RUNNER_TEMP/semgrep-ce/bin/python" -m pip install --no-input 'semgrep==1.184.0'
           echo "$RUNNER_TEMP/semgrep-ce/bin" >> "$GITHUB_PATH"
 
-      - name: Validate local rules
-        run: semgrep scan --validate --config .semgrep/rules/nexa-security.yml --metrics=off --disable-version-check
-
-      - name: Run positive and negative rule fixtures
-        run: semgrep scan --test --config .semgrep/rules/nexa-security.yml .semgrep/tests/nexa-security.ts --metrics=off --disable-version-check
+      # The Semgrep --validate command may download lint rules from the
+      # external registry. Test mode validates local rules without that fetch.
+      - name: Test local rule syntax and positive / negative fixtures
+        run: semgrep scan --test --config .semgrep/rules/ .semgrep/tests/ --metrics=off --disable-version-check
 
       - name: Scan first-party NEXA sources (hard gate)
         run: |
