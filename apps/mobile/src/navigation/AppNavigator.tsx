@@ -28,6 +28,7 @@ import { ProfileEditScreen } from '@/screens/ProfileEditScreen';
 import { PhotosScreen } from '@/screens/PhotosScreen';
 import { ChatScreen } from '@/screens/ChatScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
+import { WorldModesScreen } from '@/features/worldModes/WorldModesScreen';
 import { AlertComposerScreen } from '@/screens/AlertComposerScreen';
 import { VerificationScreen } from '@/screens/VerificationScreen';
 import EmailVerificationScreen from '@/screens/EmailVerificationScreen';
@@ -129,6 +130,7 @@ function AccountNavigator(): React.JSX.Element {
 	const screenOptions = useStackScreenOptions();
 	return <AccountStack.Navigator screenOptions={screenOptions}>
 		<AccountStack.Screen name="Settings" component={SettingsScreen} />
+		<AccountStack.Screen name="WorldModes" component={WorldModesScreen} options={{ headerShown: false }} />
 		<AccountStack.Screen name="TrustCenter" component={TrustCenterScreen} options={{ headerShown: false, title: 'Trust' }} />
 		<AccountStack.Screen name="Privacy" component={PrivacyScreen} /><AccountStack.Screen name="Help" component={HelpScreen} /><AccountStack.Screen name="About" component={AboutScreen} /><AccountStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} /><AccountStack.Screen name="BlockedUsers" component={BlockedUsersScreen} /><AccountStack.Screen name="Verification" component={VerificationScreen} />
 		<AccountStack.Screen name="EmailVerification" component={EmailVerificationScreen} options={{ title: 'Verify email', presentation: 'modal' }} />

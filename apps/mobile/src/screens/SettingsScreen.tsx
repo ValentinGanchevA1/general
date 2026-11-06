@@ -21,6 +21,7 @@ import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { deleteAccount, logout } from '@/features/auth/authSlice';
 import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
 import { ListRow } from '@/components/ListRow';
+import { WORLD_MODES_ENABLED } from '@/features/worldModes/worldModes';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { APP_VERSION, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { resolveNexaTrustActionLabel } from '@/product/nexaActionLanguage';
@@ -288,6 +289,14 @@ export function SettingsScreen(): React.JSX.Element {
               );
             })}
           </View>
+          {WORLD_MODES_ENABLED ? (
+            <ListRow
+              style={styles.rowSpaced}
+              title="World Modes"
+              subtitle="Preview and choose from 10 NEXA worlds"
+              onPress={() => navigation.navigate('WorldModes')}
+            />
+          ) : null}
         </View>
 
         <View style={styles.section}>

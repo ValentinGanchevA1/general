@@ -1,4 +1,5 @@
 import eventReviewsReducer from '@/features/events/eventReviewsSlice';
+import worldModesReducer, { clearWorldMode } from '@/features/worldModes/worldModesSlice';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '@/features/auth/authSlice';
 import passwordResetReducer from '@/features/auth/passwordResetSlice';
@@ -28,6 +29,7 @@ import {
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    worldModes: worldModesReducer,
     eventReviews: eventReviewsReducer,
     passwordReset: passwordResetReducer,
     profile: profileReducer,
@@ -51,13 +53,18 @@ export type AppDispatch = typeof store.dispatch;
 let previousAuthUserId = store.getState().auth.user?.id ?? null;
 store.subscribe(() => {
   const nextAuthUserId = store.getState().auth.user?.id ?? null;
-  if (shouldResetSavedPlacesMapLayer(previousAuthUserId, nextAuthUserId)) {
+  const previousId = previousAuthUserId;
+  // Update before dispatch: Redux subscriptions are synchronously re-entrant.
+  previousAuthUserId = nextAuthUserId;
+  if (shouldResetSavedPlacesMapLayer(previousId, nextAuthUserId)) {
     publicPlacesMapLayerStore.reset();
     savedPlacesMapLayerStore.reset();
     savedPlaceMapFocusStore.clear();
     groupChatRouteStore.clear();
   }
-  previousAuthUserId = nextAuthUserId;
+  if (previousId !== nextAuthUserId) {
+    store.dispatch(clearWorldMode());
+  }
 });
 
 // ─── Chat outbox persistence (P2.C6) ─────────────────────────────────────────
