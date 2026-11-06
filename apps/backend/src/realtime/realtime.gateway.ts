@@ -497,16 +497,62 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(this.userRoom(toUserId)).emit('leaderboard:rank_up', evt);
   }
 
-  emitEventPoll(delta: EventPollDelta): void {
-    this.server.to(this.eventRoom(delta.eventId)).emit('event:poll', delta);
+  /**
+   * Room membership is not a permanent authorization grant. Recheck the
+   * current DB access policy for every recipient immediately before sending
+   * an event delta, including sockets connected to other adapter nodes.
+   *
+   * Errors are swallowed after logging: broadcasting is best-effort and a
+   * failed realtime fanout must never roll back an already-committed vote.
+   */
+  private async emitAuthorizedEventDelta(
+    eventId: string,
+    deliver: (socketId: string) => void,
+    question?: { authorId?: string; questionId?: string },
+  ): Promise<void> {
+    try {
+      const sockets = await this.server.in(this.eventRoom(eventId)).fetchSockets();
+      if (sockets.length === 0) return;
+
+      const viewerIds = sockets.map((socket) => socket.data.userId).filter(Boolean);
+      const allowed = await this.eventRoomAccess.authorizedViewerIds(
+        eventId,
+        viewerIds,
+        question,
+      );
+
+      for (const socket of sockets) {
+        if (allowed.has(socket.data.userId)) {
+          // Target the authorized socket, never the entire stale event room.
+          deliver(socket.id);
+        }
+      }
+    } catch (err) {
+      this.logger.error(`event delta delivery authorization failed: ${err}`);
+    }
   }
 
-  emitEventQuestion(delta: EventQuestionDelta): void {
-    this.server.to(this.eventRoom(delta.eventId)).emit('event:question', delta);
+  async emitEventPoll(delta: EventPollDelta): Promise<void> {
+    await this.emitAuthorizedEventDelta(
+      delta.eventId,
+      (socketId) => this.server.to(socketId).emit('event:poll', delta),
+    );
   }
 
-  emitEventQuestionUpvote(delta: EventQuestionUpvoteDelta): void {
-    this.server.to(this.eventRoom(delta.eventId)).emit('event:question:upvote', delta);
+  async emitEventQuestion(delta: EventQuestionDelta): Promise<void> {
+    await this.emitAuthorizedEventDelta(
+      delta.eventId,
+      (socketId) => this.server.to(socketId).emit('event:question', delta),
+      { authorId: delta.userId },
+    );
+  }
+
+  async emitEventQuestionUpvote(delta: EventQuestionUpvoteDelta): Promise<void> {
+    await this.emitAuthorizedEventDelta(
+      delta.eventId,
+      (socketId) => this.server.to(socketId).emit('event:question:upvote', delta),
+      { questionId: delta.questionId },
+    );
   }
 
   emitStoryNew(evt: StoryNewEvent): void {
