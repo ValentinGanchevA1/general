@@ -342,7 +342,7 @@ function EventCard({point, onClose}: { point: EventEntityPoint; onClose: () => v
 	const [myRsvp, setMyRsvp] = useState<RsvpStatus | null>(null);
 	const capacityLine = (() => { const parts: string[] = []; if (meta.attendeeCount > 0) parts.push(`${meta.attendeeCount} going`); if (meta.capacity != null) parts.push(`${meta.capacity} cap`); return parts.length > 0 ? parts.join(' · ') : null; })();
 	const onRsvpGoing = async (): Promise<void> => { if (rsvpBusy) return; setRsvpBusy(true); try { const res = await rsvpToEvent(point.id, 'going'); setMyRsvp(res.status ?? 'going'); } catch (e) { const msg = e && typeof e === 'object' && 'message' in e ? String((e as { message: unknown }).message) : 'Try again in a moment.'; appAlert('Could not RSVP', msg); } finally { setRsvpBusy(false); } };
-	const openDetail = (): void => { onClose(); openRootScreen(navigation, 'EventDetail', {eventId: point.id}); };
+	const openDetail = (): void => { onClose(); openRootScreen(navigation, 'EventDetail', {eventId: point.id, ...(PORTAL_EVENT_PREVIEW_ENABLED ? {entry: 'portal'} : {})}); };
 	const going = myRsvp === 'going';
 	const joinLabel = resolveNexaRsvpActionLabel('going', going);
 	if (PORTAL_EVENT_PREVIEW_ENABLED) {
