@@ -78,7 +78,7 @@ export function AboutScreen(): React.JSX.Element {
         </View>
 
         <Text style={styles.about}>
-          NEXA brings nearby people, events, stories, and local listings into one live map.
+          NEXUS brings nearby people, events, stories, and local listings into one live map.
           Discover what is happening around you, then interact directly through waves, messages,
           RSVPs, and offers — without a global feed. Precise GPS is used for nearby discovery but
           is coarsened before persistence, and other users never receive your exact coordinates.
@@ -105,7 +105,7 @@ export function AboutScreen(): React.JSX.Element {
             colors={colors}
             icon="circle-outline"
             title="Stories"
-            body="Share temporary photo or short-video updates with people nearby and react without turning NEXA into a global follower feed."
+            body="Share temporary photo or short-video updates with people nearby and react without turning NEXUS into a global follower feed."
           />
           <Feature
             styles={styles}
@@ -175,7 +175,7 @@ export function AboutScreen(): React.JSX.Element {
           />
         </View>
 
-        <Text style={styles.copyright}>© {new Date().getFullYear()} NEXA. All rights reserved.</Text>
+        <Text style={styles.copyright}>© {new Date().getFullYear()} NEXUS. All rights reserved.</Text>
       </ScrollView>
     </View>
   );
