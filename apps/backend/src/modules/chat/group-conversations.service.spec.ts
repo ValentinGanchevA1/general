@@ -34,13 +34,20 @@ function request() {
 }
 
 describe('GroupConversationsService', () => {
+  const previousFlag = process.env.ROOM_REVOCATION_OUTBOX_ENABLED;
   const dbQuery = jest.fn();
   const transaction = jest.fn();
   const db = { query: dbQuery, transaction } as unknown as DataSource;
   const service = new GroupConversationsService(db);
 
   beforeEach(() => {
+    process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'true';
     jest.clearAllMocks();
+  });
+
+  afterAll(() => {
+    if (previousFlag === undefined) delete process.env.ROOM_REVOCATION_OUTBOX_ENABLED;
+    else process.env.ROOM_REVOCATION_OUTBOX_ENABLED = previousFlag;
   });
 
   it('creates a group with empty legacy participants and normalized owner/member rows', async () => {
