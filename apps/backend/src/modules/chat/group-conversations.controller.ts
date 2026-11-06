@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  Logger,
   Param,
   ParseUUIDPipe,
   Post,
@@ -51,6 +52,8 @@ class CreateGroupConversationDto implements CreateGroupConversationRequest {
 @Controller('conversations/groups')
 @UseGuards(JwtAuthGuard)
 export class GroupConversationsController {
+  private readonly logger = new Logger(GroupConversationsController.name);
+
   constructor(
     private readonly groups: GroupConversationsService,
     private readonly moduleRef: ModuleRef,
@@ -84,7 +87,13 @@ export class GroupConversationsController {
     await this.groups.removeMember(userId, conversationId, memberId);
     // Remove all of the former member's devices from this room only after the
     // membership transaction commits. The emitter uses adapter-aware eviction.
-    this.moduleRef.get(RealtimeEmitterService, { strict: false })
-      .leaveRoomForUsers([memberId], `convo:${conversationId}`);
+    try {
+      this.moduleRef.get(RealtimeEmitterService, { strict: false })
+        .leaveRoomForUsers([memberId], `convo:${conversationId}`);
+    } catch {
+      // DB membership and outbox both committed: a transient adapter error
+      // must not cause a false HTTP 500 or lose the retry intent.
+      this.logger.warn('Group member removed; room eviction is queued for retry');
+    }
   }
 }
