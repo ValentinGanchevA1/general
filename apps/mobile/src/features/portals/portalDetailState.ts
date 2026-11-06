@@ -137,3 +137,50 @@ export function resolvePortalLoadPresentation(error: unknown): PortalLoadPresent
     canRetry: true,
   };
 }
+
+export interface PortalRsvpFailure {
+  message: string;
+  accessLost: boolean;
+  requiresRefresh: boolean;
+  statusCode: number | null;
+}
+
+/**
+ * API conflict codes, not HTTP 409 alone, distinguish lifecycle from capacity.
+ * Do not pass untrusted server exception text into user-visible screens.
+ */
+export function resolvePortalRsvpFailure(error: unknown): PortalRsvpFailure {
+  const statusCode =
+    error != null && typeof error === 'object' && 'statusCode' in error &&
+    typeof error.statusCode === 'number'
+      ? error.statusCode
+      : null;
+  const code =
+    error != null && typeof error === 'object' && 'code' in error &&
+    typeof error.code === 'string'
+      ? error.code
+      : null;
+
+  if (statusCode === 401 || statusCode === 403 || statusCode === 404) {
+    return {
+      message: 'Portal unavailable. Your event access may have changed.',
+      accessLost: true,
+      requiresRefresh: false,
+      statusCode,
+    };
+  }
+  if (statusCode === 409) {
+    const message = code === 'event.ended'
+      ? 'This event has ended. RSVP changes are unavailable.'
+      : code === 'event.full'
+        ? 'This event is at capacity. Refresh to check availability.'
+        : 'Event availability has changed. Refresh before responding.';
+    return { message, accessLost: false, requiresRefresh: true, statusCode };
+  }
+  return {
+    message: 'Could not confirm your RSVP. Refresh to check the latest status.',
+    accessLost: false,
+    requiresRefresh: true,
+    statusCode,
+  };
+}
