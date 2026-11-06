@@ -32,6 +32,15 @@ export const hydrateWorldMode = createAsyncThunk(
       return rejectWithValue('Could not load your World Mode preference.');
     }
   },
+  {
+    // A preference is loaded once per authenticated session. Deduplicate
+    // StrictMode re-renders and never reset an in-flight successful activation.
+    condition: (userId, { getState }) => {
+      const state = (getState() as { worldModes: WorldModeState }).worldModes;
+      return !(state.ownerId === userId &&
+        (state.hydrated || state.hydrationRequestId !== null || state.saving));
+    },
+  },
 );
 
 export const activateWorldMode = createAsyncThunk(
