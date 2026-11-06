@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, forwardRef } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
@@ -27,6 +27,8 @@ export interface BlockedUserRow {
  */
 @Injectable()
 export class BlocksService {
+  private readonly logger = new Logger(BlocksService.name);
+
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     @Inject(forwardRef(() => FriendsService))
@@ -51,7 +53,13 @@ export class BlocksService {
     // evict all of their sockets from those conversation rooms cluster-wide.
     const sharedGroupIds = await this.groups.leaveSharedGroupsForBlock(blockerId, blockedId);
     for (const conversationId of sharedGroupIds) {
-      this.realtime.leaveRoomForUsers([blockerId], `convo:${conversationId}`);
+      try {
+        this.realtime.leaveRoomForUsers([blockerId], `convo:${conversationId}`);
+      } catch {
+        // Shared group removals were durably queued in their transactions.
+        // Continue graph cleanup even when the adapter dispatch fails.
+        this.logger.warn('Group room eviction after block queued for retry');
+      }
     }
 
     // Hard-delete social graph edges (follows, friendships, pending requests).
