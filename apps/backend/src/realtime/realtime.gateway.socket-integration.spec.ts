@@ -4,7 +4,7 @@ import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import type { AddressInfo } from 'node:net';
 
-import type { AckResult, LocationShareUpdateEvent } from '@g88/shared';
+import type { AckResult, EventPollDelta, LocationShareUpdateEvent } from '@g88/shared';
 
 import { RealtimeGateway } from './realtime.gateway';
 import { EventRoomAccessService } from './event-room-access.service';
@@ -278,7 +278,17 @@ describe('RealtimeGateway real Socket.IO revocation integration', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         RealtimeGateway,
-        { provide: EventRoomAccessService, useValue: { canView: jest.fn(async () => true) } },
+        {
+          provide: EventRoomAccessService,
+          useValue: {
+            canView: jest.fn(async () => true),
+            // Simulate a block/visibility revocation after both clients joined.
+            authorizedViewerIds: jest.fn(async (
+              _eventId: string,
+              viewers: readonly string[],
+            ): Promise<Set<string>> => new Set(viewers.filter((id) => id === sharerId))),
+          },
+        },
         RealtimeEmitterService,
         WsJwtGuard,
         BlocksService,
@@ -325,6 +335,59 @@ describe('RealtimeGateway real Socket.IO revocation integration', () => {
     for (const client of clients) client.close();
     await sleep(25);
     await app.close();
+  });
+
+  it('sends an event poll only to currently authorized sockets, not stale event room members', async () => {
+    const eventId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    // Use a distinct viewer from the conversation revocation tests below.
+    const eventViewerId = '11111111-1111-4111-8111-111111111111';
+    const host = new SocketIoWireClient(socketUrl);
+    const revokedViewer = new SocketIoWireClient(socketUrl);
+    clients.push(host, revokedViewer);
+    await Promise.all([host.connect(sharerId), revokedViewer.connect(eventViewerId)]);
+
+    await expect(host.emitWithAck<AckResult<{ joined: true }>>(
+      'event:join', { eventId },
+    )).resolves.toEqual({ ok: true, data: { joined: true } });
+    await expect(revokedViewer.emitWithAck<AckResult<{ joined: true }>>(
+      'event:join', { eventId },
+    )).resolves.toEqual({ ok: true, data: { joined: true } });
+
+    const room = `event:${eventId}`;
+    await expect(roomUserIds(gateway, room))
+      .resolves.toEqual(expect.arrayContaining([sharerId, eventViewerId]));
+
+    const hostPolls: EventPollDelta[] = [];
+    const revokedPolls: EventPollDelta[] = [];
+    const offHost = host.on<EventPollDelta>('event:poll', (event) => hostPolls.push(event));
+    const offRevoked = revokedViewer.on<EventPollDelta>(
+      'event:poll', (event) => revokedPolls.push(event),
+    );
+
+    const poll: EventPollDelta = {
+      id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      eventId,
+      question: 'Where should we meet?',
+      options: [],
+      totalVotes: 0,
+      closedAt: null,
+    };
+
+    try {
+      await gateway.emitEventPoll(poll);
+      await sleep(70);
+      expect(hostPolls).toEqual([poll]);
+      expect(revokedPolls).toEqual([]);
+      // The revoked viewer remains in the room to prove the receiver filter,
+      // not room eviction, prevented the forbidden delivery.
+      await expect(roomUserIds(gateway, room)).resolves.toContain(eventViewerId);
+    } finally {
+      offHost();
+      offRevoked();
+      host.close();
+      revokedViewer.close();
+      await sleep(40);
+    }
   });
 
   it('pre-joined peer receives no precise GPS after block, even with a stale convo room', async () => {

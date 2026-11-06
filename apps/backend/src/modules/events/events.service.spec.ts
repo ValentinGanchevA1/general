@@ -150,6 +150,47 @@ describe('EventsService', () => {
   });
 
   describe('rsvp', () => {
+    it.each(['going', 'maybe', 'declined'] as const)(
+      'rejects a post-end %s RSVP before touching attendance',
+      async (status) => {
+        const { runner, calls } = makeQueryRunner([
+          [{ id: 'e1', host_id: 'h1', capacity: 10, visibility: 'public', is_ended: true }],
+        ]);
+        createQueryRunner.mockReturnValue(runner);
+
+        await expect(service.rsvp('u1', 'e1', { status } as never))
+          .rejects.toMatchObject({
+            response: {
+              code: 'event.ended',
+              message: 'This event has ended. RSVP changes are unavailable.',
+            },
+          });
+
+        expect(calls).toHaveLength(1);
+        expect(calls[0]?.sql).toContain('COALESCE(e.ends_at <= clock_timestamp(), false) AS is_ended');
+        expect(calls[0]?.sql).toContain('FOR UPDATE');
+        expect(calls[0]?.params).toEqual(['e1', 'u1']);
+        expect(runner.commitTransaction).not.toHaveBeenCalled();
+        expect(runner.rollbackTransaction).toHaveBeenCalledTimes(1);
+        expect(runner.release).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it('allows existing open-ended events without inventing a forced end time', async () => {
+      const { runner } = makeQueryRunner([
+        [{ id: 'e1', host_id: 'h1', capacity: null, visibility: 'public', is_ended: false }],
+        [],
+        [],
+        [],
+        [{ attendee_count: 1 }],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+
+      await expect(service.rsvp('u1', 'e1', { status: 'going' } as never))
+        .resolves.toEqual({ eventId: 'e1', status: 'going', attendeeCount: 1 });
+      expect(runner.commitTransaction).toHaveBeenCalledTimes(1);
+    });
+
     it('rejects when the event is at capacity and the user is newly going', async () => {
       const { runner } = makeQueryRunner([
         [{ id: 'e1', host_id: 'h1', capacity: 2, visibility: 'public' }], // SELECT ... FOR UPDATE
