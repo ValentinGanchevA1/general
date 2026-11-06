@@ -62,7 +62,7 @@ async function main() {
   function collection(name, modes) {
     let found = collections.find((entry) => entry.name === name);
     if (!found && name.startsWith('NEXUS /')) {
-      found = collections.find((entry) => entry.name === name.replace(/^NEXUS \/, 'NEXA /'));
+      found = collections.find((entry) => entry.name === name.replace('NEXUS /', 'NEXA /'));
       if (found) found.name = name;
     }
     if (!found) {
@@ -150,7 +150,7 @@ async function main() {
   const textStyles = await figma.getLocalTextStylesAsync();
   for (const [key, size] of Object.entries(NEXA_TOKENS.fontSize)) {
     const name = 'NEXUS / Text / ' + key;
-    let style = textStyles.find((candidate) => candidate.name === name || candidate.name === name.replace(/^NEXUS \/, 'NEXA /'));
+    let style = textStyles.find((candidate) => candidate.name === name || candidate.name === name.replace('NEXUS /', 'NEXA /'));
     if (style && style.name !== name) style.name = name;
     if (!style) { style = figma.createTextStyle(); style.name = name; if (!textStyles.some((item) => item.id === style.id)) textStyles.push(style); }
     style.fontName = { family: 'Inter', style: key === 'xxl' || key === 'xl' ? 'Semi Bold' : 'Regular' };
@@ -162,7 +162,7 @@ async function main() {
   const effectStyles = await figma.getLocalEffectStylesAsync();
   for (const [mode, effect] of Object.entries(NEXA_TOKENS.elevation)) {
     const name = 'NEXUS / Elevation / ' + mode;
-    let style = effectStyles.find((candidate) => candidate.name === name || candidate.name === name.replace(/^NEXUS \/, 'NEXA /'));
+    let style = effectStyles.find((candidate) => candidate.name === name || candidate.name === name.replace('NEXUS /', 'NEXA /'));
     if (style && style.name !== name) style.name = name;
     if (!style) { style = figma.createEffectStyle(); style.name = name; if (!effectStyles.some((item) => item.id === style.id)) effectStyles.push(style); }
     style.effects = [{
