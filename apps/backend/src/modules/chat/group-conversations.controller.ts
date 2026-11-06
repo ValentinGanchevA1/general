@@ -29,6 +29,7 @@ import type {
 } from '@g88/shared';
 
 import { RealtimeEmitterService } from '../../realtime/realtime-emitter.service';
+import { roomRevocationOutboxEnabled } from '../../realtime/room-revocation.config';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GroupConversationsService } from './group-conversations.service';
@@ -90,7 +91,9 @@ export class GroupConversationsController {
     try {
       this.moduleRef.get(RealtimeEmitterService, { strict: false })
         .leaveRoomForUsers([memberId], `convo:${conversationId}`);
-    } catch {
+    } catch (error) {
+      // Before migration 0069/flag activation there is no durable retry path.
+      if (!roomRevocationOutboxEnabled()) throw error;
       // DB membership and outbox both committed: a transient adapter error
       // must not cause a false HTTP 500 or lose the retry intent.
       this.logger.warn('Group member removed; room eviction is queued for retry');
