@@ -7,7 +7,7 @@ import { NexaWordmark } from './NexaWordmark';
 describe('NexaWordmark', () => {
   it('keeps the full lockup accessible as one image', () => {
     const ui = render(<NexaWordmark />);
-    expect(ui.getByLabelText('NEXA').props.accessibilityRole).toBe('image');
+    expect(ui.getByLabelText('NEXUS').props.accessibilityRole).toBe('image');
   });
 
   it('renders the reference eye as open upper and split lower arcs around a glowing iris', () => {
@@ -23,7 +23,7 @@ describe('NexaWordmark', () => {
     // The central pupil is distinct from the surrounding iris rings and glow.
     expect(circles).toHaveLength(5);
     const pupil = circles[4];
-    if (!pupil) throw new Error('Expected NEXA central pupil circle');
+    if (!pupil) throw new Error('Expected NEXUS central pupil circle');
     expect(pupil.props.fill).toMatch(/^url\(#nexa-wordmark-pupil-/);
     expect(ui.UNSAFE_getAllByType(RadialGradient)).toHaveLength(1);
   });
