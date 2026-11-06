@@ -120,13 +120,15 @@ describe('RealtimeGateway conversation join authorization', () => {
   it('rejects a left or otherwise unauthorized group member', async () => {
     const { gateway, client, getRecipientIds } = setup(false);
     const join = jest.fn();
-    Object.assign(client, { join });
+    const leave = jest.fn();
+    Object.assign(client, { join, leave });
     getRecipientIds.mockResolvedValue([recipientId, memberCId]);
 
     await expect(
       gateway.onConversationJoin(client as never, { conversationId }),
     ).resolves.toMatchObject({ ok: false, code: 'chat.forbidden' });
     expect(join).not.toHaveBeenCalled();
+    expect(leave).toHaveBeenCalledWith(`convo:${conversationId}`);
     expect(client.rooms.has(`convo:${conversationId}`)).toBe(false);
   });
 });

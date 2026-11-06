@@ -14,7 +14,8 @@ describe('RealtimeGateway live location multi-socket revocation', () => {
   it('rejects conversation rejoin after a block or participant removal', async () => {
     const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
     const join = jest.fn();
-    const client = { data: { userId: peerId, rooms: new Set<string>() }, join };
+    const leave = jest.fn();
+    const client = { data: { userId: peerId, rooms: new Set<string>() }, join, leave };
     const getRecipientIds = jest.fn().mockResolvedValue([sharerId]);
     Object.assign(gateway, {
       chatRealtimeAccess: { getRecipientIds },
@@ -31,6 +32,31 @@ describe('RealtimeGateway live location multi-socket revocation', () => {
     await expect(gateway.onConversationJoin(client as never, { conversationId }))
       .resolves.toMatchObject({ ok: false, code: 'chat.forbidden' });
     expect(join).not.toHaveBeenCalled();
+    expect(leave).toHaveBeenCalledTimes(2);
+    expect(leave).toHaveBeenCalledWith(`convo:${conversationId}`);
+  });
+
+  it('removes a stale tracked subscription even when the first access check fails', async () => {
+    const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
+    const room = `convo:${conversationId}`;
+    const rooms = new Set([room, `user:${peerId}`]);
+    const trackedRooms = new Set([room]);
+    const leave = jest.fn(async (target: string): Promise<void> => {
+      rooms.delete(target);
+    });
+    const client = { rooms, data: { userId: peerId, rooms: trackedRooms }, leave };
+    const getRecipientIds = jest.fn().mockRejectedValue(new Error('authorization query unavailable'));
+    Object.assign(gateway, {
+      chatRealtimeAccess: { getRecipientIds },
+      logger: { error: jest.fn() },
+    });
+
+    await expect(gateway.onConversationJoin(client as never, { conversationId }))
+      .resolves.toMatchObject({ ok: false });
+    expect(leave).toHaveBeenCalledWith(room);
+    expect(rooms.has(room)).toBe(false);
+    expect(trackedRooms.has(room)).toBe(false);
+    expect(rooms.has(`user:${peerId}`)).toBe(true);
   });
 
   it('does not deliver precise updates to blocked peer sockets retaining stale conversation rooms', async () => {

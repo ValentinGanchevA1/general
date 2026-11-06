@@ -216,7 +216,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: G88Socket,
     @MessageBody() payload: ConversationJoinDto,
   ): Promise<AckResult<{ joined: true }>> {
-    let pendingRoom: string | null = null;
+    const room = this.conversationRoom(payload.conversationId);
+    let joinedAndAuthorized = false;
     try {
       const authorized = (await this.authorizedConversationRecipients(payload.conversationId))
         .includes(client.data.userId);
@@ -224,8 +225,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         return { ok: false, code: 'chat.forbidden', message: 'Not a participant' };
       }
 
-      const room = this.conversationRoom(payload.conversationId);
-      pendingRoom = room;
       await client.join(room);
 
       // A block or group removal may commit between the first authorization
@@ -238,17 +237,18 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       }
 
       client.data.rooms.add(room);
-      pendingRoom = null;
+      joinedAndAuthorized = true;
       return { ok: true, data: { joined: true } };
     } catch (err) {
       const { code, message } = extractApiError(err);
       return { ok: false, code, message };
     } finally {
-      // Also roll back room entry when the second authorization query fails:
-      // no failed join may leave a subscribed socket behind.
-      if (pendingRoom !== null) {
-        await client.leave(pendingRoom);
-        client.data.rooms.delete(pendingRoom);
+      // An earlier adapter eviction may have failed after membership was revoked.
+      // Always discard a stale subscription on denied/failed rejoin, including
+      // failures on the first authorization lookup (before join() is called).
+      if (!joinedAndAuthorized) {
+        await client.leave(room);
+        client.data.rooms.delete(room);
       }
     }
   }
