@@ -25,6 +25,7 @@ export type CommerceStackParamList = {
 /** Settings / verification / legal + self-owned private collections. */
 export type AccountStackParamList = {
   Settings: undefined;
+  WorldModes: undefined;
   Privacy: undefined;
   Help: undefined;
   About: undefined;
