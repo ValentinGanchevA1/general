@@ -310,6 +310,14 @@ export class GroupConversationsService {
           AND left_at IS NULL`,
       [conversationId, target.user_id],
     );
+
+    // Commit the revocation intent with the membership change, both for
+    // explicit kick/leave and the shared-group privacy boundary on block.
+    await tx.query(
+      `INSERT INTO realtime_room_revocations (conversation_id, user_id)
+       VALUES ($1, $2)`,
+      [conversationId, target.user_id],
+    );
   }
 
   private async assertInviteesEligible(
