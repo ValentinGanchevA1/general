@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator, AppState, Linking, Modal, Pressable, ScrollView, StyleSheet,
   Switch, Text, View,
@@ -19,9 +19,8 @@ export function TermsAcceptanceGate({ userId }: { userId: string }): React.JSX.E
   const [agreed, setAgreed] = useState(false);
   const [deferred, setDeferred] = useState(false);
 
+  // Parent uses key=userId, so consent state resets on account changes.
   useEffect(() => {
-    setAgreed(false);
-    setDeferred(false);
     void dispatch(loadTermsStatus());
   }, [dispatch, userId]);
 
@@ -35,12 +34,12 @@ export function TermsAcceptanceGate({ userId }: { userId: string }): React.JSX.E
   const current = status?.required === true && status.configured &&
     status.enforcementEnabled && Boolean(status.url) && Boolean(status.version);
 
-  const openTerms = useCallback(() => {
+  const openTerms = () => {
     const url = status?.url;
     if (url?.startsWith('https://')) void Linking.openURL(url).catch(() => undefined);
-  }, [status?.url]);
+  };
 
-  const submit = useCallback(async () => {
+  const submit = async () => {
     if (!agreed || !status?.version) return;
     const result = await dispatch(acceptTerms({
       version: status.version, accepted: true, channel: 'mobile',
@@ -49,7 +48,7 @@ export function TermsAcceptanceGate({ userId }: { userId: string }): React.JSX.E
       setAgreed(false);
       void dispatch(loadTermsStatus());
     }
-  }, [agreed, dispatch, status?.version]);
+  };
 
   if (!current || deferred || loading) return null;
 
