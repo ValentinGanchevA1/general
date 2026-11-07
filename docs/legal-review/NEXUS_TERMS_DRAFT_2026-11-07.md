@@ -9,7 +9,8 @@ Status: editorial draft for issue #592. Product: **NEXUS** (public brand); techn
 - [ ] Confirm user-generated-content moderation policy, escalation process, retention and appeal procedure, including risk of illegal material.
 - [ ] Confirm deletion timelines, legal holds and whether archived posts/reports may be retained in backend or backups.
 - [ ] Confirm current launch feature flags: all paid digital goods and Premium purchases disabled, but marketplace interactions may exist.
-- [ ] Validate whether the service is explicitly restricted to adults 18+, and how the restriction is enforced.
+- [x] Product owner chose optional Dating-only 18+ (issue #1068); do not claim general account registration or NEXUS social functionality is universally 18+.
+- [ ] Confirm robust adult verification and protections for younger social users before any Play release; a self-declared DOB alone can be circumvented.
 - [ ] Validate exact location behavior: coarsened *public* map presence; separately opt-in *precise* 1:1 chat live location (persisted in location session and initial chat message).
 - [ ] Review risk notices and policies for offline meetings, events, local marketplace trades and identity badges.
 - [ ] Translate approved terms as appropriate for launch market; align the accepted version and locale.
@@ -25,7 +26,7 @@ NEXUS is a location-based social service for discovering people, local activitie
 **Effective date/version (not set):** [VERSION AND DATE].
 
 ### 2. Eligibility and accounts
-You must be at least **18 years old** to create an account or use NEXUS. You agree to provide accurate registration details, maintain the confidentiality of your credentials and notify support if you suspect unauthorized use of your account. You are responsible for activity originating from your account, subject to applicable law. Do not impersonate others or bypass account restrictions.
+NEXUS provides general social features and optional **Dating/matchmaking**, which is reserved for people aged **18 or older**. Ordinary account creation does not itself require the user to be 18. Some social features or types of content may be restricted by age, jurisdiction, parental consent requirements or safety rules; the appropriate minimum age and safeguards for general social access remain subject to review. You must provide accurate information, must not misrepresent your age to bypass Dating restrictions, and must secure your credentials and report unauthorized access. You are responsible for activity originating from your account, subject to applicable law. Do not impersonate other people or evade account restrictions.
 
 ### 3. Community safety and prohibited conduct
 NEXUS is intended for respectful, lawful interactions. You must not:

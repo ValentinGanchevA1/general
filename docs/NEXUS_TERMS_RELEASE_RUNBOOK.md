@@ -2,6 +2,8 @@
 
 Status: **implementation candidate** (PR #1067). The working Terms draft was merged as a **review artifact only** in #1065. It is **not legally approved** or published. Issue #592 remains open. This runbook does not certify legal compliance.
 
+**Product age-scope decision (issue #1068):** NEXUS general social access is *not universally 18+*. Only optional Dating/matchmaking is restricted to adults aged 18+. A claimed date of birth is not a verified age; Google Play's incidental Dating exception requires effective feature-level safeguards. Legal review must check appropriate restrictions and protection for any younger general-social audience. The final signed Terms, Privacy and Play Console target-age declarations must match this actual implementation. Reference: https://support.google.com/googleplay/android-developer/answer/16838200 .
+
 ## Google Play rule
 Official UGC policy: https://support.google.com/googleplay/android-developer/answer/9876937
 Google requires affirmative acceptance of the app's terms/user policy before creating or uploading UGC, clear prohibited-content rules, effective reporting/blocking, and appropriate ongoing moderation.
