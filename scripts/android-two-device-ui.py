@@ -140,9 +140,20 @@ def find_node(serial: str, value: str, contains: bool, timeout: float) -> UiNode
                     click_node(serial, skip)
                     time.sleep(0.75)
                     continue
-            for node in nodes:
-                if matches(node, value, contains):
-                    return node
+            if value in MAP_NAV_TARGETS and not contains:
+                # Tab text is visible on Android even when UIAutomator omits
+                # the parent accessibilityLabel. Prefer the exact requested
+                # label; allow the currently rendered visible tab text as a
+                # fallback. Selecting the lowest matching node avoids headers.
+                labels = (value, *(label for label in sorted(MAP_NAV_TARGETS) if label != value))
+                for label in labels:
+                    matches_here = [node for node in nodes if matches(node, label, False)]
+                    if matches_here:
+                        return max(matches_here, key=lambda node: node.bounds[1])
+            else:
+                for node in nodes:
+                    if matches(node, value, contains):
+                        return node
         except (subprocess.CalledProcessError, ET.ParseError) as error:
             last_error = error
         time.sleep(0.75)
