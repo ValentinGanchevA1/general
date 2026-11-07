@@ -50,7 +50,21 @@ export function TermsAcceptanceGate({ userId }: { userId: string }): React.JSX.E
     }
   };
 
-  if (!current || deferred || loading) return null;
+  if (!current || loading) return null;
+  if (deferred) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Review Terms to enable posting"
+        onPress={() => setDeferred(false)}
+        style={[styles.reminder, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
+        <Text style={[styles.reminderText, { color: colors.textPrimary }]}>
+          Terms not accepted · Review to enable posting
+        </Text>
+      </Pressable>
+    );
+  }
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => setDeferred(true)}>
@@ -117,6 +131,10 @@ export function TermsAcceptanceGate({ userId }: { userId: string }): React.JSX.E
 }
 
 const styles = StyleSheet.create({
+  reminder: { position: 'absolute', top: 62, left: 16, right: 16, paddingVertical: 12,
+    paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, elevation: 14, zIndex: 99,
+    alignItems: 'center' },
+  reminderText: { fontSize: 13, fontWeight: '700' },
   backdrop: { flex: 1, backgroundColor: 'rgba(3,7,15,0.87)', padding: 18, justifyContent: 'center' },
   card: { width: '100%', maxWidth: 540, alignSelf: 'center', borderRadius: 20, borderWidth: 1, maxHeight: '88%' },
   contents: { padding: 24, gap: 16 },
