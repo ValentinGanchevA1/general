@@ -20,4 +20,10 @@ export interface ContentReport {
   reviewedAt: string | null;
 }
 export interface ContentReportPage { items: ContentReport[]; nextOffset: number | null }
+export interface AdminContentReport extends ContentReport {
+  targetDisplayName: string | null;
+  targetCaption: string | null;
+  targetMediaUrl: string | null;
+}
+export interface AdminContentReportPage { items: AdminContentReport[]; nextOffset: number | null }
 export type ContentReportDecision = 'review' | 'dismiss' | 'hide_story';
