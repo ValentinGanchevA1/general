@@ -79,13 +79,19 @@ function MessageBubble({
 
   if (msg.type === 'location_session') {
     if (allowLocationSession) {
-      return <LocationSessionBubble msg={msg} isMine={isMine} />;
+      return (
+        <View>
+          <LocationSessionBubble msg={msg} isMine={isMine} />
+          {!isMine ? <ReportContentButton targetType="message" targetId={msg.id} /> : null}
+        </View>
+      );
     }
     return (
       <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
         <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
           Live location is unavailable in group chats.
         </Text>
+        {!isMine ? <ReportContentButton targetType="message" targetId={msg.id} /> : null}
       </View>
     );
   }
