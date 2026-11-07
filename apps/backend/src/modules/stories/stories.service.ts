@@ -205,8 +205,10 @@ export class StoriesService {
         dto.mediaUrl,
         dto.mediaType,
         dto.caption ?? null,
-        dto.location.lng,
-        dto.location.lat,
+        // Persist only the coarsened H3 r10 centroid. Raw device GPS must
+        // not be retained as the story's geography column.
+        approx.lng,
+        approx.lat,
         cells.r4,
         cells.r5,
         cells.r6,
