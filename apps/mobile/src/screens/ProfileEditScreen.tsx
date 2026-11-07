@@ -39,6 +39,7 @@ import { openRootScreen } from '@/navigation/openRootScreen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
 import { ProfileDatePicker, formatProfileDate } from '@/components/Profile/ProfileDatePicker';
+import { parseIsoDate } from '@/features/profile/profileOrigin';
 import {
   ProfileSearchPicker,
   type ProfileSearchOption,
@@ -241,7 +242,12 @@ export function ProfileEditScreen(): React.JSX.Element {
     const next: Partial<Record<FieldKey, string>> = {};
     if (!displayName.trim()) next.displayName = 'Display name is required.';
     const dob = dateOfBirth.trim();
-    if (dob && !isAdult(dob)) next.dateOfBirth = 'You must be at least 18 years old.';
+    const parsedDob = dob ? parseIsoDate(dob) : null;
+    if (dob && (!parsedDob || parsedDob.getTime() > Date.now())) {
+      next.dateOfBirth = 'Enter a valid date of birth.';
+    } else if (openToDating && (!dob || !isAdult(dob))) {
+      next.dateOfBirth = 'Dating requires an eligible birth date (18+).';
+    }
     if (Object.keys(next).length > 0) {
       setErrors(next);
       return;
@@ -354,7 +360,7 @@ export function ProfileEditScreen(): React.JSX.Element {
           <View style={styles.compactMain}>
             <Text style={styles.compactLabel}>Date of birth</Text>
             <Text style={[styles.compactValue, !dateOfBirth && styles.pickerFieldPlaceholder]}>{dateOfBirth ? formatProfileDate(dateOfBirth) : 'Select date'}</Text>
-            <Text style={styles.compactHint}>Private exact date · 18+ required</Text>
+            <Text style={styles.compactHint}>Private exact date · 18+ for Dating only</Text>
           </View>
           <Icon name="calendar-outline" size={22} color={colors.primary} />
         </TouchableOpacity>
@@ -387,7 +393,7 @@ export function ProfileEditScreen(): React.JSX.Element {
 
         <View onLayout={(e) => { datingYRef.current = e.nativeEvent.layout.y; }}>
           <Text style={styles.section}>DATING</Text>
-          <Text style={styles.hint}>Opt in to appear when others use the Dating map filter. Seeking is private.</Text>
+          <Text style={styles.hint}>Dating is optional and available only to adults aged 18+. Seeking is private.</Text>
           <View style={styles.toggleRow}><View style={styles.toggleText}><Text style={styles.toggleLabel}>Open to dating</Text></View>{themedSwitch(openToDating, setOpenToDating)}</View>
           {openToDating ? <>
             <Text style={styles.fieldLabel}>Interested in</Text>

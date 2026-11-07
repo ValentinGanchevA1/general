@@ -15,6 +15,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { NexaDiscoveryHero } from '@/components/Brand/NexaDiscoveryHero';
 import { BirthDateField, CityAutocompleteField } from '@/components/Profile/ProfileOriginFields';
+import { parseIsoDate } from '@/features/profile/profileOrigin';
 import { FormField } from '@/components/FormField';
 import { INTEREST_OPTIONS } from '@/features/profile/interestOptions';
 import { PURPOSE_OPTIONS } from '@/features/profile/goalOptions';
@@ -55,14 +56,9 @@ function StepHeader({ eyebrow, title, subtitle }: StepHeaderProps): React.JSX.El
   );
 }
 
-function isAdult(isoDate: string): boolean {
-  const dob = new Date(isoDate);
-  if (Number.isNaN(dob.getTime())) return false;
-  const today = new Date();
-  let years = today.getFullYear() - dob.getFullYear();
-  const monthDelta = today.getMonth() - dob.getMonth();
-  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < dob.getDate())) years -= 1;
-  return years >= 18;
+function isValidBirthDate(value: string): boolean {
+  const date = parseIsoDate(value);
+  return date !== null && date.getTime() <= Date.now();
 }
 
 function StepName({ value, onChange }: { value: string; onChange: (value: string) => void }): React.JSX.Element {
@@ -180,7 +176,7 @@ function StepOrigin({
       <StepHeader
         eyebrow="ABOUT YOU"
         title="Age & origin"
-        subtitle="You must be 18+. Exact date of birth stays private; NEXUS can derive your age and zodiac from it."
+        subtitle="Your date of birth is optional for social features. Dating is 18+ only."
       />
       <View style={styles.originFields}>
         <BirthDateField
@@ -326,7 +322,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
     if (step === 2) return form.interests.length >= MIN_INTERESTS;
     if (step === 3) {
       const dob = form.dateOfBirth.trim();
-      return /^\d{4}-\d{2}-\d{2}$/.test(dob) && isAdult(dob);
+      return !dob || isValidBirthDate(dob);
     }
     if (step === 4) return form.goals.length > 0;
     return true;
@@ -335,12 +331,8 @@ export function ProfileCreationScreen(): React.JSX.Element {
   const advance = (): void => {
     if (step === 3) {
       const dob = form.dateOfBirth.trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
-        setOriginError('Enter date of birth as YYYY-MM-DD');
-        return;
-      }
-      if (!isAdult(dob)) {
-        setOriginError('You must be at least 18 years old');
+      if (dob && !isValidBirthDate(dob)) {
+        setOriginError('Enter a valid date of birth or leave it empty.');
         return;
       }
       setOriginError('');
@@ -357,7 +349,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
         // Legacy completion currently relies on bio being non-null. Bio authoring moves to Profile v3.
         bio: '',
         interests: form.interests,
-        dateOfBirth: form.dateOfBirth.trim(),
+        dateOfBirth: form.dateOfBirth.trim() || null,
         hometownCity: form.hometownCity.trim() || null,
         hometownCountry: form.hometownCountry.trim() || null,
         showAge: form.showAge,
