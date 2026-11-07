@@ -1,6 +1,6 @@
 import { createSign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 const PACKAGE = 'com.g88';
 const LOCALES = ['en-US', 'bg-BG'];
@@ -71,7 +71,7 @@ async function getAccessToken(serviceAccount) {
   return token.access_token;
 }
 
-async function playRequest(token, method, path, body) {
+async function playRequest(token, method, path, body, allowNotFound = false) {
   const response = await fetch(BASE + path, {
     method,
     headers: {
@@ -82,6 +82,7 @@ async function playRequest(token, method, path, body) {
     signal: AbortSignal.timeout(45000),
   });
   // Deliberately do not log response bodies, OAuth tokens or service-account JSON.
+  if (allowNotFound && response.status === 404) return null;
   if (!response.ok) throw new Error('Play API ' + method + ' failed (HTTP ' + response.status + ')');
   return response.json();
 }
@@ -109,14 +110,17 @@ async function main() {
   if (typeof edit.id !== 'string' || !edit.id) throw new Error('Play edit ID missing');
   const path = prefix + '/' + encodeURIComponent(edit.id);
   for (const { locale, listing } of listings) {
-    await playRequest(token, 'PATCH', path + '/listings/' + locale, listing);
+    const listingPath = path + '/listings/' + locale;
+    const existing = await playRequest(token, 'GET', listingPath, undefined, true);
+    // PATCH preserves optional metadata such as promo video. PUT creates a missing locale.
+    await playRequest(token, existing ? 'PATCH' : 'PUT', listingPath, listing);
     console.log(locale + ': staged in Play edit');
   }
   await playRequest(token, 'POST', path + ':commit', {});
   console.log('NEXUS listing changes committed for en-US and bg-BG. No release track was modified.');
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(fileURLToPath(process.argv[1])).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
     console.error('NEXUS Play listing sync failed: ' + error.message);
     process.exitCode = 1;
