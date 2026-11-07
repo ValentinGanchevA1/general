@@ -34,7 +34,7 @@
 <body>
   <h1>NEXUS Privacy Policy</h1>
   <p class="meta">
-    Last updated: <strong>25 October 2026</strong> &middot;
+    Last updated: <strong>7 November 2026</strong> &middot;
     Operated by <strong>Valentin Ganchev</strong>
     (&ldquo;NEXUS&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;).
   </p>
@@ -44,8 +44,9 @@
     live map so you can discover, connect, chat, join events, and explore local listings. This
     policy explains what we collect, how we use it, who we share it with, and the choices and
     rights you have. Privacy is a core design constraint of the product: most notably,
-    <strong>your exact location is never shared with other users or stored on our servers</strong>
-    (see &ldquo;Location&rdquo; below).
+    <strong>your public map presence is privacy-coarsened</strong>. Separately, if you
+    explicitly activate live location sharing in a one-to-one chat, your chat partner
+    can see precise GPS coordinates, which are also stored by our service as explained below.
   </p>
 
   <h2>1. Who this applies to</h2>
@@ -63,6 +64,7 @@
       <tr><td>Account</td><td>Email address, password (stored only as a salted hash), or Google sign-in identifier; display name</td><td>Create and secure your account, authentication</td></tr>
       <tr><td>Profile</td><td>Photos, bio, interests/goals, date of birth, optional hometown and social links you add</td><td>Build your profile, confirm 18+ eligibility, and provide discovery context</td></tr>
       <tr><td>Approximate location</td><td>A privacy-coarsened location (~120&nbsp;m) of where you are</td><td>Show nearby people, presence, and local content on the map</td></tr>
+      <tr><td>Precise live location (optional)</td><td>Last latitude/longitude of an active or ended 1:1 sharing session; the initial shared location in a chat message</td><td>Deliver opt-in precise location to one authorized chat partner</td></tr>
       <tr><td>Messages &amp; interactions</td><td>Chat messages, waves, RSVPs, listings, gifts, challenges</td><td>Deliver the core social features</td></tr>
       <tr><td>Verification (optional)</td><td>Phone number; selfie + ID document if you request ID verification</td><td>Provide identity-verification signals and support trust &amp; safety</td></tr>
       <tr><td>Payment (optional)</td><td>Subscription status and identifiers; card details are handled by Stripe, never by us</td><td>Manage subscriptions</td></tr>
@@ -76,11 +78,23 @@
       Your device determines your precise GPS position for nearby discovery. That precise
       position is transmitted to our server over an encrypted connection and is
       <strong>immediately coarsened to roughly a 120-meter area</strong> (an H3 grid-cell
-      centroid) <strong>before anything is stored</strong>. We do not retain your exact GPS
-      coordinates, and other users only ever see the coarsened location. This means you appear
-      &ldquo;in the neighborhood,&rdquo; never at a precise point.
+      centroid) <strong>before public map-presence data is stored</strong>. In nearby map
+      discovery, other users see only the privacy-coarsened position rather than your
+      raw GPS coordinates. Opt-in direct-message live-location sharing is different;
+      that feature stores and discloses precise location as described below.
     </p>
   </div>
+  <p>
+    <strong>Opt-in chat live location:</strong> In a one-to-one chat, you can explicitly
+    choose to share your precise GPS position with that chat partner for 15 minutes,
+    60 minutes, or until you stop. Your partner can see accurate coordinates while
+    the sharing session remains active. The service stores the latest precise location
+    in the chat-location session record and the initial shared coordinates in the
+    chat message. Ending the session stops new updates but does not automatically
+    remove these stored records. Records are handled under account/chat retention
+    and deletion procedures below; please do not share location unless you trust
+    the recipient. Group chats cannot use this feature.
+  </p>
   <p>
     Location is used only while you are using the app (foreground); NEXUS does not track your
     location in the background. You can turn your map presence off from
@@ -102,9 +116,10 @@
 
   <h2>5. Who we share with</h2>
   <p><strong>Other users</strong> see your display name, avatar/photos, bio, interests, verification
-  signals, and your coarsened (~120&nbsp;m) location when map presence is enabled &mdash; not your
-  email, phone, date of birth, or precise location. Your age is shown only when your profile
-  visibility setting for age is enabled.</p>
+  signals, and your coarsened map presence when enabled. They do not receive your
+  email, phone or date of birth. <strong>An individual chat recipient can receive
+  your exact location only when you explicitly start a live-location share with them.</strong>
+  Your age is shown only when your profile visibility setting for age is enabled.</p>
   <p><strong>Service providers</strong> process data on our behalf, under contract, only to run NEXUS:</p>
   <table>
     <thead><tr><th>Provider</th><th>Purpose</th></tr></thead>

@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  ServiceUnavailableException,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -33,6 +34,14 @@ export class SubscriptionsController {
     @CurrentUser('id') userId: string,
     @Body() dto: CreateCheckoutDto,
   ): Promise<CheckoutSessionResponse> {
+    // Default-deny paid digital checkout for the free first Google Play release.
+    // Future enablement requires a separate policy / Play Billing review.
+    if (process.env.ENABLE_PAID_SUBSCRIPTIONS !== 'true') {
+      throw new ServiceUnavailableException({
+        code: 'subscription.unavailable',
+        message: 'Paid subscriptions are unavailable during early access.',
+      });
+    }
     return { url: await this.subscriptions.createCheckout(userId, dto.tier) };
   }
 

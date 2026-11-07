@@ -65,14 +65,15 @@ export function PrivacyScreen(): React.JSX.Element {
           the features we ship today.
         </Text>
 
-        {point('map-marker-off', 'Your exact location is never stored', 'Precise GPS is coarsened to roughly a 120-meter area before anything is saved. Other users only ever see that coarsened neighborhood — never a point on your doorstep.')}
+        {point('map-marker-off', 'Nearby map shows a coarsened position', 'NEXUS coarsens your location for public discovery. Other people do not see exact map-presence coordinates. Live location sharing in a 1:1 chat is a separate, opt-in feature.')}
+        {point('map-marker-path', 'Live location in chat is optional', 'If you choose Share live location, your chat partner sees your precise GPS coordinates until you stop or the session ends. The service stores the session\'s last coordinates and the initial shared position in a chat message; stopping does not immediately erase that history.')}
         {point('map-clock', 'Foreground only', 'Location is used only while the app is open (map, Pulse stories, nearby feed). NEXUS does not track you in the background.')}
         {point('eye-off', 'You control who sees you', 'Hide from discovery any time in Settings → Appear on map. You stay logged in and can still browse; others will not see you in discovery.')}
         {point('account-group', 'Friends stay intentional', 'Friend requests are explicit. Online presence is shown only to friends, and only if you allow it in Settings → Friends can see when I’m online. Your friends list is not sold or used for ads. Unfriending does not automatically tear down public follows.')}
         {point('circle-outline', 'Stories stay local and temporary', 'Stories are visible to people nearby and expire after 24 hours. Posting requires a verified email and a minimum account age (phone-verified accounts can post sooner). Media is not kept as a permanent public archive.')}
         {point('hand-wave', 'Interactions are intentional', 'Waves, story reactions, and friend requests are first-class signals. Chat prioritizes people you already know; cold outreach stays lightweight until interest is mutual. Inbound waves can open a map pin only when the sender has a public coarsened location.')}
         {point('card-account-details-outline', 'ID verification is assist-only', 'If you submit ID, automated face checks help reviewers — a human always decides. Selfie and ID images are used for verification only, not for advertising or sale.')}
-        {point('account-eye', 'What others can see', 'Display name, photos, bio, interests, badges, coarsened location, and public storyline — never your email, phone number, or precise position.')}
+        {point('account-eye', 'What others can see', 'In public discovery: display name, photos, bio, interests, verification badges and coarsened map presence. In an opted-in 1:1 live-location session, your chat partner can also see precise coordinates.')}
         {point('storefront-outline', 'Trading stays offline', 'Listings and offers are free. Settlement happens between people offline — we do not process payments or store card data for local trade.')}
         {point('shield-lock', 'Encrypted and minimized', 'Data is encrypted in transit. Passwords are salted hashes only. Sign-in tokens stay in your device keystore. Diagnostics are scrubbed of location and tokens.')}
         {point('cancel', 'No selling, no ads', 'We do not sell your personal data and we do not show third-party advertising.')}

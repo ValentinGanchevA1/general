@@ -6,7 +6,7 @@ export interface HelpFaq {
 export const NEXA_HELP_FAQS: HelpFaq[] = [
   {
     q: 'How does NEXUS know who is nearby?',
-    a: 'While the app is open, your device shares an approximate location (coarsened to about a 120-meter area). We use it for the map, Pulse stories, and nearby activity. Your exact position is never stored.',
+    a: 'While the app is open, your precise GPS is sent securely to the server and coarsened for map discovery, so other people see only an approximate location. Sharing live location in a one-to-one chat is a separate opt-in feature: your chat partner sees exact coordinates, which are stored for the session and in the initial chat message.',
   },
   {
     q: 'How do I hide myself from the map?',

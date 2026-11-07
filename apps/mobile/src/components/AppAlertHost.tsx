@@ -5,10 +5,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
 } from 'react-native';
 
 import {
@@ -31,6 +31,7 @@ function createStyles(colors: ThemeColors) {
     card: {
       width: '100%',
       maxWidth: 340,
+      maxHeight: '85%',
       backgroundColor: colors.surface,
       borderRadius: radius.lg,
       borderWidth: 1,
@@ -96,7 +97,12 @@ export function AppAlertHost(): React.JSX.Element | null {
         <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
           <Text style={styles.title}>{req.title}</Text>
           {req.message ? <Text style={styles.message}>{req.message}</Text> : null}
-          <View style={[styles.actions, useRow && styles.actionsRow]}>
+          <ScrollView
+            style={{ flexGrow: 0 }}
+            contentContainerStyle={[styles.actions, useRow && styles.actionsRow]}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+          >
             {orderedButtons.map((btn, i) => {
               const isCancel = btn.style === 'cancel';
               const isDestructive = btn.style === 'destructive';
@@ -113,7 +119,7 @@ export function AppAlertHost(): React.JSX.Element | null {
                 </TouchableOpacity>
               );
             })}
-          </View>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>

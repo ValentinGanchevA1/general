@@ -9,6 +9,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { appAlert } from '@/ui/appAlert';
+import { useAppDispatch } from '@/hooks/redux';
+import { showContentReportPrompt } from '@/features/reports/reportPrompt';
 import {
 	BottomSheetModal,
 	BottomSheetView,
@@ -39,6 +41,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
  * Layout lives in ProfileView mode="other" (PR-C).
  */
 export function UserProfileScreen({ route, navigation }: Props): React.JSX.Element {
+	const dispatch = useAppDispatch();
 	const { colors } = useAppTheme();
 	const styles = useMemo(() => createStyles(colors), [colors]);
 	const sheetChrome = useSheetChrome();
@@ -93,6 +96,12 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 		if (blocked) {
 			items = [
 				{
+					key: 'report',
+					label: 'Report',
+					icon: 'flag-outline',
+					onPress: () => { dismiss(); showContentReportPrompt(dispatch, 'user', userId); },
+				},
+				{
 					key: 'unblock',
 					label: 'Unblock',
 					icon: 'account-check-outline',
@@ -139,10 +148,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 				icon: 'flag-outline',
 				onPress: () => {
 					dismiss();
-					appAlert(
-						'Report submitted',
-						'Thanks — our team will review this profile. For serious harm use local emergency services.',
-					);
+					showContentReportPrompt(dispatch, 'user', userId);
 				},
 			});
 			items.push({
@@ -189,6 +195,15 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 	const footer = (
 		<View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
 			{blocked ? (
+				<>
+					<TouchableOpacity
+						style={[styles.footerBtn, styles.menuBtn]}
+						onPress={openMenu}
+						accessibilityRole="button"
+						accessibilityLabel="More options, including report"
+					>
+						<Icon name="dots-horizontal" size={22} color={colors.textPrimary} />
+					</TouchableOpacity>
 				<TouchableOpacity
 					style={styles.unblockBtn}
 					onPress={() => void unblock()}
@@ -196,6 +211,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 				>
 					<Text style={styles.unblockBtnText}>Unblock</Text>
 				</TouchableOpacity>
+				</>
 			) : (
 				<TouchableOpacity
 					style={[styles.footerBtn, styles.menuBtn, styles.footerMenuOnly]}

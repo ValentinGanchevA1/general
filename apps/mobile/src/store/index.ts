@@ -1,4 +1,5 @@
 import eventReviewsReducer from '@/features/events/eventReviewsSlice';
+import reportsReducer from '@/features/reports/reportsSlice';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '@/features/auth/authSlice';
 import passwordResetReducer from '@/features/auth/passwordResetSlice';
@@ -29,6 +30,7 @@ export const store = configureStore({
   reducer: {
     auth: authReducer,
     eventReviews: eventReviewsReducer,
+    reports: reportsReducer,
     passwordReset: passwordResetReducer,
     profile: profileReducer,
     chat: chatReducer,
