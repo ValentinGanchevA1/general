@@ -32,7 +32,7 @@ describe('UsersService dating age safeguards', () => {
     query.mockResolvedValueOnce([{ date_of_birth: null, open_to_dating: false }]);
     await expect(service.updateProfile(userId, { openToDating: true }))
       .rejects.toBeInstanceOf(BadRequestException);
-    expect(query.mock.calls.some(([sql]: [string]) => sql.startsWith('UPDATE users')))
+    expect(query.mock.calls.some((call: unknown[]) => typeof call[0] === 'string' && call[0].startsWith('UPDATE users')))
       .toBe(false);
   });
 
@@ -48,7 +48,7 @@ describe('UsersService dating age safeguards', () => {
     query.mockResolvedValueOnce([{ date_of_birth: '1990-01-01', open_to_dating: true }]);
     await expect(service.updateProfile(userId, { dateOfBirth: null }))
       .rejects.toBeInstanceOf(BadRequestException);
-    expect(query.mock.calls.some(([sql]: [string]) => sql.startsWith('UPDATE users')))
+    expect(query.mock.calls.some((call: unknown[]) => typeof call[0] === 'string' && call[0].startsWith('UPDATE users')))
       .toBe(false);
   });
 });
