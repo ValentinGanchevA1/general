@@ -32,7 +32,7 @@ interface Props {
 	item: ActivityItem;
 	onPress: () => void;
 	onView?: () => void;
-	onReport?: () => void;
+	onReport?: (() => void) | undefined;
 }
 
 export function ActivityCard({ item, onPress, onView, onReport }: Props): React.JSX.Element {
