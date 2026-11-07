@@ -38,6 +38,7 @@ import { StoriesModule } from './modules/stories/stories.module';
 import { DatingModule } from './modules/dating/dating.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { RuntimeConfigModule } from './modules/runtime-config/runtime-config.module';
+import { TermsModule } from './modules/terms/terms.module';
 import { ContentReportsModule } from './modules/content-reports/content-reports.module';
 
 @Module({
@@ -93,6 +94,7 @@ import { ContentReportsModule } from './modules/content-reports/content-reports.
     ListingsModule,
     HealthModule,
     RuntimeConfigModule,
+    TermsModule,
     BlocksModule,
     FriendsModule,
     StoriesModule,
