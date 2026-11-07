@@ -38,7 +38,10 @@
 - [ ] Audit Sentry, FCM, first-party analytics and optional PostHog/Stripe flags before marking shared/collected categories.
 - [ ] Confirm hosted privacy policy and external account-deletion request URL load anonymously over HTTPS, and reflect the build.
 - [ ] Complete Terms of Service + policy acceptance for posting UGC (tracked separately as #592); do not present this follow-up PR as clearing that blocker.
-- [ ] Resolve [issue #1068](https://github.com/ValentinGanchevA1/general/issues/1068): intended all-app 18+ vs existing dating-only DOB enforcement, align user-facing Terms/Privacy, target audience, actual email/Google OAuth entry flows and any applicable **Restrict Minor Access** setting. Do not mark adult age verification as implemented.
+- [x] Product scope chosen in [issue #1068](https://github.com/ValentinGanchevA1/general/issues/1068): **only optional Dating is 18+**; ordinary signup/profile is not adult-only.
+- [ ] Verify Dating age-gating resists trivial self-reported-DOB circumvention; Google Play's incidental-dating exception requires effective safeguards. https://support.google.com/googleplay/android-developer/answer/16838200
+- [ ] Decide accurate Play target-age groups and complete separate child/teen social safety, privacy/consent and UGC review; no permission to select children under 13 is implied.
+- [ ] Match final legally reviewed Terms, hosted Privacy Policy and submitted AAB to the Dating-only age scope (not a universal adult-only claim).
 
 ## Google policy sources
 
