@@ -44,6 +44,31 @@ describe('UsersService dating age safeguards', () => {
     expect(query.mock.calls[1]?.[0]).toContain("INTERVAL '18 years'");
   });
 
+  it('permits under-18 birth dates for non-dating social profiles', async () => {
+    jest.spyOn(service, 'getProfile').mockResolvedValue({} as Awaited<ReturnType<UsersService['getProfile']>>);
+    await service.updateProfile(userId, { dateOfBirth: '2010-06-01', openToDating: false });
+    expect(query.mock.calls.some((call: unknown[]) =>
+      typeof call[0] === 'string' && call[0].startsWith('UPDATE users'))).toBe(true);
+  });
+
+  it('rejects an under-18 DOB change while Dating is still enabled', async () => {
+    query.mockResolvedValueOnce([{ date_of_birth: '1990-01-01', open_to_dating: true }])
+      .mockResolvedValueOnce([{ adult: false }]);
+    await expect(service.updateProfile(userId, { dateOfBirth: '2010-06-01' }))
+      .rejects.toBeInstanceOf(BadRequestException);
+    expect(query.mock.calls.some((call: unknown[]) =>
+      typeof call[0] === 'string' && call[0].startsWith('UPDATE users'))).toBe(false);
+  });
+
+  it('permits changing DOB with an explicit Dating opt-out', async () => {
+    jest.spyOn(service, 'getProfile').mockResolvedValue({} as Awaited<ReturnType<UsersService['getProfile']>>);
+    query.mockResolvedValueOnce([{ date_of_birth: '1990-01-01', open_to_dating: true }]);
+    await service.updateProfile(userId, { dateOfBirth: '2010-06-01', openToDating: false });
+    const update = query.mock.calls.find((call: unknown[]) =>
+      typeof call[0] === 'string' && call[0].startsWith('UPDATE users'));
+    expect(update?.[0]).toContain('open_to_dating');
+  });
+
   it('does not allow an opted-in user to clear their DOB', async () => {
     query.mockResolvedValueOnce([{ date_of_birth: '1990-01-01', open_to_dating: true }]);
     await expect(service.updateProfile(userId, { dateOfBirth: null }))

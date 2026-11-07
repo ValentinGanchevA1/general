@@ -477,15 +477,8 @@ export class UsersService {
         if (Number.isNaN(dob.getTime())) {
           throw new BadRequestException({ code: 'profile.invalid_dob', message: 'Invalid date of birth' });
         }
-        const today = new Date();
-        let years = today.getFullYear() - dob.getFullYear();
-        const m = today.getMonth() - dob.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) years -= 1;
-        if (years < 18) {
-          throw new BadRequestException({
-            code: 'profile.underage',
-            message: 'You must be at least 18 years old to use G88.',
-          });
+        if (dob.getTime() > Date.now()) {
+          throw new BadRequestException({ code: 'profile.invalid_dob', message: 'Date of birth cannot be in the future.' });
         }
       }
       params.push(req.dateOfBirth);
@@ -576,9 +569,9 @@ export class UsersService {
       params.push(req.showNationality);
       setClauses.push(`show_nationality = $${params.length}`);
     }
-    // Dating age eligibility is always enforced server-side, including OAuth accounts.
-    // A profile that is opted into dating cannot clear its birth date.
-    if (req.openToDating === true || req.dateOfBirth === null) {
+    // Only Dating requires adulthood. Re-check every DOB edit of an opted-in user.
+    // General social profiles must not impose a universal 18+ requirement.
+    if (req.openToDating === true || req.dateOfBirth !== undefined) {
       const [existing] = await this.db.query<Array<{ date_of_birth: string | null; open_to_dating: boolean }>>(
         'SELECT date_of_birth::text AS date_of_birth, open_to_dating FROM users WHERE id = $1 AND deleted_at IS NULL',
         [userId],

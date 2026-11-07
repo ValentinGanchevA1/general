@@ -60,7 +60,7 @@ class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @IsIn(['public', 'private']) visibility?: 'public' | 'private';
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) goals?: string[];
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) interests?: string[];
-  // ISO date (YYYY-MM-DD); null clears it. Server enforces age >= 18.
+  // ISO date (YYYY-MM-DD); optional for general profiles. Dating opt-in requires 18+.
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsISO8601() dateOfBirth?: string | null;
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(80) hometownCity?: string | null;
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(40) hometownCountry?: string | null;
