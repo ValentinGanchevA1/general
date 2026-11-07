@@ -23,6 +23,7 @@ import type {
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { RequireCurrentTerms } from '../terms/require-terms.decorator';
 import { DiscoveryRealtimePublisher } from '../../realtime/discovery-realtime.publisher';
 import { ListingsService } from './listings.service';
 import {
@@ -45,6 +46,7 @@ export class ListingsController {
 
   /** POST /api/v1/listings — create a listing the caller sells. */
   @Post()
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 15 } })
   async create(
@@ -69,6 +71,7 @@ export class ListingsController {
    * Declared before the `:id` routes so the literal path always wins.
    */
   @Post('photo/base64')
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   uploadPhoto(
@@ -156,6 +159,7 @@ export class ListingsController {
 
   /** POST /api/v1/listings/:id/offers — make (or re-open) an offer. */
   @Post(':id/offers')
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   makeOffer(
@@ -218,6 +222,7 @@ export class ListingsController {
    * Keeps status=pending; sets last_actor=seller so buyer can accept / re-offer.
    */
   @Put('offers/:offerId/counter')
+  @RequireCurrentTerms()
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   counterOffer(
     @CurrentUser('id') userId: string,
