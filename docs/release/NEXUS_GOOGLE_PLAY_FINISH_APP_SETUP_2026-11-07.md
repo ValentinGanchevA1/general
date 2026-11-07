@@ -1,0 +1,124 @@
+# NEXUS — Google Play Console / Finish setting up your app
+
+**Prepared:** 7 November 2026. **Status:** working Play Console entry sheet, **NOT submitted or signed off**.
+**Console:** https://play.google.com/console/u/0/developers/7979767954237794759/app/4973636174477114914/app-dashboard
+**Technical identity:** Android `com.g88` (must not change for this release). **Public brand:** NEXUS.
+**Evidence bases:** PR #1066 (`975590aa`), PR #1067 (`6c622bba`), cross-PR PostGIS smoke [42397690398](https://github.com/ValentinGanchevA1/general/actions/runs/42397690398), and `docs/play-data-safety-rc1-2026-11-07.md`. **Exact final signed AAB, live Play declarations, public policy hosting, and live runtime flags have NOT been verified.**
+
+> Never click **Submit** or select definitive answers for unresolved policy questions merely because the working recommendation below is written. A green CI does not mean Google Play compliance, legal approval or Play submission.
+
+## A. Let us know about the content of your app
+
+| Console section | Draft answer / required input | Status / blocking evidence |
+|---|---|---|
+| **Set privacy policy** | Candidate `https://g88-legal.onrender.com/privacy`; in-app constant points there. Source HTML `docs/legal/privacy/index.html` is NEXUS branded. | **BLOCKED** until latest content has been deployed and URL can be opened anonymously worldwide on HTTPS; neither source commit nor Render's "Live" label proves text is deployed. Legal review also required. |
+| **Sign in details** | **Access restricted: Yes.** Email/password and Google OAuth available. Provide a persistent *reviewer-only* account + password via **Play Console**, never GitHub. Account must have completed verification for core Map, chat, Story, event/listing reports. Describe location permission, optional phone/ID verification and testing path. | **BLOCKED** until test credentials and no-OTP/OTP route proven on *target backend*, verified consent version deployed. |
+| **Ads** | **Likely No** for free-first-launch if no ads, native sponsored units, cross-promotion ads or advertising SDKs actually active. Marketplace listings are not automatically third-party advertising. | **VERIFY** release dependency/SDK manifest and runtime; no ad SDK appears in mobile package's direct dependencies, but transitive/remote behavior is still unknown. |
+| **Content rating** | Complete IARC questionnaire **truthfully**: public UGC (profiles/photos/videos/listings), direct chat, optional dating, location sharing, peer interactions and moderation. Do not guess the eventual age rating. | **BLOCKED** until in-app UGC/sexual-content exposure and content moderation controls verified. |
+| **Target audience** | **Adult-targeted product decision pending.** Working intent is 18+, but current email and Google OAuth registration do *not* enforce DOB or independently verify age; only dating-specific actions enforce declared adult DOB. | **BLOCKED** by [issue #1068](https://github.com/ValentinGanchevA1/general/issues/1068): choose enforce all-app 18+ or accurately scope non-dating access and legal copy. Do not select a child age-group by accident. |
+| **Data safety** | **Collects data: Yes.** **Precise Location: Yes** (raw GPS transmitted and live 1:1 sharing stored). Name, email, user ID, optional phone number; DOB and gender / optional sexual orientation; photos, videos, ID/selfie documents; messages, other UGC, analytics; diagnostics/device identifiers when enabled. Encrypted-in-transit appears to be implemented with TLS; account deletion in app exists. | **BLOCKED** until exact AAB + vendors/SDKs + final retention and sharing classification reviewed, and externally accessible account deletion path validated. Use `docs/play-data-safety-rc1-2026-11-07.md` as line-item audit, not auto-submission. |
+| **Government apps** | **No** if this remains a privately operated social product with no governmental agency ownership/official government services. | **OWNER VERIFY** legal/operator identity; do not claim government affiliation. |
+| **Financial features** | **Likely “My app doesn’t provide any financial features”** *only after verifying* free-first-release checkout disabled, no financial wallets/transfers/loans/investments, no monetizable rewards or points. Peer-to-peer listing/offer flow does not automatically mean a payment or financial-services feature. | **VERIFY** actual build + backend `ENABLE_PAID_SUBSCRIPTIONS`, Stripe exposure and whether in-app rewards have cash value. Complete declaration even if answer is No. |
+| **Health** | **Likely “My app doesn’t provide any health features”**: NestJS `HealthModule` is infrastructure health monitoring, not patient/fitness data. | **VERIFY** no customer-facing health/fitness feature or health-data capture. Complete declaration even if answer is No. |
+
+**Data Safety caveats**: Optional user-initiated precise chat sharing and backend storage are **collected** despite private recipient selection. Public map GPS coarsening to H3 ~120m does not meet Google's 3 km² approximate-area threshold. “Collected” and “Shared” are different Play definitions—do not infer the latter solely from having 1:1 chat or contractors. Evaluate each type's purposes, optional/required status, transient/persistent handling and user deletion behavior against actual Google form.
+
+## B. Manage how your app is organized and presented
+
+| Field | Working answer | State |
+|---|---|---|
+| App or game | **App** | Proposed |
+| Pricing | **Free** initial release | User decision / checkout code disabled, confirm Console |
+| Category | **Social** | Proposed; must select in Console |
+| Tags | Social / Local / Map **only if actual selectable options** | Console-specific choices unverified |
+| App name | **NEXUS** | Draft; `com.g88` stays unchanged |
+| Default language | English (United States), unless app's existing configured default differs | **VERIFY** Console |
+| Support email | `vganchev6@gmail.com` appears in `apps/mobile/src/constants/app.ts` | **OWNER CONFIRM** before publicly displaying |
+| Website | Optional; no official NEXUS marketing homepage has been verified | Unknown |
+| Privacy policy | `https://g88-legal.onrender.com/privacy` | External content unverified |
+| Store listing | Use current `docs/play-store-listing.md` with screenshots captured from the actual Android release candidate. | **READY FOR REVIEW**, not upload |
+
+### Recommended copy (English, current functional scope)
+
+**Name (max 30 chars):** `NEXUS`
+
+**Short description (max 80 chars):**
+
+```text
+Discover nearby people, local events and listings on a live map
+```
+
+**Full description (max 4,000 chars):**
+
+```text
+NEXUS is a map-first social app for discovering people and local activity around you.
+
+Explore nearby profiles, events and listings from one live map. Find local experiences, discover opportunities, connect with people through waves and chats, and stay in touch with your connections.
+
+DISCOVER NEARBY
+See nearby people and local activity, explore places and view map-based events and listings.
+
+CONNECT
+Wave to someone, open a conversation and manage your connections in one place.
+
+EXPERIENCES AND OPPORTUNITIES
+Discover events, join local activities, browse community listings and exchange offers.
+
+YOUR IDENTITY, YOUR CHOICES
+Manage your profile and verification options. Choose your map visibility. Public map discovery uses privacy-coarsened location; precise live location sharing in a one-to-one chat is optional and initiated by you.
+
+NEXUS brings local discovery, real-time interaction and useful nearby activity together.
+```
+
+**Do not falsely advertise** a dedicated “Pulse” bottom tab; current Android navigation is **Map / Experiences / Opportunities / Connections / Identity**. Local Pulse activity may still exist as a content surface. Never show a public trust score or claim GPS never leaves the device.
+
+### Graphics and screenshots
+
+| Asset | Verified Google Play requirement | Source needed |
+|---|---|---|
+| Store icon | **512 × 512 PNG (32-bit with alpha), ≤ 1024 KB** | Final NEXUS brand asset |
+| Feature graphic | **1024 × 500 JPEG or 24-bit PNG (no alpha)** | Final NEXUS art |
+| Phone screenshots | **At least 2** valid screenshots; **4 × 1080 × 1920 portrait recommended** for app discovery. PNG/JPEG, 320–3840 px with longer dimension ≤ 2× the shorter. | **Capture from exact current build**, not concept art |
+| Suggested 5 screenshots | Map and people, event experience, opportunities/listing, Connections/chat (no real user private data), Identity/privacy settings | Redact personal data and temporary test-account names. |
+| Promotional video | Optional | Current recorded app behavior only |
+
+The Android E2E screenshots currently attached to GitHub run logs show a **trust-required empty Map**. They are valuable QA evidence but **poor marketing screenshots**. Capture real populated, consented demo data on the same release candidate instead of faking features.
+
+## C. Reviewer login details — store securely in Play Console only
+
+- Reviewer account email: **TO CREATE / DO NOT COMMIT**
+- Reviewer password: **TO CREATE / DO NOT COMMIT**
+- Backend/environment reachable by the same APK: **TO VERIFY**
+- Email / phone verification state: **TO VERIFY**, ideally preverified synthetic reviewer account
+- Instructions: “Launch NEXUS → Sign in using the provided test credentials → Map → Connections → Chats; Experiences and Opportunities are accessible from the bottom navigation. If Android asks for location permission, allow while using the app to test nearby map features. Please use only the provided demo users for chat and reports.”
+- If updated Terms is enforced, reviewer must be able to explicitly accept it; a legally unapproved draft must not be misrepresented as final Terms.
+
+## D. Ship gates before we fill or submit the Console
+
+1. [ ] PR #1067 versioned Terms acceptance merged **after** Android E2E and legal decision.
+2. [ ] PR #1066 UGC reporting / dating DOB / Data Safety merged **after** CI and device QA.
+3. [ ] New file version of Terms actually published at `/terms`, approved by qualified reviewer; mobile `TERMS_OF_SERVICE_URL` no longer points to Privacy.
+4. [ ] Application age scope decision #1068 resolved and actual sign-in / OAuth and Play declarations aligned.
+5. [ ] `/privacy` and `/delete-account/` open anonymously on HTTPS, with accurate latest product/operator/content.
+6. [ ] Moderation team workflow/report queue, user blocking, and abuse response tested; UGC Terms accepted **before** upload.
+7. [ ] Signed release **AAB** produced from frozen merged commit; verify manifest permissions, dependencies, feature flags, target SDK and release signing.
+8. [ ] Android physical-device flow and Two-Device E2E pass using the signed candidate (including stored vs live precise GPS).
+9. [ ] All Data Safety questions independently mapped to shipped code and providers.
+10. [ ] Reviewer test login verified, no credentials in Git.
+11. [ ] IARC answers, target audience, government/financial/health forms, contact and store details verified by owner.
+12. [ ] Actual screenshots and store icon / feature graphic uploaded; release track, Play App Signing and versionCode confirmed.
+13. [ ] **If a personal developer account created after 13 Nov 2023**, Google Play requires a closed test with **12 opted-in testers continuously for 14 days**, followed by an application for production access. Do not assume test eligibility from CI alone.
+
+## E. Google Help references (live policy)
+
+- Prepare app content: https://support.google.com/googleplay/android-developer/answer/9859455
+- Dashboard setup: https://support.google.com/googleplay/android-developer/answer/9859454
+- Store listing: https://support.google.com/googleplay/android-developer/answer/9859152
+- Store graphics: https://support.google.com/googleplay/android-developer/answer/9866151
+- Data Safety: https://support.google.com/googleplay/android-developer/answer/10787469
+- UGC / Terms acceptance: https://support.google.com/googleplay/android-developer/answer/9876937
+- Financial features declaration: https://support.google.com/googleplay/android-developer/answer/13849271
+- Health declaration: https://support.google.com/googleplay/android-developer/answer/14738291
+- Personal developer account testing: https://support.google.com/googleplay/android-developer/answer/14151465
+
+**Console state:** not inspected through an authenticated Play Console session; every listed section is **unsubmitted/unverified** unless the owner shares verified Console evidence. A source draft is **not** a Play declaration.
