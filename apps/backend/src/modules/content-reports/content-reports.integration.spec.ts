@@ -89,11 +89,11 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
     );
     await db.query(migration);
     const extension = readFileSync(
-      join(__dirname, '../../..', 'migrations/0072_extend_content_report_targets.sql'), 'utf8',
+      join(__dirname, '../../..', 'migrations/0073_extend_content_report_targets.sql'), 'utf8',
     );
     await db.query(extension);
     const questionsMigration = readFileSync(
-      join(__dirname, '../../..', 'migrations/0073_event_question_moderation.sql'), 'utf8',
+      join(__dirname, '../../..', 'migrations/0074_event_question_moderation.sql'), 'utf8',
     );
     await db.query(questionsMigration);
     const [questionColumn] = await db.query<Array<{ count: number }>>(

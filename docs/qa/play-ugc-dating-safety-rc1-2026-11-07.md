@@ -18,7 +18,7 @@
 | Soft hide | Hide story, listing, event, check-in, area alert and event Q&A item | `deleted_at` stored, fresh read/viewport no longer returns content; snapshots/realtime also rechecked | **Pending** |
 | Chat review | Admin reviews reported DM / group message | Manual disposition only: **not** claiming automatic deletion of chat message | **Pending** |
 
-**Required migrations:** `0070` and `0071` already introduced in #1064, followed by `0072_extend_content_report_targets.sql` and `0073_event_question_moderation.sql`. Apply in staging and verify repeat replay before any app distribution. The backend must be deployed before this mobile client is installed.
+**Required migrations:** `0070` and `0071` already introduced in #1064, followed by `0073_extend_content_report_targets.sql` and `0074_event_question_moderation.sql`. Apply in staging and verify repeat replay before any app distribution. The backend must be deployed before this mobile client is installed.
 
 ## P1: Dating adult eligibility
 
