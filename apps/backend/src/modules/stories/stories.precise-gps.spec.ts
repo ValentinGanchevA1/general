@@ -10,7 +10,7 @@ describe('StoriesService precise GPS retention', () => {
     const now = new Date('2026-11-07T12:00:00.000Z');
     const row = {
       id: '22222222-2222-4222-8222-222222222222',
-      author_id: userId, media_url: 'https://example.test/stories/a.jpg',
+      author_id: userId, media_url: `https://example.test/stories/${userId}/a.jpg`,
       media_type: 'image', caption: null,
       approx_lat: coarse.lat, approx_lng: coarse.lng, expires_at: now, created_at: now,
       view_count: 0, reaction_count: 0, location_h3_r7: cells.r7,
