@@ -93,9 +93,11 @@ instead of a single endless global feed.
 
 > Source of truth for location handling remains the implementation / architecture,
 > not marketing copy. Current architecture documents that precise GPS is sent for
-> map-position computation, immediately coarsened to roughly the H3 r10 / ~120 m
-> area, and only the coarse position is stored. Other users receive only the
-> privacy-coarsened position.
+> public-map-position computation, immediately coarsened for nearby discovery.
+> The optional live location share in a 1:1 chat is separate: it persists exact
+> coordinates and delivers them to the chosen chat recipient. A ~120 m map cell
+> remains more precise than Google Play's 3 km² 'approximate location' threshold;
+> evaluate the Play Data Safety classification conservatively.
 
 ### 3a. Overview
 
@@ -109,8 +111,8 @@ instead of a single endless global feed.
 
 | Data type | Working treatment | Purpose / note |
 |---|---|---|
-| **Approximate location** | Collected | Nearby discovery / map presence; privacy-coarsened position is stored |
-| **Precise location** | Collected and stored for opt-in chat sessions; processed for public map presence | Last live session coordinates and initial shared chat location persist; public nearby map is coarsened |
+| **Location (Play category to verify)** | Collected | Public map presence is coarsened to ~120 m, which is still within Google's 'precise location' area threshold |
+| **Precise location** | Collected | Public map processing and optional 1:1 chat sharing; last live-session coordinates and initial shared chat location are stored |
 | **Name / profile identity** | Collected | Account and profile functionality |
 | **Email address** | Collected | Auth / account management |
 | **Phone number** | Collected when supplied | Login / verification |
