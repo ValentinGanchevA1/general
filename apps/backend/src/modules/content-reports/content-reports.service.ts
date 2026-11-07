@@ -30,9 +30,10 @@ export class ContentReportsService {
   async submit(reporterId: string, dto: CreateContentReportRequest): Promise<CreateContentReportResponse> {
     // Enforce the same discoverability gates as the user/story read paths; don't
     // permit arbitrary UUID probing, self-reports, deleted content, or blocked stories.
-    // Reporters may only report content they are authorized to view.
-    // SQL parameters remain bound; never query arbitrary target IDs without
-    // the same visibility, expiry and bilateral-block rules as normal reads.
+    // The target must exist in a surface the reporter legitimately accessed.
+    // Abuse reporting must remain possible after mutual blocks and expiry of
+    // ephemeral posts (to avoid allowing bad actors to block reporting).
+    // These checks never return the target content to the reporting client.
     let sql: string;
     switch (dto.targetType) {
       case 'user':
@@ -47,58 +48,34 @@ export class ContentReportsService {
       case 'listing':
         sql = `SELECT l.id FROM listings l JOIN users u ON u.id = l.seller_id AND u.deleted_at IS NULL
           WHERE l.id = $1 AND l.deleted_at IS NULL AND l.visibility = 'public'
-            AND l.seller_id <> $2 AND NOT EXISTS (
-              SELECT 1 FROM user_blocks b
-               WHERE (b.blocker_id = $2 AND b.blocked_id = l.seller_id)
-                  OR (b.blocker_id = l.seller_id AND b.blocked_id = $2)
-            )`;
+            AND l.seller_id <> $2`;
         break;
       case 'event':
         sql = `SELECT e.id FROM events e JOIN users u ON u.id = e.host_id AND u.deleted_at IS NULL
           WHERE e.id = $1 AND e.deleted_at IS NULL AND e.visibility = 'public'
-            AND e.host_id <> $2 AND NOT EXISTS (
-              SELECT 1 FROM user_blocks b
-               WHERE (b.blocker_id = $2 AND b.blocked_id = e.host_id)
-                  OR (b.blocker_id = e.host_id AND b.blocked_id = $2)
-            )`;
+            AND e.host_id <> $2`;
         break;
       case 'event_question':
         sql = `SELECT q.id FROM event_questions q
           JOIN events e ON e.id = q.event_id AND e.deleted_at IS NULL
           JOIN users u ON u.id = q.user_id AND u.deleted_at IS NULL
           WHERE q.id = $1 AND q.user_id <> $2 AND q.deleted_at IS NULL
-            AND (e.visibility = 'public' OR e.host_id = $2)
-            AND NOT EXISTS (
-              SELECT 1 FROM user_blocks b
-               WHERE (b.blocker_id = $2 AND b.blocked_id IN (q.user_id, e.host_id))
-                  OR (b.blocked_id = $2 AND b.blocker_id IN (q.user_id, e.host_id))
-            )`;
+            AND (e.visibility = 'public' OR e.host_id = $2)`;
         break;
       case 'check_in':
         sql = `SELECT ci.id FROM pulse_check_ins ci
           JOIN users u ON u.id = ci.user_id AND u.deleted_at IS NULL
           WHERE ci.id = $1 AND ci.user_id <> $2 AND ci.deleted_at IS NULL
-            AND ci.expires_at > clock_timestamp()
             AND (ci.audience = 'nearby' OR (ci.audience = 'friends' AND EXISTS (
               SELECT 1 FROM friendships f
                WHERE (f.user_low_id = $2 AND f.user_high_id = ci.user_id)
                   OR (f.user_high_id = $2 AND f.user_low_id = ci.user_id)
-            )))
-            AND NOT EXISTS (
-              SELECT 1 FROM user_blocks b
-               WHERE (b.blocker_id = $2 AND b.blocked_id = ci.user_id)
-                  OR (b.blocker_id = ci.user_id AND b.blocked_id = $2)
-            )`;
+            )))`;
         break;
       case 'alert':
         sql = `SELECT a.id FROM alerts a JOIN users u ON u.id = a.author_id AND u.deleted_at IS NULL
           WHERE a.id = $1 AND a.author_id <> $2 AND a.deleted_at IS NULL
-            AND a.visibility = 'public'
-            AND NOT EXISTS (
-              SELECT 1 FROM user_blocks b
-               WHERE (b.blocker_id = $2 AND b.blocked_id = a.author_id)
-                  OR (b.blocker_id = a.author_id AND b.blocked_id = $2)
-            )`;
+            AND a.visibility = 'public'`;
         break;
       case 'message':
         sql = `SELECT m.id FROM messages m
@@ -111,11 +88,6 @@ export class ContentReportsService {
                WHERE cm.conversation_id = c.id AND cm.user_id = $2
                  AND cm.left_at IS NULL
             ))
-          )
-          AND NOT EXISTS (
-            SELECT 1 FROM user_blocks b
-             WHERE (b.blocker_id = $2 AND b.blocked_id = m.sender_id)
-                OR (b.blocker_id = m.sender_id AND b.blocked_id = $2)
           )`;
         break;
       default:
