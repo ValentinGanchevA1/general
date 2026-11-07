@@ -28,8 +28,10 @@ export class ContentReportsService {
   constructor(@InjectDataSource() private readonly db: DataSource) {}
 
   async submit(reporterId: string, dto: CreateContentReportRequest): Promise<CreateContentReportResponse> {
-    // Enforce the same discoverability gates as the user/story read paths; don't
-    // permit arbitrary UUID probing, self-reports, deleted content, or blocked stories.
+    // Reports must remain possible after an author blocks the reporter, or a
+    // Story expires: neither action should erase the ability to flag past abuse.
+    // Story IDs are unguessable UUIDs; this endpoint returns no target content.
+    // Deleted Stories and deleted authors remain unavailable.
     const rows: Array<{ id: string }> = dto.targetType === 'user'
       ? await this.db.query<Array<{ id: string }>>(
         `SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL AND id <> $2`,
@@ -37,12 +39,8 @@ export class ContentReportsService {
       )
       : await this.db.query<Array<{ id: string }>>(
         `SELECT s.id FROM stories s JOIN users u ON u.id = s.author_id AND u.deleted_at IS NULL
-         WHERE s.id = $1 AND s.deleted_at IS NULL AND s.expires_at > clock_timestamp()
-         AND s.author_id <> $2 AND NOT EXISTS (
-            SELECT 1 FROM user_blocks b
-            WHERE (b.blocker_id = $2 AND b.blocked_id = s.author_id)
-               OR (b.blocker_id = s.author_id AND b.blocked_id = $2)
-         )`, [dto.targetId, reporterId],
+         WHERE s.id = $1 AND s.deleted_at IS NULL AND s.author_id <> $2`,
+        [dto.targetId, reporterId],
       );
     if (!rows[0]) {
       throw new NotFoundException({ code: 'report.target_unavailable', message: 'Content is no longer available.' });
