@@ -25,7 +25,10 @@ export function showContentReportPrompt(
     if (submitContentReport.fulfilled.match(result)) {
       appAlert('Report sent', 'Thank you. Your report has been received for review.');
     } else {
-      appAlert('Report not sent', result.payload ?? 'Please try again.');
+      appAlert('Report not sent',
+        submitContentReport.rejected.match(result)
+          ? (result.payload ?? 'Please try again.')
+          : 'A report is already being sent. Please retry shortly.');
     }
   };
   appAlert('Report ' + (targetType === 'story' ? 'story' : 'profile'), 'Choose a reason:', [
