@@ -1,0 +1,55 @@
+name: NEXUS Play Store listing
+
+on:
+  pull_request:
+    paths:
+      - "play-console/listings/**"
+      - "scripts/play-console/**"
+      - ".github/workflows/nexus-play-listing.yml"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Commit validated en-US and bg-BG listing changes to Google Play (not a binary release)"
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  validate:
+    name: Validate localized listing (offline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: .nvmrc
+      - run: node --test scripts/play-console/sync-listing.test.mjs
+      - run: node scripts/play-console/sync-listing.mjs
+
+  apply:
+    name: Commit store listing changes (manual only)
+    needs: validate
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/master' &&
+      inputs.apply == true
+    runs-on: ubuntu-latest
+    environment: play-testing
+    concurrency:
+      group: nexus-play-console-com-g88
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: .nvmrc
+      - name: Apply approved localized listing
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: node scripts/play-console/sync-listing.mjs --apply
