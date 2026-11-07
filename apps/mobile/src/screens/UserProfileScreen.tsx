@@ -195,6 +195,15 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 	const footer = (
 		<View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
 			{blocked ? (
+				<>
+					<TouchableOpacity
+						style={[styles.footerBtn, styles.menuBtn]}
+						onPress={openMenu}
+						accessibilityRole="button"
+						accessibilityLabel="More options, including report"
+					>
+						<Icon name="dots-horizontal" size={22} color={colors.textPrimary} />
+					</TouchableOpacity>
 				<TouchableOpacity
 					style={styles.unblockBtn}
 					onPress={() => void unblock()}
@@ -202,6 +211,7 @@ export function UserProfileScreen({ route, navigation }: Props): React.JSX.Eleme
 				>
 					<Text style={styles.unblockBtnText}>Unblock</Text>
 				</TouchableOpacity>
+				</>
 			) : (
 				<TouchableOpacity
 					style={[styles.footerBtn, styles.menuBtn, styles.footerMenuOnly]}
