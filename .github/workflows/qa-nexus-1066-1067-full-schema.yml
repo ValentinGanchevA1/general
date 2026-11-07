@@ -1,8 +1,9 @@
-# QA-ONLY ephemeral integration workflow: the combined #1067 + #1066 branch.
-# Runs every production migration against disposable PostGIS, not production.
+# QA-ONLY integration workflow; no production database access.
 # Ensure NEXUS discovery can compile against every real migration, not only
 # the minimal physical tables used by the 10k/50k/100k service benchmarks.
-name: QA NEXUS 1067+1066 Combined Full-Scheon:
+name: QA NEXUS 1067+1066 Combined Full-Schema PostGIS Smoke
+
+on:
   push:
     branches:
       - claude/nexus-integration-pr1066-pr1067-20261107
