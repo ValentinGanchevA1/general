@@ -21,6 +21,7 @@ KEY_CODES = {
 MAP_COACHMARK_TITLE = "You are on the map"
 MAP_COACHMARK_SKIP = "Skip"
 MAP_NAV_TARGETS = {
+    "Connections, chats and relationship activity",
     "Connections, chats and activity",
     "Connections",
 }
