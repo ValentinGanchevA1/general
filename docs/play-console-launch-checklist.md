@@ -87,6 +87,15 @@ A grey/blank map on Play-installed builds is a release blocker until this restri
 - [ ] Confirm data-in-transit encryption declarations against production configuration.
 - [ ] Confirm account deletion is described consistently with the in-app delete flow and a **public external deletion-request URL** is deployed/verified (`docs/legal/delete-account/index.html` is draft source only).
 - [ ] Complete content rating, target audience, app access and any other Play declarations truthfully.
+- [ ] **Precise location permission declaration (new November 2026 Play Console workflow):**
+  - The Android manifest requests `ACCESS_FINE_LOCATION` **and** `ACCESS_COARSE_LOCATION`; do not characterize NEXUS as coarse-only.
+  - For the user-facing purpose, distinguish **Search nearby** (public map discovery) from **Live tracking** (user-initiated, continuously updated precise location in 1:1 chat).
+  - Explain why one-time location selection or coarse permission is insufficient *for opted-in live tracking*, while retaining coarse-location functionality where technically feasible.
+  - Confirm there is no `ACCESS_BACKGROUND_LOCATION` in the release manifest and no undisclosed background tracking.
+  - Complete the Play Console precise-location justification when offered. Google's November 2026 declaration precedes **27 January 2027** enforcement; do not wait for the mandatory deadline.
+  - Re-check the final merged/signed AAB manifest and runtime permissions; source manifest alone is insufficient.
+- [ ] **Data Safety precision:** NEXUS's public ~120m H3 cell is still below Google's **3 km²** threshold for *precise* location. Mark precise-location collection based on off-device processing and optional live DM persistence, not solely on how coarsened pins look.
+- [ ] **UGC Terms acceptance:** #592 requires versioned Terms acceptance before posting/uploading; showing a Terms hyperlink without an actual acceptance state is insufficient.
 
 ## 7. NEXUS legal gate — production only
 
