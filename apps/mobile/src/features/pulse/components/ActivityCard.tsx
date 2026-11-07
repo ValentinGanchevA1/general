@@ -32,9 +32,10 @@ interface Props {
 	item: ActivityItem;
 	onPress: () => void;
 	onView?: () => void;
+	onReport?: (() => void) | undefined;
 }
 
-export function ActivityCard({ item, onPress, onView }: Props): React.JSX.Element {
+export function ActivityCard({ item, onPress, onView, onReport }: Props): React.JSX.Element {
 	const { colors } = useAppTheme();
 	const styles = useMemo(() => createStyles(colors), [colors]);
 	const accentByType = useMemo(() => getAccentByType(colors), [colors]);
@@ -86,6 +87,7 @@ export function ActivityCard({ item, onPress, onView }: Props): React.JSX.Elemen
 						{!!item.preview && <Text style={styles.preview} numberOfLines={2}>{item.preview}</Text>}
 						{!!meta && <Text style={styles.meta}>{meta}</Text>}
 					</View>
+					{onReport ? <Pressable accessibilityRole="button" accessibilityLabel="Report activity" hitSlop={8} onPress={event => { event.stopPropagation(); onReport(); }}><MCI name="flag-outline" size={20} color={colors.danger} /></Pressable> : null}
 					{isDiscoveryItem && onView ? (
 						<Pressable
 							style={styles.cta}

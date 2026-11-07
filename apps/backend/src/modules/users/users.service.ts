@@ -576,6 +576,27 @@ export class UsersService {
       params.push(req.showNationality);
       setClauses.push(`show_nationality = $${params.length}`);
     }
+    // Dating age eligibility is always enforced server-side, including OAuth accounts.
+    // A profile that is opted into dating cannot clear its birth date.
+    if (req.openToDating === true || req.dateOfBirth === null) {
+      const [existing] = await this.db.query<Array<{ date_of_birth: string | null; open_to_dating: boolean }>>(
+        'SELECT date_of_birth::text AS date_of_birth, open_to_dating FROM users WHERE id = $1 AND deleted_at IS NULL',
+        [userId],
+      );
+      const nextDating = req.openToDating ?? existing?.open_to_dating ?? false;
+      const effectiveDob = req.dateOfBirth === undefined ? existing?.date_of_birth : req.dateOfBirth;
+      if (nextDating) {
+        if (!effectiveDob) {
+          throw new BadRequestException({ code: 'dating.age_restricted', message: 'Adult date of birth required for dating.' });
+        }
+        const [age] = await this.db.query<Array<{ adult: boolean }>>(
+          "SELECT $1::date <= CURRENT_DATE - INTERVAL '18 years' AS adult", [effectiveDob],
+        );
+        if (!age?.adult) {
+          throw new BadRequestException({ code: 'dating.age_restricted', message: 'Dating is limited to adults aged 18 or older.' });
+        }
+      }
+    }
     if (req.openToDating !== undefined) {
       params.push(req.openToDating);
       setClauses.push(`open_to_dating = $${params.length}`);

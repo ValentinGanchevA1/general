@@ -134,6 +134,65 @@ describe('DiscoveryEntityResolver', () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
+  it('requires a declared adult birth date for a realtime dating subscriber', async () => {
+    query.mockResolvedValueOnce([{ open_to_dating: false }]);
+    await expect(
+      resolver.resolveForViewer({
+        viewerId: 'viewer',
+        kind: 'user',
+        entityId: 'u1',
+        context: { ...context, datingOnly: true },
+      }),
+    ).resolves.toBeNull();
+    const [sql] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('date_of_birth IS NOT NULL');
+    expect(sql).toContain("INTERVAL '18 years'");
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it('filters out underage realtime dating candidates even when their open flag is true', async () => {
+    query
+      .mockResolvedValueOnce([{ open_to_dating: true }])
+      .mockResolvedValueOnce([]);
+
+    await expect(
+      resolver.resolveForViewer({
+        viewerId: 'viewer',
+        kind: 'user',
+        entityId: 'u1',
+        context: { ...context, datingOnly: true },
+      }),
+    ).resolves.toBeNull();
+
+    const [sql] = query.mock.calls[1] as [string, unknown[]];
+    expect(sql).toContain('du.open_to_dating = true');
+    expect(sql).toContain('du.date_of_birth IS NOT NULL');
+    expect(sql).toContain("du.date_of_birth <= CURRENT_DATE - INTERVAL '18 years'");
+  });
+
+  it('checks adult DOB again when reading mutual gender preferences for a realtime dating candidate', async () => {
+    query
+      .mockResolvedValueOnce([{ open_to_dating: true }])
+      .mockResolvedValueOnce([{
+        id: 'u1', kind: 'user', lat: 1.02, lng: 1.03,
+        meta: { displayName: 'Candidate', avatarUrl: null, verification: 'email' },
+      }])
+      .mockResolvedValueOnce([]);
+
+    await expect(
+      resolver.resolveForViewer({
+        viewerId: 'viewer',
+        kind: 'user',
+        entityId: 'u1',
+        context: { ...context, datingOnly: true },
+      }),
+    ).resolves.toBeNull();
+
+    const [sql] = query.mock.calls[2] as [string, unknown[]];
+    expect(sql).toContain('date_of_birth IS NOT NULL');
+    expect(sql).toContain("INTERVAL '18 years'");
+  });
+
   it('rejects a dating candidate when mutual gender preferences do not match', async () => {
     query
       .mockResolvedValueOnce([{ open_to_dating: true }])

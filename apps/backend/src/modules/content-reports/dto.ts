@@ -9,7 +9,7 @@ import {
 } from '@g88/shared';
 
 export class CreateContentReportDto implements CreateContentReportRequest {
-  @IsIn(['user', 'story'])
+  @IsIn(['user', 'story', 'listing', 'event', 'message', 'check_in', 'alert', 'event_question'])
   targetType!: ContentReportTarget;
 
   @IsUUID('4')
@@ -40,7 +40,7 @@ export class ContentReportQueueDto {
 }
 
 export class DecideContentReportDto {
-  @IsIn(['review', 'dismiss', 'hide_story'])
+  @IsIn(['review', 'dismiss', 'hide_story', 'hide_listing', 'hide_event', 'hide_check_in', 'hide_alert', 'hide_event_question'])
   decision!: ContentReportDecision;
 
   @IsOptional()

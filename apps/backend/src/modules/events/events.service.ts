@@ -428,6 +428,7 @@ export class EventsService {
          JOIN users u ON u.id = q.user_id
          LEFT JOIN event_question_upvotes uv ON uv.question_id = q.id AND uv.user_id = $1
         WHERE q.event_id = $2
+          AND q.deleted_at IS NULL
           AND (q.user_id = $1 OR NOT EXISTS (
                 SELECT 1 FROM user_blocks ub
                  WHERE (ub.blocker_id = $1 AND ub.blocked_id = q.user_id)
@@ -463,6 +464,7 @@ export class EventsService {
            FROM event_questions q
            JOIN events e ON e.id = q.event_id
           WHERE q.id = $1
+            AND q.deleted_at IS NULL
             AND e.deleted_at IS NULL
             AND (e.visibility = 'public' OR e.host_id = $2)
             AND NOT EXISTS (
