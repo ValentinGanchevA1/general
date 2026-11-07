@@ -108,6 +108,7 @@ export class ListingsController {
 
   /** PUT /api/v1/listings/:id/status — seller marks active/sold/withdrawn. */
   @Put(':id/status')
+  @RequireCurrentTerms()
   async updateStatus(
     @CurrentUser('id') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -190,6 +191,7 @@ export class ListingsController {
 
   /** PUT /api/v1/listings/offers/:offerId — seller or countered buyer accepts/declines. */
   @Put('offers/:offerId')
+  @RequireCurrentTerms()
   async respondToOffer(
     @CurrentUser('id') userId: string,
     @Param('offerId', ParseUUIDPipe) offerId: string,
