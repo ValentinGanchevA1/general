@@ -249,7 +249,7 @@ export function SettingsScreen(): React.JSX.Element {
               const selected = mode === option.mode;
               const handlePress = (): void => {
                 if (locked) {
-                  navigation.navigate('Subscription');
+                  appAlert('Coming later', 'Paid plans are disabled during NEXUS early access.');
                   return;
                 }
                 setMode(option.mode);
@@ -262,8 +262,8 @@ export function SettingsScreen(): React.JSX.Element {
                   onPress={handlePress}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: selected }}
-                  accessibilityLabel={locked ? `${option.label} appearance. Premium membership required.` : `${option.label} appearance`}
-                  accessibilityHint={locked ? 'Opens Premium membership options' : undefined}
+                  accessibilityLabel={locked ? `${option.label} appearance. Not available during early access.` : `${option.label} appearance`}
+                  accessibilityHint={locked ? 'Not available in this version' : undefined}
                 >
                   <View style={styles.appearanceCopy}>
                     <Text style={[styles.appearanceLabel, isNexus ? styles.nexusLabel : undefined]}>{option.label}</Text>
