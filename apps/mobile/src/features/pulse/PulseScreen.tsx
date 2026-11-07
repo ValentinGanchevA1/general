@@ -31,6 +31,8 @@ import { pickAndUploadStoryMedia } from '@/features/stories/storyMedia';
 import { useSocket } from '@/realtime/useSocket';
 import { track } from '@/lib/analytics';
 import { ActivityCard } from './components/ActivityCard';
+import { showContentReportPrompt } from '@/features/reports/reportPrompt';
+import type { ContentReportTarget } from '@g88/shared';
 import { CheckInSheet, type CheckInDraft } from './components/CheckInSheet';
 import { NearbyPeopleStrip } from './components/NearbyPeopleStrip';
 import { TrendingStrip } from './components/TrendingStrip';
@@ -81,6 +83,16 @@ export function PulseScreen(): React.JSX.Element {
 	useEffect(() => on('pulse:activity', (event) => { dispatch(activityReceived(event.item)); }), [on, dispatch]);
 	useEffect(() => on('pulse:activity:remove', (event) => { dispatch(activityRemoved(event.activityId)); }), [on, dispatch]);
 	const filtered = useMemo(() => { const definition = FILTERS.find((candidate) => candidate.key === filter); let next = definition?.type ? items.filter((item) => item.type === definition.type) : items; if (filter === 'nearby') next = [...next].sort((left, right) => (left.distanceM ?? Number.POSITIVE_INFINITY) - (right.distanceM ?? Number.POSITIVE_INFINITY) || Date.parse(right.createdAt) - Date.parse(left.createdAt)); return next; }, [items, filter]);
+	const reportTargetFor = (item: ActivityItem): { type: ContentReportTarget; id: string } | null => {
+		const parts = item.id.split(':');
+		const id = parts[parts.length - 1];
+		if (!id || !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(id)) return null;
+		if (item.type === 'listing') return { type: 'listing', id };
+		if (item.type === 'alert') return { type: 'alert', id };
+		if (item.type === 'event' && item.narrative?.kind === 'event_created') return { type: 'event', id };
+		if (item.type === 'place' && item.narrative?.kind === 'place_visit') return { type: 'check_in', id };
+		return null;
+	};
 	const onTap = useCallback((item: ActivityItem): void => { const { screen, params } = item.deepLink; if (screen === 'ListingDetail') { openRootScreen(navigation, 'ListingDetail', params); return; } if (screen === 'EventDetail') { openRootScreen(navigation, 'EventDetail', params); return; } if (screen === 'Main') { navigation.navigate('Main', params as never); return; } (navigation.navigate as (screenName: string, screenParams?: object) => void)(screen, params); }, [navigation]);
 	const storyEligibility = useMemo(() => { if (!profile) return { allowed: false as const, reason: 'email_unverified' as const }; return canPostStory({ verification: profile.verification, createdAt: profile.createdAt, strikePoints: profile.strikePoints ?? 0, storySuspendedUntil: profile.storySuspendedUntil ?? null }); }, [profile]);
 	const onOpenStory = useCallback((story: StoryCard, index: number) => { setViewerIndex(index); setViewerOpen(true); track('story.open', { storyId: story.id, index, surface: 'pulse' }); }, []);
@@ -110,7 +122,7 @@ export function PulseScreen(): React.JSX.Element {
 
 	if (loading && items.length === 0) return <View style={S.container}>{Header}<View style={S.center}><ActivityIndicator color={colors.primary} /></View>{overlays}</View>;
 	if (error && items.length === 0) return <View style={S.container}>{Header}<View style={S.center}><Text style={S.errorText}>{error}</Text><TouchableOpacity onPress={load} style={S.retry}><Text style={S.retryText}>Retry</Text></TouchableOpacity></View>{overlays}</View>;
-	return <View style={S.container}><FlatList data={filtered} keyExtractor={(item) => item.id} renderItem={({ item }) => <ActivityCard item={item} onPress={() => onTap(item)} onView={() => onTap(item)} />} ListHeaderComponent={Header} ListFooterComponent={Footer} ListEmptyComponent={<View style={S.emptyWrap}><EmptyState variant="plain" icon={emptyCopy.icon} title={emptyCopy.title} body={emptyCopy.body} actionLabel={emptyCopy.actionLabel} onAction={onEmptyAction} /></View>} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => { load(); loadStories(); }} tintColor={colors.primary} colors={[colors.primary]} progressBackgroundColor={colors.surfaceRaised} />} contentContainerStyle={{ paddingBottom: 100 + Math.max(insets.bottom, 8) }} />{overlays}</View>;
+	return <View style={S.container}><FlatList data={filtered} keyExtractor={(item) => item.id} renderItem={({ item }) => <ActivityCard item={item} onPress={() => onTap(item)} onView={() => onTap(item)} onReport={reportTargetFor(item) ? () => { const target = reportTargetFor(item); if (target) showContentReportPrompt(dispatch, target.type, target.id); } : undefined} />} ListHeaderComponent={Header} ListFooterComponent={Footer} ListEmptyComponent={<View style={S.emptyWrap}><EmptyState variant="plain" icon={emptyCopy.icon} title={emptyCopy.title} body={emptyCopy.body} actionLabel={emptyCopy.actionLabel} onAction={onEmptyAction} /></View>} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => { load(); loadStories(); }} tintColor={colors.primary} colors={[colors.primary]} progressBackgroundColor={colors.surfaceRaised} />} contentContainerStyle={{ paddingBottom: 100 + Math.max(insets.bottom, 8) }} />{overlays}</View>;
 }
 
 function createStyles(colors: ThemeColors) {

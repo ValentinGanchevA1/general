@@ -62,7 +62,10 @@ WHAT YOU CAN DO
 • Map presence controls — choose whether you appear in nearby discovery
 
 BUILT FOR PRIVACY
-NEXUS displays privacy-coarsened locations for nearby map discovery. Separately,\nyou may opt into sharing precise live GPS with one other person in a 1:1 chat.\nThe backend retains last live-session coordinates and the location in the initial\nchat message, subject to our documented retention and deletion practices.
+NEXUS displays privacy-coarsened locations for nearby map discovery. Separately,
+you may opt into sharing precise live GPS with one other person in a 1:1 chat.
+The backend retains last live-session coordinates and the location in the initial
+chat message, subject to our documented retention and deletion practices.
 
 Verification is factual and signal-based. NEXUS does not expose a public numeric
 trust or popularity score.
@@ -124,6 +127,13 @@ instead of a single endless global feed.
 | **Crash logs / diagnostics** | Collected when diagnostics are enabled | Stability / debugging |
 | **Purchase / subscription data** | ⟨verify enabled billing path⟩ | Subscription / premium functionality |
 | **Government ID / verification material** | ⟨validate exact collection, retention and processor declarations⟩ | Identity verification |
+| **Sexual orientation** | Collected when supplied | Explicit profile orientation field; sensitive Personal info even if public visibility is disabled |
+| **Other personal info** | Collected | Date of birth, gender identity, dating preferences, profile context |
+| **Videos** | Collected when supplied | User-uploaded Story video; may include audio embedded in the video |
+| **Files and documents** | Collected when supplied | Identity-verification document images and accompanying documents |
+| **Other user-generated content** | Collected | Stories, listings, events, check-ins, event questions and reviews |
+| **Location live-share** | Collected and disclosed to an explicitly selected chat partner | Initial chat location and latest session lat/lng persist after session end; disclose precisely |
+| **Other in-app messages** | Collected | DM/group chat text and attachments as enabled |
 
 ### 3c. Location declaration note
 
@@ -142,6 +152,9 @@ form rather than weakening the privacy explanation.
 - [ ] Publish and verify the external deletion-request path: `/delete-account/` (draft in `docs/legal/delete-account/index.html`); required in addition to in-app deletion
 - [ ] Current release build checked for analytics / diagnostics providers
 - [ ] Current identity-verification processors and retention disclosed accurately
+- [ ] Age-related sensitive fields (date of birth, gender identity, orientation and dating preferences) declared under Play taxonomy
+- [ ] Story videos, uploaded media and government ID files/documents correctly declared
+- [ ] Distinguish consent-based user-to-user live-coordinate sharing from vendor processing in Play's Sharing questions
 - [ ] No public numeric trust/popularity score is claimed
 
 ---

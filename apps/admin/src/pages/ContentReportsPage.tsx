@@ -37,8 +37,8 @@ export default function ContentReportsPage() {
     onError: () => toast.error('Could not process report. Please retry.'),
   });
   const handleDecision = (report: AdminContentReport, action: ContentReportDecision) => {
-    const explanation = action === 'hide_story'
-      ? 'Hide this story from all discovery/read surfaces?'
+    const explanation = action.startsWith('hide_')
+      ? 'Hide this reported content from discovery/read surfaces?'
       : action === 'dismiss' ? 'Dismiss this report without hiding content?' : 'Mark this report reviewed without hiding content?';
     if (!window.confirm(explanation)) return;
     decision.mutate({ report, action });
@@ -52,7 +52,7 @@ export default function ContentReportsPage() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Safety reports</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Review user and story reports. Never dismiss a report without assessing the content.
+              Review UGC safety reports. Never dismiss a report without assessing the content.
             </p>
           </div>
           <div className="flex gap-2 items-center">
@@ -76,7 +76,7 @@ export default function ContentReportsPage() {
           {reports.map(report => (
             <article key={report.id} className="rounded-xl border bg-card p-4 space-y-3">
               <div className="flex flex-wrap gap-2 text-sm items-center">
-                <strong>{report.targetType === 'story' ? 'Story' : 'Profile'}</strong>
+                <strong>{report.targetType.replace('_', ' ')}</strong>
                 <span className="rounded bg-muted px-2 py-0.5">{report.reason}</span>
                 <span className="text-muted-foreground">{new Date(report.createdAt).toLocaleString()}</span>
               </div>
@@ -98,9 +98,15 @@ export default function ContentReportsPage() {
                     onClick={() => handleDecision(report, 'review')}>Mark reviewed</Button>
                   <Button variant="outline" disabled={decision.isPending}
                     onClick={() => handleDecision(report, 'dismiss')}>Dismiss</Button>
-                  {report.targetType === 'story' ? (
+                  {(['story', 'listing', 'event', 'check_in', 'alert', 'event_question'] as const).includes(
+                    report.targetType as 'story' | 'listing' | 'event' | 'check_in' | 'alert' | 'event_question',
+                  ) ? (
                     <Button variant="destructive" disabled={decision.isPending}
-                      onClick={() => handleDecision(report, 'hide_story')}>Hide story</Button>
+                      onClick={() => handleDecision(report,
+                        ({ story: 'hide_story', listing: 'hide_listing', event: 'hide_event',
+                           check_in: 'hide_check_in', alert: 'hide_alert', event_question: 'hide_event_question' } as const)[report.targetType as 'story' | 'listing' | 'event' | 'check_in'])}>
+                      Hide {report.targetType.replace('_', ' ')}
+                    </Button>
                   ) : null}
                 </div>
               ) : <p className="text-muted-foreground text-xs">Status: {report.status} · {report.reviewedAt ?? 'pending'}</p>}

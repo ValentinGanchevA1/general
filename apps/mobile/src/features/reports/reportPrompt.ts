@@ -31,7 +31,11 @@ export function showContentReportPrompt(
           : 'A report is already being sent. Please retry shortly.');
     }
   };
-  appAlert('Report ' + (targetType === 'story' ? 'story' : 'profile'), 'Choose a reason:', [
+  const label: Record<ContentReportTarget, string> = {
+    user: 'profile', story: 'story', listing: 'listing', event: 'event',
+    message: 'message', check_in: 'check-in', alert: 'area post', event_question: 'event question',
+  };
+  appAlert('Report ' + label[targetType], 'Choose a reason:', [
     ...OPTIONS.map(option => ({
       text: option.label,
       onPress: () => { void send(option.reason); },

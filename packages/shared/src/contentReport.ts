@@ -1,7 +1,7 @@
 /** User-generated-content abuse reports. Never include free-text/media or exact GPS in the submission. */
 export const CONTENT_REPORT_REASONS = ['spam', 'harassment', 'hate', 'sexual', 'violence', 'privacy', 'other'] as const;
 export type ContentReportReason = (typeof CONTENT_REPORT_REASONS)[number];
-export type ContentReportTarget = 'user' | 'story';
+export type ContentReportTarget = 'user' | 'story' | 'listing' | 'event' | 'message' | 'check_in' | 'alert' | 'event_question';
 export interface CreateContentReportRequest {
   targetType: ContentReportTarget;
   targetId: string;
@@ -26,4 +26,4 @@ export interface AdminContentReport extends ContentReport {
   targetMediaUrl: string | null;
 }
 export interface AdminContentReportPage { items: AdminContentReport[]; nextOffset: number | null }
-export type ContentReportDecision = 'review' | 'dismiss' | 'hide_story';
+export type ContentReportDecision = 'review' | 'dismiss' | 'hide_story' | 'hide_listing' | 'hide_event' | 'hide_check_in' | 'hide_alert' | 'hide_event_question';
