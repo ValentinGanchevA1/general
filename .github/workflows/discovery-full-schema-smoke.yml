@@ -10,6 +10,7 @@ on:
       - 'apps/backend/migrations/**'
       - 'apps/backend/scripts/migrate.js'
       - 'apps/backend/scripts/verify-discovery-schema.mjs'
+      - 'apps/backend/scripts/verify-story-geo-coarsening.mjs'
       - 'apps/backend/src/modules/discovery/discovery.full-schema-http.integration.spec.ts'
       - '.github/workflows/discovery-full-schema-smoke.yml'
 
@@ -65,6 +66,8 @@ jobs:
         run: |
           pnpm --filter @g88/backend migration:run
           node apps/backend/scripts/verify-discovery-schema.mjs
+      - name: Verify story GPS coarsening migration (disposable PostGIS)
+        run: pnpm --filter @g88/backend exec node scripts/verify-story-geo-coarsening.mjs
       - name: Build shared TypeScript contracts
         run: pnpm --filter @g88/shared build
       - name: Profile 10k 50k 100k mixed-kind JWT HTTP Redis + PostgreSQL waits
