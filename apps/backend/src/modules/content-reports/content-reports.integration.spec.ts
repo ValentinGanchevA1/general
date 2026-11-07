@@ -124,16 +124,25 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
     })).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('rejects self-reports, absent/deleted or blocked story targets', async () => {
+  it('permits reporting after an author blocks the reporter or a story expires', async () => {
+    await db.query('INSERT INTO user_blocks VALUES ($1,$2)', [authorId, reporterId]);
+    await db.query("UPDATE stories SET expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1", [storyId]);
+    await expect(reports.submit(reporterId, {
+      targetType: 'story', targetId: storyId, reason: 'harassment',
+    })).resolves.toEqual({ reported: true });
+    expect((await reports.list({ status: 'open' })).items).toHaveLength(1);
+  });
+
+  it('rejects self-reports, deleted stories and deleted authors', async () => {
     await expect(reports.submit(authorId, {
       targetType: 'user', targetId: authorId, reason: 'other',
     })).rejects.toBeInstanceOf(NotFoundException);
-    await db.query('INSERT INTO user_blocks VALUES ($1,$2)', [reporterId, authorId]);
+    await db.query('UPDATE stories SET deleted_at=clock_timestamp() WHERE id=$1', [storyId]);
     await expect(reports.submit(reporterId, {
       targetType: 'story', targetId: storyId, reason: 'spam',
     })).rejects.toBeInstanceOf(NotFoundException);
-    await db.query('TRUNCATE user_blocks');
-    await db.query('UPDATE stories SET expires_at=clock_timestamp()-interval \'1 minute\' WHERE id=$1', [storyId]);
+    await db.query('UPDATE stories SET deleted_at=NULL WHERE id=$1', [storyId]);
+    await db.query('UPDATE users SET deleted_at=clock_timestamp() WHERE id=$1', [authorId]);
     await expect(reports.submit(reporterId, {
       targetType: 'story', targetId: storyId, reason: 'spam',
     })).rejects.toBeInstanceOf(NotFoundException);
