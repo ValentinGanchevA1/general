@@ -167,6 +167,9 @@ form rather than weakening the privacy explanation.
 - [ ] **Ads** — verify against the exact release build; do not infer from old docs
 - [ ] **Content rating** — complete the current Play questionnaire truthfully for UGC, user communication and location-aware social functionality
 - [ ] **Target audience** — general Social and optional Dating 18+ are distinct; select age groups only after age-appropriate safeguards are reviewed. The incidental Dating exception requires robust feature-level age gating: https://support.google.com/googleplay/android-developer/answer/16838200
+- [ ] **Product owner decision confirmed (7 Nov 2026):** no universal 18+ requirement at account creation. Keep Dating opt-in 18+ only. Do not advertise general access as 18+ or as suitable for children until minimum social age and teen safeguards are settled.
+- [ ] **Reviewer evidence:** provide a social-access test account and, if Dating is enabled in the submitted build, a separate eligible-adult account to demonstrate age controls and no underage Dating exposure.
+- [ ] **Social child safety:** publish child sexual abuse and exploitation prevention standards, reporting pathway and contact; assess unknown-user chat, live location and meetups before selecting any under-18 target audience groups.
 - [ ] **Data Safety** — validate the matrix above against the exact release build
 - [ ] **Financial features / subscriptions** — declare enabled subscription/payment behavior accurately
 - [ ] **Identity verification** — ensure any ID/selfie processing disclosures match the production implementation
