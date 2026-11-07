@@ -17,7 +17,7 @@ Welcome to the NEXUS closed beta.
 • Local events and marketplace listings
 • Identity verification and privacy-aware map presence
 
-Your exact location is never shown to other users; NEXUS coarsens map presence before it is stored or displayed.
+Public map presence is coarsened. Optional 1:1 live-location sharing sends exact coordinates only to your chosen chat partner.
 
 Please report bugs, crashes, confusing flows, or visual issues. Thanks for testing!
 ```
@@ -25,7 +25,7 @@ Please report bugs, crashes, confusing flows, or visual issues. Thanks for testi
 ### Shorter variant
 
 ```
-NEXUS closed beta: map-first nearby discovery, waves, Connections, chat, events and marketplace. Map presence is privacy-coarsened and exact location is never shown to other users. Please report bugs or confusing flows — thanks for testing!
+NEXUS closed beta: map-first nearby discovery, waves, Connections, chat, events and marketplace. Public map presence is coarsened; optional 1:1 live sharing can show exact location to the chosen partner. Please report bugs or confusing flows — thanks for testing!
 ```
 
 ---
