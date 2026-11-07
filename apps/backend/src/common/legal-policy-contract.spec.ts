@@ -11,11 +11,14 @@ function readPrivacyPolicy(): string {
 }
 
 describe('NEXUS legal/product contract', () => {
-  it('keeps the Privacy Policy aligned with the enforced 18+ onboarding rule', () => {
+  it('accurately describes adult-only intent, dating age checks, and no registration DOB check', () => {
     const policy = readPrivacyPolicy();
 
     expect(policy).toContain('<strong>18 years old</strong>');
     expect(policy).toContain('confirm 18+ eligibility');
+    expect(policy).toContain('Account registration does not currently request a date of birth.');
+    expect(policy).toContain('A self-reported birth date is not independent age or identity verification.');
+    expect(policy).not.toContain('onboarding flow requires a date of birth');
     expect(policy).not.toContain('at least <strong>13</strong>');
   });
 
