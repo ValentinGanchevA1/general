@@ -80,8 +80,9 @@ export function AboutScreen(): React.JSX.Element {
         <Text style={styles.about}>
           NEXUS brings nearby people, events, stories, and local listings into one live map.
           Discover what is happening around you, then interact directly through waves, messages,
-          RSVPs, and offers — without a global feed. Precise GPS is used for nearby discovery but
-          is coarsened before persistence, and other users never receive your exact coordinates.
+          RSVPs, and offers — without a global feed. Public nearby discovery uses
+          privacy-coarsened map presence. Separately, you may opt into sharing
+          your precise location with one person in a direct chat.
         </Text>
 
         <Text style={styles.sectionTitle}>What you can do</Text>
@@ -147,7 +148,7 @@ export function AboutScreen(): React.JSX.Element {
             colors={colors}
             icon="map-marker-radius-outline"
             title="Privacy by design"
-            body="Your precise location is never shown to other users. Map presence is privacy-coarsened before storage and can be turned off from Settings."
+            body="Public map presence is coarsened before storage and can be turned off from Settings. Optional 1:1 live-location sharing sends your exact location only to your chosen chat partner."
           />
         </View>
 
