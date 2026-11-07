@@ -42,6 +42,10 @@
 - [ ] Verify Dating age-gating resists trivial self-reported-DOB circumvention; Google Play's incidental-dating exception requires effective safeguards. https://support.google.com/googleplay/android-developer/answer/16838200
 - [ ] Decide accurate Play target-age groups and complete separate child/teen social safety, privacy/consent and UGC review; no permission to select children under 13 is implied.
 - [ ] Match final legally reviewed Terms, hosted Privacy Policy and submitted AAB to the Dating-only age scope (not a universal adult-only claim).
+- [ ] Record product owner's decision: general Social **not universally 18+**, only optional Dating **18+**; no automatic global adult registration gate, no inferred child-friendly classification.
+- [ ] Validate exact age groups, child/teen safety and social app CSAE standards separately from Data Safety; age scope does not change whether location/messages/identity are collected.
+- [ ] Check DOB and optional orientation data on both account kinds (standard social with DOB absent; dating opt-in with DOB supplied). Do not claim age verification from a self-declaration.
+- [ ] Match in-app privacy, published Privacy Policy, Terms, Play IARC and app access instructions on the exact release build.
 
 ## Google policy sources
 
