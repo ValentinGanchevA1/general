@@ -4,7 +4,7 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import type {
-  ContentReport, ContentReportPage, CreateContentReportRequest,
+  ContentReport, AdminContentReport, AdminContentReportPage, CreateContentReportRequest,
   CreateContentReportResponse,
 } from '@g88/shared';
 import type { ContentReportQueueDto, DecideContentReportDto } from './dto';
@@ -18,6 +18,9 @@ interface ReportRow {
   status: ContentReport['status'];
   created_at: Date;
   reviewed_at: Date | null;
+  target_display_name: string | null;
+  target_caption: string | null;
+  target_media_url: string | null;
 }
 
 @Injectable()
@@ -54,20 +57,30 @@ export class ContentReportsService {
     return { reported: true };
   }
 
-  async list(dto: ContentReportQueueDto): Promise<ContentReportPage> {
+  async list(dto: ContentReportQueueDto): Promise<AdminContentReportPage> {
     const limit = dto.limit ?? 30;
     const offset = dto.offset ?? 0;
     const rows = await this.db.query<ReportRow[]>(
-      `SELECT id, reporter_id, target_type, target_id, reason, status, created_at, reviewed_at
-       FROM content_abuse_reports WHERE status = $1
-       ORDER BY created_at DESC, id DESC LIMIT $2 OFFSET $3`,
+      `SELECT r.id, r.reporter_id, r.target_type, r.target_id, r.reason, r.status,
+         r.created_at, r.reviewed_at,
+         COALESCE(tu.display_name, au.display_name) AS target_display_name,
+         s.caption AS target_caption, s.media_url AS target_media_url
+       FROM content_abuse_reports r
+       LEFT JOIN users tu ON r.target_type = 'user' AND tu.id = r.target_id
+       LEFT JOIN stories s ON r.target_type = 'story' AND s.id = r.target_id
+       LEFT JOIN users au ON au.id = s.author_id
+       WHERE r.status = $1
+       ORDER BY r.created_at DESC, r.id DESC LIMIT $2 OFFSET $3`,
       [dto.status ?? 'open', limit + 1, offset],
     );
     return {
-      items: rows.slice(0, limit).map((r): ContentReport => ({
+      items: rows.slice(0, limit).map((r): AdminContentReport => ({
         id: r.id, reporterId: r.reporter_id, targetType: r.target_type,
         targetId: r.target_id, reason: r.reason, status: r.status,
         createdAt: r.created_at.toISOString(), reviewedAt: r.reviewed_at?.toISOString() ?? null,
+        targetDisplayName: r.target_display_name,
+        targetCaption: r.target_caption,
+        targetMediaUrl: r.target_media_url,
       })),
       nextOffset: rows.length > limit ? offset + limit : null,
     };
