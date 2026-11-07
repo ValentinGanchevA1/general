@@ -63,7 +63,7 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
       );
       CREATE TABLE event_questions (
         id uuid PRIMARY KEY, event_id uuid NOT NULL REFERENCES events(id),
-        user_id uuid NOT NULL REFERENCES users(id), body text, deleted_at timestamptz
+        user_id uuid NOT NULL REFERENCES users(id), body text
       );
       CREATE TABLE pulse_check_ins (
         id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES users(id),
@@ -95,6 +95,13 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
       join(__dirname, '../../..', 'migrations/0073_event_question_moderation.sql'), 'utf8',
     );
     await db.query(questionsMigration);
+    const [questionColumn] = await db.query<Array<{ count: number }>>(
+      `SELECT COUNT(*)::int AS count
+         FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'event_questions' AND column_name = 'deleted_at'`,
+    );
+    expect(questionColumn?.count).toBe(1);
     // Migration retries must not recreate, truncate or lose pending reports.
     await db.query(migration);
     await db.query(extension);
