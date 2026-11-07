@@ -38,6 +38,7 @@ import { StoriesModule } from './modules/stories/stories.module';
 import { DatingModule } from './modules/dating/dating.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { RuntimeConfigModule } from './modules/runtime-config/runtime-config.module';
+import { ContentReportsModule } from './modules/content-reports/content-reports.module';
 
 @Module({
   imports: [
@@ -97,6 +98,7 @@ import { RuntimeConfigModule } from './modules/runtime-config/runtime-config.mod
     StoriesModule,
     DatingModule,
     AnalyticsModule,
+    ContentReportsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
