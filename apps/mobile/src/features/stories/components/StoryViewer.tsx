@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 
-import { appAlert } from '@/ui/appAlert';
+import { showContentReportPrompt } from '@/features/reports/reportPrompt';
 import {
   BottomSheetModal,
   BottomSheetView,
@@ -339,10 +339,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
                   destructive: true,
                   onPress: () => {
                     optionsRef.current?.dismiss();
-                    appAlert(
-                      'Report submitted',
-                      'Thanks — we will review this story.',
-                    );
+                    showContentReportPrompt(dispatch, 'story', current.id);
                   },
                 },
               ]}
