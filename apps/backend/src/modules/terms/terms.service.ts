@@ -26,7 +26,7 @@ export class TermsService {
     try {
       const parsed = new URL(url);
       if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.hash ||
-          parsed.pathname.replace(/\\/$/, '') === '/privacy') return null;
+          (parsed.pathname === '/privacy' || parsed.pathname === '/privacy/')) return null;
       return { version, url };
     } catch {
       return null;
