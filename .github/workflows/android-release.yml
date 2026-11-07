@@ -1,19 +1,22 @@
 name: Android Release (AAB)
 
-# Builds a signed Android App Bundle for Google Play (closed testing / production).
-# Manual via the Actions tab, or automatically on a v* tag push.
-# The first upload to the Play Console must be done by hand (Play requires it to
-# establish the app); afterwards the .aab artifact from here can be uploaded
-# manually or wired to a service-account auto-publish step (see DEPLOY.md).
+# Builds signed AABs on manual dispatch and v* tags. Tag pushes NEVER upload to
+# Google Play. Only a manually dispatched workflow on master with publish=true
+# may upload to the allowlisted INTERNAL or ALPHA test track. Production is
+# deliberately unsupported in this workflow.
 on:
   workflow_dispatch:
     inputs:
       track:
-        description: "Play track to publish to (e.g. closed track name, 'alpha', or 'internal')"
-        required: false
-        default: "alpha"
+        description: "Testing track ONLY (production is not available)"
+        required: true
+        type: choice
+        options:
+          - internal
+          - alpha
+        default: internal
       publish:
-        description: "Explicitly opt in to Play upload (default is safe build-only; requires PLAY_SERVICE_ACCOUNT_JSON)"
+        description: "Manually upload signed AAB to the selected testing track (false = build only)"
         type: boolean
         required: false
         default: false
@@ -22,7 +25,7 @@ on:
         type: choice
         required: false
         default: "completed"
-        options: ["completed", "draft", "halted", "inProgress"]
+        options: ["completed", "draft"]
   push:
     tags:
       - "v*"
@@ -37,10 +40,7 @@ jobs:
   release:
     name: Signed AAB
     runs-on: ubuntu-latest
-    # Surface secret presence as a plain env value so the publish step's `if:`
-    # can gate on it (the `secrets` context isn't allowed in `if:` directly).
     env:
-      HAS_PLAY_SA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
       # These values are consumed by Babel while Metro creates the release JS bundle.
       # Keep them at job scope so every transform worker receives the same config.
       # Public OAuth client ID shared with Android CI; override in GitHub secret/variable
@@ -191,23 +191,51 @@ jobs:
           path: apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 14
 
-      # Publishes to the Play track via a service account. Auto-skips until the
-      # PLAY_SERVICE_ACCOUNT_JSON secret exists, so the build stays green before
-      # automation is set up. Requires the app to already exist in the Console
-      # with at least one manual release on the target track (Play API rule).
-      - name: Publish to Google Play
-        if: >-
-          env.HAS_PLAY_SA == 'true' &&
-          (github.event_name == 'push' || inputs.publish == true)
+      - name: Report build-only completion
+        run: echo "::notice::AAB uploaded as a workflow artifact. Tag pushes never publish to Google Play."
+
+  publish_test:
+    name: Upload to Google Play testing (manual only)
+    needs: release
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/master' &&
+      inputs.publish == true &&
+      (inputs.track == 'internal' || inputs.track == 'alpha')
+    runs-on: ubuntu-latest
+    environment: play-testing
+    concurrency:
+      group: nexus-play-console-com-g88
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download signed AAB from this run
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: g88-release-aab
+          path: apps/mobile/android/app/build/outputs/bundle/release/
+
+      - name: Check artifact and API credentials
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          test -s apps/mobile/android/app/build/outputs/bundle/release/app-release.aab || {
+            echo "::error::The signed AAB artifact is missing"; exit 1;
+          }
+          test -n "$PLAY_SERVICE_ACCOUNT_JSON" || {
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON is not configured"; exit 1;
+          }
+          sha256sum apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Upload signed AAB to testing only
         uses: r0adkll/upload-google-play@eb49699984a39f23558439581660aa6f088acfd6 # v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.g88
           releaseFiles: apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
-          track: ${{ inputs.track || 'alpha' }}
-          status: ${{ inputs.status || 'completed' }}
+          track: ${{ inputs.track }}
+          status: ${{ inputs.status }}
           whatsNewDirectory: apps/mobile/distribution/whatsnew
-
-      - name: Note when publish was skipped
-        if: env.HAS_PLAY_SA != 'true'
-        run: echo "::notice::PLAY_SERVICE_ACCOUNT_JSON not set — built the AAB but skipped Play upload. Download the g88-release-aab artifact and upload manually, or add the secret to enable automation (see DEPLOY.md)."
