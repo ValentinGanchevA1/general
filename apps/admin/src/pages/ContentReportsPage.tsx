@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ContentReport, ContentReportDecision, ContentReportPage, ContentReportStatus } from '@g88/shared';
+import type { AdminContentReport, AdminContentReportPage, ContentReportDecision, ContentReportStatus } from '@g88/shared';
 import { apiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -8,15 +8,8 @@ import { toast } from 'sonner';
 const PAGE_SIZE = 20;
 const REPORTS_KEY = ['admin', 'content-reports'] as const;
 
-type AdminContentReport = ContentReport & {
-  targetDisplayName: string | null;
-  targetCaption: string | null;
-  targetMediaUrl: string | null;
-};
-type AdminReportsPage = Omit<ContentReportPage, 'items'> & { items: AdminContentReport[] };
-
-async function loadReports(status: ContentReportStatus, offset: number): Promise<AdminReportsPage> {
-  const { data } = await apiClient.get<AdminReportsPage>('/admin/content-reports', {
+ async function loadReports(status: ContentReportStatus, offset: number): Promise<AdminContentReportPage> {
+  const { data } = await apiClient.get<AdminContentReportPage>('/admin/content-reports', {
     params: { status, offset, limit: PAGE_SIZE },
   });
   return data;
