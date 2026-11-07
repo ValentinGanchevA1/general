@@ -63,7 +63,8 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
       );
       CREATE TABLE event_questions (
         id uuid PRIMARY KEY, event_id uuid NOT NULL REFERENCES events(id),
-        user_id uuid NOT NULL REFERENCES users(id), body text
+        user_id uuid NOT NULL REFERENCES users(id), body text,
+        created_at timestamptz NOT NULL DEFAULT clock_timestamp()
       );
       CREATE TABLE pulse_check_ins (
         id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES users(id),
