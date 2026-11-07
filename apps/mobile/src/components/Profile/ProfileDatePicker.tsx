@@ -28,15 +28,16 @@ function pad(value: number): string {
   return String(value).padStart(2, '0');
 }
 
-function maxAdultDate(): Date {
+function latestBirthDate(): Date {
   const now = new Date();
-  return new Date(now.getFullYear() - 18, now.getMonth(), now.getDate());
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 function parseInitial(value: string): Date {
   const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T12:00:00`) : null;
   if (parsed && !Number.isNaN(parsed.getTime())) return parsed;
-  return maxAdultDate();
+  const now = new Date();
+  return new Date(now.getFullYear() - 25, now.getMonth(), now.getDate());
 }
 
 function daysInMonth(year: number, monthIndex: number): number {
@@ -58,8 +59,8 @@ export function ProfileDatePicker({ visible, value, onClose, onChange }: Props):
   const [month, setMonth] = useState(initial.getMonth());
   const [year, setYear] = useState(initial.getFullYear());
 
-  const maxDate = maxAdultDate();
-  const years = Array.from({ length: 100 }, (_, index) => maxDate.getFullYear() - index);
+  const maxDate = latestBirthDate();
+  const years = Array.from({ length: 121 }, (_, index) => maxDate.getFullYear() - index);
   const dayCount = daysInMonth(year, month);
   const safeDay = Math.min(day, dayCount);
   const days = Array.from({ length: dayCount }, (_, index) => index + 1);

@@ -181,7 +181,7 @@ export function BirthDateField({
   return (
     <>
       <View style={styles.fieldWrap}>
-        <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Date of birth</Text>
+        <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Date of birth (optional)</Text>
         <TouchableOpacity
           style={[
             styles.selectorControl,

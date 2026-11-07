@@ -16,8 +16,8 @@ interface MapTilerFeature {
   countryName: string;
 }
 
-const MIN_AGE = 18;
-const MAX_AGE = 100;
+// The shared profile picker is not the 18+ Dating gate.
+const MAX_AGE = 120;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -146,7 +146,7 @@ export function getBirthDateBounds(now: Date = new Date()): {
   maxDate: Date;
   defaultDate: Date;
 } {
-  const maxDate = new Date(now.getFullYear() - MIN_AGE, now.getMonth(), now.getDate());
+  const maxDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const minDate = new Date(now.getFullYear() - MAX_AGE, now.getMonth(), now.getDate());
   const defaultDate = new Date(now.getFullYear() - 25, now.getMonth(), now.getDate());
 
