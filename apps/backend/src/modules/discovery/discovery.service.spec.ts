@@ -348,7 +348,7 @@ describe('DiscoveryService', () => {
         id: 'compatible', kind: 'user', lat: 2, lng: 2, verification: 'id',
       });
       query.mockImplementation((sql: string, params: unknown[]) => {
-        if (sql.includes('SELECT COALESCE(open_to_dating')) {
+        if (sql.includes('AS open_to_dating') && sql.includes('date_of_birth')) {
           return Promise.resolve([{ open_to_dating: true }]);
         }
         if (sql.includes('AS listing_mode')) return Promise.resolve(candidates);
