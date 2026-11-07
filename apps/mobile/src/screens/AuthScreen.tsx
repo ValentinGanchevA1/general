@@ -182,6 +182,12 @@ export function AuthScreen(): React.JSX.Element {
                 Create your NEXUS account
               </Text>
             ) : null}
+            {mode === 'register' ? (
+              <Text style={[styles.eligibilityNote, { color: colors.textSecondary }]}>
+                Join for local social discovery, events and connections. Optional Dating is
+                reserved for adults aged 18+ and has separate eligibility checks.
+              </Text>
+            ) : null}
 
             {mode === 'register' ? (
               <FormField
@@ -374,6 +380,7 @@ const styles = StyleSheet.create({
   tagline: { fontSize: fontSize.sm, textAlign: 'center', letterSpacing: 1.1 },
   form: { gap: spacing.md },
   title: { fontSize: fontSize.lg, fontWeight: '600', textAlign: 'center', marginBottom: spacing.sm },
+  eligibilityNote: { fontSize: fontSize.sm, lineHeight: 19, textAlign: 'center', marginBottom: spacing.md },
   fieldIcon: { marginLeft: spacing.lg },
   visibilityButton: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   error: { fontSize: fontSize.sm, lineHeight: 19, textAlign: 'center' },
