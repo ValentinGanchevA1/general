@@ -254,7 +254,7 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
     }
   });
 
-  it('rejects inaccessible chat, blocked listings and other users\' private content', async () => {
+  it('rejects inaccessible chats and other users\' private listings', async () => {
     const listing = randomUUID();
     const conversation = randomUUID();
     const message = randomUUID();
@@ -266,6 +266,32 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
       [message, conversation, authorId, 'Private DM']);
     await expect(reports.submit(reporterId, { targetType: 'message', targetId: message, reason: 'spam' }))
       .rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('accepts historical reports of blocked authors and expired check-ins without exposing their content', async () => {
+    const listing = randomUUID();
+    const checkIn = randomUUID();
+    await db.query(
+      'INSERT INTO listings (id,seller_id,description) VALUES ($1,$2,$3)',
+      [listing, authorId, 'Previously viewed listing'],
+    );
+    await db.query(
+      `INSERT INTO pulse_check_ins (id,user_id,place_label,expires_at)
+       VALUES ($1,$2,'Past check-in',clock_timestamp()-interval '5 minutes')`,
+      [checkIn, authorId],
+    );
+    await db.query('INSERT INTO user_blocks VALUES ($1,$2)', [authorId, reporterId]);
+    await expect(reports.submit(reporterId, {
+      targetType: 'listing', targetId: listing, reason: 'harassment',
+    })).resolves.toEqual({ reported: true });
+    await expect(reports.submit(reporterId, {
+      targetType: 'check_in', targetId: checkIn, reason: 'privacy',
+    })).resolves.toEqual({ reported: true });
+    await expect(reports.submit(authorId, {
+      targetType: 'listing', targetId: listing, reason: 'other',
+    })).rejects.toBeInstanceOf(NotFoundException);
+    const queue = await reports.list({ status: 'open' });
+    expect(queue.items).toHaveLength(2);
   });
 
   it('rejects reason and target corruption at database layer', async () => {
