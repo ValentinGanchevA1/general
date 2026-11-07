@@ -55,9 +55,7 @@ WHAT TO TRY
 • Reduced Motion and larger text if your device supports them
 
 PRIVACY
-Other users never receive your exact location. NEXUS uses your location for
-nearby discovery and stores/displays privacy-coarsened map presence rather than
-your precise position.
+Nearby map presence is privacy-coarsened; other users do not see exact map coordinates.\nIf you explicitly opt into live location in a 1:1 chat, the peer sees precise coordinates\nduring the share. The session and initial message retain precise coordinates.
 
 KNOWN LIMITATIONS
 • Beta data may be reset between builds
