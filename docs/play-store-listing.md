@@ -62,9 +62,7 @@ WHAT YOU CAN DO
 • Map presence controls — choose whether you appear in nearby discovery
 
 BUILT FOR PRIVACY
-NEXUS never shows your exact coordinates to other users. Location is used to
-compute nearby discovery and map presence, then privacy-coarsened before it is
-stored or displayed to others. Precise GPS is not persisted in precise form.
+NEXUS displays privacy-coarsened locations for nearby map discovery. Separately,\nyou may opt into sharing precise live GPS with one other person in a 1:1 chat.\nThe backend retains last live-session coordinates and the location in the initial\nchat message, subject to our documented retention and deletion practices.
 
 Verification is factual and signal-based. NEXUS does not expose a public numeric
 trust or popularity score.
@@ -112,7 +110,7 @@ instead of a single endless global feed.
 | Data type | Working treatment | Purpose / note |
 |---|---|---|
 | **Approximate location** | Collected | Nearby discovery / map presence; privacy-coarsened position is stored |
-| **Precise location** | Ephemeral processing; not persisted in precise form | Used to compute privacy-coarsened map presence |
+| **Precise location** | Collected and stored for opt-in chat sessions; processed for public map presence | Last live session coordinates and initial shared chat location persist; public nearby map is coarsened |
 | **Name / profile identity** | Collected | Account and profile functionality |
 | **Email address** | Collected | Auth / account management |
 | **Phone number** | Collected when supplied | Login / verification |
@@ -127,12 +125,9 @@ instead of a single endless global feed.
 
 ### 3c. Location declaration note
 
-Do **not** say that precise GPS “never leaves the device.” The implementation
-sends precise location for nearby-position computation, then coarsens it before
-persistence. Public copy should instead say:
+Do **not** say that precise GPS “never leaves the device.” The implementation sends precise location for nearby-position computation, then coarsens it before storing map presence. Optional 1:1 chat live-location sessions are different: they store precise coordinates in chat session and message records. Public copy should instead say:
 
-> Exact coordinates are never shown to other users, and precise GPS is not
-> persisted in precise form; NEXUS stores/displays privacy-coarsened map presence.
+> Public map discovery shows only privacy-coarsened location. With explicit consent,\n> a 1:1 chat peer can receive precise live location; backend stores related coordinates.
 
 If Play Console wording or reviewer interpretation classifies ephemeral precise
 location differently, use the conservative declaration required by the current
