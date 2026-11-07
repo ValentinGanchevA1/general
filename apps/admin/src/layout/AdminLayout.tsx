@@ -20,7 +20,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-semibold tracking-tight truncate">NEXUS Admin</span>
             <span className="text-xs text-muted-foreground hidden sm:inline">
-              ID verification
+              Verification &amp; safety
             </span>
           </div>
           <div className="flex items-center gap-3 min-w-0">
