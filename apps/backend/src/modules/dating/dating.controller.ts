@@ -5,6 +5,7 @@ import type { LikeRequest, LikeResponse } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { RequireCurrentTerms } from '../terms/require-terms.decorator';
 import { DatingService } from './dating.service';
 
 export class LikeDto implements LikeRequest {
@@ -23,6 +24,7 @@ export class DatingController {
   constructor(private readonly dating: DatingService) {}
 
   @Post('likes')
+  @RequireCurrentTerms()
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   async like(
     @Body() dto: LikeDto,
