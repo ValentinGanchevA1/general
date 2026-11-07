@@ -60,6 +60,7 @@ WHAT YOU CAN DO
 • Marketplace — explore local listings and offers
 • Identity verification — manage verification signals through Trust Center
 • Map presence controls — choose whether you appear in nearby discovery
+• Optional Dating (18+) — adult-only opt-in matchmaking and dating discovery
 
 BUILT FOR PRIVACY
 NEXUS displays privacy-coarsened locations for nearby map discovery. Separately,
@@ -165,7 +166,7 @@ form rather than weakening the privacy explanation.
 - [ ] **App access** — provide reviewer credentials and steps to reach Map / core flows
 - [ ] **Ads** — verify against the exact release build; do not infer from old docs
 - [ ] **Content rating** — complete the current Play questionnaire truthfully for UGC, user communication and location-aware social functionality
-- [ ] **Target audience** — configure the intended audience explicitly; do not target children by accident
+- [ ] **Target audience** — general Social and optional Dating 18+ are distinct; select age groups only after age-appropriate safeguards are reviewed. The incidental Dating exception requires robust feature-level age gating: https://support.google.com/googleplay/android-developer/answer/16838200
 - [ ] **Data Safety** — validate the matrix above against the exact release build
 - [ ] **Financial features / subscriptions** — declare enabled subscription/payment behavior accurately
 - [ ] **Identity verification** — ensure any ID/selfie processing disclosures match the production implementation
