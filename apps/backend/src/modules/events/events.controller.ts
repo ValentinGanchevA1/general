@@ -87,6 +87,7 @@ export class EventsController {
 
   /** PUT /api/v1/events/:id/rsvp — set/update the caller's RSVP. */
   @Put(':id/rsvp')
+  @RequireCurrentTerms()
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   async rsvp(
     @CurrentUser('id') userId: string,
@@ -138,6 +139,7 @@ export class EventsController {
 
   /** PUT /api/v1/events/polls/:pollId/vote — cast/replace the caller's vote. */
   @Put('polls/:pollId/vote')
+  @RequireCurrentTerms()
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   vote(
     @CurrentUser('id') userId: string,
@@ -173,6 +175,7 @@ export class EventsController {
 
   /** PUT /api/v1/events/questions/:questionId/upvote — dedup'd upvote. */
   @Put('questions/:questionId/upvote')
+  @RequireCurrentTerms()
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   upvoteQuestion(
     @CurrentUser('id') userId: string,
