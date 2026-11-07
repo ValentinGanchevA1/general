@@ -295,6 +295,37 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
     expect(queue.items).toHaveLength(2);
   });
 
+  it('authorizes a group-message report only for an active normalized member', async () => {
+    const group = randomUUID();
+    const message = randomUUID();
+    await db.query(
+      "INSERT INTO conversations (id,kind,participant_ids) VALUES ($1,'group',$2)",
+      [group, [authorId]],
+    );
+    await db.query(
+      'INSERT INTO conversation_members (conversation_id,user_id) VALUES ($1,$2)',
+      [group, reporterId],
+    );
+    await db.query(
+      'INSERT INTO messages (id,conversation_id,sender_id,body) VALUES ($1,$2,$3,$4)',
+      [message, group, authorId, 'Reportable group message'],
+    );
+    await expect(reports.submit(reporterId, {
+      targetType: 'message', targetId: message, reason: 'harassment',
+    })).resolves.toEqual({ reported: true });
+    await db.query(
+      'UPDATE conversation_members SET left_at=clock_timestamp() WHERE conversation_id=$1 AND user_id=$2',
+      [group, reporterId],
+    );
+    await expect(reports.submit(reporterId, {
+      targetType: 'message', targetId: message, reason: 'privacy',
+    })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(reports.submit(authorId, {
+      targetType: 'message', targetId: message, reason: 'other',
+    })).rejects.toBeInstanceOf(NotFoundException);
+    expect((await reports.list({ status: 'open' })).items).toHaveLength(1);
+  });
+
   it('rejects reason and target corruption at database layer', async () => {
     await expect(db.query(
       `INSERT INTO content_abuse_reports (reporter_id,target_type,target_id,reason)
