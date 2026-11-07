@@ -10,7 +10,7 @@
 | **Location → Approximate location** | Public position is coarsened relative to raw GPS, but not coarse enough to meet Google Play's 3km² threshold | **Do not infer 'Approximate' just from H3 fuzzing.** Declare only if another qualifying coarse collection path exists in the shipped release. |
 | **Personal info → Name / Email / Phone number / User IDs** | Account registration, OAuth/profile, optional phone verification | **Collected:** name/email/user ID yes; phone when supplied. Verify `optional` choice field-by-field. |
 | **Personal info → Sexual orientation** | ProfileEdit offers optional orientation; `users.sexual_orientation`, including self-description when selected | **Collected when provided.** Private profile visibility is NOT equivalent to no collection. |
-| **Personal info → Other info** | DOB required in normal onboarding; gender identity, purpose/interests, dating preference and hometown | **Collected.** DOB is used for adult eligibility; legal controls must match the deployed service. |
+| **Personal info → Other info** | DOB is currently optional at email/Google OAuth signup; a declared adult DOB is required for dating opt-in, dating interactions and dating-only discovery; gender identity, purpose/interests, dating preference and hometown | **Collected.** DOB is used for adult eligibility; legal controls must match the deployed service. |
 | **Photos & videos → Photos** | Avatars, gallery, story photos, listing media and optional verification selfie/ID images | **Collected when supplied.** Audit storage, deletion and processors. |
 | **Photos & videos → Videos** | Stories can contain camera/gallery video, uploaded using S3 presigned URLs | **Collected when supplied.** Verify whether audio/video file types require further separate declaration. |
 | **Files and docs → Files and docs** | Optional identity verification document uploads | **Collected if verification is enabled and used in the AAB/backend.** Determine retention and provider before finalizing. |
@@ -38,7 +38,7 @@
 - [ ] Audit Sentry, FCM, first-party analytics and optional PostHog/Stripe flags before marking shared/collected categories.
 - [ ] Confirm hosted privacy policy and external account-deletion request URL load anonymously over HTTPS, and reflect the build.
 - [ ] Complete Terms of Service + policy acceptance for posting UGC (tracked separately as #592); do not present this follow-up PR as clearing that blocker.
-- [ ] Validate IARC/target audience 18+ and any applicable **Restrict Minor Access** Play Console setting.
+- [ ] Resolve [issue #1068](https://github.com/ValentinGanchevA1/general/issues/1068): intended all-app 18+ vs existing dating-only DOB enforcement, align user-facing Terms/Privacy, target audience, actual email/Google OAuth entry flows and any applicable **Restrict Minor Access** setting. Do not mark adult age verification as implemented.
 
 ## Google policy sources
 
