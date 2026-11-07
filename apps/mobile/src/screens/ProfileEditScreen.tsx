@@ -393,7 +393,7 @@ export function ProfileEditScreen(): React.JSX.Element {
 
         <View onLayout={(e) => { datingYRef.current = e.nativeEvent.layout.y; }}>
           <Text style={styles.section}>DATING</Text>
-          <Text style={styles.hint}>Dating is optional and available only to adults aged 18+. Seeking is private.</Text>
+          <Text style={styles.hint}>Dating is optional and 18+ only. A self-declared birth date is not independent age verification; additional checks may be required. Seeking preferences are private.</Text>
           <View style={styles.toggleRow}><View style={styles.toggleText}><Text style={styles.toggleLabel}>Open to dating</Text></View>{themedSwitch(openToDating, setOpenToDating)}</View>
           {openToDating ? <>
             <Text style={styles.fieldLabel}>Interested in</Text>
