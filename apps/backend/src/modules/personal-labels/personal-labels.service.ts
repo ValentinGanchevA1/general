@@ -14,6 +14,7 @@ import type {
 import { PERSONAL_LABEL_MAX_SELECTED } from '@g88/shared';
 import { requirePersonalLabelsEnabled } from './personal-labels.flag';
 import type { PersonalLabelQueueDto } from './personal-labels.dto';
+import { UsersService } from '../users/users.service';
 
 interface LabelRow {
   key: string;
@@ -61,7 +62,7 @@ function presentProposal(row: ProposalRow): PersonalLabelProposal {
 
 @Injectable()
 export class PersonalLabelsService {
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(@InjectDataSource() private readonly db: DataSource, private readonly users: UsersService) {}
 
   async catalog(locale: PersonalLabelLocale = 'en'): Promise<PersonalLabelCatalogResponse> {
     requirePersonalLabelsEnabled();
@@ -83,6 +84,13 @@ export class PersonalLabelsService {
       [userId],
     );
     return { items: rows.map(presentLabel) };
+  }
+
+  async publicLabels(targetId: string, viewerId: string, locale: PersonalLabelLocale = 'en'): Promise<SelectedPersonalLabelsResponse> {
+    requirePersonalLabelsEnabled();
+    // Reuse the canonical public profile privacy, symmetric block and deletion gates.
+    if (viewerId !== targetId) await this.users.getPublicProfile(targetId, viewerId);
+    return this.myLabels(targetId, locale);
   }
 
   async setMine(userId: string, dto: SetPersonalLabelsRequest, locale: PersonalLabelLocale = 'en'): Promise<SelectedPersonalLabelsResponse> {
