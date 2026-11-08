@@ -12,6 +12,12 @@ const context = {
 };
 
 describe('DiscoveryEntityResolver', () => {
+  const previousDating = process.env.NEXUS_DATING_RELEASE_ENABLED;
+  beforeAll(() => { process.env.NEXUS_DATING_RELEASE_ENABLED = 'true'; });
+  afterAll(() => {
+    if (previousDating === undefined) delete process.env.NEXUS_DATING_RELEASE_ENABLED;
+    else process.env.NEXUS_DATING_RELEASE_ENABLED = previousDating;
+  });
   let resolver: DiscoveryEntityResolver;
   let query: jest.Mock;
   let listFriendIds: jest.Mock;
@@ -119,6 +125,20 @@ describe('DiscoveryEntityResolver', () => {
       }),
     ).resolves.toBeNull();
     expect(query).not.toHaveBeenCalled();
+  });
+
+  it('denies realtime Dating context without any database lookup when disabled', async () => {
+    process.env.NEXUS_DATING_RELEASE_ENABLED = 'false';
+    try {
+      const result = await resolver.resolveForViewer({
+        viewerId: 'viewer', kind: 'user', entityId: 'u1',
+        context: { ...context, datingOnly: true },
+      });
+      expect(result).toBeNull();
+      expect(query).not.toHaveBeenCalled();
+    } finally {
+      process.env.NEXUS_DATING_RELEASE_ENABLED = 'true';
+    }
   });
 
   it('rejects dating mode when the viewer is not open to dating', async () => {
