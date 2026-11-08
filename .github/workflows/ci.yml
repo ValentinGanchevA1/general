@@ -68,6 +68,8 @@ jobs:
         run: pnpm --filter @g88/shared build
       - name: Test runtime renderer policy verifier
         run: node --test scripts/check-runtime-renderer-policy.test.mjs
+      - name: Test Render PR-preview database isolation guard
+        run: node --test apps/backend/scripts/preview-db-guard.test.cjs
       - name: Migration prefix uniqueness
         run: node apps/backend/scripts/check-migration-prefixes.mjs
       - name: Lint
