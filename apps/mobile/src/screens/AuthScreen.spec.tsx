@@ -6,6 +6,14 @@ import { clearError, login, loginWithGoogle, register } from '@/features/auth/au
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { AuthScreen } from './AuthScreen';
 
+let mockGoogleWebClientId = 'configured-client.apps.googleusercontent.com';
+jest.mock('@/config', () => ({
+  Config: {
+    get GOOGLE_WEB_CLIENT_ID(): string {
+      return mockGoogleWebClientId;
+    },
+  },
+}));
 jest.mock('./PasswordRecoveryScreen', () => ({ PasswordRecoveryScreen: 'PasswordRecoveryScreen' }));
 
 const mockDispatch = jest.fn();
@@ -31,6 +39,7 @@ jest.mock('react-native-vector-icons/MaterialCommunityIcons', () => 'Icon');
 beforeEach(() => {
   jest.clearAllMocks();
   mockAuth = { loading: false, error: null };
+  mockGoogleWebClientId = 'configured-client.apps.googleusercontent.com';
 });
 
 it('validates locally then submits trimmed email and the unchanged password', () => {
@@ -75,6 +84,17 @@ it('clears stale errors before Google sign-in and displays server errors', () =>
   fireEvent.press(screen.getByLabelText('Continue with Google'));
   expect(clearError).toHaveBeenCalled();
   expect(loginWithGoogle).toHaveBeenCalledTimes(1);
+});
+
+it('hides an unavailable Google sign-in button and divider while preserving email login', () => {
+  mockGoogleWebClientId = '';
+  const screen = render(<AuthScreen />);
+  expect(screen.queryByLabelText('Continue with Google')).toBeNull();
+  expect(screen.queryByText('or')).toBeNull();
+  expect(screen.getByLabelText('Email')).toBeTruthy();
+  expect(screen.getByLabelText('Password')).toBeTruthy();
+  expect(screen.getByLabelText('Sign in')).toBeTruthy();
+  expect(loginWithGoogle).not.toHaveBeenCalled();
 });
 
 it('blocks button and keyboard submission while authentication is pending', () => {
