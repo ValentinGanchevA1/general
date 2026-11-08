@@ -79,7 +79,7 @@ describe('AuthService', () => {
 
     it('persists valid adult DOB before issuing tokens with gate enabled', async () => {
       process.env.NEXUS_REQUIRE_ADULT_AGE = 'true';
-      db.query.mockResolvedValueOnce([{ id: 'u-adult', email: 'adult@example.com', auth_version: 0, display_name: 'Adult', avatar_url: null, verification_level: 'none' }]).mockResolvedValueOnce([]);
+      db.query.mockResolvedValueOnce([{ id: 'u-adult', email: 'adult@example.com', auth_version: 0, display_name: 'Adult', avatar_url: null, verification_level: 'none' }]).mockResolvedValueOnce([{ id: 'refresh-row' }]);
       const response = await service.register('adult@example.com', 'password-123', 'Adult', '2000-01-01');
       expect(response.tokens.accessToken).toBe('access-token');
       expect(db.query.mock.calls[0]?.[0]).toContain('date_of_birth');
