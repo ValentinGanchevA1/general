@@ -26,6 +26,8 @@ jobs:
           node-version-file: '.nvmrc'
       - name: Test secret scanning guard (regressions)
         run: node --test scripts/ci/check-no-secrets.test.mjs
+      - name: Test Play AAB manual publish and signature workflow guard
+        run: node --test scripts/ci/check-play-release-workflow.test.mjs
       - name: Secret / env scanning (hard gate)
         run: bash scripts/ci/check-no-secrets.sh
       - name: Test manual Terms legal publication gate (no files published)

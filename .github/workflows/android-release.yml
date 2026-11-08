@@ -1,7 +1,7 @@
 name: Android Release (AAB)
 
 # Builds a signed Android App Bundle for Google Play (closed testing / production).
-# Manual via the Actions tab, or automatically on a v* tag push.
+# Manual builds via Actions, or build-only on v* tag pushes (no implicit Play upload).
 # The first upload to the Play Console must be done by hand (Play requires it to
 # establish the app); afterwards the .aab artifact from here can be uploaded
 # manually or wired to a service-account auto-publish step (see DEPLOY.md).
@@ -174,15 +174,35 @@ jobs:
             sleep "$sleep_s"
           done
 
-      - name: Verify the AAB is not debug-signed
+      - name: Verify the AAB is signed with a non-debug certificate
         run: |
           AAB=android/app/build/outputs/bundle/release/app-release.aab
           test -f "$AAB" || { echo "::error::AAB not produced"; exit 1; }
-          # Fail loudly if the bundle is still signed with the Android debug key.
-          if unzip -p "$AAB" META-INF/*.RSA 2>/dev/null | keytool -printcert 2>/dev/null | grep -q "Android Debug"; then
-            echo "::error::AAB is debug-signed — upload keystore secrets are missing or misconfigured."
+
+          # A missing signer must be an error, not a successful "not debug-signed" check.
+          # Android App Bundles use JAR signing, which jarsigner can verify.
+          SIGNATURE_OUTPUT="$(jarsigner -verify "$AAB" 2>&1)" || {
+            echo "::error::AAB signature verification failed."
+            exit 1
+          }
+          if ! grep -Fq 'jar verified.' <<< "$SIGNATURE_OUTPUT"; then
+            echo "::error::AAB has no verifiable JAR signature."
             exit 1
           fi
+
+          CERT_INFO="$(keytool -printcert -jarfile "$AAB" 2>&1)" || {
+            echo "::error::Could not read AAB signing certificate."
+            exit 1
+          }
+          if ! grep -q '^Owner:' <<< "$CERT_INFO"; then
+            echo "::error::AAB signing certificate metadata missing."
+            exit 1
+          fi
+          if grep -qi 'Android Debug' <<< "$CERT_INFO"; then
+            echo "::error::AAB uses an Android Debug certificate, not the upload key."
+            exit 1
+          fi
+          echo "::notice::AAB JAR signature verified with a non-debug certificate. Confirm its SHA-256 against the Play Console upload certificate before upload."
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -191,14 +211,15 @@ jobs:
           path: apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 14
 
-      # Publishes to the Play track via a service account. Auto-skips until the
-      # PLAY_SERVICE_ACCOUNT_JSON secret exists, so the build stays green before
-      # automation is set up. Requires the app to already exist in the Console
-      # with at least one manual release on the target track (Play API rule).
+      # Never upload solely because a v* tag was pushed, even if Play credentials exist.
+      # Publishing requires a manual workflow_dispatch with publish=true AND a
+      # configured Play service account. Tag pushes always remain build-only.
+      # The first upload on a new app/track may still need to be performed in Console.
       - name: Publish to Google Play
         if: >-
-          env.HAS_PLAY_SA == 'true' &&
-          (github.event_name == 'push' || inputs.publish == true)
+          github.event_name == 'workflow_dispatch' &&
+          inputs.publish == true &&
+          env.HAS_PLAY_SA == 'true'
         uses: r0adkll/upload-google-play@eb49699984a39f23558439581660aa6f088acfd6 # v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
@@ -209,5 +230,8 @@ jobs:
           whatsNewDirectory: apps/mobile/distribution/whatsnew
 
       - name: Note when publish was skipped
-        if: env.HAS_PLAY_SA != 'true'
-        run: echo "::notice::PLAY_SERVICE_ACCOUNT_JSON not set — built the AAB but skipped Play upload. Download the g88-release-aab artifact and upload manually, or add the secret to enable automation (see DEPLOY.md)."
+        if: >-
+          github.event_name != 'workflow_dispatch' ||
+          inputs.publish != true ||
+          env.HAS_PLAY_SA != 'true'
+        run: echo "::notice::Build-only AAB; Play upload skipped. Explicit manual publish=true plus PLAY_SERVICE_ACCOUNT_JSON are required. The first Play upload can be completed manually in the Console."
