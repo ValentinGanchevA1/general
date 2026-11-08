@@ -115,8 +115,12 @@ export class ContentReportsService {
          r.created_at, r.reviewed_at,
          COALESCE(tu.display_name, au.display_name, lu.display_name, eu.display_name,
                   cu.display_name, mu.display_name, alert_author.display_name, qu.display_name) AS target_display_name,
-         COALESCE(s.caption, l.description, e.description, ci.place_label, m.body, a.body, q.body) AS target_caption,
-         COALESCE(s.media_url, l.thumbnail_url, e.cover_url) AS target_media_url
+         CASE WHEN r.reason = 'child_safety' THEN NULL
+              ELSE COALESCE(s.caption, l.description, e.description, ci.place_label, m.body, a.body, q.body)
+         END AS target_caption,
+         CASE WHEN r.reason = 'child_safety' THEN NULL
+              ELSE COALESCE(s.media_url, l.thumbnail_url, e.cover_url)
+         END AS target_media_url
        FROM content_abuse_reports r
        LEFT JOIN users tu ON r.target_type = 'user' AND tu.id = r.target_id
        LEFT JOIN stories s ON r.target_type = 'story' AND s.id = r.target_id
