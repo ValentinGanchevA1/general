@@ -37,5 +37,5 @@ export async function assertAdultAge(db: DataSource, userId: string): Promise<vo
 
 export type AgePendingPermission = 'always' | 'profile_update';
 export const AGE_PENDING_PERMISSION = 'auth.age_pending_permission';
-export const AllowAgePending = (permission: AgePendingPermission): MethodDecorator =>
+export const AllowAgePending = (permission: AgePendingPermission) =>
   SetMetadata(AGE_PENDING_PERMISSION, permission);
