@@ -97,6 +97,17 @@ A grey/blank map on Play-installed builds is a release blocker until this restri
 - [ ] **Data Safety precision:** NEXUS's public ~120m H3 cell is still below Google's **3 km²** threshold for *precise* location. Mark precise-location collection based on off-device processing and optional live DM persistence, not solely on how coarsened pins look.
 - [ ] **UGC Terms acceptance:** #592 requires versioned Terms acceptance before posting/uploading; showing a Terms hyperlink without an actual acceptance state is insufficient.
 
+## 6A. Public brand and adult-only launch eligibility (8 November 2026)
+- [x] **Owner decision:** the official public product name is **NEXUS**. NEXA remains only a historical project/internal code label. Keep `com.g88` and all `@g88/*` compatibility identifiers unchanged.
+- [ ] Google Play Console → Policy → App content → Target audience and content: select **18 and over** as the only audience. Enable **Restrict Minor Access** for the adult-only launch.
+- [ ] Do not claim that the IARC questionnaire itself must assign 18+. Content rating and product eligibility are separate.
+- [ ] Release backend: deploy adult-only age status and JWT/Socket guards, then set **`NEXUS_REQUIRE_ADULT_AGE=true`**, after testing migration/UX for existing and Google OAuth users. Default-OFF is **NOT** an acceptable final RC1 production state.
+- [ ] Email registration requires valid adult DOB; Google OAuth and grandfathered accounts must pass backend age status before map, messaging, events, listing, presence or private live location.
+- [ ] Check users under 18, missing DOB, illegal birth dates and exactly-18 birthday; direct REST and WebSocket bypass must fail.
+- [ ] Ensure people can sign out, delete account, block/report abuse and decrease profile visibility while age declaration is pending.
+- [ ] Align Privacy, Terms, Child Safety Standards and Data Safety with NEXUS 18+ and the actual on-device consent/check mechanism. Self-declared DOB is not independently verified age.
+- [ ] Attach Play Console target-age screenshot, signed AAB hash, deployed API SHA, age gate flag evidence and Android device test results.
+
 ## 7. NEXUS legal gate — production only
 
 Closed testing may proceed while Terms are under review, but production must remain **NO-GO** until all items below pass:
