@@ -7,12 +7,35 @@ const require = createRequire(new URL('../apps/mobile/package.json', import.meta
 const { io } = require('socket.io-client');
 
 const STATE_FILE = process.env.DEVICE_E2E_STATE_FILE ?? '.tmp/android-two-device-privacy.json';
-const BASE = process.env.DEVICE_E2E_BASE_URL ?? 'https://g88-api.onrender.com';
+// No implicit production endpoint: this script creates users, messages and blocks.
+const BASE = (process.env.DEVICE_E2E_BASE_URL ?? '').trim().replace(/\/$/, '');
 const API = `${BASE}/api/v1`;
 const command = process.argv[2] ?? 'prepare';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function assertApprovedStagingTarget() {
+  assert(
+    process.env.DEVICE_E2E_STAGING_APPROVED === 'true',
+    'Device E2E writes require explicit approval of an isolated staging backend.',
+  );
+  let target;
+  try {
+    target = new URL(BASE);
+  } catch {
+    throw new Error('DEVICE_E2E_BASE_URL must be an explicit staging HTTPS URL.');
+  }
+  assert(
+    target.protocol === 'https:' && !target.username && !target.password &&
+      target.pathname === '/' && !target.search && !target.hash,
+    'Device E2E staging URL must be a credential-free HTTPS origin.',
+  );
+  assert(
+    target.hostname.toLowerCase() !== 'g88-api.onrender.com',
+    'Device E2E must never create test accounts on the live NEXUS API.',
+  );
 }
 
 async function readJson(response) {
@@ -33,7 +56,7 @@ async function register(label, runId, password) {
   const { response, body } = await api('/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, displayName }),
+    body: JSON.stringify({ email, password, displayName, dateOfBirth: '1990-01-01' }),
   });
   assert(response.status === 201, `register ${label} failed: HTTP ${response.status}`);
   assert(typeof body?.tokens?.accessToken === 'string', `register ${label} missing access token`);
@@ -217,8 +240,10 @@ async function cleanup() {
 }
 
 if (command === 'prepare') {
+  assertApprovedStagingTarget();
   await prepare();
 } else if (command === 'cleanup') {
+  assertApprovedStagingTarget();
   await cleanup();
 } else {
   throw new Error(`Unsupported command: ${command}`);
