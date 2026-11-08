@@ -17,7 +17,9 @@ function labelTitle(item: PersonalLabel): string {
 }
 
 /** An isolated opt-in form. The released app renders nothing and makes no requests by default. */
-export function PersonalLabelsEditor(): React.JSX.Element | null {
+export function PersonalLabelsEditor({ onDraftChange }: {
+  onDraftChange?: (keys: string[] | null) => void;
+}): React.JSX.Element | null {
   const dispatch = useAppDispatch();
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -37,17 +39,21 @@ export function PersonalLabelsEditor(): React.JSX.Element | null {
   if (!Config.PERSONAL_LABELS_REQUESTED || (!enabled && !loading)) return null;
 
   const toggle = (key: string): void => {
-    setDraftOverride((current) => {
-      const values = current ?? selectedKeys;
-      return values.includes(key)
-        ? values.filter((item) => item !== key)
-        : values.length < PERSONAL_LABEL_MAX_SELECTED ? [...values, key] : values;
-    });
+    const nextKeys = draft.includes(key)
+      ? draft.filter((item) => item !== key)
+      : draft.length < PERSONAL_LABEL_MAX_SELECTED ? [...draft, key] : draft;
+    if (nextKeys === draft) return;
+    setDraftOverride(nextKeys);
+    // The parent Save button must also commit unsaved label edits.
+    onDraftChange?.(nextKeys);
   };
 
   const save = async (): Promise<void> => {
     const result = await dispatch(savePersonalLabels(draft));
-    if (savePersonalLabels.fulfilled.match(result)) setDraftOverride(null);
+    if (savePersonalLabels.fulfilled.match(result)) {
+      setDraftOverride(null);
+      onDraftChange?.(null);
+    }
   };
   const submit = async (): Promise<void> => {
     const text = suggestion.trim();
