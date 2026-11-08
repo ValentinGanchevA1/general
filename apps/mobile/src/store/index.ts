@@ -4,6 +4,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '@/features/auth/authSlice';
 import passwordResetReducer from '@/features/auth/passwordResetSlice';
 import profileReducer from '@/features/profile/profileSlice';
+import personalLabelsReducer from '@/features/profile/personalLabelsSlice';
 import chatReducer, { outboxHydrated } from '@/features/chat/chatSlice';
 import { groupChatRouteStore } from '@/features/chat/groupChatRouteStore';
 import pulseReducer from '@/features/pulse/pulseSlice';
@@ -33,6 +34,7 @@ export const store = configureStore({
     reports: reportsReducer,
     passwordReset: passwordResetReducer,
     profile: profileReducer,
+    personalLabels: personalLabelsReducer,
     chat: chatReducer,
     pulse: pulseReducer,
     discovery: discoveryReducer,
