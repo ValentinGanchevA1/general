@@ -355,6 +355,9 @@ export function AppNavigator(): React.JSX.Element {
 	const dispatch = useAppDispatch();
 	const user = useAppSelector((s) => s.auth.user);
 	const userId = user?.id ?? null;
+	const adultAge = useAppSelector((s) => s.adultAge);
+	const adultReady = !!userId && adultAge.userId === userId && adultAge.status != null &&
+		(!adultAge.status.enforced || adultAge.status.eligible);
 	const restoring = useAppSelector((s) => s.auth.restoring);
 	const profileSetupComplete = useAppSelector((s) => s.auth.profileSetupComplete);
 	const launchInteractionsReady = useNexaLaunchInteractionsReady();
@@ -382,13 +385,13 @@ export function AppNavigator(): React.JSX.Element {
 		};
 	}, []);
 	useEffect(() => {
-		if (!navigationReady || !userId || !profileSetupComplete || pendingPlaceDeepLinkId == null) return;
+		if (!navigationReady || !adultReady || !userId || !profileSetupComplete || pendingPlaceDeepLinkId == null) return;
 		openViaRef('PlaceDetail', { placeId: pendingPlaceDeepLinkId });
 		placeDeepLinkQueue.clear(pendingPlaceDeepLinkId);
-	}, [navigationReady, pendingPlaceDeepLinkId, profileSetupComplete, userId]);
+	}, [navigationReady, pendingPlaceDeepLinkId, profileSetupComplete, userId, adultReady]);
 	useEffect(() => { if (!userId) return; return setupNotificationHandlers((screen, params) => { openViaRef(screen as Parameters<typeof openViaRef>[0], params); }); }, [userId]);
-	useEffect(() => { if (!launchInteractionsReady) return; if (userId && prevUserRef.current !== userId) { prevUserRef.current = userId; void registerPushToken(); void pingGamification(); } if (!userId) prevUserRef.current = null; }, [launchInteractionsReady, userId]);
-	useEffect(() => { if (!launchInteractionsReady || !userId || restoring) return; let cancelled = false; const t = setTimeout(() => { void (async () => { const phone = await takePendingPhoneVerify(); if (cancelled || !phone) return; openViaRef('Verification', { initialPhone: phone }); })(); }, 700); return () => { cancelled = true; clearTimeout(t); }; }, [launchInteractionsReady, userId, restoring]);
+	useEffect(() => { if (!launchInteractionsReady) return; if (adultReady && userId && prevUserRef.current !== userId) { prevUserRef.current = userId; void registerPushToken(); void pingGamification(); } if (!userId) prevUserRef.current = null; }, [launchInteractionsReady, userId, adultReady]);
+	useEffect(() => { if (!launchInteractionsReady || !adultReady || !userId || restoring) return; let cancelled = false; const t = setTimeout(() => { void (async () => { const phone = await takePendingPhoneVerify(); if (cancelled || !phone) return; openViaRef('Verification', { initialPhone: phone }); })(); }, 700); return () => { cancelled = true; clearTimeout(t); }; }, [launchInteractionsReady, userId, restoring, adultReady]);
 	if (restoring && user === null) return <View style={{ flex: 1, backgroundColor: themeColors.bg, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Loading" accessibilityRole="progressbar"><BrandLogo size={120} /></View>;
 	return <NavigationContainer ref={navigationRef} theme={navigationTheme} onReady={() => { setNavigationReady(true); navigationIntegration.registerNavigationContainer(navigationRef); }}><BottomSheetModalProvider>
 		<Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themeColors.bg } }}>
