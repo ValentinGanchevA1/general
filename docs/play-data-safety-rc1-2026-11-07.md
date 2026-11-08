@@ -2,6 +2,8 @@
 
 > **Working declaration only.** Based on source in `feat/play-ugc-dating-safety-followup-20261107`, stacked on draft PR #1064. Does not certify the uploaded AAB, live runtime flags, production data retention, hosted legal page, or submitted Play Console values. **Do not submit blindly.**
 
+> **Dating release hold (8 Nov 2026):** For the initial social release, adult-only Dating is default-disabled via backend `NEXUS_DATING_RELEASE_ENABLED` and hidden by the mobile feature gate. DOB and orientation remain optional profile fields and must be declared as collected **when provided**, even if Dating interactions are disabled. Verify the actual production flag / AAB before answering Play forms; do not equate a disabled feature with absence of historical or optional collected data.
+
 ## Source-backed data inventory
 
 | Google Play category | Code-backed behavior | Launch declaration guidance / verification |
