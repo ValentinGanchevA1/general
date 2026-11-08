@@ -10,6 +10,7 @@ import type {
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { RequireCurrentTerms } from '../terms/require-terms.decorator';
 import { InteractionsInboxService } from './interactions-inbox.service';
 import { InteractionsService } from './interactions.service';
 import { WaveIdempotencyService } from './wave-idempotency.service';
@@ -34,6 +35,7 @@ export class InteractionsController {
   ) {}
 
   @Post('wave')
+  @RequireCurrentTerms()
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // 20 waves/min
   async wave(
     @Body() dto: WaveDto,

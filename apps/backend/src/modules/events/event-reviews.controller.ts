@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGua
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { RequireCurrentTerms } from '../terms/require-terms.decorator';
 import { AdminGuard } from '../id-verification/admin.guard';
 import { EventReviewsService } from './event-reviews.service';
 import { ReportEventReviewDto, ReviewPageDto, SaveEventReviewDto } from './review.dto';
@@ -14,8 +15,10 @@ export class EventReviewsController {
   @Get(':id/reviews/me')
   me(@CurrentUser('id') actor: string, @Param('id', ParseUUIDPipe) id: string) { return this.service.me(actor, id); }
   @Post(':id/reviews')
+  @RequireCurrentTerms()
   create(@CurrentUser('id') actor: string, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SaveEventReviewDto) { return this.service.save(actor, id, dto, false); }
   @Patch(':id/reviews/me')
+  @RequireCurrentTerms()
   edit(@CurrentUser('id') actor: string, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SaveEventReviewDto) { return this.service.save(actor, id, dto, true); }
   @Get(':id/reviews')
   list(@CurrentUser('id') actor: string, @Param('id', ParseUUIDPipe) id: string, @Query() dto: ReviewPageDto) { return this.service.list(actor, id, dto); }

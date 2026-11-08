@@ -11,6 +11,7 @@ import type {
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { RequireCurrentTerms } from '../terms/require-terms.decorator';
 import { GiftsService } from './gifts.service';
 import { SendGiftDto } from './dto';
 
@@ -49,6 +50,7 @@ export class GiftsController {
 
   /** Spend XP to send a gift. Tight throttle — it mutates the wallet. */
   @Post('send')
+  @RequireCurrentTerms()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   send(
     @CurrentUser('id') userId: string,
