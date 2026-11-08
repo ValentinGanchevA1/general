@@ -256,6 +256,7 @@ export class UsersController {
   }
 
   @Patch('me/photos/order')
+  @RequireCurrentTerms()
   async reorderPhotos(
     @CurrentUser('id') userId: string,
     @Body() dto: ReorderPhotosDto,

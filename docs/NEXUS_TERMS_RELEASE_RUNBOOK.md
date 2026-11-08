@@ -45,6 +45,14 @@ Both are outside Render static site's `docs/legal` publish directory.
 6. Apply migration 0072, confirm `/terms/status` for both new and existing accounts. Then explicitly set the three backend runtime flags and verify no bypass.
 7. Capture evidence and resolve #592 only when product owner, QA and legal reviewer have signed off.
 
+## November 8 hardening — publication and consent resilience
+- UI now visibly offers a retry if the authenticated Terms status request fails, rather than silently treating the status as not required.
+- Redux correlates status/acceptance requests with their IDs; late network responses after logout, account changes or a newer refresh can no longer overwrite the current consent state.
+- Friend follow/request/accept and reordering published profile photos are gated by accepted current Terms; users can still decline/cancel/unfriend, delete photos or hide their profile without accepting an updated version.
+- Existing safety exits remain available without acceptance: withdraw an existing marketplace listing, decline an offer or RSVP, and opt out of public-profile/dating visibility. Any attempt to add more fields or publish new UGC still requires acceptance.
+- Tests cover state isolation across accounts, status ordering, consent acceptance and UGC metadata. CI must be green at the latest head; these changes alone are **not release approval**.
+- Open risk for final device QA: foreground location presence and other non-UGC telemetry should honor independent visibility/privacy controls without silently treating Terms consent as location sharing consent.
+
 ## Tests
 - Shared/backend/mobile typechecks and lint pass.
 - On disposable PostgreSQL: apply 0072 twice, accept current version, reject absent/stale acceptance, test immutable first timestamp and cascade deletion.
