@@ -161,7 +161,7 @@ set_geo() {
 }
 
 assert_blocked_rejoin() {
-  local base_url="${DEVICE_E2E_BASE_URL:-https://g88-api.onrender.com}"
+  local base_url="${DEVICE_E2E_BASE_URL:?A reviewed staging backend URL is required}"
 
   node --input-type=module - "$STATE_FILE" "$base_url" <<'NODE'
 import { readFile } from 'node:fs/promises';
@@ -267,6 +267,8 @@ stop_share_if_visible() {
 }
 
 main() {
+  # Fail closed before any device or network activity if target is not approved staging.
+  node scripts/android-two-device-privacy-setup.mjs verify
   test -f "$APK_PATH" || { echo "::error::APK not found: $APK_PATH"; exit 1; }
   test -f "$STATE_FILE" || { echo "::error::state file not found: $STATE_FILE"; exit 1; }
 
