@@ -314,29 +314,29 @@ export function AuthScreen(): React.JSX.Element {
               </View>
 
               <TouchableOpacity
-            style={[
-              styles.googleButton,
-              loading && styles.disabled,
-              {
-                backgroundColor: colors.surfaceSecondary,
-                borderColor: colors.borderStrong,
-              },
-            ]}
-            onPress={() => {
-              dispatch(clearError());
-              setFieldErrors({});
-              void dispatch(loginWithGoogle());
-            }}
-            disabled={loading}
-            activeOpacity={0.82}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: loading }}
-            accessibilityLabel="Continue with Google"
-          >
-            <GoogleMark />
-            <Text style={[styles.googleButtonText, { color: colors.textPrimary }]}>
-              Continue with Google
-            </Text>
+                style={[
+                  styles.googleButton,
+                  loading && styles.disabled,
+                  {
+                    backgroundColor: colors.surfaceSecondary,
+                    borderColor: colors.borderStrong,
+                  },
+                ]}
+                onPress={() => {
+                  dispatch(clearError());
+                  setFieldErrors({});
+                  void dispatch(loginWithGoogle());
+                }}
+                disabled={loading}
+                activeOpacity={0.82}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: loading }}
+                accessibilityLabel="Continue with Google"
+              >
+                <GoogleMark />
+                <Text style={[styles.googleButtonText, { color: colors.textPrimary }]}>
+                  Continue with Google
+                </Text>
               </TouchableOpacity>
             </>
           ) : null}
