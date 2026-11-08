@@ -1,5 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { PersonalLabel, PersonalLabelsFeaturePolicy, SelectedPersonalLabelsResponse } from '@g88/shared';
 import { getJson } from '@/api/client';
@@ -9,15 +8,16 @@ import { spacing, radius, useAppTheme, type ThemeColors } from '@/theme';
 interface Props {
   userId: string;
   own?: boolean;
+  refreshKey?: number;
 }
 
 /** Read-only, fail-closed personality chips for the existing profile surfaces. */
-export function PersonalLabelsBadges({ userId, own = false }: Props): React.JSX.Element | null {
+export function PersonalLabelsBadges({ userId, own = false, refreshKey = 0 }: Props): React.JSX.Element | null {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [items, setItems] = useState<PersonalLabel[]>([]);
 
-  useFocusEffect(useCallback(() => {
+  useEffect(() => {
     let active = true;
     setItems([]);
     if (!Config.PERSONAL_LABELS_REQUESTED || !userId) return () => { active = false; };
@@ -35,7 +35,7 @@ export function PersonalLabelsBadges({ userId, own = false }: Props): React.JSX.
     };
     void load();
     return () => { active = false; };
-  }, [userId, own]));
+  }, [userId, own, refreshKey]);
 
   if (!Config.PERSONAL_LABELS_REQUESTED || items.length === 0) return null;
 
