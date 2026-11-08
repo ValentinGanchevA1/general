@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AllowAgePending } from '../auth/adult-eligibility';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AdminGuard } from '../id-verification/admin.guard';
 import { ContentReportsService } from './content-reports.service';
@@ -8,6 +9,7 @@ import { ContentReportQueueDto, CreateContentReportDto, DecideContentReportDto }
 
 @Controller('reports')
 @UseGuards(JwtAuthGuard)
+@AllowAgePending('always')
 export class ContentReportsController {
   constructor(private readonly service: ContentReportsService) {}
   @Post()
