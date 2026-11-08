@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
@@ -16,7 +16,15 @@ describe('AuthService', () => {
   let service: AuthService;
   let db: { query: jest.Mock };
 
+  const priorAdultPolicy = process.env.NEXUS_REQUIRE_ADULT_AGE;
+
+  afterEach(() => {
+    if (priorAdultPolicy === undefined) delete process.env.NEXUS_REQUIRE_ADULT_AGE;
+    else process.env.NEXUS_REQUIRE_ADULT_AGE = priorAdultPolicy;
+  });
+
   beforeEach(async () => {
+    delete process.env.NEXUS_REQUIRE_ADULT_AGE;
     db = { query: jest.fn() };
     const module = await Test.createTestingModule({
       providers: [
@@ -57,6 +65,27 @@ describe('AuthService', () => {
   });
 
   describe('register()', () => {
+    it('fails closed on missing or underage DOB when 18+ Social gate is enabled', async () => {
+      process.env.NEXUS_REQUIRE_ADULT_AGE = 'true';
+      await expect(service.register('person@example.com', 'password-123', 'User')).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(service.register('minor@example.com', 'password-123', 'User', '2010-01-01')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(db.query).not.toHaveBeenCalled();
+    });
+
+    it('rejects impossible DOB even with adult gate disabled', async () => {
+      await expect(service.register('person@example.com', 'password-123', 'User', '2000-02-30')).rejects.toBeInstanceOf(BadRequestException);
+      expect(db.query).not.toHaveBeenCalled();
+    });
+
+    it('persists valid adult DOB before issuing tokens with gate enabled', async () => {
+      process.env.NEXUS_REQUIRE_ADULT_AGE = 'true';
+      db.query.mockResolvedValueOnce([{ id: 'u-adult', email: 'adult@example.com', auth_version: 0, display_name: 'Adult', avatar_url: null, verification_level: 'none' }]).mockResolvedValueOnce([]);
+      const response = await service.register('adult@example.com', 'password-123', 'Adult', '2000-01-01');
+      expect(response.tokens.accessToken).toBe('access-token');
+      expect(db.query.mock.calls[0]?.[0]).toContain('date_of_birth');
+      expect(db.query.mock.calls[0]?.[1]?.[3]).toBe('2000-01-01');
+    });
+
     it('throws ConflictException when email unique constraint fails (23505)', async () => {
       // register() is INSERT-only; concurrent/taken email surfaces as Postgres unique_violation.
       const err = Object.assign(

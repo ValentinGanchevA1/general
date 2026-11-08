@@ -1,7 +1,9 @@
 import { createHash, randomBytes, randomUUID } from 'crypto';
 
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -14,6 +16,7 @@ import { OAuth2Client } from 'google-auth-library';
 import type { LoginResponse, AuthTokens, AuthenticatedUser } from '@g88/shared';
 
 import type { JwtPayload } from './jwt.strategy';
+import { isAtLeast18, isValidBirthDate, requiresAdultSocialAccess } from './adult-age-policy';
 
 interface UserRow {
   id: string;
@@ -52,15 +55,23 @@ export class AuthService {
     email: string,
     password: string,
     displayName: string,
+    dateOfBirth?: string,
   ): Promise<LoginResponse> {
+    if (dateOfBirth !== undefined && !isValidBirthDate(dateOfBirth)) {
+      throw new BadRequestException({ code: 'auth.invalid_dob', message: 'Invalid date of birth' });
+    }
+    if (requiresAdultSocialAccess() && !isAtLeast18(dateOfBirth)) {
+      throw new ForbiddenException({ code: 'auth.age_restricted', message: 'NEXUS registration requires age 18 or older' });
+    }
+
     const passwordHash = await bcrypt.hash(password, AuthService.BCRYPT_ROUNDS);
     let rows: UserRow[];
     try {
       rows = await this.db.query<UserRow[]>(
-        `INSERT INTO users (email, password_hash, display_name)
-              VALUES ($1, $2, $3)
+        `INSERT INTO users (email, password_hash, display_name, date_of_birth)
+              VALUES ($1, $2, $3, $4::date)
            RETURNING id, email, password_hash, display_name, avatar_url, verification_level, auth_version`,
-        [email, passwordHash, displayName],
+        [email, passwordHash, displayName, dateOfBirth ?? null],
       );
     } catch (err) {
       if (err instanceof QueryFailedError && (err as QueryFailedError & { code: string }).code === '23505') {
