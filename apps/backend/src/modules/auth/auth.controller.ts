@@ -12,9 +12,10 @@ import {
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 
-import type { LoginResponse, AuthTokens, AuthenticatedUser, ForgotPasswordResponse, ResetPasswordResponse } from '@g88/shared';
+import type { LoginResponse, AuthTokens, AuthenticatedUser, AdultAgeStatus, ForgotPasswordResponse, ResetPasswordResponse } from '@g88/shared';
 
 import { AuthService } from './auth.service';
+import { AllowAgePending } from './adult-eligibility';
 import { PasswordResetService } from './password-reset.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
@@ -51,7 +52,7 @@ export class AuthController {
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async register(@Body() dto: RegisterDto): Promise<LoginResponse> {
-    return this.auth.register(dto.email, dto.password, dto.displayName);
+    return this.auth.register(dto.email, dto.password, dto.displayName, dto.dateOfBirth);
   }
 
   @Post('login')
@@ -132,8 +133,17 @@ export class AuthController {
     return this.auth.googleOAuth(dto.idToken);
   }
 
+  @Get('age-status')
+  @UseGuards(JwtAuthGuard)
+  @AllowAgePending('always')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async ageStatus(@CurrentUser('id') userId: string): Promise<AdultAgeStatus> {
+    return this.auth.adultAgeStatus(userId);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
+  @AllowAgePending('always')
   @SkipThrottle()
   async me(@CurrentUser('id') userId: string): Promise<AuthenticatedUser> {
     return this.auth.me(userId);
