@@ -61,7 +61,7 @@ export function AdultEligibilityGate({ userId }: Props): React.JSX.Element | nul
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete account', style: 'destructive', onPress: () => { void (async () => {
         setDeleting(true);
-        const result = await dispatch(deleteAccount({ password: password.trim() || undefined }));
+        const result = await dispatch(deleteAccount(password.trim() ? { password: password.trim() } : {}));
         if (deleteAccount.rejected.match(result)) {
           setLocalError(typeof result.payload === 'string' ? result.payload : 'Could not delete account.');
         }
