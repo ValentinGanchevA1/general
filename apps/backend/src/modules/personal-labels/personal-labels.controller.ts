@@ -14,15 +14,16 @@ import type { PersonalLabelReviewRequest } from '@g88/shared';
 
 @Controller('personal-labels')
 @UseGuards(JwtAuthGuard)
-@Header('Cache-Control', 'private, no-store')
 export class PersonalLabelsController {
   constructor(private readonly labels: PersonalLabelsService) {}
 
   @Get('catalog')
+  @Header('Cache-Control', 'private, no-store')
   catalog(@Query() query: PersonalLabelsLocaleDto) {
     return this.labels.catalog(query.locale);
   }
   @Get('me')
+  @Header('Cache-Control', 'private, no-store')
   mine(@CurrentUser('id') id: string, @Query() query: PersonalLabelsLocaleDto) {
     return this.labels.myLabels(id, query.locale);
   }
@@ -37,6 +38,7 @@ export class PersonalLabelsController {
     return this.labels.submit(id, dto);
   }
   @Get('proposals/me')
+  @Header('Cache-Control', 'private, no-store')
   suggestions(@CurrentUser('id') id: string) {
     return this.labels.myProposals(id);
   }
@@ -45,10 +47,10 @@ export class PersonalLabelsController {
 @Controller('admin/personal-label-proposals')
 @UseGuards(JwtAuthGuard, AdminGuard)
 @Throttle({ default: { limit: 30, ttl: 60_000 } })
-@Header('Cache-Control', 'private, no-store')
 export class AdminPersonalLabelsController {
   constructor(private readonly labels: PersonalLabelsService) {}
   @Get()
+  @Header('Cache-Control', 'private, no-store')
   queue(@Query() query: PersonalLabelQueueDto) {
     return this.labels.queue(query);
   }
