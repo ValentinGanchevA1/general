@@ -1,4 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
+import { isAdultDateOfBirth } from '@g88/shared';
 
 /**
  * Existing members must be able to reduce their public exposure even when a
@@ -41,4 +42,15 @@ export function isSafeExitOnly(body: unknown, rule: TermsSafetyExitRule): boolea
   const fields = Object.entries(body as Record<string, unknown>);
   return fields.length === 1 && fields[0]?.[0] === rule.field &&
     fields[0]?.[1] === rule.value;
+}
+
+/** Existing OAuth and legacy accounts can confirm age before accepting Terms.
+ * This path cannot contain bio, photos, visibility expansion or other UGC.
+ */
+export function isAdultDeclarationOnly(body: unknown): boolean {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return false;
+  const fields = Object.entries(body as Record<string, unknown>);
+  return fields.length === 1 && fields[0]?.[0] === 'dateOfBirth'
+    && typeof fields[0][1] === 'string'
+    && isAdultDateOfBirth(fields[0][1]);
 }
