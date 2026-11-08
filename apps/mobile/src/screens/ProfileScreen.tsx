@@ -1,7 +1,7 @@
 // apps/mobile/src/screens/ProfileScreen.tsx
 // Profile v3 — self identity surface, not a settings/dashboard duplicate.
 
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import MCI from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,6 +20,7 @@ import { VerificationBadge } from '@/components/VerificationBadge';
 import { ProfileErrorState, ProfileLoadingState } from '@/components/Profile/ProfileScreenStates';
 import { ProfileTagsSection } from '@/components/Profile/ProfileTagsSection';
 import { PersonalLabelsBadges } from '@/features/profile/PersonalLabelsBadges';
+import { Config } from '@/config';
 import { fetchPendingCount, pendingCountSet } from '@/features/friends/friendsSlice';
 import {
   buildNexaProfileIdentityLine,
@@ -141,6 +142,10 @@ export function ProfileScreen(): React.JSX.Element {
   const pendingCount = useAppSelector((s) => s.friends.pendingCount);
   const friendsCount = useAppSelector((s) => s.friends.friends.items.length);
   const myUserId = useAppSelector((s) => s.auth.user?.id ?? null);
+  const [personalLabelsRefresh, setPersonalLabelsRefresh] = useState(0);
+  useFocusEffect(useCallback(() => {
+    if (Config.PERSONAL_LABELS_REQUESTED) setPersonalLabelsRefresh((value) => value + 1);
+  }, []));
   const { loading, error, refreshing, gamification, mapVisible, derived, onRefresh, dispatch } = useProfileScreenData();
 
   useEffect(() => { void dispatch(fetchPendingCount()); }, [dispatch]);
@@ -247,7 +252,7 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
       </View>
 
-      {myUserId ? <PersonalLabelsBadges userId={myUserId} own /> : null}
+      {myUserId ? <PersonalLabelsBadges userId={myUserId} own refreshKey={personalLabelsRefresh} /> : null}
 
       <View style={S.sectionHeader}>
         <Text style={S.sectionTitle}>Interests & Purpose</Text>
