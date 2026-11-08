@@ -1,4 +1,6 @@
 import { assertDatingReleaseEnabled } from '../dating/dating-release-gate';
+import { isAdultDateOfBirth } from '@g88/shared';
+import { isAdultGateEnforced } from '../auth/adult-eligibility';
 import {
   BadRequestException,
   Injectable,
@@ -473,6 +475,12 @@ export class UsersService {
       setClauses.push(`interests = $${params.length}`);
     }
     if (req.dateOfBirth !== undefined) {
+      if (isAdultGateEnforced() && (!req.dateOfBirth || !isAdultDateOfBirth(req.dateOfBirth))) {
+        throw new BadRequestException({
+          code: 'profile.age_restricted',
+          message: 'NEXUS is only available to users aged 18 or older.',
+        });
+      }
       if (req.dateOfBirth !== null) {
         const dob = new Date(req.dateOfBirth);
         if (Number.isNaN(dob.getTime())) {
@@ -573,8 +581,8 @@ export class UsersService {
     // Keep social profiles editable while adult-only Dating is paused.
     // A self-declared DOB alone never enables the restricted Dating service.
     if (req.openToDating === true) assertDatingReleaseEnabled();
-    // Only Dating requires adulthood. Re-check every DOB edit of an opted-in user.
-    // General social profiles must not impose a universal 18+ requirement.
+    // All NEXUS Social access is 18+ for launch. Dating remains separately
+    // disabled; validate any DOB change of an opted-in account as well.
     if (req.openToDating === true || req.dateOfBirth !== undefined) {
       const [existing] = await this.db.query<Array<{ date_of_birth: string | null; open_to_dating: boolean }>>(
         'SELECT date_of_birth::text AS date_of_birth, open_to_dating FROM users WHERE id = $1 AND deleted_at IS NULL',
