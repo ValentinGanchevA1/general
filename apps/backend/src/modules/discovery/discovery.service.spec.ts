@@ -39,6 +39,12 @@ type LoosePoint = {
 const asPoints = (ps: unknown): LoosePoint[] => ps as LoosePoint[];
 
 describe('DiscoveryService', () => {
+  const previousDating = process.env.NEXUS_DATING_RELEASE_ENABLED;
+  beforeAll(() => { process.env.NEXUS_DATING_RELEASE_ENABLED = 'true'; });
+  afterAll(() => {
+    if (previousDating === undefined) delete process.env.NEXUS_DATING_RELEASE_ENABLED;
+    else process.env.NEXUS_DATING_RELEASE_ENABLED = previousDating;
+  });
   let service: DiscoveryService;
   let query: jest.Mock;
   let whichAreOnline: jest.Mock;
@@ -80,6 +86,17 @@ describe('DiscoveryService', () => {
     service.nearby({ viewport: VIEWPORT, zoom: 16, requesterId: 'me', ...over });
 
   describe('guards', () => {
+    it('returns no Dating users without the explicit release switch', async () => {
+      process.env.NEXUS_DATING_RELEASE_ENABLED = 'false';
+      try {
+        const result = await call({ datingOnly: true });
+        expect(result.points).toEqual([]);
+        expect(query).not.toHaveBeenCalled();
+      } finally {
+        process.env.NEXUS_DATING_RELEASE_ENABLED = 'true';
+      }
+    });
+
     it('returns empty (no DB hit) when the viewport produces no cells', async () => {
       (cellsForViewport as jest.Mock).mockReturnValue([]);
       const res = await call();
