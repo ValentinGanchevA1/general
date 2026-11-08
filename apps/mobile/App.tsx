@@ -34,6 +34,7 @@ import { getLastResolvedLaunchReduceMotion } from '@/components/Brand/resolveLau
 import { ChatRealtimeSync } from '@/features/chat/ChatRealtimeSync';
 import { UserLocationProvider } from '@/features/location/UserLocationProvider';
 import { TermsAcceptanceGate } from '@/features/terms/TermsAcceptanceGate';
+import { AdultEligibilityGate } from '@/features/auth/AdultEligibilityGate';
 
 Sentry.init({
   dsn: Config.SENTRY_DSN,
@@ -53,10 +54,14 @@ GoogleSignin.configure({ webClientId: Config.GOOGLE_WEB_CLIENT_ID });
 function AppShell(): React.JSX.Element {
   const restoring = useAppSelector((state) => state.auth.restoring);
   const user = useAppSelector((state) => state.auth.user);
+  const adultAge = useAppSelector((state) => state.adultAge);
   const profileSetupComplete = useAppSelector(
     (state) => state.auth.profileSetupComplete,
   );
   const { colors, scheme } = useAppTheme();
+  const adultReady = user != null && adultAge.userId === user.id
+    && adultAge.status != null
+    && (!adultAge.status.enforced || adultAge.status.eligible);
   const [showSpatialHandoff, setShowSpatialHandoff] = React.useState(false);
   const [launchInteractionsReady, setLaunchInteractionsReady] = React.useState(false);
   const [mapSurfaceReady, setMapSurfaceReady] = React.useState(false);
@@ -75,10 +80,10 @@ function AppShell(): React.JSX.Element {
   const requiresMapSurface = React.useMemo(
     () =>
       shouldRunNexaSpatialHandoff({
-        authenticated: user != null,
+        authenticated: adultReady,
         profileSetupComplete,
       }),
-    [profileSetupComplete, user],
+    [profileSetupComplete, adultReady],
   );
 
   React.useEffect(() => {
@@ -199,9 +204,9 @@ function AppShell(): React.JSX.Element {
       >
         <UserLocationProvider
           key={user?.id ?? 'signed-out'}
-          enabled={user != null}
+          enabled={adultReady}
         >
-          {user ? <ChatRealtimeSync viewerId={user.id} /> : null}
+          {adultReady && user ? <ChatRealtimeSync viewerId={user.id} /> : null}
           <AppNavigator />
         </UserLocationProvider>
       </NexaLaunchSurfaceProvider>
@@ -209,7 +214,8 @@ function AppShell(): React.JSX.Element {
       {showSpatialHandoff ? (
         <NexaSpatialMapHandoff onComplete={handleSpatialHandoffComplete} />
       ) : null}
-      {user && !restoring ? <TermsAcceptanceGate key={user.id} userId={user.id} /> : null}
+      {adultReady && user && !restoring ? <TermsAcceptanceGate key={user.id} userId={user.id} /> : null}
+      {user && !restoring ? <AdultEligibilityGate key={user.id} userId={user.id} /> : null}
     </View>
   );
 }
