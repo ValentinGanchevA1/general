@@ -58,3 +58,11 @@ node apps/backend/scripts/check-migration-prefixes.mjs
 The Jest migration spec uses `EVENT_REVIEWS_TEST_DATABASE_URL` and creates a disposable schema. **Never set it to production or persistent databases.** GitHub Actions CI job uses a disposable PostgreSQL 16 service; the PostGIS smoke workflow tests full migration replay on disposable PostGIS.
 
 **Sign-off state: NOT READY.** Update evidence column with run URLs, build SHA, screenshot/video and admin/db proof only after executed. Do not infer passing tests from mergeability.
+
+## Child safety escalation (8 Nov 2026 — pending validation)
+- New explicit `child_safety` report reason is selectable on all supported Report surfaces, in addition to `sexual`. **Do not treat routine sexual-content cases as automatically confirmed CSAM.**
+- Migration `0076_child_safety_report_reason.sql` extends the DB reason enum and adds priority queue index. **Run only in staging after 0070/0073/0074/0075 as applicable; never assume production migration has run.**
+- Admin `open` queue orders suspected child exploitation reports before ordinary reports; API deliberately suppresses the associated content text/media URL for those cases, and the admin UI displays an urgent escalation warning. This avoids accidental preview/download in the routine admin list; it is **not a staffed law-enforcement escalation mechanism**.
+- QA: submit a child-safety report on a Story, confirm non-duplicate persisted row, high-priority order even when an ordinary report is newer, empty targetCaption/targetMediaUrl in admin response, and warning visible in dashboard. Negative/offline UI must not show false success.
+- Owner must designate a child-safety contact, operational procedures, approved public CSAE standards and age-scope decisions before Play certification. See #1071 and draft PR #1076.
+- **NO-GO:** CSAM case review/secure escalation, legal obligations, staffing, contact designation, child safety statement publication and real-device test evidence remain missing.
