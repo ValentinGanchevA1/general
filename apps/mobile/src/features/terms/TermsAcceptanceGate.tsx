@@ -50,6 +50,22 @@ export function TermsAcceptanceGate({ userId }: { userId: string }): React.JSX.E
     }
   };
 
+  if (!current && error && !loading) {
+    // A status fetch failure is not consent. Keep a clear retry control visible
+    // instead of silently removing the gate while the backend denies UGC.
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Terms status unavailable, retry"
+        onPress={() => { void dispatch(loadTermsStatus()); }}
+        style={[styles.reminder, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
+        <Text style={[styles.reminderText, { color: colors.textPrimary }]}>
+          Cannot verify Terms right now · Tap to retry
+        </Text>
+      </Pressable>
+    );
+  }
   if (!current || loading) return null;
   if (deferred) {
     return (

@@ -42,6 +42,7 @@ import type {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequireCurrentTerms } from '../terms/require-terms.decorator';
+import { AllowPrivacyReductionWithoutTerms } from '../terms/privacy-reduction';
 import { UsersService } from './users.service';
 import { S3Service } from '../../common/s3.service';
 
@@ -168,6 +169,7 @@ export class UsersController {
 
   @Patch('me/profile')
   @RequireCurrentTerms()
+  @AllowPrivacyReductionWithoutTerms()
   async updateProfile(
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateProfileDto,

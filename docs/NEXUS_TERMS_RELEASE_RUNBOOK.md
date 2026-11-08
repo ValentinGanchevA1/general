@@ -4,6 +4,8 @@ Status: **implementation candidate** (PR #1067). The working Terms draft was mer
 
 **Product age-scope decision (#1068, 7 Nov 2026):** General NEXUS social access is not universally 18+. Optional Dating/matchmaking is the only 18+ product pillar. General registration currently has no birth-date requirement; Dating uses a user-declared DOB plus backend guards, **not independently verified age**. The product minimum age for non-Dating features, regional consent, minor/teen protections and robust anti-bypass age assurance must be determined before Google Play target-age declaration or public release. See #1071 for tracked safeguarding requirements.
 
+**First-release Dating hold (8 Nov 2026):** The default-deny backend `NEXUS_DATING_RELEASE_ENABLED` switch and mobile `DATING_RELEASE_ENABLED = false` suppress the adult-only Dating module until effective age assurance is approved. Do not enable this by entering an adult DOB or simply toggling a release switch. Confirm exact deployed backend configuration and signed Android candidate. General Social age safeguards are tracked separately in #1071.
+
 ## Google Play rule
 Official UGC policy: https://support.google.com/googleplay/android-developer/answer/9876937
 Google requires affirmative acceptance of the app's terms/user policy before creating or uploading UGC, clear prohibited-content rules, effective reporting/blocking, and appropriate ongoing moderation.
