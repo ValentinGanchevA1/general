@@ -26,12 +26,17 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   DEVICE_E2E_STATE_FILE: .tmp/android-two-device-privacy.json
-  DEVICE_E2E_BASE_URL: https://g88-api.onrender.com
+  # Never mutate the live backend from an automatic PR workflow.
+  # The owner must approve a dedicated staging service via repository variables.
+  DEVICE_E2E_BASE_URL: ${{ vars.NEXUS_E2E_STAGING_BASE_URL }}
+  DEVICE_E2E_STAGING_APPROVED: ${{ vars.NEXUS_E2E_STAGING_APPROVED }}
   ANDROID_AVD_HOME: ${{ github.workspace }}/.tmp/android-avd
 
 jobs:
   android-two-device-privacy:
-    name: live location block + reconnect on two AVDs
+    # No staging approval => SKIPPED (not a QA pass). Never fall back to live API.
+    if: ${{ vars.NEXUS_E2E_STAGING_APPROVED == 'true' && vars.NEXUS_E2E_STAGING_BASE_URL != '' }}
+    name: staging live location block + reconnect on two AVDs
     runs-on: ubuntu-latest
     timeout-minutes: 55
 
@@ -97,6 +102,15 @@ jobs:
           JSON
           fi
 
+      - name: Cache Gradle wrapper and dependencies
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-
+
       - name: Build probe-enabled x86_64 release APK
         working-directory: apps/mobile/android
         env:
@@ -104,16 +118,27 @@ jobs:
           NEXA_E2E_DEVICE_PROBE: '1'
           SENTRY_DSN: ''
         run: |
-          ./gradlew assembleRelease --no-daemon \
-            --init-script ci-init.gradle \
-            -PversionCodeOverride=${{ github.run_number }} \
-            -PreactNativeArchitectures=x86_64
+          # GitHub Releases / Kotlin artifact downloads have transient 504s.
+          # Retry downloads; never convert a failed build into a device-QA pass.
+          for attempt in 1 2 3; do
+            if ./gradlew assembleRelease --no-daemon \
+              --init-script ci-init.gradle \
+              -PversionCodeOverride=${{ github.run_number }} \
+              -PreactNativeArchitectures=x86_64; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Probe APK build failed after $attempt attempts"
+              exit 1
+            fi
+            sleep "$((attempt * 45))"
+          done
           APK=app/build/outputs/apk/release/app-release.apk
           test -f "$APK"
           unzip -l "$APK" | grep -q 'assets/index.android.bundle'
           unzip -Z1 "$APK" | grep -q '^lib/x86_64/.*\.so$'
 
-      - name: Provision isolated production test accounts
+      - name: Provision synthetic accounts on approved staging backend
         run: node scripts/android-two-device-privacy-setup.mjs prepare
 
       - name: Install Android 12 emulator image
