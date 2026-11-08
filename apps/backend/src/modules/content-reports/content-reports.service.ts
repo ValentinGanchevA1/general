@@ -134,7 +134,8 @@ export class ContentReportsService {
        LEFT JOIN event_questions q ON r.target_type = 'event_question' AND q.id = r.target_id
        LEFT JOIN users qu ON qu.id = q.user_id
        WHERE r.status = $1
-       ORDER BY r.created_at DESC, r.id DESC LIMIT $2 OFFSET $3`,
+       ORDER BY CASE WHEN r.reason = 'child_safety' THEN 0 ELSE 1 END,
+                 r.created_at DESC, r.id DESC LIMIT $2 OFFSET $3`,
       [dto.status ?? 'open', limit + 1, offset],
     );
     return {
@@ -143,8 +144,11 @@ export class ContentReportsService {
         targetId: r.target_id, reason: r.reason, status: r.status,
         createdAt: r.created_at.toISOString(), reviewedAt: r.reviewed_at?.toISOString() ?? null,
         targetDisplayName: r.target_display_name,
-        targetCaption: r.target_caption,
-        targetMediaUrl: r.target_media_url,
+        // Avoid returning possibly illegal content or media links to ordinary
+        // moderation dashboards. A trained responder must follow a separate
+        // incident procedure using only approved/limited access.
+        targetCaption: r.reason === 'child_safety' ? null : r.target_caption,
+        targetMediaUrl: r.reason === 'child_safety' ? null : r.target_media_url,
       })),
       nextOffset: rows.length > limit ? offset + limit : null,
     };
