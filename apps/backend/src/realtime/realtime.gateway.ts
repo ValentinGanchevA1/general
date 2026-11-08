@@ -196,6 +196,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('presence:update')
+  @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onPresenceUpdate(
     @ConnectedSocket() client: G88Socket,
@@ -359,6 +360,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('chat:send')
+  @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onChatSend(
     @ConnectedSocket() client: G88Socket,
@@ -393,6 +395,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('location:share:start')
+  @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onLocationShareStart(
     @ConnectedSocket() client: G88Socket,
@@ -436,6 +439,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('location:share:update')
+  @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onLocationShareUpdate(
     @ConnectedSocket() client: G88Socket,
