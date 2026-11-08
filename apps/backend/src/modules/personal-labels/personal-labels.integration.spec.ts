@@ -128,7 +128,7 @@ suite('Personal Labels: migration and moderation (PostgreSQL)', () => {
     await expect(service.review(moderator, proposal.id, {
       decision: 'approve', key: 'other_key', labelBg: 'Нощна сова',
       labelEn: 'Different text', category: 'rhythm',
-    })).rejects.toMatchObject({ driverError: { code: '23505' } });
+    })).rejects.toBeInstanceOf(ConflictException);
     expect((await service.queue({ status: 'pending' })).items).toHaveLength(1);
     await db.query("UPDATE personal_labels SET active=false WHERE key='night_owl'");
     await expect(service.setMine(userA, { keys: ['night_owl'] }))
