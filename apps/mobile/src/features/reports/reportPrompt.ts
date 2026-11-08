@@ -4,6 +4,7 @@ import { appAlert } from '@/ui/appAlert';
 import { submitContentReport } from './reportsSlice';
 
 const OPTIONS: ReadonlyArray<{ reason: ContentReportReason; label: string }> = [
+  { reason: 'child_safety', label: 'Child sexual exploitation or grooming' },
   { reason: 'harassment', label: 'Harassment or bullying' },
   { reason: 'spam', label: 'Spam or scam' },
   { reason: 'hate', label: 'Hate or discrimination' },
