@@ -9,7 +9,7 @@ Status: **feature branch / not released**. Only merge after CI, migration dry-ru
 - Bio stays optional and unchanged. User can pick **0–5** approved labels.
 - User proposals do **not** become profile tags until a moderator publishes them in the curated catalog.
 - Initial bilingual seed: `night_owl` 🌙 Нощна сова / Night owl; `sarcastic` 😏 Саркастичен / Sarcastic; `good_listener` 💬 Добър слушател / Good listener; `spontaneous` ⚡ Спонтанен / Spontaneous.
-- Current mobile UI uses English. Backend supports Bulgarian and English catalogs and selected labels; a locale selector is not yet exposed in mobile UI.
+- Current mobile catalog and profile badges use English. Backend supports Bulgarian and English catalogs and selected labels; a locale selector for **catalog display** is not yet exposed in mobile UI. The suggestion form does offer an explicit **Български / English** language choice.
 
 ## Kill switches (both required)
 
@@ -38,7 +38,7 @@ The moderator must provide `key` (stable ASCII slug), `labelBg`, `labelEn`, `cat
 
 ## UI
 
-- `ProfileEditScreen` — opt-in `PersonalLabelsEditor`, after Bio and before Interests, with selectable chips, count, Save, suggestion form and own proposal statuses. Save is independent of existing profile PATCH so no optimistic profile contract drift.
+- `ProfileEditScreen` — opt-in `PersonalLabelsEditor`, after Bio and before Interests, with selectable chips, count, Save, suggestion form with explicit BG/EN choice and own proposal statuses. Save is independent of existing profile PATCH so no optimistic profile contract drift.
 - `ProfileScreen` and shared `ProfileView` — `PersonalLabelsBadges`, fail-closed and read-only. Selected labels appear on public profiles only where an existing public profile is viewable.
 - `apps/admin` — separate opt-in Personal Labels review tab, bilingual/category approval form, duplicate merge and explicit confirmation. Never render raw proposal HTML.
 
@@ -63,6 +63,7 @@ The moderator must provide `key` (stable ASCII slug), `labelBg`, `labelEn`, `cat
 - [ ] Moderator approval requires valid bilingual strings and category, creates one catalog entry, and records reviewer; double review gets 409; merge references active label only.
 - [ ] Existing block/private/deleted profile permissions apply to viewing labels.
 - [ ] Android/iOS dark and light mode; long words, screen readers, font scaling, error/offline/retry, app resume and cold launch checked on devices.
+- [ ] Saving labels then returning to You refreshes the visible chips; standalone ProfileView mounts do not require React Navigation context.
 - [ ] No differences in Map/Discover/Pulse/Connections/You, profile PATCH, messaging, identity verification, onboarding or AAB build when feature is off.
 - [ ] Red-team test proposals including “Honest cheater”, identity claims, protected attributes and phone numbers; moderation must reject/merge appropriately.
 - [ ] CI backend/mobile/admin typechecks/tests and migration-prefix guard green.
