@@ -361,7 +361,7 @@ export function ProfileEditScreen(): React.JSX.Element {
           <View style={styles.compactMain}>
             <Text style={styles.compactLabel}>Date of birth</Text>
             <Text style={[styles.compactValue, !dateOfBirth && styles.pickerFieldPlaceholder]}>{dateOfBirth ? formatProfileDate(dateOfBirth) : 'Select date'}</Text>
-            <Text style={styles.compactHint}>Private exact date · 18+ for Dating only</Text>
+            <Text style={styles.compactHint}>Private exact date · NEXUS is 18+</Text>
           </View>
           <Icon name="calendar-outline" size={22} color={colors.primary} />
         </TouchableOpacity>
@@ -396,7 +396,7 @@ export function ProfileEditScreen(): React.JSX.Element {
           <Text style={styles.section}>DATING</Text>
           <Text style={styles.hint}>{DATING_RELEASE_ENABLED
             ? 'Dating is optional and 18+ only. A self-declared birth date is not independent age verification; additional checks may be required. Seeking preferences are private.'
-            : 'Dating is temporarily unavailable during early access while adult-age verification is being prepared. Your social account and other features remain available.'}</Text>
+            : 'Dating is temporarily unavailable during early access. NEXUS currently requires all users to be adults.'}</Text>
           {DATING_RELEASE_ENABLED ? <View style={styles.toggleRow}><View style={styles.toggleText}><Text style={styles.toggleLabel}>Open to dating</Text></View>{themedSwitch(openToDating, setOpenToDating)}</View> : null}
           {openToDating ? <>
             <Text style={styles.fieldLabel}>Interested in</Text>
