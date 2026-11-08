@@ -6,6 +6,8 @@
 **versionName (About):** 1.0.0 · **gradle versionName:** 1.0.0 · **versionCode:** CI `github.run_number`  
 **AAB workflow:** `.github/workflows/android-release.yml` (`workflow_dispatch` + `v*` tags)
 
+**AAB upload safety (PR #1072):** `v*` tag pushes **build only** even if the Play service-account secret exists. Upload requires a human-triggered `workflow_dispatch` run with `publish=true` and available `PLAY_SERVICE_ACCOUNT_JSON`. Default `publish=false` creates an AAB artifact without changing Play. The workflow verifies an actual JAR signature and rejects Android Debug certificates, but you must still compare the actual upload certificate SHA-256 against **Play Console → App integrity** before any rollout. Do not use automated publishing merely to finish the Play setup checklist.
+
 ## Verdict: **CONDITIONAL GO** for closed testing
 
 The product is suitable for a small closed track after the operational and
