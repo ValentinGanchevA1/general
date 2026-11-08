@@ -21,6 +21,7 @@ export class ContentReportsController {
 
 @Controller('admin/content-reports')
 @UseGuards(JwtAuthGuard, AdminGuard)
+@AllowAgePending('always')
 @Throttle({ default: { ttl: 60_000, limit: 30 } })
 export class AdminContentReportsController {
   constructor(private readonly service: ContentReportsService) {}
