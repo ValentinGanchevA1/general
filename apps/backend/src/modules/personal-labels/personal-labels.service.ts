@@ -196,45 +196,45 @@ export class PersonalLabelsService {
     requirePersonalLabelsEnabled();
     try {
       return await this.db.transaction(async tx => {
-      const [row] = await tx.query<ProposalRow[]>(
-        `SELECT id,user_id,proposed_text,locale,status,created_at,reviewed_at,reviewed_by,review_note
-         FROM personal_label_proposals WHERE id=$1 FOR UPDATE`, [proposalId],
-      );
-      if (!row) throw new NotFoundException('Suggestion not found.');
-      if (row.status !== 'pending') throw new ConflictException('Suggestion already reviewed.');
-      let key: string | null = null;
-      let status: PersonalLabelProposalStatus;
-      if (dto.decision === 'approve') {
-        if (!dto.key || !dto.labelBg || !dto.labelEn || !dto.category) {
-          throw new BadRequestException('Approval requires key, both translations and category.');
+        const [row] = await tx.query<ProposalRow[]>(
+          `SELECT id,user_id,proposed_text,locale,status,created_at,reviewed_at,reviewed_by,review_note
+           FROM personal_label_proposals WHERE id=$1 FOR UPDATE`, [proposalId],
+        );
+        if (!row) throw new NotFoundException('Suggestion not found.');
+        if (row.status !== 'pending') throw new ConflictException('Suggestion already reviewed.');
+        let key: string | null = null;
+        let status: PersonalLabelProposalStatus;
+        if (dto.decision === 'approve') {
+          if (!dto.key || !dto.labelBg || !dto.labelEn || !dto.category) {
+            throw new BadRequestException('Approval requires key, both translations and category.');
+          }
+          const labelBg = normalizePersonalLabelText(dto.labelBg);
+          const labelEn = normalizePersonalLabelText(dto.labelEn);
+          await tx.query(
+            `INSERT INTO personal_labels (key,label_bg,label_en,category,emoji)
+             VALUES ($1,$2,$3,$4,$5)`,
+            [dto.key, labelBg, labelEn, dto.category, dto.emoji ?? null],
+          );
+          key = dto.key;
+          status = 'approved';
+        } else if (dto.decision === 'merge') {
+          if (!dto.existingKey) throw new BadRequestException('Select an existing label.');
+          const found = await tx.query<Array<{ key: string }>>(
+            'SELECT key FROM personal_labels WHERE key=$1 AND active=true', [dto.existingKey],
+          );
+          if (!found[0]) throw new BadRequestException('Existing label not found.');
+          key = dto.existingKey;
+          status = 'merged';
+        } else {
+          status = 'rejected';
         }
-        const labelBg = normalizePersonalLabelText(dto.labelBg);
-        const labelEn = normalizePersonalLabelText(dto.labelEn);
         await tx.query(
-          `INSERT INTO personal_labels (key,label_bg,label_en,category,emoji)
-           VALUES ($1,$2,$3,$4,$5)`,
-          [dto.key, labelBg, labelEn, dto.category, dto.emoji ?? null],
+          `UPDATE personal_label_proposals
+           SET status=$2,resulting_key=$3,reviewed_by=$4,reviewed_at=clock_timestamp(),review_note=$5
+           WHERE id=$1`,
+          [proposalId, status, key, adminId, dto.decision === 'approve' ? null : dto.note?.trim() || null],
         );
-        key = dto.key;
-        status = 'approved';
-      } else if (dto.decision === 'merge') {
-        if (!dto.existingKey) throw new BadRequestException('Select an existing label.');
-        const found = await tx.query<Array<{ key: string }>>(
-          'SELECT key FROM personal_labels WHERE key=$1 AND active=true', [dto.existingKey],
-        );
-        if (!found[0]) throw new BadRequestException('Existing label not found.');
-        key = dto.existingKey;
-        status = 'merged';
-      } else {
-        status = 'rejected';
-      }
-      await tx.query(
-        `UPDATE personal_label_proposals
-         SET status=$2,resulting_key=$3,reviewed_by=$4,reviewed_at=clock_timestamp(),review_note=$5
-         WHERE id=$1`,
-        [proposalId, status, key, adminId, dto.decision === 'approve' ? null : dto.note?.trim() || null],
-      );
-      return { status, key };
+        return { status, key };
       });
     } catch (error) {
       if (isUniqueConstraintViolation(error)) {
