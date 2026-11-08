@@ -12,6 +12,15 @@ describe('UsersService dating age safeguards', () => {
   const userId = '11111111-1111-4111-8111-111111111111';
   let service: UsersService;
   let query: jest.Mock;
+  const originalDatingFlag = process.env.NEXUS_DATING_RELEASE_ENABLED;
+
+  // Test the adult DOB rules with the release switch explicitly enabled.
+  // A separate release-gate suite covers the first-release disabled state.
+  beforeAll(() => { process.env.NEXUS_DATING_RELEASE_ENABLED = 'true'; });
+  afterAll(() => {
+    if (originalDatingFlag === undefined) delete process.env.NEXUS_DATING_RELEASE_ENABLED;
+    else process.env.NEXUS_DATING_RELEASE_ENABLED = originalDatingFlag;
+  });
 
   beforeEach(async () => {
     query = jest.fn().mockResolvedValue([]);
