@@ -2,7 +2,7 @@
 
 > **Working declaration only.** Based on source in `feat/play-ugc-dating-safety-followup-20261107`, stacked on draft PR #1064. Does not certify the uploaded AAB, live runtime flags, production data retention, hosted legal page, or submitted Play Console values. **Do not submit blindly.**
 
-> **Dating release hold (8 Nov 2026):** For the initial social release, adult-only Dating is default-disabled via backend `NEXUS_DATING_RELEASE_ENABLED` and hidden by the mobile feature gate. DOB and orientation remain optional profile fields and must be declared as collected **when provided**, even if Dating interactions are disabled. Verify the actual production flag / AAB before answering Play forms; do not equate a disabled feature with absence of historical or optional collected data.
+> **Dating release hold (8 Nov 2026):** For the initial social release, adult-only Dating is default-disabled via backend `NEXUS_DATING_RELEASE_ENABLED` and hidden by the mobile feature gate. DOB is required for adult-only NEXUS access (including email signup, legacy users and OAuth onboarding); orientation remains optional and must be declared as collected **when provided**, even if Dating interactions are disabled. Verify the actual production flag / AAB before answering Play forms; do not equate a disabled feature with absence of historical or optional collected data.
 
 ## Source-backed data inventory
 
@@ -12,7 +12,7 @@
 | **Location → Approximate location** | Public position is coarsened relative to raw GPS, but not coarse enough to meet Google Play's 3km² threshold | **Do not infer 'Approximate' just from H3 fuzzing.** Declare only if another qualifying coarse collection path exists in the shipped release. |
 | **Personal info → Name / Email / Phone number / User IDs** | Account registration, OAuth/profile, optional phone verification | **Collected:** name/email/user ID yes; phone when supplied. Verify `optional` choice field-by-field. |
 | **Personal info → Sexual orientation** | ProfileEdit offers optional orientation; `users.sexual_orientation`, including self-description when selected | **Collected when provided.** Private profile visibility is NOT equivalent to no collection. |
-| **Personal info → Other info** | DOB is currently optional at email/Google OAuth signup; a declared adult DOB is required for dating opt-in, dating interactions and dating-only discovery; gender identity, purpose/interests, dating preference and hometown | **Collected.** DOB is used for adult eligibility; legal controls must match the deployed service. |
+| **Personal info → Other info** | DOB is required for adult-only NEXUS release: email registration requests it, while OAuth and existing accounts must provide it before protected Social access. Gender identity, interests, orientation and hometown remain optional. | **Collected.** DOB is used for adult eligibility; legal controls must match the deployed service. |
 | **Photos & videos → Photos** | Avatars, gallery, story photos, listing media and optional verification selfie/ID images | **Collected when supplied.** Audit storage, deletion and processors. |
 | **Photos & videos → Videos** | Stories can contain camera/gallery video, uploaded using S3 presigned URLs | **Collected when supplied.** Verify whether audio/video file types require further separate declaration. |
 | **Files and docs → Files and docs** | Optional identity verification document uploads | **Collected if verification is enabled and used in the AAB/backend.** Determine retention and provider before finalizing. |
@@ -40,13 +40,13 @@
 - [ ] Audit Sentry, FCM, first-party analytics and optional PostHog/Stripe flags before marking shared/collected categories.
 - [ ] Confirm hosted privacy policy and external account-deletion request URL load anonymously over HTTPS, and reflect the build.
 - [ ] Complete Terms of Service + policy acceptance for posting UGC (tracked separately as #592); do not present this follow-up PR as clearing that blocker.
-- [x] Product scope chosen in [issue #1068](https://github.com/ValentinGanchevA1/general/issues/1068): **only optional Dating is 18+**; ordinary signup/profile is not adult-only.
+- [x] Product scope chosen in [issue #1068](https://github.com/ValentinGanchevA1/general/issues/1068): **all NEXUS social features are 18+**; Dating remains disabled in the first release. Decision supersedes the earlier Dating-only age scope.
 - [ ] Verify Dating age-gating resists trivial self-reported-DOB circumvention; Google Play's incidental-dating exception requires effective safeguards. https://support.google.com/googleplay/android-developer/answer/16838200
 - [ ] Decide accurate Play target-age groups and complete separate child/teen social safety, privacy/consent and UGC review; no permission to select children under 13 is implied.
-- [ ] Match final legally reviewed Terms, hosted Privacy Policy and submitted AAB to the Dating-only age scope (not a universal adult-only claim).
+- [ ] Match final legally reviewed Terms, hosted Privacy Policy and submitted AAB to the universal 18+ adult-only release scope.
 - [ ] Record product owner's decision: general Social **not universally 18+**, only optional Dating **18+**; no automatic global adult registration gate, no inferred child-friendly classification.
 - [ ] Validate exact age groups, child/teen safety and social app CSAE standards separately from Data Safety; age scope does not change whether location/messages/identity are collected.
-- [ ] Check DOB and optional orientation data on both account kinds (standard social with DOB absent; dating opt-in with DOB supplied). Do not claim age verification from a self-declaration.
+- [ ] Check DOB and optional orientation data on both account kinds (email signup with DOB, OAuth/existing accounts pending an adult eligibility check, and underage denial). Do not claim age verification from a self-declaration.
 - [ ] Match in-app privacy, published Privacy Policy, Terms, Play IARC and app access instructions on the exact release build.
 
 ## Google policy sources
@@ -56,3 +56,12 @@
 - Dating age-restrictions: https://support.google.com/googleplay/android-developer/answer/16838200
 
 **Status: DECLARATION DRAFT / NO SIGN-OFF.** Code review is not substitute for deployed build, Play Console evidence or legal review.
+
+## Owner override — 8 November 2026
+The previously recorded **Dating-only 18+** option is superseded. Official public
+brand: **NEXUS**. All first-release social features are **18+**. NEXUS mobile
+collects a DOB at email registration; OAuth and older accounts must declare DOB
+before REST/socket access. This is self-declared, not independent age verification.
+Select **18 and over only** and **Restrict Minor Access** in Play Console.
+Backend flag `NEXUS_REQUIRE_ADULT_AGE=true` is mandatory before first release.
+Update the hosted policy only after legal review and review the exact AAB.
