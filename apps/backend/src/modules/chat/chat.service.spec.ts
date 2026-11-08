@@ -48,6 +48,24 @@ describe('ChatService', () => {
   ];
 
   describe('persist — gate + transaction', () => {
+    it('prevents old Dating match threads from sending during social-only RC1', async () => {
+      const previous = process.env.NEXUS_DATING_RELEASE_ENABLED;
+      delete process.env.NEXUS_DATING_RELEASE_ENABLED;
+      try {
+        txQuery.mockResolvedValueOnce([{
+          kind: 'dm', participant_ids: ['me', 'other'], status: 'accepted',
+          initiated_by: null, dating_match: true,
+        }]);
+        await expect(service.persist('c1', 'me', 'hi')).rejects.toMatchObject({
+          response: expect.objectContaining({ code: 'dating.release_disabled' }),
+        });
+        expect(txQuery).toHaveBeenCalledTimes(1);
+      } finally {
+        if (previous === undefined) delete process.env.NEXUS_DATING_RELEASE_ENABLED;
+        else process.env.NEXUS_DATING_RELEASE_ENABLED = previous;
+      }
+    });
+
     it('throws NotFound when the conversation does not exist', async () => {
       txQuery.mockResolvedValueOnce([]); // SELECT ... FOR UPDATE
       await expect(service.persist('c1', 'me', 'hi')).rejects.toBeInstanceOf(NotFoundException);
