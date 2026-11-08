@@ -35,7 +35,11 @@ describe('realtime conversation recipient privacy', () => {
   });
 
   it('fails an entire realtime recipient set closed when a blocked pair remains', () => {
-    expect(accessSource).toContain('if (row == null || row.blocked_pair) return [];');
+    // The realtime recipient guard must preserve the bilateral block check
+    // alongside the new Dating-derived conversation release restriction.
+    expect(accessSource).toContain('row.blocked_pair');
+    expect(accessSource).toContain('row.dating_match');
+    expect(accessSource).toContain('isDatingReleaseEnabled()');
     expect(accessSource).toContain('b.blocker_id = ANY(r.participant_ids)');
     expect(accessSource).toContain('b.blocked_id = ANY(r.participant_ids)');
   });
