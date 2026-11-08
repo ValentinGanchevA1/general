@@ -13,6 +13,7 @@ import type { LikeRequest, LikeResponse } from '@g88/shared';
 
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { BlocksService } from '../blocks/blocks.service';
+import { assertDatingReleaseEnabled } from './dating-release-gate';
 
 @Injectable()
 export class DatingService {
@@ -32,6 +33,7 @@ export class DatingService {
    * 4. Emit dating:like_received / dating:match_created
    */
   async like(fromUserId: string, req: LikeRequest): Promise<LikeResponse> {
+    assertDatingReleaseEnabled();
     if (fromUserId === req.toUserId) {
       throw new BadRequestException({
         code: 'dating.like.self',
@@ -178,6 +180,7 @@ export class DatingService {
   }
 
   async pass(fromUserId: string, toUserId: string): Promise<{ ok: true }> {
+    assertDatingReleaseEnabled();
     if (fromUserId === toUserId) {
       throw new BadRequestException({
         code: 'dating.pass.self',
