@@ -66,6 +66,9 @@ import { FriendsService } from '../modules/friends/friends.service';
 import type { JwtPayload } from '../modules/auth/jwt.strategy';
 import { corsOrigins } from '../common/cors-origins';
 import { TermsService } from '../modules/terms/terms.service';
+import { InjectDataSource } from '@nestjs/typeorm';
+import type { DataSource } from 'typeorm';
+import { assertAdultAge, isAdultGateEnforced } from '../modules/auth/adult-eligibility';
 
 type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 type G88Socket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
@@ -125,6 +128,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     // Optional only for pre-existing isolated gateway unit-test fixtures.
     // A production deployment with enforcement enabled fails closed if missing.
     @Optional() private readonly terms?: TermsService,
+    // Optional for isolated gateway tests; fail closed when 18+ is enforced.
+    @Optional() @InjectDataSource() private readonly adultDb?: DataSource,
   ) {}
 
   private async assertTermsForUgc(userId: string): Promise<void> {
@@ -153,6 +158,18 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
 
     const userId = client.data.userId;
+    if (isAdultGateEnforced()) {
+      if (!this.adultDb) {
+        client.disconnect(true);
+        return;
+      }
+      try {
+        await assertAdultAge(this.adultDb, userId);
+      } catch {
+        client.disconnect(true);
+        return;
+      }
+    }
     client.data.rooms = new Set();
     client.data.friendPresenceAnnounced = false;
     client.join(this.userRoom(userId));
