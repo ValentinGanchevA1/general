@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { ProfileErrorState, ProfileLoadingState } from '@/components/Profile/ProfileScreenStates';
 import { ProfileTagsSection } from '@/components/Profile/ProfileTagsSection';
+import { PersonalLabelsBadges } from '@/features/profile/PersonalLabelsBadges';
 import { fetchPendingCount, pendingCountSet } from '@/features/friends/friendsSlice';
 import {
   buildNexaProfileIdentityLine,
@@ -245,6 +246,8 @@ export function ProfileScreen(): React.JSX.Element {
           {p.nationality ? <Detail icon="flag-outline" text={p.nationality} /> : null}
         </View>
       </View>
+
+      {myUserId ? <PersonalLabelsBadges userId={myUserId} own /> : null}
 
       <View style={S.sectionHeader}>
         <Text style={S.sectionTitle}>Interests & Purpose</Text>
