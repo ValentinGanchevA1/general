@@ -1,4 +1,4 @@
-import { isPrivacyReductionOnly, isSafeExitOnly } from './privacy-reduction';
+import { isPrivacyReductionOnly, isSafeExitOnly, isAdultDeclarationOnly } from './privacy-reduction';
 
 describe('privacy-reduction bypass', () => {
   it.each([
@@ -55,5 +55,22 @@ describe('Terms safety exit exception', () => {
     for (const input of unsafeDeclines) {
       expect(isSafeExitOnly(input, decline)).toBe(false);
     }
+  });
+});
+
+describe('adult age declaration without Terms consent', () => {
+  it('permits only one valid adult DOB field', () => {
+    expect(isAdultDeclarationOnly({ dateOfBirth: '1990-11-08' })).toBe(true);
+  });
+
+  it.each([
+    [{ dateOfBirth: '2015-01-01' }],
+    [{ dateOfBirth: null }],
+    [{ dateOfBirth: '1990-11-08', bio: 'A message' }],
+    [{ dateOfBirth: '1990-11-08', visibility: 'public' }],
+    [{ dateOfBirth: '1990-02-30' }],
+    [{}], [null], [[]],
+  ])('rejects mixed/invalid age updates: %p', body => {
+    expect(isAdultDeclarationOnly(body)).toBe(false);
   });
 });
