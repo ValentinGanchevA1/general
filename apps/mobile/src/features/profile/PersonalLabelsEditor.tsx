@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import type { PersonalLabel } from '@g88/shared';
+import type { PersonalLabel, PersonalLabelLocale } from '@g88/shared';
 import { PERSONAL_LABEL_MAX_SELECTED } from '@g88/shared';
 import { Config } from '@/config';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
@@ -25,6 +25,7 @@ export function PersonalLabelsEditor(): React.JSX.Element | null {
     useAppSelector((state) => state.personalLabels);
   const [draft, setDraft] = useState<string[]>([]);
   const [suggestion, setSuggestion] = useState('');
+  const [suggestionLocale, setSuggestionLocale] = useState<PersonalLabelLocale>('en');
 
   useEffect(() => {
     if (!Config.PERSONAL_LABELS_REQUESTED) return;
@@ -47,7 +48,7 @@ export function PersonalLabelsEditor(): React.JSX.Element | null {
   const submit = async (): Promise<void> => {
     const text = suggestion.trim();
     if (text.length < 3) return;
-    const result = await dispatch(suggestPersonalLabel({ text, locale: 'en' }));
+    const result = await dispatch(suggestPersonalLabel({ text, locale: suggestionLocale }));
     if (suggestPersonalLabel.fulfilled.match(result)) setSuggestion('');
   };
   const changed = draft.join('|') !== selected.map((item) => item.key).join('|');
@@ -81,6 +82,24 @@ export function PersonalLabelsEditor(): React.JSX.Element | null {
       </View>
       <Text style={styles.heading}>SUGGEST A LABEL</Text>
       <Text style={styles.help}>Missing a personality trait? Send a short suggestion. A moderator reviews it before publishing.</Text>
+      <View style={styles.row}>
+        <Text style={styles.help}>Suggestion language</Text>
+        <View style={styles.tags}>
+          {(['en', 'bg'] as const).map((locale) => (
+            <TouchableOpacity
+              key={locale}
+              onPress={() => setSuggestionLocale(locale)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: suggestionLocale === locale }}
+              style={[styles.chip, suggestionLocale === locale && styles.chipSelected]}
+            >
+              <Text style={[styles.chipText, suggestionLocale === locale && styles.selectedText]}>
+                {locale === 'bg' ? 'Български' : 'English'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
       <TextInput
         value={suggestion}
         onChangeText={(value) => { setSuggestion(value); if (error) dispatch(clearPersonalLabelsFeedback()); }}
