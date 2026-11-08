@@ -96,6 +96,10 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
       join(__dirname, '../../..', 'migrations/0074_event_question_moderation.sql'), 'utf8',
     );
     await db.query(questionsMigration);
+    const childSafetyMigration = readFileSync(
+      join(__dirname, '../../..', 'migrations/0076_child_safety_report_reason.sql'), 'utf8',
+    );
+    await db.query(childSafetyMigration);
     const [questionColumn] = await db.query<Array<{ count: number }>>(
       `SELECT COUNT(*)::int AS count
          FROM information_schema.columns
@@ -107,6 +111,7 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
     await db.query(migration);
     await db.query(extension);
     await db.query(questionsMigration);
+    await db.query(childSafetyMigration);
     reports = new ContentReportsService(db);
   }, 30_000);
 
@@ -129,6 +134,34 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
        VALUES ($1,$2,'https://example.test/media.jpg','Example for moderator',clock_timestamp()+interval '1 hour')`,
       [storyId, authorId],
     );
+  });
+
+  it('prioritizes suspected child exploitation and omits sensitive content/media in admin API', async () => {
+    await reports.submit(reporterId, {
+      targetType: 'story', targetId: storyId, reason: 'child_safety',
+    });
+    // Make a younger child-safety case vs a newer ordinary case, to prove
+    // urgency ordering is independent from the timestamp of submission.
+    await db.query(
+      "UPDATE content_abuse_reports SET created_at=clock_timestamp()-interval '2 days' WHERE reason='child_safety'",
+    );
+    await reports.submit(reporterId, {
+      targetType: 'user', targetId: authorId, reason: 'spam',
+    });
+    const queue = await reports.list({ status: 'open', limit: 10 });
+    expect(queue.items).toHaveLength(2);
+    expect(queue.items[0]).toMatchObject({
+      reason: 'child_safety',
+      targetType: 'story',
+      targetId: storyId,
+      targetCaption: null,
+      targetMediaUrl: null,
+    });
+    expect(queue.items[1]?.reason).toBe('spam');
+    const [stored] = await db.query<Array<{ reason: string }>>(
+      "SELECT reason FROM content_abuse_reports WHERE reason='child_safety'",
+    );
+    expect(stored?.reason).toBe('child_safety');
   });
 
   it('deduplicates concurrent user reports and enforces one row per reporter+target', async () => {
