@@ -15,27 +15,32 @@ interface Props {
 export function PersonalLabelsBadges({ userId, own = false, refreshKey = 0 }: Props): React.JSX.Element | null {
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [items, setItems] = useState<PersonalLabel[]>([]);
+  const cacheKey = [userId, own ? 'self' : 'public', refreshKey].join(':');
+  const [snapshot, setSnapshot] = useState<{ key: string; items: PersonalLabel[] } | null>(null);
+  const items = snapshot?.key === cacheKey ? snapshot.items : [];
 
   useEffect(() => {
     let active = true;
-    setItems([]);
     if (!Config.PERSONAL_LABELS_REQUESTED || !userId) return () => { active = false; };
     const load = async (): Promise<void> => {
       try {
         const policy = await getJson<PersonalLabelsFeaturePolicy>('/runtime-config/personal-labels');
-        if (!policy.enabled || !active) return;
+        if (!active) return;
+        if (!policy.enabled) {
+          setSnapshot({ key: cacheKey, items: [] });
+          return;
+        }
         const path = own ? '/personal-labels/me?locale=en' : `/personal-labels/users/${userId}?locale=en`;
         const response = await getJson<SelectedPersonalLabelsResponse>(path);
-        if (active) setItems(response.items);
+        if (active) setSnapshot({ key: cacheKey, items: response.items });
       } catch {
         // Opt-in enhancement: do not leak API errors or stale private labels in profile.
-        if (active) setItems([]);
+        if (active) setSnapshot({ key: cacheKey, items: [] });
       }
     };
     void load();
     return () => { active = false; };
-  }, [userId, own, refreshKey]);
+  }, [userId, own, refreshKey, cacheKey]);
 
   if (!Config.PERSONAL_LABELS_REQUESTED || items.length === 0) return null;
 
