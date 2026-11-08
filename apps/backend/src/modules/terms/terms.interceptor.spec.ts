@@ -2,7 +2,7 @@ import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { lastValueFrom, of } from 'rxjs';
 import { RequireCurrentTerms } from './require-terms.decorator';
-import { AllowPrivacyReductionWithoutTerms } from './privacy-reduction';
+import { AllowPrivacyReductionWithoutTerms, AllowTermsSafetyExit } from './privacy-reduction';
 import { TermsInterceptor } from './terms.interceptor';
 import { TermsService } from './terms.service';
 
@@ -10,6 +10,8 @@ class SampleController {
   @RequireCurrentTerms() publish() { return undefined; }
   @RequireCurrentTerms() @AllowPrivacyReductionWithoutTerms()
   updateProfile() { return undefined; }
+  @RequireCurrentTerms() @AllowTermsSafetyExit({ field: 'status', value: 'withdrawn' })
+  withdraw() { return undefined; }
   browse() { return undefined; }
 }
 
@@ -19,7 +21,7 @@ describe('TermsInterceptor', () => {
     new Reflector(), { assertAccepted } as unknown as TermsService,
   );
   const next = { handle: jest.fn(() => of('saved')) };
-  const ctx = (method: 'publish' | 'browse' | 'updateProfile', userId?: string, body?: unknown): ExecutionContext => ({
+  const ctx = (method: 'publish' | 'browse' | 'updateProfile' | 'withdraw', userId?: string, body?: unknown): ExecutionContext => ({
     getHandler: () => SampleController.prototype[method],
     getClass: () => SampleController,
     switchToHttp: () => ({ getRequest: () => ({ user: userId ? { id: userId } : undefined, body }) }),
@@ -63,6 +65,25 @@ describe('TermsInterceptor', () => {
         .rejects.toThrow('Terms required');
     }
     expect(assertAccepted).toHaveBeenCalledTimes(4);
+    expect(next.handle).not.toHaveBeenCalled();
+  });
+
+  it('lets existing content be withdrawn while a new policy awaits acceptance', async () => {
+    await expect(lastValueFrom(interceptor.intercept(
+      ctx('withdraw', 'u3', { status: 'withdrawn' }),
+      next,
+    ))).resolves.toBe('saved');
+    expect(assertAccepted).not.toHaveBeenCalled();
+  });
+
+  it('never lets a user republish or mix a content edit with an exit action', async () => {
+    for (const body of [{ status: 'active' }, { status: 'withdrawn', bio: 'a' }]) {
+      assertAccepted.mockRejectedValueOnce(new Error('Terms required'));
+      await expect(lastValueFrom(interceptor.intercept(
+        ctx('withdraw', 'u3', body),
+        next,
+      ))).rejects.toThrow('Terms required');
+    }
     expect(next.handle).not.toHaveBeenCalled();
   });
 
