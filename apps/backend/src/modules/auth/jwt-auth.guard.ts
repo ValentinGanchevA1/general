@@ -4,8 +4,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { AuthGuard } from '@nestjs/passport';
 import { isObservable, lastValueFrom } from 'rxjs';
 import type { DataSource } from 'typeorm';
-import { isAdultDateOfBirth } from '@g88/shared';
-import { isPrivacyReductionOnly } from '../terms/privacy-reduction';
+import { isAdultDeclarationOnly, isPrivacyReductionOnly } from '../terms/privacy-reduction';
 import {
   AGE_PENDING_PERMISSION,
   assertAdultAge,
@@ -39,11 +38,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     );
     if (permission === 'always') return true;
     if (permission === 'profile_update') {
-      if (isPrivacyReductionOnly(request.body)) return true;
-      const body = request.body;
-      if (body && typeof body === 'object' && !Array.isArray(body)) {
-        const dob = (body as Record<string, unknown>)['dateOfBirth'];
-        if (typeof dob === 'string' && isAdultDateOfBirth(dob)) return true;
+      // An age-pending account may declare its DOB or reduce public exposure,
+      // but must not bundle either exception with unrelated UGC mutations.
+      if (isPrivacyReductionOnly(request.body) || isAdultDeclarationOnly(request.body)) {
+        return true;
       }
     }
     await assertAdultAge(this.db, request.user?.id ?? '');

@@ -72,12 +72,28 @@ describe('adult-only HTTP API guard', () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('permits an adult DOB to be registered without exposing unrelated UGC writes', async () => {
+  it('permits DOB-only recovery but denies mixed adult DOB + UGC before eligibility', async () => {
     await expect(guard().canActivate(makeContext(UsersController.prototype, 'updateProfile',
       { dateOfBirth: '1990-03-22' }))).resolves.toBe(true);
+    expect(query).not.toHaveBeenCalled();
+
+    // Regression: previously even a valid adult DOB bypassed the guard when
+    // bundled with arbitrary bio/UGC, before the server had checked eligibility.
+    query.mockResolvedValueOnce([{ date_of_birth: null }]);
+    await expect(guard().canActivate(makeContext(UsersController.prototype, 'updateProfile',
+      { dateOfBirth: '1990-03-22', bio: 'unexpected UGC mutation' })))
+      .rejects.toBeInstanceOf(ForbiddenException);
+
     query.mockResolvedValueOnce([{ date_of_birth: null }]);
     await expect(guard().canActivate(makeContext(UsersController.prototype, 'updateProfile',
       { dateOfBirth: '2016-02-03', bio: 'still too young' })))
       .rejects.toBeInstanceOf(ForbiddenException);
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps pure privacy reduction accessible to age-pending accounts', async () => {
+    await expect(guard().canActivate(makeContext(UsersController.prototype, 'updateProfile',
+      { visibility: 'private', showAge: false }))).resolves.toBe(true);
+    expect(query).not.toHaveBeenCalled();
   });
 });
