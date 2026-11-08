@@ -40,6 +40,7 @@ import type {
 } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AllowAgePending } from '../auth/adult-eligibility';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequireCurrentTerms } from '../terms/require-terms.decorator';
 import { AllowPrivacyReductionWithoutTerms } from '../terms/privacy-reduction';
@@ -62,7 +63,7 @@ class UpdateProfileDto implements UpdateProfileRequest {
   @IsOptional() @IsIn(['public', 'private']) visibility?: 'public' | 'private';
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) goals?: string[];
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) interests?: string[];
-  // ISO date (YYYY-MM-DD); optional for general profiles. Dating opt-in requires 18+.
+  // ISO date (YYYY-MM-DD). Entire NEXUS app is 18+ for launch; age is not publicly revealed.
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsISO8601() dateOfBirth?: string | null;
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(80) hometownCity?: string | null;
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(40) hometownCountry?: string | null;
@@ -158,16 +159,19 @@ export class UsersController {
   ) {}
 
   @Get('me')
+  @AllowAgePending('always')
   async getMe(@CurrentUser('id') userId: string): Promise<UserProfile> {
     return this.users.getProfile(userId);
   }
 
   @Get('me/profile')
+  @AllowAgePending('always')
   async getProfile(@CurrentUser('id') userId: string): Promise<UserProfile> {
     return this.users.getProfile(userId);
   }
 
   @Patch('me/profile')
+  @AllowAgePending('profile_update')
   @RequireCurrentTerms()
   @AllowPrivacyReductionWithoutTerms()
   async updateProfile(
@@ -178,6 +182,7 @@ export class UsersController {
   }
 
   @Delete('me')
+  @AllowAgePending('always')
   @HttpCode(204)
   async deleteAccount(
     @CurrentUser('id') userId: string,
