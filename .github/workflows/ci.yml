@@ -28,6 +28,8 @@ jobs:
         run: node --test scripts/ci/check-no-secrets.test.mjs
       - name: Secret / env scanning (hard gate)
         run: bash scripts/ci/check-no-secrets.sh
+      - name: Test manual Terms legal publication gate (no files published)
+        run: node --test scripts/legal/prepare-approved-terms.test.mjs
       - name: Check for forbidden legacy/ imports
         run: bash scripts/ci/check-no-legacy-imports.sh
       - name: Check for do-not-commit / dev-preview markers
