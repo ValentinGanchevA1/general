@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { StyleSheet, Text, View } from 'react-native';
 import type { PersonalLabel, PersonalLabelsFeaturePolicy, SelectedPersonalLabelsResponse } from '@g88/shared';
 import { getJson } from '@/api/client';
@@ -16,7 +17,7 @@ export function PersonalLabelsBadges({ userId, own = false }: Props): React.JSX.
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [items, setItems] = useState<PersonalLabel[]>([]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let active = true;
     setItems([]);
     if (!Config.PERSONAL_LABELS_REQUESTED || !userId) return () => { active = false; };
@@ -34,13 +35,13 @@ export function PersonalLabelsBadges({ userId, own = false }: Props): React.JSX.
     };
     void load();
     return () => { active = false; };
-  }, [userId, own]);
+  }, [userId, own]));
 
   if (!Config.PERSONAL_LABELS_REQUESTED || items.length === 0) return null;
 
   return (
     <View style={styles.root} testID="personal-labels-profile">
-      <Text style={styles.title}>MY PERSONALITY</Text>
+      <Text style={styles.title}>{own ? "MY PERSONALITY" : "PERSONALITY"}</Text>
       <View style={styles.chips}>
         {items.map(item => (
           <View key={item.key} style={styles.chip}>
