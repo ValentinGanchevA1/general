@@ -12,6 +12,7 @@ import { GiftsController } from '../gifts/gifts.controller';
 import { DatingController } from '../dating/dating.controller';
 import { ContentReportsController } from '../content-reports/content-reports.controller';
 import { TermsController } from './terms.controller';
+import { FriendsController } from '../friends/friends.controller';
 
 describe('UGC Terms enforcement: route metadata coverage', () => {
   const cases: Array<[object, string[]]> = [
@@ -19,9 +20,10 @@ describe('UGC Terms enforcement: route metadata coverage', () => {
     [EventsController.prototype, ['create', 'rsvp', 'shareJoinToPulse', 'createPoll', 'vote', 'askQuestion', 'upvoteQuestion']],
     [EventReviewsController.prototype, ['create', 'edit']],
     [ListingsController.prototype, ['create', 'uploadPhoto', 'updateStatus', 'bump', 'makeOffer', 'respondToOffer', 'counterOffer']],
-    [UsersController.prototype, ['updateProfile', 'avatarPresignedUrl', 'uploadPhotoBase64', 'photoPresignedUrl', 'addPhoto', 'setCover']],
+    [UsersController.prototype, ['updateProfile', 'avatarPresignedUrl', 'uploadPhotoBase64', 'photoPresignedUrl', 'addPhoto', 'setCover', 'reorderPhotos']],
     [FeedController.prototype, ['createCheckIn', 'createPlaceCheckIn']],
     [MessagingController.prototype, ['create']],
+    [FriendsController.prototype, ['follow', 'request', 'accept']],
     [InteractionsController.prototype, ['wave']],
     [GiftsController.prototype, ['send']],
     [DatingController.prototype, ['like']],
@@ -44,6 +46,11 @@ describe('UGC Terms enforcement: route metadata coverage', () => {
       [ListingsController.prototype, 'browse'],
       [UsersController.prototype, 'deleteAccount'],
       [ContentReportsController.prototype, 'submit'],
+      [FriendsController.prototype, 'unfollow'],
+      [FriendsController.prototype, 'decline'],
+      [FriendsController.prototype, 'cancel'],
+      [FriendsController.prototype, 'unfriend'],
+      [UsersController.prototype, 'deletePhoto'],
       [TermsController.prototype, 'status'],
       [TermsController.prototype, 'accept'],
     ];
