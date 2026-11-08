@@ -1,3 +1,4 @@
+import { isDatingReleaseEnabled } from '../dating/dating-release-gate';
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -10,6 +11,7 @@ import type {
 } from '@g88/shared';
 
 interface ConversationRow {
+  dating_match?: boolean;
   id: string;
   status: ConversationStatus;
   initiated_by: string | null;
@@ -85,12 +87,20 @@ export class MessagingService {
     const sharedInterests = sharedRow?.shared ?? [];
 
     const [convo] = await this.db.query<ConversationRow[]>(
-      `SELECT id, status, initiated_by
+      `SELECT id, status, initiated_by,
+              EXISTS (SELECT 1 FROM dating_matches dm WHERE dm.conversation_id = conversations.id)
+                AS dating_match
          FROM conversations
         WHERE participant_ids = $1::uuid[]
         LIMIT 1`,
       [this.pairKey(viewerId, targetId)],
     );
+
+    // Avoid reopening a Dating-derived conversation through a normal profile
+    // message action when adult-only Dating is paused.
+    if (convo?.dating_match === true && !isDatingReleaseEnabled()) {
+      return { matched: false, sharedInterests: [], canMessage: 'none', conversation: null };
+    }
 
     const conversation = convo
       ? { id: convo.id, status: convo.status, initiatedBy: convo.initiated_by }
