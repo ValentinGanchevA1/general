@@ -1,12 +1,13 @@
 # NEXUS Child Safety Standards — WORKING DRAFT
 **Internal/legal-review document — NOT APPROVED, NOT PUBLISHED, NOT A CLAIM OF GOOGLE PLAY COMPLIANCE.**
 
-Intended product: **NEXUS**, map-first Social app. General Social minimum age and target-audience groups remain undecided (#1068, #1071). Dating is intended as 18+ but disabled for first release pending effective age assurance. This draft **cannot** be published as final policy until eligibility, child protections and response capability are verified.
+Intended product: **NEXUS**, the final public brand. The **entire first-release Social app is 18+** (#1068, #1071), and Dating is disabled. This draft **cannot** be published as a final policy until adult-age gating, child-safety protections and the reporting/response process are independently verified.
 
 ## Required decision sheet before legal sign-off
-- [ ] Confirm exact public product/brand: NEXUS is current Play listing, while #592 still refers to NEXA.
+- [x] Public brand confirmed by product owner: **NEXUS**. Legacy NEXA issue references must be updated before release.
 - [ ] Confirm operator legal entity/contact and **designated named child-safety representative** (authorized to receive and act on Play notices).
-- [ ] Decide minimum general-Social eligibility, target-age groups, and regional age assurance; do not imply whole app is 18+.
+- [x] Owner decision: **all Social access is restricted to adults 18+ at launch**; select only 18 and over and enable Restrict Minor Access in Google Play Console.
+- [ ] Verify backend REST/WebSocket adult eligibility gate, OAuth/existing account recovery, age-declaration handling and any stronger age verification required by applicable law or Google Play policy.
 - [ ] Determine whether under-18 users can register or access messaging, nearby persons, meetups, marketplace or exact location sharing; document defaults and safeguarding.
 - [ ] Define real incident duty coverage and handling times; do not promise 24/7 or specific SLA without staff.
 - [ ] Confirm operational process for CSAM removal, preservation where legally required, and reporting to competent authorities (jurisdiction-dependent; counsel review).
@@ -32,7 +33,7 @@ NEXUS intends to review child-safety reports using a restricted moderation workf
 Specific response times, appeal procedures and law-enforcement reporting routes are **not finalized** and must reflect actual operational capacity and legal obligations. An investigation is not a guarantee of any particular outcome.
 
 ## 4. Privacy, minor safety and location
-The nearby map does not show raw GPS coordinates for general public discovery, but a coarsened location can still present re-identification or safety risks. Separately, when enabled, live precise location sharing in a one-to-one chat exposes precise coordinates to the chosen participant and is persisted in session/message records. Eligibility and safeguards for minors need a separate product decision and enforcement. Do not imply the existing feature is safe for minors without testing and age-specific protection.
+The nearby map does not show raw GPS coordinates for general public discovery, but a coarsened location can still present re-identification or safety risks. Separately, when enabled, live precise location sharing in a one-to-one chat exposes precise coordinates to the chosen participant and is persisted in session/message records. Under-18 accounts must not be given access to NEXUS map, chat, events, listings or live-location sharing at launch. Independent runtime and physical-device QA of this restriction are required. Do not imply an unverified DOB proves identity.
 
 Dating/matchmaking is **not part of the initial release**. Self-declared date of birth alone is not independent age verification and cannot support broad claims of robust age assurance.
 
