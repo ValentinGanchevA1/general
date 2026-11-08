@@ -15,7 +15,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { NexaDiscoveryHero } from '@/components/Brand/NexaDiscoveryHero';
 import { BirthDateField, CityAutocompleteField } from '@/components/Profile/ProfileOriginFields';
-import { parseIsoDate } from '@/features/profile/profileOrigin';
+import { isAdultDateOfBirth } from '@g88/shared';
 import { FormField } from '@/components/FormField';
 import { INTEREST_OPTIONS } from '@/features/profile/interestOptions';
 import { PURPOSE_OPTIONS } from '@/features/profile/goalOptions';
@@ -57,8 +57,7 @@ function StepHeader({ eyebrow, title, subtitle }: StepHeaderProps): React.JSX.El
 }
 
 function isValidBirthDate(value: string): boolean {
-  const date = parseIsoDate(value);
-  return date !== null && date.getTime() <= Date.now();
+  return isAdultDateOfBirth(value);
 }
 
 function StepName({ value, onChange }: { value: string; onChange: (value: string) => void }): React.JSX.Element {
@@ -176,7 +175,7 @@ function StepOrigin({
       <StepHeader
         eyebrow="ABOUT YOU"
         title="Age & origin"
-        subtitle="Birth date is optional for social features. Dating is paused in early access and will require adult eligibility (18+) when launched."
+        subtitle="NEXUS is available to adults aged 18 or older. Your exact date of birth stays private."
       />
       <View style={styles.originFields}>
         <BirthDateField
@@ -322,7 +321,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
     if (step === 2) return form.interests.length >= MIN_INTERESTS;
     if (step === 3) {
       const dob = form.dateOfBirth.trim();
-      return !dob || isValidBirthDate(dob);
+      return isValidBirthDate(dob);
     }
     if (step === 4) return form.goals.length > 0;
     return true;
@@ -331,8 +330,8 @@ export function ProfileCreationScreen(): React.JSX.Element {
   const advance = (): void => {
     if (step === 3) {
       const dob = form.dateOfBirth.trim();
-      if (dob && !isValidBirthDate(dob)) {
-        setOriginError('Enter a valid date of birth or leave it empty.');
+      if (!isValidBirthDate(dob)) {
+        setOriginError('NEXUS requires a valid date of birth confirming you are 18 or older.');
         return;
       }
       setOriginError('');
@@ -349,7 +348,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
         // Legacy completion currently relies on bio being non-null. Bio authoring moves to Profile v3.
         bio: '',
         interests: form.interests,
-        dateOfBirth: form.dateOfBirth.trim() || null,
+        dateOfBirth: form.dateOfBirth.trim(),
         hometownCity: form.hometownCity.trim() || null,
         hometownCountry: form.hometownCountry.trim() || null,
         showAge: form.showAge,
