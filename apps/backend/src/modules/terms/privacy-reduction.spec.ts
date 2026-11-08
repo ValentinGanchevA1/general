@@ -34,17 +34,25 @@ describe('Terms safety exit exception', () => {
     expect(isSafeExitOnly({ status: 'declined' }, decline)).toBe(true);
   });
 
-  it.each([
-    [{ status: 'active' }],
-    [{ status: 'withdrawn', description: 'New ad' }],
-    [{ status: 'accepted' }],
-    [{ status: 'declined', note: 'A new post' }],
-    [{ status: 'withdrawn', __proto__: { hidden: 1 } }],
-    [[]], [null], [{}],
-  ])('rejects non-exit actions or unsafe shapes: %p', input => {
-    expect(isSafeExitOnly(input, withdraw)).toBe(false);
-    if (typeof input !== 'object' || !input || Array.isArray(input) ||
-      Object.keys(input).length !== 1 || 'status' in input && input.status !== 'declined') {
+  it('denies republishing, combined content edits and malformed body shapes', () => {
+    const unsafeWithdrawals: unknown[] = [
+      { status: 'active' },
+      { status: 'withdrawn', description: 'Updated listing' },
+      { status: 'accepted' },
+      { status: 'declined' },
+      { status: 'withdrawn', ['__proto__']: { hidden: 1 } },
+      [], null, {},
+    ];
+    for (const input of unsafeWithdrawals) {
+      expect(isSafeExitOnly(input, withdraw)).toBe(false);
+    }
+    const unsafeDeclines: unknown[] = [
+      { status: 'accepted' },
+      { status: 'declined', message: 'Extra content' },
+      { status: 'withdrawn' },
+      [], null, {},
+    ];
+    for (const input of unsafeDeclines) {
       expect(isSafeExitOnly(input, decline)).toBe(false);
     }
   });
