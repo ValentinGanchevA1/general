@@ -15,7 +15,7 @@ and the public Render page served from `docs/legal/terms/index.html`.
 
 ## From legal sign-off to a publication PR
 1. Human legal reviewer settles all placeholders in the actual Terms. For launch,
-   review **general Social not necessarily 18+; Dating 18+ but disabled in RC1**.
+   review **NEXUS 18+ across ALL Social for RC1; Dating disabled**. The backend REST/Socket adult gate and the Play Console Restrict Minor Access setting must be verified.
    Also verify Terms assertions against real app/backend behavior.
 2. Put the **final** legal-reviewed HTML in
    `docs/legal-review/NEXUS_TERMS_CANDIDATE.html`. It must have:
