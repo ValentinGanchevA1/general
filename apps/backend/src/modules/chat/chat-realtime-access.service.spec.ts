@@ -81,6 +81,22 @@ describe('ChatRealtimeAccessService', () => {
     await expect(service.getRecipientIds(CONVERSATION_ID, true)).resolves.toEqual([]);
   });
 
+  it('blocks all live recipients for a previously matched Dating conversation during RC1', async () => {
+    const previous = process.env.NEXUS_DATING_RELEASE_ENABLED;
+    delete process.env.NEXUS_DATING_RELEASE_ENABLED;
+    try {
+      query.mockResolvedValueOnce([{
+        kind: 'dm', participant_ids: [USER_A, USER_B],
+        blocked_pair: false, dating_match: true,
+      }]);
+      await expect(service.getRecipientIds(CONVERSATION_ID)).resolves.toEqual([]);
+      expect(query.mock.calls[0]?.[0]).toContain('dating_matches');
+    } finally {
+      if (previous === undefined) delete process.env.NEXUS_DATING_RELEASE_ENABLED;
+      else process.env.NEXUS_DATING_RELEASE_ENABLED = previous;
+    }
+  });
+
   it('fails closed when the conversation does not exist', async () => {
     query.mockResolvedValueOnce([]);
     await expect(service.getRecipientIds(CONVERSATION_ID)).resolves.toEqual([]);
