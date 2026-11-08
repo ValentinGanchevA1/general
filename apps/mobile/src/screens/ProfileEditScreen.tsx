@@ -1,3 +1,4 @@
+import { DATING_RELEASE_ENABLED } from '@/constants/app';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -214,7 +215,7 @@ export function ProfileEditScreen(): React.JSX.Element {
   const [showGender, setShowGender] = useState(profile?.showGender ?? true);
   const [showOrientation, setShowOrientation] = useState(profile?.showOrientation ?? false);
   const [showNationality, setShowNationality] = useState(profile?.showNationality ?? true);
-  const [openToDating, setOpenToDating] = useState(profile?.openToDating ?? false);
+  const [openToDating, setOpenToDating] = useState(DATING_RELEASE_ENABLED && profile?.openToDating === true);
   const [seekingGenders, setSeekingGenders] = useState<Gender[]>(profile?.seekingGenders ?? []);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [pickerKind, setPickerKind] = useState<PickerKind>(null);
@@ -393,8 +394,10 @@ export function ProfileEditScreen(): React.JSX.Element {
 
         <View onLayout={(e) => { datingYRef.current = e.nativeEvent.layout.y; }}>
           <Text style={styles.section}>DATING</Text>
-          <Text style={styles.hint}>Dating is optional and 18+ only. A self-declared birth date is not independent age verification; additional checks may be required. Seeking preferences are private.</Text>
-          <View style={styles.toggleRow}><View style={styles.toggleText}><Text style={styles.toggleLabel}>Open to dating</Text></View>{themedSwitch(openToDating, setOpenToDating)}</View>
+          <Text style={styles.hint}>{DATING_RELEASE_ENABLED
+            ? 'Dating is optional and 18+ only. A self-declared birth date is not independent age verification; additional checks may be required. Seeking preferences are private.'
+            : 'Dating is temporarily unavailable during early access while adult-age verification is being prepared. Your social account and other features remain available.'}</Text>
+          {DATING_RELEASE_ENABLED ? <View style={styles.toggleRow}><View style={styles.toggleText}><Text style={styles.toggleLabel}>Open to dating</Text></View>{themedSwitch(openToDating, setOpenToDating)}</View> : null}
           {openToDating ? <>
             <Text style={styles.fieldLabel}>Interested in</Text>
             <View style={styles.chipRow}>{GENDERS.filter((g) => g !== 'self_describe').map((g) => {
