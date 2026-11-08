@@ -1,5 +1,5 @@
 /** User-generated-content abuse reports. Never include free-text/media or exact GPS in the submission. */
-export const CONTENT_REPORT_REASONS = ['spam', 'harassment', 'hate', 'sexual', 'violence', 'privacy', 'other'] as const;
+export const CONTENT_REPORT_REASONS = ['child_safety', 'spam', 'harassment', 'hate', 'sexual', 'violence', 'privacy', 'other'] as const;
 export type ContentReportReason = (typeof CONTENT_REPORT_REASONS)[number];
 export type ContentReportTarget = 'user' | 'story' | 'listing' | 'event' | 'message' | 'check_in' | 'alert' | 'event_question';
 export interface CreateContentReportRequest {
