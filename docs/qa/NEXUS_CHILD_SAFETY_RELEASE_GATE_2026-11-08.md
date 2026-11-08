@@ -19,7 +19,7 @@ Before self-certification, confirm all of:
 | CSAM action | Documented, staffed moderation/removal/escalation process with case ownership and secure audit trail | **Unverified** |
 | Applicable child-safety laws | Jurisdictional review and written reporting/escalation policy | **Undecided / needs counsel** |
 | Child safety point of contact | Named person with working monitored address submitted to Play Console | **Not designated** |
-| Social minimum age / Play audience | Explicit targeted age brackets, protective defaults, registration/backend enforcement | **Undecided** |
+| Social minimum age / Play audience | **Owner decided 18+ across NEXUS Social**; verify backend email/OAuth/REST/Socket age gates, Play Restrict Minor Access and signed Android AAB | **Decision ✅ / enforcement unverified** |
 | Dating off for first release | Inaccessible on signed AAB, REST, WebSockets and all deep links/previous matches | **Code planned in #1066; runtime QA unknown** |
 | Privacy consistency | Public Privacy + Terms match general-Social age scope, precise 1:1 chat location, retention | **Inconsistent pending #1066 / legal** |
 
@@ -38,7 +38,8 @@ Before self-certification, confirm all of:
 - [ ] Re-report blocked user or expired story; persisted report should still be accepted as designed.
 - [ ] Confirm admin triage queue + action audit are accessible **only** to authorized accounts.
 - [ ] Confirm reported objectionable user content can be removed or disabled in normal read endpoints, caches, map and realtime pushes.
-- [ ] Confirm age gating and target-audience choices only after explicit owner/legal decision.
+- [x] Owner confirmed public brand **NEXUS** and target audience **18+ only**.
+- [ ] Configure Play **Restrict Minor Access**; verify signed AAB, underage denial across REST and Socket, OAuth/existing-account recovery, report/delete controls and accurate hosted Privacy/Terms.
 - [ ] Confirm public standards page, child-safety contact, privacy/terms and approved release build refer to the same brand.
 - [ ] Attach signed AAB SHA, date, device OS, app version, release track, API deploy SHA and screenshots/videos.
 
