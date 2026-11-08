@@ -28,6 +28,9 @@ export default function App() {
         <button type="button" aria-current={tab === 'reports' ? 'page' : undefined}
           className={tab === 'reports' ? 'font-bold underline' : 'text-muted-foreground'}
           onClick={() => setTab('reports')}>Safety Reports</button>
+        {personalLabelsEnabled ? <button type="button" aria-current={tab === 'personal-labels' ? 'page' : undefined}
+          className={tab === 'personal-labels' ? 'font-bold underline' : 'text-muted-foreground'}
+          onClick={() => setTab('personal-labels')}>Personal Labels</button> : null}
       </nav>
       {tab === 'verification' ? <QueuePage /> : tab === 'personal-labels' && personalLabelsEnabled ? <PersonalLabelsPage /> : <ContentReportsPage />}
     </AdminLayout>
