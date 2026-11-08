@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Alert, AppState, KeyboardAvoidingView, Linking, Modal,
-  Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity,
 } from 'react-native';
 import { isAdultDateOfBirth } from '@g88/shared';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
