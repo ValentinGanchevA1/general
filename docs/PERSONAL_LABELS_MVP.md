@@ -38,7 +38,7 @@ The moderator must provide `key` (stable ASCII slug), `labelBg`, `labelEn`, `cat
 
 ## UI
 
-- `ProfileEditScreen` — opt-in `PersonalLabelsEditor`, after Bio and before Interests, with selectable chips, count, Save, suggestion form with explicit BG/EN choice and own proposal statuses. Save is independent of existing profile PATCH so no optimistic profile contract drift.
+- `ProfileEditScreen` — opt-in `PersonalLabelsEditor`, after Bio and before Interests, with selectable chips, count, Save, suggestion form with explicit BG/EN choice and own proposal statuses. The section also offers a dedicated Save labels action. The primary Edit Profile Save commits any pending label changes after the existing profile PATCH, and closes the editor only if all requested writes succeed. These are still separate API requests, not a database transaction. If label saving fails, the editor stays open with Redux error feedback so users can retry.
 - `ProfileScreen` and shared `ProfileView` — `PersonalLabelsBadges`, fail-closed and read-only. Selected labels appear on public profiles only where an existing public profile is viewable.
 - `apps/admin` — separate opt-in Personal Labels review tab, bilingual/category approval form, duplicate merge and explicit confirmation. Never render raw proposal HTML.
 
@@ -62,6 +62,7 @@ The moderator must provide `key` (stable ASCII slug), `labelBg`, `labelEn`, `cat
 - [ ] 3 suggestions / 30 days per account and route throttling enforced, including after app reinstall.
 - [ ] Moderator approval requires valid bilingual strings and category, creates one catalog entry, and records reviewer; double review gets 409; merge references active label only.
 - [ ] Existing block/private/deleted profile permissions apply to viewing labels.
+- [ ] Main Edit Profile Save with changed labels persists both resources; a failed label PUT keeps the editor open, and unchanged/disabled labels preserve the legacy profile save path.
 - [ ] Android/iOS dark and light mode; long words, screen readers, font scaling, error/offline/retry, app resume and cold launch checked on devices.
 - [ ] Saving labels then returning to You refreshes the visible chips; standalone ProfileView mounts do not require React Navigation context.
 - [ ] No differences in Map/Discover/Pulse/Connections/You, profile PATCH, messaging, identity verification, onboarding or AAB build when feature is off.
