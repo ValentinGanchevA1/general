@@ -23,7 +23,9 @@ export function PersonalLabelsEditor(): React.JSX.Element | null {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { enabled, catalog, selected, proposals, loading, saving, proposing, error, notice } =
     useAppSelector((state) => state.personalLabels);
-  const [draft, setDraft] = useState<string[]>([]);
+  const [draftOverride, setDraftOverride] = useState<string[] | null>(null);
+  const selectedKeys = selected.map((item) => item.key);
+  const draft = draftOverride ?? selectedKeys;
   const [suggestion, setSuggestion] = useState('');
   const [suggestionLocale, setSuggestionLocale] = useState<PersonalLabelLocale>('en');
 
@@ -32,26 +34,28 @@ export function PersonalLabelsEditor(): React.JSX.Element | null {
     void dispatch(loadPersonalLabels());
   }, [dispatch]);
 
-  useEffect(() => {
-    setDraft(selected.map((item) => item.key));
-  }, [selected]);
-
   if (!Config.PERSONAL_LABELS_REQUESTED || (!enabled && !loading)) return null;
 
   const toggle = (key: string): void => {
-    setDraft((current) => current.includes(key)
-      ? current.filter((item) => item !== key)
-      : current.length < PERSONAL_LABEL_MAX_SELECTED ? [...current, key] : current);
+    setDraftOverride((current) => {
+      const values = current ?? selectedKeys;
+      return values.includes(key)
+        ? values.filter((item) => item !== key)
+        : values.length < PERSONAL_LABEL_MAX_SELECTED ? [...values, key] : values;
+    });
   };
 
-  const save = (): void => { void dispatch(savePersonalLabels(draft)); };
+  const save = async (): Promise<void> => {
+    const result = await dispatch(savePersonalLabels(draft));
+    if (savePersonalLabels.fulfilled.match(result)) setDraftOverride(null);
+  };
   const submit = async (): Promise<void> => {
     const text = suggestion.trim();
     if (text.length < 3) return;
     const result = await dispatch(suggestPersonalLabel({ text, locale: suggestionLocale }));
     if (suggestPersonalLabel.fulfilled.match(result)) setSuggestion('');
   };
-  const changed = draft.join('|') !== selected.map((item) => item.key).join('|');
+  const changed = draft.join('|') !== selectedKeys.join('|');
 
   return (
     <View style={styles.section} testID="personal-labels-editor">
@@ -75,7 +79,7 @@ export function PersonalLabelsEditor(): React.JSX.Element | null {
       )}
       <View style={styles.row}>
         <Text style={styles.help}>{draft.length}/{PERSONAL_LABEL_MAX_SELECTED} chosen</Text>
-        <TouchableOpacity disabled={!changed || saving} onPress={save}
+        <TouchableOpacity disabled={!changed || saving} onPress={() => { void save(); }}
           accessibilityRole="button" style={[styles.button, (!changed || saving) && styles.buttonDisabled]}>
           {saving ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.buttonText}>Save labels</Text>}
         </TouchableOpacity>
