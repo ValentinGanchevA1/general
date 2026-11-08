@@ -12,6 +12,24 @@ const query: DiscoverySubscriptionDto = {
 };
 
 describe('DiscoverySubscriptionGateway', () => {
+  it('refuses adult-only Dating subscriptions during social-only early access', () => {
+    const previous = process.env.NEXUS_DATING_RELEASE_ENABLED;
+    delete process.env.NEXUS_DATING_RELEASE_ENABLED;
+    try {
+      const store = new DiscoverySubscriptionStore();
+      const gateway = new DiscoverySubscriptionGateway(store);
+      const client = { id: 'socket-a', data: { userId: 'viewer-1' } };
+      expect(gateway.onSubscribe(client as never, { ...query, datingOnly: true }))
+        .toMatchObject({ ok: false, code: 'dating.release_disabled' });
+      expect(store.get('socket-a')).toBeNull();
+      expect(gateway.onSubscribe(client as never, query))
+        .toEqual({ ok: true, data: { subscribed: true } });
+    } finally {
+      if (previous === undefined) delete process.env.NEXUS_DATING_RELEASE_ENABLED;
+      else process.env.NEXUS_DATING_RELEASE_ENABLED = previous;
+    }
+  });
+
   it('registers and replaces the authenticated socket context', () => {
     const store = new DiscoverySubscriptionStore();
     const gateway = new DiscoverySubscriptionGateway(store);
