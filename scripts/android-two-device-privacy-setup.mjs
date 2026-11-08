@@ -33,7 +33,7 @@ function assertApprovedStagingTarget() {
     'Device E2E staging URL must be a credential-free HTTPS origin.',
   );
   assert(
-    target.hostname.toLowerCase() !== 'g88-api.onrender.com',
+    target.hostname.toLowerCase().replace(/\.$/, '') !== 'g88-api.onrender.com',
     'Device E2E must never create test accounts on the live NEXUS API.',
   );
 }
