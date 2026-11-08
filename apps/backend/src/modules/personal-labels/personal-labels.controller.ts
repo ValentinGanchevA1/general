@@ -27,6 +27,11 @@ export class PersonalLabelsController {
   mine(@CurrentUser('id') id: string, @Query() query: PersonalLabelsLocaleDto) {
     return this.labels.myLabels(id, query.locale);
   }
+  @Get('users/:id')
+  @Header('Cache-Control', 'private, no-store')
+  publicLabels(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('id') viewerId: string, @Query() query: PersonalLabelsLocaleDto) {
+    return this.labels.publicLabels(id, viewerId, query.locale);
+  }
   @Put('me')
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   update(@CurrentUser('id') id: string, @Body() dto: SetPersonalLabelsDto, @Query() query: PersonalLabelsLocaleDto) {
