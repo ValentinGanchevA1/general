@@ -133,6 +133,8 @@ The Android E2E screenshots currently attached to GitHub run logs show a **trust
 
 - [ ] Verify `NEXUS_DATING_RELEASE_ENABLED` **unset/false on production** before AAB upload, and again after backend deployment.
 - [ ] Android device QA: Dating filter and opt-in absent; user cannot access likes, matches or Dating-only entities from saved links, old sessions or direct requests; ordinary social map/chat continue working.
+- [ ] Test **previously created Dating matches**: their stored conversation IDs must not be exposed by social conversation-list and profile-message routes, and must fail on chat send, message read and realtime room recipient authorization while Dating is paused. Ordinary unrelated DMs continue to work; since an earlier Dating match may reuse a general DM, review the effect on established social conversations.
+- [ ] Verify an already active precise live-location share in such a match can still be **stopped** by the sharer, but no new location updates or live delivery occur while Dating is disabled.
 - [ ] Admin and legal approval required before any future enablement; do not simply flip the flag to true on a self-declared DOB.
 - [ ] IARC must describe the **actual shipped** user-accessible functionality; don't claim enabled Dating if unavailable. Reassess when re-enabled.
 - [ ] Keep Social category and general target-audience safeguards under review. Even without Dating, random/anonymous stranger-chat functionality can independently trigger Play restrictions: https://support.google.com/googleplay/android-developer/answer/16302250 .
