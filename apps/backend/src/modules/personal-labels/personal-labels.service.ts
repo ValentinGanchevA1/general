@@ -1,6 +1,6 @@
 import {
   BadRequestException, ConflictException, Injectable, NotFoundException,
-  TooManyRequestsException,
+  HttpException, HttpStatus,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -129,7 +129,7 @@ export class PersonalLabelsService {
         [userId],
       );
       if (Number(count?.n ?? 0) >= 3) {
-        throw new TooManyRequestsException('You can suggest up to three labels every 30 days.');
+        throw new HttpException('You can suggest up to three labels every 30 days.', HttpStatus.TOO_MANY_REQUESTS);
       }
       const col = dto.locale === 'bg' ? 'label_bg' : 'label_en';
       const existing = await tx.query<Array<{ key: string }>>(
