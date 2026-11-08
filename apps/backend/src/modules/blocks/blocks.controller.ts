@@ -2,11 +2,13 @@ import { Controller, Delete, Get, Param, ParseUUIDPipe, Post, UseGuards } from '
 import { Throttle } from '@nestjs/throttler';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AllowAgePending } from '../auth/adult-eligibility';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { BlocksService } from './blocks.service';
 
 @Controller('blocks')
 @UseGuards(JwtAuthGuard)
+@AllowAgePending('always')
 export class BlocksController {
   constructor(private readonly blocks: BlocksService) {}
 
