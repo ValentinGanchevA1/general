@@ -176,7 +176,7 @@ function StepOrigin({
       <StepHeader
         eyebrow="ABOUT YOU"
         title="Age & origin"
-        subtitle="Birth date is optional for social features. Dating requires adult eligibility (18+); a self-declared date does not independently verify age."
+        subtitle="Birth date is optional for social features. Dating is paused in early access and will require adult eligibility (18+) when launched."
       />
       <View style={styles.originFields}>
         <BirthDateField
