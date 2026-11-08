@@ -37,6 +37,7 @@ import {
 import { updateProfile } from '@/features/profile/profileSlice';
 import { PersonalLabelsEditor } from '@/features/profile/PersonalLabelsEditor';
 import { savePersonalLabels } from '@/features/profile/personalLabelsSlice';
+import { completeProfileEditSave } from '@/features/profile/completeProfileEditSave';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
@@ -278,13 +279,17 @@ export function ProfileEditScreen(): React.JSX.Element {
       openToDating,
       seekingGenders,
     }));
-    if (!updateProfile.fulfilled.match(result)) return;
-    if (personalLabelsEnabled && pendingPersonalLabels !== null) {
-      const labelsResult = await dispatch(savePersonalLabels(pendingPersonalLabels));
-      if (!savePersonalLabels.fulfilled.match(labelsResult)) return;
-      setPendingPersonalLabels(null);
-    }
-    navigation.goBack();
+    const pendingKeys = personalLabelsEnabled ? pendingPersonalLabels : null;
+    const saved = await completeProfileEditSave(
+      updateProfile.fulfilled.match(result),
+      pendingKeys !== null
+        ? async () => {
+            const labelsResult = await dispatch(savePersonalLabels(pendingKeys));
+            return savePersonalLabels.fulfilled.match(labelsResult);
+          }
+        : null,
+    );
+    if (saved) navigation.goBack();
   };
 
   const themedSwitch = (value: boolean, onValueChange: (value: boolean) => void): React.JSX.Element => (
