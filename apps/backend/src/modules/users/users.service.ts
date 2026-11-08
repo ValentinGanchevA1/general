@@ -590,6 +590,20 @@ export class UsersService {
       );
       const nextDating = req.openToDating ?? existing?.open_to_dating ?? false;
       const effectiveDob = req.dateOfBirth === undefined ? existing?.date_of_birth : req.dateOfBirth;
+      if (
+        isAdultGateEnforced() &&
+        req.dateOfBirth !== undefined &&
+        existing?.date_of_birth &&
+        !isAdultDateOfBirth(existing.date_of_birth) &&
+        existing.date_of_birth !== req.dateOfBirth
+      ) {
+        // Previously declared underage users need a support-led age correction
+        // process. Do not permit a simple re-submit of an older birth year.
+        throw new BadRequestException({
+          code: 'profile.age_review_required',
+          message: 'Contact support to review a previously declared underage date of birth.',
+        });
+      }
       if (nextDating) {
         if (!effectiveDob) {
           throw new BadRequestException({ code: 'dating.age_restricted', message: 'Adult date of birth required for dating.' });
