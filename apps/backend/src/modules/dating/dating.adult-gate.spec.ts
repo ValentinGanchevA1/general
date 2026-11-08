@@ -8,6 +8,14 @@ describe('DatingService adult-eligibility guard', () => {
   const sender = '11111111-1111-4111-8111-111111111111';
   const peer = '22222222-2222-4222-8222-222222222222';
 
+  // Adult eligibility must be tested independently from the RC1 release hold.
+  const originalDatingFlag = process.env.NEXUS_DATING_RELEASE_ENABLED;
+  beforeAll(() => { process.env.NEXUS_DATING_RELEASE_ENABLED = 'true'; });
+  afterAll(() => {
+    if (originalDatingFlag === undefined) delete process.env.NEXUS_DATING_RELEASE_ENABLED;
+    else process.env.NEXUS_DATING_RELEASE_ENABLED = originalDatingFlag;
+  });
+
   const setup = () => {
     const query = jest.fn();
     const transaction = jest.fn();
