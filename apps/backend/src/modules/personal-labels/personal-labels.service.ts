@@ -46,6 +46,12 @@ export function normalizePersonalLabelText(value: string): string {
   return text;
 }
 
+function isUniqueConstraintViolation(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const failure = error as { driverError?: { code?: unknown } };
+  return failure.driverError?.code === '23505';
+}
+
 function presentLabel(row: LabelRow): PersonalLabel {
   return { key: row.key, label: row.label, category: row.category, emoji: row.emoji };
 }
@@ -188,7 +194,8 @@ export class PersonalLabelsService {
 
   async review(adminId: string, proposalId: string, dto: PersonalLabelReviewRequest): Promise<{ status: PersonalLabelProposalStatus; key: string | null }> {
     requirePersonalLabelsEnabled();
-    return this.db.transaction(async tx => {
+    try {
+      return await this.db.transaction(async tx => {
       const [row] = await tx.query<ProposalRow[]>(
         `SELECT id,user_id,proposed_text,locale,status,created_at,reviewed_at,reviewed_by,review_note
          FROM personal_label_proposals WHERE id=$1 FOR UPDATE`, [proposalId],
@@ -228,6 +235,15 @@ export class PersonalLabelsService {
         [proposalId, status, key, adminId, dto.decision === 'approve' ? null : dto.note?.trim() || null],
       );
       return { status, key };
-    });
+      });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        throw new ConflictException({
+          code: 'personal_labels.already_exists',
+          message: 'A label with this key or translation already exists.',
+        });
+      }
+      throw error;
+    }
   }
 }
