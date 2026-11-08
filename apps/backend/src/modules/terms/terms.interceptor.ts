@@ -4,7 +4,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { from, mergeMap, Observable } from 'rxjs';
 import { REQUIRE_CURRENT_TERMS } from './require-terms.decorator';
-import { ALLOW_TERMS_PRIVACY_REDUCTION, ALLOW_TERMS_SAFETY_EXIT, isPrivacyReductionOnly, isSafeExitOnly, type TermsSafetyExitRule } from './privacy-reduction';
+import { ALLOW_TERMS_PRIVACY_REDUCTION, ALLOW_TERMS_SAFETY_EXIT, isPrivacyReductionOnly, isAdultDeclarationOnly, isSafeExitOnly, type TermsSafetyExitRule } from './privacy-reduction';
 import { TermsService } from './terms.service';
 
 @Injectable()
@@ -31,7 +31,7 @@ export class TermsInterceptor implements NestInterceptor {
       ALLOW_TERMS_PRIVACY_REDUCTION,
       [context.getHandler(), context.getClass()],
     );
-    if (privacyReduction && isPrivacyReductionOnly(request.body)) {
+    if (privacyReduction && (isPrivacyReductionOnly(request.body) || isAdultDeclarationOnly(request.body))) {
       // Reducing account visibility must remain possible during lockout.
       return next.handle();
     }
