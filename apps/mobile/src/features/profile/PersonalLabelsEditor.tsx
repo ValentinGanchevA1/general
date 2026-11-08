@@ -55,7 +55,7 @@ export function PersonalLabelsEditor(): React.JSX.Element | null {
   return (
     <View style={styles.section} testID="personal-labels-editor">
       <Text style={styles.heading}>MY PERSONALITY</Text>
-      <Text style={styles.help}>What makes you, you? Choose up to 5. These are self-descriptions, not verified traits.</Text>
+      <Text style={styles.help}>What makes you, you? Choose up to 5. Selected labels appear on your public profile and are not verified traits.</Text>
       {loading ? <ActivityIndicator color={colors.primary} /> : (
         <View style={styles.tags}>
           {catalog.map((label) => {
