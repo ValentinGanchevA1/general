@@ -47,6 +47,24 @@ describe('ChatService', () => {
     },
   ];
 
+  it('omits previous Dating-derived chat conversations from the social inbox', async () => {
+    const previous = process.env.NEXUS_DATING_RELEASE_ENABLED;
+    delete process.env.NEXUS_DATING_RELEASE_ENABLED;
+    try {
+      query.mockResolvedValueOnce([{
+        id: 'c-dating', participant_ids: ['me', 'other'],
+        status: 'accepted', initiated_by: null, last_message_at: null,
+        dating_match: true, is_friend: false, peer_id: 'other',
+        peer_allows_online: false, unread_count: 2, participants: [],
+      }]);
+      await expect(service.findConversations('me')).resolves.toEqual([]);
+      expect(query.mock.calls[0]?.[0]).toContain('dating_matches');
+    } finally {
+      if (previous === undefined) delete process.env.NEXUS_DATING_RELEASE_ENABLED;
+      else process.env.NEXUS_DATING_RELEASE_ENABLED = previous;
+    }
+  });
+
   describe('persist — gate + transaction', () => {
     it('prevents old Dating match threads from sending during social-only RC1', async () => {
       const previous = process.env.NEXUS_DATING_RELEASE_ENABLED;
