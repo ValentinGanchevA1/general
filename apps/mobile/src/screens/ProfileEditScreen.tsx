@@ -35,6 +35,7 @@ import {
   resolveCountry,
 } from '@/features/profile/profileReferenceData';
 import { updateProfile } from '@/features/profile/profileSlice';
+import { PersonalLabelsEditor } from '@/features/profile/PersonalLabelsEditor';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
@@ -338,6 +339,8 @@ export function ProfileEditScreen(): React.JSX.Element {
         <FormField label="Display name" value={displayName} onChangeText={(t) => { setDisplayName(t); clear('displayName'); }} placeholder="Your name" maxLength={50} returnKeyType="next" onSubmitEditing={() => bioRef.current?.focus()} error={errors.displayName} testID="profile-edit-display-name" />
         <FormField ref={bioRef} label="Bio" value={bio} onChangeText={setBio} placeholder="A short intro" multiline maxLength={160} style={styles.bioInput} testID="profile-edit-bio" />
         <Text style={styles.charCount}>{bio.length}/160</Text>
+
+        <PersonalLabelsEditor />
 
         <Text style={styles.section}>INTERESTS</Text>
         <Text style={styles.hint}>What you enjoy. Shared interests power suggestions and matching signals.</Text>
