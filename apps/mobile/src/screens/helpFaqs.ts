@@ -26,7 +26,7 @@ export const NEXA_HELP_FAQS: HelpFaq[] = [
   },
   {
     q: 'Is NEXUS an 18+ app? Who can use Dating?',
-    a: 'NEXUS is primarily a local social app, not a dating-only service. General social features are not automatically restricted to adults. Optional Dating and matchmaking are reserved for users aged 18 or older and require a separate eligibility check. A birth date entered in your profile is not independent proof of age. We are reviewing additional protections for younger users before launch.',
+    a: 'NEXUS is primarily a local social app, not a dating-only service. General social features are not automatically restricted to adults. Optional Dating and matchmaking are reserved for users aged 18 or older, but are temporarily unavailable during early access while stronger age checks are prepared. A birth date entered in your profile is not independent proof of age. We are reviewing additional protections for younger users before launch.',
   },
   {
     q: 'How do friends and online status work?',
