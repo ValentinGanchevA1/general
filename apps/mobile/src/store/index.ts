@@ -3,6 +3,7 @@ import reportsReducer from '@/features/reports/reportsSlice';
 import termsReducer from '@/features/terms/termsSlice';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '@/features/auth/authSlice';
+import adultAgeReducer from '@/features/auth/adultAgeSlice';
 import passwordResetReducer from '@/features/auth/passwordResetSlice';
 import profileReducer from '@/features/profile/profileSlice';
 import chatReducer, { outboxHydrated } from '@/features/chat/chatSlice';
@@ -30,6 +31,7 @@ import {
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    adultAge: adultAgeReducer,
     eventReviews: eventReviewsReducer,
     reports: reportsReducer,
     terms: termsReducer,
