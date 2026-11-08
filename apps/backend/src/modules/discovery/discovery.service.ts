@@ -1,3 +1,4 @@
+import { isDatingReleaseEnabled } from '../dating/dating-release-gate';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -138,6 +139,20 @@ export class DiscoveryService {
     const friendIds = friendsOnly
       ? await this.friends.listFriendIds(params.requesterId)
       : null;
+
+    if (datingOnly && !isDatingReleaseEnabled()) {
+      return this.empty(
+        h3ResolutionForZoom(params.zoom),
+        params.viewport,
+        kinds,
+        '',
+        undefined,
+        undefined,
+        false,
+        rankBy,
+        true,
+      );
+    }
 
     if (datingOnly) {
       const openRows = await this.db.query<Array<{ open_to_dating: boolean }>>(
