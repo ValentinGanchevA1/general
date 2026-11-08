@@ -108,6 +108,19 @@ describe('PersonalLabelsService', () => {
     expect(query.mock.calls[2]?.[0]).toContain('UPDATE personal_label_proposals');
   });
 
+  it('maps duplicate catalog approval to an actionable 409, not a 500', async () => {
+    const { query, service } = make();
+    query.mockResolvedValueOnce([row]).mockRejectedValueOnce({
+      driverError: { code: '23505' },
+    });
+    await expect(service.review(admin, proposalId, {
+      decision: 'approve', key: 'deep_thinker',
+      labelBg: 'Дълбок мислител', labelEn: 'Deep thinker',
+      category: 'character',
+    })).rejects.toBeInstanceOf(ConflictException);
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
   it('reuses canonical public profile privacy checks', async () => {
     const { query, service, users } = make();
     users.getPublicProfile.mockRejectedValueOnce(new NotFoundException('Hidden'));
