@@ -1,3 +1,4 @@
+import { isDatingReleaseEnabled } from '../dating/dating-release-gate';
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -80,6 +81,7 @@ export class DiscoveryEntityResolver {
 
     const friendsOnly = context?.friendsOnly === true;
     const datingOnly = context?.datingOnly === true && !friendsOnly;
+    if (datingOnly && !isDatingReleaseEnabled()) return null;
     let friendIds: string[] | null = null;
     if (friendsOnly) {
       friendIds = await this.friends.listFriendIds(params.viewerId);
