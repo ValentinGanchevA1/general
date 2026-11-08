@@ -66,3 +66,15 @@ The Jest migration spec uses `EVENT_REVIEWS_TEST_DATABASE_URL` and creates a dis
 - QA: submit a child-safety report on a Story, confirm non-duplicate persisted row, high-priority order even when an ordinary report is newer, empty targetCaption/targetMediaUrl in admin response, and warning visible in dashboard. Negative/offline UI must not show false success.
 - Owner must designate a child-safety contact, operational procedures, approved public CSAE standards and age-scope decisions before Play certification. See #1071 and draft PR #1076.
 - **NO-GO:** CSAM case review/secure escalation, legal obligations, staffing, contact designation, child safety statement publication and real-device test evidence remain missing.
+
+## FINAL owner override (8 November 2026): NEXUS 18+
+- Public brand **NEXUS**; `com.g88` unchanged.
+- The first launch is **adult-only for all Social**, not just Dating. Dating stays disabled.
+- New registration must include DOB; existing and Google-login users need server-verified
+  eligibility status before full app access; direct API and Socket.IO bypass blocked.
+- API flag `NEXUS_REQUIRE_ADULT_AGE=true` on production is required for adult-only launch;
+  default-OFF only for staged compatibility. No Android sign-off without this evidence.
+- Age declaration is NOT a document-based independent age verification. Underage accounts
+  must retain access to safe deletion, block/report and support paths.
+- Target audience: only **18 and over**, enable **Restrict Minor Access**.
+- All prior references to Dating-only 18+ in historical QA sections are superseded.
