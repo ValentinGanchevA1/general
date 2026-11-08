@@ -1,3 +1,4 @@
+import { assertDatingReleaseEnabled } from '../dating/dating-release-gate';
 import {
   BadRequestException,
   Injectable,
@@ -569,6 +570,9 @@ export class UsersService {
       params.push(req.showNationality);
       setClauses.push(`show_nationality = $${params.length}`);
     }
+    // Keep social profiles editable while adult-only Dating is paused.
+    // A self-declared DOB alone never enables the restricted Dating service.
+    if (req.openToDating === true) assertDatingReleaseEnabled();
     // Only Dating requires adulthood. Re-check every DOB edit of an opted-in user.
     // General social profiles must not impose a universal 18+ requirement.
     if (req.openToDating === true || req.dateOfBirth !== undefined) {
