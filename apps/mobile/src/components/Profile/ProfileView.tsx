@@ -21,6 +21,7 @@ import { ProfilePrimaryCtaRow } from '@/components/Profile/ProfilePrimaryCtaRow'
 import { ProfileSocialSecondary } from '@/components/Profile/ProfileSocialSecondary';
 import { ProfileStatsRow } from '@/components/Profile/ProfileStatsRow';
 import { ProfileTagsSection } from '@/components/Profile/ProfileTagsSection';
+import { PersonalLabelsBadges } from '@/features/profile/PersonalLabelsBadges';
 import { ProfileTrustBlock } from '@/components/Profile/ProfileTrustBlock';
 import { ProfileStoryline } from '@/features/stories/components/ProfileStoryline';
 import { fontSize, spacing, useAppTheme, type ThemeColors } from '@/theme';
@@ -140,6 +141,7 @@ export function ProfileView({
 						<ProfileTrustScoreCard score={profile.verificationScore} idVerified={profile.idVerified} {...(actions.onOpenTrustDetails != null ? { onPress: actions.onOpenTrustDetails } : actions.onPressVerificationBadge != null ? { onPress: actions.onPressVerificationBadge } : {})} />
 					</View>
 					{profile.bio ? <ProfileBio bio={profile.bio} /> : null}
+					<PersonalLabelsBadges userId={profile.userId} own />
 					<ProfileTagsSection interests={profile.interests} goals={profile.goals} />
 					{selfSlots?.trustNext}
 					{selfSlots?.activity}
@@ -194,6 +196,7 @@ export function ProfileView({
 					<ProfileStatsRow {...(profile.status?.level != null ? { level: profile.status.level } : {})} {...(profile.status?.allTimeRank != null ? { allTimeRank: profile.status.allTimeRank } : {})} {...(profile.status?.achievementIcons != null ? { achievementIcons: profile.status.achievementIcons } : {})} onLayout={onSectionLayout('stats')} />
 				</View> : null}
 				{profile.bio ? <View onLayout={onSectionLayout('bio')}><ProfileBio bio={profile.bio} showTitle padded={false} /></View> : null}
+				{!blocked ? <PersonalLabelsBadges userId={profile.userId} /> : null}
 				<View style={styles.section} onLayout={onSectionLayout('storyline')}><ProfileStoryline userId={profile.userId} /></View>
 				{hasPhotos ? <View onLayout={onSectionLayout('photos')}><ProfilePhotosSection photos={profile.photoUrls} isSelf={false} padded={false} /></View> : <View onLayout={onSectionLayout('photos')} />}
 				{hasGoals ? <ProfileTagsSection goals={profile.goals} goalsTitle="Goals" padded={false} /> : null}
