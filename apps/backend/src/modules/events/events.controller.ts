@@ -24,6 +24,7 @@ import type {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequireCurrentTerms } from '../terms/require-terms.decorator';
+import { AllowTermsSafetyExit } from '../terms/privacy-reduction';
 import { DiscoveryRealtimePublisher } from '../../realtime/discovery-realtime.publisher';
 import { EventPulseShareService } from './event-pulse-share.service';
 import { EventsService } from './events.service';
@@ -88,6 +89,7 @@ export class EventsController {
   /** PUT /api/v1/events/:id/rsvp — set/update the caller's RSVP. */
   @Put(':id/rsvp')
   @RequireCurrentTerms()
+  @AllowTermsSafetyExit({ field: 'status', value: 'declined' })
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   async rsvp(
     @CurrentUser('id') userId: string,
