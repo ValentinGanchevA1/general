@@ -127,6 +127,16 @@ The Android E2E screenshots currently attached to GitHub run logs show a **trust
 **Console state:** not inspected through an authenticated Play Console session; every listed section is **unsubmitted/unverified** unless the owner shares verified Console evidence. A source draft is **not** a Play declaration.
 
 
+## Release hold — Dating disabled until age assurance is approved
+
+**Decision for current technical release candidate (8 Nov 2026):** preserve the product's **Dating-only 18+** policy, but keep the adult-only Dating feature **disabled** until independent, effective age-assurance and safety controls are implemented, verified and signed off. Backend `NEXUS_DATING_RELEASE_ENABLED` defaults to `false`; Dating like/pass, profile opt-in, Dating discovery and realtime subscriptions reject or return empty. Mobile first-release code hides the Dating map filter and opt-in control. This is an interim engineering safety gate, **not a substitute for verifying legal target age groups or operating a real age-verification system**.
+
+- [ ] Verify `NEXUS_DATING_RELEASE_ENABLED` **unset/false on production** before AAB upload, and again after backend deployment.
+- [ ] Android device QA: Dating filter and opt-in absent; user cannot access likes, matches or Dating-only entities from saved links, old sessions or direct requests; ordinary social map/chat continue working.
+- [ ] Admin and legal approval required before any future enablement; do not simply flip the flag to true on a self-declared DOB.
+- [ ] IARC must describe the **actual shipped** user-accessible functionality; don't claim enabled Dating if unavailable. Reassess when re-enabled.
+- [ ] Keep Social category and general target-audience safeguards under review. Even without Dating, random/anonymous stranger-chat functionality can independently trigger Play restrictions: https://support.google.com/googleplay/android-developer/answer/16302250 .
+
 ## F. Dating-only 18+ owner decision (7 Nov 2026)
 
 NEXUS is **primarily a contextual, map-first social application**, with optional Dating/matchmaking restricted to adults. According to Google's April 2026 clarification, apps with **incidental** Dating can avoid *app-wide* Restrict Minor Access **if** they implement sufficiently robust feature-level age gates: https://support.google.com/googleplay/android-developer/answer/16838200 . A DOB entered by the user is not proof of age; require technical/abuse review before relying on this exception. The general/social audience age bands are **NOT YET CHOSEN** and must not default to under-13 or Families without safeguarding compliance. Social app Child Safety Standards apply independently of the eventual minimum age: https://support.google.com/googleplay/android-developer/answer/14747720 .
