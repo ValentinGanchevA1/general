@@ -25,6 +25,8 @@
 
 ---
 
+> **First release availability gate (2026-11-08):** Adult-only Dating is temporarily disabled by default until independently reviewed age assurance is operational. Do **not** advertise Dating, matches or adult-only dating discovery as available in the initial release build. The general-social app can ship separately only after child/teen safety and Play declarations are resolved. Backend switch `NEXUS_DATING_RELEASE_ENABLED` must remain unset/false in first-release production; mobile hides the Dating toggle. Do not turn this switch on merely because users enter an adult DOB.
+
 ## 2. Store listing copy
 
 ### App name
@@ -60,7 +62,7 @@ WHAT YOU CAN DO
 • Marketplace — explore local listings and offers
 • Identity verification — manage verification signals through Trust Center
 • Map presence controls — choose whether you appear in nearby discovery
-• Optional Dating (18+) — adult-only opt-in matchmaking and dating discovery
+• Privacy-aware nearby social discovery — decide when to appear on the map
 
 BUILT FOR PRIVACY
 NEXUS displays privacy-coarsened locations for nearby map discovery. Separately,
