@@ -245,6 +245,9 @@ if (command === 'prepare') {
 } else if (command === 'cleanup') {
   assertApprovedStagingTarget();
   await cleanup();
+} else if (command === 'verify') {
+  // Used by the shell E2E runner; performs no external writes or requests.
+  assertApprovedStagingTarget();
 } else {
   throw new Error(`Unsupported command: ${command}`);
 }
