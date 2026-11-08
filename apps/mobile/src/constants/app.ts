@@ -19,3 +19,10 @@ export const PRIVACY_POLICY_URL = 'https://g88-legal.onrender.com/privacy';
  * is updated to that document.
  */
 export const TERMS_OF_SERVICE_URL = 'https://g88-legal.onrender.com/privacy';
+
+/**
+ * First Android social release: adult-only Dating is intentionally paused until
+ * independent age-assurance and teen-safety review are signed off.
+ * Backend independently default-denies Dating (NEXUS_DATING_RELEASE_ENABLED).
+ */
+export const DATING_RELEASE_ENABLED = false;
