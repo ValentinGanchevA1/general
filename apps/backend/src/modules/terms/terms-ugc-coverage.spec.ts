@@ -18,7 +18,7 @@ describe('UGC Terms enforcement: route metadata coverage', () => {
     [StoriesController.prototype, ['presign', 'uploadMediaBase64', 'uploadMediaFile', 'create', 'react']],
     [EventsController.prototype, ['create', 'rsvp', 'shareJoinToPulse', 'createPoll', 'vote', 'askQuestion', 'upvoteQuestion']],
     [EventReviewsController.prototype, ['create', 'edit']],
-    [ListingsController.prototype, ['create', 'uploadPhoto', 'updateStatus', 'makeOffer', 'respondToOffer', 'counterOffer']],
+    [ListingsController.prototype, ['create', 'uploadPhoto', 'updateStatus', 'bump', 'makeOffer', 'respondToOffer', 'counterOffer']],
     [UsersController.prototype, ['updateProfile', 'avatarPresignedUrl', 'uploadPhotoBase64', 'photoPresignedUrl', 'addPhoto', 'setCover']],
     [FeedController.prototype, ['createCheckIn', 'createPlaceCheckIn']],
     [MessagingController.prototype, ['create']],
