@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { createRequire } from 'node:module';
 
@@ -50,7 +50,7 @@ async function api(path, init = {}) {
   return { response, body: await readJson(response) };
 }
 
-async function register(label, runId, password) {
+async function register(label, runId, password, recordUser) {
   const displayName = `Device Privacy ${label} ${runId.slice(-6)}`;
   const email = `device-privacy-${label.toLowerCase()}-${runId}@g88.app`;
   const { response, body } = await api('/auth/register', {
@@ -61,12 +61,15 @@ async function register(label, runId, password) {
   assert(response.status === 201, `register ${label} failed: HTTP ${response.status}`);
   assert(typeof body?.tokens?.accessToken === 'string', `register ${label} missing access token`);
   assert(typeof body?.user?.id === 'string', `register ${label} missing user id`);
-  return {
+  const user = {
     email,
     displayName,
     userId: body.user.id,
     accessToken: body.tokens.accessToken,
   };
+  // Journal each successful registration before performing further writes.
+  await recordUser(label.toLowerCase(), user);
+  return user;
 }
 
 async function completeProfile(user, sharedInterest) {
@@ -166,12 +169,11 @@ async function promoteConversation(owner, peer, conversationId, runId, label) {
   }
 }
 
-async function createPair(firstLabel, secondLabel, runId, password) {
+async function createPair(firstLabel, secondLabel, runId, password, recordUser) {
   const sharedInterest = `device-privacy-${firstLabel.toLowerCase()}${secondLabel.toLowerCase()}-${runId}`;
-  const [first, second] = await Promise.all([
-    register(firstLabel, runId, password),
-    register(secondLabel, runId, password),
-  ]);
+  // Sequential registration avoids concurrent state-file writes.
+  const first = await register(firstLabel, runId, password, recordUser);
+  const second = await register(secondLabel, runId, password, recordUser);
   await Promise.all([
     completeProfile(first, sharedInterest),
     completeProfile(second, sharedInterest),
@@ -186,26 +188,22 @@ async function prepare() {
   const runId = `${Date.now()}-${secret.slice(0, 8)}`;
   const password = `DevicePass${secret}Aa1`;
 
-  const [revocationPair, authorizedPair] = await Promise.all([
-    createPair('A', 'B', runId, password),
-    createPair('C', 'D', runId, password),
-  ]);
-
+  const state = { baseUrl: BASE, runId, password, cleaned: [] };
   await mkdir(dirname(STATE_FILE), { recursive: true });
-  await writeFile(
-    STATE_FILE,
-    JSON.stringify({
-      baseUrl: BASE,
-      password,
-      a: revocationPair.first,
-      b: revocationPair.second,
-      abConversationId: revocationPair.conversationId,
-      c: authorizedPair.first,
-      d: authorizedPair.second,
-      cdConversationId: authorizedPair.conversationId,
-    }, null, 2),
-    { mode: 0o600 },
-  );
+  const persist = () => writeFile(STATE_FILE, JSON.stringify(state, null, 2), { mode: 0o600 });
+  await persist();
+  const recordUser = async (label, user) => {
+    state[label] = user;
+    await persist();
+  };
+
+  // Journal users before starting the next pair. Cleanup can now handle partial setup.
+  const revocationPair = await createPair('A', 'B', runId, password, recordUser);
+  state.abConversationId = revocationPair.conversationId;
+  await persist();
+  const authorizedPair = await createPair('C', 'D', runId, password, recordUser);
+  state.cdConversationId = authorizedPair.conversationId;
+  await persist();
   console.log(`[device-e2e] prepared isolated A/B and C/D accepted conversations (${runId})`);
 }
 
@@ -222,7 +220,8 @@ async function deleteAccount(user, password) {
     },
     body: JSON.stringify({ confirm: 'DELETE', password }),
   });
-  if (response.status !== 204 && response.status !== 401 && response.status !== 404) {
+  // A 401 is not evidence that the synthetic account was deleted.
+  if (response.status !== 204 && response.status !== 404) {
     throw new Error(`cleanup failed: HTTP ${response.status}`);
   }
 }
@@ -230,13 +229,17 @@ async function deleteAccount(user, password) {
 async function cleanup() {
   const state = await loadState().catch(() => null);
   if (!state) return;
-  await Promise.allSettled([
-    deleteAccount(state.a, state.password),
-    deleteAccount(state.b, state.password),
-    deleteAccount(state.c, state.password),
-    deleteAccount(state.d, state.password),
-  ]);
-  console.log('[device-e2e] cleanup requested for synthetic accounts');
+  assert(state.baseUrl === BASE, 'Refusing to clean up accounts on a different backend');
+  const cleaned = new Set(Array.isArray(state.cleaned) ? state.cleaned : []);
+  for (const label of ['a', 'b', 'c', 'd']) {
+    if (!state[label] || cleaned.has(label)) continue;
+    await deleteAccount(state[label], state.password);
+    cleaned.add(label);
+    state.cleaned = [...cleaned];
+    await writeFile(STATE_FILE, JSON.stringify(state, null, 2), { mode: 0o600 });
+  }
+  await unlink(STATE_FILE);
+  console.log('[device-e2e] synthetic account deletion confirmed for journaled accounts');
 }
 
 if (command === 'prepare') {
