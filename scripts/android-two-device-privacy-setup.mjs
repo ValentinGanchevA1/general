@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { createRequire } from 'node:module';
 
@@ -190,8 +190,19 @@ async function prepare() {
 
   const state = { baseUrl: BASE, runId, password, cleaned: [] };
   await mkdir(dirname(STATE_FILE), { recursive: true });
-  const persist = () => writeFile(STATE_FILE, JSON.stringify(state, null, 2), { mode: 0o600 });
-  await persist();
+  // Exclusive creation prevents a new run from erasing a previous failed cleanup.
+  const journal = await open(STATE_FILE, 'wx', 0o600);
+  try {
+    await journal.writeFile(JSON.stringify(state, null, 2));
+  } finally {
+    await journal.close();
+  }
+  const persist = async () => {
+    const tempFile = `${STATE_FILE}.${runId}.tmp`;
+    await writeFile(tempFile, JSON.stringify(state, null, 2), { mode: 0o600 });
+    // Atomic replacement preserves the previous journal if a write is interrupted.
+    await rename(tempFile, STATE_FILE);
+  };
   const recordUser = async (label, user) => {
     state[label] = user;
     await persist();
@@ -227,8 +238,14 @@ async function deleteAccount(user, password) {
 }
 
 async function cleanup() {
-  const state = await loadState().catch(() => null);
-  if (!state) return;
+  let state;
+  try {
+    state = await loadState();
+  } catch (error) {
+    // Missing journal is a no-op; corrupt/unreadable journals require investigation.
+    if (error?.code === 'ENOENT') return;
+    throw error;
+  }
   assert(state.baseUrl === BASE, 'Refusing to clean up accounts on a different backend');
   const cleaned = new Set(Array.isArray(state.cleaned) ? state.cleaned : []);
   for (const label of ['a', 'b', 'c', 'd']) {
