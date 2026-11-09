@@ -20,7 +20,7 @@
 3. Ensure sandbox email/push, synthetic-only test identities, appropriate staging Terms/age-gate configuration and that the app's test build points at the same approved staging endpoint. Do not send synthetic account messages to real users.
 4. Approve the two repository variables above and trigger an explicit test run only after security review. The operator must keep the relevant approval evidence in the PR.
 5. Collect job URL, actual emulator boot logs, device UI/realtime event assertions, error reports, candidate commit/SHA and APK metadata.
-6. Verify that all synthetic accounts, content, conversations and block records were deleted from staging. Setup currently writes its final state only after both conversation pairs are prepared; an intermediate failure can leave accounts without a cleanup-state file. **Do not assume cleanup succeeded.** Confirm via an operator-side, read-only reconciliation before sign-off.
+6. Verify that all synthetic accounts, content, conversations and block records were deleted from staging. Setup now journals each successful registration immediately in a restricted-permission state file, allowing partial-run cleanup; cleanup tracks confirmed deletions, treats HTTP 401 as an error, and fails the workflow rather than silently succeeding. A failed registration response or crash before a journal write can still leave an untracked account. **Do not assume cleanup succeeded.** Reconcile disposable test accounts and associated content read-only before sign-off.
 7. Confirm **no production database migrations, account changes, user messages or Play Console writes** occurred.
 
 ## Offline guard regression
@@ -46,3 +46,7 @@ CI also runs this test in the backend job, independent of staging approval. It c
 - These guards prevent accidental use of the **known** live URL; they cannot prove a different hostname, DNS alias or proxy isn't backed by production. Staging DB/service/credentials isolation still requires manual operator evidence.
 
 **Status:** static source changes committed in draft branches. Latest-head CI and actual staging emulator execution must be verified before QA sign-off. The new E2E build override is for probe builds only and must never become a user-facing production setting.
+
+## RC1 update — synthetic cleanup integrity (9 November 2026)
+
+The staging setup/cleanup script now keeps a per-user journal before the next pair is created, and attempts deletion only against the matching approved backend. Cleanup errors (including 401) must fail the workflow, preserving the state file for investigation rather than silently claiming success. The offline regression test exercises a partial journal, a denied delete and successful retry. This is **not proof** of deletion in any real backend; operator reconciliation remains required.
