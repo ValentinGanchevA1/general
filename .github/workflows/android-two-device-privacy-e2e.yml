@@ -2,6 +2,15 @@ name: Android Two-Device Realtime Privacy E2E
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_staging_mutations:
+        description: 'Approve synthetic staging account/message writes for this run'
+        required: true
+        default: 'NO'
+        type: choice
+        options:
+          - 'NO'
+          - 'I_APPROVE_STAGING_WRITES'
   pull_request:
     branches: [master]
     paths:
@@ -36,8 +45,9 @@ env:
 
 jobs:
   android-two-device-privacy:
-    # No staging approval => SKIPPED (not a QA pass). Never fall back to live API.
-    if: ${{ vars.NEXUS_E2E_STAGING_APPROVED == 'true' && vars.NEXUS_E2E_STAGING_BASE_URL != '' }}
+    # PR checks are read-only; staging writes require explicit manual dispatch.
+    # Unapproved or unconfigured runs are SKIPPED, never a device-QA pass.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm_staging_mutations == 'I_APPROVE_STAGING_WRITES' && vars.NEXUS_E2E_STAGING_APPROVED == 'true' && vars.NEXUS_E2E_STAGING_BASE_URL != '' }}
     name: staging live location block + reconnect on two AVDs
     runs-on: ubuntu-latest
     timeout-minutes: 55
