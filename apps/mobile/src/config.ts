@@ -34,10 +34,25 @@ const DEV_API_URL = isLocalDevHost(DEV_HOST)
   ? `http://${DEV_HOST}:3001`
   : `https://${DEV_HOST}`;
 
+// The probe-enabled release APK must use the same isolated staging API as
+// the synthetic-account setup. Normal signed releases retain the live URL.
+const DEVICE_E2E_PROBE = (process.env.NEXA_E2E_DEVICE_PROBE as string | undefined) === '1';
+
+function deviceE2eApiBaseUrl(): string {
+  const candidate = (process.env.NEXA_E2E_API_BASE_URL as string | undefined) ?? '';
+  const match = /^https:\/\/([a-z0-9.-]+)(?::443)?\/?$/i.exec(candidate);
+  if (!match || match[1].toLowerCase().replace(/\.$/, '') === 'g88-api.onrender.com') {
+    throw new Error('Probe-enabled release APK requires a separate HTTPS staging API');
+  }
+  return candidate.replace(/\/$/, '');
+}
+
 export const Config = {
   API_BASE_URL: __DEV__
     ? DEV_API_URL
-    : 'https://g88-api.onrender.com',
+    : DEVICE_E2E_PROBE
+      ? deviceE2eApiBaseUrl()
+      : 'https://g88-api.onrender.com',
   // OAuth 2.0 Web Client ID from Google Cloud Console (same value used by backend GOOGLE_CLIENT_ID)
   GOOGLE_WEB_CLIENT_ID:
     (process.env.GOOGLE_WEB_CLIENT_ID as string | undefined) ?? '',
