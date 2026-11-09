@@ -5,10 +5,10 @@
 ## Fail-closed behavior
 
 - `.github/workflows/android-two-device-privacy-e2e.yml` no longer supplies the live API as a default.
-- The job only runs when **both** repository variables are configured by an authorized operator:
+- The job only runs after an explicitly dispatched **manual workflow run** with `confirm_staging_mutations=I_APPROVE_STAGING_WRITES` AND **both** repository variables configured by an authorized operator. All automatic `pull_request` runs are **SKIPPED**, even after staging is approved:
   - `NEXUS_E2E_STAGING_BASE_URL`: the reviewed **separately hosted** HTTPS staging backend origin, with a staging-only database, Redis and outbound services.
   - `NEXUS_E2E_STAGING_APPROVED`: literal `true` after staging isolation review.
-- With either variable absent, the job is **SKIPPED**, not passed. Do **not** count green aggregate checks or skipped jobs as two-device QA evidence.
+- Without the per-run manual confirmation or either variable, the job is **SKIPPED**, not passed. Do **not** count green aggregate checks or skipped jobs as two-device QA evidence.
 - `scripts/android-two-device-privacy-setup.mjs` fails closed before any registration or cleanup if approval or a valid HTTPS staging origin is missing. It explicitly denies `g88-api.onrender.com` (including a trailing-dot hostname). `verify` checks these conditions without making any network request.
 - The shell E2E runner calls `verify` before installing/opening the app and no longer contains a live API fallback.
 - Probe APK build reuses the same Gradle cache format as the regular Android Build workflow and retries transient remote artifact download failures. This improves resilience but **does not** establish a successful emulator test.
@@ -18,9 +18,9 @@
 1. Record the exact staging URL **privately**, and confirm it cannot route via DNS, reverse proxy or CNAME to the live API. The exact-host guard is **not DNS isolation proof**.
 2. Prove the staging DB credentials cannot access production data or migrations. Check Redis, S3, OAuth, Socket.IO, push, email, crash reporting and analytics isolation separately.
 3. Ensure sandbox email/push, synthetic-only test identities, appropriate staging Terms/age-gate configuration and that the app's test build points at the same approved staging endpoint. Do not send synthetic account messages to real users.
-4. Approve the two repository variables above and trigger an explicit test run only after security review. The operator must keep the relevant approval evidence in the PR.
+4. Approve the two repository variables above and **manually dispatch** the workflow with the confirmation choice `I_APPROVE_STAGING_WRITES` only after security review. The operator must keep the approval evidence in the PR.
 5. Collect job URL, actual emulator boot logs, device UI/realtime event assertions, error reports, candidate commit/SHA and APK metadata.
-6. Verify that all synthetic accounts, content, conversations and block records were deleted from staging. Setup now journals each successful registration immediately in a restricted-permission state file, allowing partial-run cleanup; cleanup tracks confirmed deletions, treats HTTP 401 as an error, and fails the workflow rather than silently succeeding. A failed registration response or crash before a journal write can still leave an untracked account. **Do not assume cleanup succeeded.** Reconcile disposable test accounts and associated content read-only before sign-off.
+6. Verify that all synthetic accounts, content, conversations and block records were deleted from staging. Setup now journals each successful registration immediately in a restricted-permission state file, allowing partial-run cleanup; journal creation is exclusive so a new run cannot overwrite old evidence, and subsequent journal updates use atomic file replacement. Cleanup tracks confirmed deletions, treats HTTP 401 or malformed journal content as errors, and fails the workflow rather than silently succeeding. A failed registration response or crash before a journal write can still leave an untracked account. **Do not assume cleanup succeeded.** Reconcile disposable test accounts and associated content read-only before sign-off.
 7. Confirm **no production database migrations, account changes, user messages or Play Console writes** occurred.
 
 ## Offline guard regression
