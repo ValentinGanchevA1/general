@@ -197,12 +197,7 @@ async function prepare() {
   } finally {
     await journal.close();
   }
-  const persist = async () => {
-    const tempFile = `${STATE_FILE}.${runId}.tmp`;
-    await writeFile(tempFile, JSON.stringify(state, null, 2), { mode: 0o600 });
-    // Atomic replacement preserves the previous journal if a write is interrupted.
-    await rename(tempFile, STATE_FILE);
-  };
+  const persist = () => persistJournal(state);
   const recordUser = async (label, user) => {
     state[label] = user;
     await persist();
@@ -216,6 +211,12 @@ async function prepare() {
   state.cdConversationId = authorizedPair.conversationId;
   await persist();
   console.log(`[device-e2e] prepared isolated A/B and C/D accepted conversations (${runId})`);
+}
+
+async function persistJournal(state) {
+  const tempFile = `${STATE_FILE}.${process.pid}.tmp`;
+  await writeFile(tempFile, JSON.stringify(state, null, 2), { mode: 0o600 });
+  await rename(tempFile, STATE_FILE);
 }
 
 async function loadState() {
@@ -253,7 +254,7 @@ async function cleanup() {
     await deleteAccount(state[label], state.password);
     cleaned.add(label);
     state.cleaned = [...cleaned];
-    await writeFile(STATE_FILE, JSON.stringify(state, null, 2), { mode: 0o600 });
+    await persistJournal(state);
   }
   await unlink(STATE_FILE);
   console.log('[device-e2e] synthetic account deletion confirmed for journaled accounts');
