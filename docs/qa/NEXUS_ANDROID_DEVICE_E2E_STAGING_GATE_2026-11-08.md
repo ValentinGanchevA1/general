@@ -34,3 +34,15 @@ node --test scripts/android-two-device-privacy-setup.test.mjs
 CI also runs this test in the backend job, independent of staging approval. It checks missing approval, empty/malformed URLs, live API and trailing-dot denial, and approved synthetic staging acceptance without contacting any server.
 
 **Release gate:** neither a skipped staging job nor a failed Gradle/CodeQL dependency download is Android device QA evidence. PR #1066 and #1067 remain Draft; a separate signed release AAB, legally reviewed Terms/Privacy, Social 18+ acceptance, moderation and Google Play decisions are still required.
+
+## RC1 update — probe APK backend parity (9 November 2026)
+
+**New critical finding:** Before this update, `apps/mobile/src/config.ts` compiled every release-mode APK with `https://g88-api.onrender.com` even when synthetic-account scripts targeted staging. The original staging-only job gate was therefore **insufficient**: the installed device app could still authenticate, send messages or share location against the live backend. **Do not run older probe APKs as staging tests.**
+
+- `Config.API_BASE_URL` now selects `NEXA_E2E_API_BASE_URL` **only** when `NEXA_E2E_DEVICE_PROBE=1`. Ordinary release builds continue to select the production API.
+- The probe branch rejects missing/non-HTTPS/credential-bearing/URL-path/query addresses and the known production hostname. The workflow supplies `NEXA_E2E_API_BASE_URL` and the setup target `DEVICE_E2E_BASE_URL` from the same approved staging variable.
+- A preflight checks both values match exactly before Gradle builds the probe APK.
+- `node --test scripts/ci/device-e2e-api-routing.test.mjs` uses the real TypeScript configuration through an offline JavaScript transform to verify normal release defaults, staging probe routing and fail-closed invalid/live target conditions. It is included in Backend CI beside the synthetic-account target guard.
+- These guards prevent accidental use of the **known** live URL; they cannot prove a different hostname, DNS alias or proxy isn't backed by production. Staging DB/service/credentials isolation still requires manual operator evidence.
+
+**Status:** static source changes committed in draft branches. Latest-head CI and actual staging emulator execution must be verified before QA sign-off. The new E2E build override is for probe builds only and must never become a user-facing production setting.
