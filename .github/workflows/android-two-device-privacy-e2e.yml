@@ -29,6 +29,8 @@ env:
   # Never mutate the live backend from an automatic PR workflow.
   # The owner must approve a dedicated staging service via repository variables.
   DEVICE_E2E_BASE_URL: ${{ vars.NEXUS_E2E_STAGING_BASE_URL }}
+  # Inlined into the probe release APK; must equal the setup/Socket.IO backend.
+  NEXA_E2E_API_BASE_URL: ${{ vars.NEXUS_E2E_STAGING_BASE_URL }}
   DEVICE_E2E_STAGING_APPROVED: ${{ vars.NEXUS_E2E_STAGING_APPROVED }}
   ANDROID_AVD_HOME: ${{ github.workspace }}/.tmp/android-avd
 
@@ -60,6 +62,14 @@ jobs:
 
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Verify staging-only API target before building the probe APK
+        run: |
+          node scripts/android-two-device-privacy-setup.mjs verify
+          test "$NEXA_E2E_API_BASE_URL" = "$DEVICE_E2E_BASE_URL" || {
+            echo "::error::Probe APK and synthetic-account API targets differ"
+            exit 1
+          }
 
       - name: Make Hermes compiler executable
         run: |
