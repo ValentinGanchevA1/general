@@ -116,3 +116,57 @@ test('partial setup cleanup retains evidence after 401 and resumes without delet
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('prepare preserves an existing partial cleanup journal without network access', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'nexus-e2e-journal-'));
+  const stateFile = join(directory, 'state.json');
+  const existing = JSON.stringify({
+    baseUrl: 'https://nexa-stage.example.invalid',
+    password: 'prior-run-only',
+    a: { accessToken: 'must-not-be-lost' },
+    cleaned: [],
+  });
+  try {
+    await writeFile(stateFile, existing, { mode: 0o600 });
+    const result = spawnSync(process.execPath, [entry, 'prepare'], {
+      encoding: 'utf8',
+      timeout: 10_000,
+      env: {
+        ...process.env,
+        DEVICE_E2E_BASE_URL: 'https://nexa-stage.example.invalid',
+        DEVICE_E2E_STAGING_APPROVED: 'true',
+        DEVICE_E2E_STATE_FILE: stateFile,
+      },
+    });
+    assert.equal(result.error, undefined);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /EEXIST/);
+    assert.equal(await readFile(stateFile, 'utf8'), existing);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('cleanup fails closed on a corrupt journal instead of silently succeeding', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'nexus-e2e-corrupt-'));
+  const stateFile = join(directory, 'state.json');
+  try {
+    await writeFile(stateFile, '{not-json', { mode: 0o600 });
+    const result = spawnSync(process.execPath, [entry, 'cleanup'], {
+      encoding: 'utf8',
+      timeout: 10_000,
+      env: {
+        ...process.env,
+        DEVICE_E2E_BASE_URL: 'https://nexa-stage.example.invalid',
+        DEVICE_E2E_STAGING_APPROVED: 'true',
+        DEVICE_E2E_STATE_FILE: stateFile,
+      },
+    });
+    assert.equal(result.error, undefined);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /SyntaxError/);
+    assert.equal(await readFile(stateFile, 'utf8'), '{not-json');
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
