@@ -5,6 +5,7 @@ const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+const { resolveDatabaseUrl } = require('./preview-db-guard');
 
 async function run(client) {
   await client.query(`
@@ -107,7 +108,8 @@ async function run(client) {
 }
 
 async function main() {
-  const connectionString = process.env.DATABASE_URL;
+  // Never run PR-preview migrations against the parent's inherited DATABASE_URL.
+  const connectionString = resolveDatabaseUrl(process.env);
   if (!connectionString) {
     console.error(
       'DATABASE_URL is required. Set it in the environment or in apps/backend/.env',

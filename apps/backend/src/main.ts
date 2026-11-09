@@ -13,8 +13,16 @@ import { DiscoveryHttpDiagnosticsService } from './common/discovery-http-diagnos
 import { assertProductionCorsOrigins, corsOrigins } from './common/cors-origins';
 import { RedisIoAdapter } from './realtime/redis-io.adapter';
 import { shouldUseSocketIoRedisAdapter } from './realtime/socket-io-redis.config';
+import { resolveDatabaseUrl } from '../scripts/preview-db-guard';
 
 loadEnv({ path: join(process.cwd(), '../../.env') });
+// Render service previews inherit the parent's DATABASE_URL by default. Fail
+// closed unless an explicitly separate preview DB has been configured.
+const startupDatabaseUrl = resolveDatabaseUrl(process.env);
+if (process.env.IS_PULL_REQUEST === 'true') {
+  if (!startupDatabaseUrl) throw new Error('Preview database URL is required');
+  process.env.DATABASE_URL = startupDatabaseUrl;
+}
 assertProductionCorsOrigins();
 
 Sentry.init({
