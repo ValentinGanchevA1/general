@@ -41,7 +41,8 @@ const DEVICE_E2E_PROBE = (process.env.NEXA_E2E_DEVICE_PROBE as string | undefine
 function deviceE2eApiBaseUrl(): string {
   const candidate = (process.env.NEXA_E2E_API_BASE_URL as string | undefined) ?? '';
   const match = /^https:\/\/([a-z0-9.-]+)(?::443)?\/?$/i.exec(candidate);
-  if (!match || match[1].toLowerCase().replace(/\.$/, '') === 'g88-api.onrender.com') {
+  const hostname = match?.[1]?.toLowerCase().replace(/\.$/, '');
+  if (!hostname || hostname === 'g88-api.onrender.com') {
     throw new Error('Probe-enabled release APK requires a separate HTTPS staging API');
   }
   return candidate.replace(/\/$/, '');
