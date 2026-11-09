@@ -23,6 +23,8 @@ import type {
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { RequireCurrentTerms } from '../terms/require-terms.decorator';
+import { AllowTermsSafetyExit } from '../terms/privacy-reduction';
 import { DiscoveryRealtimePublisher } from '../../realtime/discovery-realtime.publisher';
 import { ListingsService } from './listings.service';
 import {
@@ -45,6 +47,7 @@ export class ListingsController {
 
   /** POST /api/v1/listings — create a listing the caller sells. */
   @Post()
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 15 } })
   async create(
@@ -69,6 +72,7 @@ export class ListingsController {
    * Declared before the `:id` routes so the literal path always wins.
    */
   @Post('photo/base64')
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   uploadPhoto(
@@ -105,6 +109,8 @@ export class ListingsController {
 
   /** PUT /api/v1/listings/:id/status — seller marks active/sold/withdrawn. */
   @Put(':id/status')
+  @RequireCurrentTerms()
+  @AllowTermsSafetyExit({ field: 'status', value: 'withdrawn' })
   async updateStatus(
     @CurrentUser('id') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -124,6 +130,7 @@ export class ListingsController {
 
   /** POST /api/v1/listings/:id/bump — seller extends expires_at (rate-limited). */
   @Post(':id/bump')
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   async bump(
@@ -156,6 +163,7 @@ export class ListingsController {
 
   /** POST /api/v1/listings/:id/offers — make (or re-open) an offer. */
   @Post(':id/offers')
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   makeOffer(
@@ -186,6 +194,8 @@ export class ListingsController {
 
   /** PUT /api/v1/listings/offers/:offerId — seller or countered buyer accepts/declines. */
   @Put('offers/:offerId')
+  @RequireCurrentTerms()
+  @AllowTermsSafetyExit({ field: 'status', value: 'declined' })
   async respondToOffer(
     @CurrentUser('id') userId: string,
     @Param('offerId', ParseUUIDPipe) offerId: string,
@@ -218,6 +228,7 @@ export class ListingsController {
    * Keeps status=pending; sets last_actor=seller so buyer can accept / re-offer.
    */
   @Put('offers/:offerId/counter')
+  @RequireCurrentTerms()
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   counterOffer(
     @CurrentUser('id') userId: string,

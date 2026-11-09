@@ -2,6 +2,7 @@ import {
   ForbiddenException,
   GoneException,
   Inject,
+  Optional,
   Logger,
   NotFoundException,
   UseGuards,
@@ -64,6 +65,7 @@ import { ChallengesService } from '../modules/challenges/challenges.service';
 import { FriendsService } from '../modules/friends/friends.service';
 import type { JwtPayload } from '../modules/auth/jwt.strategy';
 import { corsOrigins } from '../common/cors-origins';
+import { TermsService } from '../modules/terms/terms.service';
 
 type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 type G88Socket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
@@ -120,7 +122,21 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly friends: FriendsService,
     private readonly jwt: JwtService,
     private readonly eventRoomAccess: EventRoomAccessService,
+    // Optional only for pre-existing isolated gateway unit-test fixtures.
+    // A production deployment with enforcement enabled fails closed if missing.
+    @Optional() private readonly terms?: TermsService,
   ) {}
+
+  private async assertTermsForUgc(userId: string): Promise<void> {
+    if (this.terms) return this.terms.assertAccepted(userId);
+    if (process.env.NEXUS_REQUIRE_UGC_TERMS === 'true') {
+      throw new ForbiddenException({
+        code: 'terms.guard_unavailable',
+        message: 'Publishing is unavailable until Terms authorization can be checked.',
+      });
+    }
+  }
+
 
   async handleConnection(client: G88Socket): Promise<void> {
     const token = client.handshake.auth?.['token'] as string | undefined;
@@ -336,6 +352,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
 
     try {
+      await this.assertTermsForUgc(client.data.userId);
       const msg = await this.chat.persist(
         payload.conversationId,
         client.data.userId,
@@ -369,6 +386,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
 
     try {
+      await this.assertTermsForUgc(client.data.userId);
       const { session, message } = await this.locationShare.start(
         client.data.userId,
         payload.conversationId,
@@ -407,6 +425,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     @MessageBody() payload: LocationShareUpdateDto,
   ): Promise<AckResult<{ updatedAt: string }>> {
     try {
+      await this.assertTermsForUgc(client.data.userId);
       const { updatedAt, conversationId } = await this.locationShare.update(
         client.data.userId,
         payload.sessionId,

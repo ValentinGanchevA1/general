@@ -9,7 +9,9 @@ Status: editorial draft for issue #592. Product: **NEXUS** (public brand); techn
 - [ ] Confirm user-generated-content moderation policy, escalation process, retention and appeal procedure, including risk of illegal material.
 - [ ] Confirm deletion timelines, legal holds and whether archived posts/reports may be retained in backend or backups.
 - [ ] Confirm current launch feature flags: all paid digital goods and Premium purchases disabled, but marketplace interactions may exist.
-- [ ] Validate whether the service is explicitly restricted to adults 18+, and how the restriction is enforced.
+- [x] **Final product owner decision (8 Nov 2026): NEXUS is the public brand and the ENTIRE initial Social app is 18+**; this supersedes the earlier Dating-only rule.
+- [ ] Independently review adult-only eligibility, server-side age enforcement, existing/OAuth account onboarding, local legal requirements and any necessary identity-based age assurance. No under-18 access is intended for RC1.
+- [ ] Verify whole-app 18+ safeguards cannot be bypassed (email/Google login, JWT REST, Socket.IO, map, events, listings, private messages and deep links). A user-entered DOB is not independent proof of age. Dating stays disabled in RC1.
 - [ ] Validate exact location behavior: coarsened *public* map presence; separately opt-in *precise* 1:1 chat live location (persisted in location session and initial chat message).
 - [ ] Review risk notices and policies for offline meetings, events, local marketplace trades and identity badges.
 - [ ] Translate approved terms as appropriate for launch market; align the accepted version and locale.
@@ -25,12 +27,16 @@ NEXUS is a location-based social service for discovering people, local activitie
 **Effective date/version (not set):** [VERSION AND DATE].
 
 ### 2. Eligibility and accounts
-You must be at least **18 years old** to create an account or use NEXUS. You agree to provide accurate registration details, maintain the confidentiality of your credentials and notify support if you suspect unauthorized use of your account. You are responsible for activity originating from your account, subject to applicable law. Do not impersonate others or bypass account restrictions.
+**NEXUS is available only to users aged 18 or older for the first launch, across all social features.** Email registration asks for a date of birth; Google OAuth and existing accounts without a declared adult DOB must complete adult eligibility onboarding before access to the map, chat, events, listings or other social features. These are product rules and a planned backend release gate, **not a statement that age is independently verified**. Users should be able to sign out, delete their accounts and report abuse even before eligibility is completed. [LEGAL / SAFETY REVIEW: ADULT AGE ASSURANCE, APPEALS AND REGIONAL REQUIREMENTS].
+
+**Dating and matchmaking are disabled for the first Android release**, even though the entire NEXUS Social app is already restricted to adults 18+. Separate product and safety approval is required before Dating is made available. A self-declared DOB cannot be described as independent identity or age verification.
+
+You agree to provide accurate registration details, maintain the confidentiality of your credentials and notify support if you suspect unauthorized use of your account. You are responsible for activity originating from your account, subject to applicable law. Do not impersonate others or bypass account restrictions.
 
 ### 3. Community safety and prohibited conduct
 NEXUS is intended for respectful, lawful interactions. You must not:
 - threaten, harass, stalk, bully or encourage violence against anyone;
-- publish hateful or discriminatory abuse, exploitative sexual content, content involving minors, or unlawful content;
+- publish hateful or discriminatory abuse, sexually exploitative material (especially material involving minors), or other unlawful content;
 - disclose another person's private information or exact location without authorization;
 - impersonate an identity-verified user, misrepresent identity, or use verification badges to deceive;
 - send scams, spam, malware, phishing links, misleading listings or fraudulent offers;

@@ -23,6 +23,8 @@ import type {
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { RequireCurrentTerms } from '../terms/require-terms.decorator';
+import { AllowTermsSafetyExit } from '../terms/privacy-reduction';
 import { DiscoveryRealtimePublisher } from '../../realtime/discovery-realtime.publisher';
 import { EventPulseShareService } from './event-pulse-share.service';
 import { EventsService } from './events.service';
@@ -46,6 +48,7 @@ export class EventsController {
 
   /** POST /api/v1/events — create an event the caller hosts. */
   @Post()
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   async create(
@@ -85,6 +88,8 @@ export class EventsController {
 
   /** PUT /api/v1/events/:id/rsvp — set/update the caller's RSVP. */
   @Put(':id/rsvp')
+  @RequireCurrentTerms()
+  @AllowTermsSafetyExit({ field: 'status', value: 'declined' })
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   async rsvp(
     @CurrentUser('id') userId: string,
@@ -101,6 +106,7 @@ export class EventsController {
 
   /** POST /api/v1/events/:id/share-join — explicitly publish Going to Pulse. */
   @Post(':id/share-join')
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   shareJoinToPulse(
@@ -114,6 +120,7 @@ export class EventsController {
 
   /** POST /api/v1/events/:id/polls — host creates a poll. */
   @Post(':id/polls')
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.CREATED)
   createPoll(
     @CurrentUser('id') userId: string,
@@ -134,6 +141,7 @@ export class EventsController {
 
   /** PUT /api/v1/events/polls/:pollId/vote — cast/replace the caller's vote. */
   @Put('polls/:pollId/vote')
+  @RequireCurrentTerms()
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   vote(
     @CurrentUser('id') userId: string,
@@ -147,6 +155,7 @@ export class EventsController {
 
   /** POST /api/v1/events/:id/questions — ask a question. */
   @Post(':id/questions')
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 15 } })
   askQuestion(
@@ -168,6 +177,7 @@ export class EventsController {
 
   /** PUT /api/v1/events/questions/:questionId/upvote — dedup'd upvote. */
   @Put('questions/:questionId/upvote')
+  @RequireCurrentTerms()
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   upvoteQuestion(
     @CurrentUser('id') userId: string,

@@ -41,6 +41,8 @@ import type {
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { RequireCurrentTerms } from '../terms/require-terms.decorator';
+import { AllowPrivacyReductionWithoutTerms } from '../terms/privacy-reduction';
 import { UsersService } from './users.service';
 import { S3Service } from '../../common/s3.service';
 
@@ -166,6 +168,8 @@ export class UsersController {
   }
 
   @Patch('me/profile')
+  @RequireCurrentTerms()
+  @AllowPrivacyReductionWithoutTerms()
   async updateProfile(
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateProfileDto,
@@ -183,6 +187,7 @@ export class UsersController {
   }
 
   @Post('me/avatar/presigned-url')
+  @RequireCurrentTerms()
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   async avatarPresignedUrl(
     @CurrentUser('id') userId: string,
@@ -192,6 +197,7 @@ export class UsersController {
   }
 
   @Post('me/photos/base64')
+  @RequireCurrentTerms()
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async uploadPhotoBase64(
     @CurrentUser('id') userId: string,
@@ -219,6 +225,7 @@ export class UsersController {
   }
 
   @Post('me/photos/presigned-url')
+  @RequireCurrentTerms()
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   async photoPresignedUrl(
     @CurrentUser('id') userId: string,
@@ -228,6 +235,7 @@ export class UsersController {
   }
 
   @Post('me/photos')
+  @RequireCurrentTerms()
   async addPhoto(
     @CurrentUser('id') userId: string,
     @Body() dto: AddPhotoDto,
@@ -236,6 +244,7 @@ export class UsersController {
   }
 
   @Patch('me/cover')
+  @RequireCurrentTerms()
   async setCover(
     @CurrentUser('id') userId: string,
     @Body() dto: SetCoverDto,
@@ -247,6 +256,7 @@ export class UsersController {
   }
 
   @Patch('me/photos/order')
+  @RequireCurrentTerms()
   async reorderPhotos(
     @CurrentUser('id') userId: string,
     @Body() dto: ReorderPhotosDto,

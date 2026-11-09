@@ -33,6 +33,7 @@ import { buildNexaLaunchTelemetryProps } from '@/components/Brand/nexaLaunchTele
 import { getLastResolvedLaunchReduceMotion } from '@/components/Brand/resolveLaunchReduceMotion';
 import { ChatRealtimeSync } from '@/features/chat/ChatRealtimeSync';
 import { UserLocationProvider } from '@/features/location/UserLocationProvider';
+import { TermsAcceptanceGate } from '@/features/terms/TermsAcceptanceGate';
 
 Sentry.init({
   dsn: Config.SENTRY_DSN,
@@ -208,6 +209,7 @@ function AppShell(): React.JSX.Element {
       {showSpatialHandoff ? (
         <NexaSpatialMapHandoff onComplete={handleSpatialHandoffComplete} />
       ) : null}
+      {user && !restoring ? <TermsAcceptanceGate key={user.id} userId={user.id} /> : null}
     </View>
   );
 }

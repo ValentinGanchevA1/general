@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { createRequire } from 'node:module';
 
@@ -7,12 +7,35 @@ const require = createRequire(new URL('../apps/mobile/package.json', import.meta
 const { io } = require('socket.io-client');
 
 const STATE_FILE = process.env.DEVICE_E2E_STATE_FILE ?? '.tmp/android-two-device-privacy.json';
-const BASE = process.env.DEVICE_E2E_BASE_URL ?? 'https://g88-api.onrender.com';
+// No implicit production endpoint: this script creates users, messages and blocks.
+const BASE = (process.env.DEVICE_E2E_BASE_URL ?? '').trim().replace(/\/$/, '');
 const API = `${BASE}/api/v1`;
 const command = process.argv[2] ?? 'prepare';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function assertApprovedStagingTarget() {
+  assert(
+    process.env.DEVICE_E2E_STAGING_APPROVED === 'true',
+    'Device E2E writes require explicit approval of an isolated staging backend.',
+  );
+  let target;
+  try {
+    target = new URL(BASE);
+  } catch {
+    throw new Error('DEVICE_E2E_BASE_URL must be an explicit staging HTTPS URL.');
+  }
+  assert(
+    target.protocol === 'https:' && !target.username && !target.password &&
+      target.pathname === '/' && !target.search && !target.hash,
+    'Device E2E staging URL must be a credential-free HTTPS origin.',
+  );
+  assert(
+    target.hostname.toLowerCase().replace(/\.$/, '') !== 'g88-api.onrender.com',
+    'Device E2E must never create test accounts on the live NEXUS API.',
+  );
 }
 
 async function readJson(response) {
@@ -27,23 +50,26 @@ async function api(path, init = {}) {
   return { response, body: await readJson(response) };
 }
 
-async function register(label, runId, password) {
+async function register(label, runId, password, recordUser) {
   const displayName = `Device Privacy ${label} ${runId.slice(-6)}`;
   const email = `device-privacy-${label.toLowerCase()}-${runId}@g88.app`;
   const { response, body } = await api('/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, displayName }),
+    body: JSON.stringify({ email, password, displayName, dateOfBirth: '1990-01-01' }),
   });
   assert(response.status === 201, `register ${label} failed: HTTP ${response.status}`);
   assert(typeof body?.tokens?.accessToken === 'string', `register ${label} missing access token`);
   assert(typeof body?.user?.id === 'string', `register ${label} missing user id`);
-  return {
+  const user = {
     email,
     displayName,
     userId: body.user.id,
     accessToken: body.tokens.accessToken,
   };
+  // Journal each successful registration before performing further writes.
+  await recordUser(label.toLowerCase(), user);
+  return user;
 }
 
 async function completeProfile(user, sharedInterest) {
@@ -143,12 +169,11 @@ async function promoteConversation(owner, peer, conversationId, runId, label) {
   }
 }
 
-async function createPair(firstLabel, secondLabel, runId, password) {
+async function createPair(firstLabel, secondLabel, runId, password, recordUser) {
   const sharedInterest = `device-privacy-${firstLabel.toLowerCase()}${secondLabel.toLowerCase()}-${runId}`;
-  const [first, second] = await Promise.all([
-    register(firstLabel, runId, password),
-    register(secondLabel, runId, password),
-  ]);
+  // Sequential registration avoids concurrent state-file writes.
+  const first = await register(firstLabel, runId, password, recordUser);
+  const second = await register(secondLabel, runId, password, recordUser);
   await Promise.all([
     completeProfile(first, sharedInterest),
     completeProfile(second, sharedInterest),
@@ -163,27 +188,35 @@ async function prepare() {
   const runId = `${Date.now()}-${secret.slice(0, 8)}`;
   const password = `DevicePass${secret}Aa1`;
 
-  const [revocationPair, authorizedPair] = await Promise.all([
-    createPair('A', 'B', runId, password),
-    createPair('C', 'D', runId, password),
-  ]);
-
+  const state = { baseUrl: BASE, runId, password, cleaned: [] };
   await mkdir(dirname(STATE_FILE), { recursive: true });
-  await writeFile(
-    STATE_FILE,
-    JSON.stringify({
-      baseUrl: BASE,
-      password,
-      a: revocationPair.first,
-      b: revocationPair.second,
-      abConversationId: revocationPair.conversationId,
-      c: authorizedPair.first,
-      d: authorizedPair.second,
-      cdConversationId: authorizedPair.conversationId,
-    }, null, 2),
-    { mode: 0o600 },
-  );
+  // Exclusive creation prevents a new run from erasing a previous failed cleanup.
+  const journal = await open(STATE_FILE, 'wx', 0o600);
+  try {
+    await journal.writeFile(JSON.stringify(state, null, 2));
+  } finally {
+    await journal.close();
+  }
+  const persist = () => persistJournal(state);
+  const recordUser = async (label, user) => {
+    state[label] = user;
+    await persist();
+  };
+
+  // Journal users before starting the next pair. Cleanup can now handle partial setup.
+  const revocationPair = await createPair('A', 'B', runId, password, recordUser);
+  state.abConversationId = revocationPair.conversationId;
+  await persist();
+  const authorizedPair = await createPair('C', 'D', runId, password, recordUser);
+  state.cdConversationId = authorizedPair.conversationId;
+  await persist();
   console.log(`[device-e2e] prepared isolated A/B and C/D accepted conversations (${runId})`);
+}
+
+async function persistJournal(state) {
+  const tempFile = `${STATE_FILE}.${process.pid}.tmp`;
+  await writeFile(tempFile, JSON.stringify(state, null, 2), { mode: 0o600 });
+  await rename(tempFile, STATE_FILE);
 }
 
 async function loadState() {
@@ -199,27 +232,43 @@ async function deleteAccount(user, password) {
     },
     body: JSON.stringify({ confirm: 'DELETE', password }),
   });
-  if (response.status !== 204 && response.status !== 401 && response.status !== 404) {
+  // A 401 is not evidence that the synthetic account was deleted.
+  if (response.status !== 204 && response.status !== 404) {
     throw new Error(`cleanup failed: HTTP ${response.status}`);
   }
 }
 
 async function cleanup() {
-  const state = await loadState().catch(() => null);
-  if (!state) return;
-  await Promise.allSettled([
-    deleteAccount(state.a, state.password),
-    deleteAccount(state.b, state.password),
-    deleteAccount(state.c, state.password),
-    deleteAccount(state.d, state.password),
-  ]);
-  console.log('[device-e2e] cleanup requested for synthetic accounts');
+  let state;
+  try {
+    state = await loadState();
+  } catch (error) {
+    // Missing journal is a no-op; corrupt/unreadable journals require investigation.
+    if (error?.code === 'ENOENT') return;
+    throw error;
+  }
+  assert(state.baseUrl === BASE, 'Refusing to clean up accounts on a different backend');
+  const cleaned = new Set(Array.isArray(state.cleaned) ? state.cleaned : []);
+  for (const label of ['a', 'b', 'c', 'd']) {
+    if (!state[label] || cleaned.has(label)) continue;
+    await deleteAccount(state[label], state.password);
+    cleaned.add(label);
+    state.cleaned = [...cleaned];
+    await persistJournal(state);
+  }
+  await unlink(STATE_FILE);
+  console.log('[device-e2e] synthetic account deletion confirmed for journaled accounts');
 }
 
 if (command === 'prepare') {
+  assertApprovedStagingTarget();
   await prepare();
 } else if (command === 'cleanup') {
+  assertApprovedStagingTarget();
   await cleanup();
+} else if (command === 'verify') {
+  // Used by the shell E2E runner; performs no external writes or requests.
+  assertApprovedStagingTarget();
 } else {
   throw new Error(`Unsupported command: ${command}`);
 }

@@ -6,6 +6,7 @@ import type { CreateConversationRequest, CreateConversationResponse } from '@g88
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { RequireCurrentTerms } from '../terms/require-terms.decorator';
 import { MessagingService } from './messaging.service';
 
 export class CreateConversationDto implements CreateConversationRequest {
@@ -24,6 +25,7 @@ export class MessagingController {
    * interest mints a pending request; otherwise 403 `chat.locked`.
    */
   @Post()
+  @RequireCurrentTerms()
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // 10 new requests/min
   async create(
     @Body() dto: CreateConversationDto,
