@@ -1,10 +1,32 @@
 # NEXUS — Google Play first release gate (2026-11-05)
 
-**Status: PREPARING / NOT READY TO SUBMIT.** Owner-side Play Console screenshots dated **2026-11-06** confirm the new **g88 Personal** developer account and **successful identity verification**; the **Create your first app** action is visible. The linked Google Payments bank account still requires proof-of-account documentation; the owner is obtaining it, and verification approval is **unknown**. Whether NEXUS has actually been created in Play Console, the contact phone was verified, or a Play track exists is **unknown**. No signed AAB, Play upload, or on-device QA sign-off is yet demonstrated.
+**Status: ANDROID CLOSED ALPHA RC1 BUILT / PLAY SUBMISSION NOT CONFIRMED.** Evidence checked on **2026-11-07** (Europe/Sofia). Developer identity was verified by Google on **2026-11-06**; the earlier proof-of-address rejection is superseded by this approval. The personal developer account is registered, non-trader declared, and physical-device verification complete. A **signed AAB has been produced in CI** and saved as a GitHub Actions artifact; this does not prove a Play Console upload, accepted track release, physical-device sign-off or Production access. Phone verification and actual Play app creation are **UNKNOWN**, not failed or complete. Google Payments bank verification is a separate owner-side process and its current status is unknown; do not treat it as proof that Google Play developer identity is pending.
+
+## Current sign-off board (2026-11-07)
+
+| Area | Status | Evidence / next gate |
+|---|---|---|
+| g88 Personal developer account | **DONE** | Registration receipt and prior Play account screenshots |
+| Trader declaration | **DONE — non-trader** | Google confirmation, 2026-11-05 |
+| Android device verification | **DONE** | Huawei Nova 11 mobile confirmation; task disappeared in Play Console |
+| Developer identity verification | **DONE** | Google email **Your identity has been verified**, 2026-11-06 08:50 Europe/Sofia |
+| Contact phone | **MISSING EVIDENCE** | No current Play Console confirmation of completed SMS/call verification |
+| Play app creation | **MISSING EVIDENCE** | “Create app” available 2026-11-06; no verified NEXUS app record, package reservation or track |
+| NEXA → NEXUS public identity | **DONE — merged** | [PR #1045](https://github.com/ValentinGanchevA1/general/pull/1045), 2026-11-06; retain `com.g88` |
+| Android signed AAB RC1 | **BUILT IN CI** | [Android Release run #42260327118](https://github.com/ValentinGanchevA1/general/actions/runs/42260327118) succeeded, commit `d240c77470ade24fa3e145d11881d8fcd946967d`, artifact `g88-release-aab` (ID `13525263640`), not expired on 2026-11-07 |
+| AAB binary/signing/device smoke | **RETEST / MISSING EVIDENCE** | CI reports non-debug signing; independent artifact SHA-256, signing certificate, final Play install and functional QA remain unverified |
+| Play upload / release | **NOT CONFIRMED** | Publish step deliberately skipped; no verified Play Console upload/track/release |
+| Store listing & real screenshots | **REQUIRES QA** | Assets must reflect current NEXUS-branded UI; issue [#616](https://github.com/ValentinGanchevA1/general/issues/616) open and older NEXA RC3 screenshot scope is stale |
+| Privacy / Data Safety / deletion | **MISSING EVIDENCE** | Source exists; hosted public URL, accurate forms, deletion request URL and flow must be tested |
+| Dedicated NEXUS Terms | **PRODUCTION BLOCKER** | [#592](https://github.com/ValentinGanchevA1/general/issues/592) remains open; current app still routes Terms to Privacy |
+| Physical Android QA | **RETEST REQUIRED** | [#580](https://github.com/ValentinGanchevA1/general/issues/580), [#669](https://github.com/ValentinGanchevA1/general/issues/669) open; exact NEXUS RC1 device evidence missing |
+| Closed testing / production access | **NOT CONFIRMED** | Personal account: at least 12 continuously opted-in testers for 14 days, then apply for production access |
+
+**Release decision:** **GO to owner-side Play app configuration and controlled Android RC1 QA** once Play allows; **NO-GO for production** until legal, data, device, closed testing, and access gates pass. No Google Play publication is performed by this status update.
 
 ## Verified repository baseline
 
-- Repo: `ValentinGanchevA1/general`, default `master`. Audit snapshot: `0d792e9c1b595fd161746586293a4a51263406a3`. Recheck HEAD and open PRs before freezing the release candidate.
+- Repo: `ValentinGanchevA1/general`, default `master`. Release-status audit snapshot: `11f0aa6312f3260bbcb4139da9123bad0033e34d`. RC1 build is pinned separately; recheck HEAD before freezing another candidate.
 - Product display: **NEXUS**; Android app ID / namespace: **`com.g88`** (retain intentionally); `versionName=1.0.0`; `versionCode` derived from GitHub Actions run number.
 - React Native 0.83.0; `minSdk=24`, `compileSdk=36`, `targetSdk=36`.
 - Signed AAB workflow: `.github/workflows/android-release.yml` → `g88-release-aab` → `apps/mobile/android/app/build/outputs/bundle/release/app-release.aab`.
@@ -15,14 +37,16 @@
 - Dedicated legal-reviewed Terms remain unimplemented: issue **#592**, `TERMS_OF_SERVICE_URL` still equals privacy URL. **Production NO-GO**.
 
 
-## 2026-11-06 NEXUS AAB preflight evidence
+## 2026-11-06 NEXUS release build evidence
 
-- Branding PR: [#1045](https://github.com/ValentinGanchevA1/general/pull/1045), still **Draft**, not merged; Android + Backend + Figma QA on the PR passed, but Sonar duplication Quality Gate is **red** (5.6% new-code duplication versus a 3% maximum). Do not present the rebrand as shipped.
-- A safe build-only release candidate branch, `release/nexus-closed-alpha-aab-preflight-20261106`, combines NEXUS PR code with current master security changes. Its `android-release.yml` push path explicitly **does not publish to Google Play**.
-- [Run #42221845711](https://github.com/ValentinGanchevA1/general/actions/runs/42221845711) failed only the `Guard required release secrets` step, specifically `GOOGLE_WEB_CLIENT_ID` missing. Other required inputs were present, but not yet fully validated.
-- [Run #42222245425](https://github.com/ValentinGanchevA1/general/actions/runs/42222245425) uses the previously committed public Android CI OAuth Web Client ID as a safe fallback; it passed the secret, legal URL and MapLibre guards and injected Firebase/signing input. At the time of this record, **the bundle build and AAB artifact are not yet confirmed**. Verify final run status and retrieve artifact evidence before editing this line.
-- Before any Play upload, verify that the effective Web Client ID matches the backend `GOOGLE_CLIENT_ID`, that Play signing SHA certificates are whitelisted, and that Google Sign-In works from a **Play-installed** NEXUS build.
-- Google Payments bank-statement verification is separate from developer identity verification and must be tracked to approval; do not interpret the identity success notification as a completed bank review.
+- Branding [PR #1045](https://github.com/ValentinGanchevA1/general/pull/1045) is **MERGED** on `master`; earlier draft/Sonar-red status in this document is superseded. Public display name now **NEXUS**, technical Android ID remains `com.g88`.
+- Initial [preflight run #42221845711](https://github.com/ValentinGanchevA1/general/actions/runs/42221845711) failed the required `GOOGLE_WEB_CLIENT_ID` guard.
+- Follow-up [preflight run #42222245425](https://github.com/ValentinGanchevA1/general/actions/runs/42222245425) **succeeded** with artifact `g88-release-aab` (ID `13504793424`), publishing skipped.
+- **LATEST reference:** [NEXUS Closed Alpha RC1 run #42260327118](https://github.com/ValentinGanchevA1/general/actions/runs/42260327118), `release/nexus-closed-alpha-rc1-20261106`, commit `d240c77470ade24fa3e145d11881d8fcd946967d`: **SUCCESS** (2026-11-06 17:35 UTC). Build, release input guards, non-debug signing guard and artifact upload steps all passed; Google Play publish step was **SKIPPED**.
+- The latest `g88-release-aab` artifact (ID `13525263640`) is available in GitHub Actions; it is a ZIP workflow artifact containing the AAB, not proof of a Play release. Record the extracted AAB SHA-256 and signing certificate before Play upload.
+- The AAB workflow derives `versionCode` from the GitHub run number; verify the **actual packaged versionCode** from artifact inspection and the Play UI before committing to a test track.
+- Confirm effective Google OAuth Web Client ID matches backend `GOOGLE_CLIENT_ID`, and Google Maps restrictions include Play app-signing SHA-1; exercise Google Sign-In on a **Play-installed** build.
+- Owner-side bank-account verification is **separate** from Play developer identity. Its final state has not been independently verified and should not be assumed to block a free test release without an explicit Console requirement.
 
 ## 1. Developer account / Play bootstrap (owner-side)
 
@@ -71,7 +95,7 @@
 - [ ] Capture device model, Android version, run URL, commit SHA, artifact SHA-256, pass/fail and evidence links for each blocking test.
 - [ ] Recruit at least **12 opted-in closed testers for 14 consecutive days** for the new personal account; after that **apply** for production access (not automatic approval).
 - [ ] Confirm closed-test tester list + opt-in URL and at least one Play-installed smoke pass.
-- [ ] **PRODUCTION NO-GO** until identity/phone, store declarations, dedicated Terms #592, platform safety/QA, and Play production access are complete.
+- [ ] **PRODUCTION NO-GO** until required phone verification (if still outstanding), store declarations, dedicated Terms #592, platform safety/QA, closed testing, and Play production access are complete. Developer identity was verified on 2026-11-06.
 
 ## Official policy references (verify before submission)
 
