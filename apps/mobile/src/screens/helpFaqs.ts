@@ -25,6 +25,10 @@ export const NEXA_HELP_FAQS: HelpFaq[] = [
     a: 'Connections is where relationship activity and chats return. Activity surfaces items that need your attention, while Chats keeps your conversations and authoritative unread state together. Use the Map for spatial discovery.',
   },
   {
+    q: 'Is NEXUS an 18+ app? Who can use Dating?',
+    a: 'NEXUS is primarily a local social app, not a dating-only service. General social features are not automatically restricted to adults. Optional Dating and matchmaking are reserved for users aged 18 or older, but are temporarily unavailable during early access while stronger age checks are prepared. A birth date entered in your profile is not independent proof of age. We are reviewing additional protections for younger users before launch.',
+  },
+  {
     q: 'How do friends and online status work?',
     a: 'Send or accept a friend request from a profile. Friends can appear with a distinct map style. Online status is shown only to friends, and only if you allow it in Settings → Friends can see when I’m online. Unfriending does not remove mutual follows.',
   },

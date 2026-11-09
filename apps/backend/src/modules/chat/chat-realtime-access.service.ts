@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { isDatingReleaseEnabled } from '../dating/dating-release-gate';
 
 type ConversationKind = 'dm' | 'group';
 
@@ -8,6 +9,7 @@ interface RealtimeRecipientRow {
   kind: ConversationKind;
   participant_ids: string[];
   blocked_pair: boolean;
+  dating_match: boolean;
 }
 
 /**
@@ -30,7 +32,7 @@ export class ChatRealtimeAccessService {
           WHERE c.id = $1
           LIMIT 1
        ), resolved AS (
-         SELECT t.kind,
+         SELECT t.id AS conversation_id, t.kind,
                 CASE
                   WHEN t.kind = 'group' THEN ARRAY(
                     SELECT cm.user_id
@@ -49,6 +51,10 @@ export class ChatRealtimeAccessService {
        SELECT r.kind,
               r.participant_ids,
               EXISTS (
+                SELECT 1 FROM dating_matches dm
+                 WHERE dm.conversation_id = r.conversation_id
+              ) AS dating_match,
+              EXISTS (
                 SELECT 1
                   FROM user_blocks b
                  WHERE b.blocker_id = ANY(r.participant_ids)
@@ -59,7 +65,7 @@ export class ChatRealtimeAccessService {
       [conversationId],
     );
 
-    if (row == null || row.blocked_pair) return [];
+    if (row == null || row.blocked_pair || (!isDatingReleaseEnabled() && row.dating_match)) return [];
     if (dmOnly && row.kind !== 'dm') return [];
     return row.participant_ids;
   }

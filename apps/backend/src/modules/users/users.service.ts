@@ -1,3 +1,6 @@
+import { assertDatingReleaseEnabled } from '../dating/dating-release-gate';
+import { isAdultDateOfBirth } from '@g88/shared';
+import { isAdultGateEnforced } from '../auth/adult-eligibility';
 import {
   BadRequestException,
   Injectable,
@@ -472,20 +475,19 @@ export class UsersService {
       setClauses.push(`interests = $${params.length}`);
     }
     if (req.dateOfBirth !== undefined) {
+      if (isAdultGateEnforced() && (!req.dateOfBirth || !isAdultDateOfBirth(req.dateOfBirth))) {
+        throw new BadRequestException({
+          code: 'profile.age_restricted',
+          message: 'NEXUS is only available to users aged 18 or older.',
+        });
+      }
       if (req.dateOfBirth !== null) {
         const dob = new Date(req.dateOfBirth);
         if (Number.isNaN(dob.getTime())) {
           throw new BadRequestException({ code: 'profile.invalid_dob', message: 'Invalid date of birth' });
         }
-        const today = new Date();
-        let years = today.getFullYear() - dob.getFullYear();
-        const m = today.getMonth() - dob.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) years -= 1;
-        if (years < 18) {
-          throw new BadRequestException({
-            code: 'profile.underage',
-            message: 'You must be at least 18 years old to use G88.',
-          });
+        if (dob.getTime() > Date.now()) {
+          throw new BadRequestException({ code: 'profile.invalid_dob', message: 'Date of birth cannot be in the future.' });
         }
       }
       params.push(req.dateOfBirth);
@@ -575,6 +577,44 @@ export class UsersService {
     if (req.showNationality !== undefined) {
       params.push(req.showNationality);
       setClauses.push(`show_nationality = $${params.length}`);
+    }
+    // Keep social profiles editable while adult-only Dating is paused.
+    // A self-declared DOB alone never enables the restricted Dating service.
+    if (req.openToDating === true) assertDatingReleaseEnabled();
+    // All NEXUS Social access is 18+ for launch. Dating remains separately
+    // disabled; validate any DOB change of an opted-in account as well.
+    if (req.openToDating === true || req.dateOfBirth !== undefined) {
+      const [existing] = await this.db.query<Array<{ date_of_birth: string | null; open_to_dating: boolean }>>(
+        'SELECT date_of_birth::text AS date_of_birth, open_to_dating FROM users WHERE id = $1 AND deleted_at IS NULL',
+        [userId],
+      );
+      const nextDating = req.openToDating ?? existing?.open_to_dating ?? false;
+      const effectiveDob = req.dateOfBirth === undefined ? existing?.date_of_birth : req.dateOfBirth;
+      if (
+        isAdultGateEnforced() &&
+        req.dateOfBirth !== undefined &&
+        existing?.date_of_birth &&
+        !isAdultDateOfBirth(existing.date_of_birth) &&
+        existing.date_of_birth !== req.dateOfBirth
+      ) {
+        // Previously declared underage users need a support-led age correction
+        // process. Do not permit a simple re-submit of an older birth year.
+        throw new BadRequestException({
+          code: 'profile.age_review_required',
+          message: 'Contact support to review a previously declared underage date of birth.',
+        });
+      }
+      if (nextDating) {
+        if (!effectiveDob) {
+          throw new BadRequestException({ code: 'dating.age_restricted', message: 'Adult date of birth required for dating.' });
+        }
+        const [age] = await this.db.query<Array<{ adult: boolean }>>(
+          "SELECT $1::date <= CURRENT_DATE - INTERVAL '18 years' AS adult", [effectiveDob],
+        );
+        if (!age?.adult) {
+          throw new BadRequestException({ code: 'dating.age_restricted', message: 'Dating is limited to adults aged 18 or older.' });
+        }
+      }
     }
     if (req.openToDating !== undefined) {
       params.push(req.openToDating);

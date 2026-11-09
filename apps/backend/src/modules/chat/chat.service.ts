@@ -1,3 +1,4 @@
+import { isDatingReleaseEnabled } from '../dating/dating-release-gate';
 import { ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -127,9 +128,11 @@ export class ChatService {
         status: string;
         initiated_by: string | null;
         active_group_member: boolean;
+        dating_match: boolean;
       }>
     >(
       `SELECT c.kind, c.participant_ids, c.status, c.initiated_by,
+              EXISTS (SELECT 1 FROM dating_matches dm WHERE dm.conversation_id = c.id) AS dating_match,
               CASE WHEN c.kind = 'group' THEN EXISTS (
                 SELECT 1
                   FROM conversation_members cm
@@ -145,6 +148,13 @@ export class ChatService {
     );
     if (!convo) {
       throw new NotFoundException({ code: 'chat.not_found', message: 'Conversation not found' });
+    }
+
+    if (!isDatingReleaseEnabled() && convo.dating_match === true) {
+      throw new ForbiddenException({
+        code: 'dating.release_disabled',
+        message: 'Dating conversations are paused during early access.',
+      });
     }
 
     if (dmOnly && convo.kind !== 'dm') {
@@ -224,6 +234,8 @@ export class ChatService {
       `SELECT 1
          FROM conversations c
         WHERE c.id = $1
+          AND (${isDatingReleaseEnabled() ? 'TRUE' :
+            "NOT EXISTS (SELECT 1 FROM dating_matches dm WHERE dm.conversation_id = c.id)"})
           AND (
             (c.kind = 'dm' AND $2 = ANY(c.participant_ids))
             OR (
@@ -251,6 +263,8 @@ export class ChatService {
         WHERE c.id = $1
           AND c.kind = 'dm'
           AND $2 = ANY(c.participant_ids)
+          AND (${isDatingReleaseEnabled() ? 'TRUE' :
+            "NOT EXISTS (SELECT 1 FROM dating_matches dm WHERE dm.conversation_id = c.id)"})
         LIMIT 1`,
       [conversationId, userId],
     );
@@ -291,6 +305,7 @@ export class ChatService {
         peer_id: string | null;
         peer_allows_online: boolean;
         unread_count: number;
+        dating_match: boolean;
         participants: Array<{ id: string; displayName: string; avatarUrl: string | null }>;
       }>
     >(
@@ -300,6 +315,7 @@ export class ChatService {
          c.status,
          c.initiated_by,
          c.last_message_at,
+         EXISTS (SELECT 1 FROM dating_matches dm WHERE dm.conversation_id = c.id) AS dating_match,
          m.body         AS last_body,
          m.sender_id    AS last_sender_id,
          EXISTS (
@@ -358,9 +374,13 @@ export class ChatService {
       [userId],
     );
 
+    const visibleRows = isDatingReleaseEnabled()
+      ? rows
+      : rows.filter((row) => row.dating_match !== true);
+
     const peerIds = [
       ...new Set(
-        rows
+        visibleRows
           .filter((r) => r.is_friend && r.peer_id && r.peer_allows_online)
           .map((r) => r.peer_id as string),
       ),
@@ -369,7 +389,7 @@ export class ChatService {
       ? await this.presence.whichAreOnline(peerIds)
       : new Set<string>();
 
-    const mapped: ConversationSummary[] = rows.map((r) => {
+    const mapped: ConversationSummary[] = visibleRows.map((r) => {
       const isFriend = r.is_friend === true;
       let peerOnline: boolean | null = null;
       if (isFriend && r.peer_id && r.peer_allows_online) {

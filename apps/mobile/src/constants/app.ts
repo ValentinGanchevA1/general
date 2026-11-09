@@ -15,7 +15,14 @@ export const PRIVACY_POLICY_URL = 'https://g88-legal.onrender.com/privacy';
 /**
  * Temporary closed-testing compatibility only: no dedicated Terms document is
  * published yet, so this still resolves to Privacy. Production is NO-GO until
- * issue #592 publishes reviewed NEXA Terms at a separate URL and this constant
+ * issue #592 publishes reviewed NEXUS Terms at a separate URL and this constant
  * is updated to that document.
  */
 export const TERMS_OF_SERVICE_URL = 'https://g88-legal.onrender.com/privacy';
+
+/**
+ * First Android social release: adult-only Dating is intentionally paused until
+ * independent age-assurance and teen-safety review are signed off.
+ * Backend independently default-denies Dating (NEXUS_DATING_RELEASE_ENABLED).
+ */
+export const DATING_RELEASE_ENABLED = false;

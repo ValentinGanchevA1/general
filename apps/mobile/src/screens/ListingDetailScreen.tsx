@@ -7,6 +7,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import {appAlert} from '@/ui/appAlert';
 import {ScreenHeader} from '@/components/ScreenHeader';
+import {ReportContentButton} from '@/features/reports/ReportContentButton';
 import {EmptyState} from '@/components/EmptyState';
 import {useAppTheme, type ThemeColors} from '@/theme';
 import type {CreateConversationRequest, CreateConversationResponse, ListingOffer, WaveRequest, WaveResponse} from '@g88/shared';
@@ -68,9 +69,11 @@ export function ListingDetailScreen(): React.JSX.Element {
 	const marketplaceLabel = marketplaceKindLabel(listing.marketplaceKind);
 	const displayedPrice = `${marketplacePricePrefix(listing.marketplaceKind)}${formatPrice(listing.priceCents, listing.currency)}`;
 	return <ScrollView style={S.container} contentContainerStyle={S.content} refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} progressBackgroundColor={colors.surfaceRaised}/> }>
-		<ScreenHeader title={marketplaceLabel == null ? 'Listing' : 'Marketplace'} right={<TouchableOpacity onPress={() => void onToggleFav()} disabled={favBusy} hitSlop={8} accessibilityRole="button" accessibilityLabel={listing.favoritedByMe ? 'Remove from saved' : 'Save listing'}>
+		<ScreenHeader title={marketplaceLabel == null ? 'Listing' : 'Marketplace'} right={<View style={{flexDirection: 'row', alignItems: 'center'}}>
+		{!isSeller ? <ReportContentButton targetType="listing" targetId={listingId} /> : null}
+		<TouchableOpacity onPress={() => void onToggleFav()} disabled={favBusy} hitSlop={8} accessibilityRole="button" accessibilityLabel={listing.favoritedByMe ? 'Remove from saved' : 'Save listing'}>
 			<Icon name={listing.favoritedByMe ? 'heart' : 'heart-outline'} size={24} color={listing.favoritedByMe ? colors.danger : colors.textPrimary}/>
-		</TouchableOpacity>}/>
+		</TouchableOpacity></View>}/>
 		{listing.thumbnailUrl ? <Image source={{uri: listing.thumbnailUrl}} style={S.image}/> : <View style={[S.image, S.imagePlaceholder]}><Icon name="image-off-outline" size={40} color={colors.borderStrong}/></View>}
 		<View style={S.body}>
 			<Text style={S.title}>{listing.title}</Text>

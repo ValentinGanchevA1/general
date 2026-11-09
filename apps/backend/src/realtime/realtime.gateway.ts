@@ -2,6 +2,7 @@ import {
   ForbiddenException,
   GoneException,
   Inject,
+  Optional,
   Logger,
   NotFoundException,
   UseGuards,
@@ -64,6 +65,10 @@ import { ChallengesService } from '../modules/challenges/challenges.service';
 import { FriendsService } from '../modules/friends/friends.service';
 import type { JwtPayload } from '../modules/auth/jwt.strategy';
 import { corsOrigins } from '../common/cors-origins';
+import { TermsService } from '../modules/terms/terms.service';
+import { InjectDataSource } from '@nestjs/typeorm';
+import type { DataSource } from 'typeorm';
+import { assertAdultAge, isAdultGateEnforced } from '../modules/auth/adult-eligibility';
 
 type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 type G88Socket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
@@ -120,7 +125,23 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly friends: FriendsService,
     private readonly jwt: JwtService,
     private readonly eventRoomAccess: EventRoomAccessService,
+    // Optional only for pre-existing isolated gateway unit-test fixtures.
+    // A production deployment with enforcement enabled fails closed if missing.
+    @Optional() private readonly terms?: TermsService,
+    // Optional for isolated gateway tests; fail closed when 18+ is enforced.
+    @Optional() @InjectDataSource() private readonly adultDb?: DataSource,
   ) {}
+
+  private async assertTermsForUgc(userId: string): Promise<void> {
+    if (this.terms) return this.terms.assertAccepted(userId);
+    if (process.env.NEXUS_REQUIRE_UGC_TERMS === 'true') {
+      throw new ForbiddenException({
+        code: 'terms.guard_unavailable',
+        message: 'Publishing is unavailable until Terms authorization can be checked.',
+      });
+    }
+  }
+
 
   async handleConnection(client: G88Socket): Promise<void> {
     const token = client.handshake.auth?.['token'] as string | undefined;
@@ -137,6 +158,18 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
 
     const userId = client.data.userId;
+    if (isAdultGateEnforced()) {
+      if (!this.adultDb) {
+        client.disconnect(true);
+        return;
+      }
+      try {
+        await assertAdultAge(this.adultDb, userId);
+      } catch {
+        client.disconnect(true);
+        return;
+      }
+    }
     client.data.rooms = new Set();
     client.data.friendPresenceAnnounced = false;
     client.join(this.userRoom(userId));
@@ -163,6 +196,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('presence:update')
+  @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onPresenceUpdate(
     @ConnectedSocket() client: G88Socket,
@@ -326,6 +360,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('chat:send')
+  @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onChatSend(
     @ConnectedSocket() client: G88Socket,
@@ -336,6 +371,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
 
     try {
+      await this.assertTermsForUgc(client.data.userId);
       const msg = await this.chat.persist(
         payload.conversationId,
         client.data.userId,
@@ -359,6 +395,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('location:share:start')
+  @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onLocationShareStart(
     @ConnectedSocket() client: G88Socket,
@@ -369,6 +406,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
 
     try {
+      await this.assertTermsForUgc(client.data.userId);
       const { session, message } = await this.locationShare.start(
         client.data.userId,
         payload.conversationId,
@@ -401,12 +439,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('location:share:update')
+  @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onLocationShareUpdate(
     @ConnectedSocket() client: G88Socket,
     @MessageBody() payload: LocationShareUpdateDto,
   ): Promise<AckResult<{ updatedAt: string }>> {
     try {
+      await this.assertTermsForUgc(client.data.userId);
       const { updatedAt, conversationId } = await this.locationShare.update(
         client.data.userId,
         payload.sessionId,

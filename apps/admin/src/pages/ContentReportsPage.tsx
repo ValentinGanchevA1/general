@@ -37,8 +37,8 @@ export default function ContentReportsPage() {
     onError: () => toast.error('Could not process report. Please retry.'),
   });
   const handleDecision = (report: AdminContentReport, action: ContentReportDecision) => {
-    const explanation = action === 'hide_story'
-      ? 'Hide this story from all discovery/read surfaces?'
+    const explanation = action.startsWith('hide_')
+      ? 'Hide this reported content from discovery/read surfaces?'
       : action === 'dismiss' ? 'Dismiss this report without hiding content?' : 'Mark this report reviewed without hiding content?';
     if (!window.confirm(explanation)) return;
     decision.mutate({ report, action });
@@ -52,7 +52,7 @@ export default function ContentReportsPage() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Safety reports</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Review user and story reports. Never dismiss a report without assessing the content.
+              Review UGC safety reports. Never dismiss a report without assessing the content.
             </p>
           </div>
           <div className="flex gap-2 items-center">
@@ -76,8 +76,13 @@ export default function ContentReportsPage() {
           {reports.map(report => (
             <article key={report.id} className="rounded-xl border bg-card p-4 space-y-3">
               <div className="flex flex-wrap gap-2 text-sm items-center">
-                <strong>{report.targetType === 'story' ? 'Story' : 'Profile'}</strong>
-                <span className="rounded bg-muted px-2 py-0.5">{report.reason}</span>
+                <strong>{report.targetType.replace('_', ' ')}</strong>
+                <span className={report.reason === 'child_safety'
+                  ? 'rounded border border-red-600 bg-red-950 px-2 py-0.5 font-bold text-red-100'
+                  : 'rounded bg-muted px-2 py-0.5'} aria-label={report.reason === 'child_safety'
+                  ? 'Urgent child safety incident' : undefined}>
+                  {report.reason === 'child_safety' ? 'URGENT: Child safety' : report.reason}
+                </span>
                 <span className="text-muted-foreground">{new Date(report.createdAt).toLocaleString()}</span>
               </div>
               <div className="text-sm break-all">
@@ -85,10 +90,17 @@ export default function ContentReportsPage() {
                 <p><strong>Reporter ID:</strong> {report.reporterId}</p>
                 <p><strong>Report ID:</strong> {report.id}</p>
               </div>
-              {report.targetCaption ? (
+              {report.reason === 'child_safety' ? (
+                <p role="alert" className="rounded border border-red-700 p-3 text-sm">
+                  Potential child exploitation report. Escalate to the designated safety responder.
+                  Do not download or forward suspected illegal material. Subject content and media
+                  links are intentionally omitted from this queue.
+                </p>
+              ) : null}
+              {report.targetCaption && report.reason !== 'child_safety' ? (
                 <p className="border-l-2 pl-3 whitespace-pre-wrap break-words text-sm">{report.targetCaption}</p>
               ) : null}
-              {report.targetMediaUrl ? (
+              {report.targetMediaUrl && report.reason !== 'child_safety' ? (
                 <a className="underline text-sm" href={report.targetMediaUrl}
                   target="_blank" rel="noopener noreferrer">Inspect reported media (may be sensitive)</a>
               ) : null}
@@ -98,9 +110,15 @@ export default function ContentReportsPage() {
                     onClick={() => handleDecision(report, 'review')}>Mark reviewed</Button>
                   <Button variant="outline" disabled={decision.isPending}
                     onClick={() => handleDecision(report, 'dismiss')}>Dismiss</Button>
-                  {report.targetType === 'story' ? (
+                  {(['story', 'listing', 'event', 'check_in', 'alert', 'event_question'] as const).includes(
+                    report.targetType as 'story' | 'listing' | 'event' | 'check_in' | 'alert' | 'event_question',
+                  ) ? (
                     <Button variant="destructive" disabled={decision.isPending}
-                      onClick={() => handleDecision(report, 'hide_story')}>Hide story</Button>
+                      onClick={() => handleDecision(report,
+                        ({ story: 'hide_story', listing: 'hide_listing', event: 'hide_event',
+                           check_in: 'hide_check_in', alert: 'hide_alert', event_question: 'hide_event_question' } as const)[report.targetType as 'story' | 'listing' | 'event' | 'check_in'])}>
+                      Hide {report.targetType.replace('_', ' ')}
+                    </Button>
                   ) : null}
                 </div>
               ) : <p className="text-muted-foreground text-xs">Status: {report.status} · {report.reviewedAt ?? 'pending'}</p>}

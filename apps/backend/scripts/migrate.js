@@ -46,6 +46,13 @@ async function run(client) {
   // Filename renames when a migration was renumbered after already applying
   // under the old name (tracked by filename PRIMARY KEY). Idempotent.
   const RENAMES = [
+    // PR #1066 originally used 0073 for this index, which collided with the
+    // UGC report migration. Preserve schema_migrations history on any staging
+    // DB that ran the draft filename; CREATE INDEX is otherwise idempotent.
+    {
+      from: '0073_dating_match_conversation_lookup.sql',
+      to: '0075_dating_match_conversation_lookup.sql',
+    },
     { from: '0030_profile_origin.sql', to: '0031_profile_origin.sql' },
     {
       from: '0047_personal_activity_notifications.sql',

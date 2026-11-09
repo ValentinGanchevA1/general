@@ -30,6 +30,7 @@ import type {
 import { S3Service } from '../../common/s3.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { RequireCurrentTerms } from '../terms/require-terms.decorator';
 import { StoriesService } from './stories.service';
 import {
   CreateStoryDto,
@@ -64,6 +65,7 @@ export class StoriesController {
 
   /** POST /api/v1/stories/presign — get S3 PUT URL for media. */
   @Post('presign')
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   presign(
@@ -78,6 +80,7 @@ export class StoriesController {
    * Kept for photo compatibility; large video clients should use presigned upload.
    */
   @Post('media/base64')
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   uploadMediaBase64(
@@ -92,6 +95,7 @@ export class StoriesController {
    * FileInterceptor uses memory storage, so presigned upload is preferred for large media.
    */
   @Post('media/upload')
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @UseInterceptors(
@@ -115,6 +119,7 @@ export class StoriesController {
 
   /** POST /api/v1/stories — create a 24h story after media is uploaded. */
   @Post()
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   async create(
@@ -170,6 +175,7 @@ export class StoriesController {
   }
 
   @Post(':id/react')
+  @RequireCurrentTerms()
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   react(

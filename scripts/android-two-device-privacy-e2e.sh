@@ -72,7 +72,7 @@ dismiss_map_coachmark() {
 
   if ui "$serial" wait --value 'You are on the map' --timeout "$timeout_seconds" >/dev/null 2>&1; then
     ui "$serial" tap --value 'Skip' --timeout 5
-    ui "$serial" wait --value 'Connections, chats and activity' --timeout 15
+    ui "$serial" wait --value 'Connections, chats and relationship activity' --timeout 15
   fi
 }
 
@@ -90,7 +90,7 @@ login() {
   ui "$serial" type --value "$password"
   ui "$serial" key --name back
   ui "$serial" tap --value 'Sign in' --timeout 15
-  ui "$serial" wait --value 'Connections, chats and activity' --timeout 90
+  ui "$serial" wait --value 'Connections, chats and relationship activity' --timeout 90
   dismiss_map_coachmark "$serial" 8
 }
 
@@ -101,7 +101,7 @@ open_chat() {
   # The first-run map coachmark can be scheduled just after login settles.
   # Re-check immediately before navigation so it cannot intercept the tab tap.
   dismiss_map_coachmark "$serial" 4
-  ui "$serial" tap --value 'Connections, chats and activity' --timeout 30
+  ui "$serial" tap --value 'Connections, chats and relationship activity' --timeout 30
   ui "$serial" wait --value 'Connections' --timeout 30
   ui "$serial" tap --value 'Chats' --timeout 20
   ui "$serial" wait --value "Chat with ${peer_name}" --contains --timeout 45
@@ -161,7 +161,7 @@ set_geo() {
 }
 
 assert_blocked_rejoin() {
-  local base_url="${DEVICE_E2E_BASE_URL:-https://g88-api.onrender.com}"
+  local base_url="${DEVICE_E2E_BASE_URL:?A reviewed staging backend URL is required}"
 
   node --input-type=module - "$STATE_FILE" "$base_url" <<'NODE'
 import { readFile } from 'node:fs/promises';
@@ -267,6 +267,8 @@ stop_share_if_visible() {
 }
 
 main() {
+  # Fail closed before any device or network activity if target is not approved staging.
+  node scripts/android-two-device-privacy-setup.mjs verify
   test -f "$APK_PATH" || { echo "::error::APK not found: $APK_PATH"; exit 1; }
   test -f "$STATE_FILE" || { echo "::error::state file not found: $STATE_FILE"; exit 1; }
 
@@ -306,9 +308,9 @@ main() {
   adb -s "$SERIAL_B" shell am force-stop "$PACKAGE"
   adb -s "$SERIAL_B" logcat -c
   launch_app "$SERIAL_B"
-  ui "$SERIAL_B" wait --value 'Connections, chats and activity' --timeout 75
+  ui "$SERIAL_B" wait --value 'Connections, chats and relationship activity' --timeout 75
   dismiss_map_coachmark "$SERIAL_B" 4
-  ui "$SERIAL_B" tap --value 'Connections, chats and activity'
+  ui "$SERIAL_B" tap --value 'Connections, chats and relationship activity'
   ui "$SERIAL_B" wait --value 'Connections' --timeout 30
   ui "$SERIAL_B" tap --value 'Chats' --timeout 20
 

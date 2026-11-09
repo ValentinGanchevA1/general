@@ -139,6 +139,7 @@ async function auth(user) {
       email: user.email,
       password: user.password,
       displayName: user.displayName,
+      dateOfBirth: '1990-01-01',
     });
     if (res.status !== 201) fail(`register ${user.email}`, `HTTP ${res.status} ${JSON.stringify(res.body)}`);
     ok(`register ${user.email} (first run)`, elapsed());
@@ -333,6 +334,7 @@ const reqUser = {
   email: `monitor-req-${Date.now()}@g88.app`,
   password: 'MonitorPass_R1!',
   displayName: 'Monitor Req',
+  dateOfBirth: '1990-01-01',
 };
 const r = await auth(reqUser);
 

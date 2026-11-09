@@ -1,6 +1,7 @@
 // NEXUS primary map chrome: search + locate, semantic public layers + private overlays.
 // Keep high-frequency controls visible without horizontal scrolling or duplicate floating actions.
 
+import { DATING_RELEASE_ENABLED } from '@/constants/app';
 import React, { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import {
 	Modal,
@@ -350,7 +351,7 @@ function FilterModal(props: FilterModalProps): React.JSX.Element {
 						{props.showPeople ? <>
 							<SectionLabel styles={styles}>People</SectionLabel>
 							<ChoiceRow styles={styles} colors={colors} label="Friends only" active={props.friendsOnly} onPress={() => { props.onFriendsOnlyChange(!props.friendsOnly); if (!props.friendsOnly) props.onDatingOnlyChange(false); }} />
-							<ChoiceRow styles={styles} colors={colors} label="Dating" active={props.datingOnly} onPress={() => { props.onDatingOnlyChange(!props.datingOnly); if (!props.datingOnly) props.onFriendsOnlyChange(false); }} />
+							{DATING_RELEASE_ENABLED ? <ChoiceRow styles={styles} colors={colors} label="Dating" active={props.datingOnly} onPress={() => { props.onDatingOnlyChange(!props.datingOnly); if (!props.datingOnly) props.onFriendsOnlyChange(false); }} /> : null}
 						</> : null}
 
 						{props.showListings ? <>

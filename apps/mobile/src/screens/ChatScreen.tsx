@@ -31,6 +31,7 @@ import { VerificationBadge } from '@/components/VerificationBadge';
 import { Avatar } from '@/components/Avatar';
 import { spacing, useAppTheme, type ThemeColors } from '@/theme';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ReportContentButton } from '@/features/reports/ReportContentButton';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import {
   fetchMessages,
@@ -78,13 +79,19 @@ function MessageBubble({
 
   if (msg.type === 'location_session') {
     if (allowLocationSession) {
-      return <LocationSessionBubble msg={msg} isMine={isMine} />;
+      return (
+        <View>
+          <LocationSessionBubble msg={msg} isMine={isMine} />
+          {!isMine ? <ReportContentButton targetType="message" targetId={msg.id} /> : null}
+        </View>
+      );
     }
     return (
       <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
         <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
           Live location is unavailable in group chats.
         </Text>
+        {!isMine ? <ReportContentButton targetType="message" targetId={msg.id} /> : null}
       </View>
     );
   }
@@ -97,6 +104,7 @@ function MessageBubble({
       <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
         {msg.body}
       </Text>
+      {!isMine && !msg.id.startsWith('opt-') ? <ReportContentButton targetType="message" targetId={msg.id} /> : null}
       {isPending ? <Text style={styles.statusPending}>⏱</Text> : null}
       {isFailed ? (
         <TouchableOpacity

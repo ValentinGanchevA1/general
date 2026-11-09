@@ -56,7 +56,7 @@ it('toggles password visibility and restores hidden state when changing mode', (
   expect(screen.getByLabelText('Display name')).toBeTruthy();
 });
 
-it('retains registration validation and submits the existing registration contract', () => {
+it('requires adult date of birth and submits the age-gated registration contract', () => {
   const screen = render(<AuthScreen />);
   fireEvent.press(screen.getByText('Create account'));
   fireEvent.press(screen.getByLabelText('Join NEXUS'));
@@ -65,7 +65,11 @@ it('retains registration validation and submits the existing registration contra
   fireEvent.changeText(screen.getByLabelText('Email'), 'person@example.com');
   fireEvent.changeText(screen.getByLabelText('Password'), 'password123');
   fireEvent.press(screen.getByLabelText('Join NEXUS'));
-  expect(register).toHaveBeenCalledWith({ email: 'person@example.com', password: 'password123', displayName: 'Person' });
+  expect(register).not.toHaveBeenCalled();
+  expect(screen.getByText('Enter your date of birth (YYYY-MM-DD) to confirm adult eligibility.')).toBeTruthy();
+  fireEvent.changeText(screen.getByLabelText('Date of birth'), '2000-01-01');
+  fireEvent.press(screen.getByLabelText('Join NEXUS'));
+  expect(register).toHaveBeenCalledWith({ email: 'person@example.com', password: 'password123', displayName: 'Person', dateOfBirth: '2000-01-01' });
 });
 
 it('clears stale errors before Google sign-in and displays server errors', () => {

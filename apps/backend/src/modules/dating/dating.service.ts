@@ -13,6 +13,7 @@ import type { LikeRequest, LikeResponse } from '@g88/shared';
 
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { BlocksService } from '../blocks/blocks.service';
+import { assertDatingReleaseEnabled } from './dating-release-gate';
 
 @Injectable()
 export class DatingService {
@@ -32,6 +33,7 @@ export class DatingService {
    * 4. Emit dating:like_received / dating:match_created
    */
   async like(fromUserId: string, req: LikeRequest): Promise<LikeResponse> {
+    assertDatingReleaseEnabled();
     if (fromUserId === req.toUserId) {
       throw new BadRequestException({
         code: 'dating.like.self',
@@ -47,9 +49,10 @@ export class DatingService {
     }
 
     const users = await this.db.query<
-      Array<{ id: string; open_to_dating: boolean; display_name: string; avatar_url: string | null }>
+      Array<{ id: string; open_to_dating: boolean; adult: boolean; display_name: string; avatar_url: string | null }>
     >(
-      `SELECT id, open_to_dating, display_name, avatar_url
+      `SELECT id, open_to_dating, display_name, avatar_url,
+              (date_of_birth IS NOT NULL AND date_of_birth <= CURRENT_DATE - INTERVAL '18 years') AS adult
          FROM users
         WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`,
       [[fromUserId, req.toUserId]],
@@ -62,6 +65,9 @@ export class DatingService {
         code: 'dating.like.user_missing',
         message: 'User not found',
       });
+    }
+    if (!from.adult || !to.adult) {
+      throw new ForbiddenException({ code: 'dating.age_restricted', message: 'Dating requires an adult-eligible profile for both participants.' });
     }
     if (!from.open_to_dating || !to.open_to_dating) {
       throw new ForbiddenException({
@@ -174,6 +180,7 @@ export class DatingService {
   }
 
   async pass(fromUserId: string, toUserId: string): Promise<{ ok: true }> {
+    assertDatingReleaseEnabled();
     if (fromUserId === toUserId) {
       throw new BadRequestException({
         code: 'dating.pass.self',
@@ -185,6 +192,16 @@ export class DatingService {
         code: 'dating.pass.blocked',
         message: 'You cannot interact with this user.',
       });
+    }
+
+    const [eligibility] = await this.db.query<Array<{ eligible: boolean }>>(
+      `SELECT COUNT(*)::int = 2 AS eligible FROM users
+        WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL AND open_to_dating = true
+          AND date_of_birth IS NOT NULL AND date_of_birth <= CURRENT_DATE - INTERVAL '18 years'`,
+      [[fromUserId, toUserId]],
+    );
+    if (!eligibility?.eligible) {
+      throw new ForbiddenException({ code: 'dating.age_restricted', message: 'Dating requires adult-eligible participants.' });
     }
 
     await this.db.query(

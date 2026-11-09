@@ -1,3 +1,4 @@
+import { isDatingReleaseEnabled } from '../dating/dating-release-gate';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -139,9 +140,23 @@ export class DiscoveryService {
       ? await this.friends.listFriendIds(params.requesterId)
       : null;
 
+    if (datingOnly && !isDatingReleaseEnabled()) {
+      return this.empty(
+        h3ResolutionForZoom(params.zoom),
+        params.viewport,
+        kinds,
+        '',
+        undefined,
+        undefined,
+        false,
+        rankBy,
+        true,
+      );
+    }
+
     if (datingOnly) {
       const openRows = await this.db.query<Array<{ open_to_dating: boolean }>>(
-        `SELECT COALESCE(open_to_dating, false) AS open_to_dating
+        `SELECT (COALESCE(open_to_dating, false) AND date_of_birth IS NOT NULL AND date_of_birth <= CURRENT_DATE - INTERVAL '18 years') AS open_to_dating
            FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
         [params.requesterId],
       );
@@ -332,6 +347,8 @@ export class DiscoveryService {
            SELECT 1 FROM users du
             WHERE du.id = v_discoverable_entity.id
               AND du.open_to_dating = true
+              AND du.date_of_birth IS NOT NULL
+              AND du.date_of_birth <= CURRENT_DATE - INTERVAL '18 years'
               AND du.deleted_at IS NULL
          )`;
     }
@@ -396,6 +413,8 @@ export class DiscoveryService {
            SELECT 1 FROM users du
             WHERE du.id = v_discoverable_entity.id
               AND du.open_to_dating = true
+              AND du.date_of_birth IS NOT NULL
+              AND du.date_of_birth <= CURRENT_DATE - INTERVAL '18 years'
               AND du.deleted_at IS NULL
          )`;
     }
@@ -616,7 +635,9 @@ export class DiscoveryService {
         >(
           `SELECT id, gender, COALESCE(seeking_genders, '{}') AS seeking_genders
              FROM users
-            WHERE id = ANY($1::uuid[]) OR id = $2`,
+            WHERE (id = ANY($1::uuid[]) OR id = $2)
+              AND open_to_dating = true AND date_of_birth IS NOT NULL
+              AND date_of_birth <= CURRENT_DATE - INTERVAL '18 years'`,
           [userIdsForDating, requesterId],
         );
         const byId = new Map(prefRows.map((p) => [p.id, p]));
@@ -746,7 +767,9 @@ export class DiscoveryService {
     }>>(
       `SELECT id, gender, COALESCE(seeking_genders, '{}') AS seeking_genders
          FROM users
-        WHERE id = ANY($1::uuid[]) OR id = $2`,
+        WHERE (id = ANY($1::uuid[]) OR id = $2)
+              AND open_to_dating = true AND date_of_birth IS NOT NULL
+              AND date_of_birth <= CURRENT_DATE - INTERVAL '18 years'`,
       [candidateIds, requesterId],
     );
     const byId = new Map(prefRows.map((person) => [person.id, person]));

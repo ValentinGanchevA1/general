@@ -51,10 +51,16 @@
 
   <h2>1. Who this applies to</h2>
   <p>
-    This policy covers the NEXUS mobile application and its backend services. By creating an
-    account or using NEXUS you agree to it. NEXUS is for adults; you must be at least
-    <strong>18 years old</strong> to use it. The onboarding flow requires a date of birth and
-    the service rejects profiles that do not meet this minimum age.
+    This policy explains how the NEXUS mobile application and backend services process data.
+    <strong>NEXUS is intended only for adults aged at least 18 years.</strong>
+    This rule applies to registration and to all social features, including the
+    map, nearby discovery, messages, events and local listings. Our planned Android
+    launch requests a date of birth at email registration; Google sign-in and
+    existing accounts without a birth date must complete the same age check before
+    accessing social features. An entered date of birth is self-declared and
+    <strong>does not constitute independent age or identity verification</strong>.
+    Eligibility is checked server-side when the adult-only release gate is enabled.
+    Dating and matchmaking remain unavailable during the first release.
   </p>
 
   <h2>2. Data we collect</h2>
@@ -62,11 +68,11 @@
     <thead><tr><th>Category</th><th>Examples</th><th>Why</th></tr></thead>
     <tbody>
       <tr><td>Account</td><td>Email address, password (stored only as a salted hash), or Google sign-in identifier; display name</td><td>Create and secure your account, authentication</td></tr>
-      <tr><td>Profile</td><td>Photos, bio, interests/goals, date of birth, optional hometown and social links you add</td><td>Build your profile, confirm 18+ eligibility, and provide discovery context</td></tr>
-      <tr><td>Approximate location</td><td>A privacy-coarsened location (~120&nbsp;m) of where you are</td><td>Show nearby people, presence, and local content on the map</td></tr>
+      <tr><td>Profile &amp; sensitive preferences</td><td>Photos, bio, interests/goals, date of birth, gender identity, optional sexual orientation, dating preferences, hometown and social links you choose to add</td><td>Build your profile, evaluate 18+ eligibility, and provide opt-in discovery/dating context. You can hide optional identity fields from your public profile independently of whether they are stored.</td></tr>
+      <tr><td>Map location (precise under Google Play classification)</td><td>A privacy-coarsened location (~120&nbsp;m) of where you are; the device's GPS sample is transmitted over TLS for server-side coarsening</td><td>Show nearby people, presence, and local content on the map. A 120&nbsp;m grid remains within Google Play's precise-location threshold, even though raw coordinates are not used as ordinary public presence.</td></tr>
       <tr><td>Precise live location (optional)</td><td>Last latitude/longitude of an active or ended 1:1 sharing session; the initial shared location in a chat message</td><td>Deliver opt-in precise location to one authorized chat partner</td></tr>
-      <tr><td>Messages &amp; interactions</td><td>Chat messages, waves, RSVPs, listings, gifts, challenges</td><td>Deliver the core social features</td></tr>
-      <tr><td>Verification (optional)</td><td>Phone number; selfie + ID document if you request ID verification</td><td>Provide identity-verification signals and support trust &amp; safety</td></tr>
+      <tr><td>Messages &amp; user content</td><td>Private chat messages, waves, RSVPs, event questions and reviews, listing text/photos, Pulse check-ins and story captions/photos/videos</td><td>Deliver social features, display content to the intended audience and process content-safety reports.</td></tr>
+      <tr><td>Verification (optional)</td><td>Phone number, selfie photos and government ID document images or associated documents if identity verification is requested</td><td>Provide identity-verification signals and support trust &amp; safety; exact processors and retention depend on the enabled verification workflow.</td></tr>
       <tr><td>Payment (optional)</td><td>Subscription status and identifiers; card details are handled by Stripe, never by us</td><td>Manage subscriptions</td></tr>
       <tr><td>Device &amp; diagnostics</td><td>Crash reports, error diagnostics, app-usage events, push token</td><td>Keep the app stable, send notifications, improve the product</td></tr>
     </tbody>
@@ -104,9 +110,10 @@
 
   <h2>4. How we use your data</h2>
   <ul>
-    <li>Operate core features: discovery, presence, waves, chat, events, listings, gifts, challenges.</li>
+    <li>Operate core features: discovery, presence, waves, chat, events, listings, gifts, challenges, stories and voluntary dating interactions.</li>
+    <li>Receive and moderate reports of user-generated content to prevent spam, abuse and harassment.</li>
     <li>Authenticate you and keep your account secure.</li>
-    <li>Confirm that the profile meets NEXUS&rsquo;s 18+ eligibility requirement.</li>
+    <li>Assess adult eligibility for the initial adult-only Social release, including map discovery, messaging, events and listings. A self-declared birth date is not independent age verification, and further safeguards may be necessary. Dating and matchmaking remain disabled for the first release.</li>
     <li>Send notifications you have not opted out of (you control these per-channel in Settings).</li>
     <li>Maintain reliability and diagnose crashes and errors.</li>
     <li>Understand aggregate product usage to improve NEXUS.</li>
@@ -119,7 +126,9 @@
   signals, and your coarsened map presence when enabled. They do not receive your
   email, phone or date of birth. <strong>An individual chat recipient can receive
   your exact location only when you explicitly start a live-location share with them.</strong>
-  Your age is shown only when your profile visibility setting for age is enabled.</p>
+  Your age is shown only when your profile visibility setting for age is enabled.
+  Your optional sexual orientation is only shown if its independent visibility setting is enabled;
+  dating seeking preferences are not publicly exposed as profile fields.</p>
   <p><strong>Service providers</strong> process data on our behalf, under contract, only to run NEXUS:</p>
   <table>
     <thead><tr><th>Provider</th><th>Purpose</th></tr></thead>

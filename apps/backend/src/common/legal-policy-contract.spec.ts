@@ -11,11 +11,18 @@ function readPrivacyPolicy(): string {
 }
 
 describe('NEXUS legal/product contract', () => {
-  it('keeps the Privacy Policy aligned with the enforced 18+ onboarding rule', () => {
+  it('documents Social-wide 18+ eligibility and the first-release Dating hold', () => {
     const policy = readPrivacyPolicy();
 
-    expect(policy).toContain('<strong>18 years old</strong>');
-    expect(policy).toContain('confirm 18+ eligibility');
+    expect(policy).toContain('NEXUS is intended only for adults aged at least 18 years.');
+    expect(policy).toContain('launch requests a date of birth at email registration');
+    expect(policy).toContain('existing accounts without a birth date must complete the same age check');
+    expect(policy).toContain('does not constitute independent age or identity verification');
+    expect(policy).toContain('Dating and matchmaking remain unavailable during the first release.');
+    expect(policy).toContain('Assess adult eligibility for the initial adult-only Social release');
+    expect(policy).not.toContain('general social access does not require a universally adult profile');
+    expect(policy).not.toContain('General NEXUS social features are not restricted to adults only.');
+    expect(policy).not.toContain('Account registration does not currently request a date of birth.');
     expect(policy).not.toContain('at least <strong>13</strong>');
   });
 

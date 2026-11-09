@@ -1,3 +1,4 @@
+import { isDatingReleaseEnabled } from '../dating/dating-release-gate';
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -80,6 +81,7 @@ export class DiscoveryEntityResolver {
 
     const friendsOnly = context?.friendsOnly === true;
     const datingOnly = context?.datingOnly === true && !friendsOnly;
+    if (datingOnly && !isDatingReleaseEnabled()) return null;
     let friendIds: string[] | null = null;
     if (friendsOnly) {
       friendIds = await this.friends.listFriendIds(params.viewerId);
@@ -88,7 +90,8 @@ export class DiscoveryEntityResolver {
 
     if (datingOnly) {
       const openRows = await this.db.query<Array<{ open_to_dating: boolean }>>(
-        `SELECT COALESCE(open_to_dating, false) AS open_to_dating
+        `SELECT (COALESCE(open_to_dating, false) AND date_of_birth IS NOT NULL
+             AND date_of_birth <= CURRENT_DATE - INTERVAL '18 years') AS open_to_dating
            FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
         [params.viewerId],
       );
@@ -124,6 +127,8 @@ export class DiscoveryEntityResolver {
             SELECT 1 FROM users du
              WHERE du.id = v_discoverable_entity.id
                AND du.open_to_dating = true
+               AND du.date_of_birth IS NOT NULL
+               AND du.date_of_birth <= CURRENT_DATE - INTERVAL '18 years'
                AND du.deleted_at IS NULL
           )`;
     }
@@ -157,7 +162,9 @@ export class DiscoveryEntityResolver {
       >(
         `SELECT id, gender, COALESCE(seeking_genders, '{}') AS seeking_genders
            FROM users
-          WHERE id = ANY($1::uuid[]) OR id = $2`,
+          WHERE (id = ANY($1::uuid[]) OR id = $2)
+            AND open_to_dating = true AND date_of_birth IS NOT NULL
+            AND date_of_birth <= CURRENT_DATE - INTERVAL '18 years'`,
         [[row.id], params.viewerId],
       );
       const byId = new Map(prefRows.map((preference) => [preference.id, preference]));

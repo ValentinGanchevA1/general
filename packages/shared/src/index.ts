@@ -20,6 +20,7 @@ export * from './verification';
 export * from './friends';
 export * from './identity';
 export * from './dating';
+export * from './ageEligibility';
 export * from './analytics';
 export * from './mapRendererPolicy';
 export * from './social';
@@ -86,3 +87,5 @@ export * from './eventReview';
 export * from './contentReport';
 
 export * from './passwordReset';
+
+export * from './terms';

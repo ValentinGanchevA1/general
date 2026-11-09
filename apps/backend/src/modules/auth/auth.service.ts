@@ -11,7 +11,8 @@ import { DataSource, QueryFailedError } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
 
-import type { LoginResponse, AuthTokens, AuthenticatedUser } from '@g88/shared';
+import { isAdultDateOfBirth, type AdultAgeStatus, type LoginResponse, type AuthTokens, type AuthenticatedUser } from '@g88/shared';
+import { getAdultAgeStatus, isAdultGateEnforced } from './adult-eligibility';
 
 import type { JwtPayload } from './jwt.strategy';
 
@@ -52,15 +53,23 @@ export class AuthService {
     email: string,
     password: string,
     displayName: string,
+    dateOfBirth?: string,
   ): Promise<LoginResponse> {
+    if ((isAdultGateEnforced() || dateOfBirth !== undefined)
+      && (!dateOfBirth || !isAdultDateOfBirth(dateOfBirth))) {
+      throw new UnauthorizedException({
+        code: 'auth.age_restricted',
+        message: 'NEXUS registration is only available to adults 18 or older.',
+      });
+    }
     const passwordHash = await bcrypt.hash(password, AuthService.BCRYPT_ROUNDS);
     let rows: UserRow[];
     try {
       rows = await this.db.query<UserRow[]>(
-        `INSERT INTO users (email, password_hash, display_name)
-              VALUES ($1, $2, $3)
+        `INSERT INTO users (email, password_hash, display_name, date_of_birth)
+              VALUES ($1, $2, $3, $4::date)
            RETURNING id, email, password_hash, display_name, avatar_url, verification_level, auth_version`,
-        [email, passwordHash, displayName],
+        [email, passwordHash, displayName, dateOfBirth ?? null],
       );
     } catch (err) {
       if (err instanceof QueryFailedError && (err as QueryFailedError & { code: string }).code === '23505') {
@@ -194,8 +203,8 @@ export class AuthService {
       if (refreshed[0]) user = refreshed[0];
     } else {
       const rows = await this.db.query<UserRow[]>(
-        `INSERT INTO users (email, display_name, avatar_url, google_id, verification_level, email_verified_at)
-              VALUES ($1, $2, $3, $4, 'email', NOW())
+        `INSERT INTO users (email, display_name, avatar_url, google_id, verification_level, email_verified_at, visibility)
+              VALUES ($1, $2, $3, $4, 'email', NOW(), 'private')
            RETURNING id, email, display_name, avatar_url, verification_level, auth_version`,
         [email, name ?? email.split('@')[0], picture ?? null, googleId],
       );
@@ -208,6 +217,10 @@ export class AuthService {
 
     const tokens = await this.issueTokens(user);
     return { user: this.toPublic(user), tokens };
+  }
+
+  async adultAgeStatus(userId: string): Promise<AdultAgeStatus> {
+    return getAdultAgeStatus(this.db, userId);
   }
 
   async me(userId: string): Promise<AuthenticatedUser> {

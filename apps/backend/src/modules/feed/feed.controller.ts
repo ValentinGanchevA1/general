@@ -5,6 +5,7 @@ import type { ActivityType, FeedResponse, PulseCheckInResult } from '@g88/shared
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { RequireCurrentTerms } from '../terms/require-terms.decorator';
 import { PlaceActivityLinkService } from './place-activity-link.service';
 import { PulseCheckInService } from './pulse-check-in.service';
 import {
@@ -47,6 +48,7 @@ export class FeedController {
   }
 
   @Post('check-ins')
+  @RequireCurrentTerms()
   createCheckIn(
     @CurrentUser('id') userId: string,
     @Body() dto: CreatePulseCheckInDto,
@@ -55,6 +57,7 @@ export class FeedController {
   }
 
   @Post('check-ins/by-place')
+  @RequireCurrentTerms()
   createPlaceCheckIn(
     @CurrentUser('id') userId: string,
     @Body() dto: CreatePlacePulseCheckInDto,

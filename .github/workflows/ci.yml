@@ -64,6 +64,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Test Android E2E staging isolation guard
+        run: node --test scripts/android-two-device-privacy-setup.test.mjs scripts/ci/device-e2e-api-routing.test.mjs
       - name: Build shared
         run: pnpm --filter @g88/shared build
       - name: Test runtime renderer policy verifier

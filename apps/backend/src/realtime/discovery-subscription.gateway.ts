@@ -17,6 +17,7 @@ import type {
 
 import { corsOrigins } from '../common/cors-origins';
 import { DiscoverySubscriptionStore } from './discovery-subscription.store';
+import { isDatingReleaseEnabled } from '../modules/dating/dating-release-gate';
 import { DiscoverySubscriptionDto } from './realtime.dto';
 import { WsJwtGuard } from './ws-jwt.guard';
 
@@ -66,6 +67,13 @@ export class DiscoverySubscriptionGateway implements OnGatewayDisconnect {
     @ConnectedSocket() client: G88Socket,
     @MessageBody() payload: DiscoverySubscriptionDto,
   ): AckResult<{ subscribed: true }> {
+    if (payload.datingOnly === true && !isDatingReleaseEnabled()) {
+      return {
+        ok: false,
+        code: 'dating.release_disabled',
+        message: 'Dating is not available during early access.',
+      };
+    }
     if (!isBoundedViewport(payload.viewport)) {
       return {
         ok: false,

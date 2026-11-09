@@ -65,6 +65,7 @@ export function PrivacyScreen(): React.JSX.Element {
           the features we ship today.
         </Text>
 
+        {point('account-heart-outline', 'Dating requires adulthood', 'General social features are separate from optional Dating. Dating is 18+ only, and profile birth dates used for eligibility are self-declared rather than independently verified. Additional minor-safety controls are under review.')}
         {point('map-marker-off', 'Nearby map shows a coarsened position', 'NEXUS coarsens your location for public discovery. Other people do not see exact map-presence coordinates. Live location sharing in a 1:1 chat is a separate, opt-in feature.')}
         {point('map-marker-path', 'Live location in chat is optional', 'If you choose Share live location, your chat partner sees your precise GPS coordinates until you stop or the session ends. The service stores the session\'s last coordinates and the initial shared position in a chat message; stopping does not immediately erase that history.')}
         {point('map-clock', 'Foreground only', 'Location is used only while the app is open (map, Pulse stories, nearby feed). NEXUS does not track you in the background.')}

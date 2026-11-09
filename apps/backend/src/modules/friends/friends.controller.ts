@@ -13,6 +13,7 @@ import { Throttle } from '@nestjs/throttler';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { RequireCurrentTerms } from '../terms/require-terms.decorator';
 import { DismissSuggestionDto, TargetUserDto } from './dto';
 import { FriendsService } from './friends.service';
 import { FriendsSuggestionsService } from './friends-suggestions.service';
@@ -28,6 +29,7 @@ export class FriendsController {
   ) {}
 
   @Post('follow')
+  @RequireCurrentTerms()
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   follow(@CurrentUser('id') userId: string, @Body() body: TargetUserDto) {
     return this.friends.follow(userId, body.userId);
@@ -43,12 +45,14 @@ export class FriendsController {
   }
 
   @Post('requests')
+  @RequireCurrentTerms()
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   request(@CurrentUser('id') userId: string, @Body() body: TargetUserDto) {
     return this.friends.requestFriend(userId, body.userId);
   }
 
   @Post('requests/:id/accept')
+  @RequireCurrentTerms()
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   accept(
     @CurrentUser('id') userId: string,

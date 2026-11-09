@@ -47,13 +47,71 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
         expires_at timestamptz NOT NULL,
         deleted_at timestamptz
       );
+      CREATE TABLE alerts (
+        id uuid PRIMARY KEY, author_id uuid NOT NULL REFERENCES users(id),
+        body text, visibility text NOT NULL DEFAULT 'public', deleted_at timestamptz
+      );
+      CREATE TABLE listings (
+        id uuid PRIMARY KEY, seller_id uuid NOT NULL REFERENCES users(id),
+        description text, thumbnail_url text, visibility text NOT NULL DEFAULT 'public',
+        deleted_at timestamptz
+      );
+      CREATE TABLE events (
+        id uuid PRIMARY KEY, host_id uuid NOT NULL REFERENCES users(id),
+        description text, cover_url text, visibility text NOT NULL DEFAULT 'public',
+        deleted_at timestamptz
+      );
+      CREATE TABLE event_questions (
+        id uuid PRIMARY KEY, event_id uuid NOT NULL REFERENCES events(id),
+        user_id uuid NOT NULL REFERENCES users(id), body text,
+        created_at timestamptz NOT NULL DEFAULT clock_timestamp()
+      );
+      CREATE TABLE pulse_check_ins (
+        id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES users(id),
+        place_label text, audience text NOT NULL DEFAULT 'nearby',
+        expires_at timestamptz NOT NULL, deleted_at timestamptz
+      );
+      CREATE TABLE friendships (user_low_id uuid, user_high_id uuid);
+      CREATE TABLE conversations (
+        id uuid PRIMARY KEY, kind text NOT NULL, participant_ids uuid[] NOT NULL
+      );
+      CREATE TABLE conversation_members (
+        conversation_id uuid REFERENCES conversations(id), user_id uuid,
+        left_at timestamptz
+      );
+      CREATE TABLE messages (
+        id uuid PRIMARY KEY, conversation_id uuid REFERENCES conversations(id),
+        sender_id uuid REFERENCES users(id), body text
+      );
     `);
     const migration = readFileSync(
       join(__dirname, '../../..', 'migrations/0070_content_abuse_reports.sql'), 'utf8',
     );
     await db.query(migration);
+    const extension = readFileSync(
+      join(__dirname, '../../..', 'migrations/0073_extend_content_report_targets.sql'), 'utf8',
+    );
+    await db.query(extension);
+    const questionsMigration = readFileSync(
+      join(__dirname, '../../..', 'migrations/0074_event_question_moderation.sql'), 'utf8',
+    );
+    await db.query(questionsMigration);
+    const childSafetyMigration = readFileSync(
+      join(__dirname, '../../..', 'migrations/0076_child_safety_report_reason.sql'), 'utf8',
+    );
+    await db.query(childSafetyMigration);
+    const [questionColumn] = await db.query<Array<{ count: number }>>(
+      `SELECT COUNT(*)::int AS count
+         FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'event_questions' AND column_name = 'deleted_at'`,
+    );
+    expect(questionColumn?.count).toBe(1);
     // Migration retries must not recreate, truncate or lose pending reports.
     await db.query(migration);
+    await db.query(extension);
+    await db.query(questionsMigration);
+    await db.query(childSafetyMigration);
     reports = new ContentReportsService(db);
   }, 30_000);
 
@@ -66,7 +124,7 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
   });
 
   beforeEach(async () => {
-    await db.query('TRUNCATE content_abuse_reports, user_blocks, stories, users CASCADE');
+    await db.query('TRUNCATE content_abuse_reports, user_blocks, friendships, conversation_members, messages, conversations, pulse_check_ins, event_questions, alerts, listings, events, stories, users CASCADE');
     await db.query(
       `INSERT INTO users (id,display_name) VALUES ($1,'Author'),($2,'Reporter'),($3,'Moderator')`,
       [authorId, reporterId, moderatorId],
@@ -76,6 +134,34 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
        VALUES ($1,$2,'https://example.test/media.jpg','Example for moderator',clock_timestamp()+interval '1 hour')`,
       [storyId, authorId],
     );
+  });
+
+  it('prioritizes suspected child exploitation and omits sensitive content/media in admin API', async () => {
+    await reports.submit(reporterId, {
+      targetType: 'story', targetId: storyId, reason: 'child_safety',
+    });
+    // Make a younger child-safety case vs a newer ordinary case, to prove
+    // urgency ordering is independent from the timestamp of submission.
+    await db.query(
+      "UPDATE content_abuse_reports SET created_at=clock_timestamp()-interval '2 days' WHERE reason='child_safety'",
+    );
+    await reports.submit(reporterId, {
+      targetType: 'user', targetId: authorId, reason: 'spam',
+    });
+    const queue = await reports.list({ status: 'open', limit: 10 });
+    expect(queue.items).toHaveLength(2);
+    expect(queue.items[0]).toMatchObject({
+      reason: 'child_safety',
+      targetType: 'story',
+      targetId: storyId,
+      targetCaption: null,
+      targetMediaUrl: null,
+    });
+    expect(queue.items[1]?.reason).toBe('spam');
+    const [stored] = await db.query<Array<{ reason: string }>>(
+      "SELECT reason FROM content_abuse_reports WHERE reason='child_safety'",
+    );
+    expect(stored?.reason).toBe('child_safety');
   });
 
   it('deduplicates concurrent user reports and enforces one row per reporter+target', async () => {
@@ -158,10 +244,125 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
     expect(await db.query('SELECT id FROM content_abuse_reports')).toEqual([]);
   });
 
+  it('reports authorized marketplace, event, Pulse and DM targets and hides when supported', async () => {
+    const listing = randomUUID();
+    const alert = randomUUID();
+    const event = randomUUID();
+    const question = randomUUID();
+    const checkIn = randomUUID();
+    const conversation = randomUUID();
+    const message = randomUUID();
+    await db.query('INSERT INTO listings (id,seller_id,description) VALUES ($1,$2,$3)', [listing, authorId, 'Risky listing']);
+    await db.query('INSERT INTO alerts (id,author_id,body) VALUES ($1,$2,$3)', [alert, authorId, 'Unsafe post']);
+    await db.query('INSERT INTO events (id,host_id,description) VALUES ($1,$2,$3)', [event, authorId, 'Unsafe event']);
+    await db.query('INSERT INTO event_questions (id,event_id,user_id,body) VALUES ($1,$2,$3,$4)', [question, event, authorId, 'Unsafe question']);
+    await db.query(`INSERT INTO pulse_check_ins (id,user_id,place_label,expires_at)
+      VALUES ($1,$2,'Place',clock_timestamp()+interval '1 hour')`, [checkIn, authorId]);
+    await db.query('INSERT INTO conversations (id,kind,participant_ids) VALUES ($1,$2,$3)', [conversation, 'dm', [authorId, reporterId]]);
+    await db.query('INSERT INTO messages (id,conversation_id,sender_id,body) VALUES ($1,$2,$3,$4)',
+      [message, conversation, authorId, 'Test message']);
+    for (const [targetType, targetId] of [
+      ['listing', listing], ['alert', alert], ['event', event], ['event_question', question], ['check_in', checkIn], ['message', message],
+    ] as const) {
+      await expect(reports.submit(reporterId, { targetType, targetId, reason: 'spam' }))
+        .resolves.toEqual({ reported: true });
+    }
+    const queue = await reports.list({ limit: 20 });
+    expect(queue.items).toHaveLength(6);
+    expect(queue.items.find(item => item.targetType === 'message')?.targetCaption).toBe('Test message');
+    for (const [targetType, targetId, decision, table] of [
+      ['listing', listing, 'hide_listing', 'listings'],
+      ['event', event, 'hide_event', 'events'],
+      ['alert', alert, 'hide_alert', 'alerts'],
+      ['event_question', question, 'hide_event_question', 'event_questions'],
+      ['check_in', checkIn, 'hide_check_in', 'pulse_check_ins'],
+    ] as const) {
+      const report = queue.items.find(item => item.targetType === targetType);
+      expect(report).toBeDefined();
+      await expect(reports.decide(moderatorId, report!.id, { decision }))
+        .resolves.toEqual({ status: 'hidden' });
+      const [row] = await db.query<Array<{ deleted_at: Date | null }>>(
+        `SELECT deleted_at FROM ${table} WHERE id = $1`, [targetId],
+      );
+      expect(row?.deleted_at).toBeInstanceOf(Date);
+    }
+  });
+
+  it('rejects inaccessible chats and other users\' private listings', async () => {
+    const listing = randomUUID();
+    const conversation = randomUUID();
+    const message = randomUUID();
+    await db.query("INSERT INTO listings (id,seller_id,visibility) VALUES ($1,$2,'private')", [listing, authorId]);
+    await expect(reports.submit(reporterId, { targetType: 'listing', targetId: listing, reason: 'spam' }))
+      .rejects.toBeInstanceOf(NotFoundException);
+    await db.query('INSERT INTO conversations (id,kind,participant_ids) VALUES ($1,$2,$3)', [conversation, 'dm', [authorId, moderatorId]]);
+    await db.query('INSERT INTO messages (id,conversation_id,sender_id,body) VALUES ($1,$2,$3,$4)',
+      [message, conversation, authorId, 'Private DM']);
+    await expect(reports.submit(reporterId, { targetType: 'message', targetId: message, reason: 'spam' }))
+      .rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('accepts historical reports of blocked authors and expired check-ins without exposing their content', async () => {
+    const listing = randomUUID();
+    const checkIn = randomUUID();
+    await db.query(
+      'INSERT INTO listings (id,seller_id,description) VALUES ($1,$2,$3)',
+      [listing, authorId, 'Previously viewed listing'],
+    );
+    await db.query(
+      `INSERT INTO pulse_check_ins (id,user_id,place_label,expires_at)
+       VALUES ($1,$2,'Past check-in',clock_timestamp()-interval '5 minutes')`,
+      [checkIn, authorId],
+    );
+    await db.query('INSERT INTO user_blocks VALUES ($1,$2)', [authorId, reporterId]);
+    await expect(reports.submit(reporterId, {
+      targetType: 'listing', targetId: listing, reason: 'harassment',
+    })).resolves.toEqual({ reported: true });
+    await expect(reports.submit(reporterId, {
+      targetType: 'check_in', targetId: checkIn, reason: 'privacy',
+    })).resolves.toEqual({ reported: true });
+    await expect(reports.submit(authorId, {
+      targetType: 'listing', targetId: listing, reason: 'other',
+    })).rejects.toBeInstanceOf(NotFoundException);
+    const queue = await reports.list({ status: 'open' });
+    expect(queue.items).toHaveLength(2);
+  });
+
+  it('authorizes a group-message report only for an active normalized member', async () => {
+    const group = randomUUID();
+    const message = randomUUID();
+    await db.query(
+      "INSERT INTO conversations (id,kind,participant_ids) VALUES ($1,'group',$2)",
+      [group, [authorId]],
+    );
+    await db.query(
+      'INSERT INTO conversation_members (conversation_id,user_id) VALUES ($1,$2)',
+      [group, reporterId],
+    );
+    await db.query(
+      'INSERT INTO messages (id,conversation_id,sender_id,body) VALUES ($1,$2,$3,$4)',
+      [message, group, authorId, 'Reportable group message'],
+    );
+    await expect(reports.submit(reporterId, {
+      targetType: 'message', targetId: message, reason: 'harassment',
+    })).resolves.toEqual({ reported: true });
+    await db.query(
+      'UPDATE conversation_members SET left_at=clock_timestamp() WHERE conversation_id=$1 AND user_id=$2',
+      [group, reporterId],
+    );
+    await expect(reports.submit(reporterId, {
+      targetType: 'message', targetId: message, reason: 'privacy',
+    })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(reports.submit(authorId, {
+      targetType: 'message', targetId: message, reason: 'other',
+    })).rejects.toBeInstanceOf(NotFoundException);
+    expect((await reports.list({ status: 'open' })).items).toHaveLength(1);
+  });
+
   it('rejects reason and target corruption at database layer', async () => {
     await expect(db.query(
       `INSERT INTO content_abuse_reports (reporter_id,target_type,target_id,reason)
-       VALUES($1,'message',$2,'spam')`, [reporterId, authorId],
+       VALUES($1,'unknown_type',$2,'spam')`, [reporterId, authorId],
     )).rejects.toMatchObject({ driverError: { code: '23514' } });
     await expect(db.query(
       `INSERT INTO content_abuse_reports (reporter_id,target_type,target_id,reason)

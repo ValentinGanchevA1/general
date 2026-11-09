@@ -21,6 +21,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { EventReviewsSection } from '@/features/events/EventReviewsSection';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { ReportContentButton } from '@/features/reports/ReportContentButton';
 import { EmptyState } from '@/components/EmptyState';
 import { useAppTheme, type ThemeColors } from '@/theme';
 import { EVENT_LIMITS, RSVP_STATUSES, type PollResult, type RsvpStatus } from '@g88/shared';
@@ -123,7 +124,7 @@ export function EventDetailScreen(): React.JSX.Element {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} progressBackgroundColor={colors.surfaceRaised} />}
     >
-      <ScreenHeader title="Event" />
+      <ScreenHeader title="Event" right={!isHost ? <ReportContentButton targetType="event" targetId={eventId} /> : null} />
       {event.coverUrl ? <Image source={{ uri: event.coverUrl }} style={styles.cover} /> : (
         <View style={[styles.cover, styles.coverPlaceholder]}><Icon name="calendar-star" size={40} color={colors.primary} /></View>
       )}
@@ -278,6 +279,7 @@ function PollComposer({ eventId, onCreated }: { eventId: string; onCreated: () =
 
 function QuestionsSection({ eventId, questions, onChanged }: { eventId: string; questions: ReturnType<typeof useEvent>['questions']; onChanged: () => void }): React.JSX.Element {
   const { colors, styles } = useEventDetailTheme();
+  const myUserId = useAppSelector(state => state.auth.user?.id);
   const [body, setBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const onAsk = useCallback(async () => {
@@ -307,6 +309,7 @@ function QuestionsSection({ eventId, questions, onChanged }: { eventId: string; 
           <View style={styles.questionBody}>
             <Text style={styles.questionText}>{q.body}</Text>
             <TouchableOpacity onPress={() => openViaRef('UserProfile', { userId: q.userId })} hitSlop={6}><Text style={styles.questionMeta}>{q.displayName}{q.answered ? ' · answered' : ''}</Text></TouchableOpacity>
+            {q.userId !== myUserId ? <ReportContentButton targetType="event_question" targetId={q.id} /> : null}
           </View>
         </View>
       ))}

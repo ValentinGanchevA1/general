@@ -40,6 +40,23 @@ describe('MessagingService', () => {
     expect(res.matched).toBe(true);
   });
 
+  it('does not reopen a legacy Dating match through the ordinary profile message CTA', async () => {
+    const previous = process.env.NEXUS_DATING_RELEASE_ENABLED;
+    delete process.env.NEXUS_DATING_RELEASE_ENABLED;
+    try {
+      mockPermission(['music'], [{
+        id: 'c1', status: 'accepted', initiated_by: null, dating_match: true,
+      }]);
+      await expect(service.permissionFor(VIEWER, TARGET)).resolves.toMatchObject({
+        canMessage: 'none', matched: false, conversation: null,
+      });
+      expect(query).toHaveBeenCalledTimes(3);
+    } finally {
+      if (previous === undefined) delete process.env.NEXUS_DATING_RELEASE_ENABLED;
+      else process.env.NEXUS_DATING_RELEASE_ENABLED = previous;
+    }
+  });
+
   it('grants request on a shared interest with no conversation', async () => {
     mockPermission(['climbing'], []);
     const res = await service.permissionFor(VIEWER, TARGET);

@@ -1,4 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import { assertAdultAge } from '../modules/auth/adult-eligibility';
 import { JwtService } from '@nestjs/jwt';
 import type { Socket } from 'socket.io';
 
@@ -11,9 +14,9 @@ type AuthedSocket = Socket<Record<string, never>, Record<string, never>, Record<
 export class WsJwtGuard implements CanActivate {
   private readonly logger = new Logger(WsJwtGuard.name);
 
-  constructor(private readonly jwt: JwtService) {}
+  constructor(private readonly jwt: JwtService, @InjectDataSource() private readonly db: DataSource) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const client = context.switchToWs().getClient<AuthedSocket>();
     const token = client.handshake.auth?.['token'] as string | undefined;
 
@@ -26,6 +29,7 @@ export class WsJwtGuard implements CanActivate {
       const payload = this.jwt.verify<JwtPayload>(token, {
         secret: process.env.JWT_SECRET!,
       });
+      await assertAdultAge(this.db, payload.sub);
       client.data.userId = payload.sub;
       return true;
     } catch (err) {

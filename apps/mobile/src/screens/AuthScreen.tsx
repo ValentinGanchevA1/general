@@ -18,6 +18,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NexaWordmark } from '@/components/Brand/NexaWordmark';
+import { isAdultDateOfBirth } from '@g88/shared';
 import { GoogleMark } from '@/components/GoogleMark';
 import { PasswordRecoveryScreen } from './PasswordRecoveryScreen';
 import { clearPasswordRecovery } from '@/features/auth/passwordResetSlice';
@@ -41,6 +42,7 @@ interface FieldErrors {
   email?: string;
   password?: string;
   displayName?: string;
+  dateOfBirth?: string;
 }
 
 function validate(
@@ -48,6 +50,7 @@ function validate(
   email: string,
   password: string,
   displayName: string,
+  dateOfBirth: string,
 ): FieldErrors {
   const errors: FieldErrors = {};
   const e = email.trim();
@@ -68,6 +71,9 @@ function validate(
     } else if (name.length < 2) {
       errors.displayName = 'Display name must be at least 2 characters';
     }
+    if (!isAdultDateOfBirth(dateOfBirth)) {
+      errors.dateOfBirth = 'Enter your date of birth (YYYY-MM-DD) to confirm adult eligibility.';
+    }
   }
   return errors;
 }
@@ -83,6 +89,7 @@ export function AuthScreen(): React.JSX.Element {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [phone, setPhone] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -104,7 +111,7 @@ export function AuthScreen(): React.JSX.Element {
     void (async () => {
       if (loading) return;
       dispatch(clearError());
-      const nextErrors = validate(mode, email, password, displayName);
+      const nextErrors = validate(mode, email, password, displayName, dateOfBirth);
       setFieldErrors(nextErrors);
       if (Object.keys(nextErrors).length > 0) return;
 
@@ -114,7 +121,7 @@ export function AuthScreen(): React.JSX.Element {
       }
 
       const action = await dispatch(
-        register({ email: email.trim(), password, displayName: displayName.trim() }),
+        register({ email: email.trim(), password, displayName: displayName.trim(), dateOfBirth }),
       );
       if (register.fulfilled.match(action) && phone.trim().length >= 8) {
         await setPendingPhoneVerify(phone.trim());
@@ -182,6 +189,12 @@ export function AuthScreen(): React.JSX.Element {
                 Create your NEXUS account
               </Text>
             ) : null}
+            {mode === 'register' ? (
+              <Text style={[styles.eligibilityNote, { color: colors.textSecondary }]}>
+                NEXUS is available to adults aged 18 or older. Dating is disabled
+                during the first release.
+              </Text>
+            ) : null}
 
             {mode === 'register' ? (
               <FormField
@@ -196,6 +209,21 @@ export function AuthScreen(): React.JSX.Element {
                 onSubmitEditing={() => emailRef.current?.focus()}
                 error={fieldErrors.displayName}
                 accessibilityLabel="Display name"
+              />
+            ) : null}
+
+            {mode === 'register' ? (
+              <FormField
+                placeholder="Date of birth (YYYY-MM-DD)"
+                value={dateOfBirth}
+                onChangeText={(text) => {
+                  setDateOfBirth(text);
+                  clearFieldError('dateOfBirth');
+                }}
+                keyboardType="numbers-and-punctuation"
+                maxLength={10}
+                error={fieldErrors.dateOfBirth}
+                accessibilityLabel="Date of birth"
               />
             ) : null}
 
@@ -374,6 +402,7 @@ const styles = StyleSheet.create({
   tagline: { fontSize: fontSize.sm, textAlign: 'center', letterSpacing: 1.1 },
   form: { gap: spacing.md },
   title: { fontSize: fontSize.lg, fontWeight: '600', textAlign: 'center', marginBottom: spacing.sm },
+  eligibilityNote: { fontSize: fontSize.sm, lineHeight: 19, textAlign: 'center', marginBottom: spacing.md },
   fieldIcon: { marginLeft: spacing.lg },
   visibilityButton: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   error: { fontSize: fontSize.sm, lineHeight: 19, textAlign: 'center' },

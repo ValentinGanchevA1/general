@@ -25,6 +25,8 @@
 
 ---
 
+> **First release availability gate (2026-11-08):** Adult-only Dating is temporarily disabled by default until independently reviewed age assurance is operational. Do **not** advertise Dating, matches or adult-only dating discovery as available in the initial release build. The general-social app can ship separately only after child/teen safety and Play declarations are resolved. Backend switch `NEXUS_DATING_RELEASE_ENABLED` must remain unset/false in first-release production; mobile hides the Dating toggle. Do not turn this switch on merely because users enter an adult DOB.
+
 ## 2. Store listing copy
 
 ### App name
@@ -60,9 +62,13 @@ WHAT YOU CAN DO
 • Marketplace — explore local listings and offers
 • Identity verification — manage verification signals through Trust Center
 • Map presence controls — choose whether you appear in nearby discovery
+• Privacy-aware nearby social discovery — decide when to appear on the map
 
 BUILT FOR PRIVACY
-NEXUS displays privacy-coarsened locations for nearby map discovery. Separately,\nyou may opt into sharing precise live GPS with one other person in a 1:1 chat.\nThe backend retains last live-session coordinates and the location in the initial\nchat message, subject to our documented retention and deletion practices.
+NEXUS displays privacy-coarsened locations for nearby map discovery. Separately,
+you may opt into sharing precise live GPS with one other person in a 1:1 chat.
+The backend retains last live-session coordinates and the location in the initial
+chat message, subject to our documented retention and deletion practices.
 
 Verification is factual and signal-based. NEXUS does not expose a public numeric
 trust or popularity score.
@@ -124,6 +130,13 @@ instead of a single endless global feed.
 | **Crash logs / diagnostics** | Collected when diagnostics are enabled | Stability / debugging |
 | **Purchase / subscription data** | ⟨verify enabled billing path⟩ | Subscription / premium functionality |
 | **Government ID / verification material** | ⟨validate exact collection, retention and processor declarations⟩ | Identity verification |
+| **Sexual orientation** | Collected when supplied | Explicit profile orientation field; sensitive Personal info even if public visibility is disabled |
+| **Other personal info** | Collected | Date of birth, gender identity, dating preferences, profile context |
+| **Videos** | Collected when supplied | User-uploaded Story video; may include audio embedded in the video |
+| **Files and documents** | Collected when supplied | Identity-verification document images and accompanying documents |
+| **Other user-generated content** | Collected | Stories, listings, events, check-ins, event questions and reviews |
+| **Location live-share** | Collected and disclosed to an explicitly selected chat partner | Initial chat location and latest session lat/lng persist after session end; disclose precisely |
+| **Other in-app messages** | Collected | DM/group chat text and attachments as enabled |
 
 ### 3c. Location declaration note
 
@@ -142,6 +155,9 @@ form rather than weakening the privacy explanation.
 - [ ] Publish and verify the external deletion-request path: `/delete-account/` (draft in `docs/legal/delete-account/index.html`); required in addition to in-app deletion
 - [ ] Current release build checked for analytics / diagnostics providers
 - [ ] Current identity-verification processors and retention disclosed accurately
+- [ ] Age-related sensitive fields (date of birth, gender identity, orientation and dating preferences) declared under Play taxonomy
+- [ ] Story videos, uploaded media and government ID files/documents correctly declared
+- [ ] Distinguish consent-based user-to-user live-coordinate sharing from vendor processing in Play's Sharing questions
 - [ ] No public numeric trust/popularity score is claimed
 
 ---
@@ -152,7 +168,10 @@ form rather than weakening the privacy explanation.
 - [ ] **App access** — provide reviewer credentials and steps to reach Map / core flows
 - [ ] **Ads** — verify against the exact release build; do not infer from old docs
 - [ ] **Content rating** — complete the current Play questionnaire truthfully for UGC, user communication and location-aware social functionality
-- [ ] **Target audience** — configure the intended audience explicitly; do not target children by accident
+- [ ] **Target audience:** NEXUS is **18+ throughout the Social app** at first launch. Select only **18 and over** in Play Console and enable **Restrict Minor Access**. Verify the final backend age gate and signed AAB. Dating stays disabled.
+- [x] **Final product owner decision (8 Nov 2026):** public name **NEXUS**, entire Social release **18+**. Supersedes the Dating-only 18+ decision. Do not claim independent age verification from a self-entered DOB.
+- [ ] **Reviewer evidence:** provide a social-access test account and, if Dating is enabled in the submitted build, a separate eligible-adult account to demonstrate age controls and no underage Dating exposure.
+- [ ] **Social child safety:** publish child sexual abuse and exploitation prevention standards, reporting pathway and contact; assess unknown-user chat, live location and meetups before selecting any under-18 target audience groups.
 - [ ] **Data Safety** — validate the matrix above against the exact release build
 - [ ] **Financial features / subscriptions** — declare enabled subscription/payment behavior accurately
 - [ ] **Identity verification** — ensure any ID/selfie processing disclosures match the production implementation
