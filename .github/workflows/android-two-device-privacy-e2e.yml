@@ -289,5 +289,6 @@ jobs:
         if: always()
         run: |
           if [ -f "$DEVICE_E2E_STATE_FILE" ]; then
-            node scripts/android-two-device-privacy-setup.mjs cleanup || true
+            # Cleanup failures must fail the workflow; they are not an E2E pass.
+            node scripts/android-two-device-privacy-setup.mjs cleanup
           fi
