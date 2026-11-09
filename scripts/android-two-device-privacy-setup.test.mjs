@@ -1,3 +1,6 @@
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -58,4 +61,58 @@ test('E2E preflight rejects HTTP, credentials, paths and querystrings', () => {
 test('E2E preflight accepts an explicitly approved synthetic staging origin without making requests', () => {
   const result = verify('https://nexa-stage.example.invalid', 'true');
   assert.equal(result.status, 0, result.output);
+});
+
+
+test('partial setup cleanup retains evidence after 401 and resumes without deleting already-cleaned users', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'nexus-e2e-cleanup-'));
+  const stateFile = join(directory, 'state.json');
+  const preload = join(directory, 'fetch-mock.mjs');
+  const baseUrl = 'https://nexa-stage.example.invalid';
+  try {
+    await writeFile(stateFile, JSON.stringify({
+      baseUrl,
+      password: 'synthetic-test-only',
+      a: { accessToken: 'already-cleanable' },
+      b: { accessToken: 'temporarily-unauthorized' },
+      cleaned: [],
+    }), { mode: 0o600 });
+
+    // Fail one synthetic DELETE with HTTP 401; no remote service is contacted.
+    await writeFile(preload, `
+      globalThis.fetch = async (_url, options) => ({
+        status: options?.headers?.Authorization === 'Bearer temporarily-unauthorized' &&
+          process.env.NEXUS_TEST_FAIL_CLEANUP === '1' ? 401 : 204,
+        json: async () => ({}),
+      });
+    `);
+    const cleanup = (fail) => spawnSync(process.execPath, [
+      '--import', preload, entry, 'cleanup',
+    ], {
+      encoding: 'utf8',
+      timeout: 10_000,
+      env: {
+        ...process.env,
+        DEVICE_E2E_BASE_URL: baseUrl,
+        DEVICE_E2E_STAGING_APPROVED: 'true',
+        DEVICE_E2E_STATE_FILE: stateFile,
+        NEXUS_TEST_FAIL_CLEANUP: fail ? '1' : '0',
+      },
+    });
+
+    const first = cleanup(true);
+    assert.equal(first.error, undefined);
+    assert.notEqual(first.status, 0);
+    assert.match(first.stderr, /cleanup failed: HTTP 401/);
+    const partial = JSON.parse(await readFile(stateFile, 'utf8'));
+    assert.deepEqual(partial.cleaned, ['a']);
+    assert.ok(partial.b);
+
+    const second = cleanup(false);
+    assert.equal(second.error, undefined);
+    assert.equal(second.status, 0, second.stderr);
+    await assert.rejects(() => readFile(stateFile, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
