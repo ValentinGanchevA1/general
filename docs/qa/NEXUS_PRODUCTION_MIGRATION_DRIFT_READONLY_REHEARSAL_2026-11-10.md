@@ -19,6 +19,25 @@ On 2026-11-10, the connected Render workspace `tea-d87btoog4nts73domv40` returne
 
 **Critical separation:** The latest verified *live* Render deploy remains `dep-dbp80rvavr4c73edbolg` on commit `411dd153...`; the newer `master` SHA `eb946d09...` includes merged PR #1087 but has **not** been proven deployed. Disabling Auto Deploy reduces accidental release risk; a manual deployment still runs `migration:run` unless its build command is changed through an approved rollout plan.
 
+## A0. Confirm the *actual* database target before running SQL (read-only status update)
+
+A fresh connected-provider inventory on 2026-11-10 found:
+
+- The currently connected Supabase account exposes one project named `NEXA`, with status **INACTIVE**. Its **identity as the PostgreSQL target used by production `g88-api` is NOT established**. A familiar project name is not an identity proof.
+- The connected Render workspace reports **zero Render-managed Postgres instances**. This does not exclude an external/other-workspace PostgreSQL host, nor does it prove an external database has been safely separated from previews.
+- Render `g88-api` still reports production Auto Deploy **OFF**; a manual deploy would still run `migration:run`.
+
+**Hold:** Do not use the connected inactive Supabase project to "verify production" and do not resume/restore it merely for this audit. Do not attempt SQL through unverified targets. The older nine-row `schema_migrations` output remains *historical owner-supplied evidence*, not a fresh observation from this connection.
+
+**Owner target attestation — no secrets in shared evidence:**
+
+1. Open Render Dashboard → `g88-api` → Environment, inspect the existing `DATABASE_URL` **locally inside Render only**. Do not copy the full URI, password, SSL parameters, service role keys, JWTs or credentials into chat/GitHub.
+2. Read only `host`, `port`, `database name` and `database user`; separately open the intended PostgreSQL provider dashboard and compare its exact database host + name. Record whether they agree and which provider/account owns the running DB, not the credential.
+3. If Render points to another PostgreSQL account/project or if the target differs from the connected inactive Supabase project, use the correct provider read-only SQL editor/connector. Do **not** run the postconditions SQL until this match is confirmed.
+4. Once identity is confirmed, run `NEXUS_PRODUCTION_SCHEMA_POSTCONDITIONS_READONLY_2026-11-10.sql` with **read-only** access and record only schema metadata and aggregate counts; then separately attest staging PostgreSQL, Redis, storage and outbound credentials are isolated.
+
+**Gate:** The production DB target is currently **UNKNOWN / NOT ATTESTED** from the available connected systems. This blocks production schema conclusions, migration reconciliation sign-off and rollout. It does **not** invalidate the synthetically tested GitHub SQL, which must remain categorized as *synthetic/local evidence*.
+
 ## A. Read-only target identification
 
 1. In Render, open production `g88-api` and the intended, separately provisioned **staging** service. Record only non-secret Postgres **host, port, database name and database user** and independently provisioned Redis/storage destinations. **Do not copy credentials, JWTs, OAuth secrets or connection strings into GitHub/issues/chat.**
