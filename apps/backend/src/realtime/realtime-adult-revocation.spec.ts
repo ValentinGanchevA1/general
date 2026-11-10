@@ -23,16 +23,16 @@ describe('RealtimeGateway — idle outbound socket eligibility sweep', () => {
       eligibleUserIds: jest.fn().mockResolvedValue(new Set(['adult-user'])),
     };
     const logger = { error: jest.fn() };
-    const gateway = Object.assign(
-      Object.create(RealtimeGateway.prototype) as RealtimeGateway,
-      {
-        server: { local },
-        adultEligibility,
-        logger,
-        ageSweepRunning: false,
-        ageSweepTimer: null,
-      },
-    );
+    // Keep the declared class type; Object.assign's inferred intersection
+    // with the private logger field would otherwise become 'never'.
+    const gateway = Object.create(RealtimeGateway.prototype) as RealtimeGateway;
+    Object.assign(gateway, {
+      server: { local },
+      adultEligibility,
+      logger,
+      ageSweepRunning: false,
+      ageSweepTimer: null,
+    });
     return { gateway, local, adultEligibility, logger };
   }
 
