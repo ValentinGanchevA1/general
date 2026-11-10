@@ -6,7 +6,7 @@
  *         cap, recipient-reply promotion)
  *
  * Note: the message-request check registers ONE throwaway receiver per run
- * (monitor-req-<ts>@g88.app). The request→accept promotion is one-way, so a
+ * (monitor-req-<uuid>@g88.app). The request→accept promotion is one-way, so a
  * reused pair could only be exercised once; a fresh receiver keeps the check
  * deterministic. These users accumulate slowly — prune periodically if needed.
  *
@@ -21,6 +21,7 @@
  *   MONITOR_USER_B_PASSWORD
  */
 
+import { randomUUID } from 'node:crypto';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
@@ -30,7 +31,7 @@ let io;
 try {
   ({ io } = require('socket.io-client'));
 } catch {
-  ({ io } = require('./apps/mobile/node_modules/socket.io-client'));
+  ({ io } = require('../apps/mobile/node_modules/socket.io-client'));
 }
 
 /** Allowed API origins for the monitor (SSRF / open-fetch guard). */
@@ -61,6 +62,7 @@ function resolveBase(raw) {
 
 const BASE = resolveBase(process.env.MONITOR_API_URL);
 const API  = `${BASE}/api/v1`;
+const SYNTHETIC_ADULT_DOB = '2000-01-01';
 
 const USER_A = {
   email:    process.env.MONITOR_USER_A_EMAIL    ?? 'monitor-a@g88.app',
@@ -89,8 +91,7 @@ function ok(label, detail = '') {
 }
 
 function fail(label, detail = '') {
-  console.error(`  ✗ ${label}${detail ? '  ' + detail : ''}`);
-  process.exit(1);
+  throw new Error(`✗ ${label}${detail ? '  ' + detail : ''}`);
 }
 
 async function post(path, body, token) {
@@ -131,14 +132,26 @@ async function patch(path, body, token) {
 async function auth(user) {
   let res = await post('/auth/login', { email: user.email, password: user.password });
   if (res.status === 200) {
+    const token = res.body.tokens.accessToken;
     ok(`login ${user.email}`, elapsed());
-    return { token: res.body.tokens.accessToken, userId: res.body.user.id };
+    const profile = await get('/users/me/profile', token);
+    if (profile.status !== 200) fail('read monitor account profile', `HTTP ${profile.status}`);
+    // Older synthetic monitor accounts were created before DOB was required.
+    if (profile.body?.dateOfBirth === null) {
+      const age = await patch('/auth/age-eligibility', { dateOfBirth: SYNTHETIC_ADULT_DOB }, token);
+      if (age.status !== 200 || age.body?.eligible !== true) {
+        fail('complete monitor account age eligibility', `HTTP ${age.status}`);
+      }
+      ok('monitor account age eligibility completed');
+    }
+    return { token, userId: res.body.user.id };
   }
   if (res.status === 401) {
     res = await post('/auth/register', {
       email: user.email,
       password: user.password,
       displayName: user.displayName,
+      dateOfBirth: SYNTHETIC_ADULT_DOB,
     });
     if (res.status !== 201) fail(`register ${user.email}`, `HTTP ${res.status} ${JSON.stringify(res.body)}`);
     ok(`register ${user.email} (first run)`, elapsed());
@@ -330,92 +343,112 @@ const SHARED_TAG = 'synthetic-monitor';
 // Fresh receiver each run: request→accept promotion is one-way, so a reused pair
 // could only exercise the request path once. A throwaway user keeps it hermetic.
 const reqUser = {
-  email: `monitor-req-${Date.now()}@g88.app`,
-  password: 'MonitorPass_R1!',
+  email: `monitor-req-${randomUUID()}@g88.app`,
+  password: randomUUID(),
   displayName: 'Monitor Req',
 };
 const r = await auth(reqUser);
 
-// Give A and R a common interest so the gate opens the request path.
-const patchA = await patch('/users/me/profile', { interests: [SHARED_TAG] }, a.token);
-if (patchA.status !== 200) fail('patch A interests', `HTTP ${patchA.status}`);
-const patchR = await patch('/users/me/profile', { interests: [SHARED_TAG] }, r.token);
-if (patchR.status !== 200) fail('patch R interests', `HTTP ${patchR.status}`);
-ok('shared interest set', `A & R both like "${SHARED_TAG}"`);
-
-// A views R's profile → relationship should offer a request, not a full chat.
-const rel0 = await get(`/users/${r.userId}`, a.token);
-if (rel0.status !== 200) fail('GET /users/:id (R)', `HTTP ${rel0.status}`);
-const relationship0 = rel0.body?.relationship;
-if (!relationship0) fail('relationship block missing on public profile');
-if (relationship0.canMessage !== 'request') fail('expected canMessage=request', `got "${relationship0.canMessage}"`);
-if (relationship0.matched !== false) fail('expected matched=false before any message');
-if (!Array.isArray(relationship0.sharedInterests) || !relationship0.sharedInterests.includes(SHARED_TAG)) {
-  fail('expected sharedInterests to include the tag', JSON.stringify(relationship0.sharedInterests));
-}
-ok('relationship = request', `sharedInterests=${JSON.stringify(relationship0.sharedInterests)}`);
-
-// Open the request conversation.
-const openRes = await post('/conversations', { targetUserId: r.userId }, a.token);
-if (openRes.status !== 201) fail('POST /conversations', `HTTP ${openRes.status} ${JSON.stringify(openRes.body)}`);
-if (openRes.body?.status !== 'pending' || openRes.body?.permission !== 'request') {
-  fail('expected pending/request', JSON.stringify(openRes.body));
-}
-const reqConvoId = openRes.body.conversationId;
-ok('request conversation opened', `id=${reqConvoId}  ${elapsed()}`);
-
-// Sockets for A and R, both joined to the request room.
-let socketReqA, socketReqR;
 try {
-  [socketReqA, socketReqR] = await Promise.all([connectSocket(a.token), connectSocket(r.token)]);
-  ok('sockets connected (A, R)', elapsed());
-} catch (e) {
-  fail('socket connect (request flow)', e.message);
-}
+  // Give A and R a common interest so the gate opens the request path.
+  const patchA = await patch('/users/me/profile', { interests: [SHARED_TAG] }, a.token);
+  if (patchA.status !== 200) fail('patch A interests', `HTTP ${patchA.status}`);
+  const patchR = await patch('/users/me/profile', { interests: [SHARED_TAG] }, r.token);
+  if (patchR.status !== 200) fail('patch R interests', `HTTP ${patchR.status}`);
+  ok('shared interest set', `A & R both like "${SHARED_TAG}"`);
 
-const jReqA = await joinConversation(socketReqA, reqConvoId);
-if (!jReqA.ok) fail('conversation:join A (request)', JSON.stringify(jReqA));
-const jReqR = await joinConversation(socketReqR, reqConvoId);
-if (!jReqR.ok) fail('conversation:join R (request)', JSON.stringify(jReqR));
-ok('both joined request conversation');
+  const privateProfile = await get(`/users/${r.userId}`, a.token);
+  if (privateProfile.status !== 404 || privateProfile.body?.code !== 'users.not_found') {
+    fail('private receiver profile should be hidden', `HTTP ${privateProfile.status}`);
+  }
+  ok('private receiver profile hidden', 'HTTP 404');
 
-// A sends the single allowed request message.
-const m1 = await socketSendAck(socketReqA, reqConvoId, 'request: hi from monitor', `req-${Date.now()}-1`);
-if (!m1.ok) fail('first request message', JSON.stringify(m1));
-ok('request message #1 sent', elapsed());
+  const publish = await patch('/users/me/profile', { visibility: 'public' }, r.token);
+  if (publish.status !== 200 || publish.body?.visibility !== 'public') {
+    fail('enable receiver profile visibility', `HTTP ${publish.status}`);
+  }
 
-// A's SECOND message must be blocked by the one-message cap.
-const m2 = await socketSendAck(socketReqA, reqConvoId, 'request: should be blocked', `req-${Date.now()}-2`);
-if (m2.ok) fail('one-message cap', 'second message was accepted but should be blocked');
-if (m2.code !== 'chat.request_pending') fail('expected chat.request_pending', `got "${m2.code}"`);
-ok('one-message cap enforced', `code=${m2.code}`);
+  // A views R's public profile and should be able to send a message request.
+  const rel0 = await get(`/users/${r.userId}`, a.token);
+  if (rel0.status !== 200) fail('GET /users/:id (R)', `HTTP ${rel0.status}`);
+  ok('public receiver profile accessible', 'HTTP 200');
+  const relationship0 = rel0.body?.relationship;
+  if (!relationship0) fail('relationship block missing on public profile');
+  if (relationship0.canMessage !== 'request') fail('expected canMessage=request', `got "${relationship0.canMessage}"`);
+  if (relationship0.matched !== false) fail('expected matched=false before any message');
+  if (!Array.isArray(relationship0.sharedInterests) || !relationship0.sharedInterests.includes(SHARED_TAG)) {
+    fail('expected sharedInterests to include the tag', JSON.stringify(relationship0.sharedInterests));
+  }
+  ok('relationship = request', `sharedInterests=${JSON.stringify(relationship0.sharedInterests)}`);
 
-// R replies → promotes the conversation to accepted (A should receive it).
-const replyReceived = new Promise((resolve) => {
-  const timer = setTimeout(() => resolve(null), 10_000);
-  socketReqA.on('chat:message', (msg) => {
-    if (msg.senderId === r.userId) { clearTimeout(timer); resolve(msg); }
+  // Open the request conversation.
+  const openRes = await post('/conversations', { targetUserId: r.userId }, a.token);
+  if (openRes.status !== 201) fail('POST /conversations', `HTTP ${openRes.status} ${JSON.stringify(openRes.body)}`);
+  if (openRes.body?.status !== 'pending' || openRes.body?.permission !== 'request') {
+    fail('expected pending/request', JSON.stringify(openRes.body));
+  }
+  const reqConvoId = openRes.body.conversationId;
+  ok('request conversation opened', `id=${reqConvoId}  ${elapsed()}`);
+
+  // Sockets for A and R, both joined to the request room.
+  let socketReqA, socketReqR;
+  try {
+    [socketReqA, socketReqR] = await Promise.all([connectSocket(a.token), connectSocket(r.token)]);
+    ok('sockets connected (A, R)', elapsed());
+  } catch (e) {
+    fail('socket connect (request flow)', e.message);
+  }
+
+  const jReqA = await joinConversation(socketReqA, reqConvoId);
+  if (!jReqA.ok) fail('conversation:join A (request)', JSON.stringify(jReqA));
+  const jReqR = await joinConversation(socketReqR, reqConvoId);
+  if (!jReqR.ok) fail('conversation:join R (request)', JSON.stringify(jReqR));
+  ok('both joined request conversation');
+
+  // A sends the single allowed request message.
+  const m1 = await socketSendAck(socketReqA, reqConvoId, 'request: hi from monitor', `req-${Date.now()}-1`);
+  if (!m1.ok) fail('first request message', JSON.stringify(m1));
+  ok('request message #1 sent', elapsed());
+
+  // A's SECOND message must be blocked by the one-message cap.
+  const m2 = await socketSendAck(socketReqA, reqConvoId, 'request: should be blocked', `req-${Date.now()}-2`);
+  if (m2.ok) fail('one-message cap', 'second message was accepted but should be blocked');
+  if (m2.code !== 'chat.request_pending') fail('expected chat.request_pending', `got "${m2.code}"`);
+  ok('one-message cap enforced', `code=${m2.code}`);
+
+  // R replies → promotes the conversation to accepted (A should receive it).
+  const replyReceived = new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), 10_000);
+    socketReqA.on('chat:message', (msg) => {
+      if (msg.senderId === r.userId) { clearTimeout(timer); resolve(msg); }
+    });
   });
-});
-const rReply = await socketSendAck(socketReqR, reqConvoId, 'reply: accepted!', `req-${Date.now()}-reply`);
-if (!rReply.ok) fail('R reply', JSON.stringify(rReply));
-if (!(await replyReceived)) fail('A did not receive R reply');
-ok('R reply promotes request', elapsed());
+  const rReply = await socketSendAck(socketReqR, reqConvoId, 'reply: accepted!', `req-${Date.now()}-reply`);
+  if (!rReply.ok) fail('R reply', JSON.stringify(rReply));
+  if (!(await replyReceived)) fail('A did not receive R reply');
+  ok('R reply promotes request', elapsed());
 
-// Relationship now reflects an accepted chat, and A can send freely.
-const rel1 = await get(`/users/${r.userId}`, a.token);
-if (rel1.body?.relationship?.canMessage !== 'chat') {
-  fail('expected canMessage=chat after promotion', JSON.stringify(rel1.body?.relationship));
+  // Relationship now reflects an accepted chat, and A can send freely.
+  const rel1 = await get(`/users/${r.userId}`, a.token);
+  if (rel1.body?.relationship?.canMessage !== 'chat') {
+    fail('expected canMessage=chat after promotion', JSON.stringify(rel1.body?.relationship));
+  }
+  if (rel1.body?.relationship?.matched !== true) fail('expected matched=true after promotion');
+  ok('promotion confirmed', 'canMessage=chat, matched=true');
+
+  const m3 = await socketSendAck(socketReqA, reqConvoId, 'now unrestricted', `req-${Date.now()}-3`);
+  if (!m3.ok) fail('post-promotion send', JSON.stringify(m3));
+  ok('messaging unrestricted after promotion', elapsed());
+
+  socketReqA.disconnect();
+  socketReqR.disconnect();
+} finally {
+  const restore = await patch('/users/me/profile', { visibility: 'private' }, r.token);
+  if (restore.status !== 200 || restore.body?.visibility !== 'private') {
+    fail('restore receiver profile visibility', `HTTP ${restore.status}`);
+  }
+  ok('receiver profile restored to private');
 }
-if (rel1.body?.relationship?.matched !== true) fail('expected matched=true after promotion');
-ok('promotion confirmed', 'canMessage=chat, matched=true');
-
-const m3 = await socketSendAck(socketReqA, reqConvoId, 'now unrestricted', `req-${Date.now()}-3`);
-if (!m3.ok) fail('post-promotion send', JSON.stringify(m3));
-ok('messaging unrestricted after promotion', elapsed());
-
-socketReqA.disconnect();
-socketReqR.disconnect();
 
 // ─── Done ─────────────────────────────────────────────────────────────────────
 console.log(`\n✅  All checks passed in ${Date.now() - t0}ms`);
