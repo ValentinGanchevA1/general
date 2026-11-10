@@ -26,6 +26,8 @@ jobs:
           node-version-file: '.nvmrc'
       - name: Test secret scanning guard (regressions)
         run: node --test scripts/ci/check-no-secrets.test.mjs
+      - name: Test G88 Supabase API ACL hardening script (static, no database writes)
+        run: node --test scripts/ci/check-supabase-api-acl-hotfix.test.mjs
       - name: Test Play AAB manual publish and signature workflow guard
         run: node --test scripts/ci/check-play-release-workflow.test.mjs
       - name: Test disposable PostGIS credentials remain synchronized and localhost-only
@@ -74,6 +76,10 @@ jobs:
         run: node --test apps/backend/scripts/preview-db-guard.test.cjs
       - name: Test fail-closed migration history preflight (read-only)
         run: node --test apps/backend/scripts/migration-history-guard.test.cjs
+      - name: Test owner-supplied migration drift inventory (offline, always blocking)
+        run: node --test apps/backend/scripts/migration-reconciliation-report.test.cjs
+      - name: Test read-only DB target attestation (fake DB, no connection)
+        run: node --test apps/backend/scripts/db-target-attestation.test.cjs
       - name: Test migration guard against disposable local PostgreSQL (no production URL)
         env:
           NEXUS_EPHEMERAL_PG_INTEGRATION: 'true'

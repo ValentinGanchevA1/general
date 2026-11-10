@@ -1,6 +1,6 @@
 # NEXUS RC1 Android — 18+ age bootstrap + map QA sign-off (2026-11-10)
 
-**Status:** TEST PLAN ONLY. No physical-device results claimed. Test only against an isolated staging API and disposable accounts; do not turn on `NEXUS_REQUIRE_ADULT_AGE` in Render production.
+**Status:** TEST PLAN ONLY. No physical-device results claimed. Backend-only age status API merged in #1097 but is NOT deployed to the current live Render service; the mobile release must stay blocked until staging verifies backend-first rollout. Test only against an isolated staging API and disposable accounts; do not turn on `NEXUS_REQUIRE_ADULT_AGE` in Render production.
 
 ## Preconditions & evidence
 
@@ -54,3 +54,7 @@ For every test, record `PASS | FAIL | BLOCKED | NOT RUN`, linked CI run + SHA, d
 
 ## Release decision
 **NO-GO** until all P0 eligibility cases, map security and legacy login restore pass on devices; staging isolation and backup tests are proven; 18+ legal/Play policy approved; Dating OFF proven in release AAB; and owner explicitly authorizes deployment. The backend age flag remains OFF in production until then.
+
+## Verified CI artifact (not device-tested)
+
+The earlier Draft #1096 APK passed its GitHub Actions sideload build and was uploaded as [artifact 13804818424](https://github.com/ValentinGanchevA1/general/actions/runs/42902404959/artifacts/13804818424). **This artifact belongs to the PRE-REBASE commit**, not to the next regenerated PR head; obtain a fresh artifact from the exact final SHA for device testing.
