@@ -62,6 +62,52 @@ COMMIT;
 
 `SELECT` contains migration filenames and target metadata only. **Do not export users/IDs/DOB/photo/phone/email rows.** If the tracker table is absent, stop and record that; do not create it.
 
+### Nine production tracker records — recovered from the owner's 2026-11-09 read-only output
+
+These are the **original owner-supplied** `filename`/`applied_at` values (UTC), **not a new query** in this turn. Each Git blob below is a matched historical source candidate; the tracker does not itself certify SQL checksums or the exact deployed commit.
+
+| Applied at (UTC) | Tracker filename | Git SQL blob SHA | Candidate source |
+| --- | --- | --- | --- |
+| 2026-11-07 16:47:19.261582 | `0072_ugc_terms_acceptance.sql` | `818af7aef1afb495dc496e85a38219977a99d422` | #1066 / #1067 |
+| 2026-11-07 17:02:09.443726 | `0072_extend_content_report_targets.sql` | `b6cd7ba8fb740f65fa3a84ef42ff31205baa11a2` | #1066, old name at `fb79c8fe` |
+| 2026-11-07 17:02:09.599954 | `0073_event_question_moderation.sql` | `92d66c3abe6b73a7ce779869d839d8c6e6752661` | #1066, old name at `fb79c8fe` |
+| 2026-11-07 17:17:15.754453 | `0073_extend_content_report_targets.sql` | `b6cd7ba8fb740f65fa3a84ef42ff31205baa11a2` | #1066, renamed at `528e4bf4` |
+| 2026-11-07 17:17:15.893573 | `0074_event_question_moderation.sql` | `92d66c3abe6b73a7ce779869d839d8c6e6752661` | #1066, renamed at `528e4bf4` |
+| 2026-11-08 02:35:28.838706 | `0072_personal_labels.sql` | `dd08626c763b3b2b519a998938623e5423d5c522` | #1074, preview commit `7ba6777c` |
+| 2026-11-08 06:56:36.794158 | `0075_dating_match_conversation_lookup.sql` | `9a2a4ce98d858724bf2be3014249824301a930c2` | #1066 |
+| 2026-11-08 08:22:41.174796 | `0076_child_safety_report_reason.sql` | `e6618f99d54e5f15e5af7f63f112448c3a7a2b5d` | #1066 |
+| 2026-11-08 08:54:18.018611 | `0077_adult_only_rc1_visibility.sql` | `17653579249598c4783212d0bdbc63dae8698be5` | #1066 |
+
+**Rename evidence:** [Commit `fb79c8fe`](https://github.com/ValentinGanchevA1/general/commit/fb79c8feaa59062a9d4fd3bc786219344ce293d9) has `0072_extend_content_report_targets.sql` and `0073_event_question_moderation.sql`. [Commit `528e4bf4`](https://github.com/ValentinGanchevA1/general/commit/528e4bf4b15a2609331c50fc5766ab364c61a1e9) has `0073_extend_content_report_targets.sql` and `0074_event_question_moderation.sql` with **identical blob IDs**. One SQL body drops/recreates a reporting CHECK constraint; the other has `ADD COLUMN IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS`. These statements allow reapplication in ordinary cases, **not a proof of no lock, data or state impact in production**.
+
+#### Read-only schema inspection of the renamed operations
+
+```sql
+BEGIN TRANSACTION READ ONLY;
+SELECT c.conname, pg_get_constraintdef(c.oid) AS definition
+FROM pg_constraint AS c
+JOIN pg_class AS t ON t.oid = c.conrelid
+JOIN pg_namespace AS n ON n.oid = t.relnamespace
+WHERE n.nspname = 'public'
+  AND t.relname = 'content_abuse_reports'
+  AND c.conname = 'content_abuse_reports_target_type_check';
+
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'event_questions'
+  AND column_name = 'deleted_at';
+
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND tablename = 'event_questions'
+  AND indexname = 'event_questions_visible_event_idx';
+COMMIT;
+```
+
+**Never delete, renumber or collapse those nine production `schema_migrations` rows.** Historical tracker identity, exact deploy-to-DB lineage and an isolated backup restoration still need independent evidence.
+
 ### GitHub SQL candidates
 
 Read-only GitHub tree inspections identify these **candidate SQL files** on historical PR heads:
@@ -76,7 +122,7 @@ Read-only GitHub tree inspections identify these **candidate SQL files** on hist
 | #1066 | same | `0077_adult_only_rc1_visibility.sql` | `17653579249598c4783212d0bdbc63dae8698be5` |
 | [#1074](https://github.com/ValentinGanchevA1/general/pull/1074) | `7ba6777c8b64ef7d78eebb23e947ccee636eea6b` | `0072_personal_labels.sql` | `dd08626c763b3b2b519a998938623e5423d5c522` |
 
-The Git blob IDs identify source SQL versions. The owner audit reported **nine** production tracker entries, including three distinct `0072` names and two distinct `0073` names. The seven candidate files above leave at least two entries to identify from the exact tracker rows. Compare schema postconditions alongside source hashes.
+The owner's earlier read-only production snapshot contains **nine named migration records**. They can now be mapped to **seven distinct historical Git SQL blobs**: two extra filename records came from renumbering (0072→0073 and 0073→0074) while preserving the SQL blob byte-for-byte. This reconstructs source candidates, **not** the exact deployed Git revision or current schema. Verify the tracker again and inspect schema postconditions read-only.
 
 ### Potential migration impacts, assessed from GitHub SQL text only
 
@@ -90,12 +136,12 @@ The Git blob IDs identify source SQL versions. The owner audit reported **nine**
 | `0076_child_safety_report_reason.sql` (#1066) | ALTER TABLE, CREATE INDEX | Preserve/report sensitive child-safety categories |
 | `0077_adult_only_rc1_visibility.sql` (#1066) | UPDATE users | **Potentially large irreversible history-loss of prior visibility state**; do not re-publicize DOB-null users |
 
-The two additional `0072`/`0073` production records reported by the owner are **not yet linked to exact source SQL**. Even filenames that match the candidates above still need commit/deploy evidence and schema postcondition checks. The matching #1066/#1067 `0072_ugc_terms_acceptance.sql` blob SHA is `818af7aef1afb495dc496e85a38219977a99d422`; it represents **one candidate SQL content version**, not an extra migration.
+The two earlier 0072/0073 names have now been found at PR #1066 commit `fb79c8feaa59062a9d4fd3bc786219344ce293d9`, and their Git blobs match the renamed versions at commit `528e4bf4b15a2609331c50fc5766ab364c61a1e9`. The matching #1066/#1067 `0072_ugc_terms_acceptance.sql` blob `818af7aef1afb495dc496e85a38219977a99d422` is one source version, not another migration. Source identity does not establish exact deployment provenance or a production schema postcondition.
 
 ## B. Compare the actual applied migration files
 
 - From the exact GitHub SHA of the build/deployment being audited, enumerate `apps/backend/migrations/*.sql` and SHA-256 hash each version-controlled file. Compare the set of filenames against **the separate production tracker snapshot**, not a guessed current branch.
-- For each of the 9 unknown `0072`–`0077` filenames, locate the **exact SQL file content at the commit that ran the migration**, and record: originating PR, commit SHA, SQL blob SHA/hash, deploy ID/time, statement classification (DDL, DML, UPDATE users), row-count/lock impact, reversible/non-reversible effects and sensitive-data risks.
+- For each of the 9 historical `0072`–`0077` filenames, locate the **exact SQL file content at the commit that ran the migration**, and record: originating PR, commit SHA, SQL blob SHA/hash, deploy ID/time, statement classification (DDL, DML, UPDATE users), row-count/lock impact, reversible/non-reversible effects and sensitive-data risks.
 - If SQL cannot be retrieved or hashed reliably, mark it **unknown**. Do not invent a matching file or treat a renamed prefix as the same migration automatically.
 - Never `DELETE`, `UPDATE` or `INSERT` rows in `schema_migrations` to make the tracker look clean. Never execute `migration:run` against production merely to test this guard.
 
@@ -124,7 +170,7 @@ f31565f16844fd6f4ed3588b019a9ada8b530df4024acb9afc683e1f632db70b  0075_dating_ma
 491d2685420220ce4e949f6bad0823e2b369b48f3af12c1d04de9f69828a4e3b  0077_adult_only_rc1_visibility.sql
 ```
 
-The rehearsal covers the seven identified candidates and synthetic data. The full gate requires the nine production tracker rows, original SQL provenance, a sanitized restore and independently verified hosted staging.
+The rehearsal covered seven unique SQL bodies and synthetic data. The nine tracker rows were recovered from earlier owner-supplied production output; the full gate still requires a refreshed read-only tracker result, deploy/DB lineage, sanitized restore and independently verified hosted staging.
 
 ## C. Isolated staging rehearsal — required evidence
 
@@ -142,7 +188,7 @@ The rehearsal covers the seven identified candidates and synthetic data. The ful
 | --- | --- |
 | Production Auto Deploy | `no`/off verified at the point of merge and again before planned rollout |
 | All existing PR previews | `suspended` and auto-build/restart behavior explicitly controlled; DB, Redis, storage and outbound isolation demonstrated |
-| Schema history | All 9 unknown migration files identified and reviewed with their original code revisions |
+| Schema history | Nine tracker records refreshed read-only; seven unique historical Git SQL blobs cross-checked against source and actual schema postconditions; executed deploy SHA/DB identity verified |
 | Database safety | Production backup **and isolated restore** test completed; privacy-preserving forward plan |
 | Staging | Independent PostgreSQL/Redis/storage, synthetic identities, migration and 18+ QA passes |
 | #1087 | Guard CI successful; staging confirms drift rejection before any SQL mutation |
