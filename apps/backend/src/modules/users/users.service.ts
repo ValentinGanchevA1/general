@@ -430,6 +430,14 @@ export class UsersService {
   async updateProfile(userId: string, req: UpdateProfileRequest): Promise<UserProfile> {
     const setClauses: string[] = [];
     const params: unknown[] = [userId];
+    let dateOfBirthParameterIndex: number | null = null;
+
+    if (req.visibility === 'public' && req.dateOfBirth === null) {
+      throw new BadRequestException({
+        code: 'profile.age_required',
+        message: 'A date of birth is required before enabling public visibility.',
+      });
+    }
 
     if (req.displayName !== undefined) {
       params.push(req.displayName);
@@ -489,7 +497,12 @@ export class UsersService {
         }
       }
       params.push(req.dateOfBirth);
-      setClauses.push(`date_of_birth = $${params.length}`);
+      dateOfBirthParameterIndex = params.length;
+      setClauses.push(`date_of_birth = ${params.length}`);
+      // Removing age eligibility must never leave a public profile exposed.
+      if (req.dateOfBirth === null && req.visibility !== 'private') {
+        setClauses.push("visibility = 'private'");
+      }
     }
     if (req.hometownCity !== undefined) {
       params.push(
@@ -590,10 +603,23 @@ export class UsersService {
     }
 
     if (setClauses.length > 0) {
-      await this.db.query(
-        `UPDATE users SET ${setClauses.join(', ')}, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
+      // Atomic age predicate: no race between reading DOB and setting visibility.
+      const effectiveDob = dateOfBirthParameterIndex === null
+        ? 'date_of_birth'
+        : `${dateOfBirthParameterIndex}::date`;
+      const ageGate = req.visibility === 'public'
+        ? ` AND ${effectiveDob} <= (CURRENT_DATE - INTERVAL '18 years')::date RETURNING id`
+        : '';
+      const updated = await this.db.query<Array<{ id: string }>>(
+        `UPDATE users SET ${setClauses.join(', ')}, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL${ageGate}`,
         params,
       );
+      if (req.visibility === 'public' && updated.length === 0) {
+        throw new BadRequestException({
+          code: 'profile.age_required',
+          message: 'You must be at least 18 years old to enable public visibility.',
+        });
+      }
     }
     return this.getProfile(userId);
   }
