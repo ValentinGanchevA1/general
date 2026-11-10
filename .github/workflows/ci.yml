@@ -82,6 +82,8 @@ jobs:
         run: node --test apps/backend/scripts/migration-source-candidates.test.cjs
       - name: Test read-only DB target attestation (fake DB, no connection)
         run: node --test apps/backend/scripts/db-target-attestation.test.cjs
+      - name: Test offline production-vs-staging identity guard (no DB connection)
+        run: node --test apps/backend/scripts/staging-target-preflight.test.cjs
       - name: Test migration guard against disposable local PostgreSQL (no production URL)
         env:
           NEXUS_EPHEMERAL_PG_INTEGRATION: 'true'
