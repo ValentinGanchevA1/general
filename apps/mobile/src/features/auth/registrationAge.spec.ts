@@ -22,7 +22,9 @@ describe('NEXUS 18+ email registration DOB (client hint, server authoritative)',
 
   it('handles leap years without silently accepting nonexistent birthdays', () => {
     expect(registrationBirthDateError('2008-02-29', new Date('2026-02-28T23:59:00Z')))
-      .toBeNull(); // Matches the backend's month/day arithmetic for Feb 29.
+      .toBe('You must be at least 18 years old');
+    expect(registrationBirthDateError('2008-02-29', new Date('2026-03-01T00:00:00Z')))
+      .toBeNull(); // Match the backend's month/day arithmetic for leap-day birthdays.
     expect(registrationBirthDateError('2007-02-29', onBoundary))
       .toBe('Select a valid date of birth');
   });
