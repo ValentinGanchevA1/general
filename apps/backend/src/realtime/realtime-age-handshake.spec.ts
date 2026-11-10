@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 
 import { RealtimeGateway } from './realtime.gateway';
+import { DiscoverySubscriptionGateway } from './discovery-subscription.gateway';
 import { WsJwtGuard } from './ws-jwt.guard';
 
 describe('RealtimeGateway — age checked before joining rooms', () => {
@@ -12,6 +13,15 @@ describe('RealtimeGateway — age checked before joining rooms', () => {
   it('protects every gateway event with the class-level WS authorization guard', () => {
     const guards = Reflect.getMetadata(GUARDS_METADATA, RealtimeGateway) as unknown[] | undefined;
     expect(guards).toContain(WsJwtGuard);
+    // Subscription lifecycle is implemented in a separate gateway and must
+    // retain its method guards as well.
+    for (const method of ['onSubscribe', 'onUnsubscribe'] as const) {
+      const methodGuards = Reflect.getMetadata(
+        GUARDS_METADATA,
+        DiscoverySubscriptionGateway.prototype[method],
+      ) as unknown[] | undefined;
+      expect(methodGuards).toContain(WsJwtGuard);
+    }
   });
 
   const jwt = {
