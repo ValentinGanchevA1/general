@@ -93,6 +93,35 @@ test('PostgreSQL migration safety — isolated CI cluster only', { skip: !enable
     });
   });
 
+  await t.test('legacy audit SQL parses and stays read-only on disposable PostgreSQL', async () => {
+    await withDisposableDatabase(async (db) => {
+      await db.query(
+        'CREATE TABLE public.schema_migrations (filename text PRIMARY KEY, applied_at timestamptz DEFAULT now())',
+      );
+      await db.query(
+        "INSERT INTO public.schema_migrations (filename) VALUES ('0069_realtime_room_revocation_outbox.sql')",
+      );
+      const sql = fs.readFileSync(path.join(
+        __dirname, '..', '..', '..', 'docs', 'qa',
+        'NEXUS_LEGACY_MIGRATIONS_0051_0054_0069_READONLY_2026-11-10.sql',
+      ), 'utf8');
+      const results = await db.query(sql);
+      assert.ok(Array.isArray(results));
+      const identity = results.find((result) =>
+        result.rows?.some((row) => row.read_only === 'on'));
+      assert.ok(identity, 'audit must confirm a read-only transaction');
+      const inventory = results.find((result) =>
+        result.rows?.some((row) => row.section === 'relations'));
+      assert.ok(inventory, 'catalog inventory must include relations');
+      const relationRow = inventory.rows.find((row) => row.section === 'relations');
+      assert.equal(relationRow.metadata.length, 13);
+      const tracker = await db.query('SELECT filename FROM public.schema_migrations');
+      assert.deepEqual(tracker.rows, [
+        { filename: '0069_realtime_room_revocation_outbox.sql' },
+      ]);
+    });
+  });
+
   await t.test('runner updates public tracker even when search_path points to shadow', async () => {
     await withDisposableDatabase(async (db) => {
       await db.query('CREATE SCHEMA shadow');
