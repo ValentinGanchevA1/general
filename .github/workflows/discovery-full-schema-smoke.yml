@@ -30,7 +30,7 @@ jobs:
         image: postgis/postgis:16-3.4
         env:
           POSTGRES_USER: nexa_schema
-          POSTGRES_PASSWORD: nexa_schema
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
           POSTGRES_DB: nexa_schema_bench
         ports: ['5432:5432']
         options: >-
@@ -43,7 +43,7 @@ jobs:
           --health-cmd "redis-cli ping"
           --health-interval 5s --health-timeout 5s --health-retries 15
     env:
-      DATABASE_URL: postgresql://nexa_schema:nexa_schema@127.0.0.1:5432/nexa_schema_bench
+      DATABASE_URL: postgresql://nexa_schema:${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/nexa_schema_bench
       DISCOVERY_FULL_SCHEMA_ACK_DISPOSABLE: 'YES'
       DISCOVERY_FULL_HTTP_ACK_DISPOSABLE: 'YES'
       DISCOVERY_FULL_HTTP_REDIS_URL: redis://127.0.0.1:6379/15
