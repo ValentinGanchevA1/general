@@ -54,6 +54,22 @@ COMMIT;
 
 `SELECT` contains migration filenames and target metadata only. **Do not export users/IDs/DOB/photo/phone/email rows.** If the tracker table is absent, stop and record that; do not create it.
 
+### GitHub source candidates — NOT proof that production applied the file
+
+Read-only GitHub tree inspections identify these **candidate SQL files** on historical PR heads:
+
+| PR | Exact source commit | Migration filename | Git blob SHA |
+| --- | --- | --- | --- |
+| [#1066](https://github.com/ValentinGanchevA1/general/pull/1066) | `d3b13a89ba68c536fd6d1c7266426632f7b5503f` | `0072_ugc_terms_acceptance.sql` | `818af7aef1afb495dc496e85a38219977a99d422` |
+| #1066 | same | `0073_extend_content_report_targets.sql` | `b6cd7ba8fb740f65fa3a84ef42ff31205baa11a2` |
+| #1066 | same | `0074_event_question_moderation.sql` | `92d66c3abe6b73a7ce779869d839d8c6e6752661` |
+| #1066 | same | `0075_dating_match_conversation_lookup.sql` | `9a2a4ce98d858724bf2be3014249824301a930c2` |
+| #1066 | same | `0076_child_safety_report_reason.sql` | `e6618f99d54e5f15e5af7f63f112448c3a7a2b5d` |
+| #1066 | same | `0077_adult_only_rc1_visibility.sql` | `17653579249598c4783212d0bdbc63dae8698be5` |
+| [#1074](https://github.com/ValentinGanchevA1/general/pull/1074) | `b15a49ab938a42c4b35961007deb53d459c1407a` | `0072_personal_labels.sql` | `dd08626c763b3b2b519a998938623e5423d5c522` |
+
+These are **GitHub tree blob identities**, not proof of which SQL content/commit ran in Render and not an independent cryptographic checksum of production schema. The production tracker was reported to contain **nine** filenames in this range, including three different `0072` and two different `0073` names. The table above accounts for only **seven candidate names**: at least two names still require exact identification from the production tracker and their original source commits. Do not guess the missing names or infer that matching filenames prove identical SQL effects.
+
 ## B. Compare the actual applied migration files
 
 - From the exact GitHub SHA of the build/deployment being audited, enumerate `apps/backend/migrations/*.sql` and SHA-256 hash each version-controlled file. Compare the set of filenames against **the separate production tracker snapshot**, not a guessed current branch.
