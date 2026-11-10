@@ -6,8 +6,32 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const { resolveDatabaseUrl } = require('./preview-db-guard');
+const { assertMigrationHistoryCompatible } = require('./migration-history-guard');
 
 async function run(client) {
+  // Resolve local filenames before any SQL mutation, then compare the applied
+  // history read-only. Stale deploys must not rewrite migration metadata or
+  // launch SQL when draft preview migrations exist in this database.
+  const migrationsDir = path.join(__dirname, '..', 'migrations');
+  const files = fs.readdirSync(migrationsDir).filter((file) => file.endsWith('.sql')).sort();
+
+  const RENAMES = [
+    { from: '0030_profile_origin.sql', to: '0031_profile_origin.sql' },
+    {
+      from: '0047_personal_activity_notifications.sql',
+      to: '0049_personal_activity_notifications.sql',
+    },
+    {
+      from: '0048_personal_activity_notifications.sql',
+      to: '0049_personal_activity_notifications.sql',
+    },
+  ];
+  await assertMigrationHistoryCompatible(
+    client,
+    files,
+    RENAMES.map(({ from }) => from),
+  );
+
   await client.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       filename TEXT PRIMARY KEY,
@@ -46,17 +70,7 @@ async function run(client) {
 
   // Filename renames when a migration was renumbered after already applying
   // under the old name (tracked by filename PRIMARY KEY). Idempotent.
-  const RENAMES = [
-    { from: '0030_profile_origin.sql', to: '0031_profile_origin.sql' },
-    {
-      from: '0047_personal_activity_notifications.sql',
-      to: '0049_personal_activity_notifications.sql',
-    },
-    {
-      from: '0048_personal_activity_notifications.sql',
-      to: '0049_personal_activity_notifications.sql',
-    },
-  ];
+
   for (const { from, to } of RENAMES) {
     const renamed = await client.query(
       `UPDATE schema_migrations SET filename = $1
@@ -75,12 +89,6 @@ async function run(client) {
     'SELECT filename FROM schema_migrations',
   );
   const appliedSet = new Set(applied.map((r) => r.filename));
-
-  const migrationsDir = path.join(__dirname, '..', 'migrations');
-  const files = fs
-    .readdirSync(migrationsDir)
-    .filter((f) => f.endsWith('.sql'))
-    .sort();
 
   for (const file of files) {
     if (appliedSet.has(file)) {
