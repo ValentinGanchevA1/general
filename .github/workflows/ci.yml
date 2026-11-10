@@ -78,6 +78,8 @@ jobs:
         run: node --test apps/backend/scripts/migration-history-guard.test.cjs
       - name: Test owner-supplied migration drift inventory (offline, always blocking)
         run: node --test apps/backend/scripts/migration-reconciliation-report.test.cjs
+      - name: Test exact candidate source evidence for all 15 historic drift names
+        run: node --test apps/backend/scripts/migration-source-candidates.test.cjs
       - name: Test read-only DB target attestation (fake DB, no connection)
         run: node --test apps/backend/scripts/db-target-attestation.test.cjs
       - name: Test migration guard against disposable local PostgreSQL (no production URL)
