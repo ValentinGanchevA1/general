@@ -33,7 +33,7 @@ async function run(client) {
   );
 
   await client.query(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
+    CREATE TABLE IF NOT EXISTS public.schema_migrations (
       filename TEXT PRIMARY KEY,
       applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
@@ -48,10 +48,10 @@ async function run(client) {
 
   for (const { from, to } of RENAMES) {
     const renamed = await client.query(
-      `UPDATE schema_migrations SET filename = $1
+      `UPDATE public.schema_migrations SET filename = $1
          WHERE filename = $2
            AND NOT EXISTS (
-             SELECT 1 FROM schema_migrations WHERE filename = $1
+             SELECT 1 FROM public.schema_migrations WHERE filename = $1
            )`,
       [to, from],
     );
@@ -61,7 +61,7 @@ async function run(client) {
   }
 
   const { rows: applied } = await client.query(
-    'SELECT filename FROM schema_migrations',
+    'SELECT filename FROM public.schema_migrations',
   );
   const appliedSet = new Set(applied.map((r) => r.filename));
 
@@ -77,7 +77,7 @@ async function run(client) {
     try {
       await client.query(sql);
       await client.query(
-        'INSERT INTO schema_migrations (filename) VALUES ($1)',
+        'INSERT INTO public.schema_migrations (filename) VALUES ($1)',
         [file],
       );
       await client.query('COMMIT');
