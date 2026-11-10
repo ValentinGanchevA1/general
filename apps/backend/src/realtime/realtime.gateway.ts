@@ -63,6 +63,7 @@ import { NotificationsService } from '../modules/notifications/notifications.ser
 import { ChallengesService } from '../modules/challenges/challenges.service';
 import { FriendsService } from '../modules/friends/friends.service';
 import type { JwtPayload } from '../modules/auth/jwt.strategy';
+import { AdultEligibilityService, adultAgeGateEnabled } from '../modules/auth/adult-eligibility.service';
 import { corsOrigins } from '../common/cors-origins';
 
 type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
@@ -102,11 +103,16 @@ function extractApiError(err: unknown): { code: string; message: string } {
     credentials: true,
   },
 })
+@UseGuards(WsJwtGuard)
 export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server!: G88Server;
 
   private readonly logger = new Logger(RealtimeGateway.name);
+
+  // Property injection preserves the existing gateway constructor contract.
+  @Inject(AdultEligibilityService)
+  private readonly adultEligibility!: AdultEligibilityService;
 
   constructor(
     private readonly presence: PresenceService,
@@ -137,6 +143,15 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
 
     const userId = client.data.userId;
+    if (adultAgeGateEnabled()) {
+      try {
+        // No user/cell/conversation room is joined before eligibility succeeds.
+        await this.adultEligibility.assertEligible(userId);
+      } catch {
+        client.disconnect(true);
+        return;
+      }
+    }
     client.data.rooms = new Set();
     client.data.friendPresenceAnnounced = false;
     client.join(this.userRoom(userId));
@@ -212,7 +227,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('conversation:join')
-  @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onConversationJoin(
     @ConnectedSocket() client: G88Socket,
@@ -256,7 +270,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('conversation:leave')
-  @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onConversationLeave(
     @ConnectedSocket() client: G88Socket,
@@ -269,7 +282,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('event:join')
-  @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onEventJoin(
     @ConnectedSocket() client: G88Socket,
@@ -313,7 +325,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('event:leave')
-  @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async onEventLeave(
     @ConnectedSocket() client: G88Socket,
