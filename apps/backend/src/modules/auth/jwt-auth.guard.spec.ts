@@ -60,4 +60,10 @@ describe('JwtAuthGuard — adult eligibility', () => {
     await expect(guard.canActivate(context('social', 'user-1'))).resolves.toBe(false);
     expect(eligibility.assertEligible).not.toHaveBeenCalled();
   });
+
+  it('fails closed when the stored age policy rejects a user', async () => {
+    eligibility.assertEligible.mockRejectedValueOnce(new Error('age eligibility denied'));
+    await expect(guard.canActivate(context('social', 'user-1')))
+      .rejects.toThrow('age eligibility denied');
+  });
 });
