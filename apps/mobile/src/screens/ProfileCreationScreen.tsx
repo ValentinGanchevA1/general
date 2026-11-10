@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -18,7 +18,8 @@ import { BirthDateField, CityAutocompleteField } from '@/components/Profile/Prof
 import { FormField } from '@/components/FormField';
 import { INTEREST_OPTIONS } from '@/features/profile/interestOptions';
 import { PURPOSE_OPTIONS } from '@/features/profile/goalOptions';
-import { updateProfile } from '@/features/profile/profileSlice';
+import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
+import { registrationBirthDateError } from '@/features/auth/registrationAge';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fontSize, radius, spacing, useAppTheme } from '@/theme';
 
@@ -53,16 +54,6 @@ function StepHeader({ eyebrow, title, subtitle }: StepHeaderProps): React.JSX.El
       <Text style={[styles.stepSub, { color: colors.textTertiary }]}>{subtitle}</Text>
     </View>
   );
-}
-
-function isAdult(isoDate: string): boolean {
-  const dob = new Date(isoDate);
-  if (Number.isNaN(dob.getTime())) return false;
-  const today = new Date();
-  let years = today.getFullYear() - dob.getFullYear();
-  const monthDelta = today.getMonth() - dob.getMonth();
-  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < dob.getDate())) years -= 1;
-  return years >= 18;
 }
 
 function StepName({ value, onChange }: { value: string; onChange: (value: string) => void }): React.JSX.Element {
@@ -296,7 +287,10 @@ export function ProfileCreationScreen(): React.JSX.Element {
   const { colors } = useAppTheme();
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((state) => state.auth.user);
-  const { loading, error } = useAppSelector((state) => state.profile);
+  const { loading, error, profile } = useAppSelector((state) => state.profile);
+  const existingBirthDate = profile && authUser && profile.id === authUser.id
+    ? profile.dateOfBirth
+    : null;
 
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<OnboardingState>({
@@ -310,7 +304,14 @@ export function ProfileCreationScreen(): React.JSX.Element {
     goals: [],
     visibility: 'public',
   });
+  const birthDateForForm = form.dateOfBirth || existingBirthDate || '';
   const [originError, setOriginError] = useState('');
+
+  // Reuse the DOB that the server accepted during registration, instead of
+  // asking for it again in onboarding. This profile is owner-only data.
+  useEffect(() => {
+    if (authUser?.id) void dispatch(fetchProfile());
+  }, [authUser?.id, dispatch]);
 
   const toggleArrayValue = (key: 'interests' | 'goals', value: string): void => {
     setForm((current) => ({
@@ -325,8 +326,8 @@ export function ProfileCreationScreen(): React.JSX.Element {
     if (step === 1) return form.displayName.trim().length > 0;
     if (step === 2) return form.interests.length >= MIN_INTERESTS;
     if (step === 3) {
-      const dob = form.dateOfBirth.trim();
-      return /^\d{4}-\d{2}-\d{2}$/.test(dob) && isAdult(dob);
+      const dob = birthDateForForm.trim();
+      return registrationBirthDateError(dob) === null;
     }
     if (step === 4) return form.goals.length > 0;
     return true;
@@ -334,13 +335,10 @@ export function ProfileCreationScreen(): React.JSX.Element {
 
   const advance = (): void => {
     if (step === 3) {
-      const dob = form.dateOfBirth.trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
-        setOriginError('Enter date of birth as YYYY-MM-DD');
-        return;
-      }
-      if (!isAdult(dob)) {
-        setOriginError('You must be at least 18 years old');
+      const dob = birthDateForForm.trim();
+      const dateError = registrationBirthDateError(dob);
+      if (dateError) {
+        setOriginError(dateError);
         return;
       }
       setOriginError('');
@@ -357,7 +355,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
         // Legacy completion currently relies on bio being non-null. Bio authoring moves to Profile v3.
         bio: '',
         interests: form.interests,
-        dateOfBirth: form.dateOfBirth.trim(),
+        dateOfBirth: birthDateForForm.trim(),
         hometownCity: form.hometownCity.trim() || null,
         hometownCountry: form.hometownCountry.trim() || null,
         showAge: form.showAge,
@@ -405,7 +403,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {step === 1 ? <StepName value={form.displayName} onChange={(displayName) => setForm((current) => ({ ...current, displayName }))} /> : null}
         {step === 2 ? <StepInterests selected={form.interests} onToggle={(value) => toggleArrayValue('interests', value)} /> : null}
-        {step === 3 ? <StepOrigin dateOfBirth={form.dateOfBirth} hometownCity={form.hometownCity} hometownCountry={form.hometownCountry} showAge={form.showAge} showHometown={form.showHometown} error={originError} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} /> : null}
+        {step === 3 ? <StepOrigin dateOfBirth={birthDateForForm} hometownCity={form.hometownCity} hometownCountry={form.hometownCountry} showAge={form.showAge} showHometown={form.showHometown} error={originError} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} /> : null}
         {step === 4 ? <StepPurpose selected={form.goals} onToggle={(value) => toggleArrayValue('goals', value)} /> : null}
         {step === 5 ? <StepVisibility value={form.visibility} onChange={(visibility) => setForm((current) => ({ ...current, visibility }))} /> : null}
         {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}

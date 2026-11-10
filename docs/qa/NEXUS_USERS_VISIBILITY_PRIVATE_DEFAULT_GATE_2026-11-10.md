@@ -4,9 +4,9 @@
 
 ## Evidence and scope
 - The initial schema in `apps/backend/migrations/0001_initial.sql` declares `users.visibility DEFAULT 'public'`.
-- The owner's 2026-11-10 read-only schema inventory likewise reported `users.visibility DEFAULT 'public'::text`. This source SQL connection is **not yet independently attested as the Render g88-api production target**.
+- The linked Supabase G88 SQL inspection on 2026-11-10 likewise reported `users.visibility DEFAULT 'public'::text`. The 85-row history matches the failed Render drift count, but Render `DATABASE_URL` target identity is **not independently attested**.
 - Current application registration paths explicitly create accounts with `visibility='private'`, but this cannot guarantee safety for other SQL writers, imports, seed jobs or future features that omit the column.
-- Owner snapshot of 2,439 active users had **zero** missing-DOB profiles with non-private visibility, but did include 41 active public profiles. These are snapshot aggregates, not proof of production scope or ongoing compliance.
+- Verified G88 read-only aggregate of 2,440 active users had **zero** missing-DOB profiles with non-private visibility, but did include 41 active public profiles. These are snapshot aggregates, not proof of production scope or ongoing compliance.
 
 ## Proposed change
 One forward-only SQL migration, `0078_users_visibility_private_default.sql`:
@@ -34,7 +34,7 @@ ALTER TABLE public.users ALTER COLUMN visibility SET DEFAULT 'private';
 - Restore a genuine backup to **isolated** staging, re-run the 85-row inventory, verify source SQL hashes/postconditions (especially legacy 0051/0054, 0069 and adult safety 0077).
 - Parent Render `autoDeploy=no`, but build command still invokes `migration:run`. Manual deploy/merge is NOT authorized by this PR.
 - Adult-only first-release requirement (#1068) is **whole-Social 18+**, Dating OFF. This database default fix does not substitute for REST/Socket/Auth age gates, verified AAB QA, moderation, or approved legal policies.
-- Master SonarCloud Security Rating E (#903) remains a separate P0 blocker; never weaken quality gates.
+- #903 master SonarCloud Quality Gate blocker is resolved; retain the original security thresholds. All PR CI must still pass.
 
 ## Required sign-off
 - [ ] Isolated staging restores verified and has no connections to production Redis, push, OAuth, storage or outgoing notifications.
@@ -45,3 +45,9 @@ ALTER TABLE public.users ALTER COLUMN visibility SET DEFAULT 'private';
 - [ ] Explicit owner approval, controlled deploy SHA, rollback procedure and post-deploy queries documented.
 
 **No production deployment or SQL is performed by this PR.**
+
+## 2026-11-11 update
+- Read-only inventory tooling merged as #1092; this did NOT reconcile or change the migration runner's fail-closed guard.
+- Supabase Data API is disabled by owner decision. Broad anon/authenticated table/sequence SQL grants were revoked and checked in #1098, independently of this private-default migration.
+- This PR has been reconciled with latest master via merge ancestry, preserving the latest disposable Postgres guard tests and without deploying its 0078 SQL to the live database.
+- Production default remains **public** until an approved, isolated-staging-tested, forward-only deployment plan is ready.

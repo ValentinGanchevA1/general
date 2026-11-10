@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import type { AgeEligibilityStatus } from '@g88/shared';
 
 /** Release opt-in. Must remain disabled until client, WS, and staging gates pass. */
 export function adultAgeGateEnabled(): boolean {
@@ -33,6 +34,13 @@ export function assertAdultDateOfBirth(dateOfBirth: string, now: Date = new Date
 @Injectable()
 export class AdultEligibilityService {
   constructor(@InjectDataSource() private readonly db: DataSource) {}
+
+  /** Minimal bootstrap status. Errors fail closed; no DOB or profile fields leave the server. */
+  async statusForUser(userId: string): Promise<AgeEligibilityStatus> {
+    if (!adultAgeGateEnabled()) return { required: false, eligible: true };
+    const eligibleIds = await this.eligibleUserIds([userId]);
+    return { required: true, eligible: eligibleIds.has(userId) };
+  }
 
   /**
    * Batch check for connected socket accounts. One query per node/sweep rather

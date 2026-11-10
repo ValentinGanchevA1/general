@@ -13,9 +13,10 @@ import {
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 
-import type { LoginResponse, AuthTokens, AuthenticatedUser, ForgotPasswordResponse, ResetPasswordResponse } from '@g88/shared';
+import type { LoginResponse, AuthTokens, AuthenticatedUser, AgeEligibilityStatus, ForgotPasswordResponse, ResetPasswordResponse } from '@g88/shared';
 
 import { AuthService } from './auth.service';
+import { AdultEligibilityService } from './adult-eligibility.service';
 import { PasswordResetService } from './password-reset.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { SkipAdultEligibility } from './age-eligibility.decorator';
@@ -34,7 +35,11 @@ import {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService, private readonly recovery: PasswordResetService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly recovery: PasswordResetService,
+    private readonly adultEligibility: AdultEligibilityService,
+  ) {}
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
@@ -132,6 +137,15 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async googleOAuth(@Body() dto: GoogleOAuthDto): Promise<LoginResponse> {
     return this.auth.googleOAuth(dto.idToken);
+  }
+
+  /** Bootstrap-only GET: never exposes DOB. Requires valid JWT, not adult eligibility. */
+  @Get('age-eligibility')
+  @UseGuards(JwtAuthGuard)
+  @SkipAdultEligibility()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async ageEligibilityStatus(@CurrentUser('id') userId: string): Promise<AgeEligibilityStatus> {
+    return this.adultEligibility.statusForUser(userId);
   }
 
   @Patch('age-eligibility')

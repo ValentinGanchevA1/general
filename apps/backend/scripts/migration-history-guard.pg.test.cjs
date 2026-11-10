@@ -93,6 +93,43 @@ test('PostgreSQL migration safety — isolated CI cluster only', { skip: !enable
     });
   });
 
+  await t.test('legacy audit SQL parses and stays read-only on disposable PostgreSQL', async () => {
+    await withDisposableDatabase(async (db) => {
+      await db.query(
+        'CREATE TABLE public.schema_migrations (filename text PRIMARY KEY, applied_at timestamptz DEFAULT now())',
+      );
+      await db.query(
+        "INSERT INTO public.schema_migrations (filename) VALUES ('0069_realtime_room_revocation_outbox.sql')",
+      );
+      const sql = fs.readFileSync(path.join(
+        __dirname, '..', '..', '..', 'docs', 'qa',
+        'NEXUS_LEGACY_MIGRATIONS_0051_0054_0069_READONLY_2026-11-10.sql',
+      ), 'utf8');
+      const results = await db.query(sql);
+      assert.ok(Array.isArray(results));
+      const identity = results.find((result) =>
+        result.rows?.some((row) => row.read_only === 'on'));
+      assert.ok(identity, 'audit must confirm a read-only transaction');
+      const inventory = results.find((result) =>
+        result.rows?.some((row) => row.category === 'relation'));
+      assert.ok(inventory, 'catalog inventory must include relations');
+      const relations = inventory.rows.filter((row) => row.category === 'relation');
+      assert.equal(relations.length, 13);
+      assert.equal(
+        relations.find((row) => row.object_name === 'realtime_room_revocations')?.details,
+        'ABSENT',
+      );
+      assert.ok(inventory.rows.some((row) =>
+        row.category === 'trigger' && row.object_name === 'event_review_write'));
+      assert.ok(inventory.rows.some((row) =>
+        row.category === 'function' && row.object_name === 'enforce_event_review_update'));
+      const tracker = await db.query('SELECT filename FROM public.schema_migrations');
+      assert.deepEqual(tracker.rows, [
+        { filename: '0069_realtime_room_revocation_outbox.sql' },
+      ]);
+    });
+  });
+
   await t.test('0078 users default private without changing pre-existing public choices', async () => {
     await withDisposableDatabase(async (db) => {
       await db.query(`
