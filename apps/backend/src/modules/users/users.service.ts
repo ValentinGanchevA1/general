@@ -498,7 +498,7 @@ export class UsersService {
       }
       params.push(req.dateOfBirth);
       dateOfBirthParameterIndex = params.length;
-      setClauses.push(`date_of_birth = ${params.length}`);
+      setClauses.push(`date_of_birth = $${params.length}`);
       // Removing age eligibility must never leave a public profile exposed.
       if (req.dateOfBirth === null && req.visibility !== 'private') {
         setClauses.push("visibility = 'private'");
@@ -606,7 +606,7 @@ export class UsersService {
       // Atomic age predicate: no race between reading DOB and setting visibility.
       const effectiveDob = dateOfBirthParameterIndex === null
         ? 'date_of_birth'
-        : `${dateOfBirthParameterIndex}::date`;
+        : `$${dateOfBirthParameterIndex}::date`;
       const ageGate = req.visibility === 'public'
         ? ` AND ${effectiveDob} <= (CURRENT_DATE - INTERVAL '18 years')::date RETURNING id`
         : '';
