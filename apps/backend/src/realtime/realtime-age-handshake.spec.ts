@@ -1,11 +1,18 @@
 import 'reflect-metadata';
 import { JwtService } from '@nestjs/jwt';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 
 import { RealtimeGateway } from './realtime.gateway';
+import { WsJwtGuard } from './ws-jwt.guard';
 
 describe('RealtimeGateway — age checked before joining rooms', () => {
   const key = 'NEXUS_REQUIRE_ADULT_AGE';
   const initial = process.env[key];
+
+  it('protects every gateway event with the class-level WS authorization guard', () => {
+    const guards = Reflect.getMetadata(GUARDS_METADATA, RealtimeGateway) as unknown[] | undefined;
+    expect(guards).toContain(WsJwtGuard);
+  });
 
   const jwt = {
     verify: jest.fn(() => ({ sub: 'user-1', email: 'test@example.test' })),
