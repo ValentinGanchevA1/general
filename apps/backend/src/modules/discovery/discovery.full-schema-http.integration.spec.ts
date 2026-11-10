@@ -21,6 +21,7 @@ import type { DiscoveryResponse, LoginResponse, Viewport } from '@g88/shared';
 import { REDIS_CLIENT } from '../../config/redis.provider';
 import { AuthService } from '../auth/auth.service';
 import { AuthController } from '../auth/auth.controller';
+import { AdultEligibilityService } from '../auth/adult-eligibility.service';
 import { JwtStrategy } from '../auth/jwt.strategy';
 import { PasswordResetService } from '../auth/password-reset.service';
 import { FriendsService } from '../friends/friends.service';
@@ -204,7 +205,7 @@ suite('NEXA full migrated PostGIS + JWT login + real Friends + Redis/HTTP', () =
       providers: [
         { provide: getDataSourceToken(), useValue: db },
         { provide: REDIS_CLIENT, useValue: redis },
-        JwtStrategy, AuthService, PresenceService, DiscoveryService,
+        JwtStrategy, AuthService, AdultEligibilityService, PresenceService, DiscoveryService,
         {
           provide: FriendsService,
           useFactory: (source: DataSource, presence: PresenceService): FriendsService =>
