@@ -172,6 +172,19 @@ f31565f16844fd6f4ed3588b019a9ada8b530df4024acb9afc683e1f632db70b  0075_dating_ma
 
 The rehearsal covered seven unique SQL bodies and synthetic data. The nine tracker rows were recovered from earlier owner-supplied production output; the full gate still requires a refreshed read-only tracker result, deploy/DB lineage, sanitized restore and independently verified hosted staging.
 
+### Local archive restore with the nine historical tracker entries
+
+Two loopback PostgreSQL 17.11/PostGIS instances used distinct roles and synthetic profiles. The source ran 70 baseline migrations and all nine historical names in timestamp order, including both pre-rename pairs. The source files matched the seven distinct Git blobs above byte for byte. The restore used the migration runner from [#1090 at `5891078b`](https://github.com/ValentinGanchevA1/general/commit/5891078b58eafc2d172f44973a6b6406f6777a09).
+
+| Restore case | Migration runner result | PostgreSQL and data checks |
+| --- | --- | --- |
+| Full custom archive | `MIGRATION_HISTORY_DRIFT` for nine filenames, exit 1 | Exactly two `SELECT` statements. All 79 tracker rows, seven visibility and Dating fixtures, and three reporting and moderation schema checks matched before and after restore and guard execution. |
+| Schema-only restore of the same archive | `MIGRATION_HISTORY_UNTRACKED`, exit 1 | Exactly three `SELECT` statements. The restored tracker had zero rows before and after guard execution. |
+
+The full restore changed how PostgreSQL serialized casts in `analytics_events_event_name_check`. Both databases accepted the same seven event names, rejected an invalid value, and retained `NOT NULL` on `event_name`. The rest of the schema dump matched. The synthetic tracker SHA-256 was `2a2757a391e0d3527e823a45c73d36dd9007a6cce741a0689d10e71d471fff59` before restore and after the guard.
+
+The SQL inventory below also passed on the restored fixture. It reported `read_only=on`, the nine historical rows and zero violations in each of the three eligibility aggregates. The production tracker refresh and restore of a sanitized production backup in verified hosted staging remain pending.
+
 ### One-pass, non-PII production schema postcondition inventory
 
 Use the [dedicated read-only SQL file](./NEXUS_PRODUCTION_SCHEMA_POSTCONDITIONS_READONLY_2026-11-10.sql) **only after verifying the production database identity independently**. It runs a repeatable-read, read-only transaction and returns:
