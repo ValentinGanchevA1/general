@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'crypto';
 
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -14,6 +15,7 @@ import { OAuth2Client } from 'google-auth-library';
 import type { LoginResponse, AuthTokens, AuthenticatedUser } from '@g88/shared';
 
 import type { JwtPayload } from './jwt.strategy';
+import { adultAgeGateEnabled, assertAdultDateOfBirth } from './adult-eligibility.service';
 
 interface UserRow {
   id: string;
@@ -52,15 +54,24 @@ export class AuthService {
     email: string,
     password: string,
     displayName: string,
+    dateOfBirth?: string,
   ): Promise<LoginResponse> {
+    if (adultAgeGateEnabled() && !dateOfBirth) {
+      throw new BadRequestException({
+        code: 'auth.age_required',
+        message: 'Date of birth is required for NEXUS Social registration.',
+      });
+    }
+    if (dateOfBirth !== undefined) assertAdultDateOfBirth(dateOfBirth);
+
     const passwordHash = await bcrypt.hash(password, AuthService.BCRYPT_ROUNDS);
     let rows: UserRow[];
     try {
       rows = await this.db.query<UserRow[]>(
-        `INSERT INTO users (email, password_hash, display_name)
-              VALUES ($1, $2, $3)
+        `INSERT INTO users (email, password_hash, display_name, visibility, date_of_birth)
+              VALUES ($1, $2, $3, 'private', $4)
            RETURNING id, email, password_hash, display_name, avatar_url, verification_level, auth_version`,
-        [email, passwordHash, displayName],
+        [email, passwordHash, displayName, dateOfBirth ?? null],
       );
     } catch (err) {
       if (err instanceof QueryFailedError && (err as QueryFailedError & { code: string }).code === '23505') {
@@ -194,8 +205,8 @@ export class AuthService {
       if (refreshed[0]) user = refreshed[0];
     } else {
       const rows = await this.db.query<UserRow[]>(
-        `INSERT INTO users (email, display_name, avatar_url, google_id, verification_level, email_verified_at)
-              VALUES ($1, $2, $3, $4, 'email', NOW())
+        `INSERT INTO users (email, display_name, avatar_url, google_id, verification_level, email_verified_at, visibility)
+              VALUES ($1, $2, $3, $4, 'email', NOW(), 'private')
            RETURNING id, email, display_name, avatar_url, verification_level, auth_version`,
         [email, name ?? email.split('@')[0], picture ?? null, googleId],
       );
@@ -208,6 +219,29 @@ export class AuthService {
 
     const tokens = await this.issueTokens(user);
     return { user: this.toPublic(user), tokens };
+  }
+
+  async completeAge(userId: string, dateOfBirth: string): Promise<void> {
+    assertAdultDateOfBirth(dateOfBirth);
+    // Treat age completion as a bootstrap flow. Do not grant public visibility.
+    // An existing DOB cannot silently be overwritten to bypass eligibility.
+    const [updated] = await this.db.query<Array<{ id: string }>>(
+      `UPDATE users
+          SET date_of_birth = $2::date,
+              visibility = 'private',
+              updated_at = NOW()
+        WHERE id = $1
+          AND deleted_at IS NULL
+          AND (date_of_birth IS NULL OR date_of_birth = $2::date)
+        RETURNING id`,
+      [userId, dateOfBirth],
+    );
+    if (!updated) {
+      throw new ConflictException({
+        code: 'auth.age_completion_unavailable',
+        message: 'Age eligibility could not be completed. Contact support.',
+      });
+    }
   }
 
   async me(userId: string): Promise<AuthenticatedUser> {

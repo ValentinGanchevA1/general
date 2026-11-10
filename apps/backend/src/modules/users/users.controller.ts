@@ -40,6 +40,7 @@ import type {
 } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SkipAdultEligibility } from '../auth/age-eligibility.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UsersService } from './users.service';
 import { S3Service } from '../../common/s3.service';
@@ -156,11 +157,13 @@ export class UsersController {
   ) {}
 
   @Get('me')
+  @SkipAdultEligibility()
   async getMe(@CurrentUser('id') userId: string): Promise<UserProfile> {
     return this.users.getProfile(userId);
   }
 
   @Get('me/profile')
+  @SkipAdultEligibility()
   async getProfile(@CurrentUser('id') userId: string): Promise<UserProfile> {
     return this.users.getProfile(userId);
   }
@@ -174,6 +177,7 @@ export class UsersController {
   }
 
   @Delete('me')
+  @SkipAdultEligibility()
   @HttpCode(204)
   async deleteAccount(
     @CurrentUser('id') userId: string,

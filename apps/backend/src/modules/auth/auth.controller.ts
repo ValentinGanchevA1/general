@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Req,
   Res,
@@ -17,8 +18,9 @@ import type { LoginResponse, AuthTokens, AuthenticatedUser, ForgotPasswordRespon
 import { AuthService } from './auth.service';
 import { PasswordResetService } from './password-reset.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { SkipAdultEligibility } from './age-eligibility.decorator';
 import { CurrentUser } from './current-user.decorator';
-import { ForgotPasswordDto, ResetPasswordDto, GoogleOAuthDto, LoginDto, LogoutDto, RefreshDto, RegisterDto } from './dto';
+import { AgeCompletionDto, ForgotPasswordDto, ResetPasswordDto, GoogleOAuthDto, LoginDto, LogoutDto, RefreshDto, RegisterDto } from './dto';
 import {
   assertTrustedWebAuthRequest,
   clearWebRefreshCookie,
@@ -51,7 +53,7 @@ export class AuthController {
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async register(@Body() dto: RegisterDto): Promise<LoginResponse> {
-    return this.auth.register(dto.email, dto.password, dto.displayName);
+    return this.auth.register(dto.email, dto.password, dto.displayName, dto.dateOfBirth);
   }
 
   @Post('login')
@@ -132,8 +134,21 @@ export class AuthController {
     return this.auth.googleOAuth(dto.idToken);
   }
 
+  @Patch('age-eligibility')
+  @UseGuards(JwtAuthGuard)
+  @SkipAdultEligibility()
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  async completeAge(
+    @CurrentUser('id') userId: string,
+    @Body() dto: AgeCompletionDto,
+  ): Promise<{ eligible: true }> {
+    await this.auth.completeAge(userId, dto.dateOfBirth);
+    return { eligible: true };
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
+  @SkipAdultEligibility()
   @SkipThrottle()
   async me(@CurrentUser('id') userId: string): Promise<AuthenticatedUser> {
     return this.auth.me(userId);
