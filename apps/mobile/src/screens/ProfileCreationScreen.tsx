@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -18,7 +18,8 @@ import { BirthDateField, CityAutocompleteField } from '@/components/Profile/Prof
 import { FormField } from '@/components/FormField';
 import { INTEREST_OPTIONS } from '@/features/profile/interestOptions';
 import { PURPOSE_OPTIONS } from '@/features/profile/goalOptions';
-import { updateProfile } from '@/features/profile/profileSlice';
+import { fetchProfile, updateProfile } from '@/features/profile/profileSlice';
+import { registrationBirthDateError } from '@/features/auth/registrationAge';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fontSize, radius, spacing, useAppTheme } from '@/theme';
 
@@ -53,16 +54,6 @@ function StepHeader({ eyebrow, title, subtitle }: StepHeaderProps): React.JSX.El
       <Text style={[styles.stepSub, { color: colors.textTertiary }]}>{subtitle}</Text>
     </View>
   );
-}
-
-function isAdult(isoDate: string): boolean {
-  const dob = new Date(isoDate);
-  if (Number.isNaN(dob.getTime())) return false;
-  const today = new Date();
-  let years = today.getFullYear() - dob.getFullYear();
-  const monthDelta = today.getMonth() - dob.getMonth();
-  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < dob.getDate())) years -= 1;
-  return years >= 18;
 }
 
 function StepName({ value, onChange }: { value: string; onChange: (value: string) => void }): React.JSX.Element {
@@ -296,7 +287,8 @@ export function ProfileCreationScreen(): React.JSX.Element {
   const { colors } = useAppTheme();
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((state) => state.auth.user);
-  const { loading, error } = useAppSelector((state) => state.profile);
+  const { loading, error, profile } = useAppSelector((state) => state.profile);
+  const existingBirthDate = profile?.id === authUser?.id ? profile.dateOfBirth : null;
 
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<OnboardingState>({
@@ -312,6 +304,19 @@ export function ProfileCreationScreen(): React.JSX.Element {
   });
   const [originError, setOriginError] = useState('');
 
+  // Reuse the DOB that the server accepted during registration, instead of
+  // asking for it again in onboarding. This profile is owner-only data.
+  useEffect(() => {
+    if (authUser?.id) void dispatch(fetchProfile());
+  }, [authUser?.id, dispatch]);
+
+  useEffect(() => {
+    if (!existingBirthDate) return;
+    setForm((current) => current.dateOfBirth
+      ? current
+      : { ...current, dateOfBirth: existingBirthDate });
+  }, [existingBirthDate]);
+
   const toggleArrayValue = (key: 'interests' | 'goals', value: string): void => {
     setForm((current) => ({
       ...current,
@@ -326,7 +331,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
     if (step === 2) return form.interests.length >= MIN_INTERESTS;
     if (step === 3) {
       const dob = form.dateOfBirth.trim();
-      return /^\d{4}-\d{2}-\d{2}$/.test(dob) && isAdult(dob);
+      return registrationBirthDateError(dob) === null;
     }
     if (step === 4) return form.goals.length > 0;
     return true;
@@ -335,12 +340,9 @@ export function ProfileCreationScreen(): React.JSX.Element {
   const advance = (): void => {
     if (step === 3) {
       const dob = form.dateOfBirth.trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
-        setOriginError('Enter date of birth as YYYY-MM-DD');
-        return;
-      }
-      if (!isAdult(dob)) {
-        setOriginError('You must be at least 18 years old');
+      const dateError = registrationBirthDateError(dob);
+      if (dateError) {
+        setOriginError(dateError);
         return;
       }
       setOriginError('');
