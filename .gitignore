@@ -167,3 +167,8 @@ skills-lock.json
 
 # Locally downloaded APK artifacts (not source)
 dist-apk/
+
+# ─── G88 staging / local PostgreSQL backups (may contain real users) ──────────
+# Never commit SQL exports, hashes with paths, screenshots or local credentials.
+.private/
+supabase/.temp/
