@@ -21,6 +21,16 @@ const initialState: AgeEligibilityState = {
   activeRequestId: null,
 };
 
+/** Never reuse a prior account's eligibility when switching or restoring sessions. */
+export function canEnterSocial(
+  currentUserId: string | null,
+  state: Pick<AgeEligibilityState, 'userId' | 'phase'>,
+): boolean {
+  return currentUserId !== null
+    && state.userId === currentUserId
+    && state.phase === 'eligible';
+}
+
 function verifiedStatus(status: AgeEligibilityStatus): AgeEligibilityStatus {
   if (typeof status.required !== 'boolean' || typeof status.eligible !== 'boolean') {
     throw new Error('Age eligibility status was unavailable.');
