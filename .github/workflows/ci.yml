@@ -82,6 +82,8 @@ jobs:
         run: node --test apps/backend/scripts/migration-source-candidates.test.cjs
       - name: Test read-only DB target attestation (fake DB, no connection)
         run: node --test apps/backend/scripts/db-target-attestation.test.cjs
+      - name: Test local-only G88 backup checksum evidence (synthetic files, never production)
+        run: node --test scripts/qa/verify-g88-local-backup.test.mjs
       - name: Test migration guard against disposable local PostgreSQL (no production URL)
         env:
           NEXUS_EPHEMERAL_PG_INTEGRATION: 'true'
