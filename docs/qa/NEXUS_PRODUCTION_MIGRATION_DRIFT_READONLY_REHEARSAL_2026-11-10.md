@@ -172,6 +172,17 @@ f31565f16844fd6f4ed3588b019a9ada8b530df4024acb9afc683e1f632db70b  0075_dating_ma
 
 The rehearsal covered seven unique SQL bodies and synthetic data. The nine tracker rows were recovered from earlier owner-supplied production output; the full gate still requires a refreshed read-only tracker result, deploy/DB lineage, sanitized restore and independently verified hosted staging.
 
+### One-pass, non-PII production schema postcondition inventory
+
+Use the [dedicated read-only SQL file](./NEXUS_PRODUCTION_SCHEMA_POSTCONDITIONS_READONLY_2026-11-10.sql) **only after verifying the production database identity independently**. It runs a repeatable-read, read-only transaction and returns:
+
+1. All historical `0072`–`0077` `filename` / `applied_at` values (compare with the original nine-entry owner snapshot above).
+2. Existence of Terms, Personal Labels and moderation tables and indexes; definitions of reporting CHECK constraints, age-related columns and partial indexes.
+3. **Aggregate-only** privacy risks: DOB missing + non-private, declared-underage + non-private, ineligible dating-enabled, and total public profiles; no user row identifiers.
+4. `users.visibility` DB default, which was previously confirmed as `'public'::text` and remains a separate P0 issue until proven changed.
+
+**Interpretation:** all expected schema objects present is necessary but not proof of migration SQL version, deploy provenance, staging isolation, or identity verification. If an object is absent, do not run a migration to fix it without staged restore and owner approval. If DOB-null public profiles remain, prioritize privacy containment with an explicit approved change. Record only non-secret metadata and aggregate numbers.
+
 ## C. Isolated staging rehearsal — required evidence
 
 1. **Back up production using the managed provider's documented backup/snapshot workflow.** A successful backup job is not evidence of restoration until tested. Use a separately controlled database and least-privilege role for restore.
