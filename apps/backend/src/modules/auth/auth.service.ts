@@ -57,8 +57,8 @@ export class AuthService {
     let rows: UserRow[];
     try {
       rows = await this.db.query<UserRow[]>(
-        `INSERT INTO users (email, password_hash, display_name)
-              VALUES ($1, $2, $3)
+        `INSERT INTO users (email, password_hash, display_name, visibility)
+              VALUES ($1, $2, $3, 'private')
            RETURNING id, email, password_hash, display_name, avatar_url, verification_level, auth_version`,
         [email, passwordHash, displayName],
       );
@@ -194,8 +194,8 @@ export class AuthService {
       if (refreshed[0]) user = refreshed[0];
     } else {
       const rows = await this.db.query<UserRow[]>(
-        `INSERT INTO users (email, display_name, avatar_url, google_id, verification_level, email_verified_at)
-              VALUES ($1, $2, $3, $4, 'email', NOW())
+        `INSERT INTO users (email, display_name, avatar_url, google_id, verification_level, email_verified_at, visibility)
+              VALUES ($1, $2, $3, $4, 'email', NOW(), 'private')
            RETURNING id, email, display_name, avatar_url, verification_level, auth_version`,
         [email, name ?? email.split('@')[0], picture ?? null, googleId],
       );
