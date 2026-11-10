@@ -1,10 +1,24 @@
 import ageEligibilityReducer, {
+  canEnterSocial,
   checkAgeEligibility,
   completeAgeEligibility,
 } from './ageEligibilitySlice';
 
 const FIRST = '11111111-1111-1111-1111-111111111111';
 const SECOND = '22222222-2222-2222-2222-222222222222';
+
+describe('Social access eligibility selector', () => {
+  it('never grants access before server approval, on failure or for a stale account', () => {
+    expect(canEnterSocial(null, { userId: null, phase: 'eligible' })).toBe(false);
+    expect(canEnterSocial(FIRST, { userId: FIRST, phase: 'idle' })).toBe(false);
+    expect(canEnterSocial(FIRST, { userId: FIRST, phase: 'checking' })).toBe(false);
+    expect(canEnterSocial(FIRST, { userId: FIRST, phase: 'required' })).toBe(false);
+    expect(canEnterSocial(FIRST, { userId: FIRST, phase: 'completing' })).toBe(false);
+    expect(canEnterSocial(FIRST, { userId: FIRST, phase: 'error' })).toBe(false);
+    expect(canEnterSocial(SECOND, { userId: FIRST, phase: 'eligible' })).toBe(false);
+    expect(canEnterSocial(FIRST, { userId: FIRST, phase: 'eligible' })).toBe(true);
+  });
+});
 
 describe('age eligibility state is fail-closed and session-scoped', () => {
   it('requires the server result before the app can become eligible', () => {
