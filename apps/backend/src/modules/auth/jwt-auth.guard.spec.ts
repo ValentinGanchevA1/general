@@ -1,8 +1,8 @@
 import 'reflect-metadata';
-import { ExecutionContext } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { DataSource } from 'typeorm';
 
-import { AdultEligibilityService } from './adult-eligibility.service';
 import { SkipAdultEligibility } from './age-eligibility.decorator';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
@@ -14,12 +14,14 @@ class AuthenticatedController {
 }
 
 describe('JwtAuthGuard — adult eligibility', () => {
+  const flag = 'NEXUS_REQUIRE_ADULT_AGE';
+  const initial = process.env[flag];
   const controller = new AuthenticatedController();
   const parent = Object.getPrototypeOf(JwtAuthGuard.prototype) as {
     canActivate: (context: ExecutionContext) => Promise<boolean>;
   };
   let authStub: jest.SpyInstance;
-  let eligibility: { assertEligible: jest.Mock };
+  let query: jest.Mock;
   let guard: JwtAuthGuard;
 
   function context(method: 'social' | 'completeAge', id?: string): ExecutionContext {
@@ -33,37 +35,49 @@ describe('JwtAuthGuard — adult eligibility', () => {
   }
 
   beforeEach(() => {
+    process.env[flag] = 'true';
     authStub = jest.spyOn(parent, 'canActivate').mockResolvedValue(true);
-    eligibility = { assertEligible: jest.fn().mockResolvedValue(undefined) };
+    query = jest.fn().mockResolvedValue([{ eligible: true }]);
     guard = new JwtAuthGuard(
-      eligibility as unknown as AdultEligibilityService,
+      { query } as unknown as DataSource,
       new Reflector(),
     );
   });
 
   afterEach(() => {
     authStub.mockRestore();
+    if (initial === undefined) delete process.env[flag];
+    else process.env[flag] = initial;
   });
 
-  it('checks database-backed eligibility on ordinary authenticated routes', async () => {
+  it('checks database eligibility on ordinary authenticated routes', async () => {
     await expect(guard.canActivate(context('social', 'user-1'))).resolves.toBe(true);
-    expect(eligibility.assertEligible).toHaveBeenCalledWith('user-1');
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('date_of_birth IS NOT NULL'),
+      ['user-1'],
+    );
   });
 
-  it('allows only explicitly annotated bootstrap routes without adult eligibility', async () => {
+  it('exempts only annotated safe bootstrap routes', async () => {
     await expect(guard.canActivate(context('completeAge', 'user-1'))).resolves.toBe(true);
-    expect(eligibility.assertEligible).not.toHaveBeenCalled();
+    expect(query).not.toHaveBeenCalled();
   });
 
-  it('does not let an unauthorized JWT bypass age eligibility', async () => {
+  it('rejects a valid token when the stored user has no eligible DOB', async () => {
+    query.mockResolvedValueOnce([{ eligible: false }]);
+    await expect(guard.canActivate(context('social', 'user-1')))
+      .rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('does not let an unauthorized JWT bypass the age gate', async () => {
     authStub.mockResolvedValueOnce(false);
     await expect(guard.canActivate(context('social', 'user-1'))).resolves.toBe(false);
-    expect(eligibility.assertEligible).not.toHaveBeenCalled();
+    expect(query).not.toHaveBeenCalled();
   });
 
-  it('fails closed when the stored age policy rejects a user', async () => {
-    eligibility.assertEligible.mockRejectedValueOnce(new Error('age eligibility denied'));
+  it('fails closed when the eligibility database query fails', async () => {
+    query.mockRejectedValueOnce(new Error('database unavailable'));
     await expect(guard.canActivate(context('social', 'user-1')))
-      .rejects.toThrow('age eligibility denied');
+      .rejects.toThrow('database unavailable');
   });
 });
