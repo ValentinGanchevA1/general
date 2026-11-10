@@ -147,6 +147,16 @@ export interface WaveResponse {
 
 // ─── Auth ──────────────────────────────────────────────────────────────────
 
+/** Server-sourced eligibility gate. DOB is never included in the status response. */
+export interface AgeEligibilityStatus {
+  required: boolean;
+  eligible: boolean;
+}
+
+export interface AgeCompletionRequest {
+  dateOfBirth: string;
+}
+
 export interface RegisterRequest {
   email: string;
   password: string;
