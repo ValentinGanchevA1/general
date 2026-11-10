@@ -47,7 +47,10 @@ describe('UsersService — public visibility age guard', () => {
       visibility: 'public', dateOfBirth: '2000-01-01',
     });
     const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain('date_of_birth = $3');
+    expect(sql).toContain('AND $3::date <=');
     expect(sql).toMatch(/\$\d+::date <= \(CURRENT_DATE - INTERVAL '18 years'\)::date RETURNING id/);
+    expect(query.mock.calls[0]?.[1]).toEqual([USER_ID, 'public', '2000-01-01']);
   });
 
   it('rejects public visibility when DOB is explicitly cleared', async () => {
