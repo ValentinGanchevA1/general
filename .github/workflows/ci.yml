@@ -72,6 +72,8 @@ jobs:
         run: node --test apps/backend/scripts/preview-db-guard.test.cjs
       - name: Test fail-closed migration history preflight (read-only)
         run: node --test apps/backend/scripts/migration-history-guard.test.cjs
+      - name: Test owner-supplied migration drift inventory (offline, always blocking)
+        run: node --test apps/backend/scripts/migration-reconciliation-report.test.cjs
       - name: Test migration guard against disposable local PostgreSQL (no production URL)
         env:
           NEXUS_EPHEMERAL_PG_INTEGRATION: 'true'
