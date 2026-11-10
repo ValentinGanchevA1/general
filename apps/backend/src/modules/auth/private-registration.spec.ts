@@ -1,9 +1,22 @@
 import 'reflect-metadata';
 import { JwtService } from '@nestjs/jwt';
-import { OAuth2Client, type LoginTicket } from 'google-auth-library';
 import { DataSource } from 'typeorm';
 
 import { AuthService } from './auth.service';
+
+// Mock the OAuth client at the module boundary rather than spying on an
+// overloaded method whose callback signature is not a Jest Promise overload.
+jest.mock('google-auth-library', () => ({
+  OAuth2Client: jest.fn().mockImplementation(() => ({
+    verifyIdToken: jest.fn().mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-123',
+        email: 'alice@example.test',
+        email_verified: true,
+      }),
+    }),
+  })),
+}));
 
 describe('AuthService — new accounts are private', () => {
   it('explicitly creates email accounts private, independent of the DB default', async () => {
@@ -25,15 +38,6 @@ describe('AuthService — new accounts are private', () => {
   it('explicitly creates new Google OAuth accounts private', async () => {
     const originalClientId = process.env.GOOGLE_CLIENT_ID;
     process.env.GOOGLE_CLIENT_ID = 'google-test-client';
-    const verify = jest.spyOn(OAuth2Client.prototype, 'verifyIdToken')
-      .mockResolvedValue({
-        getPayload: () => ({
-          sub: 'google-123',
-          email: 'alice@example.test',
-          email_verified: true,
-        }),
-      } as unknown as LoginTicket);
-
     try {
       const query = jest.fn().mockResolvedValue([]);
       const service = new AuthService(
@@ -49,7 +53,6 @@ describe('AuthService — new accounts are private', () => {
       expect(String(insert?.[0])).toContain('email_verified_at, visibility');
       expect(String(insert?.[0])).toContain("'email', NOW(), 'private'");
     } finally {
-      verify.mockRestore();
       if (originalClientId === undefined) delete process.env.GOOGLE_CLIENT_ID;
       else process.env.GOOGLE_CLIENT_ID = originalClientId;
     }
