@@ -32,7 +32,8 @@ describe('AuthService — new accounts are private', () => {
     expect(query).toHaveBeenCalledTimes(1);
     const sql = String(query.mock.calls[0]?.[0]);
     expect(sql).toContain('display_name, visibility');
-    expect(sql).toContain("VALUES ($1, $2, $3, 'private')");
+    expect(sql).toContain("VALUES ($1, $2, $3, 'private', $4)");
+    expect(query.mock.calls[0]?.[1]).toEqual(['alice@example.test', expect.any(String), 'Alice', null]);
   });
 
   it('explicitly creates new Google OAuth accounts private', async () => {
