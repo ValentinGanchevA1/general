@@ -34,6 +34,26 @@ export function assertAdultDateOfBirth(dateOfBirth: string, now: Date = new Date
 export class AdultEligibilityService {
   constructor(@InjectDataSource() private readonly db: DataSource) {}
 
+  /**
+   * Batch check for connected socket accounts. One query per node/sweep rather
+   * than one round-trip per socket. The caller must terminate sockets on errors.
+   */
+  async eligibleUserIds(userIds: readonly string[]): Promise<ReadonlySet<string>> {
+    const uniqueIds = [...new Set(userIds)];
+    if (!adultAgeGateEnabled()) return new Set(uniqueIds);
+    if (uniqueIds.length === 0) return new Set();
+
+    const rows = await this.db.query<Array<{ id: string }>>(
+      `SELECT id FROM users
+        WHERE id = ANY($1::uuid[])
+          AND deleted_at IS NULL
+          AND date_of_birth IS NOT NULL
+          AND date_of_birth <= (timezone('UTC', NOW())::date - INTERVAL '18 years')::date`,
+      [uniqueIds],
+    );
+    return new Set(rows.map((row) => row.id));
+  }
+
   /** Fail closed if DB status is unavailable; never rely on JWT DOB claims. */
   async assertEligible(userId: string | undefined): Promise<void> {
     if (!adultAgeGateEnabled()) return;
