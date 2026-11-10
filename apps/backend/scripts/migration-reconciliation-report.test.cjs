@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { auditMigrationHistory, readOwnerSnapshot, HISTORICAL } =
-  require('./migration-reconciliation-report');
+  require('./migration-reconciliation-report.cjs');
 const { assertMigrationHistoryCompatible } = require('./migration-history-guard');
 
 const localFiles = fs.readdirSync(path.join(__dirname, '..', 'migrations'))
