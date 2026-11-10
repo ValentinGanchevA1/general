@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
@@ -69,6 +70,18 @@ test('renumbering candidates are exact Git blob matches but not tracker aliases'
   assert.equal(
     byName.get('0054_posthog_deletion_queue.sql').sourceCommit,
     'bfae85de887eab8917e8db0eeaf780e3e448791b',
+  );
+  const successorBytes = readFileSync(path.join(
+    __dirname, '..', 'migrations', '0062_posthog_deletion_queue.sql',
+  ));
+  const actualSuccessorGitBlob = createHash('sha1')
+    .update(`blob ${successorBytes.length}\0`)
+    .update(successorBytes)
+    .digest('hex');
+  assert.equal(
+    actualSuccessorGitBlob,
+    byName.get('0054_posthog_deletion_queue.sql').sourceGitBlob,
+    'the original 0054 Git blob must match the current 0062 migration bytes',
   );
   assert.notEqual(
     byName.get('0072_personal_labels.sql').sourceGitBlob,
