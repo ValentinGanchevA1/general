@@ -1,9 +1,9 @@
 # NEXUS — current status
 
-> **Synced:** 2026-10-27  
-> **Verified source baseline:** `master` at `303439b9cb3e46db5aefa29ff18b28f5a0c53606` (#827). Merged code is not evidence of deployed backend state or physical-device sign-off.
-> **Migration allocation:** inspect `apps/backend/migrations` and the CI prefix guard before allocating a number. Merged changes include password recovery (0051), event reviews (0052), and profile occupation (0053); deployment application is not verified by this snapshot.
-> Root `STATUS.md` is a historical progress log and may lag. This file is the live status pointer from `README.md`.
+> **Synced:** 2026-11-10  
+> **Verified source baseline:** `master` at `38687e9815f6c0ba97e809d837e2d02e6cf432d7` (includes docs/play child-safety draft #1076 and prior group-chat work). Merged code is not evidence of deployed backend state or physical-device sign-off.  
+> **Migration allocation:** inspect `apps/backend/migrations` and the CI prefix guard before allocating a number. Group-chat related migrations on disk include **0038**, **0066**, **0067**. Earlier recovery 0051 / reviews 0052 / occupation 0053 remain merged historically; deployment application is not verified by this snapshot.  
+> Root `STATUS.md` is a historical progress log and may lag. This file is the live status pointer from `README.md`.  
 > Early super-app MVP drafts are historical only — see `docs/HISTORICAL-SUPERAPP-PLANS.md`.
 
 ---
@@ -12,7 +12,7 @@
 
 **NEXUS is a map-first, identity-verified, real-time social app.**
 
-Canonical primary surfaces are **Map / Discover / Pulse / Connections / You**. Nearby people, events and listings lead into lightweight interactions, chat, friendship, attendance, stories and local trade. Launch-market context remains **Varna, BG**.
+Canonical primary surfaces for mobile v3 are **Map / Experiences / Opportunities / Connections / Identity** (see `docs/IA_NAVIGATION.md`). Browser v1 still uses **Map / Discover / Pulse / Connections / You**. Nearby people, events and listings lead into lightweight interactions, 1:1 and **group** chat, friendship, attendance, stories and local trade. Launch-market context remains **Varna, BG**.
 
 Public product identity is **NEXUS**. Compatibility identifiers such as `@g88/*`, Android package/application ID `com.g88`, storage keys and legacy infrastructure hostnames remain intentionally unchanged unless a separate compatibility migration is approved.
 
@@ -22,22 +22,26 @@ Public product identity is **NEXUS**. Compatibility identifiers such as `@g88/*`
 
 The P1–P3 mobile/backend foundations remain shipped: auth/profile, discovery, presence, waves, 1:1 chat, friends, stories/Pulse, events, marketplace/offers, verification/admin flow, dating layer, gamification/gifts, blocks and privacy-aware realtime/discovery behavior.
 
+**P4.G group chat is shipped in code and mobile-activated** (no longer horizon).
+
 Current high-signal slices:
 
 | Area | State | Current contract |
 |---|---|---|
-| **Mobile IA / identity** | ✅ | NEXUS visual/product identity; Map / Discover / Pulse / Connections / You |
+| **Mobile IA / identity** | ✅ | NEXUS visual/product identity; mobile v3 Map / Experiences / Opportunities / Connections / Identity |
 | **Map interaction state** | ✅ | XState pin lifecycle is canonical; legacy parallel preview/reducer paths removed (#774–#777) |
 | **Discovery realtime** | ✅ | Distributed viewer-safe mutations, bounded resolver concurrency, movement/expiry lifecycle hardening; deterministic concurrency regression coverage (#783) |
+| **1:1 chat** | ✅ | DM conversations, message requests, live location share (DM-only) |
+| **Group chat (P4.G)** | ✅ | Normalized `conversation_members`; `kind='group'`; create/list/removeMember; Socket.IO membership fanout; mobile Groups panel + group ChatScreen; friends-only invite; block fail-closed; location/gifts disabled in group mode. PRs #931 · #936 · #938 · #940 (+ eviction hardening #1020/#1034/#1035) |
 | **Error presentation** | ✅ | User-facing mobile transport/runtime errors route through the canonical sanitizer; raw transport/backend implementation strings must not reach UI (#704) |
 | **Conversation refresh diagnostics** | ✅ | Refresh failures collapse into a fixed privacy-safe class/status shape; no URL, token, conversation/user id, response body or free-text diagnostic is retained (#805) |
 | **Marketplace privacy** | ✅ | Bilateral block isolation covers discovery and direct listing/offer access paths |
 | **Admin** | ✅ | Vite verification queue; active browser-facing identity is `NEXUS Admin` (#781) |
 | **Web v1 foundation** | ✅ code foundation | Browser Map / Discover / Pulse / Connections / You, hardened HttpOnly refresh flow, same-origin edge, realtime chat and Chromium browser E2E |
 | **Product analytics** | ✅ canonical pipeline | Backend/Postgres allow-listed event persistence is canonical; optional PostHog mirror is backend-only and disabled until explicitly configured/verified (#804) |
-| **Migrations** | ✅ source changes | Recovery 0051, reviews 0052 and occupation 0053 merged; verify deployed schema separately |
+| **Migrations** | ✅ source changes | Group schema 0038/0066/0067 on disk; recovery 0051, reviews 0052, occupation 0053 historically merged; verify deployed schema separately |
 
-This snapshot intentionally does not restate every historical feature/PR. `packages/shared`, current code and focused feature docs remain the detailed contract sources.
+This snapshot intentionally does not restate every historical feature/PR. `packages/shared` (including `groupChat.ts`), current code and focused feature docs remain the detailed contract sources.
 
 ---
 
@@ -45,36 +49,25 @@ This snapshot intentionally does not restate every historical feature/PR. `packa
 
 | Area | Merged evidence | Remaining verification |
 |---|---|---|
+| **Group chat** | #931 create/list · #936 realtime · #938 mobile · #940 member management · #1020/#1034/#1035 room eviction | Physical-device create/send/leave/kick; Render apply of 0038/0066/0067 if not already |
 | Login and password recovery | #817, #819 | Deployed mail configuration, real delivery and device recovery flow |
 | Event reviews | #818, #823 | Successful backend deployment/schema application and device QA under #816 |
 | Profile v3 / Interests / Purpose / occupation privacy | #821 | Device onboarding/edit/public-profile privacy regression |
 | DOB picker and city autocomplete | #822, #824, #826 | Device date bounds, keyboard and manual fallback |
-| Realtime chat | #810, #812 | Two-client unread/preview/read-receipt smoke |
+| Realtime chat (DM) | #810, #812 | Two-client unread/preview/read-receipt smoke |
 | Direct person pin to sheet | #814 | Selection/dismiss/return-to-map device smoke |
 | Radiant Orbit v6 splash | #827 | Updated physical-device motion/accessibility evidence under #669 |
 
-Event reviews are merged, including the repeat-safe migration recovery in #823.
+Event reviews are merged, including the repeat-safe migration recovery in #823.  
 Do not describe #816 as unimplemented because its device QA issue remains open.
-Render workspace `g88` reports production `g88-api` deployment
-`dep-dbft1ojbdu5s73d87r40` as `live` on commit
-`303439b9cb3e46db5aefa29ff18b28f5a0c53606` (finished 2026-10-26T22:17:27Z).
-Runtime logs from 2026-10-27T00:35:23Z confirm registration of EventReviewsController
-and GET/POST/PATCH review routes. This establishes deployed controller presence,
-not authenticated review behavior or independently inspected database schema.
-Direct `/health` probing from the checking environment timed out; current HTTP
-reachability and the full authenticated review flow remain unverified.
 
-As of this reconciliation, #828 (avatar pins) and #829 (PostHog privacy deletion)
-remain open and are not part of the merged feature baseline.
+**Doc correction (2026-11-10):** PRODUCT/ROADMAP previously listed group chat as 📋 horizon after the feature had already landed on master. That label is retired.
 
 ### Next candidate scope
 
-RC3 remains frozen at `040f0ace62438ba0f047171fa60e6ba355ed19ca`.
-It does not certify the newer login, profile, reviews or splash changes.
-Before superseding it, select an exact commit after intended PRs pass review/CI,
-record the APK/build run and SHA-256, confirm backend/schema compatibility, then
-run #580/#669 plus the feature-specific checks above. Capture #616 screenshots
-from that approved candidate. No new candidate is declared or frozen by this document.
+RC3 remains frozen at `040f0ace62438ba0f047171fa60e6ba355ed19ca`.  
+It does not certify login, profile, reviews, splash, or **group chat** changes.  
+Before superseding it, select an exact commit after intended PRs pass review/CI, record the APK/build run and SHA-256, confirm backend/schema compatibility (including group membership tables), then run #580/#669 plus feature-specific checks (include group create → message → leave/kick). Capture #616 screenshots from that approved candidate. No new candidate is declared or frozen by this document.  
 See `docs/EVENT_REVIEWS.md` for review-specific checks.
 
 ---
@@ -91,7 +84,7 @@ Merged/CI-proven:
 - iOS React Native/CocoaPods integration, unsigned Release simulator compile and app launch are green after targeted Firebase module headers + pinned CocoaPods/Ruby + bounded pnpm-path handling (#788–#793).
 - Exact build-time opt-in `NEXA_MAP_RENDERER=maplibre` is fail-closed (#794).
 - CI exercises the native MapLibre view, NEXUS discovery renderer and `NexaMapRuntimeSurface` routing path (#795–#798).
-- Manual real-provider canary workflows exist for iOS and Android (#799–#800); the current iOS canary runtime path is hardened for simulator selection, readiness timeout and diagnostics.
+- Manual real-provider canaries exist for iOS and Android (#799–#800); the current iOS canary runtime path is hardened for simulator selection, readiness timeout and diagnostics.
 - Backend remote renderer policy + mobile fail-closed enforcement are merged (#801–#802).
 - A read-only live policy verifier exists for the documented `false → true → false` operational proof (#803).
 
@@ -135,7 +128,7 @@ Do not treat an old PR-scoped preview as authoritative production evidence.
 | Gate | State | Why it remains open |
 |---|---|---|
 | **#592 — dedicated NEXUS Terms of Service** | 🔴 P1 | Requires legal-reviewed Terms content and a dedicated public `/terms` document. Do not invent final legal language. |
-| **#580 — physical Android release audit** | 🟡 external/device | Requires RC3 installation and focused QA on a real Android device, including Friends/429, privacy, accessibility and visual/interaction checks. |
+| **#580 — physical Android release audit** | 🟡 external/device | Requires RC installation and focused QA on a real Android device, including Friends/429, privacy, accessibility, visual/interaction checks, and **group chat** smoke. |
 | **#669 — launch calibration** | 🟡 external/device | Requires physical-device recordings + telemetry before changing launch timing constants. |
 | **#616 — Play Store visual set** | 🟡 sequenced | Final screenshots follow physical-device sign-off; live UI evidence must come from an approved audited RC/device capture. |
 | **MapLibre production activation** | 🟡 operational + device | Code/CI gates are merged; live policy proof + real-provider canary/device evidence remain before default activation. |
@@ -169,13 +162,13 @@ Conversation refresh diagnostics (#805) use the same privacy principle: fixed cl
 
 ## 7. Current priorities
 
-1. **Physical-device release QA** — complete #580 and #669 without changing launch constants from subjective feel alone.
+1. **Physical-device release QA** — complete #580 and #669 without changing launch constants from subjective feel alone; include group create/send/leave/kick.
 2. **Legal production gate** — obtain reviewed Terms for #592 and wire a dedicated `/terms` URL.
 3. **Controlled MapLibre rollout evidence** — complete live remote-policy proof, manual provider canaries and physical-device validation before any production opt-in.
 4. **Play Store visuals** — finish #616 only after the approved device baseline has no open P0/P1 release blocker.
 5. **Web production topology** — choose final hostname/edge policy + production tile stack and run deployed HTTPS validation against the final topology.
 6. **Analytics mirror rollout** — resolve #815 retention/account-deletion verification, review #829 and prove staging deletion before production enablement; canonical Postgres persistence stays authoritative.
-7. **Remaining authority-doc reconciliation** — update `ARCHITECTURE.md`, `SPECIFICATION.md` and contributor guidance only where current code can prove replacement facts; preserve historical references and compatibility identifiers.
+7. **Ops** — confirm group-chat migrations applied on Render when exercising groups in any shared environment.
 
 Explicitly deferred unless reprioritized: live streaming, broad microservices/Kafka/GraphQL rewrites, and speculative features not tied to the release gates above.
 
@@ -201,7 +194,7 @@ Browser web ── same-origin edge ──► /api/v1 + /socket.io ──► sam
 Vite NEXUS Admin ── JWT/AdminGuard ──► verification/admin API
 ```
 
-Shared DTO/socket/geo contracts live in `packages/shared` (`@g88/shared` remains the compatibility package namespace).
+Shared DTO/socket/geo contracts live in `packages/shared` (`@g88/shared` remains the compatibility package namespace). Group contracts: `packages/shared/src/groupChat.ts`.
 
 ---
 
@@ -209,6 +202,8 @@ Shared DTO/socket/geo contracts live in `packages/shared` (`@g88/shared` remains
 
 - Exact client GPS must not become ordinary persisted public discovery coordinates; server privacy/coarsening rules remain authoritative.
 - Block/messaging/verification visibility is enforced server-side; UI state is not the security boundary.
+- Group membership is authoritative only via `conversation_members`; group `participant_ids` must stay empty.
+- Precise live location remains **DM-only**; group mode must not enable location sessions.
 - No public numeric trust/popularity score.
 - User-facing errors must not expose raw Axios/status/backend/runtime implementation strings.
 - Conversation refresh diagnostics must remain fixed-class/status only; no free text, URL, token or private identifier retention.

@@ -3,7 +3,7 @@
 > **Authoritative source for sequence and gates.**  
 > Sibling docs: `PRODUCT.md` (what/why), `SPECIFICATION.md` (contracts), `ARCHITECTURE.md` (how), `docs/STATUS_CURRENT.md` (live progress).  
 > **Compatibility note:** public product identity is **NEXUS**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
-> Last reconciled: **2026-10-27**.
+> Last reconciled: **2026-11-10**.
 
 ---
 
@@ -14,11 +14,11 @@
 | P1 — foundation | ✅ shipped | Auth · Profile · Map Discovery · Presence · Wave · Chat |
 | P2 — pre-launch hardening | ✅ engineering shipped | Production sign-off still depends on legal + physical-device + store gates |
 | P3 — habit-forming features | ✅ shipped | Events · trading · friends · verification · gifts/gamification · interactions |
-| P4+ product expansion | 🟡 partial | Stories shipped; web foundation merged; monetization/group chat/live streaming remain gated |
+| P4+ product expansion | 🟡 partial | Stories ✅ · **group chat ✅** · web foundation merged · monetization/live streaming remain gated |
 | Mobile renderer migration | 🟡 controlled rollout | Native/provider/runtime/remote-policy gates are merged; production remains `legacy` pending manual provider canaries, physical-device validation and explicit activation |
 | Browser public release | 🟡 foundation merged | Hosting/browser matrix/map provider/deployed HTTPS validation remain |
 
-**Migration allocation:** inspect the migration directory and CI prefix guard before choosing a number. Merged changes include recovery `0051`, reviews `0052`, and occupation `0053`; this does not certify the deployed schema.  
+**Migration allocation:** inspect the migration directory and the CI prefix guard before choosing a number. Group-chat schema includes `0038_conversation_kind_members`, `0066_dm_conversation_membership_sync`, `0067_group_conversation_legacy_participant_isolation`. Earlier notes about recovery `0051` / reviews `0052` / occupation `0053` remain valid as historical merges; this document does not certify the deployed schema.  
 **Target launch market:** **Varna, BG** (see `PRODUCT.md`).
 
 ## How to read this doc
@@ -49,7 +49,7 @@ Production sign-off remains gated by:
 3. **#592 dedicated NEXUS Terms of Service** — legal-reviewed content + separate public `/terms` URL.
 4. **#616 Play Store visual set** — final screenshot capture after physical-device sign-off.
 
-Do not collapse those external/product/legal gates into “engineering done.”
+Do not collapse those external/product/legal gates into "engineering done."
 
 ## P3 — Habit-forming ✅
 
@@ -70,11 +70,22 @@ Do not collapse those external/product/legal gates into “engineering done.”
 | ID | Item | Status |
 |---|---|---|
 | P4.S | Stories / ephemeral | ✅ shipped in Pulse |
+| **P4.G** | **Group chat** | ✅ **shipped** — schema 0038/0066/0067; API create/list/member management; Socket.IO membership fanout; mobile Groups panel + group ChatScreen; friends-only invite; blocks fail-closed; live location remains DM-only. Evidence: #931, #936, #938, #940 (+ follow-up security eviction #1020/#1034/#1035). Device QA residual only. |
 | P4.W | Browser / desktop-capable web client | 🟡 foundation merged; public release gated |
 | P4.M | Monetization / premium / Connect | 📋 gated on retention + legal/payment readiness |
-| P4.G | Group chat | 📋 |
 | P4.L | Live streaming | ❌ deferred (infra + moderation) |
 | P4.I | Geo expansion beyond current launch region | 📋 gated on launch-market evidence + abuse maturity |
+
+### P4.G — group chat (delivered)
+
+Do **not** treat group chat as horizon work. Product boundaries that remain intentional:
+
+- precise live location is **DM-only**;
+- gifts stay out of group mode on mobile;
+- membership is normalized (`conversation_members`), not legacy `participant_ids`;
+- create is friends-only and block-aware.
+
+Residual: physical-device group create/send/leave/kick smoke on an approved RC; confirm migrations applied on Render.
 
 ### P4.W — browser release gates
 
@@ -126,7 +137,7 @@ Canonical product analytics persist through the backend/Postgres allow-listed ev
 
 ## Explicit cuts / deferred architecture
 
-Microservices-from-day-one · Kafka · GraphQL · Elasticsearch · Kubernetes · anonymous-only social · global cold-start feed as primary surface.
+Microservices-from-day-one · Kafka · GraphQL · Elasticsearch · Kubernetes · anonymous-only social · global cold-start feed as primary surface · group precise live-location share.
 
 Do not introduce these because they are fashionable; require a measured product/load/security reason and an explicit decision.
 
@@ -135,18 +146,19 @@ Do not introduce these because they are fashionable; require a measured product/
 | ID | Risk | Mitigation / gate |
 |---|---|---|
 | R-Legal | Terms label does not yet have final reviewed dedicated Terms document | #592 blocks production sign-off; do not invent legal language |
-| R-Device | CI/simulator evidence cannot prove final device ergonomics, launch feel or provider behavior | #580 + #669 plus MapLibre physical-device canary evidence |
+| R-Device | CI/simulator evidence cannot prove final device ergonomics, launch feel or provider behavior | #580 + #669 plus MapLibre physical-device canary evidence; include group-chat smoke on RC |
 | R-MapRollout | Merged MapLibre/runtime/kill-switch code could be mistaken for production activation | keep `legacy` default; require operational policy proof + manual provider/device evidence + separate activation PR |
 | R-WebRelease | Browser foundation mistaken for production-ready web product | final hosting/browser/provider/deployed-E2E gates remain explicit |
 | R-Analytics | Optional third-party analytics mirror expands processing surface | backend-only best-effort mirror; canonical persistence first; strict allow-list/privacy tests; disabled until configured |
 | R-Play | Store-owner/review delay | sideload/release artifact path remains available; #616 sequences final visuals after device sign-off |
 | R-Rekognition | Assist integration unavailable/misconfigured | human verification decision remains authoritative; assist-only semantics |
 | R-Abuse | Spam/harassment/local discovery abuse | blocks, rate limits, strikes, server-side visibility and privacy policies remain authoritative |
+| R-GroupChat | Docs previously labeled P4.G as horizon after code shipped | corrected 2026-11-10; residual is device QA + schema deploy confirmation only |
 
 ## Changelog
 
+- **2026-11-10** — Reconciled **P4.G group chat to ✅ shipped** from master code and merged PRs (#931 create/list, #936 realtime, #938 mobile activation, #940 member management; security follow-ups #1020/#1034/#1035). Split live streaming / paid gifts from group chat in PRODUCT pillars. Updated P4+ snapshot. Residual: device smoke + Render migration apply confirmation.
 - **2026-10-27** — Reconciled merged login/recovery, event reviews and migration recovery, Profile v3 and splash changes in `docs/STATUS_CURRENT.md`. #828/#829 remain open. RC3 does not certify newer features; a later candidate requires an exact commit/artifact and fresh device checks. Preserved legal, device, web and renderer gates; strengthened PostHog gating with #815.
-
 - **2026-10-26** — Reconciled roadmap to current NEXUS master: migrations `0001–0050` / next `0051`; web foundation remains a gated public-release track; iOS native compile/launch and MapLibre runtime-router CI gates are green; real-provider iOS/Android canary workflows and remote renderer kill-switch are merged; remaining activation work is operational policy proof + physical-device/provider evidence + a separate production opt-in. Backend-only privacy-safe PostHog mirroring is also merged behind explicit enablement.
 - **2026-09-14** — P2/P3 engineering marked closed; Stories shipped; post-P3 friends/map/sheet/offers work documented.
 - **2026-09-12** — P2.B1 remaining-scope cleared (wave.blocked verified).

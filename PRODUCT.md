@@ -3,7 +3,7 @@
 > **Authoritative source for what we are building and why.**  
 > Sibling docs: `ARCHITECTURE.md` (how), `ROADMAP.md` (when), `SPECIFICATION.md` (contracts), `docs/STATUS_CURRENT.md` (live progress).  
 > **Compatibility note:** public product identity is **NEXUS**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
-> Last reconciled: **2026-10-26**.
+> Last reconciled: **2026-11-10**.
 
 ---
 
@@ -43,18 +43,27 @@ A map-first social app: see who and what is nearby, then act on it — wave, cha
 |--------|--------|
 | Map discovery + presence | ✅ Shipped (H3, clustering, viewport diff, filters, privacy-aware realtime deltas) |
 | Auth + progressive verification | ✅ Email · phone · ID (human review + assist-only Rekognition) |
-| Wave + 1:1 chat | ✅ Shipped (+ live location share sessions) |
+| Wave + 1:1 chat | ✅ Shipped (+ live location share sessions; **location remains DM-only**) |
+| **Group chat** | ✅ Shipped (normalized `conversation_members`; friends-only create; Socket.IO fanout; mobile `GroupChatsPanel` + group ChatScreen; leave/kick roles) |
 | Friends graph | ✅ Requests, mutual, suggestions, online privacy |
-| Events | ✅ Create · discover · RSVP · polls/Q&A |
+| Events | ✅ Create · discover · RSVP · polls/Q&A · reviews |
 | Marketplace | ✅ Listings · offers · counter · Wanted mode |
 | Gifts + gamification | ✅ XP, challenges, achievements, leaderboard |
 | Stories | ✅ Pulse stories (soft gate: email + account age) |
-| Connections | ✅ Activity inbox + conversations/chat |
+| Connections | ✅ Activity inbox + DM + group conversations |
 | Browser client | 🟡 Foundation merged; public release gated on final production topology, browser matrix, map provider and deployed HTTPS validation |
 | Mobile MapLibre renderer | 🟡 Controlled rollout: native/provider/runtime/remote-kill-switch code gates merged; production default remains `legacy` pending manual provider-canary evidence, physical-device validation and a separate activation step |
 | Product analytics mirror | 🟡 Backend-only PostHog mirror merged behind explicit enablement; canonical Postgres analytics remains the source of truth |
-| Group chat / live streaming / paid gifts | 📋 Horizon — explicit go-ahead required |
+| Live streaming / paid gifts | 📋 Horizon — explicit go-ahead required |
 | Monetization (premium, Connect) | 📋 Horizon — gated on retention |
+
+### Group chat contract (shipped)
+
+- Schema: `conversations.kind` (`dm` | `group`); groups use **`conversation_members`** as source of truth; legacy `participant_ids` stays empty for groups (migrations 0038 / 0066 / 0067).
+- API: create/list groups; member remove/leave with owner → admin → member role rules.
+- Realtime: authorized join/send/fanout via membership; bilateral block fails closed and soft-leaves blocker from shared groups.
+- Mobile: Connections → Groups panel, open live ChatScreen in group mode; gifts and live-location UI disabled in group mode.
+- Invite policy: active friends only; blocked pairs rejected at create.
 
 The current **mobile navigation v3** is **Map / Experiences / Opportunities / Connections / Identity**. Experiences and Opportunities select spatial lenses on the same Map, while Pulse remains a contextual live activity surface. Legacy Discover, Pulse and You routes remain hidden for compatibility. The browser v1 navigation still uses **Map / Discover / Pulse / Connections / You**; do not present the two platform implementations as identical until a deliberate cross-platform IA decision is shipped. See `docs/IA_NAVIGATION.md` for the mobile runtime contract.
 
@@ -65,6 +74,7 @@ The current **mobile navigation v3** is **Map / Experiences / Opportunities / Co
 - Microservices / Kafka / GraphQL before load justifies them.
 - Treating a bundled renderer/provider SDK, green simulator smoke, merged canary workflow, or remote-policy code as production activation without real rollout evidence.
 - iOS App Store launch before Android closed testing proves the core loop; cross-platform technical rollouts such as MapLibre activation still require appropriate runtime/device evidence.
+- Group precise live-location share (remains DM-only by design).
 
 ## Success metrics (α)
 
