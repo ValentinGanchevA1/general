@@ -32,7 +32,7 @@ jobs:
           POSTGRES_USER: nexa_schema
           POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
           POSTGRES_DB: nexa_schema_bench
-        ports: ['5432:5432']
+        ports: ['127.0.0.1:5432:5432']
         options: >-
           --health-cmd "pg_isready -U nexa_schema -d nexa_schema_bench"
           --health-interval 5s --health-timeout 5s --health-retries 15
