@@ -70,6 +70,8 @@ jobs:
         run: node --test scripts/check-runtime-renderer-policy.test.mjs
       - name: Test Render PR-preview database isolation guard
         run: node --test apps/backend/scripts/preview-db-guard.test.cjs
+      - name: Test fail-closed migration history preflight (read-only)
+        run: node --test apps/backend/scripts/migration-history-guard.test.cjs
       - name: Migration prefix uniqueness
         run: node apps/backend/scripts/check-migration-prefixes.mjs
       - name: Lint
