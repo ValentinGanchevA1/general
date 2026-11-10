@@ -51,6 +51,14 @@ It also checks that the **actual existing migration guard** fails with `MIGRATIO
 6. Design a narrowly scoped **forward-only** resolution with an independently reviewable mapping and proof of already-applied effects. Run it on restored staging first. Do not erase, rename, or reinsert tracking rows merely to satisfy checks.
 7. Require owner sign-off for a specific production deployment SHA, migration plan, rollback window and post-deployment REST/Socket.IO checks.
 
+### Full read-only schema evidence for historical 0051 / 0054 / 0069
+
+[Legacy migration postcondition inventory](./NEXUS_LEGACY_MIGRATIONS_0051_0054_0069_READONLY_2026-11-10.sql) adds a **non-PII, SELECT-only** inspection of migration tracker entries, tables, indexes, CHECK/FK constraints, column definitions, review/PostHog triggers, and stored-function signatures. It never invokes a user-defined function or modifies schema/data.
+
+Before execution, confirm the real DB host/port/name/user match between the owner's SQL editor and Render `g88-api` environment **without sharing secrets**. The query runs `BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY` and reports `transaction_read_only`. If any object is missing, record the discrepancy and stop; **do not rerun a missing migration** or stamp history.
+
+The repository CI includes a non-runtime regression test rejecting write verbs in this audit SQL. This is **syntactic safety evidence only**, not an audited production DB session or backup restoration.
+
 ### Safe PostgreSQL read-only check for the 0069 outbox
 
 **Only after independently confirming DB identity.** Execute in a SQL editor with read-only privileges:
