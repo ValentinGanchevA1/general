@@ -7,6 +7,7 @@ import type {
   AuthenticatedUser,
   DeleteAccountRequest,
   LoginResponse,
+  RegisterRequest,
   UserProfile,
 } from '@g88/shared';
 
@@ -60,7 +61,7 @@ export const login = createAsyncThunk(
 export const register = createAsyncThunk(
   'auth/register',
   async (
-    args: { email: string; password: string; displayName: string },
+    args: RegisterRequest,
     { rejectWithValue },
   ) => {
     try {

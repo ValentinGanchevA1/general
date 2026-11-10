@@ -147,6 +147,14 @@ export interface WaveResponse {
 
 // ─── Auth ──────────────────────────────────────────────────────────────────
 
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  displayName: string;
+  /** Calendar DOB, YYYY-MM-DD; server remains authoritative for 18+ eligibility. */
+  dateOfBirth: string;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;

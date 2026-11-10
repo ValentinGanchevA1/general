@@ -22,6 +22,8 @@ import { GoogleMark } from '@/components/GoogleMark';
 import { PasswordRecoveryScreen } from './PasswordRecoveryScreen';
 import { clearPasswordRecovery } from '@/features/auth/passwordResetSlice';
 import { FormField } from '@/components/FormField';
+import { BirthDateField } from '@/components/Profile/ProfileOriginFields';
+import { registrationBirthDateError } from '@/features/auth/registrationAge';
 import { PRIVACY_POLICY_URL, SUPPORT_EMAIL, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { clearError, login, loginWithGoogle, register } from '@/features/auth/authSlice';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
@@ -41,6 +43,7 @@ interface FieldErrors {
   email?: string;
   password?: string;
   displayName?: string;
+  dateOfBirth?: string;
 }
 
 function validate(
@@ -48,6 +51,7 @@ function validate(
   email: string,
   password: string,
   displayName: string,
+  dateOfBirth: string,
 ): FieldErrors {
   const errors: FieldErrors = {};
   const e = email.trim();
@@ -68,6 +72,8 @@ function validate(
     } else if (name.length < 2) {
       errors.displayName = 'Display name must be at least 2 characters';
     }
+    const dateError = registrationBirthDateError(dateOfBirth);
+    if (dateError) errors.dateOfBirth = dateError;
   }
   return errors;
 }
@@ -83,6 +89,7 @@ export function AuthScreen(): React.JSX.Element {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [phone, setPhone] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -104,7 +111,7 @@ export function AuthScreen(): React.JSX.Element {
     void (async () => {
       if (loading) return;
       dispatch(clearError());
-      const nextErrors = validate(mode, email, password, displayName);
+      const nextErrors = validate(mode, email, password, displayName, dateOfBirth);
       setFieldErrors(nextErrors);
       if (Object.keys(nextErrors).length > 0) return;
 
@@ -114,7 +121,12 @@ export function AuthScreen(): React.JSX.Element {
       }
 
       const action = await dispatch(
-        register({ email: email.trim(), password, displayName: displayName.trim() }),
+        register({
+          email: email.trim(),
+          password,
+          displayName: displayName.trim(),
+          dateOfBirth,
+        }),
       );
       if (register.fulfilled.match(action) && phone.trim().length >= 8) {
         await setPendingPhoneVerify(phone.trim());
@@ -126,6 +138,7 @@ export function AuthScreen(): React.JSX.Element {
     dispatch(clearError());
     setFieldErrors({});
     setPasswordVisible(false);
+    setDateOfBirth(''); // Never retain a previous registration DOB when switching modes.
     setMode((m) => (m === 'login' ? 'register' : 'login'));
   };
 
@@ -231,6 +244,23 @@ export function AuthScreen(): React.JSX.Element {
                 onSubmitEditing={() => passwordRef.current?.focus()}
                 accessibilityLabel="Phone number optional"
               />
+            ) : null}
+
+            {mode === 'register' ? (
+              <View style={styles.birthDateSection}>
+                <BirthDateField
+                  value={dateOfBirth}
+                  onChange={(value) => {
+                    setDateOfBirth(value);
+                    clearFieldError('dateOfBirth');
+                  }}
+                  onComplete={() => passwordRef.current?.focus()}
+                  error={fieldErrors.dateOfBirth}
+                />
+                <Text style={[styles.birthDateHint, { color: colors.textTertiary }]}>
+                  NEXUS Social is for adults aged 18+. Your date of birth stays private.
+                </Text>
+              </View>
             ) : null}
 
             <FormField
@@ -375,6 +405,8 @@ const styles = StyleSheet.create({
   form: { gap: spacing.md },
   title: { fontSize: fontSize.lg, fontWeight: '600', textAlign: 'center', marginBottom: spacing.sm },
   fieldIcon: { marginLeft: spacing.lg },
+  birthDateSection: { gap: spacing.xs },
+  birthDateHint: { fontSize: fontSize.xs, lineHeight: 18 },
   visibilityButton: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   error: { fontSize: fontSize.sm, lineHeight: 19, textAlign: 'center' },
   primaryButton: { borderRadius: radius.md, overflow: 'hidden', marginTop: spacing.sm },

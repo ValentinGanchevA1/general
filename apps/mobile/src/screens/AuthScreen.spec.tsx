@@ -7,6 +7,7 @@ import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { AuthScreen } from './AuthScreen';
 
 jest.mock('./PasswordRecoveryScreen', () => ({ PasswordRecoveryScreen: 'PasswordRecoveryScreen' }));
+jest.mock('@/components/Profile/ProfileOriginFields', () => ({ BirthDateField: 'BirthDateField' }));
 
 const mockDispatch = jest.fn();
 let mockAuth = { loading: false, error: null as string | null };
@@ -56,7 +57,7 @@ it('toggles password visibility and restores hidden state when changing mode', (
   expect(screen.getByLabelText('Display name')).toBeTruthy();
 });
 
-it('retains registration validation and submits the existing registration contract', () => {
+it('requires DOB before email signup and submits the typed 18+ registration payload', () => {
   const screen = render(<AuthScreen />);
   fireEvent.press(screen.getByText('Create account'));
   fireEvent.press(screen.getByLabelText('Join NEXUS'));
@@ -65,7 +66,24 @@ it('retains registration validation and submits the existing registration contra
   fireEvent.changeText(screen.getByLabelText('Email'), 'person@example.com');
   fireEvent.changeText(screen.getByLabelText('Password'), 'password123');
   fireEvent.press(screen.getByLabelText('Join NEXUS'));
-  expect(register).toHaveBeenCalledWith({ email: 'person@example.com', password: 'password123', displayName: 'Person' });
+  expect(screen.UNSAFE_getByType('BirthDateField' as unknown as React.ComponentType).props.error)
+    .toBe('Choose your date of birth');
+  expect(register).not.toHaveBeenCalled();
+
+  const picker = () => screen.UNSAFE_getByType('BirthDateField' as unknown as React.ComponentType);
+  fireEvent(picker(), 'change', '2015-01-01');
+  fireEvent.press(screen.getByLabelText('Join NEXUS'));
+  expect(picker().props.error).toBe('You must be at least 18 years old');
+  expect(register).not.toHaveBeenCalled();
+
+  fireEvent(picker(), 'change', '2000-01-01');
+  fireEvent.press(screen.getByLabelText('Join NEXUS'));
+  expect(register).toHaveBeenCalledWith({
+    email: 'person@example.com',
+    password: 'password123',
+    displayName: 'Person',
+    dateOfBirth: '2000-01-01',
+  });
 });
 
 it('clears stale errors before Google sign-in and displays server errors', () => {
