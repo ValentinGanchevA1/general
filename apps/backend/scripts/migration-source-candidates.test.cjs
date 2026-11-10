@@ -29,8 +29,8 @@ test('historical source manifest covers all 15 drift names but never authorizes 
   assert.equal(databaseEvidence.hasSqlChecksums, false);
   assert.equal(databaseEvidence.renderTargetProven, false);
   assert.match(manifest.purpose, /never an executable migration allowlist/i);
-  assert.equal(entries.filter((r) => r.status === 'source-unverified').length, 1);
-  assert.equal(entries.filter((r) => r.sourceGitBlob !== null).length, 14);
+  assert.equal(entries.filter((r) => r.status === 'source-unverified').length, 0);
+  assert.equal(entries.filter((r) => r.sourceGitBlob !== null).length, 15);
   for (const entry of entries) {
     assert.ok(snapshot.includes(entry.filename));
     assert.ok(entry.status === 'source-unverified' ||
@@ -59,6 +59,16 @@ test('renumbering candidates are exact Git blob matches but not tracker aliases'
   assert.equal(
     byName.get('0073_event_question_moderation.sql').sourceGitBlob,
     byName.get('0074_event_question_moderation.sql').sourceGitBlob,
+  );
+  // This source was reconstructed from PR #829's archived pre-force-push
+  // Actions head, not inferred from the current file name.
+  assert.equal(
+    byName.get('0054_posthog_deletion_queue.sql').sourceGitBlob,
+    'f094ca033680ec799b099741e5bf2be409398ee4',
+  );
+  assert.equal(
+    byName.get('0054_posthog_deletion_queue.sql').sourceCommit,
+    'bfae85de887eab8917e8db0eeaf780e3e448791b',
   );
   assert.notEqual(
     byName.get('0072_personal_labels.sql').sourceGitBlob,
