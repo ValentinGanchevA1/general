@@ -288,7 +288,9 @@ export function ProfileCreationScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((state) => state.auth.user);
   const { loading, error, profile } = useAppSelector((state) => state.profile);
-  const existingBirthDate = profile?.id === authUser?.id ? profile.dateOfBirth : null;
+  const existingBirthDate = profile && authUser && profile.id === authUser.id
+    ? profile.dateOfBirth
+    : null;
 
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<OnboardingState>({
