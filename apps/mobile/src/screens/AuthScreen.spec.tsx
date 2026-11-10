@@ -66,16 +66,17 @@ it('requires DOB before email signup and submits the typed 18+ registration payl
   fireEvent.changeText(screen.getByLabelText('Email'), 'person@example.com');
   fireEvent.changeText(screen.getByLabelText('Password'), 'password123');
   fireEvent.press(screen.getByLabelText('Join NEXUS'));
-  expect(screen.getByText('Choose your date of birth')).toBeTruthy();
+  expect(screen.UNSAFE_getByType('BirthDateField' as unknown as React.ComponentType).props.error)
+    .toBe('Choose your date of birth');
   expect(register).not.toHaveBeenCalled();
 
-  const picker = screen.UNSAFE_getByType('BirthDateField' as unknown as React.ComponentType);
-  fireEvent(picker, 'change', '2015-01-01');
+  const picker = (): React.ReactTestInstance => screen.UNSAFE_getByType('BirthDateField' as unknown as React.ComponentType);
+  fireEvent(picker(), 'change', '2015-01-01');
   fireEvent.press(screen.getByLabelText('Join NEXUS'));
-  expect(screen.getByText('You must be at least 18 years old')).toBeTruthy();
+  expect(picker().props.error).toBe('You must be at least 18 years old');
   expect(register).not.toHaveBeenCalled();
 
-  fireEvent(picker, 'change', '2000-01-01');
+  fireEvent(picker(), 'change', '2000-01-01');
   fireEvent.press(screen.getByLabelText('Join NEXUS'));
   expect(register).toHaveBeenCalledWith({
     email: 'person@example.com',
