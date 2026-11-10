@@ -61,6 +61,34 @@ describe('Adult eligibility policy', () => {
     await expect(service.assertEligible(USER_ID)).rejects.toThrow('database unavailable');
   });
 
+  it('returns a non-PII bootstrap status and relies on stored DOB', async () => {
+    process.env[FLAG] = 'true';
+    const query = jest.fn()
+      .mockResolvedValueOnce([{ id: USER_ID }])
+      .mockResolvedValueOnce([]);
+    const service = new AdultEligibilityService({ query } as unknown as DataSource);
+
+    await expect(service.statusForUser(USER_ID)).resolves.toEqual({ required: true, eligible: true });
+    await expect(service.statusForUser(USER_ID)).resolves.toEqual({ required: true, eligible: false });
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query.mock.calls[0]?.[1]).toEqual([[USER_ID]]);
+  });
+
+  it('returns flag-OFF eligibility without querying the database', async () => {
+    delete process.env[FLAG];
+    const query = jest.fn();
+    const service = new AdultEligibilityService({ query } as unknown as DataSource);
+    await expect(service.statusForUser(USER_ID)).resolves.toEqual({ required: false, eligible: true });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on unavailable status DB', async () => {
+    process.env[FLAG] = 'true';
+    const query = jest.fn().mockRejectedValue(new Error('DB unavailable'));
+    const service = new AdultEligibilityService({ query } as unknown as DataSource);
+    await expect(service.statusForUser(USER_ID)).rejects.toThrow('DB unavailable');
+  });
+
   it('does not query the database when the release flag is OFF', async () => {
     delete process.env[FLAG];
     const query = jest.fn();
