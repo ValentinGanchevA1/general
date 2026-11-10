@@ -3,6 +3,7 @@ import {
   GoneException,
   Inject,
   Logger,
+  OnModuleDestroy,
   NotFoundException,
   UseGuards,
   UsePipes,
@@ -15,6 +16,7 @@ import {
   MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
@@ -104,11 +106,15 @@ function extractApiError(err: unknown): { code: string; message: string } {
   },
 })
 @UseGuards(WsJwtGuard)
-export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, OnModuleDestroy {
   @WebSocketServer()
   server!: G88Server;
 
   private readonly logger = new Logger(RealtimeGateway.name);
+  /** Bound on-node eviction; not an immediate cross-node revocation protocol. */
+  private static readonly AGE_SWEEP_MS = 10_000;
+  private ageSweepTimer: ReturnType<typeof setInterval> | null = null;
+  private ageSweepRunning = false;
 
   // Property injection preserves the existing gateway constructor contract.
   @Inject(AdultEligibilityService)
@@ -127,6 +133,51 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly jwt: JwtService,
     private readonly eventRoomAccess: EventRoomAccessService,
   ) {}
+
+  afterInit(): void {
+    if (!adultAgeGateEnabled() || this.ageSweepTimer !== null) return;
+
+    this.ageSweepTimer = setInterval(() => {
+      void this.sweepAdultSockets();
+    }, RealtimeGateway.AGE_SWEEP_MS);
+    this.ageSweepTimer.unref?.();
+  }
+
+  onModuleDestroy(): void {
+    if (this.ageSweepTimer !== null) {
+      clearInterval(this.ageSweepTimer);
+      this.ageSweepTimer = null;
+    }
+  }
+
+  /**
+   * Revalidate every locally connected socket, including idle recipients that
+   * receive outbound events but never send another inbound message. All nodes
+   * run their own sweep. Fail closed if DB eligibility cannot be determined.
+   */
+  async sweepAdultSockets(): Promise<void> {
+    if (!adultAgeGateEnabled() || this.ageSweepRunning || !this.server) return;
+    this.ageSweepRunning = true;
+    try {
+      const sockets = await this.server.local.fetchSockets();
+      if (sockets.length === 0) return;
+      const userIds = [...new Set(
+        sockets.map((socket) => socket.data.userId).filter((id): id is string => typeof id === 'string' && id.length > 0),
+      )];
+      const eligible = await this.adultEligibility.eligibleUserIds(userIds);
+      for (const socket of sockets) {
+        if (!eligible.has(socket.data.userId)) {
+          socket.disconnect(true);
+        }
+      }
+    } catch (error: unknown) {
+      this.logger.error('Adult socket eligibility sweep failed; disconnecting local sockets', error);
+      // On a DB/adapter failure, no socket may keep receiving room broadcasts.
+      this.server.local.disconnectSockets(true);
+    } finally {
+      this.ageSweepRunning = false;
+    }
+  }
 
   async handleConnection(client: G88Socket): Promise<void> {
     const token = client.handshake.auth?.['token'] as string | undefined;
