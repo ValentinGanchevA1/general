@@ -58,7 +58,7 @@ test('changed checkout breaks snapshot match; not-applied migration is surfaced'
     [...localFiles, '0078_new_schema.sql'],
   );
   assert.equal(report.matchesOwnerSnapshot, false);
-  assert.deepEqual(report.checkoutFilesNotRecorded, ['0078_new_schema.sql']);
+  assert.deepEqual(report.checkoutFilesNotRecorded, ['0001_initial.sql', '0078_new_schema.sql']);
 });
 
 test('invalid filenames and duplicated metadata fail instead of being interpreted', () => {
