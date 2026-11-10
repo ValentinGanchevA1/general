@@ -95,8 +95,8 @@ function auditMigrationHistory(appliedFiles, localFiles) {
     matchesOwnerSnapshot,
     // An exact filename match is only evidence of a known risk, never an approval.
     disposition: 'BLOCKED_RECONCILIATION_REVIEW_REQUIRED',
-    migrationRunnerUnchanged: true,
-    databaseWritesPerformed: false,
+    // Scope of THIS offline report, not an assertion about any external system.
+    auditReadsDatabase: false,
   };
 }
 
