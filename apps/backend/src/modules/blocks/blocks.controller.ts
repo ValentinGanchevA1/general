@@ -2,6 +2,7 @@ import { Controller, Delete, Get, Param, ParseUUIDPipe, Post, UseGuards } from '
 import { Throttle } from '@nestjs/throttler';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SkipAdultEligibility } from '../auth/age-eligibility.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { BlocksService } from './blocks.service';
 
@@ -12,11 +13,13 @@ export class BlocksController {
 
   /** The caller's own block list (for a "Blocked users" settings screen). */
   @Get()
+  @SkipAdultEligibility()
   list(@CurrentUser('id') userId: string) {
     return this.blocks.listBlockedBy(userId);
   }
 
   @Post(':userId')
+  @SkipAdultEligibility()
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   async block(@CurrentUser('id') userId: string, @Param('userId', ParseUUIDPipe) targetId: string) {
     await this.blocks.block(userId, targetId);
