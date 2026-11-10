@@ -21,6 +21,9 @@ This is an **offline evidence + tests** change only. It does not make Render dep
 | 9 | Three 0072, two 0073, one each 0074–0077 | Draft #1066/#1067/#1074 family; seven distinct candidate SQL bodies across nine tracker names, including identical source blobs under renamed filenames. No proof of exact DB execution. |
 
 Historical source/evidence: `docs/qa/NEXUS_PRODUCTION_MIGRATION_DRIFT_READONLY_REHEARSAL_2026-11-10.md`.
+
+**Important difference:** GitHub commit [`1ccacd9`](https://github.com/ValentinGanchevA1/general/commit/1ccacd9ea9d887c6ac698fffdc4be42bfb919b23) (PR #818) contains an older `0051_event_reviews.sql` with non-repeat-safe `CREATE TABLE` / `CREATE TRIGGER` statements. The current `0052_event_reviews.sql` (hardened in PR #823) uses `IF NOT EXISTS`, `DROP TRIGGER IF EXISTS`, and `CREATE OR REPLACE FUNCTION`. They are **not byte-identical**, and the DB tracker alone does not establish which SQL version was actually executed. Treat this as a required schema/provenance check, not an alias safe to auto-accept.
+
 Renaming commits for first three: `b89e6b37`, `cf5858c5`, `12c672b4`; original commit `a3f8c2dd`.
 
 ## Local offline verification
