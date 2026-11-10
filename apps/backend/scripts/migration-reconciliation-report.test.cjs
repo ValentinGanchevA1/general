@@ -111,3 +111,22 @@ test('offline CLI always exits nonzero and reports BLOCKED even on matching fixt
   assert.equal(report.disposition, 'BLOCKED_RECONCILIATION_REVIEW_REQUIRED');
   assert.equal(report.auditReadsDatabase, false);
 });
+
+test('legacy 0051/0054/0069 inventory is SELECT-only inside a read-only transaction', () => {
+  const sqlPath = path.join(
+    __dirname, '..', '..', '..',
+    'docs', 'qa', 'NEXUS_LEGACY_MIGRATIONS_0051_0054_0069_READONLY_2026-11-10.sql',
+  );
+  const sql = fs.readFileSync(sqlPath, 'utf8');
+  const statements = sql.split('\n')
+    .filter((line) => !line.trim().startsWith('--')).join('\n');
+  assert.match(statements, /BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;/);
+  assert.match(statements, /current_setting\('transaction_read_only'\)/);
+  assert.match(statements, /FROM public\.schema_migrations/);
+  assert.match(statements, /SELECT pg_get_function_identity_arguments|pg_get_function_identity_arguments/);
+  assert.match(statements, /COMMIT;\s*$/);
+  assert.doesNotMatch(
+    statements,
+    /\b(?:INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|TRUNCATE|GRANT|REVOKE|CALL|DO|EXECUTE|COPY)\b/i,
+  );
+});
