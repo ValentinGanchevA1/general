@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SkipAdultEligibility } from '../auth/age-eligibility.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AdminGuard } from '../id-verification/admin.guard';
 import { ContentReportsService } from './content-reports.service';
@@ -11,6 +12,7 @@ import { ContentReportQueueDto, CreateContentReportDto, DecideContentReportDto }
 export class ContentReportsController {
   constructor(private readonly service: ContentReportsService) {}
   @Post()
+  @SkipAdultEligibility()
   @Throttle({ default: { ttl: 60_000, limit: 8 } })
   submit(@CurrentUser('id') id: string, @Body() dto: CreateContentReportDto) {
     return this.service.submit(id, dto);

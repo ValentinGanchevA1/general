@@ -1,5 +1,5 @@
 import type { ForgotPasswordRequest, ResetPasswordRequest } from '@g88/shared';
-import { IsEmail, IsString, MinLength, MaxLength, Matches, IsByteLength } from 'class-validator';
+import { IsEmail, IsString, IsOptional, MinLength, MaxLength, Matches, IsByteLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -14,6 +14,18 @@ export class RegisterDto {
   @MinLength(2)
   @MaxLength(50)
   displayName!: string;
+
+  /** Required by AuthService when NEXUS_REQUIRE_ADULT_AGE=true. */
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  dateOfBirth?: string;
+}
+
+export class AgeCompletionDto {
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  dateOfBirth!: string;
 }
 
 export class LoginDto {
