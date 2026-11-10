@@ -111,10 +111,18 @@ test('PostgreSQL migration safety — isolated CI cluster only', { skip: !enable
         result.rows?.some((row) => row.read_only === 'on'));
       assert.ok(identity, 'audit must confirm a read-only transaction');
       const inventory = results.find((result) =>
-        result.rows?.some((row) => row.section === 'relations'));
+        result.rows?.some((row) => row.category === 'relation'));
       assert.ok(inventory, 'catalog inventory must include relations');
-      const relationRow = inventory.rows.find((row) => row.section === 'relations');
-      assert.equal(relationRow.metadata.length, 13);
+      const relations = inventory.rows.filter((row) => row.category === 'relation');
+      assert.equal(relations.length, 13);
+      assert.equal(
+        relations.find((row) => row.object_name === 'realtime_room_revocations')?.details,
+        'ABSENT',
+      );
+      assert.ok(inventory.rows.some((row) =>
+        row.category === 'trigger' && row.object_name === 'event_review_write'));
+      assert.ok(inventory.rows.some((row) =>
+        row.category === 'function' && row.object_name === 'enforce_event_review_update'));
       const tracker = await db.query('SELECT filename FROM public.schema_migrations');
       assert.deepEqual(tracker.rows, [
         { filename: '0069_realtime_room_revocation_outbox.sql' },
