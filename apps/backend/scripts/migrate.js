@@ -133,10 +133,16 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('Migration failed:', err.message || err.name || '(no message)');
-  if (err.code) console.error('code:', err.code);
-  if (err.cause) console.error('cause:', err.cause);
-  if (err.stack) console.error(err.stack);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('Migration failed:', err.message || err.name || '(no message)');
+    if (err.code) console.error('code:', err.code);
+    if (err.cause) console.error('cause:', err.cause);
+    if (err.stack) console.error(err.stack);
+    process.exit(1);
+  });
+}
+
+// Export the actual runner for read-only drift regression tests. Requiring this
+// module must never connect to a database or invoke production migrations.
+module.exports = { run };
