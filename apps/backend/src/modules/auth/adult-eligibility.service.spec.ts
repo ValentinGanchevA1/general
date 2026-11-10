@@ -71,6 +71,48 @@ describe('Adult eligibility policy', () => {
   });
 });
 
+describe('Adult eligibility — batch socket checks', () => {
+  const flag = 'NEXUS_REQUIRE_ADULT_AGE';
+  const original = process.env[flag];
+
+  afterEach(() => {
+    if (original === undefined) delete process.env[flag];
+    else process.env[flag] = original;
+  });
+
+  it('performs one bounded SQL query for distinct socket user IDs', async () => {
+    process.env[flag] = 'true';
+    const query = jest.fn().mockResolvedValue([{ id: 'u1' }]);
+    const policy = new AdultEligibilityService({ query } as unknown as DataSource);
+
+    const eligible = await policy.eligibleUserIds(['u1', 'u2', 'u1']);
+
+    expect(eligible).toEqual(new Set(['u1']));
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(String(query.mock.calls[0]?.[0])).toContain('ANY($1::uuid[])');
+    expect(query.mock.calls[0]?.[1]).toEqual([['u1', 'u2']]);
+  });
+
+  it('does not query DB when disabled or when no sockets are connected', async () => {
+    const query = jest.fn();
+    const policy = new AdultEligibilityService({ query } as unknown as DataSource);
+
+    delete process.env[flag];
+    await expect(policy.eligibleUserIds(['u1'])).resolves.toEqual(new Set(['u1']));
+    process.env[flag] = 'true';
+    await expect(policy.eligibleUserIds([])).resolves.toEqual(new Set());
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('propagates DB failures for fail-closed socket eviction', async () => {
+    process.env[flag] = 'true';
+    const query = jest.fn().mockRejectedValue(new Error('DB offline'));
+    const policy = new AdultEligibilityService({ query } as unknown as DataSource);
+
+    await expect(policy.eligibleUserIds(['u1'])).rejects.toThrow('DB offline');
+  });
+});
+
 describe('AuthService — adult onboarding', () => {
   const previous = process.env[FLAG];
   afterEach(() => {
