@@ -21,6 +21,7 @@ import type { DiscoveryResponse, LoginResponse, Viewport } from '@g88/shared';
 import { REDIS_CLIENT } from '../../config/redis.provider';
 import { AuthService } from '../auth/auth.service';
 import { AuthController } from '../auth/auth.controller';
+import { AdultEligibilityService } from '../auth/adult-eligibility.service';
 import { JwtStrategy } from '../auth/jwt.strategy';
 import { PasswordResetService } from '../auth/password-reset.service';
 import { FriendsService } from '../friends/friends.service';
@@ -204,7 +205,7 @@ suite('NEXA full migrated PostGIS + JWT login + real Friends + Redis/HTTP', () =
       providers: [
         { provide: getDataSourceToken(), useValue: db },
         { provide: REDIS_CLIENT, useValue: redis },
-        JwtStrategy, AuthService, PresenceService, DiscoveryService,
+        JwtStrategy, AuthService, AdultEligibilityService, PresenceService, DiscoveryService,
         {
           provide: FriendsService,
           useFactory: (source: DataSource, presence: PresenceService): FriendsService =>
@@ -250,6 +251,20 @@ suite('NEXA full migrated PostGIS + JWT login + real Friends + Redis/HTTP', () =
       expect(result.tokens.accessToken.length).toBeGreaterThan(40);
       tokens.set(viewer.id, result.tokens.accessToken);
     }
+
+    // Compatibility contract for backend-first rollout: authenticated clients
+    // may check status even when the adult release flag is still OFF. The GET
+    // is never public and must not expose DOB or other private user fields.
+    const anonymousAgeStatus = await fetch(base + '/auth/age-eligibility', {
+      signal: AbortSignal.timeout(10_000),
+    });
+    expect(anonymousAgeStatus.status).toBe(401);
+    const ageStatusResponse = await fetch(base + '/auth/age-eligibility', {
+      headers: { authorization: 'Bearer ' + tokens.get(viewers[0]!.id) },
+      signal: AbortSignal.timeout(10_000),
+    });
+    expect(ageStatusResponse.status).toBe(200);
+    expect(await ageStatusResponse.json()).toEqual({ required: false, eligible: true });
 
     const realFriends = moduleRef.get(FriendsService);
     expect(await realFriends.listFriendIds(viewers[0]!.id)).toContain(friend);
