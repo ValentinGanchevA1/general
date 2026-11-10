@@ -47,11 +47,11 @@
     },
     {
       "filename": "0054_posthog_deletion_queue.sql",
-      "status": "source-unverified",
-      "sourceCommit": null,
-      "sourceGitBlob": null,
+      "status": "candidate-historical-commit",
+      "sourceCommit": "bfae85de887eab8917e8db0eeaf780e3e448791b",
+      "sourceGitBlob": "f094ca033680ec799b099741e5bf2be409398ee4",
       "successor": "0062_posthog_deletion_queue.sql",
-      "notes": "Current successor in merged #829 exists, but historical 0054 source not retrieved"
+      "notes": "Recovered from pre-force-push PR #829 GitHub Actions run 40443005780 (2026-10-27); byte-identical Git blob to current 0062_posthog_deletion_queue.sql. This does not verify executed SQL in G88."
     },
     {
       "filename": "0069_realtime_room_revocation_outbox.sql",
