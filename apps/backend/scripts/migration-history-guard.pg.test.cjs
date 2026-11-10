@@ -81,6 +81,65 @@ test('PostgreSQL migration safety — isolated CI cluster only', { skip: !enable
     });
   });
 
+  await t.test('real G88 85-filename history blocks migration runner without writes', async () => {
+    await withDisposableDatabase(async (db) => {
+      const { readOwnerSnapshot } = require('./migration-reconciliation-report.cjs');
+      const fixture = path.join(__dirname, 'fixtures', 'migration-history-owner-20261110.txt');
+      const appliedNames = readOwnerSnapshot(fixture);
+      assert.equal(appliedNames.length, 85);
+      await db.query(`
+        CREATE TABLE public.users (
+          id uuid PRIMARY KEY,
+          visibility text NOT NULL DEFAULT 'public'
+        )
+      `);
+      await db.query(`
+        INSERT INTO public.users (id, visibility)
+        VALUES ('11111111-1111-1111-1111-111111111111', 'private')
+      `);
+      await db.query(`
+        CREATE TABLE public.schema_migrations (
+          filename text PRIMARY KEY,
+          applied_at timestamptz DEFAULT now()
+        )
+      `);
+      await db.query(
+        'INSERT INTO public.schema_migrations (filename) SELECT unnest($1::text[])',
+        [appliedNames],
+      );
+
+      await assert.rejects(
+        run(db),
+        (error) => error.code === 'MIGRATION_HISTORY_DRIFT' &&
+          /15 applied migration filename/.test(error.message),
+      );
+      const tracked = await db.query(
+        'SELECT filename FROM public.schema_migrations ORDER BY filename',
+      );
+      assert.deepEqual(
+        tracked.rows.map((row) => row.filename),
+        [...appliedNames].sort(),
+        'runner must not stamp, rename, or delete applied migrations',
+      );
+      const profiles = await db.query('SELECT id, visibility FROM public.users');
+      assert.deepEqual(profiles.rows, [{
+        id: '11111111-1111-1111-1111-111111111111',
+        visibility: 'private',
+      }]);
+      const privacyDefault = await db.query(`
+        SELECT column_default FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users' AND column_name = 'visibility'
+      `);
+      assert.equal(privacyDefault.rows[0].column_default, "'public'::text");
+      const schema = await db.query(`
+        SELECT COUNT(*)::int AS count FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+      `);
+      assert.equal(schema.rows[0].count, 2, 'no new schema objects before drift rejection');
+    });
+  });
+
   await t.test('brand-new database has no user/tracker and passes preflight without mutation', async () => {
     await withDisposableDatabase(async (db) => {
       await assert.doesNotReject(
