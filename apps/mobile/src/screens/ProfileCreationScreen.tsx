@@ -302,6 +302,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
     goals: [],
     visibility: 'public',
   });
+  const birthDateForForm = form.dateOfBirth || existingBirthDate || '';
   const [originError, setOriginError] = useState('');
 
   // Reuse the DOB that the server accepted during registration, instead of
@@ -309,13 +310,6 @@ export function ProfileCreationScreen(): React.JSX.Element {
   useEffect(() => {
     if (authUser?.id) void dispatch(fetchProfile());
   }, [authUser?.id, dispatch]);
-
-  useEffect(() => {
-    if (!existingBirthDate) return;
-    setForm((current) => current.dateOfBirth
-      ? current
-      : { ...current, dateOfBirth: existingBirthDate });
-  }, [existingBirthDate]);
 
   const toggleArrayValue = (key: 'interests' | 'goals', value: string): void => {
     setForm((current) => ({
@@ -330,7 +324,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
     if (step === 1) return form.displayName.trim().length > 0;
     if (step === 2) return form.interests.length >= MIN_INTERESTS;
     if (step === 3) {
-      const dob = form.dateOfBirth.trim();
+      const dob = birthDateForForm.trim();
       return registrationBirthDateError(dob) === null;
     }
     if (step === 4) return form.goals.length > 0;
@@ -339,7 +333,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
 
   const advance = (): void => {
     if (step === 3) {
-      const dob = form.dateOfBirth.trim();
+      const dob = birthDateForForm.trim();
       const dateError = registrationBirthDateError(dob);
       if (dateError) {
         setOriginError(dateError);
@@ -359,7 +353,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
         // Legacy completion currently relies on bio being non-null. Bio authoring moves to Profile v3.
         bio: '',
         interests: form.interests,
-        dateOfBirth: form.dateOfBirth.trim(),
+        dateOfBirth: birthDateForForm.trim(),
         hometownCity: form.hometownCity.trim() || null,
         hometownCountry: form.hometownCountry.trim() || null,
         showAge: form.showAge,
@@ -407,7 +401,7 @@ export function ProfileCreationScreen(): React.JSX.Element {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {step === 1 ? <StepName value={form.displayName} onChange={(displayName) => setForm((current) => ({ ...current, displayName }))} /> : null}
         {step === 2 ? <StepInterests selected={form.interests} onToggle={(value) => toggleArrayValue('interests', value)} /> : null}
-        {step === 3 ? <StepOrigin dateOfBirth={form.dateOfBirth} hometownCity={form.hometownCity} hometownCountry={form.hometownCountry} showAge={form.showAge} showHometown={form.showHometown} error={originError} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} /> : null}
+        {step === 3 ? <StepOrigin dateOfBirth={birthDateForForm} hometownCity={form.hometownCity} hometownCountry={form.hometownCountry} showAge={form.showAge} showHometown={form.showHometown} error={originError} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} /> : null}
         {step === 4 ? <StepPurpose selected={form.goals} onToggle={(value) => toggleArrayValue('goals', value)} /> : null}
         {step === 5 ? <StepVisibility value={form.visibility} onChange={(visibility) => setForm((current) => ({ ...current, visibility }))} /> : null}
         {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
