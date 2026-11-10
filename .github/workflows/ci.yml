@@ -28,6 +28,8 @@ jobs:
         run: node --test scripts/ci/check-no-secrets.test.mjs
       - name: Test Play AAB manual publish and signature workflow guard
         run: node --test scripts/ci/check-play-release-workflow.test.mjs
+      - name: Test disposable PostGIS credentials remain synchronized and localhost-only
+        run: node --test scripts/ci/check-disposable-postgres-credentials.test.mjs
       - name: Secret / env scanning (hard gate)
         run: bash scripts/ci/check-no-secrets.sh
       - name: Test manual Terms legal publication gate (no files published)
