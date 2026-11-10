@@ -56,8 +56,10 @@ import { FriendsListScreen } from '@/screens/FriendsListScreen';
 import { SuggestionsScreen } from '@/screens/SuggestionsScreen';
 import type { AreaCategory, VerificationLevel } from '@g88/shared';
 import { AuthScreen } from '@/screens/AuthScreen';
+import { AgeEligibilityScreen } from '@/screens/AgeEligibilityScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { restoreSession } from '@/features/auth/authSlice';
+import { checkAgeEligibility } from '@/features/auth/ageEligibilitySlice';
 import { placeDeepLinkQueue } from '@/features/places/placeDeepLink';
 import { registerPushToken, setupNotificationHandlers } from '@/lib/pushNotifications';
 import { pingGamification } from '@/features/gamification/useGamification';
@@ -86,6 +88,7 @@ export type TabParamList = {
 };
 export type RootStackParamList = {
 	Auth: undefined;
+	AgeEligibility: undefined;
 	ProfileCreation: undefined;
 	Main: NavigatorScreenParams<TabParamList> | undefined;
 	Chat: { conversationId: string; otherUserName: string; requestPending?: boolean; otherUserId?: string; otherUserVerification?: VerificationLevel; otherUserIdVerified?: boolean };
@@ -357,6 +360,8 @@ export function AppNavigator(): React.JSX.Element {
 	const userId = user?.id ?? null;
 	const restoring = useAppSelector((s) => s.auth.restoring);
 	const profileSetupComplete = useAppSelector((s) => s.auth.profileSetupComplete);
+	const ageGate = useAppSelector((s) => s.ageEligibility);
+	const ageReady = userId !== null && ageGate.userId === userId && ageGate.phase === 'eligible';
 	const launchInteractionsReady = useNexaLaunchInteractionsReady();
 	const prevUserRef = useRef<string | null>(null);
 	const [navigationReady, setNavigationReady] = useState(false);
@@ -368,6 +373,10 @@ export function AppNavigator(): React.JSX.Element {
 	const navigationTheme = useMemo(() => buildNavigationTheme(themeColors, scheme === 'dark'), [themeColors, scheme]);
 
 	useEffect(() => { void dispatch(restoreSession()); }, [dispatch]);
+	useEffect(() => {
+		if (!userId || restoring || (ageGate.userId === userId && ageGate.phase !== 'idle')) return;
+		void dispatch(checkAgeEligibility(userId));
+	}, [dispatch, userId, restoring, ageGate.userId, ageGate.phase]);
 	useEffect(() => {
 		let active = true;
 		const acceptUrl = (url: string | null): void => {
@@ -382,17 +391,17 @@ export function AppNavigator(): React.JSX.Element {
 		};
 	}, []);
 	useEffect(() => {
-		if (!navigationReady || !userId || !profileSetupComplete || pendingPlaceDeepLinkId == null) return;
+		if (!navigationReady || !userId || !ageReady || !profileSetupComplete || pendingPlaceDeepLinkId == null) return;
 		openViaRef('PlaceDetail', { placeId: pendingPlaceDeepLinkId });
 		placeDeepLinkQueue.clear(pendingPlaceDeepLinkId);
-	}, [navigationReady, pendingPlaceDeepLinkId, profileSetupComplete, userId]);
-	useEffect(() => { if (!userId) return; return setupNotificationHandlers((screen, params) => { openViaRef(screen as Parameters<typeof openViaRef>[0], params); }); }, [userId]);
-	useEffect(() => { if (!launchInteractionsReady) return; if (userId && prevUserRef.current !== userId) { prevUserRef.current = userId; void registerPushToken(); void pingGamification(); } if (!userId) prevUserRef.current = null; }, [launchInteractionsReady, userId]);
-	useEffect(() => { if (!launchInteractionsReady || !userId || restoring) return; let cancelled = false; const t = setTimeout(() => { void (async () => { const phone = await takePendingPhoneVerify(); if (cancelled || !phone) return; openViaRef('Verification', { initialPhone: phone }); })(); }, 700); return () => { cancelled = true; clearTimeout(t); }; }, [launchInteractionsReady, userId, restoring]);
+	}, [navigationReady, pendingPlaceDeepLinkId, ageReady, profileSetupComplete, userId]);
+	useEffect(() => { if (!userId || !ageReady) return; return setupNotificationHandlers((screen, params) => { openViaRef(screen as Parameters<typeof openViaRef>[0], params); }); }, [userId, ageReady]);
+	useEffect(() => { if (!userId) prevUserRef.current = null; if (!launchInteractionsReady || !ageReady) return; if (userId && prevUserRef.current !== userId) { prevUserRef.current = userId; void registerPushToken(); void pingGamification(); } }, [launchInteractionsReady, userId, ageReady]);
+	useEffect(() => { if (!launchInteractionsReady || !userId || !ageReady || restoring) return; let cancelled = false; const t = setTimeout(() => { void (async () => { const phone = await takePendingPhoneVerify(); if (cancelled || !phone) return; openViaRef('Verification', { initialPhone: phone }); })(); }, 700); return () => { cancelled = true; clearTimeout(t); }; }, [launchInteractionsReady, userId, ageReady, restoring]);
 	if (restoring && user === null) return <View style={{ flex: 1, backgroundColor: themeColors.bg, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Loading" accessibilityRole="progressbar"><BrandLogo size={120} /></View>;
 	return <NavigationContainer ref={navigationRef} theme={navigationTheme} onReady={() => { setNavigationReady(true); navigationIntegration.registerNavigationContainer(navigationRef); }}><BottomSheetModalProvider>
 		<Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themeColors.bg } }}>
-			{user ? <>{!profileSetupComplete && <Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} />}<Stack.Screen name="Main" component={MainTabs} /><Stack.Screen name="Chat" component={ChatScreen} /><Stack.Screen name="AlertComposer" component={AlertComposerScreen} /><Stack.Screen name="UserProfile" component={UserProfileScreen} /><Stack.Screen name="MutualFriends" component={MutualFriendsScreen} options={{ headerShown: false }} /><Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} /><Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} /><Stack.Screen name="Interactions" component={InteractionsScreen} options={{ headerShown: false }} /><Stack.Screen name="Gamification" component={GamificationNavigator} options={{ headerShown: false }} /><Stack.Screen name="Commerce" component={CommerceNavigator} options={{ headerShown: false }} /><Stack.Screen name="Account" component={AccountNavigator} options={{ headerShown: false }} /><Stack.Screen name="Social" component={SocialNavigator} options={{ headerShown: false }} /><Stack.Screen name="Events" component={EventsNavigator} options={{ headerShown: false }} /></> : <Stack.Screen name="Auth" component={AuthScreen} />}
-		</Stack.Navigator>{user ? <AmbientToastHost /> : null}<AppAlertHost />
+			{user ? (ageReady ? <>{!profileSetupComplete && <Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} />}<Stack.Screen name="Main" component={MainTabs} /><Stack.Screen name="Chat" component={ChatScreen} /><Stack.Screen name="AlertComposer" component={AlertComposerScreen} /><Stack.Screen name="UserProfile" component={UserProfileScreen} /><Stack.Screen name="MutualFriends" component={MutualFriendsScreen} options={{ headerShown: false }} /><Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} /><Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} /><Stack.Screen name="Interactions" component={InteractionsScreen} options={{ headerShown: false }} /><Stack.Screen name="Gamification" component={GamificationNavigator} options={{ headerShown: false }} /><Stack.Screen name="Commerce" component={CommerceNavigator} options={{ headerShown: false }} /><Stack.Screen name="Account" component={AccountNavigator} options={{ headerShown: false }} /><Stack.Screen name="Social" component={SocialNavigator} options={{ headerShown: false }} /><Stack.Screen name="Events" component={EventsNavigator} options={{ headerShown: false }} /></> : <Stack.Screen name="AgeEligibility" component={AgeEligibilityScreen} />) : <Stack.Screen name="Auth" component={AuthScreen} />}
+		</Stack.Navigator>{user && ageReady ? <AmbientToastHost /> : null}<AppAlertHost />
 	</BottomSheetModalProvider></NavigationContainer>;
 }
