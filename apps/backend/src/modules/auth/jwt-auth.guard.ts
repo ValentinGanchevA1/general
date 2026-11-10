@@ -1,5 +1,7 @@
 import { ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { AuthGuard } from '@nestjs/passport';
 import { firstValueFrom, isObservable } from 'rxjs';
 
@@ -12,11 +14,16 @@ interface AuthRequest {
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
+  private readonly adultEligibility: AdultEligibilityService;
+
   constructor(
-    private readonly adultEligibility: AdultEligibilityService,
+    @InjectDataSource() db: DataSource,
     private readonly reflector: Reflector,
   ) {
     super();
+    // TypeORM DataSource is globally available; many feature modules using this
+    // guard do not import AuthModule. Avoid a module-local DI dependency here.
+    this.adultEligibility = new AdultEligibilityService(db);
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
