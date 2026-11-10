@@ -12,14 +12,40 @@ async function assertMigrationHistoryCompatible(client, localFiles, legacyAliase
   const tracker = await client.query(
     "SELECT to_regclass('public.schema_migrations') AS tracker_table",
   );
-  if (tracker.rows[0]?.tracker_table == null) {
-    // A fresh database can continue through the existing bootstrap flow.
+  const trackerExists = tracker.rows[0]?.tracker_table != null;
+  // A missing/empty tracker is safe only if no established app schema exists.
+  // Never infer that all migration files were applied solely from users existing.
+  if (!trackerExists) {
+    const users = await client.query(
+      "SELECT to_regclass('public.users') AS users_table",
+    );
+    if (users.rows[0]?.users_table != null) {
+      const error = new Error(
+        'MIGRATION_HISTORY_UNTRACKED: users exists but schema_migrations is missing. ' +
+        'Refusing all migration writes. Investigate the historical schema before baseline.',
+      );
+      error.code = 'MIGRATION_HISTORY_UNTRACKED';
+      throw error;
+    }
     return;
   }
 
   const { rows } = await client.query(
     'SELECT filename FROM public.schema_migrations ORDER BY filename',
   );
+  if (rows.length === 0) {
+    const users = await client.query(
+      "SELECT to_regclass('public.users') AS users_table",
+    );
+    if (users.rows[0]?.users_table != null) {
+      const error = new Error(
+        'MIGRATION_HISTORY_UNTRACKED: users exists but schema_migrations is empty. ' +
+        'Refusing all migration writes. Restore/reconcile tracker on isolated staging.',
+      );
+      error.code = 'MIGRATION_HISTORY_UNTRACKED';
+      throw error;
+    }
+  }
   const known = new Set([...localFiles, ...legacyAliases]);
   const unknown = rows
     .map((row) => row.filename)

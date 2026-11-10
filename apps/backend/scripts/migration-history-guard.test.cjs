@@ -5,13 +5,16 @@ const assert = require('node:assert/strict');
 const { assertMigrationHistoryCompatible } = require('./migration-history-guard');
 const { run } = require('./migrate');
 
-function fakeClient(applied, trackerExists = true) {
+function fakeClient(applied, trackerExists = true, usersExists = false) {
   const queries = [];
   const client = {
     async query(sql) {
       queries.push(String(sql));
-      if (String(sql).includes('to_regclass')) {
+      if (String(sql).includes("to_regclass('public.schema_migrations')")) {
         return { rows: [{ tracker_table: trackerExists ? 'schema_migrations' : null }] };
+      }
+      if (String(sql).includes("to_regclass('public.users')")) {
+        return { rows: [{ users_table: usersExists ? 'users' : null }] };
       }
       if (String(sql).startsWith('SELECT filename FROM public.schema_migrations')) {
         return { rows: applied.map((filename) => ({ filename })) };
@@ -40,10 +43,32 @@ test('legacy rename source filenames remain permitted for existing metadata norm
   ));
 });
 
-test('a new database with no migration tracker can use the existing bootstrap flow', async () => {
-  const { client, queries } = fakeClient([], false);
+test('a genuinely new database with no users/tracker passes read-only preflight', async () => {
+  const { client, queries } = fakeClient([], false, false);
   await assertMigrationHistoryCompatible(client, ['0001_initial.sql']);
-  assert.equal(queries.length, 1);
+  assert.equal(queries.length, 2);
+  assert.ok(queries.every((sql) => sql.startsWith('SELECT ')));
+});
+
+test('missing tracker on an existing users schema blocks BEFORE any mutation', async () => {
+  const { client, queries } = fakeClient([], false, true);
+  await assert.rejects(run(client), { code: 'MIGRATION_HISTORY_UNTRACKED' });
+  assert.equal(queries.length, 2);
+  assert.ok(queries.every((sql) => sql.startsWith('SELECT ')));
+});
+
+test('empty tracker on an existing users schema blocks BEFORE baseline stamping', async () => {
+  const { client, queries } = fakeClient([], true, true);
+  await assert.rejects(run(client), { code: 'MIGRATION_HISTORY_UNTRACKED' });
+  assert.equal(queries.length, 3);
+  assert.ok(queries.every((sql) => sql.startsWith('SELECT ')));
+});
+
+test('empty tracker on an otherwise new database passes read-only preflight', async () => {
+  const { client, queries } = fakeClient([], true, false);
+  await assertMigrationHistoryCompatible(client, ['0001_initial.sql']);
+  assert.equal(queries.length, 3);
+  assert.ok(queries.every((sql) => sql.startsWith('SELECT ')));
 });
 
 test('unknown draft migration filenames fail closed and report no secrets', async () => {
