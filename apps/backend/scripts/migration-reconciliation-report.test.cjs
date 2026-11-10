@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const { auditMigrationHistory, readOwnerSnapshot, HISTORICAL } =
   require('./migration-reconciliation-report.cjs');
 const { assertMigrationHistoryCompatible } = require('./migration-history-guard');
@@ -29,7 +30,9 @@ test('owner-supplied history matches exactly 85 applied / 70 checkout / 15 unkno
   ]);
   assert.equal(report.matchesOwnerSnapshot, true);
   assert.equal(report.disposition, 'BLOCKED_RECONCILIATION_REVIEW_REQUIRED');
-  assert.equal(report.databaseWritesPerformed, false);
+  assert.equal(report.auditReadsDatabase, false);
+  assert.ok(!Object.hasOwn(report, 'migrationRunnerUnchanged'));
+  assert.ok(!Object.hasOwn(report, 'databaseWritesPerformed'));
 });
 
 test('five apparent renames do not authorize migration runner or claim SQL execution', () => {
@@ -94,4 +97,17 @@ test('actual production migration guard still refuses all 15 mismatches before w
   );
   assert.equal(queries.length, 2);
   assert.ok(queries.every((sql) => sql.startsWith('SELECT ')));
+});
+
+test('offline CLI always exits nonzero and reports BLOCKED even on matching fixture', () => {
+  const cli = spawnSync(process.execPath, [
+    path.join(__dirname, 'migration-reconciliation-report.cjs'),
+  ], { encoding: 'utf8', timeout: 5000, env: {} });
+  assert.equal(cli.status, 2);
+  assert.equal(cli.stderr, '');
+  const report = JSON.parse(cli.stdout);
+  assert.equal(report.matchesOwnerSnapshot, true);
+  assert.equal(report.missingFromCheckoutCount, 15);
+  assert.equal(report.disposition, 'BLOCKED_RECONCILIATION_REVIEW_REQUIRED');
+  assert.equal(report.auditReadsDatabase, false);
 });
