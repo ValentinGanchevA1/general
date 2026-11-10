@@ -59,7 +59,7 @@ import { AuthScreen } from '@/screens/AuthScreen';
 import { AgeEligibilityScreen } from '@/screens/AgeEligibilityScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { restoreSession } from '@/features/auth/authSlice';
-import { checkAgeEligibility } from '@/features/auth/ageEligibilitySlice';
+import { canEnterSocial, checkAgeEligibility } from '@/features/auth/ageEligibilitySlice';
 import { placeDeepLinkQueue } from '@/features/places/placeDeepLink';
 import { registerPushToken, setupNotificationHandlers } from '@/lib/pushNotifications';
 import { pingGamification } from '@/features/gamification/useGamification';
@@ -361,7 +361,7 @@ export function AppNavigator(): React.JSX.Element {
 	const restoring = useAppSelector((s) => s.auth.restoring);
 	const profileSetupComplete = useAppSelector((s) => s.auth.profileSetupComplete);
 	const ageGate = useAppSelector((s) => s.ageEligibility);
-	const ageReady = userId !== null && ageGate.userId === userId && ageGate.phase === 'eligible';
+	const ageReady = canEnterSocial(userId, ageGate);
 	const launchInteractionsReady = useNexaLaunchInteractionsReady();
 	const prevUserRef = useRef<string | null>(null);
 	const [navigationReady, setNavigationReady] = useState(false);
