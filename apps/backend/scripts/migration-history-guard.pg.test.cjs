@@ -93,6 +93,49 @@ test('PostgreSQL migration safety — isolated CI cluster only', { skip: !enable
     });
   });
 
+  await t.test('0078 users default private without changing pre-existing public choices', async () => {
+    await withDisposableDatabase(async (db) => {
+      await db.query(`
+        CREATE TABLE public.users (
+          id uuid PRIMARY KEY,
+          visibility text NOT NULL DEFAULT 'public'
+            CHECK (visibility IN ('public', 'private', 'blocked'))
+        )
+      `);
+      await db.query(`
+        INSERT INTO public.users (id, visibility) VALUES
+          ('11111111-1111-1111-1111-111111111111', 'public'),
+          ('22222222-2222-2222-2222-222222222222', 'private')
+      `);
+      const migration = fs.readFileSync(
+        path.join(__dirname, '..', 'migrations', '0078_users_visibility_private_default.sql'),
+        'utf8',
+      );
+      await db.query(migration);
+      await db.query(migration); // repeat-safe SET DEFAULT, not a data replay.
+      await db.query(`
+        INSERT INTO public.users (id)
+        VALUES ('33333333-3333-3333-3333-333333333333')
+      `);
+      const rows = await db.query(
+        'SELECT id, visibility FROM public.users ORDER BY id ASC',
+      );
+      assert.deepEqual(rows.rows.map((row) => row.visibility), [
+        'public', 'private', 'private',
+      ]);
+      const column = await db.query(`
+        SELECT column_default FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users' AND column_name = 'visibility'
+      `);
+      assert.deepEqual(column.rows, [{ column_default: "'private'::text" }]);
+      const tracker = await db.query(
+        "SELECT to_regclass('public.schema_migrations') AS relation",
+      );
+      assert.equal(tracker.rows[0].relation, null, 'migration must not fabricate tracker');
+    });
+  });
+
   await t.test('runner updates public tracker even when search_path points to shadow', async () => {
     await withDisposableDatabase(async (db) => {
       await db.query('CREATE SCHEMA shadow');
