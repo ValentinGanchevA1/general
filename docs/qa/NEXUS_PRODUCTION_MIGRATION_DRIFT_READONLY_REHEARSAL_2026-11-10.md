@@ -11,6 +11,14 @@
 - Fourteen existing Render PR preview services were last reported `suspended`, but all retained automatic deploy settings. Existing preview resource identity and isolation are **not** proven by suspension alone.
 - [Draft PR #1087](https://github.com/ValentinGanchevA1/general/pull/1087) makes `migration:run` refuse a database containing applied filenames missing from the current checkout, before SQL writes. Successful CI is NOT a production rehearsal.
 
+## Current Render workspace inventory (read-only verification)
+
+On 2026-11-10, the connected Render workspace `tea-d87btoog4nts73domv40` returned **17 services**: production `g88-api` (`srv-d8d8ujojs32c73fb1gfg`), 14 suspended `g88-api PR #...` previews, the `g88-legal` static site and `nexa-web-pr-578`. All 14 existing PR preview services retained `autoDeploy=yes`. Production `g88-api` reports `autoDeploy=no`, `autoDeployTrigger=off`, and preview generation `manual`.
+
+**No independently named backend staging service was visible in this workspace.** This is not evidence that separate staging infrastructure does not exist in another account or provider. The DB target, Redis target, storage target, secrets and actual backup/restore capability were not inspected and therefore remain unknown. The `nexa-web-pr-578` service must not be assumed to be an isolated backend staging environment.
+
+**Critical separation:** The latest verified *live* Render deploy remains `dep-dbp80rvavr4c73edbolg` on commit `411dd153...`; the newer `master` SHA `eb946d09...` includes merged PR #1087 but has **not** been proven deployed. Disabling Auto Deploy reduces accidental release risk; a manual deployment still runs `migration:run` unless its build command is changed through an approved rollout plan.
+
 ## A. Read-only target identification
 
 1. In Render, open production `g88-api` and the intended, separately provisioned **staging** service. Record only non-secret Postgres **host, port, database name and database user** and independently provisioned Redis/storage destinations. **Do not copy credentials, JWTs, OAuth secrets or connection strings into GitHub/issues/chat.**
@@ -69,6 +77,20 @@ Read-only GitHub tree inspections identify these **candidate SQL files** on hist
 | [#1074](https://github.com/ValentinGanchevA1/general/pull/1074) | `b15a49ab938a42c4b35961007deb53d459c1407a` | `0072_personal_labels.sql` | `dd08626c763b3b2b519a998938623e5423d5c522` |
 
 These are **GitHub tree blob identities**, not proof of which SQL content/commit ran in Render and not an independent cryptographic checksum of production schema. The production tracker was reported to contain **nine** filenames in this range, including three different `0072` and two different `0073` names. The table above accounts for only **seven candidate names**: at least two names still require exact identification from the production tracker and their original source commits. Do not guess the missing names or infer that matching filenames prove identical SQL effects.
+
+### Potential migration impacts, assessed from GitHub SQL text only
+
+| Filename (candidate source) | Statement class | Main risk to verify before rehearsal |
+| --- | --- | --- |
+| `0072_ugc_terms_acceptance.sql` (#1066/#1067, identical blob) | CREATE TABLE, COMMENT | Versioned acceptance records, FK and uniqueness constraints |
+| `0072_personal_labels.sql` (#1074) | CREATE TABLE/INDEX, INSERT | Catalog data inserted; possible prefix collision with 0072 UGC file |
+| `0073_extend_content_report_targets.sql` (#1066) | ALTER TABLE constraint | Existing report rows must satisfy replacement constraint |
+| `0074_event_question_moderation.sql` (#1066) | ALTER TABLE, CREATE INDEX | Moderation visibility semantics |
+| `0075_dating_match_conversation_lookup.sql` (#1066) | CREATE INDEX | Lock/duration and partial index coverage |
+| `0076_child_safety_report_reason.sql` (#1066) | ALTER TABLE, CREATE INDEX | Preserve/report sensitive child-safety categories |
+| `0077_adult_only_rc1_visibility.sql` (#1066) | UPDATE users | **Potentially large irreversible history-loss of prior visibility state**; do not re-publicize DOB-null users |
+
+The two additional `0072`/`0073` production records reported by the owner are **not yet linked to exact source SQL**. Even filenames that match the candidates above still need commit/deploy evidence and schema postcondition checks. The matching #1066/#1067 `0072_ugc_terms_acceptance.sql` blob SHA is `818af7aef1afb495dc496e85a38219977a99d422`; it represents **one candidate SQL content version**, not an extra migration.
 
 ## B. Compare the actual applied migration files
 
