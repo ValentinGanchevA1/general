@@ -45,6 +45,10 @@ for (const workflow of workflows) {
     );
     assert.ok(contents.includes(workflow.acknowledgement));
     assert.ok(contents.includes('image: postgis/postgis:16-3.4'));
+    assert.ok(
+      contents.includes("ports: ['127.0.0.1:5432:5432']"),
+      'PostgreSQL service must not bind its host port to non-loopback interfaces',
+    );
     assert.match(contents, /pull_request:/);
     assert.ok(
       !/postgresql:\/\/[^\s:@]+:[a-z_][a-z_0-9]*@/i.test(contents),
