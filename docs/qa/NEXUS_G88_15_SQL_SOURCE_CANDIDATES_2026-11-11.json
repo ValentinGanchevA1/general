@@ -39,11 +39,11 @@
     },
     {
       "filename": "0051_event_reviews.sql",
-      "status": "source-unverified",
-      "sourceCommit": null,
-      "sourceGitBlob": null,
+      "status": "candidate-historical-commit",
+      "sourceCommit": "1ccacd9ea9d887c6ac698fffdc4be42bfb919b23",
+      "sourceGitBlob": "0f17246ac3db1a20e1687e91f066be2a5c1e3f9d",
       "successor": "0052_event_reviews.sql",
-      "notes": "Current successor in merged #823 exists, but historical 0051 source not retrieved"
+      "notes": "Early PR #818 commit contains original 0051; later 0052 was rewritten repeat-safe after partial rollout; SQL is NOT byte-identical."
     },
     {
       "filename": "0054_posthog_deletion_queue.sql",
