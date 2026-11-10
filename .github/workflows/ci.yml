@@ -26,6 +26,8 @@ jobs:
           node-version-file: '.nvmrc'
       - name: Test secret scanning guard (regressions)
         run: node --test scripts/ci/check-no-secrets.test.mjs
+      - name: Test G88 Supabase API ACL hardening script (static, no database writes)
+        run: node --test scripts/ci/check-supabase-api-acl-hotfix.test.mjs
       - name: Test Play AAB manual publish and signature workflow guard
         run: node --test scripts/ci/check-play-release-workflow.test.mjs
       - name: Test disposable PostGIS credentials remain synchronized and localhost-only
