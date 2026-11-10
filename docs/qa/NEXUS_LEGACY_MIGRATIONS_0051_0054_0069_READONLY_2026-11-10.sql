@@ -1,136 +1,135 @@
--- NEXUS P0: read-only schema postconditions for legacy migrations 0051/0054/0069.
--- Verify the SQL editor's database host/name/role against Render g88-api privately.
--- The output is catalog metadata ONLY; no PII, DDL, DML or migration tracker edits.
--- A matching schema is NOT proof of exact historical SQL or safe production deploy.
--- One shared relation catalog avoids drifting/repeated names across audit queries.
+-- NEXUS P0: read-only schema/postconditions of applied legacy names 0051, 0054, 0069.
+-- Verify the SQL editor DB identity against Render g88-api DATABASE_URL privately.
+-- Do NOT use a PR preview or copy credentials. This reports schema metadata, not user data.
+-- A matching schema does NOT prove that recorded historical migration SQL was identical.
+-- This inventory is not authorization to deploy, rerun migrations, or edit the tracker.
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;
 
+-- Confirm the actual session/transaction context without exposing connection credentials.
 SELECT current_database() AS database_name,
        current_user AS database_role,
        inet_server_addr() AS server_address,
        inet_server_port() AS server_port,
        current_setting('transaction_read_only') AS read_only;
 
-WITH
-  target_schema AS (
-    SELECT 'public'::text AS name
-  ),
-  -- Object names occur once, so the different metadata views cannot drift apart.
-  -- columns/constraints/index toggles only affect the diagnostic report.
-  target_relations(name, inspect_columns, inspect_constraints, inspect_index, trigger_name) AS (
-    VALUES
-      ('realtime_room_revocations', true, true, false, NULL::text),
-      ('realtime_room_revocations_pending', false, false, true, NULL),
-      ('event_attendance_confirmations', true, true, false, NULL),
-      ('event_reviews', true, true, false, 'event_review_write'),
-      ('event_reviews_page_idx', false, false, true, NULL),
-      ('event_review_reports', true, true, false, NULL),
-      ('event_review_reports_queue_idx', false, false, true, NULL),
-      ('analytics_external_deletion_requests', true, true, false, NULL),
-      ('analytics_external_deletion_due_idx', false, false, true, NULL),
-      ('analytics_external_deletion_submitted_idx', false, false, true, NULL),
-      ('analytics_external_deletion_subject_active_uidx', false, false, true, NULL),
-      ('analytics_external_deletion_retention_active_uidx', false, false, true, NULL),
-      ('analytics_subjects', false, false, false, 'analytics_subjects_queue_posthog_delete')
-  ),
-  target_functions(name) AS (
-    VALUES ('enforce_event_review_update'), ('queue_posthog_subject_deletion')
-  ),
-  migration_rows AS (
-    SELECT filename, applied_at
-    FROM public.schema_migrations
-    WHERE filename IN (
-      '0051_event_reviews.sql',
-      '0052_event_reviews.sql',
-      '0054_posthog_deletion_queue.sql',
-      '0062_posthog_deletion_queue.sql',
-      '0069_realtime_room_revocation_outbox.sql'
+-- Check recorded legacy/current names. A tracker entry alone does NOT prove SQL contents.
+SELECT filename, applied_at
+FROM public.schema_migrations
+WHERE filename IN (
+  '0051_event_reviews.sql',
+  '0052_event_reviews.sql',
+  '0054_posthog_deletion_queue.sql',
+  '0062_posthog_deletion_queue.sql',
+  '0069_realtime_room_revocation_outbox.sql'
+)
+ORDER BY filename ASC;
+
+-- A single explicit object inventory avoids repeating object names in many queries.
+-- Flags mean: inspect columns, constraints, index, trigger, function respectively.
+-- NULL/ABSENT metadata must be treated as a discrepancy, not permission to create.
+-- All output rows are metadata only; no application table rows are queried.
+WITH settings AS (
+  SELECT 'public'::name AS schema_name
+), expected (
+  object_name, inspect_columns, inspect_constraints,
+  inspect_index, inspect_trigger, inspect_function
+) AS (
+  VALUES
+    ('realtime_room_revocations', true, true, false, false, false),
+    ('realtime_room_revocations_pending', false, false, true, false, false),
+    ('event_attendance_confirmations', true, true, false, false, false),
+    ('event_reviews', true, true, false, false, false),
+    ('event_reviews_page_idx', false, false, true, false, false),
+    ('event_review_reports', true, true, false, false, false),
+    ('event_review_reports_queue_idx', false, false, true, false, false),
+    ('analytics_external_deletion_requests', true, true, false, false, false),
+    ('analytics_external_deletion_due_idx', false, false, true, false, false),
+    ('analytics_external_deletion_submitted_idx', false, false, true, false, false),
+    ('analytics_external_deletion_subject_active_uidx', false, false, true, false, false),
+    ('analytics_external_deletion_retention_active_uidx', false, false, true, false, false),
+    ('analytics_subjects', false, false, false, false, false),
+    ('event_review_write', false, false, false, true, false),
+    ('analytics_subjects_queue_posthog_delete', false, false, false, true, false),
+    ('enforce_event_review_update', false, false, false, false, true),
+    ('queue_posthog_subject_deletion', false, false, false, false, true)
+), metadata AS (
+  -- Relation/index presence, including missing expected objects.
+  SELECT 'relation'::text AS category, e.object_name,
+         to_regclass(format('%I.%I', s.schema_name, e.object_name))::text AS details
+  FROM expected AS e CROSS JOIN settings AS s
+  WHERE NOT e.inspect_trigger AND NOT e.inspect_function
+
+  UNION ALL
+
+  -- Exact column types, nullability, defaults and ordinals.
+  SELECT 'column', c.table_name || '.' || c.column_name,
+         jsonb_build_object(
+           'position', c.ordinal_position, 'type', c.data_type,
+           'nullable', c.is_nullable, 'default', c.column_default
+         )::text
+  FROM information_schema.columns AS c
+  JOIN expected AS e ON e.object_name = c.table_name AND e.inspect_columns
+  CROSS JOIN settings AS s
+  WHERE c.table_schema = s.schema_name
+
+  UNION ALL
+
+  -- FK, unique and CHECK constraints.
+  SELECT 'constraint', cls.relname || '.' || con.conname,
+         pg_get_constraintdef(con.oid, true)
+  FROM pg_constraint AS con
+  JOIN pg_class AS cls ON cls.oid = con.conrelid
+  JOIN pg_namespace AS ns ON ns.oid = cls.relnamespace
+  JOIN expected AS e ON e.object_name = cls.relname AND e.inspect_constraints
+  CROSS JOIN settings AS s
+  WHERE ns.nspname = s.schema_name
+
+  UNION ALL
+
+  -- Index definitions, including unique and partial predicates.
+  SELECT 'index', idx.indexname, idx.indexdef
+  FROM pg_indexes AS idx
+  JOIN expected AS e ON e.object_name = idx.indexname AND e.inspect_index
+  CROSS JOIN settings AS s
+  WHERE idx.schemaname = s.schema_name
+
+  UNION ALL
+
+  -- Trigger definitions and enabled status; never execute the trigger.
+  SELECT 'trigger', e.object_name,
+         pg_get_triggerdef(trg.oid, true) || ' | enabled=' || trg.tgenabled::text
+  FROM expected AS e
+  CROSS JOIN settings AS s
+  LEFT JOIN pg_trigger AS trg
+    ON trg.tgname = e.object_name
+    AND NOT trg.tgisinternal
+    AND EXISTS (
+      SELECT 1
+      FROM pg_class AS cls
+      JOIN pg_namespace AS ns ON ns.oid = cls.relnamespace
+      WHERE cls.oid = trg.tgrelid AND ns.nspname = s.schema_name
     )
-  ),
-  relation_rows AS (
-    SELECT t.name AS object_name,
-           to_regclass(format('%I.%I', s.name, t.name))::text AS actual_relation
-    FROM target_relations AS t
-    CROSS JOIN target_schema AS s
-  ),
-  column_rows AS (
-    SELECT c.table_name, c.ordinal_position, c.column_name, c.data_type,
-           c.is_nullable, c.column_default
-    FROM information_schema.columns AS c
-    JOIN target_relations AS t
-      ON t.name = c.table_name AND t.inspect_columns
-    CROSS JOIN target_schema AS s
-    WHERE c.table_schema = s.name
-  ),
-  constraint_rows AS (
-    SELECT cls.relname AS table_name, con.conname AS constraint_name,
-           con.contype AS constraint_type,
-           pg_get_constraintdef(con.oid, true) AS definition
-    FROM pg_constraint AS con
-    JOIN pg_class AS cls ON cls.oid = con.conrelid
-    JOIN pg_namespace AS ns ON ns.oid = cls.relnamespace
-    JOIN target_relations AS t
-      ON t.name = cls.relname AND t.inspect_constraints
-    CROSS JOIN target_schema AS s
-    WHERE ns.nspname = s.name
-  ),
-  index_rows AS (
-    SELECT idx.tablename, idx.indexname, idx.indexdef
-    FROM pg_indexes AS idx
-    JOIN target_relations AS t
-      ON t.name = idx.indexname AND t.inspect_index
-    CROSS JOIN target_schema AS s
-    WHERE idx.schemaname = s.name
-  ),
-  trigger_rows AS (
-    SELECT cls.relname AS table_name, trg.tgname AS trigger_name,
-           trg.tgenabled AS enabled, pg_get_triggerdef(trg.oid, true) AS definition
-    FROM pg_trigger AS trg
-    JOIN pg_class AS cls ON cls.oid = trg.tgrelid
-    JOIN pg_namespace AS ns ON ns.oid = cls.relnamespace
-    JOIN target_relations AS t
-      ON t.name = cls.relname AND t.trigger_name = trg.tgname
-    CROSS JOIN target_schema AS s
-    WHERE ns.nspname = s.name AND NOT trg.tgisinternal
-  ),
-  function_rows AS (
-    SELECT p.proname AS function_name,
-           pg_get_function_identity_arguments(p.oid) AS arguments,
-           p.prosecdef AS security_definer
-    FROM pg_proc AS p
-    JOIN pg_namespace AS ns ON ns.oid = p.pronamespace
-    JOIN target_functions AS t ON t.name = p.proname
-    CROSS JOIN target_schema AS s
-    WHERE ns.nspname = s.name
-  ),
-  audit_rows AS (
-    SELECT 1 AS section_rank, 'migration_history' AS section,
-           m.filename AS sort_key, to_jsonb(m) AS metadata
-    FROM migration_rows AS m
-    UNION ALL
-    SELECT 2, 'relations', r.object_name, to_jsonb(r)
-    FROM relation_rows AS r
-    UNION ALL
-    SELECT 3, 'columns',
-           c.table_name || '.' || lpad(c.ordinal_position::text, 4, '0'), to_jsonb(c)
-    FROM column_rows AS c
-    UNION ALL
-    SELECT 4, 'constraints', c.table_name || '.' || c.constraint_name, to_jsonb(c)
-    FROM constraint_rows AS c
-    UNION ALL
-    SELECT 5, 'indexes', i.tablename || '.' || i.indexname, to_jsonb(i)
-    FROM index_rows AS i
-    UNION ALL
-    SELECT 6, 'triggers', t.table_name || '.' || t.trigger_name, to_jsonb(t)
-    FROM trigger_rows AS t
-    UNION ALL
-    SELECT 7, 'functions', f.function_name, to_jsonb(f)
-    FROM function_rows AS f
-  )
-SELECT section, jsonb_agg(metadata ORDER BY sort_key ASC) AS metadata
-FROM audit_rows
-GROUP BY section_rank, section
-ORDER BY section_rank ASC;
+  WHERE e.inspect_trigger
+
+  UNION ALL
+
+  -- Function signatures and security-definer state only; never invoke the function.
+  SELECT 'function', e.object_name,
+         'arguments=' || pg_get_function_identity_arguments(p.oid) ||
+         ' | security_definer=' || p.prosecdef::text
+  FROM expected AS e
+  CROSS JOIN settings AS s
+  LEFT JOIN pg_proc AS p
+    ON p.proname = e.object_name
+    AND EXISTS (
+      SELECT 1 FROM pg_namespace AS ns
+      WHERE ns.oid = p.pronamespace AND ns.nspname = s.schema_name
+    )
+  WHERE e.inspect_function
+)
+SELECT category, object_name, COALESCE(details, 'ABSENT') AS details
+FROM metadata
+ORDER BY category ASC, object_name ASC;
 
 COMMIT;
--- Seven compact metadata sections, never a migration or replay authorization.
+-- Read-only evidence only. No deploy / replay / migration-history authorization.
