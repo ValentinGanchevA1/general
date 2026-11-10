@@ -29,8 +29,8 @@ test('historical source manifest covers all 15 drift names but never authorizes 
   assert.equal(databaseEvidence.hasSqlChecksums, false);
   assert.equal(databaseEvidence.renderTargetProven, false);
   assert.match(manifest.purpose, /never an executable migration allowlist/i);
-  assert.equal(entries.filter((r) => r.status === 'source-unverified').length, 2);
-  assert.equal(entries.filter((r) => r.sourceGitBlob !== null).length, 13);
+  assert.equal(entries.filter((r) => r.status === 'source-unverified').length, 1);
+  assert.equal(entries.filter((r) => r.sourceGitBlob !== null).length, 14);
   for (const entry of entries) {
     assert.ok(snapshot.includes(entry.filename));
     assert.ok(entry.status === 'source-unverified' ||
