@@ -115,6 +115,19 @@ describe('RealtimeGateway — idle outbound socket eligibility sweep', () => {
     await first;
   });
 
+  it('never starts an eligibility interval when the release flag is OFF', () => {
+    delete process.env[flag];
+    const { gateway } = setup([]);
+    const timer = jest.spyOn(global, 'setInterval');
+    try {
+      gateway.afterInit();
+      expect(timer).not.toHaveBeenCalled();
+    } finally {
+      gateway.onModuleDestroy();
+      timer.mockRestore();
+    }
+  });
+
   it('starts a bounded periodic sweep only when enabled and clears it on destroy', () => {
     const { gateway } = setup([]);
     const timer = jest.spyOn(global, 'setInterval');
