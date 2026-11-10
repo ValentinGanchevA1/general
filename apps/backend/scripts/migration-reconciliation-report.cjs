@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const BASELINE_SHA = '3e533639488ab0fb81a1728f308e77242637eb9f';
-const FILENAME_PATTERN = /^[0-9]{4}_[a-z0-9_]+\.sql$/;
+const FILENAME_PATTERN = /^\d{4}_[a-z0-9_]+\.sql$/;
 
 // Classification is descriptive, NOT an assertion that SQL ran safely.
 // Older 0036/0037/0038 source bodies match current versions apart from
@@ -56,7 +56,7 @@ function auditMigrationHistory(appliedFiles, localFiles) {
   const local = validateFileNames(localFiles, 'local checkout');
   const missingFromCheckout = [...applied]
     .filter((name) => !local.has(name))
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .map((filename) => ({
       filename,
       kind: HISTORICAL[filename]?.kind ?? 'UNKNOWN_UNRECOGNIZED',
@@ -66,8 +66,8 @@ function auditMigrationHistory(appliedFiles, localFiles) {
         ? applied.has(HISTORICAL[filename].successor)
         : null,
     }));
-  const notAppliedOnSnapshot = [...local].filter((name) => !applied.has(name)).sort();
-  const expectedNames = Object.keys(HISTORICAL).sort();
+  const notAppliedOnSnapshot = [...local].filter((name) => !applied.has(name)).sort((a, b) => a.localeCompare(b));
+  const expectedNames = Object.keys(HISTORICAL).sort((a, b) => a.localeCompare(b));
   const observedNames = missingFromCheckout.map((item) => item.filename);
   const matchesOwnerSnapshot =
     applied.size === 85 &&
@@ -81,7 +81,7 @@ function auditMigrationHistory(appliedFiles, localFiles) {
     prefixes.set(prefix, (prefixes.get(prefix) ?? 0) + 1);
   }
   const duplicatePrefixes = [...prefixes].filter(([, count]) => count > 1)
-    .map(([prefix]) => prefix).sort();
+    .map(([prefix]) => prefix).sort((a, b) => a.localeCompare(b));
 
   return {
     baselineCommit: BASELINE_SHA,
