@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "source": "GitHub immutable commit tree refs and linked G88 SQL metadata (2026-11-11)",
+  "purpose": "Historical source candidate inventory ONLY; never an executable migration allowlist",
+  "databaseEvidence": {
+    "appliedCount": 85,
+    "unmatchedFilenames": 15,
+    "trackerColumns": [
+      "filename",
+      "applied_at"
+    ],
+    "hasSqlChecksums": false,
+    "renderTargetProven": false
+  },
+  "entries": [
+    {
+      "filename": "0036_trade_offer_counter.sql",
+      "status": "candidate-historical-commit",
+      "sourceCommit": "a3f8c2dd471a4ab7ef5aad4df75fce0658453174",
+      "sourceGitBlob": "f016812a9306f30ffbcbf375ed63ff9901c3cbc8",
+      "successor": "0040_trade_offer_counter.sql",
+      "notes": "SQL excluding comments matches current successor"
+    },
+    {
+      "filename": "0037_conversation_kind_members.sql",
+      "status": "candidate-historical-commit",
+      "sourceCommit": "a3f8c2dd471a4ab7ef5aad4df75fce0658453174",
+      "sourceGitBlob": "8aa9db519ff753c178e7541f8f9403138f90b47b",
+      "successor": "0038_conversation_kind_members.sql",
+      "notes": "SQL excluding comments matches current successor"
+    },
+    {
+      "filename": "0038_user_strikes.sql",
+      "status": "candidate-historical-commit",
+      "sourceCommit": "a3f8c2dd471a4ab7ef5aad4df75fce0658453174",
+      "sourceGitBlob": "e7d31f1a1bcea463d5730983add20de8d3c5b0f1",
+      "successor": "0039_user_strikes.sql",
+      "notes": "SQL excluding comments matches current successor"
+    },
+    {
+      "filename": "0051_event_reviews.sql",
+      "status": "source-unverified",
+      "sourceCommit": null,
+      "sourceGitBlob": null,
+      "successor": "0052_event_reviews.sql",
+      "notes": "Current successor in merged #823 exists, but historical 0051 source not retrieved"
+    },
+    {
+      "filename": "0054_posthog_deletion_queue.sql",
+      "status": "source-unverified",
+      "sourceCommit": null,
+      "sourceGitBlob": null,
+      "successor": "0062_posthog_deletion_queue.sql",
+      "notes": "Current successor in merged #829 exists, but historical 0054 source not retrieved"
+    },
+    {
+      "filename": "0069_realtime_room_revocation_outbox.sql",
+      "status": "candidate-draft-branch",
+      "sourceCommit": "bd61c685264266057d5d8f6034a2dedf0afdcd9b",
+      "sourceGitBlob": "e5310d067721a3a46dd9ffb25f8d74a8f1f36793",
+      "successor": null,
+      "notes": "Draft PR #1060, do not merge/apply without membership proof"
+    },
+    {
+      "filename": "0072_extend_content_report_targets.sql",
+      "status": "candidate-historical-commit",
+      "sourceCommit": "fb79c8feaa59062a9d4fd3bc786219344ce293d9",
+      "sourceGitBlob": "b6cd7ba8fb740f65fa3a84ef42ff31205baa11a2",
+      "successor": "0073_extend_content_report_targets.sql",
+      "notes": "Same exact Git blob as successor in Draft #1066"
+    },
+    {
+      "filename": "0072_personal_labels.sql",
+      "status": "candidate-draft-branch",
+      "sourceCommit": "b15a49ab938a42c4b35961007deb53d459c1407a",
+      "sourceGitBlob": "dd08626c763b3b2b519a998938623e5423d5c522",
+      "successor": null,
+      "notes": "Draft PR #1074"
+    },
+    {
+      "filename": "0072_ugc_terms_acceptance.sql",
+      "status": "candidate-draft-branch",
+      "sourceCommit": "cb5b5fd1bbe1b2e3a2b0e21ac0bf3603ecb9896f",
+      "sourceGitBlob": "818af7aef1afb495dc496e85a38219977a99d422",
+      "successor": null,
+      "notes": "Draft PR #1067; legal acceptance approval separate"
+    },
+    {
+      "filename": "0073_event_question_moderation.sql",
+      "status": "candidate-historical-commit",
+      "sourceCommit": "fb79c8feaa59062a9d4fd3bc786219344ce293d9",
+      "sourceGitBlob": "92d66c3abe6b73a7ce779869d839d8c6e6752661",
+      "successor": "0074_event_question_moderation.sql",
+      "notes": "Same exact Git blob as successor in Draft #1066"
+    },
+    {
+      "filename": "0073_extend_content_report_targets.sql",
+      "status": "candidate-draft-branch",
+      "sourceCommit": "d3b13a89ba68c536fd6d1c7266426632f7b5503f",
+      "sourceGitBlob": "b6cd7ba8fb740f65fa3a84ef42ff31205baa11a2",
+      "successor": null,
+      "notes": "Draft PR #1066"
+    },
+    {
+      "filename": "0074_event_question_moderation.sql",
+      "status": "candidate-draft-branch",
+      "sourceCommit": "d3b13a89ba68c536fd6d1c7266426632f7b5503f",
+      "sourceGitBlob": "92d66c3abe6b73a7ce779869d839d8c6e6752661",
+      "successor": null,
+      "notes": "Draft PR #1066"
+    },
+    {
+      "filename": "0075_dating_match_conversation_lookup.sql",
+      "status": "candidate-draft-branch",
+      "sourceCommit": "d3b13a89ba68c536fd6d1c7266426632f7b5503f",
+      "sourceGitBlob": "9a2a4ce98d858724bf2be3014249824301a930c2",
+      "successor": null,
+      "notes": "Draft PR #1066, Dating OFF for RC1"
+    },
+    {
+      "filename": "0076_child_safety_report_reason.sql",
+      "status": "candidate-draft-branch",
+      "sourceCommit": "d3b13a89ba68c536fd6d1c7266426632f7b5503f",
+      "sourceGitBlob": "e6618f99d54e5f15e5af7f63f112448c3a7a2b5d",
+      "successor": null,
+      "notes": "Draft PR #1066, child-safety policy approval separate"
+    },
+    {
+      "filename": "0077_adult_only_rc1_visibility.sql",
+      "status": "candidate-draft-branch",
+      "sourceCommit": "d3b13a89ba68c536fd6d1c7266426632f7b5503f",
+      "sourceGitBlob": "17653579249598c4783212d0bdbc63dae8698be5",
+      "successor": null,
+      "notes": "Draft PR #1066; preserve privacy postconditions"
+    }
+  ]
+}
