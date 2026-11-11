@@ -57,6 +57,9 @@ export const Config = {
     (process.env.NEXA_MAPTILER_REGION as string | undefined) ?? 'eu',
   // CI-only device privacy probe. This is false in normal builds and, when enabled,
   // emits only coarse event-type markers with no IDs or coordinates.
+  // Double opt-in: build must request labels AND server policy must allow them.
+  PERSONAL_LABELS_REQUESTED:
+    (process.env.NEXA_PERSONAL_LABELS_UI as string | undefined) === 'true',
   E2E_DEVICE_PROBE:
     (process.env.NEXA_E2E_DEVICE_PROBE as string | undefined) === '1',
 } as const;

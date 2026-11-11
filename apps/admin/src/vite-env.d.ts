@@ -3,6 +3,7 @@
 interface ImportMetaEnv {
   readonly VITE_API_URL: string;
   readonly VITE_WS_URL: string;
+  readonly VITE_PERSONAL_LABELS_UI?: string;
 }
 
 interface ImportMeta {

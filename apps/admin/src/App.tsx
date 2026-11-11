@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import QueuePage from '@/pages/QueuePage';
 import ContentReportsPage from '@/pages/ContentReportsPage';
+import PersonalLabelsPage from '@/pages/PersonalLabelsPage';
 import { AdminLayout } from '@/layout/AdminLayout';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { useAuth } from '@/features/auth/useAuth';
@@ -11,7 +12,8 @@ import { useAuth } from '@/features/auth/useAuth';
  */
 export default function App() {
   const { isAuthenticated } = useAuth();
-  const [tab, setTab] = useState<'verification' | 'reports'>('verification');
+  const [tab, setTab] = useState<'verification' | 'reports' | 'personal-labels'>('verification');
+  const personalLabelsEnabled = import.meta.env.VITE_PERSONAL_LABELS_UI === 'true';
 
   if (!isAuthenticated) {
     return <LoginPage />;
@@ -26,8 +28,11 @@ export default function App() {
         <button type="button" aria-current={tab === 'reports' ? 'page' : undefined}
           className={tab === 'reports' ? 'font-bold underline' : 'text-muted-foreground'}
           onClick={() => setTab('reports')}>Safety Reports</button>
+        {personalLabelsEnabled ? <button type="button" aria-current={tab === 'personal-labels' ? 'page' : undefined}
+          className={tab === 'personal-labels' ? 'font-bold underline' : 'text-muted-foreground'}
+          onClick={() => setTab('personal-labels')}>Personal Labels</button> : null}
       </nav>
-      {tab === 'verification' ? <QueuePage /> : <ContentReportsPage />}
+      {tab === 'verification' ? <QueuePage /> : tab === 'personal-labels' && personalLabelsEnabled ? <PersonalLabelsPage /> : <ContentReportsPage />}
     </AdminLayout>
   );
 }

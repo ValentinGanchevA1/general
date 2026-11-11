@@ -35,6 +35,9 @@ import {
   resolveCountry,
 } from '@/features/profile/profileReferenceData';
 import { updateProfile } from '@/features/profile/profileSlice';
+import { PersonalLabelsEditor } from '@/features/profile/PersonalLabelsEditor';
+import { savePersonalLabels } from '@/features/profile/personalLabelsSlice';
+import { completeProfileEditSave } from '@/features/profile/completeProfileEditSave';
 import { openRootScreen } from '@/navigation/openRootScreen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormField } from '@/components/FormField';
@@ -192,7 +195,12 @@ export function ProfileEditScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const profile = useAppSelector((s) => s.profile.profile);
   const loading = useAppSelector((s) => s.profile.loading);
+  const profileSaving = useAppSelector((s) => s.profile.saving);
+  const labelSaving = useAppSelector((s) => s.personalLabels.saving);
+  const personalLabelsEnabled = useAppSelector((s) => s.personalLabels.enabled);
   const error = useAppSelector((s) => s.profile.error);
+  const [pendingPersonalLabels, setPendingPersonalLabels] = useState<string[] | null>(null);
+  const saving = loading || profileSaving || labelSaving;
 
   const [displayName, setDisplayName] = useState(profile?.displayName ?? '');
   const [bio, setBio] = useState(profile?.bio ?? '');
@@ -271,7 +279,17 @@ export function ProfileEditScreen(): React.JSX.Element {
       openToDating,
       seekingGenders,
     }));
-    if (updateProfile.fulfilled.match(result)) navigation.goBack();
+    const pendingKeys = personalLabelsEnabled ? pendingPersonalLabels : null;
+    const saved = await completeProfileEditSave(
+      updateProfile.fulfilled.match(result),
+      pendingKeys !== null
+        ? async () => {
+            const labelsResult = await dispatch(savePersonalLabels(pendingKeys));
+            return savePersonalLabels.fulfilled.match(labelsResult);
+          }
+        : null,
+    );
+    if (saved) navigation.goBack();
   };
 
   const themedSwitch = (value: boolean, onValueChange: (value: boolean) => void): React.JSX.Element => (
@@ -327,8 +345,8 @@ export function ProfileEditScreen(): React.JSX.Element {
         bordered
         onBack={() => navigation.goBack()}
         right={
-          <TouchableOpacity onPress={() => { void save(); }} disabled={loading} hitSlop={8} accessibilityRole="button" accessibilityLabel="Save profile">
-            {loading ? <ActivityIndicator size="small" color={colors.primary} /> : <Text style={styles.saveLink}>Save</Text>}
+          <TouchableOpacity onPress={() => { void save(); }} disabled={saving} hitSlop={8} accessibilityRole="button" accessibilityLabel="Save profile">
+            {saving ? <ActivityIndicator size="small" color={colors.primary} /> : <Text style={styles.saveLink}>Save</Text>}
           </TouchableOpacity>
         }
       />
@@ -338,6 +356,8 @@ export function ProfileEditScreen(): React.JSX.Element {
         <FormField label="Display name" value={displayName} onChangeText={(t) => { setDisplayName(t); clear('displayName'); }} placeholder="Your name" maxLength={50} returnKeyType="next" onSubmitEditing={() => bioRef.current?.focus()} error={errors.displayName} testID="profile-edit-display-name" />
         <FormField ref={bioRef} label="Bio" value={bio} onChangeText={setBio} placeholder="A short intro" multiline maxLength={160} style={styles.bioInput} testID="profile-edit-bio" />
         <Text style={styles.charCount}>{bio.length}/160</Text>
+
+        <PersonalLabelsEditor onDraftChange={setPendingPersonalLabels} />
 
         <Text style={styles.section}>INTERESTS</Text>
         <Text style={styles.hint}>What you enjoy. Shared interests power suggestions and matching signals.</Text>
@@ -409,7 +429,7 @@ export function ProfileEditScreen(): React.JSX.Element {
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <TouchableOpacity style={styles.btn} onPress={() => { void save(); }} disabled={loading}>{loading ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.btnText}>Save</Text>}</TouchableOpacity>
+        <TouchableOpacity style={styles.btn} onPress={() => { void save(); }} disabled={saving}>{saving ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.btnText}>Save</Text>}</TouchableOpacity>
         <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
       </ScrollView>
 
