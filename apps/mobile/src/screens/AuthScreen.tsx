@@ -26,6 +26,8 @@ import { BirthDateField } from '@/components/Profile/ProfileOriginFields';
 import { registrationBirthDateError } from '@/features/auth/registrationAge';
 import { PRIVACY_POLICY_URL, SUPPORT_EMAIL, TERMS_OF_SERVICE_URL } from '@/constants/app';
 import { clearError, login, loginWithGoogle, register } from '@/features/auth/authSlice';
+import { Config } from '@/config';
+import { hasGoogleWebClientId } from '@/features/auth/googleOAuthAvailability';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { setPendingPhoneVerify } from '@/services/pendingPhone';
 import { fontSize, radius, spacing, useAppTheme } from '@/theme';
@@ -83,6 +85,7 @@ export function AuthScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((s) => s.auth);
+  const googleSignInAvailable = hasGoogleWebClientId(Config.GOOGLE_WEB_CLIENT_ID);
 
   const [recovering, setRecovering] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -332,37 +335,41 @@ export function AuthScreen(): React.JSX.Element {
             ) : null}
           </View>
 
-          <View style={styles.dividerRow}>
-            <View style={[styles.dividerLine, { backgroundColor: colors.borderDefault }]} />
-            <Text style={[styles.dividerText, { color: colors.textTertiary }]}>or</Text>
-            <View style={[styles.dividerLine, { backgroundColor: colors.borderDefault }]} />
-          </View>
+          {googleSignInAvailable ? (
+            <>
+              <View style={styles.dividerRow}>
+                <View style={[styles.dividerLine, { backgroundColor: colors.borderDefault }]} />
+                <Text style={[styles.dividerText, { color: colors.textTertiary }]}>or</Text>
+                <View style={[styles.dividerLine, { backgroundColor: colors.borderDefault }]} />
+              </View>
 
-          <TouchableOpacity
-            style={[
-              styles.googleButton,
-              loading && styles.disabled,
-              {
-                backgroundColor: colors.surfaceSecondary,
-                borderColor: colors.borderStrong,
-              },
-            ]}
-            onPress={() => {
-              dispatch(clearError());
-              setFieldErrors({});
-              void dispatch(loginWithGoogle());
-            }}
-            disabled={loading}
-            activeOpacity={0.82}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: loading }}
-            accessibilityLabel="Continue with Google"
-          >
-            <GoogleMark />
-            <Text style={[styles.googleButtonText, { color: colors.textPrimary }]}>
-              Continue with Google
-            </Text>
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.googleButton,
+                  loading && styles.disabled,
+                  {
+                    backgroundColor: colors.surfaceSecondary,
+                    borderColor: colors.borderStrong,
+                  },
+                ]}
+                onPress={() => {
+                  dispatch(clearError());
+                  setFieldErrors({});
+                  void dispatch(loginWithGoogle());
+                }}
+                disabled={loading}
+                activeOpacity={0.82}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: loading }}
+                accessibilityLabel="Continue with Google"
+              >
+                <GoogleMark />
+                <Text style={[styles.googleButtonText, { color: colors.textPrimary }]}>
+                  Continue with Google
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
 
           <View style={styles.accountBlock}>
             <Text style={[styles.accountPrompt, { color: colors.textTertiary }]}>
