@@ -36,6 +36,16 @@ export class RealtimeEmitterService {
     }
   }
 
+  /**
+   * Revoke a user's room across adapter nodes and verify the reachable
+   * socket snapshot. A failed snapshot is retryable, not a durable ACK.
+   */
+  async evictAndVerify(userId: string, room: string): Promise<boolean> {
+    this.leaveRoomForUsers([userId], room);
+    const sockets = await this.server.in(`user:${userId}`).fetchSockets();
+    return sockets.every((socket) => !socket.rooms.has(room));
+  }
+
   private get server(): G88RealtimeServer {
     const gateway = this.moduleRef.get(RealtimeGateway, { strict: false });
     return gateway.server;

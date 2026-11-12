@@ -27,6 +27,7 @@ import { ChatRealtimeAccessService } from '../modules/chat/chat-realtime-access.
 import { GroupConversationsService } from '../modules/chat/group-conversations.service';
 import { createRedisClient } from '../config/redis-client';
 import { RealtimeEmitterService } from './realtime-emitter.service';
+import { RoomRevocationSweepService } from './room-revocation.sweep';
 import { RealtimeGateway } from './realtime.gateway';
 
 const describeRedis = process.env.REDIS_ADAPTER_TEST === 'true' ? describe : describe.skip;
@@ -186,6 +187,14 @@ async function closeNode(node: RedisBackedNode): Promise<void> {
 
 describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
   jest.setTimeout(30_000);
+  const previousFlag = process.env.ROOM_REVOCATION_OUTBOX_ENABLED;
+  beforeAll(() => {
+    process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'true';
+  });
+  afterAll(() => {
+    if (previousFlag === undefined) delete process.env.ROOM_REVOCATION_OUTBOX_ENABLED;
+    else process.env.ROOM_REVOCATION_OUTBOX_ENABLED = previousFlag;
+  });
   const itPostgres = process.env.NEXA_ROOM_TEST_DATABASE_URL ? it : it.skip;
 
   it('fans out user events and remotely evicts a revoked conversation room', async () => {
@@ -326,6 +335,11 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
           memberSoftLeft = true;
           return [];
         }
+        if (sql.includes('INSERT INTO realtime_room_revocations')) {
+          expect(memberSoftLeft).toBe(true);
+          expect(sql).toContain('VALUES ($1, $2)');
+          return [];
+        }
         throw new Error('Unexpected query in group-removal integration regression');
       });
       const transaction = jest.fn(async (work: (tx: EntityManager) => Promise<void>): Promise<void> => {
@@ -350,7 +364,7 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
       await groupController.removeMember(conversationId, userId, activeId);
       expect(memberSoftLeft).toBe(true);
       expect(transaction).toHaveBeenCalledTimes(1);
-      expect(txQuery).toHaveBeenCalledTimes(3);
+      expect(txQuery).toHaveBeenCalledTimes(4);
       expect(leaveSpy).toHaveBeenCalledWith([userId], conversationRoom);
       await waitFor(() =>
         revokedSockets.every((socket) => !socket.rooms.has(conversationRoom))
@@ -411,6 +425,12 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
         + 'PRIMARY KEY (conversation_id, user_id))',
       );
       await db.query('CREATE TABLE user_blocks (blocker_id uuid NOT NULL, blocked_id uuid NOT NULL)');
+      await db.query(
+        'CREATE TABLE realtime_room_revocations (id BIGSERIAL PRIMARY KEY, '
+        + 'conversation_id uuid NOT NULL, user_id uuid NOT NULL, '
+        + 'attempts integer NOT NULL DEFAULT 0, available_at timestamptz NOT NULL DEFAULT NOW(), '
+        + 'leased_until timestamptz, completed_at timestamptz, created_at timestamptz NOT NULL DEFAULT NOW())',
+      );
       await db.query('INSERT INTO users (id) VALUES ($1), ($2)', [actorId, userId]);
       await db.query("INSERT INTO conversations (id, kind) VALUES ($1, 'group')", [conversationId]);
       await db.query(
@@ -500,7 +520,9 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
         { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } },
       );
       eviction.mockRestore();
-      expect(failedKick.status).toBe(500);
+      // The committed membership change and outbox intent return 204 even
+      // if Socket.IO dispatch fails. The worker handles the retry.
+      expect(failedKick.status).toBe(204);
 
       const committedFailure = await db.query<Array<{ left_at: Date | null }>>(
         'SELECT left_at FROM conversation_members WHERE conversation_id = $1 AND user_id = $2',
@@ -511,6 +533,38 @@ describeRedis('Socket.IO Redis adapter multi-instance topology', () => {
       // This is the unresolved risk: a connected socket can still be in the
       // stale room when adapter eviction fails, despite committed revocation.
       expect(revokedSockets.every((socket) => socket.rooms.has(failedRoom))).toBe(true);
+      expect(activeSockets.every((socket) => socket.rooms.has(failedRoom))).toBe(true);
+
+      const [pending] = await db.query<Array<{ id: string; completed_at: Date | null }>>(
+        'SELECT id::text AS id, completed_at FROM realtime_room_revocations WHERE conversation_id = $1',
+        [failedConversationId],
+      );
+      expect(pending?.completed_at).toBeNull();
+      const emitter = app.get(RealtimeEmitterService);
+      const retryDispatch = jest.spyOn(emitter, 'evictAndVerify');
+      const worker = new RoomRevocationSweepService(db, emitter, recipients);
+      await worker.runOnce();
+      expect(retryDispatch).toHaveBeenCalledWith(userId, failedRoom);
+      retryDispatch.mockRestore();
+      const [claim] = await db.query<Array<{
+        attempts: number;
+        completed_at: Date | null;
+        leased_until: Date | null;
+      }>>(
+        'SELECT attempts, completed_at, leased_until FROM realtime_room_revocations WHERE id = $1',
+        [pending?.id],
+      );
+      // A missing claim is a worker/SQL error, not a flaky Redis eviction.
+      expect(claim?.attempts).toBe(1);
+      // A processed outbox item may only complete once adapter inspection has
+      // observed no revoked users in the room on currently reachable nodes.
+      expect(claim?.completed_at).toBeInstanceOf(Date);
+      await waitFor(() => revokedSockets.every((socket) => !socket.rooms.has(failedRoom)));
+      const [completed] = await db.query<Array<{ completed_at: Date | null }>>(
+        'SELECT completed_at FROM realtime_room_revocations WHERE id = $1',
+        [pending?.id],
+      );
+      expect(completed?.completed_at).toBeInstanceOf(Date);
       expect(activeSockets.every((socket) => socket.rooms.has(failedRoom))).toBe(true);
 
       const revokedEvents: LocationShareUpdateEvent[][] = [[], [], []];
