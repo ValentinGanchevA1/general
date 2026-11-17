@@ -12,6 +12,10 @@ on:
         description: "Play track to publish to (e.g. closed track name, 'alpha', or 'internal')"
         required: false
         default: "alpha"
+      version_code:
+        description: "Optional explicit Android versionCode (RC2 internal: 6); empty uses workflow run number"
+        required: false
+        default: ""
       publish:
         description: "Explicitly opt in to Play upload (default is safe build-only; requires PLAY_SERVICE_ACCOUNT_JSON)"
         type: boolean
@@ -152,17 +156,30 @@ jobs:
           key: gradle-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: gradle-
 
+      - name: Resolve and validate version code
+        env:
+          REQUESTED_VERSION_CODE: ${{ inputs.version_code || '' }}
+          FALLBACK_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          VERSION_CODE="${REQUESTED_VERSION_CODE:-$FALLBACK_VERSION_CODE}"
+          if ! [[ "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]] || [ "${#VERSION_CODE}" -gt 10 ] || [ "$VERSION_CODE" -gt 2100000000 ]; then
+            echo "::error::Invalid Android versionCode"
+            exit 1
+          fi
+          echo "ANDROID_RELEASE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "::notice::Building Android versionCode $VERSION_CODE; verify it exceeds all Play Console uploads."
+
       - name: Build signed release AAB
         env:
-          SENTRY_RELEASE: com.g88@1.0.0+${{ github.run_number }}
-          SENTRY_DIST: ${{ github.run_number }}
+          SENTRY_RELEASE: com.g88@1.0.1+${{ env.ANDROID_RELEASE_VERSION_CODE }}
+          SENTRY_DIST: ${{ env.ANDROID_RELEASE_VERSION_CODE }}
         run: |
           cd android
           ATTEMPTS=5
           for i in $(seq 1 "$ATTEMPTS"); do
             if ./gradlew bundleRelease --no-daemon \
               --init-script ci-init.gradle \
-              -PversionCodeOverride=${{ github.run_number }}; then
+              -PversionCodeOverride=${ANDROID_RELEASE_VERSION_CODE}; then
               exit 0
             fi
             if [ "$i" -eq "$ATTEMPTS" ]; then
