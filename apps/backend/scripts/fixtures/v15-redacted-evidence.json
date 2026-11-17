@@ -1,0 +1,101 @@
+{
+  "scope": "public schema ONLY: not full Supabase disaster recovery",
+  "archive_sha256": "1D15E6909163D27F35EE087587F64231FAA2E46A9D6319FC25630A3C571C3D65",
+  "source_g88_contacted": false,
+  "existing_nexus_containers_volumes_modified": false,
+  "restore_sections_pass": [
+    "pre-data",
+    "data",
+    "post-data"
+  ],
+  "migration_filename_set_matches_85_snapshot": true,
+  "migration_sql_execution_attested": false,
+  "migration_reconciliation": {
+    "pinned_master_sha": "ee1bcbc790704d53b3586148c56066ae72baeb97",
+    "master_sql_filenames": 70,
+    "restored_tracker_filenames": 85,
+    "known_master_files_already_tracked": 70,
+    "master_sql_files_pending": 0,
+    "historical_extra_filenames": 15,
+    "schema_migrations_changed": false,
+    "migration_runner_executed": false,
+    "production_compatibility_approved": false
+  },
+  "schema_effects_v13": {
+    "unique_catalog_checks": 43,
+    "present_catalog_checks": 43,
+    "semantic_marker_checks": 7,
+    "semantic_marker_failures": [],
+    "data_only_current_eligibility_rule_unreconciled_rows": 0
+  },
+  "migration_chronology_v14": {
+    "scope": "RESTORED_ARCHIVE_ONLY",
+    "record_count": 15,
+    "rows": [
+      {
+        "filename": "0036_trade_offer_counter.sql",
+        "applied_at_utc": "2026-09-08T19:05:31.453Z"
+      },
+      {
+        "filename": "0037_conversation_kind_members.sql",
+        "applied_at_utc": "2026-09-08T19:05:31.587Z"
+      },
+      {
+        "filename": "0038_user_strikes.sql",
+        "applied_at_utc": "2026-09-08T19:05:32.011Z"
+      },
+      {
+        "filename": "0051_event_reviews.sql",
+        "applied_at_utc": "2026-10-26T18:25:39.964Z"
+      },
+      {
+        "filename": "0054_posthog_deletion_queue.sql",
+        "applied_at_utc": "2026-10-27T03:14:41.039Z"
+      },
+      {
+        "filename": "0069_realtime_room_revocation_outbox.sql",
+        "applied_at_utc": "2026-11-06T09:06:19.478Z"
+      },
+      {
+        "filename": "0072_ugc_terms_acceptance.sql",
+        "applied_at_utc": "2026-11-07T16:47:19.261Z"
+      },
+      {
+        "filename": "0072_extend_content_report_targets.sql",
+        "applied_at_utc": "2026-11-07T17:02:09.443Z"
+      },
+      {
+        "filename": "0073_event_question_moderation.sql",
+        "applied_at_utc": "2026-11-07T17:02:09.599Z"
+      },
+      {
+        "filename": "0073_extend_content_report_targets.sql",
+        "applied_at_utc": "2026-11-07T17:17:15.754Z"
+      },
+      {
+        "filename": "0074_event_question_moderation.sql",
+        "applied_at_utc": "2026-11-07T17:17:15.893Z"
+      },
+      {
+        "filename": "0072_personal_labels.sql",
+        "applied_at_utc": "2026-11-08T02:35:28.838Z"
+      },
+      {
+        "filename": "0075_dating_match_conversation_lookup.sql",
+        "applied_at_utc": "2026-11-08T06:56:36.794Z"
+      },
+      {
+        "filename": "0076_child_safety_report_reason.sql",
+        "applied_at_utc": "2026-11-08T08:22:41.174Z"
+      },
+      {
+        "filename": "0077_adult_only_rc1_visibility.sql",
+        "applied_at_utc": "2026-11-08T08:54:18.018Z"
+      }
+    ]
+  },
+  "counts": {
+    "tables": 66,
+    "migration_rows": 85
+  }
+}
