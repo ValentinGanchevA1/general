@@ -58,9 +58,16 @@ function assess(snapshot) {
 }
 
 function main() {
-  const pathArg = process.argv[2] || path.join(__dirname, 'fixtures', 'v17-redacted-privilege-snapshot.json');
+  // Never read a caller-supplied path. The evidence gate only accepts the
+  // version-controlled, redacted fixture bundled with this script.
+  if (process.argv.length !== 2) {
+    process.stderr.write('External evidence paths are not accepted. NO-GO.\n');
+    process.exitCode = 2;
+    return;
+  }
+  const fixturePath = path.join(__dirname, 'fixtures', 'v17-redacted-privilege-snapshot.json');
   try {
-    const result = assess(JSON.parse(fs.readFileSync(pathArg, 'utf8')));
+    const result = assess(JSON.parse(fs.readFileSync(fixturePath, 'utf8')));
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
   } catch {
     process.stderr.write('Invalid offline evidence (details redacted). NO-GO.\n');
