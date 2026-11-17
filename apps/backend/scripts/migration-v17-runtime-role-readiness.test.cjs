@@ -50,8 +50,21 @@ test('committed catalog query is read-only with no row data or secrets', () => {
 });
 
 test('CLI always exits 2 without database connectivity', () => {
-  const r=spawnSync(process.execPath,[path.join(__dirname,'migration-v17-runtime-role-readiness.cjs'),fixturePath],
+  const r=spawnSync(process.execPath,[path.join(__dirname,'migration-v17-runtime-role-readiness.cjs')],
     {encoding:'utf8',timeout:5000,env:{}});
   assert.equal(r.status,2);
   assert.equal(JSON.parse(r.stdout).productionReleaseDecision,'NO-GO');
+});
+
+
+test('CLI rejects arbitrary evidence paths without reading them', () => {
+  const script = path.join(__dirname, 'migration-v17-runtime-role-readiness.cjs');
+  for (const candidate of [fixturePath, '/etc/passwd', '../../.env']) {
+    const r = spawnSync(process.execPath, [script, candidate],
+      { encoding: 'utf8', timeout: 5000, env: {} });
+    assert.equal(r.status, 2);
+    assert.equal(r.stdout, '');
+    assert.match(r.stderr, /External evidence paths are not accepted/);
+    assert.doesNotMatch(r.stderr, /passwd|\.env|v17-redacted/);
+  }
 });
