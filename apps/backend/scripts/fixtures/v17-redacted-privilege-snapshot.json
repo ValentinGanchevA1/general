@@ -1,0 +1,54 @@
+{
+  "source": "G88 Supabase read-only pg_catalog snapshot 2026-11-17",
+  "scope": "public regular/partitioned tables only",
+  "data_api_exposure_verified": false,
+  "function_and_view_acl_verified": false,
+  "application_role_tested": false,
+  "production_build_migration_run_present": true,
+  "rows": [
+    {
+      "role_name": "anon",
+      "public_tables": 66,
+      "rls_enabled": 1,
+      "rls_forced": 0,
+      "owned_by_postgres": 66,
+      "select_tables": 0,
+      "insert_tables": 0,
+      "update_tables": 0,
+      "delete_tables": 0
+    },
+    {
+      "role_name": "authenticated",
+      "public_tables": 66,
+      "rls_enabled": 1,
+      "rls_forced": 0,
+      "owned_by_postgres": 66,
+      "select_tables": 0,
+      "insert_tables": 0,
+      "update_tables": 0,
+      "delete_tables": 0
+    },
+    {
+      "role_name": "postgres",
+      "public_tables": 66,
+      "rls_enabled": 1,
+      "rls_forced": 0,
+      "owned_by_postgres": 66,
+      "select_tables": 66,
+      "insert_tables": 66,
+      "update_tables": 66,
+      "delete_tables": 66
+    },
+    {
+      "role_name": "service_role",
+      "public_tables": 66,
+      "rls_enabled": 1,
+      "rls_forced": 0,
+      "owned_by_postgres": 66,
+      "select_tables": 66,
+      "insert_tables": 66,
+      "update_tables": 66,
+      "delete_tables": 66
+    }
+  ]
+}
