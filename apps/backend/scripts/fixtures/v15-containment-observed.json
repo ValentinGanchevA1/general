@@ -1,0 +1,20 @@
+{
+  "source": "Owner confirmation + read-only Render API 2026-11-17; API autoDeploy readings may be stale",
+  "productionPreviewGeneration": "off",
+  "previews": [
+    {
+      "name": "g88-api PR #1055",
+      "suspended": true,
+      "autoDeploy": "yes",
+      "productionDatabaseConfigurationSame": true,
+      "databaseIsolationVerified": false
+    },
+    {
+      "name": "g88-api PR #1074",
+      "suspended": true,
+      "autoDeploy": "yes",
+      "productionDatabaseConfigurationSame": true,
+      "databaseIsolationVerified": false
+    }
+  ]
+}
