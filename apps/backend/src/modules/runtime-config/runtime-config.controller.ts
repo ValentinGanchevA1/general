@@ -1,4 +1,6 @@
 import { Controller, Get, Header } from '@nestjs/common';
+import type { PersonalLabelsFeaturePolicy } from '@g88/shared';
+import { personalLabelsEnabled } from '../personal-labels/personal-labels.flag';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
   MAP_RENDERER_POLICY_CACHE_TTL_SECONDS,
@@ -19,6 +21,13 @@ export function resolveMapLibreRemoteEnabled(value: string | undefined): boolean
 
 @Controller('runtime-config')
 export class RuntimeConfigController {
+  @Get('personal-labels')
+  @SkipThrottle()
+  @Header('Cache-Control', 'no-store')
+  getPersonalLabelsPolicy(): PersonalLabelsFeaturePolicy {
+    return { enabled: personalLabelsEnabled() };
+  }
+
   @Get('map-renderer')
   @SkipThrottle()
   @Header('Cache-Control', 'no-store')

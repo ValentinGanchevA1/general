@@ -45,4 +45,17 @@ describe('runtime map renderer policy', () => {
 
     expect(new RuntimeConfigController().getMapRendererPolicy().mapLibreEnabled).toBe(false);
   });
+
+  it('keeps personality labels off without an explicit server opt-in', () => {
+    const before = process.env.NEXA_PERSONAL_LABELS_ENABLED;
+    delete process.env.NEXA_PERSONAL_LABELS_ENABLED;
+    try {
+      expect(new RuntimeConfigController().getPersonalLabelsPolicy()).toEqual({ enabled: false });
+      process.env.NEXA_PERSONAL_LABELS_ENABLED = 'true';
+      expect(new RuntimeConfigController().getPersonalLabelsPolicy()).toEqual({ enabled: true });
+    } finally {
+      if (before === undefined) delete process.env.NEXA_PERSONAL_LABELS_ENABLED;
+      else process.env.NEXA_PERSONAL_LABELS_ENABLED = before;
+    }
+  });
 });
