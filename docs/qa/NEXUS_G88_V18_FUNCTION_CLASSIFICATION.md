@@ -53,6 +53,13 @@ ORDER BY 1, 2;
 
 This reads PostgreSQL metadata only. It does not execute any application function, fetch application rows or modify permissions.
 
+## Additional effective-access and body review (read-only)
+
+- `anon` and `authenticated` both have effective `USAGE` on schema `public`, but neither has `CREATE` there.
+- Both have effective `EXECUTE` on `public.g88_slugify(text)`. This is a SQL-language `IMMUTABLE PARALLEL SAFE` text transformation that lowercases/trims and normalizes a maximum 30-character input using regular expressions. Its inspected definition contains no table reads or writes.
+- This narrows the observed risk for this helper, but **does not verify whether Supabase Data API exposes `public` or allows external RPC calls**. Do not claim the API is unreachable or reachable without a separate authorized test.
+- Extension-owned routines and trigger behavior have not been exhaustively code-reviewed; staging compatibility tests remain mandatory.
+
 ## Security interpretation and remaining evidence
 
 1. **Do not infer external exposure from `EXECUTE` alone.** Supabase Data API must expose the schema, the caller must have schema `USAGE`, and API routing/function support and request permissions must be assessed. These have not been independently verified.
