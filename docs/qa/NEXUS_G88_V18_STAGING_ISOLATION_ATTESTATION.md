@@ -35,6 +35,25 @@ The production `g88-api` build command still includes `pnpm --filter @g88/backen
 6. Test Auth, Map/PostGIS, Chat/Socket.IO, Events, Marketplace, negative permission cases and rollback. Keep schema migration execution on a distinct manually controlled privileged identity.
 7. Record evidence of passing tests before proposing a separately authorized production cutover. No production credential rotation or Render production build edit is authorized here.
 
+
+## Local Windows / Docker metadata check (code-only, NOT executed on owner's PC)
+
+The previously discussed local Supabase CLI stack may have a database container named \`supabase_db_nexus-g88-staging\`, published only at \`127.0.0.1:54322\`. Its **current state is not accessible from these connected tools**. The script below is a deliberately constrained host-side Docker metadata check. It reads only container running state, image name and published ports; it never reads Docker \`Config.Env\`, DB URLs, role passwords or PostgreSQL rows.
+
+From a checkout that includes the v18 Draft PR branch, on the **owner's Windows 10 PowerShell**:
+
+\`\`\`powershell
+node --test apps/backend/scripts/v18-local-docker-preflight.test.cjs
+node apps/backend/scripts/v18-local-docker-preflight.cjs --container supabase_db_nexus-g88-staging
+$LASTEXITCODE
+\`\`\`
+
+Expected checks: an actual Supabase PostgreSQL image, running container, and exactly one PostgreSQL mapping \`5432/tcp\` -> \`127.0.0.1:54322\` with no other published container ports. The CLI intentionally exits **2** in all cases. Even with \`metadataMatchesExpectedShape: true\`, \`productionTargetExclusionProven\`, \`networkAndSideEffectIsolationProven\` and \`stagingConnectionOrRestoreAuthorized\` remain **false**. Failed Docker inspection or unexpected layout must be investigated rather than bypassed.
+
+The script cannot establish whether a Docker volume contains copied production personal data, whether Docker networking forwards connections outside the machine, or whether API/Redis/S3/webhooks/notifications point to production. This is **not** authorization to connect, restore, migrate, create roles, merge, deploy or rotate credentials.
+
+Further independent evidence is needed: an operator-verified local database identity via read-only local-container session, synthetic-only application fixtures, network isolation and disabled external side effects. Then test restricted runtime authorization in **isolated staging only**, including negative permissions, before any production plan.
+
 ## Evidence state
 
 | Gate | Current state |
