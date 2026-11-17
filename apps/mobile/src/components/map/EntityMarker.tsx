@@ -4,6 +4,7 @@ import type { MapEntityPoint } from '@g88/shared';
 import { NexaEntityMarker } from './NexaEntityMarker';
 import type { NexaMarkerDensity } from './nexaEntityMarkerVisuals';
 import { entityVisualKey } from './markerVisualKeys';
+import { PORTAL_EVENT_PREVIEW_ENABLED } from '@/features/portals/portalPreview';
 
 interface Props {
   point: MapEntityPoint;
@@ -120,7 +121,7 @@ function EntityMarkerImpl({
         density={density}
         {...(showCaption ? { caption: formatEventBadge(point.meta.startsAt) } : {})}
         state={{ selected, isNew, own, dimmed, unavailable }}
-        accessibilityLabel={`${point.meta.title}, event`}
+        accessibilityLabel={`${point.meta.title}, ${PORTAL_EVENT_PREVIEW_ENABLED ? 'event portal' : 'event'}`}
         reduceMotion={reduceMotion}
       />
     );

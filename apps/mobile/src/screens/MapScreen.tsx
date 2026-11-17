@@ -37,6 +37,7 @@ import {
 } from '@/features/map/renderers/NexaMapScreenSurface';
 import { prefetchAvatars } from '@/services/avatarCache';
 import { EntityBottomSheet } from '@/components/map/EntityBottomSheet';
+import { portalSheetInitialIndex } from '@/features/portals/portalPreview';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { EventsRail } from '@/features/events/EventsRail';
 import {
@@ -994,7 +995,7 @@ export function MapScreen(): React.JSX.Element {
 
 			<BottomSheetModal
 				ref={entitySheetRef}
-				index={0}
+				index={portalSheetInitialIndex(selected?.kind ?? null)}
 				snapPoints={entitySnapPoints}
 				enableDynamicSizing={false}
 				enablePanDownToClose

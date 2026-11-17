@@ -25,6 +25,8 @@ import type {RootStackParamList} from '@/navigation/AppNavigator';
 import {openRootScreen} from '@/navigation/openRootScreen';
 import {deleteJson, getJson, postJson} from '@/api/client';
 import {rsvpToEvent} from '@/features/events/useEvents';
+import {PortalEventPreview} from '@/features/portals/PortalEventPreview';
+import {PORTAL_EVENT_PREVIEW_ENABLED} from '@/features/portals/portalPreview';
 import {signalPostSocialActivation} from '@/features/nudges/postSocialActivation';
 import {IdentityBlock} from '@/components/IdentityBlock';
 import {useUserLocation} from '@/features/location/useUserLocation';
@@ -343,6 +345,9 @@ function EventCard({point, onClose}: { point: EventEntityPoint; onClose: () => v
 	const openDetail = (): void => { onClose(); openRootScreen(navigation, 'EventDetail', {eventId: point.id}); };
 	const going = myRsvp === 'going';
 	const joinLabel = resolveNexaRsvpActionLabel('going', going);
+	if (PORTAL_EVENT_PREVIEW_ENABLED) {
+		return <PortalEventPreview meta={meta} distanceLabel={distanceLabel} onEnter={openDetail} />;
+	}
 	return <View style={styles.sheet}><NexaSpatialKindHeader kind="event" arrivalKey={point.id} /><Text style={styles.entityTitle}>{meta.title}</Text><View style={styles.metaRow}><Text style={styles.metaText}>{formatStartsAt(meta.startsAt)}</Text>{distanceLabel != null ? <><Text style={styles.metaDot}>·</Text><Text style={styles.metaText}>{distanceLabel}</Text></> : null}</View>{capacityLine ? <Text style={styles.metaText}>{capacityLine}</Text> : null}<View style={styles.actions}><TouchableOpacity style={[styles.primaryBtn, styles.eventPrimaryBtn, styles.ctaFlex, rsvpBusy || going ? styles.btnDisabled : undefined]} onPress={() => void onRsvpGoing()} disabled={rsvpBusy || going} accessibilityRole="button" accessibilityLabel={joinLabel}><Text style={styles.primaryBtnText}>{rsvpBusy ? '…' : joinLabel}</Text></TouchableOpacity><TouchableOpacity style={[styles.profileBtn, styles.ctaFlexShrink]} onPress={openDetail} accessibilityRole="button" accessibilityLabel="View event details"><Text style={styles.profileBtnText}>Details</Text></TouchableOpacity></View></View>;
 }
 
