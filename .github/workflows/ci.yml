@@ -86,6 +86,8 @@ jobs:
         run: node --test apps/backend/scripts/staging-target-preflight.test.cjs
       - name: Test v17 runtime privilege readiness (offline NO-GO)
         run: node --test apps/backend/scripts/migration-v17-runtime-role-readiness.test.cjs
+      - name: Test v18 local Docker staging metadata preflight (offline fake Docker)
+        run: node --test apps/backend/scripts/v18-local-docker-preflight.test.cjs
       - name: Test migration guard against disposable local PostgreSQL (no production URL)
         env:
           NEXUS_EPHEMERAL_PG_INTEGRATION: 'true'
