@@ -85,7 +85,7 @@ for (const world of stageWorlds) {
   assert.match(html, /class="stage-canvas"/);
   assert.match(html, /DEMO ONLY/);
   assert.match(html, /NO REAL ACTIONS/);
-  assert.equal((html.match(/class="stage-node/g) ?? []).length, 3);
+  assert.equal((html.match(/class="stage-node(?: stage-node-active)?"/g) ?? []).length, 3);
   const lastAction = experience.WORLD_EXPERIENCES[world].actions[2];
   const selected = stage.worldStageMarkup(world, lastAction.id);
   assert.match(selected, new RegExp(lastAction.title));
