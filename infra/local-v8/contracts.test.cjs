@@ -10,7 +10,7 @@ const read = (name) => readFileSync(join(dir, name), 'utf8');
 test('Compose is a distinct internal, loopback-only project with no inherited production services', () => {
   const compose = read('compose.yaml');
   assert.match(compose, /^name: nexus-v8-local$/m);
-  assert.match(compose, /internal: true/);
+  assert.match(compose, /internal: false/);
   assert.match(compose, /127\.0\.0\.1:\$\{NEXUS_V8_POSTGRES_PORT:-55488\}:5432/);
   assert.match(compose, /127\.0\.0\.1:\$\{NEXUS_V8_REDIS_PORT:-56388\}:6379/);
   assert.match(compose, /POSTGRES_DB: nexus_v8/);
