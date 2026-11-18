@@ -25,9 +25,17 @@ function assess(container, running, image, ports) {
   const entries = ports && typeof ports === 'object' && !Array.isArray(ports)
     ? Object.entries(ports) : [];
   const bindings = entries.find(([port]) => port === '5432/tcp')?.[1];
-  if (!Array.isArray(bindings) || bindings.length !== 1 ||
-      bindings[0]?.HostIp !== '127.0.0.1' ||
-      bindings[0]?.HostPort !== DATABASE_PORT) {
+  const allowedHosts = new Set(['127.0.0.1', '::1']);
+  const validBindings = Array.isArray(bindings) &&
+    bindings.length >= 1 && bindings.length <= 2 &&
+    bindings.every((binding) =>
+      binding !== null &&
+      typeof binding === 'object' &&
+      allowedHosts.has(binding.HostIp) &&
+      binding.HostPort === DATABASE_PORT) &&
+    new Set(bindings.map((binding) => binding.HostIp)).size === bindings.length;
+
+  if (!validBindings) {
     issues.push('LOCAL_POSTGRES_NOT_EXCLUSIVELY_LOOPBACK_54322');
   }
   // Ensure no additional TCP/UDP ports from this DB container are published.
