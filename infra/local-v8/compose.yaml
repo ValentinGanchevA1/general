@@ -3,9 +3,7 @@ name: nexus-v8-local
 
 services:
   postgres:
-    build:
-      context: ../../docker/postgres
-      dockerfile: Dockerfile
+    image: postgis/postgis:16-3.4
     environment:
       POSTGRES_USER: nexus_v8
       POSTGRES_PASSWORD: ${NEXUS_V8_POSTGRES_PASSWORD:?Run bootstrap.ps1 first}
