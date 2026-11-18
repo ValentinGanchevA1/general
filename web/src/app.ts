@@ -14,7 +14,6 @@ import { mountNexaMap, type MapCamera, type MapViewport } from './map';
 import { WebRealtimeClient } from './realtime';
 import { manyWorldsPreviewEnabled, worldFromSearch, worldPickerMarkup, worldSceneMarkup, worldUrl } from './world-switcher';
 import { WORLD_DEFINITIONS, WORLD_IDS, type WorldId } from '../../packages/shared/src/worlds';
-import { worldExperienceMarkup } from './world-experiences';
 import { worldExperienceMarkup } from './world-experience';
 import {
   broadcastSessionChanged,
@@ -149,7 +148,6 @@ const state: State = {
 };
 
 const realtime = new WebRealtimeClient();
-let activeWorldFocus: string | null = null;
 let accessToken: string | null = null;
 let refreshInFlight: Promise<boolean> | null = null;
 let discoveryController: AbortController | null = null;
@@ -539,7 +537,7 @@ function shell(): string {
     ? `<div class="toast">${escapeHtml(state.notice)}</div>`
     : '';
 
-  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXUS</b></button><nav>${tabs}</nav><div class="rail-foot"><button id="theme">${THEME_ICONS[state.theme]}</button>${accountControl}</div></aside><main><header>${topbar()}</header><section class="content">${manyWorldsPreviewEnabled(window.location.search) ? worldExperienceMarkup(state.worldId, activeWorldFocus) : ""}${view()}</section></main><nav class="mobile-nav">${tabs}</nav>${notice}${authPanel()}</div>`;
+  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXUS</b></button><nav>${tabs}</nav><div class="rail-foot"><button id="theme">${THEME_ICONS[state.theme]}</button>${accountControl}</div></aside><main><header>${topbar()}</header><section class="content">${view()}</section></main><nav class="mobile-nav">${tabs}</nav>${notice}${authPanel()}</div>`;
 }
 function topbar(): string {
   const copy: Record<Tab, [string,string]> = {
@@ -708,11 +706,6 @@ function bind(): void {
     state.worldFocus = 0;
     applyTheme();
     window.history.replaceState(null, '', worldUrl(state.worldId, window.location));
-    render();
-  }));
-  document.querySelectorAll<HTMLElement>('[data-world-focus]').forEach((element) => element.addEventListener('click', () => {
-    if (!manyWorldsPreviewEnabled(window.location.search)) return;
-    activeWorldFocus = element.dataset.worldFocus ?? null;
     render();
   }));
   document.querySelectorAll<HTMLElement>('[data-tab]').forEach((element) => element.addEventListener('click', () => {
