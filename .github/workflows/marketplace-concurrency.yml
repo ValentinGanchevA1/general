@@ -1,0 +1,73 @@
+name: Marketplace concurrency manual pilot
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  marketplace-concurrency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@5eea8caf49c844361c1e9ddc1324e179c54b58e9 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+      - name: Start disposable PostgreSQL 17 and independently attest identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          password="$(openssl rand -hex 24)"
+          echo "::add-mask::$password"
+          docker run -d --name nexus-d5-ci-postgres --rm \
+            -e POSTGRES_USER=nexus_test \
+            -e POSTGRES_DB=nexus_test \
+            -e POSTGRES_PASSWORD="$password" \
+            -p 127.0.0.1:55440:5432 postgres:17 >/dev/null
+          for attempt in $(seq 1 45); do
+            if docker exec nexus-d5-ci-postgres pg_isready -U nexus_test -d nexus_test >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          docker exec nexus-d5-ci-postgres pg_isready -U nexus_test -d nexus_test >/dev/null
+          identity="$(docker exec nexus-d5-ci-postgres psql -U nexus_test -d nexus_test -Atqc 'SELECT system_identifier::text FROM pg_control_system()')"
+          [[ "$identity" =~ ^[0-9]{15,25}$ ]] || exit 1
+          {
+            echo 'NEXUS_D5_CI_RUN=1'
+            echo 'NEXUS_D5_DISPOSABLE=1'
+            echo "NEXUS_D5_EXPECTED_SYSTEM_ID=$identity"
+            echo 'NEXUS_D3_HOST=127.0.0.1'
+            echo 'NEXUS_D3_PORT=55440'
+            echo 'NEXUS_D3_DB=nexus_test'
+            echo 'NEXUS_D3_USER=nexus_test'
+            echo "PGPASSWORD=$password"
+          } >> "$GITHUB_ENV"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build shared
+        run: pnpm --filter @g88/shared build
+      - name: Run all nine Marketplace concurrency tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --filter @g88/backend exec jest --ci --runInBand \
+            --runTestsByPath src/modules/listings/listings-concurrency.integration.spec.ts \
+            --json --outputFile="$RUNNER_TEMP/marketplace-d5-results.json"
+          node - "$RUNNER_TEMP/marketplace-d5-results.json" <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const assertions = report.testResults.flatMap(s => s.assertionResults);
+          if (report.numPassedTests !== 9 || report.numFailedTests !== 0 || report.numPendingTests !== 0 || report.numTodoTests !== 0 || assertions.length !== 9 || assertions.some(a => a.status !== 'passed')) {
+            throw new Error('D5 fail-closed: exactly nine passing, zero skipped tests required');
+          }
+          console.log('D5 concurrency gate: 9 passed, 0 skipped');
+          NODE
+      - name: Stop disposable PostgreSQL
+        if: always()
+        shell: bash
+        run: docker rm -f nexus-d5-ci-postgres >/dev/null 2>&1 || true
