@@ -14,7 +14,6 @@ import { mountNexaMap, type MapCamera, type MapViewport } from './map';
 import { WebRealtimeClient } from './realtime';
 import { manyWorldsPreviewEnabled, worldFromSearch, worldPickerMarkup, worldSceneMarkup, worldUrl } from './world-switcher';
 import { WORLD_DEFINITIONS, WORLD_IDS, type WorldId } from '../../packages/shared/src/worlds';
-import { worldExperienceMarkup } from './world-experience';
 import {
   broadcastSessionChanged,
   onRemoteSessionChanged,
@@ -47,7 +46,6 @@ type ApiPath =
 interface State {
   tab: Tab;
   worldId: WorldId;
-  worldFocus: number;
   theme: ThemePreference;
   user: AuthenticatedUser | null;
   points: DiscoveryPoint[];
@@ -128,7 +126,6 @@ const demoFeed: ActivityItem[] = [
 const state: State = {
   tab: 'map',
   worldId: worldFromSearch(window.location.search),
-  worldFocus: 0,
   theme: readTheme(),
   user: null,
   points: demoPoints,
@@ -560,12 +557,9 @@ function topbar(): string {
   return `<div><p class="eyebrow">NEXUS / ${title.toUpperCase()}</p><h1>${title}</h1><p>${subtitle}${previewLabel}</p>${worldPreview}</div><div class="header-actions"><span class="mode"><i></i>${liveLabel}</span>${state.user ? '<button id="refresh">Refresh</button>' : '<button class="primary" id="auth-top">Connect backend</button>'}</div>`;
 }
 function view(): string {
-  const workspace = manyWorldsPreviewEnabled(window.location.search)
-    ? worldExperienceMarkup(state.worldId, state.worldFocus)
-    : '';
-  if (isSpatialTab(state.tab)) return workspace + mapView();
-  if (state.tab === 'connections') return workspace + connectionsView();
-  return workspace + identityView();
+  if (isSpatialTab(state.tab)) return mapView();
+  if (state.tab === 'connections') return connectionsView();
+  return identityView();
 }
 function mapView(): string {
   const visible = state.points.filter((point) => point.kind === 'cluster' || state.kinds.has(point.kind));
@@ -693,17 +687,10 @@ function safeFragment(html: string): DocumentFragment {
 }
 
 function bind(): void {
-  document.querySelectorAll<HTMLElement>('[data-world-focus]').forEach((element) => element.addEventListener('click', () => {
-    const index = Number(element.dataset.worldFocus);
-    if (!manyWorldsPreviewEnabled(window.location.search) || !Number.isInteger(index) || index < 0 || index > 2) return;
-    state.worldFocus = index;
-    render();
-  }));
   document.querySelectorAll<HTMLElement>('[data-world]').forEach((element) => element.addEventListener('click', () => {
     const id = element.dataset.world;
     if (!manyWorldsPreviewEnabled(window.location.search) || !WORLD_IDS.some((world) => world === id)) return;
     state.worldId = id as WorldId;
-    state.worldFocus = 0;
     applyTheme();
     window.history.replaceState(null, '', worldUrl(state.worldId, window.location));
     render();
