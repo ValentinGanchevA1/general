@@ -217,6 +217,8 @@ tasks.register("checkReleaseMediaPermissions") {
     }
 }
 
-tasks.named("bundleRelease") {
+// Android Gradle Plugin creates variant bundle tasks after project evaluation.
+// configureEach also covers tasks registered later without failing early.
+tasks.matching { it.name == "bundleRelease" }.configureEach {
     dependsOn("checkReleaseMediaPermissions")
 }
