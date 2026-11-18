@@ -37,4 +37,33 @@ assert.notEqual(mod.worldSceneMarkup('noir'), mod.worldSceneMarkup('sanctuary'))
 const location = { href: 'https://example.test/app?foo=bar#map' };
 const url = mod.worldUrl('noir', location);
 assert.equal(url, '/app?foo=bar&manyWorlds=1&world=noir#map');
-console.log('MANY WORLDS switcher contracts: PASS');
+
+const experienceResult = await build({
+  entryPoints: ['web/src/world-experience.ts'],
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  target: 'node22',
+  write: false,
+});
+const experienceSource = experienceResult.outputFiles?.[0]?.text;
+assert.ok(experienceSource, 'Bundled world experience source missing');
+const experience = await import(`data:text/javascript;base64,${Buffer.from(experienceSource).toString('base64')}`);
+
+for (const world of ['nexus','noir','profiler','pathfinder','nocturne','diplomat','architect','bazaar','vanguard','sanctuary']) {
+  const defaultMarkup = experience.worldExperienceMarkup(world);
+  assert.match(defaultMarkup, /class="world-experience"/);
+  assert.equal((defaultMarkup.match(/data-world-action=/g) ?? []).length, 3);
+  assert.equal((defaultMarkup.match(/aria-pressed="true"/g) ?? []).length, 1);
+  assert.match(defaultMarkup, /PREVIEW ONLY/);
+  const actions = experience.WORLD_EXPERIENCES[world].actions;
+  assert.equal(actions.length, 3);
+  assert.equal(new Set(actions.map((action) => action.id)).size, 3);
+  for (const action of actions) {
+    assert.match(experience.worldExperienceMarkup(world, action.id), new RegExp(`data-world-action="${action.id}" aria-pressed="true"`));
+  }
+  assert.equal(experience.worldExperienceMarkup(world, '__invalid__'), defaultMarkup);
+}
+assert.notEqual(experience.worldExperienceMarkup('noir'), experience.worldExperienceMarkup('sanctuary'));
+
+console.log('MANY WORLDS switcher and interactive experience contracts: PASS');
