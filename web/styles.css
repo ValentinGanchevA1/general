@@ -202,3 +202,18 @@
 @media(prefers-reduced-motion:reduce){
  .world-mobile-sheet,.world-mobile-dock{transition:none!important}
 }
+
+/* MANY WORLDS v6 — map context for fictional demo markers only. */
+.world-map-context{position:relative;margin:0;padding:16px 18px;background:linear-gradient(120deg,var(--world-haze),var(--surface));border-top:2px solid var(--world-primary);color:var(--text)}
+.world-map-context-head{display:flex;align-items:center;justify-content:space-between;gap:9px}
+.world-map-context-head small{font-size:9px;font-weight:850;letter-spacing:.13em;color:var(--world-primary)}
+.world-map-context-close{min-width:44px;min-height:44px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);color:var(--text);font-size:23px}
+.world-map-context h3{font-size:21px;margin:3px 0 5px;letter-spacing:-.025em}
+.world-map-context p{font-size:12px;line-height:1.55;color:var(--muted);margin:0 0 10px}
+.world-map-context-lens{display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:13px;border:1px solid color-mix(in srgb,var(--world-primary) 25%,var(--border));background:color-mix(in srgb,var(--world-primary) 8%,var(--surface2))}
+.world-map-context-lens>span{font-size:26px;color:var(--world-primary)}
+.world-map-context-lens strong{font-size:12px;display:block}
+.world-map-context-lens small{font-size:11px;display:block;margin-top:3px;line-height:1.45;color:var(--muted)}
+.world-map-context footer{font-size:9px;letter-spacing:.09em;font-weight:800;color:var(--world-primary);margin-top:10px}
+.world-map-context-close:focus-visible{outline:2px solid var(--world-primary);outline-offset:2px}
+@media(max-width:760px){.world-map-context{padding:10px 12px}.world-map-context h3{font-size:18px}.world-map-context-lens small{font-size:10px}}
