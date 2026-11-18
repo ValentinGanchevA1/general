@@ -15,7 +15,10 @@ import { RedisIoAdapter } from './realtime/redis-io.adapter';
 import { shouldUseSocketIoRedisAdapter } from './realtime/socket-io-redis.config';
 import { resolveDatabaseUrl } from '../scripts/preview-db-guard';
 
-loadEnv({ path: join(process.cwd(), '../../.env') });
+// Never merge root environment secrets into an isolated, allowlisted local sandbox.
+if (process.env.NEXUS_V8_LOCAL_ONLY !== '1') {
+  loadEnv({ path: join(process.cwd(), '../../.env') });
+}
 // Render service previews inherit the parent's DATABASE_URL by default. Fail
 // closed unless an explicitly separate preview DB has been configured.
 const startupDatabaseUrl = resolveDatabaseUrl(process.env);
