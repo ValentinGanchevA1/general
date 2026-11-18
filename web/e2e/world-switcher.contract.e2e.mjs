@@ -66,4 +66,31 @@ for (const world of ['nexus','noir','profiler','pathfinder','nocturne','diplomat
 }
 assert.notEqual(experience.worldExperienceMarkup('noir'), experience.worldExperienceMarkup('sanctuary'));
 
-console.log('MANY WORLDS switcher and interactive experience contracts: PASS');
+
+const stageResult = await build({
+  entryPoints: ['web/src/world-workspaces.ts'],
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  target: 'node22',
+  write: false,
+});
+const stageSource = stageResult.outputFiles?.[0]?.text;
+assert.ok(stageSource, 'Bundled world workspaces missing');
+const stage = await import(`data:text/javascript;base64,${Buffer.from(stageSource).toString('base64')}`);
+const stageWorlds = ['nexus','noir','profiler','pathfinder','nocturne','diplomat','architect','bazaar','vanguard','sanctuary'];
+assert.equal(new Set(stageWorlds.map((world) => stage.WORLD_STAGES[world].layout)).size, 10);
+for (const world of stageWorlds) {
+  const html = stage.worldStageMarkup(world);
+  assert.match(html, /class="stage-canvas"/);
+  assert.match(html, /DEMO ONLY/);
+  assert.match(html, /NO REAL ACTIONS/);
+  assert.equal((html.match(/class="stage-node(?: stage-node-active)?"/g) ?? []).length, 3);
+  const lastAction = experience.WORLD_EXPERIENCES[world].actions[2];
+  const selected = stage.worldStageMarkup(world, lastAction.id);
+  assert.match(selected, new RegExp(lastAction.title));
+  assert.notEqual(html, selected);
+  assert.equal(stage.worldStageMarkup(world, '__invalid__'), html);
+}
+
+console.log('MANY WORLDS switcher, experiences and unique workspace contracts: PASS');

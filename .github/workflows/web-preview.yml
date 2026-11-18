@@ -64,6 +64,9 @@ jobs:
       - name: MANY WORLDS interactive experience contracts
         run: node web/e2e/world-experience.contract.e2e.mjs
 
+      - name: MANY WORLDS responsive contracts
+        run: node web/e2e/world-responsive.contract.e2e.mjs
+
       - name: Public demo isolation
         run: |
           PUBLIC_DEMO_ONLY=1 PORT=4182 node web/edge.mjs >/tmp/nexa-demo-edge.log 2>&1 &

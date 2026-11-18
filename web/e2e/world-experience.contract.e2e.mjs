@@ -9,23 +9,24 @@ const source = result.outputFiles?.[0]?.text;
 assert.ok(source, 'World experience bundle missing');
 const mod = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 const ids = ['nexus','noir','profiler','pathfinder','nocturne','diplomat','architect','bazaar','vanguard','sanctuary'];
-assert.equal(new Set(mod.WORLD_LAYOUTS).size, 10, 'Each world must have its own layout');
+
+assert.deepEqual(Object.keys(mod.WORLD_EXPERIENCES).sort(), [...ids].sort());
 for (const id of ids) {
-  const defaultView = mod.worldExperienceMarkup(id, 0);
-  assert.match(defaultView, new RegExp('world-layout-' + mod.WORLD_EXPERIENCES[id].mode));
-  assert.match(defaultView, /ILLUSTRATIVE CONTENT · NOT LIVE DATA/);
-  assert.equal((defaultView.match(/data-world-focus=/g) ?? []).length, 3);
-  assert.match(defaultView, /aria-pressed="true"/);
-  const second = mod.worldExperienceMarkup(id, 1);
-  const third = mod.worldExperienceMarkup(id, 2);
-  assert.notEqual(defaultView, second);
-  assert.notEqual(second, third);
-  assert.equal(mod.worldExperienceMarkup(id, 999), defaultView, 'Invalid selection must be bounded');
-  for (const moment of mod.WORLD_EXPERIENCES[id].moments) {
-    assert.ok(moment.detail.length > 24);
+  const actions = mod.WORLD_EXPERIENCES[id].actions;
+  assert.equal(actions.length, 3);
+  assert.equal(new Set(actions.map((action) => action.id)).size, 3);
+  const defaultView = mod.worldExperienceMarkup(id);
+  assert.match(defaultView, /class="world-experience"/);
+  assert.match(defaultView, /INTERACTIVE CONCEPT/);
+  assert.match(defaultView, /PREVIEW ONLY/);
+  assert.equal((defaultView.match(/data-world-action=/g) ?? []).length, 3);
+  assert.equal((defaultView.match(/aria-pressed="true"/g) ?? []).length, 1);
+  for (const action of actions) {
+    assert.ok(action.detail.length > 24);
+    const selected = mod.worldExperienceMarkup(id, action.id);
+    assert.match(selected, new RegExp(`data-world-action="${action.id}" aria-pressed="true"`));
   }
+  assert.equal(mod.worldExperienceMarkup(id, '__invalid__'), defaultView);
 }
-assert.notEqual(mod.worldExperienceMarkup('noir',0), mod.worldExperienceMarkup('bazaar',0));
-assert.match(mod.worldExperienceMarkup('sanctuary', 0), /role="group" aria-label="Concept scenes"/);
-assert.match(mod.worldExperienceMarkup('nexus', 0), /aria-live="polite"/);
+assert.notEqual(mod.worldExperienceMarkup('noir'), mod.worldExperienceMarkup('bazaar'));
 console.log('MANY WORLDS interactive experience contract: PASS');
