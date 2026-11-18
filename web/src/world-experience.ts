@@ -73,7 +73,7 @@ export function worldExperienceMarkup(worldId: WorldId, selected: number): strin
   const def = WORLD_DEFINITIONS[worldId];
   const data = WORLD_EXPERIENCES[worldId];
   const index = Number.isInteger(selected) && selected >= 0 && selected < data.moments.length ? selected : 0;
-  const active = data.moments[index];
+  const active = data.moments[index] ?? data.moments[0];
   const items = data.moments.map((item, i) =>
     `<button type="button" class="world-moment${i === index ? ' active' : ''}" data-world-focus="${i}" aria-pressed="${i === index}" aria-label="${item.name}"><span class="world-moment-icon" aria-hidden="true">${item.icon}</span><span class="world-moment-text"><strong>${item.name}</strong><small>${item.tag}</small></span><b>${item.metric}</b></button>`
   ).join('');
