@@ -17,6 +17,7 @@ import { WORLD_DEFINITIONS, WORLD_IDS, type WorldId } from '../../packages/share
 import { WORLD_EXPERIENCES, worldExperienceMarkup } from './world-experience';
 import { worldStageMarkup } from './world-workspaces';
 import { worldMobileDockMarkup, worldMobileSheetMarkup } from './world-mobile-tools';
+import { isDemoMapMarkerId, worldMapContextMarkup } from './world-map-context';
 import {
   broadcastSessionChanged,
   onRemoteSessionChanged,
@@ -51,6 +52,7 @@ interface State {
   worldId: WorldId;
   worldAction: string | null;
   mobileSheetOpen: boolean;
+  selectedDemoMarker: string | null;
   theme: ThemePreference;
   user: AuthenticatedUser | null;
   points: DiscoveryPoint[];
@@ -108,7 +110,7 @@ const SAFE_TAGS = new Set([
   'SECTION', 'SMALL', 'SPAN', 'STRONG',
 ]);
 const SAFE_ATTRIBUTES = new Set([
-  'aria-current', 'aria-hidden', 'aria-label', 'aria-pressed', 'aria-modal', 'role', 'data-world', 'data-world-action', 'data-mobile-action', 'data-close-world-sheet',
+  'aria-current', 'aria-hidden', 'aria-label', 'aria-pressed', 'aria-modal', 'role', 'data-world', 'data-world-action', 'data-mobile-action', 'data-close-world-sheet', 'data-close-map-context',
   'autocomplete', 'class', 'data-action', 'data-conversation-id', 'data-kind',
   'data-request-id', 'data-tab', 'data-target', 'data-tone', 'data-wave-user-id',
   'disabled', 'id', 'maxlength', 'minlength', 'open', 'placeholder', 'required', 'type',
@@ -133,6 +135,7 @@ const state: State = {
   worldId: worldFromSearch(window.location.search),
   worldAction: null,
   mobileSheetOpen: false,
+  selectedDemoMarker: null,
   theme: readTheme(),
   user: null,
   points: demoPoints,
@@ -594,7 +597,10 @@ function mapView(): string {
     if (state.tab === 'opportunities') return item.type === 'listing';
     return true;
   }).slice(0, 2);
-  return `<div class="map-layout"><section class="map-card"><div class="toolbar"><div class="search">⌕ <span>Pan or zoom to search this area</span></div>${filters}</div><div class="map" id="nexa-map"></div></section><aside class="panel"><div class="section-head"><div><p class="eyebrow">NEXUS / ${lens}</p><h2>${title}</h2></div><button id="refresh-map">Refresh</button></div>${visible.slice(0,8).map(row).join('') || '<p class="empty">No nearby results for this lens.</p>'}<div class="create"><b>≋</b><div><strong>Nearby Pulse</strong><p>Local activity signals, not a second feed.</p></div></div>${signals.map(activity).join('')}</aside></div>`;
+  const context = manyWorldsPreviewEnabled(window.location.search) && state.points === demoPoints
+    ? worldMapContextMarkup(state.worldId, state.selectedDemoMarker)
+    : '';
+  return `<div class="map-layout"><section class="map-card"><div class="toolbar"><div class="search">⌕ <span>Pan or zoom to search this area</span></div>${filters}</div><div class="map" id="nexa-map"></div>${context}</section><aside class="panel"><div class="section-head"><div><p class="eyebrow">NEXUS / ${lens}</p><h2>${title}</h2></div><button id="refresh-map">Refresh</button></div>${visible.slice(0,8).map(row).join('') || '<p class="empty">No nearby results for this lens.</p>'}<div class="create"><b>≋</b><div><strong>Nearby Pulse</strong><p>Local activity signals, not a second feed.</p></div></div>${signals.map(activity).join('')}</aside></div>`;
 }
 function chip(kind: EntityKind, label: string): string {
   return `<button class="chip ${state.kinds.has(kind) ? 'selected' : ''}" data-kind="${kind}">${label}</button>`;
@@ -700,8 +706,13 @@ function bind(): void {
     state.worldId = id as WorldId;
     state.worldAction = null;
     state.mobileSheetOpen = false;
+    state.selectedDemoMarker = null;
     applyTheme();
     window.history.replaceState(null, '', worldUrl(state.worldId, window.location));
+    render();
+  }));
+  document.querySelectorAll<HTMLElement>('[data-close-map-context]').forEach((element) => element.addEventListener('click', () => {
+    state.selectedDemoMarker = null;
     render();
   }));
   document.querySelectorAll<HTMLElement>('[data-world-action]').forEach((element) => element.addEventListener('click', () => {
@@ -797,6 +808,13 @@ function bind(): void {
       points: visiblePoints,
       camera: state.mapCamera,
       onViewportSettled: onMapViewportSettled,
+      onSelectPoint: (point) => {
+        if (!manyWorldsPreviewEnabled(window.location.search) || state.points !== demoPoints) return;
+        const markerId = point.kind === 'cluster' ? `cluster:${point.cellId}` : `${point.kind}:${point.id}`;
+        if (!isDemoMapMarkerId(markerId)) return;
+        state.selectedDemoMarker = markerId;
+        render();
+      },
     });
   }
 
