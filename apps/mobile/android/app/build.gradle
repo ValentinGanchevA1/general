@@ -197,10 +197,17 @@ tasks.register("checkReleaseMediaPermissions") {
             "android.permission.READ_MEDIA_VIDEO"
         ]
         manifests.each { manifest ->
-            def xml = new XmlSlurper(false, false).parse(manifest)
-            def permissions = xml.children().findAll {
-                it.name() in ["uses-permission", "uses-permission-sdk-23", "uses-permission-sdk-m"]
-            }.collect { it.attributes().find { key, value -> key.toString().endsWith("name") }?.value?.toString() }
+            def factory = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+            factory.setNamespaceAware(true)
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            def doc = factory.newDocumentBuilder().parse(manifest)
+            def permissions = []
+            ["uses-permission", "uses-permission-sdk-23", "uses-permission-sdk-m"].each { tag ->
+                def nodes = doc.getElementsByTagName(tag)
+                for (int i = 0; i < nodes.length; i++) {
+                    permissions.add(nodes.item(i).getAttributeNS("http://schemas.android.com/apk/res/android", "name"))
+                }
+            }
             def found = forbidden.intersect(permissions)
             if (!found.isEmpty()) {
                 throw new GradleException("Forbidden broad media permissions in merged release manifest: ${found}")
