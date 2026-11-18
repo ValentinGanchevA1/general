@@ -12,7 +12,7 @@ import type { InboxItem, InboxResponse } from '../../packages/shared/src/friends
 import type { ChatMessageEvent, FriendPresenceEvent } from '../../packages/shared/src/events';
 import { mountNexaMap, type MapCamera, type MapViewport } from './map';
 import { WebRealtimeClient } from './realtime';
-import { manyWorldsPreviewEnabled, worldFromSearch, worldPickerMarkup, worldUrl } from './world-switcher';
+import { manyWorldsPreviewEnabled, worldFromSearch, worldPickerMarkup, worldSceneMarkup, worldUrl } from './world-switcher';
 import { WORLD_DEFINITIONS, WORLD_IDS, type WorldId } from '../../packages/shared/src/worlds';
 import {
   broadcastSessionChanged,
@@ -162,6 +162,7 @@ function readTheme(): ThemePreference {
 function applyTheme(): void {
   const resolved = state.theme === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : state.theme;
   document.documentElement.dataset.theme = resolved;
+  document.documentElement.dataset.world = manyWorldsPreviewEnabled(window.location.search) ? state.worldId : 'nexus';
 }
 function cycleTheme(): void {
   const order: ThemePreference[] = ['system', 'dark', 'light'];
@@ -548,7 +549,7 @@ function topbar(): string {
     ? (state.realtimeConnected ? 'Realtime live' : 'Realtime offline')
     : (state.user ? 'Live backend' : 'Demo mode');
   const worldPreview = manyWorldsPreviewEnabled(window.location.search)
-    ? worldPickerMarkup(state.worldId)
+    ? `${worldPickerMarkup(state.worldId)}${worldSceneMarkup(state.worldId)}`
     : '';
   const previewLabel = state.worldId !== 'nexus'
     ? ` · ${WORLD_DEFINITIONS[state.worldId].displayName} visual preview (core data unchanged)`
@@ -690,6 +691,7 @@ function bind(): void {
     const id = element.dataset.world;
     if (!manyWorldsPreviewEnabled(window.location.search) || !WORLD_IDS.some((world) => world === id)) return;
     state.worldId = id as WorldId;
+    applyTheme();
     window.history.replaceState(null, '', worldUrl(state.worldId, window.location));
     render();
   }));
