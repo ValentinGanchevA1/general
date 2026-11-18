@@ -1,0 +1,51 @@
+name: NEXUS v8 Local Docker Sandbox
+
+on:
+  pull_request:
+    paths:
+      - 'infra/local-v8/**'
+      - 'docker/postgres/**'
+      - '.github/workflows/nexus-v8-local-staging.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify offline safety contracts
+        run: node --test infra/local-v8/contracts.test.cjs
+
+      - name: Generate disposable CI-only secrets
+        run: pwsh -NoProfile -File infra/local-v8/bootstrap.ps1
+
+      - name: Validate standalone Compose configuration
+        run: docker compose --env-file infra/local-v8/.env.local -f infra/local-v8/compose.yaml config --quiet
+
+      - name: Boot isolated PostGIS and Redis
+        run: docker compose --env-file infra/local-v8/.env.local -f infra/local-v8/compose.yaml up -d --build --wait
+
+      - name: Execute local-only PowerShell smoke tests
+        run: pwsh -NoProfile -File infra/local-v8/smoke.ps1
+
+      - name: Prove the local PostGIS extension can execute a spatial query
+        run: |
+          docker compose --env-file infra/local-v8/.env.local -f infra/local-v8/compose.yaml exec -T postgres \
+            psql -X -v ON_ERROR_STOP=1 -U nexus_v8 -d nexus_v8 \
+            -c 'CREATE EXTENSION IF NOT EXISTS postgis;'
+          docker compose --env-file infra/local-v8/.env.local -f infra/local-v8/compose.yaml exec -T postgres \
+            psql -X -tA -v ON_ERROR_STOP=1 -U nexus_v8 -d nexus_v8 \
+            -c "SELECT ST_Distance(ST_GeogFromText('POINT(27.916 43.214)'),ST_GeogFromText('POINT(27.916 43.214)'))::integer;" | grep -qx 0
+
+      - name: Clean CI-only Docker containers and volume
+        if: always()
+        run: |
+          if test -f infra/local-v8/.env.local; then
+            docker compose --env-file infra/local-v8/.env.local -f infra/local-v8/compose.yaml down --volumes --remove-orphans
+          fi
