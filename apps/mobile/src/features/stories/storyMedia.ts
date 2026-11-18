@@ -227,31 +227,8 @@ async function ensureCameraPermission(forVideo: boolean): Promise<void> {
   }
 }
 
-async function ensureLibraryPermission(): Promise<void> {
-  if (Platform.OS !== 'android') return;
-
-  // Android 13+ granular media; older uses READ_EXTERNAL_STORAGE (maxSdk 32 in manifest).
-  const api = typeof Platform.Version === 'number' ? Platform.Version : 0;
-  if (api >= 33) {
-    const results = await PermissionsAndroid.requestMultiple([
-      PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
-      PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO,
-    ]);
-    const ok =
-      results[PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES] ===
-        PermissionsAndroid.RESULTS.GRANTED ||
-      results[PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO] ===
-        PermissionsAndroid.RESULTS.GRANTED;
-    if (!ok) {
-      throw new Error('Media library permission is required to pick a story.');
-    }
-  }
-}
-
 async function pickAsset(source: Source): Promise<Asset | null> {
-  if (source === 'library') {
-    await ensureLibraryPermission();
-  } else {
+  if (source !== 'library') {
     await ensureCameraPermission(source === 'camera_video');
   }
 
