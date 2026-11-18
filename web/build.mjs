@@ -27,6 +27,7 @@ if (process.env.PUBLIC_DEMO_ONLY === '1') {
     'web/e2e/world-responsive.contract.e2e.mjs',
     'web/e2e/world-mobile-tools.contract.e2e.mjs',
     'web/e2e/world-map-context.contract.e2e.mjs',
+    'web/e2e/world-demo-interactions.contract.e2e.mjs',
   ]) {
     execFileSync(process.execPath, [test], { stdio: 'inherit' });
   }
