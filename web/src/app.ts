@@ -18,6 +18,7 @@ import { WORLD_EXPERIENCES, worldExperienceMarkup } from './world-experience';
 import { worldStageMarkup } from './world-workspaces';
 import { worldMobileDockMarkup, worldMobileSheetMarkup } from './world-mobile-tools';
 import { isDemoMapMarkerId, worldMapContextMarkup } from './world-map-context';
+import { actionForMarker, demoInteractionMarkup, toggleDemoInteraction, type DemoInteractionState } from './world-demo-interactions';
 import {
   broadcastSessionChanged,
   onRemoteSessionChanged,
@@ -53,6 +54,7 @@ interface State {
   worldAction: string | null;
   mobileSheetOpen: boolean;
   selectedDemoMarker: string | null;
+  demoInteractions: DemoInteractionState;
   theme: ThemePreference;
   user: AuthenticatedUser | null;
   points: DiscoveryPoint[];
@@ -110,7 +112,7 @@ const SAFE_TAGS = new Set([
   'SECTION', 'SMALL', 'SPAN', 'STRONG',
 ]);
 const SAFE_ATTRIBUTES = new Set([
-  'aria-current', 'aria-hidden', 'aria-label', 'aria-pressed', 'aria-modal', 'role', 'data-world', 'data-world-action', 'data-mobile-action', 'data-close-world-sheet', 'data-close-map-context',
+  'aria-current', 'aria-hidden', 'aria-label', 'aria-pressed', 'aria-modal', 'role', 'data-world', 'data-world-action', 'data-mobile-action', 'data-close-world-sheet', 'data-close-map-context', 'data-demo-interaction',
   'autocomplete', 'class', 'data-action', 'data-conversation-id', 'data-kind',
   'data-request-id', 'data-tab', 'data-target', 'data-tone', 'data-wave-user-id',
   'disabled', 'id', 'maxlength', 'minlength', 'open', 'placeholder', 'required', 'type',
@@ -136,6 +138,7 @@ const state: State = {
   worldAction: null,
   mobileSheetOpen: false,
   selectedDemoMarker: null,
+  demoInteractions: {},
   theme: readTheme(),
   user: null,
   points: demoPoints,
@@ -598,7 +601,7 @@ function mapView(): string {
     return true;
   }).slice(0, 2);
   const context = manyWorldsPreviewEnabled(window.location.search) && state.points === demoPoints
-    ? worldMapContextMarkup(state.worldId, state.selectedDemoMarker)
+    ? worldMapContextMarkup(state.worldId, state.selectedDemoMarker) + demoInteractionMarkup(state.worldId, state.selectedDemoMarker, state.demoInteractions)
     : '';
   return `<div class="map-layout"><section class="map-card"><div class="toolbar"><div class="search">⌕ <span>Pan or zoom to search this area</span></div>${filters}</div><div class="map" id="nexa-map"></div>${context}</section><aside class="panel"><div class="section-head"><div><p class="eyebrow">NEXUS / ${lens}</p><h2>${title}</h2></div><button id="refresh-map">Refresh</button></div>${visible.slice(0,8).map(row).join('') || '<p class="empty">No nearby results for this lens.</p>'}<div class="create"><b>≋</b><div><strong>Nearby Pulse</strong><p>Local activity signals, not a second feed.</p></div></div>${signals.map(activity).join('')}</aside></div>`;
 }
@@ -709,6 +712,13 @@ function bind(): void {
     state.selectedDemoMarker = null;
     applyTheme();
     window.history.replaceState(null, '', worldUrl(state.worldId, window.location));
+    render();
+  }));
+  document.querySelectorAll<HTMLElement>('[data-demo-interaction]').forEach((element) => element.addEventListener('click', () => {
+    const id = element.dataset.demoInteraction;
+    if (!id || !manyWorldsPreviewEnabled(window.location.search) || state.points !== demoPoints) return;
+    if (state.selectedDemoMarker !== id || !actionForMarker(id)) return;
+    state.demoInteractions = toggleDemoInteraction(state.demoInteractions, id);
     render();
   }));
   document.querySelectorAll<HTMLElement>('[data-close-map-context]').forEach((element) => element.addEventListener('click', () => {
