@@ -70,6 +70,9 @@ jobs:
       - name: MANY WORLDS mobile tools contract
         run: node web/e2e/world-mobile-tools.contract.e2e.mjs
 
+      - name: MANY WORLDS v6 map context contract
+        run: node web/e2e/world-map-context.contract.e2e.mjs
+
       - name: Public demo isolation
         run: |
           PUBLIC_DEMO_ONLY=1 PORT=4182 node web/edge.mjs >/tmp/nexa-demo-edge.log 2>&1 &
