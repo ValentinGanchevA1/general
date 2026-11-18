@@ -25,6 +25,15 @@ assert.equal((html.match(/data-world=/g) ?? []).length, 10);
 assert.match(html, /data-world="bazaar" aria-current="true"/);
 assert.match(html, /NOIR · Preview/);
 
+for (const world of ['nexus','noir','profiler','pathfinder','nocturne','diplomat','architect','bazaar','vanguard','sanctuary']) {
+  const scene = mod.worldSceneMarkup(world);
+  assert.match(scene, /class="world-scene"/);
+  assert.match(scene, new RegExp(world.toUpperCase()));
+  assert.match(scene, /VISUAL CONCEPT · NO WORLD DATA/);
+  assert.ok(mod.WORLD_VISUALS[world].subtitle.length > 12);
+}
+assert.notEqual(mod.worldSceneMarkup('noir'), mod.worldSceneMarkup('sanctuary'));
+
 const location = { href: 'https://example.test/app?foo=bar#map' };
 const url = mod.worldUrl('noir', location);
 assert.equal(url, '/app?foo=bar&manyWorlds=1&world=noir#map');
