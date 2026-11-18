@@ -105,7 +105,7 @@ const SAFE_TAGS = new Set([
   'SECTION', 'SMALL', 'SPAN', 'STRONG',
 ]);
 const SAFE_ATTRIBUTES = new Set([
-  'aria-current', 'aria-hidden', 'aria-label', 'aria-pressed', 'data-world', 'data-world-action',
+  'aria-current', 'aria-hidden', 'aria-label', 'aria-pressed', 'role', 'data-world', 'data-world-action',
   'autocomplete', 'class', 'data-action', 'data-conversation-id', 'data-kind',
   'data-request-id', 'data-tab', 'data-target', 'data-tone', 'data-wave-user-id',
   'disabled', 'id', 'maxlength', 'minlength', 'open', 'placeholder', 'required', 'type',
