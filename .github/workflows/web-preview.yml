@@ -11,6 +11,7 @@ on:
   push:
     branches:
       - master
+      - feature/many-worlds-v3-experiences
     paths:
       - 'web/**'
       - 'packages/shared/**'
