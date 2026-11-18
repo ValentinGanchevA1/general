@@ -15,7 +15,7 @@ test('Compose is a distinct internal, loopback-only project with no inherited pr
   assert.match(compose, /127\.0\.0\.1:\$\{NEXUS_V8_REDIS_PORT:-56388\}:6379/);
   assert.match(compose, /POSTGRES_DB: nexus_v8/);
   assert.match(compose, /POSTGRES_USER: nexus_v8/);
-  assert.match(compose, /\.\.\/\.\.\/docker\/postgres/);
+  assert.match(compose, /image: postgis\/postgis:16-3\.4/);
   assert.match(compose, /redis:7-alpine/);
   assert.match(compose, /--requirepass/);
   assert.match(compose, /no-new-privileges:true/g);
@@ -42,6 +42,7 @@ test('Bootstrap generates independent secret references and refuses replacement'
 test('Smoke is pinned to sandbox services and never invokes migration', () => {
   const code = read('smoke.ps1');
   assert.match(code, /pg_available_extensions/);
+  assert.doesNotMatch(code, /postgresql-16-h3/);
   assert.match(code, /redis-cli ping/);
   assert.match(code, /nexus_v8\/nexus_v8/);
   assert.match(code, /127\.0\.0\.1:55488/);
