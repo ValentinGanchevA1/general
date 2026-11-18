@@ -13,7 +13,7 @@ if (!(Test-Path -LiteralPath $privateFile) -or !(Test-Path -LiteralPath $compose
 $line = Get-Content -LiteralPath $privateFile | Where-Object { $_ -match '^DATABASE_URL=' } | Select-Object -First 1
 if (!$line) { throw 'Missing local DATABASE_URL.' }
 $url = $line.Substring('DATABASE_URL='.Length)
-try { $uri = New-Object System.Uri($url) } catch { throw 'Invalid staging connection URL.' }
+try { $uri = [System.Uri]::new($url) } catch { throw 'Invalid staging connection URL.' }
 $userName = $uri.UserInfo.Split(':')[0]
 if (
   $uri.Scheme -ne 'postgresql' -or
