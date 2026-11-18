@@ -6,7 +6,7 @@ This directory is a **separate disposable sandbox**. Do not run the repository r
 
 | Resource | Sandbox configuration |
 | --- | --- |
-| PostgreSQL + PostGIS + H3 | Existing `docker/postgres/Dockerfile` (PostGIS/PostgreSQL 16 with packaged H3) |
+| PostgreSQL + PostGIS | `postgis/postgis:16-3.4` directly (PostgreSQL 16 with PostGIS) |
 | Redis | `redis:7-alpine`, password-protected, no persistent volume |
 | Compose project | `nexus-v8-local` (dedicated named PostgreSQL volume) |
 | DB host binding | `127.0.0.1:55488` -> container 5432 |
@@ -46,13 +46,13 @@ This refuses to overwrite an existing configuration; keep existing data/secrets 
 
 ```powershell
 docker compose --env-file infra/local-v8/.env.local -f infra/local-v8/compose.yaml config --quiet
-docker compose --env-file infra/local-v8/.env.local -f infra/local-v8/compose.yaml up -d --build --wait
+docker compose --env-file infra/local-v8/.env.local -f infra/local-v8/compose.yaml up -d --wait
 docker compose --env-file infra/local-v8/.env.local -f infra/local-v8/compose.yaml ps
 ```
 
 Only `postgres` and `redis` services should appear under Compose project `nexus-v8-local`. This does **not** start NestJS or run migrations.
 
-The first Postgres build uses the existing repository Dockerfile; downloading and installing the PostGIS/H3 image can take a few minutes.
+The first run downloads the PostGIS image if not cached. The existing root Dockerfile currently relies on a discontinued PGDG apt repository; this sandbox does not use it. NEXUS computes H3 cells in application code; no PostgreSQL `h3` extension is needed for this smoke test.
 
 ## Step 3 — verify isolation and health
 
@@ -60,7 +60,7 @@ The first Postgres build uses the existing repository Dockerfile; downloading an
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\infra\local-v8\smoke.ps1
 ```
 
-Expected: **PASS** for DB identity `nexus_v8/nexus_v8`, PostGIS/H3 availability, Redis `PONG` and loopback-only bindings. The smoke test is read-only and does not install extensions, seed users or run migrations.
+Expected: **PASS** for DB identity `nexus_v8/nexus_v8`, PostGIS availability, Redis `PONG` and loopback-only bindings. The smoke test is read-only and does not install extensions, seed users or run migrations.
 
 For independent container inspection:
 ```powershell
@@ -104,7 +104,7 @@ docker compose --env-file infra/local-v8/.env.local -f infra/local-v8/compose.ya
 ## Success criteria
 
 - Only loopback publishes two nondefault ports; no 0.0.0.0 binding.
-- PostGIS and H3 available on a new, dedicated DB; no production records.
+- PostGIS available on a new, dedicated DB; H3 cells are computed in application code; no production records.
 - Redis authenticated, disposable and connected only to the local network.
 - Stack reproducible on Windows 10 / Docker Desktop, no production secrets copied.
 - Smoke script passes and no migrations or external service deployments were triggered.
