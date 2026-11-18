@@ -44,7 +44,7 @@ services:
 
 networks:
   sandbox:
-    internal: true
+    internal: false
 
 volumes:
   nexus_v8_postgres:
