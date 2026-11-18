@@ -11,3 +11,34 @@
 .world-choice.selected{color:var(--cyan);border-color:var(--cyan);background:var(--cyanSoft)}
 .world-choice:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 @media(max-width:680px){.world-switcher{max-width:calc(100vw - 36px)}.world-choices{max-height:110px;overflow-y:auto}.world-choice{font-size:10px;padding:6px 8px}}
+
+/* MANY WORLDS v2: distinct, purely visual identities for the preview. */
+:root[data-world="nexus"]{--world-primary:#27d3f2;--world-secondary:#7c5cfc;--world-haze:rgba(39,211,242,.17);--world-ink:#081522}
+:root[data-world="noir"]{--world-primary:#f4c773;--world-secondary:#a45167;--world-haze:rgba(244,199,115,.2);--world-ink:#20141a}
+:root[data-world="profiler"]{--world-primary:#4becb6;--world-secondary:#1b8798;--world-haze:rgba(75,236,182,.18);--world-ink:#09241e}
+:root[data-world="pathfinder"]{--world-primary:#ffb05b;--world-secondary:#39a0d0;--world-haze:rgba(255,176,91,.17);--world-ink:#182333}
+:root[data-world="nocturne"]{--world-primary:#bc9dff;--world-secondary:#db599f;--world-haze:rgba(188,157,255,.19);--world-ink:#161129}
+:root[data-world="diplomat"]{--world-primary:#f5ce96;--world-secondary:#47b6b2;--world-haze:rgba(245,206,150,.18);--world-ink:#203031}
+:root[data-world="architect"]{--world-primary:#62dcf5;--world-secondary:#8d94ff;--world-haze:rgba(98,220,245,.18);--world-ink:#0b2635}
+:root[data-world="bazaar"]{--world-primary:#ff996c;--world-secondary:#eac267;--world-haze:rgba(255,153,108,.2);--world-ink:#34201a}
+:root[data-world="vanguard"]{--world-primary:#ff667a;--world-secondary:#e6a143;--world-haze:rgba(255,102,122,.2);--world-ink:#30131e}
+:root[data-world="sanctuary"]{--world-primary:#8bd9a5;--world-secondary:#a8b5ee;--world-haze:rgba(139,217,165,.2);--world-ink:#183329}
+:root[data-world]{--cyan:var(--world-primary);--violet:var(--world-secondary);--cyanSoft:color-mix(in srgb,var(--world-primary) 12%,transparent);--violetSoft:color-mix(in srgb,var(--world-secondary) 12%,transparent)}
+:root[data-world]:not([data-world="nexus"]) .shell>main>header{background:radial-gradient(ellipse at 64% 0%,var(--world-haze),transparent 70%);transition:background .28s ease}
+.world-scene{position:relative;display:flex;align-items:center;gap:16px;max-width:min(800px,85vw);min-height:132px;margin-top:16px;padding:18px 22px;border-radius:22px;overflow:hidden;border:1px solid color-mix(in srgb,var(--world-primary) 45%,transparent);background:radial-gradient(circle at 14% 50%,var(--world-haze),transparent 55%),linear-gradient(115deg,var(--world-ink),color-mix(in srgb,var(--world-ink) 78%,#05070c));box-shadow:0 18px 55px color-mix(in srgb,var(--world-primary) 12%,transparent)}
+.world-scene::after{content:"";position:absolute;width:250px;height:250px;right:-85px;top:-100px;border:1px solid color-mix(in srgb,var(--world-primary) 38%,transparent);border-radius:50%;box-shadow:0 0 0 27px color-mix(in srgb,var(--world-primary) 5%,transparent),0 0 0 56px color-mix(in srgb,var(--world-primary) 4%,transparent);pointer-events:none}
+.world-emblem{flex:none;display:grid;place-items:center;width:74px;height:74px;border:1px solid color-mix(in srgb,var(--world-primary) 65%,transparent);border-radius:22px;font-size:45px;color:var(--world-primary);background:color-mix(in srgb,var(--world-primary) 9%,transparent);text-shadow:0 0 18px var(--world-primary);z-index:1}
+.world-scene-copy{position:relative;z-index:1;min-width:0}.world-scene-copy small{color:var(--world-primary);font-size:10px;font-weight:800;letter-spacing:.15em}.world-scene-copy h2{margin:3px 0;font-size:clamp(21px,3vw,35px);line-height:1.05;letter-spacing:.09em;color:#fff}.world-scene-copy p{color:#d2d7e0!important;font-size:12px;margin:5px 0 0!important}.world-preview-status{position:absolute;bottom:9px;right:12px;color:#abb4c4;font-size:8px;font-weight:700;letter-spacing:.06em;z-index:1}
+:root[data-world="noir"] .world-scene{background:radial-gradient(ellipse at 20% 120%,#5b3238 0%,transparent 65%),linear-gradient(120deg,#140d10,#252022)}
+:root[data-world="profiler"] .world-scene{background:repeating-linear-gradient(90deg,transparent 0 37px,rgba(75,236,182,.045) 38px 39px),linear-gradient(125deg,#061c1b,#112d30)}
+:root[data-world="pathfinder"] .world-scene{background:linear-gradient(25deg,transparent 49%,rgba(255,176,91,.11) 50%,transparent 51%),linear-gradient(125deg,#1b242b,#37301d)}
+:root[data-world="nocturne"] .world-scene{background:radial-gradient(ellipse at 80% 120%,#6a265c 0%,transparent 55%),linear-gradient(120deg,#100d25,#2a1740)}
+:root[data-world="diplomat"] .world-scene{background:radial-gradient(circle at 90% 20%,#275a5b 0%,transparent 55%),linear-gradient(120deg,#25302d,#343023)}
+:root[data-world="architect"] .world-scene{background:repeating-linear-gradient(0deg,transparent 0 25px,rgba(98,220,245,.07) 26px 27px),repeating-linear-gradient(90deg,transparent 0 25px,rgba(98,220,245,.05) 26px 27px),#0c2230}
+:root[data-world="bazaar"] .world-scene{background:radial-gradient(ellipse at 5% 110%,#713d25 0%,transparent 70%),linear-gradient(120deg,#2c1917,#443020)}
+:root[data-world="vanguard"] .world-scene{background:linear-gradient(150deg,transparent 47%,rgba(255,102,122,.13) 48% 50%,transparent 51%),linear-gradient(120deg,#26121a,#3c1820)}
+:root[data-world="sanctuary"] .world-scene{background:radial-gradient(circle at 90% 40%,#31554d 0%,transparent 65%),linear-gradient(120deg,#142723,#243734)}
+:root[data-world]:not([data-world="nexus"]) .map-card{border-color:color-mix(in srgb,var(--world-primary) 26%,transparent)}
+:root[data-world]:not([data-world="nexus"]) .map{box-shadow:inset 0 0 70px var(--world-haze)}
+:root[data-world]:not([data-world="nexus"]) .world-choice.selected{background:var(--cyanSoft);color:var(--world-primary);border-color:var(--world-primary)}
+@media(max-width:760px){.world-scene{max-width:calc(100vw - 36px);min-height:114px;padding:14px 12px;gap:11px}.world-emblem{width:54px;height:54px;font-size:35px;border-radius:16px}.world-scene-copy h2{font-size:22px}.world-scene-copy p{font-size:10px}.world-preview-status{font-size:7px}.world-choices{max-height:none;overflow-x:auto;flex-wrap:nowrap;padding-bottom:5px}.world-choice{flex:none}}
