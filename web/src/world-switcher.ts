@@ -1,4 +1,4 @@
-import { WORLD_DEFINITIONS, WORLD_IDS, type WorldId } from '../../../packages/shared/src/worlds';
+import { WORLD_DEFINITIONS, WORLD_IDS, type WorldId } from '../../packages/shared/src/worlds';
 
 const WORLD_FLAG = 'manyWorlds';
 const WORLD_QUERY = 'world';
