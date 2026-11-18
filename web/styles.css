@@ -138,7 +138,10 @@
   .shell:has(.world-switcher) .world-scene{display:none}
   .shell:has(.world-switcher) .header-actions{display:none}
   .shell:has(.world-switcher) .content{display:flex;flex-direction:column;min-width:0;padding:10px 10px calc(84px + env(safe-area-inset-bottom))}
-  .shell:has(.world-switcher) .content>.map-layout,\n  .shell:has(.world-switcher) .content>.connections,\n  .shell:has(.world-switcher) .content>.you,\n  .shell:has(.world-switcher) .content>.you-empty{order:-2;margin-bottom:12px;min-width:0}
+  .shell:has(.world-switcher) .content>.map-layout,
+  .shell:has(.world-switcher) .content>.connections,
+  .shell:has(.world-switcher) .content>.you,
+  .shell:has(.world-switcher) .content>.you-empty{order:-2;margin-bottom:12px;min-width:0}
   .shell:has(.world-switcher) .content>.world-experience{order:0}
   .shell:has(.world-switcher) .content>.world-stage{order:1}
   .shell:has(.world-switcher) .map-card,.shell:has(.world-switcher) .panel{min-width:0}
