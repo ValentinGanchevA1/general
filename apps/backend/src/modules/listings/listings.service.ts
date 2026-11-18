@@ -556,10 +556,20 @@ await qr.query(
           message: 'You cannot respond to this offer.',
         });
       }
-      await qr.query(
-        `UPDATE trade_offers SET status = $2, updated_at = NOW() WHERE id = $1`,
+      const changed = (await qr.query(
+        `UPDATE trade_offers
+            SET status = $2, updated_at = NOW()
+          WHERE id = $1 AND status = 'pending'
+        RETURNING id`,
         [offerId, status],
-      );
+      )) as [Array<{ id: string }>, number];
+
+      if (!Array.isArray(changed[0]) || changed[0].length !== 1) {
+        throw new ConflictException({
+          code: 'offer.not_pending',
+          message: 'Only pending offers can be accepted or declined.',
+        });
+      }
       if (status === 'accepted') {
         const soldResult = (await qr.query(
           `UPDATE listings

@@ -376,7 +376,7 @@ describe('ListingsService', () => {
           listing_id: 'l1', buyer_id: 'b1', seller_id: 's1',
           offer_status: 'pending', listing_status: 'active', last_actor: 'buyer',
            }], // Lock offer and validate authorization
-        [], // UPDATE this offer -> accepted
+        [[{ id: 'o1' }], 1], // UPDATE offer RETURNING id
         [[{ id: 'l1' }], 1], // UPDATE listings -> sold RETURNING id
         [], // UPDATE other pending offers -> declined
       ]);
@@ -411,7 +411,7 @@ describe('ListingsService', () => {
           listing_id: 'l1', buyer_id: 'b1', seller_id: 's1',
           offer_status: 'pending', listing_status: 'active', last_actor: 'buyer',
         }],
-        [], // UPDATE trade_offers -> accepted
+        [[{ id: 'o1' }], 1], // UPDATE offer RETURNING id
         [[], 0], // Conditional UPDATE listings returns no rows
       ]);
       createQueryRunner.mockReturnValue(runner);
@@ -423,6 +423,29 @@ describe('ListingsService', () => {
       expect(qrq).toHaveBeenCalledTimes(5);
       expect(String(qrq.mock.calls[4]![0])).toContain("status = 'active'");
       expect(String(qrq.mock.calls[4]![0])).toContain('RETURNING id');
+      expect(runner.rollbackTransaction).toHaveBeenCalled();
+      expect(runner.commitTransaction).not.toHaveBeenCalled();
+    });
+
+    it('rolls back when conditional offer update affects zero rows', async () => {
+      const { runner, query: qrq } = makeQueryRunner([
+        [{ listing_id: 'l1' }],
+        [{ id: 'l1' }],
+        [{
+          listing_id: 'l1', buyer_id: 'b1', seller_id: 's1',
+          offer_status: 'pending', listing_status: 'active', last_actor: 'buyer',
+        }],
+        [[], 0],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+
+      await expect(
+        service.respondToOffer('s1', 'o1', 'accepted'),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(qrq).toHaveBeenCalledTimes(4);
+      expect(String(qrq.mock.calls[3]![0])).toContain("status = 'pending'");
+      expect(String(qrq.mock.calls[3]![0])).toContain('RETURNING id');
       expect(runner.rollbackTransaction).toHaveBeenCalled();
       expect(runner.commitTransaction).not.toHaveBeenCalled();
     });

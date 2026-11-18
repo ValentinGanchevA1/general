@@ -2,6 +2,12 @@ name: Marketplace concurrency manual pilot
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/marketplace-concurrency.yml'
+      - 'apps/backend/src/modules/listings/**'
 
 permissions:
   contents: read
