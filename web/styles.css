@@ -134,11 +134,11 @@
   .shell:has(.world-switcher) .world-switcher{max-width:100%;width:100%;margin-top:8px;min-width:0}
   .shell:has(.world-switcher) .world-switcher strong{font-size:9px}
   .shell:has(.world-switcher) .world-choices{position:relative;display:flex;flex-wrap:nowrap;max-height:none;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:thin;-webkit-overflow-scrolling:touch;gap:7px;padding:5px 3px 9px;touch-action:pan-x}
-  .shell:has(.world-switcher) .world-choice{flex:0 0 auto;min-height:36px;display:grid;place-items:center;white-space:nowrap;scroll-snap-align:center;font-size:11px;padding:7px 11px}
+  .shell:has(.world-switcher) .world-choice{flex:0 0 auto;min-height:44px;display:grid;place-items:center;white-space:nowrap;scroll-snap-align:center;font-size:11px;padding:7px 11px}
   .shell:has(.world-switcher) .world-scene{display:none}
   .shell:has(.world-switcher) .header-actions{display:none}
   .shell:has(.world-switcher) .content{display:flex;flex-direction:column;min-width:0;padding:10px 10px calc(84px + env(safe-area-inset-bottom))}
-  .shell:has(.world-switcher) .content>.map-layout{order:-2;margin-bottom:12px;min-width:0}
+  .shell:has(.world-switcher) .content>.map-layout,\n  .shell:has(.world-switcher) .content>.connections,\n  .shell:has(.world-switcher) .content>.you,\n  .shell:has(.world-switcher) .content>.you-empty{order:-2;margin-bottom:12px;min-width:0}
   .shell:has(.world-switcher) .content>.world-experience{order:0}
   .shell:has(.world-switcher) .content>.world-stage{order:1}
   .shell:has(.world-switcher) .map-card,.shell:has(.world-switcher) .panel{min-width:0}
