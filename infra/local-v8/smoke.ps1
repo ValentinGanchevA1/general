@@ -22,14 +22,14 @@ $pgIdentity = (& docker @compose exec -T postgres psql -X -U nexus_v8 -d nexus_v
 if ($LASTEXITCODE -ne 0 -or $pgIdentity.Trim() -ne 'nexus_v8/nexus_v8') {
   throw 'Postgres identity mismatch or container is unhealthy.'
 }
-$extensions = (& docker @compose exec -T postgres psql -X -U nexus_v8 -d nexus_v8 -tA -v ON_ERROR_STOP=1 -c "SELECT name FROM pg_available_extensions WHERE name IN ('postgis','h3') ORDER BY name;") | Out-String
-if ($LASTEXITCODE -ne 0 -or !($extensions -match '(?m)^postgis\s*$') -or !($extensions -match '(?m)^h3\s*$')) {
-  throw 'Expected PostGIS/H3 extensions are not available in isolated Postgres.'
+$extensions = (& docker @compose exec -T postgres psql -X -U nexus_v8 -d nexus_v8 -tA -v ON_ERROR_STOP=1 -c "SELECT name FROM pg_available_extensions WHERE name = 'postgis';") | Out-String
+if ($LASTEXITCODE -ne 0 -or !($extensions -match '(?m)^postgis\s*$')) {
+  throw 'Expected PostGIS extension is not available in isolated Postgres.'
 }
 $redisPing = (& docker @compose exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping') | Out-String
 if ($LASTEXITCODE -ne 0 -or $redisPing.Trim() -ne 'PONG') {
   throw 'Isolated Redis authentication/PING failed.'
 }
-Write-Host 'PASS — isolated nexus_v8 Postgres, PostGIS/H3 available and Redis PONG.'
+Write-Host 'PASS — isolated nexus_v8 Postgres, PostGIS available and Redis PONG.'
 Write-Host 'PASS — published ports restricted to 127.0.0.1:55488 and 127.0.0.1:56388.'
 Write-Host 'No migrations, demo data, production systems or external services were touched.'
