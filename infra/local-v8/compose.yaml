@@ -1,0 +1,53 @@
+# NEXUS v8 — LOCAL-ONLY sandbox. Independent of root docker-compose.yml.
+name: nexus-v8-local
+
+services:
+  postgres:
+    build:
+      context: ../../docker/postgres
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_USER: nexus_v8
+      POSTGRES_PASSWORD: ${NEXUS_V8_POSTGRES_PASSWORD:?Run bootstrap.ps1 first}
+      POSTGRES_DB: nexus_v8
+    ports:
+      - "127.0.0.1:${NEXUS_V8_POSTGRES_PORT:-55488}:5432"
+    volumes:
+      - nexus_v8_postgres:/var/lib/postgresql/data
+    networks:
+      - sandbox
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus_v8 -d nexus_v8"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: ${NEXUS_V8_REDIS_PASSWORD:?Run bootstrap.ps1 first}
+    # The only exposure is a loopback-bound local port; no production network.
+    command: ["sh", "-c", "exec redis-server --save '' --appendonly no --requirepass \"$$REDIS_PASSWORD\""]
+    ports:
+      - "127.0.0.1:${NEXUS_V8_REDIS_PORT:-56388}:6379"
+    networks:
+      - sandbox
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -qx PONG"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  sandbox:
+    internal: false
+
+volumes:
+  nexus_v8_postgres:
+  # Redis is intentionally ephemeral and retains no users, tokens or cache on stop.
