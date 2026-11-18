@@ -86,3 +86,4 @@ export * from './eventReview';
 export * from './contentReport';
 
 export * from './passwordReset';
+export * from './worlds';
