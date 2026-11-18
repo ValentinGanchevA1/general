@@ -15,6 +15,7 @@ import { WebRealtimeClient } from './realtime';
 import { manyWorldsPreviewEnabled, worldFromSearch, worldPickerMarkup, worldSceneMarkup, worldUrl } from './world-switcher';
 import { WORLD_DEFINITIONS, WORLD_IDS, type WorldId } from '../../packages/shared/src/worlds';
 import { worldExperienceMarkup } from './world-experience';
+import { worldStageMarkup } from './world-workspaces';
 import {
   broadcastSessionChanged,
   onRemoteSessionChanged,
@@ -537,7 +538,7 @@ function shell(): string {
     ? `<div class="toast">${escapeHtml(state.notice)}</div>`
     : '';
 
-  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXUS</b></button><nav>${tabs}</nav><div class="rail-foot"><button id="theme">${THEME_ICONS[state.theme]}</button>${accountControl}</div></aside><main><header>${topbar()}</header><section class="content">${manyWorldsPreviewEnabled(window.location.search) ? worldExperienceMarkup(state.worldId, state.worldAction ?? undefined) : ''}${view()}</section></main><nav class="mobile-nav">${tabs}</nav>${notice}${authPanel()}</div>`;
+  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXUS</b></button><nav>${tabs}</nav><div class="rail-foot"><button id="theme">${THEME_ICONS[state.theme]}</button>${accountControl}</div></aside><main><header>${topbar()}</header><section class="content">${manyWorldsPreviewEnabled(window.location.search) ? worldExperienceMarkup(state.worldId, state.worldAction ?? undefined) + worldStageMarkup(state.worldId, state.worldAction ?? undefined) : ''}${view()}</section></main><nav class="mobile-nav">${tabs}</nav>${notice}${authPanel()}</div>`;
 }
 function topbar(): string {
   const copy: Record<Tab, [string,string]> = {
@@ -795,6 +796,13 @@ function render(): void {
   if (preservedMap && isSpatialTab(state.tab)) {
     const placeholder = root.querySelector<HTMLElement>('#nexa-map');
     if (placeholder && placeholder !== preservedMap) placeholder.replaceWith(preservedMap);
+  }
+
+  // Re-center the active choice in the horizontal mobile world picker.
+  const picker = root.querySelector<HTMLElement>('.world-choices');
+  const selected = picker?.querySelector<HTMLElement>('.world-choice.selected');
+  if (picker && selected && window.matchMedia('(max-width: 760px)').matches) {
+    picker.scrollLeft = Math.max(0, selected.offsetLeft - (picker.clientWidth - selected.clientWidth) / 2);
   }
 
   bind();
