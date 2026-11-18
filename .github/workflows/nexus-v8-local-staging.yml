@@ -29,7 +29,7 @@ jobs:
         run: docker compose --env-file infra/local-v8/.env.local -f infra/local-v8/compose.yaml config --quiet
 
       - name: Boot isolated PostGIS and Redis
-        run: docker compose --env-file infra/local-v8/.env.local -f infra/local-v8/compose.yaml up -d --build --wait
+        run: docker compose --env-file infra/local-v8/.env.local -f infra/local-v8/compose.yaml up -d --wait
 
       - name: Execute local-only PowerShell smoke tests
         run: pwsh -NoProfile -File infra/local-v8/smoke.ps1
