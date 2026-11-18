@@ -217,3 +217,15 @@
 .world-map-context footer{font-size:9px;letter-spacing:.09em;font-weight:800;color:var(--world-primary);margin-top:10px}
 .world-map-context-close:focus-visible{outline:2px solid var(--world-primary);outline-offset:2px}
 @media(max-width:760px){.world-map-context{padding:10px 12px}.world-map-context h3{font-size:18px}.world-map-context-lens small{font-size:10px}}
+
+/* v7: local-only simulated interactions for fictional demo markers. */
+.world-demo-interaction{padding:13px 17px 16px;background:color-mix(in srgb,var(--world-primary) 4%,var(--surface));border-top:1px solid color-mix(in srgb,var(--world-primary) 24%,var(--border))}
+.demo-interaction-status{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.demo-interaction-status strong{font-size:10px;letter-spacing:.11em;color:var(--world-primary)}
+.demo-interaction-status span{font-size:9px;color:var(--muted);font-weight:750;letter-spacing:.08em}
+.world-demo-interaction-button{display:block;width:100%;min-height:46px;border:1px solid var(--world-primary);border-radius:12px;background:color-mix(in srgb,var(--world-primary) 18%,var(--surface));color:var(--text);font-size:13px;font-weight:800;cursor:pointer}
+.world-demo-interaction-button[aria-pressed="true"]{background:color-mix(in srgb,var(--world-primary) 32%,var(--surface))}
+.world-demo-interaction-button:focus-visible{outline:2px solid var(--world-primary);outline-offset:3px}
+.world-demo-interaction p{font-size:12px;line-height:1.5;margin:9px 0;color:var(--muted)}
+.world-demo-interaction small{display:block;color:var(--world-primary);font-size:9px;letter-spacing:.07em;font-weight:850}
+@media(max-width:760px){.world-demo-interaction{padding:10px 12px 13px}}
