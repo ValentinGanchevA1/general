@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { build } from 'esbuild';
 
 await build({
@@ -14,3 +15,17 @@ await build({
   // for apps/admin and bundle it into the web artifact at build time.
   nodePaths: ['apps/admin/node_modules'],
 });
+
+/**
+ * Fail closed on the public demo Render service when GitHub Actions results
+ * are delayed or unavailable. This does not change ordinary web builds.
+ */
+if (process.env.PUBLIC_DEMO_ONLY === '1') {
+  for (const test of [
+    'web/e2e/world-switcher.contract.e2e.mjs',
+    'web/e2e/world-experience.contract.e2e.mjs',
+    'web/e2e/world-responsive.contract.e2e.mjs',
+  ]) {
+    execFileSync(process.execPath, [test], { stdio: 'inherit' });
+  }
+}
