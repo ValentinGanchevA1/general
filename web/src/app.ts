@@ -14,6 +14,7 @@ import { mountNexaMap, type MapCamera, type MapViewport } from './map';
 import { WebRealtimeClient } from './realtime';
 import { manyWorldsPreviewEnabled, worldFromSearch, worldPickerMarkup, worldSceneMarkup, worldUrl } from './world-switcher';
 import { WORLD_DEFINITIONS, WORLD_IDS, type WorldId } from '../../packages/shared/src/worlds';
+import { worldExperienceMarkup } from './world-experience';
 import {
   broadcastSessionChanged,
   onRemoteSessionChanged,
@@ -46,6 +47,7 @@ type ApiPath =
 interface State {
   tab: Tab;
   worldId: WorldId;
+  worldAction: string | null;
   theme: ThemePreference;
   user: AuthenticatedUser | null;
   points: DiscoveryPoint[];
@@ -103,7 +105,7 @@ const SAFE_TAGS = new Set([
   'SECTION', 'SMALL', 'SPAN', 'STRONG',
 ]);
 const SAFE_ATTRIBUTES = new Set([
-  'aria-current', 'aria-hidden', 'aria-label', 'data-world',
+  'aria-current', 'aria-hidden', 'aria-label', 'aria-pressed', 'data-world', 'data-world-action',
   'autocomplete', 'class', 'data-action', 'data-conversation-id', 'data-kind',
   'data-request-id', 'data-tab', 'data-target', 'data-tone', 'data-wave-user-id',
   'disabled', 'id', 'maxlength', 'minlength', 'open', 'placeholder', 'required', 'type',
@@ -126,6 +128,7 @@ const demoFeed: ActivityItem[] = [
 const state: State = {
   tab: 'map',
   worldId: worldFromSearch(window.location.search),
+  worldAction: null,
   theme: readTheme(),
   user: null,
   points: demoPoints,
@@ -534,7 +537,7 @@ function shell(): string {
     ? `<div class="toast">${escapeHtml(state.notice)}</div>`
     : '';
 
-  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXUS</b></button><nav>${tabs}</nav><div class="rail-foot"><button id="theme">${THEME_ICONS[state.theme]}</button>${accountControl}</div></aside><main><header>${topbar()}</header><section class="content">${view()}</section></main><nav class="mobile-nav">${tabs}</nav>${notice}${authPanel()}</div>`;
+  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXUS</b></button><nav>${tabs}</nav><div class="rail-foot"><button id="theme">${THEME_ICONS[state.theme]}</button>${accountControl}</div></aside><main><header>${topbar()}</header><section class="content">${manyWorldsPreviewEnabled(window.location.search) ? worldExperienceMarkup(state.worldId, state.worldAction ?? undefined) : ''}${view()}</section></main><nav class="mobile-nav">${tabs}</nav>${notice}${authPanel()}</div>`;
 }
 function topbar(): string {
   const copy: Record<Tab, [string,string]> = {
@@ -691,8 +694,15 @@ function bind(): void {
     const id = element.dataset.world;
     if (!manyWorldsPreviewEnabled(window.location.search) || !WORLD_IDS.some((world) => world === id)) return;
     state.worldId = id as WorldId;
+    state.worldAction = null;
     applyTheme();
     window.history.replaceState(null, '', worldUrl(state.worldId, window.location));
+    render();
+  }));
+  document.querySelectorAll<HTMLElement>('[data-world-action]').forEach((element) => element.addEventListener('click', () => {
+    const action = element.dataset.worldAction;
+    if (!manyWorldsPreviewEnabled(window.location.search) || !action) return;
+    state.worldAction = action;
     render();
   }));
   document.querySelectorAll<HTMLElement>('[data-tab]').forEach((element) => element.addEventListener('click', () => {
