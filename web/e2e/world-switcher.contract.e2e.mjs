@@ -37,4 +37,26 @@ assert.notEqual(mod.worldSceneMarkup('noir'), mod.worldSceneMarkup('sanctuary'))
 const location = { href: 'https://example.test/app?foo=bar#map' };
 const url = mod.worldUrl('noir', location);
 assert.equal(url, '/app?foo=bar&manyWorlds=1&world=noir#map');
-console.log('MANY WORLDS switcher contracts: PASS');
+
+const experienceBundle = await build({
+  entryPoints: ['web/src/world-experience.ts'],
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  target: 'node22',
+  write: false,
+});
+const experienceSource = experienceBundle.outputFiles?.[0]?.text;
+assert.ok(experienceSource, 'Bundled experience source missing');
+const experience = await import(`data:text/javascript;base64,${Buffer.from(experienceSource).toString('base64')}`);
+assert.equal(new Set(experience.WORLD_LAYOUTS).size, 10, 'Every world needs a distinct layout');
+for (const id of ['nexus','noir','profiler','pathfinder','nocturne','diplomat','architect','bazaar','vanguard','sanctuary']) {
+  const initial = experience.worldExperienceMarkup(id, 0);
+  const next = experience.worldExperienceMarkup(id, 1);
+  assert.match(initial, /class="world-workspace world-layout-/);
+  assert.equal((initial.match(/data-world-focus=/g) ?? []).length, 3);
+  assert.match(initial, /ILLUSTRATIVE CONTENT · NOT LIVE DATA/);
+  assert.notEqual(initial, next, `${id} must change content on interaction`);
+  assert.equal(experience.worldExperienceMarkup(id, 99), initial, 'Invalid focus resets to first scene');
+}
+console.log('MANY WORLDS switcher and experiences: PASS');
