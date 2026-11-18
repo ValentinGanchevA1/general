@@ -14,8 +14,9 @@ import { mountNexaMap, type MapCamera, type MapViewport } from './map';
 import { WebRealtimeClient } from './realtime';
 import { manyWorldsPreviewEnabled, worldFromSearch, worldPickerMarkup, worldSceneMarkup, worldUrl } from './world-switcher';
 import { WORLD_DEFINITIONS, WORLD_IDS, type WorldId } from '../../packages/shared/src/worlds';
-import { worldExperienceMarkup } from './world-experience';
+import { WORLD_EXPERIENCES, worldExperienceMarkup } from './world-experience';
 import { worldStageMarkup } from './world-workspaces';
+import { worldMobileDockMarkup, worldMobileSheetMarkup } from './world-mobile-tools';
 import {
   broadcastSessionChanged,
   onRemoteSessionChanged,
@@ -49,6 +50,7 @@ interface State {
   tab: Tab;
   worldId: WorldId;
   worldAction: string | null;
+  mobileSheetOpen: boolean;
   theme: ThemePreference;
   user: AuthenticatedUser | null;
   points: DiscoveryPoint[];
@@ -106,7 +108,7 @@ const SAFE_TAGS = new Set([
   'SECTION', 'SMALL', 'SPAN', 'STRONG',
 ]);
 const SAFE_ATTRIBUTES = new Set([
-  'aria-current', 'aria-hidden', 'aria-label', 'aria-pressed', 'role', 'data-world', 'data-world-action',
+  'aria-current', 'aria-hidden', 'aria-label', 'aria-pressed', 'aria-modal', 'role', 'data-world', 'data-world-action', 'data-mobile-action', 'data-close-world-sheet',
   'autocomplete', 'class', 'data-action', 'data-conversation-id', 'data-kind',
   'data-request-id', 'data-tab', 'data-target', 'data-tone', 'data-wave-user-id',
   'disabled', 'id', 'maxlength', 'minlength', 'open', 'placeholder', 'required', 'type',
@@ -130,6 +132,7 @@ const state: State = {
   tab: 'map',
   worldId: worldFromSearch(window.location.search),
   worldAction: null,
+  mobileSheetOpen: false,
   theme: readTheme(),
   user: null,
   points: demoPoints,
@@ -538,7 +541,7 @@ function shell(): string {
     ? `<div class="toast">${escapeHtml(state.notice)}</div>`
     : '';
 
-  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXUS</b></button><nav>${tabs}</nav><div class="rail-foot"><button id="theme">${THEME_ICONS[state.theme]}</button>${accountControl}</div></aside><main><header>${topbar()}</header><section class="content">${manyWorldsPreviewEnabled(window.location.search) ? worldExperienceMarkup(state.worldId, state.worldAction ?? undefined) + worldStageMarkup(state.worldId, state.worldAction ?? undefined) : ''}${view()}</section></main><nav class="mobile-nav">${tabs}</nav>${notice}${authPanel()}</div>`;
+  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXUS</b></button><nav>${tabs}</nav><div class="rail-foot"><button id="theme">${THEME_ICONS[state.theme]}</button>${accountControl}</div></aside><main><header>${topbar()}</header><section class="content">${manyWorldsPreviewEnabled(window.location.search) ? worldExperienceMarkup(state.worldId, state.worldAction ?? undefined) + worldStageMarkup(state.worldId, state.worldAction ?? undefined) : ''}${view()}</section></main><nav class="mobile-nav">${tabs}</nav>${manyWorldsPreviewEnabled(window.location.search) ? worldMobileDockMarkup(state.worldId, state.worldAction) + (state.mobileSheetOpen ? worldMobileSheetMarkup(state.worldId, state.worldAction) : '') : ''}${notice}${authPanel()}</div>`;
 }
 function topbar(): string {
   const copy: Record<Tab, [string,string]> = {
@@ -696,6 +699,7 @@ function bind(): void {
     if (!manyWorldsPreviewEnabled(window.location.search) || !WORLD_IDS.some((world) => world === id)) return;
     state.worldId = id as WorldId;
     state.worldAction = null;
+    state.mobileSheetOpen = false;
     applyTheme();
     window.history.replaceState(null, '', worldUrl(state.worldId, window.location));
     render();
@@ -706,9 +710,22 @@ function bind(): void {
     state.worldAction = action;
     render();
   }));
+  document.querySelectorAll<HTMLElement>('[data-mobile-action]').forEach((element) => element.addEventListener('click', () => {
+    const id = element.dataset.mobileAction;
+    if (!manyWorldsPreviewEnabled(window.location.search) || !id) return;
+    const valid = WORLD_EXPERIENCES[state.worldId].actions.some((action) => action.id === id);
+    if (!valid) return;
+    state.worldAction = id;
+    state.mobileSheetOpen = true;
+    render();
+    root.querySelector<HTMLButtonElement>('#world-sheet-close')?.focus();
+  }));
+  document.querySelectorAll<HTMLElement>('[data-close-world-sheet]').forEach((element) => element.addEventListener('click', () => {
+    closeWorldSheet();
+  }));
   document.querySelectorAll<HTMLElement>('[data-tab]').forEach((element) => element.addEventListener('click', () => {
     const tab = element.dataset.tab as Tab | undefined;
-    if (tab) switchTab(tab);
+    if (tab) { state.mobileSheetOpen = false; switchTab(tab); }
   }));
   document.querySelectorAll<HTMLElement>('[data-target]').forEach((element) => element.addEventListener('click', () => {
     const tab = element.dataset.target as Tab | undefined;
@@ -786,6 +803,13 @@ function bind(): void {
   const messageList = document.querySelector<HTMLElement>('#message-list');
   if (messageList) messageList.scrollTop = messageList.scrollHeight;
 }
+function closeWorldSheet(): void {
+  if (!state.mobileSheetOpen) return;
+  state.mobileSheetOpen = false;
+  render();
+  root.querySelector<HTMLElement>('.world-mobile-dock .world-dock-action.is-active')?.focus();
+}
+
 function render(): void {
   const preservedMap = isSpatialTab(state.tab)
     ? root.querySelector<HTMLElement>('#nexa-map')
@@ -807,6 +831,19 @@ function render(): void {
 
   bind();
 }
+
+document.addEventListener('keydown', (event) => {
+  if (!state.mobileSheetOpen) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeWorldSheet();
+    return;
+  }
+  if (event.key === 'Tab') {
+    const closeButton = root.querySelector<HTMLButtonElement>('#world-sheet-close');
+    if (closeButton) { event.preventDefault(); closeButton.focus(); }
+  }
+});
 
 onRemoteSessionChanged(() => {
   window.location.reload();
