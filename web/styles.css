@@ -2,3 +2,12 @@
 
 /* NEXA v3: all three spatial destinations share one live map without a new feed shell. */
 .nav{min-width:0;padding-inline:2px}.nav small{font-size:clamp(8px,.8vw,10px);max-width:100%;line-height:1.2;letter-spacing:-.02em;overflow-wrap:anywhere;text-align:center}.mobile-nav .nav{min-width:0;padding-inline:1px}.mobile-nav .nav small{font-size:clamp(7px,1.9vw,10px);overflow-wrap:normal;letter-spacing:-.045em}.map-layout .panel .activity{margin-top:9px}.map-layout .panel .activity h2{font-size:14px}.map-layout .panel .activity>p{font-size:12px}.map-layout .panel .activity footer{display:none}@media(max-width:370px){.mobile-nav .nav small{font-size:7.5px}.mobile-nav .nav>span{font-size:18px}}
+
+/* MANY WORLDS is an opt-in visual preview (?manyWorlds=1), not live world discovery. */
+.world-switcher{margin-top:14px;max-width:min(800px,85vw)}
+.world-switcher strong{font-size:10px;letter-spacing:.13em;color:var(--muted)}
+.world-choices{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.world-choice{font-size:11px;border:1px solid var(--border);border-radius:999px;background:var(--surface2);color:var(--muted);padding:7px 10px}
+.world-choice.selected{color:var(--cyan);border-color:var(--cyan);background:var(--cyanSoft)}
+.world-choice:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+@media(max-width:680px){.world-switcher{max-width:calc(100vw - 36px)}.world-choices{max-height:110px;overflow-y:auto}.world-choice{font-size:10px;padding:6px 8px}}

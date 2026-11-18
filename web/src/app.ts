@@ -12,6 +12,8 @@ import type { InboxItem, InboxResponse } from '../../packages/shared/src/friends
 import type { ChatMessageEvent, FriendPresenceEvent } from '../../packages/shared/src/events';
 import { mountNexaMap, type MapCamera, type MapViewport } from './map';
 import { WebRealtimeClient } from './realtime';
+import { manyWorldsPreviewEnabled, worldFromSearch, worldPickerMarkup, worldUrl } from './world-switcher';
+import { WORLD_DEFINITIONS, WORLD_IDS, type WorldId } from '../../packages/shared/src/worlds';
 import {
   broadcastSessionChanged,
   onRemoteSessionChanged,
@@ -43,6 +45,7 @@ type ApiPath =
 
 interface State {
   tab: Tab;
+  worldId: WorldId;
   theme: ThemePreference;
   user: AuthenticatedUser | null;
   points: DiscoveryPoint[];
@@ -100,7 +103,7 @@ const SAFE_TAGS = new Set([
   'SECTION', 'SMALL', 'SPAN', 'STRONG',
 ]);
 const SAFE_ATTRIBUTES = new Set([
-  'aria-current', 'aria-hidden', 'aria-label',
+  'aria-current', 'aria-hidden', 'aria-label', 'data-world',
   'autocomplete', 'class', 'data-action', 'data-conversation-id', 'data-kind',
   'data-request-id', 'data-tab', 'data-target', 'data-tone', 'data-wave-user-id',
   'disabled', 'id', 'maxlength', 'minlength', 'open', 'placeholder', 'required', 'type',
@@ -122,6 +125,7 @@ const demoFeed: ActivityItem[] = [
 
 const state: State = {
   tab: 'map',
+  worldId: worldFromSearch(window.location.search),
   theme: readTheme(),
   user: null,
   points: demoPoints,
@@ -543,7 +547,13 @@ function topbar(): string {
   const liveLabel = state.tab === 'connections' && state.user
     ? (state.realtimeConnected ? 'Realtime live' : 'Realtime offline')
     : (state.user ? 'Live backend' : 'Demo mode');
-  return `<div><p class="eyebrow">NEXUS / ${title.toUpperCase()}</p><h1>${title}</h1><p>${subtitle}</p></div><div class="header-actions"><span class="mode"><i></i>${liveLabel}</span>${state.user ? '<button id="refresh">Refresh</button>' : '<button class="primary" id="auth-top">Connect backend</button>'}</div>`;
+  const worldPreview = manyWorldsPreviewEnabled(window.location.search)
+    ? worldPickerMarkup(state.worldId)
+    : '';
+  const previewLabel = state.worldId !== 'nexus'
+    ? ` · ${WORLD_DEFINITIONS[state.worldId].displayName} visual preview (core data unchanged)`
+    : '';
+  return `<div><p class="eyebrow">NEXUS / ${title.toUpperCase()}</p><h1>${title}</h1><p>${subtitle}${previewLabel}</p>${worldPreview}</div><div class="header-actions"><span class="mode"><i></i>${liveLabel}</span>${state.user ? '<button id="refresh">Refresh</button>' : '<button class="primary" id="auth-top">Connect backend</button>'}</div>`;
 }
 function view(): string {
   if (isSpatialTab(state.tab)) return mapView();
@@ -676,6 +686,13 @@ function safeFragment(html: string): DocumentFragment {
 }
 
 function bind(): void {
+  document.querySelectorAll<HTMLElement>('[data-world]').forEach((element) => element.addEventListener('click', () => {
+    const id = element.dataset.world;
+    if (!manyWorldsPreviewEnabled(window.location.search) || !WORLD_IDS.some((world) => world === id)) return;
+    state.worldId = id as WorldId;
+    window.history.replaceState(null, '', worldUrl(state.worldId, window.location));
+    render();
+  }));
   document.querySelectorAll<HTMLElement>('[data-tab]').forEach((element) => element.addEventListener('click', () => {
     const tab = element.dataset.tab as Tab | undefined;
     if (tab) switchTab(tab);
