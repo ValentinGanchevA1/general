@@ -114,7 +114,9 @@ async function bootstrap(): Promise<void> {
   logger.log(`CORS origins: ${origins.join(', ')}`);
 
   const port = Number(process.env.PORT ?? 3001);
-  await app.listen(port);
+  const bindHost = process.env.NEXUS_V8_LOCAL_ONLY === '1' ? '127.0.0.1' : undefined;
+  if (bindHost) await app.listen(port, bindHost);
+  else await app.listen(port);
   logger.log(`Backend running on http://localhost:${port}/api/v1`);
 }
 
