@@ -39,6 +39,7 @@ import { DatingModule } from './modules/dating/dating.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { RuntimeConfigModule } from './modules/runtime-config/runtime-config.module';
 import { ContentReportsModule } from './modules/content-reports/content-reports.module';
+import { WorldsModule } from './modules/worlds/worlds.module';
 
 @Module({
   imports: [
@@ -99,6 +100,7 @@ import { ContentReportsModule } from './modules/content-reports/content-reports.
     DatingModule,
     AnalyticsModule,
     ContentReportsModule,
+    WorldsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
