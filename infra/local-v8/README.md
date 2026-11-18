@@ -86,6 +86,27 @@ The wrapper checks loopback host, port, database, user and the Compose Postgres 
 
 **Backend startup is intentionally not automated yet.** `apps/backend/src/main.ts` loads the repository `.env`, so a dedicated v8 runtime guard and clean environment launch are needed before enabling real test-account login or Socket.IO. `.env.backend.local` is a staging candidate only, not a ready-to-deploy backend credential source. No production ID, SMS, Stripe, S3 or OAuth providers should be connected to this sandbox.
 
+## Step 5 — local backend preparation (new; no production connection)
+
+Do **not** launch the API until the green CI checks and external-provider review are complete. After pulling the updated staging branch, run only the preflight:
+
+```powershell
+git pull --ff-only
+powershell.exe -NoProfile -File .\infra\local-v8\start-backend.ps1 -CheckOnly
+```
+
+This checks the fixed Compose loopback bindings and an allowlisted local environment without starting NestJS. The Node launcher never imports the repository root `.env`; it starts child Node with only necessary OS variables and the local sandbox variables. In sandbox mode `apps/backend/src/main.ts` skips root dotenv and explicitly binds NestJS to `127.0.0.1`.
+
+When explicitly authorized after review, build and run from the staging clone (not from production):
+
+```powershell
+corepack pnpm --filter @g88/shared run build
+corepack pnpm --filter @g88/backend run build
+powershell.exe -NoProfile -File .\infra\local-v8\start-backend.ps1
+```
+
+The launcher requires compiled `apps/backend/dist/main.js`, then starts the isolated API on `127.0.0.1:33188`; it never seeds or migrates. Verify `http://127.0.0.1:33188/health` only once a manual service review passes. Stop with Ctrl+C. No outbound integrations are authorized: do not configure SMS/email, Stripe, analytics, push, external identity providers or S3 in this sandbox.
+
 ## Stop, restart and explicit destruction
 
 ```powershell
