@@ -30,3 +30,29 @@ export function worldUrl(id: WorldId, location: Location): string {
   url.searchParams.set(WORLD_QUERY, id);
   return `${url.pathname}${url.search}${url.hash}`;
 }
+
+/** Visual-only world themes. Not capabilities, permissions or user segmentation. */
+export interface WorldVisual {
+  readonly glyph: string;
+  readonly subtitle: string;
+  readonly signal: string;
+}
+
+export const WORLD_VISUALS: Readonly<Record<WorldId, WorldVisual>> = {
+  nexus: { glyph: '✧', subtitle: 'The gateway to everything nearby.', signal: 'CONNECTED REALITY' },
+  noir: { glyph: '◈', subtitle: 'City lights. Hidden stories. A darker lens.', signal: 'AFTER DARK' },
+  profiler: { glyph: '◎', subtitle: 'Patterns, profiles and human connections.', signal: 'INSIGHT LAYER' },
+  pathfinder: { glyph: '⌖', subtitle: 'Every journey begins with a direction.', signal: 'ROUTE EXPLORER' },
+  nocturne: { glyph: '☾', subtitle: 'Find the city when the sun goes down.', signal: 'NIGHT FREQUENCY' },
+  diplomat: { glyph: '◇', subtitle: 'Bridge cultures, communities and conversations.', signal: 'SOCIAL BRIDGE' },
+  architect: { glyph: '⬡', subtitle: 'Imagine spaces before they exist.', signal: 'BUILD MODE' },
+  bazaar: { glyph: '▣', subtitle: 'Discover things worth exchanging.', signal: 'LOCAL MARKET' },
+  vanguard: { glyph: '⚑', subtitle: 'Challenges, momentum and new frontiers.', signal: 'MISSION ACTIVE' },
+  sanctuary: { glyph: '❀', subtitle: 'A quieter place to belong.', signal: 'CALM SPACE' },
+};
+
+export function worldSceneMarkup(worldId: WorldId): string {
+  const definition = WORLD_DEFINITIONS[worldId];
+  const visual = WORLD_VISUALS[worldId];
+  return `<section class="world-scene" aria-label="${definition.displayName} world preview"><div class="world-emblem" aria-hidden="true">${visual.glyph}</div><div class="world-scene-copy"><small>WORLD / ${visual.signal}</small><h2>${definition.displayName}</h2><p>${visual.subtitle}</p></div><span class="world-preview-status">VISUAL CONCEPT · NO WORLD DATA</span></section>`;
+}
