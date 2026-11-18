@@ -26,4 +26,6 @@ for (const id of ids) {
   }
 }
 assert.notEqual(mod.worldExperienceMarkup('noir',0), mod.worldExperienceMarkup('bazaar',0));
+assert.match(mod.worldExperienceMarkup('sanctuary', 0), /role="group" aria-label="Concept scenes"/);
+assert.match(mod.worldExperienceMarkup('nexus', 0), /aria-live="polite"/);
 console.log('MANY WORLDS interactive experience contract: PASS');
