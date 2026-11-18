@@ -798,6 +798,13 @@ function render(): void {
     if (placeholder && placeholder !== preservedMap) placeholder.replaceWith(preservedMap);
   }
 
+  // Re-center the active choice in the horizontal mobile world picker.
+  const picker = root.querySelector<HTMLElement>('.world-choices');
+  const selected = picker?.querySelector<HTMLElement>('.world-choice.selected');
+  if (picker && selected && window.matchMedia('(max-width: 760px)').matches) {
+    picker.scrollLeft = Math.max(0, selected.offsetLeft - (picker.clientWidth - selected.clientWidth) / 2);
+  }
+
   bind();
 }
 
