@@ -75,6 +75,9 @@ jobs:
           node --check web/e2e/connections-actions.e2e.mjs
           node --check web/e2e/deployed-smoke.e2e.mjs
 
+      - name: MANY WORLDS switcher contract regression
+        run: node web/e2e/world-switcher.contract.e2e.mjs
+
       - name: Map runtime policy
         run: node web/e2e/map-runtime-policy.e2e.mjs
 
