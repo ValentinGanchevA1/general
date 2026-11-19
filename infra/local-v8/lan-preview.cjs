@@ -21,10 +21,10 @@ function isApi(path) { return path === '/api/v1' || path.startsWith('/api/v1/') 
 function staticPath(raw) {
   let pathname;
   try {
-    // Reject traversal before URL normalization, including percent-encoded segments.
+    // Reject traversal before URL normalization, including encoded segments.
     const rawPath = raw.split('?')[0].split('#')[0];
     const decoded = decodeURIComponent(rawPath);
-    if (decoded.includes('\\\\') || decoded.includes('\\0') ||
+    if (decoded.includes('\\') || decoded.includes('\0') ||
         decoded.split('/').some(segment => segment === '..' || segment === '.')) return null;
     pathname = new URL(raw, 'https://localhost').pathname;
   } catch { return null; }
@@ -32,8 +32,8 @@ function staticPath(raw) {
   if (full !== ROOT && !full.startsWith(ROOT + sep)) return null;
   const candidate = full === ROOT ? join(ROOT, 'index.html') : full;
   // Never expose source, credentials, package metadata or private project files.
-  const relative = candidate.slice(ROOT.length + 1).replaceAll('\\\\', '/');
-  if (!(/^(index\\.html|(?:styles|map|connections)\\.css|dist\\/[a-zA-Z0-9._/-]+\\.(?:js|css|mjs|map))$/.test(relative))) return null;
+  const relative = candidate.slice(ROOT.length + 1).replaceAll('\\', '/');
+  if (!/^(index\.html|(?:styles|map|connections)\.css|dist\/[a-zA-Z0-9._/-]+\.(?:js|css|mjs|map))$/.test(relative)) return null;
   return existsSync(candidate) && statSync(candidate).isFile() ? candidate : null;
 }
 function proxyHeaders(headers) {
