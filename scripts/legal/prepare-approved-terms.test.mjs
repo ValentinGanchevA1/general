@@ -47,3 +47,39 @@ test('rejects active scripts or publication of a noindex preview', () => {
     ...approval, contentSha256: sha256(blocked),
   }).join(' '), /index,follow/);
 });
+
+test('rejects impossible calendar dates and backdated legal approval', () => {
+  assert.match(validateApprovedTerms(html, {
+    ...approval, effectiveDate: '2026-02-31',
+  }).join(' '), /effectiveDate/);
+  assert.match(validateApprovedTerms(html, {
+    ...approval, approvedAt: '2026-11-31',
+  }).join(' '), /approvedAt/);
+  assert.match(validateApprovedTerms(html, {
+    ...approval, approvedAt: '2026-11-11',
+  }).join(' '), /after effectiveDate/);
+  assert.match(validateApprovedTerms(html, {
+    ...approval, effectiveDate: '2025-02-29',
+  }).join(' '), /effectiveDate/);
+  assert.doesNotMatch(validateApprovedTerms(html, {
+    ...approval, effectiveDate: '2028-02-29',
+  }).join(' '), /effectiveDate/);
+});
+
+test('rejects active HTML even when reviewer hash matches', () => {
+  const malicious = [
+    '<div onmouseover="alert(1)">Terms</div>',
+    '<iframe src="https://example.com"></iframe>',
+    '<form action="https://example.com"></form>',
+    '<meta http-equiv="refresh" content="0;url=https://example.com">',
+    '<svg onload="alert(1)"></svg>',
+    '<a href="javascript:alert(1)">Open</a>',
+    '<object data="https://example.com"></object>',
+  ];
+  for (const snippet of malicious) {
+    const page = html.replace('</body>', snippet + '</body>');
+    assert.match(validateApprovedTerms(page, {
+      ...approval, contentSha256: sha256(page),
+    }).join(' '), /active content/, snippet);
+  }
+});
