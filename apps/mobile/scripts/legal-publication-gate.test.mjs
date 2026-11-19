@@ -22,7 +22,7 @@ function fakeResponse(url, html, status = 200, contentType = 'text/html; charset
     url,
     status,
     headers: { get: (name) => name.toLowerCase() === 'content-type' ? contentType : null },
-    text: async () => html,
+    arrayBuffer: async () => new TextEncoder().encode(html).buffer,
   };
 }
 
@@ -113,5 +113,32 @@ test('rejects active HTML even when the approved checksum matches', async () => 
       makeFetch({ [termsUrl]: fakeResponse(termsUrl, changed) }),
       expectedVersion, sha256(changed),
     ), /active content/, snippet);
+  }
+});
+
+
+test('hashes served UTF-8 bytes, including a BOM hidden by text decoding', async () => {
+  const contentBytes = new TextEncoder().encode(termsHtml);
+  const bomBytes = new Uint8Array([0xef, 0xbb, 0xbf, ...contentBytes]);
+  const response = {
+    ...fakeResponse(termsUrl, termsHtml),
+    arrayBuffer: async () => bomBytes.buffer,
+  };
+  await assert.rejects(
+    check(makeFetch({ [termsUrl]: response })),
+    /SHA-256 differs/,
+  );
+});
+
+test('rejects non-UTF-8 or excessively large public HTML before parsing', async () => {
+  for (const body of [new Uint8Array([0xff, 0xfe]), new Uint8Array(1_000_001)]) {
+    const response = {
+      ...fakeResponse(termsUrl, termsHtml),
+      arrayBuffer: async () => body.buffer,
+    };
+    await assert.rejects(
+      check(makeFetch({ [termsUrl]: response })),
+      /valid UTF-8|size is invalid/,
+    );
   }
 });
