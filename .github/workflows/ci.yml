@@ -126,6 +126,6 @@ jobs:
       - name: Test MapLibre release config gate
         run: node --test apps/mobile/scripts/maplibre-release-config.test.mjs
       - name: Test production legal URL gate
-        run: node --test apps/mobile/scripts/legal-url-gate.test.mjs
+        run: node --test apps/mobile/scripts/legal-url-gate.test.mjs apps/mobile/scripts/legal-publication-gate.test.mjs
       - name: Test
         run: pnpm --filter @g88/mobile exec jest --ci
