@@ -71,7 +71,7 @@ export function validateApprovedTerms(html, record) {
   // Match the exact production verifier contract, not incidental text in a paragraph.
   const versionMarkers = [...html.matchAll(/<!--\s*NEXUS_TERMS_VERSION=([A-Za-z0-9._-]+)\s*-->/g)];
   if (versionMarkers.length !== 1 || versionMarkers[0][1] !== record.version) {
-    problems.push('HTML must embed exactly one approved NEXUS_TERMS_VERSION comment');
+    problems.push('HTML must embed exactly one approved Terms version in an NEXUS_TERMS_VERSION comment');
   }
   const effectiveTimeDates = [...html.matchAll(/<time\b[^>]*\bdatetime=["'](\d{4}-\d{2}-\d{2})["'][^>]*>/gi)];
   if (!effectiveTimeDates.some(match => match[1] === record.effectiveDate)) {
