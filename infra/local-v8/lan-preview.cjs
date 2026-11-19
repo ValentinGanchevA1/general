@@ -62,7 +62,7 @@ function start({ address, cert, key }) {
     if (!file) { res.writeHead(404).end('Not found'); return; }
     res.setHeader('Content-Type', MIME[extname(file)] || 'application/octet-stream');
     res.setHeader('Cache-Control','no-store');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://tile.openstreetmap.org https://api.maptiler.eu https://api.maptiler.com; connect-src 'self' https://api.maptiler.eu https://api.maptiler.com; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
     if (req.method === 'HEAD') { res.writeHead(200).end(); return; }
     createReadStream(file).pipe(res);
   });
