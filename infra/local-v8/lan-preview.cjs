@@ -19,14 +19,18 @@ function assertLanAddress(address) {
 }
 function isApi(path) { return path === '/api/v1' || path.startsWith('/api/v1/') || path === '/socket.io' || path.startsWith('/socket.io/'); }
 function staticPath(raw) {
+  // Explicit public asset allowlist: never serve package metadata, source, env or private keys.
+  const rawPath = raw.split('?')[0].split('#')[0];
+  if (/(^|\\/)(?:\\.{1,2}|%2e(?:%2e)?)(?:\\/|$)/i.test(rawPath)) return null;
   let pathname;
-  try { pathname = new URL(raw, 'https://localhost').pathname; pathname = decodeURIComponent(pathname); }
+  try { pathname = decodeURIComponent(rawPath); }
   catch { return null; }
-  if (pathname.includes('\\') || pathname.includes('\0')) return null;
-  const full = resolve(ROOT, '.' + pathname);
-  if (full !== ROOT && !full.startsWith(ROOT + sep)) return null;
-  const candidate = full === ROOT ? join(ROOT, 'index.html') : full;
-  return existsSync(candidate) && statSync(candidate).isFile() ? candidate : null;
+  if (pathname.includes('\\\\') || pathname.includes('\\0') || pathname.includes('//')) return null;
+  const allowed = new Set(['/','/index.html','/styles.css','/map.css','/connections.css']);
+  if (!allowed.has(pathname) && !/^\\/dist\\/[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)+$/.test(pathname)) return null;
+  const full = resolve(ROOT, '.' + (pathname === '/' ? '/index.html' : pathname));
+  if (!full.startsWith(ROOT + sep)) return null;
+  return existsSync(full) && statSync(full).isFile() ? full : null;
 }
 function proxyHeaders(headers) {
   const result = { ...headers, host: API + ':' + API_PORT, origin: 'http://127.0.0.1:33188' };
