@@ -2,6 +2,7 @@ import eventReviewsReducer from '@/features/events/eventReviewsSlice';
 import reportsReducer from '@/features/reports/reportsSlice';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '@/features/auth/authSlice';
+import ageEligibilityReducer from '@/features/auth/ageEligibilitySlice';
 import passwordResetReducer from '@/features/auth/passwordResetSlice';
 import profileReducer from '@/features/profile/profileSlice';
 import chatReducer, { outboxHydrated } from '@/features/chat/chatSlice';
@@ -29,6 +30,7 @@ import {
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    ageEligibility: ageEligibilityReducer,
     eventReviews: eventReviewsReducer,
     reports: reportsReducer,
     passwordReset: passwordResetReducer,
