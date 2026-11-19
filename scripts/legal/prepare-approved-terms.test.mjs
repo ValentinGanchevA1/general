@@ -83,3 +83,30 @@ test('rejects active HTML even when reviewer hash matches', () => {
     }).join(' '), /active content/, snippet);
   }
 });
+
+
+test('requires one actual version comment, not an incidental text match', () => {
+  const marker = '<!-- NEXUS_TERMS_VERSION=' + version + ' -->';
+  const invalidVersions = [
+    html.replace(marker, '<p>NEXUS_TERMS_VERSION=' + version + '</p>'),
+    html.replace(marker, marker + marker),
+    html.replace(marker, '<!-- NEXUS_TERMS_VERSION=obsolete --> NEXUS_TERMS_VERSION=' + version),
+  ];
+  for (const page of invalidVersions) {
+    assert.match(validateApprovedTerms(page, {
+      ...approval, contentSha256: sha256(page),
+    }).join(' '), /NEXUS_TERMS_VERSION/, page);
+  }
+});
+
+test('requires exact effective date in a time element, not unrelated text', () => {
+  const invalidDates = [
+    html.replace('<time datetime="2026-11-10">', '<p datetime="2026-11-10">').replace('</time>', '</p>'),
+    html.replace('datetime="2026-11-10"', 'datetime="2026-11-11"') + '<p>datetime="2026-11-10"</p>',
+  ];
+  for (const page of invalidDates) {
+    assert.match(validateApprovedTerms(page, {
+      ...approval, contentSha256: sha256(page),
+    }).join(' '), /effective date/, page);
+  }
+});
