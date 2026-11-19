@@ -12,7 +12,9 @@
 ## Owner designation (confirmed in conversation, 19 November 2026)
 
 - [x] Valentin Ganchev accepts responsibility as **NEXUS Owner & Child Safety Contact** for receiving, reviewing and handling CSAE/CSAM reports and escalating to competent authorities where legally required.
-- [x] Owner chose the **Google Play developer-account email** as the Play child-safety contact; its exact address, inbox access and monitoring are **not yet verified**.
+- [x] Owner chose the **Google Play developer-account email** as the Play child-safety contact.
+- [x] Owner confirmed (19 November 2026) that they have access to this mailbox and check it regularly. **Self-attestation only**; not an independent inbox test.
+- [ ] Verify the exact developer-account email address and successfully deliver a test Child Safety message; record timestamp and receipt without publishing the address until confirmed.
 - [ ] Validate lawful reporting channels, safe handling, escalation ownership and ability to take moderation action in production. Owner designation is **not** legal sign-off, proof of staffed moderation, or permission to self-certify.
 
 ## Before final approval
