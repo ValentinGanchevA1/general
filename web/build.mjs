@@ -25,6 +25,7 @@ await build({
  */
 if (process.env.PUBLIC_DEMO_ONLY === '1') {
   for (const test of [
+    'web/e2e/public-demo-no-auth.contract.e2e.mjs',
     'web/e2e/world-switcher.contract.e2e.mjs',
     'web/e2e/world-experience.contract.e2e.mjs',
     'web/e2e/world-responsive.contract.e2e.mjs',
