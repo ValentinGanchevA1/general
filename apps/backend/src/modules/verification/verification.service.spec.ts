@@ -193,13 +193,13 @@ describe('VerificationService', () => {
       );
     });
 
-    it('accepts DEV code in production when ALLOW_DEV_PHONE_OTP=true', async () => {
+    it('rejects DEV code in production even when ALLOW_DEV_PHONE_OTP=true', async () => {
       process.env.NODE_ENV = 'production';
       process.env.ALLOW_DEV_PHONE_OTP = 'true';
       redis.get.mockResolvedValueOnce(null);
-      await expect(service.checkPhone('u1', '+1555', '000000')).resolves.toMatchObject({
-        id: 'u1',
-      });
+      await expect(service.checkPhone('u1', '+1555', '000000')).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
+      );
     });
   });
 
@@ -257,6 +257,14 @@ describe('VerificationService', () => {
       redis.get.mockResolvedValueOnce(null);
       getProfile.mockResolvedValueOnce({ id: 'u1', verificationLevel: 'email' });
       await expect(service.checkEmail('u1', '000000')).resolves.toMatchObject({ id: 'u1' });
+    });
+
+    it('rejects DEV email code in production even when ALLOW_DEV_EMAIL_OTP=true', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.ALLOW_DEV_EMAIL_OTP = 'true';
+      query.mockResolvedValueOnce([{ email: 'a@b.co', verification_level: 'none', email_verified_at: null }]);
+      redis.get.mockResolvedValueOnce(null);
+      await expect(service.checkEmail('u1', '000000')).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('rejects wrong code', async () => {
