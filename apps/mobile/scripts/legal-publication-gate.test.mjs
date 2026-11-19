@@ -59,7 +59,7 @@ test('rejects a server returning Privacy content for the Terms route', async () 
 test('rejects draft/placeholder, mismatched version, and missing date', async () => {
   await assert.rejects(check(makeFetch({ [termsUrl]: fakeResponse(termsUrl, termsHtml + 'UNAPPROVED') })), /unapproved/);
   await assert.rejects(check(makeFetch({ [termsUrl]: fakeResponse(termsUrl, termsHtml.replace('2026-11-19-v1', '2026-11-18-v1')) })), /version differs/);
-  await assert.rejects(check(makeFetch({ [termsUrl]: fakeResponse(termsUrl, termsHtml.replace(/<time[^>]*>[^<]*<\\/time>/, '')) })), /effective date/);
+  await assert.rejects(check(makeFetch({ [termsUrl]: fakeResponse(termsUrl, termsHtml.replace('<time datetime="2026-11-19">November 19, 2026</time>', '')) })), /effective date/);
 });
 
 test('rejects wrong brand and executable script', async () => {
