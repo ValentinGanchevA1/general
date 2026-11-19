@@ -48,7 +48,7 @@ export type SocialStackParamList = {
 };
 
 export type EventsStackParamList = {
-  EventDetail: { eventId: string };
+  EventDetail: { eventId: string; entry?: 'portal' };
   EventCreate: { initialLocation?: LatLng } | undefined;
 };
 
