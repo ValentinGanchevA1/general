@@ -43,14 +43,17 @@ and the public Render page served from `docs/legal/terms/index.html`.
    archived securely.
 7. Update mobile `TERMS_OF_SERVICE_URL` and confirm it is different from
    `PRIVACY_POLICY_URL`. **After counsel and owner approval**, configure the
-   GitHub Actions repository variable `NEXUS_TERMS_VERSION` with the exact
-   immutable version from the verified approval manifest, matching the backend
-   `NEXUS_TERMS_VERSION`. The production Android release guard verifies the
-   *publicly served* pages anonymously: HTTP 200, HTML, canonical HTTPS
-   routing, distinct documents, visible NEXUS branding, exact Terms version
-   marker, effective date, Privacy link and absence of draft placeholders.
-   Missing configuration, stale deployment and mismatched versions all fail
-   closed. Closed testing tracks intentionally skip the live publication check.
+   GitHub Actions repository variables `NEXUS_TERMS_VERSION` and
+   `NEXUS_TERMS_SHA256` with the **exact** immutable version and reviewed HTML
+   `contentSha256` from the independently verified approval manifest. Match
+   the backend `NEXUS_TERMS_VERSION`. Never configure speculative values.
+   The production Android release guard anonymously verifies the *served*
+   HTML: HTTP 200, canonical HTTPS, distinct documents, NEXUS branding, version
+   marker, valid effective date, Privacy link, no draft/active markup, and the
+   exact SHA-256 of the approved HTML. Rehashing a different served document
+   is not approval. Render or another CDN must preserve the candidate HTML bytes.
+   Missing configuration, stale deployment or checksum mismatch fails closed.
+   Closed-testing tracks intentionally skip the live publication check.
    This technical guard does **not** replace independent legal/release approval.
    Build the exact signed Android AAB only after all release gates pass.
 8. Confirm backend migration 0072 has applied, and only **then** configure
