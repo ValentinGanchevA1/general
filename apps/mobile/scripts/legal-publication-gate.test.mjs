@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 import { verifyPublishedLegalPages } from './legal-publication-gate.mjs';
@@ -34,8 +35,9 @@ function makeFetch(overrides = {}) {
   return async (url) => pages[url];
 }
 
-const check = (fetchImpl, version = expectedVersion) =>
-  verifyPublishedLegalPages({ privacyUrl, termsUrl, expectedVersion: version, fetchImpl });
+const sha256 = (html) => createHash('sha256').update(html, 'utf8').digest('hex');
+const check = (fetchImpl, version = expectedVersion, hash = sha256(termsHtml)) =>
+  verifyPublishedLegalPages({ privacyUrl, termsUrl, expectedVersion: version, expectedSha256: hash, fetchImpl });
 
 test('passes when both distinct public HTML pages and the exact Terms version are served', async () => {
   assert.deepEqual(await check(makeFetch()), { verified: true, version: expectedVersion });
@@ -44,6 +46,7 @@ test('passes when both distinct public HTML pages and the exact Terms version ar
 test('rejects missing or incorrect expected release version before making a network request', async () => {
   await assert.rejects(check(() => { throw new Error('should not fetch'); }, ''), /NEXUS_TERMS_VERSION/);
   await assert.rejects(check(makeFetch(), 'obsolete'), /version differs/);
+  await assert.rejects(check(() => { throw new Error('should not fetch'); }, expectedVersion, ''), /NEXUS_TERMS_SHA256/);
 });
 
 test('rejects 404 page, non-HTML response and redirect to the Privacy path', async () => {
@@ -72,4 +75,43 @@ test('sanitizes transport errors and fails closed', async () => {
     check(async () => { throw new Error('example-secret-token'); }),
     (err) => err instanceof Error && /could not be fetched/.test(err.message) && !err.message.includes('example-secret-token'),
   );
+});
+
+
+test('requires exact approved HTML checksum even when version and branding match', async () => {
+  const changed = termsHtml.replace('protect location', 'protect approximate and precise location');
+  await assert.rejects(
+    check(makeFetch({ [termsUrl]: fakeResponse(termsUrl, changed) })),
+    /SHA-256 differs/,
+  );
+  await assert.deepEqual(
+    await check(makeFetch(), expectedVersion, sha256(termsHtml).toUpperCase()),
+    { verified: true, version: expectedVersion },
+  );
+});
+
+test('rejects impossible effective dates in live HTML even with a matching hash', async () => {
+  const changed = termsHtml.replaceAll('2026-11-19">', '2026-02-31">');
+  await assert.rejects(check(
+    makeFetch({ [termsUrl]: fakeResponse(termsUrl, changed) }),
+    expectedVersion, sha256(changed),
+  ), /effective date/);
+});
+
+test('rejects active HTML even when the approved checksum matches', async () => {
+  const unsafe = [
+    '<a onmouseover="alert(1)">Hover me</a>',
+    '<iframe src="https://example.com/"></iframe>',
+    '<form action="https://example.com/"></form>',
+    '<meta http-equiv="refresh" content="0;url=https://example.com/">',
+    '<svg onload="alert(1)"></svg>',
+    '<a href="javascript:alert(1)">Open</a>',
+  ];
+  for (const snippet of unsafe) {
+    const changed = termsHtml.replace('</body>', snippet + '</body>');
+    await assert.rejects(check(
+      makeFetch({ [termsUrl]: fakeResponse(termsUrl, changed) }),
+      expectedVersion, sha256(changed),
+    ), /active content/, snippet);
+  }
 });
