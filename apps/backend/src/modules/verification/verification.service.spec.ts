@@ -142,17 +142,14 @@ describe('VerificationService', () => {
       expect(redis.setex).toHaveBeenCalledWith('verify:phone:+15550001111', 600, '000000');
     });
 
-    it('falls back to Redis OTP in production without Twilio (no 503)', async () => {
+    it('fails closed in production without SMS delivery and does not store an OTP', async () => {
       process.env.NODE_ENV = 'production';
-      const res = await service.startPhone('u1', '+15550001111');
-      expect(res).toEqual({ sent: true, channel: 'dev' });
-      expect(redis.setex).toHaveBeenCalled();
-      const [key, ttl, code] = redis.setex.mock.calls[0]!;
-      expect(key).toBe('verify:phone:+15550001111');
-      expect(ttl).toBe(600);
-      expect(code).toMatch(/^\d{6}$/);
-      expect(code).not.toBe('000000');
+      await expect(service.startPhone('u1', '+15550001111')).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
+      );
+      expect(redis.setex).not.toHaveBeenCalled();
     });
+
   });
 
   describe('checkPhone', () => {
@@ -220,6 +217,13 @@ describe('VerificationService', () => {
       expect(key).toBe('verify:email:u1');
       expect(ttl).toBe(600);
       expect(code).toBe('000000');
+    });
+
+    it('fails closed in production without email delivery and does not store an OTP', async () => {
+      process.env.NODE_ENV = 'production';
+      query.mockResolvedValueOnce([{ email: 'a@b.co', verification_level: 'none', email_verified_at: null }]);
+      await expect(service.startEmail('u1')).rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(redis.setex).not.toHaveBeenCalled();
     });
 
     it('no-ops when already email-verified', async () => {
