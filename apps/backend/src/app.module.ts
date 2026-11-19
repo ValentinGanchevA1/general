@@ -10,6 +10,7 @@ import { RuntimeHttpDiagnosticsService } from './common/runtime-http-diagnostics
 import { BlocksModule } from './modules/blocks/blocks.module';
 import { FriendsModule } from './modules/friends/friends.module';
 import { RedisModule } from './config/redis.module';
+import { resolvePostgresConnection } from './config/postgres-ssl';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
@@ -47,7 +48,12 @@ import { WorldsModule } from './modules/worlds/worlds.module';
       useFactory: () => {
         const url = process.env.DATABASE_URL;
         if (url) {
-          return { type: 'postgres' as const, url, synchronize: false, entities: [] };
+          return {
+            type: 'postgres' as const,
+            ...resolvePostgresConnection(url, process.env),
+            synchronize: false,
+            entities: [],
+          };
         }
         if (process.env.NODE_ENV === 'production') {
           throw new Error('DATABASE_URL must be set in production');
