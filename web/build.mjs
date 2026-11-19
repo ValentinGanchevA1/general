@@ -10,6 +10,9 @@ await build({
   outfile: 'web/dist/app.js',
   sourcemap: true,
   logLevel: 'info',
+  define: {
+    __NEXUS_PUBLIC_DEMO_ONLY__: JSON.stringify(process.env.PUBLIC_DEMO_ONLY === '1'),
+  },
   // The preview intentionally avoids a new pnpm workspace importer/lockfile
   // mutation. Reuse the browser-compatible Socket.IO dependency already locked
   // for apps/admin and bundle it into the web artifact at build time.
