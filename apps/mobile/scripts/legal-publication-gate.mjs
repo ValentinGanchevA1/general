@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto';
 
 const VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$/;
 const HASH_PATTERN = /^[0-9a-f]{64}$/i;
-const MAX_HTML_CHARS = 1_000_000;
+const MAX_HTML_BYTES = 1_000_000;
 
 function normalizePath(pathname) {
   return pathname.replace(/\/+$/, '') || '/';
@@ -44,16 +44,22 @@ async function loadHtml(url, label, fetchImpl) {
     throw new Error(`[legal-gate] ${label} redirected away from its canonical HTTPS path.`);
   }
 
-  let html;
+  let bytes;
   try {
-    html = await response.text();
+    bytes = new Uint8Array(await response.arrayBuffer());
   } catch {
     throw new Error(`[legal-gate] ${label} public HTML could not be read.`);
   }
-  if (html.length === 0 || html.length > MAX_HTML_CHARS) {
+  if (bytes.byteLength === 0 || bytes.byteLength > MAX_HTML_BYTES) {
     throw new Error(`[legal-gate] ${label} public HTML size is invalid.`);
   }
-  return { html, finalUrl };
+  let html;
+  try {
+    html = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error(`[legal-gate] ${label} public HTML must use valid UTF-8.`);
+  }
+  return { html, finalUrl, bytes };
 }
 
 export async function verifyPublishedLegalPages({
@@ -110,7 +116,7 @@ export async function verifyPublishedLegalPages({
   }
   // The served document must be byte-for-byte equal to the human-reviewed candidate.
   // GitHub Actions must provide the approved manifest's contentSha256, not a guess.
-  const liveSha256 = createHash('sha256').update(terms.html, 'utf8').digest('hex');
+  const liveSha256 = createHash('sha256').update(terms.bytes).digest('hex');
   if (liveSha256 !== expectedSha256.toLowerCase()) {
     throw new Error('[legal-gate] Public Terms SHA-256 differs from the approved HTML.');
   }
