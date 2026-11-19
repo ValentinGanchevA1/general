@@ -63,10 +63,9 @@ function otpCode(): string {
   return String(randomInt(100_000, 999_999));
 }
 
-function allowDevOtp(kind: 'email' | 'phone'): boolean {
-  if (!isProd()) return true;
-  if (kind === 'email') return process.env.ALLOW_DEV_EMAIL_OTP === 'true';
-  return process.env.ALLOW_DEV_PHONE_OTP === 'true';
+function allowDevOtp(): boolean {
+  // Development OTP shortcuts must never authorize production verification.
+  return !isProd();
 }
 
 /** Ladder rank — numeric so comparisons are never possibly-undefined under strictNullChecks. */
@@ -192,6 +191,13 @@ export class VerificationService {
       }
     }
 
+    if (isProd()) {
+      this.logger.error('[verify] SMS delivery unavailable; refusing undelivered OTP in production');
+      throw new ServiceUnavailableException({
+        code: 'verification.unavailable',
+        message: 'Phone verification is temporarily unavailable',
+      });
+    }
     return this.issuePhoneRedisOtp(userId, phone);
   }
 
@@ -202,7 +208,7 @@ export class VerificationService {
     const code = otpCode();
     await this.redis.setex(`${PHONE_OTP_PREFIX}${phone}`, PHONE_OTP_TTL_SEC, code);
     this.logger.warn(
-      `[verify] Phone OTP (Redis/dev channel) for ${phone} (user ${userId}): ${code} (ttl ${PHONE_OTP_TTL_SEC}s)`,
+      '[verify] Development phone OTP issued (code and recipient redacted)',
     );
     return { sent: true, channel: 'dev' };
   }
@@ -265,27 +271,25 @@ export class VerificationService {
         await client.verify.v2
           .services(process.env.TWILIO_VERIFY_SERVICE_SID as string)
           .verifications.create({ to: row.email, channel: 'email' });
-        const backup = otpCode();
-        await this.redis.setex(`${EMAIL_OTP_PREFIX}${userId}`, EMAIL_OTP_TTL_SEC, backup);
-        this.logger.log(
-          `[verify] Twilio email OTP started for ${maskEmail(row.email)}; Redis backup stored`,
-        );
+        this.logger.log(`[verify] Twilio email OTP started for ${maskEmail(row.email)}`);
         return { sent: true, channel: 'email', maskedEmail: maskEmail(row.email) };
       } catch (e) {
         this.logger.warn(`[verify] Twilio email channel failed: ${String(e)}`);
       }
     }
 
-    if (isProd() && !client) {
-      this.logger.error(
-        `[verify] Email OTP for ${maskEmail(row.email)} issued without Twilio — configure TWILIO_* + email channel`,
-      );
+    if (isProd()) {
+      this.logger.error('[verify] Email delivery unavailable; refusing undelivered OTP in production');
+      throw new ServiceUnavailableException({
+        code: 'verification.unavailable',
+        message: 'Email verification is temporarily unavailable',
+      });
     }
 
     const code = otpCode();
     await this.redis.setex(`${EMAIL_OTP_PREFIX}${userId}`, EMAIL_OTP_TTL_SEC, code);
     this.logger.warn(
-      `[verify] Email OTP (Redis/dev channel) for ${row.email} (user ${userId}): ${code} (ttl ${EMAIL_OTP_TTL_SEC}s)`,
+      '[verify] Development email OTP issued (code and recipient redacted)',
     );
     return {
       sent: true,
@@ -341,8 +345,8 @@ export class VerificationService {
     const stored = await this.redis.get(`${PHONE_OTP_PREFIX}${phone}`);
     if (stored && stored === trimmed) return true;
 
-    if (allowDevOtp('phone') && trimmed === (process.env.DEV_OTP_CODE ?? DEV_CODE)) {
-      this.logger.warn(`[verify] ALLOW_DEV_PHONE_OTP / non-prod accepted for ${maskPhone(phone)}`);
+    if (allowDevOtp() && trimmed === (process.env.DEV_OTP_CODE ?? DEV_CODE)) {
+      this.logger.warn(`[verify] non-prod OTP accepted for ${maskPhone(phone)}`);
       return true;
     }
 
@@ -376,9 +380,9 @@ export class VerificationService {
     const stored = await this.redis.get(`${EMAIL_OTP_PREFIX}${userId}`);
     if (stored && stored === trimmed) return true;
 
-    if (allowDevOtp('email') && trimmed === (process.env.DEV_OTP_CODE ?? DEV_CODE)) {
+    if (allowDevOtp() && trimmed === (process.env.DEV_OTP_CODE ?? DEV_CODE)) {
       this.logger.warn(
-        `[verify] ALLOW_DEV_EMAIL_OTP / non-prod accepted for ${maskEmail(email)} (user ${userId})`,
+        `[verify] non-prod OTP accepted for ${maskEmail(email)} (user ${userId})`,
       );
       return true;
     }

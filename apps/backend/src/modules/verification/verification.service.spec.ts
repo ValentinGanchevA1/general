@@ -142,17 +142,14 @@ describe('VerificationService', () => {
       expect(redis.setex).toHaveBeenCalledWith('verify:phone:+15550001111', 600, '000000');
     });
 
-    it('falls back to Redis OTP in production without Twilio (no 503)', async () => {
+    it('fails closed in production without SMS delivery and does not store an OTP', async () => {
       process.env.NODE_ENV = 'production';
-      const res = await service.startPhone('u1', '+15550001111');
-      expect(res).toEqual({ sent: true, channel: 'dev' });
-      expect(redis.setex).toHaveBeenCalled();
-      const [key, ttl, code] = redis.setex.mock.calls[0]!;
-      expect(key).toBe('verify:phone:+15550001111');
-      expect(ttl).toBe(600);
-      expect(code).toMatch(/^\d{6}$/);
-      expect(code).not.toBe('000000');
+      await expect(service.startPhone('u1', '+15550001111')).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
+      );
+      expect(redis.setex).not.toHaveBeenCalled();
     });
+
   });
 
   describe('checkPhone', () => {
@@ -196,13 +193,13 @@ describe('VerificationService', () => {
       );
     });
 
-    it('accepts DEV code in production when ALLOW_DEV_PHONE_OTP=true', async () => {
+    it('rejects DEV code in production even when ALLOW_DEV_PHONE_OTP=true', async () => {
       process.env.NODE_ENV = 'production';
       process.env.ALLOW_DEV_PHONE_OTP = 'true';
       redis.get.mockResolvedValueOnce(null);
-      await expect(service.checkPhone('u1', '+1555', '000000')).resolves.toMatchObject({
-        id: 'u1',
-      });
+      await expect(service.checkPhone('u1', '+1555', '000000')).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
+      );
     });
   });
 
@@ -220,6 +217,13 @@ describe('VerificationService', () => {
       expect(key).toBe('verify:email:u1');
       expect(ttl).toBe(600);
       expect(code).toBe('000000');
+    });
+
+    it('fails closed in production without email delivery and does not store an OTP', async () => {
+      process.env.NODE_ENV = 'production';
+      query.mockResolvedValueOnce([{ email: 'a@b.co', verification_level: 'none', email_verified_at: null }]);
+      await expect(service.startEmail('u1')).rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(redis.setex).not.toHaveBeenCalled();
     });
 
     it('no-ops when already email-verified', async () => {
@@ -253,6 +257,14 @@ describe('VerificationService', () => {
       redis.get.mockResolvedValueOnce(null);
       getProfile.mockResolvedValueOnce({ id: 'u1', verificationLevel: 'email' });
       await expect(service.checkEmail('u1', '000000')).resolves.toMatchObject({ id: 'u1' });
+    });
+
+    it('rejects DEV email code in production even when ALLOW_DEV_EMAIL_OTP=true', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.ALLOW_DEV_EMAIL_OTP = 'true';
+      query.mockResolvedValueOnce([{ email: 'a@b.co', verification_level: 'none', email_verified_at: null }]);
+      redis.get.mockResolvedValueOnce(null);
+      await expect(service.checkEmail('u1', '000000')).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('rejects wrong code', async () => {
