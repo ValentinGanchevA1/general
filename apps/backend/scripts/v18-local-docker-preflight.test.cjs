@@ -21,7 +21,7 @@ test('expected Docker shape is only diagnostic, never an authorization', () => {
 });
 
 test('rejects externally published PostgreSQL port and port drift', () => {
-  for (const host of ['0.0.0.0', '::', '::1', '127.0.0.2', '']) {
+  for (const host of ['0.0.0.0', '::', '127.0.0.2', '']) {
     assert.equal(check(true, IMAGE, { '5432/tcp': [{ HostIp: host, HostPort: '54322' }] })
       .metadataMatchesExpectedShape, false);
   }
@@ -73,4 +73,45 @@ test('CLI without explicit container never inspects Docker, always NO-GO exit 2'
   assert.equal(r.status, 2);
   assert.equal(r.stdout, '');
   assert.match(r.stderr, /details redacted/);
+});
+
+test('accepts IPv4, IPv6 and dual-stack loopback on 54322', () => {
+  const ipv4 = { HostIp: '127.0.0.1', HostPort: '54322' };
+  const ipv6 = { HostIp: '::1', HostPort: '54322' };
+
+  for (const bindings of [
+    [ipv4],
+    [ipv6],
+    [ipv4, ipv6],
+    [ipv6, ipv4],
+  ]) {
+    const result = check(true, IMAGE, { '5432/tcp': bindings });
+    assert.equal(result.metadataMatchesExpectedShape, true);
+    assert.equal(result.productionTargetExclusionProven, false);
+    assert.equal(result.networkAndSideEffectIsolationProven, false);
+    assert.equal(result.stagingRuntimeRoleTested, false);
+    assert.equal(result.stagingConnectionOrRestoreAuthorized, false);
+    assert.equal(result.productionReleaseDecision, 'NO-GO');
+  }
+});
+
+test('rejects duplicate, public and mismatched bindings', () => {
+  const ipv4 = { HostIp: '127.0.0.1', HostPort: '54322' };
+  const ipv6 = { HostIp: '::1', HostPort: '54322' };
+
+  for (const bindings of [
+    [ipv4, ipv4],
+    [ipv6, ipv6],
+    [ipv4, ipv6, ipv4],
+    [ipv4, { HostIp: '0.0.0.0', HostPort: '54322' }],
+    [ipv6, { HostIp: '::', HostPort: '54322' }],
+    [ipv4, { HostIp: '::1', HostPort: '54323' }],
+    [null],
+    [],
+  ]) {
+    assert.equal(
+      check(true, IMAGE, { '5432/tcp': bindings }).metadataMatchesExpectedShape,
+      false
+    );
+  }
 });
