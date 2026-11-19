@@ -68,11 +68,14 @@ export function validateApprovedTerms(html, record) {
       !/<h1[^>]*>\s*Terms of Service\s*<\/h1>/i.test(html)) {
     problems.push('NEXUS-branded Terms title and H1 required');
   }
-  if (!html.includes(`NEXUS_TERMS_VERSION=${record.version}`)) {
-    problems.push('HTML must embed the exact approved version in an NEXUS_TERMS_VERSION comment');
+  // Match the exact production verifier contract, not incidental text in a paragraph.
+  const versionMarkers = [...html.matchAll(/<!--\s*NEXUS_TERMS_VERSION=([A-Za-z0-9._-]+)\s*-->/g)];
+  if (versionMarkers.length !== 1 || versionMarkers[0][1] !== record.version) {
+    problems.push('HTML must embed exactly one approved NEXUS_TERMS_VERSION comment');
   }
-  if (!html.includes(`datetime="${record.effectiveDate}"`)) {
-    problems.push('HTML must display effective date in a time datetime attribute');
+  const effectiveTimeDates = [...html.matchAll(/<time\b[^>]*\bdatetime=["'](\d{4}-\d{2}-\d{2})["'][^>]*>/gi)];
+  if (!effectiveTimeDates.some(match => match[1] === record.effectiveDate)) {
+    problems.push('HTML must display the approved effective date in a time datetime attribute');
   }
   if (!/href=["']https:\/\/g88-legal\.onrender\.com\/privacy\/?["']/i.test(html)) {
     problems.push('Link to separate public Privacy Policy required');
