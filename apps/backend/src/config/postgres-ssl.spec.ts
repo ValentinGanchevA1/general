@@ -18,6 +18,24 @@ describe('resolvePostgresConnection (no DB/network access)', () => {
     expect(settings.ssl).toEqual({ rejectUnauthorized: true });
   });
 
+  it('requires verified TLS for Supabase even if NODE_ENV is missing', () => {
+    for (const hostname of [
+      'db.hmtwlkplyjbskljntdkl.supabase.co',
+      'aws-0-eu-west-1.pooler.supabase.com',
+    ]) {
+      const url = 'postgresql://test:SECRET@' + hostname + ':5432/postgres';
+      const settings = resolvePostgresConnection(url, {});
+      expect(settings.ssl).toEqual({ rejectUnauthorized: true });
+      expect(() => resolvePostgresConnection(url + '?sslmode=disable', {}))
+        .toThrow('Managed/production PostgreSQL requires verified TLS');
+    }
+  });
+
+  it('does not confuse attacker-controlled suffixes with Supabase domains', () => {
+    const url = 'postgresql://test:pw@db.supabase.co.attacker.example/postgres';
+    expect(resolvePostgresConnection(url, { NODE_ENV: 'development' })).toEqual({ url });
+  });
+
   it('supports a managed CA certificate without embedding one in source', () => {
     const ca = '-----BEGIN CERTIFICATE-----\\nTEST\\n-----END CERTIFICATE-----';
     const settings = resolvePostgresConnection(target, { NODE_ENV: 'production', DATABASE_SSL_CA_PEM: ca });
@@ -27,7 +45,7 @@ describe('resolvePostgresConnection (no DB/network access)', () => {
   it('fails closed on insecure production sslmode settings', () => {
     for (const mode of ['disable', 'allow', 'prefer']) {
       expect(() => resolvePostgresConnection(target + '?sslmode=' + mode,
-        { NODE_ENV: 'production' })).toThrow('Production PostgreSQL requires verified TLS');
+        { NODE_ENV: 'production' })).toThrow('Managed/production PostgreSQL requires verified TLS');
     }
   });
 
