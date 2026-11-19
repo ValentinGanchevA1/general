@@ -19,18 +19,22 @@ function assertLanAddress(address) {
 }
 function isApi(path) { return path === '/api/v1' || path.startsWith('/api/v1/') || path === '/socket.io' || path.startsWith('/socket.io/'); }
 function staticPath(raw) {
-  // Serve only public assets; reject traversal before URL normalization.
-  const rawPath = raw.split('?')[0].split('#')[0];
   let pathname;
-  try { pathname = decodeURIComponent(rawPath); }
-  catch { return null; }
-  if (pathname.includes('\\') || pathname.includes('\0') || pathname.includes('//')) return null;
-  if (pathname.split('/').some((segment) => segment === '.' || segment === '..')) return null;
-  const allowed = new Set(['/','/index.html','/styles.css','/map.css','/connections.css']);
-  if (!allowed.has(pathname) && !/^\/dist\/[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+$/.test(pathname)) return null;
-  const full = resolve(ROOT, '.' + (pathname === '/' ? '/index.html' : pathname));
-  if (!full.startsWith(ROOT + sep)) return null;
-  return existsSync(full) && statSync(full).isFile() ? full : null;
+  try {
+    // Reject traversal before URL normalization, including percent-encoded segments.
+    const rawPath = raw.split('?')[0].split('#')[0];
+    const decoded = decodeURIComponent(rawPath);
+    if (decoded.includes('\\\\') || decoded.includes('\\0') ||
+        decoded.split('/').some(segment => segment === '..' || segment === '.')) return null;
+    pathname = new URL(raw, 'https://localhost').pathname;
+  } catch { return null; }
+  const full = resolve(ROOT, '.' + pathname);
+  if (full !== ROOT && !full.startsWith(ROOT + sep)) return null;
+  const candidate = full === ROOT ? join(ROOT, 'index.html') : full;
+  // Never expose source, credentials, package metadata or private project files.
+  const relative = candidate.slice(ROOT.length + 1).replaceAll('\\\\', '/');
+  if (!(/^(index\\.html|(?:styles|map|connections)\\.css|dist\\/[a-zA-Z0-9._/-]+\\.(?:js|css|mjs|map))$/.test(relative))) return null;
+  return existsSync(candidate) && statSync(candidate).isFile() ? candidate : null;
 }
 function proxyHeaders(headers) {
   const result = { ...headers, host: API + ':' + API_PORT, origin: 'http://127.0.0.1:33188' };
