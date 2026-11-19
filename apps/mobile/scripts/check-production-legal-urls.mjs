@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 import { validateProductionLegalUrls } from './legal-url-gate.mjs';
+import { verifyPublishedLegalPages } from './legal-publication-gate.mjs';
 
 const track = (process.env.NEXA_PLAY_TRACK ?? '').trim().toLowerCase();
 
@@ -26,10 +27,14 @@ function readExportedString(name) {
   return match[1];
 }
 
-validateProductionLegalUrls({
-  track,
-  privacyUrl: readExportedString('PRIVACY_POLICY_URL'),
-  termsUrl: readExportedString('TERMS_OF_SERVICE_URL'),
+const privacyUrl = readExportedString('PRIVACY_POLICY_URL');
+const termsUrl = readExportedString('TERMS_OF_SERVICE_URL');
+validateProductionLegalUrls({ track, privacyUrl, termsUrl });
+
+await verifyPublishedLegalPages({
+  privacyUrl,
+  termsUrl,
+  expectedVersion: process.env.NEXUS_TERMS_VERSION,
 });
 
-console.log('[legal-gate] Production legal URLs are distinct and HTTPS.');
+console.log('[legal-gate] Production legal URLs and published NEXUS Terms version verified.');
