@@ -152,6 +152,11 @@ jobs:
           key: gradle-${{ hashFiles('apps/mobile/android/**/*.gradle*', 'apps/mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: gradle-
 
+      - name: Check merged release manifest for forbidden media permissions
+        run: |
+          cd android
+          ./gradlew checkReleaseMediaPermissions --no-daemon --init-script ci-init.gradle
+
       - name: Build signed release AAB
         env:
           SENTRY_RELEASE: com.g88@1.0.0+${{ github.run_number }}
@@ -173,6 +178,22 @@ jobs:
             echo "::warning::Gradle failed (attempt $i/$ATTEMPTS) — sleeping ${sleep_s}s (Maven 429 is common on GHA)"
             sleep "$sleep_s"
           done
+
+      - name: Verify permissions in generated AAB
+        run: |
+          set -euo pipefail
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          test -f "$AAB" || { echo "::error::Release AAB missing"; exit 1; }
+          BUNDLETOOL_VERSION=1.18.2
+          curl --fail --location --retry 3 --silent --show-error \
+            "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar" \
+            --output /tmp/bundletool.jar
+          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB" --module=base > /tmp/rc2-aab-manifest.xml
+          if grep -Eq 'android.permission.READ_MEDIA_(IMAGES|VIDEO)' /tmp/rc2-aab-manifest.xml; then
+            echo "::error::Forbidden broad media permission found in generated AAB"
+            exit 1
+          fi
+          echo "::notice::Generated AAB manifest contains neither READ_MEDIA_IMAGES nor READ_MEDIA_VIDEO."
 
       - name: Verify the AAB is signed with a non-debug certificate
         run: |
