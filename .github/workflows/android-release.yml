@@ -186,7 +186,7 @@ jobs:
           test -f "$AAB" || { echo "::error::Release AAB missing"; exit 1; }
           BUNDLETOOL_VERSION=1.18.2
           curl --fail --location --retry 3 --silent --show-error \
-            "https://repo.maven.apache.org/maven2/com/android/tools/build/bundletool/${BUNDLETOOL_VERSION}/bundletool-${BUNDLETOOL_VERSION}.jar" \
+            "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar" \
             --output /tmp/bundletool.jar
           java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB" --module=base > /tmp/rc2-aab-manifest.xml
           if grep -Eq 'android.permission.READ_MEDIA_(IMAGES|VIDEO)' /tmp/rc2-aab-manifest.xml; then
