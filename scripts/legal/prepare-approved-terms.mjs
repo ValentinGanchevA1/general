@@ -93,7 +93,7 @@ export function validateApprovedTerms(html, record) {
   // A reviewed legal document is static content, never an executable UI or redirect.
   // Reject active embeds, forms, inline handlers and refresh redirects as well as scripts.
   if (/<\s*(?:script|iframe|object|embed|form|base|svg|math)\b|javascript\s*:|\bon[a-z]+\s*=|<\s*meta\b[^>]*http-equiv\s*=\s*["']?refresh\b/i.test(html)) {
-    problems.push('Terms HTML must not contain executable or active content');
+    problems.push('Terms HTML must not contain executable JavaScript or active content');
   }
   return problems;
 }
