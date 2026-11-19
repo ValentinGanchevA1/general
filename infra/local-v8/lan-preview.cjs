@@ -9,7 +9,7 @@ const { isIP } = require('node:net');
 const ROOT = resolve(__dirname, '..', '..', 'web');
 const API = '127.0.0.1';
 const API_PORT = 33188;
-const PORT = 4175;
+const PORT = 4176;
 const MIME = { '.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.map':'application/json; charset=utf-8','.svg':'image/svg+xml' };
 function assertLanAddress(address) {
   if (isIP(address) !== 4 || !(/^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(address))) {
