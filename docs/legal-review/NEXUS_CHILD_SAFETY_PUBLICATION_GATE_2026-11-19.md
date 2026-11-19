@@ -9,6 +9,12 @@
 - Target URL **only after approved merge and deploy**: https://g88-legal.onrender.com/child-safety/ .
 - Existing public contact `vganchev6@gmail.com` comes from the repository Privacy Policy; owner elected to use the **developer-account email** for Google Play. Check which mailbox that is and its monitoring setup; do not assume equality.
 
+## Owner designation (confirmed in conversation, 19 November 2026)
+
+- [x] Valentin Ganchev accepts responsibility as **NEXUS Owner & Child Safety Contact** for receiving, reviewing and handling CSAE/CSAM reports and escalating to competent authorities where legally required.
+- [x] Owner chose the **Google Play developer-account email** as the Play child-safety contact; its exact address, inbox access and monitoring are **not yet verified**.
+- [ ] Validate lawful reporting channels, safe handling, escalation ownership and ability to take moderation action in production. Owner designation is **not** legal sign-off, proof of staffed moderation, or permission to self-certify.
+
 ## Before final approval
 
 1. Review the exact HTML text, jurisdiction-specific child-safety obligations for the EU/Bulgaria, authority escalation/reporting workflow, evidence preservation/deletion process, operator responsibilities, appeals, and safeguarding. Document reviewer, date, approved SHA and effective date.
