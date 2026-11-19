@@ -12,14 +12,29 @@ import type { InboxItem, InboxResponse } from '../../packages/shared/src/friends
 import type { ChatMessageEvent, FriendPresenceEvent } from '../../packages/shared/src/events';
 import { mountNexaMap, type MapCamera, type MapViewport } from './map';
 import { WebRealtimeClient } from './realtime';
+import { manyWorldsPreviewEnabled, worldFromSearch, worldPickerMarkup, worldSceneMarkup, worldUrl } from './world-switcher';
+import { WORLD_DEFINITIONS, WORLD_IDS, type WorldId } from '../../packages/shared/src/worlds';
+import { WORLD_EXPERIENCES, worldExperienceMarkup } from './world-experience';
+import { worldStageMarkup } from './world-workspaces';
+import { worldMobileDockMarkup, worldMobileSheetMarkup } from './world-mobile-tools';
+import { isDemoMapMarkerId, worldMapContextMarkup } from './world-map-context';
+import { actionForMarker, demoInteractionMarkup, toggleDemoInteraction, type DemoInteractionState } from './world-demo-interactions';
 import {
   broadcastSessionChanged,
   onRemoteSessionChanged,
   withCrossTabAuthLock,
 } from './session-coordination';
 
-type Tab = 'map' | 'discover' | 'pulse' | 'connections' | 'you';
+declare const __NEXUS_PUBLIC_DEMO_ONLY__: boolean;
+
+type Tab = 'map' | 'experiences' | 'opportunities' | 'connections' | 'identity';
 type ThemePreference = 'system' | 'dark' | 'light';
+
+const THEME_ICONS: Record<ThemePreference, string> = {
+  system: '◐',
+  dark: '☾',
+  light: '☀',
+};
 type ApiPath =
   | '/auth/web/login'
   | '/auth/web/refresh'
@@ -37,6 +52,11 @@ type ApiPath =
 
 interface State {
   tab: Tab;
+  worldId: WorldId;
+  worldAction: string | null;
+  mobileSheetOpen: boolean;
+  selectedDemoMarker: string | null;
+  demoInteractions: DemoInteractionState;
   theme: ThemePreference;
   user: AuthenticatedUser | null;
   points: DiscoveryPoint[];
@@ -94,6 +114,7 @@ const SAFE_TAGS = new Set([
   'SECTION', 'SMALL', 'SPAN', 'STRONG',
 ]);
 const SAFE_ATTRIBUTES = new Set([
+  'aria-current', 'aria-hidden', 'aria-label', 'aria-pressed', 'aria-modal', 'role', 'data-world', 'data-world-action', 'data-mobile-action', 'data-close-world-sheet', 'data-close-map-context', 'data-demo-interaction',
   'autocomplete', 'class', 'data-action', 'data-conversation-id', 'data-kind',
   'data-request-id', 'data-tab', 'data-target', 'data-tone', 'data-wave-user-id',
   'disabled', 'id', 'maxlength', 'minlength', 'open', 'placeholder', 'required', 'type',
@@ -115,6 +136,11 @@ const demoFeed: ActivityItem[] = [
 
 const state: State = {
   tab: 'map',
+  worldId: worldFromSearch(window.location.search),
+  worldAction: null,
+  mobileSheetOpen: false,
+  selectedDemoMarker: null,
+  demoInteractions: {},
   theme: readTheme(),
   user: null,
   points: demoPoints,
@@ -151,6 +177,7 @@ function readTheme(): ThemePreference {
 function applyTheme(): void {
   const resolved = state.theme === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : state.theme;
   document.documentElement.dataset.theme = resolved;
+  document.documentElement.dataset.world = manyWorldsPreviewEnabled(window.location.search) ? state.worldId : 'nexus';
 }
 function cycleTheme(): void {
   const order: ThemePreference[] = ['system', 'dark', 'light'];
@@ -493,32 +520,92 @@ function truncate(value: string, length = 78): string {
   return value.length <= length ? value : `${value.slice(0, length - 1)}…`;
 }
 
+function isSpatialTab(tab: Tab): boolean {
+  return tab === 'map' || tab === 'experiences' || tab === 'opportunities';
+}
+function switchTab(tab: Tab): void {
+  const changing = state.tab !== tab;
+  state.tab = tab;
+  if (tab === 'map') state.kinds = new Set<EntityKind>(['user', 'event', 'listing']);
+  if (tab === 'experiences') state.kinds = new Set<EntityKind>(['event']);
+  if (tab === 'opportunities') state.kinds = new Set<EntityKind>(['listing']);
+  render();
+  if (changing && isSpatialTab(tab) && token()) void loadDiscovery();
+}
 function nav(tab: Tab, icon: string, tone: 'discovery' | 'action'): string {
-  return `<button class="nav ${state.tab === tab ? 'active' : ''}" data-tab="${tab}" data-tone="${tone}"><span>${icon}</span><small>${tab[0]?.toUpperCase()}${tab.slice(1)}</small></button>`;
+  const label = tab[0]?.toUpperCase() + tab.slice(1);
+  return `<button type="button" class="nav ${state.tab === tab ? 'active' : ''}" data-tab="${tab}" data-tone="${tone}" aria-label="${label}" aria-current="${state.tab === tab ? 'page' : 'false'}"><span aria-hidden="true">${icon}</span><small>${label}</small></button>`;
 }
 function shell(): string {
-  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXA</b></button><nav>${nav('map','⌖','discovery')}${nav('discover','◇','discovery')}${nav('pulse','≋','discovery')}${nav('connections','◎','action')}${nav('you','◉','action')}</nav><div class="rail-foot"><button id="theme">${state.theme === 'light' ? '☀' : state.theme === 'dark' ? '☾' : '◐'}</button>${state.user ? `<button class="avatar" data-tab="you">${escapeHtml(initials(state.user.displayName))}</button>` : '<button id="auth">Sign in</button>'}</div></aside><main><header>${topbar()}</header><section class="content">${view()}</section></main><nav class="mobile-nav">${nav('map','⌖','discovery')}${nav('discover','◇','discovery')}${nav('pulse','≋','discovery')}${nav('connections','◎','action')}${nav('you','◉','action')}</nav>${state.notice ? `<div class="toast">${escapeHtml(state.notice)}</div>` : ''}${authPanel()}</div>`;
+  const tabs = nav('map','⌖','discovery')
+    + nav('experiences','◇','discovery')
+    + nav('opportunities','♧','discovery')
+    + nav('connections','◎','action')
+    + nav('identity','◉','action');
+  const accountControl = state.user
+    ? `<button class="avatar" data-tab="identity">${escapeHtml(initials(state.user.displayName))}</button>`
+    : (__NEXUS_PUBLIC_DEMO_ONLY__ ? '<span class="mode">Public demo</span>' : '<button id="auth">Sign in</button>');
+  const notice = state.notice
+    ? `<div class="toast">${escapeHtml(state.notice)}</div>`
+    : '';
+
+  return `<div class="shell"><aside class="rail"><button class="logo" data-tab="map"><i></i><b>NEXUS</b></button><nav>${tabs}</nav><div class="rail-foot"><button id="theme">${THEME_ICONS[state.theme]}</button>${accountControl}</div></aside><main><header>${topbar()}</header><section class="content">${manyWorldsPreviewEnabled(window.location.search) ? worldExperienceMarkup(state.worldId, state.worldAction ?? undefined) + worldStageMarkup(state.worldId, state.worldAction ?? undefined) : ''}${view()}</section></main><nav class="mobile-nav">${tabs}</nav>${manyWorldsPreviewEnabled(window.location.search) ? worldMobileDockMarkup(state.worldId, state.worldAction) + (state.mobileSheetOpen ? worldMobileSheetMarkup(state.worldId, state.worldAction) : '') : ''}${notice}${authPanel()}</div>`;
 }
 function topbar(): string {
   const copy: Record<Tab, [string,string]> = {
-    map: ['Map','What is happening around you right now.'],
-    discover: ['Discover','Focused entry points into local life.'],
-    pulse: ['Pulse','Useful local activity, not an endless feed.'],
+    map: ['Map','Your live local world, one interactive viewport.'],
+    experiences: ['Experiences','Events and shared experiences in this map area.'],
+    opportunities: ['Opportunities','Listings and local requests in this map area.'],
     connections: ['Connections','Chats and relationship actions.'],
-    you: ['You','Identity, verification, presence and account controls.'],
+    identity: ['Identity','Verification, presence and account controls.'],
   };
   const [title, subtitle] = copy[state.tab];
   const liveLabel = state.tab === 'connections' && state.user
     ? (state.realtimeConnected ? 'Realtime live' : 'Realtime offline')
     : (state.user ? 'Live backend' : 'Demo mode');
-  return `<div><p class="eyebrow">NEXA / ${title.toUpperCase()}</p><h1>${title}</h1><p>${subtitle}</p></div><div class="header-actions"><span class="mode"><i></i>${liveLabel}</span>${state.user ? '<button id="refresh">Refresh</button>' : '<button class="primary" id="auth-top">Connect backend</button>'}</div>`;
+  const worldPreview = manyWorldsPreviewEnabled(window.location.search)
+    ? `${worldPickerMarkup(state.worldId)}${worldSceneMarkup(state.worldId)}`
+    : '';
+  const previewLabel = state.worldId !== 'nexus'
+    ? ` · ${WORLD_DEFINITIONS[state.worldId].displayName} visual preview (core data unchanged)`
+    : '';
+  return `<div><p class="eyebrow">NEXUS / ${title.toUpperCase()}</p><h1>${title}</h1><p>${subtitle}${previewLabel}</p>${worldPreview}</div><div class="header-actions"><span class="mode"><i></i>${liveLabel}</span>${state.user ? '<button id="refresh">Refresh</button>' : (__NEXUS_PUBLIC_DEMO_ONLY__ ? '' : '<button class="primary" id="auth-top">Connect backend</button>')}</div>`;
 }
 function view(): string {
-  return state.tab === 'map' ? mapView() : state.tab === 'discover' ? discoverView() : state.tab === 'pulse' ? pulseView() : state.tab === 'connections' ? connectionsView() : youView();
+  if (isSpatialTab(state.tab)) return mapView();
+  if (state.tab === 'connections') return connectionsView();
+  return identityView();
 }
 function mapView(): string {
   const visible = state.points.filter((point) => point.kind === 'cluster' || state.kinds.has(point.kind));
-  return `<div class="map-layout"><section class="map-card"><div class="toolbar"><div class="search">⌕ <span>Pan or zoom to search this area</span></div><div class="chips">${chip('user','People')}${chip('event','Events')}${chip('listing','Listings')}</div></div><div class="map" id="nexa-map"></div></section><aside class="panel"><div class="section-head"><div><p class="eyebrow">NEARBY NOW</p><h2>Local signals</h2></div><button id="refresh-map">Refresh</button></div>${visible.slice(0,8).map(row).join('') || '<p class="empty">No results in these filters.</p>'}<div class="create"><b>＋</b><div><strong>Create nearby</strong><p>Creation stays contextual to the current Map viewport.</p></div></div></aside></div>`;
+  let lens = 'DISCOVERY';
+  let title = 'Local signals';
+
+  if (state.tab === 'experiences') {
+    lens = 'EXPERIENCES';
+    title = 'Events around you';
+  } else if (state.tab === 'opportunities') {
+    lens = 'OPPORTUNITIES';
+    title = 'Nearby offers and requests';
+  }
+
+  let filters: string;
+  if (state.tab === 'map') {
+    filters = `<div class="chips">${chip('user','People')}${chip('event','Events')}${chip('listing','Listings')}</div>`;
+  } else {
+    const filterLabel = state.tab === 'experiences' ? 'Events' : 'Listings';
+    filters = `<div class="chips"><span class="chip selected">${filterLabel}</span></div>`;
+  }
+
+  const signals = state.feed.filter((item) => {
+    if (state.tab === 'experiences') return item.type === 'event' || item.type === 'alert';
+    if (state.tab === 'opportunities') return item.type === 'listing';
+    return true;
+  }).slice(0, 2);
+  const context = manyWorldsPreviewEnabled(window.location.search) && state.points === demoPoints
+    ? worldMapContextMarkup(state.worldId, state.selectedDemoMarker) + demoInteractionMarkup(state.worldId, state.selectedDemoMarker, state.demoInteractions)
+    : '';
+  return `<div class="map-layout"><section class="map-card"><div class="toolbar"><div class="search">⌕ <span>Pan or zoom to search this area</span></div>${filters}</div><div class="map" id="nexa-map"></div>${context}</section><aside class="panel"><div class="section-head"><div><p class="eyebrow">NEXUS / ${lens}</p><h2>${title}</h2></div><button id="refresh-map">Refresh</button></div>${visible.slice(0,8).map(row).join('') || '<p class="empty">No nearby results for this lens.</p>'}<div class="create"><b>≋</b><div><strong>Nearby Pulse</strong><p>Local activity signals, not a second feed.</p></div></div>${signals.map(activity).join('')}</aside></div>`;
 }
 function chip(kind: EntityKind, label: string): string {
   return `<button class="chip ${state.kinds.has(kind) ? 'selected' : ''}" data-kind="${kind}">${label}</button>`;
@@ -529,17 +616,8 @@ function row(point: DiscoveryPoint): string {
   if (point.kind === 'event') return `<article class="row"><b class="entity event">◆</b><div><strong>${escapeHtml(point.meta.title)}</strong><p>${point.meta.attendeeCount} going</p></div></article>`;
   return `<article class="row"><b class="entity listing">▣</b><div><strong>${escapeHtml(point.meta.title)}</strong><p>${escapeHtml(point.meta.currency)} ${(point.meta.priceCents / 100).toFixed(0)} · ${escapeHtml(point.meta.category)}</p></div></article>`;
 }
-function discoverView(): string {
-  return `<div class="discover">${discoverCard('Nearby people','Map → People','map','discovery')}${discoverCard('Local events','Pulse → Events','pulse','discovery')}${discoverCard('Marketplace','Map → Listings','map','action')}${discoverCard('People you may know','Connections','connections','action')}<article class="principle wide"><p class="eyebrow">DISCOVERY CONTRACT</p><h2>One city. Multiple lenses.</h2><p>Discover is a routing surface, not another ranked social feed. Spatial relevance remains authoritative on Map.</p></article></div>`;
-}
-function discoverCard(title: string, cta: string, target: Tab, tone: 'discovery'|'action'): string {
-  return `<button class="discover-card ${tone}" data-target="${target}"><i></i><h2>${title}</h2><p>Open a focused NEXA surface without duplicating ranking or location requests.</p><strong>${cta} →</strong></button>`;
-}
-function pulseView(): string {
-  return `<div class="pulse-layout"><section class="stream"><div class="chips"><button class="chip selected">For you</button><button class="chip">Nearby</button><button class="chip">Events</button><button class="chip">Marketplace</button></div>${state.feed.map(activity).join('') || '<p class="empty">No local activity yet.</p>'}</section><aside><article class="signal"><p class="eyebrow">CITY SIGNAL</p><b>${state.points.length}</b><span>nearby map signals</span><div class="bars"><i></i><i></i><i></i><i></i><i></i></div></article><article class="principle"><p class="eyebrow">PULSE IS NOT</p><h3>An infinite popularity feed.</h3><p>It prioritizes useful local events, alerts and listings.</p></article></aside></div>`;
-}
 function activity(item: ActivityItem): string {
-  return `<article class="activity"><div><span>${item.type.toUpperCase()}</span><span>${ago(item.createdAt)}</span></div><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.preview)}</p><footer><span>${distance(item.distanceM)}</span><span>${item.actorName ? escapeHtml(item.actorName) : 'NEXA local signal'}</span>${item.unread ? '<i></i>' : ''}</footer></article>`;
+  return `<article class="activity"><div><span>${item.type.toUpperCase()}</span><span>${ago(item.createdAt)}</span></div><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.preview)}</p><footer><span>${distance(item.distanceM)}</span><span>${item.actorName ? escapeHtml(item.actorName) : 'NEXUS local signal'}</span>${item.unread ? '<i></i>' : ''}</footer></article>`;
 }
 function connectionsView(): string {
   if (!state.user) {
@@ -599,13 +677,15 @@ function messageRow(message: ChatMessage): string {
   const body = message.type === 'text' ? message.body : message.type === 'location' ? 'Shared a location' : 'Shared live location';
   return `<article class="message ${mine ? 'mine' : 'peer'}"><p>${escapeHtml(body)}</p><small>${mine ? 'You' : 'Peer'} · ${ago(message.createdAt)}</small></article>`;
 }
-function youView(): string {
-  if (!state.user) return `<div class="you-empty"><div class="identity"></div><p class="eyebrow">YOUR NEXA IDENTITY</p><h2>Connect the live backend to open your identity surface.</h2><p>Map presence, verification and privacy belong here—not in a vanity feed.</p><button class="primary" id="auth-you">Sign in</button></div>`;
+function identityView(): string {
+  if (!state.user && __NEXUS_PUBLIC_DEMO_ONLY__) return `<div class="you-empty"><div class="identity"></div><p class="eyebrow">PUBLIC DEMO</p><h2>Identity is not connected in this preview.</h2><p>Explore the fictional map and worlds without signing in. No real accounts or private data are available.</p></div>`;
+  if (!state.user) return `<div class="you-empty"><div class="identity"></div><p class="eyebrow">YOUR NEXUS IDENTITY</p><h2>Connect the live backend to open your identity surface.</h2><p>Map presence, verification and privacy belong here—not in a vanity feed.</p><button class="primary" id="auth-you">Sign in</button></div>`;
   const verification = verificationLabel(state.user.verification);
   return `<div class="you"><section class="identity-card"><div class="profile">${escapeHtml(initials(state.user.displayName))}</div><div><p class="eyebrow">SIGNED IN</p><h2>${escapeHtml(state.user.displayName)}</h2><p>${escapeHtml(state.user.email)}</p></div><span>${escapeHtml(verification)}</span></section><section class="trust"><div><p class="eyebrow">VERIFICATION SIGNAL</p><h2>${escapeHtml(verification)}</h2><p>Web v1 renders the factual verification level returned by the backend. It does not calculate or expose a public numeric trust score.</p></div></section><button class="danger" id="logout">Sign out of web preview</button></div>`;
 }
 function authPanel(): string {
-  return `<dialog class="auth-dialog" ${state.authOpen ? 'open' : ''}><form id="login"><button type="button" id="close">×</button><div class="logo auth-logo"><i></i><b>NEXA</b></div><p class="eyebrow">LIVE BACKEND</p><h2>Sign in to NEXA</h2><p>The access token stays in memory. The refresh credential is held by the backend in an HttpOnly SameSite cookie and is never exposed to browser JavaScript.</p><label>Email<input id="email" type="email" required autocomplete="email"></label><label>Password<input id="password" type="password" minlength="8" required autocomplete="current-password"></label><button class="primary" type="submit">Connect live backend</button><small>Local preview targets backend port 3001. Production uses same-origin <code>/api/v1</code> and <code>/socket.io</code> edge routes.</small></form></dialog>`;
+  if (__NEXUS_PUBLIC_DEMO_ONLY__) return '';
+  return `<dialog class="auth-dialog" ${state.authOpen ? 'open' : ''}><form id="login"><button type="button" id="close">×</button><div class="logo auth-logo"><i></i><b>NEXUS</b></div><p class="eyebrow">LIVE BACKEND</p><h2>Sign in to NEXUS</h2><p>The access token stays in memory. The refresh credential is held by the backend in an HttpOnly SameSite cookie and is never exposed to browser JavaScript.</p><label>Email<input id="email" type="email" required autocomplete="email"></label><label>Password<input id="password" type="password" minlength="8" required autocomplete="current-password"></label><button class="primary" type="submit">Connect live backend</button><small>Local preview targets backend port 3001. Production uses same-origin <code>/api/v1</code> and <code>/socket.io</code> edge routes.</small></form></dialog>`;
 }
 
 function safeFragment(html: string): DocumentFragment {
@@ -627,19 +707,54 @@ function safeFragment(html: string): DocumentFragment {
 }
 
 function bind(): void {
+  document.querySelectorAll<HTMLElement>('[data-world]').forEach((element) => element.addEventListener('click', () => {
+    const id = element.dataset.world;
+    if (!manyWorldsPreviewEnabled(window.location.search) || !WORLD_IDS.some((world) => world === id)) return;
+    state.worldId = id as WorldId;
+    state.worldAction = null;
+    state.mobileSheetOpen = false;
+    state.selectedDemoMarker = null;
+    applyTheme();
+    window.history.replaceState(null, '', worldUrl(state.worldId, window.location));
+    render();
+  }));
+  document.querySelectorAll<HTMLElement>('[data-demo-interaction]').forEach((element) => element.addEventListener('click', () => {
+    const id = element.dataset.demoInteraction;
+    if (!id || !manyWorldsPreviewEnabled(window.location.search) || state.points !== demoPoints) return;
+    if (state.selectedDemoMarker !== id || !actionForMarker(id)) return;
+    state.demoInteractions = toggleDemoInteraction(state.demoInteractions, id);
+    render();
+  }));
+  document.querySelectorAll<HTMLElement>('[data-close-map-context]').forEach((element) => element.addEventListener('click', () => {
+    state.selectedDemoMarker = null;
+    render();
+  }));
+  document.querySelectorAll<HTMLElement>('[data-world-action]').forEach((element) => element.addEventListener('click', () => {
+    const action = element.dataset.worldAction;
+    if (!manyWorldsPreviewEnabled(window.location.search) || !action) return;
+    state.worldAction = action;
+    render();
+  }));
+  document.querySelectorAll<HTMLElement>('[data-mobile-action]').forEach((element) => element.addEventListener('click', () => {
+    const id = element.dataset.mobileAction;
+    if (!manyWorldsPreviewEnabled(window.location.search) || !id) return;
+    const valid = WORLD_EXPERIENCES[state.worldId].actions.some((action) => action.id === id);
+    if (!valid) return;
+    state.worldAction = id;
+    state.mobileSheetOpen = true;
+    render();
+    root.querySelector<HTMLButtonElement>('#world-sheet-close')?.focus();
+  }));
+  document.querySelectorAll<HTMLElement>('[data-close-world-sheet]').forEach((element) => element.addEventListener('click', () => {
+    closeWorldSheet();
+  }));
   document.querySelectorAll<HTMLElement>('[data-tab]').forEach((element) => element.addEventListener('click', () => {
     const tab = element.dataset.tab as Tab | undefined;
-    if (tab) {
-      state.tab = tab;
-      render();
-    }
+    if (tab) { state.mobileSheetOpen = false; switchTab(tab); }
   }));
   document.querySelectorAll<HTMLElement>('[data-target]').forEach((element) => element.addEventListener('click', () => {
     const tab = element.dataset.target as Tab | undefined;
-    if (tab) {
-      state.tab = tab;
-      render();
-    }
+    if (tab) switchTab(tab);
   }));
   document.querySelectorAll<HTMLElement>('[data-kind]').forEach((element) => element.addEventListener('click', () => {
     const kind = element.dataset.kind as EntityKind | undefined;
@@ -668,7 +783,6 @@ function bind(): void {
   document.querySelector('#theme')?.addEventListener('click', cycleTheme);
   document.querySelector('#refresh')?.addEventListener('click', () => {
     if (state.tab === 'connections') void loadConnections();
-    else if (state.tab === 'pulse') void loadFeed();
     else void loadDiscovery();
   });
   document.querySelector('#refresh-map')?.addEventListener('click', () => void loadDiscovery());
@@ -708,16 +822,60 @@ function bind(): void {
       points: visiblePoints,
       camera: state.mapCamera,
       onViewportSettled: onMapViewportSettled,
+      onSelectPoint: (point) => {
+        if (!manyWorldsPreviewEnabled(window.location.search) || state.points !== demoPoints) return;
+        const markerId = point.kind === 'cluster' ? `cluster:${point.cellId}` : `${point.kind}:${point.id}`;
+        if (!isDemoMapMarkerId(markerId)) return;
+        state.selectedDemoMarker = markerId;
+        render();
+      },
     });
   }
 
   const messageList = document.querySelector<HTMLElement>('#message-list');
   if (messageList) messageList.scrollTop = messageList.scrollHeight;
 }
+function closeWorldSheet(): void {
+  if (!state.mobileSheetOpen) return;
+  state.mobileSheetOpen = false;
+  render();
+  root.querySelector<HTMLElement>('.world-mobile-dock .world-dock-action.is-active')?.focus();
+}
+
 function render(): void {
+  const preservedMap = isSpatialTab(state.tab)
+    ? root.querySelector<HTMLElement>('#nexa-map')
+    : null;
+
   root.replaceChildren(safeFragment(shell()));
+
+  if (preservedMap && isSpatialTab(state.tab)) {
+    const placeholder = root.querySelector<HTMLElement>('#nexa-map');
+    if (placeholder && placeholder !== preservedMap) placeholder.replaceWith(preservedMap);
+  }
+
+  // Re-center the active choice in the horizontal mobile world picker.
+  const picker = root.querySelector<HTMLElement>('.world-choices');
+  const selected = picker?.querySelector<HTMLElement>('.world-choice.selected');
+  if (picker && selected && window.matchMedia('(max-width: 760px)').matches) {
+    picker.scrollLeft = Math.max(0, selected.offsetLeft - (picker.clientWidth - selected.clientWidth) / 2);
+  }
+
   bind();
 }
+
+document.addEventListener('keydown', (event) => {
+  if (!state.mobileSheetOpen) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeWorldSheet();
+    return;
+  }
+  if (event.key === 'Tab') {
+    const closeButton = root.querySelector<HTMLButtonElement>('#world-sheet-close');
+    if (closeButton) { event.preventDefault(); closeButton.focus(); }
+  }
+});
 
 onRemoteSessionChanged(() => {
   window.location.reload();
@@ -730,4 +888,4 @@ matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
 });
 applyTheme();
 render();
-void restoreSession();
+if (!__NEXUS_PUBLIC_DEMO_ONLY__) void restoreSession();

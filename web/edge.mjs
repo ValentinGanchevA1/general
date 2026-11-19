@@ -10,7 +10,8 @@ const port = Number(process.env.PORT ?? 4174);
 const PARSE_ORIGIN = 'https://nexa.invalid';
 const PREVIEW_BACKEND_ORIGIN = 'https://g88-api-pr-578.onrender.com';
 const PRODUCTION_BACKEND_ORIGIN = 'https://g88-api.onrender.com';
-const backend = resolveBackendOrigin(process.env.BACKEND_ORIGIN);
+const publicDemoOnly = process.env.PUBLIC_DEMO_ONLY === '1';
+const backend = publicDemoOnly ? null : resolveBackendOrigin(process.env.BACKEND_ORIGIN);
 const allowedMethods = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']);
 const types = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -37,6 +38,12 @@ const server = createServer((request, response) => {
     return;
   }
 
+  if (isProxyPath(target.pathname) && publicDemoOnly) {
+    setSecurityHeaders(response);
+    response.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }).end('{"error":"Public demo: backend disabled"}');
+    return;
+  }
+
   if (isProxyPath(target.pathname)) {
     proxyHttp(request, response, target.requestTarget);
     return;
@@ -47,7 +54,7 @@ const server = createServer((request, response) => {
 
 server.on('upgrade', (request, socket, head) => {
   const target = parseRequestTarget(request.url);
-  if (!target || request.method !== 'GET' || !isSocketPath(target.pathname)) {
+  if (publicDemoOnly || !target || request.method !== 'GET' || !isSocketPath(target.pathname)) {
     socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
     return;
   }
@@ -57,7 +64,7 @@ server.on('upgrade', (request, socket, head) => {
 
 server.listen(port, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
-  console.log(`NEXA web edge listening on :${port}; backend=${backend.origin}`);
+  console.log(`NEXA web edge listening on :${port}; backend=${backend?.origin ?? 'disabled (public demo)'}`);
 });
 
 function resolveBackendOrigin(value) {

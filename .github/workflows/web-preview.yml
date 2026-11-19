@@ -58,6 +58,36 @@ jobs:
           node --check web/dist/app.js
           node --check web/edge.mjs
 
+      - name: MANY WORLDS switcher contracts
+        run: node web/e2e/world-switcher.contract.e2e.mjs
+
+      - name: MANY WORLDS interactive experience contracts
+        run: node web/e2e/world-experience.contract.e2e.mjs
+
+      - name: MANY WORLDS responsive contracts
+        run: node web/e2e/world-responsive.contract.e2e.mjs
+
+      - name: MANY WORLDS mobile tools contract
+        run: node web/e2e/world-mobile-tools.contract.e2e.mjs
+
+      - name: MANY WORLDS v6 map context contract
+        run: node web/e2e/world-map-context.contract.e2e.mjs
+
+      - name: MANY WORLDS v7 local demo interactions
+        run: node web/e2e/world-demo-interactions.contract.e2e.mjs
+
+      - name: Public demo isolation
+        run: |
+          PUBLIC_DEMO_ONLY=1 PORT=4182 node web/edge.mjs >/tmp/nexa-demo-edge.log 2>&1 &
+          EDGE_PID=$!
+          trap 'kill "$EDGE_PID" 2>/dev/null || true' EXIT
+          for attempt in 1 2 3 4 5; do
+            if curl --fail --silent http://127.0.0.1:4182/healthz >/dev/null; then break; fi
+            sleep 1
+          done
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:4182/api/v1/auth/me)" = '503'
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:4182/socket.io/?EIO=4\&transport=polling)" = '503'
+
       - name: Smoke test web edge
         run: |
           if BACKEND_ORIGIN=https://example.com PORT=4181 node web/edge.mjs >/tmp/nexa-edge-reject.log 2>&1; then

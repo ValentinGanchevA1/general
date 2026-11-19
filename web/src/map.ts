@@ -20,6 +20,7 @@ interface MountNexaMapOptions {
   points: DiscoveryPoint[];
   camera: MapCamera;
   onViewportSettled: (camera: MapCamera, viewport: MapViewport) => void;
+  onSelectPoint?: (point: DiscoveryPoint) => void;
 }
 
 interface DragState {
@@ -84,7 +85,7 @@ export function mountNexaMap(options: MountNexaMapOptions): void {
     if (frame !== 0) return;
     frame = requestAnimationFrame(() => {
       frame = 0;
-      renderLayers(surface, tileLayer, featureLayer, points, camera);
+      renderLayers(surface, tileLayer, featureLayer, points, camera, options.onSelectPoint);
     });
   };
 
@@ -187,7 +188,7 @@ export function mountNexaMap(options: MountNexaMapOptions): void {
     settle();
   });
 
-  renderLayers(surface, tileLayer, featureLayer, points, camera);
+  renderLayers(surface, tileLayer, featureLayer, points, camera, options.onSelectPoint);
 }
 
 function renderLayers(
@@ -196,6 +197,7 @@ function renderLayers(
   featureLayer: HTMLElement,
   points: DiscoveryPoint[],
   camera: MapCamera,
+  onSelectPoint?: (point: DiscoveryPoint) => void,
 ): void {
   const width = surface.clientWidth;
   const height = surface.clientHeight;
@@ -260,6 +262,12 @@ function renderLayers(
       marker.setAttribute('aria-label', point.meta.title);
     }
 
+    marker.dataset.demoMarker = point.kind === 'cluster' ? `cluster:${point.cellId}` : `${point.kind}:${point.id}`;
+    marker.addEventListener('pointerdown', (event) => event.stopPropagation());
+    marker.addEventListener('click', (event) => {
+      event.stopPropagation();
+      onSelectPoint?.(point);
+    });
     featureFragment.append(marker);
   }
   featureLayer.replaceChildren(featureFragment);
