@@ -12,7 +12,7 @@
 
 ## Proposed code changes
 
-1. `apps/backend/src/config/postgres-ssl.ts` explicitly configures verified TLS for TypeORM in production, strips `sslmode` from the URI **when** it supplies the TLS object (node-postgres otherwise overrides SSL object properties), rejects non-TLS production modes, and accepts an optional PEM CA via `DATABASE_SSL_CA_PEM`. Never disable certificate validation to bypass the failure.
+1. `apps/backend/src/config/postgres-ssl.ts` explicitly configures verified TLS for TypeORM in production **and for direct/pooled Supabase targets even if `NODE_ENV` is absent**, strips `sslmode` from the URI **when** it supplies the TLS object (node-postgres otherwise overrides SSL object properties), rejects non-TLS production modes, and accepts an optional PEM CA via `DATABASE_SSL_CA_PEM`. Never disable certificate validation to bypass the failure.
 2. `scripts/render/build-backend.sh` installs/builds application artifacts **without any database query or migration**. This is the proposed Render Build Command, **not yet applied**:
 
    ```bash
@@ -25,10 +25,11 @@
 ## Validation and controlled activation
 
 - CI must pass backend Jest, typecheck, lint, build, migration-history safety tests, and the offline render-build contract.
-- In Render Environment, compare only **non-secret** host/port/database/user identity with the intended Supabase G88 connection; never paste a URL, password, or PEM into GitHub, logs, or chat. Do not presume prior evidence attests the *current* environment.
+- In Render Environment, verify whether `NODE_ENV=production` is set and compare only **non-secret** host/port/database/user identity with the intended Supabase G88 connection; never paste a URL, password, or PEM into GitHub, logs, or chat. Do not presume prior evidence attests the *current* environment.
 - If the TLS chain is not trusted by the runtime, obtain the **current** Supabase database root certificate from its Database SSL Configuration page, store it as a *secret environment variable* named `DATABASE_SSL_CA_PEM` in the intended Render service; it must contain the PEM certificate, not a local Windows path. If using the default trust store, do not set this variable.
 - The existing Render Build Command must be changed separately in the Render Dashboard (not by this GitHub PR). **Do not deploy** a build while it still runs `migration:run`; do not delete history rows, add unverified aliases, disable database SSL enforcement, or change the guarded runner.
 - Only after owner approval and environment/target attestation, deploy the reviewed code with the migration-free build command and check `GET /health`, read-only DB connectivity, representative auth/map endpoints, and fresh Nest/Render errors. `/health` is a liveness endpoint and does not prove schema compatibility.
+- An active `NEXUS-STAGING` Supabase project currently has no `public` tables and no Supabase migrations reported by its connector; its existence is **not** evidence of a restored, sanitized, isolated G88 copy. Do not use it as a production schema compatibility test yet.
 - The 15 unresolved historical migration names, production schema provenance, least-privilege database role and staging restore remain **independent NO-GO gates**. Runtime recovery is not a release sign-off.
 
 ## Offline tests
