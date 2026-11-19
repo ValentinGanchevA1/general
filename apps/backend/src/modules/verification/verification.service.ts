@@ -63,10 +63,9 @@ function otpCode(): string {
   return String(randomInt(100_000, 999_999));
 }
 
-function allowDevOtp(kind: 'email' | 'phone'): boolean {
-  if (!isProd()) return true;
-  if (kind === 'email') return process.env.ALLOW_DEV_EMAIL_OTP === 'true';
-  return process.env.ALLOW_DEV_PHONE_OTP === 'true';
+function allowDevOtp(): boolean {
+  // Development OTP shortcuts must never authorize production verification.
+  return !isProd();
 }
 
 /** Ladder rank — numeric so comparisons are never possibly-undefined under strictNullChecks. */
@@ -346,8 +345,8 @@ export class VerificationService {
     const stored = await this.redis.get(`${PHONE_OTP_PREFIX}${phone}`);
     if (stored && stored === trimmed) return true;
 
-    if (allowDevOtp('phone') && trimmed === (process.env.DEV_OTP_CODE ?? DEV_CODE)) {
-      this.logger.warn(`[verify] ALLOW_DEV_PHONE_OTP / non-prod accepted for ${maskPhone(phone)}`);
+    if (allowDevOtp() && trimmed === (process.env.DEV_OTP_CODE ?? DEV_CODE)) {
+      this.logger.warn(`[verify] non-prod OTP accepted for ${maskPhone(phone)}`);
       return true;
     }
 
@@ -381,9 +380,9 @@ export class VerificationService {
     const stored = await this.redis.get(`${EMAIL_OTP_PREFIX}${userId}`);
     if (stored && stored === trimmed) return true;
 
-    if (allowDevOtp('email') && trimmed === (process.env.DEV_OTP_CODE ?? DEV_CODE)) {
+    if (allowDevOtp() && trimmed === (process.env.DEV_OTP_CODE ?? DEV_CODE)) {
       this.logger.warn(
-        `[verify] ALLOW_DEV_EMAIL_OTP / non-prod accepted for ${maskEmail(email)} (user ${userId})`,
+        `[verify] non-prod OTP accepted for ${maskEmail(email)} (user ${userId})`,
       );
       return true;
     }
