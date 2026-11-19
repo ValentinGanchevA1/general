@@ -4,6 +4,22 @@ import { RealtimeGateway } from './realtime.gateway';
 import { RealtimeEmitterService } from './realtime-emitter.service';
 
 describe('RealtimeEmitterService', () => {
+  it('checks remote membership after adapter eviction and returns false if stale', async () => {
+    const socketsLeave = jest.fn();
+    const fetchSockets = jest.fn().mockResolvedValue([
+      { rooms: new Set(['convo:conversation-1']) },
+    ]);
+    const inRoom = jest.fn().mockReturnValue({ socketsLeave, fetchSockets });
+    const server = { in: inRoom };
+    const moduleRef = { get: jest.fn().mockReturnValue({ server }) } as unknown as ModuleRef;
+    const service = new RealtimeEmitterService(moduleRef);
+
+    await expect(service.evictAndVerify('user-a', 'convo:conversation-1')).resolves.toBe(false);
+    fetchSockets.mockResolvedValueOnce([{ rooms: new Set(['user:user-a']) }]);
+    await expect(service.evictAndVerify('user-a', 'convo:conversation-1')).resolves.toBe(true);
+    expect(socketsLeave).toHaveBeenCalledTimes(2);
+  });
+
   it('revokes every socket for both users from the conversation room via socketsLeave', () => {
     const socketsLeave = jest.fn();
     const inRoom = jest.fn(() => ({ socketsLeave }));
