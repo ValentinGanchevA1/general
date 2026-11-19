@@ -76,6 +76,9 @@ jobs:
       - name: Guard production legal URLs
         env:
           NEXA_PLAY_TRACK: ${{ inputs.track || 'alpha' }}
+          # Exact immutable version approved by counsel and configured for backend Terms acceptance.
+          # Empty until legal sign-off: a production dispatch must fail closed.
+          NEXUS_TERMS_VERSION: ${{ vars.NEXUS_TERMS_VERSION }}
         run: node scripts/check-production-legal-urls.mjs
 
       - name: Guard required release secrets
