@@ -63,3 +63,11 @@
 3. Independently reconcile 85 applied DB migration filenames against 70 checkout SQL files and the 15 historical names in an isolated restored copy. Preserve fail-closed guard; require owner sign-off for any production migration plan.
 4. Consider moving migration execution out of Render's ordinary build into a separately approved release step **only after** reconciliation, with explicit runtime role/permission validation.
 5. Only after a successful controlled deploy, check `/health`, authentication, map queries, reporting persistence, admin decisions and signed-device behavior.
+
+## Updated Render evidence — 19 Nov 2026, 05:08 UTC
+
+- **New live deploy**: `dep-dbv7t3gu01pc73d34ri0`, commit `cc6408e0ba7218a8dcaf080a45e292571f53b51e` (#1139), became live 04:45 UTC. Previous build-failed diagnosis is historical, not the latest deployment state.
+- Render build command now `bash scripts/render/build-backend.sh`, with auto-deploy off. Confirm the script behavior and separation of migrations before any further release.
+- Current app logs show NestJS process uptime, successful HTTP 2xx counters and `nearby_2xx=1`. These are runtime indications, **not signed Android login/map/reporting acceptance evidence**. Direct unauthenticated `/health` fetch could not be independently confirmed in this audit.
+- **P1 security finding:** production app logs include a plaintext email verification OTP for a test account, alongside a warning that the email delivery channel is disabled. **Never reproduce the OTP, test-account identifier or related log contents in public PR comments.** Inspect `VerificationService` fallback and log redaction; remove OTP logging in production, review log access/retention, verify delivery configuration and test negative paths. Do not claim email verification is production-ready.
+- Child Safety reporting runtime and moderation authorization remain unverified; legal/publication gates unchanged.
