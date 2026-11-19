@@ -192,6 +192,13 @@ export class VerificationService {
       }
     }
 
+    if (isProd()) {
+      this.logger.error('[verify] SMS delivery unavailable; refusing undelivered OTP in production');
+      throw new ServiceUnavailableException({
+        code: 'verification.unavailable',
+        message: 'Phone verification is temporarily unavailable',
+      });
+    }
     return this.issuePhoneRedisOtp(userId, phone);
   }
 
@@ -202,7 +209,7 @@ export class VerificationService {
     const code = otpCode();
     await this.redis.setex(`${PHONE_OTP_PREFIX}${phone}`, PHONE_OTP_TTL_SEC, code);
     this.logger.warn(
-      `[verify] Phone OTP (Redis/dev channel) for ${phone} (user ${userId}): ${code} (ttl ${PHONE_OTP_TTL_SEC}s)`,
+      '[verify] Development phone OTP issued (code and recipient redacted)',
     );
     return { sent: true, channel: 'dev' };
   }
@@ -265,27 +272,25 @@ export class VerificationService {
         await client.verify.v2
           .services(process.env.TWILIO_VERIFY_SERVICE_SID as string)
           .verifications.create({ to: row.email, channel: 'email' });
-        const backup = otpCode();
-        await this.redis.setex(`${EMAIL_OTP_PREFIX}${userId}`, EMAIL_OTP_TTL_SEC, backup);
-        this.logger.log(
-          `[verify] Twilio email OTP started for ${maskEmail(row.email)}; Redis backup stored`,
-        );
+        this.logger.log(`[verify] Twilio email OTP started for ${maskEmail(row.email)}`);
         return { sent: true, channel: 'email', maskedEmail: maskEmail(row.email) };
       } catch (e) {
         this.logger.warn(`[verify] Twilio email channel failed: ${String(e)}`);
       }
     }
 
-    if (isProd() && !client) {
-      this.logger.error(
-        `[verify] Email OTP for ${maskEmail(row.email)} issued without Twilio — configure TWILIO_* + email channel`,
-      );
+    if (isProd()) {
+      this.logger.error('[verify] Email delivery unavailable; refusing undelivered OTP in production');
+      throw new ServiceUnavailableException({
+        code: 'verification.unavailable',
+        message: 'Email verification is temporarily unavailable',
+      });
     }
 
     const code = otpCode();
     await this.redis.setex(`${EMAIL_OTP_PREFIX}${userId}`, EMAIL_OTP_TTL_SEC, code);
     this.logger.warn(
-      `[verify] Email OTP (Redis/dev channel) for ${row.email} (user ${userId}): ${code} (ttl ${EMAIL_OTP_TTL_SEC}s)`,
+      '[verify] Development email OTP issued (code and recipient redacted)',
     );
     return {
       sent: true,
