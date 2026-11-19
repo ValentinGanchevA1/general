@@ -12,6 +12,8 @@ import type {
 } from '@g88/shared';
 
 import { api, getJson, postJson } from '@/api/client';
+import { Config } from '@/config';
+import { hasGoogleWebClientId } from '@/features/auth/googleOAuthAvailability';
 import { tokenStore } from '@/api/tokenStore';
 import { resetRankBaseline } from '@/features/gamification/rankBaseline';
 import { resetInboxSeen } from '@/features/interactions/inboxSeen';
@@ -79,6 +81,9 @@ export const loginWithGoogle = createAsyncThunk(
   'auth/loginWithGoogle',
   async (_, { rejectWithValue }) => {
     try {
+      if (!hasGoogleWebClientId(Config.GOOGLE_WEB_CLIENT_ID)) {
+        return rejectWithValue('Google sign-in is not configured in this build. Use email sign-in.');
+      }
       await GoogleSignin.hasPlayServices();
       const response = await GoogleSignin.signIn();
       if (!isSuccessResponse(response)) {
