@@ -35,8 +35,14 @@ export function resolvePostgresConnection(
     throw new Error('Unsupported PostgreSQL sslmode (details redacted)');
   }
   const production = env.NODE_ENV === 'production';
-  if (production && mode && UNSAFE_MODES.has(mode)) {
-    throw new Error('Production PostgreSQL requires verified TLS');
+  // Render's NODE_ENV may be missing/misconfigured; don't depend on it
+  // to secure a managed Supabase connection (direct or pooled).
+  const hostname = parsed.hostname.toLowerCase();
+  const supabaseTarget = hostname.endsWith('.supabase.co') ||
+    hostname.endsWith('.pooler.supabase.com');
+  const verifiedTlsRequired = production || supabaseTarget;
+  if (verifiedTlsRequired && mode && UNSAFE_MODES.has(mode)) {
+    throw new Error('Managed/production PostgreSQL requires verified TLS');
   }
 
   const ca = env.DATABASE_SSL_CA_PEM?.trim();
@@ -44,7 +50,7 @@ export function resolvePostgresConnection(
     throw new Error('DATABASE_SSL_CA_PEM must contain a PEM certificate');
   }
 
-  const tlsRequired = production || (mode != null && TLS_MODES.has(mode)) || Boolean(ca);
+  const tlsRequired = verifiedTlsRequired || (mode != null && TLS_MODES.has(mode)) || Boolean(ca);
   if (!tlsRequired) return { url: rawUrl };
 
   // pg-connection-string can silently override the explicit SSL object if
