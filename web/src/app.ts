@@ -25,6 +25,8 @@ import {
   withCrossTabAuthLock,
 } from './session-coordination';
 
+declare const __NEXUS_PUBLIC_DEMO_ONLY__: boolean;
+
 type Tab = 'map' | 'experiences' | 'opportunities' | 'connections' | 'identity';
 type ThemePreference = 'system' | 'dark' | 'light';
 
@@ -542,7 +544,7 @@ function shell(): string {
     + nav('identity','◉','action');
   const accountControl = state.user
     ? `<button class="avatar" data-tab="identity">${escapeHtml(initials(state.user.displayName))}</button>`
-    : '<button id="auth">Sign in</button>';
+    : (__NEXUS_PUBLIC_DEMO_ONLY__ ? '<span class="mode">Public demo</span>' : '<button id="auth">Sign in</button>');
   const notice = state.notice
     ? `<div class="toast">${escapeHtml(state.notice)}</div>`
     : '';
@@ -567,7 +569,7 @@ function topbar(): string {
   const previewLabel = state.worldId !== 'nexus'
     ? ` · ${WORLD_DEFINITIONS[state.worldId].displayName} visual preview (core data unchanged)`
     : '';
-  return `<div><p class="eyebrow">NEXUS / ${title.toUpperCase()}</p><h1>${title}</h1><p>${subtitle}${previewLabel}</p>${worldPreview}</div><div class="header-actions"><span class="mode"><i></i>${liveLabel}</span>${state.user ? '<button id="refresh">Refresh</button>' : '<button class="primary" id="auth-top">Connect backend</button>'}</div>`;
+  return `<div><p class="eyebrow">NEXUS / ${title.toUpperCase()}</p><h1>${title}</h1><p>${subtitle}${previewLabel}</p>${worldPreview}</div><div class="header-actions"><span class="mode"><i></i>${liveLabel}</span>${state.user ? '<button id="refresh">Refresh</button>' : (__NEXUS_PUBLIC_DEMO_ONLY__ ? '' : '<button class="primary" id="auth-top">Connect backend</button>')}</div>`;
 }
 function view(): string {
   if (isSpatialTab(state.tab)) return mapView();
@@ -676,11 +678,13 @@ function messageRow(message: ChatMessage): string {
   return `<article class="message ${mine ? 'mine' : 'peer'}"><p>${escapeHtml(body)}</p><small>${mine ? 'You' : 'Peer'} · ${ago(message.createdAt)}</small></article>`;
 }
 function identityView(): string {
+  if (!state.user && __NEXUS_PUBLIC_DEMO_ONLY__) return `<div class="you-empty"><div class="identity"></div><p class="eyebrow">PUBLIC DEMO</p><h2>Identity is not connected in this preview.</h2><p>Explore the fictional map and worlds without signing in. No real accounts or private data are available.</p></div>`;
   if (!state.user) return `<div class="you-empty"><div class="identity"></div><p class="eyebrow">YOUR NEXUS IDENTITY</p><h2>Connect the live backend to open your identity surface.</h2><p>Map presence, verification and privacy belong here—not in a vanity feed.</p><button class="primary" id="auth-you">Sign in</button></div>`;
   const verification = verificationLabel(state.user.verification);
   return `<div class="you"><section class="identity-card"><div class="profile">${escapeHtml(initials(state.user.displayName))}</div><div><p class="eyebrow">SIGNED IN</p><h2>${escapeHtml(state.user.displayName)}</h2><p>${escapeHtml(state.user.email)}</p></div><span>${escapeHtml(verification)}</span></section><section class="trust"><div><p class="eyebrow">VERIFICATION SIGNAL</p><h2>${escapeHtml(verification)}</h2><p>Web v1 renders the factual verification level returned by the backend. It does not calculate or expose a public numeric trust score.</p></div></section><button class="danger" id="logout">Sign out of web preview</button></div>`;
 }
 function authPanel(): string {
+  if (__NEXUS_PUBLIC_DEMO_ONLY__) return '';
   return `<dialog class="auth-dialog" ${state.authOpen ? 'open' : ''}><form id="login"><button type="button" id="close">×</button><div class="logo auth-logo"><i></i><b>NEXUS</b></div><p class="eyebrow">LIVE BACKEND</p><h2>Sign in to NEXUS</h2><p>The access token stays in memory. The refresh credential is held by the backend in an HttpOnly SameSite cookie and is never exposed to browser JavaScript.</p><label>Email<input id="email" type="email" required autocomplete="email"></label><label>Password<input id="password" type="password" minlength="8" required autocomplete="current-password"></label><button class="primary" type="submit">Connect live backend</button><small>Local preview targets backend port 3001. Production uses same-origin <code>/api/v1</code> and <code>/socket.io</code> edge routes.</small></form></dialog>`;
 }
 
@@ -884,4 +888,4 @@ matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
 });
 applyTheme();
 render();
-void restoreSession();
+if (!__NEXUS_PUBLIC_DEMO_ONLY__) void restoreSession();
