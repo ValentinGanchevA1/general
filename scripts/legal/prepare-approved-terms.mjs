@@ -24,6 +24,14 @@ export const DESTINATION = 'docs/legal/terms/index.html';
 const versionRe = /^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$/;
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Date.parse alone normalizes impossible dates such as 2026-02-31. */
+function isValidIsoDate(value) {
+  if (typeof value !== 'string' || !dateRe.test(value)) return false;
+  const parsed = new Date(value + 'T00:00:00.000Z');
+  return Number.isFinite(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value;
+}
+
 export function sha256(content) {
   return createHash('sha256').update(content).digest('hex');
 }
@@ -35,11 +43,15 @@ export function validateApprovedTerms(html, record) {
   }
   if (record.status !== 'approved') problems.push('approval.status must be approved');
   if (!versionRe.test(record.version ?? '')) problems.push('Valid immutable Terms version is required');
-  if (!dateRe.test(record.effectiveDate ?? '') || !Number.isFinite(Date.parse(record.effectiveDate ?? ''))) {
+  if (!isValidIsoDate(record.effectiveDate)) {
     problems.push('Valid effectiveDate YYYY-MM-DD required');
   }
-  if (!dateRe.test(record.approvedAt ?? '') || !Number.isFinite(Date.parse(record.approvedAt ?? ''))) {
+  if (!isValidIsoDate(record.approvedAt)) {
     problems.push('Valid approvedAt YYYY-MM-DD required');
+  }
+  if (isValidIsoDate(record.effectiveDate) && isValidIsoDate(record.approvedAt) &&
+      record.approvedAt > record.effectiveDate) {
+    problems.push('approvedAt must not be after effectiveDate');
   }
   if (String(record.approvedBy?.name ?? '').trim().length < 5 ||
       String(record.approvedBy?.role ?? '').trim().length < 5) {
@@ -78,8 +90,10 @@ export function validateApprovedTerms(html, record) {
   if (/DRAFT|UNAPPROVED|TODO|FIXME|\[(?:LEGAL|COUNSEL|VERIFY|APPROVED_|EFFECTIVE_|PLACEHOLDER|PUBLIC_|OPERATOR|REVIEW|DEFINE|SAFETY)/i.test(html)) {
     problems.push('Reviewer placeholders / draft warnings remain in HTML');
   }
-  if (/<script\b|javascript:|on(?:load|error|click)\s*=/i.test(html)) {
-    problems.push('Terms HTML must not contain executable JavaScript');
+  // A reviewed legal document is static content, never an executable UI or redirect.
+  // Reject active embeds, forms, inline handlers and refresh redirects as well as scripts.
+  if (/<\s*(?:script|iframe|object|embed|form|base|svg|math)\b|javascript\s*:|\bon[a-z]+\s*=|<\s*meta\b[^>]*http-equiv\s*=\s*["']?refresh\b/i.test(html)) {
+    problems.push('Terms HTML must not contain executable or active content');
   }
   return problems;
 }
