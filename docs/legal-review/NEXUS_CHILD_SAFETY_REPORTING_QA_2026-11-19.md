@@ -47,3 +47,19 @@
 6. Merge PR #1140 to `master` only with owner/reviewer sign-off, verify Render static deployment and public URL, then consider Play Console self-certification based on actual evidence.
 
 **Do not upload, copy, retain or email suspected CSAM as part of testing.** If a real incident occurs, follow authorized legal response channels rather than test workflows.
+
+## Read-only Render diagnostic update — 19 Nov 2026
+
+- Render workspace `g88`, service `g88-api` (`srv-d8d8ujojs32c73fb1gfg`): last deploy `dep-dbv73kd6e07s73auuu10` at 03:50 UTC is `build_failed`, source commit `7394aae2`. Auto-deploy is off.
+- Render build command ends with `pnpm --filter @g88/backend migration:run`; migration guard rejects 15 database-history filenames absent from checkout. Do **not** delete migration rows, add unverified aliases or rerun migrations against production.
+- Render application logs at 03:53 UTC show TypeORM retries with `(ESSLREQUIRED) SSL connection is required for user: postgres`.
+- Current master `apps/backend/src/app.module.ts` calls `resolvePostgresConnection(url, process.env)`; `apps/backend/src/config/postgres-ssl.ts` requires verified TLS in production and for Supabase hosts and strips URL `sslmode` to prevent driver override. Unit tests exist in `postgres-ssl.spec.ts`. **This source-code inspection does not establish which older commit is currently running or the effective Render environment.** Do not assume the source TLS resolver is defective or that a redeploy fixes the service.
+- No live HTTP health or Child Safety URL success could be independently established. Runtime QA remains blocked.
+
+### Controlled remediation prerequisites
+
+1. Inspect current running deploy/commit and effective non-secret configuration flags, including whether `NODE_ENV` is production, whether the database target is a managed Supabase host and whether the CA variable is set. Never print `DATABASE_URL`, credentials or certificate contents.
+2. Validate the effective TLS resolver/pg client with a safe isolated connection to the same *type* of endpoint and proper trusted CA/hostname verification; do not use `rejectUnauthorized:false`.
+3. Independently reconcile 85 applied DB migration filenames against 70 checkout SQL files and the 15 historical names in an isolated restored copy. Preserve fail-closed guard; require owner sign-off for any production migration plan.
+4. Consider moving migration execution out of Render's ordinary build into a separately approved release step **only after** reconciliation, with explicit runtime role/permission validation.
+5. Only after a successful controlled deploy, check `/health`, authentication, map queries, reporting persistence, admin decisions and signed-device behavior.
