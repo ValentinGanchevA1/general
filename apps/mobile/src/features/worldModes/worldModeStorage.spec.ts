@@ -31,7 +31,8 @@ describe('World Mode storage', () => {
 
   it('scopes the first-run marker to the registering account', async () => {
     await markWorldSelectionPending('user-a');
-    expect(await readWorldSelectionPending('user-a')).toBe(false);
+    storage.getItem.mockResolvedValueOnce('1');
+    expect(await readWorldSelectionPending('user-a')).toBe(true);
     expect(storage.setItem).toHaveBeenCalledWith('g88:world-mode-first-run:v1:user-a', '1');
   });
 
