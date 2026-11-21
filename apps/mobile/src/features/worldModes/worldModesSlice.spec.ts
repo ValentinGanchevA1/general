@@ -7,6 +7,7 @@ import reducer, {
   completeFirstRunWorldSelection,
   hydrateWorldMode,
   skipWorldSelectionForSession,
+  finishFirstRunWorldSelection,
 } from './worldModesSlice';
 
 const storage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
@@ -42,9 +43,11 @@ describe('World Mode preference state', () => {
 
     await store.dispatch(completeFirstRunWorldSelection({ userId: 'user-a', id: 'sanctuary' }));
     expect(store.getState().worldModes.selectedId).toBe('sanctuary');
-    expect(store.getState().worldModes.firstRunPending).toBe(false);
+    expect(store.getState().worldModes.firstRunPending).toBe(true);
     expect(store.getState().worldModes.error).toBeNull();
     expect(storage.removeItem).toHaveBeenCalledWith('g88:world-mode-first-run:v1:user-a');
+    store.dispatch(finishFirstRunWorldSelection());
+    expect(store.getState().worldModes.firstRunPending).toBe(false);
   });
 
   it('keeps the prior selection and first-run marker when persistence fails', async () => {
@@ -89,8 +92,10 @@ describe('World Mode preference state', () => {
   it('allows session-only skip when local storage is unavailable', () => {
     const store = makeStore();
     store.dispatch(skipWorldSelectionForSession());
-    expect(store.getState().worldModes.firstRunPending).toBe(false);
+    expect(store.getState().worldModes.firstRunPending).toBe(true);
     expect(store.getState().worldModes.selectedId).toBe('nexus');
+    store.dispatch(finishFirstRunWorldSelection());
+    expect(store.getState().worldModes.firstRunPending).toBe(false);
   });
 });
 
