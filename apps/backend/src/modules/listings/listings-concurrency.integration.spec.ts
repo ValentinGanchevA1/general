@@ -72,7 +72,7 @@ suite('NEXUS Stage D3 Marketplace concurrency (disposable PostgreSQL only)', () 
     // via docker exec; local D3 retains its original fixed server identity.
     const ci = process.env.NEXUS_D5_CI_RUN === '1';
     const local = process.env.NEXUS_D3_RUN === '1';
-    if (ci === local || !process.env.PGPASSWORD) {
+    if (ci === local || (!ci && !process.env.PGPASSWORD)) {
       throw new Error('D3/D5 safety gate: exactly one test mode and password required');
     }
     const port = ci ? 55440 : 55439;
@@ -96,7 +96,7 @@ suite('NEXUS Stage D3 Marketplace concurrency (disposable PostgreSQL only)', () 
       port,
       username: 'nexus_test',
       database: 'nexus_test',
-      password: process.env.PGPASSWORD,
+      ...(process.env.PGPASSWORD ? { password: process.env.PGPASSWORD } : {}),
       entities: [],
       synchronize: false,
       poolSize: 8,
