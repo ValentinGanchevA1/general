@@ -99,13 +99,16 @@ const worldModesSlice = createSlice({
   reducers: {
     clearWorldMode: () => initialState,
     clearWorldModeError: (state) => { state.error = null; },
-    /** Session-only escape hatch if local storage is unavailable during first run. */
+    /** Session-only fallback; keep the route mounted until the portal completes. */
     skipWorldSelectionForSession: (state) => {
       state.selectedId = 'nexus';
-      state.firstRunPending = false;
       state.saving = false;
       state.activationRequestId = null;
       state.error = null;
+    },
+    /** Called only after the selected-World portal has finished. */
+    finishFirstRunWorldSelection: (state) => {
+      state.firstRunPending = false;
     },
   },
   extraReducers: (builder) => {
@@ -169,7 +172,7 @@ const worldModesSlice = createSlice({
         if (state.ownerId !== action.payload.userId ||
           state.activationRequestId !== action.meta.requestId) return;
         state.selectedId = action.payload.id;
-        state.firstRunPending = false;
+        // Keep WorldSelection registered until the portal transition completes.
         state.saving = false;
         state.activationRequestId = null;
       })
