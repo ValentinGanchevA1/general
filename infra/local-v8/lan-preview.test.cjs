@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   assertLanAddress, parseRequestTarget, isApi, isAllowedHost,
-  staticPath,
+  staticPath, MIME,
 } = require('./lan-preview.cjs');
 
 test('LAN binding rejects wildcard, loopback and public IPv4', () => {
@@ -58,4 +58,8 @@ test('legacy clear-text LAN preview is disabled', async () => {
     () => preview.start(),
     /Legacy LAN HTTP preview is disabled/,
   );
+});
+
+test('JavaScript module assets receive a browser-compatible MIME type', () => {
+  assert.equal(MIME['.mjs'], 'text/javascript; charset=utf-8');
 });
