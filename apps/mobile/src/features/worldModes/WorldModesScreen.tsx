@@ -220,7 +220,7 @@ export function WorldModesScreen({ onComplete }: WorldModesScreenProps = {}): Re
           style={[styles.cta, { backgroundColor: accent.accent, opacity: saving || !hydrated || !userId || (!onComplete && isActive) ? 0.55 : 1 }]}
         >
           {saving ? <ActivityIndicator color={colors.bg} /> : (
-            <Text style={styles.ctaText}>{!hydrated ? 'Loading…' : onComplete && isActive ? 'Enter NEXUS' : isActive ? 'Current World' : 'Activate ' + preview.label}</Text>
+            <Text style={styles.ctaText}>{!hydrated ? 'Loading…' : onComplete && isActive ? 'Enter ' + preview.label : isActive ? 'Current World' : 'Activate ' + preview.label}</Text>
           )}
         </TouchableOpacity>
       </View>
