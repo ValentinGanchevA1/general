@@ -17,8 +17,8 @@ Current implementation: [PR #1147](https://github.com/ValentinGanchevA1/general/
 | ONB-01 | Fresh email/password registration | Account is registered; only that account receives a first-run marker |
 | ONB-02 | Complete Profile Creation | World Selection is the next screen |
 | ONB-03 | Preview all 10 worlds | Preview changes only local screen state; no preference is saved |
-| ONB-04 | Activate Sanctuary | Preference is written before the first-run marker is removed; a Sanctuary portal transition plays before Main |
-| ONB-05 | Skip World Selection | NEXUS is selected; NEXUS portal transition plays before Main |
+| ONB-04 | Activate Sanctuary | Preference is written before the marker is removed; WorldSelection remains mounted through the Sanctuary portal, then Main replaces it |
+| ONB-05 | Skip World Selection | NEXUS is selected; route remains mounted through its portal; Main replaces it afterwards |
 | ONB-06 | Simulate AsyncStorage write failure during selection | No false saved state; user can continue with NEXUS for this session |
 | ONB-07 | Sign into an existing account with no first-run marker | Goes directly to Main; no forced onboarding |
 | ONB-08 | Two accounts on one device | Account B never sees account A's in-memory or persisted mode |
