@@ -74,8 +74,8 @@ jobs:
           console.log('D5 concurrency gate: 9 passed, 0 skipped');
           const lcov = fs.readFileSync('apps/backend/coverage/lcov.info', 'utf8');
           const target = lcov.split('end_of_record').find(record => record.includes('listings.service.ts'));
-          const lf = target?.split('\\n').find(line => line.startsWith('LF:'));
-          const lh = target?.split('\\n').find(line => line.startsWith('LH:'));
+          const lf = target?.split('\n').find(line => line.startsWith('LF:'));
+          const lh = target?.split('\n').find(line => line.startsWith('LH:'));
           if (!target || !lf || !lh || Number(lf.slice(3)) === 0 || Number(lh.slice(3)) === 0) {
             throw new Error('D5 fail-closed: LCOV must include non-zero line metrics for listings.service.ts');
           }
