@@ -1,7 +1,7 @@
 // NEXUS v8 LAN preview: read-only discovery, never exposes auth or realtime.
 // Explicit opt-in: NEXUS_V8_LAN_HOST=<private IPv4> node infra/local-v8/lan-preview.mjs
 import { createServer, request as httpRequest } from 'node:http';
-import { createReadStream, existsSync, realpathSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, realpathSync, statSync, readdirSync } from 'node:fs';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isIP } from 'node:net';
@@ -20,6 +20,36 @@ const types = {
   '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff': 'font/woff',
   '.woff2': 'font/woff2',
 };
+const STATIC_FILES = new Map();
+
+function registerStaticFile(route, candidate) {
+  try {
+    const real = realpathSync(candidate);
+    if ((real !== rootReal && !real.startsWith(rootReal + sep)) || !statSync(real).isFile()) return;
+    STATIC_FILES.set(route, real);
+  } catch { /* Build output may be incomplete before the web build. */ }
+}
+
+function scanDistAssets(directory, routePrefix) {
+  if (!existsSync(directory)) return;
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (!/^[A-Za-z0-9_.-]+$/.test(entry.name) || entry.name.startsWith('.')) continue;
+    const candidate = resolve(directory, entry.name);
+    const route = routePrefix + '/' + entry.name;
+    if (entry.isDirectory()) {
+      scanDistAssets(candidate, route);
+    } else if (entry.isFile() && Object.hasOwn(types, extname(entry.name).toLowerCase())) {
+      registerStaticFile(route, candidate);
+    }
+  }
+}
+
+for (const name of ['index.html', 'styles.css', 'map.css', 'connections.css']) {
+  registerStaticFile(name === 'index.html' ? '/' : '/' + name, resolve(root, name));
+  registerStaticFile('/' + name, resolve(root, name));
+}
+scanDistAssets(resolve(root, 'dist'), '/dist');
+
 const security = [
   "default-src 'self'", "script-src 'self'", "style-src 'self'",
   "img-src 'self' data: https://tile.openstreetmap.org",
@@ -82,17 +112,8 @@ function isAllowedHost(headers, address = host) {
 function staticPath(raw) {
   const target = parseRequestTarget(raw);
   if (!target) return null;
-  const pathname = target.decodedPath;
-  if (pathname.split('/').some((segment) => segment.startsWith('.'))) return null;
-  const candidate = resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname));
-  if (candidate !== root && !candidate.startsWith(root + sep)) return null;
-  try {
-    const real = realpathSync(candidate);
-    if (real !== rootReal && !real.startsWith(rootReal + sep)) return null;
-    if (!statSync(real).isFile()) return null;
-    const extension = extname(real).toLowerCase();
-    return Object.hasOwn(types, extension) ? real : null;
-  } catch { return null; }
+  const route = target.decodedPath === '/' ? '/' : target.decodedPath;
+  return STATIC_FILES.get(route) ?? null;
 }
 
 function handle(req, res, address = host) {
@@ -119,7 +140,7 @@ function handle(req, res, address = host) {
     const upstream = httpRequest({
       hostname: backend,
       port: backendPort,
-      path: target.pathname + target.search,
+      path: '/api/v1/feed',
       method: req.method,
       timeout: 4000,
       headers: { accept: 'application/json' },
