@@ -60,7 +60,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pnpm --filter @g88/backend exec jest --ci --runInBand \
+          pnpm --filter @g88/backend exec jest --ci --runInBand --coverage \
+            --coverageReporters=lcov --coverageDirectory=coverage \
             --runTestsByPath src/modules/listings/listings-concurrency.integration.spec.ts \
             --json --outputFile="$RUNNER_TEMP/marketplace-d5-results.json"
           node - "$RUNNER_TEMP/marketplace-d5-results.json" <<'NODE'
@@ -71,6 +72,14 @@ jobs:
             throw new Error('D5 fail-closed: exactly nine passing, zero skipped tests required');
           }
           console.log('D5 concurrency gate: 9 passed, 0 skipped');
+          const lcov = fs.readFileSync('apps/backend/coverage/lcov.info', 'utf8');
+          const target = lcov.split('end_of_record').find(record => /SF:.*listings\\.service\\.ts$/m.test(record));
+          const lf = target?.match(/^LF:(\\d+)$/m);
+          const lh = target?.match(/^LH:(\\d+)$/m);
+          if (!target || !lf || !lh || Number(lf[1]) === 0 || Number(lh[1]) === 0) {
+            throw new Error('D5 fail-closed: LCOV must include non-zero line metrics for listings.service.ts');
+          }
+          console.log('D5 LCOV gate: listings.service.ts included with line coverage');
           NODE
       - name: Stop disposable PostgreSQL
         if: always()
