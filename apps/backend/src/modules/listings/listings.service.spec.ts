@@ -62,6 +62,16 @@ describe('ListingsService', () => {
     expect(sql).toContain(`blocked_id = ${left}`);
   };
 
+  const expectTransactionRollback = (
+    runner: ReturnType<typeof makeQueryRunner>['runner'],
+    calls: ReturnType<typeof makeQueryRunner>['calls'],
+    expectedCalls: number,
+  ): void => {
+    expect(calls).toHaveLength(expectedCalls);
+    expect(runner.rollbackTransaction).toHaveBeenCalled();
+    expect(runner.commitTransaction).not.toHaveBeenCalled();
+  };
+
   const listingDetailRow = (overrides: Record<string, unknown> = {}) => ({
     id: 'l1',
     seller_id: 's1',
@@ -196,9 +206,7 @@ describe('ListingsService', () => {
       createQueryRunner.mockReturnValue(runner);
       await expect(service.makeOffer('b1', 'l1', { offerCents: 100 }))
         .rejects.toBeInstanceOf(ConflictException);
-      expect(calls).toHaveLength(1);
-      expect(runner.rollbackTransaction).toHaveBeenCalled();
-      expect(runner.commitTransaction).not.toHaveBeenCalled();
+      expectTransactionRollback(runner, calls, 1);
     });
 
     it('upserts the offer inside the listing transaction and returns it', async () => {
@@ -308,9 +316,7 @@ describe('ListingsService', () => {
       createQueryRunner.mockReturnValue(runner);
       await expect(service.counterOffer('s1', 'o1', { offerCents: 5000 } as never))
         .rejects.toBeInstanceOf(ConflictException);
-      expect(calls).toHaveLength(3);
-      expect(runner.rollbackTransaction).toHaveBeenCalled();
-      expect(runner.commitTransaction).not.toHaveBeenCalled();
+      expectTransactionRollback(runner, calls, 3);
     });
 
     it('rolls back when a conditional offer update returns no rows', async () => {
@@ -511,9 +517,7 @@ describe('ListingsService', () => {
       createQueryRunner.mockReturnValue(runner);
       await expect(service.updateStatus('s1', 'l1', next))
         .rejects.toBeInstanceOf(ConflictException);
-      expect(calls).toHaveLength(1);
-      expect(runner.rollbackTransaction).toHaveBeenCalled();
-      expect(runner.commitTransaction).not.toHaveBeenCalled();
+      expectTransactionRollback(runner, calls, 1);
     });
 
     it('rejects a different seller before writing', async () => {
@@ -544,9 +548,7 @@ describe('ListingsService', () => {
       createQueryRunner.mockReturnValue(runner);
       await expect(service.updateStatus('s1', 'l1', 'sold'))
         .rejects.toBeInstanceOf(ConflictException);
-      expect(calls).toHaveLength(2);
-      expect(runner.rollbackTransaction).toHaveBeenCalled();
-      expect(runner.commitTransaction).not.toHaveBeenCalled();
+      expectTransactionRollback(runner, calls, 2);
     });
   });
   describe('withdrawOffer', () => {
@@ -585,9 +587,7 @@ describe('ListingsService', () => {
       createQueryRunner.mockReturnValue(runner);
       await expect(service.withdrawOffer('b1', 'l1'))
         .rejects.toBeInstanceOf(ConflictException);
-      expect(calls).toHaveLength(2);
-      expect(runner.rollbackTransaction).toHaveBeenCalled();
-      expect(runner.commitTransaction).not.toHaveBeenCalled();
+      expectTransactionRollback(runner, calls, 2);
     });
 
     it('does not withdraw an offer on a sold listing', async () => {
@@ -598,9 +598,7 @@ describe('ListingsService', () => {
       createQueryRunner.mockReturnValue(runner);
       await expect(service.withdrawOffer('b1', 'l1'))
         .rejects.toBeInstanceOf(ConflictException);
-      expect(calls).toHaveLength(2);
-      expect(runner.rollbackTransaction).toHaveBeenCalled();
-      expect(runner.commitTransaction).not.toHaveBeenCalled();
+      expectTransactionRollback(runner, calls, 2);
     });
 
     it('does not disclose or mutate another buyer offer', async () => {
@@ -625,9 +623,7 @@ describe('ListingsService', () => {
       createQueryRunner.mockReturnValue(runner);
       await expect(service.withdrawOffer('b1', 'l1'))
         .rejects.toBeInstanceOf(ConflictException);
-      expect(calls).toHaveLength(3);
-      expect(runner.rollbackTransaction).toHaveBeenCalled();
-      expect(runner.commitTransaction).not.toHaveBeenCalled();
+      expectTransactionRollback(runner, calls, 3);
     });
   });
   describe('listOffers', () => {
