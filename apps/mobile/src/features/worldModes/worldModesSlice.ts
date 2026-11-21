@@ -191,5 +191,6 @@ export const {
   clearWorldMode,
   clearWorldModeError,
   skipWorldSelectionForSession,
+  finishFirstRunWorldSelection,
 } = worldModesSlice.actions;
 export default worldModesSlice.reducer;
