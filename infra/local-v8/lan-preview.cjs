@@ -149,5 +149,5 @@ if (require.main === module) {
 
 module.exports = {
   assertLanAddress, parseRequestTarget, isApi, isAllowedHost, staticPath,
-  start,
+  start, MIME,
 };
