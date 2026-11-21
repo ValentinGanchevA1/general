@@ -89,8 +89,11 @@ describe('World Mode preference state', () => {
     expect(store.getState().worldModes.firstRunPending).toBe(false);
   });
 
-  it('allows session-only skip when local storage is unavailable', () => {
+  it('allows session-only skip when local storage is unavailable', async () => {
     const store = makeStore();
+    storage.getItem.mockResolvedValueOnce(null).mockResolvedValueOnce('1');
+    await store.dispatch(hydrateWorldMode('user-a'));
+    expect(store.getState().worldModes.firstRunPending).toBe(true);
     store.dispatch(skipWorldSelectionForSession());
     expect(store.getState().worldModes.firstRunPending).toBe(true);
     expect(store.getState().worldModes.selectedId).toBe('nexus');
