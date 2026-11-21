@@ -6,17 +6,18 @@ This is an **opt-in static web preview**, not an authenticated phone experience.
 - Use a trusted private Wi-Fi and a dedicated test device/profile.
 - Do not use production credentials, real messages, payment credentials or live provider integrations.
 - Build the web bundle from the repository root:
+  ```powershell
   corepack pnpm exec tsc -p web/tsconfig.json
   node web/build.mjs
+  ```
 - Obtain a trusted local TLS certificate and key with a Subject Alternative Name matching the PC's **actual private LAN IPv4** (for example, using locally installed mkcert). Keep the private key outside the repository. Remove the test CA from the phone when finished.
 
 ## Windows PowerShell — new terminal
 ```powershell
-cd "$HOME
-exus-v8-staging"
+cd "$HOME\nexus-v8-staging"
 $env:NEXUS_LAN_IP = '192.168.1.105'  # REPLACE with PC Wi-Fi IPv4
-$env:NEXUS_LAN_CERT = 'C:secure-test-certslan.pem'  # REPLACE
-$env:NEXUS_LAN_KEY = 'C:secure-test-certslan-key.pem'  # REPLACE
+$env:NEXUS_LAN_CERT = 'C:\secure-test-certs\lan.pem'  # REPLACE
+$env:NEXUS_LAN_KEY = 'C:\secure-test-certs\lan-key.pem'  # REPLACE
 node infra/local-v8/lan-preview.cjs
 ```
 
